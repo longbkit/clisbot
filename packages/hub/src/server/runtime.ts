@@ -74,6 +74,7 @@ export interface ApplicationRuntime {
   providerApplications: ProviderApplications | null;
   testTriggerRoutes: boolean;
   auth(request: Request): Promise<Response>;
+  deviceSocket?(request: Request, id: string, disconnect: () => void): Promise<() => void>;
   browserAccount?(request: Request): Promise<Response>;
   signInEmail?(data: { email: string; password: string }, headers: Headers): Promise<void>;
   signUpEmail?(

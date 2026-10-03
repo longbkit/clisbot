@@ -19,6 +19,8 @@ export interface RegistrationScope {
    */
   passwordAdmission?: "invitation" | "verifiedEmail";
   google?: GoogleIdentity;
+  /** Only the protected Hub verifier sets this; browser callback intent remains server OAuth state. */
+  googleFlow?: { invitationId: string | undefined; claimInstance: boolean };
 }
 
 const storage = new AsyncLocalStorage<RegistrationScope>();

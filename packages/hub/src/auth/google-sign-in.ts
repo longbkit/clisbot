@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
 import { normalizeEmail } from "./instance-policy.js";
 import { currentRegistrationScope, type GoogleIdentity } from "./registration-scope.js";
+import type { AccountSessionRevocation } from "../device-access/account-sessions.js";
 
 export const SOCIAL_SIGN_IN_PATH = "/api/auth/sign-in/social";
 export const GOOGLE_CALLBACK_PATH = "/api/auth/callback/google";
@@ -10,6 +11,24 @@ export const GOOGLE_CALLBACK_PATH = "/api/auth/callback/google";
 export interface GoogleAuthConfig {
   clientId: string;
   clientSecret: string;
+}
+
+/** A public Google audience for verified ID-token entry; it cannot authorize OAuth redirects. */
+export interface GoogleIdTokenConfig {
+  clientId: string;
+}
+
+export type GoogleProviderConfig = GoogleAuthConfig | GoogleIdTokenConfig;
+
+export function readGoogleIdTokenConfig(
+  environment: Record<string, string | undefined>,
+): GoogleIdTokenConfig | undefined {
+  const clientId = environment["CLISBOT_GOOGLE_ID_TOKEN_CLIENT_ID"]?.trim() ?? "";
+  if (clientId.length === 0) return undefined;
+  if (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/u.test(clientId)) {
+    throw new Error("CLISBOT_GOOGLE_ID_TOKEN_CLIENT_ID must be a Google OAuth client ID");
+  }
+  return { clientId };
 }
 
 /** Google is enabled only when both client credentials are present; one without the other is a
@@ -36,12 +55,12 @@ const googleProfile = z.object({
 
 /** Better Auth `socialProviders` entry. The profile is captured into the registration scope so
  * the admission hooks judge the identity Google actually returned. */
-export function googleSocialProviders(config: GoogleAuthConfig | undefined) {
+export function googleSocialProviders(config: GoogleProviderConfig | undefined) {
   if (config === undefined) return {};
   return {
     google: {
       clientId: config.clientId,
-      clientSecret: config.clientSecret,
+      ...("clientSecret" in config ? { clientSecret: config.clientSecret } : {}),
       prompt: "select_account" as const,
       mapProfileToUser(profile: unknown) {
         const parsed = googleProfile.safeParse(profile);
@@ -59,14 +78,18 @@ export function googleSocialProviders(config: GoogleAuthConfig | undefined) {
   };
 }
 
-interface HookContext {
-  path?: string;
-  params?: Record<string, unknown>;
-}
+const callbackContext = z.object({
+  path: z.literal("/callback/:id"),
+  params: z.object({ id: z.literal("google") }),
+});
 
 export function isGoogleCallback(context: unknown): boolean {
-  const hook = context as HookContext | null | undefined;
-  return hook?.path === "/callback/:id" && hook.params?.["id"] === "google";
+  return callbackContext.safeParse(context).success;
+}
+
+/** The ID-token branch uses the same admission hooks after Better Auth verifies Google's token. */
+export function isGoogleAuthentication(context: unknown): boolean {
+  return isGoogleCallback(context) || currentRegistrationScope()?.googleFlow !== undefined;
 }
 
 export interface GoogleFlow {
@@ -79,6 +102,8 @@ export interface GoogleFlow {
 /** What the browser carried into the Google flow, restored from Better Auth's server-side OAuth
  * state rather than from the callback URL. */
 export async function googleFlow(): Promise<GoogleFlow> {
+  const verifiedFlow = currentRegistrationScope()?.googleFlow;
+  if (verifiedFlow) return verifiedFlow;
   const state = (await getOAuthState()) as Record<string, unknown> | null;
   const invitation = state?.["invitation"];
   return {
@@ -152,7 +177,10 @@ interface LinkTargetRow extends QueryRow {
  *   address, so everything that account could already use is revoked before linking.
  */
 export class GoogleAccountLinking {
-  constructor(private readonly pool: DatabaseRuntime) {}
+  constructor(
+    private readonly pool: DatabaseRuntime,
+    private readonly sessions?: AccountSessionRevocation,
+  ) {}
 
   /** Runs before Better Auth inserts the Google account row for an existing user. Throwing makes
    * Better Auth abandon the link and redirect with `?error=unable_to_link_account`. */
@@ -167,10 +195,15 @@ export class GoogleAccountLinking {
     const row = target.rows[0];
     if (row?.is_instance_operator === true) throw new OperatorLinkRefusedError();
     if (row === undefined || row.email_verified || !row.has_password) return;
-    await this.pool.transaction(async (client) => {
-      await client.query(`delete from oauth_access_token where user_id = $1`, [userId]);
-      await client.query(`delete from oauth_refresh_token where user_id = $1`, [userId]);
-      await client.query(`delete from session where user_id = $1`, [userId]);
+    const effects = await this.pool.transaction(async (client) => {
+      const revoked = this.sessions
+        ? await this.sessions.revokeInTransaction(client, userId)
+        : undefined;
+      if (!this.sessions) {
+        await client.query(`delete from oauth_access_token where user_id = $1`, [userId]);
+        await client.query(`delete from oauth_refresh_token where user_id = $1`, [userId]);
+        await client.query(`delete from session where user_id = $1`, [userId]);
+      }
       await client.query(
         `update organization_cli_credentials set revoked_at = coalesce(revoked_at, now())
          where created_by_user_id = $1`,
@@ -180,7 +213,9 @@ export class GoogleAccountLinking {
       await client.query(`delete from account where user_id = $1 and provider_id = 'credential'`, [
         userId,
       ]);
+      return revoked;
     });
+    if (effects) await this.sessions?.notify(effects);
   }
 
   /**

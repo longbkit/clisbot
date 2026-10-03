@@ -6,7 +6,7 @@ import { z } from "zod";
 import { AccessStore, type ResolvedDaemonAccess } from "../access/store.js";
 import { normalizeHubOrigin } from "./hub-origin.js";
 import * as schema from "../db/schema.js";
-import type { DatabaseRuntime, DrizzleHandle } from "../db/runtime/index.js";
+import type { DatabaseRuntime, DrizzleHandle, QueryHandle } from "../db/runtime/index.js";
 
 export const ACCESS_TICKET_LIFETIME_MS = 60_000;
 export const DEFAULT_ACCESS_LEASE_DURATION_MS = 60 * 60_000;
@@ -67,6 +67,9 @@ export class AccessTicketService {
     userId: string;
     membershipId: string;
     clientId: string;
+    deviceId?: string | undefined;
+    accountAuthenticated?: boolean | undefined;
+    accountSessionId?: string | undefined;
     now?: Date;
   }): Promise<IssuedAccessTicket> {
     const authority = await this.access.resolveDaemonAccess(input);
@@ -86,6 +89,9 @@ export class AccessTicketService {
         userId: input.userId,
         membershipId: input.membershipId,
         clientId: input.clientId,
+        deviceId: input.deviceId ?? null,
+        deviceAccountAuthenticated: input.accountAuthenticated ?? false,
+        accountSessionId: input.accountSessionId ?? null,
         expiresAt,
         createdAt: now,
       });
@@ -103,6 +109,14 @@ export class AccessTicketService {
     const now = input.now ?? new Date();
     return this.runtime.transaction(async (handle) => {
       const database = handle.drizzle();
+      const [candidate] = await database
+        .select()
+        .from(schema.daemonAccessTickets)
+        .where(eq(schema.daemonAccessTickets.tokenVerifier, verifier(accessTicket.data)))
+        .limit(1);
+      if (candidate === undefined) throw invalidTicket();
+      await requireActiveDevice(handle, candidate.deviceId, candidate.deviceAccountAuthenticated);
+      await requireActiveAccountSession(handle, candidate.userId, candidate.accountSessionId);
       const [ticket] = await database
         .select()
         .from(schema.daemonAccessTickets)
@@ -140,6 +154,9 @@ export class AccessTicketService {
           userId: ticket.userId,
           membershipId: ticket.membershipId,
           clientId: ticket.clientId,
+          deviceId: ticket.deviceId,
+          deviceAccountAuthenticated: ticket.deviceAccountAuthenticated,
+          accountSessionId: ticket.accountSessionId,
           expiresAt: leaseExpiresAt,
           createdAt: now,
         })
@@ -167,6 +184,15 @@ export class AccessTicketService {
     const now = input.now ?? new Date();
     const admission = await this.runtime.transaction(async (handle) => {
       const database = handle.drizzle();
+      // Device authority → account session → lease, matching both revocation paths.
+      const [candidate] = await database
+        .select()
+        .from(schema.daemonAccessLeases)
+        .where(eq(schema.daemonAccessLeases.id, input.leaseId))
+        .limit(1);
+      if (candidate === undefined) throw invalidLease();
+      await requireActiveDevice(handle, candidate.deviceId, candidate.deviceAccountAuthenticated);
+      await requireActiveAccountSession(handle, candidate.userId, candidate.accountSessionId);
       const [lease] = await database
         .select()
         .from(schema.daemonAccessLeases)
@@ -283,6 +309,39 @@ export class AccessTicketService {
         daemonId: schema.daemonAccessLeases.daemonId,
       });
   }
+}
+
+/** Lock the account session after device authority and before its tickets/leases. */
+async function requireActiveAccountSession(
+  handle: QueryHandle,
+  userId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (sessionId === null) return; // Existing and feature-off tickets retain their legacy admission.
+  const session = await handle.query(
+    `select id from session where id = $1 and user_id = $2 and expires_at > now() for share`,
+    [sessionId, userId],
+  );
+  if (session.rowCount !== 1) throw invalidTicket();
+}
+
+async function requireActiveDevice(
+  handle: QueryHandle,
+  deviceId: string | null,
+  accountAuthenticated: boolean,
+): Promise<void> {
+  if (deviceId === null) return;
+  const result = await handle.query(
+    `select state from device_authority where singleton = true for share`,
+  );
+  const state = result.rows[0]?.["state"] as
+    | import("@clisbot/device-access/authority").DeviceAuthorityState
+    | undefined;
+  if (!state?.devices?.some((device) => device.id === deviceId && device.revokedAt === null)) {
+    throw new AccessTicketError("access_denied", "paired device is revoked or unavailable");
+  }
+  if (state.loginRequired && !accountAuthenticated)
+    throw new AccessTicketError("access_denied", "Hub account login required");
 }
 
 export function readAccessLeaseDuration(value: string | undefined): number {

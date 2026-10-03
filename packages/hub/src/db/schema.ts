@@ -807,6 +807,9 @@ export const daemonAccessTickets = pgTable(
   {
     id: uuid().defaultRandom().primaryKey(),
     tokenVerifier: text("token_verifier").notNull().unique(),
+    deviceId: text("device_id"),
+    accountSessionId: text("account_session_id"),
+    deviceAccountAuthenticated: boolean("device_account_authenticated").default(false).notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
@@ -835,6 +838,9 @@ export const daemonAccessLeases = pgTable(
   "daemon_access_leases",
   {
     id: uuid().defaultRandom().primaryKey(),
+    deviceId: text("device_id"),
+    accountSessionId: text("account_session_id"),
+    deviceAccountAuthenticated: boolean("device_account_authenticated").default(false).notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
@@ -1681,6 +1687,19 @@ export const runtimeConfiguration = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [check("runtime_configuration_singleton_check", sql`${table.singleton}`)],
+);
+
+export const deviceAuthority = pgTable(
+  "device_authority",
+  {
+    singleton: boolean().primaryKey().default(true),
+    state: jsonb()
+      .$type<import("@clisbot/device-access/authority").DeviceAuthorityState>()
+      .notNull(),
+    personalUserId: text("personal_user_id").references(() => users.id),
+    personalOrganizationId: text("personal_organization_id").references(() => organizations.id),
+  },
+  (table) => [check("device_authority_singleton_check", sql`${table.singleton}`)],
 );
 
 export const runtimeProviderConfiguration = pgTable(

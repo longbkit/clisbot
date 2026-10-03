@@ -105,6 +105,8 @@ export interface InstanceSetupOptions {
   policy: InstanceAuthPolicy;
   /** What a provisioned organization is stamped with — resolved before the transaction opens. */
   provisioningEntitlements: ProvisioningEntitlementResolver;
+  /** Protected device entry requires a separate operator approval, checked under the claim lock. */
+  authorizeInteractiveClaim?: (transaction: TransactionHandle) => Promise<void>;
 }
 
 /**
@@ -159,14 +161,7 @@ export class InstanceSetup {
    * re-decides while holding the locks below, so a stale `available` cannot hand out ownership.
    */
   async status(): Promise<InstanceSetupStatus> {
-    const database = this.options.database;
-    const existing = await database.query<BootstrapRow>(
-      `select organization_id, owner_user_id, completed_at
-       from instance_bootstrap
-       where id = $1`,
-      [BOOTSTRAP_ROW_ID],
-    );
-    return setupStatus(existing.rows[0] ?? NO_SETUP_RECORD, await tenantCounts(database));
+    return readInstanceSetupStatus(this.options.database);
   }
 
   /**
@@ -191,6 +186,7 @@ export class InstanceSetup {
       await client.query(PRISTINE_TABLES_LOCK);
       const counts = await tenantCounts(client);
       if (setupStatus(row, counts) !== "available") return refuse(client);
+      await this.options.authorizeInteractiveClaim?.(client);
       const ownerUserId = await createOperatorAccount(client, {
         name: accountName,
         email,
@@ -229,6 +225,7 @@ export class InstanceSetup {
       await client.query(PRISTINE_TABLES_LOCK);
       const counts = await tenantCounts(client);
       if (setupStatus(row, counts) !== "available") return client.rollback(undefined);
+      await this.options.authorizeInteractiveClaim?.(client);
       const account = await client.query<{ email: string }>(
         `update "user" set is_instance_operator = true, email_verified = true, updated_at = now()
          where id = $1
@@ -263,6 +260,17 @@ export class InstanceSetup {
       return { organizationId: organization.id };
     });
   }
+}
+
+/** Discovery and claim eligibility share the persisted setup owner rather than count-only heuristics. */
+export async function readInstanceSetupStatus(
+  database: DatabaseRuntime,
+): Promise<InstanceSetupStatus> {
+  const existing = await database.query<BootstrapRow>(
+    `select organization_id, owner_user_id, completed_at from instance_bootstrap where id = $1`,
+    [BOOTSTRAP_ROW_ID],
+  );
+  return setupStatus(existing.rows[0] ?? NO_SETUP_RECORD, await tenantCounts(database));
 }
 
 /** Interactive identity is derived once from the normalized address, never from public input. */

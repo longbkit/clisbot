@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { readBoundedRequestBody } from "../http/request-body.js";
 import { PASSWORD_MIN_LENGTH } from "./instance-policy.js";
+import type { AccountSessionRevocation } from "../device-access/account-sessions.js";
 
 export const MASTER_PASSWORD_RESET_PATH = "/api/auth/clisbot/reset-password";
 const bodySchema = z
@@ -32,6 +33,7 @@ export class MasterPasswordReset {
   constructor(
     private readonly database: DatabaseRuntime,
     password?: string,
+    private readonly sessions?: AccountSessionRevocation,
   ) {
     const configured = recoveryMasterPassword(password);
     this.digest = configured === undefined ? undefined : digest(configured);
@@ -77,7 +79,7 @@ export class MasterPasswordReset {
 
   private async reset(email: string, password: string): Promise<boolean> {
     const passwordHash = await hashPassword(password);
-    return this.database.transaction(async (tx) => {
+    const result = await this.database.transaction(async (tx) => {
       const found = await tx.query<{ id: string }>(
         `select u.id from "user" u where lower(u.email) = $1
          and exists (select 1 from account a where a.user_id = u.id and a.provider_id = 'credential')
@@ -85,7 +87,7 @@ export class MasterPasswordReset {
         [email],
       );
       const user = found.rows[0];
-      if (!user) return false;
+      if (!user) return undefined;
       await tx.query(
         `update account set password = $1, updated_at = now()
         where user_id = $2 and provider_id = 'credential'`,
@@ -95,9 +97,14 @@ export class MasterPasswordReset {
         `update "user" set must_change_password = false, updated_at = now() where id = $1`,
         [user.id],
       );
-      await tx.query(`delete from oauth_access_token where user_id = $1`, [user.id]);
-      await tx.query(`delete from oauth_refresh_token where user_id = $1`, [user.id]);
-      await tx.query(`delete from "session" where user_id = $1`, [user.id]);
+      const effects = this.sessions
+        ? await this.sessions.revokeInTransaction(tx, user.id)
+        : undefined;
+      if (!this.sessions) {
+        await tx.query(`delete from oauth_access_token where user_id = $1`, [user.id]);
+        await tx.query(`delete from oauth_refresh_token where user_id = $1`, [user.id]);
+        await tx.query(`delete from "session" where user_id = $1`, [user.id]);
+      }
       await tx.query(
         `insert into audit_events
         (organization_id, actor_kind, actor_identity, action, subject_type, subject_id, evidence)
@@ -106,8 +113,10 @@ export class MasterPasswordReset {
         from member where user_id = $1`,
         [user.id],
       );
-      return true;
+      return { effects };
     });
+    if (result?.effects) await this.sessions?.notify(result.effects);
+    return result !== undefined;
   }
 }
 

@@ -1722,6 +1722,12 @@ export class ManagementApi {
         userId: access.account.id,
         membershipId: access.membership.id,
         clientId: input.clientId,
+        deviceId: await this.options.auth.deviceId?.(request),
+        accountAuthenticated: !access.session.id.startsWith("device:"),
+        accountSessionId:
+          this.options.auth.deviceId && !access.session.id.startsWith("device:")
+            ? access.session.id
+            : undefined,
       });
       return Response.json(
         {

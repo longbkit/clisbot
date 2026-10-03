@@ -1,7 +1,7 @@
 import { APIError } from "better-call";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { normalizeEmail } from "./instance-policy.js";
-import { GoogleAccountLinking, googleFlow, isGoogleCallback } from "./google-sign-in.js";
+import { GoogleAccountLinking, googleFlow, isGoogleAuthentication } from "./google-sign-in.js";
 import type { InstanceSetup } from "../instance-setup/index.js";
 import { profileUpdateHook } from "./profile-update.js";
 import {
@@ -54,7 +54,7 @@ export function registrationDatabaseHooks(options: GateOptions) {
     account: {
       create: {
         before: async (account: CreatedAccount, context: unknown) => {
-          if (account.providerId === "google" && isGoogleCallback(context)) {
+          if (account.providerId === "google" && isGoogleAuthentication(context)) {
             await options.linking.beforeLink(account.userId);
           }
         },
@@ -76,7 +76,7 @@ async function beforeUserCreate(
 ): Promise<{ data: { emailVerified: true } } | undefined> {
   const email = normalizeEmail(user.email);
   const scope = currentRegistrationScope();
-  if (isGoogleCallback(context)) {
+  if (isGoogleAuthentication(context)) {
     const identity = requireGoogleIdentity(scope);
     if (!identity.emailVerified || identity.email !== email) {
       throw rejection(REGISTRATION_ERROR_CODES.googleEmailUnverified);
@@ -116,7 +116,7 @@ async function beforeSessionCreate(
   session: CreatedSession,
   context: unknown,
 ): Promise<{ data: { activeOrganizationId: string } } | undefined> {
-  const google = isGoogleCallback(context);
+  const google = isGoogleAuthentication(context);
   if (google) {
     const identity = requireGoogleIdentity(currentRegistrationScope());
     if (!(await options.linking.ownsIdentityEmail(identity, session.userId))) {

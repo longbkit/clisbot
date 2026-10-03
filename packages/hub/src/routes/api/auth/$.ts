@@ -6,6 +6,9 @@ export const Route = createFileRoute("/api/auth/$")({
     handlers: {
       GET: ({ request }) => handleAuth(request),
       POST: ({ request }) => handleAuth(request),
+      PUT: ({ request }) => handleAuth(request),
+      PATCH: ({ request }) => handleAuth(request),
+      DELETE: ({ request }) => handleAuth(request),
     },
   },
 });

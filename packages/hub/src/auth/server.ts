@@ -29,7 +29,7 @@ import {
   type InstanceAuthPolicy,
 } from "./instance-policy.js";
 import { RegistrationAdmissionError } from "./registration-admission.js";
-import type { GoogleAuthConfig } from "./google-sign-in.js";
+import type { GoogleAuthConfig, GoogleIdTokenConfig } from "./google-sign-in.js";
 import { composeRegistration } from "./registration-routes.js";
 import { DEFAULT_PROFILE_IMAGE_HOSTS, UPDATE_USER_PATH } from "./profile-update.js";
 import { UPDATE_ORGANIZATION_PATH } from "./organization-profile.js";
@@ -61,8 +61,20 @@ import {
   HUB_ORGANIZATION_CLAIM,
   CLISBOT_CLIENT_ID,
 } from "./client-authorization.js";
+import type { HubDeviceAccess } from "../device-access/index.js";
+import { withDeviceAccess } from "../device-access/auth-server.js";
+import { currentAccountSession } from "../device-access/account-sessions.js";
 
 export interface AuthServer {
+  googleClientId?: string;
+  /** Reuses Better Auth's configured provider before allocating single-use login state. */
+  verifyGoogleIdToken?(idToken: string, nonce: string): Promise<boolean>;
+  signInGoogleToken?(
+    data: { idToken: string; nonce: string; invitationId?: string; claimInstance?: boolean },
+    headers: Headers,
+  ): Promise<Response>;
+  deviceId?(request: Request): Promise<string | undefined>;
+  deviceSocket?(request: Request, id: string, disconnect: () => void): Promise<() => void>;
   handle(request: Request): Promise<Response>;
   browserAccount?(request: Request): Promise<Response>;
   signInEmail?(data: { email: string; password: string }, headers: Headers): Promise<void>;
@@ -94,6 +106,7 @@ export interface AuthServer {
 }
 
 interface AuthServerOptions {
+  deviceAccess?: HubDeviceAccess;
   database: DatabaseRuntime;
   locks: Locks;
   /** Owned by the composition root, injected here — auth consumes entitlements, never owns them. */
@@ -116,6 +129,8 @@ interface AuthServerOptions {
   masterPassword?: string | undefined;
   /** Google sign-in client credentials; absent disables the Google provider. */
   google?: GoogleAuthConfig;
+  /** Public ID-token audience, used only with protected device entry; no client secret required. */
+  googleIdToken?: GoogleIdTokenConfig;
   /** Hosts a profile image URL may point at; defaults to `DEFAULT_PROFILE_IMAGE_HOSTS`. */
   profileImageHosts?: readonly string[];
   /** Registration link delivery; required for email domain self-registration. */
@@ -179,8 +194,13 @@ const TEAM_AUTH_MUTATION_PATHS = new Set([
 
 export function createAuthServer(options: AuthServerOptions): AuthServer {
   const database = options.database.drizzle();
-  const passwordRecovery = new MasterPasswordReset(options.database, options.masterPassword);
+  const passwordRecovery = new MasterPasswordReset(
+    options.database,
+    options.masterPassword,
+    options.deviceAccess?.accountSessions,
+  );
   const policy = options.policy ?? defaultInstanceAuthPolicy();
+  const google = options.deviceAccess ? (options.googleIdToken ?? options.google) : options.google;
   const provisioningEntitlements =
     options.provisioningEntitlements ?? (() => Promise.resolve(UNLIMITED_PROVISIONING));
   const apiKeys = new OrganizationApiKeys(options.database, options.locks);
@@ -195,6 +215,13 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     database: options.database,
     policy,
     provisioningEntitlements,
+    ...(options.deviceAccess
+      ? {
+          authorizeInteractiveClaim: (
+            transaction: import("../db/runtime/index.js").TransactionHandle,
+          ) => options.deviceAccess!.authorizeOwnerSetup(transaction),
+        }
+      : {}),
   });
   const registration = composeRegistration({
     database: options.database,
@@ -202,7 +229,8 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     policy,
     baseURL: options.baseURL,
     provisioningEntitlements,
-    google: options.google,
+    google,
+    ...(options.deviceAccess ? { sessions: options.deviceAccess.accountSessions } : {}),
     mailer: options.verificationMailer,
     instanceSetup,
     profileImageHosts: options.profileImageHosts ?? DEFAULT_PROFILE_IMAGE_HOSTS,
@@ -324,7 +352,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       };
     },
   };
-  const sessions = {
+  const accountSessions = {
     async read(headers: Headers): Promise<AccountSession | undefined> {
       const browserSession = await browserSessions.read(headers);
       if (browserSession !== undefined) return browserSession;
@@ -346,6 +374,11 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           return undefined;
         if (!(await recoverySessionValid(options.database, payload.sub, payload["sid"])))
           return undefined;
+        if (
+          options.deviceAccess &&
+          !(await currentAccountSession(options.database, payload.sub, payload["sid"]))
+        )
+          return undefined;
         const organizationId = payload[HUB_ORGANIZATION_CLAIM];
         if (typeof organizationId !== "string" || organizationId.length === 0) return undefined;
         const membership = await clientAuthorization.membership(payload.sub, organizationId);
@@ -363,6 +396,12 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       } catch {
         return undefined;
       }
+    },
+  };
+  const sessions = {
+    async read(headers: Headers): Promise<AccountSession | undefined> {
+      const account = await accountSessions.read(headers);
+      return options.deviceAccess ? options.deviceAccess.resolveSession(headers, account) : account;
     },
   };
   const access = new OrganizationAccess({
@@ -402,7 +441,39 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     },
   });
 
-  return {
+  const server: AuthServer = {
+    ...(google ? { googleClientId: google.clientId } : {}),
+    async verifyGoogleIdToken(idToken, nonce) {
+      if (!google) return false;
+      const provider = (await auth.$context).socialProviders.find(
+        (candidate) => candidate.id === "google",
+      );
+      return (await provider?.verifyIdToken?.(idToken, nonce)) === true;
+    },
+    async signInGoogleToken(data, headers) {
+      if (!google) return Response.json({ error: "google_not_configured" }, { status: 409 });
+      const body = {
+        provider: "google",
+        idToken: { token: data.idToken, nonce: data.nonce },
+        disableRedirect: true,
+      };
+      return runInRegistrationScope(
+        {
+          googleFlow: {
+            invitationId: data.invitationId,
+            claimInstance: data.claimInstance === true,
+          },
+        },
+        () =>
+          auth.handler(
+            new Request(new URL("/api/auth/sign-in/social", options.baseURL), {
+              method: "POST",
+              headers,
+              body: JSON.stringify(body),
+            }),
+          ),
+      );
+    },
     handle(request) {
       const path = new URL(request.url).pathname;
       const registrationResponse = registrationRoutes.handle(path, request);
@@ -497,17 +568,21 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     },
     async signInEmail(data, headers) {
       requireBrowserOrigin(headers, headersBrowserOrigin(headers, browserOrigin));
-      await auth.api.signInEmail({ body: data, headers });
+      const signedIn = await auth.api.signInEmail({ body: data, headers, returnHeaders: true });
+      await options.deviceAccess?.completeAccountAction(signedIn.headers);
     },
     async signUpEmail(data, headers, invitationId) {
       requireBrowserOrigin(headers, headersBrowserOrigin(headers, browserOrigin));
       await registration.admission.withAdmission(data.email, invitationId, async () => {
-        await auth.api.signUpEmail({ body: data, headers });
+        const signedUp = await auth.api.signUpEmail({ body: data, headers, returnHeaders: true });
+        await options.deviceAccess?.completeAccountAction(signedUp.headers);
       });
     },
     async claimInstance(operator, headers) {
       requireBrowserOrigin(headers, headersBrowserOrigin(headers, browserOrigin));
-      return (await claimAndSignIn(operator, headers)).claim;
+      const result = await claimAndSignIn(operator, headers);
+      if (result.headers) await options.deviceAccess?.completeAccountAction(result.headers);
+      return result.claim;
     },
     async completeAppOnboarding(request) {
       const rejected = rejectCrossOriginCookieMutation(
@@ -528,9 +603,10 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       const session = await sessions.read(headers);
       if (session === undefined) throw new Error("unauthenticated");
       await auth.api.changePassword({
-        body: { ...data, revokeOtherSessions: true },
+        body: { ...data, revokeOtherSessions: !options.deviceAccess },
         headers,
       });
+      await options.deviceAccess?.accountSessions.revokeAccount(session.userId, session.sessionId);
       await options.database.query(
         `update "user" set must_change_password = false, updated_at = now() where id = $1`,
         [session.userId],
@@ -545,6 +621,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       rejectCrossOriginCookieMutation(request, requestBrowserOrigin(request, browserOrigin)),
     async initialize() {
       await instanceSetup.initializeFromPolicy();
+      await options.deviceAccess?.initialize(await provisioningEntitlements());
       await clientAuthorization.initialize();
     },
     apiKeys,
@@ -552,6 +629,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     publicCredentials,
     close: () => Promise.resolve(),
   };
+  return options.deviceAccess ? withDeviceAccess(server, options.deviceAccess) : server;
 
   async function claimInstanceRequest(request: Request): Promise<Response> {
     if (request.method !== "POST") {
@@ -606,11 +684,12 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
             new Request(request.url, {
               method: "POST",
               headers: request.headers,
-              body: JSON.stringify({ ...body, revokeOtherSessions: true }),
+              body: JSON.stringify({ ...body, revokeOtherSessions: !options.deviceAccess }),
             }),
           )
         : await auth.handler(request);
     if (response.ok && session !== undefined) {
+      await options.deviceAccess?.accountSessions.revokeAccount(session.userId, session.sessionId);
       await options.database.query(`update "user" set must_change_password = false where id = $1`, [
         session.userId,
       ]);

@@ -9,7 +9,7 @@ import {
   googleSocialProviders,
   SOCIAL_SIGN_IN_PATH,
   startGoogleSignIn,
-  type GoogleAuthConfig,
+  type GoogleProviderConfig,
 } from "./google-sign-in.js";
 import type { InstanceAuthPolicy } from "./instance-policy.js";
 import type { InstanceSetup } from "../instance-setup/index.js";
@@ -18,6 +18,7 @@ import { RegistrationCompletion } from "./registration-completion.js";
 import { EMAIL_REGISTRATION_PATHS } from "./registration-contract.js";
 import { registrationDatabaseHooks } from "./registration-gate.js";
 import { runInRegistrationScope } from "./registration-scope.js";
+import type { AccountSessionRevocation } from "../device-access/account-sessions.js";
 
 export interface RegistrationOptions {
   database: DatabaseRuntime;
@@ -25,7 +26,7 @@ export interface RegistrationOptions {
   policy: InstanceAuthPolicy;
   baseURL: string;
   provisioningEntitlements: ProvisioningEntitlementResolver;
-  google: GoogleAuthConfig | undefined;
+  google: GoogleProviderConfig | undefined;
   mailer: VerificationMailer | undefined;
   /** First-run setup, which a Google sign-in from the setup screen claims. */
   instanceSetup: InstanceSetup;
@@ -33,6 +34,7 @@ export interface RegistrationOptions {
   profileImageHosts: readonly string[];
   onMembershipChanged?: (organizationId: string) => Promise<void>;
   onOrganizationAccessChanged?: (organizationId: string) => Promise<void>;
+  sessions?: AccountSessionRevocation;
 }
 
 /** What the registration routes need from the Better Auth instance they sit in front of. */
@@ -80,7 +82,7 @@ export function composeRegistration(options: RegistrationOptions) {
         pool: options.database,
         admission,
         completion,
-        linking: new GoogleAccountLinking(options.database),
+        linking: new GoogleAccountLinking(options.database, options.sessions),
         instanceSetup: options.instanceSetup,
         profileImageHosts: options.profileImageHosts,
       }),
@@ -114,7 +116,7 @@ function registrationRoutes(
       const rejected = auth.rejectCookieMutation(request);
       if (rejected !== undefined) return Promise.resolve(rejected);
       return path === SOCIAL_SIGN_IN_PATH
-        ? startGoogleSignIn(request, options.google !== undefined, auth.handler)
+        ? startGoogleSignIn(request, options.google !== undefined, (input) => auth.handler(input))
         : emailRegistration.handle(request);
     },
   };

@@ -21,6 +21,14 @@ import { createFetchServer } from "./http/node-server.js";
 import { loadBuiltStartServer } from "./server/build.js";
 import { publicAppOrigin } from "./server/backend.js";
 import { createAuthServer } from "./auth/server.js";
+import { HubDeviceAccess } from "./device-access/index.js";
+import { issuePersonalEnrollmentToken } from "./device-access/local-enrollment.js";
+import {
+  loadOrCreateLocalControlCredential,
+  localControlCredentialPath,
+} from "@clisbot/device-access/local-control";
+import { loadServiceKey } from "@clisbot/device-access/service-key";
+import { mountHubDeviceIngress } from "./device-access/ingress.js";
 import { startApplication, stopApplication, type ApplicationRuntime } from "./server/runtime.js";
 import { createApplicationRuntime } from "./application-runtime.js";
 import {
@@ -48,7 +56,7 @@ import { createSlackSocketInstallationVerifier } from "./providers/slack/install
 import { resolveHubDataDirectory } from "./data-directory.js";
 import { applyClisbotEnvDefaults } from "./env-alias.js";
 import { composeInvitationMailer, composeVerificationMailer } from "./invitations/index.js";
-import { readGoogleAuthConfig } from "./auth/google-sign-in.js";
+import { readGoogleAuthConfig, readGoogleIdTokenConfig } from "./auth/google-sign-in.js";
 import { readProfileImageHosts } from "./auth/profile-update.js";
 import {
   readCredentialCipherEnvironment,
@@ -143,6 +151,8 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       config.google,
       (organizationId) =>
         accessLeaseRevocation.revokeOrganization(organizationId).then(() => undefined),
+      (leases) => accessLeaseRevocation.notifyDeviceLeases(leases),
+      database,
     );
     resources.own(() => auth.close());
     await auth.initialize?.();
@@ -247,6 +257,10 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       providerApplications,
       publicBaseUrl: identity.appUrl,
       completionTokenSecret: identity.authSecret,
+      ...(/^(1|true)$/i.test(process.env["CLISBOT_HUB_DEVICE_PAIRING"] ?? "") &&
+      process.env["CLISBOT_HUB_DAEMON_ORIGIN"]
+        ? { daemonEnrollmentOrigin: process.env["CLISBOT_HUB_DAEMON_ORIGIN"] }
+        : {}),
       accessTickets,
       accessLeaseRevocation,
       claimSlackInbound,
@@ -286,9 +300,34 @@ function createProductionAuthServer(
   invitationMailer: ReturnType<typeof composeInvitationMailer>,
   google: RuntimeConfig["google"],
   onOrganizationAccessChanged: (organizationId: string) => Promise<void>,
+  notifyDeviceRevocations: (
+    leases: import("./managed-access/tickets.js").RevokedAccessLease[],
+  ) => Promise<void>,
+  domainDatabase: import("./db/types.js").Database,
 ) {
   const verificationMailer = composeVerificationMailer();
+  const deviceAccess = /^(1|true)$/i.test(process.env["CLISBOT_HUB_DEVICE_PAIRING"] ?? "")
+    ? new HubDeviceAccess(
+        database,
+        !/^(0|false)$/i.test(process.env["CLISBOT_HUB_LOGIN_REQUIRED"] ?? ""),
+        notifyDeviceRevocations,
+        loadOrCreateLocalControlCredential(localControlCredentialPath(resolveHubDataDirectory())),
+        loadServiceKey(`${localControlCredentialPath(resolveHubDataDirectory())}.key`).then(
+          (bundle) => bundle.publicKey,
+        ),
+        process.env["CLISBOT_HUB_DEVICE_RELAY_ENDPOINT"]
+          ? {
+              endpoint: process.env["CLISBOT_HUB_DEVICE_RELAY_ENDPOINT"],
+              useTls: process.env["CLISBOT_HUB_DEVICE_RELAY_TLS"] !== "false",
+            }
+          : undefined,
+        () => issuePersonalEnrollmentToken(database, domainDatabase),
+      )
+    : undefined;
+  const googleIdToken = deviceAccess ? readGoogleIdTokenConfig(process.env) : undefined;
   return createAuthServer({
+    ...(deviceAccess ? { deviceAccess } : {}),
+    ...(googleIdToken ? { googleIdToken } : {}),
     database,
     locks,
     entitlements: entitlements.service,
@@ -446,7 +485,19 @@ async function main(): Promise<void> {
       : { trustedProxyAddresses: config.trustedProxyAddresses }),
     ...(canonicalRequestOrigin === undefined ? {} : { canonicalRequestOrigin }),
   });
+  const deviceIngress = await startDeviceIngress(
+    server,
+    build,
+    (request) => admission.fetch(request),
+    port,
+  );
   server.on("upgrade", (request, socket, head) => {
+    if (
+      deviceIngress &&
+      new URL(request.url ?? "/", "http://hub.invalid").pathname ===
+        "/api/auth/clisbot/device/socket"
+    )
+      return;
     if (!admission.open) {
       socket.destroy();
       return;
@@ -459,6 +510,7 @@ async function main(): Promise<void> {
   });
   const appUrl = publicAppOrigin(port);
   server.listen(port, config.bind, () => {
+    process.send?.({ type: "clisbot:ready", listen: `${config.bind}:${port}`, serverId: "hub" });
     logger.info(`server started, available at: ${appUrl}`);
   });
 
@@ -474,6 +526,7 @@ async function main(): Promise<void> {
           name: "admission",
           run: async () => {
             admission.close();
+            deviceIngress?.close();
           },
         },
         {
@@ -507,6 +560,47 @@ async function main(): Promise<void> {
   });
   process.on("SIGTERM", () => stopAfterSignal("SIGTERM"));
   process.on("SIGINT", () => stopAfterSignal("SIGINT"));
+  process.on("message", (message) => {
+    if (
+      message &&
+      typeof message === "object" &&
+      "type" in message &&
+      message.type === "clisbot:graceful-shutdown"
+    )
+      stopAfterSignal("supervisor");
+  });
+}
+
+async function startDeviceIngress(
+  server: Server,
+  build: import("./server/build.js").BuiltStartServer,
+  fetch: (request: Request) => Promise<Response>,
+  port: number,
+): Promise<ReturnType<typeof mountHubDeviceIngress> | undefined> {
+  if (!/^(1|true)$/i.test(process.env["CLISBOT_HUB_DEVICE_PAIRING"] ?? "")) return undefined;
+  const bundle = await loadServiceKey(
+    `${localControlCredentialPath(resolveHubDataDirectory())}.key`,
+  );
+  const origin = publicAppOrigin(port);
+  const application = await build.startProductionRuntime();
+  const response = await application.auth(
+    new Request(new URL("/api/auth/clisbot/device/identity", origin)),
+  );
+  const { hubId } = (await response.json()) as { hubId: string };
+  if (!response.ok || typeof hubId !== "string") throw new Error("Hub device identity unavailable");
+  const endpoint = process.env["CLISBOT_HUB_DEVICE_RELAY_ENDPOINT"];
+  return mountHubDeviceIngress({
+    server,
+    key: bundle.key,
+    hubId,
+    origin,
+    fetch,
+    ...(application.deviceSocket ? { deviceSocket: application.deviceSocket } : {}),
+    ...(endpoint
+      ? { relay: { endpoint, useTls: process.env["CLISBOT_HUB_DEVICE_RELAY_TLS"] !== "false" } }
+      : {}),
+    error: (error) => reportFailure(error, { operation: "device.ingress", component: "auth" }),
+  });
 }
 
 /** HTTP admission, as one switch the shutdown sequence can throw.

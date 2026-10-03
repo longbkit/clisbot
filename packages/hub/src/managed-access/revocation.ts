@@ -34,8 +34,12 @@ export class AccessLeaseRevocation {
     return revoked;
   }
 
+  async notifyDeviceLeases(revoked: RevokedAccessLease[]): Promise<void> {
+    await this.notify(undefined, revoked);
+  }
+
   private async notify(
-    organizationId: string,
+    organizationId: string | undefined,
     revoked: readonly RevokedAccessLease[],
   ): Promise<void> {
     if (revoked.length === 0 || this.notifyDaemon === undefined) return;
@@ -55,7 +59,7 @@ export class AccessLeaseRevocation {
             {
               operation: "managed_access.lease.revoke.notify",
               component: "managed-access",
-              organizationId,
+              ...(organizationId === undefined ? {} : { organizationId }),
               daemonId,
             },
             { kind: "upstreamUnavailable", logger: this.failureLogger },

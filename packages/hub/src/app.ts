@@ -70,6 +70,7 @@ import { AccessStore } from "./access/store.js";
 import { consumeDaemonAccessTicket, refreshDaemonAccessLease } from "./managed-access/http.js";
 import { AccessTicketService } from "./managed-access/tickets.js";
 import { AccessLeaseRevocation } from "./managed-access/revocation.js";
+import { reconcileDaemonLeaseRevocations } from "./managed-access/reconcile-daemon.js";
 
 export interface HubRuntimeOptions {
   database: Database | null;
@@ -103,6 +104,8 @@ export interface HubRuntimeOptions {
    */
   channelReplyServer?: ChannelReplyServer | null;
   publicBaseUrl?: string;
+  /** Personal composition keeps the machine relationship on its backend listener. */
+  daemonEnrollmentOrigin?: string;
   daemonClock?: DaemonClock;
   executionDeadlineClock?: ExecutionDeadlineClock;
   dispatchTimeoutMs?: number;
@@ -302,7 +305,13 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       ? {}
       : { dispatchLaunchMachineIntent: durableDispatchHandler }),
   });
-  connectDaemonLifecycle(daemons, daemonModule, accessTickets, options.database);
+  connectDaemonLifecycle(
+    daemons,
+    daemonModule,
+    accessTickets,
+    options.database,
+    options.databaseRuntime,
+  );
   let activeSources: readonly TriggerSource[] = [];
 
   const hub: HubRuntime = {
@@ -371,7 +380,12 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
     handleDaemonEnrollment: (request) =>
       options.database === null
         ? databaseUnavailable()
-        : enrollDaemon(request, options.database, options.publicBaseUrl, options.daemonClock),
+        : enrollDaemon(
+            request,
+            options.database,
+            options.daemonEnrollmentOrigin ?? options.publicBaseUrl,
+            options.daemonClock,
+          ),
     handleDaemonRevocation: (request, daemonId) =>
       options.database === null || daemons === null
         ? databaseUnavailable()
@@ -608,6 +622,7 @@ function connectDaemonLifecycle(
   daemonModule: DaemonModule | null,
   accessTickets: AccessTicketService | null,
   database: Database | null,
+  runtime: DatabaseRuntime | undefined,
 ): void {
   const revocation =
     daemons !== null && accessTickets !== null
@@ -615,7 +630,14 @@ function connectDaemonLifecycle(
           daemons.revokeAccessLeases(daemonId, leaseIds);
         })
       : null;
-  daemons?.onConnected((daemon) => daemonModule?.lifecycle.recoverDaemon(daemon));
+  daemons?.onConnected(async (daemon) => {
+    if (runtime) {
+      await reconcileDaemonLeaseRevocations(runtime, daemon.id, (leaseIds) =>
+        daemons.revokeAccessLeases(daemon.id, leaseIds),
+      );
+    }
+    await daemonModule?.lifecycle.recoverDaemon(daemon);
+  });
   daemons?.onRevoked(async (daemon) => {
     // Canonical revocation already marked the Daemon inactive. Complete lease
     // notifications before execution cleanup can reject and close the socket.

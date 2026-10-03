@@ -107,6 +107,10 @@ export class DaemonRegistryHarness {
     };
   }
 
+  sendAccessLeaseRevocation(leaseIds: readonly string[]): boolean {
+    return this.registry.revokeAccessLeases(this.daemon.id, leaseIds);
+  }
+
   /** The registry narrowed to what a session driver needs. */
   sessionAccess() {
     return this.registry.sessionAccess();

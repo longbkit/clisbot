@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { applyClisbotEnvDefaults } from "../env-alias.js";
-import { readGoogleAuthConfig } from "./google-sign-in.js";
+import { readGoogleAuthConfig, readGoogleIdTokenConfig } from "./google-sign-in.js";
 import { emailDomain, readInstanceAuthPolicy } from "./instance-policy.js";
 
 describe("registration policy configuration", () => {
@@ -70,5 +70,25 @@ describe("registration policy configuration", () => {
     applyClisbotEnvDefaults(environment);
     assert.deepEqual(readInstanceAuthPolicy(environment).allowedDomains, ["acme.com"]);
     assert.equal(readGoogleAuthConfig(environment)?.clientId, "id");
+  });
+
+  it("reads a separate public Google ID-token audience without weakening legacy credentials", () => {
+    const environment = {
+      CLISBOT_GOOGLE_ID_TOKEN_CLIENT_ID: " public.apps.googleusercontent.com ",
+    };
+    assert.deepEqual(readGoogleIdTokenConfig(environment), {
+      clientId: "public.apps.googleusercontent.com",
+    });
+    assert.equal(readGoogleAuthConfig(environment), undefined);
+    assert.equal(readGoogleIdTokenConfig({}), undefined);
+    assert.throws(() => readGoogleIdTokenConfig({ CLISBOT_GOOGLE_ID_TOKEN_CLIENT_ID: "wrong" }));
+    assert.throws(
+      () =>
+        readGoogleAuthConfig({
+          ...environment,
+          CLISBOT_GOOGLE_AUTH_CLIENT_ID: "legacy.apps.googleusercontent.com",
+        }),
+      /supplied together/u,
+    );
   });
 });

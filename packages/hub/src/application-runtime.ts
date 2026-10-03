@@ -77,6 +77,7 @@ export interface ApplicationCompositionOptions {
   registrations?: readonly ProviderRegistration[];
   providerApplications?: ProviderApplications;
   publicBaseUrl?: string;
+  daemonEnrollmentOrigin?: string;
   completionTokenSecret?: string;
   managedAccessLeaseDurationMs?: number;
   accessTickets?: AccessTicketService;
@@ -258,6 +259,9 @@ async function createOwnedApplicationRuntime(
     triggerDashboard: triggerDashboardFor(options),
     ...entitlementSurfaces(options),
     testTriggerRoutes: options.testTriggerRoutes ?? false,
+    ...(options.auth?.deviceSocket
+      ? { deviceSocket: options.auth.deviceSocket.bind(options.auth) }
+      : {}),
     auth: (request) => {
       if (options.database === null) {
         return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
@@ -840,21 +844,23 @@ function channelDaemonCandidates(offer: ConnectionOffer, mode: string): string[]
     offer.direct !== undefined
       ? buildDaemonWebSocketUrl(offer.direct.endpoint, { useTls: offer.direct.useTls ?? true })
       : undefined;
-  const relay = buildRelayWebSocketUrl({
-    endpoint: offer.relay.endpoint,
-    useTls: offer.relay.useTls ?? true,
-    serverId: offer.serverId,
-    role: "client",
-  });
+  const relay = offer.relay
+    ? buildRelayWebSocketUrl({
+        endpoint: offer.relay.endpoint,
+        useTls: offer.relay.useTls ?? true,
+        serverId: offer.serverId,
+        role: "client",
+      })
+    : undefined;
   switch (mode) {
     case "loopback":
       return [];
     case "direct":
       return direct !== undefined ? [direct] : [];
     case "relay":
-      return [relay];
+      return relay ? [relay] : [];
     default: // "auto"
-      return direct !== undefined ? [direct, relay] : [relay];
+      return [direct, relay].filter((url): url is string => url !== undefined);
   }
 }
 
@@ -938,6 +944,9 @@ function hubApplicationOptions(
       options.auth?.publicCredentials === undefined
         ? { status: "unavailable" }
         : { status: "enabled", authenticator: options.auth.publicCredentials },
+    ...(options.daemonEnrollmentOrigin
+      ? { daemonEnrollmentOrigin: options.daemonEnrollmentOrigin }
+      : {}),
     ...(options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl }),
     ...(options.completionTokenSecret === undefined
       ? {}
