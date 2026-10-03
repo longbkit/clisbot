@@ -3,10 +3,12 @@ import { cancel, confirm, intro, isCancel, log, note, outro } from "@clack/promp
 import { Command, Option } from "commander";
 import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import {
   readPersistedConfig as loadPersistedConfig,
   savePersistedConfig,
   type PersistedConfig,
+  editPersistedConfig,
 } from "@clisbot/server/configuration";
 import { readDaemonInstance, waitForDaemonReady } from "@clisbot/server/daemon-control";
 import { withGlobalOptions } from "../utils/command-options.js";
@@ -14,6 +16,9 @@ import type { CommandOptions } from "../output/index.js";
 import { launchLocalDaemon, parseTimeoutMs } from "./daemon/local-daemon.js";
 import { connectToDaemon } from "../utils/client.js";
 import { formatPairingInstructions } from "../output/pairing.js";
+import { isPersonalServingHome } from "./serve/default-serving.js";
+import { outputPersonalServices, startPersonalDaemon } from "./serve/index.js";
+import { selectLocalPort } from "./hub/local-port.js";
 import {
   confirmRelayPairing,
   printDirectConnectionGuidance,
@@ -28,6 +33,11 @@ interface OnboardOptions extends CommandOptions {
   hostnames?: string;
   timeout?: string;
   voice?: "ask" | "enable" | "disable";
+  transport?: string;
+  publicUrl?: string;
+  httpsPort?: string;
+  webPort?: string;
+  label?: string;
 }
 
 type RawOnboardOptions = OnboardOptions & {
@@ -164,6 +174,14 @@ export function onboardCommand(): Command {
     .addOption(new Option("--allowed-hosts <hosts>").hideHelp())
     .option("--timeout <seconds>", "Max time to wait for daemon readiness (default: 600)")
     .option("--voice <mode>", "Voice setup mode: ask, enable, disable", "ask")
+    .option(
+      "--transport <kind>",
+      "Personal connection: tailscale (preferred), relay, local, or https",
+    )
+    .option("--public-url <url>", "HTTPS origin of your reverse proxy/tunnel")
+    .option("--https-port <port>", "Tailscale HTTPS port owned by Clisbot")
+    .option("--web-port <port>", "Preferred independent web/gateway loopback port")
+    .option("--label <name>", "Name of the device being paired")
     .action(
       withGlobalOptions(async (options: RawOnboardOptions, command: Command) => {
         await runOnboard({
@@ -231,8 +249,43 @@ function persistSetupChoices(clisbotHome: string, options: OnboardOptions): void
   savePersistedConfig(clisbotHome, persisted);
 }
 
+async function initializePersonalHome(clisbotHome: string): Promise<void> {
+  if (existsSync(path.join(clisbotHome, "config.json"))) return;
+  editPersistedConfig(clisbotHome, "features.personalServing", { value: true });
+  editPersistedConfig(clisbotHome, "features.devicePairing", { value: true });
+  editPersistedConfig(clisbotHome, "daemon.managedAccess.mode", { value: "off" });
+  editPersistedConfig(clisbotHome, "daemon.listen", {
+    value: `127.0.0.1:${await selectLocalPort(6868, true)}`,
+  });
+}
+
+function personalOnboardTransport(options: OnboardOptions): string {
+  if (options.relay === false) return options.transport ?? "local";
+  if (options.relay === true) return options.transport ?? "relay";
+  return options.transport ?? "tailscale";
+}
+
+function onboardingUsesRichUi(options: OnboardOptions): boolean {
+  return process.stdin.isTTY && process.stdout.isTTY && options.json !== true;
+}
+
+async function runPersonalOnboard(clisbotHome: string, options: OnboardOptions): Promise<void> {
+  await resolveAndPersistVoice(clisbotHome, {
+    ...options,
+    voice: options.json && (!options.voice || options.voice === "ask") ? "disable" : options.voice,
+  });
+  outputPersonalServices(
+    options.json === true,
+    await startPersonalDaemon({
+      ...options,
+      home: clisbotHome,
+      transport: personalOnboardTransport(options),
+    }),
+  );
+}
+
 export async function runOnboard(options: OnboardOptions): Promise<void> {
-  const richUi = process.stdin.isTTY && process.stdout.isTTY;
+  const richUi = onboardingUsesRichUi(options);
   if (richUi) {
     intro("Welcome to Clisbot");
   }
@@ -246,8 +299,14 @@ export async function runOnboard(options: OnboardOptions): Promise<void> {
 
   if (options.daemonTarget.kind !== "instance") throw new Error("Onboarding requires a local home");
   const clisbotHome = options.daemonTarget.home;
+  const personal = isPersonalServingHome({ ...process.env, CLISBOT_HOME: clisbotHome });
   const alreadyRunning = await readDaemonInstance(clisbotHome);
+  if (personal) await initializePersonalHome(clisbotHome);
   persistSetupChoices(clisbotHome, options);
+  if (personal) {
+    await runPersonalOnboard(clisbotHome, options);
+    return;
+  }
   if (richUi) {
     renderNote(clisbotHome, "Clisbot home");
   }

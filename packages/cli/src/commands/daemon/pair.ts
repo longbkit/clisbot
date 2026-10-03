@@ -13,13 +13,23 @@ import type { DaemonTarget } from "../../utils/daemon-target.js";
 import { addJsonAndDaemonHostOptions, withGlobalOptions } from "../../utils/command-options.js";
 import { formatPairingInstructions } from "../../output/pairing.js";
 import { parseConnectionOfferFromUrl } from "@clisbot/protocol/connection-offer";
+import { localHubPairingOffer } from "../hub/device-pairing.js";
+import { resolveLocalHubState } from "../hub/local-hub.js";
 import { serializeRelayConnectionUri } from "@clisbot/protocol/daemon-endpoints";
+import {
+  parseDevicePairingOfferFromUrl,
+  type DevicePairingOffer,
+} from "@clisbot/protocol/device-pairing-offer";
 
 interface PairOptions {
   daemonTarget: DaemonTarget;
   home?: string;
   json?: boolean;
   relay?: boolean;
+  devicePairing?: boolean;
+  label?: string;
+  ttl?: string;
+  direct?: string;
 }
 
 export interface PairCommandOutput {
@@ -62,6 +72,13 @@ export function pairCommand(): Command {
     new Command("pair").description("Print the daemon pairing QR code and link"),
   )
     .option("--relay", "Enable relay without prompting")
+    .option(
+      "--device-pairing",
+      "Enable device credentials for an offline daemon; a live daemon must already support them",
+    )
+    .option("--label <name>", "Label the device being paired")
+    .option("--ttl <seconds>", "Invitation lifetime, 1–900 seconds", "300")
+    .option("--direct <url>", "Direct ws://localhost or wss:// endpoint (Tailscale preferred)")
     .action(
       withGlobalOptions((options: PairOptions, _command: Command) => runPairCommand(options)),
     );
@@ -70,20 +87,38 @@ export function pairCommand(): Command {
 export async function resolveLocalPairingOffer(options: {
   clisbotHome: string;
   enableRelay?: boolean;
+  devicePairing?: boolean;
+  label?: string;
+  ttlMs?: number;
+  direct?: DevicePairingOffer["direct"];
+  hub?: DevicePairingOffer["hub"];
 }): Promise<PairingOffer> {
   const instance = await readDaemonInstance(options.clisbotHome);
-  if (instance)
-    return resolveDaemonPairingOffer(
-      { kind: "instance", home: options.clisbotHome },
-      options.enableRelay,
-    );
-  if (options.enableRelay)
+  if (!instance && options.enableRelay)
     editPersistedConfig(options.clisbotHome, "daemon.relay.enabled", { value: true });
+  if (!instance && options.devicePairing)
+    editPersistedConfig(options.clisbotHome, "features.devicePairing", { value: true });
   const config = resolveConfigFromPersisted(
     options.clisbotHome,
     readPersistedConfig(options.clisbotHome, { defaultsIfMissing: true }),
     { env: {} },
   );
+
+  const pairingOptions = {
+    ...options,
+    direct: options.direct ?? configuredDirect(options.clisbotHome),
+    hub:
+      options.hub ??
+      (config.devicePairingEnabled
+        ? await approvedLocalHubOffer(options.clisbotHome, options)
+        : undefined),
+  };
+  if (instance)
+    return resolveDaemonPairingOffer(
+      { kind: "instance", home: options.clisbotHome },
+      options.enableRelay,
+      pairingOptions,
+    );
 
   return generateLocalPairingOffer({
     clisbotHome: options.clisbotHome,
@@ -94,12 +129,51 @@ export async function resolveLocalPairingOffer(options: {
     relayPublicUseTls: config.relayPublicUseTls,
     appBaseUrl: config.appBaseUrl,
     includeQr: true,
+    devicePairingEnabled: config.devicePairingEnabled,
+    label: options.label,
+    ttlMs: options.ttlMs,
+    direct: pairingOptions.direct,
+    hub: pairingOptions.hub,
+    managedAccessMode: config.managedAccessMode,
   });
+}
+
+async function approvedLocalHubOffer(
+  home: string,
+  options: { label?: string; ttlMs?: number; direct?: DevicePairingOffer["direct"] },
+): Promise<DevicePairingOffer["hub"]> {
+  const local = resolveLocalHubState({ home });
+  if (!local.running || !local.state || !(await readDaemonInstance(home))) return undefined;
+  const client = await connectToDaemon({ target: { kind: "instance", home } });
+  try {
+    const relationship = (await client.getHubStatus()).status;
+    if (relationship.state !== "connected" || relationship.hubOrigin !== local.state.url)
+      return undefined;
+    const direct = options.direct ?? configuredDirect(home);
+    const origin = direct
+      ? `${direct.useTls ? "https" : "http"}://${direct.endpoint}`
+      : local.state.url;
+    return await localHubPairingOffer({
+      home,
+      origin,
+      ...(options.label ? { label: options.label } : {}),
+      ...(options.ttlMs ? { ttlMs: options.ttlMs } : {}),
+    });
+  } finally {
+    await client.close();
+  }
 }
 
 async function resolveDaemonPairingOffer(
   target: DaemonTarget,
   enableRelay: boolean | undefined,
+  options: {
+    devicePairing?: boolean;
+    label?: string;
+    ttlMs?: number;
+    direct?: DevicePairingOffer["direct"];
+    hub?: DevicePairingOffer["hub"];
+  } = {},
 ): Promise<PairingOffer> {
   const client = await connectToDaemon({
     target,
@@ -111,9 +185,18 @@ async function resolveDaemonPairingOffer(
     if (serverInfo?.features?.daemonStatusRpc !== true) {
       throw new Error("Update the Clisbot daemon before pairing from this command.");
     }
+    if (
+      (options.devicePairing || options.label || options.direct || options.hub) &&
+      serverInfo.features.devicePairing !== true
+    ) {
+      throw new Error(
+        "Device pairing is not enabled on this running daemon. Save features.devicePairing=true and enable it at your next planned daemon restart.",
+      );
+    }
 
     let offer = await client.getDaemonPairingOffer({
       timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
+      ...(serverInfo.features.devicePairing ? options : {}),
     });
     if (!offer.relayEnabled && enableRelay) {
       if (serverInfo.features.relayConfig !== true) {
@@ -121,7 +204,10 @@ async function resolveDaemonPairingOffer(
       }
       await client.patchDaemonConfig({ relay: { enabled: true } });
       try {
-        offer = await client.getDaemonPairingOffer({ timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS });
+        offer = await client.getDaemonPairingOffer({
+          timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
+          ...(serverInfo.features.devicePairing ? options : {}),
+        });
       } catch (error) {
         throw new Error(
           `Relay configuration was saved, but fetching the pairing offer failed: ${String(error)}`,
@@ -162,10 +248,15 @@ export function printDirectConnectionGuidance(): void {
 export async function runPairCommand(options: PairOptions): Promise<void> {
   const output = createProcessOutput();
   const target = options.daemonTarget;
+  const ttlMs = Number(options.ttl ?? "300") * 1000;
+  if (!Number.isInteger(ttlMs) || ttlMs < 1000 || ttlMs > 900000)
+    throw new Error("Invitation lifetime must be 1–900 seconds");
+  const direct = options.direct ? directPairingEndpoint(options.direct) : undefined;
+  const invitation = { devicePairing: options.devicePairing, label: options.label, ttlMs, direct };
   const resolveOffer = (enableRelay: boolean) =>
     target.kind === "instance"
-      ? resolveLocalPairingOffer({ clisbotHome: target.home, enableRelay })
-      : resolveDaemonPairingOffer(target, enableRelay);
+      ? resolveLocalPairingOffer({ clisbotHome: target.home, enableRelay, ...invitation })
+      : resolveDaemonPairingOffer(target, enableRelay, invitation);
   const offline = target.kind === "instance" && !(await readDaemonInstance(target.home));
   const pairing = await resolveOffer(options.relay === true);
 
@@ -182,7 +273,7 @@ function outputPairingResult(
   options: PairOptions,
   output: PairCommandOutput,
 ): void {
-  if (!pairing.relayEnabled || !pairing.url) {
+  if (!pairing.url) {
     if (options.json) {
       output.writeStderr(
         `${JSON.stringify({
@@ -199,8 +290,10 @@ function outputPairingResult(
     return;
   }
 
-  const offer = parseConnectionOfferFromUrl(pairing.url);
-  const connectionUri = offer ? serializeRelayConnectionUri({ offer }) : null;
+  const deviceOffer = parseDevicePairingOfferFromUrl(pairing.url);
+  const offer = deviceOffer ? null : parseConnectionOfferFromUrl(pairing.url);
+  const connectionUri =
+    !deviceOffer && offer?.v === 2 ? serializeRelayConnectionUri({ offer }) : null;
 
   if (options.json) {
     output.writeStdout(
@@ -221,4 +314,28 @@ function outputPairingResult(
       columns: output.columns,
     }),
   );
+}
+
+function directPairingEndpoint(value: string): NonNullable<DevicePairingOffer["direct"]> {
+  const url = new URL(value);
+  if (
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    !["", "/", "/ws"].includes(url.pathname)
+  )
+    throw new Error("Use a WebSocket endpoint ending at /ws");
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (url.protocol !== "wss:" && !(url.protocol === "ws:" && loopback))
+    throw new Error("Remote device pairing requires wss://; use Tailscale Serve for HTTPS");
+  return {
+    endpoint: `${url.hostname}:${url.port || (url.protocol === "wss:" ? "443" : "80")}`,
+    useTls: url.protocol === "wss:",
+  };
+}
+
+function configuredDirect(home: string): DevicePairingOffer["direct"] {
+  const direct = readPersistedConfig(home, { defaultsIfMissing: true }).daemon?.direct;
+  return direct?.endpoint ? { endpoint: direct.endpoint, useTls: direct.useTls } : undefined;
 }

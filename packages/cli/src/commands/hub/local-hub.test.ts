@@ -373,6 +373,23 @@ describe("startLocalHubDetached", () => {
     expect(readHubStateFile(home)?.port).toBe(7100);
   });
 
+  test.each([undefined, "true"])(
+    "personal bootstrap honors explicit login policy %s",
+    async (policy) => {
+      const home = await createHome();
+      const runtime = new FakeHubRuntime();
+      await startLocalHubDetached(
+        { home, initMasterKey: true, personal: true },
+        runtime,
+        policy ? { CLISBOT_HUB_LOGIN_REQUIRED: policy } : {},
+      );
+      const child = runtime.lastDetached?.options.env as NodeJS.ProcessEnv;
+      expect(child.CLISBOT_HUB_LOGIN_REQUIRED).toBe(policy ?? "false");
+      expect(child.CLISBOT_HUB_DEVICE_PAIRING).toBe("1");
+      expect(child.CLISBOT_HUB_DAEMON_ORIGIN).toBe("http://127.0.0.1:6870");
+    },
+  );
+
   test("passes the home's .daemon-password through as CLISBOT_PASSWORD", async () => {
     const home = await createHome();
     writeFileSync(path.join(home, ".daemon-password"), "CLISBOT_PASSWORD=secret789\n");

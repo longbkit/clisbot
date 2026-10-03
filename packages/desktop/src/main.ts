@@ -51,6 +51,8 @@ import {
 } from "./features/notifications.js";
 import { createExternalUrlOpener } from "./features/opener.js";
 import { registerHubClientHandlers } from "./features/hub-client.js";
+import { registerGoogleSignInHandlers } from "./features/google-sign-in.js";
+import { registerDeviceCredentialHandlers } from "./features/device-credentials.js";
 import { createBrowserCaptureService } from "./features/browser-capture.js";
 import { registerEditorTargetHandlers } from "./features/editor-targets/ipc.js";
 import { resolveAppIconPath } from "./features/stamped-icon.js";
@@ -970,6 +972,8 @@ async function bootstrap(): Promise<void> {
   registerDialogHandlers();
   registerNotificationHandlers();
   registerHubClientHandlers();
+  registerGoogleSignInHandlers();
+  registerDeviceCredentialHandlers();
   const openExternalUrl = createExternalUrlOpener({ open: shell.openExternal });
   ipcMain.handle("clisbot:opener:openUrl", (_event, value: unknown) => openExternalUrl(value));
   registerEditorTargetHandlers();

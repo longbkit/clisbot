@@ -53,6 +53,13 @@ import {
   readLegacySkillSelection,
 } from "../integrations/legacy-skill-selection.js";
 import { tailFile } from "../diagnostics/tail-file.js";
+import {
+  personalDesktopPairing,
+  preparePersonalDesktopHome,
+  desktopDevicePairingOffer,
+  startDesktopHub,
+} from "./personal-serving.js";
+import { requireTrustedRenderer } from "../features/hub-client.js";
 
 const DAEMON_LOG_FILENAME = "daemon.log";
 let ownedLaunch: { home: string; instance: DaemonInstance } | null = null;
@@ -84,6 +91,8 @@ export interface DesktopDaemonStatus {
   ownedByDesktop: boolean;
   startedAt: string | null;
   error: string | null;
+  pairingUrl?: string;
+  servingError?: string;
 }
 
 interface DesktopDaemonLogs {
@@ -290,11 +299,15 @@ async function startDaemon(): Promise<DesktopDaemonStatus> {
       });
       await stopDesktopDaemon("version_mismatch");
     } else {
-      return current;
+      return withPersonalServing(current);
     }
   }
 
   const home = getClisbotHome();
+  await preparePersonalDesktopHome(
+    home,
+    app.isPackaged ? path.join(process.resourcesPath, "app-dist") : undefined,
+  );
   const invocation = createNodeEntrypointInvocation({
     entrypoint: resolveDaemonRunnerEntrypoint(),
     argvMode: "node-script",
@@ -316,7 +329,17 @@ async function startDaemon(): Promise<DesktopDaemonStatus> {
   } catch (error) {
     if (!(error instanceof DaemonInstanceError && error.code === "DAEMON_NOT_READY")) throw error;
   }
-  return resolveDesktopDaemonStatus();
+  return withPersonalServing(await resolveDesktopDaemonStatus());
+}
+
+async function withPersonalServing(status: DesktopDaemonStatus): Promise<DesktopDaemonStatus> {
+  if (status.status !== "running") return status;
+  try {
+    const pairingUrl = await personalDesktopPairing(status.home);
+    return { ...status, ...(pairingUrl ? { pairingUrl } : {}) };
+  } catch (error) {
+    return { ...status, servingError: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function stopDesktopDaemon(
@@ -400,6 +423,31 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
       runningUnderARM64Translation: isRunningUnderARM64Translation(),
     }),
     desktop_daemon_status: () => resolveDesktopDaemonStatus(),
+    desktop_daemon_pairing_offer: async (args) => {
+      const status = await resolveDesktopDaemonStatus();
+      if (status.status !== "running" || status.serverId !== args?.serverId) return null;
+      return desktopDevicePairingOffer(status.home);
+    },
+    desktop_start_hub: async (args) => {
+      const status = await resolveDesktopDaemonStatus();
+      if (status.status !== "running" || status.serverId !== args?.serverId)
+        throw new Error("Choose this computer's connected Host before starting a Hub");
+      if (
+        args.transport !== undefined &&
+        (typeof args.transport !== "string" ||
+          !["tailscale", "relay", "local", "https"].includes(args.transport))
+      )
+        throw new Error("Choose tailscale, relay, local or https");
+      if (args.publicUrl !== undefined && typeof args.publicUrl !== "string")
+        throw new Error("Public URL must be a string");
+      if (args.label !== undefined && typeof args.label !== "string")
+        throw new Error("Device label must be a string");
+      return startDesktopHub(status.home, {
+        transport: args.transport as string | undefined,
+        publicUrl: args.publicUrl as string | undefined,
+        label: args.label as string | undefined,
+      });
+    },
     desktop_local_credential: async (args) => {
       const instance = await readDaemonInstance(getClisbotHome());
       if (!instance?.desktopManaged || typeof args?.listen !== "string") return null;
@@ -473,7 +521,8 @@ export function registerDaemonManager(): void {
 
   ipcMain.handle(
     "clisbot:invoke",
-    async (_event, command: string, args?: Record<string, unknown>) => {
+    async (event, command: string, args?: Record<string, unknown>) => {
+      requireTrustedRenderer(event);
       const handler = handlers[command];
       if (!handler) {
         throw new Error(`Unknown desktop command: ${command}`);

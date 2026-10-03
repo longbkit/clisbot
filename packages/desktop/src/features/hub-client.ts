@@ -383,7 +383,7 @@ export function registerHubClientHandlers(): void {
   });
 }
 
-function requireTrustedRenderer(event: IpcMainInvokeEvent): void {
+export function requireTrustedRenderer(event: IpcMainInvokeEvent): void {
   const frameUrl = event.senderFrame?.url ?? event.sender.getURL();
   const url = new URL(frameUrl);
   const trusted =

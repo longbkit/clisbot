@@ -6,6 +6,7 @@ import { daemonRestartCommand } from "./restart.js";
 import { runSetPasswordCommand } from "./set-password.js";
 import { runResetIdentityCommand } from "./reset-identity.js";
 import { pairCommand } from "./pair.js";
+import { devicesCommand } from "./devices.js";
 import { daemonReloadCommand } from "./reload.js";
 import { daemonConfigCommand } from "./config.js";
 import { withOutput } from "../../output/index.js";
@@ -21,6 +22,7 @@ export function createDaemonCommand(): Command {
     daemonRestartCommand(),
     daemonReloadCommand(),
     pairCommand(),
+    devicesCommand(),
     daemonConfigCommand(),
   ])
     daemon.addCommand(command);

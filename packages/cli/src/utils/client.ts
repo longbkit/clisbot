@@ -260,6 +260,10 @@ async function connectViaRelayOffer(
   timeout: number,
   nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
 ): Promise<DaemonClient> {
+  if (!offer.relay)
+    throw new Error(
+      "This Host publishes a direct-only endpoint; connect with its paired profile or a Hub access ticket",
+    );
   const url = buildRelayWebSocketUrl({
     endpoint: offer.relay.endpoint,
     serverId: offer.serverId,

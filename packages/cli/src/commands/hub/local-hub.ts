@@ -1,6 +1,11 @@
+import { writeServiceFile } from "../../utils/service-files.js";
+import { withServiceLaunchLock } from "../../utils/service-launch-lock.js";
 import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import { selectLocalPort } from "./local-port.js";
 import { localWebUiOrigin } from "./web-ui.js";
+import { serviceSupervisorArguments } from "../serve/service-process.js";
+import { requestServiceShutdown } from "../serve/service-control.js";
+import { nodeEntrypointArguments } from "../../utils/node-entrypoint.js";
 // COMPAT(clisbot-hub-local): local lifecycle + discovery for the fork's embedded
 // Hub. `hub start` spawns the `@clisbot/hub` bin detached (default loopback :6870,
 // the fork default distinct from upstream's :3000) and records url + pid in
@@ -16,6 +21,7 @@ import fs, {
   chmodSync,
   closeSync,
   existsSync,
+  mkdirSync,
   openSync,
   readFileSync,
   rmSync,
@@ -61,6 +67,9 @@ export interface HubStartOptions {
   foreground?: boolean;
   /** First run only: mint the local credential master key when it is absent. */
   initMasterKey?: boolean;
+  devicePairing?: boolean;
+  personal?: boolean;
+  supervise?: boolean;
 }
 
 export interface HubStateRecord {
@@ -71,6 +80,11 @@ export interface HubStateRecord {
   startedAt?: string;
   instanceId?: string;
   stoppedAt?: string;
+  dataDirectory?: string;
+  controlFile?: string;
+  personalComposition?: boolean;
+  appOrigin?: string;
+  deviceRelay?: boolean;
 }
 
 export interface LocalHubState {
@@ -200,6 +214,11 @@ export function readHubStateFile(home: string): HubStateRecord | null {
       startedAt,
       ...(typeof parsed.instanceId === "string" ? { instanceId: parsed.instanceId } : {}),
       ...(typeof parsed.stoppedAt === "string" ? { stoppedAt: parsed.stoppedAt } : {}),
+      ...(typeof parsed.dataDirectory === "string" ? { dataDirectory: parsed.dataDirectory } : {}),
+      ...(typeof parsed.controlFile === "string" ? { controlFile: parsed.controlFile } : {}),
+      ...(parsed.personalComposition === true ? { personalComposition: true } : {}),
+      ...(typeof parsed.appOrigin === "string" ? { appOrigin: parsed.appOrigin } : {}),
+      ...(typeof parsed.deviceRelay === "boolean" ? { deviceRelay: parsed.deviceRelay } : {}),
     };
   } catch {
     return null;
@@ -207,7 +226,7 @@ export function readHubStateFile(home: string): HubStateRecord | null {
 }
 
 function writeHubStateFile(home: string, record: HubStateRecord): void {
-  writeFileSync(hubStatePath(home), `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  writeServiceFile(hubStatePath(home), record);
 }
 
 function removeHubStateFile(home: string): void {
@@ -426,7 +445,7 @@ function buildChildEnv(
   home: string,
   port: number,
   inherited: NodeJS.ProcessEnv = process.env,
-  options: { initMasterKey?: boolean } = {},
+  options: { initMasterKey?: boolean; devicePairing?: boolean; personal?: boolean } = {},
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...inherited,
@@ -439,6 +458,8 @@ function buildChildEnv(
     CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES:
       inherited.CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES ?? "127.0.0.1,::1",
   };
+  if (options.devicePairing || options.personal) env.CLISBOT_HUB_DEVICE_PAIRING = "1";
+  if (options.personal) configurePersonalEnv(env, port);
   // A token reference for CLI onboarding is not an environment-managed Application.
   // Preserve explicit legacy Application configuration, but keep bare input tokens local to the CLI.
   if (
@@ -476,6 +497,11 @@ function buildChildEnv(
   return env;
 }
 
+function configurePersonalEnv(env: NodeJS.ProcessEnv, port: number): void {
+  env.CLISBOT_HUB_LOGIN_REQUIRED ??= "false";
+  env.CLISBOT_HUB_DAEMON_ORIGIN = `http://${FORK_HUB_BIND}:${port}`;
+}
+
 /**
  * The daemon's WS-auth password, when the home carries `<home>/.daemon-password`.
  * Without it a password-protected daemon rejects the Hub's trusted session at
@@ -502,6 +528,18 @@ export async function startLocalHubDetached(
   runtime: HubLaunchRuntime = defaultHubLaunchRuntime,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<DetachedStartResult> {
+  const home = resolveLocalHubHome(options);
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  return withServiceLaunchLock(path.join(home, "hub-launch"), () =>
+    startLocalHubUnlocked(options, runtime, environment),
+  );
+}
+
+async function startLocalHubUnlocked(
+  options: HubStartOptions = {},
+  runtime: HubLaunchRuntime = defaultHubLaunchRuntime,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<DetachedStartResult> {
   const { home, port, url, instanceId } = await prepareLocalHubLaunch(
     options,
     runtime,
@@ -510,18 +548,31 @@ export async function startLocalHubDetached(
   // The detached Hub's stdout/stderr land in `hub.log` (the path this command
   // reports and reads on failure); discarding them left the log empty.
   const logFd = fs.openSync(path.join(home, HUB_LOG_FILENAME), "a");
-  const child = runtime.spawnDetached(process.execPath, [runtime.resolveHubBin()], {
-    detached: true,
-    envMode: "internal",
-    env: buildChildEnv(
-      home,
-      port,
-      { ...environment, CLISBOT_HUB_INSTANCE_ID: instanceId },
-      { initMasterKey: options.initMasterKey === true },
-    ),
-    stdio: ["ignore", logFd, logFd],
-  });
+  const hubEntry = runtime.resolveHubBin();
+  const controlFile = options.supervise ? path.join(home, "hub-control.json") : undefined;
+  const child = runtime.spawnDetached(
+    process.execPath,
+    options.supervise
+      ? serviceSupervisorArguments(hubEntry, [], controlFile)
+      : nodeEntrypointArguments(hubEntry),
+    {
+      detached: true,
+      envMode: "internal",
+      env: buildChildEnv(
+        home,
+        port,
+        { ...environment, CLISBOT_HUB_INSTANCE_ID: instanceId },
+        {
+          initMasterKey: options.initMasterKey === true,
+          devicePairing: options.devicePairing,
+          personal: options.personal,
+        },
+      ),
+      stdio: ["ignore", logFd, logFd],
+    },
+  );
   child.unref();
+  closeSync(logFd);
   const startup = await detachedStartupWatch(child, DETACHED_STARTUP_GRACE_MS);
   if (startup.exitedEarly) {
     const reason = startup.error
@@ -546,6 +597,15 @@ export async function startLocalHubDetached(
     pid: child.pid ?? 0,
     startedAt: new Date().toISOString(),
     ...(instanceId ? { instanceId } : {}),
+    dataDirectory: environment.CLISBOT_HUB_DATA_DIR ?? home,
+    ...(controlFile ? { controlFile } : {}),
+    ...(options.personal
+      ? {
+          personalComposition: true,
+          appOrigin: environment.CLISBOT_HUB_APP_URL,
+          deviceRelay: Boolean(environment.CLISBOT_HUB_DEVICE_RELAY_ENDPOINT),
+        }
+      : {}),
   });
   return { pid: child.pid ?? null, logPath: path.join(home, HUB_LOG_FILENAME), url };
 }
@@ -563,7 +623,7 @@ async function prepareLocalHubLaunch(
   const preferred = resolveHubPort({ port: options.port ?? existing?.port.toString() });
   const enabled = isOnboardingEnabled(environment);
   const port =
-    enabled && runtime.selectPort
+    (enabled || options.personal) && runtime.selectPort
       ? await runtime.selectPort(preferred, options.port === undefined && !existing?.instanceId)
       : preferred;
   const url = hubUrlFor(port);
@@ -577,12 +637,18 @@ export function startLocalHubForeground(
 ): number {
   const home = resolveLocalHubHome(options);
   const port = resolveHubPort(options);
-  const result = runtime.spawnForeground(process.execPath, [runtime.resolveHubBin()], {
-    env: buildChildEnv(home, port, process.env, {
-      initMasterKey: options.initMasterKey === true,
-    }),
-    stdio: "inherit",
-  });
+  const result = runtime.spawnForeground(
+    process.execPath,
+    nodeEntrypointArguments(runtime.resolveHubBin()),
+    {
+      env: buildChildEnv(home, port, process.env, {
+        initMasterKey: options.initMasterKey === true,
+        devicePairing: options.devicePairing,
+        personal: options.personal,
+      }),
+      stdio: "inherit",
+    },
+  );
   if (result.error) {
     throw result.error;
   }
@@ -603,6 +669,12 @@ export async function getLocalHubStatus(
 }
 
 export async function stopLocalHub(options: StopLocalHubOptions = {}): Promise<StopLocalHubResult> {
+  const home = resolveLocalHubHome(options);
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  return withServiceLaunchLock(path.join(home, "hub-launch"), () => stopLocalHubUnlocked(options));
+}
+
+async function stopLocalHubUnlocked(options: StopLocalHubOptions): Promise<StopLocalHubResult> {
   const state = resolveLocalHubState({ home: options.home });
   const pid = state.state?.pid ?? null;
 
@@ -620,7 +692,8 @@ export async function stopLocalHub(options: StopLocalHubOptions = {}): Promise<S
     };
   }
 
-  const signaled = signalProcess(pid, "SIGTERM");
+  if (state.state?.controlFile) await requestServiceShutdown(state.state.controlFile, pid);
+  const signaled = state.state?.controlFile ? true : signalProcess(pid, "SIGTERM");
   if (!signaled) {
     recordHubStopped(state);
     return {
@@ -658,7 +731,7 @@ async function waitForHubStop(pid: number, options: StopLocalHubOptions): Promis
 }
 
 function recordHubStopped(local: LocalHubState): void {
-  if (local.state?.instanceId) {
+  if (local.state && (local.state.instanceId || local.state.personalComposition)) {
     writeHubStateFile(local.home, { ...local.state, stoppedAt: new Date().toISOString() });
   } else {
     removeHubStateFile(local.home);

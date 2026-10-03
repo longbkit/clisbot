@@ -106,6 +106,16 @@ contextBridge.exposeInMainWorld("clisbotDesktop", {
       body?: string;
     }) => ipcRenderer.invoke("clisbot:hub:request", input),
   },
+  google: {
+    signIn: (input: { clientId: string; nonce: string; transactionId: string }) =>
+      ipcRenderer.invoke("clisbot:google:sign-in", input),
+  },
+  deviceSecrets: {
+    read: (key: string) => ipcRenderer.invoke("clisbot:device-secret:read", key),
+    write: (key: string, value: string) =>
+      ipcRenderer.invoke("clisbot:device-secret:write", key, value),
+    delete: (key: string) => ipcRenderer.invoke("clisbot:device-secret:delete", key),
+  },
   editor: {
     listTargets: () => ipcRenderer.invoke("clisbot:editor:listTargets"),
     openTarget: (input: {

@@ -8,6 +8,9 @@ import { withOutput } from "../../output/index.js";
 import { addJsonOption } from "../../utils/command-options.js";
 import { getErrorMessage } from "../../utils/errors.js";
 import { DEFAULT_KILL_TIMEOUT_MS, DEFAULT_STOP_TIMEOUT_MS, stopLocalHub } from "./local-hub.js";
+import { resolveLocalHubHome } from "./local-hub.js";
+import { stopGateway } from "../serve/gateway-launch.js";
+import { removeTailscaleServe } from "../serve/tailscale.js";
 import type {
   CommandError,
   CommandOptions,
@@ -20,7 +23,12 @@ interface StopResult {
   home: string;
   pid: string;
   forced: boolean;
-  reason: "not_running" | "owner_pid_signal" | "owner_pid_sigkill";
+  reason:
+    | "not_running"
+    | "owner_pid_signal"
+    | "owner_pid_sigkill"
+    | "web_shutdown"
+    | "tailscale_removed";
   message: string;
 }
 
@@ -66,6 +74,26 @@ export async function runStopCommand(
   );
 
   try {
+    if (options.web && options.tailscale) throw new Error("Choose either --web or --tailscale");
+    if (options.web || options.tailscale) {
+      const selectedHome = resolveLocalHubHome({ home });
+      if (options.web) await stopGateway(selectedHome);
+      else await removeTailscaleServe(selectedHome);
+      return {
+        type: "single",
+        schema: stopResultSchema,
+        data: {
+          action: "stopped",
+          home: selectedHome,
+          pid: "-",
+          forced: false,
+          reason: options.web ? "web_shutdown" : "tailscale_removed",
+          message: options.web
+            ? "Web/gateway stopped; daemon and Hub preserved"
+            : "Clisbot-owned Tailscale Serve mapping removed; services preserved",
+        },
+      };
+    }
     const result = await stopLocalHub({ home, force, timeoutMs, killTimeoutMs });
     return {
       type: "single",
@@ -94,6 +122,8 @@ export function stopCommand(): Command {
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)")
     .option("--timeout <seconds>", "Wait timeout before failing (default: 15)")
     .option("--force", "Send SIGKILL if graceful stop times out")
+    .option("--web", "Stop only web/gateway; preserve daemon and Hub")
+    .option("--tailscale", "Remove only the Clisbot-owned Serve mapping; preserve services")
     .option("--kill-timeout <seconds>", "Wait after SIGKILL before failing (default: 3)");
   command.action(withOutput(runStopCommand));
   return command;

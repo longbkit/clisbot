@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { startDaemonInstance, resolveClisbotHome } from "@clisbot/server/daemon-control";
+import { nodeEntrypointArguments } from "../../utils/node-entrypoint.js";
 const require = createRequire(import.meta.url);
 function resolveServerRunnerFromDir(currentDir: string): string | null {
   const packageJsonPath = path.join(currentDir, "package.json");
@@ -55,7 +56,7 @@ export async function launchLocalDaemon(options: {
     return await startDaemonInstance({
       home: resolveClisbotHome({ CLISBOT_HOME: options.home }),
       command: process.execPath,
-      args: [...(entry.endsWith(".ts") ? ["--import", "tsx"] : []), entry],
+      args: nodeEntrypointArguments(entry),
       env: options.listen ? { ...process.env, CLISBOT_LISTEN: options.listen } : process.env,
       mode: options.foreground || options.listen ? "deployment" : "managed",
       foreground: options.foreground,

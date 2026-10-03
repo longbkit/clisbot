@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { createCli } from "./cli.js";
 
 describe("canonical CLI surface", () => {
+  it("keeps serving on existing onboarding and Hub lifecycle commands", () => {
+    const cli = createCli();
+    expect(cli.commands.some((command) => command.name() === "serve")).toBe(false);
+    expect(
+      cli.commands.find((command) => command.name() === "onboard")?.helpInformation(),
+    ).toContain("--transport");
+    const hub = cli.commands.find((command) => command.name() === "hub");
+    expect(
+      hub?.commands.find((command) => command.name() === "start")?.helpInformation(),
+    ).toContain("--personal");
+    expect(hub?.commands.find((command) => command.name() === "stop")?.helpInformation()).toContain(
+      "--web",
+    );
+  });
   it("offers daemon host selection as a global option", () => {
     expect(createCli().helpInformation()).toContain("--host <host>");
   });

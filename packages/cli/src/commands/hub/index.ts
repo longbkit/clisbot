@@ -28,6 +28,7 @@ import { planHubLoginConnection } from "./login-connection.js";
 import { startCommand as startLocalHubCommand } from "./start.js";
 import { stopCommand as stopLocalHubCommand } from "./stop.js";
 import { addHubPermissionsCommand } from "./permissions.js";
+import { addHubDevicePairingCommands } from "./device-pairing.js";
 
 interface HubCommandEnvironment {
   env: Readonly<Record<string, string | undefined>>;
@@ -63,6 +64,7 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
   // COMPAT(clisbot-hub-local): embedded-Hub lifecycle before the remote verbs.
   hub.addCommand(startLocalHubCommand());
   hub.addCommand(stopLocalHubCommand());
+  addHubDevicePairingCommands(hub);
   if (isOnboardingEnabled(environment.env)) hub.addCommand(passwordCommand());
 
   addHubLoginCommand(hub, {

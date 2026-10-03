@@ -24,7 +24,9 @@
     "test:unit": "vitest run src",
     "test:local": "tsx tests/run-all.ts",
     "test:e2e": "npm run test:local",
-    "test:e2e:lifecycle": "npx tsx tests/e2e/agent-lifecycle.test.ts"
+    "test:e2e:lifecycle": "npx tsx tests/e2e/agent-lifecycle.test.ts",
+    "test:e2e:personal-serving": "node tests/e2e/personal-serving.mjs",
+    "test:e2e:packaged-serving": "node tests/e2e/personal-serving.packaged.mjs"
   },
   "dependencies": {
     "@clack/prompts": "^1.0.0",

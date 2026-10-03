@@ -4,6 +4,7 @@ const path = require("path");
 const { smokePackagedDesktopApp } = require("../e2e/packaged-app-smoke.js");
 
 const { installLinuxLauncher } = require("./linux-sandbox");
+const { verifyPersonalBackends } = require("./verify-personal-backends");
 
 const EXECUTABLE_NAME = "Clisbot";
 
@@ -114,6 +115,12 @@ function fmtMB(bytes) {
 exports.default = async function afterPack(context) {
   const platform = context.electronPlatformName;
   const arch = ARCH_MAP[context.arch] || process.arch;
+
+  verifyPersonalBackends(
+    platform === "darwin"
+      ? path.join(context.appOutDir, `${EXECUTABLE_NAME}.app`, "Contents", "Resources")
+      : path.join(context.appOutDir, "resources"),
+  );
 
   pruneNativeModules(context.appOutDir, platform, arch);
 
