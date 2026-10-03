@@ -26,6 +26,7 @@ export const botsCopy = {
   hostOffline: "This Host is offline",
   noChats: "No chats yet",
   noBots: "No bots yet",
+  firstBotHint: "Create a bot to chat with it here",
   showMore: "Show more",
   showLess: "Show less",
   working: "Working",

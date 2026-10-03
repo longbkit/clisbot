@@ -14,6 +14,8 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { View, Text, Pressable } from "react-native";
+import { Plus } from "lucide-react-native";
+import { Button } from "@/components/ui/button";
 import { BotFace } from "../chat/bot-face";
 import { botsCopy } from "../copy";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
@@ -78,6 +80,7 @@ export const BotsSection = memo(function BotsSection({
   const [collapsed, toggleCollapsed] = useSectionCollapsed("bots");
   const visibleBots = recentSidebarBots(bots, selectedBotKey);
   const hasMoreBots = bots.length > visibleBots.length;
+  const showFirstBot = canCreateBot && !loading && !loadError && directoryBots.length === 0;
   return (
     <View testID="sidebar-bots-section">
       <BotsSectionHeader
@@ -92,6 +95,7 @@ export const BotsSection = memo(function BotsSection({
       />
       {!collapsed ? (
         <>
+          {showFirstBot ? <FirstBotPrompt onPress={onCreateBot} /> : null}
           {visibleBots.map((bot) => (
             <BotRow
               key={bot.key}
@@ -176,6 +180,44 @@ const BotRow = memo(function BotRow({
 });
 
 const botsDisplayMenu = <SectionDisplayMenu section="bots" />;
+
+/** The empty Bots section, styled like the Projects empty state (`SidebarProjectEmptyState`). */
+function FirstBotPrompt({ onPress }: { onPress: () => void }) {
+  return (
+    <View style={firstBotStyles.container} testID="sidebar-bots-first">
+      <Text style={firstBotStyles.title}>{botsCopy.noBots}</Text>
+      <Text style={firstBotStyles.description}>{botsCopy.firstBotHint}</Text>
+      <Button variant="ghost" size="sm" leftIcon={Plus} onPress={onPress}>
+        {botsCopy.form.create}
+      </Button>
+    </View>
+  );
+}
+
+const firstBotStyles = StyleSheet.create((theme) => ({
+  container: {
+    marginHorizontal: theme.spacing[2],
+    marginTop: theme.spacing[4],
+    paddingTop: theme.spacing[6],
+    paddingBottom: theme.spacing[4],
+    paddingHorizontal: theme.spacing[4],
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.surface0,
+    alignItems: "center",
+    gap: theme.spacing[3],
+  },
+  title: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    textAlign: "center",
+  },
+  description: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    textAlign: "center",
+  },
+}));
 
 const directoryStyles = StyleSheet.create((theme) => ({
   directory: { minHeight: 280, maxHeight: 520, flexShrink: 1, gap: 8 },

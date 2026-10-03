@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Alert } from "@/components/ui/alert";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,15 @@ export function BotCreateForm(props: BotCreateFormProps) {
   const footer = useMemo(
     () => (
       <View style={compact ? styles.footerMobile : styles.footerDesktop}>
-        <Button size={size} disabled={!state.canSubmit || busy} onPress={submitAction}>
+        <Button
+          size={size}
+          variant="default"
+          disabled={!state.canSubmit || busy}
+          onPress={submitAction}
+        >
           {busy ? "Saving…" : submitLabel}
         </Button>
-        <Button size={size} variant="ghost" onPress={onCancel}>
+        <Button size={size} variant="secondary" onPress={onCancel}>
           Cancel
         </Button>
       </View>
@@ -56,16 +62,8 @@ export function BotCreateForm(props: BotCreateFormProps) {
         size={size}
         hosts={hosts}
       />
-      {providerSnapshot.error ? (
-        <Text accessibilityRole="alert" style={styles.text}>
-          {providerSnapshot.error}
-        </Text>
-      ) : null}
-      {state.submitError ? (
-        <Text accessibilityRole="alert" style={styles.text}>
-          {state.submitError}
-        </Text>
-      ) : null}
+      {providerSnapshot.error ? <Alert variant="error" title={providerSnapshot.error} /> : null}
+      {state.submitError ? <Alert variant="error" title={state.submitError} /> : null}
     </BotFormLayout>
   );
 }

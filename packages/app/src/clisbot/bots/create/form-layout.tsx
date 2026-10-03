@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { StyleSheet } from "react-native-unistyles";
+import { SHEET_HORIZONTAL_PADDING_SCALE } from "@/components/adaptive-modal-sheet";
 
 /** Sheet-owned scrolling keeps the submission action clear of the keyboard. */
 export function BotFormLayout({
@@ -44,11 +45,18 @@ const styles = StyleSheet.create((theme) => ({
     maxHeight: "100%",
   },
   scroll: { flexGrow: { xs: 1, md: 0 }, flexShrink: 1, minHeight: 0 },
-  fields: { padding: theme.spacing[4], gap: theme.spacing[3] },
+  // The sheet's own gutter, so fields and footer sit on the same rail as the sheet title.
+  fields: {
+    paddingHorizontal: theme.spacing[SHEET_HORIZONTAL_PADDING_SCALE],
+    paddingVertical: theme.spacing[4],
+    gap: theme.spacing[3],
+  },
   footer: {
-    padding: theme.spacing[4],
+    paddingHorizontal: theme.spacing[SHEET_HORIZONTAL_PADDING_SCALE],
+    paddingVertical: theme.spacing[3],
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface0,
+    // Same divider as AdaptiveModalSheet's own header and footer; the footer sits on the sheet's
+    // surface, so it carries no fill of its own.
+    borderTopColor: theme.colors.surface2,
   },
 }));

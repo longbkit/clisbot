@@ -31,7 +31,7 @@ export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
     !form.busy;
   const footer = useMemo(
     () => (
-      <Button size={size} disabled={!canCreate} onPress={form.submit}>
+      <Button size={size} variant="default" disabled={!canCreate} onPress={form.submit}>
         {form.busy ? "Creating…" : "Create group chat"}
       </Button>
     ),

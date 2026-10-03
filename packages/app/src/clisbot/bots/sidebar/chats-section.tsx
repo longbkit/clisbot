@@ -66,6 +66,8 @@ export const ChatsSection = memo(function ChatsSection({
     [onBeforeNavigate, router],
   );
   const [collapsed, toggleCollapsed] = useSectionCollapsed("chats");
+  // Before the first bot exists there is nothing to group; the Bots section promotes creation.
+  if (!canCreateChat && chats.length === 0) return null;
   return (
     <View testID="sidebar-chats-section">
       <BotsSectionHeader

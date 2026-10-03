@@ -32,6 +32,7 @@ export function FusionPinnedSection({ onBeforeNavigate }: { onBeforeNavigate?: (
     menu?.remove();
     closeMenu();
   }, [menu, closeMenu]);
+  if (rows.length === 0 && !error) return null;
   return (
     <>
       <BotsSectionHeader

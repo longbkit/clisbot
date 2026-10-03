@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BotsSection, type BotsSidebarBot } from "./bots-section";
 
@@ -142,12 +142,24 @@ describe("BotsSection", () => {
     });
   });
 
-  it("always offers Create bot in the header without a bottom create row", () => {
+  it("offers Create bot in the header", () => {
     const onCreateBot = vi.fn();
-    render(<BotsSection bots={[]} onPressBot={vi.fn()} onCreateBot={onCreateBot} />);
+    render(<BotsSection bots={[bot("a")]} onPressBot={vi.fn()} onCreateBot={onCreateBot} />);
     fireEvent.click(screen.getByRole("button", { name: "Create bot" }));
     expect(onCreateBot).toHaveBeenCalledOnce();
-    expect(screen.queryByText("New bot")).toBeNull();
+  });
+  it("promotes the first bot only when none exist and creation is allowed", () => {
+    const onCreateBot = vi.fn();
+    const { rerender } = render(
+      <BotsSection bots={[]} onPressBot={vi.fn()} onCreateBot={onCreateBot} />,
+    );
+    const card = screen.getByTestId("sidebar-bots-first");
+    fireEvent.click(within(card).getByRole("button", { name: "Create bot" }));
+    expect(onCreateBot).toHaveBeenCalledOnce();
+    rerender(<BotsSection bots={[]} onPressBot={vi.fn()} onCreateBot={onCreateBot} loading />);
+    expect(screen.queryByTestId("sidebar-bots-first")).toBeNull();
+    rerender(<BotsSection bots={[bot("a")]} onPressBot={vi.fn()} onCreateBot={onCreateBot} />);
+    expect(screen.queryByTestId("sidebar-bots-first")).toBeNull();
   });
   it("offers pin options for use-only bots and shows private chat time", () => {
     render(
@@ -179,3 +191,10 @@ vi.mock("@/components/ui/scroll-view", () => ({ FlatList: () => null }));
 
 vi.mock("./directory-controls", () => ({ DirectoryControls: () => null }));
 vi.mock("@/components/ui/loading-spinner", () => ({ LoadingSpinner: () => null }));
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, onPress }: { children: React.ReactNode; onPress?: () => void }) => (
+    <button type="button" onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));

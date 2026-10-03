@@ -54,6 +54,7 @@ function HostRow({ state, model, hosts }: Pick<Props, "state" | "model" | "hosts
   return (
     <SetupSelectRow
       label="Host"
+      first
       value={state.selectedHostDisplay?.label ?? "Choose a Host"}
       placeholder={!state.selectedHostDisplay}
       options={options}

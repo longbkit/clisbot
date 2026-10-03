@@ -94,10 +94,9 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  selected: {
-    borderColor: theme.colors.foreground,
-    backgroundColor: theme.colors.surface2,
-  },
+  // A selected choice is a surface3 fill (docs/design.md, segmented control); the radio dot
+  // carries the selection, so the border stays the neutral one.
+  selected: { backgroundColor: theme.colors.surface3 },
   faded: { opacity: 0.5 },
   content: { flex: 1, minWidth: 0 },
   title: { color: theme.colors.foreground, fontSize: theme.fontSize.base },

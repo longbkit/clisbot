@@ -181,14 +181,9 @@ describe("ChatsSection", () => {
   });
 });
 
-it("keeps group creation discoverable but disabled until a bot exists", () => {
-  const create = vi.fn();
-  render(<ChatsSection chats={[]} onCreateChat={create} canCreateChat={false} />);
-  const button = screen.getByRole("button", { name: "Create group chat" });
-  expect(button.hasAttribute("disabled")).toBe(true);
-  fireEvent.click(button);
-  expect(create).not.toHaveBeenCalled();
-  expect(screen.getByText("Add at least two bots on one Host to start a group chat.")).toBeTruthy();
+it("hides the section until a bot exists", () => {
+  render(<ChatsSection chats={[]} onCreateChat={vi.fn()} canCreateChat={false} />);
+  expect(screen.queryByTestId("sidebar-chats-section")).toBeNull();
 });
 
 vi.mock("@/stores/sidebar-collapsed-sections-store", () => ({

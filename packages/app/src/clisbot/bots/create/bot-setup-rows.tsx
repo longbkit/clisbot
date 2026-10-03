@@ -21,6 +21,7 @@ export interface SetupRowLook {
   value: string;
   placeholder?: boolean;
   leading?: ReactNode;
+  first?: boolean;
   last?: boolean;
 }
 
@@ -30,6 +31,7 @@ export function SetupRowView({
   value,
   placeholder = false,
   leading,
+  first = false,
   last = false,
   interactive,
   highlighted,
@@ -40,7 +42,8 @@ export function SetupRowView({
       testID={testID}
       style={[
         styles.row,
-        !last && styles.divider,
+        first && styles.first,
+        last ? styles.last : styles.divider,
         interactive && highlighted && styles.highlighted,
       ]}
     >
@@ -144,7 +147,16 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface1,
-    overflow: "hidden",
+    // No overflow clipping: it cut a focused row's keyboard ring down to two bars. The end rows
+    // round their own corners so a hover fill still follows the card.
+  },
+  first: {
+    borderTopLeftRadius: theme.borderRadius.lg - 1,
+    borderTopRightRadius: theme.borderRadius.lg - 1,
+  },
+  last: {
+    borderBottomLeftRadius: theme.borderRadius.lg - 1,
+    borderBottomRightRadius: theme.borderRadius.lg - 1,
   },
   row: {
     flexDirection: "row",
