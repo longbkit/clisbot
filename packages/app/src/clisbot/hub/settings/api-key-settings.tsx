@@ -4,8 +4,6 @@ import { StyleSheet } from "react-native-unistyles";
 import { z } from "zod";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FormTextInput } from "@/components/ui/form-field";
-import { Switch } from "@/components/ui/switch";
 import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
@@ -13,15 +11,10 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
 import { hubResourceQueryKey } from "../query-keys";
-
-const API_KEY_SCOPES = [
-  "projects:read",
-  "configuration:validate",
-  "configuration:install",
-  "runs:dispatch",
-  "daemons:enroll",
-] as const;
-type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+import { ApiKeyCreateSheet } from "./api-key-create-sheet";
+import { API_KEY_SCOPES, SCOPE_DETAILS, type ApiKeyScope } from "./api-key-scopes";
+import { EmptyRow } from "./resource-rows";
+import { RowActionsMenu } from "./team/row-actions-menu";
 
 const ApiKeySummarySchema = z.object({
   id: z.string(),
@@ -48,29 +41,6 @@ const CreatedApiKeySchema = z.object({ key: ApiKeySummarySchema, secret: z.strin
 type ApiKeySummary = z.infer<typeof ApiKeySummarySchema>;
 type CliCredentialSummary = z.infer<typeof ApiKeysSchema>["cliCredentials"][number];
 
-const SCOPE_DETAILS: Record<ApiKeyScope, { label: string; description: string }> = {
-  "projects:read": {
-    label: "Read Projects",
-    description: "List Project configuration through the public API.",
-  },
-  "configuration:validate": {
-    label: "Validate configuration",
-    description: "Check configuration without activating it.",
-  },
-  "configuration:install": {
-    label: "Install configuration",
-    description: "Activate Project configuration revisions.",
-  },
-  "runs:dispatch": {
-    label: "Start Automation runs",
-    description: "Dispatch configured Automation runs.",
-  },
-  "daemons:enroll": {
-    label: "Enroll Hosts",
-    description: "Issue short-lived daemon enrollment tokens.",
-  },
-};
-
 /** Shared API-key administration for Clisbot web, native, and Electron. */
 export function ApiKeySettings() {
   const hub = useHubAccount();
@@ -84,8 +54,7 @@ export function ApiKeySettings() {
     retry: false,
     staleTimeMs: 0,
   });
-  const [name, setName] = useState("");
-  const [scopes, setScopes] = useState<Set<ApiKeyScope>>(new Set());
+  const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState(false);
@@ -99,25 +68,26 @@ export function ApiKeySettings() {
     [query.data?.cliCredentials],
   );
 
-  const create = useCallback(async () => {
-    if (name.trim().length === 0 || scopes.size === 0) return;
-    setPending(true);
-    setError(null);
-    try {
-      const result = await hub
-        .api()
-        .postAuth("api-keys", { name: name.trim(), scopes: [...scopes] }, CreatedApiKeySchema);
-      setSecret(result.secret);
-      setCopied(false);
-      setName("");
-      setScopes(new Set());
-      await query.refetch();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Hub request failed.");
-    } finally {
-      setPending(false);
-    }
-  }, [hub, name, query, scopes]);
+  const create = useCallback(
+    async (name: string, scopes: ApiKeyScope[]) => {
+      setPending(true);
+      setError(null);
+      try {
+        const result = await hub.api().postAuth("api-keys", { name, scopes }, CreatedApiKeySchema);
+        setSecret(result.secret);
+        setCopied(false);
+        setCreating(false);
+        await query.refetch();
+        return true;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Hub request failed.");
+        return false;
+      } finally {
+        setPending(false);
+      }
+    },
+    [hub, query],
+  );
 
   const revoke = useCallback(
     async (kind: "api-key" | "cli-credential", id: string, label: string) => {
@@ -156,23 +126,19 @@ export function ApiKeySettings() {
     setCopied(true);
   }, [secret]);
   const dismissSecret = useCallback(() => setSecret(null), []);
-  const createKey = useCallback(() => void create(), [create]);
-  const toggleScope = useCallback((scope: ApiKeyScope, enabled: boolean) => {
-    setScopes((current) => {
-      const next = new Set(current);
-      if (enabled) next.add(scope);
-      else next.delete(scope);
-      return next;
-    });
-  }, []);
+  const openCreate = useCallback(() => setCreating(true), []);
+  const closeCreate = useCallback(() => setCreating(false), []);
+  const createButton = useMemo(
+    () => (
+      <Button size="sm" onPress={openCreate}>
+        Create…
+      </Button>
+    ),
+    [openCreate],
+  );
 
   return (
-    <SettingsSection title="API keys">
-      <Alert
-        variant="info"
-        title="For external integrations and CLI automation"
-        description="Clisbot itself does not need an API key. Create one only for a machine or script, and grant only the operations it needs."
-      />
+    <SettingsSection title="API keys" info={API_KEYS_INFO} trailing={createButton}>
       {query.error ? <Alert variant="error" title={query.error.message} /> : null}
       {error ? <Alert variant="error" title={error} /> : null}
       {secret === null ? null : (
@@ -195,35 +161,6 @@ export function ApiKeySettings() {
       <View style={settingsStyles.card}>
         <ApiKeyList keys={activeKeys} pending={pending} loading={query.isPending} revoke={revoke} />
       </View>
-      <View style={[settingsStyles.card, styles.form]}>
-        <Field label="Key name" hint="Name the machine or integration that will hold it.">
-          <FormTextInput
-            initialValue=""
-            resetKey={query.data?.keys.length ?? 0}
-            onChangeText={setName}
-            placeholder="CI deployment"
-            editable={!pending}
-          />
-        </Field>
-        <View style={styles.scopeList}>
-          {API_KEY_SCOPES.map((scope) => (
-            <ScopeToggleRow
-              key={scope}
-              scope={scope}
-              selected={scopes.has(scope)}
-              pending={pending}
-              toggle={toggleScope}
-            />
-          ))}
-        </View>
-        <Button
-          disabled={pending || name.trim().length === 0 || scopes.size === 0}
-          loading={pending}
-          onPress={createKey}
-        >
-          Create API key
-        </Button>
-      </View>
       {activeCliCredentials.length === 0 ? null : (
         <View style={settingsStyles.card}>
           {activeCliCredentials.map((credential, index) => (
@@ -237,9 +174,18 @@ export function ApiKeySettings() {
           ))}
         </View>
       )}
+      <ApiKeyCreateSheet
+        visible={creating}
+        pending={pending}
+        onCreate={create}
+        onClose={closeCreate}
+      />
     </SettingsSection>
   );
 }
+
+const API_KEYS_INFO =
+  "Keys for scripts, CI or other machines that call the Hub API. Clisbot itself never needs one.";
 
 function ApiKeyList({
   keys,
@@ -254,7 +200,7 @@ function ApiKeyList({
 }) {
   if (loading) return <InfoRow title="Loading API keys…" />;
   if (keys.length === 0) {
-    return <InfoRow title="No active API keys" hint="Clisbot works without one." />;
+    return <EmptyRow message="No API keys. Create one only for a script or CI." />;
   }
   return keys.map((key, index) => (
     <ApiKeyRow key={key.id} apiKey={key} bordered={index > 0} pending={pending} revoke={revoke} />
@@ -287,33 +233,11 @@ function ApiKeyRow({
           {apiKey.lastUsedAt === null ? "Never used" : `Last used ${formatDate(apiKey.lastUsedAt)}`}
         </Text>
       </View>
-      <Button size="xs" variant="ghost" disabled={pending} onPress={handleRevoke}>
-        Revoke
-      </Button>
-    </View>
-  );
-}
-
-function ScopeToggleRow({
-  scope,
-  selected,
-  pending,
-  toggle,
-}: {
-  scope: ApiKeyScope;
-  selected: boolean;
-  pending: boolean;
-  toggle(scope: ApiKeyScope, enabled: boolean): void;
-}) {
-  const handleToggle = useCallback((enabled: boolean) => toggle(scope, enabled), [scope, toggle]);
-  const detail = SCOPE_DETAILS[scope];
-  return (
-    <View style={styles.row}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{detail.label}</Text>
-        <Text style={settingsStyles.rowHint}>{detail.description}</Text>
-      </View>
-      <Switch value={selected} disabled={pending} onValueChange={handleToggle} />
+      <RowActionsMenu
+        label="Key actions"
+        actions={[{ label: "Revoke", onSelect: handleRevoke, destructive: true }]}
+        disabled={pending}
+      />
     </View>
   );
 }
@@ -339,9 +263,11 @@ function CliCredentialRow({
         <Text style={settingsStyles.rowTitle}>CLI credential</Text>
         <Text style={settingsStyles.rowHint}>{credential.prefix}</Text>
       </View>
-      <Button size="xs" variant="ghost" disabled={pending} onPress={handleRevoke}>
-        Revoke
-      </Button>
+      <RowActionsMenu
+        label="Key actions"
+        actions={[{ label: "Revoke", onSelect: handleRevoke, destructive: true }]}
+        disabled={pending}
+      />
     </View>
   );
 }
@@ -366,13 +292,6 @@ const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[3],
-  },
-  form: {
-    padding: theme.spacing[4],
-    gap: theme.spacing[4],
-  },
-  scopeList: {
     gap: theme.spacing[3],
   },
   secret: {
