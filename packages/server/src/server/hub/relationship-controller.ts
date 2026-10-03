@@ -139,6 +139,7 @@ export interface HubRelationshipStatus {
 }
 
 export interface HubRelationshipManagement {
+  publishConnectionOffer?(): Promise<void>;
   consumeSessionOperation?(input: {
     sessionOperationTicket: string;
     clientId: string;

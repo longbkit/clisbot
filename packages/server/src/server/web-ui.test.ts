@@ -3,6 +3,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { once } from "node:events";
+import { runInNewContext } from "node:vm";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import pino from "pino";
@@ -155,8 +156,32 @@ describe("daemon web UI route module", () => {
     expect(res.headers["content-type"]).toBe("text/html; charset=utf-8");
     expect(res.body).toContain("window.__CLISBOT_INITIAL_DAEMON_CONNECTION__");
     expect(res.body).toContain('"listen":"localhost:');
-    expect(res.body).toContain('"useTls":false');
     expect(res.body).toContain('"label":"test-label"');
+    const window = { location: { protocol: "http:" } };
+    runInNewContext(
+      res.body.match(/<script>(window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__.*?)<\/script>/)![1]!,
+      { window },
+    );
+    expect(window).toMatchObject({ __CLISBOT_INITIAL_DAEMON_CONNECTION__: { useTls: false } });
+  });
+
+  test("uses WSS when HTTPS terminates at a proxy without trusting forwarded headers", async () => {
+    const app = createApp({ enabled: true, distDir, publicDir });
+    const res = await request(app, "GET", "/", {
+      host: "personal.example.test:8443",
+      "x-forwarded-proto": "http",
+    });
+    const window = { location: { protocol: "https:" } };
+    runInNewContext(
+      res.body.match(/<script>(window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__.*?)<\/script>/)![1]!,
+      { window },
+    );
+    expect(window).toMatchObject({
+      __CLISBOT_INITIAL_DAEMON_CONNECTION__: {
+        listen: "personal.example.test:8443",
+        useTls: true,
+      },
+    });
   });
 
   test("injects hint before closing head tag", async () => {

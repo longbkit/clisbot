@@ -334,6 +334,8 @@ export const PersistedConfigSchema = z
       .optional(),
     features: z
       .object({
+        devicePairing: z.boolean().optional(),
+        personalServing: z.boolean().optional(),
         agentSessionStorage: z.boolean().optional(),
         dictation: FeatureDictationSchema.optional(),
         voiceMode: FeatureVoiceModeSchema.optional(),

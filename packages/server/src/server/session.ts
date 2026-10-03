@@ -465,6 +465,7 @@ const nodeSessionFileSystem: SessionFileSystem = {
 type AgentMcpTransportFactory = () => Promise<unknown>;
 
 export interface SessionOptions {
+  localHubOperator?: boolean;
   accountActor?: SessionActor;
   browserToolsBroker?: BrowserToolsBroker | null;
   clientId: string;
@@ -722,6 +723,7 @@ interface ClientActivity {
 }
 
 export class Session {
+  private localHubOperator: boolean;
   private accountActor?: SessionActor;
   private readonly hubRelationships?: HubRelationshipManagement;
   readonly delivery = new SessionDelivery(
@@ -858,6 +860,7 @@ export class Session {
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
 
   constructor(options: SessionOptions) {
+    this.localHubOperator = options.localHubOperator === true;
     this.accountActor = options.accountActor;
     this.hubRelationships = options.hubRelationships;
     const {
@@ -2440,6 +2443,10 @@ export class Session {
     );
   }
 
+  public canStartLocalHub(): boolean {
+    return this.localHubOperator && this.authorization.allowsPermission("access.manage");
+  }
+
   public getPermissions(): DaemonPermission[] {
     return this.authorization.listPermissions();
   }
@@ -2479,6 +2486,7 @@ export class Session {
     resourceAuthorization: SessionResourceAuthorization;
     actor?: SessionActor;
   }): void {
+    this.localHubOperator = false;
     this.authorization.replacePermissions(admission.permissions);
     this.authorization.replaceResources(admission.resourceAuthorization);
     if (admission.actor !== undefined) {
@@ -3081,6 +3089,7 @@ export class Session {
     }
   }
 
+  // eslint-disable-next-line complexity -- Keep new daemon RPC cases beside the upstream dispatch table.
   private dispatchAgentConfigMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     switch (msg.type) {
       case "set_agent_mode_request":
@@ -3106,6 +3115,21 @@ export class Session {
         return this.daemonSession.handleGetStatusRequest(msg);
       case "daemon.get_pairing_offer.request":
         return this.daemonSession.handleGetPairingOfferRequest(msg);
+      case "daemon.devices.request":
+        return this.daemonSession.handleDevicesRequest(msg);
+      case "hub.local.start.request":
+        if (!this.canStartLocalHub()) {
+          this.emit({
+            type: "rpc_error",
+            payload: {
+              requestId: msg.requestId,
+              requestType: msg.type,
+              error: "Starting a Hub requires this Host's independent owner credential",
+            },
+          });
+          return undefined;
+        }
+        return this.daemonSession.handleLocalHubStartRequest(msg);
       case "daemon.config.reload.request":
         this.daemonSession.handleConfigReloadRequest(msg);
         return undefined;

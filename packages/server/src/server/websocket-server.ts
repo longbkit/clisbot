@@ -96,6 +96,8 @@ import {
   type DaemonAuthConfig,
 } from "./auth.js";
 import { resolveSessionAdmission } from "./session-admission-auth.js";
+import { buildDeviceAccessServerFeatures } from "./device-access/server-features.js";
+import { attachEncryptedSocket } from "./relay-transport.js";
 import {
   WebSocketRuntimeMetricsWindow,
   type WebSocketRuntimeCounters,
@@ -136,13 +138,16 @@ import type {
 const WS_CLOSE_DAEMON_AUTH_FAILED = 4401;
 
 export interface ExternalSocketMetadata {
-  transport: "relay" | "hub";
+  transport: "direct" | "relay" | "hub";
+  encrypted?: boolean;
   externalSessionKey?: string;
   relayConnectionId?: string;
   hubDaemonId?: string;
 }
 
 export interface SessionAdmission {
+  localOperator?: boolean;
+  deviceCredential?: { backendId: string; credentialId: string };
   actor?: SessionActor;
   principalId: string;
   permissions: readonly DaemonPermission[];
@@ -155,6 +160,7 @@ export interface SessionAdmission {
 }
 
 interface PendingConnection {
+  encrypted: boolean;
   connectionLogger: pino.Logger;
   helloTimeout: ReturnType<typeof setTimeout> | null;
   identity: WebSocketConnectionIdentity;
@@ -179,6 +185,7 @@ interface WebSocketConnectionIdentity {
 }
 
 interface WebSocketServerConfig {
+  encryptedDirectKey?: import("@clisbot/relay/e2ee").KeyPair;
   shouldHandleUpgrade?: (request: IncomingMessage) => boolean;
   allowedOrigins?: Set<string>;
   hostnames?: HostnamesConfig;
@@ -523,6 +530,7 @@ export interface WebSocketLike {
 }
 
 interface SessionConnectionBase {
+  deviceCredentialId: string | null;
   session: Session;
   principalId: string;
   sessionKey: string;
@@ -553,6 +561,7 @@ interface PluginSessionConnection extends SessionConnectionBase {
 type SessionConnection = ReconnectableSessionConnection | PluginSessionConnection;
 
 interface SocketSessionOptions {
+  localHubOperator?: boolean;
   accountActor?: SessionActor;
   clientId: string;
   appVersion: string | null;
@@ -648,6 +657,8 @@ export class VoiceAssistantWebSocketServer {
   private readonly clisbotHome: string;
   private readonly passwordHash: string | undefined;
   private readonly credentialSource: DaemonAuthConfig | undefined;
+  private readonly revokedDevicePrincipals = new Set<string>();
+  private managedAccessGeneration = 0;
   private readonly worktreesRoot: string | undefined;
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
@@ -935,7 +946,10 @@ export class VoiceAssistantWebSocketServer {
     const wss = new WebSocketServer({
       noServer: true,
       path: "/ws",
-      handleProtocols: (protocols) => selectWebSocketProtocol(protocols, password),
+      handleProtocols: (protocols) =>
+        wsConfig.encryptedDirectKey && protocols.has("clisbot.e2ee.v1")
+          ? "clisbot.e2ee.v1"
+          : selectWebSocketProtocol(protocols, password),
       verifyClient: ({ req }, callback) => {
         this.verifyWsUpgrade(
           req,
@@ -952,6 +966,16 @@ export class VoiceAssistantWebSocketServer {
     server.on("upgrade", upgrade);
     wss.once("close", () => server.off("upgrade", upgrade));
     wss.on("connection", (ws, request) => {
+      if (wsConfig.encryptedDirectKey && ws.protocol === "clisbot.e2ee.v1") {
+        void attachEncryptedSocket(
+          ws,
+          wsConfig.encryptedDirectKey,
+          this.logger,
+          (socket, metadata) => this.attachSocket(socket, request, metadata),
+          { transport: "direct", encrypted: true },
+        );
+        return;
+      }
       void this.attachAuthenticatedSocket(ws, request, password);
     });
     return wss;
@@ -1049,7 +1073,7 @@ export class VoiceAssistantWebSocketServer {
       const token =
         extractHttpBearerToken(request.headers.authorization) ?? extractWsBearerToken(protocol);
       const hasHeaderCredential = token !== null;
-      if (password && hasHeaderCredential) {
+      if (!this.credentialSource?.deviceAuthority && password && hasHeaderCredential) {
         const requestMetadata = extractSocketRequestMetadata(request);
         const isAuthorized = await isBearerTokenValidAsync({ password, token });
         if (!isAuthorized) {
@@ -1068,7 +1092,9 @@ export class VoiceAssistantWebSocketServer {
         request,
         undefined,
         false,
-        hasHeaderCredential ? OWNER_SESSION_ADMISSION : null,
+        !this.credentialSource?.deviceAuthority && hasHeaderCredential
+          ? OWNER_SESSION_ADMISSION
+          : null,
       );
     } finally {
       ws.resume();
@@ -1169,6 +1195,44 @@ export class VoiceAssistantWebSocketServer {
 
   public prepareForShutdown(): void {
     this.connectionLifecycle = "stopping";
+  }
+
+  public async revokeDeviceSessions(deviceId: string): Promise<void> {
+    const principalId = `device:${deviceId}`;
+    this.revokedDevicePrincipals.add(principalId);
+    for (const [socket, pending] of this.pendingConnections) {
+      if (
+        pending.admission?.principalId !== principalId &&
+        pending.admission?.deviceCredential?.credentialId !== deviceId
+      )
+        continue;
+      this.clearPendingConnection(socket);
+      socket.close(WS_CLOSE_DAEMON_AUTH_FAILED, "Device revoked");
+    }
+    const connections = new Set([
+      ...this.sessions.values(),
+      ...this.externalSessionsByKey.values(),
+    ]);
+    await Promise.all(
+      [...connections]
+        .filter((c) => c.principalId === principalId || c.deviceCredentialId === deviceId)
+        .map((c) =>
+          this.closeManagedConnection(c, "Device revoked", { code: WS_CLOSE_DAEMON_AUTH_FAILED }),
+        ),
+    );
+  }
+
+  public deviceSessions(deviceId: string): { clientId: string; connected: boolean }[] {
+    return [...new Set([...this.sessions.values(), ...this.externalSessionsByKey.values()])]
+      .filter(
+        (connection) =>
+          connection.principalId === `device:${deviceId}` ||
+          connection.deviceCredentialId === deviceId,
+      )
+      .map((connection) => ({
+        clientId: connection.clientId,
+        connected: connection.sockets.size > 0,
+      }));
   }
 
   public beginAcceptingConnections(): void {
@@ -1445,6 +1509,7 @@ export class VoiceAssistantWebSocketServer {
     const connectionLogger = this.logger.child(toConnectionLogFields(identity));
 
     const pending: PendingConnection = {
+      encrypted: metadata?.encrypted === true,
       connectionLogger,
       helloTimeout: null,
       identity,
@@ -1512,6 +1577,10 @@ export class VoiceAssistantWebSocketServer {
       clientCapabilities,
       permissions: admission.permissions,
       accountActor: admission.actor,
+      localHubOperator:
+        !!this.credentialSource?.deviceAuthority &&
+        (admission.localOperator === true ||
+          (!!admission.deviceCredential && admission.leaseId === undefined)),
       ...(admission.resourceMode !== undefined &&
       admission.projects !== undefined &&
       admission.leaseId !== undefined &&
@@ -1578,6 +1647,7 @@ export class VoiceAssistantWebSocketServer {
     });
 
     const base: SessionConnectionBase = {
+      deviceCredentialId: admission.deviceCredential?.credentialId ?? null,
       session,
       principalId: admission.principalId,
       sessionKey: sessionConnectionKey(admission.principalId, clientId),
@@ -1609,6 +1679,7 @@ export class VoiceAssistantWebSocketServer {
     return new Session({
       browserToolsBroker: this.browserToolsBroker,
       clientId: options.clientId,
+      localHubOperator: options.localHubOperator,
       accountActor: options.accountActor,
       appVersion: options.appVersion,
       clientCapabilities: options.clientCapabilities,
@@ -1725,6 +1796,7 @@ export class VoiceAssistantWebSocketServer {
   }): Promise<void> {
     const { ws, message, pending } = params;
 
+    const managedAccessGeneration = this.managedAccessGeneration;
     if (message.protocolVersion < 1) {
       this.clearPendingConnection(ws);
       pending.connectionLogger.warn(
@@ -1765,11 +1837,15 @@ export class VoiceAssistantWebSocketServer {
       return;
     }
 
-    const requiresManagedAccess = this.requiresManagedAccess(pending.identity, pluginId);
+    const requiresManagedAccess = this.requiresManagedAccess(
+      pending.identity,
+      pluginId,
+      pending.admission,
+    );
     const resolveOptionalIdentity =
       this.agentManager.sessionStorageEnabled &&
       message.accessTicket !== undefined &&
-      this.isManagedAccessSubject(pending.identity, pluginId);
+      this.isManagedAccessSubject(pending.identity, pluginId, pending.admission);
     if (requiresManagedAccess || resolveOptionalIdentity) {
       const admitted = await this.admitManagedAccess({
         ws,
@@ -1779,6 +1855,14 @@ export class VoiceAssistantWebSocketServer {
         identityOnly: !requiresManagedAccess,
       });
       if (!admitted) return;
+    }
+    if (
+      managedAccessGeneration !== this.managedAccessGeneration ||
+      requiresManagedAccess !==
+        this.requiresManagedAccess(pending.identity, pluginId, pending.admission)
+    ) {
+      this.rejectManagedAccess(ws, pending, "Managed access policy changed; reconnect");
+      return;
     }
     this.completeHello({ ws, message, pending, clientId, pluginId });
   }
@@ -1820,14 +1904,21 @@ export class VoiceAssistantWebSocketServer {
       connectionLogger,
       lifecycle: pluginId ? { kind: "ephemeral-plugin", pluginId } : { kind: "reconnectable" },
       admission: admitted,
-      requiresManagedAccessInExternalMode: this.isManagedAccessSubject(pending.identity, pluginId),
+      requiresManagedAccessInExternalMode: this.isManagedAccessSubject(
+        pending.identity,
+        pluginId,
+        admitted,
+      ),
     });
     this.sessions.set(ws, connection);
     if (connection.lifecycle === "reconnectable") {
       this.externalSessionsByKey.set(sessionKey, connection);
     }
     pending.identity.sessionId = connection.session.getSessionId();
-    this.sendToClient(ws, this.createServerInfoMessage(connection.session));
+    this.sendToClient(
+      ws,
+      this.createServerInfoMessage(connection.session, admitted.deviceCredential),
+    );
     connection.connectionLogger.info(
       {
         ...toConnectionLogFields(pending.identity),
@@ -1841,8 +1932,11 @@ export class VoiceAssistantWebSocketServer {
   private requiresManagedAccess(
     identity: WebSocketConnectionIdentity,
     pluginId: string | undefined,
+    admission?: SessionAdmission | null,
   ): boolean {
-    return this.managedAccessEnforced() && this.isManagedAccessSubject(identity, pluginId);
+    return (
+      this.managedAccessEnforced() && this.isManagedAccessSubject(identity, pluginId, admission)
+    );
   }
 
   /** `external` asks for tickets only once the daemon belongs to a Hub (hub-membership.ts). */
@@ -1865,8 +1959,20 @@ export class VoiceAssistantWebSocketServer {
       throw new Error("Managed access external mode requires an admission resolver");
     }
     const previous = this.managedAccess.mode;
+    if (previous !== mode) this.managedAccessGeneration++;
     this.managedAccess = { ...this.managedAccess, mode };
     this.broadcastCapabilitiesUpdate();
+    if (this.credentialSource?.deviceAuthority && previous === "external" && mode === "off") {
+      for (const connection of new Set(this.externalSessionsByKey.values())) {
+        if (connection.managedLeaseId !== null)
+          void this.closeManagedConnection(
+            connection,
+            "Daemon device credentials are now required",
+            { code: MANAGED_ACCESS_REBIND_CLOSE_CODE },
+          );
+      }
+      return;
+    }
     if (previous === "external" || !this.managedAccessEnforced()) return;
     this.closeTicketlessSessions();
   }
@@ -1882,7 +1988,15 @@ export class VoiceAssistantWebSocketServer {
   private isManagedAccessSubject(
     identity: WebSocketConnectionIdentity,
     pluginId: string | undefined,
+    admission?: SessionAdmission | null,
   ): boolean {
+    if (
+      admission?.localOperator &&
+      identity.transport === "direct" &&
+      identity.peer === "loopback" &&
+      !identity.browserOrigin
+    )
+      return false;
     return pluginId === undefined && identity.transport !== "hub" && identity.peer !== "local_ipc";
   }
 
@@ -1916,7 +2030,12 @@ export class VoiceAssistantWebSocketServer {
         if (!pending.admission) throw new Error("Identity resolution requires session admission");
         pending.admission = { ...pending.admission, actor: admission.actor };
       } else {
-        pending.admission = admission;
+        pending.admission = {
+          ...admission,
+          ...(pending.admission?.deviceCredential
+            ? { deviceCredential: pending.admission.deviceCredential }
+            : {}),
+        };
       }
       return true;
     } catch (error) {
@@ -1979,11 +2098,25 @@ export class VoiceAssistantWebSocketServer {
         passwordHash: this.passwordHash,
         localCredential: this.credentialSource?.localCredential?.() ?? null,
         transport: pending.identity.transport === "relay" ? "relay" : "direct",
+        deviceAuthority: this.credentialSource?.deviceAuthority,
+        hello: message,
+        allowManagedTicket: this.requiresManagedAccess(
+          pending.identity,
+          this.pluginSocketIds.get(ws),
+        ),
+        encrypted: pending.encrypted,
       });
       if (this.pendingConnections.get(ws) !== pending) return false;
-      if ("rejection" in resolved) {
+      if (
+        "rejection" in resolved ||
+        this.revokedDevicePrincipals.has(resolved.admission.principalId)
+      ) {
         this.clearPendingConnection(ws);
-        await this.rejectHello(ws, message, resolved.rejection);
+        await this.rejectHello(
+          ws,
+          message,
+          "rejection" in resolved ? resolved.rejection : "incorrect_password",
+        );
         return false;
       }
       pending.admission = resolved.admission;
@@ -2028,6 +2161,7 @@ export class VoiceAssistantWebSocketServer {
   }
 
   private rebindManagedAdmission(connection: SessionConnection, admission: SessionAdmission): void {
+    connection.deviceCredentialId = admission.deviceCredential?.credentialId ?? null;
     if (
       admission.leaseId === undefined ||
       admission.leaseExpiresAt === undefined ||
@@ -2131,7 +2265,10 @@ export class VoiceAssistantWebSocketServer {
     existing.sockets.add(ws);
     this.sessions.set(ws, existing);
     pending.identity.sessionId = existing.session.getSessionId();
-    this.sendToClient(ws, this.createServerInfoMessage(existing.session));
+    this.sendToClient(
+      ws,
+      this.createServerInfoMessage(existing.session, pending.admission?.deviceCredential),
+    );
     pending.connectionLogger.info(
       {
         ...toConnectionLogFields(pending.identity),
@@ -2155,6 +2292,12 @@ export class VoiceAssistantWebSocketServer {
       desktopManaged: this.daemonRuntimeConfig?.desktopManaged === true,
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
       features: {
+        ...buildDeviceAccessServerFeatures({
+          hasDeviceAuthority: Boolean(this.credentialSource?.deviceAuthority),
+          hasHubRelationships: Boolean(this.hubRelationships),
+          hasLocalHubLauncher: Boolean(this.daemonRuntimeConfig?.startLocalHub),
+          canStartLocalHub: () => session.canStartLocalHub(),
+        }),
         ...(this.agentManager.sessionStorageEnabled ? { agentSessionStorage: true } : {}),
         ...(this.agentManager.sessionStorageReadable ? { agentSessionStorageRead: true } : {}),
         ownedSubscriptions: true,
@@ -2322,12 +2465,18 @@ export class VoiceAssistantWebSocketServer {
     };
   }
 
-  private createServerInfoMessage(session: Session): WSOutboundMessage {
+  private createServerInfoMessage(
+    session: Session,
+    deviceCredential?: SessionAdmission["deviceCredential"],
+  ): WSOutboundMessage {
     return {
       type: "session",
       message: {
         type: "status",
-        payload: this.buildServerInfoStatusPayload(session),
+        payload: {
+          ...this.buildServerInfoStatusPayload(session),
+          ...(deviceCredential ? { deviceCredential } : {}),
+        },
       },
     };
   }

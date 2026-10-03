@@ -329,6 +329,7 @@ interface SessionForTestOptions {
   serverId?: SessionOptions["serverId"];
   daemonVersion?: SessionOptions["daemonVersion"];
   daemonRuntimeConfig?: SessionOptions["daemonRuntimeConfig"];
+  localHubOperator?: boolean;
   downloadTokenStore?: SessionOptions["downloadTokenStore"];
   pushNotifications?: SessionOptions["pushNotifications"];
   messages?: unknown[];
@@ -446,6 +447,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     serverId: options.serverId,
     daemonVersion: options.daemonVersion,
     daemonRuntimeConfig: options.daemonRuntimeConfig,
+    localHubOperator: options.localHubOperator,
     permissions: options.permissions ?? OWNER_PERMISSIONS,
     ...(options.resourceAuthorization
       ? { resourceAuthorization: options.resourceAuthorization }
@@ -2013,6 +2015,66 @@ test("push token revocation only acknowledges durable removal", async () => {
 });
 
 describe("daemon status + pairing RPC", () => {
+  test("Hub-granted daemon management never authorizes Host-local Hub bootstrap", async () => {
+    const startLocalHub = vi.fn();
+    const messages: SessionOutboundMessage[] = [];
+    const session = createSessionForTest({
+      messages,
+      daemonRuntimeConfig: {
+        listen: "127.0.0.1:6868",
+        getRelayConfig: () => null,
+        startLocalHub,
+      },
+    });
+    expect(session.canStartLocalHub()).toBe(false);
+    await session.handleMessage({ type: "hub.local.start.request", requestId: "start-unapproved" });
+    expect(startLocalHub).not.toHaveBeenCalled();
+    expect(messages).toContainEqual({
+      type: "rpc_error",
+      payload: {
+        requestId: "start-unapproved",
+        requestType: "hub.local.start.request",
+        error: "Starting a Hub requires this Host's independent owner credential",
+      },
+    });
+  });
+
+  test("explicit independent Host owner can start Hub without restarting daemon, and permission loss disables it", async () => {
+    const result = {
+      url: "https://app.clisbot.com/#offer=approved",
+      hub: { hubId: "hub-1", publicKey: "pinned" },
+      transport: "relay" as const,
+    };
+    const startLocalHub = vi.fn().mockResolvedValue(result);
+    const messages: SessionOutboundMessage[] = [];
+    const session = createSessionForTest({
+      messages,
+      localHubOperator: true,
+      daemonRuntimeConfig: {
+        listen: "127.0.0.1:6868",
+        getRelayConfig: () => null,
+        startLocalHub,
+      },
+    });
+    expect(session.canStartLocalHub()).toBe(true);
+    await session.handleMessage({
+      type: "hub.local.start.request",
+      requestId: "approved",
+      label: "Phone",
+      transport: "relay",
+    });
+    expect(startLocalHub).toHaveBeenCalledWith({
+      label: "Phone",
+      transport: "relay",
+      publicUrl: undefined,
+    });
+    expect(messages).toContainEqual({
+      type: "hub.local.start.response",
+      payload: { requestId: "approved", ...result },
+    });
+    session.setPermissions([]);
+    expect(session.canStartLocalHub()).toBe(false);
+  });
   const tempDirs: string[] = [];
 
   afterEach(() => {

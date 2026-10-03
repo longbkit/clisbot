@@ -1,6 +1,10 @@
 import os from "node:os";
 
-import { ConnectionOfferV2Schema, type ConnectionOffer } from "@clisbot/protocol/connection-offer";
+import {
+  ConnectionOfferV2Schema,
+  type ConnectionOffer,
+  type ConnectionOfferV2,
+} from "@clisbot/protocol/connection-offer";
 
 interface BuildOfferEndpointsArgs {
   listenHost: string;
@@ -32,7 +36,7 @@ export async function createConnectionOfferV2(args: {
   daemonPublicKeyB64: string;
   relay: { endpoint: string; useTls?: boolean };
   direct?: { endpoint: string; useTls?: boolean };
-}): Promise<ConnectionOffer> {
+}): Promise<ConnectionOfferV2> {
   return ConnectionOfferV2Schema.parse({
     v: 2,
     serverId: args.serverId,
@@ -43,7 +47,7 @@ export async function createConnectionOfferV2(args: {
 }
 
 export function encodeOfferToFragmentUrl(args: {
-  offer: ConnectionOffer;
+  offer: ConnectionOffer | import("@clisbot/protocol/device-pairing-offer").DevicePairingOffer;
   appBaseUrl: string;
 }): string {
   const json = JSON.stringify(args.offer);

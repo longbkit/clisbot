@@ -12,12 +12,23 @@ import type { ManagedAgent } from "../../agent/agent-manager.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "../../workspace-registry.js";
 import type { HubRelationshipManagement } from "../../hub/relationship-controller.js";
 import type { DaemonConfigReloadResult } from "../../daemon-config-store.js";
+import { readDevicePairingConfiguration } from "../../device-access/runtime.js";
+import { discoverEnrolledHub } from "../../hub/discovery.js";
 
 export interface DaemonRuntimeConfig {
   listen: string | null;
   worktreesRoot?: string;
   appBaseUrl?: string;
   desktopManaged?: boolean;
+  devicePairingEnabled?: boolean;
+  startLocalHub?(
+    options: import("@clisbot/protocol/hub-local").HubLocalStartOptions,
+  ): Promise<import("@clisbot/protocol/hub-local").HubLocalStartResult>;
+  devices?: {
+    authority: import("@clisbot/device-access/authority").DeviceAuthority;
+    sessions(id: string): { clientId: string; connected: boolean }[];
+    revokeSessions(id: string): Promise<void>;
+  };
   getRelayConfig(): {
     enabled: boolean;
     endpoint: string;
@@ -63,6 +74,69 @@ export interface DaemonSessionOptions {
  * construction and the outbound channel.
  */
 export class DaemonSession {
+  async handleLocalHubStartRequest(
+    msg: Extract<SessionInboundMessage, { type: "hub.local.start.request" }>,
+  ): Promise<void> {
+    try {
+      if (!this.daemonRuntimeConfig?.startLocalHub)
+        throw new Error("Local Hub startup is unavailable");
+      const result = await this.daemonRuntimeConfig.startLocalHub({
+        label: msg.label,
+        transport: msg.transport,
+        publicUrl: msg.publicUrl,
+      });
+      this.host.emit({
+        type: "hub.local.start.response",
+        payload: { requestId: msg.requestId, ...result },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: msg.requestId,
+          requestType: msg.type,
+          error: error instanceof Error ? error.message : "Hub startup failed",
+        },
+      });
+    }
+  }
+  async handleDevicesRequest(
+    msg: Extract<SessionInboundMessage, { type: "daemon.devices.request" }>,
+  ): Promise<void> {
+    const devices = this.daemonRuntimeConfig?.devices;
+    try {
+      if (!devices) throw new Error("Device pairing is disabled");
+      if (msg.action.kind === "rename")
+        await devices.authority.rename(msg.action.deviceId, msg.action.label);
+      if (msg.action.kind === "revoke") {
+        await devices.authority.revoke(msg.action.deviceId);
+        await devices.revokeSessions(msg.action.deviceId);
+      }
+      this.host.emit({
+        type: "daemon.devices.response",
+        payload: {
+          requestId: msg.requestId,
+          devices: (await devices.authority.list()).map((device) => ({
+            id: device.id,
+            label: device.label,
+            createdAt: device.createdAt,
+            lastSeenAt: device.lastSeenAt,
+            revokedAt: device.revokedAt,
+            sessions: devices.sessions(device.id),
+          })),
+        },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: msg.requestId,
+          requestType: msg.type,
+          error: error instanceof Error ? error.message : "Device operation failed",
+        },
+      });
+    }
+  }
   private readonly host: DaemonSessionHost;
   private readonly clientId: string;
   private readonly clisbotHome: string;
@@ -151,9 +225,16 @@ export class DaemonSession {
         });
         return;
       }
+      const status = this.hubRelationships.status();
+      const hubConnection = this.daemonRuntimeConfig?.devicePairingEnabled
+        ? await discoverEnrolledHub(this.clisbotHome, status.hubOrigin)
+        : undefined;
       this.host.emit({
         type: "hub.management.daemon.get_status.response",
-        payload: { requestId: msg.requestId, status: this.hubRelationships.status() },
+        payload: {
+          requestId: msg.requestId,
+          status: { ...status, ...(hubConnection ? { hubConnection } : {}) },
+        },
       });
     } catch (error) {
       this.logger.error({ err: error }, "Failed to handle Hub relationship request");
@@ -217,6 +298,7 @@ export class DaemonSession {
   ): Promise<void> {
     try {
       const relay = this.daemonRuntimeConfig?.getRelayConfig();
+      const configured = readDevicePairingConfiguration(this.clisbotHome);
       const pairing = await generateLocalPairingOffer({
         clisbotHome: this.clisbotHome,
         relayEnabled: relay?.enabled ?? false,
@@ -227,7 +309,20 @@ export class DaemonSession {
         appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
         includeQr: true,
         logger: this.logger,
+        devicePairingEnabled: this.daemonRuntimeConfig?.devicePairingEnabled,
+        label: msg.label,
+        ttlMs: msg.ttlMs,
+        direct: msg.direct ?? configured.direct,
+        hub: msg.hub,
+        managedAccessMode: configured.managedAccessMode,
       });
+      if (this.daemonRuntimeConfig?.devicePairingEnabled) {
+        void this.hubRelationships
+          ?.publishConnectionOffer?.()
+          .catch((error) =>
+            this.logger.warn({ err: error }, "Failed to publish protected connection routes"),
+          );
+      }
       this.host.emit({
         type: "daemon.get_pairing_offer.response",
         payload: {

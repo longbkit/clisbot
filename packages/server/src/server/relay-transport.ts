@@ -413,7 +413,7 @@ export function startRelayTransport({
   return { stop };
 }
 
-async function attachEncryptedSocket(
+export async function attachEncryptedSocket(
   socket: RelayWebSocketLike,
   daemonKeyPair: KeyPair,
   logger: pino.Logger,
@@ -423,6 +423,8 @@ async function attachEncryptedSocket(
   try {
     const relayTransport = createRelayTransportAdapter(socket, logger);
     const emitter = new EventEmitter();
+    // Handshake events can precede attachSocket's listeners.
+    emitter.on("error", () => undefined);
     const pendingMessages: Array<string | ArrayBuffer> = [];
     let attached = false;
     const emitMessage = (data: string | ArrayBuffer) => {
@@ -438,6 +440,7 @@ async function attachEncryptedSocket(
       onerror: (error) => {
         logger.warn({ err: error }, "relay_e2ee_error");
         emitter.emit("error", error);
+        socket.close(4401, "Invalid encrypted frame");
       },
     });
     const encryptedSocket = createEncryptedRelaySocket({
@@ -446,7 +449,7 @@ async function attachEncryptedSocket(
       getTransportBufferedAmount: () => socket.bufferedAmount,
       terminateTransport: () => socket.terminate(),
     });
-    await attachSocket(encryptedSocket, metadata);
+    await attachSocket(encryptedSocket, metadata ? { ...metadata, encrypted: true } : undefined);
     attached = true;
     for (const message of pendingMessages) {
       emitter.emit("message", message);

@@ -9,6 +9,8 @@ import type { DaemonConfigStore } from "./daemon-config-store.js";
 import type { ScheduleService } from "./schedule/service.js";
 import type { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import type { WorkspaceAutoName } from "./workspace-auto-name.js";
+import type { DaemonAuthConfig } from "./auth.js";
+import type { DeviceAuthority } from "@clisbot/device-access/authority";
 import { asInternals, createStub } from "./test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "./test-utils/session-stubs.js";
 import {
@@ -18,6 +20,7 @@ import {
   TerminalStreamOpcode,
 } from "@clisbot/protocol/terminal-stream-protocol";
 import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
+import { MANAGED_ACCESS_REBIND_CLOSE_CODE } from "@clisbot/protocol/managed-access";
 import { APPLICATION_SOCKET_LEASE_MS } from "./websocket/physical-socket.js";
 
 type SocketListener = (...args: unknown[]) => void;
@@ -34,6 +37,10 @@ const wsModuleMock = vi.hoisted(() => {
     on(event: string, handler: (...args: unknown[]) => void) {
       this.handlers.set(event, handler);
       return this;
+    }
+
+    once(event: string, handler: (...args: unknown[]) => void) {
+      return this.on(event, handler);
     }
 
     close() {
@@ -279,7 +286,7 @@ function createServer(options?: {
       }>;
     };
   };
-  auth?: { password: string; localCredential: () => string | null };
+  auth?: DaemonAuthConfig;
 }) {
   const speechReadiness = options?.speechReadiness ?? null;
   const daemonConfigStore = {
@@ -289,7 +296,7 @@ function createServer(options?: {
   };
   const logger = options?.logger ?? createLogger();
   return new VoiceAssistantWebSocketServer(
-    createStub<HTTPServer>({}),
+    createStub<HTTPServer>({ on: vi.fn(), off: vi.fn() }),
     createStub<pino.Logger>(logger),
     "srv_test",
     createStub<AgentManager>({
@@ -561,7 +568,11 @@ describe("relay external socket reconnect behavior", () => {
       );
       await vi.waitFor(() => expect(initiallyFailed.readyState).toBe(3));
       const healthy = new MockSocket();
-      await attachRelayAndHello({ server, socket: healthy, clientId: "still-running" });
+      await attachRelayAndHello({
+        server,
+        socket: healthy,
+        clientId: "still-running",
+      });
     } finally {
       await server.close();
     }
@@ -783,9 +794,18 @@ describe("relay external socket reconnect behavior", () => {
 
   test.each([
     { failure: new Error("Hub request timed out"), code: 4503 },
-    { failure: Object.assign(new Error("Hub failed"), { statusCode: 502 }), code: 4503 },
-    { failure: Object.assign(new Error("Too many"), { statusCode: 429 }), code: 4503 },
-    { failure: Object.assign(new Error("Denied"), { statusCode: 403 }), code: 4401 },
+    {
+      failure: Object.assign(new Error("Hub failed"), { statusCode: 502 }),
+      code: 4503,
+    },
+    {
+      failure: Object.assign(new Error("Too many"), { statusCode: 429 }),
+      code: 4503,
+    },
+    {
+      failure: Object.assign(new Error("Denied"), { statusCode: 403 }),
+      code: 4401,
+    },
   ])(
     "a Hub admission failure closes with $code so only definitive denials revoke",
     async ({ failure, code }) => {
@@ -802,7 +822,9 @@ describe("relay external socket reconnect behavior", () => {
         socket,
         { transport: "relay" },
         undefined,
-        createHelloMessage("managed-client", { accessTicket: "clisbot_dat_ticket" }),
+        createHelloMessage("managed-client", {
+          accessTicket: "clisbot_dat_ticket",
+        }),
       );
 
       await vi.waitFor(() => expect(closed).toHaveBeenCalledTimes(1));
@@ -926,6 +948,117 @@ describe("relay external socket reconnect behavior", () => {
     await server.close();
   });
 
+  test.each([false, true])(
+    "switching external to off requires new device admission without revoking Hub access (protected: %s)",
+    async (protectedDevices) => {
+      const resolve = vi.fn(async () => ({
+        principalId: "member:user-1",
+        permissions: ["workspace.read" as const],
+        resourceMode: "daemon" as const,
+        projects: new Map<string, never>(),
+        leaseId: "transition-lease",
+        leaseExpiresAt: Date.now() + 60_000,
+      }));
+      const server = createServer({
+        ...(protectedDevices ? { auth: { deviceAuthority: createStub<DeviceAuthority>({}) } } : {}),
+        managedAccess: { mode: "external", resolver: { resolve } },
+      });
+      const socket = new MockSocket();
+      const closed = vi.fn();
+      socket.on("close", closed);
+      try {
+        await server.attachExternalSocket(
+          socket,
+          { transport: "relay", encrypted: true },
+          undefined,
+          createHelloMessage("managed-client", {
+            accessTicket: "valid-ticket",
+          }),
+        );
+        expect(sessionMock.instances).toHaveLength(1);
+        asInternals<WebSocketServerInternals>(server).applyManagedAccessMode("off");
+        if (!protectedDevices) {
+          expect(socket.readyState).toBe(1);
+          expect(closed).not.toHaveBeenCalled();
+          return;
+        }
+
+        expect(closed).toHaveBeenCalledWith(
+          MANAGED_ACCESS_REBIND_CLOSE_CODE,
+          "Daemon device credentials are now required",
+        );
+        await vi.waitFor(() => expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce());
+        const ticketOnly = new MockSocket();
+        await server.attachExternalSocket(
+          ticketOnly,
+          { transport: "relay", encrypted: true },
+          undefined,
+          createHelloMessage("ticket-only", { accessTicket: "valid-ticket" }),
+        );
+        expect(ticketOnly.readyState).toBe(3);
+        expect(resolve).toHaveBeenCalledOnce();
+        expect(sessionMock.instances).toHaveLength(1);
+
+        asInternals<WebSocketServerInternals>(server).applyManagedAccessMode("external");
+        const admitted = new MockSocket();
+        const revoked = vi.fn();
+        admitted.on("close", revoked);
+        await server.attachExternalSocket(
+          admitted,
+          { transport: "relay", encrypted: true },
+          undefined,
+          createHelloMessage("managed-client", { accessTicket: "new-ticket" }),
+        );
+        expect(admitted.readyState).toBe(1);
+        expect(server.revokeManagedLeases(["transition-lease"])).toBe(1);
+        expect(revoked).toHaveBeenCalledWith(4403, "Managed access lease revoked");
+      } finally {
+        await server.close();
+      }
+    },
+  );
+
+  test("switching external to off rejects a ticket hello whose resolver finishes afterward", async () => {
+    const admission = {
+      principalId: "member:user-1",
+      permissions: ["workspace.read" as const],
+      resourceMode: "daemon" as const,
+      projects: new Map<string, never>(),
+      leaseId: "late-lease",
+      leaseExpiresAt: Date.now() + 60_000,
+    };
+    let finish!: (value: typeof admission) => void;
+    const resolve = vi.fn(
+      () =>
+        new Promise<typeof admission>((done) => {
+          finish = done;
+        }),
+    );
+    const server = createServer({
+      auth: { deviceAuthority: createStub<DeviceAuthority>({}) },
+      managedAccess: { mode: "external", resolver: { resolve } },
+    });
+    const socket = new MockSocket();
+    const attaching = server.attachExternalSocket(
+      socket,
+      { transport: "relay", encrypted: true },
+      undefined,
+      createHelloMessage("late-client", { accessTicket: "valid-ticket" }),
+    );
+    try {
+      await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
+      asInternals<WebSocketServerInternals>(server).applyManagedAccessMode("off");
+      finish(admission);
+      await attaching;
+      expect(socket.readyState).toBe(3);
+      expect(sessionMock.instances).toHaveLength(0);
+    } finally {
+      finish(admission);
+      await attaching;
+      await server.close();
+    }
+  });
+
   test.each([
     { kind: "password" as const, password: "correct-password" },
     { kind: "localCredential" as const, token: "local-token" },
@@ -957,13 +1090,18 @@ describe("relay external socket reconnect behavior", () => {
 
       const withTicket = new MockSocket();
       await server.attachExternalSocket(withTicket, { transport: "relay" }, null, {
-        ...createHelloMessage("with-ticket", { accessTicket: "clisbot_dat_ticket" }),
+        ...createHelloMessage("with-ticket", {
+          accessTicket: "clisbot_dat_ticket",
+        }),
         auth,
       });
       expect(sessionMock.instances).toHaveLength(1);
       expect(sessionMock.instances[0]?.args).toMatchObject({
         permissions: ["workspace.read"],
-        resourceAuthorization: { resourceMode: "projects", leaseId: expect.any(String) },
+        resourceAuthorization: {
+          resourceMode: "projects",
+          leaseId: expect.any(String),
+        },
       });
       expect(sentServerInfoEnvelopes(withTicket)).toHaveLength(1);
     } finally {
@@ -995,7 +1133,9 @@ describe("relay external socket reconnect behavior", () => {
       first,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_first" }),
+      createHelloMessage("managed-client", {
+        accessTicket: "clisbot_dat_first",
+      }),
     );
     await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(1));
 
@@ -1005,7 +1145,9 @@ describe("relay external socket reconnect behavior", () => {
       window,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_window" }),
+      createHelloMessage("managed-client", {
+        accessTicket: "clisbot_dat_window",
+      }),
     );
     expect(sessionMock.instances).toHaveLength(1);
     expect(first.readyState).not.toBe(3);
@@ -1097,7 +1239,9 @@ describe("relay external socket reconnect behavior", () => {
     },
     {
       name: "a Hub that refuses the renewal revokes the lease at once",
-      failure: Object.assign(new Error("Hub enrollment failed (403)"), { statusCode: 403 }),
+      failure: Object.assign(new Error("Hub enrollment failed (403)"), {
+        statusCode: 403,
+      }),
       code: 4403,
       advanceMs: 1_000,
     },
@@ -1129,7 +1273,9 @@ describe("relay external socket reconnect behavior", () => {
         socket,
         { transport: "relay" },
         undefined,
-        createHelloMessage("managed-client", { accessTicket: "clisbot_dat_ticket" }),
+        createHelloMessage("managed-client", {
+          accessTicket: "clisbot_dat_ticket",
+        }),
       );
 
       await vi.advanceTimersByTimeAsync(advanceMs);
@@ -1239,7 +1385,9 @@ describe("relay external socket reconnect behavior", () => {
       first,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_first" }),
+      createHelloMessage("managed-client", {
+        accessTicket: "clisbot_dat_first",
+      }),
     );
     expect(sessionMock.instances).toHaveLength(1);
     first.close();
@@ -1249,7 +1397,9 @@ describe("relay external socket reconnect behavior", () => {
       second,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "clisbot_dat_second" }),
+      createHelloMessage("managed-client", {
+        accessTicket: "clisbot_dat_second",
+      }),
     );
     expect(sessionMock.instances).toHaveLength(1);
     expect(second.readyState).toBe(1);

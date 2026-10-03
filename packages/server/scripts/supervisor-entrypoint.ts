@@ -94,7 +94,7 @@ function resolvePackagedNodeEntrypointRunnerPath(currentScriptPath: string): str
     return null;
   }
 
-  const appRoot = currentScriptPath.slice(0, markerIndex);
+  const appRoot = currentScriptPath.slice(0, markerIndex).replace(/\.asar$/, ".asar.unpacked");
   const runnerPath = path.join(appRoot, "dist", "daemon", "node-entrypoint-runner.js");
   return existsSync(runnerPath) ? runnerPath : null;
 }

@@ -267,13 +267,13 @@ function injectConnectionHint(
   hubEnabled: boolean,
 ): string {
   const host = typeof req.headers.host === "string" ? req.headers.host : "";
-  const useTls = req.protocol === "https";
   const hint = {
     listen: host,
-    useTls,
     label,
   };
-  const script = `<script>window.__CLISBOT_INITIAL_DAEMON_CONNECTION__=${serializeInlineScriptJson(hint)};window.__CLISBOT_HUB_ENABLED__=${hubEnabled}</script>`;
+  // TLS may terminate at Tailscale or another proxy before this HTTP listener.
+  // The browser's page protocol is authoritative, without trusting forwarded headers.
+  const script = `<script>window.__CLISBOT_INITIAL_DAEMON_CONNECTION__={...${serializeInlineScriptJson(hint)},useTls:window.location.protocol==="https:"};window.__CLISBOT_HUB_ENABLED__=${hubEnabled}</script>`;
   const headClose = /<\/head>/i;
   if (headClose.test(html)) {
     return html.replace(headClose, `${script}</head>`);

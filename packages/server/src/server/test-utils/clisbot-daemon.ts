@@ -16,6 +16,7 @@ import type { AgentProfile } from "@clisbot/protocol/messages";
 import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
 
 interface TestClisbotDaemonOptions {
+  devicePairingEnabled?: boolean;
   bots?: ClisbotDaemonConfig["bots"];
   createDaemon?: typeof createClisbotDaemon;
   agentSessionStorage?: boolean;
@@ -195,6 +196,7 @@ async function prepareTestDaemonConfig(
     relayPublicUseTls: options.relayPublicUseTls,
     appBaseUrl: "https://app.clisbot.com",
     auth: options.auth,
+    devicePairingEnabled: options.devicePairingEnabled,
     pushNotificationSender: options.pushNotificationSender,
     serviceProxy: options.serviceProxy,
     webUi: options.webUi,

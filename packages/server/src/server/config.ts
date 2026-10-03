@@ -656,6 +656,8 @@ export function resolveConfigFromPersisted(
     serviceProxy,
     webUi,
     hubHttpProxyUrl: env.CLISBOT_HUB_PROXY_URL?.trim() || persisted.features?.webUi?.hubProxyUrl,
+    devicePairingEnabled:
+      parseBooleanEnv(env.CLISBOT_DEVICE_PAIRING) ?? persisted.features?.devicePairing ?? false,
     appBaseUrl,
     auth: resolveAuthConfig(env, persisted),
     // COMPAT(clisbot-managed-access-default): upstream Clisbot runs `off`. The Clisbot fusion

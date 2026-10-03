@@ -1,3 +1,6 @@
+import { createDaemonDeviceAuthority, createDeviceRuntimeAccess } from "./device-access/runtime.js";
+import { localHubCliEntrypoint, startHostLocalHub } from "./hub/local-start.js";
+import { createPublishedConnectionOffer } from "./device-access/connection-offer.js";
 import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
 import { recoverStoredSessionAuthorship } from "./agent/session-storage/recover-session-authorship.js";
 import { deleteSessionDirectory } from "./file-upload/session-files.js";
@@ -5,6 +8,7 @@ import { startSessionFileMaintenance } from "./file-upload/session-file-maintena
 import { FileAgentTimelineStore } from "./agent/session-storage/file-agent-timeline-store.js";
 import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
 import express from "express";
+import { mountDeviceAccess } from "./device-access/http.js";
 import { createServer as createHTTPServer, type IncomingMessage, type ServerResponse } from "http";
 import { constants, existsSync, unlinkSync } from "fs";
 import { open, rm, stat } from "fs/promises";
@@ -249,7 +253,6 @@ import {
   type HubRelationshipRemote,
 } from "./hub/relationship-remote.js";
 import { DaemonExecutions } from "./hub/daemon-executions.js";
-import { createConnectionOfferV2 } from "./connection-offer.js";
 import { PluginService } from "./plugins/index.js";
 import { ManagedPluginSources } from "./plugins/managed-source.js";
 
@@ -455,6 +458,7 @@ export interface ClisbotDaemonConfig {
   hubHttpProxyUrl?: string | undefined;
   appBaseUrl?: string;
   auth?: DaemonAuthConfig;
+  devicePairingEnabled?: boolean;
   managedAccessMode?: import("@clisbot/protocol/managed-access").ManagedAccessMode;
   bots?: import("./bots/bots-config.js").BotsConfig;
   openai?: ClisbotOpenAIConfig;
@@ -864,8 +868,11 @@ export async function createClisbotDaemon(
     const origin = req.headers.origin;
     if (origin && (allowedOrigins.has("*") || allowedOrigins.has(origin))) {
       res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Clisbot-Device-Proof",
+      );
       res.setHeader("Access-Control-Allow-Credentials", "true");
     }
     if (req.method === "OPTIONS") {
@@ -891,7 +898,22 @@ export async function createClisbotDaemon(
   mountWebUi(app, config, logger);
 
   let localCredential: string | null = null;
-  const daemonAuth = { ...config.auth, localCredential: () => localCredential };
+  const deviceAuthority = createDaemonDeviceAuthority(
+    config.devicePairingEnabled,
+    config.clisbotHome,
+    serverId,
+  );
+  const daemonAuth = { ...config.auth, deviceAuthority, localCredential: () => localCredential };
+  mountDeviceAccess({
+    app,
+    authority: deviceAuthority,
+    localCredential: () => localCredential,
+    managedAccessRequired: () =>
+      (config.managedAccessMode ?? "off") === "external" && hubRelationships.requiresTickets(),
+    revokeSessions: async (id) => {
+      await wsServer?.revokeDeviceSessions(id);
+    },
+  });
   app.use(
     createRequireBearerMiddleware(daemonAuth, (context) => {
       logger.warn(context, "Rejected HTTP request with invalid daemon password");
@@ -1462,23 +1484,13 @@ export async function createClisbotDaemon(
           return entry;
         });
     },
-    getConnectionOffer: async () => {
-      const relay = daemonConfigStore.get().relay;
-      const enabled = relay?.enabled ?? config.relayEnabled ?? true;
-      if (!enabled) return null;
-      const endpoint = config.relayPublicEndpoint ?? config.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT;
-      const useTls =
-        config.relayPublicUseTls ?? config.relayUseTls ?? endpoint === DEFAULT_RELAY_ENDPOINT;
-      const directEndpoint = config.directEndpoint?.trim();
-      return createConnectionOfferV2({
+    getConnectionOffer: () =>
+      createPublishedConnectionOffer(
+        config,
+        daemonConfigStore.get().relay?.enabled,
         serverId,
-        daemonPublicKeyB64: daemonKeyPair.publicKeyB64,
-        relay: { endpoint, useTls },
-        ...(directEndpoint
-          ? { direct: { endpoint: directEndpoint, useTls: config.directUseTls ?? true } }
-          : {}),
-      });
-    },
+        daemonKeyPair.publicKeyB64,
+      ),
     getManagedAccessMode: () => daemonConfigStore.get().managedAccess.mode,
     // Joining or leaving a Hub changes whether `external` asks for tickets. Deferred so a
     // `hub connect` reply reaches its client before that session is closed for lacking one.
@@ -1770,6 +1782,7 @@ export async function createClisbotDaemon(
       if (
         !(await isAgentMcpRequestAuthorized({
           password: config.auth?.password,
+          devicePairingEnabled: config.devicePairingEnabled,
           capabilityToken: agentMcpAuthToken,
           authorizationHeader: req.header("authorization"),
         }))
@@ -1884,6 +1897,7 @@ export async function createClisbotDaemon(
         const onListening = () => {
           httpServer.off("error", onError);
           mainStarted = true;
+          // eslint-disable-next-line complexity -- Preserve the upstream startup sequence while wiring optional services.
           const logAndResolve = async () => {
             boundListenTarget = resolveBoundListenTarget(listenTarget, httpServer);
             const mcpBaseUrl = createAgentMcpBaseUrl(boundListenTarget);
@@ -1947,6 +1961,7 @@ export async function createClisbotDaemon(
               mcpBaseUrl,
               {
                 getAllowedOrigins: () => allowedOrigins,
+                encryptedDirectKey: config.devicePairingEnabled ? daemonKeyPair.keyPair : undefined,
                 shouldHandleUpgrade: (request) => !hubHttpProxy.handlesUpgrade(request),
                 getHostnames: () => configuredHostnames,
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
@@ -2001,6 +2016,12 @@ export async function createClisbotDaemon(
                   return appBaseUrl;
                 },
                 desktopManaged: config.desktopManaged === true,
+                devicePairingEnabled: config.devicePairingEnabled,
+                devices: createDeviceRuntimeAccess(deviceAuthority, () => wsServer),
+                startLocalHub:
+                  config.devicePairingEnabled && localHubCliEntrypoint()
+                    ? (options) => startHostLocalHub(config.clisbotHome, options)
+                    : undefined,
                 getRelayConfig: () =>
                   relayRuntime?.getConfig() ?? {
                     enabled: daemonConfigStore.get().relay?.enabled ?? relayEnabled,

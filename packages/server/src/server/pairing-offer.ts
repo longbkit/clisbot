@@ -6,6 +6,8 @@ import { createConnectionOfferV2, encodeOfferToFragmentUrl } from "./connection-
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
 import { renderPairingQr } from "./pairing-qr.js";
 import { getOrCreateServerId } from "./server-id.js";
+import { generateDevicePairingOffer } from "./device-access/pairing.js";
+import type { DevicePairingOffer } from "@clisbot/protocol/device-pairing-offer";
 
 export interface LocalPairingOffer {
   relayEnabled: boolean;
@@ -23,8 +25,24 @@ export async function generateLocalPairingOffer(args: {
   appBaseUrl?: string;
   includeQr?: boolean;
   logger?: Logger;
+  devicePairingEnabled?: boolean;
+  label?: string;
+  ttlMs?: number;
+  direct?: DevicePairingOffer["direct"];
+  hub?: DevicePairingOffer["hub"];
+  managedAccessMode?: DevicePairingOffer["managedAccessMode"];
 }): Promise<LocalPairingOffer> {
   const relayEnabled = args.relayEnabled ?? true;
+  if (args.devicePairingEnabled)
+    return generateDevicePairingOffer({
+      ...args,
+      relay: relayEnabled
+        ? {
+            endpoint: args.relayPublicEndpoint ?? args.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT,
+            useTls: args.relayPublicUseTls ?? args.relayUseTls ?? true,
+          }
+        : undefined,
+    });
   if (!relayEnabled) {
     return {
       relayEnabled: false,

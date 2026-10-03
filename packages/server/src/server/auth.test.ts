@@ -99,6 +99,29 @@ describe("agent MCP request authorizer", () => {
     ).toBe(true);
   });
 
+  test("device pairing requires the MCP capability token even without a password", async () => {
+    for (const password of [undefined, CORRECT_PASSWORD_HASH]) {
+      for (const token of [undefined, "wrong-token", "correct-password"]) {
+        expect(
+          await isAgentMcpRequestAuthorized({
+            devicePairingEnabled: true,
+            password,
+            capabilityToken: CAPABILITY_TOKEN,
+            authorizationHeader: token ? `Bearer ${token}` : undefined,
+          }),
+        ).toBe(false);
+      }
+      expect(
+        await isAgentMcpRequestAuthorized({
+          devicePairingEnabled: true,
+          password,
+          capabilityToken: CAPABILITY_TOKEN,
+          authorizationHeader: `Bearer ${CAPABILITY_TOKEN}`,
+        }),
+      ).toBe(true);
+    }
+  });
+
   test("still accepts a valid daemon-password bearer", async () => {
     expect(
       await isAgentMcpRequestAuthorized({
