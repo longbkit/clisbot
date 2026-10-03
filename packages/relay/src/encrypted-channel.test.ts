@@ -8,6 +8,7 @@ import {
 import {
   deriveSharedKey,
   encrypt,
+  encryptWithNonce,
   exportPublicKey,
   generateKeyPair,
   importPublicKey,
@@ -531,4 +532,154 @@ describe("EncryptedChannel", () => {
       "string",
     );
   });
+});
+
+describe("security review: ciphertext replay", () => {
+  it.each([false, true])(
+    "rejects duplicate ciphertext before dispatch (binary=%s)",
+    async (binary) => {
+      const [daemonTransport, clientTransport] = createMockTransportPair();
+      const key = generateKeyPair();
+      const delivered: (string | ArrayBuffer)[] = [];
+      const daemonReady = createDaemonChannel(daemonTransport, key, {
+        onmessage: (data) => delivered.push(data),
+      });
+      const client = await createClientChannel(clientTransport, exportPublicKey(key.publicKey));
+      const daemon = await daemonReady;
+      await waitForAsyncDelivery();
+      try {
+        const payload = binary ? new Uint8Array([7, 8, 9]).buffer : "terminal command";
+        await client.send(payload);
+        await waitForAsyncDelivery();
+        const calls = (clientTransport.send as ReturnType<typeof vi.fn>).mock.calls;
+        const wire = calls[calls.length - 1][0] as string | ArrayBuffer;
+        daemonTransport.onmessage?.({ data: wire, isBinary: wire instanceof ArrayBuffer });
+        daemonTransport.onmessage?.({ data: wire, isBinary: wire instanceof ArrayBuffer });
+        await waitForAsyncDelivery();
+        expect(delivered).toHaveLength(1);
+        expect(daemonTransport.close).toHaveBeenCalled();
+        expect(daemon.isOpen()).toBe(false);
+      } finally {
+        client.close();
+        daemon.close();
+      }
+    },
+  );
+});
+
+describe("security review: channel resource and nonce boundaries", () => {
+  function transport(): Transport {
+    return { send: vi.fn(), close: vi.fn(), onmessage: null, onclose: null, onerror: null };
+  }
+
+  function channels() {
+    const one = generateKeyPair();
+    const two = generateKeyPair();
+    const key = deriveSharedKey(one.secretKey, two.publicKey);
+    const sent = transport();
+    const received = transport();
+    const messages: (string | ArrayBuffer)[] = [];
+    const sender = new EncryptedChannel(sent, key, {}, { binaryCiphertext: true });
+    const receiver = new EncryptedChannel(
+      received,
+      key,
+      { onmessage: (data) => messages.push(data) },
+      { binaryCiphertext: true },
+    );
+    sender.setState("open");
+    receiver.setState("open");
+    const deliver = (data: string | ArrayBuffer) =>
+      received.onmessage?.({ data, isBinary: data instanceof ArrayBuffer });
+    return { sender, receiver, sent, received, messages, deliver, key };
+  }
+
+  it("accepts legacy random nonces but rejects replay through another WebSocket opcode", async () => {
+    const f = channels();
+    const frames = [1, 2, 3].map((n) => encrypt(f.key, String(n)));
+    for (const frame of frames) f.deliver(arrayBufferToBase64(frame));
+    await waitForAsyncDelivery();
+    expect(f.messages).toEqual(["1", "2", "3"]);
+    f.deliver(frames[0]);
+    await waitForAsyncDelivery();
+    expect(f.messages).toHaveLength(3);
+    expect(f.receiver.isOpen()).toBe(false);
+  });
+
+  it("supports long modern sessions without evicting replay state", async () => {
+    const f = channels();
+    for (let n = 0; n < 5000; n++) {
+      await f.sender.send(String(n));
+      const calls = (f.sent.send as ReturnType<typeof vi.fn>).mock.calls;
+      f.deliver(calls[n][0] as string);
+    }
+    await waitForAsyncDelivery();
+    expect(f.messages).toHaveLength(5000);
+    expect(f.receiver.isOpen()).toBe(true);
+    const first = (f.sent.send as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    f.deliver(first);
+    await waitForAsyncDelivery();
+    expect(f.messages).toHaveLength(5000);
+    expect(f.receiver.isOpen()).toBe(false);
+  });
+
+  it("closes at the legacy nonce budget instead of evicting old replay evidence", async () => {
+    const f = channels();
+    for (let n = 0; n < 4097; n++) {
+      const nonce = new Uint8Array(24);
+      new DataView(nonce.buffer).setUint32(0, n);
+      nonce[23] = 1;
+      f.deliver(arrayBufferToBase64(encryptWithNonce(f.key, String(n), nonce)));
+    }
+    await waitForAsyncDelivery();
+    expect(f.messages).toHaveLength(4096);
+    expect(f.receiver.isOpen()).toBe(false);
+    expect(f.received.close).toHaveBeenCalledWith(1011, expect.stringContaining("capacity"));
+  });
+
+  it("rejects reflected ciphertext, reordered counters and queued traffic after failure", async () => {
+    const f = channels();
+    await f.sender.send("first");
+    await f.sender.send("second");
+    await f.sender.send("third");
+    const calls = (f.sent.send as ReturnType<typeof vi.fn>).mock.calls;
+    f.deliver(calls[1][0] as string);
+    f.deliver(calls[0][0] as string);
+    f.deliver(calls[2][0] as string);
+    await waitForAsyncDelivery();
+    expect(f.messages).toEqual(["second"]);
+    expect(f.receiver.isOpen()).toBe(false);
+    f.sent.onmessage?.({ data: calls[0][0] as string, isBinary: false });
+    await waitForAsyncDelivery();
+    expect(f.sender.isOpen()).toBe(false);
+    expect(f.sent.close).toHaveBeenCalledWith(1011, "Reflected encrypted frame");
+  });
+
+  it.each([false, true])(
+    "bounds frames buffered while ready is blocked and never revives a rejected handshake (large=%s)",
+    async (large) => {
+      const wire = transport();
+      let ready!: () => void;
+      wire.send = () =>
+        new Promise<void>((resolve) => {
+          ready = resolve;
+        });
+      const waiting = createDaemonChannel(wire, generateKeyPair());
+      wire.onmessage?.({
+        data: JSON.stringify({
+          type: "e2ee_hello",
+          key: exportPublicKey(generateKeyPair().publicKey),
+        }),
+        isBinary: false,
+      });
+      for (let n = 0; n < (large ? 1 : 65); n++)
+        wire.onmessage?.({
+          data: large ? "x".repeat(1024 * 1024 + 1) : "buffered",
+          isBinary: false,
+        });
+      const rejected = expect(waiting).rejects.toThrow("handshake buffer");
+      ready();
+      await rejected;
+      expect(wire.close).toHaveBeenCalledWith(1008, expect.stringContaining("handshake buffer"));
+    },
+  );
 });

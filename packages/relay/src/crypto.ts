@@ -154,8 +154,21 @@ export function deriveSharedKey(ourSecretKey: Uint8Array, peerPublicKey: Uint8Ar
  *   [nonce (24)] [ciphertext...]
  */
 export function encrypt(sharedKey: SharedKey, data: string | ArrayBuffer): ArrayBuffer {
+  return encryptWithNonce(sharedKey, data, generateNonce());
+}
+
+export function generateNonce(): Uint8Array {
   ensurePrng();
-  const nonce = nacl.randomBytes(NONCE_LENGTH);
+  return nacl.randomBytes(NONCE_LENGTH);
+}
+
+/** Internal channel helper: the caller must allocate a unique nonce for each send. */
+export function encryptWithNonce(
+  sharedKey: SharedKey,
+  data: string | ArrayBuffer,
+  nonce: Uint8Array,
+): ArrayBuffer {
+  if (nonce.byteLength !== NONCE_LENGTH) throw new Error("Invalid nonce length");
   const plaintext = toUint8(data);
   const ciphertext = nacl.box.after(plaintext, nonce, sharedKey);
   const out = new Uint8Array(nonce.byteLength + ciphertext.byteLength);

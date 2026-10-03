@@ -27,8 +27,20 @@ export const ConnectionOfferV2Schema = z.object({
 
 export type ConnectionOfferV2 = z.infer<typeof ConnectionOfferV2Schema>;
 
-export const ConnectionOfferSchema = ConnectionOfferV2Schema;
-export type ConnectionOffer = ConnectionOfferV2;
+// COMPAT(deviceConnectionOffer): protected admission can publish direct-only routes.
+// This is public inventory metadata; it contains no pairing grant.
+export const ConnectionOfferV5Schema = z
+  .object({
+    v: z.literal(5),
+    serverId: z.string().min(1),
+    daemonPublicKeyB64: z.string().min(1),
+    encrypted: z.literal(true),
+    relay: ConnectionOfferV2Schema.shape.relay.optional(),
+    direct: ConnectionOfferV2Schema.shape.direct,
+  })
+  .refine((value) => value.relay || value.direct, "A connection route is required");
+export const ConnectionOfferSchema = z.union([ConnectionOfferV2Schema, ConnectionOfferV5Schema]);
+export type ConnectionOffer = z.infer<typeof ConnectionOfferSchema>;
 
 function decodeBase64UrlToUtf8(input: string): string {
   const base64 = input.replace(/-/g, "+").replace(/_/g, "/");

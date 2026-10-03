@@ -8,6 +8,11 @@ import {
   ImageAttachmentSchema,
 } from "./agent-attachments.js";
 import { SessionOperationIdentitySchema } from "./session-operation.js";
+import { DeviceProofSchema, DeviceCredentialSchema } from "./device-access.js";
+import { DevicePairingOfferSchema } from "./device-pairing-offer.js";
+import { DaemonDevicesRequestSchema, DaemonDevicesResponseSchema } from "./daemon-devices.js";
+import { HubLocalStartRequestSchema, HubLocalStartResponseSchema } from "./hub-local.js";
+import { HubConnectionSchema } from "./device-pairing-offer.js";
 import { SessionActorSchema, SessionAuthorshipShape } from "./session-authorship.js";
 import { AgentProfileSchema, AgentSkillSelectionSchema } from "./agent-profile.js";
 export {
@@ -1308,6 +1313,11 @@ export const DaemonGetStatusRequestSchema = z.object({
 export const DaemonGetPairingOfferRequestSchema = z.object({
   type: z.literal("daemon.get_pairing_offer.request"),
   requestId: z.string(),
+  // COMPAT(devicePairing): added 2026-10-03; requires devicePairing capability.
+  label: z.string().max(80).optional(),
+  ttlMs: z.number().int().min(1000).max(900000).optional(),
+  direct: DevicePairingOfferSchema.shape.direct,
+  hub: DevicePairingOfferSchema.shape.hub,
 });
 
 export const DaemonConfigReloadRequestSchema = z.object({
@@ -3255,6 +3265,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WaitForFinishRequestSchema,
   DaemonGetStatusRequestSchema,
   DaemonGetPairingOfferRequestSchema,
+  DaemonDevicesRequestSchema,
+  HubLocalStartRequestSchema,
   DaemonConfigReloadRequestSchema,
   HubManagementDaemonConnectRequestSchema,
   HubManagementDaemonGetStatusRequestSchema,
@@ -3592,6 +3604,8 @@ export const ServerInfoStatusPayloadSchema = z
     version: ServerInfoVersionSchema.optional(),
     // COMPAT(sessionPermissions): optional while clients support older daemons.
     permissions: z.array(DaemonPermissionSchema).optional(),
+    // COMPAT(devicePairing): added 2026-10-03; review after 2027-04-03.
+    deviceCredential: DeviceCredentialSchema.optional(),
     // COMPAT(botCreationAllowed): older hosts omit authority; clients fail closed.
     botCreationAllowed: z.boolean().optional(),
     // COMPAT(desktopManaged): added in v0.1.X, remove optional parsing after 2027-01-16.
@@ -3600,6 +3614,11 @@ export const ServerInfoStatusPayloadSchema = z
     // COMPAT(providersSnapshot): added in v0.1.48, remove gating when all clients use snapshot
     features: z
       .object({
+        devicePairing: z.boolean().optional(),
+        // COMPAT(localHubStart): absent on upstream/legacy or unauthorized sessions.
+        localHubStart: z.boolean().optional(),
+        // COMPAT(hubDiscovery): public metadata only, never an approved grant.
+        hubDiscovery: z.boolean().optional(),
         // COMPAT(projectWorkspaceCreation): absent daemons require workspace.manage.
         projectWorkspaceCreation: z.boolean().optional(),
         // COMPAT(agentSessionStorage): unreleased Fusion; keep optional fields and capability gates until supported peers explicitly negotiate session storage (review 2027-03-11).
@@ -5152,6 +5171,8 @@ export const HubRelationshipStatusSchema = z.object({
   ]),
   daemonId: z.string().nullable(),
   hubOrigin: z.string().nullable(),
+  // COMPAT(hubDiscovery): older Hosts omit public Hub routes/pins.
+  hubConnection: HubConnectionSchema.optional(),
   permissions: z.array(DaemonPermissionSchema),
   connectedAt: z.string().nullable(),
   lastError: z.string().nullable(),
@@ -7049,6 +7070,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   SetVoiceModeResponseMessageSchema,
   DaemonGetStatusResponseSchema,
   DaemonGetPairingOfferResponseSchema,
+  DaemonDevicesResponseSchema,
+  HubLocalStartResponseSchema,
   DaemonConfigReloadResponseSchema,
   HubManagementDaemonConnectResponseSchema,
   HubManagementDaemonGetStatusResponseSchema,
@@ -7644,6 +7667,14 @@ export const WSHelloMessageSchema = z.object({
     .discriminatedUnion("kind", [
       z.object({ kind: z.literal("password"), password: z.string() }),
       z.object({ kind: z.literal("localCredential"), token: z.string() }),
+      z.object({ kind: z.literal("device"), proof: DeviceProofSchema }),
+      z.object({
+        kind: z.literal("pairing"),
+        label: z.string().min(1).max(80).optional(),
+        token: z.string().length(43),
+        publicKey: z.string().max(128),
+        proof: DeviceProofSchema,
+      }),
     ])
     .optional(),
   appVersion: z.string().optional(),

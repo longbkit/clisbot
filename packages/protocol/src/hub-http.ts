@@ -23,5 +23,5 @@ export function isHubHttpPath(path: string): boolean {
 }
 
 export function isHubWebSocketPath(path: string): boolean {
-  return path === "/api/daemons/socket";
+  return path === "/api/daemons/socket" || path === "/api/auth/clisbot/device/socket";
 }

@@ -8,6 +8,7 @@ import {
   type TimelineSubscription,
 } from "./connection/index.js";
 import { CreationClient } from "./creation/index.js";
+import { deviceHelloAuth, acceptDeviceCredential } from "./device-access.js";
 import type { CreationSnapshot } from "@clisbot/protocol/messages";
 import type { z } from "zod";
 import type { ClientCapability } from "@clisbot/protocol/client-capabilities";
@@ -394,6 +395,8 @@ export type BrowserAutomationExecuteRequestMessage = BrowserAutomationExecuteReq
 export type BrowserAutomationExecuteResponseMessage = BrowserAutomationExecuteResponse;
 
 export interface DaemonClientConfig {
+  deviceAccess?: import("./device-access.js").DaemonDeviceAccess;
+  resolveDeviceAccess?: () => Promise<import("./device-access.js").DaemonDeviceAccess | undefined>;
   /** Deliver compact bodies/hash references to a caller-owned snapshot cache.
    * The default keeps public SDK snapshot entries expanded. */
   providerSnapshots?: "wire";
@@ -783,6 +786,10 @@ export interface DaemonStatusOptions {
   timeout?: number;
 }
 export interface DaemonPairingOfferOptions {
+  label?: string;
+  ttlMs?: number;
+  direct?: import("@clisbot/protocol/device-pairing-offer").DevicePairingOffer["direct"];
+  hub?: import("@clisbot/protocol/device-pairing-offer").DevicePairingOffer["hub"];
   requestId?: string;
   timeout?: number;
 }
@@ -1396,6 +1403,8 @@ export class DaemonClient {
     }
 
     try {
+      if (this.config.resolveDeviceAccess)
+        this.config.deviceAccess = await this.config.resolveDeviceAccess();
       const resolution = resolveConnectionAuth(this.config);
       const selected = resolution instanceof Promise ? await resolution : resolution;
       if (this.connectionAttempt !== attempt) return;
@@ -1407,7 +1416,7 @@ export class DaemonClient {
         this.config.transportFactory ??
         createWebSocketTransportFactory(this.config.webSocketFactory ?? defaultWebSocketFactory);
       const isRelayTransport = isRelayClientWebSocketUrl(this.config.url);
-      const shouldUseRelayE2ee = this.config.e2ee?.enabled === true && isRelayTransport;
+      const shouldUseRelayE2ee = this.config.e2ee?.enabled === true;
       this.assertEncryptedRelayAuth(selected.helloAuth, isRelayTransport);
 
       let transportFactory = isRelayTransport
@@ -1428,7 +1437,7 @@ export class DaemonClient {
       const transport = transportFactory({
         url: transportUrl,
         headers: selected.headers,
-        ...(selected.protocols ? { protocols: selected.protocols } : {}),
+        protocols: directE2eeProtocols(isRelayTransport, shouldUseRelayE2ee, selected.protocols),
       });
       this.transport = transport;
       this.lastServerInfoMessage = null;
@@ -1569,7 +1578,12 @@ export class DaemonClient {
   }
 
   private assertEncryptedRelayAuth(helloAuth: HelloAuth, isRelayTransport: boolean): void {
-    if (!isRelayTransport || !helloAuth || this.config.e2ee?.enabled === true) return;
+    if (
+      !isRelayTransport ||
+      (!helloAuth && !this.config.deviceAccess) ||
+      this.config.e2ee?.enabled === true
+    )
+      return;
     this.setReconnectEnabled(false);
     throw new Error("Relay credentials require E2EE");
   }
@@ -5501,10 +5515,38 @@ export class DaemonClient {
       requestId: options?.requestId,
       message: {
         type: "daemon.get_pairing_offer.request",
+        label: options?.label,
+        ttlMs: options?.ttlMs,
+        direct: options?.direct,
+        hub: options?.hub,
       },
       responseType: "daemon.get_pairing_offer.response",
       timeout: options?.timeout,
     });
+  }
+
+  async devices(
+    action: import("@clisbot/protocol/daemon-devices").DaemonDevicesAction = { kind: "list" },
+  ) {
+    if (!this.lastServerInfoMessage?.features?.devicePairing)
+      throw new Error("This daemon does not support device pairing");
+    return this.sendCorrelatedSessionRequest({
+      message: { type: "daemon.devices.request", action },
+      responseType: "daemon.devices.response",
+    });
+  }
+
+  async startLocalHub(
+    options: import("@clisbot/protocol/hub-local").HubLocalStartOptions = {},
+  ): Promise<import("@clisbot/protocol/hub-local").HubLocalStartResult> {
+    if (!this.lastServerInfoMessage?.features?.localHubStart)
+      throw new Error("This Host cannot start a Hub from this connection");
+    const { requestId: _requestId, ...result } = await this.sendCorrelatedSessionRequest({
+      message: { type: "hub.local.start.request", ...options },
+      responseType: "hub.local.start.response",
+      timeout: 120_000,
+    });
+    return result;
   }
 
   async collectDiagnostics(requestId?: string): Promise<DiagnosticsPayload> {
@@ -6513,20 +6555,22 @@ export class DaemonClient {
       if (accessTicket !== undefined && accessTicket.length === 0) {
         throw new Error("Access ticket resolver returned an empty credential");
       }
-      const auth = this.helloAuth;
-      this.sendJsonMessage("hello", "hello", {
+      const hello = {
         type: "hello",
         clientId: this.config.clientId,
         clientType: this.config.clientType ?? "cli",
         protocolVersion: 1,
-        ...(auth ? { auth } : {}),
         capabilities: {
           ...DEFAULT_CLIENT_CAPABILITIES,
           ...this.config.capabilities,
         },
         ...(this.config.appVersion ? { appVersion: this.config.appVersion } : {}),
         ...(accessTicket === undefined ? {} : { accessTicket }),
-      });
+      } as const;
+      const auth = this.config.deviceAccess
+        ? deviceHelloAuth(this.config.deviceAccess, hello)
+        : this.helloAuth;
+      this.sendJsonMessage("hello", "hello", { ...hello, ...(auth ? { auth } : {}) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send hello message";
       this.lastErrorValue = message;
@@ -6976,6 +7020,24 @@ export class DaemonClient {
 
   private handleSessionMessage(msg: SessionOutboundMessage): void {
     msg = this.owned.normalize(msg);
+    const credential =
+      msg.type === "status"
+        ? parseServerInfoStatusPayload(msg.payload)?.deviceCredential
+        : undefined;
+    const access = this.config.deviceAccess;
+    if (credential && access && access.credentialId !== credential.credentialId) {
+      void acceptDeviceCredential(access, credential).then(
+        () => this.deliverSessionMessage(msg),
+        (error) => {
+          this.setReconnectEnabled(false);
+          this.disposeTransport(4401, "Could not save device credential");
+          this.rejectConnect(
+            error instanceof Error ? error : new Error("Could not save device credential"),
+          );
+        },
+      );
+      return;
+    }
     if (
       msg.type === "providers_snapshot_update" &&
       this.config.providerSnapshots !== "wire" &&
@@ -7272,4 +7334,12 @@ function resolveAgentConfig(options: CreateAgentRequestOptions): AgentSessionCon
     provider: merged.provider,
     cwd: merged.cwd,
   };
+}
+
+function directE2eeProtocols(
+  relay: boolean,
+  encrypted: boolean,
+  protocols: string[] | undefined,
+): string[] | undefined {
+  return !relay && encrypted ? ["clisbot.e2ee.v1"] : protocols;
 }

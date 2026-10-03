@@ -1,0 +1,50 @@
+{
+  "name": "@clisbot/device-access",
+  "version": "0.10.2",
+  "description": "Device proof and backend-owned pairing invitations for Clisbot",
+  "license": "Apache-2.0",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./proof": {
+      "types": "./dist/proof.d.ts",
+      "default": "./dist/proof.js"
+    },
+    "./authority": {
+      "types": "./dist/authority.d.ts",
+      "default": "./dist/authority.js"
+    },
+    "./file-store": {
+      "types": "./dist/file-store.d.ts",
+      "default": "./dist/file-store.js"
+    },
+    "./local-control": {
+      "types": "./dist/local-control.d.ts",
+      "default": "./dist/local-control.js"
+    },
+    "./service-key": {
+      "types": "./dist/service-key.d.ts",
+      "default": "./dist/service-key.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --incremental false",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@clisbot/relay": "0.10.2",
+    "base64-js": "^1.5.1",
+    "proper-lockfile": "^4.1.2",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.13"
+  }
+}

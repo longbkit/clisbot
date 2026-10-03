@@ -8,6 +8,7 @@ import {
   type Logger,
 } from "./daemon-client";
 import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
+import { MANAGED_ACCESS_REBIND_CLOSE_CODE } from "@clisbot/protocol/managed-access";
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
 import {
   decodeFileTransferFrame,
@@ -43,7 +44,10 @@ interface TraceRecord {
   args?: Record<string, string>;
 }
 
-function createTraceRecorder(): { trace: DaemonClientTrace; records: TraceRecord[] } {
+function createTraceRecorder(): {
+  trace: DaemonClientTrace;
+  records: TraceRecord[];
+} {
   const records: TraceRecord[] = [];
   return {
     trace: {
@@ -353,13 +357,19 @@ test("keeps Hub access when a newer connection from this client replaces the ses
   const connecting = client.connect().catch(() => undefined);
   mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
   await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
-  mock.triggerClose({ code: 4409, reason: "Session continued in another connection" });
+  mock.triggerClose({
+    code: 4409,
+    reason: "Session continued in another connection",
+  });
   await connecting;
 
   expect(onAccessRevoked).not.toHaveBeenCalled();
 });
 
-test("reconnects with a new ticket when the daemon asks to rebind admission", async () => {
+test.each([
+  "Session continued with updated admission",
+  "Daemon device credentials are now required",
+])("keeps Hub access when the daemon asks to rebind admission: %s", async (reason) => {
   const mock = createMockTransport();
   const onAccessRevoked = vi.fn();
   const client = new DaemonClient({
@@ -375,7 +385,7 @@ test("reconnects with a new ticket when the daemon asks to rebind admission", as
   const connecting = client.connect().catch(() => undefined);
   mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
   await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
-  mock.triggerClose({ code: 4410, reason: "Session continued with updated admission" });
+  mock.triggerClose({ code: MANAGED_ACCESS_REBIND_CLOSE_CODE, reason });
   await connecting;
 
   expect(onAccessRevoked).not.toHaveBeenCalled();
@@ -404,6 +414,33 @@ test("keeps Hub access when an older daemon replaces the session with the legacy
 });
 
 test.each([false, true])(
+  "missing daemon credential after policy rebind does not revoke Hub access (framed: %s)",
+  async (framed) => {
+    const mock = createMockTransport();
+    const onAccessRevoked = vi.fn();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "managed_access_pairing_required_test",
+      transportFactory: () => mock.transport,
+      reconnect: { enabled: false },
+      resolveAccessTicket: async () => "clisbot_dat_ticket",
+      onAccessRevoked,
+    });
+    clients.push(client);
+
+    const connecting = client.connect().catch((error: unknown) => error);
+    mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
+    await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
+    if (framed) {
+      mock.triggerMessage(JSON.stringify({ type: "hello.rejected", reason: "password_required" }));
+    }
+    mock.triggerClose({ code: 4401, reason: "Password required" });
+    expect(await connecting).toMatchObject({ reason: "password_required" });
+    expect(onAccessRevoked).not.toHaveBeenCalled();
+  },
+);
+
+test.each([false, true])(
   "password rejection does not revoke Hub access (framed: %s)",
   async (framed) => {
     const mock = createMockTransport();
@@ -423,7 +460,12 @@ test.each([false, true])(
     mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
     await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
     if (framed) {
-      mock.triggerMessage(JSON.stringify({ type: "hello.rejected", reason: "incorrect_password" }));
+      mock.triggerMessage(
+        JSON.stringify({
+          type: "hello.rejected",
+          reason: "incorrect_password",
+        }),
+      );
     }
     mock.triggerClose({ code: 4403, reason: "Incorrect password" });
     expect(await connecting).toMatchObject({ reason: "incorrect_password" });
@@ -454,10 +496,16 @@ test("reports revocation when the daemon withdraws managed access", async () => 
 });
 
 test.each([
-  { name: "a network error", failure: new TypeError("Failed to fetch"), revoked: false },
+  {
+    name: "a network error",
+    failure: new TypeError("Failed to fetch"),
+    revoked: false,
+  },
   {
     name: "a Hub 503",
-    failure: Object.assign(new Error("Hub request failed (503)."), { status: 503 }),
+    failure: Object.assign(new Error("Hub request failed (503)."), {
+      status: 503,
+    }),
     revoked: false,
   },
   {
@@ -512,7 +560,10 @@ test("keeps Hub access when the daemon could not reach the Hub to admit it", asy
   const connecting = client.connect().catch(() => undefined);
   mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
   await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
-  mock.triggerClose({ code: 4503, reason: "Hub admission temporarily unavailable" });
+  mock.triggerClose({
+    code: 4503,
+    reason: "Hub admission temporarily unavailable",
+  });
   await connecting;
 
   expect(onAccessRevoked).not.toHaveBeenCalled();
@@ -560,7 +611,11 @@ test("retry-safe creation rejects older hosts before sending any request", async
   transport.triggerOpen();
   await connecting;
   await expect(
-    client.createAgent({ provider: "codex", cwd: "/project", idempotencyKey: "creation" }),
+    client.createAgent({
+      provider: "codex",
+      cwd: "/project",
+      idempotencyKey: "creation",
+    }),
   ).rejects.toThrow("Update the host to use retry-safe agent creation.");
   expect(transport.sent).toEqual([]);
 });
@@ -669,7 +724,10 @@ test.each([false, true])(
     void duplicate.catch(() => {});
     expect(transport.sent).toHaveLength(1);
     const request = parseSentFrame(transport.sent[0]);
-    expect(request).toMatchObject({ type: "workspace.create.request", source: input.source });
+    expect(request).toMatchObject({
+      type: "workspace.create.request",
+      source: input.source,
+    });
     expect(request.idempotencyKey).toBe(receipts ? input.idempotencyKey : undefined);
     transport.triggerMessage(
       wrapSessionMessage({
@@ -682,8 +740,12 @@ test.each([false, true])(
         },
       }),
     );
-    await expect(created).resolves.toMatchObject({ error: "Directory unavailable" });
-    await expect(duplicate).resolves.toMatchObject({ error: "Directory unavailable" });
+    await expect(created).resolves.toMatchObject({
+      error: "Directory unavailable",
+    });
+    await expect(duplicate).resolves.toMatchObject({
+      error: "Directory unavailable",
+    });
   },
 );
 
@@ -715,7 +777,10 @@ test.each(["agent", "workspace"] as const)(
           });
     void creation.catch(() => {});
     expect(transport.sent).toHaveLength(1);
-    transport.triggerClose({ code: 1006, reason: "Connection lost after dispatch" });
+    transport.triggerClose({
+      code: 1006,
+      reason: "Connection lost after dispatch",
+    });
     await expect(creation).rejects.toThrow();
     const reconnecting = client.connect();
     transport.triggerOpen({ features: {} });
@@ -756,9 +821,14 @@ test("timeline observation consumes broadcasts from a host without selective del
   mock.triggerOpen({ features: {} });
   await connecting;
   const observation = client.observeTimeline(["agent"]);
-  await expect(observation.ready).resolves.toMatchObject({ agentIds: ["agent"] });
+  await expect(observation.ready).resolves.toMatchObject({
+    agentIds: ["agent"],
+  });
   const updates: unknown[] = [];
-  observation.subscribe({ snapshot: () => {}, update: (message) => updates.push(message) });
+  observation.subscribe({
+    snapshot: () => {},
+    update: (message) => updates.push(message),
+  });
   mock.triggerMessage(
     wrapSessionMessage({
       type: "agent_stream",
@@ -854,7 +924,11 @@ class FakeDaemon {
       const pong = sessionPing
         ? wrapSessionMessage({
             type: "pong",
-            payload: { ...sessionPing, serverReceivedAt: Date.now(), serverSentAt: Date.now() },
+            payload: {
+              ...sessionPing,
+              serverReceivedAt: Date.now(),
+              serverSentAt: Date.now(),
+            },
           })
         : JSON.stringify({ type: "pong" });
       if (this.pongMode.delayMs === 0) {
@@ -1128,8 +1202,11 @@ test("passes password as HTTP bearer header and WebSocket subprotocol", async ()
 
 test("keeps relay upgrade credentials out of the socket request", async () => {
   const mock = createMockTransport();
-  const requests: Array<{ url: string; headers?: Record<string, string>; protocols?: string[] }> =
-    [];
+  const requests: Array<{
+    url: string;
+    headers?: Record<string, string>;
+    protocols?: string[];
+  }> = [];
   const client = new DaemonClient({
     url: "ws://relay.test/ws?role=client&serverId=srv_test&v=2",
     clientId: "clsk_relay_auth_test",
@@ -1145,7 +1222,9 @@ test("keeps relay upgrade credentials out of the socket request", async () => {
   clients.push(client);
   void client.connect();
   await vi.waitFor(() => expect(requests).toHaveLength(1));
-  expect(requests[0]).toEqual({ url: "ws://relay.test/ws?role=client&serverId=srv_test&v=2" });
+  expect(requests[0]).toEqual({
+    url: "ws://relay.test/ws?role=client&serverId=srv_test&v=2",
+  });
 });
 
 test("refuses relay password auth without an encrypted hello", async () => {
@@ -1231,7 +1310,10 @@ test("uses a local credential over a saved password when the desktop bridge prov
   await vi.waitFor(() => expect(transportFactory).toHaveBeenCalled());
   mock.triggerOpen({ preserveSent: true });
   await connected;
-  expect(transportFactory).toHaveBeenCalledWith({ url: "ws://test", headers: {} });
+  expect(transportFactory).toHaveBeenCalledWith({
+    url: "ws://test",
+    headers: {},
+  });
   expect(JSON.parse(assertStr(mock.sent[0]))).toMatchObject({
     type: "hello",
     auth: { kind: "localCredential", token: "current-local-token" },
@@ -2000,8 +2082,14 @@ test("preserves legacy fetchAgent id overload", async () => {
 test.each([
   { features: undefined, enabled: false },
   { features: { agentSessionStorage: true }, enabled: false },
-  { features: { agentSessionStorage: true, agentSessionStorageRead: false }, enabled: false },
-  { features: { agentSessionStorageRead: true, agentSessionStorage: false }, enabled: true },
+  {
+    features: { agentSessionStorage: true, agentSessionStorageRead: false },
+    enabled: false,
+  },
+  {
+    features: { agentSessionStorageRead: true, agentSessionStorage: false },
+    enabled: true,
+  },
 ])(
   "gates timeline extensions on connected daemon read capability: $features",
   async ({ features, enabled }) => {
@@ -2016,7 +2104,9 @@ test.each([
     });
     clients.push(client);
     const connection = client.connect();
-    mock.triggerOpen({ features: { ...features, projectedSubagentTimeline: true } });
+    mock.triggerOpen({
+      features: { ...features, projectedSubagentTimeline: true },
+    });
     await connection;
 
     const options = {
@@ -2109,7 +2199,10 @@ test.each([
     }
     const payload = expect(client.readTimelinePayload("agent-1", options)).rejects.toThrow();
     const ranges = expect(
-      client.readTimelineSourceRanges("agent-1", { ...options, requestId: "ranges" }),
+      client.readTimelineSourceRanges("agent-1", {
+        ...options,
+        requestId: "ranges",
+      }),
     ).rejects.toThrow();
     expect(parseSentFrame(mock.sent[0])).toMatchObject({
       type: "agent.timeline.payload.get.request",
@@ -2211,7 +2304,13 @@ test("lists the full agent prompt index", async () => {
         requestId: "req-prompts-1",
         agentId: "agent-1",
         epoch: "epoch-1",
-        prompts: [{ seq: 1, timestamp: "2026-01-01T00:00:00.000Z", preview: "First prompt" }],
+        prompts: [
+          {
+            seq: 1,
+            timestamp: "2026-01-01T00:00:00.000Z",
+            preview: "First prompt",
+          },
+        ],
         error: null,
       },
     }),
@@ -2484,7 +2583,10 @@ test("gets a structured plugin log snapshot", async () => {
 
   const response = client.getPluginLogs("example");
   const request = parseSentFrame(mock.sent[0]);
-  expect(request).toMatchObject({ type: "plugin.logs.get.request", pluginId: "example" });
+  expect(request).toMatchObject({
+    type: "plugin.logs.get.request",
+    pluginId: "example",
+  });
   mock.triggerMessage(
     wrapSessionMessage({
       type: "plugin.logs.get.response",
@@ -2865,7 +2967,9 @@ test("a candidate measurement that times out under a heartbeat tick does not cou
   );
   await session.advance(5_500);
   await expect(measurementError).resolves.toEqual(
-    expect.objectContaining({ message: "Latency measurement timed out (5000ms)" }),
+    expect.objectContaining({
+      message: "Latency measurement timed out (5000ms)",
+    }),
   );
 
   // The measurement timeout must not have been recorded as a liveness failure: a
@@ -2985,7 +3089,10 @@ test("file context action RPCs correlate success and error responses", async () 
     error: null,
   });
 
-  const deletePromise = client.deleteFileEntry({ cwd: "/tmp/project", path: "src/new.ts" });
+  const deletePromise = client.deleteFileEntry({
+    cwd: "/tmp/project",
+    path: "src/new.ts",
+  });
   const deleteRequest = parseSentFrame(mock.sent.at(-1));
   expect(deleteRequest).toMatchObject({
     type: "fs.entry.delete.request",
@@ -3004,9 +3111,14 @@ test("file context action RPCs correlate success and error responses", async () 
       },
     }),
   );
-  await expect(deletePromise).resolves.toMatchObject({ success: true, error: null });
+  await expect(deletePromise).resolves.toMatchObject({
+    success: true,
+    error: null,
+  });
 
-  const discardPromise = client.checkoutDiscardChanges("/tmp/project", { paths: ["src"] });
+  const discardPromise = client.checkoutDiscardChanges("/tmp/project", {
+    paths: ["src"],
+  });
   const discardRequest = parseSentFrame(mock.sent.at(-1));
   expect(discardRequest).toMatchObject({
     type: "checkout.discard_changes.request",
@@ -3069,7 +3181,10 @@ test("sends plugin source identifiers unchanged for daemon-host resolution", asy
     }),
   );
 
-  await expect(installPromise).resolves.toMatchObject({ id: "review", status: "running" });
+  await expect(installPromise).resolves.toMatchObject({
+    id: "review",
+    status: "running",
+  });
 });
 
 test("a connection loss rejects an in-flight file context action", async () => {
@@ -3087,7 +3202,10 @@ test("a connection loss rejects an in-flight file context action", async () => {
   mock.triggerOpen();
   await connectPromise;
 
-  const pending = client.deleteFileEntry({ cwd: "/tmp/project", path: "src/file.ts" });
+  const pending = client.deleteFileEntry({
+    cwd: "/tmp/project",
+    path: "src/file.ts",
+  });
   mock.triggerClose({ code: 1006, reason: "network lost" });
 
   await expect(pending).rejects.toThrow(/network lost|disconnected|closed/i);
@@ -3345,7 +3463,10 @@ test("readFile drops an old daemon's over-budget binary chunks and reports the r
     }),
   );
   mock.triggerMessage(
-    encodeFileTransferFrame({ opcode: FileTransferOpcode.FileEnd, requestId: "req-budget" }),
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileEnd,
+      requestId: "req-budget",
+    }),
   );
 
   await expect(responsePromise).rejects.toThrow("File is too large to display");
@@ -4224,7 +4345,9 @@ test("sends project.remove.request", async () => {
     }),
   );
 
-  await expect(removePromise).resolves.toEqual({ removedWorkspaceIds: ["ws-main"] });
+  await expect(removePromise).resolves.toEqual({
+    removedWorkspaceIds: ["ws-main"],
+  });
 });
 
 test("sends worktree base-ref fields in create_clisbot_worktree_request", async () => {
@@ -4587,7 +4710,9 @@ test("subscribes to checkout diff updates via RPC handshake", async () => {
   mock.triggerOpen();
   await connectPromise;
 
-  const subscription = client.observeCheckoutDiff("/tmp/project", { mode: "uncommitted" });
+  const subscription = client.observeCheckoutDiff("/tmp/project", {
+    mode: "uncommitted",
+  });
   const promise = subscription.ready;
   await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
 
@@ -4640,7 +4765,10 @@ test("getCheckoutDiff reads a snapshot without creating a subscription", async (
   mock.triggerOpen();
   await connectPromise;
 
-  const promise = client.getCheckoutDiff("/tmp/project", { mode: "base", baseRef: "main" });
+  const promise = client.getCheckoutDiff("/tmp/project", {
+    mode: "base",
+    baseRef: "main",
+  });
 
   expect(mock.sent).toHaveLength(1);
   const subscribeRequest = parseSentFrame(mock.sent[0]);
@@ -5324,7 +5452,10 @@ test("resubscribes checkout diff streams after reconnect", async () => {
   mock.triggerOpen();
   await connectPromise;
 
-  const observation = client.observeCheckoutDiff("/tmp/project", { mode: "base", baseRef: "main" });
+  const observation = client.observeCheckoutDiff("/tmp/project", {
+    mode: "base",
+    baseRef: "main",
+  });
   await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
   const first = parseSentFrame(mock.sent[0]);
   mock.triggerMessage(
@@ -5969,7 +6100,10 @@ test("requests provider snapshots conditionally and expands the compact response
   mock.triggerOpen();
   await connectPromise;
 
-  const promise = client.getProvidersSnapshot({ cwd: "/repo", ifNoneMatch: "previous-hash" });
+  const promise = client.getProvidersSnapshot({
+    cwd: "/repo",
+    ifNoneMatch: "previous-hash",
+  });
   const request = parseSentFrame(mock.sent[0]);
   expect(request).toMatchObject({
     type: "get_providers_snapshot_request",
@@ -6276,7 +6410,9 @@ test("emits output events for the active terminal stream", async () => {
     seen.push(new TextDecoder().decode(event.data));
   });
 
-  const subscribePromise = client.subscribeTerminal("term-1", { requestId: "sub-1" });
+  const subscribePromise = client.subscribeTerminal("term-1", {
+    requestId: "sub-1",
+  });
   await vi.waitFor(() =>
     expect(parseSentFrame(mock.sent.at(-1)).type).toBe("subscribe_terminal_request"),
   );
@@ -6332,7 +6468,9 @@ test("emits snapshot events for the subscribed terminal stream", async () => {
     snapshots.push(event.state);
   });
 
-  const subscribePromise = client.subscribeTerminal("term-1", { requestId: "sub-2" });
+  const subscribePromise = client.subscribeTerminal("term-1", {
+    requestId: "sub-2",
+  });
   await vi.waitFor(() =>
     expect(parseSentFrame(mock.sent.at(-1)).type).toBe("subscribe_terminal_request"),
   );
@@ -6385,7 +6523,9 @@ test("sends explicit terminal input and resize commands", async () => {
   mock.triggerOpen();
   await connectPromise;
 
-  const subscribePromise = client.subscribeTerminal("term-1", { requestId: "sub-3" });
+  const subscribePromise = client.subscribeTerminal("term-1", {
+    requestId: "sub-3",
+  });
   await vi.waitFor(() =>
     expect(parseSentFrame(mock.sent.at(-1)).type).toBe("subscribe_terminal_request"),
   );
@@ -6454,7 +6594,9 @@ test("routes concurrent terminal stream frames by slot", async () => {
     seen.push(`${event.terminalId}:${new TextDecoder().decode(event.data)}`);
   });
 
-  const subscribeFirstPromise = client.subscribeTerminal("term-1", { requestId: "sub-multi-1" });
+  const subscribeFirstPromise = client.subscribeTerminal("term-1", {
+    requestId: "sub-multi-1",
+  });
   await vi.waitFor(() =>
     expect(parseSentFrame(mock.sent.at(-1)).type).toBe("subscribe_terminal_request"),
   );
@@ -6472,7 +6614,9 @@ test("routes concurrent terminal stream frames by slot", async () => {
   );
   await subscribeFirstPromise;
 
-  const subscribeSecondPromise = client.subscribeTerminal("term-2", { requestId: "sub-multi-2" });
+  const subscribeSecondPromise = client.subscribeTerminal("term-2", {
+    requestId: "sub-multi-2",
+  });
   await vi.waitFor(() =>
     expect(parseSentFrame(mock.sent.at(-1)).type).toBe("subscribe_terminal_request"),
   );
@@ -6556,7 +6700,9 @@ test("ignores terminal stream frames after terminal_stream_exit", async () => {
     seen.push(new TextDecoder().decode(event.data));
   });
 
-  const subscribePromise = client.subscribeTerminal("term-1", { requestId: "sub-4" });
+  const subscribePromise = client.subscribeTerminal("term-1", {
+    requestId: "sub-4",
+  });
   await vi.waitFor(() =>
     expect(parseSentFrame(mock.sent.at(-1)).type).toBe("subscribe_terminal_request"),
   );
@@ -6965,7 +7111,10 @@ test("sends subscribe/unsubscribe terminals messages", async () => {
   const observation = client.observeTerminals({ cwd: "/tmp/project" });
   await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
   const request = parseSentFrame(mock.sent[0]);
-  expect(request).toMatchObject({ type: "subscribe_terminals_request", cwd: "/tmp/project" });
+  expect(request).toMatchObject({
+    type: "subscribe_terminals_request",
+    cwd: "/tmp/project",
+  });
   expect(request.subscriptionId).toBeUndefined();
   mock.triggerMessage(
     wrapSessionMessage({
@@ -7256,7 +7405,10 @@ test("RPC denial messages remain user-facing while retaining structured diagnost
   const connecting = client.connect();
   mock.triggerOpen();
   await connecting;
-  const result = client.fetchAgents({ requestId: "denied-read", scope: "active" });
+  const result = client.fetchAgents({
+    requestId: "denied-read",
+    scope: "active",
+  });
   const assertion = expect(result).rejects.toMatchObject({
     message:
       "You do not have permission to perform this action. Ask your administrator for access.",
@@ -7368,7 +7520,10 @@ test("wire snapshot callers own expansion and receive hash references unchanged"
     requestId: sent.requestId,
   };
   transport.triggerMessage(
-    wrapSessionMessage({ type: "get_providers_snapshot_response", payload: body }),
+    wrapSessionMessage({
+      type: "get_providers_snapshot_response",
+      payload: body,
+    }),
   );
   expect(await request).toEqual(body);
 });
@@ -7383,7 +7538,9 @@ test("creation lifecycle sends the keyed agent and initial prompt as one intent"
   });
   clients.push(client);
   const connected = client.connect();
-  transport.triggerOpen({ features: { creationLifecycle: true, agentRequestReceipts: true } });
+  transport.triggerOpen({
+    features: { creationLifecycle: true, agentRequestReceipts: true },
+  });
   await connected;
   const creation = client.createAgent({
     idempotencyKey: "draft-one",
@@ -7404,7 +7561,11 @@ test("creation lifecycle sends the keyed agent and initial prompt as one intent"
   transport.triggerMessage(
     wrapSessionMessage({
       type: "agent.create.response",
-      payload: { requestId: request.requestId, agent: null, error: "provider unavailable" },
+      payload: {
+        requestId: request.requestId,
+        agent: null,
+        error: "provider unavailable",
+      },
     }),
   );
   await expect(creation).rejects.toThrow("provider unavailable");
@@ -7450,7 +7611,11 @@ test("creation lifecycle acknowledgement reaches the observer before the final r
   transport.triggerMessage(
     wrapSessionMessage({
       type: "agent.create.response",
-      payload: { requestId: request.requestId, agent: null, error: "provider unavailable" },
+      payload: {
+        requestId: request.requestId,
+        agent: null,
+        error: "provider unavailable",
+      },
     }),
   );
   await expect(creation).rejects.toThrow("provider unavailable");
@@ -7616,7 +7781,11 @@ test("reviewed plugin updates gate before requests and preserve exact proposal d
     const proposal = {
       id: "review",
       expected: {
-        identity: { kind: "npm" as const, packageName: "review", pluginPath: "." },
+        identity: {
+          kind: "npm" as const,
+          packageName: "review",
+          pluginPath: ".",
+        },
         installationRoot: "/plugins/review/version-root",
         revision: "1.0.0",
       },
@@ -7754,7 +7923,10 @@ test("Chat pages and live pushes from older Hosts expose flat sender identities"
   const pushed = vi.fn();
   client.on("chat.transcript.appended", pushed);
   mock.triggerMessage(
-    wrapSessionMessage({ type: "chat.transcript.appended", payload: { chatId: "chat", line } }),
+    wrapSessionMessage({
+      type: "chat.transcript.appended",
+      payload: { chatId: "chat", line },
+    }),
   );
   expect(pushed).toHaveBeenCalledWith({
     type: "chat.transcript.appended",

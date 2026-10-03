@@ -20,8 +20,8 @@ export function createRelayE2eeTransportFactory(args: {
   daemonPublicKeyB64: string;
   logger: TransportLogger;
 }): DaemonTransportFactory {
-  return ({ url }) => {
-    const base = args.baseFactory({ url });
+  return (parameters) => {
+    const base = args.baseFactory(parameters);
     return createEncryptedTransport(base, args.daemonPublicKeyB64, args.logger);
   };
 }

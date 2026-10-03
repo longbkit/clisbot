@@ -62,6 +62,14 @@
       "types": "./dist/server/server/agent/agent-response-loop.d.ts",
       "source": "./src/server/agent/agent-response-loop.ts",
       "default": "./dist/server/server/agent/agent-response-loop.js"
+    },
+    "./gateway-adapters": {
+      "types": "./dist/server/server/gateway-adapters.d.ts",
+      "default": "./dist/server/server/gateway-adapters.js"
+    },
+    "./supervisor": {
+      "types": "./dist/scripts/supervisor.d.ts",
+      "default": "./dist/scripts/supervisor.js"
     }
   },
   "publishConfig": {
@@ -108,6 +116,7 @@
     "@anthropic-ai/claude-agent-sdk": "0.3.246",
     "@anthropic-ai/sdk": "^0.104.2",
     "@clisbot/client": "0.10.2",
+    "@clisbot/device-access": "0.10.2",
     "@clisbot/highlight": "0.10.2",
     "@clisbot/plugin": "0.10.2",
     "@clisbot/protocol": "0.10.2",

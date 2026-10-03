@@ -24,6 +24,10 @@
     "./internal/daemon-client-websocket-transport": {
       "types": "./dist/daemon-client-websocket-transport.d.ts",
       "default": "./dist/daemon-client-websocket-transport.js"
+    },
+    "./internal/hub-device-transport": {
+      "types": "./dist/hub-device-transport.d.ts",
+      "default": "./dist/hub-device-transport.js"
     }
   },
   "publishConfig": {
@@ -39,8 +43,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@clisbot/device-access": "0.10.2",
     "@clisbot/protocol": "0.10.2",
     "@clisbot/relay": "0.10.2",
+    "base64-js": "^1.5.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

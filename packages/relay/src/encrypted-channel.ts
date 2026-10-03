@@ -11,12 +11,13 @@ import {
   exportPublicKey,
   importPublicKey,
   deriveSharedKey,
-  encrypt,
+  encryptWithNonce,
   decrypt,
   type KeyPair,
   type SharedKey,
 } from "./crypto.js";
 import { arrayBufferToBase64, base64ToArrayBuffer } from "./base64.js";
+import { ChannelNonces } from "./channel-nonce.js";
 
 export interface Transport {
   send(data: string | ArrayBuffer): void | Promise<void>;
@@ -117,6 +118,8 @@ function buildInvalidHelloError(rawText: string, parsed?: unknown): Error {
 
 const HANDSHAKE_RETRY_MS = 1000;
 const MAX_PENDING_SENDS = 200;
+const MAX_HANDSHAKE_BUFFER_MESSAGES = 64;
+const MAX_HANDSHAKE_BUFFER_BYTES = 1024 * 1024;
 const REHANDSHAKE_REJECTION_CODE = 1008;
 const ENCRYPTED_PAYLOAD_OVERHEAD_BYTES = 40;
 
@@ -231,6 +234,12 @@ export async function createDaemonChannel(
 ): Promise<EncryptedChannel> {
   return new Promise((resolve, reject) => {
     const bufferedMessages: TransportMessage[] = [];
+    let bufferedBytes = 0;
+    let failed = false;
+    const fail = (error: Error): void => {
+      failed = true;
+      reject(error);
+    };
     const shouldIgnorePostHelloPlaintext = (message: TransportMessage): boolean => {
       try {
         if (message.isBinary) return false;
@@ -267,6 +276,17 @@ export async function createDaemonChannel(
         // for the next message (already encrypted) to be misinterpreted as a
         // second hello, causing the handshake to fail.
         const bufferNext = (next: TransportMessage): void => {
+          if (failed) return;
+          bufferedBytes += utf8ByteLength(next.data);
+          if (
+            bufferedMessages.length >= MAX_HANDSHAKE_BUFFER_MESSAGES ||
+            bufferedBytes > MAX_HANDSHAKE_BUFFER_BYTES
+          ) {
+            const error = new Error("Encrypted handshake buffer limit reached");
+            fail(error);
+            transport.close(1008, error.message);
+            return;
+          }
           bufferedMessages.push(next);
         };
         Object.assign(transport, { onmessage: bufferNext });
@@ -283,6 +303,7 @@ export async function createDaemonChannel(
               : {}),
           } satisfies E2EEReadyMessage),
         );
+        if (failed) return;
 
         const channel = new EncryptedChannel(transport, sharedKey, events, {
           daemonKeyPair,
@@ -298,17 +319,17 @@ export async function createDaemonChannel(
 
         resolve(channel);
       } catch (error) {
-        reject(error);
+        fail(error instanceof Error ? error : new Error(String(error)));
       }
     };
 
     Object.assign(transport, {
       onmessage: handleHello,
       onerror: (error: Error) => {
-        reject(error);
+        fail(error);
       },
       onclose: (code: number, reason: string) => {
-        reject(new Error(`Connection closed during handshake: ${code} ${reason}`));
+        fail(new Error(`Connection closed during handshake: ${code} ${reason}`));
       },
     });
   });
@@ -318,6 +339,7 @@ export async function createDaemonChannel(
  * Encrypted channel that wraps a transport with E2EE.
  */
 export class EncryptedChannel {
+  private readonly nonces = new ChannelNonces();
   private transport: Transport;
   private sharedKey: SharedKey;
   private state: ChannelState = "handshaking";
@@ -440,8 +462,9 @@ export class EncryptedChannel {
         }
       })();
 
-      if (ciphertext) {
+      if (ciphertext && this.state === "open") {
         const plaintextBytes = decrypt(this.sharedKey, ciphertext.data);
+        this.nonces.acceptAuthenticated(ciphertext.data);
         const plaintext = decodePlaintext(plaintextBytes, ciphertext.isBinary);
         this.events.onmessage?.(plaintext);
       }
@@ -452,7 +475,7 @@ export class EncryptedChannel {
       // re-handshake. Emitting an error event here can cause higher-level code
       // to tear down the session without triggering a clean reconnect.
       try {
-        this.transport.close(1011, err.message);
+        this.close(1011, err.message);
       } catch {
         // ignore
       }
@@ -472,7 +495,7 @@ export class EncryptedChannel {
       throw new Error("Channel not open");
     }
 
-    const ciphertext = encrypt(this.sharedKey, data);
+    const ciphertext = encryptWithNonce(this.sharedKey, data, this.nonces.next());
     if (this.options.binaryCiphertext && data instanceof ArrayBuffer) {
       await this.transport.send(ciphertext);
       return;

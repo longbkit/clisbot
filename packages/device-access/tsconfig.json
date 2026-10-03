@@ -3,22 +3,23 @@
     "target": "ES2020",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
+    "lib": ["ES2020", "DOM"],
     "types": ["node"],
-    "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "declaration": true,
+    "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["scripts/supervisor-entrypoint.ts", "scripts/dev-runner.ts", "scripts/supervisor.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }

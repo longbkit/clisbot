@@ -80,13 +80,6 @@ function pathOf(request: IncomingMessage): string | null {
   }
 }
 
-function ownsUpgrade(request: IncomingMessage): boolean {
-  const path = pathOf(request);
-  // Consume invalid targets too, so the daemon listener cannot upgrade a socket
-  // after this adapter has rejected it.
-  return path === null || isHubWebSocketPath(path);
-}
-
 // COMPAT(clisbot-hub-proxy): optional transport adapter. Hub authenticates its
 // requests with its existing cookies/tickets; daemon bearer auth still owns
 // daemon routes. No credential is minted or added by this proxy.
@@ -105,10 +98,18 @@ const disabledProxy: HubHttpProxy = {
 };
 
 export function createHubHttpProxy(origin: string | undefined): HubHttpProxy {
+  return createFixedHttpProxy(origin, isHubHttpPath, isHubWebSocketPath);
+}
+
+export function createFixedHttpProxy(
+  origin: string | undefined,
+  ownsHttp: (path: string) => boolean,
+  ownsWs: (path: string) => boolean,
+): HubHttpProxy {
   if (!origin?.trim()) return disabledProxy;
   const target = readTarget(origin);
   const middleware: RequestHandler = (request, response, next) => {
-    if (!isHubHttpPath(request.path)) return next();
+    if (!ownsHttp(request.path)) return next();
     const upstream = requestTo(target, request, { clientAddress: request.ip });
     upstream.on("response", (incoming) => {
       response.writeHead(incoming.statusCode ?? 502, forwardHeaders(incoming));
@@ -128,12 +129,15 @@ export function createHubHttpProxy(origin: string | undefined): HubHttpProxy {
   return {
     enabled: true,
     middleware,
-    handlesUpgrade: ownsUpgrade,
+    handlesUpgrade: (request) => {
+      const path = pathOf(request);
+      return path === null || ownsWs(path);
+    },
     upgrade(request: IncomingMessage, socket: Duplex, head: Buffer) {
       const path = pathOf(request);
       if (path === null) {
         socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
-      } else if (isHubWebSocketPath(path)) forwardUpgrade(target, request, socket, head);
+      } else if (ownsWs(path)) forwardUpgrade(target, request, socket, head);
     },
   };
 }

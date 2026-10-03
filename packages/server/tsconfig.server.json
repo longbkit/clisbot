@@ -22,7 +22,12 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/server/**/*", "src/services/**/*", "src/terminal/**/*"],
+  "include": [
+    "src/server/**/*",
+    "src/services/**/*",
+    "src/terminal/**/*",
+    "src/utils/tool-call-parsers.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
