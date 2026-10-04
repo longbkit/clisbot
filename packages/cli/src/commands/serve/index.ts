@@ -9,7 +9,7 @@ import { prepareHub } from "./hub-launch.js";
 import { configureServingAdmission } from "./network-admission.js";
 import { localHubPairingOffer } from "../hub/device-pairing.js";
 import { launchGateway } from "./gateway-launch.js";
-import { configureTailscaleServe, detectTailscale } from "./tailscale.js";
+import { configureTailscaleServe, detectTailscale, readTailscaleServePort } from "./tailscale.js";
 import { selectLocalPort } from "../hub/local-port.js";
 import { connectToDaemon } from "../../utils/client.js";
 import { enrollPersonalDaemon } from "./enrollment.js";
@@ -276,7 +276,7 @@ async function prepareDaemon(home: string, relay: boolean): Promise<{ origin: st
 async function servingNetwork(options: PersonalServingOptions): Promise<{
   transport: string;
   origin?: string;
-  tailscale?: { dnsName: string };
+  tailscale?: { dnsName: string; port: number };
   tailscaleState?: "ready" | "missing" | "login-required" | "stopped" | "unavailable";
   networkGuidance?: string;
 }> {
@@ -298,13 +298,18 @@ async function servingNetwork(options: PersonalServingOptions): Promise<{
   }
   if (transport !== "tailscale") return { transport };
   const status = await detectTailscale();
-  if (status.state === "ready")
+  if (status.state === "ready") {
+    const httpsPort = port(
+      options.httpsPort ??
+        String(readTailscaleServePort(selectedHome(options), status.dnsName) ?? 8443),
+    );
     return {
       transport,
-      tailscale: status,
+      tailscale: { dnsName: status.dnsName, port: httpsPort },
       tailscaleState: "ready",
-      origin: new URL(`https://${status.dnsName}:${port(options.httpsPort ?? "8443")}`).origin,
+      origin: new URL(`https://${status.dnsName}:${httpsPort}`).origin,
     };
+  }
   console.error(status.guidance);
   if (!process.stdin.isTTY || options.json)
     return { transport: "relay", tailscaleState: status.state, networkGuidance: status.guidance };
@@ -353,7 +358,7 @@ async function exposeServices(
       origin = await configureTailscaleServe({
         home,
         dnsName: network.tailscale.dnsName,
-        port: port(options.httpsPort ?? "8443"),
+        port: network.tailscale.port,
         target: gateway.origin,
       });
     } catch (error) {

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -7,6 +7,7 @@ import {
   removeTailscaleServe,
   detectTailscale,
   resolveTailscaleBinary,
+  readTailscaleServePort,
 } from "./tailscale.js";
 
 const homes: string[] = [];
@@ -116,4 +117,58 @@ test("normalizes HTTPS default port to the browser Origin while recording the ow
   expect(
     JSON.parse(await readFile(path.join(home, "tailscale-serve.json"), "utf8")).authority,
   ).toBe("host.tail123.ts.net:443");
+  expect(readTailscaleServePort(home, "host.tail123.ts.net")).toBe(443);
+});
+
+test("reuses a custom HTTPS port without taking ownership of a replaced mapping", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-tailscale-reuse-"));
+  homes.push(home);
+  const dnsName = "host.tail123.ts.net";
+  const authority = `${dnsName}:8452`;
+  let proxy: string | undefined;
+  const run = vi.fn(async (args: string[]) =>
+    args[1] === "status"
+      ? JSON.stringify({
+          Web: { [authority]: { Handlers: proxy ? { "/": { Proxy: proxy } } : {} } },
+        })
+      : "",
+  );
+  expect(readTailscaleServePort(home, dnsName)).toBeUndefined();
+  const options = { home, dnsName, port: 8452, target: "http://127.0.0.1:6889" };
+  await configureTailscaleServe(options, run);
+  expect(readTailscaleServePort(home, dnsName)).toBe(8452);
+  proxy = options.target;
+  await configureTailscaleServe({ ...options, port: readTailscaleServePort(home, dnsName)! }, run);
+  expect(run).toHaveBeenLastCalledWith([
+    "serve",
+    "--bg",
+    "--https=8452",
+    "--set-path=/",
+    options.target,
+  ]);
+  proxy = "http://127.0.0.1:9999";
+  run.mockClear();
+  await expect(
+    configureTailscaleServe({ ...options, port: readTailscaleServePort(home, dnsName)! }, run),
+  ).rejects.toThrow("preserved");
+  expect(run).toHaveBeenCalledTimes(1);
+});
+
+test("ignores saved ports for another Tailscale host and invalid records", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-tailscale-port-"));
+  homes.push(home);
+  for (const authority of [
+    "other.tail123.ts.net:8452",
+    "host.tail123.ts.net:0",
+    "host.tail123.ts.net:65536",
+    "host.tail123.ts.net:8452/path",
+    "user@host.tail123.ts.net:8452",
+    "host.tail123.ts.net:8452?query",
+    "host.tail123.ts.net:8452#fragment",
+  ]) {
+    await writeFile(path.join(home, "tailscale-serve.json"), JSON.stringify({ authority }));
+    expect(readTailscaleServePort(home, "host.tail123.ts.net")).toBeUndefined();
+  }
+  await writeFile(path.join(home, "tailscale-serve.json"), "invalid JSON");
+  expect(readTailscaleServePort(home, "host.tail123.ts.net")).toBeUndefined();
 });

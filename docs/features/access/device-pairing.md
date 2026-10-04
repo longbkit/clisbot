@@ -222,6 +222,8 @@ setup remains available on self-hosted web.
 The CLI is a launcher. Each backend has its own supervisor; the daemon is not the parent
 of Hub or the web service. Ports below are preferences, with free-port selection on first
 launch. A running gateway and the saved Hub port are reused; backend identities persist.
+The home's recorded Tailscale HTTPS port is reused unless `--https-port` is supplied, so
+starting Hub from the app preserves the existing web address and other homes' Serve mappings.
 
 ```mermaid
 flowchart TB

@@ -104,6 +104,26 @@ export async function configureTailscaleServe(
   return new URL(`https://${authority}`).origin;
 }
 
+/** Reuse this home's HTTPS port; mapping ownership is checked separately before changes. */
+export function readTailscaleServePort(home: string, dnsName: string): number | undefined {
+  try {
+    const record = JSON.parse(readFileSync(path.join(home, "tailscale-serve.json"), "utf8")) as {
+      authority?: unknown;
+    } | null;
+    if (typeof record?.authority !== "string") return undefined;
+    const url = new URL(`https://${record.authority}`);
+    const port = Number(url.port || "443");
+    return port >= 1 &&
+      port <= 65535 &&
+      record.authority === `${dnsName}:${port}` &&
+      url.hostname === dnsName
+      ? port
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function removeTailscaleServe(
   home: string,
   run: TailscaleRunner = runTailscale,
