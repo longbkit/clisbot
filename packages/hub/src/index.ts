@@ -62,6 +62,7 @@ import {
   readCredentialCipherEnvironment,
   type CredentialCipher,
 } from "./credentials/credential-cipher.js";
+import { resealLegacyCredentialEnvelopes } from "./credentials/credential-reseal.js";
 import { AccessStore } from "./access/store.js";
 import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 import { AccessTicketService, readAccessLeaseDuration } from "./managed-access/tickets.js";
@@ -104,6 +105,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       credentialCipher,
     );
     resources.own(() => database.close());
+    await resealCredentials(runtime, credentialCipher);
     const identity = await resolveHubIdentity(runtime, readPort(), credentialCipher);
     const accessTickets = new AccessTicketService(runtime, new AccessStore(runtime), {
       leaseDurationMs: readAccessLeaseDuration(
@@ -458,6 +460,23 @@ async function resolveHubIdentity(
     authSecret: await configuration.authSecret(),
     ...(configuredAppUrl === undefined ? {} : { explicitAppUrl: configuredAppUrl }),
   };
+}
+
+async function resealCredentials(
+  runtime: DatabaseRuntime,
+  credentialCipher: CredentialCipher,
+): Promise<void> {
+  const { resealed, skipped, failures } = await resealLegacyCredentialEnvelopes(
+    runtime,
+    credentialCipher,
+  );
+  for (const failure of failures) {
+    logger.warn(failure, "credential envelope could not be re-sealed to the current version");
+  }
+  if (resealed + skipped + failures.length === 0) return;
+  logger.info(
+    `credential envelopes re-sealed to the current version: ${resealed} re-sealed, ${skipped} skipped, ${failures.length} failed`,
+  );
 }
 
 async function main(): Promise<void> {

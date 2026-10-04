@@ -3,6 +3,10 @@ import type { DatabaseRuntime, QueryRow } from "../../db/runtime/index.js";
 import type { Locks } from "../../db/runtime/locks/index.js";
 import type { Database } from "../../db/types.js";
 import type { CredentialCipher, CredentialEnvelope } from "../../credentials/credential-cipher.js";
+import {
+  providerApplicationCredentialOwner,
+  slackConnectionCredentialOwner,
+} from "../../credentials/credential-owners.js";
 import type {
   Provider,
   ProviderApplicationConfiguration,
@@ -395,14 +399,6 @@ function parseRow(
     updatedAt: new Date(row.updated_at),
     updatedByUserId: row.updated_by_user_id,
   };
-}
-
-function providerApplicationCredentialOwner(provider: Provider, applicationId: string): string {
-  return `provider-application:${provider}:${applicationId}`;
-}
-
-function slackConnectionCredentialOwner(applicationId: string, teamId: string): string {
-  return `slack-connection:${applicationId}:${teamId}`;
 }
 
 function providerSchema(value: string): Provider {

@@ -7,6 +7,7 @@ import type { Duplex } from "node:stream";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { createPostgresQueryRuntime } from "../../db/test-utils/runtime.js";
+import { slackConnectionCredentialOwner } from "../../credentials/credential-owners.js";
 import { createTestCredentialCipher } from "../../credentials/test-utils.js";
 import { dump } from "js-yaml";
 import { WebSocket, type RawData } from "ws";
@@ -294,7 +295,7 @@ export class HubHarness {
     const id = "00000000-0000-4000-8000-0000000000c1";
     const providerApplicationId = "A-TEST";
     const credentialEnvelope = createTestCredentialCipher().encrypt(
-      `slack-connection:${providerApplicationId}:${teamId}`,
+      slackConnectionCredentialOwner(providerApplicationId, teamId),
       { botAccessToken: "xoxb-test" },
     );
     const client = await createPostgresQueryRuntime(this.postgres.getConnectionUri());

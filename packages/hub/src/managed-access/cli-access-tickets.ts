@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { OperationAuthenticator } from "../auth/operation-auth.js";
-import { CLI_CREDENTIAL_PREFIX } from "../auth/cli-credentials.js";
+import { hasCliCredential } from "../auth/cli-credentials.js";
 import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
 import { AccessTicketError, type AccessTicketService } from "./tickets.js";
 
@@ -27,7 +27,7 @@ export function isCliAccessTicketRequest(request: Request, segments: readonly st
     segments[0] === "organizations" &&
     segments[2] === "daemons" &&
     segments[4] === "access-tickets" &&
-    (request.headers.get("authorization")?.startsWith(`Bearer ${CLI_CREDENTIAL_PREFIX}`) ?? false)
+    hasCliCredential(request.headers.get("authorization"))
   );
 }
 

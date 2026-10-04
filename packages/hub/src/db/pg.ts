@@ -23,9 +23,16 @@ import { ConnectionRepository } from "./connections.js";
 import { ProviderEventAcceptanceRepository } from "./trigger-acceptance.js";
 import {
   credentialEnvelopeVersion,
+  CURRENT_CREDENTIAL_ENVELOPE_VERSION,
   type CredentialCipher,
-  type CredentialEnvelopeVersion,
 } from "../credentials/credential-cipher.js";
+import {
+  channelCredentialOwner,
+  channelStateSecretOwner,
+  linearConnectionCredentialOwner,
+  providerApplicationCredentialOwner,
+  slackConnectionCredentialOwner,
+} from "../credentials/credential-owners.js";
 import {
   toAgentExecutionRecord,
   toAttachmentRecord,
@@ -166,31 +173,6 @@ export function createDatabase(
  */
 function channelConnectionTable(channel: ChannelConnectionChannel) {
   return CHANNEL_CONNECTION_TABLES[channel];
-}
-
-/**
- * The envelope's additional authenticated data: one owner per connection row.
- * v2 binds the organization as well, so a row lifted into another organization
- * fails authentication instead of decrypting; v1 is the pre-2026-09-07 form and
- * is read-only — `configureChannelConnection` always writes v2, which re-seals
- * a v1 row the next time its credential is written.
- */
-function channelCredentialOwner(
-  channel: ChannelConnectionChannel,
-  connectionId: string,
-  organizationId: string,
-  version: CredentialEnvelopeVersion,
-): string {
-  return version === 1
-    ? `${channel}-connection:${connectionId}`
-    : `${channel}-connection:${organizationId}:${connectionId}`;
-}
-
-/** The AAD owner of one encrypted keyed-store namespace. Binding the whole
- * scope means a row lifted into another organization, account or namespace
- * fails authentication instead of decrypting. */
-function channelStateSecretOwner(scope: ChannelStateSecretScope, namespace: string): string {
-  return `channel-state:${scope.channel}:${scope.organizationId}:${scope.accountId}:${namespace}`;
 }
 
 /** The `(organization, channel, account)` predicate every state-secret query
@@ -4068,7 +4050,7 @@ class PgDatabase implements Database {
           throw new Error("Slack connection has no application");
         const credentials = requireSlackAccessCredential(
           this.credentialCipher.decrypt(
-            `slack-connection:${row.provider_application_id}:${row.team_id}`,
+            slackConnectionCredentialOwner(row.provider_application_id, row.team_id),
             row.credential_envelope,
           ),
         );
@@ -4089,7 +4071,10 @@ class PgDatabase implements Database {
           throw new Error("Linear connection has no application");
         const credentials = requireLinearAccessCredential(
           this.credentialCipher.decrypt(
-            `linear-connection:${row.provider_application_id}:${row.linear_organization_id}`,
+            linearConnectionCredentialOwner(
+              row.provider_application_id,
+              row.linear_organization_id,
+            ),
             row.credential_envelope,
           ),
         );
@@ -4392,7 +4377,12 @@ class PgDatabase implements Database {
         .for("update");
       const connectionId = existing?.id ?? randomUUID();
       const credentialEnvelope = this.credentialCipher.encrypt(
-        channelCredentialOwner(input.channel, connectionId, input.organizationId, 2),
+        channelCredentialOwner(
+          input.channel,
+          connectionId,
+          input.organizationId,
+          CURRENT_CREDENTIAL_ENVELOPE_VERSION,
+        ),
         sealableChannelCredentials(input.credentials),
       );
       const externalIdentity = input.identity ?? null;
@@ -4509,7 +4499,7 @@ class PgDatabase implements Database {
     if (connection === undefined) return undefined;
     const bot = requireChannelSlackCredential(
       this.credentialCipher.decrypt(
-        `slack-connection:${connection.providerApplicationId}:${connection.teamId}`,
+        slackConnectionCredentialOwner(connection.providerApplicationId, connection.teamId),
         connection.credentialEnvelope,
       ),
     );
@@ -4530,7 +4520,7 @@ class PgDatabase implements Database {
       .limit(1);
     if (application === undefined) return bot;
     const configuration: unknown = this.credentialCipher.decrypt(
-      `provider-application:slack:${connection.providerApplicationId}`,
+      providerApplicationCredentialOwner("slack", connection.providerApplicationId),
       application.envelope,
     );
     const appToken =

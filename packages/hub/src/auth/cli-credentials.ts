@@ -5,6 +5,21 @@ import type { OperationAuthorizationResult } from "./api-keys.js";
 
 export const CLI_CREDENTIAL_PREFIX = "clisbot_cli_";
 const CLI_CREDENTIAL_PREFIX_LENGTH = 12;
+/**
+ * Credentials issued before the 2026-09-29 rebrand start with `paseo_cli_`. A
+ * credential is looked up by the prefix stored with it, so the old form stays
+ * valid for as long as its row does; new credentials always use
+ * `CLI_CREDENTIAL_PREFIX`. Never drop a prefix from this list: the holder cannot
+ * be reached to replace the credential.
+ */
+const ACCEPTED_CLI_CREDENTIAL_PREFIXES = [CLI_CREDENTIAL_PREFIX, "paseo_cli_"] as const;
+
+/** Whether an `Authorization` header carries a CLI credential rather than an API key. */
+export function hasCliCredential(authorization: string | null): boolean {
+  return ACCEPTED_CLI_CREDENTIAL_PREFIXES.some(
+    (prefix) => authorization?.startsWith(`Bearer ${prefix}`) ?? false,
+  );
+}
 
 interface CliCredentialRow extends QueryRow {
   id: string;
@@ -119,7 +134,7 @@ function bearerToken(value: string | null): string | undefined {
 function parseCliCredential(token: string): { prefix: string; token: string } | undefined {
   const match = token.match(
     new RegExp(
-      `^(${CLI_CREDENTIAL_PREFIX}[A-Za-z0-9_-]{${CLI_CREDENTIAL_PREFIX_LENGTH}})_(.+)$`,
+      `^((?:${ACCEPTED_CLI_CREDENTIAL_PREFIXES.join("|")})[A-Za-z0-9_-]{${CLI_CREDENTIAL_PREFIX_LENGTH}})_(.+)$`,
       "u",
     ),
   );

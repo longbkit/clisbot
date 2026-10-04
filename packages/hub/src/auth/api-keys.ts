@@ -12,6 +12,13 @@ import { withApiKeySerialization } from "../db/api-key-serialization.js";
 
 const API_KEY_PREFIX = "clisbot_pk_";
 const API_KEY_PREFIX_LENGTH = 12;
+/**
+ * Keys issued before the 2026-09-29 rebrand start with `paseo_pk_`. A key is
+ * looked up by the prefix stored with it, so the old form stays valid for as long
+ * as its row does; new keys always use `API_KEY_PREFIX`. Never drop a prefix from
+ * this list: the Hub cannot replace a key pasted into someone's CI or script.
+ */
+const ACCEPTED_API_KEY_PREFIXES = [API_KEY_PREFIX, "paseo_pk_"] as const;
 const API_KEY_SECRET_BYTES = 32;
 const apiKeyNameSchema = z.string().trim().min(1).max(100);
 
@@ -203,7 +210,10 @@ function bearerToken(value: string | null): string | undefined {
 
 function parseApiKey(token: string): { prefix: string; token: string } | undefined {
   const match = token.match(
-    new RegExp(`^(${API_KEY_PREFIX}[A-Za-z0-9_-]{${API_KEY_PREFIX_LENGTH}})_(.+)$`, "u"),
+    new RegExp(
+      `^((?:${ACCEPTED_API_KEY_PREFIXES.join("|")})[A-Za-z0-9_-]{${API_KEY_PREFIX_LENGTH}})_(.+)$`,
+      "u",
+    ),
   );
   if (match === null || match[1] === undefined) return undefined;
   return { prefix: match[1], token };

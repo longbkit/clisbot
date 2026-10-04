@@ -9,6 +9,12 @@ import {
 } from "./errors.js";
 import * as schema from "./schema.js";
 import type { CredentialCipher } from "../credentials/credential-cipher.js";
+import {
+  connectionAttemptCredentialOwner,
+  linearConnectionCredentialOwner,
+  providerApplicationCredentialOwner,
+  slackConnectionCredentialOwner,
+} from "../credentials/credential-owners.js";
 import type {
   AdvanceGitHubConnectionAttemptInput,
   BindDiscordConnectionInput,
@@ -1413,34 +1419,6 @@ function requireLinearConnectionCredential(credentials: unknown): {
     throw new Error("Linear connection credential envelope is malformed");
   }
   return { accessToken, refreshToken };
-}
-
-function providerApplicationCredentialOwner(
-  provider: ConnectionProvider,
-  applicationId: string,
-): string {
-  return `provider-application:${provider}:${applicationId}`;
-}
-
-function connectionAttemptCredentialOwner(input: {
-  provider: ConnectionProvider;
-  providerApplicationId: string | null;
-  configurationVersion: number;
-}): string {
-  if (input.providerApplicationId === null)
-    throw new Error("connection attempt has no application");
-  return `connection-attempt:${input.provider}:${input.providerApplicationId}:${input.configurationVersion}`;
-}
-
-function slackConnectionCredentialOwner(applicationId: string, teamId: string): string {
-  return `slack-connection:${applicationId}:${teamId}`;
-}
-
-function linearConnectionCredentialOwner(
-  applicationId: string,
-  linearOrganizationId: string,
-): string {
-  return `linear-connection:${applicationId}:${linearOrganizationId}`;
 }
 
 async function uniqueConnectionSlug(

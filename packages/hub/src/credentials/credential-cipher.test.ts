@@ -8,6 +8,7 @@ import {
   createCredentialCipher,
   readCredentialCipherEnvironment,
 } from "./credential-cipher.js";
+import { sealTestEnvelope } from "./test-utils.js";
 
 const roots: string[] = [];
 const key = Buffer.from(Array.from({ length: 32 }, (_, index) => index));
@@ -54,6 +55,28 @@ describe("credential cipher", () => {
         ),
       CredentialCipherError,
     );
+  });
+
+  it("seals v3 under the clisbot-hub prefix and still opens older envelopes", () => {
+    const cipher = createCredentialCipher({ keyId: "test-v1", masterKey: key });
+    const owner = "runtime-configuration:auth-secret";
+    const sealed = (prefix: string, version: 1 | 2 | 3) =>
+      sealTestEnvelope({
+        prefix,
+        version,
+        owner,
+        value: "secret",
+        keyId: "test-v1",
+        masterKey: key,
+      });
+
+    assert.equal(cipher.encrypt(owner, "secret").version, 3);
+    assert.equal(cipher.decrypt(owner, sealed("clisbot-hub", 3)), "secret");
+    assert.equal(cipher.decrypt(owner, sealed("paseo-hub", 1)), "secret");
+    assert.equal(cipher.decrypt(owner, sealed("paseo-hub", 2)), "secret");
+    assert.equal(cipher.decrypt(owner, sealed("clisbot-hub", 2)), "secret");
+    assert.throws(() => cipher.decrypt(owner, sealed("paseo-hub", 3)), CredentialCipherError);
+    assert.throws(() => cipher.decrypt(owner, sealed("clisbot-hub", 1)), CredentialCipherError);
   });
 
   it("loads one external base64 key from environment", async () => {

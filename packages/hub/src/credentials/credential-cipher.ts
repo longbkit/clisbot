@@ -5,13 +5,15 @@ import { isAbsolute, relative, resolve } from "node:path";
 const ALGORITHM = "aes-256-gcm";
 /**
  * Envelope versions. The number is part of the AAD, so it also names which
- * owner string the writer bound: v1 owners are the historical ones, v2 owners
- * additionally bind the organization (`db/pg.ts` `channelCredentialOwner`).
- * Reads accept both and writes mint `CURRENT_ENVELOPE_VERSION`, so a v1 row is
- * re-sealed the next time its credential is written — no migration.
+ * owner string and AAD prefix the writer bound: v1 owners are the historical
+ * ones, v2 owners additionally bind the organization
+ * (`credential-owners.ts` `channelCredentialOwner`), and v3 keeps the v2 owner
+ * under the `clisbot-hub` prefix instead of `paseo-hub`. Reads accept every
+ * version and writes mint `CURRENT_CREDENTIAL_ENVELOPE_VERSION`; the Hub re-seals older
+ * rows at boot (`credential-reseal.ts`).
  */
-export const CREDENTIAL_ENVELOPE_VERSIONS = [1, 2] as const;
-const CURRENT_ENVELOPE_VERSION = 2;
+export const CREDENTIAL_ENVELOPE_VERSIONS = [1, 2, 3] as const;
+export const CURRENT_CREDENTIAL_ENVELOPE_VERSION = 3;
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
@@ -117,11 +119,13 @@ function seal(
   value: unknown,
 ): CredentialEnvelope {
   const cipher = createCipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
-  cipher.setAAD(additionalAuthenticatedData(owner, CURRENT_ENVELOPE_VERSION));
+  cipher.setAAD(
+    additionalAuthenticatedData(CURRENT_AAD_PREFIX, owner, CURRENT_CREDENTIAL_ENVELOPE_VERSION),
+  );
   const plaintext = Buffer.from(JSON.stringify(value), "utf8");
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   return {
-    version: CURRENT_ENVELOPE_VERSION,
+    version: CURRENT_CREDENTIAL_ENVELOPE_VERSION,
     algorithm: ALGORITHM,
     keyId,
     nonce: nonce.toString("base64url"),
@@ -134,11 +138,19 @@ function open({ key }: CredentialKey, owner: string, parsed: CredentialEnvelope)
   const nonce = decodeBase64Url(parsed.nonce, NONCE_BYTES, "nonce");
   const tag = decodeBase64Url(parsed.authenticationTag, TAG_BYTES, "authentication tag");
   const ciphertext = decodeBase64Url(parsed.ciphertext, undefined, "ciphertext");
-  const decipher = createDecipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
-  decipher.setAAD(additionalAuthenticatedData(owner, parsed.version));
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return JSON.parse(plaintext.toString("utf8")) as unknown;
+  let failure: unknown;
+  for (const prefix of aadPrefixes(parsed.version)) {
+    const decipher = createDecipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
+    decipher.setAAD(additionalAuthenticatedData(prefix, owner, parsed.version));
+    decipher.setAuthTag(tag);
+    try {
+      const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      return JSON.parse(plaintext.toString("utf8")) as unknown;
+    } catch (error) {
+      failure = error;
+    }
+  }
+  throw failure;
 }
 
 /**
@@ -246,8 +258,28 @@ function isEnvelopeVersion(value: unknown): value is CredentialEnvelopeVersion {
   return CREDENTIAL_ENVELOPE_VERSIONS.some((version) => version === value);
 }
 
-function additionalAuthenticatedData(owner: string, version: CredentialEnvelopeVersion): Buffer {
-  return Buffer.from(`clisbot-hub:credential:${version}:${owner}`, "utf8");
+/**
+ * The AAD prefix is part of the stored data format, not product branding: a
+ * row only opens under the prefix it was sealed with. Change it only together
+ * with a new envelope version.
+ */
+const CURRENT_AAD_PREFIX = "clisbot-hub";
+// COMPAT(hub-envelope-v3): added in Hub 0.7.3, remove after 2026-11-30 together
+// with `credential-reseal.ts`. v1 and v2 rows were sealed under `paseo-hub`, and
+// builds between the 2026-09-29 rebrand and v3 sealed v2 rows under `clisbot-hub`.
+const LEGACY_AAD_PREFIX = "paseo-hub";
+
+function aadPrefixes(version: CredentialEnvelopeVersion): readonly string[] {
+  if (version === CURRENT_CREDENTIAL_ENVELOPE_VERSION) return [CURRENT_AAD_PREFIX];
+  return version === 2 ? [LEGACY_AAD_PREFIX, CURRENT_AAD_PREFIX] : [LEGACY_AAD_PREFIX];
+}
+
+function additionalAuthenticatedData(
+  prefix: string,
+  owner: string,
+  version: CredentialEnvelopeVersion,
+): Buffer {
+  return Buffer.from(`${prefix}:credential:${version}:${owner}`, "utf8");
 }
 
 function decodeMasterKey(value: string): Buffer {

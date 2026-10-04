@@ -212,3 +212,5 @@ Keep one machine running. Hub holds Slack Socket Mode and Discord gateway connec
 ## Upgrades
 
 Pull the new image or source and deploy it. Migrations are forward-only. Back up the embedded data directory or PostgreSQL database first; it contains accounts, app credentials, configuration revisions, connections, and execution history.
+
+The first start of Hub 0.7.3 or later re-seals every stored credential in a format older builds cannot read. After that start, rolling back to an older build makes every stored credential unreadable unless you restore the backup taken before the upgrade. Right after that upgrade, the app's Hub requests fail for up to 5 minutes, until its current access token expires and it fetches a new one. An agent run that received an attachment download link before the upgrade cannot open it afterwards; send its trigger again.

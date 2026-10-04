@@ -52,6 +52,7 @@ function service(options: {
 describe("CLI daemon access tickets", () => {
   test("only claims CLI bearer requests for a daemon ticket", () => {
     expect(isCliAccessTicketRequest(ticketRequest(), PATH)).toBe(true);
+    expect(isCliAccessTicketRequest(ticketRequest("Bearer paseo_cli_abc_secret"), PATH)).toBe(true);
     expect(isCliAccessTicketRequest(ticketRequest("Bearer clisbot_key_x"), PATH)).toBe(false);
     expect(isCliAccessTicketRequest(ticketRequest(), PATH.slice(0, 4))).toBe(false);
   });

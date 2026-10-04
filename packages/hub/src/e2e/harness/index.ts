@@ -14,6 +14,7 @@ import { HubFaultProxy } from "./fault-proxy.js";
 import { SourceClisbot } from "./source-clisbot.js";
 import { configurationBundleFixture } from "../../test-utils/configuration-bundle.js";
 import { currentProjectConfigurationFiles } from "../../test-utils/current-project-configuration.js";
+import { slackConnectionCredentialOwner } from "../../credentials/credential-owners.js";
 import { createTestCredentialCipher } from "../../credentials/test-utils.js";
 
 const exec = promisify(execFile);
@@ -1459,7 +1460,7 @@ export class HubE2E {
   private async seedCurrentProjectResources(): Promise<void> {
     const providerApplicationId = "A-E2E";
     const credentialEnvelope = createTestCredentialCipher().encrypt(
-      `slack-connection:${providerApplicationId}:clisbot`,
+      slackConnectionCredentialOwner(providerApplicationId, "clisbot"),
       { botAccessToken: "xoxb-test" },
     );
     await this.requirePool().query(

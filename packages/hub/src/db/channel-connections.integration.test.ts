@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { createCipheriv } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, it } from "vitest";
-import { createTestCredentialCipher } from "../credentials/test-utils.js";
+import { createTestCredentialCipher, sealTestEnvelope } from "../credentials/test-utils.js";
 import { createProviderApplicationStore } from "../provider-applications/index.js";
 import { createDatabase } from "./pg.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "./runtime/index.js";
@@ -185,26 +184,11 @@ it(
  * organization (`credential-cipher.ts` v1: AAD version 1, owner without the
  * organization). Reads must still accept it. */
 function sealV1(owner: string, value: unknown): string {
-  const key = Buffer.from(Array.from({ length: 32 }, (_, index) => index));
-  const nonce = Buffer.alloc(12, 7);
-  const cipher = createCipheriv("aes-256-gcm", key, nonce, { authTagLength: 16 });
-  cipher.setAAD(Buffer.from(`clisbot-hub:credential:1:${owner}`, "utf8"));
-  const ciphertext = Buffer.concat([
-    cipher.update(Buffer.from(JSON.stringify(value), "utf8")),
-    cipher.final(),
-  ]);
-  return JSON.stringify({
-    version: 1,
-    algorithm: "aes-256-gcm",
-    keyId: "test-key",
-    nonce: nonce.toString("base64url"),
-    ciphertext: ciphertext.toString("base64url"),
-    authenticationTag: cipher.getAuthTag().toString("base64url"),
-  });
+  return JSON.stringify(sealTestEnvelope({ prefix: "paseo-hub", version: 1, owner, value }));
 }
 
 it(
-  "reads a v1 connection envelope and refuses a v2 row moved to another organization",
+  "reads a v1 connection envelope and refuses a current row moved to another organization",
   async () => {
     root = await mkdtemp(join(tmpdir(), "hub-channel-connection-aad-"));
     bundle = await embeddedDatabaseRuntime(root);
@@ -232,7 +216,7 @@ it(
       { botToken: "legacy-canary" },
     );
 
-    // A v2 row: writing it re-seals under the organization-bound owner, so the
+    // A current row: writing it re-seals under the organization-bound owner, so the
     // same ciphertext under another organization no longer authenticates.
     const fresh = await database.configureChannelConnection({
       organizationId: "org",
@@ -244,7 +228,7 @@ it(
       `select credential_envelope::text as envelope from telegram_connections where id = $1`,
       [fresh.connectionId],
     );
-    assert.equal(JSON.parse(envelope.rows[0]?.envelope ?? "{}").version, 2);
+    assert.equal(JSON.parse(envelope.rows[0]?.envelope ?? "{}").version, 3);
     const movedId = "22222222-2222-4222-8222-222222222222";
     await bundle.runtime.query(
       `insert into telegram_connections (id, organization_id, account_id, credential_envelope)
