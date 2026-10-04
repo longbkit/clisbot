@@ -46,7 +46,7 @@ ${config}
 
 function compileTelegramConfig(config: string): Record<string, unknown> {
   const plane = compileChannelControlPlane({
-    files: [{ path: `.clisbot/channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
+    files: [{ path: `channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
     agentNames: ["assistant"],
     environmentNames: ["repo"],
     workflowNames: [],
@@ -77,7 +77,7 @@ function fakeApi(calls: ApiCall[]): Record<string, unknown> {
  * post the showcase with the vertical's own outbound entry point. */
 async function driveShowcase(config: string): Promise<ApiCall[]> {
   const compiled = compileChannelControlPlane({
-    files: [{ path: `.clisbot/channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
+    files: [{ path: `channels/telegram/${ACCOUNT_ID}.yml`, content: accountFile(config) }],
     agentNames: ["assistant"],
     environmentNames: ["repo"],
     workflowNames: [],
@@ -154,7 +154,7 @@ describe("Telegram richMessages default", () => {
     const plane = compileChannelControlPlane({
       files: [
         {
-          path: ".clisbot/channels/slack/work.yml",
+          path: "channels/slack/work.yml",
           content: `
 channel: slack
 accountId: work

@@ -95,11 +95,11 @@ async function seedConfiguration(database: Database): Promise<void> {
     userId: null,
   });
   const files = [
-    { path: ".clisbot/hub.yml", content: HUB_YAML },
-    { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
-    { path: ".clisbot/channels/slack/work.yml", content: accountYaml("work", true) },
-    { path: ".clisbot/channels/slack/ops.yml", content: accountYaml("ops", true) },
-    { path: ".clisbot/channels/slack/off.yml", content: accountYaml("off", false) },
+    { path: "hub.yml", content: HUB_YAML },
+    { path: "channels/policy.yml", content: POLICY_YAML },
+    { path: "channels/slack/work.yml", content: accountYaml("work", true) },
+    { path: "channels/slack/ops.yml", content: accountYaml("ops", true) },
+    { path: "channels/slack/off.yml", content: accountYaml("off", false) },
   ];
   await database.saveChannelConfiguration({
     organizationId: ORG_ID,
@@ -242,10 +242,10 @@ describe("createChannelSupervisor", () => {
       await database.saveChannelConfiguration({
         organizationId: ORG_ID,
         files: [
-          { path: ".clisbot/hub.yml", content: HUB_YAML },
-          { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
+          { path: "hub.yml", content: HUB_YAML },
+          { path: "channels/policy.yml", content: POLICY_YAML },
           {
-            path: ".clisbot/channels/discord/guild.yml",
+            path: "channels/discord/guild.yml",
             content: `
 channel: discord
 accountId: guild

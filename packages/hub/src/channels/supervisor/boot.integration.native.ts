@@ -527,23 +527,23 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
       userId: null,
     });
     const files = [
-      { path: ".clisbot/hub.yml", content: HUB_YAML },
+      { path: "hub.yml", content: HUB_YAML },
       {
-        path: ".clisbot/channels/policy.yml",
+        path: "channels/policy.yml",
         content: policyYaml(liveSenderId),
       },
       {
-        path: ".clisbot/channels/slack/work.yml",
+        path: "channels/slack/work.yml",
         content: slackAccountYaml("00000000-0000-4000-8000-000000000001"),
       },
       {
-        path: ".clisbot/channels/telegram/work.yml",
+        path: "channels/telegram/work.yml",
         content: telegramAccountYaml("00000000-0000-4000-8000-000000000002"),
       },
       ...(DISCORD_SKIP === false
         ? [
             {
-              path: ".clisbot/channels/discord/work.yml",
+              path: "channels/discord/work.yml",
               content: discordAccountYaml(DISCORD_CONNECTION_ID),
             },
           ]

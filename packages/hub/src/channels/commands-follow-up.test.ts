@@ -45,8 +45,8 @@ function harness(
 ) {
   const plane = compileChannelControlPlane({
     files: [
-      { path: ".clisbot/channels/policy.yml", content: "defaults: {}\n" },
-      { path: ".clisbot/channels/slack/support.yml", content: ACCOUNT },
+      { path: "channels/policy.yml", content: "defaults: {}\n" },
+      { path: "channels/slack/support.yml", content: ACCOUNT },
     ],
     agentNames: ["assistant"],
     environmentNames: ["lab"],

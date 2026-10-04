@@ -61,7 +61,7 @@ import {
 import {
   CHANNELS_DIRECTORY,
   CHANNEL_POLICY_PATH,
-  HUB_RESOURCE_PATH,
+  CHANNEL_RESOURCE_PATH,
   type HubBundleFile,
 } from "../config/bundle-contract.js";
 import {
@@ -1908,7 +1908,7 @@ function serializeDaemonProject(
 }
 
 function channelConfigurationView(snapshot: Awaited<ReturnType<typeof loadChannelControlPlane>>) {
-  const resourceFile = snapshot.files.find(({ path }) => path === HUB_RESOURCE_PATH);
+  const resourceFile = snapshot.files.find(({ path }) => path === CHANNEL_RESOURCE_PATH);
   const policyFile = snapshot.files.find(({ path }) => path === CHANNEL_POLICY_PATH);
   const policy = OrgPolicySchema.parse(policyFile === undefined ? {} : load(policyFile.content));
   const accounts = snapshot.files
@@ -1973,13 +1973,13 @@ function writeChannelConfiguration(
     ...existing.filter(
       ({ path }) =>
         !path.startsWith(`${CHANNELS_DIRECTORY}/`) &&
-        (resource === undefined || path !== HUB_RESOURCE_PATH),
+        (resource === undefined || path !== CHANNEL_RESOURCE_PATH),
     ),
     ...(resource === undefined
       ? []
       : [
           {
-            path: HUB_RESOURCE_PATH,
+            path: CHANNEL_RESOURCE_PATH,
             content: dump(resource, { lineWidth: -1 }),
           },
         ]),

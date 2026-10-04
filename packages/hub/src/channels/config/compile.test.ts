@@ -147,8 +147,8 @@ describe("compileChannelControlPlane", () => {
   it("compiles the documented Slack account + org policy", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: POLICY,
-        [".clisbot/channels/slack/work.yml"]: SLACK_WORK,
+        ["channels/policy.yml"]: POLICY,
+        ["channels/slack/work.yml"]: SLACK_WORK,
       }),
     );
     assert.equal(plane.enabled, true);
@@ -179,8 +179,8 @@ describe("compileChannelControlPlane", () => {
   it("passes the vertical-owned account config block through verbatim", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: POLICY,
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/policy.yml"]: POLICY,
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -202,7 +202,7 @@ config:
   it("compiles wide open-audience Routes and warns about each choice", () => {
     const safe = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/public.yml"]: `
+        ["channels/slack/public.yml"]: `
 channel: slack
 accountId: public
 connectionId: connection-id
@@ -237,7 +237,7 @@ routes:
 
     expectRouteWarning(
       {
-        [".clisbot/channels/slack/public.yml"]: `
+        ["channels/slack/public.yml"]: `
 channel: slack
 accountId: public
 connectionId: connection-id
@@ -262,7 +262,7 @@ routes:
     );
     expectRouteWarning(
       {
-        [".clisbot/channels/slack/public.yml"]: `
+        ["channels/slack/public.yml"]: `
 channel: slack
 accountId: public
 connectionId: connection-id
@@ -278,7 +278,7 @@ routes:
     );
     expectRouteWarning(
       {
-        [".clisbot/channels/slack/public.yml"]: `
+        ["channels/slack/public.yml"]: `
 channel: slack
 accountId: public
 connectionId: connection-id
@@ -296,7 +296,7 @@ routes:
     );
     expectRouteWarning(
       {
-        [".clisbot/channels/slack/public.yml"]: `
+        ["channels/slack/public.yml"]: `
 channel: slack
 accountId: public
 connectionId: connection-id
@@ -315,7 +315,7 @@ routes:
   it("folds limits over the open-audience defaults, with no ceiling and an off switch", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/public.yml"]: `
+        ["channels/slack/public.yml"]: `
 channel: slack
 accountId: public
 connectionId: connection-id
@@ -360,8 +360,8 @@ routes:
   it("defaults the account config block to empty when omitted", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: POLICY,
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/policy.yml"]: POLICY,
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -375,13 +375,13 @@ transport: { mode: socket }
   it("rejects two accounts that would start competing transports for one connection", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/first.yml"]: `
+        ["channels/slack/first.yml"]: `
 channel: slack
 accountId: first
 connectionId: shared-connection
 transport: { mode: socket }
 `,
-        [".clisbot/channels/slack/second.yml"]: `
+        ["channels/slack/second.yml"]: `
 channel: slack
 accountId: second
 connectionId: shared-connection
@@ -395,8 +395,8 @@ transport: { mode: socket }
   it("folds route overrides over account defaults", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: POLICY,
-        [".clisbot/channels/slack/work.yml"]: SLACK_WORK,
+        ["channels/policy.yml"]: POLICY,
+        ["channels/slack/work.yml"]: SLACK_WORK,
       }),
     );
     const infra = plane.accounts[0]!.routes[1]!;
@@ -414,8 +414,8 @@ transport: { mode: socket }
   it("maps the agent and workflow route targets", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: POLICY,
-        [".clisbot/channels/slack/work.yml"]: SLACK_WORK,
+        ["channels/policy.yml"]: POLICY,
+        ["channels/slack/work.yml"]: SLACK_WORK,
       }),
     );
     const routes = plane.accounts[0]!.routes;
@@ -434,7 +434,7 @@ transport: { mode: socket }
   it("computes role closures with extends and fail-closed unknowns", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: POLICY,
+        ["channels/policy.yml"]: POLICY,
       }),
     );
     assert.deepEqual(plane.roles["operator"]?.closure, ["operator", "user"]);
@@ -446,7 +446,7 @@ transport: { mode: socket }
   it("rejects an identity owned by two users", () => {
     expectCompileError(
       {
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 users:
   a: { identities: [slack:U1] }
   b: { identities: [slack:U1] }
@@ -459,8 +459,8 @@ users:
   it("rejects an assignment to an unknown user", () => {
     expectCompileError(
       {
-        [".clisbot/channels/policy.yml"]: POLICY,
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/policy.yml"]: POLICY,
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -478,7 +478,7 @@ policy:
   it("rejects a role extends cycle", () => {
     expectCompileError(
       {
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 roles:
   a:
     extends: [b]
@@ -495,7 +495,7 @@ roles:
   it("rejects an unknown privilege pattern in a role", () => {
     expectCompileError(
       {
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 roles:
   rogue:
     grants: [approval.command.destructive.force]
@@ -505,10 +505,21 @@ roles:
     );
   });
 
+  it.each([
+    ".clisbot/channels/slack/work.yml",
+    ".paseo/hub.yml",
+    "channels/slack/deep/work.yml",
+    "channels/slack/work.yaml",
+    "channels/stray.yml",
+    "workflows/triage.yml",
+  ])("rejects the revision key %s", (path) => {
+    expectCompileError({ [path]: "enabled: true\n" }, /Channel configuration files are hub\.yml/);
+  });
+
   it("rejects an account whose keys do not match the path", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: personal
 connectionId: connection-id
@@ -522,7 +533,7 @@ transport: { mode: socket }
   it("rejects a route that targets both an agent and a workflow", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -541,7 +552,7 @@ routes:
   it("rejects a route whose agent is not in hub.yml", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -559,7 +570,7 @@ routes:
   it("rejects approval rules without a * fallback", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -576,7 +587,7 @@ defaults:
   it("rejects an approval match outside the closed vocabulary", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -594,7 +605,7 @@ defaults:
   it("compiles a channel with no policy.yml using org floors", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/telegram/support.yml"]: `
+        ["channels/telegram/support.yml"]: `
 channel: telegram
 accountId: support
 connectionId: connection-id
@@ -629,7 +640,7 @@ defaults:
   it("folds an account-level sync.subagents override onto its routes", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/main.yml"]: `
+        ["channels/slack/main.yml"]: `
 channel: slack
 accountId: main
 connectionId: connection-id
@@ -660,7 +671,7 @@ routes:
     // leaves come from the floor, not from the legacy boolean.
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -683,11 +694,11 @@ defaults:
     // line — and none of the three disturbs the others.
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 defaults:
   sync: { progress: { typingIndicator: false } }
 `,
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -729,7 +740,7 @@ routes:
     // conversations to another Agent. So: no floor in the compiled block.
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -770,11 +781,11 @@ routes:
     // the switch ALONE — the rendering leaves come from the layer below.
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 defaults:
   sync: { toolCalls: { detail: full, throttleSeconds: 0 } }
 `,
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -809,7 +820,7 @@ routes:
     // route narrows one leaf and inherits the rest.
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -848,7 +859,7 @@ routes:
     // name shape: a typo fails at compile, not as a bad_emoji on every turn.
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -864,7 +875,7 @@ defaults:
   it("folds outbound like every other default leaf (org floor < account < route)", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/main.yml"]: `
+        ["channels/slack/main.yml"]: `
 channel: slack
 accountId: main
 connectionId: connection-id
@@ -918,7 +929,7 @@ routes:
   it("folds workspace.organize like every other default leaf (A6)", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/main.yml"]: `
+        ["channels/slack/main.yml"]: `
 channel: slack
 accountId: main
 connectionId: connection-id
@@ -946,7 +957,7 @@ routes:
     // had, and absence reads as organization ON.
     const untouched = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/main.yml"]: `
+        ["channels/slack/main.yml"]: `
 channel: slack
 accountId: main
 connectionId: connection-id
@@ -975,7 +986,7 @@ routes:
 ${route}
 `;
     const compiled = (yaml: string) =>
-      compileChannelControlPlane(input({ [".clisbot/channels/slack/main.yml"]: yaml })).accounts[0]!
+      compileChannelControlPlane(input({ ["channels/slack/main.yml"]: yaml })).accounts[0]!
         .routes[0]!.defaults;
     assert.equal(
       compiled(account("", "defaults: { questions: recommended }")).questions,
@@ -987,7 +998,7 @@ ${route}
     );
     assert.equal("questions" in compiled(account("")), false);
     expectCompileError(
-      { [".clisbot/channels/slack/main.yml"]: account("    questions: always") },
+      { ["channels/slack/main.yml"]: account("    questions: always") },
       /questions/u,
     );
   });
@@ -1006,7 +1017,7 @@ routes:
 ${route}
 `;
     const compiled = (yaml: string) =>
-      compileChannelControlPlane(input({ [".clisbot/channels/slack/main.yml"]: yaml })).accounts[0]!
+      compileChannelControlPlane(input({ ["channels/slack/main.yml"]: yaml })).accounts[0]!
         .routes[0]!.defaults;
     const window = { pauseSeconds: 3, maxWaitSeconds: 10, maxMessages: 20 };
     const accountOn = `defaults:
@@ -1038,7 +1049,7 @@ ${route}
 
   it("refuses conversation leaves it cannot run, saying which", () => {
     const account = (route: string) => ({
-      [".clisbot/channels/slack/main.yml"]: `
+      ["channels/slack/main.yml"]: `
 channel: slack
 accountId: main
 connectionId: connection-id
@@ -1081,8 +1092,8 @@ routes:
     approval: [{ match: "*", mode: auto-allow }]
 `;
     const route = (who: string) =>
-      compileChannelControlPlane(input({ [".clisbot/channels/slack/main.yml"]: account(who) }))
-        .accounts[0]!.routes[0]!;
+      compileChannelControlPlane(input({ ["channels/slack/main.yml"]: account(who) })).accounts[0]!
+        .routes[0]!;
     const every = "Every permission request is accepted automatically.";
     assert.deepEqual(routeWarnings(route("{ roles: [member] }")), [every]);
     const open = route("{ anyone: true }");
@@ -1096,7 +1107,7 @@ routes:
   it("carries a route-level outbound.template onto the tool path", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/main.yml"]: `
+        ["channels/slack/main.yml"]: `
 channel: slack
 accountId: main
 connectionId: connection-id
@@ -1121,7 +1132,7 @@ routes:
     // that is not a channel at all — which is what it exists to refuse.
     expectCompileError(
       {
-        [".clisbot/channels/whatsapp/main.yml"]: `
+        ["channels/whatsapp/main.yml"]: `
 channel: whatsapp
 accountId: main
 connectionId: connection-id
@@ -1135,7 +1146,7 @@ transport: { mode: qr }
   it("compiles a Zalo Personal account: the QR transport and the profile label", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/zalouser/main.yml"]: `
+        ["channels/zalouser/main.yml"]: `
 channel: zalouser
 accountId: main
 connectionId: connection-id
@@ -1163,7 +1174,7 @@ routes:
       () =>
         compileChannelControlPlane(
           input({
-            [".clisbot/channels/zalouser/main.yml"]: `
+            ["channels/zalouser/main.yml"]: `
 channel: zalouser
 accountId: main
 connectionId: connection-id
@@ -1183,7 +1194,7 @@ fallback: { deny: true }
   it("rejects a wrong-typed Zalo Personal config knob at deploy", () => {
     expectCompileError(
       {
-        [".clisbot/channels/zalouser/main.yml"]: `
+        ["channels/zalouser/main.yml"]: `
 channel: zalouser
 accountId: main
 connectionId: connection-id
@@ -1199,7 +1210,7 @@ config:
   it("rejects a Discord transport mode the vertical does not implement", () => {
     expectCompileError(
       {
-        [".clisbot/channels/discord/main.yml"]: `
+        ["channels/discord/main.yml"]: `
 channel: discord
 accountId: main
 connectionId: connection-id
@@ -1213,7 +1224,7 @@ transport: { mode: polling }
   it("compiles a Discord gateway account with dm/channel/thread routes", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/discord/main.yml"]: `
+        ["channels/discord/main.yml"]: `
 channel: discord
 accountId: main
 connectionId: connection-id
@@ -1247,7 +1258,7 @@ routes:
   it("rejects an organization assignment to an unknown user even with no accounts", () => {
     expectCompileError(
       {
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 assignments:
   - identities: [user:missing]
     roles: [operator]
@@ -1260,7 +1271,7 @@ assignments:
   it("rejects transport modes whose inbound runtime is not implemented", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -1271,7 +1282,7 @@ transport: { mode: webhook, webhookPath: /channels/slack/work/webhook }
     );
     expectCompileError(
       {
-        [".clisbot/channels/telegram/work.yml"]: `
+        ["channels/telegram/work.yml"]: `
 channel: telegram
 accountId: work
 connectionId: connection-id
@@ -1289,7 +1300,7 @@ describe("channel compile: the later in-repo verticals", () => {
   it("compiles a Google Chat account and carries its webhook knobs verbatim", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/googlechat/workspace.yml"]: `
+        ["channels/googlechat/workspace.yml"]: `
 channel: googlechat
 accountId: workspace
 connectionId: googlechat-workspace
@@ -1326,7 +1337,7 @@ routes:
   it("compiles a Feishu long-connection account with its tool-family gate", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/feishu/lark.yml"]: `
+        ["channels/feishu/lark.yml"]: `
 channel: feishu
 accountId: lark
 connectionId: feishu-lark
@@ -1358,7 +1369,7 @@ routes:
   it("compiles a Zalo polling account with its Fusion-added mention aliases", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/zalo/oa.yml"]: `
+        ["channels/zalo/oa.yml"]: `
 channel: zalo
 accountId: oa
 connectionId: zalo-oa
@@ -1381,7 +1392,7 @@ routes:
   it("type-checks the vertical-owned account config instead of passing a typo through", () => {
     expectCompileError(
       {
-        [".clisbot/channels/zalo/oa.yml"]: `
+        ["channels/zalo/oa.yml"]: `
 channel: zalo
 accountId: oa
 connectionId: zalo-oa
@@ -1393,7 +1404,7 @@ config: { webhookPort: "8443" }
     );
     expectCompileError(
       {
-        [".clisbot/channels/googlechat/workspace.yml"]: `
+        ["channels/googlechat/workspace.yml"]: `
 channel: googlechat
 accountId: workspace
 connectionId: googlechat-workspace
@@ -1407,7 +1418,7 @@ config: { audienceType: project }
     // account must stay compilable.
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/feishu/lark.yml"]: `
+        ["channels/feishu/lark.yml"]: `
 channel: feishu
 accountId: lark
 connectionId: feishu-lark
@@ -1422,7 +1433,7 @@ config: { streamingCard: true }
   it("refuses a transport mode the Hub cannot receive events on", () => {
     expectCompileError(
       {
-        [".clisbot/channels/feishu/lark.yml"]: `
+        ["channels/feishu/lark.yml"]: `
 channel: feishu
 accountId: lark
 connectionId: feishu-lark
@@ -1433,7 +1444,7 @@ transport: { mode: webhook }
     );
     expectCompileError(
       {
-        [".clisbot/channels/zalo/oa.yml"]: `
+        ["channels/zalo/oa.yml"]: `
 channel: zalo
 accountId: oa
 connectionId: zalo-oa
@@ -1445,7 +1456,7 @@ transport: { mode: webhook }
     // Google Chat has no alternative delivery model, so its webhook IS drivable.
     expectCompileError(
       {
-        [".clisbot/channels/googlechat/workspace.yml"]: `
+        ["channels/googlechat/workspace.yml"]: `
 channel: googlechat
 accountId: workspace
 connectionId: googlechat-workspace
@@ -1469,7 +1480,7 @@ ${body}
   it("omits the key entirely when no layer authored a leaf", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/telegram/butler.yml"]: account(`routes:
+        ["channels/telegram/butler.yml"]: account(`routes:
   - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
     environment: personal-lab`),
@@ -1481,7 +1492,7 @@ ${body}
   it("folds org < account < route with the upstream leaf names", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/policy.yml"]: `
+        ["channels/policy.yml"]: `
 enabled: true
 defaults:
   access:
@@ -1489,7 +1500,7 @@ defaults:
     groupPolicy: allowlist
     allowFrom: [111]
 `,
-        [".clisbot/channels/telegram/butler.yml"]: account(`defaults:
+        ["channels/telegram/butler.yml"]: account(`defaults:
   access:
     groupAllowFrom: [222, "tg:333"]
     deniedReply: "Not allowed."
@@ -1513,7 +1524,7 @@ routes:
   it("refuses a policy name upstream does not have", () => {
     expectCompileError(
       {
-        [".clisbot/channels/telegram/butler.yml"]: account(`defaults:
+        ["channels/telegram/butler.yml"]: account(`defaults:
   access: { dmPolicy: everyone }
 routes:
   - audience: [{ who: { roles: [member] }, where: { dm: true } }]
@@ -1537,7 +1548,7 @@ ${body}
   it("compiles the agents and models a route offers", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/telegram/butler.yml"]: account(`routes:
+        ["channels/telegram/butler.yml"]: account(`routes:
   - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
     environment: personal-lab
@@ -1554,7 +1565,7 @@ ${body}
   it("refuses an agent name hub.yml does not define", () => {
     expectCompileError(
       {
-        [".clisbot/channels/telegram/butler.yml"]: account(`routes:
+        ["channels/telegram/butler.yml"]: account(`routes:
   - audience: [{ who: { roles: [member] }, where: { dm: true } }]
     agent: telegram-butler
     environment: personal-lab
@@ -1569,7 +1580,7 @@ describe("audience rules", () => {
   it("compiles the new shape: rules on audience, contains at route level", () => {
     const plane = compileChannelControlPlane(
       input({
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id
@@ -1600,7 +1611,7 @@ routes:
   it("reports a rule with no Who part under routes[i].audience[j]", () => {
     expectCompileError(
       {
-        [".clisbot/channels/slack/work.yml"]: `
+        ["channels/slack/work.yml"]: `
 channel: slack
 accountId: work
 connectionId: connection-id

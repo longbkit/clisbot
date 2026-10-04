@@ -63,6 +63,7 @@ import {
   type CredentialCipher,
 } from "./credentials/credential-cipher.js";
 import { resealLegacyCredentialEnvelopes } from "./credentials/credential-reseal.js";
+import { isChannelsEnabled } from "./channels/loader/channel-gate.js";
 import { AccessStore } from "./access/store.js";
 import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 import { AccessTicketService, readAccessLeaseDuration } from "./managed-access/tickets.js";
@@ -106,6 +107,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     );
     resources.own(() => database.close());
     await resealCredentials(runtime, credentialCipher);
+    await rekeyChannelRevisions(runtime);
     const identity = await resolveHubIdentity(runtime, readPort(), credentialCipher);
     const accessTickets = new AccessTicketService(runtime, new AccessStore(runtime), {
       leaseDurationMs: readAccessLeaseDuration(
@@ -477,6 +479,13 @@ async function resealCredentials(
   logger.info(
     `credential envelopes re-sealed to the current version: ${resealed} re-sealed, ${skipped} skipped, ${failures.length} failed`,
   );
+}
+
+async function rekeyChannelRevisions(runtime: DatabaseRuntime): Promise<void> {
+  if (!isChannelsEnabled()) return;
+  const { rekeyLegacyChannelRevisions } = await import("./channels/config/rekey-revisions.js");
+  const rekeyed = await rekeyLegacyChannelRevisions(runtime);
+  if (rekeyed > 0) logger.info(`channel configuration revisions moved to current keys: ${rekeyed}`);
 }
 
 async function main(): Promise<void> {

@@ -45,18 +45,18 @@ async function delegatedExecutions(
   const controlPlane = compileChannelControlPlane({
     files: [
       {
-        path: ".clisbot/channels/policy.yml",
+        path: "channels/policy.yml",
         content: 'defaults:\n  approval:\n    - { match: "*", mode: require }\n',
       },
       {
-        path: ".clisbot/channels/slack/support.yml",
+        path: "channels/slack/support.yml",
         content: account(
           "support",
           "support",
           "    agentControls: { provider: claude, model: claude-opus-5, mode: bypassPermissions }",
         ),
       },
-      { path: ".clisbot/channels/slack/finance.yml", content: account("finance", "finance") },
+      { path: "channels/slack/finance.yml", content: account("finance", "finance") },
     ],
     agentNames: ["assistant"],
     environmentNames: ["support", "finance"],

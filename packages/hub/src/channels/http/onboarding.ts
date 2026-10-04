@@ -7,7 +7,11 @@ import { z } from "zod";
 import type { Database } from "../../db/types.js";
 import type { DatabaseRuntime } from "../../db/runtime/index.js";
 import type { AccessStore } from "../../access/store.js";
-import type { HubBundleFile } from "../../config/bundle-contract.js";
+import {
+  CHANNEL_RESOURCE_PATH,
+  CHANNELS_DIRECTORY,
+  type HubBundleFile,
+} from "../../config/bundle-contract.js";
 import { AccountFileSchema } from "../config/schema.js";
 
 export const ChannelOnboardingSchema = z
@@ -83,7 +87,7 @@ export function configureOnboardingRoute(
 ): HubBundleFile[] {
   const key = `bot-${input.name}`;
   const resourceFile = configureOnboardingResources(files, key, input);
-  const accountPath = `.clisbot/channels/${channel}/${accountId}.yml`;
+  const accountPath = `${CHANNELS_DIRECTORY}/${channel}/${accountId}.yml`;
   const account = AccountFileSchema.parse(
     load(files.find(({ path }) => path === accountPath)!.content),
   );
@@ -117,8 +121,7 @@ function configureOnboardingResources(
   key: string,
   input: ChannelOnboarding,
 ): HubBundleFile {
-  const resourcePath = ".clisbot/hub.yml";
-  const resourceFile = files.find(({ path }) => path === resourcePath);
+  const resourceFile = files.find(({ path }) => path === CHANNEL_RESOURCE_PATH);
   const resource = z
     .record(z.string(), z.unknown())
     .parse(resourceFile ? load(resourceFile.content) : {});
@@ -138,7 +141,7 @@ function configureOnboardingResources(
       ...(input.mode ? { mode: input.mode } : {}),
     };
   return {
-    path: resourcePath,
+    path: CHANNEL_RESOURCE_PATH,
     content: dump({ ...resource, environments, agents }, { lineWidth: -1 }),
   };
 }

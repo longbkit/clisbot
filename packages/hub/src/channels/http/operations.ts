@@ -49,7 +49,7 @@ import { apiFirstOnboardingEnabled } from "../../organizations/onboarding.js";
 import { timingSafeEqual } from "node:crypto";
 import { dump, load } from "js-yaml";
 import { z } from "zod";
-import { CHANNEL_POLICY_PATH } from "../../config/bundle-contract.js";
+import { CHANNEL_POLICY_PATH, CHANNELS_DIRECTORY } from "../../config/bundle-contract.js";
 import { type HubBundleFile } from "../../config/bundle.js";
 import type { Database } from "../../db/types.js";
 import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../../http/client-address.js";
@@ -414,7 +414,7 @@ async function handleRemoveChannel(
       `no ${body.channel} account "${body.account}" is installed`,
     );
   }
-  const path = `.clisbot/channels/${body.channel}/${body.account}.yml`;
+  const path = `${CHANNELS_DIRECTORY}/${body.channel}/${body.account}.yml`;
   await deployRevision(
     database,
     snapshot,
@@ -759,7 +759,7 @@ function upsertAccountFile(
   account: string,
   connectionId: string,
 ): HubBundleFile[] {
-  const path = `.clisbot/channels/${channel}/${account}.yml`;
+  const path = `${CHANNELS_DIRECTORY}/${channel}/${account}.yml`;
   const previous = snapshot.files.find((file) => file.path === path);
   const retained = previous ? (load(previous.content) as Record<string, unknown>) : {};
   const content = dump(

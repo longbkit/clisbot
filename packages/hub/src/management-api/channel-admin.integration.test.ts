@@ -90,15 +90,15 @@ async function seedOrganization(hub: ReturnType<typeof createDatabase>): Promise
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".clisbot/hub.yml",
+        path: "hub.yml",
         content: `environments:\n  work:\n    kind: daemon\n    daemon: ${TEST_DAEMON_SLUG}\n    cwd: /workspace/app\nagents:\n  coding:\n    provider: codex\n    model: gpt-5.5\n`,
       },
       {
-        path: `.clisbot/channels/zalouser/${ACCOUNT_ID}.yml`,
+        path: `channels/zalouser/${ACCOUNT_ID}.yml`,
         content: accountFile(ACCOUNT_ID, connectionId),
       },
       {
-        path: `.clisbot/channels/zalouser/${OTHER_ACCOUNT_ID}.yml`,
+        path: `channels/zalouser/${OTHER_ACCOUNT_ID}.yml`,
         content: accountFile(OTHER_ACCOUNT_ID, other.connectionId),
       },
     ],

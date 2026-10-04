@@ -622,7 +622,7 @@ it("keeps an Automation a Route uses enabled, but lets its Mode widen", async ()
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".clisbot/channels/slack/public.yml",
+        path: "channels/slack/public.yml",
         content: `
 channel: slack
 accountId: public
@@ -711,7 +711,7 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".clisbot/hub.yml",
+        path: "hub.yml",
         content: `environments:\n  work:\n    kind: daemon\n    daemon: daemon-10000000\n    cwd: /workspace/app\nagents:\n  coding:\n    provider: codex\n    model: gpt-5.5\n`,
       },
     ],
@@ -1357,7 +1357,7 @@ it("stores provider credentials in the Connection owner and never returns them",
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: ".clisbot/channels/telegram/support.yml",
+        path: "channels/telegram/support.yml",
         content: `channel: telegram\naccountId: support\nenabled: true\nconnectionId: ${connection.id}\ntransport:\n  mode: polling\n`,
       },
     ],
@@ -2046,7 +2046,7 @@ it("probes and stores a Discord bot Connection, keeps it organization scoped, an
       organizationId: ORGANIZATION_ID,
       files: [
         {
-          path: ".clisbot/channels/discord/guild-ops.yml",
+          path: "channels/discord/guild-ops.yml",
           content: `channel: discord\naccountId: guild-ops\nenabled: true\nconnectionId: ${connection.id}\ntransport:\n  mode: gateway\n`,
         },
       ],

@@ -172,9 +172,9 @@ async function withActiveConfiguration(database: Database): Promise<ChannelContr
     userId: null,
   });
   const files = [
-    { path: ".clisbot/hub.yml", content: HUB_YAML },
-    { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
-    { path: ".clisbot/channels/slack/work.yml", content: ACCOUNT_YAML },
+    { path: "hub.yml", content: HUB_YAML },
+    { path: "channels/policy.yml", content: POLICY_YAML },
+    { path: "channels/slack/work.yml", content: ACCOUNT_YAML },
   ];
   await database.saveChannelConfiguration({
     organizationId: ORG_ID,
@@ -224,7 +224,7 @@ describe("loadChannelControlPlane", () => {
     });
     // The snapshot carries the authored files the ops handlers edit.
     assert.equal(
-      snapshot.files.some(({ path }) => path === ".clisbot/channels/slack/work.yml"),
+      snapshot.files.some(({ path }) => path === "channels/slack/work.yml"),
       true,
     );
   });
@@ -362,14 +362,14 @@ describe("loadChannelControlPlane", () => {
     const database = twoOrganizations();
     await database.saveChannelConfiguration({
       organizationId: ORG_ID,
-      files: [{ path: ".clisbot/hub.yml", content: HUB_YAML }],
+      files: [{ path: "hub.yml", content: HUB_YAML }],
       contentHash: "only-configured",
       createdByUserId: null,
     });
     assert.equal((await loadChannelControlPlane(database)).organizationId, ORG_ID);
     await database.saveChannelConfiguration({
       organizationId: "org-other",
-      files: [{ path: ".clisbot/hub.yml", content: HUB_YAML }],
+      files: [{ path: "hub.yml", content: HUB_YAML }],
       contentHash: "second-configured",
       createdByUserId: null,
     });
@@ -392,9 +392,9 @@ describe("loadChannelControlPlane", () => {
     await database.saveChannelConfiguration({
       organizationId: ORG_ID,
       files: [
-        { path: ".clisbot/hub.yml", content: HUB_YAML },
+        { path: "hub.yml", content: HUB_YAML },
         {
-          path: ".clisbot/channels/slack/public.yml",
+          path: "channels/slack/public.yml",
           content: `
 channel: slack
 accountId: public
@@ -443,7 +443,7 @@ run:
       organizationId: ORG_ID,
       files: [
         {
-          path: ".clisbot/channels/slack/public.yml",
+          path: "channels/slack/public.yml",
           content: `
 channel: slack
 accountId: public
@@ -474,9 +474,9 @@ routes:
     await database.saveChannelConfiguration({
       organizationId: ORG_ID,
       files: [
-        { path: ".clisbot/hub.yml", content: HUB_YAML },
+        { path: "hub.yml", content: HUB_YAML },
         {
-          path: ".clisbot/channels/slack/public.yml",
+          path: "channels/slack/public.yml",
           content: `
 channel: slack
 accountId: public
@@ -522,7 +522,7 @@ run:
       organizationId: ORG_ID,
       files: [
         {
-          path: ".clisbot/channels/slack/public.yml",
+          path: "channels/slack/public.yml",
           content: `
 channel: slack
 accountId: public

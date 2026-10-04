@@ -1,5 +1,5 @@
 // Authored YAML shapes for the channel control plane (implementation doc §4.3.2,
-// §4.3.3, §4.3.6). These parse the files under `.clisbot/channels/`; cross-reference
+// §4.3.3, §4.3.6). These parse the files under `channels/`; cross-reference
 // validation (agents/environments/workflows/users) happens in `compile.ts`.
 
 import { z } from "zod";

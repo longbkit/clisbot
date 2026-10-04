@@ -112,7 +112,7 @@ describe("Hub configuration bundle", () => {
 
     assert.deepEqual(
       bundle.configuration.environments.map(({ name }) => name),
-      ["hub", "clisbot"],
+      ["clisbot", "hub"],
     );
     assert.equal(trigger.sourceFile, ".clisbot/workflows/route.yml");
     assert.equal(step.environment, "${{ clisbot.inputs.repo }}");
@@ -292,23 +292,10 @@ describe("Hub configuration bundle", () => {
     [".clisbot/workflows/run.yaml", "must use the .yml extension"],
     [".clisbot/workflows/partials/safety.txt", "must use the .md extension"],
     ["../hub.yml", "unsafe bundle path"],
-    // COMPAT(clisbot-channels): the channel directory is fork-owned (§4.3).
-    [".clisbot/channels/slack/deep/work.yml", "channel files are policy.yml"],
-    [".clisbot/channels/slack/work.yaml", "channel files are policy.yml"],
-    [".clisbot/channels/stray.yml", "channel files are policy.yml"],
   ])("rejects non-canonical bundle path %s", (path, message) => {
     assert.throws(
       () => compileHubBundle([...canonicalFiles(), { path, content: "name: ignored" }]),
       new RegExp(message, "iu"),
     );
-  });
-
-  it("accepts the fork channel directory layout (policy.yml + one account file)", () => {
-    const channelFiles = [
-      { path: ".clisbot/channels/policy.yml", content: "enabled: true" },
-      { path: ".clisbot/channels/slack/work.yml", content: "enabled: true" },
-      { path: ".clisbot/channels/telegram/personal.yml", content: "enabled: true" },
-    ];
-    assert.doesNotThrow(() => compileHubBundle([...canonicalFiles(), ...channelFiles]));
   });
 });

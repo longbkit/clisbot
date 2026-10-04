@@ -177,7 +177,7 @@ async function seedOrganization(hub: ReturnType<typeof createDatabase>): Promise
     organizationId: ORGANIZATION_ID,
     files: [
       {
-        path: `.clisbot/channels/zalouser/${ACCOUNT_ID}.yml`,
+        path: `channels/zalouser/${ACCOUNT_ID}.yml`,
         content: `channel: zalouser\naccountId: ${ACCOUNT_ID}\nenabled: true\nconnectionId: ${connectionId}\ntransport:\n  mode: qr\nconfig:\n  profile: ${PROFILE}\n`,
       },
     ],

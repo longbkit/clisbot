@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import { isChannelsEnabled } from "../loader/channel-gate.js";
 import type { Database } from "../../db/types.js";
-import { compileHubBundle, HubBundleError, type HubBundleFile } from "../../config/bundle.js";
+import { HubBundleError, type CompiledHubBundle, type HubBundleFile } from "../../config/bundle.js";
+import { canonicalChannelRevision, compileChannelResource } from "../config/revision-files.js";
 import {
   channelAgentNames,
   channelEnvironmentNames,
@@ -36,11 +36,9 @@ export async function deployRevision(
 ): Promise<ChannelConfigurationWarning[]> {
   const candidate = await prepareChannelConfigurationCandidate(database, snapshot, files);
   await options.authorize?.(candidate);
-  const canonical = [...files].sort((left, right) => left.path.localeCompare(right.path));
   await database.saveChannelConfiguration({
     organizationId: snapshot.organizationId,
-    files: canonical,
-    contentHash: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
+    ...canonicalChannelRevision(files),
     createdByUserId: options.createdByUserId ?? null,
     ...(options.expectedRevisionId === undefined
       ? {}
@@ -64,7 +62,7 @@ export async function validateChannelConfigurationCandidate(
 }
 
 export interface ChannelConfigurationCandidate {
-  bundle: ReturnType<typeof compileHubBundle>;
+  bundle: CompiledHubBundle;
   controlPlane: ChannelControlPlane;
   /** Wide choices the configurator made on purpose; never a refusal. */
   warnings: ChannelConfigurationWarning[];
@@ -83,16 +81,7 @@ export async function prepareChannelConfigurationCandidate(
 ): Promise<ChannelConfigurationCandidate> {
   if (!isChannelsEnabled()) throw channelPlaneAbsent();
   try {
-    const candidateResourceFiles = [...files];
-    if (!candidateResourceFiles.some(({ path }) => path === ".clisbot/hub.yml")) {
-      candidateResourceFiles.push({
-        path: ".clisbot/hub.yml",
-        content: "environments: {}\nagents: {}\n",
-      });
-    }
-    const candidateBundle = compileHubBundle(candidateResourceFiles, {
-      requireWorkflow: false,
-    });
+    const candidateBundle = compileChannelResource(files);
     const triggers = await database.listOrganizationTriggers(snapshot.organizationId);
     const workflowNames = triggers.filter(({ enabled }) => enabled).map(({ name }) => name);
     const controlPlane = compileChannelControlPlane({

@@ -213,11 +213,11 @@ export async function startChannelSimBoot(
   await database.saveChannelConfiguration({
     organizationId: SIM_ORG_ID,
     files: [
-      { path: ".clisbot/hub.yml", content: HUB_YAML },
-      { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
-      { path: `.clisbot/channels/slack/${SIM_ACCOUNT_ID}.yml`, content: slackAccountYaml(options) },
+      { path: "hub.yml", content: HUB_YAML },
+      { path: "channels/policy.yml", content: POLICY_YAML },
+      { path: `channels/slack/${SIM_ACCOUNT_ID}.yml`, content: slackAccountYaml(options) },
       {
-        path: `.clisbot/channels/telegram/${SIM_ACCOUNT_ID}.yml`,
+        path: `channels/telegram/${SIM_ACCOUNT_ID}.yml`,
         content: telegramAccountYaml(telegram.apiRoot, options),
       },
     ],

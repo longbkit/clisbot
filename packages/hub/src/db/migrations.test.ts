@@ -259,7 +259,7 @@ describe("a pre-0065 channel database migrates to latest", () => {
     ]);
     const revision = await database.saveChannelConfiguration({
       organizationId: ORGANIZATION_ID,
-      files: [{ path: ".clisbot/channels/slack/work.yml", content: "channel: slack\n" }],
+      files: [{ path: "channels/slack/work.yml", content: "channel: slack\n" }],
       contentHash: "pre-0065-hash",
       createdByUserId: "operator",
     });
@@ -318,7 +318,7 @@ describe("a pre-0065 channel database migrates to latest", () => {
     assert.equal(active?.id, revision.id);
     assert.equal(active?.contentHash, "pre-0065-hash");
     assert.deepEqual(active?.files, [
-      { path: ".clisbot/channels/slack/work.yml", content: "channel: slack\n" },
+      { path: "channels/slack/work.yml", content: "channel: slack\n" },
     ]);
 
     // The rebuilt CHECK constraints admit the channels the port added; a row

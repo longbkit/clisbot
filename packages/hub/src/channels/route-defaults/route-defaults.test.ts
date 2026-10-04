@@ -36,15 +36,15 @@ ${route}
 
 function files(route = ""): HubBundleFile[] {
   return [
-    { path: ".clisbot/hub.yml", content: "agents: {}\n" },
-    { path: ".clisbot/channels/policy.yml", content: POLICY },
-    { path: ".clisbot/channels/slack/support.yml", content: account(route) },
+    { path: "hub.yml", content: "agents: {}\n" },
+    { path: "channels/policy.yml", content: POLICY },
+    { path: "channels/slack/support.yml", content: account(route) },
   ];
 }
 
 function compile(revision: readonly HubBundleFile[]) {
   return compileChannelControlPlane({
-    files: revision.filter(({ path }) => path.startsWith(".clisbot/channels/")),
+    files: revision.filter(({ path }) => path.startsWith("channels/")),
     agentNames: ["assistant"],
     environmentNames: ["lab"],
     workflowNames: [],
@@ -63,7 +63,7 @@ describe("route default agent controls", () => {
 
   it("keeps an account's signature when only a neighbour account changes", () => {
     const neighbour = (route: string): HubBundleFile => ({
-      path: ".clisbot/channels/slack/sales.yml",
+      path: "channels/slack/sales.yml",
       content: account(route)
         .replace("accountId: support", "accountId: sales")
         .replace("connectionId: slack-support", "connectionId: slack-sales"),

@@ -113,9 +113,9 @@ async function withActiveConfiguration(database: Database): Promise<void> {
     userId: null,
   });
   const files = [
-    { path: ".clisbot/hub.yml", content: HUB_YAML },
-    { path: ".clisbot/channels/policy.yml", content: POLICY_YAML },
-    { path: ".clisbot/channels/slack/work.yml", content: ACCOUNT_YAML },
+    { path: "hub.yml", content: HUB_YAML },
+    { path: "channels/policy.yml", content: POLICY_YAML },
+    { path: "channels/slack/work.yml", content: ACCOUNT_YAML },
   ];
   await database.saveChannelConfiguration({
     organizationId: ORG_ID,
@@ -219,13 +219,13 @@ describe("channel control-plane ops", () => {
     await withActiveConfiguration(database);
     const snapshot = await loadChannelControlPlane(database);
     const files = snapshot.files.map((file) => {
-      if (file.path === ".clisbot/hub.yml") {
+      if (file.path === "hub.yml") {
         return {
           ...file,
           content: `environments:\n  candidate-env:\n    kind: daemon\n    daemon: daemon-10000000\n    cwd: /workspace/candidate\nagents:\n  candidate-agent:\n    provider: codex\n`,
         };
       }
-      if (file.path === ".clisbot/channels/slack/work.yml") {
+      if (file.path === "channels/slack/work.yml") {
         return {
           ...file,
           content: `${ACCOUNT_YAML}\nroutes:\n  - audience: [{ who: { roles: [member] }, where: { groups: all } }]\n    agent: candidate-agent\n    environment: candidate-env\n`,
@@ -643,7 +643,7 @@ describe("channel control-plane ops", () => {
     assert.notEqual(after.revision!.id, before.revision!.id);
     assert.deepEqual(after.controlPlane.accounts, []);
     assert.equal(
-      after.files.some((file) => file.path === ".clisbot/channels/slack/work.yml"),
+      after.files.some((file) => file.path === "channels/slack/work.yml"),
       false,
     );
     // The credential Connection outlives the account — another one can hold it

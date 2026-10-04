@@ -8,7 +8,7 @@ import type { compileAutomationDocument } from "../triggers/configuration/workfl
 // Two concerns, one module:
 //   1. resolve the org-scoped source: the single provisioned organization →
 //      its active Channel revision → the authored files.
-//   2. compile the snapshot: `compileHubBundle` + `compileChannelControlPlane`
+//   2. compile the snapshot: `compileChannelResource` + `compileChannelControlPlane`
 //      + the agent-spec resolver the plane's binding engine drives.
 //
 // The agent-spec resolver is a pure function of the compiled bundle, so the
@@ -17,7 +17,8 @@ import type { compileAutomationDocument } from "../triggers/configuration/workfl
 // (`daemons/registry.ts` validate/launch path: provider, model, modeId,
 // thinkingOptionId, providerOptions) plus the environment's `cwd`.
 
-import { compileHubBundle, type CompiledHubBundle, type HubBundleFile } from "../config/bundle.js";
+import type { CompiledHubBundle, HubBundleFile } from "../config/bundle.js";
+import { compileChannelResource } from "./config/revision-files.js";
 import type {
   ChannelConfigurationRevisionRecord,
   Database,
@@ -41,7 +42,7 @@ import {
 } from "./plane/types.js";
 import { composeMessageToolPrompt } from "./outbound-template.js";
 
-const EMPTY_CHANNEL_RESOURCE = `environments:\n  channel-unconfigured:\n    kind: daemon\n    daemon: channel-unconfigured\n    cwd: /\nagents: {}\n`;
+const UNCONFIGURED_CHANNEL_RESOURCE = `environments:\n  channel-unconfigured:\n    kind: daemon\n    daemon: channel-unconfigured\n    cwd: /\nagents: {}\n`;
 
 export type ChannelControlPlaneErrorCode =
   | "organization_not_found"
@@ -147,20 +148,7 @@ async function compileControlPlaneSnapshot(
   options: { publicBaseUrl?: string } = {},
 ): Promise<ChannelControlPlaneSnapshot> {
   const files = revision?.files ?? [];
-  if (files.some((file) => file.path.startsWith(".clisbot/workflows/"))) {
-    throw new ChannelControlPlaneError(
-      "bundle_unavailable",
-      "Channel revisions cannot contain Workflow documents; use organization Triggers",
-    );
-  }
-  const resourceFiles = [...files];
-  if (!resourceFiles.some(({ path }) => path === ".clisbot/hub.yml")) {
-    resourceFiles.push({
-      path: ".clisbot/hub.yml",
-      content: EMPTY_CHANNEL_RESOURCE,
-    });
-  }
-  const bundle = compileHubBundle(resourceFiles, { requireWorkflow: false });
+  const bundle = compileChannelResource(files, UNCONFIGURED_CHANNEL_RESOURCE);
   const triggers = await database.listOrganizationTriggers(organizationId);
   const workflowNames = triggers.filter(({ enabled }) => enabled).map(({ name }) => name);
   // Runtime composition supplies its canonical public URL. Local consumers that only
