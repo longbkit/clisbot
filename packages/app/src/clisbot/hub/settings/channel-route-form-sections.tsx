@@ -15,7 +15,8 @@ import {
 // The Route form follows the Route's own model, a rule: conditions, then what
 // happens. Conditions: the Connection, who may talk and where, when the bot
 // answers (mention, follow-up, message text). Then what runs and how it runs
-// (Permissions, folded Advanced), how it replies, and folded Limits.
+// (Permissions, folded Advanced), how it replies, then the folded sections
+// most Routes leave at their defaults: Limits and Incoming messages.
 
 export type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 

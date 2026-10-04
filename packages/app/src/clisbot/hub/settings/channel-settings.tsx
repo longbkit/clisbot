@@ -2774,10 +2774,10 @@ function ChannelAccountForm({
       {renderConnection()}
       {renderAudience()}
       {renderTrigger()}
-      {renderConversation()}
       {renderTarget()}
       {renderReplies()}
       {renderLimits()}
+      {renderConversation()}
       {target === "automation" && automationName !== null && !adminScoped ? (
         <AutomationReplyAuthority
           automation={automations.find((item) => item.name === automationName)}

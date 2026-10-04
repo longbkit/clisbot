@@ -35,7 +35,7 @@ function saved(draft: RouteConversationDraft): ChannelRouteConversation {
   return parsed.value;
 }
 
-describe("Conversation context form model", () => {
+describe("Incoming messages form model", () => {
   it("shows what the Route authors and saves it back unchanged", () => {
     const draft = open(authoredRoute);
     expect(routeConversationDisplay(draft)).toMatchObject({
@@ -44,7 +44,7 @@ describe("Conversation context form model", () => {
       maxMessages: "8",
       batchingOn: true,
       batchingFields: { pauseSeconds: "2", maxWaitSeconds: "6", maxMessages: "12" },
-      advancedInUse: true,
+      inUse: true,
     });
     expect(saved(draft)).toEqual({
       whenBusy: "queue",
@@ -61,7 +61,7 @@ describe("Conversation context form model", () => {
       unmentioned: ORG_CONVERSATION_DEFAULTS.unmentioned,
       maxMessages: "20",
       batchingOn: false,
-      advancedInUse: false,
+      inUse: false,
     });
     expect(saved(draft)).toEqual({});
   });
@@ -80,7 +80,7 @@ describe("Conversation context form model", () => {
       maxMessages: "5",
       batchingOn: true,
       batchingFields: { pauseSeconds: "4", maxWaitSeconds: "9", maxMessages: "30" },
-      advancedInUse: false,
+      inUse: false,
     });
     expect(saved(draft)).toEqual({});
   });
@@ -155,7 +155,7 @@ describe("Conversation context form model", () => {
   });
 });
 
-describe("Conversation context on a saved Route", () => {
+describe("Incoming messages on a saved Route", () => {
   const input = {
     accountId: "support",
     audience: [

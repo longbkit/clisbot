@@ -1004,7 +1004,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Channel tool only" }));
     expect(screen.getByText("The Agent controls replies")).toBeTruthy();
     expect(screen.queryByLabelText("Send final answers")).toBeNull();
-    // Limits and Advanced hold nothing yet, so they start folded to a summary.
+    // Limits, Incoming messages and Advanced hold nothing yet, so they start folded.
     expect(screen.getByText("Default limits")).toBeTruthy();
     expect(screen.getByText("Fast mode and provider options")).toBeTruthy();
     expect(screen.queryByLabelText("Provider options")).toBeNull();
@@ -1276,19 +1276,20 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0]).toMatchObject(fullRoute);
   });
 
-  it("edits Conversation context and saves only the leaves the owner set", async () => {
+  it("edits Incoming messages and saves only the leaves the owner set", async () => {
     await openEditor();
-    expect(screen.getByText("Conversation context")).toBeTruthy();
-    // An inherited Route shows the defaults, with Advanced folded.
-    expect((screen.getByLabelText("Earlier messages to include") as HTMLInputElement).value).toBe(
-      "20",
-    );
-    expect(screen.getByText("No batching · When busy: steer")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Allowed senders only" }));
+    // An inherited Route authors nothing here, so the section starts folded.
+    expect(screen.getByText("Default")).toBeTruthy();
+    expect(screen.queryByLabelText("Catch-up limit")).toBeNull();
     fireEvent.click(
-      within(screen.getByText("Advanced").parentElement!).getByRole("button", { name: "Show" }),
+      within(screen.getByText("Incoming messages").parentElement!.parentElement!).getByRole(
+        "button",
+        { name: "Show" },
+      ),
     );
-    const batch = screen.getByLabelText("Batch messages") as HTMLInputElement;
+    expect((screen.getByLabelText("Catch-up limit") as HTMLInputElement).value).toBe("20");
+    fireEvent.click(screen.getByRole("button", { name: "Allowed senders only" }));
+    const batch = screen.getByLabelText("Batch message bursts") as HTMLInputElement;
     expect(batch.checked).toBe(false);
     fireEvent.click(batch);
     expect(

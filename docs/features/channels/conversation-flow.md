@@ -197,30 +197,22 @@ defaults:
 
 `batching: off` is explicit so a Route can turn off what its account turned on. The sender line has no setting.
 
-The Route form shows these in a **Conversation context** section between _When it answers_ and _What runs_:
+The Route form shows these in an **Incoming messages** section after _Limits_. Like Limits it starts folded, and opens on its own when the Route authors any of these leaves. Folded, it reads `Default`, or names only the leaves the Route changed: a line of every value made the reader decode defaults they never chose. Each row is one setting with no hint under it; what the rows do, and the sender line, are in the section's ⓘ.
 
 ```
-┌ Conversation context ⓘ ──────────────────────────────┐
-│ Each message reaches the Agent with its sender:      │
-│   An Nguyễn (slack:U0000000001): …                  │
-│                                                      │
-│ Earlier messages without a mention                   │
-│   ( Everyone ● | Allowed senders only | None )       │
-│   Sent as quoted context, not as instructions.       │
-│                                                      │
-│ Earlier messages to include        [ 20 ] messages   │
-│                                                      │
-│ ▸ Advanced                                           │
-│   Batch messages                        [ ○ off ]    │
-│     Send after no new messages for  [ 3 ] seconds    │
-│     Send anyway after              [ 10 ] seconds    │
-│     Max messages per batch         [ 20 ]            │
-│   When the Agent is busy                             │
-│     ( Steer ● | Queue )                              │
+┌ Incoming messages ⓘ ────────────────────────── Hide ┐
+│ Catch up on missed messages from                     │
+│   ( Everyone ● | Allowed senders only | No one )     │
+│ Catch-up limit                      [ 20 ] messages  │
+│ Batch message bursts                    [ ○ off ]    │
+│   Send after no new messages for  [ 3 ] seconds      │
+│   Send anyway after              [ 10 ] seconds      │
+│   Max messages per batch         [ 20 ]              │
+│ New message while the Agent is busy (Steer ●|Queue)│
 └──────────────────────────────────────────────────────┘
 ```
 
-The three batching rows show only while _Batch messages_ is on. A pause of 0 is not a value: off is the switch.
+_Catch up on missed messages from_ shows only on a group Route that requires a mention; elsewhere every message starts a turn. The three batching rows show only while _Batch message bursts_ is on. A pause of 0 is not a value: off is the switch.
 
 `sync.toolCalls` is a leaf of the same kind: off, or the options its lines run with.
 

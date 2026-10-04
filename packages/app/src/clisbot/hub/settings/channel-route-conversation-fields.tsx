@@ -1,7 +1,4 @@
 import { useCallback, useMemo, useState } from "react";
-import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import { settingsStyles } from "@/styles/settings";
 import {
   UNMENTIONED_VALUES,
   WHEN_BUSY_VALUES,
@@ -25,17 +22,19 @@ import {
   type ParsedRouteConversation,
   type RouteConversationDraft,
 } from "./channel-route-conversation-form";
-import { FoldedRouteFormSubgroup, RouteFormSection } from "./channel-route-form-sections";
+import { FoldedRouteFormSection } from "./channel-route-form-sections";
 
-// The Route form's Conversation context section
-// (docs/features/channels/conversation-flow.md, "Configuration").
+// The Route form's Incoming messages section
+// (docs/features/channels/conversation-flow.md, "Configuration"). It starts
+// folded, like Limits: the defaults suit most Routes.
 
-const CONVERSATION_CONTEXT_INFO =
-  "What the Agent is given with a message. Earlier messages are the ones in the same conversation that did not start a turn since the last delivery; they are sent before the message that did.";
+// Every row explains itself; what each one does in detail is in the ⓘ.
+const MESSAGE_HANDLING_INFO =
+  "Catch up: when someone mentions the Agent, it first reads what was said since its last reply, as background, not as instructions. Batch message bursts: several messages sent in a row get one answer. While the Agent is busy: Steer adds a new message to the work in progress, Queue holds it until that work is done. Every message names its sender, e.g. An Nguyễn (slack:U0000000001): …";
 const UNMENTIONED_LABELS: Record<ChannelRouteUnmentioned, string> = {
   everyone: "Everyone",
   "allowed-senders": "Allowed senders only",
-  none: "None",
+  none: "No one",
 };
 // The app's own words for the same choice (Settings → General, "Default
 // send"): Enter steers the running turn, Command/Ctrl+Enter queues it.
@@ -106,49 +105,41 @@ export function RouteConversationSection({
 }) {
   const shown = routeConversationDisplay(draft);
   return (
-    <RouteFormSection title="Conversation context" info={CONVERSATION_CONTEXT_INFO}>
-      <View>
-        <Text style={settingsStyles.rowHint}>Each message reaches the Agent with its sender:</Text>
-        <Text style={styles.example}>An Nguyễn (slack:U0000000001, @an.example): …</Text>
-      </View>
+    <FoldedRouteFormSection
+      title="Incoming messages"
+      info={MESSAGE_HANDLING_INFO}
+      summary={messageHandlingSummary(draft, shown)}
+      inUse={shown.inUse}
+    >
       {showUnmentioned ? (
-        <View>
-          <ChoiceRow
-            label="Earlier messages without a mention"
-            values={UNMENTIONED_VALUES}
-            selected={shown.unmentioned}
-            labels={UNMENTIONED_LABELS}
-            onChange={commands.changeUnmentioned}
-            disabled={pending}
-          />
-          <Text style={settingsStyles.rowHint}>Sent as quoted context, not as instructions.</Text>
-        </View>
+        <ChoiceRow
+          label="Catch up on missed messages from"
+          values={UNMENTIONED_VALUES}
+          selected={shown.unmentioned}
+          labels={UNMENTIONED_LABELS}
+          onChange={commands.changeUnmentioned}
+          disabled={pending}
+        />
       ) : null}
       <RouteNumberRow
-        label="Earlier messages to include"
+        label="Catch-up limit"
         unit="messages"
         value={shown.maxMessages}
         error={parsed.errors.maxMessages}
         onChange={commands.changeMaxMessages}
         disabled={pending}
       />
-      <FoldedRouteFormSubgroup
-        title="Advanced"
-        summary={advancedSummary(shown.batchingOn, shown.whenBusy)}
-        inUse={shown.advancedInUse}
-      >
-        <RouteBatchingFields shown={shown} parsed={parsed} commands={commands} pending={pending} />
-        <ChoiceRow
-          label="When the Agent is busy"
-          note="Steer sends the message into the work already running. Queue holds it until that work finishes."
-          values={WHEN_BUSY_VALUES}
-          selected={shown.whenBusy}
-          labels={WHEN_BUSY_LABELS}
-          onChange={commands.changeWhenBusy}
-          disabled={pending}
-        />
-      </FoldedRouteFormSubgroup>
-    </RouteFormSection>
+      <RouteBatchingFields shown={shown} parsed={parsed} commands={commands} pending={pending} />
+      <ChoiceRow
+        label="New message while the Agent is busy"
+        layout="row"
+        values={WHEN_BUSY_VALUES}
+        selected={shown.whenBusy}
+        labels={WHEN_BUSY_LABELS}
+        onChange={commands.changeWhenBusy}
+        disabled={pending}
+      />
+    </FoldedRouteFormSection>
   );
 }
 
@@ -166,7 +157,7 @@ function RouteBatchingFields({
   return (
     <>
       <RouteBehaviorSwitch
-        label="Batch messages"
+        label="Batch message bursts"
         value={shown.batchingOn}
         onChange={commands.changeBatchingOn}
         disabled={pending}
@@ -201,16 +192,28 @@ function BatchingRow({
   return <RouteNumberRow {...row} onChange={change} />;
 }
 
-function advancedSummary(batchingOn: boolean, whenBusy: ChannelRouteWhenBusy): string {
-  const batching = batchingOn ? "Batch messages" : "No batching";
-  return `${batching} · When busy: ${WHEN_BUSY_LABELS[whenBusy].toLowerCase()}`;
-}
+const BATCHING_SUMMARIES: Record<string, string> = {
+  true: "Batches message bursts",
+  false: "No batching",
+};
 
-const styles = StyleSheet.create((theme) => ({
-  example: {
-    color: theme.colors.foregroundMuted,
-    fontFamily: theme.fontFamily.mono,
-    fontSize: theme.fontSize.sm,
-    marginTop: theme.spacing[1],
-  },
-}));
+/**
+ * The folded line names only what this Route changed, so an untouched Route
+ * reads "Default" (as Limits does) instead of a line of values to decode.
+ */
+function messageHandlingSummary(
+  draft: RouteConversationDraft,
+  shown: ReturnType<typeof routeConversationDisplay>,
+): string {
+  const changed = [
+    draft.unmentioned === undefined
+      ? null
+      : `Catches up from: ${UNMENTIONED_LABELS[shown.unmentioned].toLowerCase()}`,
+    draft.maxMessages === undefined ? null : `Catch-up limit: ${shown.maxMessages}`,
+    draft.batching === undefined ? null : BATCHING_SUMMARIES[String(shown.batchingOn)],
+    draft.whenBusy === undefined
+      ? null
+      : `If busy: ${WHEN_BUSY_LABELS[shown.whenBusy].toLowerCase()}`,
+  ].filter((item) => item !== null);
+  return changed.length === 0 ? "Default" : changed.join(" · ");
+}

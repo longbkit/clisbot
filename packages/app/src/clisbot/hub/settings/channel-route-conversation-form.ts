@@ -10,7 +10,7 @@ import {
   type EffectiveChannelRouteConversation,
 } from "../channel-route-conversation";
 
-// The Route form's Conversation context section as a plain model: the draft
+// The Route form's Incoming messages section as a plain model: the draft
 // opens from the stored Route and what it inherits, commands return the next
 // draft, and `parseRouteConversationDraft` gives the leaves a save writes.
 // A leaf the Route does not author shows the inherited value and writes
@@ -79,8 +79,12 @@ export function routeConversationDisplay(draft: RouteConversationDraft) {
     maxMessages: draft.maxMessages ?? String(inherited.maxMessages),
     batchingOn,
     batchingFields: shownBatchingFields(draft),
-    /** Advanced holds a value the Route authors, so it opens on its own. */
-    advancedInUse: draft.batching !== undefined || draft.whenBusy !== undefined,
+    /** The Route authors a value here, so the folded section opens on its own. */
+    inUse:
+      draft.unmentioned !== undefined ||
+      draft.maxMessages !== undefined ||
+      draft.batching !== undefined ||
+      draft.whenBusy !== undefined,
   };
 }
 
