@@ -90,7 +90,7 @@ export function HubAccountSignInSummary({
   openPolicy(): void;
 }) {
   return (
-    <SettingsSection title="Account sign-in">
+    <SettingsSection title="Sign-in">
       <SettingsCard>
         <HubAccountSignInRow capabilities={capabilities} signIn={signIn} openPolicy={openPolicy} />
       </SettingsCard>

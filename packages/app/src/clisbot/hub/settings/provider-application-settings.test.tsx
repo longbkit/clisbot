@@ -81,7 +81,12 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
   ),
 }));
 vi.mock("@/components/settings/headings/settings-section", () => ({
-  SettingsSection: ({ children }: { children: ReactNode }) => <section>{children}</section>,
+  SettingsSection: ({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) => (
+    <section>
+      {trailing}
+      {children}
+    </section>
+  ),
 }));
 vi.mock("@/components/ui/alert", () => ({
   Alert: ({ title }: { title: string }) => <div role="alert">{title}</div>,
@@ -121,7 +126,7 @@ afterEach(() => {
 describe("Provider Application save recovery", () => {
   it("keeps a post-save refresh failure visible after closing the credential sheet", async () => {
     render(<ProviderApplicationSettings />);
-    fireEvent.click(screen.getByText("Add provider application"));
+    fireEvent.click(screen.getByText("Add…"));
     fireEvent.click(screen.getByText("Verify and save"));
     await screen.findByText("Provider details could not refresh. Use Refresh to try again.");
     expect(screen.queryByRole("dialog")).toBe(null);
@@ -140,18 +145,16 @@ describe("Provider Application save recovery", () => {
     applications.data = undefined;
     applications.isPending = true;
     const { rerender } = render(<ProviderApplicationSettings />);
-    expect(screen.queryByText("No Provider Applications configured")).toBe(null);
-    expect(screen.getByText("Add provider application").closest("button")?.disabled).toBe(true);
+    expect(screen.queryByText(/^None yet\./)).toBe(null);
+    expect(screen.getByText("Add…").closest("button")?.disabled).toBe(true);
     applications.isPending = false;
     applications.error = new Error("inventory unavailable");
     rerender(<ProviderApplicationSettings />);
     expect(screen.getByText("inventory unavailable").textContent).toBe("inventory unavailable");
-    expect(screen.queryByText("No Provider Applications configured")).toBe(null);
+    expect(screen.queryByText(/^None yet\./)).toBe(null);
     applications.data = overview;
     rerender(<ProviderApplicationSettings />);
-    expect(screen.getByText("No Provider Applications configured").textContent).toBe(
-      "No Provider Applications configured",
-    );
-    expect(screen.getByText("Add provider application").closest("button")?.disabled).toBe(false);
+    expect(screen.getByText(/^None yet\./)).toBeTruthy();
+    expect(screen.getByText("Add…").closest("button")?.disabled).toBe(false);
   });
 });

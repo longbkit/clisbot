@@ -20,6 +20,7 @@ import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
 import { HubConnectionContinuationNotice } from "./connection-continuation";
 import { hubResourceQueryKey } from "../query-keys";
+import { RowActionsMenu } from "./team/row-actions-menu";
 import { useHubConnectionContinuation } from "../use-connection-continuation";
 import {
   HubConnectionContinuationSchema,
@@ -212,15 +213,33 @@ export function ProviderApplicationSettings() {
     setDraft(null);
   }, []);
 
+  const loaded = applications.data !== undefined;
+  const headerActions = useMemo(
+    () => (
+      <View style={styles.headerActions}>
+        <Button size="xs" variant="ghost" disabled={applications.isFetching} onPress={refresh}>
+          Refresh
+        </Button>
+        <Button
+          size="sm"
+          disabled={!loaded || pendingApplicationId !== null}
+          onPress={addApplication}
+        >
+          Add…
+        </Button>
+      </View>
+    ),
+    [addApplication, applications.isFetching, loaded, pendingApplicationId, refresh],
+  );
+
   if (!operator) return null;
 
   return (
-    <SettingsSection title="Provider applications">
-      <Alert
-        variant="info"
-        title="Provider credentials are instance-wide"
-        description="Applications hold provider app registration. Each organization connects its own account or installation from a verified Application."
-      />
+    <SettingsSection
+      title="Provider applications"
+      info={PROVIDER_APPLICATIONS_INFO}
+      trailing={headerActions}
+    >
       <ProviderApplicationLoadState pending={applications.isPending} error={applications.error} />
       {error ? <Alert variant="error" title={error} /> : null}
       <HubConnectionContinuationNotice continuation={continuation} />
@@ -228,7 +247,7 @@ export function ProviderApplicationSettings() {
         <View style={settingsStyles.card}>
           {visible.length === 0 ? (
             <View style={settingsStyles.row}>
-              <Text style={settingsStyles.rowHint}>No Provider Applications configured</Text>
+              <Text style={settingsStyles.rowHint}>{PROVIDER_APPLICATIONS_EMPTY}</Text>
             </View>
           ) : (
             visible.map((application, index) => (
@@ -245,18 +264,6 @@ export function ProviderApplicationSettings() {
           )}
         </View>
       )}
-      <View style={styles.sectionActions}>
-        <Button
-          variant="outline"
-          disabled={applications.data === undefined || pendingApplicationId !== null}
-          onPress={addApplication}
-        >
-          Add provider application
-        </Button>
-        <Button variant="ghost" disabled={applications.isFetching} onPress={refresh}>
-          Refresh
-        </Button>
-      </View>
       {draft === null ? null : (
         <ProviderApplicationSheet
           key={draft.key}
@@ -315,6 +322,16 @@ function ProviderApplicationRow({
     application.deliveryStatus?.state === "actionNeeded";
   const canConnectAccount = identity !== null && providerApplicationCanConnectAccount(application);
   const connectionCount = application.connections.length;
+  const actions = useMemo(
+    () => [
+      ...(canConnectAccount ? [{ label: "Connect account", onSelect: connectAccount }] : []),
+      ...(canRetry ? [{ label: "Retry delivery", onSelect: retry }] : []),
+      ...(application.managedByEnvironment
+        ? []
+        : [{ label: "Replace credentials", onSelect: replace }]),
+    ],
+    [application.managedByEnvironment, canConnectAccount, canRetry, connectAccount, replace, retry],
+  );
 
   return (
     <View
@@ -340,40 +357,13 @@ function ProviderApplicationRow({
             : `${String(connectionCount)} Connection${connectionCount === 1 ? "" : "s"}`}
         </Text>
       </View>
-      <View style={styles.actions}>
-        {!canConnectAccount ? null : (
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={pendingApplicationId !== null}
-            loading={pendingApplicationId === identity.id}
-            onPress={connectAccount}
-          >
-            Connect account
-          </Button>
-        )}
-        {canRetry ? (
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={pendingApplicationId !== null}
-            loading={pendingApplicationId === identity?.id}
-            onPress={retry}
-          >
-            Retry delivery
-          </Button>
-        ) : null}
-        {application.managedByEnvironment ? null : (
-          <Button
-            size="xs"
-            variant="ghost"
-            disabled={pendingApplicationId !== null}
-            onPress={replace}
-          >
-            Replace credentials
-          </Button>
-        )}
-      </View>
+      {actions.length === 0 ? null : (
+        <RowActionsMenu
+          label={`Actions for ${providerLabel(application.provider)}`}
+          actions={actions}
+          disabled={pendingApplicationId !== null}
+        />
+      )}
     </View>
   );
 }
@@ -818,18 +808,9 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.spacing[2],
   },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: theme.spacing[2],
-  },
-  sectionActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: theme.spacing[2],
-  },
+
+  headerActions: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
+
   form: {
     gap: theme.spacing[4],
   },
@@ -904,3 +885,8 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
   },
 }));
+
+const PROVIDER_APPLICATIONS_INFO =
+  "Your own GitHub, Slack, Discord or Linear app, registered once for this whole Hub. Organizations then connect their account through it, so Automations can react to its events. Slack and Telegram chat bots in Channels do not need one.";
+const PROVIDER_APPLICATIONS_EMPTY =
+  "None yet. Add one only if Automations should react to GitHub, Slack, Discord or Linear events.";
