@@ -1288,6 +1288,19 @@ it("stores provider credentials in the Connection owner and never returns them",
     } as ChannelSupervisor,
   });
 
+  // A Hub always has its base configuration; a Connection's account is written onto it.
+  await enrollTestDaemon(database, ORGANIZATION_ID);
+  await database.saveChannelConfiguration({
+    organizationId: ORGANIZATION_ID,
+    files: [
+      {
+        path: "hub.yml",
+        content: `environments:\n  work:\n    kind: daemon\n    daemon: daemon-10000000\n    cwd: /workspace/app\nagents:\n  coding:\n    provider: codex\n    model: gpt-5.5\n`,
+      },
+    ],
+    contentHash: "initial",
+    createdByUserId: USER_ID,
+  });
   const create = await api.handle(
     request("/connections", "POST", {
       provider: "telegram",
@@ -1300,6 +1313,26 @@ it("stores provider credentials in the Connection owner and never returns them",
   assert.equal(connection.provider, "telegram");
   assert.equal(connection.name, "support");
   assert.equal(JSON.stringify(connection).includes("telegram-secret"), false);
+  // The bot runs from the moment it is added: its account comes with it, no Routes yet.
+  const configured = await (await api.handle(request("/channel-configuration", "GET"))).json();
+  assert.deepEqual(
+    configured.accounts.map((account: Record<string, unknown>) => ({
+      channel: account["channel"],
+      accountId: account["accountId"],
+      connectionId: account["connectionId"],
+      transport: account["transport"],
+      routes: account["routes"] ?? [],
+    })),
+    [
+      {
+        channel: "telegram",
+        accountId: "support",
+        connectionId: connection.id,
+        transport: { mode: "polling" },
+        routes: [],
+      },
+    ],
+  );
 
   const list = await api.handle(request("/connections", "GET"));
   assert.equal(list.status, 200);

@@ -1715,6 +1715,20 @@ export type ChannelConnectionChannel = Extract<
 >;
 
 /** The bot identity a credential probe recorded. Never carries credential material. */
+/**
+ * A second Connection for a bot one already holds. Two Connections on one bot
+ * token would both run it, and each message would reach one of them at random.
+ */
+export class DuplicateChannelBotError extends Error {
+  constructor(
+    readonly channel: string,
+    /** The Connection that already holds the bot. */
+    readonly existingAccountId: string,
+  ) {
+    super(`This bot is already connected as "${existingAccountId}".`);
+  }
+}
+
 export interface ChannelBotIdentity {
   /** Provider-side bot user id. */
   id: string;

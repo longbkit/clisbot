@@ -12,6 +12,7 @@ import {
 } from "./channel-ingress.js";
 import { channelIngressAccountKey } from "../channels/ingress/health.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
+import { channelAccountFilePath, upsertAccountFile } from "../channels/config/account-file.js";
 import { channelCatalogView } from "./channel-catalog.js";
 import { channelAdminHandles, handleChannelAccountAdmin } from "./channel-admin.js";
 import { holdsAnyChannelAccountManagement } from "../channels/access-grants.js";
@@ -81,6 +82,7 @@ import type {
   ChannelConnectionChannel,
   Database,
 } from "../db/types.js";
+import { DuplicateChannelBotError } from "../db/types.js";
 import { configureDiscordConnection } from "../channels/connections/discord.js";
 import { configureFeishuConnection } from "../channels/connections/feishu.js";
 import { configureGoogleChatConnection } from "../channels/connections/googlechat.js";
@@ -827,6 +829,9 @@ export class ManagementApi {
     try {
       configured = await this.storeChannelConnection(access.organization.id, input);
     } catch (error) {
+      if (error instanceof DuplicateChannelBotError) {
+        return problem(requestId, 409, "connection_duplicate", error.message);
+      }
       if (!(error instanceof ChannelCredentialProbeError)) throw error;
       return problem(
         requestId,
@@ -837,6 +842,12 @@ export class ManagementApi {
     }
     await this.restartChannelAccountsUsingConnection(
       access.organization.id,
+      configured.connectionId,
+    );
+    await this.ensureConnectionAccount(
+      access,
+      input.provider,
+      input.accountId,
       configured.connectionId,
     );
     return Response.json(
@@ -851,6 +862,52 @@ export class ManagementApi {
       },
       { status: 201 },
     );
+  }
+
+  /**
+   * A new Connection's account, so the bot runs from the moment it is added:
+   * it answers `/status` and `/me` and records who writes before any Route lets
+   * them in (docs/audits/2026-10-05-status-and-me-disclosure.md), the way the
+   * CLI's `channels add` has always installed one. An account the Connection
+   * already has is left alone. The account starts in the background, so the
+   * answer is not held by a transport start; a failure here is logged and the
+   * Connection stands, the next Route save writes the account as before.
+   */
+  private async ensureConnectionAccount(
+    access: OrganizationAccessValue,
+    channel: SupportedChannelName,
+    accountId: string,
+    connectionId: string,
+  ): Promise<void> {
+    try {
+      const snapshot = await channelControlPlaneView(this.options.database, access.organization.id);
+      const path = channelAccountFilePath(channel, accountId);
+      if (snapshot.files.some((file) => file.path === path)) return;
+      await deployRevision(
+        this.options.database,
+        snapshot,
+        upsertAccountFile(snapshot.files, channel, accountId, connectionId),
+        {
+          createdByUserId: access.account.id,
+          expectedRevisionId: snapshot.revision?.id ?? null,
+          authorize: ({ bundle, controlPlane }) =>
+            assertChannelConfigurationDelegation({
+              access: this.options.access,
+              database: this.options.database,
+              principal: delegationPrincipal(access),
+              bundle,
+              controlPlane,
+            }),
+        },
+      );
+      void this.options.channelSupervisor?.reconcile?.();
+    } catch (error) {
+      reportFailure(error, {
+        operation: "management_api.connection_account",
+        component: "management-api",
+        status: 500,
+      });
+    }
   }
 
   /** One channel's credential into its Connection owner, probe included. */

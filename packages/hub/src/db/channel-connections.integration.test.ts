@@ -6,6 +6,7 @@ import { afterEach, it } from "vitest";
 import { createTestCredentialCipher, sealTestEnvelope } from "../credentials/test-utils.js";
 import { createProviderApplicationStore } from "../provider-applications/index.js";
 import { createDatabase } from "./pg.js";
+import { DuplicateChannelBotError } from "./types.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "./runtime/index.js";
 
 const PROBED_AT = "2026-09-07T00:00:00.000Z";
@@ -243,6 +244,57 @@ it(
       }),
       /authentication failed/u,
     );
+  },
+  PGLITE_TEST_TIMEOUT_MS,
+);
+
+it(
+  "refuses a second Connection for a bot one already holds, and still rotates its own",
+  async () => {
+    root = await mkdtemp(join(tmpdir(), "hub-channel-connections-dup-"));
+    bundle = await embeddedDatabaseRuntime(root);
+    await bundle.runtime.migrate();
+    await bundle.runtime.query(
+      `insert into organization (id, name, slug) values ('org', 'Org', 'org')`,
+    );
+    const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+    const bot = { id: "zalo-bot-1", username: "bot.xDCToPYF", probedAt: PROBED_AT };
+    const first = await database.configureChannelConnection({
+      organizationId: "org",
+      channel: "zalo",
+      accountId: "bot",
+      credentials: { botToken: "token-a" },
+      identity: bot,
+    });
+    // The same bot under another name: refused, naming the Connection that has it.
+    await assert.rejects(
+      database.configureChannelConnection({
+        organizationId: "org",
+        channel: "zalo",
+        accountId: "chinese",
+        credentials: { botToken: "token-a" },
+        identity: bot,
+      }),
+      (error: unknown) =>
+        error instanceof DuplicateChannelBotError && error.existingAccountId === "bot",
+    );
+    // Its own name: a credential rotation, same Connection.
+    const rotated = await database.configureChannelConnection({
+      organizationId: "org",
+      channel: "zalo",
+      accountId: "bot",
+      credentials: { botToken: "token-b" },
+      identity: bot,
+    });
+    assert.equal(rotated.connectionId, first.connectionId);
+    // Another bot is another Connection.
+    await database.configureChannelConnection({
+      organizationId: "org",
+      channel: "zalo",
+      accountId: "other",
+      credentials: { botToken: "token-c" },
+      identity: { id: "zalo-bot-2", probedAt: PROBED_AT },
+    });
   },
   PGLITE_TEST_TIMEOUT_MS,
 );

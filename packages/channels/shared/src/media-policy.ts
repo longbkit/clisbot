@@ -23,9 +23,13 @@ export const TELEGRAM_MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 export const SLACK_MAX_MEDIA_BYTES = 250 * 1024 * 1024;
 /** Discord's default (non-boosted) attachment cap. */
 export const DISCORD_MAX_MEDIA_BYTES = 10 * 1024 * 1024;
+/** Zalo Personal: the personal-account client uploads natively. Zalo itself
+ * takes files far larger (about 1 GB); the Hub caps a post at 100 MB, read and
+ * staged whole, until a larger one is needed. */
+export const ZALOUSER_MAX_MEDIA_BYTES = 100 * 1024 * 1024;
 
 /** The channel the G11 policy is applied under. */
-export type MediaChannel = "telegram" | "slack" | "discord";
+export type MediaChannel = "telegram" | "slack" | "discord" | "zalouser";
 
 /** Why an outbound file may not be posted natively: the G11 gate is size-only
  * (an unknown/unmapped extension posts as `application/octet-stream`). */
@@ -36,12 +40,14 @@ const CHANNEL_LABEL: Record<MediaChannel, string> = {
   telegram: "Telegram",
   slack: "Slack",
   discord: "Discord",
+  zalouser: "Zalo Personal",
 };
 
 const MAX_MEDIA_BYTES: Record<MediaChannel, number> = {
   telegram: TELEGRAM_MAX_MEDIA_BYTES,
   slack: SLACK_MAX_MEDIA_BYTES,
   discord: DISCORD_MAX_MEDIA_BYTES,
+  zalouser: ZALOUSER_MAX_MEDIA_BYTES,
 };
 
 /** The channel's G11 cap in bytes. */
@@ -62,6 +68,9 @@ const MAX_INBOUND_MEDIA_BYTES: Record<MediaChannel, number> = {
   telegram: TELEGRAM_MAX_INBOUND_MEDIA_BYTES,
   slack: SLACK_MAX_MEDIA_BYTES,
   discord: DISCORD_MAX_MEDIA_BYTES,
+  // The Zalo Personal port downloads no inbound attachment (upstream-sync.json,
+  // `monitor.ts`); the ceiling bounds one if it ever does.
+  zalouser: ZALOUSER_MAX_MEDIA_BYTES,
 };
 
 /** The channel's inbound download ceiling in bytes. */

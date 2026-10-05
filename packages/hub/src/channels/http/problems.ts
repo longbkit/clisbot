@@ -1,3 +1,4 @@
+import { DuplicateChannelBotError } from "../../db/types.js";
 import { reportFailure } from "../../failures/index.js";
 import { ProviderApplicationError } from "../../provider-applications/index.js";
 import { randomUUID } from "node:crypto";
@@ -32,6 +33,15 @@ export function errorResponse(request: Request, error: unknown): Response {
   }
   if (error instanceof ControlPlaneHttpError) {
     return problem(request, error.status, error.code, error.title, error.detail);
+  }
+  if (error instanceof DuplicateChannelBotError) {
+    return problem(
+      request,
+      409,
+      "connection_duplicate",
+      "Channel bot already connected",
+      `${error.message} Add the account to that Connection, or remove it first.`,
+    );
   }
   return problem(
     request,

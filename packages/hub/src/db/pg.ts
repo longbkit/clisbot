@@ -2,7 +2,8 @@ import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { ConnectionOfferSchema } from "@clisbot/protocol/connection-offer";
 import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
+import { DuplicateChannelBotError } from "./types.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { JsonValue } from "../config/compiler.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
@@ -4375,6 +4376,22 @@ class PgDatabase implements Database {
           and(eq(table.organizationId, input.organizationId), eq(table.accountId, input.accountId)),
         )
         .for("update");
+      if (input.identity !== undefined) {
+        // One bot, one Connection: the same token under a second name would run twice.
+        const [holder] = await transaction
+          .select({ accountId: table.accountId })
+          .from(table)
+          .where(
+            and(
+              eq(table.organizationId, input.organizationId),
+              ne(table.accountId, input.accountId),
+              sql`${table.externalIdentity} ->> 'id' = ${input.identity.id}`,
+            ),
+          )
+          .limit(1);
+        if (holder !== undefined)
+          throw new DuplicateChannelBotError(input.channel, holder.accountId);
+      }
       const connectionId = existing?.id ?? randomUUID();
       const credentialEnvelope = this.credentialCipher.encrypt(
         channelCredentialOwner(

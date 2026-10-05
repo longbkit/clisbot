@@ -23,6 +23,7 @@ import { sendMedia, sendText } from "./outbound.js";
 import { probeZalo } from "./probe.js";
 import { getHostRuntime } from "./runtime-store.js";
 import { sendMessageZalo } from "./send.js";
+import { zaloTyping } from "./typing.js";
 
 export const zaloPlugin: ChannelPlugin = {
   /** Message-tool discovery, schema contributions and the native
@@ -37,6 +38,10 @@ export const zaloPlugin: ChannelPlugin = {
     sendText,
     // The Bot API has no upload endpoint; `outbound.ts` refuses loudly.
     sendMedia,
+    // The `sync.progress` liveness surface: `sendChatAction("typing")` while a turn runs.
+    typing: async (args: Record<string, unknown>) => {
+      await zaloTyping(args as never);
+    },
     // The ported Zalo Bot API primitives, by their upstream names.
     sendMessageZalo,
     sendMessage,

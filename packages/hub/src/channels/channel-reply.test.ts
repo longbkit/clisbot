@@ -37,6 +37,7 @@ import {
   buildChannelMessageToolSchema,
   forgetChannelMessageToolCatalog,
   HOST_ONLY_MESSAGE_TOOL_FIELDS,
+  isMediaChannel,
   listChannelMessageToolActions,
 } from "./channel-message-tool.js";
 import { clearChannelMessageActions, registerChannelMessageActions } from "./message-actions.js";
@@ -184,6 +185,15 @@ describe("channel-reply MCP endpoint", () => {
       for (const field of HOST_ONLY_MESSAGE_TOOL_FIELDS) {
         assert.equal(schema.properties[field], undefined, `${channel} must not expose ${field}`);
       }
+    }
+  });
+
+  it("offers file sends only where the channel uploads natively", () => {
+    for (const channel of ["slack", "telegram", "discord", "zalouser"] as const) {
+      assert.equal(isMediaChannel(channel), true, `${channel} uploads files`);
+    }
+    for (const channel of ["zalo", "googlechat", "feishu"] as const) {
+      assert.equal(isMediaChannel(channel), false, `${channel} has no upload path`);
     }
   });
 

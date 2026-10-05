@@ -198,6 +198,16 @@
       "upstream": "extensions/zalo/src/token.ts"
     },
     {
+      "local": "src/typing.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-021"]
+    },
+    {
+      "local": "src/typing.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-021"]
+    },
+    {
       "local": "src/types.ts",
       "status": "verbatim",
       "upstream": "extensions/zalo/src/types.ts"
@@ -212,7 +222,7 @@
   "omitted": [
     {
       "upstream": "extensions/zalo/src/monitor.ts",
-      "reason": "The OpenClaw inbound pipeline: route resolution, pairing/allowlist policy, media download, ctxPayload build, `core.channel.inbound.dispatch`, the reply-delivery closure and the typing indicator, plus the provider lifecycle around them. The Hub owns every one of those. Replaced at the smallest boundary by `fusion/inbound-adapter.ts`, `fusion/admission.ts`, `fusion/polling-session.ts`, `fusion/webhook-session.ts` and `lifecycle/start-account.ts` (D-ZL-012/013/015/014/018). Consequence: the typing indicator (`sendChatAction`) is wired on the client but not driven, and the hosted-media outbound path is gone with `outbound-media.ts`."
+      "reason": "The OpenClaw inbound pipeline: route resolution, pairing/allowlist policy, media download, ctxPayload build, `core.channel.inbound.dispatch`, the reply-delivery closure and the typing indicator, plus the provider lifecycle around them. The Hub owns every one of those. Replaced at the smallest boundary by `fusion/inbound-adapter.ts`, `fusion/admission.ts`, `fusion/polling-session.ts`, `fusion/webhook-session.ts` and `lifecycle/start-account.ts` (D-ZL-012/013/015/014/018). Consequence: the typing indicator (`sendChatAction`) is driven by `typing.ts` (D-ZL-021), and the hosted-media outbound path is gone with `outbound-media.ts`."
     },
     {
       "upstream": "extensions/zalo/src/monitor-durable.ts",
@@ -410,6 +420,12 @@
       "id": "D-ZL-020",
       "file": "src/api.test.ts",
       "reason": "Two ported expectations move with the core provider-HTTP boundary (`@clisbot/channels-core` D-CORE-036 / D-CORE-306): upstream throws a size-named error at the JSON cap and re-raises the caller's abort when a body read is cut short, while the Fusion reader stops at the cap / at its own 10s per-chunk idle deadline and the truncated body fails to parse. The invariants the cases exist for are asserted unchanged: the oversized stream is bounded and cancelled exactly once, and a hanging response body cannot hold the send."
+    },
+    {
+      "id": "D-ZL-021",
+      "file": "src/typing.ts",
+      "reason": "The Hub's `plugin.outbound.typing` (`sync.progress`) for the Zalo Bot API, which upstream drives from its own monitor (omitted here). A `start` sends the ported `sendChatAction(\"typing\")` now and re-sends it every 4.5s, inside the few seconds the action shows; a `stop` cancels and sends nothing. A fault throws into the Hub's lease bookkeeping, and a failing refresh stops its own timer. Token and proxy are resolved the way `send.ts` resolves them. Mirrors the Telegram vertical's `typing.ts` (D-TG-025).",
+      "tests": ["src/typing.test.ts"]
     }
   ]
 }

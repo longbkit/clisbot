@@ -63,7 +63,7 @@ import { isChannelsEnabled } from "../loader/channel-gate.js";
 import type { ChannelReplyServer } from "../channel-reply.js";
 import { assignmentCoversPrincipal } from "../policy.js";
 import type { ChannelSupervisor } from "../supervisor/types.js";
-import type { SupportedChannelName } from "../catalog.js";
+import { upsertAccountFile } from "../config/account-file.js";
 import { configureDiscordConnection } from "../connections/discord.js";
 import { configureFeishuConnection } from "../connections/feishu.js";
 import { configureGoogleChatConnection } from "../connections/googlechat.js";
@@ -94,21 +94,6 @@ export interface ChannelControlPlaneOpsOptions {
    * `/mcp/channel/<opaque-capability>` route to the shared 503. */
   channelReplyServer: ChannelReplyServer | null;
 }
-
-/** Every supported channel's default transport mode for a freshly added account. */
-const DEFAULT_TRANSPORT_MODE: Record<SupportedChannelName, string> = {
-  slack: "socket",
-  telegram: "polling",
-  discord: "gateway",
-  // Google Chat has no other delivery model; the operator fronts the account's
-  // listener with a reverse proxy (packages/channels/googlechat/HUB-WIRING.md).
-  googlechat: "webhook",
-  // The long connection and the long poll need no public URL, so they lead.
-  feishu: "websocket",
-  zalo: "polling",
-  // Zalo Personal has one mode; the account is linked afterwards by a QR scan.
-  zalouser: "qr",
-};
 
 const channelAddBodySchema = z.discriminatedUnion("channel", [
   z
@@ -351,7 +336,7 @@ async function handleAddChannel(
     connectionId,
   });
   if (connection === undefined) throw invalidRequest("the channel connection does not exist");
-  let files = upsertAccountFile(snapshot, body.channel, body.account, connectionId);
+  let files = upsertAccountFile(snapshot.files, body.channel, body.account, connectionId);
   if (body.setup) files = configureOnboardingRoute(files, body.channel, body.account, body.setup);
   await deployRevision(database, snapshot, files, {
     expectedRevisionId: snapshot.revision?.id ?? null,
@@ -750,32 +735,6 @@ async function loadSnapshot(database: Database): Promise<ChannelControlPlaneSnap
     }
     throw error;
   }
-}
-
-/** Write/replace the account file into a copy of the active revision's files. */
-function upsertAccountFile(
-  snapshot: ChannelControlPlaneSnapshot,
-  channel: SupportedChannelName,
-  account: string,
-  connectionId: string,
-): HubBundleFile[] {
-  const path = `${CHANNELS_DIRECTORY}/${channel}/${account}.yml`;
-  const previous = snapshot.files.find((file) => file.path === path);
-  const retained = previous ? (load(previous.content) as Record<string, unknown>) : {};
-  const content = dump(
-    {
-      ...retained,
-      channel,
-      accountId: account,
-      enabled: true,
-      connectionId,
-      transport: retained["transport"] ?? { mode: DEFAULT_TRANSPORT_MODE[channel] },
-    },
-    { lineWidth: -1 },
-  );
-  const next = snapshot.files.filter((file) => file.path !== path);
-  next.push({ path, content });
-  return next;
 }
 
 /** Replace-or-add the policy file's `users[username]` record in a copy of the files. */

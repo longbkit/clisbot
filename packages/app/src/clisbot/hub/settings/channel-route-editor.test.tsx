@@ -535,6 +535,43 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByText(/channel-support/)).toBeNull();
   });
 
+  it("lists every channel's bot Connection, and no integration Connection", async () => {
+    // A Route can use a Connection a sender's identity resolves through: a
+    // channel bot's or a Slack workspace's. GitHub has none to offer.
+    const routeless = { ...configuration, accounts: [] };
+    const connections = {
+      connections: [
+        {
+          id: "zalo-bot",
+          provider: "zalo",
+          name: "shop",
+          externalName: null,
+          status: "active",
+          identityRealm: "zalo:bot:zalo-bot",
+          consumers: [],
+        },
+        {
+          id: "github",
+          provider: "github",
+          name: "acme",
+          externalName: null,
+          status: "active",
+          identityRealm: null,
+          consumers: [],
+        },
+      ],
+      providerApplications: [],
+    };
+    adapters.get.mockImplementation(async (resource: string) => {
+      if (resource === "channel-configuration") return routeless;
+      if (resource === "connections") return connections;
+      return data[resource];
+    });
+    renderChannels();
+    expect(await screen.findByText("Zalo Official Bot · shop")).toBeTruthy();
+    expect(screen.queryByText(/acme/)).toBeNull();
+  });
+
   it("keeps a Connection whose Routes were removed on the page, ready for a new Route", async () => {
     // Removing a Connection's Routes offers to keep its credential; the
     // Connection then has no account, and must not disappear from the page.
@@ -1407,6 +1444,76 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Use an existing Connection" }));
     expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("");
     expect(screen.queryByLabelText("Name")).toBeNull();
+  });
+
+  it("puts a new Connection's first Route on the account the Hub added with it", async () => {
+    let current: Record<string, unknown> = configuration;
+    let currentConnections = data.connections;
+    adapters.get.mockImplementation(async (resource: string) => {
+      if (resource === "channel-configuration") return current;
+      if (resource === "connections") return currentConnections;
+      return data[resource];
+    });
+    adapters.put.mockImplementation(
+      async (_resource: string, candidate: Record<string, unknown>) => {
+        current = { ...configuration, ...candidate };
+        return current;
+      },
+    );
+    adapters.post.mockImplementation(async (resource: string) => {
+      if (resource !== "connections") return {};
+      const created = {
+        id: "new-connection",
+        provider: "telegram",
+        name: "new-bot",
+        externalName: null,
+        status: "active",
+        identityRealm: "telegram:bot:new-connection",
+        consumers: [],
+      };
+      currentConnections = {
+        connections: [...(data.connections as { connections: unknown[] }).connections, created],
+        providerApplications: [],
+      };
+      // The Hub adds the running account with the Connection, no Routes yet.
+      const accounts = (configuration as { accounts: Record<string, unknown>[] }).accounts;
+      current = {
+        ...configuration,
+        accounts: [
+          ...accounts,
+          {
+            channel: "telegram",
+            accountId: "new-bot",
+            enabled: true,
+            connectionId: "new-connection",
+            transport: { mode: "polling" },
+            routes: [],
+          },
+        ],
+      };
+      return created;
+    });
+    renderChannels();
+    await screen.findByRole("button", { name: /^Edit Route/ });
+    fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+      target: { value: "new-bot" },
+    });
+    fireEvent.change(screen.getByLabelText("Bot token"), { target: { value: "bot-token" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and add Connection" }));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
+        "account:telegram:new-bot",
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
+    fireEvent.change(screen.getByLabelText("Automation"), { target: { value: "support" } });
+    fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledOnce());
+    const saved = adapters.put.mock.calls[0]![1].accounts as Record<string, unknown>[];
+    const newBot = saved.filter((entry) => entry["accountId"] === "new-bot");
+    expect(newBot).toHaveLength(1);
+    expect((newBot[0]!["routes"] as unknown[]).length).toBe(1);
   });
 
   it("offers every channel this Hub can connect and swaps the credential form", async () => {

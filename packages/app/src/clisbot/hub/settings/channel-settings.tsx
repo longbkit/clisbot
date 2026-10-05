@@ -750,9 +750,13 @@ function ChannelSettingsContent({
             : current,
       );
       void connections.refetch();
+      // The Hub adds the Connection's account with it (a running bot, no
+      // Routes yet): read it before the Route form opens on that account.
+      await channels.refetch();
+      void runtimeStatus.refetch();
       return created;
     },
-    [connections, hub, queryClient, organizationId, hubAccountId],
+    [channels, connections, hub, queryClient, organizationId, hubAccountId, runtimeStatus],
   );
   const validateAdvancedConfiguration = useCallback(
     async (candidate: ReturnType<typeof parseChannelConfigurationYaml>) => {
@@ -1103,11 +1107,12 @@ function AutomationChannelAccount({
   removeRoute(account: RecordValue, index: number): Promise<void>;
 }) {
   const add = useCallback(() => addRouteTo(channelAccountKey(account)), [account, addRouteTo]);
+  const channelName = useChannelName();
   const routes = arrayField(account, "routes") as RecordValue[];
   return (
     <View style={settingsStyles.card}>
       <View style={settingsStyles.row}>
-        <Text style={settingsStyles.rowTitle}>{channelAccountLabel(account)}</Text>
+        <Text style={settingsStyles.rowTitle}>{channelAccountLabel(account, channelName)}</Text>
         {choosing ? (
           <Button size="sm" variant="outline" disabled={pending} onPress={add}>
             Add input here
@@ -2479,10 +2484,25 @@ function ChannelAccountForm({
     setDestinationState(next);
     setAccountId(null);
   }, []);
+  // A new Connection's Route goes onto the account the Hub added with it; a Hub
+  // that adds none leaves the Connection itself to build the account from. The
+  // account can arrive a render after the Connection, so the pick moves to it
+  // once; every pick happens once, so a later read never undoes the user's.
+  const picked = useRef<string | null>(null);
   useEffect(() => {
-    if (createdConnectionId !== null)
-      setDestination({ kind: "connection", id: createdConnectionId });
-  }, [createdConnectionId, setDestination]);
+    if (createdConnectionId === null) return;
+    const account = existingAccounts.find(
+      (candidate) => stringField(candidate, "connectionId") === createdConnectionId,
+    );
+    const next: RouteDestination =
+      account === undefined
+        ? { kind: "connection", id: createdConnectionId }
+        : { kind: "account", key: channelAccountKey(account) };
+    const mark = `${createdConnectionId}:${next.kind}`;
+    if (picked.current === mark || picked.current === `${createdConnectionId}:account`) return;
+    picked.current = mark;
+    setDestination(next);
+  }, [createdConnectionId, existingAccounts, setDestination]);
   const { configurationKind, existingAccountKey, connectionId, destinationValue } =
     routeDestinationState(isEditing, initial.accountKey, destination);
   const accountId =
@@ -2625,9 +2645,17 @@ function ChannelAccountForm({
   // The totals, and any other limit an earlier version set on the Route, so
   // it stays visible and editable; read once, so a field never vanishes mid-edit.
   const [routeLimitNames] = useState(() => routeLimitFields(initial.routeLimits));
+  const channelName = useChannelName();
   const destinationOptions = useMemo(
-    () => routeDestinationOptions(existingAccounts, connections, adminScoped, inputDraft?.provider),
-    [adminScoped, connections, existingAccounts, inputDraft?.provider],
+    () =>
+      routeDestinationOptions(
+        existingAccounts,
+        connections,
+        adminScoped,
+        channelName,
+        inputDraft?.provider,
+      ),
+    [adminScoped, channelName, connections, existingAccounts, inputDraft?.provider],
   );
   const daemonOptions = useMemo<SelectFieldOption<string>[]>(
     () =>
@@ -2658,7 +2686,7 @@ function ChannelAccountForm({
     existingTargetIndex,
   );
   const hubPredatesRules = editedRoute !== undefined && routeCarriesRuleConditions(editedRoute);
-  const canSave = canSaveChannelRoute({
+  const saveBlocker = routeSaveBlocker({
     conversationValid: conversation.parsed.valid,
     toolActivityValid: toolActivity.parsed.valid,
     selectedConnection,
@@ -2678,6 +2706,7 @@ function ChannelAccountForm({
     provider: agentConfiguration.provider,
     providerOptionsValid: parsedProviderOptions.valid,
   });
+  const canSave = saveBlocker === null;
   const duplicateAccount =
     configurationKind === "account" &&
     isDuplicateChannelAccount(existingAccounts, selectedConnection, accountId);
@@ -2886,7 +2915,7 @@ function ChannelAccountForm({
             size={14}
           />
           <Text style={settingsStyles.rowTitle}>
-            {channelAccountLabel(isEditing ? editedAccount : selectedAccount)}
+            {channelAccountLabel(isEditing ? editedAccount : selectedAccount, channelName)}
           </Text>
         </View>
       ) : (
@@ -3137,6 +3166,10 @@ function ChannelAccountForm({
         <Button disabled={pending || !canSave || duplicateAccount} onPress={submit}>
           {inputDraft ? "Use input" : channelFormSubmitLabel(isEditing)}
         </Button>
+        {/* A greyed button says nothing on its own: name the step it waits for. */}
+        {saveBlocker === null || pending ? null : (
+          <Text style={[settingsStyles.rowHint, styles.saveBlocker]}>{saveBlocker}</Text>
+        )}
         <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
           Cancel
         </Button>
@@ -3662,9 +3695,21 @@ function channelAccountKey(account: RecordValue): string {
   return `${stringField(account, "channel") ?? "channel"}:${stringField(account, "accountId") ?? "account"}`;
 }
 
-function channelAccountLabel(account: RecordValue | undefined): string {
+/** The catalog's name for a channel ("Zalo Official Bot", not "Zalo"). */
+function useChannelName(): (channel: string) => string {
+  const catalog = useChannelCatalog();
+  return useCallback(
+    (channel: string) => channelCatalogLabel(catalog.entries, channel),
+    [catalog.entries],
+  );
+}
+
+function channelAccountLabel(
+  account: RecordValue | undefined,
+  channelName: (channel: string) => string,
+): string {
   if (account === undefined) return "Connection unavailable";
-  return `${channelLabel(stringField(account, "channel") ?? "channel")} · ${stringField(account, "accountId") ?? "account"}`;
+  return `${channelName(stringField(account, "channel") ?? "channel")} · ${stringField(account, "accountId") ?? "account"}`;
 }
 
 /** What a Connection Admin sees where the Connection would be named. */
@@ -4109,6 +4154,7 @@ function routeDestinationOptions(
   accounts: readonly RecordValue[],
   connections: readonly { id: string; provider: string; name: string }[],
   adminScoped: boolean,
+  channelName: (channel: string) => string,
   /** An Automation input draft is for one channel; only its Connections are offered. */
   provider?: string,
 ): SelectFieldOption<string>[] {
@@ -4124,7 +4170,7 @@ function routeDestinationOptions(
       return {
         id: value,
         value,
-        label: channelAccountLabel(account),
+        label: channelAccountLabel(account, channelName),
         description: connection === undefined ? routes : `${connection.name} · ${routes}`,
       };
     });
@@ -4136,7 +4182,7 @@ function routeDestinationOptions(
       return {
         id: value,
         value,
-        label: `${channelLabel(connection.provider)} · ${connection.name}`,
+        label: `${channelName(connection.provider)} · ${connection.name}`,
         description: "No Routes yet",
       };
     });
@@ -4193,7 +4239,8 @@ function channelFormSelection(input: {
   };
 }
 
-function canSaveChannelRoute(input: {
+/** What keeps the Route form from saving, said as the next step; null when it can. */
+function routeSaveBlocker(input: {
   conversationValid: boolean;
   toolActivityValid: boolean;
   selectedConnection: { id: string } | undefined;
@@ -4212,23 +4259,36 @@ function canSaveChannelRoute(input: {
   workspaceValid: boolean;
   provider: string;
   providerOptionsValid: boolean;
-}): boolean {
-  if (input.effectiveAccountId.length === 0) return false;
-  if (input.configurationKind === "route" && input.selectedAccount === undefined) return false;
-  if (input.configurationKind === "account" && input.selectedConnection === undefined) return false;
-  if (!input.parsedRouteLimits.valid) return false;
-  if (!input.audienceComplete) return false;
-  if (!input.conversationValid || !input.toolActivityValid) return false;
-  if (input.existingTarget !== null) return true;
-  if (input.target === "automation") return input.automationName !== null;
-  return (
-    input.daemonId !== null &&
-    input.projectId !== null &&
-    input.cwd.trim().length > 0 &&
-    input.workspaceValid &&
-    input.provider.trim().length > 0 &&
-    input.providerOptionsValid
-  );
+}): string | null {
+  if (input.effectiveAccountId.length === 0) return "Give the Connection a name.";
+  if (input.configurationKind === "route" && input.selectedAccount === undefined)
+    return "Choose a Connection.";
+  if (input.configurationKind === "account" && input.selectedConnection === undefined)
+    return "Choose a Connection.";
+  if (!input.parsedRouteLimits.valid) return input.parsedRouteLimits.error;
+  if (!input.audienceComplete) return "Finish the Rules above.";
+  if (!input.conversationValid || !input.toolActivityValid) return "Fix the fields marked above.";
+  if (input.existingTarget !== null) return null;
+  if (input.target === "automation")
+    return input.automationName === null ? "Choose an Automation." : null;
+  return agentTargetBlocker(input);
+}
+
+/** What an Agent target still needs, in the order the form asks for it. */
+function agentTargetBlocker(input: {
+  daemonId: string | null;
+  projectId: string | null;
+  cwd: string;
+  workspaceValid: boolean;
+  provider: string;
+  providerOptionsValid: boolean;
+}): string | null {
+  if (input.daemonId === null) return "Choose a Host.";
+  if (input.projectId === null) return "Choose a Project.";
+  if (input.cwd.trim().length === 0) return "Choose a folder for the Agent.";
+  if (!input.workspaceValid) return "Fix the workspace settings.";
+  if (input.provider.trim().length === 0) return "Choose a Provider and Model.";
+  return input.providerOptionsValid ? null : "Fix the provider options.";
 }
 
 /** The Route keeps its target when the form was not allowed to rebuild one. */
@@ -4450,6 +4510,9 @@ const styles = StyleSheet.create((theme) => ({
   statusPanel: { flexDirection: "column", alignItems: "flex-start", gap: theme.spacing[2] },
   formActions: {
     gap: theme.spacing[2],
+  },
+  saveBlocker: {
+    textAlign: "center",
   },
 }));
 

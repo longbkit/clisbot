@@ -20,6 +20,8 @@ describe("G11 caps", () => {
     expect(SLACK_MAX_MEDIA_BYTES).toBe(250 * 1024 * 1024);
     expect(mediaMaxBytesForChannel("telegram")).toBe(50 * 1024 * 1024);
     expect(mediaMaxBytesForChannel("slack")).toBe(250 * 1024 * 1024);
+    expect(mediaMaxBytesForChannel("zalouser")).toBe(100 * 1024 * 1024);
+    expect(mediaNotice("zalouser", "big.png")).toContain("Zalo Personal limit 100 MB");
   });
 });
 

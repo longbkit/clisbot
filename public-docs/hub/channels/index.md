@@ -21,8 +21,8 @@ Slack / Telegram / Discord / Google Chat / Feishu / Zalo
 
 Three resources make that work, and they are separate on purpose:
 
-- A **Connection** owns the credential — one Slack workspace installation, one bot token, one linked Zalo account. Hub encrypts it and never shows it again.
-- A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization.
+- A **Connection** owns the credential — one Slack workspace installation, one bot token, one linked Zalo account. Hub encrypts it and never shows it again. A bot has one Connection: adding a second one for a bot Hub already holds is refused and names the Connection that has it, since two would both run the bot and split its messages.
+- A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization. Adding a Connection adds its account, so the bot runs at once: before any Route it answers `/status` and `/me` with the sender's ID and remembers who wrote, which is how you find the people to name in a Rule. Nobody reaches an agent until a Route lets them in.
 - A **Route** is where a message goes — a direct agent, or an Automation — and its **Rules** are the ways in. The first Route with a Rule that lets the message in wins; a sender no Route admits is refused.
 
 [How Hub works](/docs/hub/concepts) covers the resource model. This section covers the platforms.

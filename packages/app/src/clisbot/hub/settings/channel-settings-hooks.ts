@@ -291,12 +291,27 @@ function useChannelConnections(
   return useMemo(
     () =>
       (connections?.connections ?? []).filter((connection) =>
-        provider === undefined
-          ? ["slack", "telegram"].includes(connection.provider)
-          : connection.provider === provider,
+        provider === undefined ? isChannelConnection(connection) : connection.provider === provider,
       ),
     [connections?.connections, provider],
   );
+}
+
+/**
+ * A Connection a Route can use: a channel bot's, or a Slack workspace's. Those
+ * are the ones a sender's identity resolves through, so the Hub gives them an
+ * identity realm; a GitHub, Linear or per-guild Discord integration has none.
+ */
+function isChannelConnection(connection: {
+  provider: string;
+  identityRealm?: string | null | undefined;
+}): boolean {
+  // COMPAT(connection-identity-realm): a Hub from before 2026-09 omits
+  // `identityRealm` and routed Slack and Telegram only; remove after 2027-01-31.
+  if (connection.identityRealm === undefined) {
+    return connection.provider === "slack" || connection.provider === "telegram";
+  }
+  return connection.identityRealm !== null;
 }
 
 /** Tell the Automation input draft whether a Route editor is open, while this screen is mounted. */

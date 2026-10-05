@@ -470,6 +470,14 @@ export function channelConnectionProblem(
       retryable: true,
     };
   }
+  if (input.status === 409 && input.code === "connection_duplicate") {
+    return {
+      title: "This bot is already connected",
+      detail: input.message,
+      hint: "Use that Connection: add a Route to it from the Connections page.",
+      retryable: false,
+    };
+  }
   if (input.status === 403) {
     return {
       title: "You cannot add Connections in this organization",

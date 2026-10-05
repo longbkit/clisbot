@@ -59,7 +59,7 @@ There are no threads. Zalo Personal has none, so a reply is a plain message on t
 
 ## What the agent can do
 
-Text rendered into Zalo's native style ranges — Zalo takes styled ranges rather than markdown — chunked at 2000 characters with the styles sliced per chunk; native file upload, where an audio file becomes a voice message; and links.
+Text rendered into Zalo's native style ranges — Zalo takes styled ranges rather than markdown — chunked at 2000 characters with the styles sliced per chunk; native file upload up to 100 MB per file, where an audio file becomes a voice message; and links.
 
 Message tool actions: `send` — the Hub's own outbound path, present on every channel — and `react`.
 

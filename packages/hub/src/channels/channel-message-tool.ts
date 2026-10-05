@@ -173,14 +173,17 @@ const CHANNEL_MESSAGE_TOOL_DISCOVERY: Record<SupportedChannelName, ChannelMessag
 
 /**
  * The channels with a native outbound file-upload path, so `message` accepts
- * media params at all. Google Chat's upload is user-OAuth
- * only, Feishu's is omitted from the port, and the Zalo Bot API has no upload
+ * media params at all. Zalo Personal's client uploads natively (its
+ * `outbound.sendMedia`, D-ZU-018). Google Chat's upload is user-OAuth only,
+ * Feishu's is omitted from the port, and the Zalo Bot API has no upload
  * endpoint — offering the tool there would advertise a delivery that always
  * fails. The set is pinned to `@clisbot/channels-shared`'s `MediaChannel`,
  * which owns the per-channel size caps.
  */
 export function isMediaChannel(channel: SupportedChannelName): channel is MediaChannel {
-  return channel === "slack" || channel === "telegram" || channel === "discord";
+  return (
+    channel === "slack" || channel === "telegram" || channel === "discord" || channel === "zalouser"
+  );
 }
 
 /**
