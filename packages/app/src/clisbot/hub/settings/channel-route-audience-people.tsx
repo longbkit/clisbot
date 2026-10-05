@@ -1,115 +1,128 @@
-// The two people pickers Who and Where share: Teams or Members from one list,
-// and Guests by name. One component each, so both halves of a rule pick alike.
+// "Only people I pick": one list for everyone a Rule can name — Hub roles,
+// Teams, Hub people, and people from the channel who have no Hub account (by
+// their channel user id). The person configuring picks people; which kind of
+// subject each is stays the Hub's business.
 
 import React, { useCallback, useMemo } from "react";
 import type { SelectFieldOption } from "@/components/ui/select-field";
-import { PickerRow, type AudienceOption } from "./channel-route-audience-controls";
-import { SenderSelectionFields } from "./conversation-picker-field";
+import { splitConversationIds } from "../conversation-picker";
+import type { HubAudienceRole } from "../contracts";
+import { AUDIENCE_ROLE_LABELS, type AudienceRuleDraft } from "./channel-route-audience";
+import { useObservedSenders } from "./conversation-picker-field";
 import { MultiSelectField, type MultiSelection } from "./multi-select-field";
+import type { RulePeople } from "./channel-route-rule-people";
 
-const TEAM_PREFIX = "team:";
-const MEMBER_PREFIX = "member:";
+const ROLE = "role:";
+const TEAM = "team:";
+const MEMBER = "member:";
+const GUEST = "guest:";
+const ROLES: readonly HubAudienceRole[] = ["owner", "admin", "member"];
 
-/** Teams, then Members, in one list: the same picker Access uses for a grant. */
-export function TeamsOrMembersField({
-  hint,
-  teams,
-  members,
-  selectedTeams,
-  selectedMembers,
+export interface PeoplePickerPlace {
+  /** The channel's name, as people know it ("Slack"). */
+  channelName: string;
+  observedChannel: string | null;
+  accountId: string | null;
+}
+
+export function PeoplePicker({
+  who,
+  people,
+  place,
   onChange,
   disabled,
 }: {
-  hint: string;
-  teams: readonly AudienceOption[];
-  /** Members by membership id. */
-  members: readonly AudienceOption[];
-  selectedTeams: readonly string[];
-  selectedMembers: readonly string[];
-  onChange(picked: { teams: string[]; members: string[] }): void;
+  who: AudienceRuleDraft["who"];
+  people: RulePeople;
+  place: PeoplePickerPlace;
+  onChange(who: AudienceRuleDraft["who"]): void;
   disabled: boolean;
 }) {
-  const options = useMemo<SelectFieldOption<string>[]>(
-    () => [
-      ...teams.map((team) => prefixedOption(TEAM_PREFIX, team, "Teams")),
-      ...members.map((member) => prefixedOption(MEMBER_PREFIX, member, "Members")),
-    ],
-    [members, teams],
-  );
+  const senders = useObservedSenders(place.observedChannel, place.accountId);
+  const identities = useMemo(() => splitConversationIds(who.identities), [who.identities]);
+  const options = useMemo<SelectFieldOption<string>[]>(() => {
+    const observed = (senders.data?.senders ?? []).map((sender) => ({
+      id: sender.identity,
+      label: sender.name ?? sender.username ?? sender.id,
+      description: sender.username ? `@${sender.username}` : sender.id,
+    }));
+    // A picked id the bot has not seen yet still lists, under the id itself.
+    const unseen = identities
+      .filter((id) => !observed.some((sender) => sender.id === id))
+      .map((id) => ({ id, label: id, description: "" }));
+    return [
+      ...ROLES.map((role) => option(ROLE, role, AUDIENCE_ROLE_LABELS[role], "Roles")),
+      ...people.teams.map((team) => option(TEAM, team.id, team.name, "Teams")),
+      ...people.people.map((person) =>
+        option(MEMBER, person.id, person.name, "Hub people", unlinkedNote(person.linked, place)),
+      ),
+      ...[...observed, ...unseen].map((sender) =>
+        option(GUEST, sender.id, sender.label, `From ${place.channelName}`, sender.description),
+      ),
+    ];
+  }, [identities, people.people, people.teams, place, senders.data?.senders]);
   const value = useMemo(
     () => [
-      ...selectedTeams.map((id) => `${TEAM_PREFIX}${id}`),
-      ...selectedMembers.map((id) => `${MEMBER_PREFIX}${id}`),
+      ...who.roles.map((id) => `${ROLE}${id}`),
+      ...who.teams.map((id) => `${TEAM}${id}`),
+      ...who.members.map((id) => `${MEMBER}${id}`),
+      ...identities.map((id) => `${GUEST}${id}`),
     ],
-    [selectedMembers, selectedTeams],
+    [identities, who.members, who.roles, who.teams],
   );
   const change = useCallback(
     (picked: MultiSelection) => {
       // No `allLabel` is offered, so the wildcard never arrives.
       if (picked === "*") return;
-      onChange({
-        teams: unprefixed(picked, TEAM_PREFIX),
-        members: unprefixed(picked, MEMBER_PREFIX),
-      });
+      onChange(whoFromPicked(picked));
     },
     [onChange],
   );
+  const create = useMemo(
+    () => ({
+      label: `Add ${place.channelName} user ID`,
+      description: "Someone without a Hub account, by their channel user ID.",
+      onCreate: (text: string) => onChange(whoFromPicked([...value, `${GUEST}${text.trim()}`])),
+    }),
+    [onChange, place.channelName, value],
+  );
   return (
     <MultiSelectField
-      label="Specific Teams or Members"
-      hint={hint}
+      label="People"
       options={options}
       value={value}
       onChange={change}
       disabled={disabled}
-      placeholder="Choose Teams or Members"
-      searchPlaceholder="Search Teams and Members"
+      placeholder="Choose people, Teams or roles"
+      searchPlaceholder="Search people, Teams, roles, or paste an ID"
+      create={create}
     />
   );
 }
 
-function prefixedOption(prefix: string, option: AudienceOption, group: string) {
-  const id = `${prefix}${option.id}`;
-  return { id, value: id, label: option.name, group };
+function option(
+  prefix: string,
+  id: string,
+  label: string,
+  group: string,
+  description?: string,
+): SelectFieldOption<string> {
+  const value = `${prefix}${id}`;
+  return { id: value, value, label, group, ...(description ? { description } : {}) };
 }
 
-function unprefixed(ids: readonly string[], prefix: string): string[] {
-  return ids.filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length));
+function unlinkedNote(linked: boolean | undefined, place: PeoplePickerPlace): string | undefined {
+  return linked === false ? `Not linked on ${place.channelName}` : undefined;
 }
 
-/**
- * Guests, picked the way conversations are: from the people who already messaged the
- * bot, or by id. `among` limits the choice to the Guests a rule's Who names.
- */
-export function GuestsField({
-  hint,
-  channel,
-  accountId,
-  among,
-  value,
-  onChange,
-  disabled,
-}: {
-  hint: string;
-  channel: string | null;
-  accountId: string | null;
-  among: readonly string[] | null;
-  /** Channel identities, comma-separated. */
-  value: string;
-  onChange(value: string): void;
-  disabled: boolean;
-}) {
-  return (
-    <PickerRow label="Specific Guests">
-      <SenderSelectionFields
-        channel={channel}
-        accountId={accountId}
-        among={among}
-        hint={hint}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-      />
-    </PickerRow>
-  );
+function whoFromPicked(picked: readonly string[]): AudienceRuleDraft["who"] {
+  const ids = (prefix: string) =>
+    picked.filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length));
+  return {
+    roles: ROLES.filter((role) => ids(ROLE).includes(role)),
+    teams: ids(TEAM),
+    members: ids(MEMBER),
+    anyone: false,
+    identities: ids(GUEST).join(", "),
+  };
 }

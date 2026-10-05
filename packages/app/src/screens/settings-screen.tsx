@@ -466,6 +466,19 @@ function DiagnosticsSection({
   );
 }
 
+function headingOf(header: { title: string; heading?: string } | null): string | undefined {
+  return header === null ? undefined : (header.heading ?? header.title);
+}
+
+/** The app's first settings page names the product on its one title line. */
+function sectionHeader(
+  section: string,
+  title: string,
+): { title: string; heading?: string; leading?: ReactNode } {
+  if (section !== "general") return { title };
+  return { title, heading: `Clisbot – ${title}`, leading: <ClisbotBrand iconOnly /> };
+}
+
 interface AboutSectionProps {
   appVersion: string | null;
   appVersionText: string;
@@ -1095,26 +1108,29 @@ function SettingsSidebar({
           onSelect={openHubs}
         />
         <HubPicker />
-        {hub.enabled
-          ? hubItems
-              .filter(
-                (item) =>
-                  !(
-                    item.section === "account" &&
-                    hub.connection?.accountAuthentication === "personal"
-                  ),
-              )
-              .map((item) => (
-                <SidebarSectionButton
-                  key={item.section}
-                  itemId={item.section}
-                  label={item.label}
-                  icon={item.icon}
-                  isSelected={selectedHubSection === item.section}
-                  onSelect={onSelectHubSection}
-                />
-              ))
-          : null}
+        {/* A Hub's pages sit under its picker, indented so they read as its own. */}
+        <View style={sidebarStyles.nested}>
+          {hub.enabled
+            ? hubItems
+                .filter(
+                  (item) =>
+                    !(
+                      item.section === "account" &&
+                      hub.connection?.accountAuthentication === "personal"
+                    ),
+                )
+                .map((item) => (
+                  <SidebarSectionButton
+                    key={item.section}
+                    itemId={item.section}
+                    label={item.label}
+                    icon={item.icon}
+                    isSelected={selectedHubSection === item.section}
+                    onSelect={onSelectHubSection}
+                  />
+                ))
+            : null}
+        </View>
       </View>
       <View style={sidebarStyles.list}>
         <Text style={sidebarStyles.groupLabel}>{t("settings.groups.host")}</Text>
@@ -1136,16 +1152,18 @@ function SettingsSidebar({
               onAddHost={onAddHost}
               enableBuiltInDaemonOption={enableBuiltInDaemonOption}
             />
-            {HOST_SECTION_ITEMS.map((item) => (
-              <SidebarHostSectionButton
-                key={item.id}
-                itemId={item.id}
-                label={t(item.labelKey)}
-                icon={item.icon}
-                isSelected={selectedHostSection === item.id}
-                onSelect={onSelectHostSection}
-              />
-            ))}
+            <View style={sidebarStyles.nested}>
+              {HOST_SECTION_ITEMS.map((item) => (
+                <SidebarHostSectionButton
+                  key={item.id}
+                  itemId={item.id}
+                  label={t(item.labelKey)}
+                  icon={item.icon}
+                  isSelected={selectedHostSection === item.id}
+                  onSelect={onSelectHostSection}
+                />
+              ))}
+            </View>
           </>
         ) : (
           <>
@@ -1481,6 +1499,10 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   const hubDetailParams = useLocalSearchParams<{ hubPanel?: string; hubIntent?: string }>();
   const detailHeader = ((): {
     title: string;
+    /** What the page header shows when it differs from `title`. */
+    heading?: string;
+    /** Before the heading on the desktop title line. */
+    leading?: ReactNode;
     titleAccessory?: ReactNode;
   } | null => {
     if (view.kind === "plugin") {
@@ -1497,7 +1519,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     if (view.kind === "section") {
       const item = SIDEBAR_SECTION_ITEMS.find((s) => s.id === view.section);
       if (!item) return null;
-      return { title: t(item.labelKey) };
+      return sectionHeader(view.section, t(item.labelKey));
     }
     if (view.kind === "hub") {
       const item = hubSettingsSection(view.section);
@@ -1529,9 +1551,6 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           case "general":
             return (
               <>
-                <View style={styles.brandHeader} testID="settings-general-brand">
-                  <ClisbotBrand />
-                </View>
                 <GeneralSection settings={settings} handleLanguageChange={handleLanguageChange} />
                 <SendingSection />
                 <ProductAnalyticsSettings />
@@ -1578,10 +1597,12 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     );
   }
 
+  const pageHeading = headingOf(detailHeader);
   const desktopPageTitle = detailHeader ? (
     <View style={styles.pageTitleRow}>
+      {detailHeader.leading}
       <Text style={styles.pageTitle} testID="settings-detail-header-title">
-        {detailHeader.title}
+        {pageHeading}
       </Text>
       {detailHeader.titleAccessory}
       {hubPickerAccessory ? (
@@ -1648,7 +1669,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     return (
       <View style={styles.container}>
         <BackHeader
-          title={detailHeader?.title}
+          title={pageHeading}
           titleAccessory={detailHeader?.titleAccessory}
           rightContent={hubPickerAccessory}
           onBack={handleBackFromDetail}
@@ -1832,6 +1853,11 @@ const sidebarStyles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
     gap: theme.spacing[0.5],
+  },
+  // A picker's pages: icons start where the picker's name does.
+  nested: {
+    gap: theme.spacing[0.5],
+    paddingLeft: theme.iconSize.md + theme.spacing[2],
   },
   groupLabel: {
     fontSize: theme.fontSize.base,

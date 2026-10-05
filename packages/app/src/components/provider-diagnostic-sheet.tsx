@@ -749,7 +749,7 @@ const sheetStyles = StyleSheet.create((theme) => ({
     color: theme.colors.destructive,
   },
   formInput: {
-    backgroundColor: theme.colors.surface2,
+    backgroundColor: theme.colors.input,
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[3],

@@ -1,5 +1,5 @@
-// Reading and writing one Route's `agentControls:` and `interaction.followUp:`
-// leaves in the authored account file, and finding the controls it had before
+// Reading and writing one Route's `agentControls:` and its rules'
+// `interaction.followUp:` leaves in the authored account file, and finding the controls it had before
 // their last change. Pure functions of revision files; `publish.ts` owns
 // loading, authority and deployment.
 
@@ -9,7 +9,12 @@ import { routeFingerprint } from "../bindings/stored-route.js";
 import type { AgentControls } from "../config/agent-controls.js";
 import type { CompiledRoute } from "../config/compile.js";
 import type { RouteFollowUpChange } from "../commands-follow-up-arguments.js";
-import { AccountFileSchema, type AccountFile, type Route } from "../config/schema.js";
+import {
+  AccountFileSchema,
+  type AccountFile,
+  type FollowUp,
+  type Route,
+} from "../config/schema.js";
 
 /** A Route's place in its account file: an index into `routes`. */
 export type RoutePosition = number;
@@ -56,8 +61,10 @@ export function writeRouteAgentControls(
 
 /**
  * Replace the account file with one whose Route at `position` has `change`
- * applied to its `interaction.followUp`. Authored leaves the change does not
- * name stay, so `mention-only` keeps a window for a later `auto`.
+ * applied to every rule's `interaction.followUp`: the follow-up is a rule's
+ * condition, and the change is for every conversation the Route serves.
+ * Authored leaves the change does not name stay, so `mention-only` keeps a
+ * window for a later `auto`.
  */
 export function writeRouteFollowUp(
   files: readonly HubBundleFile[],
@@ -67,11 +74,19 @@ export function writeRouteFollowUp(
   change: RouteFollowUpChange,
 ): HubBundleFile[] {
   return writeRoute(files, channel, accountId, position, (route) => {
-    route.interaction = {
-      ...route.interaction,
-      followUp: { ...route.interaction?.followUp, ...change },
-    };
+    for (const rule of route.audience) {
+      rule.interaction = {
+        ...rule.interaction,
+        followUp: { ...rule.interaction?.followUp, ...change },
+      };
+    }
   });
+}
+
+/** The follow-up the Route's rules author after a `writeRouteFollowUp`; the
+ * first rule's, since the change wrote the same leaves into every rule. */
+export function authoredRouteFollowUp(route: Route | undefined): FollowUp | undefined {
+  return route?.audience[0]?.interaction?.followUp;
 }
 
 function writeRoute(

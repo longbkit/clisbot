@@ -7,6 +7,7 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import { ChannelExecutionLimiter } from "./execution-limiter.js";
+import { limitRule } from "./limit-scopes.js";
 
 const defaults: EffectiveDefaults = {
   requireMention: true,
@@ -373,5 +374,45 @@ describe("ChannelExecutionLimiter", () => {
     f.limiter.bind(members.lease, "agent-member");
     await f.limiter.cancelActive();
     assert.deepEqual(f.cancelled, ["agent-open"]);
+  });
+
+  it("counts an owner in their own rule, never with the strangers on the same Route", () => {
+    const f = fixture();
+    delete f.route.limits;
+    const owners = compileAudienceRule({
+      who: { roles: ["owner"] },
+      where: { conversations: ["C_PUBLIC"] },
+    });
+    const anyone = compileAudienceRule({
+      who: { anyone: true },
+      where: { conversations: ["C_PUBLIC"] },
+      limits: { messagesPerMinute: 2 },
+    });
+    f.route.audienceRules = [owners, anyone];
+    const conversation = { kind: "channel" as const, id: "C_PUBLIC" };
+    const admit = (sender: string, admitting: readonly (typeof owners)[]) =>
+      f.limiter.admit({
+        account: f.account,
+        route: f.route,
+        conversationId: "C_PUBLIC",
+        rule: limitRule(f.route, conversation, admitting),
+        senderIdentity: `slack:${sender}`,
+        text: "x".repeat(20_000),
+      });
+    // A stranger counts in the Anyone rule: its default caps their input.
+    assert.equal(admit("eve", [anyone]).allowed, false, "8000-character default");
+    // The owner is let in by both rules and counts in the named one: no limit.
+    for (let n = 0; n < 5; n += 1) assert.equal(admit("owner", [owners, anyone]).allowed, true);
+  });
+
+  it("picks the rule a sender counts in: named first, Anyone for one let in outside the rules", () => {
+    const owners = compileAudienceRule({ who: { roles: ["owner"] }, where: { dm: true } });
+    const anyone = compileAudienceRule({ who: { anyone: true }, where: { dm: true } });
+    const route = { audienceRules: [anyone, owners] };
+    const dm = { kind: "dm" as const, id: "D1" };
+    assert.equal(limitRule(route, dm, [anyone, owners]), owners);
+    assert.equal(limitRule(route, dm, [anyone]), anyone);
+    assert.equal(limitRule(route, dm, undefined), anyone);
+    assert.equal(limitRule({ audienceRules: [owners] }, dm, undefined), undefined);
   });
 });

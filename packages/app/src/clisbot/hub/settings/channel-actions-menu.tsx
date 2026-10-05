@@ -1,4 +1,5 @@
 import { MoreHorizontal } from "lucide-react-native";
+import type { GestureResponderEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   DropdownMenu,
@@ -13,6 +14,10 @@ import type { Theme } from "@/styles/theme";
 
 const ThemedMoreHorizontal = withUnistyles(MoreHorizontal);
 const mutedColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+// The menu can sit inside a row that presses (a Route row opens its editor).
+function keepPressInMenu(event: GestureResponderEvent) {
+  event.stopPropagation();
+}
 function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
   return [styles.trigger, (hovered || pressed || open) && styles.highlight];
 }
@@ -42,6 +47,7 @@ export function ChannelActionsMenu({
         accessibilityRole="button"
         accessibilityLabel={label}
         disabled={disabled}
+        onPressIn={keepPressInMenu}
         style={triggerStyle}
       >
         <ThemedMoreHorizontal size={buttonIconSize[compact ? "md" : "sm"]} uniProps={mutedColor} />

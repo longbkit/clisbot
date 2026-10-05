@@ -1,4 +1,3 @@
-import type { ChannelPrivilegeDecision } from "../access/store.js";
 import {
   CHANNEL_IDENTITY_REALM_SCOPE,
   type IdentityChannel,
@@ -23,7 +22,8 @@ import type { DaemonConnection } from "./daemon/client.js";
 import { isHostNotConnected } from "./daemon/enrolled-client.js";
 import { AgentEventOrder } from "./plane/agent-event-order.js";
 import type { InboundReplyParams } from "./loader/host.js";
-import { isOpenAudience } from "./config/audience.js";
+import { isOpenAudience, type CompiledAudienceRule } from "./config/audience.js";
+import { limitRule } from "./plane/limit-scopes.js";
 import {
   audienceRulesAdmit,
   isEnabled,
@@ -41,6 +41,7 @@ import {
   normalizeChannelCommandText,
   type ChannelTextCommand,
   commandAddressesThisBot,
+  isPublicChannelCommand,
 } from "./commands.js";
 import { redeemChannelCommandButton } from "./command-buttons.js";
 import {
@@ -48,10 +49,20 @@ import {
   audienceSenderFor,
   mayUseChannelRoute,
   type ChannelAccessGateOutcome,
+  type ChannelRouteAdmission,
 } from "./policy/gate.js";
+import { mentionTrigger, senderTrigger } from "./rule-trigger.js";
 import { ChannelLifecycleCommands } from "./commands-lifecycle.js";
 import { ChannelCommandDispatcher } from "./commands-dispatch.js";
-import { commandReplyAddress, channelIdentityText } from "./commands-context.js";
+import { commandReplyAddress } from "./commands-context.js";
+import {
+  answersPublicCommand,
+  callerChatLines,
+  meText,
+  PublicCommandThrottle,
+  resolveCommandCaller,
+  type CommandCaller,
+} from "./commands-caller.js";
 import { expandDynamicCommand } from "./commands-extension.js";
 import {
   admitFollowUp,
@@ -310,6 +321,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   const agentEventOrder = new AgentEventOrder();
   /** Senders already told today that this bot does not admit them. */
   const notAdmittedNotices = new OnceMemory(1_000);
+  /** `/help`, `/me`, `/status` from senders the bot does not admit: one answer per window. */
+  const publicCommandThrottle = new PublicCommandThrottle(30_000, () => clock.now());
   const subscribed = new Set<string>();
   const workflowExecutionAgents = new Map<
     string,
@@ -1056,12 +1069,14 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    admitting: readonly CompiledAudienceRule[] | undefined,
     leaseId?: string,
   ): Promise<{ lease: ExecutionLease | undefined } | { refused: PlaneInboundResult }> {
     const admission = executionLimiter?.admit({
       account,
       route,
       conversationId: message.conversation.rootConversationId,
+      rule: limitRule(route, message.conversation, admitting),
       senderIdentity: message.senderIdentity,
       text: message.text,
       ...(leaseId === undefined ? {} : { leaseId }),
@@ -1113,7 +1128,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
-      ...commandReplyAddress(message, route.defaults.replyAnchor),
+      ...commandReplyAddress(message, route.defaults),
       text: boundThread ? boundThreadRefusalText(account, route) : NOT_ADMITTED_TEXT,
     });
   }
@@ -1146,7 +1161,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
-      ...commandReplyAddress(message, route.defaults.replyAnchor),
+      ...commandReplyAddress(message, route.defaults),
       text: WAIT_NOTICE_TEXT[notice],
     });
   }
@@ -1174,7 +1189,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       if (stale !== undefined) await bindingsEngine().retireBoundSession(stale);
     }
     const deliveryId = workflowDeliveryId(message, route);
-    const admission = await admitExecution(message, account, route, deliveryId);
+    const admission = await admitExecution(message, account, route, sender.rules, deliveryId);
     if ("refused" in admission) return admission.refused;
     const executionLease = admission.lease;
     if (route.target.kind === "workflow") {
@@ -1300,7 +1315,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       throw error;
     }
     workflowBindingActivity.set(workflowActivityKey(bindingKey, workflow), clock.now());
-    await endFollowUpPause(store, deps.organizationId, message, route);
+    await endFollowUpPause(
+      store,
+      deps.organizationId,
+      message,
+      route,
+      mentionTrigger(route, message.conversation),
+    );
     return recordChannelActivity(message, account, route, {
       result: result(true, { kind: "workflow", workflow, deliveryId }),
       limitDecision: "allowed",
@@ -1439,8 +1460,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
   ): Promise<ReturnType<typeof admitFollowUp>> {
     if (route.target.kind !== "workflow") throw new Error("workflow route is required");
-    const authorization = await mayUseChannel(message, account, route);
-    if (!authorization.allowed) return authorization;
     const key = deriveBindingKey(message, route);
     const bindingKey = JSON.stringify([
       message.channel,
@@ -1456,17 +1475,24 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     const lastActivity =
       workflowBindingActivity.get(workflowActivityKey(bindingKey, route.target.workflow)) ??
       persisted?.getTime();
+    // A conversation with no run yet is a new one: a rule's `contains` applies.
+    const scope = lastActivity === undefined ? { text: message.text } : undefined;
+    const authorization = await mayUseChannel(message, account, route, scope !== undefined);
+    if (!authorization.allowed) return authorization;
+    const trigger = senderTrigger(route, message.conversation, authorization.rules, scope);
+    const rules = authorization.rules === undefined ? {} : { rules: authorization.rules };
     if (lastActivity === undefined) {
-      return route.defaults.requireMention && !message.mentionedBot
+      return trigger.requireMention && !message.mentionedBot
         ? { allowed: false, reason: "not mentioned; requireMention is on" }
-        : { allowed: true };
+        : { allowed: true, ...rules };
     }
-    return admitFollowUp(
+    const followUp = admitFollowUp(
       message,
-      route.defaults,
-      clock.now() - lastActivity > route.defaults.followUp.ttlMinutes * 60_000,
-      await conversationFollowUpMode(store, deps.organizationId, message, route),
+      trigger,
+      clock.now() - lastActivity > trigger.followUp.ttlMinutes * 60_000,
+      await conversationFollowUpMode(store, deps.organizationId, message, route, trigger),
     );
+    return followUp.allowed ? { ...followUp, ...rules } : followUp;
   }
 
   async function handleApprovalCommand(
@@ -1553,8 +1579,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     // The upstream sender-admission gate (`access:`), in front of everything
     // that could start or steer a turn. A route with no `access:` block
     // allows here and only the RBAC gate decides, exactly as before.
+    // `/help`, `/me`, `/status` report access and never use it: the gate is
+    // dry-run inside them (`commands-caller.ts`), never minting a pairing code.
     const gated =
-      textCommand?.name === "help" || textCommand?.name === "me"
+      textCommand !== null && isPublicChannelCommand(textCommand)
         ? undefined
         : await admitAccess(message, account, route);
     if (gated !== undefined) return gated;
@@ -1575,19 +1603,56 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     account: CompiledChannelAccount,
     textCommand: ChannelTextCommand | null,
   ): Promise<PlaneInboundResult> {
-    if (textCommand?.name === "help" || textCommand?.name === "me") {
-      const text =
-        textCommand.name === "help"
-          ? textCommandHelpText()
-          : await channelIdentityText(deps, message, account);
-      const delivered = await commandReplyFor(message, account, textCommand.name)(text);
-      return result(delivered, {
-        kind: "command",
-        handled: delivered,
-        detail: textCommand.name,
-      });
+    if (textCommand === null || !isPublicChannelCommand(textCommand)) {
+      return result(false, { kind: "ignored", reason: "no route matches this conversation" });
     }
-    return result(false, { kind: "ignored", reason: "no route matches this conversation" });
+    const caller = await publicCommandCaller(message, account, undefined, textCommand);
+    if (caller === null) return publicCommandWithheld();
+    const text = await unroutedPublicText(textCommand, message, account, caller);
+    const delivered = await commandReplyFor(message, account, textCommand.name)(text);
+    return result(delivered, {
+      kind: "command",
+      handled: delivered,
+      detail: textCommand.name,
+    });
+  }
+
+  async function unroutedPublicText(
+    command: ChannelTextCommand,
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    caller: CommandCaller,
+  ): Promise<string> {
+    if (command.name === "help") return textCommandHelpText();
+    if (command.name === "me") {
+      return meText({ plane: deps, message, account, route: undefined, caller });
+    }
+    return callerChatLines(caller, message).join("\n");
+  }
+
+  /** Who asked a public command; `null` when the answer is withheld from them. */
+  async function publicCommandCaller(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute | undefined,
+    command: ChannelTextCommand,
+  ): Promise<CommandCaller | null> {
+    const caller = await resolveCommandCaller({
+      plane: deps,
+      store: store?.access,
+      message,
+      account,
+      route,
+    });
+    const scope = { account, message, command: command.name };
+    return answersPublicCommand(caller, scope, publicCommandThrottle) ? caller : null;
+  }
+
+  function publicCommandWithheld(): PlaneInboundResult {
+    return result(false, {
+      kind: "ignored",
+      reason: "public command withheld from a sender the bot does not admit",
+    });
   }
 
   async function dispatchUnknownCommandOrPrompt(
@@ -1635,11 +1700,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     command: ChannelTextCommand,
   ): Promise<PlaneInboundResult> {
     const post = commandReplyFor(message, account, command.name, route);
-    if (
-      command.name !== "help" &&
-      command.name !== "me" &&
-      !(await mayUseChannel(message, account, route)).allowed
-    ) {
+    const isPublic = isPublicChannelCommand(command);
+    const use = isPublic ? undefined : await mayUseChannel(message, account, route);
+    const caller = isPublic
+      ? await publicCommandCaller(message, account, route, command)
+      : undefined;
+    if (caller === null) return publicCommandWithheld();
+    if (use !== undefined && !use.allowed) {
       await post("Sender may not control this conversation.");
       return result(false, {
         kind: "command",
@@ -1655,7 +1722,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ? await workflowAccessTarget(message, route, agentId)
         : undefined;
     const limited = LIMITED_COMMANDS.has(command.name)
-      ? await admitExecution(message, account, route)
+      ? await admitExecution(message, account, route, use?.allowed === true ? use.rules : undefined)
       : { lease: undefined };
     if ("refused" in limited) return limited.refused;
     const lease = limited.lease;
@@ -1673,6 +1740,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         route,
         ...(agentId ? { agentId } : {}),
         ...(accessTarget ? { accessTarget } : {}),
+        ...(caller ? { caller } : {}),
         post,
         onAgentCreated: holdLease,
       });
@@ -1724,7 +1792,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     command: ChannelTextCommand["name"],
     route?: CompiledRoute,
   ): CommandReply {
-    const address = commandReplyAddress(message, route?.defaults.replyAnchor);
+    const address = commandReplyAddress(message, route?.defaults);
     return async (text) => {
       const response = await deps.post({
         channel: channelName(account),
@@ -1757,10 +1825,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
     command: ChannelTextCommand,
   ): Promise<PlaneInboundResult> {
-    const gated =
-      command.name === "help" || command.name === "me"
-        ? undefined
-        : await admitAccess(message, account, route);
+    const gated = isPublicChannelCommand(command)
+      ? undefined
+      : await admitAccess(message, account, route);
     return gated ?? (await handleTextCommand(message, account, route, command));
   }
 
@@ -1806,7 +1873,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     const response = await deps.post({
       channel: channelName(account),
       accountId: account.accountId,
-      ...commandReplyAddress(message, route.defaults.replyAnchor),
+      ...commandReplyAddress(message, route.defaults),
       text,
     });
     if (!response.ok) {
@@ -1822,8 +1889,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-  ): Promise<ChannelPrivilegeDecision> {
+    newConversation = false,
+  ): Promise<ChannelRouteAdmission> {
     return await mayUseChannelRoute({
+      newConversation,
       ...(store === undefined ? {} : { store: store.access }),
       organizationId: deps.organizationId,
       controlPlane: deps.controlPlane,
@@ -2122,7 +2191,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       message.conversation,
       account,
       message.text,
-      async (route) => (await mayUseChannel(message, account, route)).allowed,
+      async (route) => (await mayUseChannel(message, account, route, true)).allowed,
     );
     return selection.route ?? undefined;
   }

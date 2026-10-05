@@ -34,30 +34,19 @@ export type ChannelLimits = Partial<Record<ChannelLimitName, number | "off">>;
 /** The account's `limits`: the whole bot's, plus what each Conversation gets. */
 export type ChannelAccountLimits = ChannelLimits & { perConversation?: ChannelLimits };
 
-/**
- * How a bound group thread continues after a mention. `mention-only` needs a
- * mention on every message; `auto` lets unmentioned messages continue for
- * `followUpTtlMinutes` after the last turn. Ignored for DMs and when
- * `requireMention` is off.
- */
-export type ChannelRouteFollowUpMode = "auto" | "mention-only";
-
+/** The organization floor a Rule meets when no layer sets a follow-up window. */
 export const DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES = 5;
 
+/**
+ * What a Route does once a message is in. When a message gets in (a mention,
+ * the follow-up window, a text filter) is each Rule's
+ * (docs/audits/2026-10-05-routes-and-rules.md, `channel-route-audience.ts`).
+ */
 export interface ChannelRouteBehavior {
-  requireMention: boolean;
-  followUpMode: ChannelRouteFollowUpMode;
-  followUpTtlMinutes: number;
-  /**
-   * The Route's own `interaction.followUp` as loaded. Absent means the Route
-   * inherits the policy from its account or organization.
-   */
-  followUpAuthored?: ChannelConfigurationRecord;
-  /** The user changed the follow-up switch or minutes in the form. */
-  followUpEdited?: boolean;
-  /** `followUpTtlMinutes` came from the Route or the user, not the default. */
-  followUpTtlAuthored?: boolean;
   replyAnchor: "default" | "thread";
+  /** Where a reply to a root message lands in a DM (`reply.dmAnchor`). Absent
+   * when the Route never set it: the DM itself, and the save writes nothing. */
+  dmReplyAnchor?: "default" | "thread";
   /** Mirrors the Hub's `outbound.path`. `hybrid` relays text and attaches the
    * Channel tool for files and actions (the default for a member Route). */
   outboundPath: ChannelOutboundPath;
@@ -95,13 +84,36 @@ export function inheritedChannelOutboundPath(
   return path;
 }
 
+/**
+ * What a Rule that sets no condition meets: the last `defaults:` layer that
+ * sets each leaf (organization, then the account), else the Hub's floor —
+ * a mention required, follow-ups `mention-only`, a 5-minute window.
+ */
+export function inheritedRuleConditions(
+  layers: readonly (ChannelConfigurationRecord | undefined)[],
+): { requireMention: boolean; followUpMode: "auto" | "mention-only"; ttlMinutes: number } {
+  let requireMention = true;
+  let followUpMode: "auto" | "mention-only" = "mention-only";
+  let ttlMinutes = DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES;
+  for (const layer of layers) {
+    const interaction = recordField(layer ?? {}, "interaction");
+    const followUp = recordField(interaction, "followUp");
+    if (typeof interaction["requireMention"] === "boolean") {
+      requireMention = interaction["requireMention"];
+    }
+    if (followUp["mode"] === "auto" || followUp["mode"] === "mention-only") {
+      followUpMode = followUp["mode"];
+    }
+    const ttl = followUp["ttlMinutes"];
+    if (typeof ttl === "number" && Number.isInteger(ttl) && ttl > 0) ttlMinutes = ttl;
+  }
+  return { requireMention, followUpMode, ttlMinutes };
+}
+
 /** Mirrors the Hub's `questions:` defaults leaf. */
 export type ChannelRouteQuestions = "ask" | "recommended" | "agent-decides";
 
 export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
-  requireMention: true,
-  followUpMode: "mention-only",
-  followUpTtlMinutes: DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES,
   replyAnchor: "thread",
   outboundPath: "hybrid",
   finalAnswers: true,
@@ -112,14 +124,16 @@ export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
 
 /**
  * Where a new open-audience Route starts: final answers only, a mention in
- * groups, tool requests denied. Every setting stays editable; the Hub warns
- * about wide choices instead of refusing them.
+ * groups. Like any new Route (decided 2026-10-05) its Reply method is Hybrid,
+ * so its Agent can attach files from the Project, and a permission request is
+ * put to authorized members: a sender let in as Anyone can never approve one.
+ * Deny and Text forward are one click away for a room that should get neither.
+ * Every setting stays editable; the Hub warns about wide choices instead of
+ * refusing them.
  */
 export const DEFAULT_OPEN_AUDIENCE_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   ...DEFAULT_MEMBER_ROUTE_BEHAVIOR,
-  outboundPath: "relay",
   progressMessage: false,
-  approvalMode: "auto-deny",
 };
 
 /** Mirrors `OPEN_AUDIENCE_ROUTE_LIMITS` in the Hub: defaults, not ceilings. */
@@ -133,9 +147,8 @@ export const DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS: Partial<Record<ChannelLimitName
 
 interface ChannelRouteCandidateInput {
   accountId: string;
-  /** Who may talk, where: at least one rule (`channel-route-audience.ts` builds them). */
+  /** The Route's Rules: at least one (`channel-route-audience.ts` builds them). */
   audience: readonly HubAudienceRule[];
-  contains?: string;
   limits?: ChannelLimits;
   behavior?: ChannelRouteBehavior;
   /** The conversation leaves the Route authors (`channel-route-conversation.ts`). */
@@ -196,7 +209,6 @@ export function buildChannelAccountCandidate(input: ChannelAccountCandidateInput
   const candidate = buildChannelRouteCandidate({
     accountId,
     audience: input.audience,
-    ...(input.contains === undefined ? {} : { contains: input.contains }),
     ...(input.limits === undefined ? {} : { limits: input.limits }),
     ...(input.behavior === undefined ? {} : { behavior: input.behavior }),
     ...(input.conversation === undefined ? {} : { conversation: input.conversation }),
@@ -222,22 +234,18 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
   route: ChannelConfigurationRecord;
   resource: ChannelConfigurationRecord;
 } {
-  const contains = input.contains?.trim();
   const audience = input.audience.map(audienceRuleRecord);
   const openAudience = audience.some((rule) => rule.who.anyone === true);
   const limits = authoredLimits(input.limits);
   const behavior = withChannelRouteToolActivity(
     withChannelRouteConversation(
-      input.behavior === undefined
-        ? {}
-        : routeBehaviorSettings(input.behavior, isDirectMessageOnly(input.audience)),
+      input.behavior === undefined ? {} : routeBehaviorSettings(input.behavior),
       input.conversation,
     ),
     input.toolActivity,
   );
   const audiencePolicy = {
     audience,
-    ...(contains ? { contains } : {}),
     ...(openAudience ? withQuietSync(behavior) : behavior),
     ...(limits === undefined ? {} : { limits }),
   };
@@ -262,11 +270,13 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
   };
 }
 
-/** The wire shape of one rule: only the parts that are set, ids as strings. */
+/** The wire shape of one rule: only the parts that are set, ids as strings. Its
+ * conditions (`interaction`, `contains`) and any key the form does not show stay. */
 function audienceRuleRecord(rule: HubAudienceRule): HubAudienceRule {
   const { who, where } = rule;
   const allDms = where.dm === true;
   return {
+    ...rule,
     who: {
       ...listKey("roles", who.roles),
       ...listKey("teams", who.teams),
@@ -295,22 +305,6 @@ function listKey<Key extends string, Item>(
   return { [key]: [...list] } as { [K in Key]?: Item[] };
 }
 
-/** True when every rule covers DMs and nothing else: mention and thread settings do not apply. */
-export function isDirectMessageOnly(rules: readonly HubAudienceRule[]): boolean {
-  const coversDms = (where: HubAudienceRule["where"]) =>
-    where.dm === true ||
-    [where.dmMembers, where.dmTeams, where.dmIdentities].some((list) => (list ?? []).length > 0);
-  return (
-    rules.length > 0 &&
-    rules.every(
-      ({ where }) =>
-        coversDms(where) &&
-        (where.groups === undefined || where.groups === "off") &&
-        (where.conversations === undefined || where.conversations.length === 0),
-    )
-  );
-}
-
 /**
  * Anyone gets in somewhere un-narrowed. DMs limited to named senders admit those
  * senders alone, so they do not make a rule open (the Hub's `isOpenAudience`).
@@ -333,17 +327,13 @@ export function isOpenAudienceRoute(route: ChannelConfigurationRecord): boolean 
   return Array.isArray(audience) && audience.some((rule) => isRecord(rule) && isOpenRule(rule));
 }
 
-function routeBehaviorSettings(
-  behavior: ChannelRouteBehavior,
-  dmOnly: boolean,
-): ChannelConfigurationRecord {
-  const followUp = routeFollowUpSetting(behavior, dmOnly);
+function routeBehaviorSettings(behavior: ChannelRouteBehavior): ChannelConfigurationRecord {
+  // A mention and the follow-up window are each Rule's now (`audienceRuleRecord`).
   return {
-    interaction: {
-      requireMention: behavior.requireMention,
-      ...(followUp === undefined ? {} : { followUp }),
+    reply: {
+      anchor: behavior.replyAnchor,
+      ...(behavior.dmReplyAnchor === undefined ? {} : { dmAnchor: behavior.dmReplyAnchor }),
     },
-    reply: { anchor: behavior.replyAnchor },
     ...(behavior.outboundPathInherited === true
       ? {}
       : { outbound: { path: behavior.outboundPath } }),
@@ -358,43 +348,6 @@ function routeBehaviorSettings(
       ? {}
       : { approval: [{ match: "*", mode: behavior.approvalMode }] }),
     ...(behavior.questions === undefined ? {} : { questions: behavior.questions }),
-  };
-}
-
-/**
- * The `interaction.followUp` to write. Untouched controls keep what the Route
- * authored, or leave the key out so the account or organization policy still
- * applies. DMs ignore follow-up, so they never gain one.
- */
-function routeFollowUpSetting(
-  behavior: ChannelRouteBehavior,
-  dmOnly: boolean,
-): ChannelConfigurationRecord | undefined {
-  if (!behavior.followUpEdited || dmOnly) return behavior.followUpAuthored;
-  if (behavior.followUpMode === "auto") {
-    return { mode: "auto", ttlMinutes: behavior.followUpTtlMinutes };
-  }
-  return behavior.followUpTtlAuthored
-    ? { mode: "mention-only", ttlMinutes: behavior.followUpTtlMinutes }
-    : { mode: "mention-only" };
-}
-
-/** Reads an authored `interaction.followUp`; anything unrecognized falls back to the defaults. */
-export function channelRouteFollowUp(
-  interaction: ChannelConfigurationRecord,
-): Pick<
-  ChannelRouteBehavior,
-  "followUpMode" | "followUpTtlMinutes" | "followUpAuthored" | "followUpTtlAuthored"
-> {
-  const authored = interaction["followUp"];
-  const followUp = recordField(interaction, "followUp");
-  const ttlMinutes = followUp["ttlMinutes"];
-  const ttlValid = typeof ttlMinutes === "number" && Number.isInteger(ttlMinutes) && ttlMinutes > 0;
-  return {
-    followUpMode: followUp["mode"] === "auto" ? "auto" : DEFAULT_MEMBER_ROUTE_BEHAVIOR.followUpMode,
-    followUpTtlMinutes: ttlValid ? ttlMinutes : DEFAULT_CHANNEL_FOLLOW_UP_TTL_MINUTES,
-    followUpTtlAuthored: ttlValid,
-    ...(isRecord(authored) ? { followUpAuthored: authored } : {}),
   };
 }
 
@@ -443,18 +396,53 @@ export function replaceChannelRouteCandidate(
   return { route, resource: nextResource };
 }
 
+/** What a Route no longer holds: each Rule's conditions (the Hub refuses them on a Route). */
+const RULE_CONDITION_KEYS = ["requireMention", "followUp"] as const;
+
 /**
- * The Route keys the form writes whole and may leave out on purpose: a cleared
- * text filter, a limit set back to default, the target it switched away from.
- * Every other key starts from the stored Route, so a key the form does not show
+ * COMPAT(route-rule-conditions): added in v0.10.3, remove after 2027-01-31.
+ * A Hub from before 2026-10-05 keeps `contains`, `interaction.requireMention`
+ * and `interaction.followUp` on the Route; a current Hub moves them onto its
+ * Rules at start and refuses them on a Route. This form saves them only on
+ * Rules, so editing such a Route would silently drop them and widen who gets
+ * in: the form refuses to save it and asks for a Hub update.
+ */
+export function routeCarriesRuleConditions(route: ChannelConfigurationRecord): boolean {
+  if (route["contains"] !== undefined) return true;
+  const interaction = route["interaction"];
+  return isRecord(interaction) && RULE_CONDITION_KEYS.some((key) => interaction[key] !== undefined);
+}
+
+/**
+ * The Route keys the form writes whole and may leave out on purpose: a limit
+ * set back to default, the target it switched away from. Every other key
+ * starts from the stored Route, so a key the form does not show
  * (`agentControls`, `agents`, `workspace`, a key added to the schema later)
  * survives a save.
  */
-const FORM_CLEARABLE_ROUTE_KEYS = ["contains", "limits", "agent", "environment", "workflow"];
+const FORM_CLEARABLE_ROUTE_KEYS = ["limits", "agent", "environment", "workflow"];
 /** Defaults a change of audience restarts from (`buildChannelRouteCandidate`). */
 const AUDIENCE_DEFAULT_ROUTE_KEYS = ["interaction", "sync", "approval"] as const;
 
 function preserveRouteSettings(
+  current: ChannelConfigurationRecord,
+  replacement: ChannelConfigurationRecord,
+): ChannelConfigurationRecord {
+  return withoutRouteConditions(mergeRouteSettings(current, replacement));
+}
+
+function withoutRouteConditions(route: ChannelConfigurationRecord): ChannelConfigurationRecord {
+  const next = { ...route };
+  delete next["contains"];
+  if (!isRecord(next["interaction"])) return next;
+  const interaction = { ...next["interaction"] };
+  for (const key of RULE_CONDITION_KEYS) delete interaction[key];
+  if (Object.keys(interaction).length === 0) delete next["interaction"];
+  else next["interaction"] = interaction;
+  return next;
+}
+
+function mergeRouteSettings(
   current: ChannelConfigurationRecord,
   replacement: ChannelConfigurationRecord,
 ): ChannelConfigurationRecord {
@@ -529,22 +517,25 @@ function isRecord(value: unknown): value is ChannelConfigurationRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Routes with a `contains` filter stay ahead of Routes without one. */
+/** Routes that take only filtered messages stay ahead of Routes that take any. */
 export function insertChannelRoute(
   routes: readonly ChannelConfigurationRecord[],
   route: ChannelConfigurationRecord,
 ): ChannelConfigurationRecord[] {
-  if (routeContainsText(route) === null) return [...routes, route];
-  const firstUnfiltered = routes.findIndex((candidate) => routeContainsText(candidate) === null);
+  if (!routeTakesOnlyFilteredText(route)) return [...routes, route];
+  const firstUnfiltered = routes.findIndex((candidate) => !routeTakesOnlyFilteredText(candidate));
   return firstUnfiltered < 0
     ? [...routes, route]
     : [...routes.slice(0, firstUnfiltered), route, ...routes.slice(firstUnfiltered)];
 }
 
-/** The Route-level `contains` text filter, when set. */
-export function routeContainsText(route: ChannelConfigurationRecord): string | null {
-  const contains = route["contains"];
-  return typeof contains === "string" && contains.length > 0 ? contains : null;
+/** Every Rule of the Route asks for text (`contains`): an unmatched message passes it by. */
+export function routeTakesOnlyFilteredText(route: ChannelConfigurationRecord): boolean {
+  const audience = Array.isArray(route["audience"]) ? route["audience"] : [];
+  return (
+    audience.length > 0 &&
+    audience.every((rule) => isRecord(rule) && typeof rule["contains"] === "string")
+  );
 }
 
 function recordField(record: ChannelConfigurationRecord, key: string): ChannelConfigurationRecord {

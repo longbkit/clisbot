@@ -20,6 +20,8 @@ import type {
 import type { AgentPermissionResponse, AgentSnapshot, CreateAgentConfig } from "../daemon/types.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import { ManualClock } from "../plane/clock.js";
+import { compileAudienceRule, deriveRouteWhere } from "../config/audience.js";
+import type { AudienceRule } from "../config/schema.js";
 import type { InboundConversationDetail, InboundMessage, PlaneLogger } from "../plane/types.js";
 import {
   BindingEngine,
@@ -371,7 +373,7 @@ describe("deriveBindingKey", () => {
     assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
   });
 
-  it("never marker-keys a DM root marker (no thread level in DMs)", () => {
+  it("keys a DM root marker at the DM: the group chats' thread anchor does not reach DMs", () => {
     const key = deriveBindingKey(
       message({
         conversation: { kind: "dm", id: "D0PEER", rootConversationId: "D0PEER", threadId: null },
@@ -380,6 +382,20 @@ describe("deriveBindingKey", () => {
       makeRoute(),
     );
     assert.deepEqual(key, { externalConversationId: "D0PEER", externalThreadId: null });
+  });
+
+  it("binds a DM root marker at its own minted thread under reply.dmAnchor = thread", () => {
+    const key = deriveBindingKey(
+      message({
+        conversation: { kind: "dm", id: "D0PEER", rootConversationId: "D0PEER", threadId: null },
+        externalMessageId: "1700000000.000009",
+      }),
+      makeRoute(CONVERSATION, { defaults: { dmReplyAnchor: "thread" } }),
+    );
+    assert.deepEqual(key, {
+      externalConversationId: "D0PEER",
+      externalThreadId: "1700000000.000009",
+    });
   });
 
   it("never marker-keys on a non-Slack channel", () => {
@@ -883,6 +899,160 @@ describe("follow-up (resume / steer)", () => {
 });
 
 // --- admitFollowUp (pure) --------------------------------------------------
+
+describe("rule conditions (each rule's own)", () => {
+  const DM_CONVERSATION: InboundConversationDetail = {
+    kind: "dm",
+    id: "D0RULES",
+    rootConversationId: "D0RULES",
+    threadId: null,
+  };
+  const ROOM: InboundConversationDetail = {
+    kind: "channel",
+    id: "C0RULES",
+    rootConversationId: "C0RULES",
+    threadId: null,
+  };
+
+  /** A Route over a DM and a room whose rules differ only in their conditions. */
+  function rulesRoute(rules: AudienceRule[]): CompiledRoute {
+    const audienceRules = rules.map(compileAudienceRule);
+    return { ...makeRoute("C0RULES"), audienceRules, where: deriveRouteWhere(audienceRules) };
+  }
+
+  it("answers a plain DM through a DM rule that needs no mention, and still gates the room", async () => {
+    const { daemon } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const route = rulesRoute([
+      {
+        who: { identities: [INITIATOR] },
+        where: { dm: true },
+        interaction: { requireMention: false },
+      },
+      { who: { identities: [INITIATOR] }, where: { conversations: ["C0RULES"] } },
+    ]);
+    const dm = await engine.bindOrSteer(
+      message({ mentionedBot: false, conversation: DM_CONVERSATION }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(dm.kind, "bound", "the DM rule lets a plain message in");
+    const room = await engine.bindOrSteer(
+      message({ mentionedBot: false, conversation: ROOM }),
+      makeAccount(route),
+      route,
+    );
+    assert.deepEqual(room, { kind: "ignored", reason: "not mentioned; requireMention is on" });
+  });
+
+  it("holds a sender to the conditions of the rule that admitted them", async () => {
+    const { daemon } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    // Alice may talk here without a mention; anyone else needs one.
+    const route = rulesRoute([
+      {
+        who: { identities: [INITIATOR] },
+        where: { conversations: ["C0RULES"] },
+        interaction: { requireMention: false },
+      },
+      { who: { anyone: true }, where: { conversations: ["C0RULES"] } },
+    ]);
+    const bob = await engine.admit(
+      message({ mentionedBot: false, senderIdentity: "slack:U0BOB", conversation: ROOM }),
+      makeAccount(route),
+      route,
+    );
+    assert.deepEqual(bob, {
+      allowed: false,
+      reason: "not mentioned; requireMention is on",
+      unaddressed: true,
+    });
+    const alice = await engine.admit(
+      message({ mentionedBot: false, conversation: ROOM }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(alice.allowed, true);
+    // The rules that let her in ride along: her limits count in the one naming her.
+    assert.ok(alice.rules?.includes(route.audienceRules[0]!));
+  });
+
+  /** Alice talks in the room without a mention; Carol only with one. */
+  function disagreeingRoute(): CompiledRoute {
+    return {
+      ...rulesRoute([
+        {
+          who: { identities: [INITIATOR] },
+          where: { conversations: ["C0RULES"] },
+          interaction: { requireMention: false },
+        },
+        { who: { identities: ["slack:U0CAROL"] }, where: { conversations: ["C0RULES"] } },
+      ]),
+      defaultRoles: [],
+      assignments: [],
+    };
+  }
+
+  it("keeps a refused stranger's unmentioned chatter silent, and refuses them when they mention the bot", async () => {
+    const { daemon } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const route = disagreeingRoute();
+    const stranger = { senderIdentity: "slack:U0EVE", conversation: ROOM };
+    const chatter = await engine.admit(
+      message({ ...stranger, mentionedBot: false }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(chatter.allowed, false);
+    assert.equal(chatter.unaddressed, true, "no refusal notice for a message not for the bot");
+    assert.equal(chatter.audienceRefused, undefined);
+    const addressed = await engine.admit(
+      message({ ...stranger, mentionedBot: true }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(addressed.allowed, false);
+    assert.equal(addressed.audienceRefused, true);
+  });
+
+  it("does not apply a rule's contains to a conversation a pending binding owns", async () => {
+    const { daemon } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const route = {
+      ...rulesRoute([
+        {
+          who: { identities: [INITIATOR] },
+          where: { conversations: ["C0RULES"] },
+          contains: "#help",
+        },
+      ]),
+      defaultRoles: [],
+      assignments: [],
+    };
+    const fresh = await engine.admit(message({ conversation: ROOM }), makeAccount(route), route);
+    assert.equal(fresh.allowed, false, "a new conversation must contain the text");
+    await store.recordPendingThreadBinding({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0RULES",
+      externalThreadId: null,
+      pendingExecutionId: "execution-pending",
+      initiator: INITIATOR,
+      route: {},
+    });
+    const owned = await engine.admit(message({ conversation: ROOM }), makeAccount(route), route);
+    assert.equal(owned.allowed, true);
+    // The store is shared by this file: leave no pending marker for orphan recovery.
+    await store.releaseThreadBinding({
+      organizationId: ORGANIZATION_ID,
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0RULES",
+      externalThreadId: null,
+      expectedPendingExecutionId: "execution-pending",
+    });
+  });
+});
 
 describe("admitFollowUp", () => {
   it("always admits a mention", () => {

@@ -171,7 +171,8 @@ describe("Incoming messages on a saved Route", () => {
       ...input,
       conversation: { whenBusy: "queue", maxMessages: 8, batching: "off" },
     });
-    expect(route["interaction"]).toEqual({ requireMention: true, whenBusy: "queue" });
+    // Mentions belong to each Rule; the Route keeps only what happens when busy.
+    expect(route["interaction"]).toEqual({ whenBusy: "queue" });
     expect(route["context"]).toEqual({ maxMessages: 8 });
     expect(route["batching"]).toBe("off");
   });

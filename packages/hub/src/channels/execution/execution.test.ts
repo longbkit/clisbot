@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { compileAudienceRule } from "../config/audience.js";
+import { compileAudienceRule, type CompiledAudienceRule } from "../config/audience.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 // COMPAT(clisbot-channels): targeted tests for the execution plane facade
 // (plan §4-S2). Drives `createChannelPlane` end to end over the real ChannelStore
@@ -77,6 +77,20 @@ const DEFAULTS: EffectiveDefaults = {
 };
 
 // Kind-level match: any channel conversation resolves this route.
+/** A rule over every group chat that names nobody and lets in only "#triage". */
+const TRIAGE_RULE: CompiledAudienceRule = {
+  who: { roles: [], teams: [], members: [], anyone: false, identities: [] },
+  where: {
+    dm: false,
+    dmMembers: [],
+    dmTeams: [],
+    dmIdentities: [],
+    groups: "all",
+    conversations: [],
+  },
+  trigger: { contains: "#triage" },
+};
+
 function makeRoute(overrides: { approval?: CompiledRoute["approval"] } = {}): CompiledRoute {
   return {
     audienceRules: [],
@@ -264,6 +278,14 @@ interface FacadeHarness {
   activity: RecordChannelInboundActivityInput[];
 }
 
+const LINKED_MEMBER = {
+  membershipId: "membership-linked",
+  userId: "user-linked",
+  role: "member",
+  name: "Linked Member",
+  image: null,
+};
+
 function makeHarness(
   opts: {
     envFlag?: boolean;
@@ -336,7 +358,8 @@ function makeHarness(
         unrestricted: true,
         agentConfigurations: [],
       }),
-      resolveChannelMember: async () => undefined,
+      // A linked Hub Member: `/status` shows them the session.
+      resolveChannelMember: async () => LINKED_MEMBER,
     },
     ...(opts.readWorkflowRuns ? { readWorkflowRuns: opts.readWorkflowRuns } : {}),
     cancelWorkflowRuns: async () => {
@@ -556,9 +579,10 @@ describe("workflow route", () => {
     const direct = makeRoute();
     const workflow: CompiledRoute = {
       ...makeRoute(),
-      audienceRules: [],
+      // The text filter is a rule's; this rule names nobody, so the sender
+      // still gets in through the route's role assignment.
+      audienceRules: [TRIAGE_RULE],
       where: { dm: false, groups: ["all"], conversations: [] },
-      contains: "#triage",
       target: { kind: "workflow", workflow: "engineering-assistant" },
     };
     const account: CompiledChannelAccount = {
@@ -2268,9 +2292,10 @@ describe("channel session commands", () => {
   it("uses captured Workflow context for approval callbacks and /stop", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
-      audienceRules: [],
+      // The text filter is a rule's; this rule names nobody, so the sender
+      // still gets in through the route's role assignment.
+      audienceRules: [TRIAGE_RULE],
       where: { dm: false, groups: ["all"], conversations: [] },
-      contains: "#triage",
       target: { kind: "workflow", workflow: "engineering-assistant" },
     };
     const harness = makeHarness({ account: makeAccount(route) });
@@ -3448,7 +3473,7 @@ describe("inbound event kinds", () => {
       await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
     }
     assert.match(harness.posted[0]!, /Commands:/);
-    assert.match(harness.posted[1]!, /Guest/);
+    assert.match(harness.posted[1]!, /Hub account: not linked/);
     assert.match(harness.posted[2]!, /needs Project access \(agent\.interact\)/);
     assert.equal(harness.fake.created.length, 0);
   });
@@ -3597,5 +3622,179 @@ describe("inbound event kinds", () => {
     assert.equal(harness.fake.created.length, 1);
     assert.equal(harness.fake.created[0]?.config.modeId, "full-access");
     await harness.plane.stop();
+  });
+});
+
+// `/me` and `/status` answer anyone, and each caller sees what their standing
+// allows (docs/audits/2026-10-05-status-and-me-disclosure.md).
+describe("/me and /status disclosure", () => {
+  const STRANGER = "slack:U0STRANGER";
+  const GUEST_ACCESS: ChannelPlaneDeps["commandAccess"] = {
+    authorizeChannelPrivilege: async () => ({ allowed: true }),
+    resolveChannelAgentConfigurations: async () => ({
+      unrestricted: true,
+      agentConfigurations: [],
+    }),
+    resolveChannelMember: async () => undefined,
+  };
+
+  function room(id: string): InboundMessage["conversation"] {
+    return { kind: "channel", id, rootConversationId: id, threadId: null };
+  }
+
+  async function send(harness: FacadeHarness, overrides: Partial<InboundMessage>) {
+    harness.next.message = message(overrides);
+    return harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+  }
+
+  function assertNoSession(text: string): void {
+    for (const leak of [/Agent:/u, /Session:/u, /Working directory/u, /Model:/u, /Why/u]) {
+      assert.doesNotMatch(text, leak);
+    }
+  }
+
+  it("tells a sender no Rule admits only this chat's id and that they cannot talk here", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    await send(harness, { conversation: room("C0DISCLOSE") });
+    const before = harness.posted.length;
+    const status = await send(harness, {
+      text: "/status",
+      senderIdentity: STRANGER,
+      conversation: room("C0DISCLOSE"),
+    });
+    assert.equal(status.outcome?.kind, "command");
+    const answer = harness.posted[before] ?? "";
+    assert.match(answer, /Chat ID: C0DISCLOSE/u);
+    assert.match(answer, /You can't talk to the bot here/u);
+    assert.doesNotMatch(answer, /Bot:|Mention the bot/u);
+    assertNoSession(answer);
+    await send(harness, {
+      text: "/me",
+      senderIdentity: STRANGER,
+      conversation: room("C0DISCLOSE2"),
+    });
+    assert.match(harness.posted.at(-1) ?? "", /Your ID: slack:U0STRANGER/u);
+    assert.doesNotMatch(harness.posted.at(-1) ?? "", /Access here/u);
+    await harness.plane.stop();
+  });
+
+  it("shows an admitted guest the conditions and whether the bot is busy, not the session", async () => {
+    const harness = makeHarness({
+      commandAccess: GUEST_ACCESS,
+      daemonAgents: [snapshotOf("agent-0", "Build")],
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    await send(harness, { conversation: room("C0GUEST") });
+    const before = harness.posted.length;
+    await send(harness, { text: "/status", conversation: room("C0GUEST") });
+    const answer = harness.posted[before] ?? "";
+    assert.match(answer, /You can talk to the bot here/u);
+    assert.match(answer, /Mention the bot: needed, then not for 60 minutes/u);
+    assert.match(answer, /Bot: idle\./u);
+    assertNoSession(answer);
+    await send(harness, { text: "/me", conversation: room("C0GUEST") });
+    assert.match(harness.posted.at(-1) ?? "", /Hub account: not linked/u);
+    assert.doesNotMatch(harness.posted.at(-1) ?? "", /Access here/u);
+    await harness.plane.stop();
+  });
+
+  it("shows an admitted Hub Member the session and their access here", async () => {
+    const harness = makeHarness({ daemonAgents: [snapshotOf("agent-0", "Build")] });
+    await harness.plane.start(harness.fake.daemon, store);
+    await send(harness, { conversation: room("C0MEMBER") });
+    const before = harness.posted.length;
+    await send(harness, { text: "/status", conversation: room("C0MEMBER") });
+    const answer = harness.posted[before] ?? "";
+    assert.match(answer, /Chat ID: C0MEMBER/u);
+    assert.match(answer, /Agent: Build \(codex\)/u);
+    assert.match(answer, /Working directory: \/tmp\/repo/u);
+    await send(harness, { text: "/me", conversation: room("C0MEMBER") });
+    assert.match(harness.posted.at(-1) ?? "", /Hub account: Linked Member/u);
+    assert.match(harness.posted.at(-1) ?? "", /Access here: agent\.interact/u);
+    await harness.plane.stop();
+  });
+
+  it("answers in a conversation no Route serves, and tells a manager why", async () => {
+    const harness = makeHarness({
+      commandAccess: {
+        ...GUEST_ACCESS,
+        resolveChannelMember: async () => LINKED_MEMBER,
+        authorizeChannelAccountManagement: async () => ({ membershipId: "m", userId: "u" }),
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    const dm: InboundMessage["conversation"] = {
+      kind: "dm",
+      id: "D0UNROUTED",
+      rootConversationId: "D0UNROUTED",
+      threadId: null,
+    };
+    const status = await send(harness, {
+      text: "/status",
+      senderIdentity: STRANGER,
+      conversation: dm,
+    });
+    assert.equal(status.outcome?.kind, "command");
+    assert.match(harness.posted.at(-1) ?? "", /a direct message/u);
+    assert.match(harness.posted.at(-1) ?? "", /You can't talk to the bot here/u);
+    assert.match(
+      harness.posted.at(-1) ?? "",
+      /Why \(shown to Connection managers\): no Route serves this chat/u,
+    );
+    await harness.plane.stop();
+  });
+
+  it("checks a Route's access list without minting a pairing request", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      where: { dm: true, groups: ["all"], conversations: [] },
+      defaults: { ...DEFAULTS, access: { dmPolicy: "pairing" } },
+    };
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const dm: InboundMessage["conversation"] = {
+      kind: "dm",
+      id: "D0PAIRING",
+      rootConversationId: "D0PAIRING",
+      threadId: null,
+    };
+    await send(harness, { text: "/status", senderIdentity: STRANGER, conversation: dm });
+    assert.match(harness.posted.at(-1) ?? "", /You can't talk to the bot here/u);
+    const key = {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack" as const,
+      accountId: ACCOUNT_ID,
+    };
+    assert.deepEqual(await store.access.listPairings(key), []);
+    await harness.plane.stop();
+  });
+
+  it("answers a stranger once per window, and not at all with publicCommands off", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    const ask = () =>
+      send(harness, { text: "/me", senderIdentity: STRANGER, conversation: room("C0THROTTLE") });
+    assert.equal((await ask()).outcome?.kind, "command");
+    assert.equal((await ask()).outcome?.kind, "ignored");
+    harness.clock.advance(30_000);
+    assert.equal((await ask()).outcome?.kind, "command");
+    await harness.plane.stop();
+
+    const silent = makeAccount(makeRoute());
+    const quiet = makeHarness({
+      account: { ...silent, defaults: { ...DEFAULTS, publicCommands: false } },
+    });
+    await quiet.plane.start(quiet.fake.daemon, store);
+    const refused = await send(quiet, {
+      text: "/status",
+      senderIdentity: STRANGER,
+      conversation: room("C0QUIET"),
+    });
+    assert.equal(refused.outcome?.kind, "ignored");
+    assert.deepEqual(quiet.posted, []);
+    const admitted = await send(quiet, { text: "/status", conversation: room("C0QUIET") });
+    assert.equal(admitted.outcome?.kind, "command");
+    await quiet.plane.stop();
   });
 });

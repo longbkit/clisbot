@@ -7,8 +7,8 @@ import {
   insertChannelRoute,
   parseChannelConfigurationYaml,
   replaceChannelRouteCandidate,
-  channelRouteFollowUp,
   DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+  inheritedRuleConditions,
   parseChannelFollowUpTtlMinutes,
 } from "../channel-configuration";
 import { routeEffectiveAgent } from "../channel-route-target";
@@ -39,8 +39,9 @@ describe("buildChannelAccountCandidate", () => {
     const result = buildChannelAccountCandidate({
       connection: { id: "telegram-connection", provider: "telegram" },
       accountId: " Customer Support ",
-      audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1", "C2"] } }],
-      contains: " #triage ",
+      audience: [
+        { who: { roles: ["member"] }, where: { conversations: ["C1", "C2"] }, contains: "#triage" },
+      ],
       target: {
         kind: "agent",
         daemonId: "daemon-1",
@@ -71,8 +72,14 @@ describe("buildChannelAccountCandidate", () => {
       transport: { mode: "polling" },
       routes: [
         {
-          audience: [{ who: { roles: ["member"] }, where: { conversations: ["C1", "C2"] } }],
-          contains: "#triage",
+          // The text filter is the Rule's own; the Route carries none.
+          audience: [
+            {
+              who: { roles: ["member"] },
+              where: { conversations: ["C1", "C2"] },
+              contains: "#triage",
+            },
+          ],
           agent: "channel-customer-support",
           environment: "channel-customer-support",
         },
@@ -154,8 +161,7 @@ describe("buildChannelAccountCandidate", () => {
 
     expect(result.route).toMatchObject({
       audience: [{ who: { anyone: true }, where: { conversations: ["C_CUSTOMER"] } }],
-      interaction: { requireMention: true },
-      outbound: { path: "relay" },
+      outbound: { path: "hybrid" },
       sync: {
         finalAnswers: true,
         progress: { progressMessage: false, messageReaction: "off" },
@@ -163,7 +169,8 @@ describe("buildChannelAccountCandidate", () => {
         threadLink: "none",
         subagents: { finalAnswers: false, progress: false, toolCalls: false },
       },
-      approval: [{ match: "*", mode: "auto-deny" }],
+      // Put to authorized members, as on any new Route.
+      approval: [{ match: "*", mode: "require" }],
       limits: { maxConcurrentRuns: 10, messagesSentPerMinute: "off" },
     });
     expect(result.resource).toMatchObject({
@@ -180,9 +187,6 @@ describe("buildChannelAccountCandidate", () => {
       accountId: "support",
       audience: [{ who: { roles: ["member"] }, where: { conversations: ["C_SUPPORT"] } }],
       behavior: {
-        requireMention: false,
-        followUpMode: "mention-only",
-        followUpTtlMinutes: 5,
         replyAnchor: "thread",
         outboundPath: "relay",
         finalAnswers: true,
@@ -195,7 +199,6 @@ describe("buildChannelAccountCandidate", () => {
       resource: {},
     });
     expect(member.route).toMatchObject({
-      interaction: { requireMention: false },
       reply: { anchor: "thread" },
       outbound: { path: "relay" },
       sync: {
@@ -213,9 +216,6 @@ describe("buildChannelAccountCandidate", () => {
       accountId: "support",
       audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
       behavior: {
-        requireMention: false,
-        followUpMode: "mention-only",
-        followUpTtlMinutes: 5,
         replyAnchor: "thread",
         outboundPath: "tool",
         finalAnswers: false,
@@ -229,15 +229,15 @@ describe("buildChannelAccountCandidate", () => {
     });
     expect(open.route).toMatchObject({
       audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
-      interaction: { requireMention: false },
       outbound: { path: "tool" },
       sync: { finalAnswers: false, toolCalls: false },
       approval: [{ match: "*", mode: "auto-allow" }],
     });
   });
 
-  it("adds a Route with a contains filter before unfiltered Routes and keeps direct resources unique", () => {
+  it("adds a Route whose Rules all filter text before unfiltered Routes and keeps direct resources unique", () => {
     const audience = [{ who: { roles: ["member" as const] }, where: { conversations: ["C1"] } }];
+    const filtered = [{ ...audience[0]!, contains: "#triage" }];
     const first = buildChannelRouteCandidate({
       accountId: "support",
       audience,
@@ -252,8 +252,7 @@ describe("buildChannelAccountCandidate", () => {
     });
     const second = buildChannelRouteCandidate({
       accountId: "support",
-      audience,
-      contains: "#triage",
+      audience: filtered,
       target: {
         kind: "agent",
         daemonId: "daemon-1",
@@ -266,8 +265,7 @@ describe("buildChannelAccountCandidate", () => {
 
     expect(insertChannelRoute([first.route], second.route)).toEqual([
       expect.objectContaining({
-        audience,
-        contains: "#triage",
+        audience: filtered,
         agent: "channel-support-2",
       }),
       expect.objectContaining({
@@ -299,9 +297,6 @@ describe("buildChannelAccountCandidate", () => {
       accountId: "support",
       audience: [{ who: { roles: ["member"] }, where: { conversations: ["C2"] } }],
       behavior: {
-        requireMention: false,
-        followUpMode: "mention-only",
-        followUpTtlMinutes: 5,
         replyAnchor: "thread",
         outboundPath: "relay",
         finalAnswers: true,
@@ -345,7 +340,6 @@ describe("buildChannelAccountCandidate", () => {
         { match: "command.destructive", mode: "require" },
         { match: "*", mode: "auto-deny" },
       ],
-      interaction: { requireMention: false },
       reply: { anchor: "thread" },
       outbound: { path: "relay" },
       audience: [{ who: { roles: ["member"] }, where: { conversations: ["C2"] } }],
@@ -442,128 +436,64 @@ describe("buildChannelAccountCandidate", () => {
   });
 });
 
-describe("Route follow-up policy", () => {
-  function memberRoute(
-    behavior: Partial<typeof DEFAULT_MEMBER_ROUTE_BEHAVIOR>,
-    matchKind: "channel" | "dm" = "channel",
-  ) {
-    return buildChannelRouteCandidate({
+describe("a Route's Rules carry the conditions", () => {
+  const MEMBERS_IN_SUPPORT = {
+    who: { roles: ["member" as const] },
+    where: { conversations: ["C_SUPPORT"] },
+  };
+
+  it("writes each Rule's conditions, and keys the form does not show, onto the Rule", () => {
+    const rule = {
+      ...MEMBERS_IN_SUPPORT,
+      interaction: { requireMention: true, followUp: { mode: "auto" as const, ttlMinutes: 7 } },
+      contains: "#help",
+      futureKey: "kept",
+    };
+    const { route } = buildChannelRouteCandidate({
       accountId: "support",
-      audience: [supportWhere(matchKind)],
-      behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, ...behavior },
+      audience: [rule],
+      behavior: DEFAULT_MEMBER_ROUTE_BEHAVIOR,
       target: { kind: "automation", automationName: "triage" },
       resource: {},
-    }).route;
-  }
+    });
+    expect(route["audience"]).toEqual([rule]);
+    // A Route is where messages go: it holds no condition of its own.
+    expect(route).not.toHaveProperty("contains");
+    expect(route).not.toHaveProperty("interaction");
+  });
 
-  /** Members in `#support`, or Members in DMs when the Route is DM-only. */
-  function supportWhere(matchKind: "channel" | "dm") {
-    return {
-      who: { roles: ["member" as const] },
-      where: matchKind === "dm" ? { dm: true } : { conversations: ["C_SUPPORT"] },
-    };
-  }
-
-  /** Loads `interaction` into the form, applies the user's edits, and saves over it. */
-  function savedInteraction(
-    interaction: Record<string, unknown>,
-    edits: Partial<typeof DEFAULT_MEMBER_ROUTE_BEHAVIOR> = {},
-    matchKind: "channel" | "dm" = "channel",
-  ) {
+  it("drops conditions a Route still carried from before, keeping what happens once in", () => {
     const currentRoute = {
-      audience: [supportWhere(matchKind)],
+      audience: [MEMBERS_IN_SUPPORT],
       workflow: "triage",
-      interaction,
+      contains: "#old",
+      interaction: { requireMention: true, followUp: { mode: "auto" }, whenBusy: "queue" },
     };
-    return replaceChannelRouteCandidate({
+    const { route } = replaceChannelRouteCandidate({
       accountId: "support",
-      audience: [supportWhere(matchKind)],
-      behavior: {
-        ...DEFAULT_MEMBER_ROUTE_BEHAVIOR,
-        ...channelRouteFollowUp(interaction),
-        ...edits,
-      },
+      audience: [MEMBERS_IN_SUPPORT],
+      behavior: DEFAULT_MEMBER_ROUTE_BEHAVIOR,
       target: { kind: "automation", automationName: "triage" },
       resource: {},
       currentRoute,
       accounts: [{ accountId: "support", routes: [currentRoute] }],
-    }).route["interaction"];
-  }
-
-  it("leaves an inherited policy unwritten until the user changes it", () => {
-    expect(memberRoute({}).interaction).toEqual({ requireMention: true });
-    expect(savedInteraction({ requireMention: true })).toEqual({ requireMention: true });
+    });
+    expect(route).not.toHaveProperty("contains");
+    expect(route["interaction"]).toEqual({ whenBusy: "queue" });
   });
 
-  it("writes back an authored policy the user did not change, window included", () => {
-    const followUp = { mode: "mention-only", ttlMinutes: 15, note: "kept" };
-    expect(savedInteraction({ requireMention: true, followUp })).toEqual({
+  it("resolves what a Rule inherits: the account over the organization over the floor", () => {
+    expect(inheritedRuleConditions([])).toEqual({
       requireMention: true,
-      followUp,
-    });
-  });
-
-  it("writes auto with its window when the user turns it on", () => {
-    expect(
-      savedInteraction({ requireMention: true }, { followUpMode: "auto", followUpEdited: true }),
-    ).toEqual({ requireMention: true, followUp: { mode: "auto", ttlMinutes: 5 } });
-    expect(
-      savedInteraction(
-        { followUp: { mode: "mention-only", ttlMinutes: 15 } },
-        { followUpMode: "auto", followUpEdited: true },
-      ),
-    ).toEqual({ requireMention: true, followUp: { mode: "auto", ttlMinutes: 15 } });
-  });
-
-  it("keeps a known window when the user turns auto off", () => {
-    const off = { followUpMode: "mention-only", followUpEdited: true } as const;
-    expect(savedInteraction({ followUp: { mode: "auto", ttlMinutes: 20 } }, off)).toEqual({
-      requireMention: true,
-      followUp: { mode: "mention-only", ttlMinutes: 20 },
-    });
-    expect(savedInteraction({ followUp: { mode: "auto" } }, off)).toEqual({
-      requireMention: true,
-      followUp: { mode: "mention-only" },
-    });
-    expect(
-      savedInteraction(
-        { followUp: { mode: "auto" } },
-        { ...off, followUpTtlMinutes: 9, followUpTtlAuthored: true },
-      ),
-    ).toEqual({ requireMention: true, followUp: { mode: "mention-only", ttlMinutes: 9 } });
-  });
-
-  it("never adds a policy to a DM Route but keeps one it already has", () => {
-    const edited = { followUpMode: "auto", followUpEdited: true } as const;
-    expect(memberRoute(edited, "dm").interaction).toEqual({ requireMention: true });
-    expect(savedInteraction({ requireMention: true }, edited, "dm")).toEqual({
-      requireMention: true,
-    });
-    const followUp = { mode: "auto", ttlMinutes: 7 };
-    expect(savedInteraction({ followUp }, edited, "dm")).toEqual({
-      requireMention: true,
-      followUp,
-    });
-  });
-
-  it("reads the authored policy and defaults what is missing or invalid", () => {
-    expect(channelRouteFollowUp({ followUp: { mode: "auto", ttlMinutes: 12 } })).toEqual({
-      followUpMode: "auto",
-      followUpTtlMinutes: 12,
-      followUpTtlAuthored: true,
-      followUpAuthored: { mode: "auto", ttlMinutes: 12 },
-    });
-    expect(channelRouteFollowUp({ requireMention: true })).toEqual({
       followUpMode: "mention-only",
-      followUpTtlMinutes: 5,
-      followUpTtlAuthored: false,
+      ttlMinutes: 5,
     });
-    expect(channelRouteFollowUp({ followUp: { mode: "auto", ttlMinutes: -1 } })).toEqual({
-      followUpMode: "auto",
-      followUpTtlMinutes: 5,
-      followUpTtlAuthored: false,
-      followUpAuthored: { mode: "auto", ttlMinutes: -1 },
-    });
+    expect(
+      inheritedRuleConditions([
+        { interaction: { requireMention: false, followUp: { mode: "auto", ttlMinutes: 30 } } },
+        { interaction: { followUp: { ttlMinutes: 10 } } },
+      ]),
+    ).toEqual({ requireMention: false, followUpMode: "auto", ttlMinutes: 10 });
   });
 
   it("accepts only positive whole minutes", () => {
@@ -571,20 +501,6 @@ describe("Route follow-up policy", () => {
     for (const draft of ["", "0", "-3", "2.5", "1e3", "abc"]) {
       expect(parseChannelFollowUpTtlMinutes(draft)).toBeNull();
     }
-  });
-
-  it("writes an open-audience Route's follow-up like a Member Route's", () => {
-    const open = buildChannelRouteCandidate({
-      accountId: "support",
-      audience: [{ who: { anyone: true }, where: { conversations: ["C_PUBLIC"] } }],
-      behavior: { ...DEFAULT_MEMBER_ROUTE_BEHAVIOR, followUpMode: "auto", followUpEdited: true },
-      target: { kind: "automation", automationName: "triage" },
-      resource: {},
-    });
-    expect(open.route["interaction"]).toEqual({
-      requireMention: true,
-      followUp: { mode: "auto", ttlMinutes: 5 },
-    });
   });
 });
 

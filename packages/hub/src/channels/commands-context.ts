@@ -2,13 +2,14 @@ import type { AccessPrivilege } from "../access/contract.js";
 import type { ChannelPrivilegeRequest } from "../access/store.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { ChannelPlaneDeps, InboundMessage, OutboundPostParams } from "./plane/types.js";
-import { anchoredReplyThreadId } from "./reply-anchor.js";
+import type { EffectiveDefaults } from "./config/inheritance.js";
+import { anchoredReplyThreadId, replyAnchorFor } from "./reply-anchor.js";
 import { sessionDeepLink, sessionOpenUrl } from "./session-open-link.js";
 
 export function commandAccessRequest(
-  deps: ChannelPlaneDeps,
+  deps: Pick<ChannelPlaneDeps, "organizationId" | "resolveAgentAccessTarget">,
   message: InboundMessage,
-  account: CompiledChannelAccount,
+  account: Pick<CompiledChannelAccount, "connectionId" | "channel" | "accountId">,
   route: CompiledRoute | undefined,
   privilege: AccessPrivilege,
   capturedTarget?: import("./plane/types.js").ChannelAgentAccessTarget,
@@ -41,12 +42,11 @@ export function commandAccessRequest(
  */
 export function commandReplyAddress(
   message: InboundMessage,
-  replyAnchor: "default" | "thread" = "default",
+  defaults?: Pick<EffectiveDefaults, "replyAnchor" | "dmReplyAnchor">,
 ): Pick<OutboundPostParams, "to" | "threadId"> {
   const threadId = anchoredReplyThreadId({
     channel: message.channel,
-    rootKind: message.conversation.kind === "dm" ? "dm" : "channel",
-    replyAnchor,
+    replyAnchor: replyAnchorFor(defaults, message.conversation.kind),
     threadId: message.conversation.threadId,
     messageId: message.externalMessageId,
   });
@@ -94,27 +94,4 @@ export function channelSessionLinkText(links: ChannelSessionLinks): string {
     ? `[Open in the Clisbot app](${links.app})`
     : `Open in the Clisbot app: ${links.app}`;
   return [...(links.web ? [`[Open in the web app](${links.web})`] : []), app].join("\n");
-}
-
-export async function channelIdentityText(
-  deps: ChannelPlaneDeps,
-  message: InboundMessage,
-  account: CompiledChannelAccount,
-  route?: CompiledRoute,
-): Promise<string> {
-  const request = commandAccessRequest(deps, message, account, route, "agent.interact");
-  const member = await deps.commandAccess?.resolveChannelMember(request);
-  const privileges = ["agent.interact", "agent.create", "approval.config"] as const;
-  const decisions = await Promise.all(
-    privileges.map(async (privilege) =>
-      (await deps.commandAccess?.authorizeChannelPrivilege({ ...request, privilege }))?.allowed
-        ? privilege
-        : undefined,
-    ),
-  );
-  return [
-    `Channel identity: ${message.senderIdentity}`,
-    member ? `Hub Member: ${member.membershipId}` : "Hub access subject: Guest",
-    `Access here: ${decisions.filter(Boolean).join(", ") || "public commands only"}`,
-  ].join("\n");
 }

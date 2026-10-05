@@ -774,8 +774,8 @@ export const HUB_AUDIENCE_ROLES = ["owner", "admin", "member"] as const;
 export type HubAudienceRole = (typeof HUB_AUDIENCE_ROLES)[number];
 
 /**
- * One "[who] may talk in [where]" rule of a Route
- * (docs/audits/2026-09-19-route-audience-rules.md). Mirrors the Hub's
+ * One Rule of a Route: "[who] may talk in [where]", and when a message there
+ * gets in (docs/audits/2026-10-05-routes-and-rules.md). Mirrors the Hub's
  * `AudienceRuleSchema`; every part optional on the wire, the editor decides
  * which are set.
  */
@@ -800,6 +800,24 @@ export const HubAudienceRuleSchema = z.object({
     groups: z.enum(["off", "all", "public", "private"]).optional(),
     conversations: z.array(z.union([z.string(), z.number()])).optional(),
   }),
+  /** The rule's own trigger conditions (docs/audits/2026-10-05-routes-and-rules.md);
+   * an absent leaf inherits the Connection's and the organization's `defaults:`. */
+  interaction: z
+    .object({
+      requireMention: z.boolean().optional(),
+      followUp: z
+        .object({
+          mode: z.enum(["auto", "mention-only"]).optional(),
+          ttlMinutes: z.number().int().positive().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  /** Text a message must contain to start a conversation through this rule. */
+  contains: z.string().min(1).optional(),
+  /** The rule's own limits; absent leaves fall back to the Route's, then for an
+   * Anyone rule the open-Route defaults (hub `config/limits.ts` `ruleLimits`). */
+  limits: z.record(z.string(), z.union([z.number(), z.literal("off")])).optional(),
 });
 export type HubAudienceRule = z.infer<typeof HubAudienceRuleSchema>;
 

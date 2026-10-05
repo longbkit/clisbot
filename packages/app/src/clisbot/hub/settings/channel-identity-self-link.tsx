@@ -12,6 +12,7 @@ import { useHubAccount } from "../account-provider";
 import { channelIdentityLine, useChannelIdentityReads } from "../channel-identity-directory";
 import type { ChannelCatalogEntry } from "../channel-catalog";
 import { CopyableCommand } from "../copyable-command";
+import { useExpired } from "./use-expired";
 import { useChannelCatalog } from "./channel-catalog-queries";
 import { QueryFeedback, selectedOptionDisplay } from "./channel-identity-form-parts";
 import {
@@ -391,25 +392,6 @@ function linkInstruction(realm: LinkRealm): string {
   }
   const target = realm.scope === "bot" ? `the bot ${bots}` : `any one of these bots: ${bots}`;
   return `Send this command from your own ${realm.channelLabel} account to ${target}. In a direct message send it as is; in a group, mention the bot in the same message.`;
-}
-
-// setTimeout fires at once past this delay, so a far deadline waits in steps.
-const MAX_TIMER_MS = 2_147_483_647;
-
-function useExpired(expiresAt: string): boolean {
-  const deadline = new Date(expiresAt).getTime();
-  const [expired, setExpired] = useState(() => Date.now() >= deadline);
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (expired) return;
-    const remaining = Math.max(deadline - Date.now(), 0);
-    const timer = setTimeout(
-      () => (remaining > MAX_TIMER_MS ? setTick((current) => current + 1) : setExpired(true)),
-      Math.min(remaining, MAX_TIMER_MS),
-    );
-    return () => clearTimeout(timer);
-  }, [deadline, expired, tick]);
-  return expired;
 }
 
 function ChannelIdentityChallenge({ challenge }: { challenge: IssuedChallenge }) {

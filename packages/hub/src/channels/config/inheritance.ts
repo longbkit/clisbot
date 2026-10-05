@@ -39,6 +39,14 @@ export interface EffectiveDefaults extends EffectiveConversationDefaults {
   followUp: { mode: "auto" | "mention-only"; ttlMinutes: number };
   bindingKey: "thread" | "channel" | "dm";
   replyAnchor: "default" | "thread";
+  /** `reply.dmAnchor`. ABSENT — the floor — answers in the DM itself, and keeps
+   * a revision authored before the knob existed compiling to the block (and the
+   * `routeFingerprint`) it always had. */
+  dmReplyAnchor?: "default" | "thread" | undefined;
+  /** `interaction.publicCommands`. ABSENT — the floor — means on, and keeps a
+   * revision authored before the knob existed compiling to the block (and the
+   * `routeFingerprint`) it always had. */
+  publicCommands?: boolean | undefined;
   /** Workspace organization (`workspace.organize`). ABSENT — the floor — means
    * on, and keeps a revision authored before the knob existed compiling to the
    * block (and the `routeFingerprint`) it always had. */
@@ -135,6 +143,14 @@ export function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): 
     },
     bindingKey: pick((layer) => layer?.binding?.key) ?? floor.binding.key,
     replyAnchor: pick((layer) => layer?.reply?.anchor) ?? floor.reply.anchor,
+    ...optional(
+      "dmReplyAnchor",
+      pick((layer) => layer?.reply?.dmAnchor),
+    ),
+    ...optional(
+      "publicCommands",
+      pick((layer) => layer?.interaction?.publicCommands),
+    ),
     ...optional("workspace", foldWorkspaceDefaults(pick)),
     outbound,
     inbound: {

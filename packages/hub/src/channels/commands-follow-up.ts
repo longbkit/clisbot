@@ -15,6 +15,7 @@ import type { LifecycleCommandContext } from "./commands-lifecycle.js";
 import { commandRefusalText } from "./commands.js";
 import { routeDefaultTarget, routeLabel } from "./commands-route-default.js";
 import type { ChannelPlaneDeps } from "./plane/types.js";
+import { mentionTrigger, type Trigger } from "./rule-trigger.js";
 
 export interface FollowUpCommandReply {
   text: string;
@@ -60,7 +61,7 @@ async function runConversationAction(
   const key = conversationKey(input);
   if (action.action === "resume") {
     await store.access.clearConversationFollowUp(key);
-    return `Follow-up for ${scope} reset to the route's \`${context.route.defaults.followUp.mode}\`.`;
+    return `Follow-up for ${scope} reset to the route's \`${followUpTrigger(context).followUp.mode}\`.`;
   }
   await store.access.setConversationFollowUp(key, {
     mode: action.mode,
@@ -124,9 +125,14 @@ function conversationKey(input: { plane: ChannelPlaneDeps; context: LifecycleCom
   );
 }
 
-/** Follow-up only decides unmentioned messages on a route that requires a mention. */
+/** Follow-up only decides unmentioned messages where a mention is required. */
 function followUpApplies(context: LifecycleCommandContext): boolean {
-  return context.message.conversation.kind !== "dm" && context.route.defaults.requireMention;
+  return followUpTrigger(context).requireMention;
+}
+
+/** The conditions of the covering rules that need a mention: those `/followup` acts on. */
+function followUpTrigger(context: LifecycleCommandContext): Trigger {
+  return mentionTrigger(context.route, context.message.conversation);
 }
 
 function changedText(
@@ -138,7 +144,7 @@ function changedText(
   if (mode === "mention-only") {
     return `Follow-up for ${scope} set to \`mention-only\`: every message must mention the bot.`;
   }
-  const minutes = context.route.defaults.followUp.ttlMinutes;
+  const minutes = followUpTrigger(context).followUp.ttlMinutes;
   return `Follow-up for ${scope} set to \`auto\`: after a mention, messages continue without one until ${minutes} minutes after the agent's last turn.`;
 }
 
@@ -163,7 +169,7 @@ function statusText(
   scope: string | undefined,
   override: ConversationFollowUpMode | undefined,
 ): string {
-  const { followUp } = context.route.defaults;
+  const { followUp } = followUpTrigger(context);
   if (scope === undefined) return `${routeStatusText(context)}\n${OUTSIDE_THREAD}`;
   const mode = override === "paused" ? "mention-only" : (override ?? followUp.mode);
   const lines = [`Follow-up for ${scope}: \`${mode}\``, routeLine(context)];
@@ -183,13 +189,13 @@ function routeStatusText(context: LifecycleCommandContext): string {
   lines.push(
     "- change it: /followup route auto [minutes] · /followup route mention-only (channel.manage)",
   );
-  if (!context.route.defaults.requireMention)
-    lines.push("- not in effect: this route does not require a mention");
+  if (!followUpApplies(context))
+    lines.push("- not in effect: this route does not require a mention here");
   return lines.join("\n");
 }
 
 function routeLine(context: LifecycleCommandContext): string {
-  const { followUp } = context.route.defaults;
+  const { followUp } = followUpTrigger(context);
   return `- route: \`${followUp.mode}\`, window ${followUp.ttlMinutes} minutes after the agent's last turn in \`auto\``;
 }
 

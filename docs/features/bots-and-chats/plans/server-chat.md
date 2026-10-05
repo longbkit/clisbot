@@ -150,7 +150,7 @@ Hub's "a bound that runs out ends in a notice, never in silence"
 > `rounds.max` replaces `hops.max`. The table below is the first implementation, kept until that
 > change lands.
 
-Vocabulary is the Route's: `interaction.requireMention` (`packages/hub/src/channels/config/schema.ts:73`,
+Vocabulary is the channel plane's: `interaction.requireMention` (a Rule's leaf since [2026-10-05](../../../audits/2026-10-05-routes-and-rules.md); `packages/hub/src/channels/config/schema.ts:73`,
 default there `true` for groups `:288`; the Chat default is `false` per D9), `interaction.whenBusy`
 (`steer | queue`, conversation-flow.md:185), `context.maxMessages` (default 20, `:188`), limit leaf
 names from `CHANNEL_LIMIT_NAMES` (`schema.ts:667-674`) with the same "unset = default, number, or

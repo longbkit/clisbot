@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react-native";
+import { useCallback, useState } from "react";
 import { View } from "react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { StyleSheet } from "react-native-unistyles";
@@ -40,16 +41,10 @@ export function ChannelCatalogView() {
   const back = useCallback(() => setSelectedChannel(null), []);
   const connect = useCallback(() => setConnecting(true), []);
   const save = useSaveConnection(selected?.entry, refresh, cancel);
-  const refreshAction = useMemo(
-    () => (
-      <Button size="sm" variant="ghost" loading={fetching} disabled={fetching} onPress={refresh}>
-        Refresh health
-      </Button>
-    ),
-    [fetching, refresh],
-  );
+  // Both columns open on a text label, so their cards start level; a button in
+  // this header would make it taller than the detail's.
   const list = (
-    <SettingsSection title="Channels" trailing={refreshAction}>
+    <SettingsSection title="All channels">
       {catalog.availability === "available" || catalog.message === null ? null : (
         <Alert
           variant={catalog.availability === "loading" ? "info" : "warning"}
@@ -65,6 +60,18 @@ export function ChannelCatalogView() {
         />
       )}
       <ChannelCatalogList rows={rows} selected={selectedChannel} onSelect={select} />
+      <View style={styles.refresh}>
+        <Button
+          size="sm"
+          variant="ghost"
+          leftIcon={RefreshCw}
+          loading={fetching}
+          disabled={fetching}
+          onPress={refresh}
+        >
+          Refresh health
+        </Button>
+      </View>
     </SettingsSection>
   );
   const detail =
@@ -172,4 +179,6 @@ const styles = StyleSheet.create((theme) => ({
   columns: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing[6] },
   master: { flexBasis: 320, flexShrink: 0 },
   detail: { flex: 1, minWidth: 0, gap: theme.spacing[2] },
+  // The ghost button's padding moves out, so its icon sits on the section label's rail.
+  refresh: { alignItems: "flex-start", marginLeft: theme.spacing[1] - (theme.spacing[3] + 1) },
 }));

@@ -3,6 +3,7 @@
 // caller. Routes match by conversation and message text in order, so only the
 // Hub knows which one served this message, and that Route is the one changed.
 
+import { conversationTrigger, rulesFor } from "./rule-trigger.js";
 import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
 import type { ChannelConversationKey } from "../db/channel-access.js";
 import type { ChannelStore } from "../db/channels.js";
@@ -121,14 +122,23 @@ function outcomeText(outcome: Exclude<RouteDefaultOutcome, { status: "published"
   return ROUTE_CHANGED;
 }
 
-/** `route #3 (mention, contains "deploy")`. */
-export function routeLabel(context: LifecycleCommandContext): string {
-  const position = routePosition(context.account, context.route);
+/** `route #3 (mention, contains "deploy")`: the conditions of the rules that
+ * cover this conversation. */
+export function routeLabel(
+  context: Pick<LifecycleCommandContext, "route" | "message" | "account">,
+): string {
+  const { route, message } = context;
+  const position = routePosition(context.account, route);
+  const contains = [
+    ...new Set(
+      rulesFor(route, message.conversation).flatMap(({ trigger }) =>
+        trigger?.contains === undefined ? [] : [trigger.contains],
+      ),
+    ),
+  ];
   const traits = [
-    ...(context.route.defaults.requireMention ? ["mention"] : []),
-    ...(context.route.contains === undefined
-      ? []
-      : [`contains ${JSON.stringify(context.route.contains)}`]),
+    ...(conversationTrigger(route, message.conversation).requireMention ? ["mention"] : []),
+    ...contains.map((text) => `contains ${JSON.stringify(text)}`),
   ];
   return `route #${position + 1}${traits.length === 0 ? "" : ` (${traits.join(", ")})`}`;
 }

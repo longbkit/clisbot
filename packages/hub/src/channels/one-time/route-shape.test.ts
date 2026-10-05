@@ -52,6 +52,7 @@ describe("convertAccountFile", () => {
       [grant({ conversation: { kind: "public_channels" } })],
     );
 
+    // The Route set no mention, so its rule keeps inheriting it (`rule-conditions.ts`).
     expect(converted.account.routes?.[0]?.audience).toEqual([
       { who: { roles: ["member"] }, where: { dm: true } },
     ]);
@@ -97,16 +98,16 @@ describe("convertAccountFile", () => {
     });
   });
 
-  it("keeps a thread route's contains marker at the Route level", () => {
+  it("moves a thread route's contains marker onto its rule", () => {
     const converted = convertAccountFile(
       { ...BASE, routes: [{ workflow: "w", match: { kind: "thread", contains: "#triage" } }] },
       [],
     );
 
     expect(converted.account.routes?.[0]).toMatchObject({
-      contains: "#triage",
-      audience: [{ who: { roles: ["member"] }, where: { groups: "all" } }],
+      audience: [{ who: { roles: ["member"] }, where: { groups: "all" }, contains: "#triage" }],
     });
+    expect(converted.account.routes?.[0]).not.toHaveProperty("contains");
     expect(converted.account.routes?.[0]).not.toHaveProperty("match");
     // Rules cannot say "threads only": the dry run lists the Route.
     expect(converted.widenedRoutes).toEqual([0]);

@@ -10,7 +10,8 @@ import { homeCopy } from "./copy";
 
 const BotIcon = withUnistyles(Bot);
 const FolderIcon = withUnistyles(FolderOpen);
-const accent = (theme: Theme) => ({ color: theme.colors.accent });
+// Neutral: accent is the one CTA on a surface (docs/design.md); these cards are choices.
+const iconColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 /**
  * The two ways to start, side by side and equal: a bot first, then a project. New bot opens the
@@ -57,7 +58,7 @@ function ActionCard({
   disabled = false,
   testID,
 }: {
-  Icon: ComponentType<{ size: number; uniProps: typeof accent }>;
+  Icon: ComponentType<{ size: number; uniProps: typeof iconColor }>;
   title: string;
   description: string;
   onPress: () => void;
@@ -87,7 +88,7 @@ function ActionCard({
       testID={testID}
       style={style}
     >
-      <Icon size={22} uniProps={accent} />
+      <Icon size={22} uniProps={iconColor} />
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
     </Pressable>
@@ -104,9 +105,9 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.spacing[4],
     gap: theme.spacing[2],
     borderWidth: 1,
-    borderColor: theme.colors.borderAccent,
+    borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surface0,
   },
   hovered: { backgroundColor: theme.colors.surface2 },
   pressed: { opacity: 0.85 },

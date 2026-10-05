@@ -46,9 +46,14 @@ Foreground is for the thing being acted on: row titles, section headings, the se
 
 The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text
 (`#1d1c1d`), dark gray secondary text and icons (`#4a4a4a`), and passive chrome (`#707070`).
-The sidebar is near-white (`#fafafa`); hover uses `surface1`, while selected navigation and
-workspace rows use the stronger `surfaceSidebarSelected` fill (`#e2e2e2`). Borders use
-`#d8d8d8` so panes and controls remain legible against the bright surfaces.
+Content sits on white: cards and inputs are `surface0`, grouped by a `#d8d8d8` border, and
+`surface1`/`surface2` stay at the near-white upstream values (`#fafafa`/`#f4f4f5`). Gray is
+for state and regions, never under text you read: muted text and placeholders drop below 4.5:1
+on `#f3f3f3`, and an input filled `#ededed` on a `#f3f3f3` card is 1.06:1, invisible. The
+sidebar is near-white (`#fafafa`); its hover is the light theme's own `surfaceSidebarHover`
+(`#f3f3f3`, because `surface1` is the sidebar's color), and selected navigation and workspace
+rows use `surfaceSidebarSelected` (`#e2e2e2`). Dark themes keep filled, borderless inputs
+(`inputBorder` is transparent there).
 
 Accent is the one CTA per surface. A `<Button variant="default">` filled with `accent` appears at most once on a page. Most pages have zero — settings is mostly toggles and text, the workspace pane is mostly content, the chat composer is the input itself.
 
@@ -78,6 +83,8 @@ Sizes: `xs` for ultra-tight inline triggers. `sm` for any button sitting in a ro
 
 Sizes are a shared contract across control kinds, defined once in `control-geometry.ts`: `xs` = 28px tall with `fontSize.sm` labels, `sm` = 32px with `fontSize.base`, `md`/`lg` = 44px with `fontSize.base`. `<SegmentedControl>` (`packages/app/src/components/ui/segmented-control.tsx`) takes the same `xs`/`sm`/`md` sizes — a segmented control next to a `<Button>` of the same size always matches in height, label size, and corner radius. Its segments run one padding step tighter than a button, because the gap between segments already reads as padding. The selected segment is a `surface3` fill with `foreground` text, not an inverted one — inverting it inside thin chrome puts a white slab in the toolbar. Thin chrome such as the file toolbar uses `xs`; settings rows use `sm`. Never shrink a control's font or padding locally to fit a context — if the context needs a smaller control, the size tier is missing or the wrong one is in use.
 
+One choice among a few takes the control that fits the choice. Two to four short options that need no explanation are a `<SegmentedControl size="sm">`. Options with consequences to read — who gets in, what is allowed, how replies are sent — are a radio list, each option with one line of detail under it (`RadioList`, `packages/app/src/clisbot/hub/settings/channel-route-audience-controls.tsx`). On or off is a `<Switch>`. A row of `secondary`/`outline` buttons standing in for segments is wrong; the Route form's `ChoiceRow` picks between the first two and was once exactly that.
+
 For touch controls, `MIN_TOUCH_TARGET_SIZE` in the same module supplies a 48px minimum actual hit
 target separately from these desktop size tiers. The sidebar footer and its New actions apply it
 on compact layouts, touch tablets and native clients. Keep adjacent hit regions separate.
@@ -98,7 +105,7 @@ A list that is itself the page content — sidebar items in `sidebar-workspace-l
 
 Pane chrome — the workspace pane header, the file-explorer header, the diff pane header — uses a single bottom border to separate the header from the content (`packages/app/src/components/git-diff-pane.tsx:2328-2331`). One border, no shadow.
 
-`borderAccent` is reserved for the outline button. Inputs use `border`. Single-thing borders are wrong; a single bordered element is either a card with one row (use the card) or it does not need a border.
+`borderAccent` is reserved for the outline button. Inputs use `border`: `<FormTextInput>` and `<SelectField>` paint `colors.input` with an `inputBorder` at rest. Single-thing borders are wrong; a single bordered element is either a card with one row (use the card) or it does not need a border.
 
 ---
 

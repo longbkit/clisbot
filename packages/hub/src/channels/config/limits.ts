@@ -48,15 +48,46 @@ export function compileRouteLimits(authored: ChannelLimits | undefined): {
   return authored === undefined || Object.keys(authored).length === 0 ? {} : { limits: authored };
 }
 
-/** The limits a Route is enforced against: what it authored over the
- * open-audience defaults, which only an open-audience Route gets. */
+/**
+ * The limits a Route is enforced against as a whole: only what it authored.
+ * The open-audience defaults are an Anyone rule's (`ruleLimits`), so a Member
+ * on a Route that also lets strangers in is not held to them
+ * (docs/audits/2026-10-05-routes-and-rules.md#limits).
+ */
 export function routeLimits(route: {
-  audienceRules: readonly CompiledAudienceRule[];
   limits?: ChannelLimits | undefined;
 }): ResolvedLimits | undefined {
-  const defaults = isOpenAudience(route.audienceRules) ? OPEN_AUDIENCE_ROUTE_LIMITS : undefined;
-  return resolveLimits(route.limits, defaults);
+  return resolveLimits(route.limits);
 }
+
+/**
+ * The limits one rule is enforced against: its own leaf, else the Route's
+ * authored leaf, else, for a rule that lets anyone in, the open-audience
+ * default. The Route's leaf stands in before the default because it always
+ * did: a Route that raised or turned off a default for strangers before rules
+ * carried limits keeps exactly that, with nothing to migrate.
+ */
+export function ruleLimits(
+  route: { limits?: ChannelLimits | undefined },
+  rule: CompiledAudienceRule,
+): ResolvedLimits | undefined {
+  const open = isOpenAudience([rule]);
+  const resolved: ResolvedLimits = {};
+  for (const name of RULE_LIMIT_NAMES) {
+    const value =
+      rule.limits?.[name] ??
+      route.limits?.[name] ??
+      (open ? OPEN_AUDIENCE_ROUTE_LIMITS[name] : undefined);
+    if (typeof value === "number") resolved[name] = value;
+  }
+  return Object.keys(resolved).length === 0 ? undefined : resolved;
+}
+
+/** The limits a rule can carry: all but the bot's own posting rate. */
+const RULE_LIMIT_NAMES = CHANNEL_LIMIT_NAMES.filter(
+  (name): name is Exclude<ChannelLimitName, "messagesSentPerMinute"> =>
+    name !== "messagesSentPerMinute",
+);
 
 export function compileAccountLimits(authored: AccountLimits | undefined): {
   limits?: CompiledAccountLimits;

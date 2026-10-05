@@ -14,7 +14,12 @@ const fixtures = vi.hoisted(() => ({
     agentDirectoryError: null,
   } as Record<string, unknown> | null,
   refresh: vi.fn(),
+  catalog: [] as { id: string; projectId: string; name: string; available: boolean }[],
 }));
+const TWO_PROJECTS = [
+  { id: "catalog-a", projectId: "a", name: "Brain", available: true },
+  { id: "catalog-b", projectId: "b", name: "App", available: true },
+];
 vi.mock("@/hooks/use-projects", () => ({
   useProjects: () => ({ projects: fixtures.projects, refetch: fixtures.refresh }),
 }));
@@ -25,12 +30,7 @@ vi.mock("@/runtime/host-runtime", () => ({
 }));
 vi.mock("@/data/query", () => ({
   useFetchQuery: () => ({
-    data: {
-      projects: [
-        { id: "catalog-a", projectId: "a", name: "Brain", available: true },
-        { id: "catalog-b", projectId: "b", name: "App", available: true },
-      ],
-    },
+    data: { projects: fixtures.catalog },
     error: null,
     isPending: false,
   }),
@@ -155,6 +155,7 @@ const props = { daemonId: "daemon", serverId: "sandbox", value: "a", cwd: "", di
 beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.clearAllMocks();
+  fixtures.catalog = TWO_PROJECTS;
   fixtures.projects = [
     project("a", "mac", "/wrong-host/brain"),
     project("a", "sandbox", "/srv/brain"),
@@ -303,4 +304,38 @@ it("puts a folder inside the Project and a worktree behind one switch, as one ch
   fireEvent.click(screen.getByLabelText("Work outside the Project folder"));
   expect(screen.getByLabelText("Behavior").textContent).toBe("project");
   expect(screen.queryByLabelText("Where the Agent works")).toBeNull();
+});
+
+it("takes a Host's only Project when none is chosen yet", async () => {
+  fixtures.catalog = [TWO_PROJECTS[1]!];
+  const selected = vi.fn();
+  const changed = vi.fn();
+  render(<DaemonProjectField {...props} value={null} onChange={selected} onCwdChange={changed} />);
+  await waitFor(() => expect(selected).toHaveBeenCalledWith("b"));
+  await waitFor(() => expect(changed).toHaveBeenLastCalledWith("/srv/app"));
+});
+
+it.each([
+  ["several Projects to choose from", TWO_PROJECTS, null],
+  ["a Project already chosen", [TWO_PROJECTS[1]!], "a"],
+])("leaves the choice alone with %s", (_case, catalog, value) => {
+  fixtures.catalog = catalog;
+  const selected = vi.fn();
+  render(<DaemonProjectField {...props} value={value} onChange={selected} onCwdChange={vi.fn()} />);
+  expect(selected).not.toHaveBeenCalled();
+});
+
+it("does not choose for a disabled field", () => {
+  fixtures.catalog = [TWO_PROJECTS[1]!];
+  const selected = vi.fn();
+  render(
+    <DaemonProjectField
+      {...props}
+      value={null}
+      disabled
+      onChange={selected}
+      onCwdChange={vi.fn()}
+    />,
+  );
+  expect(selected).not.toHaveBeenCalled();
 });

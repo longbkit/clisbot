@@ -4,6 +4,7 @@ import {
   channelMembersAudienceLabel,
   initialChannelRouteTarget,
   initialChannelReplyAnchor,
+  initialDmReplyAnchor,
 } from "./channel-onboarding";
 import { buildChannelRouteCandidate, DEFAULT_MEMBER_ROUTE_BEHAVIOR } from "./channel-configuration";
 
@@ -21,6 +22,12 @@ describe("Channel onboarding defaults", () => {
       resource: {},
     });
     expect(candidate.route.reply).toEqual({ anchor: "thread" });
+  });
+  it("threads DM replies on a new Route and keeps an edited Route's stored choice", () => {
+    expect(initialDmReplyAnchor(false, undefined)).toEqual({ dmReplyAnchor: "thread" });
+    expect(initialDmReplyAnchor(true, undefined)).toEqual({});
+    expect(initialDmReplyAnchor(true, "default")).toEqual({ dmReplyAnchor: "default" });
+    expect(initialDmReplyAnchor(true, "thread")).toEqual({ dmReplyAnchor: "thread" });
   });
   it("offers Agent first for new Routes and preserves an edited Automation target", () => {
     expect(CHANNEL_ROUTE_TARGET_VALUES).toEqual(["agent", "automation"]);

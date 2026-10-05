@@ -27,8 +27,10 @@ import {
   whereCovers,
   type AudienceConversation,
   type AudienceSender,
+  type CompiledAudienceRule,
 } from "./config/audience.js";
 import type { AgentPermissionRequest } from "./daemon/types.js";
+import { routeApplies } from "./rule-trigger.js";
 
 // --- Tool classes ---------------------------------------------------------------
 //
@@ -297,14 +299,13 @@ export function routeConversationMatches(
   return whereCovers(route.where, conversation);
 }
 
-/** Does a route apply to this conversation and normalized inbound text? */
+/** Does some rule let a NEW conversation in, by its Where and its `contains`? */
 export function routeMatches(
-  route: Pick<CompiledRoute, "where" | "contains">,
+  route: Pick<CompiledRoute, "audienceRules" | "where">,
   conversation: InboundConversation,
   text?: string,
 ): boolean {
-  if (!routeConversationMatches(route, conversation)) return false;
-  return route.contains === undefined || (text !== undefined && text.includes(route.contains));
+  return routeApplies(route, conversation, text);
 }
 
 /** What ordered selection found for an unbound conversation. */
@@ -318,8 +319,8 @@ export interface RouteSelection {
 }
 
 /**
- * Ordered selection for a NEW conversation: the first Route whose Where and
- * `contains` apply AND that admits the sender. A Route that applies but
+ * Ordered selection for a NEW conversation: the first Route one of whose rules
+ * lets the message in (Where, then `contains`) AND that admits the sender. A Route that applies but
  * refuses the sender is skipped for the next one, so tiers by audience work
  * (Owner on a strong Agent first, Anyone in public rooms on a limited one after
  * it). There is no catch-all: a sender no Route admits is refused.
@@ -382,8 +383,8 @@ export function mayTrigger(
 
 /**
  * An open-audience Route has a rule that admits anyone somewhere. Where, and
- * whether a mention is needed, are that rule's Where and the Route's
- * `interaction.requireMention` — the same gates a Member rule uses. The
+ * whether a mention is needed, are that rule's own (`rule-trigger.ts`) — the
+ * same gates a Member rule uses. The
  * configuration warns about wide choices; it does not forbid them.
  */
 export function isOpenAudienceRoute(route: Pick<CompiledRoute, "audienceRules">): boolean {
@@ -405,6 +406,15 @@ export function audienceRulesAdmit(
     (rule) =>
       !(options.membersOnly === true && rule.who.anyone) && ruleAdmits(rule, conversation, sender),
   );
+}
+
+/** The rules whose Where covers the conversation and whose Who names the sender. */
+export function admittingRules(
+  route: Pick<CompiledRoute, "audienceRules">,
+  conversation: InboundConversation,
+  sender: AudienceSender,
+): CompiledAudienceRule[] {
+  return route.audienceRules.filter((rule) => ruleAdmits(rule, conversation, sender));
 }
 
 /** Legacy Channel identities count as Members only when explicitly mapped or assigned. */

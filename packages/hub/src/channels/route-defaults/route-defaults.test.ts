@@ -10,6 +10,7 @@ import {
   writeRouteFollowUp,
 } from "./files.js";
 import { revisionSignature } from "./signature.js";
+import { ruleTrigger } from "../rule-trigger.js";
 
 const POLICY = `
 enabled: true
@@ -18,7 +19,8 @@ defaults:
     - { match: "*", mode: require }
 `;
 
-function account(route: string): string {
+/** One account whose Route has one rule; `rule` adds lines to that rule. */
+function account(rule: string): string {
   return `
 channel: slack
 accountId: support
@@ -26,19 +28,21 @@ enabled: true
 connectionId: slack-support
 transport: { mode: socket, errorPolicy: once }
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] } }]
-    contains: deploy
+  - audience:
+      - who: { roles: [member] }
+        where: { conversations: [C1] }
+        contains: deploy
+${rule}
     agent: assistant
     environment: lab
-${route}
 `;
 }
 
-function files(route = ""): HubBundleFile[] {
+function files(rule = ""): HubBundleFile[] {
   return [
     { path: "hub.yml", content: "agents: {}\n" },
     { path: "channels/policy.yml", content: POLICY },
-    { path: "channels/slack/support.yml", content: account(route) },
+    { path: "channels/slack/support.yml", content: account(rule) },
   ];
 }
 
@@ -69,7 +73,7 @@ describe("route default agent controls", () => {
         .replace("connectionId: slack-support", "connectionId: slack-sales"),
     });
     const before = [...files(), neighbour("")];
-    const after = [...files(), neighbour("    interaction: { requireMention: false }")];
+    const after = [...files(), neighbour("        interaction: { requireMention: false }")];
     const support = { channel: "slack", accountId: "support" };
     const sales = { channel: "slack", accountId: "sales" };
     const sign = (revision: HubBundleFile[], scope: typeof support) =>
@@ -90,7 +94,7 @@ describe("route default agent controls", () => {
       revisionSignature({ files: before, controlPlane: plain }),
       revisionSignature({ files: after, controlPlane: promoted }),
     );
-    const edited = files("    interaction: { requireMention: false }");
+    const edited = files("        interaction: { requireMention: false }");
     assert.notEqual(
       revisionSignature({ files: before, controlPlane: plain }),
       revisionSignature({ files: edited, controlPlane: compile(edited) }),
@@ -122,7 +126,7 @@ describe("route default agent controls", () => {
   });
 
   it("does not undo past an edit of the Route itself", () => {
-    const edited = files("    interaction: { requireMention: false }");
+    const edited = files("        interaction: { requireMention: false }");
     const promoted = writeRouteAgentControls(edited, "slack", "support", 0, OPUS);
     assert.deepEqual(previousRouteAgentControls([promoted, files()], "slack", "support", 0), {
       found: false,
@@ -171,11 +175,15 @@ describe("applyAgentControls", () => {
 });
 
 describe("route follow-up", () => {
-  const followUp = (revision: readonly HubBundleFile[]) =>
-    compile(revision).accounts[0]!.routes[0]!.defaults.followUp;
+  /** The conditions the Route's rule meets, as the gate reads them. */
+  const trigger = (revision: readonly HubBundleFile[]) => {
+    const route = compile(revision).accounts[0]!.routes[0]!;
+    return ruleTrigger(route, route.audienceRules[0]!);
+  };
+  const followUp = (revision: readonly HubBundleFile[]) => trigger(revision).followUp;
 
-  it("writes the change onto the Route and keeps authored leaves it does not name", () => {
-    const authored = files("    interaction: { followUp: { mode: auto, ttlMinutes: 15 } }");
+  it("writes the change onto every rule and keeps authored leaves it does not name", () => {
+    const authored = files("        interaction: { followUp: { mode: auto, ttlMinutes: 15 } }");
     const mentionOnly = writeRouteFollowUp(authored, "slack", "support", 0, {
       mode: "mention-only",
     });
@@ -189,11 +197,10 @@ describe("route follow-up", () => {
     assert.deepEqual(followUp(shorter), { mode: "auto", ttlMinutes: 3 });
   });
 
-  it("adds the leaf to a Route that inherited it, leaving other interaction keys alone", () => {
-    const inherited = files("    interaction: { requireMention: false }");
+  it("adds the leaf to a rule that inherited it, leaving other interaction keys alone", () => {
+    const inherited = files("        interaction: { requireMention: false }");
     const written = writeRouteFollowUp(inherited, "slack", "support", 0, { mode: "auto" });
-    const route = compile(written).accounts[0]!.routes[0]!;
-    assert.equal(route.defaults.requireMention, false);
-    assert.equal(route.defaults.followUp.mode, "auto");
+    assert.equal(trigger(written).requireMention, false);
+    assert.equal(trigger(written).followUp.mode, "auto");
   });
 });

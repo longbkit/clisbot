@@ -68,6 +68,10 @@ import {
 import { FloatingSurface } from "@/components/ui/floating";
 import { useDismissKeyboardOnOpen } from "@/components/ui/keyboard-dismiss";
 import {
+  useFollowAnchorOnScroll,
+  useWheelThroughBackdrop,
+} from "@/components/ui/combobox-page-scroll";
+import {
   getOverlayRoot,
   OverlayLayerProvider,
   useOverlayLayer,
@@ -1208,12 +1212,14 @@ function DesktopComboboxBody(props: DesktopBodyProps): ReactElement {
     layer: props.overlayLayer,
     onKeyDown: handleWebOverlayKeyDown,
   });
+  const setWheelScope = useWheelThroughBackdrop(isWeb && props.isOpen);
   const setFloatingRef = useCallback(
     (node: View | null) => {
       props.refs.setFloating(node);
       setWebOverlayScope(node);
+      setWheelScope(node);
     },
-    [props.refs, setWebOverlayScope],
+    [props.refs, setWebOverlayScope, setWheelScope],
   );
 
   const overlay = (
@@ -1416,6 +1422,18 @@ export function Combobox({
     setReferenceWidth,
     setReferenceAtOrigin,
   });
+  const followAnchor = useCallback(() => {
+    anchorRef.current?.measureInWindow((x, y, width) =>
+      applyMeasuredAnchor(
+        { setReferenceLeft, setReferenceTop, setReferenceWidth, setReferenceAtOrigin },
+        x,
+        y,
+        width,
+      ),
+    );
+    void update();
+  }, [anchorRef, update]);
+  useFollowAnchorOnScroll(IS_WEB && isOpen && !isMobile, followAnchor);
 
   const floatingTop = toNumericStyleValue(floatingStyles.top);
   const floatingLeft = toNumericStyleValue(floatingStyles.left);

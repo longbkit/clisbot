@@ -4,7 +4,7 @@
 // (docs/features/access/scoped-admins.md): their accounts only, read and saved
 // through the per-account endpoints, the Connection and target left alone.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChannelSettings } from "./channel-settings";
@@ -55,7 +55,37 @@ vi.mock("@/components/confirmation-provider", () => ({
   useConfirmation: () => adapters.confirm,
 }));
 vi.mock("./channel-actions-menu", () => ({
-  ChannelActionsMenu: ({ label }: { label: string }) => <button type="button">{label}</button>,
+  // Opens on its trigger, so a test reads what each menu offers this viewer.
+  ChannelActionsMenu: function MenuAdapter({
+    label,
+    actions = [],
+    remove,
+  }: {
+    label: string;
+    actions?: { label: string; onSelect(): void }[];
+    remove?: () => void;
+  }) {
+    const [open, setOpen] = React.useState(false);
+    const toggle = React.useCallback(() => setOpen((value) => !value), []);
+    const items = [
+      ...actions,
+      ...(remove === undefined ? [] : [{ label: "Remove", onSelect: remove }]),
+    ];
+    return (
+      <div>
+        <button type="button" aria-label={label} onClick={toggle}>
+          …
+        </button>
+        {open
+          ? items.map((item) => (
+              <button key={item.label} type="button" onClick={item.onSelect}>
+                {item.label}
+              </button>
+            ))
+          : null}
+      </div>
+    );
+  },
 }));
 vi.mock("@/components/ui/form-field", () => ({
   Field: ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -136,6 +166,7 @@ vi.mock("./multi-select-field", () => ({
 }));
 vi.mock("./conversation-picker-field", () => ({
   SenderSelectionFields: () => null,
+  useObservedSenders: () => ({ data: undefined, isLoading: false }),
   ConversationSelectionFields: function TestConversations(props: {
     value: string;
     onChange(value: string): void;
@@ -263,16 +294,21 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
     renderChannels();
     expect(await screen.findByText("Slack · support")).toBeTruthy();
     expect(screen.getByText(/Managed by Organization Admins/)).toBeTruthy();
-    // Add Route is theirs too, but its picker only offers their own Connections.
+    // They add Routes to their own Connection, but never connect a new one.
+    expect(screen.queryByRole("button", { name: "Add Connection" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
     expect(screen.queryByRole("button", { name: "Connect a new one" })).toBeNull();
-    const picker = screen.getByLabelText("Connection") as HTMLSelectElement;
-    expect(Array.from(picker.options, ({ value }) => value)).toEqual(["account:slack:support"]);
+    expect(screen.queryByLabelText("Connection")).toBeNull();
+    expect(screen.getByText("Slack · support")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    // The page menu has nothing organization-wide; the Connection's has no Remove.
+    fireEvent.click(await screen.findByRole("button", { name: "More Connection actions" }));
     expect(screen.queryByText("Advanced YAML")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Actions for support/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Manage" }));
-    expect(screen.queryByRole("button", { name: "Manage Connection" })).toBeNull();
+    expect(screen.queryByText("Revision history")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More Connection actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
+    expect(screen.getByRole("button", { name: "Send test message" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Show Admins" })).toBeNull();
     const read = adapters.get.mock.calls.map(([resource]) => resource as string);
     expect(read).toContain("channel-configuration/accounts/slack/support");
@@ -284,15 +320,24 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
 
   it("edits a Route's audience and saves the one account file, keeping its Connection and target", async () => {
     renderChannels();
-    fireEvent.click(await screen.findByRole("button", { name: "Manage" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit Route/ }));
     await screen.findByText("Edit Route 1");
     // The target is shown, not edited.
     expect(screen.getByText("Agent · worker")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start or continue an Agent" })).toBeNull();
-    expect(screen.getByText("Team QC may talk in C1")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText("Direct messages"));
-    fireEvent.click(screen.getByRole("button", { name: "All direct messages" }));
+    // The lone Rule is open: group chats, the Team picked by name.
+    expect(
+      screen.getByRole("radio", { name: "Only people I pick" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    // A second way in: DMs, from Owners, answered without a mention.
+    fireEvent.click(screen.getByRole("button", { name: "Add another rule" }));
+    const added = screen.getByLabelText("Rule 2");
+    expect(
+      within(added).getByRole("radio", { name: "Only owners" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    expect((within(added).getByLabelText("Require a mention") as HTMLInputElement).checked).toBe(
+      false,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save Route" }));
     await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
     const [resource, body] = adapters.put.mock.calls[0]!;
@@ -304,7 +349,15 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
         transport: { mode: "socket" },
         routes: [
           {
-            audience: [{ who: { teams: ["team-qc"] }, where: { dm: true, conversations: ["C1"] } }],
+            audience: [
+              // The untouched Rule is written back as it was stored.
+              { who: { teams: ["team-qc"] }, where: { conversations: ["C1"] } },
+              {
+                who: { roles: ["owner"] },
+                where: { dm: true },
+                interaction: { requireMention: false },
+              },
+            ],
             agent: "worker",
             environment: "repo",
           },

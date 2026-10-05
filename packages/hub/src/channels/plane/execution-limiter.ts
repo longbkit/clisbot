@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
 import { inWindow, limitScopes, RATE_WINDOW_MS, type LimitScope } from "./limit-scopes.js";
+import { isOpenAudience, type CompiledAudienceRule } from "../config/audience.js";
 import { isOpenAudienceRoute } from "../policy.js";
 import type { PlaneLogger } from "./types.js";
 
@@ -43,6 +44,8 @@ export interface ExecutionTarget {
   route: CompiledRoute;
   /** The root conversation: every thread of a channel counts toward it. */
   conversationId: string;
+  /** The rule that let the sender in (`limitRule`): its limits count too. */
+  rule?: CompiledAudienceRule | undefined;
 }
 
 interface ExecutionLimiterDeps {
@@ -63,6 +66,15 @@ interface ActiveLease {
   /** When the run's agent became known; the reconcile grace counts from here. */
   boundAt?: number;
   agentId?: string;
+}
+
+/**
+ * A run a stranger started stops when its policy is replaced; a Member's keeps
+ * going. Known by the rule that let them in; a run restored without one (a
+ * Workflow lease after a Hub restart) falls back to the Route as a whole.
+ */
+function isStrangerRun(input: ExecutionTarget): boolean {
+  return input.rule === undefined ? isOpenAudienceRoute(input.route) : isOpenAudience([input.rule]);
 }
 
 function defaultSchedule(callback: () => void, delayMs: number): () => void {
@@ -109,7 +121,7 @@ export class ChannelExecutionLimiter {
       if (refusal !== undefined) return refusal;
     }
     for (const scope of scopes) this.record(scope, input.senderIdentity, now);
-    return this.openLease(scopes, input.leaseId, isOpenAudienceRoute(input.route));
+    return this.openLease(scopes, input.leaseId, isStrangerRun(input));
   }
 
   bind(lease: ExecutionLease | undefined, agentId: string): void {
@@ -147,7 +159,7 @@ export class ChannelExecutionLimiter {
       void this.cancel(input.agentId, "runtime limit reached");
       return;
     }
-    this.addLease(input.leaseId, scopes, remainingMs, isOpenAudienceRoute(input.route));
+    this.addLease(input.leaseId, scopes, remainingMs, isStrangerRun(input));
     this.bind({ id: input.leaseId }, input.agentId);
   }
 

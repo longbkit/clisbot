@@ -21,6 +21,8 @@ export interface LifecycleCommandContext {
   route: CompiledRoute;
   agentId?: string | undefined;
   accessTarget?: import("./plane/types.js").ChannelAgentAccessTarget;
+  /** Who asked, resolved once by the plane for `/help`, `/me`, `/status`. */
+  caller?: import("./commands-caller.js").CommandCaller | undefined;
   post(text: string): Promise<boolean>;
   /** Told the id of a session a command creates, so its run slot can follow it. */
   onAgentCreated?: ((agentId: string) => void) | undefined;

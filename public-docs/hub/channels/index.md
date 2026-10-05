@@ -23,7 +23,7 @@ Three resources make that work, and they are separate on purpose:
 
 - A **Connection** owns the credential — one Slack workspace installation, one bot token, one linked Zalo account. Hub encrypts it and never shows it again.
 - A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization.
-- A **Route** picks what a matching conversation runs — a direct agent, or an Automation. The first Route whose audience rules admit the sender wins; a sender no Route admits is refused.
+- A **Route** is where a message goes — a direct agent, or an Automation — and its **Rules** are the ways in. The first Route with a Rule that lets the message in wins; a sender no Route admits is refused.
 
 [How Hub works](/docs/hub/concepts) covers the resource model. This section covers the platforms.
 
@@ -83,17 +83,17 @@ The same matrix appears per account under **Channels → Channel Integrations** 
 
 The same verbs work on every channel, with or without a leading `/`, and with or without a mention in front. An addressed `@bot /new` and a Telegram-style `/new@yourbot` both normalize to the same command.
 
-| Command                | What it does                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------ |
-| `/new`, `/reset`       | Start a fresh agent session for this conversation.                                   |
-| `/stop`, `/cancel`     | Stop what the agent is doing.                                                        |
-| `/status`, `/state`    | Report what the conversation is bound to.                                            |
-| `/help`                | List the commands.                                                                   |
-| `/agent <name>`        | Switch this conversation to another agent.                                           |
-| `/model <name>`        | Switch this conversation to another model.                                           |
-| `/approve`, `/deny`    | Answer a pending permission request.                                                 |
-| `/routedefault`        | Show the route serving this conversation and its default.                            |
-| `/promoteroutedefault` | Make this conversation's setup that route's default; `undo` reverts its last change. |
+| Command                | What it does                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `/new`, `/reset`       | Start a fresh agent session for this conversation.                                     |
+| `/stop`, `/cancel`     | Stop what the agent is doing.                                                          |
+| `/status`, `/state`    | This chat's IDs and whether you can talk here; the session for an admitted Hub Member. |
+| `/help`                | List the commands.                                                                     |
+| `/agent <name>`        | Switch this conversation to another agent.                                             |
+| `/model <name>`        | Switch this conversation to another model.                                             |
+| `/approve`, `/deny`    | Answer a pending permission request.                                                   |
+| `/routedefault`        | Show the route serving this conversation and its default.                              |
+| `/promoteroutedefault` | Make this conversation's setup that route's default; `undo` reverts its last change.   |
 
 Approve and deny also arrive as button presses where the platform has buttons.
 
@@ -152,8 +152,7 @@ automations share:
 
 ```yaml
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
-    contains: deploy
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] }, contains: deploy }]
     agent: worker
     environment: repo
     agentControls: { provider: claude, model: claude-opus-5, thinkingOptionId: high }
@@ -233,22 +232,34 @@ they change where the conversation goes:
 - narrowing or removing the route so it no longer matches the conversation
   leaves it unserved, and the bot stops answering there.
 
-## Who may talk, where
+## Rules: how a message gets in
 
-Each route carries **audience rules**. A rule is one sentence, "[who] may talk
-in [where]", and a sender is admitted when any rule of the route matches.
-Rules are the only place that decides who may chat; the People & access › Access tab grants
-only **Connection Admin**.
+A route is where messages go: the agent or Automation, the Host, how it replies,
+its limits. Its **Rules** are the ways in, and a message gets in when any Rule
+matches it. Rules are the only place that decides who may chat; the People &
+access › Access tab grants only **Connection Admin**. Each Rule has:
 
-- **Who**: Owner, Admins, Members (every linked Member), Teams, named Members,
-  Anyone (unlinked senders included), or senders outside the Hub, picked from
-  the people who already messaged the bot (or typed as channel user ids).
-- **Where**: two switches, both off on a new route. **Direct messages** is
-  either all of them or only named senders (`dmTeams`, `dmMembers`, and
-  `dmIdentities` for Guests: of the Who, only these may DM). **Group chats** is exactly one of all group chats, public only,
-  private only (Slack and Telegram), or specific conversations picked from one
-  search box that lists every conversation the bot has seen. A rule that covers
-  group chats does not cover DMs unless its Direct messages switch is on.
+- **Where**: direct messages, or group chats — every chat the bot is in,
+  public only, private only (Slack and Telegram), or the chats you pick from
+  one search box that lists every conversation the bot has seen.
+- **Who**: only owners, owners and admins, everyone on the Hub (every linked
+  Member), people you pick (roles, Teams, Members, or senders outside the Hub,
+  picked from the people who already messaged the bot or typed as channel user
+  ids), or anyone (unlinked senders included).
+- **When**: **Require a mention**, **Continue without a mention** for some
+  minutes after the bot's last reply (`interaction.followUp`), and an optional
+  text the first message must contain (`contains`). A Rule that leaves one out
+  inherits it from the account and organization defaults.
+
+A new route starts with one Rule: only owners, in direct messages, answered
+without a mention. A group-chat Rule starts with a mention required. One route
+can answer DMs without a mention and a support room only when mentioned, with
+two Rules instead of two copies of the same route.
+
+A Hub member is recognized on a channel only through a linked identity, so a
+Rule for owners lets nobody in until the owner links their account. The route
+form offers **Link my Slack account** (or the channel at hand) in place when a
+Rule names you and the bot cannot recognize you yet.
 
 Public or private is what the platform says on the message: a Slack channel's
 type, and on Telegram a group with a public @username is public, any other
@@ -258,22 +269,28 @@ matches no group chat there; the editor warns when a rule asks for it.
 ```yaml
 routes:
   - audience:
-      - who: { roles: [owner, admin] }
-        where: { dm: true, groups: all }
+      - who: { roles: [owner] }
+        where: { dm: true }
+        interaction: { requireMention: false }
       - who: { teams: [team-qc] }
         where: { groups: public }
-      - who: { teams: [team-qc] }
-        where: { dmMembers: [membership-id-of-the-lead], conversations: [C0QCPRIVATE] }
+        interaction: { requireMention: true, followUp: { mode: auto, ttlMinutes: 10 } }
       - who: { anyone: true }
         where: { conversations: [C0HELP] }
-    contains: deploy # optional text filter, route-level
+        contains: deploy # optional text filter for this Rule
+    interaction: { whenBusy: queue } # what happens once a message is in
     agent: worker
     environment: repo
 ```
 
-Routes stay ordered. A route applies when a rule's Where covers the
-conversation (and `contains`, if set, matches); if the sender matches none of
-that route's rules, the next route is tried. A bound conversation does not fall
+Hubs upgraded from a release that kept `requireMention`, `followUp` or
+`contains` on the route move them onto each Rule at start. On a route that set
+`requireMention`, a DM-only Rule that did not set its own is saved as answering
+without a mention, which is what the app always promised.
+
+Routes stay ordered. A route applies when a Rule's Where covers the
+conversation (and, for a new conversation, that Rule's `contains` matches if
+set); if the sender matches none of that route's Rules, the next route is tried. A bound conversation does not fall
 through: the route that started the session owns it, and a sender that route
 refuses is told in the thread to start their own conversation with a new
 message outside it. There is no catch-all: a
@@ -281,12 +298,26 @@ sender no route admits is refused. To answer everyone else, add a last route
 whose rule covers them.
 
 Talking to a bot and reaching a Host or Project stay separate. A chatting
-sender can start sessions with the route's configuration and use `/status`,
+sender can start sessions with the route's configuration and use
 `/stop`, `/new`, `/fork`, `/side`, `/quick`, `/steer`, `/queue`, `/skill` and
 `/command`; chat gives no access to the Host, the Project, or the Clisbot app.
 `/agent`, `/model`, `/provider`, `/effort`, `/permission`, `/cowork` and
 `/resume` need the sender's own Access grants on the route's Project, and
 answering an approval needs an `approval.*` privilege.
+
+To find the IDs a Rule takes, send `/status` in the chat (its chat and
+thread/topic IDs) and `/me` (your sender ID; on Telegram, send it to the bot in
+a DM). Both answer anyone, so a person the bot does not let in can send them
+to an admin. They show the session only to a Hub Member the route lets in, and
+why a sender is refused only to someone who manages the Connection. A sender
+the route does not let in gets one answer per command every 30 seconds. To
+make the bot silent to them instead, set:
+
+```yaml
+defaults:
+  interaction:
+    publicCommands: false # /help, /me and /status answer only senders a route lets in
+```
 
 The person who publishes a route vouches for what it runs: saving checks that
 they may hand out its Host, Project, Agent configuration and automatic
@@ -297,8 +328,8 @@ Connection Admin can change who may talk to a route they could not publish.
 The bot token and every credential in the account's settings are never shown
 to a Connection Admin and survive their saves unchanged.
 
-Commands never need a mention. `requireMention` decides when a plain message
-wakes the agent.
+Commands never need a mention. Each Rule's `requireMention` decides when a
+plain message wakes the agent.
 
 ### Routes open to Anyone
 
@@ -308,7 +339,8 @@ needed, a follow-up window that lets anyone talk without a mention, output
 beyond the final answer, permission requests accepted automatically, Fast mode, or a
 mode that runs tools without asking. The app lists them before you confirm a
 save. New routes start from the safe side: a mention in groups, final answers
-only, tool requests denied.
+only, and permission requests put to authorized members (someone let in as
+Anyone can never approve one).
 
 A route takes its audience only as a list of rules. A file that still carries a
 route `match:`, a one-value `audience: { kind: … }` or an account `fallback:`
@@ -316,17 +348,19 @@ fails validation.
 
 ## Limits
 
-Limits are available on every route and on the account, with the same fields
-everywhere:
+Limits sit on each Rule, on the route as a whole, and on the account (the
+whole bot, and each conversation):
 
-| Field                        | Counts                                    |
-| ---------------------------- | ----------------------------------------- |
-| `maxInputCharacters`         | characters in one incoming message        |
-| `messagesPerMinutePerSender` | messages received from one sender         |
-| `messagesPerMinute`          | messages received                         |
-| `messagesSentPerMinute`      | new messages the bot posts                |
-| `maxConcurrentRuns`          | agent turns running at the same time      |
-| `maxRuntimeSeconds`          | how long one turn may run before it stops |
+| Field (app label)                                                      | Counts                                               | Rule | Route | Account |
+| ---------------------------------------------------------------------- | ---------------------------------------------------- | ---- | ----- | ------- |
+| `maxInputCharacters` (Message length)                                  | characters in one incoming message                   | ✓    |       | ✓       |
+| `messagesPerMinutePerSender` (Messages handled per minute, per person) | messages from one person that start or continue work | ✓    |       | ✓       |
+| `messagesPerMinute` (Messages handled per minute)                      | messages that start or continue work                 | ✓    | ✓     | ✓       |
+| `messagesSentPerMinute` (Bot messages per minute)                      | new messages the bot posts                           |      |       | ✓       |
+| `maxConcurrentRuns` (Concurrent runs)                                  | agent turns running at the same time                 | ✓    | ✓     | ✓       |
+| `maxRuntimeSeconds` (Run time)                                         | how long one turn may run before it stops            | ✓    |       | ✓       |
+
+Chatter the bot ignores and status commands are not "handled" messages.
 
 ```yaml
 limits: # the whole bot
@@ -335,15 +369,25 @@ limits: # the whole bot
   perConversation: # each channel, group or DM; threads count toward their channel
     messagesPerMinute: 30
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C0SUPPORT] } }]
-    limits: { maxConcurrentRuns: 5, maxRuntimeSeconds: off }
+  - audience:
+      - { who: { roles: [owner] }, where: { dm: true } }
+      - who: { anyone: true }
+        where: { conversations: [C0SUPPORT] }
+        limits: { messagesPerMinutePerSender: 3 } # this way in only
+    limits: { maxConcurrentRuns: 5 } # every Rule of the route together
 ```
 
-A message must fit the bot, its conversation and its route. Each field is a
-positive number, `off`, or left out. Left out means no limit, except on an
-open-audience route, which defaults to 8000 characters, 10 messages per sender
-and 60 per minute, 8 concurrent runs and 900 seconds. There is no ceiling: set
-any number or turn a default off.
+A message must fit the bot, its conversation, its route and the Rule that let
+its sender in. A sender let in by several Rules counts in one that names them
+before one that lets anyone in, so an owner never shares the strangers' limits.
+Each field is a positive number, `off`, or left out. A Rule's field left out
+takes the route's; left out there too, it means no limit, except on a Rule that
+lets anyone in, which defaults to 8000 characters, 10 messages per person and 60
+per minute, 8 concurrent runs and 900 seconds. A route field set or turned off
+replaces that default, as it always did. There is no ceiling: set any number or
+turn a default off. In the app, a Rule's limits are under the Rule, the route's
+under **Route limits**, and the bot's under the Connection's **…** menu,
+**Limits**.
 
 Over a limit, an incoming message waits in the ingress queue and runs when there
 is room, and the bot says once that it is queued. A message longer than

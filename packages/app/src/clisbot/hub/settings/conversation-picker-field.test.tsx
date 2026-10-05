@@ -169,9 +169,49 @@ describe("Conversation selection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove #support" }));
     expect(screen.getByLabelText("Canonical IDs").textContent).toBe("C2");
     fireEvent.click(screen.getByRole("button", { name: "Remove #delivery" }));
-    expect(screen.getByText("No conversations selected.")).toBeTruthy();
+    expect(screen.queryByText(/selected\./)).toBeNull();
     expect(screen.getByLabelText("Canonical IDs").textContent).toBe("");
   });
+
+  it.each([
+    ["", false],
+    ["D9", true],
+  ])(
+    "keeps DMs out of a group-chat pick unless one is already picked (%s)",
+    async (value, listed) => {
+      adapters.get.mockResolvedValue({
+        conversations: [],
+        destinations: [
+          ...observations.destinations,
+          {
+            id: "D9",
+            kind: "dm",
+            rootConversationId: "D9",
+            threadId: null,
+            label: "The Longbkit",
+            source: "provider",
+          },
+        ],
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <ConversationSelectionFields
+            channel="slack"
+            accountId="support"
+            excludeKind="dm"
+            value={value}
+            onChange={vi.fn()}
+            disabled={false}
+            hint="Pick chats."
+            placeholder="C1"
+          />
+        </QueryClientProvider>,
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "Choose conversations" }));
+      expect(await screen.findByRole("button", { name: "Choose #support" })).toBeTruthy();
+      expect(Boolean(screen.queryByRole("button", { name: "Choose The Longbkit" }))).toBe(listed);
+    },
+  );
 
   it("uses the same selection for comma/newline manual entry and keeps it across disclosure changes", async () => {
     mount();

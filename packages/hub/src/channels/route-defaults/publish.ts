@@ -15,6 +15,7 @@ import type { RouteFollowUpChange } from "../commands-follow-up-arguments.js";
 import { deployRevision, type ChannelConfigurationCandidate } from "../http/configuration.js";
 import {
   authoredRoute,
+  authoredRouteFollowUp,
   previousRouteAgentControls,
   routeIdentity,
   writeRouteAgentControls,
@@ -166,7 +167,7 @@ export function createRouteDefaultPublisher(
       const outcome = await publish(target, (snapshot) => {
         const { channel, accountId, position } = target;
         const files = writeRouteFollowUp(snapshot.files, channel, accountId, position, change);
-        const followUp = authoredRoute(files, channel, accountId, position)?.interaction?.followUp;
+        const followUp = authoredRouteFollowUp(authoredRoute(files, channel, accountId, position));
         return { files, published: followUp ?? change };
       });
       return outcome.status === "published"

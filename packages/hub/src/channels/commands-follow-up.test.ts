@@ -18,12 +18,14 @@ enabled: true
 connectionId: slack-support
 transport: { mode: socket, errorPolicy: once }
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] } }]
+  - audience:
+      - who: { roles: [member] }
+        where: { conversations: [C1] }
+        interaction: { requireMention: true, followUp: { mode: mention-only, ttlMinutes: 5 } }
     agent: assistant
     environment: lab
-    interaction: { requireMention: true, followUp: { mode: mention-only, ttlMinutes: 5 } }
     reply: { anchor: thread }
-  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
+  - audience: [{ who: { roles: [member] }, where: { dm: true }, interaction: { requireMention: false } }]
     agent: assistant
     environment: lab
 `;

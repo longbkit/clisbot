@@ -146,7 +146,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surface0,
     // No overflow clipping: it cut a focused row's keyboard ring down to two bars. The end rows
     // round their own corners so a hover fill still follows the card.
   },

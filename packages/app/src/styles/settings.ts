@@ -26,7 +26,7 @@ export const settingsStyles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
   },
   card: {
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surface0,
     borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,

@@ -23,6 +23,8 @@ interface ConfigurationProps {
   error?: string | null;
   validate(candidate: ChannelConfigurationCandidate): Promise<void>;
   save(candidate: ChannelConfigurationCandidate): Promise<boolean>;
+  /** Opened from a menu: it starts open, and Hide closes it there. */
+  close?: () => void;
 }
 
 export function AdvancedConfigurationSection(props: ConfigurationProps) {
@@ -47,10 +49,13 @@ export function useChannelYamlForm(channels: HubChannelConfiguration | undefined
   return model;
 }
 
-function ChannelYamlEditor({ model, pending, error, validate, save }: ConfigurationProps) {
+function ChannelYamlEditor({ model, pending, error, validate, save, close }: ConfigurationProps) {
   const state = useSyncExternalStore(model.subscribe, model.getState);
-  const [expanded, setExpanded] = useState(false);
-  const toggle = useCallback(() => setExpanded((current) => !current), []);
+  const [expanded, setExpanded] = useState(close !== undefined);
+  const toggle = useCallback(() => {
+    if (close === undefined) setExpanded((current) => !current);
+    else close();
+  }, [close]);
   const disclosureState = useMemo(() => ({ expanded }), [expanded]);
   const runValidation = useCallback(() => {
     void model.validate(validate);

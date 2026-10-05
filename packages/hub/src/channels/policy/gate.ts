@@ -17,10 +17,25 @@ import type {
   InboundMessage,
   SupportedChannelName,
 } from "../plane/types.js";
-import { needsSenderFacts, type AudienceSender } from "../config/audience.js";
-import { audienceRulesAdmit, mayTrigger } from "../policy.js";
+import {
+  needsSenderFacts,
+  type AudienceSender,
+  type CompiledAudienceRule,
+} from "../config/audience.js";
+import { admittingRules, mayTrigger } from "../policy.js";
+import { rulesFor } from "../rule-trigger.js";
 import { evaluateChannelAccess, type DmGroupAccessReasonCode } from "./access.js";
 import { mintPairingCode, pairingChallengeText } from "./pairing.js";
+
+/**
+ * Whether the sender may use the Route. Admitted by the Route's rules, it
+ * names them: their conditions (a mention, the follow-up window) decide the
+ * message (`rule-trigger.ts`). Admitted another way (a role assignment, the
+ * legacy `access:` block), `rules` is absent and the conversation's apply.
+ */
+export type ChannelRouteAdmission =
+  | { allowed: true; rules?: readonly CompiledAudienceRule[] }
+  | Extract<ChannelPrivilegeDecision, { allowed: false }>;
 
 /** What the gate decided, and what (if anything) to say. */
 export type ChannelAccessGateOutcome =
@@ -154,23 +169,52 @@ export async function mayUseChannelRoute(input: {
   route: CompiledRoute;
   message: InboundMessage;
   resolveChannelSender?: ChannelSenderResolver | undefined;
-}): Promise<ChannelPrivilegeDecision> {
+  /** The message would start a conversation on this Route: a rule's
+   * `contains` then decides whether it is a way in. */
+  newConversation?: boolean | undefined;
+}): Promise<ChannelRouteAdmission> {
   const { account, controlPlane, message, route } = input;
   const sender = await audienceSenderFor(input);
-  if (audienceRulesAdmit(route, message.conversation, sender)) return { allowed: true };
+  const applicable =
+    input.newConversation === true
+      ? new Set(rulesFor(route, message.conversation, { text: message.text }))
+      : undefined;
+  const rules = admittingRules(route, message.conversation, sender).filter(
+    (rule) => applicable === undefined || applicable.has(rule),
+  );
+  if (rules.length > 0) return { allowed: true, rules };
   if (mayTrigger(message.senderIdentity, controlPlane, account, route)) return { allowed: true };
-  if (route.defaults.access !== undefined && input.store !== undefined) {
-    const storeAllowFrom = await input.store.listApprovedPairedSenders({
-      organizationId: input.organizationId,
-      channel: account.channel as SupportedChannelName,
-      accountId: account.accountId,
-    });
-    const decision = evaluateChannelAccess({
-      access: route.defaults.access,
-      message,
-      storeAllowFrom,
-    });
-    if (decision.decision === "allow") return { allowed: true };
+  if (
+    route.defaults.access !== undefined &&
+    input.store !== undefined &&
+    (await accessGateAllows({ ...input, store: input.store }))
+  ) {
+    return { allowed: true };
   }
   return { allowed: false, reason: "sender may not trigger this route" };
+}
+
+/**
+ * The `access:` block's decision without its side effects: no pairing request
+ * is minted and nothing is answered. A pairing challenge counts as a refusal —
+ * the sender is not in yet. For the commands that only report access (`/me`,
+ * `/status`), which must never change it.
+ */
+export async function accessGateAllows(input: {
+  store: ChannelAccessStore;
+  organizationId: string;
+  account: CompiledChannelAccount;
+  route: CompiledRoute;
+  message: InboundMessage;
+}): Promise<boolean> {
+  const access = input.route.defaults.access;
+  if (access === undefined) return true;
+  const storeAllowFrom = await input.store.listApprovedPairedSenders({
+    organizationId: input.organizationId,
+    channel: input.account.channel as SupportedChannelName,
+    accountId: input.account.accountId,
+  });
+  return (
+    evaluateChannelAccess({ access, message: input.message, storeAllowFrom }).decision === "allow"
+  );
 }

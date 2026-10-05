@@ -112,6 +112,14 @@ function ProjectDirectoryField({
         })),
     [projects.data?.projects],
   );
+  // A Host with one Project leaves nothing to choose: take it, as the form
+  // takes the only Host. A chosen Project, even one no longer reported, stays.
+  const onlyProject = options.length === 1 ? options[0]!.value : null;
+  useEffect(() => {
+    if (onlyProject !== null && directory.projectId === null && !disabled) {
+      changeProject(onlyProject);
+    }
+  }, [changeProject, directory.projectId, disabled, onlyProject]);
   const selected = options.find((option) => option.value === directory.projectId);
   const selectedDisplay = useMemo(
     () => (selected === undefined ? null : { label: selected.label }),

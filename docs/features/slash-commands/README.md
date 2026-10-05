@@ -36,15 +36,15 @@ changing the configuration or reaching outside it
 Each privilege, and what it unlocks — grant these to a Member, Team, or the Guest
 group:
 
-| Privilege         | What it unlocks                                            | Commands                                                                                                                                                             |
-| ----------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _public_          | anyone, even an unlinked guest                             | `/help`, `/me`                                                                                                                                                       |
-| `channel.use`     | chat with the Route's Agent — the baseline to give a Guest | `/status`, `/stop`, `/new`, `/followup` (this conversation), `/steer`, `/queue`, `/skill`, `/command` (list/search/run), `/fork`, `/side`, `/quick`, `/routedefault` |
-| `agent.interact`  | change or leave the Route's configuration                  | `/cowork`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`                                                                                                 |
-| `agent.create`    | bring a session from elsewhere                             | `/resume`                                                                                                                                                            |
-| `approval.config` | manage dynamic commands                                    | `/command add`, `/command remove`                                                                                                                                    |
-| `approval.*`      | answer or suppress prompts                                 | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                                |
-| `channel.manage`  | change a Connection's Route defaults³                      | `/promoteroutedefault`                                                                                                                                               |
+| Privilege         | What it unlocks                                                                                                | Commands                                                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _public_          | anyone, even a sender no Rule admits; each sees what their standing allows ([below](#what-status-and-me-show)) | `/help`, `/me`, `/status`                                                                                                                                 |
+| `channel.use`     | chat with the Route's Agent — the baseline to give a Guest                                                     | `/stop`, `/new`, `/followup` (this conversation), `/steer`, `/queue`, `/skill`, `/command` (list/search/run), `/fork`, `/side`, `/quick`, `/routedefault` |
+| `agent.interact`  | change or leave the Route's configuration                                                                      | `/cowork`, `/agent`, `/model`, `/provider`, `/effort`, `/permission`                                                                                      |
+| `agent.create`    | bring a session from elsewhere                                                                                 | `/resume`                                                                                                                                                 |
+| `approval.config` | manage dynamic commands                                                                                        | `/command add`, `/command remove`                                                                                                                         |
+| `approval.*`      | answer or suppress prompts                                                                                     | `/approve`, `/deny`; an unattended `/permission` mode                                                                                                     |
+| `channel.manage`  | change a Connection's Route defaults³                                                                          | `/promoteroutedefault`                                                                                                                                    |
 
 The per-command **Requires** columns below repeat this at the row level.
 
@@ -52,7 +52,7 @@ The per-command **Requires** columns below repeat this at the row level.
 
 | Command                                 | Does                                                                                                                                                   | Requires                |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
-| `/status`                               | Agent + session state.                                                                                                                                 | channel.use             |
+| `/status`                               | This chat's IDs and whether you can talk here; the session for an admitted Hub Member ([below](#what-status-and-me-show)).                             | — (public)              |
 | `/stop`                                 | Stop the running turn.                                                                                                                                 | channel.use             |
 | `/new`                                  | Clear the binding; the next message starts fresh. `/new <message>` starts immediately.                                                                 | channel.use             |
 | `/agent [<name>]`                       | Switch the conversation's agent. Apply an **agent profile** bounded by the caller's configuration grant ([below](#agent-profiles-and-the-route-menu)). | agent.interact + grant² |
@@ -85,7 +85,7 @@ Implementation and verification notes are in [implementation-plan.md](implementa
 | Command                                                                                                   | Does                                                                                                           | Requires                                         | Direct | Automation |
 | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :----: | :--------: |
 | `/cowork` (`/open`, `/app`)                                                                               | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact                                   |   •    |     •      |
-| `/me`                                                                                                     | Your channel identity and access here.                                                                         | — (public)                                       |   •    |     •      |
+| `/me`                                                                                                     | Your channel ID, and your access here ([below](#what-status-and-me-show)).                                     | — (public)                                       |   •    |     •      |
 | `/followup [status\|auto\|mention-only\|pause\|resume]`, `/followup route [auto [minutes]\|mention-only]` | Show or change whether messages need a mention, here or on the whole route ([below](#follow-up)).              | channel.use; `route` changes need channel.manage |   •    |     •      |
 | `/resume <id>`                                                                                            | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create                                     |   •    |     —      |
 | `/steer <message>`                                                                                        | Admit `<message>` into the running turn.                                                                       | channel.use                                      |   •    |     —      |
@@ -125,6 +125,31 @@ Guest group more and guests can also change the configuration. Nothing above is
 reachable without the named privilege, so a guest gets only what the Guest group
 holds. The Guest subject is persisted as `(guest, guest)` in org Access with no default grants; linked Members do not inherit it. See
 see [implementation-plan.md](implementation-plan.md#resolved-decisions).
+
+### What `/status` and `/me` show
+
+Both answer anyone, so a person asking for access and the admin granting it can
+read the IDs a Rule's Where and Who take. How much more each caller sees
+depends on their standing, not on which command they typed
+([decision and table](../../audits/2026-10-05-status-and-me-disclosure.md)):
+
+- **Anyone:** their own ID (`/me`), this chat's ID and thread/topic ID
+  (`/status`), and whether they can talk to the bot here. A no reads the same
+  whatever the reason.
+- **Admitted by the Route:** whether a mention is needed, and whether the bot
+  is working or idle.
+- **Admitted and linked to a Hub Member:** the session (agent, model, context,
+  pending approvals, links; the runs on an Automation route) and their
+  privileges here.
+- **Connection manager:** which Route serves the chat and why a sender is
+  refused.
+
+The Route's gates run dry: no pairing code is minted. A sender the Route does
+not admit gets one answer per command per 30 seconds. In a group where members
+cannot see each other's IDs (Telegram and the other non-Slack/Discord
+channels), `/me` asks for a DM instead of printing the ID. Set
+`defaults.interaction.publicCommands: false` on the organization or the
+Connection to answer only admitted senders and managers.
 
 ## Starting sessions
 
@@ -266,8 +291,11 @@ the parser runs.
 ### Follow-up
 
 `interaction.followUp` decides whether an **unmentioned** message continues a
-bound session. It refines `requireMention`: a DM, or a Route with
-`requireMention: false`, admits every message.
+bound session. Both leaves sit on each Rule of a Route
+([Routes and Rules](../../audits/2026-10-05-routes-and-rules.md)), so a DM Rule
+and a group-chat Rule of the same Route can differ. Follow-up refines
+`requireMention`: a conversation whose Rules do not require a mention admits
+every message.
 
 - `mention-only` (the default): every message needs a mention.
 - `auto`: after a mention, unmentioned messages in that conversation continue
@@ -288,21 +316,22 @@ Two scopes change it:
   one; `resume` returns to the Route. The reply names the scope (`this thread`,
   `this topic`, `this channel`). The override lives in
   `channel_conversation_follow_ups`, apart from the `/agent` and `/model`
-  selection, so `/promoteroutedefault` does not clear it. In a DM, or on a Route
-  without `requireMention`, a change is refused: it would have no effect.
+  selection, so `/promoteroutedefault` does not clear it. Where none of the
+  Rules covering the conversation requires a mention (a DM Rule, by default), a
+  change is refused: it would have no effect.
 - **Channel root on a thread-anchored Slack Route.** The message there opens its
   own thread, so an override would only cover that thread. Clisbot stores it
   anyway; the Hub refuses and points to running it in the thread or to
   `/followup route`.
 - **Route change.** It publishes a Channel revision through the same path as
   `/promoteroutedefault` (compile guard, delegation check, attributed to the
-  sender). It writes `interaction.followUp` on the Route and keeps the authored
-  leaves it does not name, so `mention-only` keeps a custom `ttlMinutes` for a
-  later `auto`. Conversation overrides stay until `/followup resume`. Clisbot has
+  sender). It writes `interaction.followUp` on every Rule of the Route and keeps
+  the authored leaves it does not name, so `mention-only` keeps a custom
+  `ttlMinutes` for a later `auto`. To vary it by Rule, edit the Route. Conversation overrides stay until `/followup resume`. Clisbot has
   no chat form for this; it is config-file only there.
-- **Route editor.** It shows the leaf as **Continue without a mention**. Saving a
-  Route writes `followUp` only when you changed that control or the Route
-  already authored it, so a Route inheriting `auto` from its account keeps
+- **Route editor.** Each Rule shows the leaf as **Continue without a mention**.
+  Saving writes `followUp` on a Rule only when you changed that control or the
+  Rule already authored it, so a Rule inheriting `auto` from its account keeps
   inheriting.
 - **Arguments.** Only the forms above parse as the command. Anything else, such
   as `followup on the PR`, goes to the agent as a prompt.
@@ -380,8 +409,8 @@ Most changes are for the conversation you are in, so `/model`, `/provider` and
 the rest stay conversation-scoped. When the choice should apply to everyone the
 same Route serves, `/promoteroutedefault` makes this conversation's configuration
 the Route's default. The caller never names the Route: Routes match in order, by
-conversation and by message text (`contains`), so only the Hub knows which one
-served this message. That Route is the one changed, and `/routedefault` shows it.
+conversation and by each Rule's message text (`contains`), so only the Hub knows
+which one served this message. That Route is the one changed, and `/routedefault` shows it.
 
 - **Where it lives.** The Route's `agentControls:` leaf (provider, model, mode,
   thinking option, feature values) over the named `agent:` in `hub.yml`
@@ -471,9 +500,10 @@ is never ambiguous:
 
 Every command replies in the conversation and thread it was invoked from,
 including `/cowork` and `/status`, whose output carries a session link. The
-reply follows the Route's `reply.anchor` exactly as the agent's replies do
-(`channels/reply-anchor.ts`): under `thread`, a command sent at the Slack channel
-root is answered in a thread on that message rather than at the root. An
+reply follows the Route's anchor exactly as the agent's replies do
+(`channels/reply-anchor.ts`; `reply.anchor` in group chats, `reply.dmAnchor` in
+DMs): under `thread`, a command sent at the Slack root is answered in a thread on
+that message rather than at the root. An
 unrouted `/help` or `/me` has no anchor and replies where it was sent. Ordinary
 messages carry no native interaction token on Slack or Discord, so the only
 private surface available is a requester DM — and a reply in a DM the caller is

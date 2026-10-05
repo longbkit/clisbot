@@ -14,6 +14,7 @@ import {
   type AudienceRule,
   type AudienceWhere,
 } from "../config/schema.js";
+import { moveAccountConditions } from "../config/rule-conditions.js";
 
 /** One `channel.use` Access grant on a Channel account, as stored. */
 export interface ChannelUseGrant {
@@ -77,10 +78,13 @@ export function convertAccountFile(
   const fallbackPosition = catchAll === undefined ? undefined : routes.length;
   if (catchAll !== undefined) routes.push(catchAll);
   const folded = foldGrants(routes, grants);
-  const converted = AccountFileSchema.parse({
+  const shaped: Record<string, unknown> = {
     ...account,
     ...(legacyRoutes === undefined && catchAll === undefined ? {} : { routes: folded.routes }),
-  });
+  };
+  // A Route's conditions are its rules' now; the upgrade's own move puts them there.
+  moveAccountConditions(shaped);
+  const converted = AccountFileSchema.parse(shaped);
   return { account: converted, fallbackPosition, foldedGrantIds: folded.grantIds, widenedRoutes };
 }
 

@@ -18,6 +18,7 @@ import type {
 } from "../config/compile.js";
 import { routeConversationMatches, type InboundConversation } from "../policy.js";
 import type { ThreadBindingRecord } from "../../db/types.js";
+import { replyAnchorFor } from "../reply-anchor.js";
 import {
   SLACK_THREAD_TS_PATTERN,
   type InboundConversationDetail,
@@ -66,7 +67,8 @@ export function bindingSummary(
     match,
     target: route.target,
     bindingKey: route.defaults.bindingKey,
-    replyAnchor: route.defaults.replyAnchor,
+    // The anchor this conversation answers under: a DM has its own.
+    replyAnchor: replyAnchorFor(route.defaults, conversation.kind),
     ...(safeConversationLabel ? { conversationLabel: safeConversationLabel } : {}),
     ...(selection === undefined
       ? {}
@@ -215,9 +217,8 @@ export interface ThreadKey {
 export function rootMessagesOpenThreads(message: InboundMessage, route: CompiledRoute): boolean {
   return (
     route.defaults.bindingKey === "thread" &&
-    route.defaults.replyAnchor === "thread" &&
-    message.channel === "slack" &&
-    message.conversation.kind !== "dm"
+    replyAnchorFor(route.defaults, message.conversation.kind) === "thread" &&
+    message.channel === "slack"
   );
 }
 

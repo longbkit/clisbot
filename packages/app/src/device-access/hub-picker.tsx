@@ -53,12 +53,16 @@ export function HubPicker({ compact = false }: { compact?: boolean }) {
         disabled={locked}
         chevron={chevron}
         block
-        style={[styles.trigger, compact && styles.compact, locked && styles.locked]}
+        style={[styles.trigger, compact ? styles.compact : styles.sidebar, locked && styles.locked]}
         onPress={showPicker}
         accessibilityLabel={locked ? "Save or cancel before switching Hub" : "Switch Hub"}
         testID={compact ? "hub-title-picker" : "hub-sidebar-picker"}
       >
-        <View style={[styles.dot, account.signedIn ? styles.ready : styles.pending]} />
+        {/* In the sidebar the dot takes an icon's room, so the name lines up
+            with the items under it, as the Host picker's does. */}
+        <View style={compact ? undefined : styles.dotBox}>
+          <View style={[styles.dot, account.signedIn ? styles.ready : styles.pending]} />
+        </View>
         <View style={styles.name}>
           <Text style={styles.label} numberOfLines={1}>
             {current.label}
@@ -107,6 +111,18 @@ const styles = StyleSheet.create((theme) => ({
     width: { xs: 180, md: "auto" },
     maxWidth: { xs: 180, md: 300 },
     minWidth: { xs: 120, md: 180 },
+  },
+  // The Host picker's sidebar row (settings-screen `pickerTrigger`).
+  sidebar: {
+    height: { xs: 44, md: 28 },
+    minHeight: { xs: 44, md: 28 },
+    paddingVertical: { xs: 0, md: theme.spacing[1] },
+  },
+  dotBox: {
+    width: theme.iconSize.md,
+    height: theme.iconSize.md,
+    alignItems: "center",
+    justifyContent: "center",
   },
   locked: { opacity: 0.5 },
   name: { flex: 1, minWidth: 0 },

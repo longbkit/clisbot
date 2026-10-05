@@ -7,6 +7,14 @@ that record (execution vouched by the publisher, warnings, limits) stands.
 The UI name **Channel Route** used below is now **Connection**
 ([2026-09-19 naming decision](2026-09-19-connection-naming-and-route-flow.md)).
 
+Amended 2026-10-05 by [Routes and Rules](2026-10-05-routes-and-rules.md): an
+audience rule is now a **Rule**, one way into the Route. It holds one kind of
+place (DMs or group chats), a Who chosen from one ladder (Only owners → Anyone),
+and its own trigger conditions (mention, follow-up, `contains`), which moved
+off the Route. The DM-narrowing lists below (`dmTeams`, `dmMembers`,
+`dmIdentities`) still load and are honored, but the editor no longer offers
+them: a DM Rule's Who is the whole Who.
+
 ## Context
 
 "May this sender talk to this Route" is answered in four places today, and any
@@ -58,7 +66,7 @@ it lists every conversation a bot has seen on every channel.
 | Direct messages | **All direct messages**, or **Specific people**: of the Who, only the named Teams and Members (`where.dmTeams`, `where.dmMembers`) and Guests (`where.dmIdentities`) may DM, picked from the same lists Who uses. The lists narrow the Who and never add to it; the Guest list offers only the Guests under Who (every Guest seen, under Anyone) |
 | Group chats     | **All group chats**, **Public only**, **Private only** (both only where the platform reports visibility), or **Specific conversations** from one search box                                                                                                                                                                                      |
 
-A new Route names Members and opens no place, so it cannot save until the configurator opens one. Turning either switch on starts at its Specific option; All is a deliberate pick. A place that is on must name something: a Specific option with an empty list blocks the save, because saving would drop the place and the switch would read off again. A list the Who can never reach lets nobody in, so the editor and the Hub schema both refuse it: Teams or Members named for DMs need a Who that names Members (or Anyone), Guests named for DMs need a Who that names Guests (or Anyone). A Route counts as open (open-Route limits, warnings) only when Anyone gets in somewhere un-narrowed; Anyone limited to named DM senders is not open. A DM listed under Specific conversations stays open to the whole Who, threads included.
+A new rule named Members and opened no place (superseded 2026-10-05: a new Rule starts as Only owners in direct messages, see [Routes and Rules](2026-10-05-routes-and-rules.md#the-route-form-wireframe)). Turning a place's switch on starts at its Specific option; All is a deliberate pick. A place that is on must name something: a Specific option with an empty list blocks the save, because saving would drop the place and the switch would read off again. A list the Who can never reach lets nobody in, so the editor and the Hub schema both refuse it: Teams or Members named for DMs need a Who that names Members (or Anyone), Guests named for DMs need a Who that names Guests (or Anyone). A Route counts as open (open-Route limits, warnings) only when Anyone gets in somewhere un-narrowed; Anyone limited to named DM senders is not open. A DM listed under Specific conversations stays open to the whole Who, threads included.
 
 Why the revision: the first editor offered a Group chats switch **and** a Specific conversations list at once. The switch meant "every group chat", but read as "group chats are an allowed kind", so a configurator left it on, named two channels, and had opened all of them. New Routes also started with both switches on. Exclusive options remove that reading; "public plus one private room" is now two rules. Rules stored with a filter **and** conversations keep both until the configurator picks an option again (the editor says so).
 

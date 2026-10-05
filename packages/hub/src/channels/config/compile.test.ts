@@ -6,7 +6,7 @@ import {
   type ChannelCompileInput,
 } from "./compile.js";
 import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
-import { routeLimits } from "./limits.js";
+import { routeLimits, ruleLimits } from "./limits.js";
 import { routeFingerprint } from "../bindings/stored-route.js";
 import { toolActivity } from "./inheritance.js";
 import { conversationSettings } from "./conversation.js";
@@ -72,8 +72,7 @@ defaults:
   approval:
     - { match: command.destructive, mode: require, initiatorOnly: true }
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
-    contains: "#triage"
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] }, contains: "#triage" }]
     agent: worker-app
     environment: repo-app
     template: team
@@ -170,7 +169,7 @@ describe("compileChannelControlPlane", () => {
     assert.equal(account.approval.length, 3);
     assert.equal(account.approval[0]!.match, "command.destructive");
     assert.equal(account.routes.length, 4);
-    assert.equal(account.routes[0]!.contains, "#triage");
+    assert.equal(account.routes[0]!.audienceRules[0]?.trigger?.contains, "#triage");
     assert.deepEqual(account.routes[0]!.where, { dm: false, groups: [], conversations: ["C0APP"] });
     assert.deepEqual(account.routes[0]!.audienceRules[0]?.who.roles, ["member"]);
     assert.equal("fallback" in account, false);
@@ -233,7 +232,13 @@ routes:
     // The open-audience defaults are NOT compiled in — they are applied where
     // the limits are read, so moving a default never rewrites a fingerprint.
     assert.equal(safe.accounts[0]?.routes[0]?.limits, undefined);
-    assert.deepEqual(routeLimits(safe.accounts[0]!.routes[0]!), OPEN_AUDIENCE_ROUTE_LIMITS);
+    // They are the Anyone rule's, not the Route's as a whole.
+    const openRoute = safe.accounts[0]!.routes[0]!;
+    assert.equal(routeLimits(openRoute), undefined);
+    assert.deepEqual(
+      ruleLimits(openRoute, openRoute.audienceRules[0]!),
+      OPEN_AUDIENCE_ROUTE_LIMITS,
+    );
 
     expectRouteWarning(
       {
@@ -268,10 +273,12 @@ accountId: public
 connectionId: connection-id
 transport: { mode: socket }
 routes:
-  - audience: [{ who: { anyone: true }, where: { conversations: [C_CUSTOMER] } }]
+  - audience:
+      - who: { anyone: true }
+        where: { conversations: [C_CUSTOMER] }
+        interaction: { requireMention: false }
     agent: worker-app
     environment: repo-app
-    interaction: { requireMention: false }
 `,
       },
       /answers every message/u,
@@ -345,8 +352,11 @@ routes:
       maxConcurrentRuns: 25,
       maxInputCharacters: "off",
     });
-    // Read, the open-audience defaults fill the rest and `off` still wins.
-    assert.deepEqual(routeLimits(account.routes[0]!), {
+    // As a whole the Route is held to what it authored.
+    assert.deepEqual(routeLimits(account.routes[0]!), { maxConcurrentRuns: 25 });
+    // Its Anyone rule: the Route's leaves stand in before the open-audience
+    // defaults, as they did before rules carried limits, and `off` still wins.
+    assert.deepEqual(ruleLimits(account.routes[0]!, account.routes[0]!.audienceRules[0]!), {
       messagesPerMinutePerSender: 10,
       messagesPerMinute: 60,
       maxConcurrentRuns: 25,
@@ -355,6 +365,57 @@ routes:
     assert.equal(account.routes[1]?.limits, undefined);
     // A member Route gets no defaults at all.
     assert.equal(routeLimits(account.routes[1]!), undefined);
+    assert.equal(ruleLimits(account.routes[1]!, account.routes[1]!.audienceRules[0]!), undefined);
+  });
+
+  it("gives each rule its own limits, and the open defaults only to the rule that lets anyone in", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        ["channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience:
+      - { who: { roles: [owner] }, where: { dm: true }, limits: { maxRuntimeSeconds: 3600 } }
+      - who: { anyone: true }
+        where: { conversations: [C_OPEN] }
+        limits: { messagesPerMinutePerSender: 3, maxInputCharacters: off }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const route = plane.accounts[0]!.routes[0]!;
+    const [owners, anyone] = route.audienceRules;
+    // An owner on a Route open to strangers is not held to the strangers' defaults.
+    assert.deepEqual(ruleLimits(route, owners!), { maxRuntimeSeconds: 3600 });
+    assert.deepEqual(ruleLimits(route, anyone!), {
+      messagesPerMinutePerSender: 3,
+      messagesPerMinute: 60,
+      maxConcurrentRuns: 8,
+      maxRuntimeSeconds: 900,
+    });
+    assert.equal(routeLimits(route), undefined);
+  });
+
+  it("refuses the bot's posting rate on a rule: posts belong to no sender", () => {
+    expectCompileError(
+      {
+        ["channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience: [{ who: { anyone: true }, where: { conversations: [C_OPEN] }, limits: { messagesSentPerMinute: 5 } }]
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /messagesSentPerMinute|Unrecognized key/,
+    );
   });
 
   it("defaults the account config block to empty when omitted", () => {
@@ -602,6 +663,27 @@ defaults:
     );
   });
 
+  it("folds a Route's reply.dmAnchor apart from its group anchor", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        ["channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
+    reply: { anchor: default, dmAnchor: thread }
+    agent: telegram-butler
+    environment: personal-lab
+`,
+      }),
+    );
+    const route = plane.accounts[0]!.routes[0]!;
+    assert.equal(route.defaults.replyAnchor, "default");
+    assert.equal(route.defaults.dmReplyAnchor, "thread");
+  });
+
   it("compiles a channel with no policy.yml using org floors", () => {
     const plane = compileChannelControlPlane(
       input({
@@ -621,6 +703,8 @@ defaults:
     assert.equal(account.defaults.requireMention, false);
     assert.equal(account.defaults.followUp.ttlMinutes, 120);
     assert.equal(account.defaults.replyAnchor, "default");
+    // Absent until authored, so a revision from before the knob compiles as it did.
+    assert.equal("dmReplyAnchor" in account.defaults, false);
     assert.equal(account.defaults.bindingKey, "thread");
     assert.equal(account.defaults.sync.finalAnswers, true);
     assert.equal(account.defaults.sync.threadLink, "final-only");
@@ -1577,7 +1661,15 @@ ${body}
 });
 
 describe("audience rules", () => {
-  it("compiles the new shape: rules on audience, contains at route level", () => {
+  const account = (body: string) => `
+channel: telegram
+accountId: butler
+connectionId: telegram-butler
+transport: { mode: polling }
+${body}
+`;
+
+  it("compiles rules with their own conditions, and only the conditions they author", () => {
     const plane = compileChannelControlPlane(
       input({
         ["channels/slack/work.yml"]: `
@@ -1589,16 +1681,22 @@ routes:
   - audience:
       - who: { roles: [owner, admin] }
         where: { dm: true, groups: all }
+        interaction: { requireMention: false }
       - who: { teams: [qc] }
         where: { groups: public, conversations: [C0PRIVATE] }
-    contains: deploy
+        interaction: { followUp: { mode: auto } }
+        contains: deploy
     agent: worker-app
     environment: repo-app
 `,
       }),
     );
     const route = plane.accounts[0]!.routes[0]!;
-    assert.equal(route.contains, "deploy");
+    assert.deepEqual(route.audienceRules[0]?.trigger, { requireMention: false });
+    assert.deepEqual(route.audienceRules[1]?.trigger, {
+      followUp: { mode: "auto" },
+      contains: "deploy",
+    });
     assert.deepEqual(route.where, {
       dm: true,
       groups: ["all", "public"],
@@ -1606,6 +1704,37 @@ routes:
     });
     assert.deepEqual(route.audienceRules[1]?.who.teams, ["qc"]);
     assert.equal(route.limits, undefined, "no anyone rule, no open-audience defaults");
+  });
+
+  it("leaves a rule with no conditions of its own as it compiled before rules had any", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        ["channels/telegram/butler.yml"]: account(`routes:
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
+    agent: telegram-butler
+    environment: personal-lab`),
+      }),
+    );
+    const rule = plane.accounts[0]!.routes[0]!.audienceRules[0]!;
+    // No \`trigger\` key at all: the Route keeps the fingerprint it had.
+    assert.equal("trigger" in rule, false);
+  });
+
+  it.each([
+    ["contains", "    contains: deploy"],
+    ["interaction.requireMention", "    interaction: { requireMention: true }"],
+    ["interaction.followUp", "    interaction: { followUp: { mode: auto } }"],
+  ])("refuses a Route-level %s: conditions are each rule's", (_leaf, line) => {
+    expectCompileError(
+      {
+        ["channels/telegram/butler.yml"]: account(`routes:
+  - audience: [{ who: { roles: [member] }, where: { dm: true } }]
+${line}
+    agent: telegram-butler
+    environment: personal-lab`),
+      },
+      /is set on each rule of the Route now .*update the app/,
+    );
   });
 
   it("reports a rule with no Who part under routes[i].audience[j]", () => {

@@ -2,99 +2,28 @@ import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
-import { Field, FormTextInput } from "@/components/ui/form-field";
+import { FormTextInput } from "@/components/ui/form-field";
 import { settingsStyles } from "@/styles/settings";
 import {
   CHANNEL_LIMIT_NAMES,
   type ChannelAccountLimits,
   type ChannelLimitName,
-  type ChannelLimits,
 } from "../channel-configuration";
+import { SettingRow } from "./channel-route-behavior-rows";
+import {
+  LIMITS_NOTE,
+  LIMIT_LABELS,
+  LIMIT_UNITS,
+  NO_DEFAULTS,
+  channelLimitsDraft,
+  parseChannelLimitsDraft,
+  type ChannelLimitDefaults,
+  type ChannelLimitsDraft,
+  type LimitDraft,
+} from "./channel-limits-draft";
 
-/**
- * Channel limits as a form: each leaf is left at its default, set to a
- * number, or turned off. The same fields serve the Bot, each Conversation and
- * a Route (docs/audits/2026-09-18-channel-chat-authority-and-limits.md).
- */
-type LimitMode = "default" | "custom" | "off";
-interface LimitDraft {
-  mode: LimitMode;
-  value: string;
-}
-export type ChannelLimitsDraft = Record<ChannelLimitName, LimitDraft>;
-export type ChannelLimitDefaults = Partial<Record<ChannelLimitName, number>>;
-
-const LIMIT_LABELS: Record<ChannelLimitName, string> = {
-  maxInputCharacters: "Maximum input characters",
-  messagesPerMinutePerSender: "Messages received per minute, per sender",
-  messagesPerMinute: "Messages received per minute",
-  messagesSentPerMinute: "Messages sent per minute",
-  maxConcurrentRuns: "Concurrent runs",
-  maxRuntimeSeconds: "Maximum runtime (seconds)",
-};
-
-/** The Bot and Conversation scopes have no defaults: unset means no limit. */
-export const NO_DEFAULTS: ChannelLimitDefaults = {};
-
-/**
- * With a default there are three choices; without one, "Default" already means
- * no limit, so the choices are just "No limit" and "Set".
- */
-function modeChoices(defaultValue: number | undefined): { mode: LimitMode; label: string }[] {
-  if (defaultValue === undefined) {
-    return [
-      { mode: "default", label: "No limit" },
-      { mode: "custom", label: "Set" },
-    ];
-  }
-  return [
-    { mode: "default", label: `Default (${String(defaultValue)})` },
-    { mode: "custom", label: "Set" },
-    { mode: "off", label: "Off" },
-  ];
-}
-
-export function channelLimitsDraft(authored: unknown): ChannelLimitsDraft {
-  const record =
-    typeof authored === "object" && authored !== null ? (authored as Record<string, unknown>) : {};
-  const entry = (name: ChannelLimitName): LimitDraft => {
-    const value = record[name];
-    if (value === "off") return { mode: "off", value: "" };
-    if (typeof value === "number") return { mode: "custom", value: String(value) };
-    return { mode: "default", value: "" };
-  };
-  return Object.fromEntries(
-    CHANNEL_LIMIT_NAMES.map((name) => [name, entry(name)]),
-  ) as ChannelLimitsDraft;
-}
-
-export function parseChannelLimitsDraft(
-  draft: ChannelLimitsDraft,
-): { valid: true; value: ChannelLimits } | { valid: false; error: string } {
-  const value: ChannelLimits = {};
-  for (const name of CHANNEL_LIMIT_NAMES) {
-    const { mode, value: text } = draft[name];
-    if (mode === "off") value[name] = "off";
-    if (mode !== "custom") continue;
-    const parsed = Number(text.trim());
-    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-      return { valid: false, error: `${LIMIT_LABELS[name]}: use a positive whole number.` };
-    }
-    value[name] = parsed;
-  }
-  return { valid: true, value };
-}
-
-/** One line for a card: what is set, or that everything is at its default. */
-export function channelLimitsSummary(limits: unknown): string {
-  const draft = channelLimitsDraft(limits);
-  const set = CHANNEL_LIMIT_NAMES.flatMap((name) => {
-    const { mode, value } = draft[name];
-    if (mode === "default") return [];
-    return [`${LIMIT_LABELS[name]}: ${mode === "off" ? "off" : value}`];
-  });
-  return set.length === 0 ? "Default limits" : set.join(" · ");
-}
+// The fields of the Channel limits form (`channel-limits-draft.ts` holds its
+// model). The same fields serve the Bot, each Conversation, a Route and a Rule.
 
 export function ChannelLimitsFields({
   draft,
@@ -102,7 +31,13 @@ export function ChannelLimitsFields({
   defaults,
   error,
   disabled,
+  names = CHANNEL_LIMIT_NAMES,
+  note = true,
 }: {
+  /** The limits this scope carries, in display order. */
+  names?: readonly ChannelLimitName[];
+  /** The one line saying how limits behave; off where a second set follows the first. */
+  note?: boolean;
   draft: ChannelLimitsDraft;
   setDraft(update: (current: ChannelLimitsDraft) => ChannelLimitsDraft): void;
   defaults: ChannelLimitDefaults;
@@ -116,7 +51,8 @@ export function ChannelLimitsFields({
   );
   return (
     <View style={styles.fields}>
-      {CHANNEL_LIMIT_NAMES.map((name) => (
+      {note ? <Text style={styles.note}>{LIMITS_NOTE}</Text> : null}
+      {names.map((name) => (
         <LimitRow
           key={name}
           name={name}
@@ -131,6 +67,11 @@ export function ChannelLimitsFields({
   );
 }
 
+/**
+ * One limit on one line: its name, a short number field, its unit, and Off
+ * where there is a default to turn off. An empty field is the default, shown
+ * in the field itself, so nothing explains a value that is not there.
+ */
 function LimitRow({
   name,
   entry,
@@ -144,74 +85,56 @@ function LimitRow({
   onChange(name: ChannelLimitName, next: LimitDraft): void;
   disabled: boolean;
 }) {
-  const setValue = useCallback(
-    (value: string) => onChange(name, { mode: "custom", value }),
+  const off = entry.mode === "off";
+  const type = useCallback(
+    (value: string) =>
+      onChange(
+        name,
+        value.trim() === "" ? { mode: "default", value: "" } : { mode: "custom", value },
+      ),
     [name, onChange],
   );
+  const toggleOff = useCallback(
+    () => onChange(name, off ? { mode: "default", value: "" } : { mode: "off", value: "" }),
+    [name, off, onChange],
+  );
+  const label = LIMIT_LABELS[name];
   return (
-    <Field label={LIMIT_LABELS[name]}>
-      <View style={styles.modes}>
-        {modeChoices(defaultValue).map(({ mode, label }) => (
-          <ModeButton
-            key={mode}
-            name={name}
-            mode={mode}
-            label={label}
-            entry={entry}
-            defaultValue={defaultValue}
-            onChange={onChange}
-            disabled={disabled}
-          />
-        ))}
-      </View>
-      {entry.mode === "custom" ? (
+    <SettingRow label={label}>
+      <View style={styles.numberInput}>
         <FormTextInput
-          initialValue={entry.value}
-          onChangeText={setValue}
+          // A fresh field when Turn off clears it, so no stale number shows through.
+          key={off ? "off" : "on"}
+          initialValue={entry.mode === "custom" ? entry.value : ""}
+          onChangeText={type}
+          placeholder={placeholder(off, defaultValue)}
           keyboardType="number-pad"
-          editable={!disabled}
+          accessibilityLabel={label}
+          editable={!disabled && !off}
         />
-      ) : null}
-    </Field>
+      </View>
+      {/* Fixed slots for the unit and the action, so every row's field lines up. */}
+      <Text style={styles.unit}>{LIMIT_UNITS[name] ?? ""}</Text>
+      <View style={styles.offSlot}>
+        {defaultValue === undefined && !off ? null : (
+          <Button
+            size="xs"
+            variant="ghost"
+            disabled={disabled}
+            onPress={toggleOff}
+            accessibilityLabel={`${label}: ${off ? "use default" : "turn off"}`}
+          >
+            {off ? "Use default" : "Turn off"}
+          </Button>
+        )}
+      </View>
+    </SettingRow>
   );
 }
 
-function ModeButton({
-  name,
-  mode,
-  label,
-  entry,
-  defaultValue,
-  onChange,
-  disabled,
-}: {
-  name: ChannelLimitName;
-  mode: LimitMode;
-  label: string;
-  entry: LimitDraft;
-  defaultValue: number | undefined;
-  onChange(name: ChannelLimitName, next: LimitDraft): void;
-  disabled: boolean;
-}) {
-  // Choosing "Set" starts from the default when there is one.
-  const select = useCallback(
-    () =>
-      onChange(name, {
-        mode,
-        value: mode === "custom" && entry.value === "" ? String(defaultValue ?? "") : entry.value,
-      }),
-    [defaultValue, entry.value, mode, name, onChange],
-  );
-  return (
-    <Button
-      size="xs"
-      variant={entry.mode === mode ? "secondary" : "outline"}
-      disabled={disabled}
-      onPress={select}
-    >
-      {label}
-    </Button>
-  );
+function placeholder(off: boolean, defaultValue: number | undefined): string {
+  if (off) return "Off";
+  return defaultValue === undefined ? "No limit" : `Default ${String(defaultValue)}`;
 }
 
 /** The Bot's own limits and the limits each of its Conversations gets. */
@@ -243,12 +166,9 @@ export function ChannelAccountLimitsPanel({
   }, [parsedBot, parsedConversation, save]);
   return (
     <View style={settingsStyles.row}>
-      <View style={settingsStyles.rowContent}>
+      <View style={[settingsStyles.rowContent, styles.panel]}>
         <Text style={settingsStyles.rowTitle}>Whole bot</Text>
-        <Text style={settingsStyles.rowHint}>
-          Counted across every conversation of this bot. Messages over a rate or run limit wait
-          their turn; a message longer than the input limit is refused.
-        </Text>
+        <Text style={settingsStyles.rowHint}>Every conversation of this bot together.</Text>
         <ChannelLimitsFields
           draft={bot}
           setDraft={setBot}
@@ -256,14 +176,15 @@ export function ChannelAccountLimitsPanel({
           error={parsedBot.valid ? null : parsedBot.error}
           disabled={pending}
         />
-        <Text style={settingsStyles.rowTitle}>Each conversation</Text>
+        <Text style={[settingsStyles.rowTitle, styles.group]}>Each conversation</Text>
         <Text style={settingsStyles.rowHint}>
-          Counted per channel, group or DM. Every thread of a channel counts toward that channel.
+          Each channel, group or DM on its own, its threads included.
         </Text>
         <ChannelLimitsFields
           draft={conversation}
           setDraft={setConversation}
           defaults={NO_DEFAULTS}
+          note={false}
           error={parsedConversation.valid ? null : parsedConversation.error}
           disabled={pending}
         />
@@ -280,14 +201,17 @@ export function ChannelAccountLimitsPanel({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  panel: { gap: theme.spacing[2] },
+  // The second scope starts a new group: set it off from the fields above.
+  group: { marginTop: theme.spacing[4] },
   fields: {
     gap: theme.spacing[3],
   },
-  modes: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[2],
-  },
+  // The Route form's number rows (`RouteNumberRow`): a short field, its unit after it.
+  numberInput: { width: 128 },
+  unit: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm, width: 64 },
+  offSlot: { alignItems: "flex-end", width: 92 },
+  note: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   error: {
     color: theme.colors.destructive,
     fontSize: theme.fontSize.sm,

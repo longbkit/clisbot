@@ -387,7 +387,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface2,
+    backgroundColor: theme.colors.input,
     overflow: "hidden",
   },
   linkInput: {

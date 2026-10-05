@@ -54,7 +54,7 @@ Slack installs from an existing Connection, so create the Connection first under
 clisbot channels add slack --account main --connection-id <connection-uuid>
 ```
 
-In the app, open **Channels → Connections → Add Route** and pick the Slack Connection (or **Connect a new one**); that first Route covers the conversations the agent should answer, and the Connection's own **Add Route** adds more. **Channels → Channel Integrations** shows the same capability matrix per account.
+In the app, open **Channels → Connections → Add Connection** and connect Slack (or **Use an existing Connection**); that first Route covers the conversations the agent should answer, and the Connection's own **Add Route** adds more. **Channels → Channel Integrations** shows the same capability matrix per account.
 
 `clisbot channels ls` shows every account and its transport state; `clisbot channels status` adds the pin, integrity, and load-trace columns.
 

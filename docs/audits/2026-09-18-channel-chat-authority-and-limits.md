@@ -56,6 +56,8 @@ only open-audience Routes showed them in the UI.
 ### Chat authority is separate from Host/Project access
 
 > **Superseded (2026-09-19):** who may talk to a Route is decided only by its audience rules; `channel.use` is no longer granted. See [Route audience rules](2026-09-19-route-audience-rules.md). The separation from Host/Project access below still holds.
+>
+> **Amended (2026-10-05):** `/status` is public, answered with what the caller's standing allows. See [`/status` and `/me` disclosure](2026-10-05-status-and-me-disclosure.md).
 
 Option C.
 
@@ -94,6 +96,11 @@ Replacing a configuration cancels only open-audience runs, as it did before
 Member Routes could carry limits.
 
 ### Limits
+
+Amended 2026-10-05 by [Routes and Rules, Limits](2026-10-05-routes-and-rules.md#limits):
+each Rule has its own limits and the open-audience defaults are an Anyone
+Rule's, not the whole Route's; the Route keeps totals; Bot messages per minute
+is the Connection's.
 
 - One limit shape everywhere, with every leaf available at every scope:
   `maxInputCharacters`, `messagesPerMinutePerSender`, `messagesPerMinute`,

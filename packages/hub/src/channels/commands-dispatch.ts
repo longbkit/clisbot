@@ -16,10 +16,16 @@ import {
 } from "./commands.js";
 import {
   commandAccessRequest,
-  channelIdentityText,
   channelSessionLinks,
   channelSessionLinkText,
 } from "./commands-context.js";
+import {
+  callerChatLines,
+  callerSeesSession,
+  meText,
+  resolveCommandCaller,
+  type CommandCaller,
+} from "./commands-caller.js";
 import {
   runConfigurationCommand,
   resolveConversationConfiguration,
@@ -93,17 +99,16 @@ export class ChannelCommandDispatcher {
     try {
       if (command.name === "help")
         return this.reply(context, textCommandHelpText(context.route.target.kind), "help");
-      if (command.name === "me")
+      if (command.name === "me") {
+        const caller = await this.callerOf(context);
         return this.reply(
           context,
-          await channelIdentityText(
-            this.deps.plane,
-            context.message,
-            context.account,
-            context.route,
-          ),
+          await meText({ plane: this.deps.plane, ...context, caller }),
           "me",
         );
+      }
+      if (command.name === "status")
+        return this.reply(context, await this.status(context), "status");
       if (command.name === "followup") return this.followUp(command.value, context);
       if (context.route.target.kind === "workflow") return this.workflow(command, context);
       const lifecycle = await this.deps.lifecycle.handle(command, context);
@@ -472,11 +477,54 @@ export class ChannelCommandDispatcher {
     const link = links ? channelSessionLinkText(links) : undefined;
     if (command.name === "cowork")
       return this.reply(context, link ?? "The host has not provided a session link yet.", "cowork");
-    if (command.name === "status") return this.reply(context, this.status(agent, link), "status");
     return this.reply(context, `/${command.name} is unavailable.`);
   }
 
-  private status(agent: AgentSnapshot, link?: string): string {
+  /** The caller the plane resolved before answering, or resolved here. */
+  private async callerOf(context: LifecycleCommandContext): Promise<CommandCaller> {
+    return (
+      context.caller ??
+      (await resolveCommandCaller({
+        plane: this.deps.plane,
+        store: this.deps.store.access,
+        ...context,
+      }))
+    );
+  }
+
+  /** `/status`: this chat for anyone, the session for an admitted Hub Member. */
+  private async status(context: LifecycleCommandContext): Promise<string> {
+    const caller = await this.callerOf(context);
+    const { message, route, account } = context;
+    const lines = callerChatLines(caller, message, { route, account });
+    if (!caller.admitted) return lines.join("\n");
+    if (!callerSeesSession(caller)) return [...lines, await this.busyLine(context)].join("\n");
+    return [...lines, await this.sessionText(context)].join("\n");
+  }
+
+  /** What an admitted guest may know about the session: whether it is working. */
+  private async busyLine(context: LifecycleCommandContext): Promise<string> {
+    if (context.route.target.kind === "workflow" || !context.agentId) {
+      return "Bot: no session in this chat yet.";
+    }
+    const agent = (await this.deps.daemon.listAgents()).find(({ id }) => id === context.agentId);
+    return agent?.status === "running" ? "Bot: working on a reply." : "Bot: idle.";
+  }
+
+  private async sessionText(context: LifecycleCommandContext): Promise<string> {
+    if (context.route.target.kind === "workflow") return this.workflowRuns(context);
+    if (!context.agentId) return "No agent session is bound to this conversation yet.";
+    const agent = (await this.deps.daemon.listAgents()).find(({ id }) => id === context.agentId);
+    if (!agent) return "The bound agent is unavailable.";
+    const links = channelSessionLinks(
+      this.deps.daemon.getServerInfo?.()?.serverId,
+      agent.id,
+      this.deps.plane.appWebUrl,
+    );
+    return this.sessionLines(agent, links ? channelSessionLinkText(links) : undefined);
+  }
+
+  private sessionLines(agent: AgentSnapshot, link?: string): string {
     const used = agent.contextWindowUsedTokens;
     const max = agent.contextWindowMaxTokens;
     return [
@@ -497,10 +545,26 @@ export class ChannelCommandDispatcher {
     command: ChannelTextCommand,
     context: LifecycleCommandContext,
   ): Promise<CommandResult> {
+    if (command.name === "stop") {
+      if (!this.deps.plane.cancelWorkflowRuns)
+        throw new Error("Automation cancellation is unavailable.");
+      const count = await this.deps.plane.cancelWorkflowRuns(this.workflowRunScope(context));
+      return this.reply(context, `Stop requested for ${count} active automation run(s).`);
+    }
+    return this.reply(context, await this.workflowRuns(context), command.name);
+  }
+
+  private async workflowRuns(context: LifecycleCommandContext): Promise<string> {
+    if (!this.deps.plane.readWorkflowRuns) throw new Error("Automation status is unavailable.");
+    const runs = await this.deps.plane.readWorkflowRuns(this.workflowRunScope(context));
+    return workflowRunsText(runs, this.deps.plane.appWebUrl);
+  }
+
+  private workflowRunScope(context: LifecycleCommandContext) {
     const { message, route } = context;
     if (route.target.kind !== "workflow") throw new Error("An automation route is required.");
     const key = deriveBindingKey(message, route);
-    const input = {
+    return {
       organizationId: this.deps.plane.organizationId,
       bindingKey: JSON.stringify([
         message.channel,
@@ -510,15 +574,6 @@ export class ChannelCommandDispatcher {
       ]),
       workflowName: route.target.workflow,
     };
-    if (command.name === "stop") {
-      if (!this.deps.plane.cancelWorkflowRuns)
-        throw new Error("Automation cancellation is unavailable.");
-      const count = await this.deps.plane.cancelWorkflowRuns(input);
-      return this.reply(context, `Stop requested for ${count} active automation run(s).`);
-    }
-    if (!this.deps.plane.readWorkflowRuns) throw new Error("Automation status is unavailable.");
-    const runs = await this.deps.plane.readWorkflowRuns(input);
-    return this.reply(context, workflowRunsText(runs, this.deps.plane.appWebUrl), command.name);
   }
 
   private async reply(

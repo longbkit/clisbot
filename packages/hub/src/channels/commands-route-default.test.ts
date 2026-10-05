@@ -23,12 +23,10 @@ enabled: true
 connectionId: slack-support
 transport: { mode: socket, errorPolicy: once }
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C0] } }]
-    contains: other
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C0] }, contains: other }]
     agent: assistant
     environment: lab
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] } }]
-    contains: deploy
+  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] }, contains: deploy }]
     agent: assistant
     environment: lab
 `;

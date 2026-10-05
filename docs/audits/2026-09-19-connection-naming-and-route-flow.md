@@ -9,6 +9,10 @@ hub: `channels/policy.ts`, `channels/approvals/question-auto-answer.ts`,
 ([2026-08-23 §S10](2026-08-23-openclaw-channel-reuse-plan.md#s10-trust-posture-channel-originated-sessions-are-approval-required-by-default-p15),
 [2026-08-24 §4.3.7](2026-08-24-hub-integration-implementation.md#437-open-vocabulary-referential-not-enum)).
 
+Amended 2026-10-05 by [Routes and Rules](2026-10-05-routes-and-rules.md): "Who
+can talk, and where" and "When it answers" are one **Rules** section, and the
+mention, follow-up and message text are per Rule, not per Route.
+
 ## Context
 
 The Channels screen showed one bot under two names and three verbs:
@@ -56,6 +60,32 @@ Auto-accept:
 
 ## Decision
 
+- **One-screen Connections (2026-10-04):** the Connections tab lists every
+  Connection with its Routes; there is no Connection page to open. Opening one
+  took a click and showed nothing the list could not, and a Hub with dozens of
+  Connections needs every Route one click from its form. This supersedes "An
+  open Connection is a page" and the list header's Add Route below.
+  - One compact card per Connection. Its header is one line: name, a status
+    badge, the platform's name for the bot when it differs from the account
+    id, then **Add Route**, the switch and a … menu (Send test message, Retry
+    runtime, View activity, Remove). Runtime errors and QR linking show under
+    the header only when they apply.
+  - A Route is two lines: who may talk and where, then what answers and how
+    (the Agent, or its provider and model when the form generated its name;
+    the Host; the Reply method; the permission choice; "Custom limits" once
+    set). "Route N" shows only when the Connection has more than one Route,
+    and reordering moved into the Route's … menu.
+  - The page header has **Add Connection** and a … menu (Refresh status, View
+    activity, Revision history, Advanced YAML). Add Connection opens the Add
+    Route form on its connect step, so a Connection still arrives with its
+    first Route; **Use an existing Connection** leads to the form's picker,
+    the way to give a Connection with no Routes its first one. Revision history
+    and Advanced YAML open above the list and close with Hide.
+  - A Connection with no Routes stays on the page. Removing a Connection's
+    Routes offers to keep its credential, and the list showed only Connections
+    with Routes, so a kept one disappeared with no way to route it again. Its
+    card reads **No Routes**; **Add Route** opens the form with it picked, and
+    Remove disconnects the credential when nothing else uses it.
 - **Connection detail simplification (2026-09-24):** Route actions sit beside
   the Route title. Ordering arrows appear only when the Connection has multiple
   Routes. The refusal note below the Routes and the Connection settings block

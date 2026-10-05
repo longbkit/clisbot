@@ -1,18 +1,57 @@
-// Route audience rules as the editor holds them: "[who] may talk in [where]",
-// one row per rule (docs/audits/2026-09-19-route-audience-rules.md). Pure
-// functions over the stored Route shape — no React — so the form, the row
-// summaries and the tests read one definition.
+// A Route's Rules as the editor holds them (docs/audits/2026-10-05-routes-and-rules.md):
+// each Rule is one way into the Route — a place (direct messages, or group
+// chats), who may talk there, and when a message gets in (a mention, the
+// follow-up window, a text filter). Pure functions over the stored Route shape
+// — no React — so the form, the row summaries and the tests read one definition.
 
-import { routeContainsText, type ChannelConfigurationRecord } from "../channel-configuration";
+import {
+  parseChannelFollowUpTtlMinutes,
+  type ChannelConfigurationRecord,
+  type ChannelLimits,
+} from "../channel-configuration";
 import { splitConversationIds } from "../conversation-picker";
 import { HUB_AUDIENCE_ROLES, type HubAudienceRole, type HubAudienceRule } from "../contracts";
+import {
+  RULE_LIMIT_NAMES,
+  channelLimitsDraft,
+  parseChannelLimitsDraft,
+  type ChannelLimitsDraft,
+} from "./channel-limits-draft";
 
 export type AudienceGroups = NonNullable<HubAudienceRule["where"]["groups"]>;
+export type FollowUpMode = "auto" | "mention-only";
 
-/** One rule as the form edits it: lists as arrays, typed ids as the picker's comma-joined text. */
+/** Where a Rule applies: one kind of place per Rule. */
+export type RulePlace = "dm" | "groups";
+
+/**
+ * Who, as one choice from narrow to wide. Roles nest on the Hub (`admin`
+ * includes Owners, `member` is every Member), so they are a ladder, not chips.
+ */
+export type WhoChoice = "owners" | "admins" | "everyone" | "pick" | "anyone";
+
+/** A Rule's own conditions; an absent leaf inherits the Connection's and organization's. */
+export interface RuleConditionsDraft {
+  requireMention?: boolean;
+  followUpMode?: FollowUpMode;
+  /** Typed minutes for the follow-up window. */
+  ttlMinutes?: string;
+  /** Absent = every message; a string = only messages containing it. */
+  contains?: string;
+}
+
+/** What a Rule that sets no condition meets: the Connection's, then the organization's. */
+export interface InheritedConditions {
+  requireMention: boolean;
+  followUpMode: FollowUpMode;
+  ttlMinutes: number;
+}
+
+/** One Rule as the form edits it: lists as arrays, typed ids as comma-joined text. */
 export interface AudienceRuleDraft {
   /** Row identity for the editor only; never sent to the Hub. */
   id: string;
+  place: RulePlace;
   who: {
     roles: HubAudienceRole[];
     teams: string[];
@@ -22,42 +61,48 @@ export interface AudienceRuleDraft {
     /** Channel identities outside the Hub, comma-separated. */
     identities: string;
   };
+  /** The person picked "Only people I pick": stays there even before anyone is named. */
+  picking: boolean;
   where: {
-    /** Off, every DM with someone the Who names, or only DMs with `dmMembers`. */
+    /** A DM Rule: every DM with someone the Who names; `specific` only in a stored
+     * Rule that narrowed DMs to named people (no longer offered). */
     dm: AudienceDmScope;
-    /** Membership ids; read only while `dm` is `specific`. */
     dmMembers: string[];
-    /** Team ids; read only while `dm` is `specific`. */
     dmTeams: string[];
-    /** Guests' channel identities, comma-separated; read only while `dm` is `specific`. */
     dmIdentities: string;
-    /** Off, or exactly one of: every group chat, a visibility filter, the named conversations. */
+    /** A group-chats Rule: every group chat, a visibility filter, or the named ones. */
     groups: AudienceGroupScope;
     /** Native conversation ids, comma-separated (`ConversationSelectionFields`). */
     conversations: string;
   };
+  conditions: RuleConditionsDraft;
+  /** Its own limits; a leaf left at its default meets the Route's, then for an
+   * Anyone Rule the open-Route defaults (`ruleLimitDefaults`). */
+  limits: ChannelLimitsDraft;
+  /** The Rule as stored. An untouched Rule is written back exactly as it was. */
+  stored?: ChannelConfigurationRecord;
+  edited: boolean;
 }
 
 export type AudienceDmScope = "off" | "all" | "specific";
 /** The stored `groups` values plus `specific`: `groups: off` with `conversations`. */
 export type AudienceGroupScope = AudienceGroups | "specific";
 
-/** In a sentence: "Members may talk in …". */
+/** In a sentence and a summary: "Members may talk in …". */
 export const AUDIENCE_ROLE_LABELS: Record<HubAudienceRole, string> = {
   owner: "Owners",
-  admin: "Admins",
-  member: "Members",
+  admin: "Owners and admins",
+  member: "Everyone on the Hub",
 };
 
-/**
- * On a chip, where the picker under it lists Members by name: "All Members"
- * says the role covers everyone who holds it, not some of them.
- */
-export const AUDIENCE_ROLE_CHIP_LABELS: Record<HubAudienceRole, string> = {
-  owner: "All Owners",
-  admin: "All Admins",
-  member: "All Members",
+export const WHO_CHOICE_LABELS: Record<Exclude<WhoChoice, "anyone">, string> = {
+  owners: "Only owners",
+  admins: "Owners and admins",
+  everyone: "Everyone on the Hub",
+  pick: "Only people I pick",
 };
+
+const EMPTY_STORED: ChannelConfigurationRecord = {};
 
 let ruleSequence = 0;
 function nextRuleId(): string {
@@ -65,60 +110,152 @@ function nextRuleId(): string {
   return `rule-${String(ruleSequence)}`;
 }
 
-/** A new Route: every Member, nowhere yet. The configurator opens each place on purpose. */
-export function newRouteRule(): AudienceRuleDraft {
+const NO_WHERE: AudienceRuleDraft["where"] = {
+  dm: "off",
+  dmMembers: [],
+  dmTeams: [],
+  dmIdentities: "",
+  groups: "off",
+  conversations: "",
+};
+
+/**
+ * A new Rule: the Hub's owners in direct messages, answered without a mention.
+ * Switched to group chats it needs a mention there.
+ */
+export function newAudienceRule(place: RulePlace = "dm"): AudienceRuleDraft {
   return {
     id: nextRuleId(),
-    who: { roles: ["member"], teams: [], members: [], anyone: false, identities: "" },
-    where: {
-      dm: "off",
-      dmMembers: [],
-      dmTeams: [],
-      dmIdentities: "",
-      groups: "off",
-      conversations: "",
-    },
+    place,
+    who: whoForChoice("owners"),
+    picking: false,
+    where: placeWhere(place),
+    conditions: placeConditions(place),
+    limits: channelLimitsDraft(undefined),
+    edited: true,
   };
 }
 
-/** An added row starts empty: the configurator names both halves. */
-export function emptyAudienceRule(): AudienceRuleDraft {
+function placeWhere(place: RulePlace): AudienceRuleDraft["where"] {
+  return place === "dm" ? { ...NO_WHERE, dm: "all" } : { ...NO_WHERE, groups: "specific" };
+}
+
+/** A place's starting conditions: a DM is answered without a mention, a group chat with one. */
+function placeConditions(place: RulePlace): RuleConditionsDraft {
+  return place === "dm"
+    ? { requireMention: false }
+    : { requireMention: true, followUpMode: "mention-only" };
+}
+
+/** The Rule moved to the other kind of place: its Where and mention start over there. */
+export function withPlace(rule: AudienceRuleDraft, place: RulePlace): AudienceRuleDraft {
+  if (rule.place === place) return rule;
+  const { contains } = rule.conditions;
   return {
-    id: nextRuleId(),
-    who: { roles: [], teams: [], members: [], anyone: false, identities: "" },
-    where: {
-      dm: "off",
-      dmMembers: [],
-      dmTeams: [],
-      dmIdentities: "",
-      groups: "off",
-      conversations: "",
-    },
+    ...rule,
+    place,
+    where: placeWhere(place),
+    conditions: { ...placeConditions(place), ...(contains === undefined ? {} : { contains }) },
   };
 }
 
-export function audienceRuleDraft(rule: HubAudienceRule): AudienceRuleDraft {
+// --- Who -------------------------------------------------------------------------
+
+const CHOICE_ROLES: Record<"owners" | "admins" | "everyone", HubAudienceRole> = {
+  owners: "owner",
+  admins: "admin",
+  everyone: "member",
+};
+
+export function whoForChoice(choice: Exclude<WhoChoice, "pick">): AudienceRuleDraft["who"] {
+  const none = { roles: [], teams: [], members: [], anyone: false, identities: "" };
+  if (choice === "anyone") return { ...none, anyone: true };
+  return { ...none, roles: [CHOICE_ROLES[choice]] };
+}
+
+/** The choice a Who reads as. Anything beyond one role is people picked by hand. */
+export function whoChoiceOf(
+  rule: Pick<AudienceRuleDraft, "who" | "picking"> & { where?: AudienceRuleDraft["where"] },
+): WhoChoice {
+  const { who } = rule;
+  if (who.anyone) return "anyone";
+  // An older Rule that narrowed DMs lets in only the people it named there.
+  if (rule.picking || rule.where?.dm === "specific") return "pick";
+  const named = who.teams.length + who.members.length + splitConversationIds(who.identities).length;
+  if (named > 0 || who.roles.length === 0) return "pick";
+  if (who.roles.includes("member")) return who.roles.length === 1 ? "everyone" : "pick";
+  if (who.roles.includes("admin")) return "admins";
+  return "owners";
+}
+
+// --- Stored shape → drafts --------------------------------------------------------
+
+/** What a stored Route authored: its Rules, a Rule over DMs and group chats split in two. */
+export function routeAudienceDraft(route: ChannelConfigurationRecord): AudienceRuleDraft[] {
+  const audience = route["audience"];
+  if (!Array.isArray(audience)) return [];
+  return audience.flatMap((rule) => {
+    const record = recordValue(rule);
+    return record === null ? [] : storedRuleDrafts(record);
+  });
+}
+
+/**
+ * One stored Rule as the editor shows it. A Rule over DMs and group chats
+ * becomes two (the same people, the same conditions): a sender gets in through
+ * any Rule, so the meaning is unchanged.
+ */
+function storedRuleDrafts(stored: ChannelConfigurationRecord): AudienceRuleDraft[] {
+  const where = storedWhere(recordValue(stored["where"]) ?? {});
+  const base = {
+    who: storedWho(recordValue(stored["who"]) ?? {}),
+    picking: false,
+    conditions: storedConditions(stored),
+    limits: channelLimitsDraft(stored["limits"]),
+    stored,
+  };
+  const dm = where.dm !== "off";
+  const groups = where.groups !== "off";
+  if (dm && groups) {
+    return [
+      {
+        ...base,
+        id: nextRuleId(),
+        place: "dm",
+        where: { ...where, groups: "off", conversations: "" },
+        edited: true,
+      },
+      {
+        ...base,
+        id: nextRuleId(),
+        place: "groups",
+        where: { ...where, dm: "off", dmMembers: [], dmTeams: [], dmIdentities: "" },
+        edited: true,
+      },
+    ];
+  }
+  return [{ ...base, id: nextRuleId(), place: dm ? "dm" : "groups", where, edited: false }];
+}
+
+function storedWho(who: ChannelConfigurationRecord): AudienceRuleDraft["who"] {
+  const roles = new Set(stringList(who["roles"]));
   return {
-    id: nextRuleId(),
-    who: {
-      roles: HUB_AUDIENCE_ROLES.filter((role) => rule.who.roles?.includes(role) === true),
-      teams: [...(rule.who.teams ?? [])],
-      members: [...(rule.who.members ?? [])],
-      anyone: rule.who.anyone === true,
-      identities: (rule.who.identities ?? []).join(", "),
-    },
-    where: whereDraft(rule.where),
+    roles: HUB_AUDIENCE_ROLES.filter((role) => roles.has(role)),
+    teams: stringList(who["teams"]),
+    members: stringList(who["members"]),
+    anyone: who["anyone"] === true,
+    identities: stringList(who["identities"]).join(", "),
   };
 }
 
-function whereDraft(where: HubAudienceRule["where"]): AudienceRuleDraft["where"] {
-  const dmMembers = [...(where.dmMembers ?? [])];
-  const dmTeams = [...(where.dmTeams ?? [])];
-  const dmIdentities = [...(where.dmIdentities ?? [])];
-  const conversations = (where.conversations ?? []).map(String);
-  const groups = where.groups ?? "off";
+function storedWhere(where: ChannelConfigurationRecord): AudienceRuleDraft["where"] {
+  const dmMembers = stringList(where["dmMembers"]);
+  const dmTeams = stringList(where["dmTeams"]);
+  const dmIdentities = stringList(where["dmIdentities"]);
+  const conversations = stringList(where["conversations"]);
+  const groups = audienceGroups(where["groups"]);
   let dm: AudienceDmScope = "off";
-  if (where.dm === true) dm = "all";
+  if (where["dm"] === true) dm = "all";
   else if (dmMembers.length + dmTeams.length + dmIdentities.length > 0) dm = "specific";
   return {
     dm,
@@ -128,6 +265,73 @@ function whereDraft(where: HubAudienceRule["where"]): AudienceRuleDraft["where"]
     // A stored filter keeps its conversations beside it (`extraConversations`).
     groups: groups === "off" && conversations.length > 0 ? "specific" : groups,
     conversations: conversations.join(", "),
+  };
+}
+
+function storedConditions(stored: ChannelConfigurationRecord): RuleConditionsDraft {
+  const interaction = recordValue(stored["interaction"]) ?? {};
+  const followUp = recordValue(interaction["followUp"]) ?? {};
+  const mode = followUp["mode"];
+  const ttl = followUp["ttlMinutes"];
+  const contains = stored["contains"];
+  return {
+    ...(typeof interaction["requireMention"] === "boolean"
+      ? { requireMention: interaction["requireMention"] }
+      : {}),
+    ...(mode === "auto" || mode === "mention-only" ? { followUpMode: mode } : {}),
+    ...(typeof ttl === "number" ? { ttlMinutes: String(ttl) } : {}),
+    ...(typeof contains === "string" && contains.length > 0 ? { contains } : {}),
+  };
+}
+
+// --- Drafts → stored shape --------------------------------------------------------
+
+/**
+ * What a Rule saves as. Untouched, exactly what was stored; edited, the stored
+ * Rule with only the leaves this editor owns replaced, so a key it does not
+ * show survives.
+ */
+export function audienceRuleFromDraft(draft: AudienceRuleDraft): HubAudienceRule {
+  if (!draft.edited && draft.stored !== undefined) return draft.stored as HubAudienceRule;
+  const {
+    who: _who,
+    where: _where,
+    interaction,
+    contains: _contains,
+    limits: _limits,
+    ...kept
+  } = draft.stored ?? EMPTY_STORED;
+  const keptInteraction = { ...recordValue(interaction) };
+  delete keptInteraction["requireMention"];
+  delete keptInteraction["followUp"];
+  const ownInteraction = { ...keptInteraction, ...interactionFromDraft(draft.conditions) };
+  const contains = draft.conditions.contains?.trim() ?? "";
+  return {
+    ...kept,
+    who: whoFromDraft(draft.who),
+    where: whereFromDraft(draft.where),
+    ...(Object.keys(ownInteraction).length === 0 ? {} : { interaction: ownInteraction }),
+    ...(contains.length === 0 ? {} : { contains }),
+    ...ownLimits(draft.limits),
+  } as HubAudienceRule;
+}
+
+/** The leaves the Rule sets; a Rule at every default writes no `limits`. */
+function ownLimits(draft: ChannelLimitsDraft): { limits?: ChannelLimits } {
+  const parsed = parseChannelLimitsDraft(draft, RULE_LIMIT_NAMES);
+  if (!parsed.valid || Object.keys(parsed.value).length === 0) return {};
+  return { limits: parsed.value };
+}
+
+function whoFromDraft(who: AudienceRuleDraft["who"]): HubAudienceRule["who"] {
+  // Anyone covers every sender, so a rule saved as Anyone carries nothing else.
+  if (who.anyone) return { roles: [], teams: [], members: [], anyone: true, identities: [] };
+  return {
+    roles: who.roles,
+    teams: who.teams,
+    members: who.members,
+    anyone: false,
+    identities: splitConversationIds(who.identities),
   };
 }
 
@@ -143,6 +347,38 @@ function whereFromDraft(where: AudienceRuleDraft["where"]): HubAudienceRule["whe
   };
 }
 
+function interactionFromDraft(conditions: RuleConditionsDraft): ChannelConfigurationRecord {
+  const ttl = parseTtlMinutes(conditions.ttlMinutes);
+  const followUp = {
+    ...(conditions.followUpMode === undefined ? {} : { mode: conditions.followUpMode }),
+    ...(ttl === null ? {} : { ttlMinutes: ttl }),
+  };
+  return {
+    ...(conditions.requireMention === undefined
+      ? {}
+      : { requireMention: conditions.requireMention }),
+    ...(Object.keys(followUp).length === 0 ? {} : { followUp }),
+  };
+}
+
+function parseTtlMinutes(text: string | undefined): number | null {
+  return text === undefined ? null : parseChannelFollowUpTtlMinutes(text);
+}
+
+/** The conditions a Rule meets: its own, over what it inherits. */
+export function effectiveConditions(
+  conditions: RuleConditionsDraft,
+  inherited: InheritedConditions,
+): InheritedConditions & { contains?: string } {
+  const ttl = parseTtlMinutes(conditions.ttlMinutes);
+  return {
+    requireMention: conditions.requireMention ?? inherited.requireMention,
+    followUpMode: conditions.followUpMode ?? inherited.followUpMode,
+    ttlMinutes: ttl ?? inherited.ttlMinutes,
+    ...(conditions.contains === undefined ? {} : { contains: conditions.contains }),
+  };
+}
+
 /**
  * Conversations stored beside All / Public only / Private only by an earlier editor, which
  * offered both at once. They still count until the configurator picks an option again.
@@ -153,22 +389,7 @@ export function extraConversations(where: AudienceRuleDraft["where"]): string[] 
     : splitConversationIds(where.conversations);
 }
 
-export function audienceRuleFromDraft(draft: AudienceRuleDraft): HubAudienceRule {
-  // Anyone covers every sender, so a rule saved as Anyone carries nothing else.
-  const who: HubAudienceRule["who"] = draft.who.anyone
-    ? { roles: [], teams: [], members: [], anyone: true, identities: [] }
-    : {
-        roles: draft.who.roles,
-        teams: draft.who.teams,
-        members: draft.who.members,
-        anyone: draft.who.anyone,
-        identities: splitConversationIds(draft.who.identities),
-      };
-  return {
-    who,
-    where: whereFromDraft(draft.where),
-  };
-}
+// --- Checks ----------------------------------------------------------------------
 
 function hasWhoPart(who: AudienceRuleDraft["who"]): boolean {
   return (
@@ -180,48 +401,80 @@ function hasWhoPart(who: AudienceRuleDraft["who"]): boolean {
   );
 }
 
-function hasWherePart(where: AudienceRuleDraft["where"]): boolean {
-  const saved = whereFromDraft(where);
-  return (
-    saved.dm === true ||
-    (saved.dmMembers ?? []).length > 0 ||
-    (saved.dmTeams ?? []).length > 0 ||
-    (saved.dmIdentities ?? []).length > 0 ||
-    saved.groups !== "off" ||
-    (saved.conversations ?? []).length > 0
-  );
+/** Why a Rule cannot save yet, or null. `inherited` decides which condition fields show. */
+export function audienceRuleProblem(
+  rule: AudienceRuleDraft,
+  inherited: InheritedConditions,
+): string | null {
+  return ruleProblemAt(rule, inherited)?.message ?? null;
 }
 
-/**
- * Why a rule cannot save yet, or null. A place that is switched on must name
- * something: saving would otherwise drop it and the switch would read off again.
- */
-export function audienceRuleProblem(rule: AudienceRuleDraft): string | null {
+/** Which part of the Rule a problem belongs to, so it shows under that field. */
+export type RuleProblemPart = "where" | "who" | "conditions";
+
+/** Why a Rule cannot save yet, and the part to show it under; null when it can. */
+export function ruleProblemAt(
+  rule: AudienceRuleDraft,
+  inherited: InheritedConditions,
+): { part: RuleProblemPart; message: string } | null {
+  const whoOrWhere = whoOrWhereProblem(rule);
+  if (whoOrWhere !== null) return whoOrWhere;
+  const message = conditionsProblem(rule, inherited) ?? legacyDmProblem(rule);
+  return message === null ? null : { part: "conditions", message };
+}
+
+function whoOrWhereProblem(
+  rule: AudienceRuleDraft,
+): { part: RuleProblemPart; message: string } | null {
   const { who, where } = rule;
-  if (!hasWhoPart(who) || !hasWherePart(where)) return "Choose both a Who and a Where to save.";
-  const dmGuests = splitConversationIds(where.dmIdentities);
-  const dmPeople = where.dmMembers.length + where.dmTeams.length;
-  if (where.dm === "specific" && dmPeople === 0 && dmGuests.length === 0) {
-    return "Pick who may DM, or choose All direct messages.";
+  if (rule.place === "groups") {
+    if (where.groups === "off") return { part: "where", message: "Choose which chats." };
+    if (where.groups === "specific" && splitConversationIds(where.conversations).length === 0) {
+      return { part: "where", message: "Pick a chat, or choose Every chat the bot is in." };
+    }
   }
-  if (where.groups === "specific" && splitConversationIds(where.conversations).length === 0) {
-    return "Name a conversation, or choose All group chats.";
+  return hasWhoPart(who) ? null : { part: "who", message: "Pick at least one person." };
+}
+
+function conditionsProblem(rule: AudienceRuleDraft, inherited: InheritedConditions): string | null {
+  const { conditions } = rule;
+  // Only a minutes field that shows can block the save: its mode may be inherited.
+  const effective = effectiveConditions(conditions, inherited);
+  if (
+    effective.requireMention &&
+    effective.followUpMode === "auto" &&
+    conditions.ttlMinutes !== undefined &&
+    parseTtlMinutes(conditions.ttlMinutes) === null
+  ) {
+    return "Use a whole number of minutes.";
   }
+  if (conditions.contains !== undefined && conditions.contains.trim().length === 0) {
+    return "Type the text a message must contain.";
+  }
+  const limits = parseChannelLimitsDraft(rule.limits, RULE_LIMIT_NAMES);
+  return limits.valid ? null : limits.error;
+}
+
+/** A stored Rule that narrowed DMs: a list the Who can never reach lets nobody in. */
+function legacyDmProblem({ who, where }: AudienceRuleDraft): string | null {
   if (where.dm !== "specific" || who.anyone) return null;
-  // The DM lists narrow the Who, so a list the Who can never reach lets nobody in.
+  const dmPeople = where.dmMembers.length + where.dmTeams.length;
   const whoNamesMembers = who.roles.length > 0 || who.teams.length > 0 || who.members.length > 0;
   if (dmPeople > 0 && !whoNamesMembers) {
-    return "Who names no Member, so the Teams and Members picked for DMs never get in. Add them to Who, or remove them here.";
+    return "This older Rule limits DMs to Members its Who does not name. Pick the people again.";
   }
-  if (dmGuests.length > 0 && splitConversationIds(who.identities).length === 0) {
-    return "Who names no Guest, so the Guests picked for DMs never get in. Add them to Who, or remove them here.";
+  if (splitConversationIds(where.dmIdentities).length > 0 && who.identities.trim().length === 0) {
+    return "This older Rule limits DMs to Guests its Who does not name. Pick the people again.";
   }
   return null;
 }
 
-/** A Route needs one rule, and every rule must be able to save. */
-export function audienceRulesComplete(rules: readonly AudienceRuleDraft[]): boolean {
-  return rules.length > 0 && rules.every((rule) => audienceRuleProblem(rule) === null);
+/** A Route needs one Rule, and every Rule must be able to save. */
+export function audienceRulesComplete(
+  rules: readonly AudienceRuleDraft[],
+  inherited: InheritedConditions,
+): boolean {
+  return rules.length > 0 && rules.every((rule) => audienceRuleProblem(rule, inherited) === null);
 }
 
 export function isOpenAudienceDraft(rules: readonly AudienceRuleDraft[]): boolean {
@@ -233,52 +486,6 @@ export function isOpenAudienceDraft(rules: readonly AudienceRuleDraft[]): boolea
       (saved.dm === true || saved.groups !== "off" || (saved.conversations ?? []).length > 0)
     );
   });
-}
-
-// --- Stored shape → rules --------------------------------------------------------
-
-/** What a stored Route authored: its audience rules and its `contains` filter. */
-export function routeAudienceDraft(route: ChannelConfigurationRecord): {
-  rules: AudienceRuleDraft[];
-  contains: string;
-} {
-  return {
-    rules: storedAudienceRules(route["audience"]),
-    contains: routeContainsText(route) ?? "",
-  };
-}
-
-function storedAudienceRules(audience: unknown): AudienceRuleDraft[] {
-  if (!Array.isArray(audience)) return [];
-  return audience.flatMap((rule) => {
-    const record = recordValue(rule);
-    if (record === null) return [];
-    const who = recordValue(record["who"]) ?? {};
-    const where = recordValue(record["where"]) ?? {};
-    return [
-      audienceRuleDraft({
-        who: {
-          roles: stringList(who["roles"]).filter(isAudienceRole),
-          teams: stringList(who["teams"]),
-          members: stringList(who["members"]),
-          anyone: who["anyone"] === true,
-          identities: stringList(who["identities"]),
-        },
-        where: {
-          dm: where["dm"] === true,
-          dmMembers: stringList(where["dmMembers"]),
-          dmTeams: stringList(where["dmTeams"]),
-          dmIdentities: stringList(where["dmIdentities"]),
-          groups: audienceGroups(where["groups"]),
-          conversations: stringList(where["conversations"]),
-        },
-      }),
-    ];
-  });
-}
-
-function isAudienceRole(value: string): value is HubAudienceRole {
-  return (HUB_AUDIENCE_ROLES as readonly string[]).includes(value);
 }
 
 function audienceGroups(value: unknown): AudienceGroups {
@@ -306,8 +513,8 @@ function recordValue(value: unknown): ChannelConfigurationRecord | null {
 /**
  * The Hub catalog capability a channel claims when its inbound event states a
  * room's public/private visibility (`packages/hub/src/channels/catalog.ts`).
- * The Where filter is offered only there: elsewhere it matches nothing
- * (`packages/hub/src/channels/config/audience.ts` is the runtime side).
+ * The public/private choices are offered only there: elsewhere they match
+ * nothing (`packages/hub/src/channels/config/audience.ts` is the runtime side).
  */
 export const VISIBILITY_CAPABILITY = "visibility";
 
@@ -317,70 +524,13 @@ export function channelReportsVisibility(
   return entry?.capabilities.includes(VISIBILITY_CAPABILITY) === true;
 }
 
-/** A public-only or private-only group filter on a channel that never reports
- * visibility: that part of the rule matches no group chat. */
+/** A public-only or private-only filter on a channel that never reports
+ * visibility: that Rule matches no group chat. */
 export function visibilityFilterMatchesNothing(
   where: AudienceRuleDraft["where"],
   reportsVisibility: boolean,
 ): boolean {
   return !reportsVisibility && (where.groups === "public" || where.groups === "private");
-}
-
-// --- Summaries ----------------------------------------------------------------------
-
-/** Names for the ids a rule stores; unknown ids fall back to the id itself. */
-export interface AudienceNames {
-  teamName(id: string): string;
-  memberName(id: string): string;
-  conversationLabel(id: string): string;
-}
-
-export function audienceWhoLabel(who: AudienceRuleDraft["who"], names: AudienceNames): string {
-  // Anyone covers every sender, and a rule saved as Anyone carries nothing else.
-  if (who.anyone) return "Anyone";
-  const parts = [
-    ...who.roles.map((role) => AUDIENCE_ROLE_LABELS[role]),
-    ...who.teams.map((id) => `Team ${names.teamName(id)}`),
-    ...who.members.map((id) => names.memberName(id)),
-    // A raw channel id means a sender with no Hub account: a Guest.
-    ...splitConversationIds(who.identities).map((identity) => `Guest ${identity}`),
-  ];
-  return parts.length === 0 ? "Nobody yet" : joinNatural(parts);
-}
-
-const GROUP_LABELS: Record<Exclude<AudienceGroups, "off">, string> = {
-  all: "every group chat",
-  public: "every public group chat",
-  private: "every private group chat",
-};
-
-export function audienceWhereLabel(
-  where: AudienceRuleDraft["where"],
-  names: AudienceNames,
-): string {
-  const saved = whereFromDraft(where);
-  const dmWith = [
-    ...(saved.dmTeams ?? []).map((id) => `Team ${names.teamName(id)}`),
-    ...(saved.dmMembers ?? []).map((id) => names.memberName(id)),
-    ...(saved.dmIdentities ?? []).map((identity) => `Guest ${identity}`),
-  ];
-  const parts = [
-    ...(saved.dm === true ? ["DMs"] : []),
-    ...(dmWith.length > 0 ? [`DMs (only ${joinNatural(dmWith)})`] : []),
-    ...(saved.groups === undefined || saved.groups === "off" ? [] : [GROUP_LABELS[saved.groups]]),
-    ...(saved.conversations ?? []).map((id) => names.conversationLabel(String(id))),
-  ];
-  return parts.length === 0 ? "nowhere yet" : joinNatural(parts);
-}
-
-/** "Team QC may talk in every public group chat and #qc-private". */
-export function audienceRuleSentence(rule: AudienceRuleDraft, names: AudienceNames): string {
-  return `${audienceWhoLabel(rule.who, names)} may talk in ${audienceWhereLabel(rule.where, names)}`;
-}
-
-function joinNatural(parts: readonly string[]): string {
-  if (parts.length <= 1) return parts.join("");
-  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 // --- Hub validation ---------------------------------------------------------------

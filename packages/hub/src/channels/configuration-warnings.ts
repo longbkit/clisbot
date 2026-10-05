@@ -18,6 +18,7 @@ import type { ChannelControlPlane, CompiledRoute, EffectiveDefaults } from "./co
 import type { ApprovalRule } from "./config/schema.js";
 import { privilegeCovers } from "./config/privileges.js";
 import { autoAllowsEveryToolClass, isOpenAudienceRoute } from "./policy.js";
+import { ruleTrigger } from "./rule-trigger.js";
 
 export interface ChannelConfigurationWarning {
   channel: string;
@@ -87,14 +88,18 @@ export function openRouteWarnings(route: CompiledRoute): string[] {
   if (open.some(({ where }) => where.dm)) {
     warnings.push("Anyone who can message the bot directly can use this Route.");
   }
-  const inRooms = open.some(
-    ({ where }) => where.groups !== undefined || where.conversations.length > 0,
-  );
-  if (inRooms && !route.defaults.requireMention) {
+  // Each open rule's own conditions: one that needs no mention in a room
+  // answers everyone there.
+  const inRooms = open
+    .filter(({ where }) => where.groups !== undefined || where.conversations.length > 0)
+    .map((rule) => ruleTrigger(route, rule));
+  const auto = inRooms.filter(({ followUp }) => followUp.mode === "auto");
+  if (inRooms.some(({ requireMention }) => !requireMention)) {
     warnings.push("The bot answers every message here, not only when it is mentioned.");
-  } else if (inRooms && route.defaults.followUp.mode === "auto") {
+  } else if (auto.length > 0) {
+    const minutes = Math.max(...auto.map(({ followUp }) => followUp.ttlMinutes));
     warnings.push(
-      `After a mention, the bot answers anyone here without one for ${String(route.defaults.followUp.ttlMinutes)} minutes.`,
+      `After a mention, the bot answers anyone here without one for ${String(minutes)} minutes.`,
     );
   }
   if (autoAllowsApprovals(route.approval) && !autoAllowsEveryToolClass(route)) {

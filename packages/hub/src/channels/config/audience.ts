@@ -4,7 +4,8 @@
 // compiled shape — no IO — so the compiler, the policy engine, the gate and
 // the configuration warnings all read one definition of "covers".
 
-import type { AudienceRole, AudienceRule } from "./schema.js";
+import type { FollowUpMode } from "./enums.js";
+import type { AudienceRole, AudienceRule, RuleLimits } from "./schema.js";
 
 /** The group-chat filters a Where can ask for; `off` never reaches here. */
 export type GroupFilter = "all" | "public" | "private";
@@ -32,9 +33,23 @@ export interface CompiledWho {
   identities: readonly string[];
 }
 
+/** The trigger conditions a rule authors for itself; each absent leaf inherits
+ * the Route's effective value (`rule-trigger.ts` resolves it). */
+export interface RuleTriggerOverrides {
+  requireMention?: boolean;
+  followUp?: { mode?: FollowUpMode | undefined; ttlMinutes?: number | undefined };
+  contains?: string;
+}
+
 export interface CompiledAudienceRule {
   who: CompiledWho;
   where: CompiledWhere;
+  /** Present only when the rule authors a condition, so a rule that authors
+   * none compiles to the block (and the `routeFingerprint`) it always had. */
+  trigger?: RuleTriggerOverrides;
+  /** The rule's own limits, as authored (`off` kept). Present only when it
+   * authors one, for the same reason as `trigger`. */
+  limits?: RuleLimits;
 }
 
 /** The union of every rule's Where: which conversations the Route applies to. */
@@ -65,6 +80,7 @@ export interface AudienceSender {
 
 export function compileAudienceRule(rule: AudienceRule): CompiledAudienceRule {
   const groups = rule.where.groups;
+  const trigger = ruleTriggerOverrides(rule);
   return {
     who: {
       roles: rule.who.roles ?? [],
@@ -81,7 +97,21 @@ export function compileAudienceRule(rule: AudienceRule): CompiledAudienceRule {
       ...(groups === undefined || groups === "off" ? {} : { groups }),
       conversations: (rule.where.conversations ?? []).map(String),
     },
+    ...(trigger === undefined ? {} : { trigger }),
+    ...(rule.limits === undefined || Object.keys(rule.limits).length === 0
+      ? {}
+      : { limits: rule.limits }),
   };
+}
+
+function ruleTriggerOverrides(rule: AudienceRule): RuleTriggerOverrides | undefined {
+  const { requireMention, followUp } = rule.interaction ?? {};
+  const overrides: RuleTriggerOverrides = {
+    ...(requireMention === undefined ? {} : { requireMention }),
+    ...(followUp === undefined || Object.keys(followUp).length === 0 ? {} : { followUp }),
+    ...(rule.contains === undefined ? {} : { contains: rule.contains }),
+  };
+  return Object.keys(overrides).length === 0 ? undefined : overrides;
 }
 
 export function deriveRouteWhere(rules: readonly CompiledAudienceRule[]): RouteWhere {

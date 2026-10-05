@@ -101,10 +101,15 @@ export function configureOnboardingRoute(
     account.routes = [
       ...retained,
       ...wheres.map((where) => ({
-        audience: [{ who: { roles: ["member" as const] }, where }],
+        audience: [
+          {
+            who: { roles: ["member" as const] },
+            where,
+            interaction: { requireMention: where.dm !== true },
+          },
+        ],
         agent: key,
         environment: key,
-        interaction: { requireMention: where.dm !== true },
         reply: channel === "slack" && where.dm !== true ? { anchor: "thread" as const } : undefined,
         sync: { finalAnswers: true },
       })),

@@ -116,7 +116,7 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surface0,
   },
   row: {
     flexDirection: "row",

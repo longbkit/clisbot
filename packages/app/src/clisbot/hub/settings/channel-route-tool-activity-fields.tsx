@@ -25,7 +25,11 @@ const TOOL_DETAIL_LABELS: Record<ChannelRouteToolDetail, string> = {
   short: "Tool and short command",
   full: "Tool and full command",
 };
-const TOOL_DETAIL_NOTE = "How much of each tool line lands in the conversation.";
+const TOOL_DETAIL_DESCRIPTIONS: Record<ChannelRouteToolDetail, string> = {
+  name: "Without the command or path",
+  short: "Plus the command or path on one line, cut when long",
+  full: "Plus the whole command or path",
+};
 const WHEN_THROTTLED_LABELS: Record<ChannelRouteWhenThrottled, string> = {
   update: "Update the last line",
   skip: "Skip it",
@@ -124,10 +128,10 @@ function ToolActivityOptions({
     <>
       <ChoiceRow
         label="Tool detail"
-        note={TOOL_DETAIL_NOTE}
         values={TOOL_DETAIL_VALUES}
         selected={shown.fields.detail}
         labels={TOOL_DETAIL_LABELS}
+        descriptions={TOOL_DETAIL_DESCRIPTIONS}
         onChange={commands.changeDetail}
         disabled={pending}
       />

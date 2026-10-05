@@ -231,6 +231,8 @@ export interface LightThemeConfig {
   surface4: string;
   surfaceDiffEmpty: string;
   surfaceSidebar: string;
+  /** Defaults to `surface1`; set when the sidebar itself is `surface1`. */
+  surfaceSidebarHover?: string;
   foreground: string;
   foregroundMuted: string;
   foregroundExtraMuted: string;
@@ -273,7 +275,7 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surface4: tint.surface4,
     surfaceDiffEmpty: tint.surfaceDiffEmpty,
     surfaceSidebar: tint.surfaceSidebar,
-    surfaceSidebarHover: tint.surface1,
+    surfaceSidebarHover: tint.surfaceSidebarHover ?? tint.surface1,
     surfaceSidebarSelected: tint.surface3,
     surfaceWorkspace: tint.surface0,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
@@ -304,7 +306,8 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     muted: tint.surface2,
     mutedForeground: tint.foregroundMuted,
     accentBorder: tint.borderAccent,
-    input: tint.surface2,
+    input: tint.surface0,
+    inputBorder: tint.border,
     ring: tint.ring,
 
     ...lightDiffColors,
@@ -326,20 +329,22 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
   };
 }
 
-// Bright neutral surfaces with charcoal text, following Slack's light-theme contrast.
+// Near-white surfaces with charcoal text (Slack's light-theme contrast). Content and
+// inputs sit on white; the darker grays mark sidebar state only (docs/design.md).
 const lightSemanticColors = buildLightSemanticColors({
   surface0: "#ffffff",
-  surface1: "#f3f3f3",
-  surface2: "#ededed",
+  surface1: "#fafafa",
+  surface2: "#f4f4f5",
   surface3: "#e2e2e2",
   surface4: "#cecece",
   surfaceDiffEmpty: "#f6f6f6",
   surfaceSidebar: "#fafafa",
+  surfaceSidebarHover: "#f3f3f3",
   foreground: "#1d1c1d",
   foregroundMuted: "#4a4a4a",
   foregroundExtraMuted: "#707070",
   border: "#d8d8d8",
-  borderAccent: "#bdbdbd",
+  borderAccent: "#c8c8c8",
   accent: "#20744A",
   accentBright: "#239956",
   accentForeground: "#ffffff",
@@ -438,6 +443,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     mutedForeground: tint.foregroundMuted,
     accentBorder: tint.borderAccent,
     input: tint.surface2,
+    inputBorder: "transparent",
     ring,
 
     ...darkDiffColors,

@@ -35,7 +35,6 @@ interface IdPickerLabels {
   choose: string;
   search: string;
   empty: string;
-  none: string;
   manualField: string;
   manualHint: string;
   unavailable: string;
@@ -45,7 +44,6 @@ const CONVERSATION_LABELS: IdPickerLabels = {
   choose: "Choose conversations",
   search: "Search by name or provider ID",
   empty: "No conversation matches this search.",
-  none: "No conversations selected.",
   manualField: "Conversation IDs",
   manualHint:
     "Enter multiple IDs separated by commas or new lines. These update the selected conversations above.",
@@ -57,7 +55,6 @@ const SENDER_LABELS: IdPickerLabels = {
   choose: "Choose people who messaged the bot",
   search: "Search by name, username or ID",
   empty: "Nobody without a Hub account matches this search.",
-  none: "No senders selected.",
   manualField: "Sender IDs",
   manualHint:
     "Channel user ids, separated by commas or new lines: U0ALICE or slack:U0ALICE. Use this for someone who has not messaged the bot yet.",
@@ -95,11 +92,17 @@ function useAccountDirectory<Schema extends z.ZodType>(
   });
 }
 
+/** The people who messaged this bot, for naming the senders a Rule picks. */
+export function useObservedSenders(channel: string | null, accountId: string | null) {
+  return useAccountDirectory("senders", channel, accountId, HubObservedChannelSendersSchema);
+}
+
 /** Conversations this bot has seen, plus the ones Routes already name, searchable by name. */
 export function ConversationSelectionFields({
   channel,
   accountId,
   kind,
+  excludeKind,
   value,
   onChange,
   disabled,
@@ -109,6 +112,8 @@ export function ConversationSelectionFields({
   channel: string | null;
   accountId: string | null;
   kind?: ConversationKind;
+  /** A kind not to offer, such as DMs for a group-chat Rule; one already picked stays listed. */
+  excludeKind?: ConversationKind;
   value: string;
   onChange(value: string): void;
   disabled: boolean;
@@ -121,15 +126,18 @@ export function ConversationSelectionFields({
     accountId,
     HubObservedChannelConversationsSchema,
   );
-  const options = useMemo(
-    () =>
-      observedConversationOptions(
-        observations.data?.conversations ?? [],
-        kind,
-        observations.data?.destinations,
-      ),
-    [kind, observations.data?.conversations, observations.data?.destinations],
-  );
+  const options = useMemo(() => {
+    const all = observedConversationOptions(
+      observations.data?.conversations ?? [],
+      kind,
+      observations.data?.destinations,
+    );
+    if (excludeKind === undefined) return all;
+    const picked = new Set(splitConversationIds(value));
+    return all.filter(
+      (option) => !option.id.startsWith(`${excludeKind}:`) || picked.has(option.conversationId),
+    );
+  }, [excludeKind, kind, observations.data?.conversations, observations.data?.destinations, value]);
   return (
     <IdSelectionFields
       pickerKey={`${channel}:${accountId}:${kind}`}
@@ -267,20 +275,6 @@ function IdSelectionFields({
     <View style={styles.selection}>
       {/* The explanation reads before the control, like a Field's hint under its label. */}
       <Text style={settingsStyles.rowHint}>{hint}</Text>
-      {selectedIds.length === 0 ? (
-        <Text style={settingsStyles.rowHint}>{labels.none}</Text>
-      ) : (
-        selectedIds.map((id) => (
-          <SelectedConversation
-            key={id}
-            id={id}
-            option={options.find((option) => option.conversationId === id)}
-            selectedIds={selectedIds}
-            onChange={setSelectedIds}
-            disabled={disabled}
-          />
-        ))
-      )}
       <View style={styles.pickerRow}>
         {options.length > 0 ? (
           <ObservedConversationPicker
@@ -298,6 +292,19 @@ function IdSelectionFields({
           </Button>
         ) : null}
       </View>
+      {/* Listed under the picker, as Multi-select lists its values: picking one
+          never moves the picker out from under its open list. Nothing picked
+          says nothing; the Choose button is the empty state. */}
+      {selectedIds.map((id) => (
+        <SelectedConversation
+          key={id}
+          id={id}
+          option={options.find((option) => option.conversationId === id)}
+          selectedIds={selectedIds}
+          onChange={setSelectedIds}
+          disabled={disabled}
+        />
+      ))}
       {manualEntry ? (
         <Field label={labels.manualField} hint={labels.manualHint}>
           <FormTextInput
@@ -373,17 +380,6 @@ function ObservedConversationPicker({
 }) {
   const anchorRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
-  const pickerActions = useMemo(
-    () => (
-      <View style={styles.pickerActions}>
-        <Button size="sm" variant="secondary" onPress={close}>
-          Done
-        </Button>
-      </View>
-    ),
-    [close],
-  );
   const [focused, setFocused] = useState(false);
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const toggle = useCallback(
@@ -455,7 +451,6 @@ function ObservedConversationPicker({
         searchPlaceholder={labels.search}
         emptyText={labels.empty}
         title={labels.choose}
-        stickyHeader={pickerActions}
         open={open}
         onOpenChange={setOpen}
         keepOpenOnSelect
@@ -468,11 +463,6 @@ function ObservedConversationPicker({
 
 const styles = StyleSheet.create((theme) => ({
   selection: { gap: theme.spacing[2] },
-  pickerActions: {
-    alignItems: "flex-end",
-    paddingHorizontal: theme.spacing[6],
-    paddingBottom: theme.spacing[2],
-  },
   pickerRow: {
     alignItems: "center",
     flexDirection: "row",

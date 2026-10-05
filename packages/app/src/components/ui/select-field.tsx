@@ -354,7 +354,7 @@ const styles = StyleSheet.create((theme) => {
       flexDirection: "row",
       alignItems: "center",
       gap: theme.spacing[2],
-      backgroundColor: theme.colors.surface2,
+      backgroundColor: theme.colors.input,
     },
     triggerSm: {
       ...geometry.fieldControlSm,
@@ -364,6 +364,7 @@ const styles = StyleSheet.create((theme) => {
     },
     controlRest: {
       ...geometry.controlRest,
+      borderColor: theme.colors.inputBorder,
     },
     controlHover: {
       ...geometry.controlHover,

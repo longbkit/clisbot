@@ -58,15 +58,19 @@ describe("onboarding configuration defaults", () => {
     const seeded = configureOnboardingRoute(initial, "slack", "assistant", input);
     const account = load(seeded.find((f) => f.path === accountPath)!.content) as {
       routes: Array<{
-        audience: Array<{ where: { dm?: boolean; groups?: string } }>;
+        audience: Array<{
+          where: { dm?: boolean; groups?: string };
+          interaction: { requireMention: boolean };
+        }>;
         reply?: { anchor: string };
-        interaction: { requireMention: boolean };
       }>;
     };
     const inGroups = (r: { audience: Array<{ where: { groups?: string } }> }) =>
       r.audience[0]?.where.groups === "all";
     expect(account.routes.find(inGroups)?.reply?.anchor).toBe("thread");
-    account.routes[0]!.interaction.requireMention = true;
+    // The DM rule answers without a mention; an API edit to require one survives a restart.
+    expect(account.routes[0]!.audience[0]!.interaction.requireMention).toBe(false);
+    account.routes[0]!.audience[0]!.interaction.requireMention = true;
     account.routes = account.routes.filter((r) => !inGroups(r));
     const edited = seeded.map((f) =>
       f.path === accountPath ? { path: f.path, content: dump(account) } : f,

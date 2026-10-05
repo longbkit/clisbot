@@ -7,7 +7,8 @@ import { AutomationInputDraftContext, type AutomationChannelDraft } from "./auto
 import type { AutomationConnection } from "./automation-settings";
 import { StyleSheet } from "react-native-unistyles";
 import { useState, useSyncExternalStore, type ComponentType } from "react";
-import { audienceRuleSentence, routeAudienceDraft } from "./channel-route-audience";
+import { routeAudienceDraft } from "./channel-route-audience";
+import { ID_NAMES, rulePlaceLabel, ruleWhoLabel } from "./channel-route-rule-summary";
 import { Text, View } from "react-native";
 import { stringify, parse } from "yaml";
 import { Button } from "@/components/ui/button";
@@ -974,17 +975,17 @@ function stepTitle(step: Record<string, unknown>, index: number): string {
   return text && !text.startsWith("${{") ? text.slice(0, 72) : `Agent step ${index + 1}`;
 }
 
-/** Who this Route admits and where, in the Route's own words; ids stand in for names here. */
+/** The Route's Rules, one per clause; ids stand in for names here. */
 function routeSummary(route: Record<string, unknown>): string {
-  const { rules, contains } = routeAudienceDraft(route);
-  const names = { teamName: same, memberName: same, conversationLabel: same };
-  const parts = rules.map((rule) => audienceRuleSentence(rule, names));
-  if (contains.length > 0) parts.push(`Contains: ${contains}`);
-  return parts.join(" · ") || "Configured conversation filter";
-}
-
-function same(id: string): string {
-  return id;
+  const parts = routeAudienceDraft(route).map((rule) => {
+    const contains = rule.conditions.contains?.trim();
+    return [
+      rulePlaceLabel(rule, ID_NAMES),
+      ruleWhoLabel(rule, ID_NAMES),
+      ...(contains ? [`contains “${contains}”`] : []),
+    ].join(" · ");
+  });
+  return parts.join("; ") || "Configured conversation filter";
 }
 
 function WorkflowParameters({ model, pending }: { model: Model; pending: boolean }) {

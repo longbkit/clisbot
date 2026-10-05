@@ -69,7 +69,7 @@ describe("Pure black theme", () => {
 
 describe("Sidebar interaction surfaces", () => {
   it("keeps Light selection distinct from the sidebar surface", () => {
-    expect(lightTheme.colors.surfaceSidebarHover).toBe(lightTheme.colors.surface1);
+    expect(lightTheme.colors.surfaceSidebarHover).not.toBe(lightTheme.colors.surfaceSidebar);
     expect(lightTheme.colors.surfaceSidebarSelected).toBe(lightTheme.colors.surface3);
     expect(lightTheme.colors.surfaceSidebarSelected).not.toBe(lightTheme.colors.surfaceSidebar);
   });

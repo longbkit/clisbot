@@ -49,7 +49,9 @@ export interface ApprovalCommand {
 /**
  * Metadata owns parsing, discovery, route applicability and Access gating.
  * `access` is who may run the command:
- *   - `public`: anyone, even a sender the Route does not admit (`/help`, `/me`);
+ *   - `public`: anyone, even a sender the Route does not admit (`/help`, `/me`,
+ *     `/status`). `/me` and `/status` answer each caller with what their
+ *     standing allows (`commands-caller.ts`);
  *   - `chat`: anyone the Route admits — the command stays inside the Route's
  *     configuration, which its publisher was authorized to delegate;
  *   - a privilege: a personal Access grant, for commands that change or reach
@@ -61,10 +63,10 @@ export const CHANNEL_COMMANDS = [
     name: "status",
     aliases: ["state"],
     args: false,
-    access: "chat",
+    access: "public",
     directOnly: false,
     usage: "/status",
-    description: "agent, session, context and access",
+    description: "this chat's ids, whether you can talk here, and the session",
   },
   {
     name: "stop",
@@ -110,7 +112,7 @@ export const CHANNEL_COMMANDS = [
     access: "public",
     directOnly: false,
     usage: "/me",
-    description: "your channel identity and access",
+    description: "your channel id, and your access here",
   },
   {
     name: "cowork",
@@ -281,6 +283,11 @@ const PRIVILEGE_NEEDS: Readonly<Record<string, string>> = {
 export function commandRefusalText(commandLabel: string, privilege: string): string {
   const needs = PRIVILEGE_NEEDS[privilege] ?? "more access";
   return `${commandLabel} needs ${needs} (${privilege}). Ask an admin, or send /me to see your access.`;
+}
+
+/** Answered for anyone, before the Route's gates: `/help`, `/me`, `/status`. */
+export function isPublicChannelCommand(command: Pick<ChannelTextCommand, "name">): boolean {
+  return channelCommandSpec(command.name).access === "public";
 }
 
 export function channelCommandAccess(command: ChannelTextCommand) {

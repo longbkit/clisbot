@@ -469,9 +469,21 @@ describe("route matching (first match wins)", () => {
     const account = makeAccount({
       routes: [
         routeFor(plane, accountStub(), {
-          audienceRules: [],
+          // The text condition is a rule's own.
+          audienceRules: [
+            {
+              who: { roles: [], teams: [], members: [], anyone: true, identities: [] },
+              where: {
+                dm: false,
+                dmMembers: [],
+                dmTeams: [],
+                dmIdentities: [],
+                conversations: ["C0APP"],
+              },
+              trigger: { contains: "#triage" },
+            },
+          ],
           where: { dm: false, groups: [], conversations: ["C0APP"] },
-          contains: "#triage",
           target: { kind: "workflow", workflow: "triage" },
         }),
         routeFor(plane, accountStub(), {

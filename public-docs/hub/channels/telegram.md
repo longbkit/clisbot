@@ -33,7 +33,7 @@ rm /tmp/telegram-token
 
 Hub probes the token with `getMe` before storing it, encrypts it into a Connection, and starts the account. `clisbot channels ls` shows the transport state.
 
-In the app: **Channels → Connections → Add Route**, choose **Connect a new one**, pick Telegram, paste the token into the credential form, then finish the Route.
+In the app: **Channels → Connections → Add Connection**, pick Telegram, paste the token into the credential form, then finish the Route.
 
 Polling is the default and needs nothing else. The webhook transport needs a public HTTPS URL and a secret token, and Hub refuses to compile it until you supply both.
 

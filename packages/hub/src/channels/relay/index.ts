@@ -20,7 +20,7 @@ import {
   type StreamContext,
 } from "../plane/types.js";
 import type { ProcessingController } from "../plane/processing.js";
-import { anchoredReplyThreadId } from "../reply-anchor.js";
+import { anchoredReplyThreadId, replyAnchorFor } from "../reply-anchor.js";
 import type {
   ChannelStreamingDriver,
   ChannelStreamingProducer,
@@ -96,8 +96,8 @@ function subagentSyncKnobs(sync: EffectiveDefaults["sync"]): SyncKnobs {
  * conversation root. `thread` goes one step further: when the marker sat at
  * the conversation root, the reply mints a new thread by answering the marker
  * message itself (`thread_ts` = the marker's native `ts` — Slack has no
- * create-thread API; OpenClaw `replyToMode: all`). Minting is Slack-only, is
- * skipped for DMs (no thread level), and needs the marker's `ts` in native
+ * create-thread API; OpenClaw `replyToMode: all`). Minting is Slack-only, in a
+ * DM follows `reply.dmAnchor` (`replyAnchorFor`), and needs the marker's `ts` in native
  * shape (a restart re-attach carries none, so it never mints). Under
  * `binding.key: thread` a root marker already binds at its own minted thread
  * (`deriveBindingKey`'s marker rule), so this branch is the collapsed case
@@ -109,8 +109,7 @@ export function replyLocationFor(context: StreamContext): {
 } {
   const threadId = anchoredReplyThreadId({
     channel: context.channel,
-    rootKind: context.rootKind,
-    replyAnchor: context.route.defaults.replyAnchor,
+    replyAnchor: replyAnchorFor(context.route.defaults, context.rootKind),
     threadId: context.externalThreadId ?? context.triggerThreadId ?? null,
     messageId: context.triggerMessageId,
   });

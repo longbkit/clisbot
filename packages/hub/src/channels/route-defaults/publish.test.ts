@@ -34,11 +34,13 @@ accountId: support
 connectionId: slack-support
 transport: { mode: socket, errorPolicy: once }
 routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C1] } }]
-    contains: deploy
+  - audience:
+      - who: { roles: [member] }
+        where: { conversations: [C1] }
+        contains: deploy
+        interaction: { requireMention: ${requireMention} }
     agent: assistant
     environment: lab
-    interaction: { requireMention: ${requireMention} }
 `;
 }
 

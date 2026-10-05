@@ -108,6 +108,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     resources.own(() => database.close());
     await resealCredentials(runtime, credentialCipher);
     await rekeyChannelRevisions(runtime);
+    await moveRouteConditionsToRules(runtime);
     const identity = await resolveHubIdentity(runtime, readPort(), credentialCipher);
     const accessTickets = new AccessTicketService(runtime, new AccessStore(runtime), {
       leaseDurationMs: readAccessLeaseDuration(
@@ -486,6 +487,20 @@ async function rekeyChannelRevisions(runtime: DatabaseRuntime): Promise<void> {
   const { rekeyLegacyChannelRevisions } = await import("./channels/config/rekey-revisions.js");
   const rekeyed = await rekeyLegacyChannelRevisions(runtime);
   if (rekeyed > 0) logger.info(`channel configuration revisions moved to current keys: ${rekeyed}`);
+}
+
+/** Every stored revision's Route-level conditions moved onto its rules. */
+async function moveRouteConditionsToRules(runtime: DatabaseRuntime): Promise<void> {
+  if (!isChannelsEnabled()) return;
+  const { moveStoredRouteConditions } = await import("./channels/config/rule-conditions.js");
+  const { moved, unreadable } = await moveStoredRouteConditions(runtime);
+  if (moved > 0)
+    logger.info(`channel configuration revisions with conditions moved to rules: ${moved}`);
+  if (unreadable.length > 0)
+    logger.warn(
+      { revisions: unreadable },
+      "channel configuration revisions left unchanged: they do not parse",
+    );
 }
 
 async function main(): Promise<void> {

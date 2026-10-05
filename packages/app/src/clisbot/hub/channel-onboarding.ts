@@ -9,6 +9,19 @@ export function initialChannelReplyAnchor(
   return anchor === "thread" ? "thread" : "default";
 }
 
+/**
+ * A new Route replies in a thread in DMs too. An edited one keeps its stored
+ * `reply.dmAnchor`, absent when it never set one, so the Hub's default still
+ * applies there.
+ */
+export function initialDmReplyAnchor(
+  isEditing: boolean,
+  anchor: unknown,
+): { dmReplyAnchor?: "thread" | "default" } {
+  if (!isEditing) return { dmReplyAnchor: "thread" };
+  return anchor === "thread" || anchor === "default" ? { dmReplyAnchor: anchor } : {};
+}
+
 /** New Routes start an Agent; editing keeps the saved target. */
 export function initialChannelRouteTarget(
   isEditing: boolean,

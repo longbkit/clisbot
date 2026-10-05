@@ -260,7 +260,7 @@ const formInputStyles = StyleSheet.create((theme) => {
 
   return {
     chrome: {
-      backgroundColor: theme.colors.surface2,
+      backgroundColor: theme.colors.input,
     },
     chromeSm: {
       ...geometry.fieldControlSm,
@@ -270,6 +270,7 @@ const formInputStyles = StyleSheet.create((theme) => {
     },
     controlRest: {
       ...geometry.controlRest,
+      borderColor: theme.colors.inputBorder,
     },
     controlHover: {
       ...geometry.controlHover,

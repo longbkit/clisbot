@@ -1,106 +1,92 @@
-// Small controls the audience-rule editor is built from: labelled rows, a row
-// folded to its count, and toggle chips.
+// Small controls the Rule editor is built from: a radio list for one choice
+// among a few that each need a line of detail.
 
 import React, { useCallback, useMemo } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { Button } from "@/components/ui/button";
-import { settingsStyles } from "@/styles/settings";
 
 export interface AudienceOption {
   id: string;
   name: string;
 }
 
-/** Rows that belong to the control above them, indented under it. */
-export function NestedRows({ children }: { children: React.ReactNode }) {
-  return <View style={styles.nested}>{children}</View>;
+export interface RadioOption<T extends string> {
+  value: T;
+  label: string;
+  /** One line under the label: who it lets in, what it covers. */
+  description?: string;
 }
 
-/** A labelled row whose control sits under the label. */
-export function PickerRow({
+/** One choice among a few, stacked, each with its line of detail. */
+export function RadioList<T extends string>({
   label,
-  hint,
-  children,
+  options,
+  selected,
+  onChange,
+  disabled,
 }: {
   label: string;
-  hint?: string;
-  children: React.ReactNode;
+  options: readonly RadioOption<T>[];
+  selected: T;
+  onChange(value: T): void;
+  disabled: boolean;
 }) {
   return (
     <View style={styles.part}>
       <Text style={styles.rowLabel}>{label}</Text>
-      {hint === undefined ? null : <Text style={styles.rowHint}>{hint}</Text>}
-      {children}
+      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={styles.radios}>
+        {options.map((option) => (
+          <RadioRow
+            key={option.value}
+            option={option}
+            selected={option.value === selected}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        ))}
+      </View>
     </View>
   );
 }
 
-export function OptionChips({
-  options,
+function RadioRow<T extends string>({
+  option,
   selected,
+  onChange,
   disabled,
-  onToggle,
-  empty,
 }: {
-  options: readonly AudienceOption[];
-  selected: readonly string[];
-  disabled: boolean;
-  onToggle(id: string): void;
-  empty: string;
-}) {
-  if (options.length === 0) return <Text style={settingsStyles.rowHint}>{empty}</Text>;
-  return (
-    <View style={styles.chips}>
-      {options.map((option) => (
-        <ToggleChip
-          key={option.id}
-          value={option.id}
-          label={option.name}
-          selected={selected.includes(option.id)}
-          disabled={disabled}
-          onToggle={onToggle}
-        />
-      ))}
-    </View>
-  );
-}
-
-export function ToggleChip({
-  value,
-  label,
-  selected,
-  disabled,
-  onToggle,
-}: {
-  value: string;
-  label: string;
+  option: RadioOption<T>;
   selected: boolean;
+  onChange(value: T): void;
   disabled: boolean;
-  onToggle(value: string): void;
 }) {
-  const press = useCallback(() => onToggle(value), [onToggle, value]);
-  const state = useMemo(() => ({ selected }), [selected]);
+  const press = useCallback(() => onChange(option.value), [onChange, option.value]);
+  const state = useMemo(() => ({ checked: selected, disabled }), [disabled, selected]);
   return (
-    <Button
-      size="xs"
-      variant={selected ? "secondary" : "outline"}
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityLabel={option.label}
+      aria-checked={selected}
+      accessibilityState={state}
       disabled={disabled}
       onPress={press}
-      accessibilityState={state}
+      style={styles.radioRow}
     >
-      {label}
-    </Button>
+      <View style={[styles.radio, selected && styles.radioSelected]}>
+        {selected ? <View style={styles.dot} /> : null}
+      </View>
+      <View style={styles.radioText}>
+        <Text style={styles.radioLabel}>{option.label}</Text>
+        {option.description === undefined ? null : (
+          <Text style={styles.rowHint}>{option.description}</Text>
+        )}
+      </View>
+    </Pressable>
   );
-}
-
-export function toggled<T>(list: readonly T[], value: T): T[] {
-  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
 const styles = StyleSheet.create((theme) => ({
   part: { gap: theme.spacing[2] },
-  nested: { gap: theme.spacing[3], paddingLeft: theme.spacing[3] },
   // The same label treatment as every Select and text field in this form, so no
   // row looks more important than the picker beside it.
   rowLabel: {
@@ -112,9 +98,25 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: Math.round(theme.fontSize.sm * 1.4),
   },
-  chips: {
+  radios: { gap: theme.spacing[1] },
+  radioRow: {
+    alignItems: "flex-start",
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
   },
+  radioText: { flex: 1, minWidth: 0, gap: theme.spacing[0.5] },
+  radioLabel: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
+  radio: {
+    width: 16,
+    height: 16,
+    marginTop: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.foregroundMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioSelected: { borderColor: theme.colors.foreground },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.foreground },
 }));

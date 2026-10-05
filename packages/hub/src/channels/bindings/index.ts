@@ -17,7 +17,6 @@ import type {
   ChannelControlPlane,
   CompiledChannelAccount,
   CompiledRoute,
-  EffectiveDefaults,
 } from "../config/compile.js";
 import { outboundAttachesTool, type FollowUpMode } from "../config/enums.js";
 import {
@@ -47,6 +46,8 @@ import {
   type FollowUpAdmission,
 } from "./follow-up.js";
 import { mayUseChannelRoute } from "../policy/gate.js";
+import { mentionTrigger, type Trigger } from "../rule-trigger.js";
+import { admitInbound } from "./admission.js";
 import { messagesOf, type BindingInbox, type Delivery, type PreparedDelivery } from "./inbox.js";
 import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
 import type { ProcessingController } from "../plane/processing.js";
@@ -164,19 +165,31 @@ export class BindingEngine {
     );
     const blocked = bindingBlock(binding);
     if (blocked !== undefined) return { allowed: false, reason: blocked };
-    if (binding?.status === "bound" && binding.agentId !== null) {
-      const followUp = admitFollowUp(
-        message,
-        route.defaults,
-        this.isIdle(binding.agentId, route.defaults),
-        await this.followUpMode(message, route),
-      );
-      if (!followUp.allowed) return followUp;
-    } else if (route.defaults.requireMention && !message.mentionedBot) {
-      return { allowed: false, reason: "not mentioned; requireMention is on", unaddressed: true };
+    const agentId = binding?.status === "bound" ? (binding.agentId ?? undefined) : undefined;
+    return admitInbound(this, message, account, route, {
+      agentId,
+      newConversation: binding === undefined,
+    });
+  }
+
+  /** A mention, or a follow-up into the session bound here, under one trigger. */
+  async mentionGate(
+    message: InboundMessage,
+    route: CompiledRoute,
+    trigger: Trigger,
+    agentId: string | undefined,
+  ): Promise<FollowUpAdmission> {
+    if (agentId === undefined) {
+      return trigger.requireMention && !message.mentionedBot
+        ? { allowed: false, reason: "not mentioned; requireMention is on", unaddressed: true }
+        : { allowed: true };
     }
-    const decision = await this.mayUse(message, account, route);
-    return decision.allowed ? decision : { ...decision, audienceRefused: true };
+    return admitFollowUp(
+      message,
+      trigger,
+      this.isIdle(agentId, trigger),
+      await this.followUpMode(message, route, trigger),
+    );
   }
 
   /**
@@ -218,6 +231,7 @@ export class BindingEngine {
         this.context.organizationId,
         delivery.message,
         route,
+        mentionTrigger(route, delivery.message.conversation),
       );
     }
     return outcome;
@@ -250,10 +264,10 @@ export class BindingEngine {
     // thread starts a session at the new one — but only for an inbound that may
     // start one, so an unadmitted message never retires a running session.
     if (!keepsTarget(binding, route)) {
-      const refusal = await this.admitUnbound(delivery, account, route);
+      const refusal = await this.admitUnbound(delivery, account, route, false);
       if (refusal !== undefined) return refusal;
       await this.retireRetargeted(binding);
-      return this.firstMention(delivery, account, route, key, subscribe);
+      return this.startSession(delivery, account, route, key, subscribe);
     }
     if (this.lostReplyCapability(binding.agentId, route)) {
       return this.replaceSilencedSession(delivery, account, route, binding, key, subscribe);
@@ -279,7 +293,7 @@ export class BindingEngine {
     key: ThreadKey,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const refusal = await this.admitUnbound(delivery, account, route);
+    const refusal = await this.admitUnbound(delivery, account, route, true);
     if (refusal !== undefined) return refusal;
     return this.startSession(delivery, account, route, key, subscribe);
   }
@@ -406,14 +420,16 @@ export class BindingEngine {
     delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    newConversation: boolean,
   ): Promise<InboundOutcome | undefined> {
     if (delivery.admitted === true) return undefined;
-    const message = delivery.message;
-    if (route.defaults.requireMention && !message.mentionedBot) {
-      return { kind: "ignored", reason: "not mentioned; requireMention is on" };
-    }
-    const authorization = await this.mayUse(message, account, route);
-    return authorization.allowed ? undefined : { kind: "ignored", reason: authorization.reason };
+    const admission = await admitInbound(this, delivery.message, account, route, {
+      agentId: undefined,
+      newConversation,
+    });
+    return admission.allowed
+      ? undefined
+      : { kind: "ignored", reason: admission.reason ?? "sender may not trigger this route" };
   }
 
   /**
@@ -427,18 +443,13 @@ export class BindingEngine {
     agentId: string,
   ): Promise<InboundOutcome | undefined> {
     if (delivery.admitted === true) return undefined;
-    const message = delivery.message;
-    const admission = admitFollowUp(
-      message,
-      route.defaults,
-      this.isIdle(agentId, route.defaults),
-      await this.followUpMode(message, route),
-    );
-    if (!admission.allowed) {
-      return { kind: "ignored", reason: admission.reason ?? "follow-up not admitted" };
-    }
-    const authorization = await this.mayUse(message, account, route);
-    return authorization.allowed ? undefined : { kind: "ignored", reason: authorization.reason };
+    const admission = await admitInbound(this, delivery.message, account, route, {
+      agentId,
+      newConversation: false,
+    });
+    return admission.allowed
+      ? undefined
+      : { kind: "ignored", reason: admission.reason ?? "follow-up not admitted" };
   }
 
   /**
@@ -523,7 +534,7 @@ export class BindingEngine {
     marker: ThreadBindingRecord,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const refusal = await this.admitUnbound(delivery, account, route);
+    const refusal = await this.admitUnbound(delivery, account, route, false);
     if (refusal !== undefined) return refusal;
     const message = delivery.message;
     const key = deriveBindingKey(message, route);
@@ -603,18 +614,23 @@ export class BindingEngine {
    * The window lives in memory, so an agent with no recorded activity in this
    * process (a Hub restart) is outside it: the next message must mention the
    * bot, as clisbot's `participationTtl` does with no recorded bot reply. */
-  isIdle(agentId: string, defaults: EffectiveDefaults): boolean {
+  isIdle(agentId: string, trigger: Trigger): boolean {
     const last = this.lastActivity.get(agentId);
     if (last === undefined) return true;
-    return this.context.clock.now() - last > defaults.followUp.ttlMinutes * 60_000;
+    return this.context.clock.now() - last > trigger.followUp.ttlMinutes * 60_000;
   }
 
-  private followUpMode(message: InboundMessage, route: CompiledRoute): Promise<FollowUpMode> {
+  private followUpMode(
+    message: InboundMessage,
+    route: CompiledRoute,
+    trigger: Trigger,
+  ): Promise<FollowUpMode> {
     return conversationFollowUpMode(
       this.context.store,
       this.context.organizationId,
       message,
       route,
+      trigger,
     );
   }
 
@@ -623,10 +639,11 @@ export class BindingEngine {
     this.lastActivity.set(agentId, this.context.clock.now());
   }
 
-  private async mayUse(
+  async mayUse(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    newConversation: boolean,
   ): ReturnType<typeof mayUseChannelRoute> {
     return await mayUseChannelRoute({
       store: this.context.store.access,
@@ -635,6 +652,7 @@ export class BindingEngine {
       account,
       route,
       message,
+      newConversation,
       ...(this.context.resolveChannelSender === undefined
         ? {}
         : { resolveChannelSender: this.context.resolveChannelSender }),

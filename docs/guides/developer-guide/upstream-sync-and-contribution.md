@@ -460,6 +460,18 @@ four metadata/doc files; the 2026-09-06 comparison from `74a377ff6` to Paseo
   — preserve managed access and channel integration contracts.
 - `packages/server/src/server/agent/providers/codex-app-server-agent.ts` and its
   test — retain Fusion behavior alongside the upstream paginated rewind fix.
+- The light theme ([design.md](../../design.md), "Light palette"):
+  `packages/app/src/styles/theme.ts` (light values, the optional
+  `surfaceSidebarHover`, the `input`/`inputBorder` tokens),
+  `packages/app/src/styles/settings.ts` (card on `surface0`),
+  `packages/app/src/components/ui/form-field.tsx` and `select-field.tsx` (input
+  fill and rest border), and one assertion in `theme.test.ts`. Keep the white
+  cards and bordered inputs; take upstream's other edits. A trial merge of
+  `upstream/main` on 2026-10-05 merged all four cleanly. Hand-styled form
+  inputs paint `colors.input` instead of `surface2`, one line each, in
+  `add-host-modal.tsx`, `pair-link-modal.tsx`, `provider-diagnostic-sheet.tsx`,
+  `pair-device-section.tsx`, `project-settings-screen.tsx` and
+  `appearance-section.tsx`; search, find, menu and read-only fields stay filled.
 
 `getpaseo/hub` has its own overlap, from the channel plane driving a Host over
 the connection that Host holds to the Hub

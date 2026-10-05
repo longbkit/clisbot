@@ -1,12 +1,15 @@
 // The follow-up policy (implementation doc §4.3.4): whether an unmentioned
 // message continues a bound session. It is a refinement of `requireMention` —
-// a route that does not require a mention admits every message — and the
-// conversation's `/followup` override replaces the Route's mode.
+// a rule that does not require a mention admits every message — and the
+// conversation's `/followup` override replaces the rule's mode. The trigger
+// passed in is the conversation's or the sender's (`rule-trigger.ts`).
 import type { ChannelStore } from "../../db/channels.js";
 import type { ChannelConversationKey } from "../../db/channel-access.js";
-import type { CompiledRoute, EffectiveDefaults } from "../config/compile.js";
+import type { CompiledAudienceRule } from "../config/audience.js";
+import type { CompiledRoute } from "../config/compile.js";
 import type { FollowUpMode } from "../config/enums.js";
 import type { InboundMessage } from "../plane/types.js";
+import type { Trigger } from "../rule-trigger.js";
 import { deriveBindingKey } from "./stored-route.js";
 
 /** A follow-up admission result over a bound session. */
@@ -19,6 +22,9 @@ export interface FollowUpAdmission {
   /** Refused by the mention or follow-up gate: the message was not for the
    * bot, and it is kept as the binding's context. */
   unaddressed?: boolean;
+  /** Admitted: the rules that let the sender in (absent = let in outside the
+   * rules). The execution limits count the message in one of them (`limitRule`). */
+  rules?: readonly CompiledAudienceRule[] | undefined;
 }
 
 /** The key a conversation's `/followup` override is stored against: its binding key. */
@@ -45,9 +51,10 @@ export async function conversationFollowUpMode(
   organizationId: string,
   message: InboundMessage,
   route: CompiledRoute,
+  trigger: Trigger,
 ): Promise<FollowUpMode> {
-  const routeMode = route.defaults.followUp.mode;
-  if (store === undefined || message.mentionedBot || !route.defaults.requireMention) {
+  const routeMode = trigger.followUp.mode;
+  if (store === undefined || message.mentionedBot || !trigger.requireMention) {
     return routeMode;
   }
   const override = await store.access.findConversationFollowUp(
@@ -67,8 +74,9 @@ export async function endFollowUpPause(
   organizationId: string,
   message: InboundMessage,
   route: CompiledRoute,
+  trigger: Trigger,
 ): Promise<void> {
-  if (store === undefined || !message.mentionedBot || !route.defaults.requireMention) return;
+  if (store === undefined || !message.mentionedBot || !trigger.requireMention) return;
   await store.access.clearPausedConversationFollowUp(
     followUpConversationKey(organizationId, message, route),
   );
@@ -76,17 +84,17 @@ export async function endFollowUpPause(
 
 /**
  * Admit a follow-up into a bound session. A mention always steers, and so does
- * every message on a route that does not require a mention. Otherwise an
+ * every message a rule lets in without one. Otherwise an
  * unmentioned follow-up steers only in `auto` mode while the session is inside
  * its `ttlMinutes` window; `mention-only` always needs a new mention.
  */
 export function admitFollowUp(
   message: { mentionedBot: boolean },
-  defaults: EffectiveDefaults,
+  trigger: Trigger,
   idle: boolean,
-  mode: FollowUpMode = defaults.followUp.mode,
+  mode: FollowUpMode = trigger.followUp.mode,
 ): FollowUpAdmission {
-  if (message.mentionedBot || !defaults.requireMention) return { allowed: true };
+  if (message.mentionedBot || !trigger.requireMention) return { allowed: true };
   if (mode === "mention-only") {
     return {
       allowed: false,

@@ -140,6 +140,14 @@ interface Harness {
   agents: AgentSnapshot[];
 }
 
+const LINKED_MEMBER = {
+  membershipId: "membership-linked",
+  userId: "user-linked",
+  role: "member",
+  name: "Linked Member",
+  image: null,
+};
+
 function makeHarness(options: {
   organizationId?: string;
   accountId?: string;
@@ -223,7 +231,8 @@ function makeHarness(options: {
         unrestricted: true,
         agentConfigurations: [],
       }),
-      resolveChannelMember: async () => undefined,
+      // A linked Hub Member: `/status` shows them the session.
+      resolveChannelMember: async () => LINKED_MEMBER,
     },
     recordChannelInboundActivity: async (input) => {
       activity.push(input);

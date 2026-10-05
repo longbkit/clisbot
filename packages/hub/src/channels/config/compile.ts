@@ -98,8 +98,6 @@ export interface CompiledRoute {
   audienceRules: readonly CompiledAudienceRule[];
   /** The union of the rules' Where: the conversations this Route applies to. */
   where: RouteWhere;
-  /** Case-sensitive literal substring; absent leaves text out of matching. */
-  contains?: string;
   target: RouteTarget;
   defaultRoles: string[];
   assignments: readonly RoleAssignment[];
@@ -347,7 +345,6 @@ function compileRoute(
   return {
     audienceRules,
     where: deriveRouteWhere(audienceRules),
-    ...(route.contains === undefined ? {} : { contains: route.contains }),
     target: compileRouteTarget(route, context),
     defaultRoles: context.defaultRoles,
     assignments: context.assignments,

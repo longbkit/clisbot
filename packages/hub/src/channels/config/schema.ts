@@ -73,14 +73,51 @@ export const InteractionDefaultsSchema = z
     requireMention: z.boolean().optional(),
     followUp: FollowUpSchema.optional(),
     whenBusy: WhenBusySchema.optional(),
+    /**
+     * `false` = `/help`, `/me` and `/status` answer only senders a Rule admits
+     * (and Connection managers); everyone else gets silence. Absent = on.
+     * Organization and Connection only: it decides conversations no Route
+     * serves, so a Route does not author it.
+     */
+    publicCommands: z.boolean().optional(),
   })
   .strict();
 export type InteractionDefaults = z.infer<typeof InteractionDefaultsSchema>;
 
+/**
+ * COMPAT(route-rule-conditions): added in Hub 0.7.3, remove after 2027-01-31.
+ * A condition the Route no longer holds is refused by name, so an older app
+ * or a YAML file written before Rules learns where it went instead of reading
+ * "Unrecognized key" (docs/audits/2026-10-05-routes-and-rules.md).
+ */
+function movedToRules(key: string) {
+  return z
+    .never({
+      error: `${key} is set on each rule of the Route now (audience[].${key}); update the app, or move it onto the rules`,
+    })
+    .optional();
+}
+
+/** A Route's own `interaction`: what happens to a message once it is in. */
+export const RouteInteractionSchema = InteractionDefaultsSchema.pick({ whenBusy: true })
+  .extend({
+    requireMention: movedToRules("interaction.requireMention"),
+    followUp: movedToRules("interaction.followUp"),
+  })
+  .strict();
+
 export const BindingDefaultsSchema = z.object({ key: BindingKeySchema.optional() }).strict();
 export type BindingDefaults = z.infer<typeof BindingDefaultsSchema>;
 
-export const ReplyDefaultsSchema = z.object({ anchor: ReplyAnchorSchema.optional() }).strict();
+export const ReplyDefaultsSchema = z
+  .object({
+    /** Where a reply to a root message in a group chat lands. */
+    anchor: ReplyAnchorSchema.optional(),
+    /** The same in direct messages; absent answers in the DM itself, as every
+     * DM did before it existed (`reply-anchor.ts`). */
+    dmAnchor: ReplyAnchorSchema.optional(),
+  })
+  .strict();
 export type ReplyDefaults = z.infer<typeof ReplyDefaultsSchema>;
 
 /**
@@ -631,38 +668,6 @@ export const AudienceWhereSchema = z
   );
 export type AudienceWhere = z.infer<typeof AudienceWhereSchema>;
 
-/** One "[who] may talk in [where]" sentence; a sender is admitted when any rule matches. */
-export const AudienceRuleSchema = z
-  .object({ who: AudienceWhoSchema, where: AudienceWhereSchema })
-  .strict()
-  // The DM lists narrow the Who, so a list the Who can never reach admits nobody.
-  .refine(
-    ({ who, where }) =>
-      where.dm === true || !(named(where.dmMembers) || named(where.dmTeams)) || namesMembers(who),
-    {
-      path: ["where", "dmMembers"],
-      message: "dmMembers and dmTeams narrow the Who to Members, and this Who names no Member",
-    },
-  )
-  .refine(({ who, where }) => where.dm === true || !named(where.dmIdentities) || namesGuests(who), {
-    path: ["where", "dmIdentities"],
-    message: "dmIdentities narrows the Who to Guests, and this Who names no Guest",
-  });
-export type AudienceRule = z.infer<typeof AudienceRuleSchema>;
-
-function named(list: readonly unknown[] | undefined): boolean {
-  return list !== undefined && list.length > 0;
-}
-
-/** `identities` are senders without a Hub Member, so they can never be on `dmMembers`. */
-function namesMembers(who: AudienceWho): boolean {
-  return who.anyone === true || [who.roles, who.teams, who.members].some(named);
-}
-
-function namesGuests(who: AudienceWho): boolean {
-  return who.anyone === true || named(who.identities);
-}
-
 /** Every limit a Bot, a Conversation or a Route can carry, in display order. */
 export const CHANNEL_LIMIT_NAMES = [
   "maxInputCharacters",
@@ -706,6 +711,74 @@ export const ChannelLimitsSchema = z
 export type ChannelLimits = z.infer<typeof ChannelLimitsSchema>;
 
 /** The Bot's own limits, plus the limits each of its Conversations gets. */
+/**
+ * A Rule's own limits: who comes in this way, and how much they may take
+ * (docs/audits/2026-10-05-routes-and-rules.md#limits). Messages the bot posts
+ * belong to no sender, so `messagesSentPerMinute` is the Route's, the Bot's
+ * and each Conversation's, never a Rule's.
+ */
+export const RuleLimitsSchema = ChannelLimitsSchema.omit({ messagesSentPerMinute: true }).strict();
+export type RuleLimits = z.infer<typeof RuleLimitsSchema>;
+
+/**
+ * A rule's own trigger conditions: whether a message must mention the bot,
+ * and how an unmentioned follow-up continues a session. An omitted leaf
+ * inherits the account's, then the organization's `defaults:`; the Route
+ * carries none (docs/audits/2026-10-05-routes-and-rules.md).
+ */
+export const RuleInteractionSchema = z
+  .object({
+    requireMention: z.boolean().optional(),
+    followUp: FollowUpSchema.optional(),
+  })
+  .strict();
+export type RuleInteraction = z.infer<typeof RuleInteractionSchema>;
+
+/**
+ * One Rule: "[who] may talk in [where]", and when a message there reaches the
+ * Route. A Route is where messages go; its Rules are the ways in, and a
+ * message gets in when any Rule matches it.
+ */
+export const AudienceRuleSchema = z
+  .object({
+    who: AudienceWhoSchema,
+    where: AudienceWhereSchema,
+    interaction: RuleInteractionSchema.optional(),
+    /** Absent: the Route's own limits, then for an Anyone rule the open-Route defaults. */
+    limits: RuleLimitsSchema.optional(),
+    /** Case-sensitive literal text a message must contain to start a session
+     * through this rule. Absent: any text. */
+    contains: z.string().min(1).optional(),
+  })
+  .strict()
+  // The DM lists narrow the Who, so a list the Who can never reach admits nobody.
+  .refine(
+    ({ who, where }) =>
+      where.dm === true || !(named(where.dmMembers) || named(where.dmTeams)) || namesMembers(who),
+    {
+      path: ["where", "dmMembers"],
+      message: "dmMembers and dmTeams narrow the Who to Members, and this Who names no Member",
+    },
+  )
+  .refine(({ who, where }) => where.dm === true || !named(where.dmIdentities) || namesGuests(who), {
+    path: ["where", "dmIdentities"],
+    message: "dmIdentities narrows the Who to Guests, and this Who names no Guest",
+  });
+export type AudienceRule = z.infer<typeof AudienceRuleSchema>;
+
+function named(list: readonly unknown[] | undefined): boolean {
+  return list !== undefined && list.length > 0;
+}
+
+/** `identities` are senders without a Hub Member, so they can never be on `dmMembers`. */
+function namesMembers(who: AudienceWho): boolean {
+  return who.anyone === true || [who.roles, who.teams, who.members].some(named);
+}
+
+function namesGuests(who: AudienceWho): boolean {
+  return who.anyone === true || named(who.identities);
+}
+
 export const AccountLimitsSchema = ChannelLimitsSchema.extend({
   perConversation: ChannelLimitsSchema.optional(),
 }).strict();
@@ -723,9 +796,6 @@ export const RouteSchema = z
     /** Who may talk, where: the Route applies to the conversations its rules'
      * Where covers, and admits a sender any covering rule names. */
     audience: z.array(AudienceRuleSchema),
-    // Optional literal content discriminator. This selects a route only when
-    // no durable direct-Agent binding already owns the inbound conversation.
-    contains: z.string().min(1).optional(),
     agent: z.string().min(1).optional(),
     environment: z.string().min(1).optional(),
     workflow: z.string().min(1).optional(),
@@ -742,7 +812,10 @@ export const RouteSchema = z
       })
       .strict()
       .optional(),
-    interaction: InteractionDefaultsSchema.optional(),
+    // A Route is where messages go: when a message gets in (a mention, the
+    // follow-up window, `contains`) is each Rule's, so only `whenBusy` stays.
+    interaction: RouteInteractionSchema.optional(),
+    contains: movedToRules("contains"),
     binding: BindingDefaultsSchema.optional(),
     reply: ReplyDefaultsSchema.optional(),
     workspace: WorkspaceDefaultsSchema.optional(),

@@ -1221,7 +1221,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface2,
+    backgroundColor: theme.colors.input,
   },
   modalMultilineInput: {
     color: theme.colors.foreground,
@@ -1231,7 +1231,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface2,
+    backgroundColor: theme.colors.input,
     minHeight: 100,
     textAlignVertical: "top",
   },

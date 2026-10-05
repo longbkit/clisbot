@@ -28,19 +28,21 @@ describe("command replies", () => {
       externalMessageId: "1789556491.248199",
       conversation: { ...message.conversation, threadId: null },
     };
-    expect(commandReplyAddress(root, "thread")).toEqual({
+    const thread = { replyAnchor: "thread" as const };
+    expect(commandReplyAddress(root, thread)).toEqual({
       to: "C123",
       threadId: "1789556491.248199",
     });
-    expect(commandReplyAddress(root, "default")).toEqual({ to: "C123" });
+    expect(commandReplyAddress(root, { replyAnchor: "default" })).toEqual({ to: "C123" });
     expect(commandReplyAddress(root)).toEqual({ to: "C123" });
-    expect(
-      commandReplyAddress(
-        { ...root, conversation: { ...root.conversation, kind: "dm" } },
-        "thread",
-      ),
-    ).toEqual({ to: "C123" });
-    expect(commandReplyAddress({ ...root, channel: "telegram" }, "thread")).toEqual({
+    const dm = { ...root, conversation: { ...root.conversation, kind: "dm" as const } };
+    // A DM follows its own anchor: the group chats' thread does not reach it.
+    expect(commandReplyAddress(dm, thread)).toEqual({ to: "C123" });
+    expect(commandReplyAddress(dm, { replyAnchor: "default", dmReplyAnchor: "thread" })).toEqual({
+      to: "C123",
+      threadId: "1789556491.248199",
+    });
+    expect(commandReplyAddress({ ...root, channel: "telegram" }, thread)).toEqual({
       to: "C123",
     });
   });

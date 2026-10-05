@@ -188,13 +188,29 @@ summarize what changed today and what's blocked`, then later just `/standup`.
 
 ## Who you are here
 
-- `/status` — the bound session, its Clisbot link, how much context is left, and
-  your access in this conversation.
-- `/me` — your public identity and what you're allowed to do here. An identity that is not linked to a Hub Member
-  uses the organization's Guest grants; Guest has no permissions by default.
+- `/status` — this chat's ID (and the thread or topic ID), and whether you can
+  talk to the bot here. If you can, it also says whether you need to mention the
+  bot and whether it is working. If your account is linked to a Hub Member, it
+  shows the session: agent, model, context left, pending approvals and the
+  Clisbot link.
+- `/me` — your ID, whether it is linked to a Hub Member, and, when linked, what
+  you're allowed to do here. An identity that is not linked uses the
+  organization's Guest grants; Guest has no permissions by default.
 
-Both reply in the conversation you asked from. On an Automation route, `/status` and
-`/cowork` show the runs and step Agents you may access; links use each Agent's Host.
+Anyone can send these two, even where the bot does not answer them otherwise.
+Both reply in the conversation you asked from. On an Automation route, `/status`
+and `/cowork` show the runs and step Agents you may access; links use each
+Agent's Host.
+
+### Asking for access
+
+The bot does not answer you here? Send `/status` in the chat and `/me` to the
+bot, and give your Hub admin the IDs they print. The admin adds the chat ID to a
+Rule's Where and your ID to its Who. On Telegram, `/me` in a group does not print
+your ID (other members cannot see it); send `/me` to the bot in a direct message.
+
+If the bot does not answer `/status` at all, it cannot see the chat (on Slack,
+invite it first), or this Connection answers only people it lets in.
 
 ## Approvals
 
