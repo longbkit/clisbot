@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useHubAccount } from "../account-provider";
 import { createChannelConnection } from "../channel-api";
+import { addQrChannelAccount } from "../channel-qr-account";
 import type { ChannelConnectionProblem } from "../channel-connection-form";
 import type { ChannelCatalogRow } from "../channel-account-health";
 import type { ChannelCatalogEntry } from "../channel-catalog";
@@ -128,8 +129,9 @@ function ChannelSelection({
       {entry !== undefined && connecting && row.connectable ? (
         <ChannelConnectionSetup key={row.channel} entry={entry} save={save} onCancel={onCancel} />
       ) : null}
-      {entry?.auth === "qr" ? (
-        <ChannelQrPanel channel={row.channel} accountId={account?.accountId ?? row.channel} />
+      {/* QR linking runs on a real account; before one exists, Connect creates it. */}
+      {entry?.auth === "qr" && account !== null ? (
+        <ChannelQrPanel channel={row.channel} accountId={account.accountId} />
       ) : null}
       {entry === undefined ? null : <ChannelSupportSection entry={entry} />}
     </View>
@@ -155,9 +157,12 @@ function useSaveConnection(
   const hub = useHubAccount();
   const create = useCallback(
     async (body: Record<string, unknown>) => {
-      await createChannelConnection(hub.api(), body);
+      const created = await createChannelConnection(hub.api(), body);
+      // A QR channel's login runs on its account, so the account comes now and
+      // the QR code shows here; its Routes come after.
+      if (entry?.auth === "qr") await addQrChannelAccount(hub.api(), created);
     },
-    [hub],
+    [entry?.auth, hub],
   );
   const save = useChannelConnectionSave(entry, create);
   return useCallback(

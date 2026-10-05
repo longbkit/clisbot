@@ -90,13 +90,13 @@ export function channelCatalogLabel(
 }
 
 /**
- * Whether an operator can create a Connection for this channel by supplying a
- * credential. A `planned` channel has no runtime on this Hub, and a QR channel's
- * credential is produced by a scan rather than pasted, so neither goes through
- * `POST connections`.
+ * Whether an operator can create a Connection for this channel here. A
+ * `planned` channel has no runtime on this Hub. A QR channel's Connection holds
+ * no secret, only a name: its credential comes from the scan, once the account
+ * runs (`POST connections` with `credentials: {}`).
  */
 export function isConnectableChannel(entry: ChannelCatalogEntry): boolean {
-  return entry.status === "in-repo" && entry.auth !== "qr";
+  return entry.status === "in-repo";
 }
 
 /** The one-line prerequisite an operator reads before opening the setup form. */

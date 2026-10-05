@@ -12,6 +12,7 @@ import zalouserEntry from "@clisbot/channels-zalouser/dist/entry.js";
 import { zalouserPlugin } from "@clisbot/channels-zalouser/dist/plugin.js";
 import type { HostRuntime, KeyedStoreEntry } from "@clisbot/channels-shared";
 import { buildAccountCarriers } from "./account-carriers.js";
+import { linkEndsNeedsLogin } from "./qr-login.js";
 import {
   channelUsesQrLogin,
   isNeedsLoginFailure,
@@ -105,10 +106,25 @@ describe("needs-login classification", () => {
     assert.equal(monitorFailureTransport("zalouser", 'account "x" is not linked'), "needs-login");
     assert.equal(monitorFailureTransport("zalouser", "socket hang up"), "failed");
     // Reconcile re-drives a failed account and leaves a parked one alone: only a
-    // human QR scan (or a new revision) changes the answer.
+    // human QR scan (which starts it, below) or a new revision changes the answer.
     assert.equal(isSettledTransport("needs-login"), true);
     assert.equal(isSettledTransport("failed"), false);
     assert.equal(isSettledTransport("started"), true);
     assert.equal(isSettledTransport("deferred"), false);
+  });
+
+  it("starts a parked account once its QR login links, and nothing else", () => {
+    const linked = { status: "linked" as const, message: "Login successful." };
+    assert.equal(linkEndsNeedsLogin(linked, "needs-login"), true);
+    assert.equal(linkEndsNeedsLogin(linked, "started"), false);
+    assert.equal(linkEndsNeedsLogin(linked, undefined), false);
+    assert.equal(
+      linkEndsNeedsLogin({ status: "pending", message: "scan the code" }, "needs-login"),
+      false,
+    );
+    assert.equal(
+      linkEndsNeedsLogin({ cleared: true, message: "logged out" }, "needs-login"),
+      false,
+    );
   });
 });

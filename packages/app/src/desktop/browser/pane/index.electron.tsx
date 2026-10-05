@@ -1473,7 +1473,7 @@ export function BrowserPane({
             onFocus={handleUrlBarFocus}
             onSubmitEditing={handleNavigateDraftUrl}
             placeholder={t("workspace.browser.controls.enterUrl")}
-            placeholderTextColor={theme.colors.foregroundMuted}
+            placeholderTextColor={theme.colors.placeholder}
             ref={urlInputRef}
             style={urlInputStyle}
             initialValue={draftUrl}
@@ -1678,8 +1678,8 @@ const ThemedAnnotationInput = withUnistyles(TextInput);
 const iconForegroundMutedMapping = (theme: { colors: { foregroundMuted: string } }) => ({
   color: theme.colors.foregroundMuted,
 });
-const annotationInputMapping = (theme: { colors: { foregroundMuted: string } }) => ({
-  placeholderTextColor: theme.colors.foregroundMuted,
+const annotationInputMapping = (theme: { colors: { placeholder: string } }) => ({
+  placeholderTextColor: theme.colors.placeholder,
 });
 
 const styles = StyleSheet.create((theme) => ({

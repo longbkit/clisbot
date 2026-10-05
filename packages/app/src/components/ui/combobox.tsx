@@ -224,7 +224,7 @@ export function SearchInput({
         // @ts-expect-error - outlineStyle is web-only
         style={[styles.searchInput, IS_WEB && { outlineStyle: "none" }]}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.foregroundMuted}
+        placeholderTextColor={theme.colors.placeholder}
         resetKey={resetKey}
         onChangeText={onChangeText}
         autoCapitalize="none"

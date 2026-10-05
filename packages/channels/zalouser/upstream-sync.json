@@ -174,6 +174,16 @@
       "deviation": ["D-ZU-007"]
     },
     {
+      "local": "src/typing.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZU-025"]
+    },
+    {
+      "local": "src/typing.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZU-025"]
+    },
+    {
       "local": "src/session-state.ts",
       "status": "adapted",
       "upstream": "extensions/zalouser/src/session-state.ts",
@@ -250,7 +260,7 @@
   "omitted": [
     {
       "upstream": "extensions/zalouser/src/monitor.ts",
-      "reason": "The OpenClaw inbound pipeline: allowlist name resolution against the friend/group directory, route resolution, pairing/DM/group policy, the group history window, the delivered/seen acks, the typing indicator, the `ctxPayload` build, `core.channel.inbound.dispatch` and the reply-delivery closure, plus the provider lifecycle around them. The Hub owns every one of those. Replaced at the smallest boundary by `fusion/inbound-adapter.ts`, `fusion/admission.ts`, `fusion/listener-session.ts` and `lifecycle/start-account.ts` (D-ZU-013/014/015/020); the listener itself (`startZaloListener`) is carried verbatim inside `zalo-js.ts`. Consequence: the typing indicator and the delivered/seen acks are wired on the client (`send.ts`) but not driven, and the inbound-media download is not carried (Zalo Personal inbound attachments arrive as message content, not as a URL the vertical fetches)."
+      "reason": "The OpenClaw inbound pipeline: allowlist name resolution against the friend/group directory, route resolution, pairing/DM/group policy, the group history window, the delivered/seen acks, the typing indicator, the `ctxPayload` build, `core.channel.inbound.dispatch` and the reply-delivery closure, plus the provider lifecycle around them. The Hub owns every one of those. Replaced at the smallest boundary by `fusion/inbound-adapter.ts`, `fusion/admission.ts`, `fusion/listener-session.ts` and `lifecycle/start-account.ts` (D-ZU-013/014/015/020); the listener itself (`startZaloListener`) is carried verbatim inside `zalo-js.ts`. Consequence: the delivered/seen acks are wired on the client (`send.ts`) but not driven (the typing indicator is driven by `typing.ts`, D-ZU-025), and the inbound-media download is not carried (Zalo Personal inbound attachments arrive as message content, not as a URL the vertical fetches)."
     },
     {
       "upstream": "extensions/zalouser/src/ingress.ts",
@@ -428,7 +438,7 @@
     {
       "id": "D-ZU-013",
       "file": "src/fusion/inbound-adapter.ts",
-      "reason": "`monitor.ts`'s inbound normalization. Upstream resolves the route, runs the pairing/allowlist/group policy, builds the history window, assembles the OpenClaw `ctxPayload` and calls `core.channel.inbound.dispatch`. The Hub owns all of that, so this module only turns the already-normalized `ZaloInboundMessage` (upstream's own `normalizeZaloInboundMessage`, carried verbatim in `zalo-js.ts`) into the shared `ChannelInboundEvent` (kind + facts). Carried from upstream: the group/direct split, the timestamp rule, the mention extraction and the mention-stripped command body \u2014 all of them inside `normalizeZaloInboundMessage`. DECIDED here, because the Hub reads them: (1) the external message id is the `msgId:cliMsgId` PAIR, because `addReaction` needs both and collapsing to `msgId` would make an inbound message un-reactable; (2) `wasMentioned` folds upstream's explicit mention, its implicit (quote-of-own-message) mention and its \"cannot attribute the mention\" fallback into the single fact the Hub's mention policy reads; (3) a leading `/verb` in the mention-stripped body is `kind: \"command\"`, since Zalo Personal has no native command surface.",
+      "reason": "`monitor.ts`'s inbound normalization. Upstream resolves the route, runs the pairing/allowlist/group policy, builds the history window, assembles the OpenClaw `ctxPayload` and calls `core.channel.inbound.dispatch`. The Hub owns all of that, so this module only turns the already-normalized `ZaloInboundMessage` (upstream's own `normalizeZaloInboundMessage`, carried verbatim in `zalo-js.ts`) into the shared `ChannelInboundEvent` (kind + facts). Carried from upstream: the group/direct split, the timestamp rule, the mention extraction and the mention-stripped command body \u2014 all of them inside `normalizeZaloInboundMessage`. DECIDED here, because the Hub reads them: (1) the external message id is the `msgId:cliMsgId` PAIR, because `addReaction` needs both and collapsing to `msgId` would make an inbound message un-reactable; (2) `wasMentioned` folds upstream's explicit mention, its implicit (quote-of-own-message) mention and its \"cannot attribute the mention\" fallback into the single fact the Hub's mention policy reads; (3) a leading `/verb` in the mention-stripped body is `kind: \"command\"`, since Zalo Personal has no native command surface. A group's conversation id carries the `group:` prefix (`group:<threadId>`), the same target `session-route.ts` parses: the Hub answers on the conversation id, and a bare id sends as a DM.",
       "tests": ["src/fusion/inbound-adapter.test.ts"]
     },
     {
@@ -494,6 +504,12 @@
       "file": "src/send.ts",
       "reason": "One ported test expectation moves with the core outbound-media boundary: `@clisbot/channels-core`'s `loadOutboundMediaFromUrl` refuses an oversized file with `\u2026 is N bytes, over the M byte limit` where upstream's message is `exceeds limit`. The invariant the case exists for \u2014 the account media cap is applied BEFORE the native send, so nothing is posted \u2014 is asserted unchanged.",
       "tests": ["src/zalo-quote-metadata.test.ts"]
+    },
+    {
+      "id": "D-ZU-025",
+      "file": "src/typing.ts",
+      "reason": "The Hub's `plugin.outbound.typing` (`sync.progress`) for Zalo Personal, which upstream drives from its own monitor (omitted here). A `start` sends the ported `sendTypingZalouser` now and re-sends it every 4s, inside the few seconds Zalo shows the event; a `stop` cancels and sends nothing. A fault throws into the Hub's lease bookkeeping, and a failing refresh stops its own timer. Mirrors the Telegram vertical's `typing.ts` (D-TG-025).",
+      "tests": ["src/typing.test.ts"]
     }
   ]
 }

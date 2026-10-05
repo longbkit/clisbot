@@ -86,7 +86,10 @@ function accountSummary(row: ChannelCatalogRow): string {
 function statusLabel(row: ChannelCatalogRow): string {
   if (row.status !== "in-repo") return CHANNEL_STATUS_LABELS[row.status];
   if (row.accounts.length === 0) return "Ready to connect";
-  return row.accounts.some((account) => account.severity === "error") ? "Attention" : "Connected";
+  if (row.accounts.some((account) => account.severity === "error")) return "Attention";
+  // A warning names itself ("Needs linking", "Stopped") rather than reading "Connected".
+  const warning = row.accounts.find((account) => account.severity === "warning");
+  return warning?.transportLabel ?? "Connected";
 }
 
 function statusVariant(row: ChannelCatalogRow): "success" | "warning" | "error" | "muted" {

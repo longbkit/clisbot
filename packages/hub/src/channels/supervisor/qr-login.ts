@@ -73,6 +73,14 @@ export type QrLoginResult = QrLoginState | QrLoginCancelled | QrLoginCleared;
 
 export class QrLoginUnavailableError extends Error {}
 
+/**
+ * Whether a verb's answer ends a `needs-login` park: the account linked, and it
+ * is still parked waiting for exactly that. The supervisor then starts it.
+ */
+export function linkEndsNeedsLogin(result: QrLoginResult, transport: string | undefined): boolean {
+  return "status" in result && result.status === "linked" && transport === "needs-login";
+}
+
 type SetupVerbFn = (params: Record<string, unknown>) => Promise<unknown>;
 
 function setupSurface(plugin: ChannelPlugin): Record<string, unknown> {

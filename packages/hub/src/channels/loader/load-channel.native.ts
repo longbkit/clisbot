@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { ChannelsDisabledError, isChannelsEnabled } from "./channel-gate.js";
 import { ChannelLoaderError } from "./hooks.js";
@@ -286,6 +287,48 @@ describe("loadChannelVertical (native ESM loader)", () => {
     );
     loadedA.dispose();
     loadedB.dispose();
+    delete (globalThis as Record<string, unknown>)["__gate"];
+  });
+
+  // The Hub imports on its own schedule while a vertical loads (a dev server
+  // compiling a web route mid-load once failed Slack's load-trace with 45 of the
+  // Hub's own modules). An import from no account is never charged to the load.
+  it("keeps the Hub's own import during a load out of that load's trace", async () => {
+    const base = join(workDir, "hub-import");
+    const tree = writeTree(join(base, "c"));
+    const hubDir = join(base, "hub-own");
+    mkdirSync(hubDir, { recursive: true });
+    writeFileSync(join(hubDir, "package.json"), PKG);
+    writeFileSync(join(hubDir, "ui.js"), "export const ui = 'HUB-UI';\n");
+    writeFileSync(join(tree.channelDir, "dist", "index.js"), `await globalThis.__gate;\n${ENTRY}`);
+    let release = (): void => undefined;
+    (globalThis as Record<string, unknown>)["__gate"] = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const loading = loadChannelVertical({
+      channel: "c",
+      accountId: "c",
+      organizationId: "org",
+      installDir: join(base, "c"),
+      mainInstallDir: tree.mainDir,
+      channelInstallDir: tree.channelDir,
+      entry: "dist/index.js",
+      plugin: { specifier: "dist/__hub__plugin.js", exportName: "fakePlugin" },
+      loadMode: "published",
+      hostRuntime: hostRuntime(),
+      hostBaseDir: tree.hostBaseDir,
+    });
+    // The load window is open and parked; the Hub imports a module of its own.
+    const hubModule = (await import(pathToFileURL(join(hubDir, "ui.js")).href)) as { ui: string };
+    release();
+    const loaded = await loading;
+
+    assert.equal(hubModule.ui, "HUB-UI");
+    assert.deepEqual(
+      loaded.loadedModules.filter((url) => url.includes("/hub-own/")),
+      [],
+    );
+    loaded.dispose();
     delete (globalThis as Record<string, unknown>)["__gate"];
   });
 

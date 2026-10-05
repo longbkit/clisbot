@@ -6,7 +6,11 @@ import {
   initialChannelReplyAnchor,
   initialDmReplyAnchor,
 } from "./channel-onboarding";
-import { buildChannelRouteCandidate, DEFAULT_MEMBER_ROUTE_BEHAVIOR } from "./channel-configuration";
+import {
+  buildChannelRouteCandidate,
+  channelAccountRecord,
+  DEFAULT_MEMBER_ROUTE_BEHAVIOR,
+} from "./channel-configuration";
 
 describe("Channel onboarding defaults", () => {
   it("creates thread replies by default and retains existing default replies when editing", () => {
@@ -60,5 +64,25 @@ describe("Channel onboarding defaults", () => {
         channelMembersAudienceLabel({ membership: member, members: [member], selectedTeamIds: [] }),
       ).toBe("Members with access");
     }
+  });
+});
+
+describe("a new account's transport", () => {
+  it("starts on each channel's own first mode, as the Hub picks it", () => {
+    const mode = (provider: string) =>
+      channelAccountRecord({ id: "c1", provider }, "main", [])["transport"];
+    expect(mode("slack")).toEqual({ mode: "socket" });
+    expect(mode("telegram")).toEqual({ mode: "polling" });
+    expect(mode("discord")).toEqual({ mode: "gateway" });
+    expect(mode("feishu")).toEqual({ mode: "websocket" });
+    expect(mode("zalouser")).toEqual({ mode: "qr" });
+    expect(channelAccountRecord({ id: "c1", provider: "zalouser" }, "main", [])).toEqual({
+      channel: "zalouser",
+      accountId: "main",
+      enabled: true,
+      connectionId: "c1",
+      transport: { mode: "qr" },
+      routes: [],
+    });
   });
 });

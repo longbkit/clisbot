@@ -80,6 +80,14 @@ describe("Sidebar interaction surfaces", () => {
   });
 });
 
+describe("Placeholder text", () => {
+  it("sits lighter than secondary text, so an empty field never reads as filled", () => {
+    expect(lightTheme.colors.placeholder).toBe("#a1a1aa");
+    expect(lightTheme.colors.placeholder).not.toBe(lightTheme.colors.foregroundMuted);
+    expect(darkTheme.colors.placeholder).toBe(darkTheme.colors.foregroundExtraMuted);
+  });
+});
+
 describe("Built-in light theme", () => {
   it("preserves its authored aliases and terminal contrast through the semantic builder", () => {
     expect(lightTheme.colors).toMatchObject({

@@ -217,16 +217,39 @@ export function buildChannelAccountCandidate(input: ChannelAccountCandidateInput
     resource: input.resource,
   });
   return {
-    account: {
-      channel: input.connection.provider,
-      accountId,
-      enabled: true,
-      connectionId: input.connection.id,
-      transport:
-        input.connection.provider === "telegram" ? { mode: "polling" } : { mode: "socket" },
-      routes: [candidate.route],
-    },
+    account: channelAccountRecord(input.connection, accountId, [candidate.route]),
     resource: candidate.resource,
+  };
+}
+
+/**
+ * The transport a new account starts on: each channel's first mode, as the
+ * Hub's own `DEFAULT_TRANSPORT_MODE` (channels/http/operations.ts) picks it.
+ * Each channel's schema accepts only its own modes; Discord has no `socket`.
+ */
+const DEFAULT_TRANSPORT_MODES: Readonly<Record<string, string>> = {
+  slack: "socket",
+  telegram: "polling",
+  discord: "gateway",
+  googlechat: "webhook",
+  feishu: "websocket",
+  zalo: "polling",
+  zalouser: "qr",
+};
+
+/** A new, enabled account on a Connection, with the Routes it starts with. */
+export function channelAccountRecord(
+  connection: { id: string; provider: string },
+  accountId: string,
+  routes: ChannelConfigurationRecord[],
+): ChannelConfigurationRecord {
+  return {
+    channel: connection.provider,
+    accountId,
+    enabled: true,
+    connectionId: connection.id,
+    transport: { mode: DEFAULT_TRANSPORT_MODES[connection.provider] ?? "socket" },
+    routes,
   };
 }
 

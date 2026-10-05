@@ -132,9 +132,16 @@ function ownerKeyForParent(parentURL: string | undefined): string | undefined {
 
 /** Attribute one resolution and record it in its account's load trace. A module
  * attributed to an account whose load window has already closed is dropped: it
- * belongs to that account's graph, not to whoever happens to be loading now. */
+ * belongs to that account's graph, not to whoever happens to be loading now.
+ *
+ * An import with neither an attributed importer nor a running account is the
+ * Hub's own, and is never charged to the open load: every channel import runs
+ * under `runAsChannelAccount` (the entry and plugin imports, the supervisor's
+ * load and start), while the Hub keeps importing on its own schedule — a dev
+ * server compiling a web route mid-load once failed Slack's load-trace with 45
+ * of the Hub's `@tanstack/react-query` modules. */
 function recordResolvedModule(url: string, parentURL: string | undefined): void {
-  const owner = ownerKeyForParent(parentURL) ?? runningAccount.getStore() ?? active?.key;
+  const owner = ownerKeyForParent(parentURL) ?? runningAccount.getStore();
   if (owner === undefined) return;
   if (!moduleOwner.has(url)) moduleOwner.set(url, owner);
   if (owner === active?.key) active.loaded.add(url);

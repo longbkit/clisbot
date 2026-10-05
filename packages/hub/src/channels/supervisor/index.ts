@@ -127,7 +127,12 @@ import {
 import { encryptedStateNamespaces } from "../state/encrypted-namespaces.js";
 import { isSettledTransport, monitorFailureTransport } from "./needs-login.js";
 import { AccountRestartScheduler } from "./account-restart.js";
-import { runQrLoginVerb, type QrLoginResult, type QrLoginVerb } from "./qr-login.js";
+import {
+  linkEndsNeedsLogin,
+  runQrLoginVerb,
+  type QrLoginResult,
+  type QrLoginVerb,
+} from "./qr-login.js";
 import { openChannelSecretStateBackend } from "../state/secret-backend.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
 import {
@@ -237,31 +242,53 @@ function threadIdOf(messageThreadId: unknown): string | null {
 }
 
 /** The plane `kind` a native conversation maps to (null = not plane-bound). */
+type PlaneKind = InboundMessage["conversation"]["kind"];
+
+/**
+ * Each in-repo vertical's native chat types (`ctxPayload.ChatType`), as the
+ * plane names them: the kind at the root, and the kind a thread inside it gets.
+ * A chat type a channel never emits maps to nothing, and its message is dropped.
+ */
+const PLANE_KINDS: Readonly<
+  Record<string, Readonly<Record<string, { root: PlaneKind; thread: PlaneKind }>>>
+> = {
+  slack: {
+    direct: { root: "dm", thread: "dm" },
+    group: { root: "group", thread: "group" },
+    // Threads are not a Slack kind: a threaded message keeps `channel`.
+    channel: { root: "channel", thread: "thread" },
+  },
+  telegram: {
+    direct: { root: "dm", thread: "dm" },
+    group: { root: "group", thread: "topic" },
+  },
+  // A Discord thread IS a channel (the thread id is the channel the message
+  // arrived in); the vertical emits only `direct` and `channel`.
+  discord: {
+    direct: { root: "dm", thread: "dm" },
+    channel: { root: "channel", thread: "thread" },
+  },
+  // Zalo and Zalo Personal: DMs and groups, no threads.
+  zalo: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "group" } },
+  zalouser: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "group" } },
+  // A Feishu group message in a thread (`thread_id` / `root_id`) is that
+  // thread's own conversation.
+  feishu: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "thread" } },
+  // A Google Chat space is a channel, and a thread in it its own conversation.
+  googlechat: {
+    direct: { root: "dm", thread: "dm" },
+    channel: { root: "channel", thread: "thread" },
+  },
+};
+
 function planeKindFor(
   channel: string,
   chatType: string,
   threadId: string | null,
-): InboundMessage["conversation"]["kind"] | null {
-  if (channel === "slack") {
-    if (chatType === "direct") return "dm";
-    if (chatType === "group") return "group";
-    if (chatType === "channel") return threadId !== null ? "thread" : "channel";
-    return null;
-  }
-  if (channel === "telegram") {
-    if (chatType === "direct") return "dm";
-    if (chatType === "group") return threadId !== null ? "topic" : "group";
-    return null;
-  }
-  // A Discord thread IS a channel (the thread id is the channel the message
-  // arrived in), so the guild mapping matches Slack's; the vertical emits only
-  // `direct` and `channel` (transport/gateway.ts `resolveChatType`).
-  if (channel === "discord") {
-    if (chatType === "direct") return "dm";
-    if (chatType === "channel") return threadId !== null ? "thread" : "channel";
-    return null;
-  }
-  return null;
+): PlaneKind | null {
+  const kinds = PLANE_KINDS[channel]?.[chatType];
+  if (kinds === undefined) return null;
+  return threadId === null ? kinds.root : kinds.thread;
 }
 
 /**
@@ -1144,12 +1171,31 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     });
     const profile = typeof account["profile"] === "string" ? account["profile"] : input.accountId;
     const state = this.accountState.get(handleKey(input.channel, input.accountId));
-    return runQrLoginVerb({
+    const result = await runQrLoginVerb({
       plugin: vertical.plugin,
       accountId: input.accountId,
       profile,
       verb: input.verb,
       ...(state === undefined ? {} : { flushState: () => state.flush() }),
+    });
+    this.startLinkedAccount(input.channel, input.accountId, result);
+    return result;
+  }
+
+  /**
+   * A login that links ends `needs-login`: the account starts the way Retry
+   * would, in the background, so the verb's answer is not held by the
+   * transport's start. The session is already flushed (`runQrLoginVerb`).
+   */
+  private startLinkedAccount(channel: string, accountId: string, result: QrLoginResult): void {
+    const transport = this.handles.get(handleKey(channel, accountId))?.transport;
+    if (!linkEndsNeedsLogin(result, transport)) return;
+    void this.startAccount(channel, accountId).catch((error: unknown) => {
+      this.logger.warn("channel account start after QR link failed", {
+        channel,
+        account: accountId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 

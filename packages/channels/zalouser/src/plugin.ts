@@ -29,6 +29,7 @@ import {
 } from "./fusion/session-store.js";
 import { startZalouserAccount } from "./lifecycle/start-account.js";
 import { sendMedia, sendText } from "./outbound.js";
+import { zalouserTyping } from "./typing.js";
 import { probeZalouser } from "./probe.js";
 import { getHostRuntime } from "./runtime-store.js";
 import {
@@ -119,6 +120,10 @@ export const zalouserPlugin: ChannelPlugin = {
   outbound: {
     sendText,
     sendMedia,
+    // The `sync.progress` liveness surface: the typing event while a turn runs.
+    typing: async (args: Record<string, unknown>) => {
+      await zalouserTyping(args as never);
+    },
     // The ported Zalo Personal primitives, by their upstream names.
     sendMessageZalouser,
     sendImageZalouser,

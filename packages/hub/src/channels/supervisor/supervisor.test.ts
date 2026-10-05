@@ -467,16 +467,36 @@ describe("flatInboundNormalizer", () => {
     assert.equal(message?.conversation.kind, "dm");
   });
 
-  it("drops an inbound message from a channel with no in-repo vertical", () => {
+  it("maps every in-repo vertical's conversations, so none of its messages is dropped", () => {
+    const kind = (channel: string, chatType: string, thread?: string) =>
+      flatInboundNormalizer({
+        channel,
+        accountId: "main",
+        ctxPayload: {
+          Body: "/status",
+          ChatType: chatType,
+          ChatId: "C1",
+          SenderId: "U1",
+          ...(thread === undefined ? {} : { MessageThreadId: thread }),
+        },
+      })?.conversation.kind;
+    assert.equal(kind("zalouser", "direct"), "dm");
+    assert.equal(kind("zalouser", "group"), "group");
+    assert.equal(kind("zalo", "direct"), "dm");
+    assert.equal(kind("zalo", "group"), "group");
+    assert.equal(kind("feishu", "direct"), "dm");
+    assert.equal(kind("feishu", "group"), "group");
+    assert.equal(kind("feishu", "group", "omt_1"), "thread");
+    assert.equal(kind("googlechat", "direct"), "dm");
+    assert.equal(kind("googlechat", "channel"), "channel");
+    assert.equal(kind("googlechat", "channel", "spaces/A/threads/T"), "thread");
+  });
+
+  it("drops a chat type its channel never emits", () => {
     const message = flatInboundNormalizer({
-      channel: "googlechat",
-      accountId: "space",
-      ctxPayload: {
-        Body: "hi",
-        ChatType: "channel",
-        ChatId: "spaces/AAAA",
-        SenderId: "users/1",
-      },
+      channel: "zalouser",
+      accountId: "main",
+      ctxPayload: { Body: "hi", ChatType: "channel", ChatId: "C1", SenderId: "U1" },
     });
     assert.equal(message, null);
   });

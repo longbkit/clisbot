@@ -126,6 +126,18 @@ describe("validation", () => {
 });
 
 describe("submission", () => {
+  it("adds a Zalo Personal Connection by name alone: the QR scan comes later", () => {
+    const model = openForm("zalouser");
+    expect(model.getState()).toMatchObject({ setup: "qr", fields: [] });
+    expect(model.requestBody()).toBeNull();
+    model.setAccountId("main");
+    expect(model.requestBody()).toEqual({
+      provider: "zalouser",
+      accountId: "main",
+      credentials: {},
+    });
+  });
+
   it("refuses a body until the form is complete", () => {
     const model = openForm("telegram");
     expect(model.requestBody()).toBeNull();
@@ -254,12 +266,12 @@ describe("Hub problems become guidance", () => {
 });
 
 describe("which channels the Accounts view can offer", () => {
-  it("leaves out the QR channel and, without the authority, the Provider Application one", () => {
+  it("offers the QR channel and, without the authority, leaves out the Provider Application one", () => {
     expect(
       connectableChannelEntries(CHANNEL_CATALOG_FIXTURE, {
         allowProviderApplications: false,
       }).map((entry) => entry.id),
-    ).toEqual(["telegram", "discord", "googlechat", "feishu", "zalo"]);
+    ).toEqual(["telegram", "discord", "googlechat", "feishu", "zalouser", "zalo"]);
   });
 
   it("adds Slack for an instance operator", () => {
@@ -267,7 +279,7 @@ describe("which channels the Accounts view can offer", () => {
       connectableChannelEntries(CHANNEL_CATALOG_FIXTURE, {
         allowProviderApplications: true,
       }).map((entry) => entry.id),
-    ).toEqual(["slack", "telegram", "discord", "googlechat", "feishu", "zalo"]);
+    ).toEqual(["slack", "telegram", "discord", "googlechat", "feishu", "zalouser", "zalo"]);
   });
 
   it("leaves out a channel this build has no request body for", () => {

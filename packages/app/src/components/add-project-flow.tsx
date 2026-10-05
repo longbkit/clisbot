@@ -140,7 +140,7 @@ const ThemedArrowLeft = withUnistyles(ArrowLeft);
 const ThemedX = withUnistyles(X);
 const NO_SHORTCUTS: [] = [];
 const ThemedTextInput = withUnistyles(TextInput, (theme) => ({
-  placeholderTextColor: theme.colors.foregroundMuted,
+  placeholderTextColor: theme.colors.placeholder,
 }));
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });

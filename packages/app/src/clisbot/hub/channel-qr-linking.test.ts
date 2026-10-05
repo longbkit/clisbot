@@ -224,6 +224,25 @@ describe("cancel, relink and logout", () => {
 });
 
 describe("a verb that did not answer", () => {
+  it("reads a request that outran the transport as a retry, not as a failure to explain", () => {
+    for (const message of ["Hub request timed out", "Hub connection closed"]) {
+      const failure = channelQrFailure({ status: 0, code: "request_failed", message });
+      expect(failure.unavailable).toBe(false);
+      expect(failure.message).toContain("Try again");
+    }
+  });
+
+  it("reads a 404 for a missing account as that, not as an old Hub", () => {
+    const failure = channelQrFailure({
+      status: 404,
+      code: "channel_account_unavailable",
+      message: "Channel account is unavailable.",
+    });
+    expect(failure.unavailable).toBe(false);
+    expect(failure.message).toContain("not set up on the Hub");
+    expect(failure.message).not.toContain("Update the Hub");
+  });
+
   it("reads the unknown-route 404 as a Hub without the QR operations", () => {
     const failure = channelQrFailure({ status: 404, message: "No management resource." });
     expect(failure.unavailable).toBe(true);

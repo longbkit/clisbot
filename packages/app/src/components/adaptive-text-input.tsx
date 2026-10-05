@@ -21,8 +21,9 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 
+// Lighter than a typed value, so an empty field never reads as filled.
 const ThemedTextInput = withUnistyles(EditingTextInput, (theme) => ({
-  placeholderTextColor: theme.colors.foregroundMuted,
+  placeholderTextColor: theme.colors.placeholder,
 }));
 
 export const AdaptiveTextInput = forwardRef<EditingTextInputHandle, AdaptiveTextInputProps>(

@@ -44,7 +44,7 @@ export function findShortcutPlatform(): FindShortcutPlatform {
 }
 
 const TextInput = withUnistyles(EditingTextInput, (theme) => ({
-  placeholderTextColor: theme.colors.foregroundMuted,
+  placeholderTextColor: theme.colors.placeholder,
 }));
 const ArrowUpIcon = withUnistyles(ArrowUp, mutedIconColorMapping);
 const ArrowDownIcon = withUnistyles(ArrowDown, mutedIconColorMapping);

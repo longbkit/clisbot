@@ -27,6 +27,10 @@ const SOURCE_OPTIONS: SegmentedControlOption<ServiceAccountSource>[] = [
  * the Hub's problem, or null when the Connection was created; the caller closes
  * the form on null.
  */
+/** A QR channel has nothing to paste: the scan happens on the Connection's card. */
+const QR_NEXT_STEP =
+  "Nothing to paste. Once it is added, scan its QR code with the phone signed in to this Zalo account, then give it a Route so people can reach it.";
+
 export function ChannelConnectionSetup({
   entry,
   save,
@@ -44,6 +48,7 @@ export function ChannelConnectionSetup({
     <SettingsSection title={`Connect ${entry.label}`}>
       <View style={[settingsStyles.card, styles.form]}>
         <Text style={settingsStyles.rowHint}>{entry.transports[0]?.setup ?? ""}</Text>
+        {state.setup === "qr" ? <Text style={settingsStyles.rowHint}>{QR_NEXT_STEP}</Text> : null}
         {state.transports.length > 1 && state.transportId !== null ? (
           <Field label="Transport">
             <SegmentedControl
@@ -101,7 +106,7 @@ export function ChannelConnectionSetup({
         )}
         <View style={styles.actions}>
           <Button disabled={!state.canSubmit} loading={state.submitting} onPress={submit}>
-            Verify and add Connection
+            {state.setup === "qr" ? "Add Connection" : "Verify and add Connection"}
           </Button>
           {onCancel === undefined ? null : (
             <Button variant="ghost" disabled={state.submitting} onPress={onCancel}>

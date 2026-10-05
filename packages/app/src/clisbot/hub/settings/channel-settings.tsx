@@ -46,7 +46,13 @@ import { RouteHostProvider, useRouteHost } from "./route-host-context";
 import { ChannelActionsMenu } from "./channel-actions-menu";
 import { ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { ChoiceRow } from "./channel-route-behavior-rows";
-import { AddRouteRow, DrillChevron, DrillRow, keepPressInControl } from "./channel-list-rows";
+import {
+  AddRouteRow,
+  DrillChevron,
+  DrillRow,
+  keepPressInControl,
+  RuntimeDetailRow,
+} from "./channel-list-rows";
 import {
   FoldedRouteFormSection,
   FoldedRouteFormSubgroup,
@@ -142,6 +148,8 @@ import { ChannelActivity, initialChannelActivityState } from "./channel-activity
 import { AddChannelConnection } from "./channel-connection-add";
 import { ChannelCatalogView } from "./channel-catalog-view";
 import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
+import { channelCatalogLabel } from "../channel-catalog";
+import { useChannelCatalog } from "./channel-catalog-queries";
 import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
 import { ChannelOperationsView } from "./channel-operations-view";
 import { DaemonProjectField } from "./daemon-project-field";
@@ -1596,11 +1604,7 @@ function ChannelAccountRow({
         pending={pending}
         menu={menu}
       />
-      {runtime?.detail ? (
-        <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
-          <Text style={styles.errorText}>{runtime.detail}</Text>
-        </View>
-      ) : null}
+      {runtime?.detail ? <RuntimeDetailRow detail={runtime.detail} /> : null}
       <ConnectionRuntimeFacts
         channel={channel}
         accountId={accountId}
@@ -1761,11 +1765,14 @@ function ConnectionHeader({
   menu: ConnectionMenu;
 }) {
   const compact = useIsCompactFormFactor();
+  const catalog = useChannelCatalog();
   return (
     <View style={[settingsStyles.row, styles.row, compact && styles.stackedRow]}>
       <View style={[settingsStyles.rowContent, styles.connectionTitle]}>
         <ChannelIcon channel={channel} size={14} />
-        <Text style={settingsStyles.rowTitle}>{`${channelLabel(channel)} · ${accountId}`}</Text>
+        <Text style={settingsStyles.rowTitle}>
+          {`${channelCatalogLabel(catalog.entries, channel)} · ${accountId}`}
+        </Text>
         <StatusBadge label={status.label} variant={status.variant} />
         {detail === null ? null : (
           <Text style={settingsStyles.rowHint} numberOfLines={1}>
@@ -4443,10 +4450,6 @@ const styles = StyleSheet.create((theme) => ({
   statusPanel: { flexDirection: "column", alignItems: "flex-start", gap: theme.spacing[2] },
   formActions: {
     gap: theme.spacing[2],
-  },
-  errorText: {
-    color: theme.colors.destructive,
-    fontSize: 12,
   },
 }));
 

@@ -52,10 +52,14 @@ interface ChannelConnectionShape {
  * credential is called and what it is for, the request body says which keys the
  * `.strict()` schema will take. Telegram's catalog entry carries
  * `webhookUrl`/`webhookSecret`, for instance, while its Connection credential is
- * a bot token alone. A channel with no shape here has no operator-supplied
- * credential — Zalo Personal is linked by QR.
+ * a bot token alone. Zalo Personal's Connection is a name with no credential:
+ * the account is linked by a QR scan once it runs.
  */
 const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
+  zalouser: {
+    setup: "qr",
+    fields: [],
+  },
   telegram: {
     setup: "token",
     fields: [{ key: "botToken", catalogKey: "botToken", kind: "secret", required: true }],
@@ -160,7 +164,7 @@ export function channelSetupKind(entry: ChannelCatalogEntry): ChannelSetupKind {
 
 /** Whether this app build knows how to build a `POST connections` body for it. */
 export function hasChannelConnectionForm(entry: ChannelCatalogEntry): boolean {
-  return entry.auth !== "qr" && CONNECTION_SHAPES[entry.id] !== undefined;
+  return CONNECTION_SHAPES[entry.id] !== undefined;
 }
 
 /**

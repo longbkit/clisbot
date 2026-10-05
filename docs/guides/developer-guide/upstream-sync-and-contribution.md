@@ -472,6 +472,9 @@ four metadata/doc files; the 2026-09-06 comparison from `74a377ff6` to Paseo
   `add-host-modal.tsx`, `pair-link-modal.tsx`, `provider-diagnostic-sheet.tsx`,
   `pair-device-section.tsx`, `project-settings-screen.tsx` and
   `appearance-section.tsx`; search, find, menu and read-only fields stay filled.
+  Every `placeholderTextColor` reads `colors.placeholder` (a theme token the
+  fork adds) instead of `foregroundMuted`: one-line edits in about 19 app files.
+  An upstream input added later needs the same edit.
 
 `getpaseo/hub` has its own overlap, from the channel plane driving a Host over
 the connection that Host holds to the Hub

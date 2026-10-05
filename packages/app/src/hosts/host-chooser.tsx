@@ -258,7 +258,7 @@ export function HostChooserModal() {
               initialValue={query}
               onChangeText={handleQueryChange}
               placeholder="Search hosts..."
-              placeholderTextColor={theme.colors.foregroundMuted}
+              placeholderTextColor={theme.colors.placeholder}
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}

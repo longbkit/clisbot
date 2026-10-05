@@ -104,13 +104,36 @@ export interface ChannelQrFailure {
   message: string;
 }
 
-/** How a verb's rejection is settled. Only the unknown-route 404 is terminal. */
-export function channelQrFailure(problem: { status: number; message: string }): ChannelQrFailure {
+/**
+ * How a verb's rejection is settled. Only the unknown-route 404 is terminal: a
+ * 404 that names the account (`channel_account_unavailable`) means this Hub
+ * serves QR linking but has no such account running, so updating the Hub
+ * would not help.
+ */
+export function channelQrFailure(problem: {
+  status: number;
+  code?: string;
+  message: string;
+}): ChannelQrFailure {
+  if (problem.status === 404 && problem.code === "channel_account_unavailable") {
+    return {
+      unavailable: false,
+      message:
+        "This account is not set up on the Hub or is turned off. Add it as a Connection with a Route, then link it here.",
+    };
+  }
   if (problem.status === 404) {
     return {
       unavailable: true,
       message:
         "This Hub does not serve QR linking for this channel. Update the Hub, then link the account here.",
+    };
+  }
+  if (problem.status === 0 && /timed out|connection closed/iu.test(problem.message)) {
+    return {
+      unavailable: false,
+      message:
+        "The Hub took too long to prepare the QR code; the first one after adding an account can. Try again.",
     };
   }
   if (problem.status === 503) {

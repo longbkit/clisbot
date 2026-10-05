@@ -130,10 +130,10 @@ describe("catalog accessors", () => {
     expect(channelCatalogLabel([], "zalouser")).toBe("Zalouser");
   });
 
-  it("treats a QR channel as not connectable through the credential form", () => {
+  it("treats a QR channel as connectable: its Connection is a name, linked by a scan later", () => {
     const zalouser = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "zalouser");
     expect(zalouser).toBeDefined();
-    expect(zalouser && isConnectableChannel(zalouser)).toBe(false);
+    expect(zalouser && isConnectableChannel(zalouser)).toBe(true);
     const telegram = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "telegram");
     expect(telegram && isConnectableChannel(telegram)).toBe(true);
   });

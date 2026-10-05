@@ -264,7 +264,7 @@ function PairLinkModalContent({
           accessibilityLabel={t("pairing.link.label")}
           onChangeText={handleChangeOfferUrl}
           placeholder={`${DEFAULT_APP_BASE_URL}/#offer=...`}
-          placeholderTextColor={theme.colors.foregroundMuted}
+          placeholderTextColor={theme.colors.placeholder}
           style={styles.input}
           autoFocus
           autoCapitalize="none"

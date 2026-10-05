@@ -42,6 +42,8 @@ The rule, condensed: text that _names_ a surface or a group is `medium`. Text th
 
 Foreground is for the thing being acted on: row titles, section headings, the selected sidebar item. `foregroundMuted` is for context: hints, descriptions, secondary metadata, idle sidebar items, placeholders, status text.
 
+Placeholder text is `colors.placeholder` (`#a1a1aa` in Light, each dark theme's `foregroundExtraMuted`), lighter than any text the user reads, so an empty field never reads as filled. Pass it as `placeholderTextColor`; `foregroundMuted` there is wrong.
+
 `foregroundExtraMuted` is reserved for passive chrome that must sit behind muted text, such as an always-visible window control. Use the solid token instead of lowering SVG opacity; per-path opacity makes overlapping icon strokes render unevenly. Interactive hover and pressed states return to `foreground`.
 
 The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text

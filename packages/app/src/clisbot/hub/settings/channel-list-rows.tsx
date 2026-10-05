@@ -3,10 +3,11 @@
 // card's last row, kept apart from the Connection's switch in the header.
 
 import { ChevronRight, Plus } from "lucide-react-native";
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   type GestureResponderEvent,
   Pressable,
+  Text,
   View,
   type PressableStateCallbackType,
   type StyleProp,
@@ -70,6 +71,32 @@ export function DrillChevron() {
   return <ThemedChevronRight uniProps={chevronProps} />;
 }
 
+/** Past this, a runtime error folds to its first lines until asked for. */
+const LONG_DETAIL_CHARACTERS = 240;
+
+/**
+ * Why a Connection is not running, as the Hub reports it. A runtime error can
+ * run to hundreds of lines (a load-trace miss lists every module): it shows two
+ * lines and opens on request, and stays selectable for a bug report.
+ */
+export function RuntimeDetailRow({ detail }: { detail: string }) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((value) => !value), []);
+  const long = detail.length > LONG_DETAIL_CHARACTERS || detail.includes("\n");
+  return (
+    <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.detailRow]}>
+      <Text style={styles.detail} selectable numberOfLines={long && !open ? 2 : undefined}>
+        {detail}
+      </Text>
+      {long ? (
+        <Button size="xs" variant="ghost" onPress={toggle}>
+          {open ? "Hide details" : "Show details"}
+        </Button>
+      ) : null}
+    </View>
+  );
+}
+
 export function AddRouteRow({ disabled, onPress }: { disabled: boolean; onPress(): void }) {
   return (
     <View style={[settingsStyles.rowBorder, styles.addRow]}>
@@ -84,6 +111,8 @@ export function AddRouteRow({ disabled, onPress }: { disabled: boolean; onPress(
 
 const styles = StyleSheet.create((theme) => ({
   hovered: { backgroundColor: theme.colors.surface2 },
+  detailRow: { flexDirection: "column", alignItems: "flex-start", gap: theme.spacing[1] },
+  detail: { color: theme.colors.destructive, fontSize: theme.fontSize.sm },
   pressed: { backgroundColor: theme.colors.surface3 },
   addRow: {
     paddingHorizontal: theme.spacing[4],

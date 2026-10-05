@@ -30,7 +30,7 @@ const ThemedSvgXml = withUnistyles(SvgXml);
 const ThemedSearch = withUnistyles(Search);
 const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedTextInput = withUnistyles(TextInput, (theme) => ({
-  placeholderTextColor: theme.colors.foregroundMuted,
+  placeholderTextColor: theme.colors.placeholder,
 }));
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });

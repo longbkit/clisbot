@@ -23,7 +23,7 @@ A phone signed in to the Zalo account you want the agent to act as, and someone 
 
 ## Add it to Hub
 
-Create the account first — it has no credential, so there is no secret file:
+Create the account first. It has no credential, so there is nothing to paste. In the app, open **Channels → Channel Integrations → Zalo Personal → Connect Zalo Personal**, give the account a name, then add a Route to it. From the CLI:
 
 ```sh
 clisbot channels add zalouser --account main --profile main
@@ -45,7 +45,7 @@ Five verbs drive it, and the app renders all five:
 
 The QR expires after about three minutes. An expired code is not an error state — generate a new one. A start that completes inside its own budget can come back linked without a poll.
 
-Once the scan succeeds, restart the account (**Retry** in the app) to clear `needs-login`.
+Once the scan succeeds, Hub starts the account on its own and `needs-login` clears within a few seconds. If it stays, use **Retry** in the app.
 
 ## Where the session lives
 

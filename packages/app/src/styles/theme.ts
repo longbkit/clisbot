@@ -236,6 +236,8 @@ export interface LightThemeConfig {
   foreground: string;
   foregroundMuted: string;
   foregroundExtraMuted: string;
+  /** Text in an empty field; defaults to `foregroundExtraMuted`. */
+  placeholder?: string;
   border: string;
   borderAccent: string;
   accent: string;
@@ -283,6 +285,7 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     foreground: tint.foreground,
     foregroundMuted: tint.foregroundMuted,
     foregroundExtraMuted: tint.foregroundExtraMuted,
+    placeholder: tint.placeholder ?? tint.foregroundExtraMuted,
 
     border: tint.border,
     borderAccent: tint.borderAccent,
@@ -343,6 +346,9 @@ const lightSemanticColors = buildLightSemanticColors({
   foreground: "#1d1c1d",
   foregroundMuted: "#4a4a4a",
   foregroundExtraMuted: "#707070",
+  // Lighter than any text, so an empty field never reads as filled (macOS/iOS
+  // placeholders sit at about a quarter of the label's weight).
+  placeholder: "#a1a1aa",
   border: "#d8d8d8",
   borderAccent: "#c8c8c8",
   accent: "#20744A",
@@ -370,6 +376,8 @@ export interface DarkThemeConfig {
   surfaceSidebar: string;
   foregroundMuted: string;
   foregroundExtraMuted: string;
+  /** Text in an empty field; defaults to `foregroundExtraMuted`. */
+  placeholder?: string;
   border: string;
   borderAccent: string;
   accent: string;
@@ -418,6 +426,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     foreground,
     foregroundMuted: tint.foregroundMuted,
     foregroundExtraMuted: tint.foregroundExtraMuted,
+    placeholder: tint.placeholder ?? tint.foregroundExtraMuted,
 
     border: tint.border,
     borderAccent: tint.borderAccent,

@@ -26,6 +26,8 @@ export interface ChannelQrVerbs {
   poll(): Promise<ChannelQrPollResult>;
   cancel(): Promise<{ cancelled: boolean; message: string }>;
   logout(): Promise<{ cleared: boolean; message: string }>;
+  /** Called once the login reaches `linked`, so the account's status refreshes. */
+  linked?(): void;
 }
 
 /**
@@ -47,6 +49,10 @@ export function ChannelQrLinkPanel({
   useEffect(() => () => model.close(), [model]);
   const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
   useChannelQrPolling(model, state.phase, state.polling, verbs);
+  const { linked } = verbs;
+  useEffect(() => {
+    if (state.phase === "linked") linked?.();
+  }, [linked, state.phase]);
   const run = useQrAction(model, verbs);
   const code = useMemo(
     () => (state.qrDataUrl === null ? null : { uri: state.qrDataUrl }),

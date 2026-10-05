@@ -55,6 +55,8 @@ describe("buildZalouserInboundEvent", () => {
     );
     expect(plain.admit && plain.event).toMatchObject({
       chatType: "group",
+      // The Hub replies on this id, so it is the group's sendable target.
+      externalConversationId: "group:g1",
       conversationLabel: "Team",
       replyTo: "group:g1",
       wasMentioned: false,

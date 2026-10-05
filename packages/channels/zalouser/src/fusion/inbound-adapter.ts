@@ -95,7 +95,10 @@ export function buildZalouserInboundEvent(
     // `ingress.ts` keys its durable row on (`data.msgId`).
     externalEventId: messageId,
     externalMessageId: messageId,
-    externalConversationId: message.threadId,
+    // The Hub answers on the conversation id (`to`), and a bare id sends as a
+    // DM (`session-route.ts`): a group's id carries its `group:` prefix so a
+    // reply lands in the group, not in a DM with the group's id.
+    externalConversationId: message.isGroup ? `group:${message.threadId}` : message.threadId,
     chatType: message.isGroup ? "group" : "direct",
     senderId: message.senderId,
     ...(message.senderName === undefined ? {} : { senderName: message.senderName }),

@@ -139,9 +139,9 @@ describe("catalog rows", () => {
     ]);
   });
 
-  it("marks a QR channel as not connectable through the Connection form", () => {
+  it("marks a QR channel as connectable", () => {
     const zalouser = rows.find((row) => row.channel === "zalouser");
-    expect(zalouser).toMatchObject({ status: "in-repo", connectable: false });
+    expect(zalouser).toMatchObject({ status: "in-repo", connectable: true });
     expect(CHANNEL_STATUS_LABELS["planned"]).toBe("Coming soon");
     expect(CHANNEL_STATUS_LABELS["unknown"]).toBe("Reported by this Hub");
   });

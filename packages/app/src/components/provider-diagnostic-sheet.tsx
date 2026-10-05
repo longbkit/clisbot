@@ -213,7 +213,7 @@ function AddCustomModelSubSheet({
           onChangeText={setInput}
           onSubmitEditing={handleAdd}
           placeholder={t("settings.providers.models.modelIdPlaceholder")}
-          placeholderTextColor={theme.colors.foregroundMuted}
+          placeholderTextColor={theme.colors.placeholder}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
