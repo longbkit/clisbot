@@ -33,3 +33,7 @@ export function stripChannelTargetPrefix(raw: string, ...providers: string[]): s
 export function stripTargetKindPrefix(raw: string): string {
   return raw.replace(/^(user|channel|group|conversation|room|dm):/i, "").trim();
 }
+
+// WhatsApp port addition: the ported WhatsApp send path mints idempotency ids
+// with upstream's secure UUID helper (`src/infra/secure-random.ts`).
+export { generateSecureUuid } from "../infra/secure-random.js";

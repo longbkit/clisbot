@@ -2402,6 +2402,35 @@ export const zalouserConnections = pgTable(
 );
 
 /**
+ * WhatsApp linked-device account rows. Identical columns; like Zalo Personal
+ * the envelope holds NO secret — the account is linked by a QR scan in
+ * WhatsApp → Linked devices and the resulting Baileys auth state rests in
+ * `channel_state_secrets` (namespace `auth`). The envelope carries only the
+ * non-secret `name` label, sealed anyway so every channel Connection travels
+ * one path (`db/channel-connections.ts`).
+ */
+export const whatsappConnections = pgTable(
+  "whatsapp_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    credentialEnvelope: jsonb("credential_envelope").$type<CredentialEnvelope>().notNull(),
+    externalIdentity: jsonb("external_identity"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("whatsapp_connections_organization_account_unique").on(
+      table.organizationId,
+      table.accountId,
+    ),
+  ],
+);
+
+/**
  * Feishu/Lark custom-app credentials. The envelope holds FOUR fields — app id,
  * app secret, and the event-subscription verification token + encrypt key —
  * rather than one token, which is the only thing that separates it from the

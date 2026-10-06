@@ -146,6 +146,7 @@ function supervisorOver(vertical: ReturnType<typeof fakeVertical>): ChannelSuper
       });
       return runQrLoginVerb({
         plugin: vertical.plugin,
+        channel: input.channel,
         accountId: input.accountId,
         profile: String(account["profile"]),
         verb: input.verb,
@@ -277,6 +278,7 @@ it("makes the scanned session durable before it answers linked", async () => {
   const verb = async (name: "start" | "poll") =>
     await runQrLoginVerb({
       plugin: vertical.plugin,
+      channel: "zalouser",
       accountId: ACCOUNT_ID,
       profile: PROFILE,
       verb: name,
@@ -357,13 +359,13 @@ it("publishes the channel catalog behind the same management authority", async (
   };
   assert.deepEqual(
     channels.map((entry) => entry.id),
-    ["slack", "telegram", "discord", "googlechat", "feishu", "zalouser", "zalo"],
+    ["slack", "telegram", "discord", "googlechat", "feishu", "zalouser", "whatsapp", "zalo"],
   );
   // `auth` is defaulted here, so a client never has to know the catalog's own
   // "absent means token" rule.
   assert.deepEqual(
     channels.filter((entry) => entry.auth === "qr").map((entry) => entry.id),
-    ["zalouser"],
+    ["zalouser", "whatsapp"],
   );
   assert.equal(
     channels.every((entry) => entry.auth === "token" || entry.auth === "qr"),

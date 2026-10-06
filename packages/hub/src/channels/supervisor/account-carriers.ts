@@ -50,8 +50,9 @@ function present(fields: Record<string, string | undefined>): Record<string, str
  * block merged onto the entry, Feishu the four app-credential fields plus its
  * `domain`/`connectionMode` (`fusion/account-config.ts`), Google Chat the
  * service-account document and nothing else, Zalo Personal a non-secret
- * `profile` label and no credential at all. The connection credential always
- * wins over the authored config: credentials come from the connection.
+ * `profile` label and no credential at all, WhatsApp only its `name` label.
+ * The connection credential always wins over the authored config: credentials
+ * come from the connection.
  */
 const ACCOUNT_CARRIERS: Record<
   SupportedChannelName,
@@ -157,6 +158,16 @@ const ACCOUNT_CARRIERS: Record<
       profile: profile ?? asLabel(compiled.config["profile"]) ?? accountId,
       name: asLabel(compiled.config["name"]),
     });
+    return {
+      account: { accountId, ...carrier },
+      cfgAccount: { ...compiled.config, ...carrier },
+    };
+  },
+  // WhatsApp has no operator secret and no profile: the account id is the
+  // identity, and the linked-device keys rest in the Hub's encrypted keyed-store
+  // namespace `auth`. The carrier is only the operator's `name` label.
+  whatsapp: ({ accountId, compiled }) => {
+    const carrier = present({ name: asLabel(compiled.config["name"]) });
     return {
       account: { accountId, ...carrier },
       cfgAccount: { ...compiled.config, ...carrier },

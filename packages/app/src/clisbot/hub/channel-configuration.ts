@@ -235,6 +235,7 @@ const DEFAULT_TRANSPORT_MODES: Readonly<Record<string, string>> = {
   feishu: "websocket",
   zalo: "polling",
   zalouser: "qr",
+  whatsapp: "qr",
 };
 
 /** A new, enabled account on a Connection, with the Routes it starts with. */

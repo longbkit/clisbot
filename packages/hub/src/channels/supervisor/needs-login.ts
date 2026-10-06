@@ -27,7 +27,13 @@ import type { ChannelTransportState } from "./types.js";
  * plain failure, because telling an operator to rescan a QR when the real fault
  * was a network error wastes the one action they have.
  */
-const NOT_LINKED_MARKERS = [/\bis not linked\b/iu, /\bnot authenticated\b/iu] as const;
+// "is not linked" is what verticals said before QR sign-in was named Login;
+// a pinned or older vertical can still say it.
+const NOT_LINKED_MARKERS = [
+  /\bis not logged in\b/iu,
+  /\bis not linked\b/iu,
+  /\bnot authenticated\b/iu,
+] as const;
 
 /** True when the channel is linked by a live login rather than a pasted token. */
 export function channelUsesQrLogin(channel: string): boolean {

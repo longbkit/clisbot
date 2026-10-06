@@ -280,6 +280,9 @@ export interface HubOutboundSendParams {
   /** The portable presentation this message renders, for a vertical that
    * renders one natively. `text` stays the fallback rendering. */
   presentation?: MessagePresentation | undefined;
+  /** The message the post quotes or replies to, for a vertical that can
+   * (core's `reply` facts / the tool's `replyTo`). Text posts only. */
+  replyToId?: string | undefined;
   threadId?: string | undefined;
   idempotencyKey?: string | undefined;
 }
@@ -472,7 +475,14 @@ function boundParams(request: ChannelMessageActionRequest): Record<string, unkno
  * place that decides what a send's files are.
  */
 function collectOutboundMedia(params: MessageSendParams): ChannelMediaSource[] {
-  const asVoice = params["asVoice"] === true ? { asVoice: true } : {};
+  const asVoice = {
+    ...(params["asVoice"] === true ? { asVoice: true } : {}),
+    // Core passes `forceDocument`; the tool also accepts upstream's `asDocument`.
+    ...(params["forceDocument"] === true || params["asDocument"] === true
+      ? { forceDocument: true }
+      : {}),
+    ...(params["gifPlayback"] === true ? { gifPlayback: true } : {}),
+  };
   const metadata = readAttachmentMetadata(params);
   const sources: ChannelMediaSource[] = [];
   for (const media of readMediaUrls(params)) {
@@ -546,14 +556,29 @@ async function hubSendMessage(
       ...(params.idempotencyKey === undefined ? {} : { idempotencyKey: params.idempotencyKey }),
     });
   const presentation = rendersPresentation(request) ? readSendPresentation(params) : undefined;
+  const replyToId = readReplyToId(params);
   const outcomes = await postSendParts({
     request,
     text: params.content,
     media,
     post,
     ...(presentation === undefined ? {} : { presentation }),
+    ...(replyToId === undefined ? {} : { replyToId }),
   });
   return { ...base, ...summarizeSendOutcomes(outcomes) };
+}
+
+/** The message this send replies to: core's normalized `reply` facts, else the
+ * raw `replyTo` param. */
+function readReplyToId(params: MessageSendParams): string | undefined {
+  const reply = params["reply"];
+  const fromFacts =
+    typeof reply === "object" && reply !== null
+      ? (reply as { replyToId?: unknown }).replyToId
+      : undefined;
+  const raw = fromFacts ?? params["replyTo"] ?? params["replyToId"];
+  if (typeof raw === "number") return String(raw);
+  return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : undefined;
 }
 
 /** True for a value shaped like core's portable presentation. */
@@ -591,6 +616,7 @@ async function postSendParts(args: {
   text: string;
   media: readonly ChannelMediaSource[];
   presentation?: MessagePresentation;
+  replyToId?: string;
   post: (one: Omit<HubOutboundSendParams, "to" | "threadId">) => Promise<HubOutboundSendResult>;
 }): Promise<HubOutboundSendResult[]> {
   const outcomes: HubOutboundSendResult[] = [];
@@ -603,6 +629,7 @@ async function postSendParts(args: {
       await args.post({
         text: args.text,
         ...(args.presentation === undefined ? {} : { presentation: args.presentation }),
+        ...(args.replyToId === undefined ? {} : { replyToId: args.replyToId }),
       }),
     );
     if (outcomes[0]?.ok !== true) return outcomes;
@@ -631,7 +658,13 @@ async function postOneFile(
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
   try {
-    return await post({ text: "", media: staged });
+    // Delivery options are the message's, not the bytes': applied after staging.
+    const media: StagedChannelMedia = {
+      ...staged,
+      ...(source.forceDocument === undefined ? {} : { forceDocument: source.forceDocument }),
+      ...(source.gifPlayback === undefined ? {} : { gifPlayback: source.gifPlayback }),
+    };
+    return await post({ text: "", media });
   } finally {
     await staged.release?.().catch(() => undefined);
   }

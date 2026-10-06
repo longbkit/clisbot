@@ -135,6 +135,7 @@ describe("catalog rows", () => {
       "googlechat",
       "feishu",
       "zalouser",
+      "whatsapp",
       "zalo",
     ]);
   });

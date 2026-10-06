@@ -15,6 +15,7 @@ import type { DiscordConfig } from "./types.discord.js";
 import type { GoogleChatConfig } from "./types.googlechat.js";
 import type { SlackConfig } from "./types.slack.js";
 import type { TelegramConfig } from "./types.telegram.js";
+import type { WhatsAppConfig } from "./types.whatsapp.js";
 
 /** Upstream: JSON-compatible open-world channel section for plugin ids unknown to core. */
 type OpenWorldChannelConfig = ReturnType<typeof JSON.parse>;
@@ -49,6 +50,7 @@ export type OpenClawConfig = Omit<HostOpenClawConfig, "channels" | "agents" | "s
     googlechat?: GoogleChatConfig;
     slack?: SlackConfig;
     telegram?: TelegramConfig;
+    whatsapp?: WhatsAppConfig;
     defaults?: ChannelDefaultsConfig;
     /**
      * Upstream `src/config/types.channels.ts`: channel sections are

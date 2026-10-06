@@ -27,3 +27,7 @@ export { resolveAccountEntry, resolveNormalizedAccountEntry } from "../routing/a
 // same source module (`src/plugin-sdk/account-core.ts` → the carried
 // `src/config/channel-account-config.ts`).
 export { resolveMergedAccountConfig } from "../config/channel-account-config.js";
+
+// WhatsApp port addition: the ported WhatsApp target normalizer folds phone
+// numbers through upstream's `normalizeE164` (same barrel upstream).
+export { normalizeE164 } from "../utils.host-adapter.js";

@@ -15,6 +15,8 @@ import {
   GoogleChatAccountConfigSchema,
   GoogleChatTransportSchema,
   TelegramTransportSchema,
+  WhatsappAccountConfigSchema,
+  WhatsappTransportSchema,
   ZaloAccountConfigSchema,
   ZaloTransportSchema,
   ZalouserAccountConfigSchema,
@@ -174,6 +176,7 @@ const TRANSPORT_SCHEMAS = {
   googlechat: GoogleChatTransportSchema,
   feishu: FeishuTransportSchema,
   zalouser: ZalouserTransportSchema,
+  whatsapp: WhatsappTransportSchema,
   zalo: ZaloTransportSchema,
 } as const;
 
@@ -186,11 +189,12 @@ const TRANSPORT_SCHEMAS = {
  *    all need a public HTTPS URL the Hub does not publish; each has a mode that
  *    needs none (socket / polling / long connection), so that mode is the only
  *    one offered.
- *  * Zalo Personal has one mode: the QR-linked session's push socket. It needs
- *    no public URL, so there is nothing to refuse.
- *  * Google Chat has no such alternative — HTTP POST is its only delivery
- *    model — so `webhook` is admitted and the operator supplies the reverse
- *    proxy (`packages/channels/googlechat/HUB-WIRING.md` §6).
+ *  * Zalo Personal and WhatsApp have one mode each: the QR-linked session's
+ *    socket. It needs no public URL, so there is nothing to refuse.
+ *  * Google Chat `pubsub` pulls from a subscription and needs no public URL.
+ *    Its `webhook` is ported but has never run against Google (it needs the
+ *    reverse proxy of `packages/channels/googlechat/HUB-WIRING.md` §6), so it
+ *    is refused like the other webhooks until it has.
  */
 const DRIVABLE_TRANSPORT_MODES: Record<keyof typeof TRANSPORT_SCHEMAS, string> = {
   slack: "socket",
@@ -199,6 +203,7 @@ const DRIVABLE_TRANSPORT_MODES: Record<keyof typeof TRANSPORT_SCHEMAS, string> =
   googlechat: "pubsub",
   feishu: "websocket",
   zalouser: "qr",
+  whatsapp: "qr",
   zalo: "polling",
 };
 
@@ -247,6 +252,7 @@ export const ACCOUNT_CONFIG_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   feishu: FeishuAccountConfigSchema,
   zalo: ZaloAccountConfigSchema,
   zalouser: ZalouserAccountConfigSchema,
+  whatsapp: WhatsappAccountConfigSchema,
 };
 
 /**

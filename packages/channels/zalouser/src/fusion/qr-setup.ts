@@ -151,7 +151,7 @@ async function pollOnce(params: {
   } catch (error) {
     return {
       status: "failed",
-      message: `Zalo linked but the session could not be persisted: ${formatErrorMessage(error)}`,
+      message: `Logged in to Zalo, but the session could not be saved: ${formatErrorMessage(error)}`,
     };
   }
   const user = await getZaloUserInfo(params.profile).catch(() => null);
@@ -177,7 +177,7 @@ async function cancelOnce(params: {
   const before = await checkZaloAuthenticated(params.profile);
   if (before) {
     // Never let a cancel of a `relink` QR drop a session that is still good.
-    return { cancelled: false, message: "Zalo session is still linked; nothing to cancel." };
+    return { cancelled: false, message: "Zalo is still logged in; nothing to cancel." };
   }
   const result = await logoutZaloProfile(params.profile);
   await flushZalouserSessions().catch(() => undefined);

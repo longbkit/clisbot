@@ -111,6 +111,7 @@ const ADDABLE_CHANNELS: readonly AddableChannel[] = [
   "feishu",
   "googlechat",
   "zalouser",
+  "whatsapp",
 ];
 
 function addInput(channel: string, account: string, options: CommandOptions): ChannelAddInput {
@@ -131,6 +132,15 @@ function addInput(channel: string, account: string, options: CommandOptions): Ch
       channel,
       account,
       ...(typeof profile === "string" && profile !== "" ? { profile } : {}),
+    };
+  }
+  // WhatsApp likewise: it is linked as a linked device by a QR scan afterwards.
+  if (channel === "whatsapp") {
+    const name = options["name"];
+    return {
+      channel,
+      account,
+      ...(typeof name === "string" && name !== "" ? { name } : {}),
     };
   }
   const input = channelCredentialFromFile(
@@ -197,11 +207,12 @@ export function createChannelsCommand(): Command {
         .description("Install a channel account on the running Hub")
         .argument(
           "<channel>",
-          "Channel id: slack, telegram, discord, zalo, zalouser, feishu, or googlechat",
+          "Channel id: slack, telegram, discord, zalo, zalouser, whatsapp, feishu, or googlechat",
         )
         .requiredOption("--account <id>", "Account id to install")
         .option("--connection-id <uuid>", "Existing Hub connection id")
         .option("--profile <label>", "Zalo Personal only: the QR session label")
+        .option("--name <label>", "WhatsApp only: the linked account's label")
         .option(
           "--subscription <name>",
           "Google Chat only: the Pub/Sub pull subscription, projects/<project>/subscriptions/<name>",

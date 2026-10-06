@@ -15,6 +15,7 @@ export type ChannelId =
   | "googlechat"
   | "feishu"
   | "zalouser"
+  | "whatsapp"
   | "zalo";
 
 export type ChannelImplementationStatus = "in-repo" | "planned";
@@ -472,8 +473,65 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     capabilities: ["text", "mention", "format", "chunk", "media", "file", "reaction", "voice"],
     extraTools: ["zalouser"],
     notes: [
-      "Links a personal Zalo account by scanning a QR code in the Zalo app. Zalo ends these sessions from time to time, so expect to scan again.",
+      "Log in to a personal Zalo account by scanning a QR code in the Zalo app. Zalo ends these sessions from time to time, so expect to log in again.",
       "Automating a personal account can break Zalo's terms; use an account made for this. No threads, and images people send are not read.",
+    ],
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    status: "in-repo",
+    // A QR-linked device, like Zalo Personal: the credential is the linked
+    // device's Baileys auth state, created by the scan and kept in the Hub's
+    // encrypted keyed-store namespace `auth`. There is no profile concept; the
+    // account id is the identity.
+    auth: "qr",
+    upstreamPackage: "@openclaw/whatsapp",
+    sdkPackages: ["baileys"],
+    transports: [
+      {
+        id: "qr",
+        label: "QR login",
+        requiredConfig: [],
+        setup:
+          "Log in by scanning the QR code in WhatsApp → Linked devices; the Hub stores the login keys encrypted at rest.",
+        supported: true,
+      },
+    ],
+    credentials: [
+      {
+        key: "name",
+        label: "Account label",
+        secret: false,
+        required: false,
+        help: "Non-secret label for this WhatsApp account; defaults to the account id.",
+      },
+    ],
+    // No threads (a reply quotes the message), no edit/delete. Approval and
+    // question cards render as reactions (`fusion/reaction-cards.ts`), so no
+    // `buttons`. `whatsapp_send_location` posts a native location pin.
+    // `voice`: an outbound audio file posts as a voice note; audio that is not
+    // already Ogg/Opus is converted with ffmpeg on the Hub host. `poll`: a
+    // native poll; votes arrive as `poll_answer` activity.
+    capabilities: [
+      "text",
+      "mention",
+      "format",
+      "chunk",
+      "media",
+      "file",
+      "reaction",
+      "voice",
+      "video",
+      "location",
+      "poll",
+      "approval",
+    ],
+    extraTools: ["whatsapp_send_location"],
+    notes: [
+      "Log in by scanning a QR code in WhatsApp → Linked devices. WhatsApp can end the session, so expect to log in again.",
+      "Automating a personal number can break WhatsApp's terms; use a separate number. No threads (an answer quotes the message it answers when that message was a reply); no message edits.",
+      "Approval prompts and agent questions are answered by reacting: 👍 approves, 👎 denies, 1️⃣–4️⃣ pick an option. The typed command in the prompt works too.",
     ],
   },
   {
@@ -550,6 +608,7 @@ export const SUPPORTED_CHANNEL_NAMES = [
   "googlechat",
   "feishu",
   "zalouser",
+  "whatsapp",
   "zalo",
 ] as const satisfies readonly ChannelId[];
 

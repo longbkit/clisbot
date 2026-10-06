@@ -183,6 +183,10 @@ export type FeishuTransportMode = z.infer<typeof FeishuTransportModeSchema>;
  * that is the only choice the operator makes. */
 export const ZalouserTransportModeSchema = z.enum(["qr"]);
 export type ZalouserTransportMode = z.infer<typeof ZalouserTransportModeSchema>;
+/** WhatsApp, like Zalo Personal, is linked by a QR scan (WhatsApp → Linked
+ * Devices) and the resulting linked-device keys drive the Baileys socket. */
+export const WhatsappTransportModeSchema = z.enum(["qr"]);
+export type WhatsappTransportMode = z.infer<typeof WhatsappTransportModeSchema>;
 /** Zalo's two upstream modes. `polling` is a plain outbound long poll and needs
  * no public URL; `webhook` additionally needs the signing secret Zalo echoes in
  * `x-bot-api-secret-token`. */

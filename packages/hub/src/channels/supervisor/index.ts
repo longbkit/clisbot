@@ -117,6 +117,8 @@ type ChannelMediaPostFn = (
     fileName?: string | undefined;
     mimeType?: string | undefined;
     asVoice?: boolean | undefined;
+    forceDocument?: boolean | undefined;
+    gifPlayback?: boolean | undefined;
   },
 ) => Promise<MediaPostResult>;
 import { resolveHome } from "../daemon/discovery.js";
@@ -269,9 +271,10 @@ const PLANE_KINDS: Readonly<
     direct: { root: "dm", thread: "dm" },
     channel: { root: "channel", thread: "thread" },
   },
-  // Zalo and Zalo Personal: DMs and groups, no threads.
+  // Zalo, Zalo Personal and WhatsApp: DMs and groups, no threads.
   zalo: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "group" } },
   zalouser: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "group" } },
+  whatsapp: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "group" } },
   // A Feishu group message in a thread (`thread_id` / `root_id`) is that
   // thread's own conversation.
   feishu: { direct: { root: "dm", thread: "dm" }, group: { root: "group", thread: "thread" } },
@@ -338,6 +341,10 @@ function postFor(
         // (`readPluginPresentationOutbound`), so a vertical that ignores the arg
         // is never handed a message whose content lives only in the blocks.
         ...(params.presentation !== undefined ? { presentation: params.presentation } : {}),
+        // The message the post replies to, and a card's buttons for a vertical
+        // that renders its own control (WhatsApp reactions). Others ignore both.
+        ...(params.replyToId !== undefined ? { replyToId: params.replyToId } : {}),
+        ...(params.cardButtons !== undefined ? { cardButtons: params.cardButtons } : {}),
         // Telegram only: disable the native config write-back (admin-scope
         // check fails) — P0 posts numeric chat ids, no legacy rewrite (outbound.md).
         ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
@@ -430,6 +437,8 @@ function mediaPostFor(
         ...(params.fileName === undefined ? {} : { fileName: params.fileName }),
         ...(params.mimeType === undefined ? {} : { mimeType: params.mimeType }),
         ...(params.asVoice === undefined ? {} : { asVoice: params.asVoice }),
+        ...(params.forceDocument === undefined ? {} : { forceDocument: params.forceDocument }),
+        ...(params.gifPlayback === undefined ? {} : { gifPlayback: params.gifPlayback }),
       });
       if (typeof result.messageId !== "string" && typeof result.messageId !== "number") {
         throw new Error("channel outbound.sendMedia returned no messageId");
@@ -1016,7 +1025,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   async channelReplyPost(
     ref: ChannelReplyBindingRef,
     text: string,
-    options?: { presentation?: MessagePresentation | undefined },
+    options?: {
+      presentation?: MessagePresentation | undefined;
+      replyToId?: string | undefined;
+    },
   ): Promise<OutboundPostResult> {
     const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
     const post = handle?.post;
@@ -1033,6 +1045,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
       text,
       ...(options?.presentation === undefined ? {} : { presentation: options.presentation }),
+      ...(options?.replyToId === undefined ? {} : { replyToId: options.replyToId }),
     });
   }
 
@@ -1084,6 +1097,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       fileName: file.fileName,
       ...(file.mimeType === undefined ? {} : { mimeType: file.mimeType }),
       ...(file.asVoice === undefined ? {} : { asVoice: file.asVoice }),
+      ...(file.forceDocument === undefined ? {} : { forceDocument: file.forceDocument }),
+      ...(file.gifPlayback === undefined ? {} : { gifPlayback: file.gifPlayback }),
     });
   }
 
@@ -1174,6 +1189,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const state = this.accountState.get(handleKey(input.channel, input.accountId));
     const result = await runQrLoginVerb({
       plugin: vertical.plugin,
+      channel: input.channel,
       accountId: input.accountId,
       profile,
       verb: input.verb,

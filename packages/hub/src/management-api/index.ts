@@ -250,6 +250,15 @@ const connectionRequestSchema = z.union([
     .strict(),
   z
     .object({
+      provider: z.literal("whatsapp"),
+      accountId: z.string().trim().min(1).max(128),
+      // No secret: the Connection is only a label; the linked-device keys come
+      // from the QR scan and rest in the encrypted keyed-store namespace `auth`.
+      credentials: z.object({ name: z.string().trim().min(1).max(128).optional() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
       provider: z.literal("slack"),
       transport: z.literal("socket"),
       credentials: z
@@ -945,6 +954,14 @@ export class ManagementApi {
         channel: "zalouser",
         accountId,
         credentials: { profile: input.credentials.profile ?? accountId },
+      });
+    }
+    if (input.provider === "whatsapp") {
+      return await database.configureChannelConnection({
+        organizationId,
+        channel: "whatsapp",
+        accountId,
+        credentials: { name: input.credentials.name ?? accountId },
       });
     }
     if (input.provider === "zalo") {

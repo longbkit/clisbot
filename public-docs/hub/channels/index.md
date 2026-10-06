@@ -11,7 +11,7 @@ category: Hub
 A channel puts an agent in a chat platform. Someone mentions the bot in Slack, DMs it on Telegram, or messages it in a Feishu group; Hub routes that conversation to an agent on one of your daemons and posts the answer back into the same conversation.
 
 ```text
-Slack / Telegram / Discord / Google Chat / Feishu / Zalo
+Slack / Telegram / Discord / Google Chat / Feishu / Zalo / WhatsApp
         │
         ▼
       Hub  ──►  daemon  ──►  agent session
@@ -21,7 +21,7 @@ Slack / Telegram / Discord / Google Chat / Feishu / Zalo
 
 Three resources make that work, and they are separate on purpose:
 
-- A **Connection** owns the credential — one Slack workspace installation, one bot token, one linked Zalo account. Hub encrypts it and never shows it again. A bot has one Connection: adding a second one for a bot Hub already holds is refused and names the Connection that has it, since two would both run the bot and split its messages.
+- A **Connection** owns the credential — one Slack workspace installation, one bot token, one Zalo account you logged in to. Hub encrypts it and never shows it again. A bot has one Connection: adding a second one for a bot Hub already holds is refused and names the Connection that has it, since two would both run the bot and split its messages.
 - A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization. Adding a Connection adds its account, so the bot runs at once: before any Route it answers `/status` and `/me` with the sender's ID and remembers who wrote, which is how you find the people to name in a Rule. Nobody reaches an agent until a Route lets them in.
 - A **Route** is where a message goes — a direct agent, or an Automation — and its **Rules** are the ways in. The first Route with a Rule that lets the message in wins; a sender no Route admits is refused.
 
@@ -29,53 +29,57 @@ Three resources make that work, and they are separate on purpose:
 
 ## The eight channels
 
-| Channel                                      | Credential                                 | Inbound transport                  | Needs a public HTTPS URL |
-| -------------------------------------------- | ------------------------------------------ | ---------------------------------- | ------------------------ |
-| [Slack](/docs/hub/channels/slack)            | Bot token + app token                      | Socket Mode, or Events API webhook | Webhook only             |
-| [Telegram](/docs/hub/channels/telegram)      | Bot token                                  | Bot API polling, or webhook        | Webhook only             |
-| [Discord](/docs/hub/channels/discord)        | Bot token                                  | Gateway                            | No                       |
-| [Google Chat](/docs/hub/channels/googlechat) | Service-account JSON + subscription        | Cloud Pub/Sub                      | No                       |
-| [Feishu / Lark](/docs/hub/channels/feishu)   | App ID + app secret (+ webhook secrets)    | Long connection, or webhook        | Webhook only             |
-| [Zalo Official Bot](/docs/hub/channels/zalo) | Bot token                                  | Bot API polling, or webhook        | Webhook only             |
-| [Zalo Personal](/docs/hub/channels/zalouser) | A QR-linked session for a personal account | Push socket                        | No                       |
+| Channel                                      | Credential                              | Inbound transport                  | Needs a public HTTPS URL |
+| -------------------------------------------- | --------------------------------------- | ---------------------------------- | ------------------------ |
+| [Slack](/docs/hub/channels/slack)            | Bot token + app token                   | Socket Mode, or Events API webhook | Webhook only             |
+| [Telegram](/docs/hub/channels/telegram)      | Bot token                               | Bot API polling, or webhook        | Webhook only             |
+| [Discord](/docs/hub/channels/discord)        | Bot token                               | Gateway                            | No                       |
+| [Google Chat](/docs/hub/channels/googlechat) | Service-account JSON + subscription     | Cloud Pub/Sub                      | No                       |
+| [Feishu / Lark](/docs/hub/channels/feishu)   | App ID + app secret (+ webhook secrets) | Long connection, or webhook        | Webhook only             |
+| [Zalo Official Bot](/docs/hub/channels/zalo) | Bot token                               | Bot API polling, or webhook        | Webhook only             |
+| [Zalo Personal](/docs/hub/channels/zalouser) | A QR login to a personal account        | Push socket                        | No                       |
+| [WhatsApp](/docs/hub/channels/whatsapp)      | A QR login                              | WhatsApp Web socket                | No                       |
 
-Zalo Personal is the odd one: there is no token to paste. You link it by scanning a QR code with a phone, and the session expires and has to be relinked. Everything that account can do, a human on that account can do. Read its page before you use it.
+**Webhook transports are not supported yet.** Each one is ported but none has run end to end against its platform, so the app labels them "Not supported yet" under Channel Integrations and offers no way to pick one. Use the other transport in the table; every channel has one that needs no public URL.
+
+Zalo Personal and WhatsApp are the odd ones: there is no token to paste. You log in to each by scanning a QR code with a phone, and the session ends from time to time, so you log in again. Everything that account can do, a human on that account can do. Read their pages before you use them.
 
 ## Capability matrix
 
 What each vertical implements. A blank cell means the platform or the vertical has no such thing; footnoted cells work with a restriction.
 
-| Capability            | Slack | Telegram | Discord | Google Chat | Feishu | Zalo Bot | Zalo Personal |
-| --------------------- | ----- | -------- | ------- | ----------- | ------ | -------- | ------------- |
-| Text messages         | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            |
-| Threads               | ✅    | ✅       | ✅      | ✅          | ✅     |          |               |
-| Mentions              | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            |
-| Rich formatting       | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            |
-| Long-message chunking | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            |
-| Media                 | ✅    | ✅       | ✅      |             |        | ¹        | ✅            |
-| File attachments      | ✅    | ✅       | ✅      |             |        |          | ✅            |
-| Reactions             | ✅    | ✅       | ²       |             | ✅     |          | ✅            |
-| Edit messages         | ✅    | ✅       | ✅      | ✅          | ✅     |          |               |
-| Delete messages       | ✅    | ✅       | ✅      | ✅          |        |          |               |
-| Voice messages        | ✅    | ✅       |         |             |        |          | ✅            |
-| Video                 | ✅    | ✅       |         |             |        |          |               |
-| Video notes           |       | ✅       |         |             |        |          |               |
-| Location              |       | ✅       |         |             |        |          |               |
-| Polls                 | ✅    | ✅       | ✅      |             |        |          |               |
-| Forum topics          |       | ✅       |         |             |        |          |               |
-| Tables and charts     | ✅    | ✅       | ✅      |             |        |          |               |
-| Buttons               | ✅    | ✅       | ✅      | ³           | ⁴      |          |               |
-| Select menus          | ✅    | ✅       | ✅      | ³           | ⁴      |          |               |
-| Approval prompts      | ✅    | ✅       |         |             |        |          |               |
-| Native commands       | ✅    | ✅       | ⁵       |             |        |          |               |
-| Group DMs             | ✅    |          |         |             | ✅     |          |               |
-| Emoji discovery       | ✅    | ✅       | ✅      |             |        |          |               |
+| Capability            | Slack | Telegram | Discord | Google Chat | Feishu | Zalo Bot | Zalo Personal | WhatsApp |
+| --------------------- | ----- | -------- | ------- | ----------- | ------ | -------- | ------------- | -------- |
+| Text messages         | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
+| Threads               | ✅    | ✅       | ✅      | ✅          | ✅     |          |               |          |
+| Mentions              | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
+| Rich formatting       | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
+| Long-message chunking | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
+| Media                 | ✅    | ✅       | ✅      |             |        | ¹        | ✅            | ✅       |
+| File attachments      | ✅    | ✅       | ✅      |             |        |          | ✅            | ✅       |
+| Reactions             | ✅    | ✅       | ²       |             | ✅     |          | ✅            | ✅       |
+| Edit messages         | ✅    | ✅       | ✅      | ✅          | ✅     |          |               |          |
+| Delete messages       | ✅    | ✅       | ✅      | ✅          |        |          |               |          |
+| Voice messages        | ✅    | ✅       |         |             |        |          | ✅            | ✅       |
+| Video                 | ✅    | ✅       |         |             |        |          |               | ✅       |
+| Video notes           |       | ✅       |         |             |        |          |               |          |
+| Location              |       | ✅       |         |             |        |          |               | ✅       |
+| Polls                 | ✅    | ✅       | ✅      |             |        |          |               | ✅       |
+| Forum topics          |       | ✅       |         |             |        |          |               |          |
+| Tables and charts     | ✅    | ✅       | ✅      |             |        |          |               |          |
+| Buttons               | ✅    | ✅       | ✅      | ³           | ⁴      |          |               |          |
+| Select menus          | ✅    | ✅       | ✅      | ³           | ⁴      |          |               |          |
+| Approval prompts      | ✅    | ✅       |         |             |        |          |               | ⁶        |
+| Native commands       | ✅    | ✅       | ⁵       |             |        |          |               |          |
+| Group DMs             | ✅    |          |         |             | ✅     |          |               |          |
+| Emoji discovery       | ✅    | ✅       | ✅      |             |        |          |               |          |
 
 ¹ Inbound images only; the Zalo Bot API has no upload endpoint.
 ² Outbound reactions only; inbound reaction events are not wired yet.
 ³ Card clicks arrive inbound; Hub renders no card of its own.
 ⁴ Card clicks arrive inbound; Hub renders no Lark card of its own.
 ⁵ Slash commands and interaction callbacks are not wired yet.
+⁶ Answered by reacting to the prompt (👍, 👎, 1️⃣–4️⃣); WhatsApp has no buttons.
 
 The same matrix appears per account under **Channels → Channel Integrations** in the Clisbot app, where a claimed capability shows as **Not verified** until the account has actually exercised it. The catalog is a claim; a green check in the app means evidence.
 
@@ -513,6 +517,7 @@ A capability is only "verified live" when a message from a real account on the r
 | Feishu / Lark     | No. Tested against a faked Lark SDK client only; needs Lark app credentials.                                   |
 | Zalo Official Bot | No. Polling E2E is runnable with a bot token and a human sender; not yet run.                                  |
 | Zalo Personal     | No. Needs a human to scan a QR code.                                                                           |
+| WhatsApp          | No. Needs a human to scan a QR code with a spare number.                                                       |
 
 Each channel page carries its own per-capability line. The running record of what passed and what failed, with message ids, is `docs/tests/channels/p0-live-scenarios.md` in the repository.
 

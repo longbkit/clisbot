@@ -31,7 +31,7 @@ import { startZalouserAccount } from "./lifecycle/start-account.js";
 import { sendMedia, sendText } from "./outbound.js";
 import { zalouserTyping } from "./typing.js";
 import { probeZalouser } from "./probe.js";
-import { getHostRuntime } from "./runtime-store.js";
+import { accountHostRuntime, forgetAccountHostRuntime, getHostRuntime } from "./runtime-store.js";
 import {
   sendDeliveredZalouser,
   sendImageZalouser,
@@ -86,10 +86,20 @@ export const zalouserPlugin: ChannelPlugin = {
      * only in the in-process cache and the next account start would hydrate an
      * empty store and report "not linked" again.
      */
-    bindAccountSession: async ({ accountId }: { accountId: string }): Promise<void> => {
+    bindAccountSession: async ({
+      accountId,
+      hostRuntime,
+    }: {
+      accountId: string;
+      /** The account's own runtime; the channel-wide slot is the last-loaded account's. */
+      hostRuntime?: HostRuntime;
+    }): Promise<void> => {
       installZalouserSessionStore(
         accountId,
-        createHostRuntimeSessionStore({ hostRuntime: getHostRuntime(), accountId }),
+        createHostRuntimeSessionStore({
+          hostRuntime: accountHostRuntime(accountId, hostRuntime),
+          accountId,
+        }),
       );
       await hydrateZalouserSessions(accountId);
     },
@@ -106,6 +116,10 @@ export const zalouserPlugin: ChannelPlugin = {
     relinkQrLogin: (params: QrLoginParams) =>
       startZalouserQrLogin({ ...accountScoped(params), relink: true }),
     logout: (params: QrLoginParams) => logoutZalouser(accountScoped(params)),
+  },
+  /** The Hub's loader unloaded the account: forget the runtime its sessions were stored through. */
+  disposeAccount: (accountId: string) => {
+    forgetAccountHostRuntime(accountId);
   },
   gateway: {
     startAccount: (ctx) =>

@@ -14,3 +14,12 @@ export { responseWithRelease } from "../infra/net/guarded-body-stream.js";
 // header-normalization dependency. `makeProxyFetch` stays omitted: Discord's own
 // `proxy-fetch.ts` is the vertical's proxy seam (D-DC-006).
 export { resolveFetch, wrapFetchWithAbortSignal } from "../infra/fetch.js";
+
+// WhatsApp port addition: the ported WhatsApp session resolves its WebSocket
+// proxy from the environment with upstream's NO_PROXY rules. Same upstream
+// barrel, same source module (`src/infra/net/proxy-env.ts`, verbatim).
+export {
+  matchesNoProxy,
+  resolveEnvHttpProxyUrl,
+  shouldUseEnvHttpProxyForUrl,
+} from "../infra/net/proxy-env.js";

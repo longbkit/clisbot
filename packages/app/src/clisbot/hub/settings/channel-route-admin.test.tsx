@@ -105,6 +105,8 @@ vi.mock("@/components/ui/form-field", () => ({
     return <input defaultValue={props.initialValue} onChange={change} />;
   },
 }));
+// The channel picker renders its options as ComboboxItems; the stub select never opens them.
+vi.mock("@/components/ui/combobox", () => ({ Combobox: () => null, ComboboxItem: () => null }));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: (props: { label: string; options?: { id: string; value: string }[] }) => (
     <select aria-label={props.label}>

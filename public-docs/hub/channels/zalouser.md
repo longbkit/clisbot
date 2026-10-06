@@ -1,6 +1,6 @@
 ---
 title: Zalo Personal channel
-description: Run an agent on a personal Zalo account linked by QR code, and understand what that costs you.
+description: Run an agent on a personal Zalo account you log in to by QR code, and understand what that costs you.
 nav: Zalo Personal
 order: 88
 category: Hub
@@ -8,10 +8,10 @@ category: Hub
 
 # Zalo Personal
 
-Zalo Personal is not a bot. It drives a **real personal Zalo account** through a community client, and the account is linked by scanning a QR code with a phone. That one fact shapes everything else:
+Zalo Personal is not a bot. It drives a **real personal Zalo account** through a community client, and you log in to the account by scanning a QR code with a phone. That one fact shapes everything else:
 
 - There is no token to paste. Onboarding is a live, multi-step QR flow.
-- The credential is a session, not a static secret. It expires, it rotates, and relinking is routine rather than exceptional.
+- The credential is a session, not a static secret. It expires, it rotates, and logging in again is routine rather than exceptional.
 - Everything that account can do, a human on that account can do. This is the highest-trust channel in the catalog.
 - A personal-account client is not a sanctioned API. Use an account you are willing to lose.
 
@@ -23,7 +23,7 @@ A phone signed in to the Zalo account you want the agent to act as, and someone 
 
 ## Add it to Hub
 
-Create the account first. It has no credential, so there is nothing to paste. In the app, open **Channels → Channel Integrations → Zalo Personal → Connect Zalo Personal**, give the account a name, then add a Route to it. From the CLI:
+Create the account first. It has no credential, so there is nothing to paste. In the app, open **Channels → Channel Integrations → Zalo Personal → Connect Zalo Personal**, give the account a name, and scan the QR code that shows next. Then add a Route to it. From the CLI:
 
 ```sh
 clisbot channels add zalouser --account main --profile main
@@ -31,19 +31,19 @@ clisbot channels add zalouser --account main --profile main
 
 `--profile` names the stored session and defaults to the account id. The account starts, finds no session, and reports the transport state **`needs-login`**. That is the designed first state, not a failure.
 
-Then link it from the app: **Channels → Connections**; the Connection's card shows its QR operations while it needs linking. The flow is start → show the QR → poll → linked. Confirm the reported user id is the account you meant before you point a Route at it.
+Adding the Connection in the app shows the QR code straight away. Until the scan is done, the Connection's card under **Channels → Connections** shows the same **Log in** row. The flow is start → show the QR → poll → logged in. Confirm the reported user id is the account you meant before you point a Route at it.
 
-Five verbs drive it, and the app renders all five:
+Five verbs drive it. The app runs the poll itself while a code waits; the other four are its buttons:
 
-| Verb       | When you use it                                                                  |
-| ---------- | -------------------------------------------------------------------------------- |
-| **Start**  | First link. Returns the QR image.                                                |
-| **Poll**   | Runs on a timer while the code is pending.                                       |
-| **Cancel** | Abandon a pending code. It refuses to touch a healthy session.                   |
-| **Relink** | Session died, or you want a different account. Discards the old one first.       |
-| **Logout** | Unlink. Leaves a revocation marker so a stale copy cannot resurrect the session. |
+| Verb                                | When you use it                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Log in**                          | First login. Returns the QR image.                                                         |
+| Poll                                | Runs on a timer while the code is pending.                                                 |
+| **Cancel**                          | Abandon a pending code. It refuses to touch a healthy session.                             |
+| **Log in with a different account** | Session died, or you want a different account. Discards the old one first.                 |
+| **Log out**                         | Ends the session. Leaves a revocation marker so a stale copy cannot resurrect the session. |
 
-The QR expires after about three minutes. An expired code is not an error state — generate a new one. A start that completes inside its own budget can come back linked without a poll.
+The QR expires after about three minutes. An expired code is not an error state — generate a new one. A start that completes inside its own budget can come back logged in without a poll.
 
 Once the scan succeeds, Hub starts the account on its own and `needs-login` clears within a few seconds. If it stays, use **Retry** in the app.
 
@@ -82,6 +82,6 @@ Nothing. A live run needs a human with a phone. The QR state machine, the sessio
 
 **The QR image never resolves.** It expired, or the scan was declined. Both are reported rather than swallowed. Start again.
 
-**The session dies for no reason.** It does that. The phone can sign the session out and Zalo rotates it. Offer relink whenever the account start fails with "not linked".
+**The session dies for no reason.** It does that. The phone can sign the session out and Zalo rotates it. Log in again whenever the account start fails with "not logged in".
 
-**Cancel says it will not run.** Cancel refuses when the session is still good. Use logout to unlink deliberately.
+**Cancel says it will not run.** Cancel refuses when the session is still good. Use **Log out** to end it deliberately.

@@ -28,6 +28,7 @@ describe("channel catalog contract", () => {
       "googlechat",
       "feishu",
       "zalouser",
+      "whatsapp",
       "zalo",
     ]);
     expect(parsed.channels.every((entry) => entry.auth === "token" || entry.auth === "qr")).toBe(
@@ -124,6 +125,7 @@ describe("catalog accessors", () => {
     // The catalog is the source: no amount of casing turns these ids into their names.
     expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "zalouser")).toBe("Zalo Personal");
     expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "googlechat")).toBe("Google Chat");
+    expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "whatsapp")).toBe("WhatsApp");
     // A channel this Hub does not carry, and the window before the catalog loads.
     expect(channelCatalogLabel(CHANNEL_CATALOG_FIXTURE, "matrix")).toBe("Matrix");
     expect(channelCatalogLabel([], "telegram")).toBe("Telegram");
@@ -134,6 +136,8 @@ describe("catalog accessors", () => {
     const zalouser = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "zalouser");
     expect(zalouser).toBeDefined();
     expect(zalouser && isConnectableChannel(zalouser)).toBe(true);
+    const whatsapp = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "whatsapp");
+    expect(whatsapp && isConnectableChannel(whatsapp)).toBe(true);
     const telegram = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "telegram");
     expect(telegram && isConnectableChannel(telegram)).toBe(true);
   });

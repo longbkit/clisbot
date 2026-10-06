@@ -29,7 +29,7 @@ describe("unavailable Hub", () => {
     expect(model.getState()).toMatchObject({
       phase: "unavailable",
       actions: [],
-      message: "This Hub does not serve QR linking for this channel.",
+      message: "This Hub does not serve QR login for this channel.",
     });
   });
 
@@ -250,7 +250,7 @@ describe("a verb that did not answer", () => {
     model.begin("start");
     model.fail(failure);
     expect(model.getState()).toMatchObject({ phase: "unavailable", actions: [] });
-    expect(model.getState().message).toContain("does not serve QR linking");
+    expect(model.getState().message).toContain("does not serve QR login");
   });
 
   it("keeps a 503 retryable and says what is missing", () => {

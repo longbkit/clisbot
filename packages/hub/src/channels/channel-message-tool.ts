@@ -169,12 +169,15 @@ const CHANNEL_MESSAGE_TOOL_DISCOVERY: Record<SupportedChannelName, ChannelMessag
   // Zalo Personal's `messageActions` is `react` only (`ZALOUSER_MESSAGE_ACTIONS`);
   // `send` is the Hub's own outbound seam, as on every channel.
   zalouser: { actions: ["send", "react"], capabilities: [] },
+  // WhatsApp's message actions are `react` and `poll`: no edit or delete
+  // (`WHATSAPP_MESSAGE_ACTIONS`); `send` is the Hub's own outbound seam.
+  whatsapp: { actions: ["send", "react", "poll"], capabilities: [] },
 };
 
 /**
  * The channels with a native outbound file-upload path, so `message` accepts
  * media params at all. Zalo Personal's client uploads natively (its
- * `outbound.sendMedia`, D-ZU-018). Google Chat's upload is user-OAuth only,
+ * `outbound.sendMedia`, D-ZU-018), and so does WhatsApp's Baileys socket. Google Chat's upload is user-OAuth only,
  * Feishu's is omitted from the port, and the Zalo Bot API has no upload
  * endpoint — offering the tool there would advertise a delivery that always
  * fails. The set is pinned to `@clisbot/channels-shared`'s `MediaChannel`,
@@ -182,7 +185,11 @@ const CHANNEL_MESSAGE_TOOL_DISCOVERY: Record<SupportedChannelName, ChannelMessag
  */
 export function isMediaChannel(channel: SupportedChannelName): channel is MediaChannel {
   return (
-    channel === "slack" || channel === "telegram" || channel === "discord" || channel === "zalouser"
+    channel === "slack" ||
+    channel === "telegram" ||
+    channel === "discord" ||
+    channel === "zalouser" ||
+    channel === "whatsapp"
   );
 }
 

@@ -172,6 +172,14 @@ export interface OutboundPostParams {
    * outbound pacer keeps only the newest one waiting per thread and sends a
    * queued answer ahead of it. Absent = an answer, never dropped. */
   priority?: "progress" | undefined;
+  /** The native message this post quotes or replies to, for a vertical that
+   * can; others ignore it. */
+  replyToId?: string | undefined;
+  /** An approval/question card's buttons, for a vertical that renders its own
+   * control (WhatsApp: reactions). `text` stays the full fallback prompt. */
+  cardButtons?:
+    | ReadonlyArray<{ text: string; value: string; style?: "primary" | "danger" }>
+    | undefined;
 }
 
 export interface OutboundPostResult {

@@ -81,6 +81,7 @@ describe("a new account's transport", () => {
     expect(mode("discord")).toEqual({ mode: "gateway" });
     expect(mode("feishu")).toEqual({ mode: "websocket" });
     expect(mode("zalouser")).toEqual({ mode: "qr" });
+    expect(mode("whatsapp")).toEqual({ mode: "qr" });
     expect(channelAccountRecord({ id: "c1", provider: "zalouser" }, "main", [])).toEqual({
       channel: "zalouser",
       accountId: "main",

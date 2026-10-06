@@ -10,6 +10,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import zalouserEntry from "@clisbot/channels-zalouser/dist/entry.js";
 import { zalouserPlugin } from "@clisbot/channels-zalouser/dist/plugin.js";
+import whatsappEntry from "@clisbot/channels-whatsapp/dist/entry.js";
+import { whatsappPlugin } from "@clisbot/channels-whatsapp/dist/plugin.js";
 import type { HostRuntime, KeyedStoreEntry } from "@clisbot/channels-shared";
 import { buildAccountCarriers } from "./account-carriers.js";
 import { linkEndsNeedsLogin } from "./qr-login.js";
@@ -44,9 +46,11 @@ function hostRuntime(): HostRuntime {
   } as unknown as HostRuntime;
 }
 
-function compiledAccount(): CompiledChannelAccount {
+function compiledAccount(
+  channel: CompiledChannelAccount["channel"] = "zalouser",
+): CompiledChannelAccount {
   return {
-    channel: "zalouser",
+    channel,
     accountId: ACCOUNT_ID,
     enabled: true,
     channelEnabled: true,
@@ -92,6 +96,33 @@ describe("needs-login classification", () => {
     assert.equal(isNeedsLoginFailure("zalouser", detail), true, detail);
   });
 
+  it("recognises the real WhatsApp vertical's never-linked start failure", async () => {
+    const { account, cfgAccount } = buildAccountCarriers("whatsapp", {
+      accountId: ACCOUNT_ID,
+      compiled: compiledAccount("whatsapp"),
+    });
+    const host = hostRuntime();
+    whatsappEntry.setChannelRuntime(host);
+    const start = whatsappPlugin.gateway?.startAccount as (context: unknown) => Promise<void>;
+    let detail = "";
+    try {
+      await start({
+        accountId: ACCOUNT_ID,
+        account,
+        cfg: { channels: { whatsapp: { accounts: { [ACCOUNT_ID]: cfgAccount } } } },
+        hostRuntime: host,
+        abortSignal: new AbortController().signal,
+        setStatus: () => undefined,
+        getStatus: () => undefined,
+        log: { warn: () => undefined },
+      });
+      assert.fail("an unlinked WhatsApp account must fail the start");
+    } catch (error) {
+      detail = error instanceof Error ? error.message : String(error);
+    }
+    assert.equal(isNeedsLoginFailure("whatsapp", detail), true, detail);
+  });
+
   it("leaves an ordinary failure on a QR channel a failure", () => {
     assert.equal(channelUsesQrLogin("zalouser"), true);
     assert.equal(isNeedsLoginFailure("zalouser", "socket hang up"), false);
@@ -103,6 +134,11 @@ describe("needs-login classification", () => {
   });
 
   it("parks an unlinked account instead of failing it, and leaves it parked", () => {
+    assert.equal(
+      monitorFailureTransport("zalouser", 'account "x" is not logged in'),
+      "needs-login",
+    );
+    // The wording verticals used before QR sign-in was named Login.
     assert.equal(monitorFailureTransport("zalouser", 'account "x" is not linked'), "needs-login");
     assert.equal(monitorFailureTransport("zalouser", "socket hang up"), "failed");
     // Reconcile re-drives a failed account and leaves a parked one alone: only a

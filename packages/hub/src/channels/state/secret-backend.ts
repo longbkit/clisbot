@@ -47,22 +47,36 @@ export async function openChannelSecretStateBackend(deps: {
   }
   let pending: Promise<void> = Promise.resolve();
   let failure: unknown;
+  // Namespaces whose upsert is queued but has not started, with the entries it
+  // will write. A save while one is waiting only replaces those entries: every
+  // upsert re-encrypts the whole namespace, so a burst of mutations (a vertical
+  // writing several entries at once) costs one write, not one per mutation. A
+  // caller that awaits `flush` after its save still waits for an upsert that
+  // carries its entries.
+  const queued = new Map<string, StoredEntry[]>();
+
+  const write = (namespace: string) => {
+    const entries = queued.get(namespace) ?? [];
+    queued.delete(namespace);
+    return deps.database
+      .saveChannelStateSecret({ ...deps.scope, namespace, entries })
+      .catch((error: unknown) => {
+        failure ??= new Error(
+          `could not persist encrypted channel state for ${deps.scope.channel} account ${deps.scope.accountId} namespace ${namespace}`,
+          { cause: error },
+        );
+      });
+  };
 
   return {
     load: (namespace) => [...(snapshot.get(namespace) ?? [])],
     save: (namespace, entries) => {
       const persisted = [...entries];
       snapshot.set(namespace, persisted);
-      pending = pending.then(() =>
-        deps.database
-          .saveChannelStateSecret({ ...deps.scope, namespace, entries: persisted })
-          .catch((error: unknown) => {
-            failure ??= new Error(
-              `could not persist encrypted channel state for ${deps.scope.channel} account ${deps.scope.accountId} namespace ${namespace}`,
-              { cause: error },
-            );
-          }),
-      );
+      const waiting = queued.has(namespace);
+      queued.set(namespace, persisted);
+      if (waiting) return;
+      pending = pending.then(() => write(namespace));
     },
     flush: async () => {
       await pending;

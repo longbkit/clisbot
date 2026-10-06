@@ -57,3 +57,8 @@ export { asNullableObjectRecord } from "../normalization-core/record-coerce.js";
 // nullable record fields off a raw Lark envelope. Same upstream barrel, same
 // source module (`packages/normalization-core/src/record-coerce.ts`).
 export { asNullableRecord } from "../normalization-core/record-coerce.js";
+
+// WhatsApp port addition: the ported WhatsApp outbound-media contract dedupes
+// media URLs. Same upstream barrel, same source module
+// (`packages/normalization-core/src/string-normalization.ts`).
+export { normalizeUniqueStringEntries } from "../normalization-core/string-normalization.js";

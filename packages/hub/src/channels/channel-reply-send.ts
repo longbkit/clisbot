@@ -337,7 +337,12 @@ async function postOnce(
 ): Promise<HubOutboundSendResult> {
   if (params.media !== undefined) return await mediaPost(mcp, ref, params.media);
   const options =
-    params.presentation === undefined ? undefined : { presentation: params.presentation };
+    params.presentation === undefined && params.replyToId === undefined
+      ? undefined
+      : {
+          ...(params.presentation === undefined ? {} : { presentation: params.presentation }),
+          ...(params.replyToId === undefined ? {} : { replyToId: params.replyToId }),
+        };
   return await mcp.post(ref, params.text, options);
 }
 

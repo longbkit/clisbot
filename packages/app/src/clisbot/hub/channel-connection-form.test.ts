@@ -134,6 +134,26 @@ describe("submission", () => {
     });
   });
 
+  it("adds a WhatsApp Connection by name, with an optional account label", () => {
+    const model = openForm("whatsapp");
+    expect(model.getState()).toMatchObject({ setup: "qr" });
+    expect(model.getState().fields.map((field) => [field.key, field.label])).toEqual([
+      ["name", "Account label"],
+    ]);
+    model.setAccountId("support");
+    expect(model.requestBody()).toEqual({
+      provider: "whatsapp",
+      accountId: "support",
+      credentials: {},
+    });
+    model.setField("name", "Support line");
+    expect(model.requestBody()).toEqual({
+      provider: "whatsapp",
+      accountId: "support",
+      credentials: { name: "Support line" },
+    });
+  });
+
   it("refuses a body until the form is complete", () => {
     const model = openForm("telegram");
     expect(model.requestBody()).toBeNull();
@@ -267,7 +287,7 @@ describe("which channels the Accounts view can offer", () => {
       connectableChannelEntries(CHANNEL_CATALOG_FIXTURE, {
         allowProviderApplications: false,
       }).map((entry) => entry.id),
-    ).toEqual(["telegram", "discord", "googlechat", "feishu", "zalouser", "zalo"]);
+    ).toEqual(["telegram", "discord", "googlechat", "feishu", "zalouser", "whatsapp", "zalo"]);
   });
 
   it("adds Slack for an instance operator", () => {
@@ -275,7 +295,16 @@ describe("which channels the Accounts view can offer", () => {
       connectableChannelEntries(CHANNEL_CATALOG_FIXTURE, {
         allowProviderApplications: true,
       }).map((entry) => entry.id),
-    ).toEqual(["slack", "telegram", "discord", "googlechat", "feishu", "zalouser", "zalo"]);
+    ).toEqual([
+      "slack",
+      "telegram",
+      "discord",
+      "googlechat",
+      "feishu",
+      "zalouser",
+      "whatsapp",
+      "zalo",
+    ]);
   });
 
   it("leaves out a channel this build has no request body for", () => {

@@ -893,6 +893,39 @@ describe("native media over the Hub seam", () => {
     );
   });
 
+  it("carries the model's replyTo, forceDocument and gifPlayback to the outbound seam", async () => {
+    const project = await mediaProject("hub-send-flags-");
+    roots.push(project.root);
+    const sends: HubOutboundSendParams[] = [];
+    const outcome = await runChannelMessageAction({
+      ...scope("telegram", "bot"),
+      action: "send",
+      params: {
+        message: "the chart",
+        replyTo: "4242",
+        attachments: [{ media: project.png }],
+        forceDocument: true,
+        gifPlayback: true,
+      },
+      conversation: { to: TELEGRAM_CHAT },
+      stageMedia: createChannelMediaStager({
+        channel: "telegram",
+        readLocalFile: async function* (path) {
+          yield await readHostTestFile(path);
+        },
+      }),
+      send: async (params) => {
+        sends.push(params);
+        return { ok: true, externalMessageId: String(sends.length) };
+      },
+    });
+    assert.equal(outcome.ok, true, outcome.error);
+    assert.equal(sends[0]?.text, "the chart");
+    assert.equal(sends[0]?.replyToId, "4242", "the text part quotes the message the model named");
+    assert.equal(sends[1]?.media?.forceDocument, true);
+    assert.equal(sends[1]?.media?.gifPlayback, true);
+  });
+
   it("uploads a Slack send's two attachments through the three-step external upload", async () => {
     const project = await mediaProject("hub-slack-media-");
     roots.push(project.root);

@@ -115,6 +115,7 @@
     "@clisbot/channels-googlechat": "0.7.3-beta.1",
     "@clisbot/channels-slack": "0.7.3-beta.1",
     "@clisbot/channels-telegram": "0.7.3-beta.1",
+    "@clisbot/channels-whatsapp": "0.7.3-beta.1",
     "@clisbot/channels-zalo": "0.7.3-beta.1",
     "@clisbot/channels-zalouser": "0.7.3-beta.1",
     "@playwright/test": "1.61.1",

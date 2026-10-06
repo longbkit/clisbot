@@ -155,6 +155,9 @@ vi.mock("@/components/ui/form-field", () => ({
     );
   },
 }));
+// The channel picker renders its options as ComboboxItems; the stub select
+// below never opens them.
+vi.mock("@/components/ui/combobox", () => ({ Combobox: () => null, ComboboxItem: () => null }));
 vi.mock("@/components/ui/select-field", () => ({
   SelectField: function TestSelect(props: {
     label: string;
@@ -1510,10 +1513,12 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
         connections: [...(data.connections as { connections: unknown[] }).connections, created],
         providerApplications: [],
       };
-      // The Hub adds the running account with the Connection, no Routes yet.
+      // The Hub adds the running account with the Connection, no Routes yet,
+      // and that write moves the configuration to a new revision.
       const accounts = (configuration as { accounts: Record<string, unknown>[] }).accounts;
       current = {
         ...configuration,
+        revision: { ...configuration.revision, id: "revision-with-connection", version: 2 },
         accounts: [
           ...accounts,
           {
@@ -1544,11 +1549,149 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
     fireEvent.change(screen.getByLabelText("Automation"), { target: { value: "support" } });
     fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
+    // The form's own Connection add is not a concurrent edit: the save goes
+    // through against the revision that add produced.
     await waitFor(() => expect(adapters.put).toHaveBeenCalledOnce());
+    expect(adapters.put.mock.calls[0]![1]).toMatchObject({
+      expectedRevisionId: "revision-with-connection",
+    });
     const saved = adapters.put.mock.calls[0]![1].accounts as Record<string, unknown>[];
     const newBot = saved.filter((entry) => entry["accountId"] === "new-bot");
     expect(newBot).toHaveLength(1);
     expect((newBot[0]!["routes"] as unknown[]).length).toBe(1);
+  });
+
+  it("still stops the save when another change landed with the Connection add", async () => {
+    let current: Record<string, unknown> = configuration;
+    let currentConnections = data.connections;
+    adapters.get.mockImplementation(async (resource: string) => {
+      if (resource === "channel-configuration") return current;
+      if (resource === "connections") return currentConnections;
+      return data[resource];
+    });
+    adapters.put.mockImplementation(
+      async (_resource: string, candidate: Record<string, unknown>) => {
+        current = { ...configuration, ...candidate };
+        return current;
+      },
+    );
+    adapters.post.mockImplementation(async (resource: string) => {
+      if (resource !== "connections") return {};
+      const created = {
+        id: "new-connection",
+        provider: "telegram",
+        name: "new-bot",
+        externalName: null,
+        status: "active",
+        identityRealm: "telegram:bot:new-connection",
+        consumers: [],
+      };
+      currentConnections = {
+        connections: [...(data.connections as { connections: unknown[] }).connections, created],
+        providerApplications: [],
+      };
+      // The Hub adds the running account with the Connection, no Routes yet,
+      // and that write moves the configuration to a new revision.
+      const accounts = (configuration as { accounts: Record<string, unknown>[] }).accounts;
+      current = {
+        ...configuration,
+        revision: { ...configuration.revision, id: "revision-with-connection", version: 2 },
+        accounts: [
+          // Someone else edited an existing account in the same window.
+          { ...accounts[0], enabled: false },
+          ...accounts.slice(1),
+          {
+            channel: "telegram",
+            accountId: "new-bot",
+            enabled: true,
+            connectionId: "new-connection",
+            transport: { mode: "polling" },
+            routes: [],
+          },
+        ],
+      };
+      return created;
+    });
+    renderChannels();
+    await screen.findByRole("button", { name: /^Edit Route/ });
+    fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+      target: { value: "new-bot" },
+    });
+    fireEvent.change(screen.getByLabelText("Bot token"), { target: { value: "bot-token" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and add Connection" }));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
+        "account:telegram:new-bot",
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
+    fireEvent.change(screen.getByLabelText("Automation"), { target: { value: "support" } });
+    fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
+    expect(await screen.findByText(/Channel configuration changed while editing/)).toBeTruthy();
+    expect(adapters.put).not.toHaveBeenCalled();
+  });
+
+  it("logs a new QR Connection in right after it is named, before its first Route", async () => {
+    let currentConnections = data.connections;
+    adapters.get.mockImplementation(async (resource: string) => {
+      if (resource === "connections") return currentConnections;
+      return data[resource];
+    });
+    adapters.post.mockImplementation(async (resource: string) => {
+      if (resource === "channel-accounts/whatsapp/support-wa/qr/start") {
+        return {
+          status: "pending",
+          message: "Scan this QR in WhatsApp → Linked Devices.",
+          qrDataUrl: "data:image/png;base64,AAAA",
+        };
+      }
+      if (resource.endsWith("/qr/cancel")) return { cancelled: true, message: "Cancelled" };
+      if (resource !== "connections") return {};
+      const created = {
+        id: "wa-connection",
+        provider: "whatsapp",
+        name: "support-wa",
+        externalName: null,
+        status: "active",
+        identityRealm: "whatsapp:bot:wa-connection",
+        consumers: [],
+      };
+      currentConnections = {
+        connections: [...(data.connections as { connections: unknown[] }).connections, created],
+        providerApplications: [],
+      };
+      return created;
+    });
+    renderChannels();
+    await screen.findByRole("button", { name: /^Edit Route/ });
+    fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
+    // WhatsApp is one of the popular channels offered as a segment.
+    fireEvent.click(await screen.findByRole("button", { name: "WhatsApp" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+      target: { value: "support-wa" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
+    // The code shows without another click: the scan follows the name.
+    expect(await screen.findByText("Scan with WhatsApp")).toBeTruthy();
+    expect(screen.getByLabelText("Login QR code")).toBeTruthy();
+    expect(screen.getByText(/Linked devices/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
+    // Logging in later goes on to the Route, on the new Connection, and
+    // cancels the code the Hub was waiting on.
+    fireEvent.click(screen.getByRole("button", { name: "Log in later" }));
+    await waitFor(() =>
+      expect(adapters.post).toHaveBeenCalledWith(
+        "channel-accounts/whatsapp/support-wa/qr/cancel",
+        expect.anything(),
+        expect.anything(),
+      ),
+    );
+    await waitFor(() =>
+      expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
+        "connection:wa-connection",
+      ),
+    );
   });
 
   it("offers every channel this Hub can connect and swaps the credential form", async () => {
@@ -1558,9 +1701,20 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(await screen.findByText("Connect Telegram")).toBeTruthy();
     // Slack Socket Mode is created from a Provider Application; this Member is
     // not an instance operator, so it is not on offer.
-    expect(screen.queryByRole("button", { name: "Slack" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Zalo Official Bot" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Feishu / Lark" }));
+    // A few popular channels are one tap away; every channel is in the searchable list.
+    // The first popular channel starts picked.
+    const telegramSegment = screen
+      .getAllByText("Telegram")
+      .map((node) => node.closest("button"))
+      .find((button) => button !== null);
+    expect(telegramSegment?.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: "WhatsApp" })).toBeTruthy();
+    const all = screen.getByLabelText("All channels") as HTMLSelectElement;
+    const offered = [...all.options].map((option) => option.text);
+    expect(offered).not.toContain("Slack");
+    expect(offered).toContain("Zalo Official Bot");
+    expect(offered).toContain("WhatsApp");
+    fireEvent.change(all, { target: { value: "feishu" } });
     expect(await screen.findByText("Connect Feishu / Lark")).toBeTruthy();
     expect(screen.getByLabelText("App ID")).toBeTruthy();
     expect(screen.getByLabelText("App secret")).toBeTruthy();

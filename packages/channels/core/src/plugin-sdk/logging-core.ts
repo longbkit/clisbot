@@ -22,3 +22,7 @@ export { redactSensitiveText as redactToolPayloadText } from "../logging/redact.
 // module; `redactSensitiveFieldValue` is the narrowed one (D-CORE-002).
 export { redactIdentifier, sha256HexPrefix } from "../logging/redact-identifier.js";
 export { redactSensitiveFieldValue, isSensitiveFieldKey } from "../logging/redact.js";
+
+// WhatsApp port addition: the ported WhatsApp QR login logs through upstream's
+// `logInfo` (`src/logger.ts`), carried in the D-CORE-700 logging boundary.
+export { getChildLogger, logInfo } from "../logging/logger.host-adapter.js";

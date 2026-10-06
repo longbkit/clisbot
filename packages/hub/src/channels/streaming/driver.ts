@@ -37,6 +37,10 @@ const STREAMING_LIMITS: Record<SupportedChannelName, StreamingLimits> = {
   // Zalo Personal's own chunk limit (`ZALOUSER_TEXT_CHUNK_LIMIT`). It publishes
   // no edit-in-place drive verb either, so the driver returns `undefined`.
   zalouser: { maxDraftChars: 2_000, minEditIntervalMs: 1_000 },
+  // WhatsApp's text chunk limit (4000). WhatsApp can edit its own message for
+  // 15 minutes, but the vertical publishes no edit-in-place drive verb yet, so
+  // the driver returns `undefined` for it as well.
+  whatsapp: { maxDraftChars: 4_000, minEditIntervalMs: 1_000 },
 };
 
 type OutboundSurface = Record<string, unknown>;

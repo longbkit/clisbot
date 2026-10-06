@@ -132,10 +132,14 @@ built as written:
   `plugin-state/plugin-store-validation.ts`, `/^[a-z0-9][a-z0-9._-]*$/i`), which
   the colon form is not; the Hub opens one keyed-store root per account, so the
   name is already account-scoped.
-- `plugin.setup` gained `bindAccountSession({ accountId })`. The §7 verbs run
-  exactly when the account start has failed for a missing session, so nothing
-  else installs the store on that path and a freshly scanned credential would
-  never reach the backing.
+- `plugin.setup` gained `bindAccountSession({ accountId, hostRuntime })`. The
+  §7 verbs run exactly when the account start has failed for a missing session,
+  so nothing else installs the store on that path and a freshly scanned
+  credential would never reach the backing. The Hub passes the account's own
+  `hostRuntime` (and `accountId` on every verb): the vertical is imported once
+  per channel and its channel-wide runtime slot is the last-loaded account's, so
+  the store is opened through `accountHostRuntime` (`runtime-store.ts`), never
+  that slot.
 
 The Hub side is slice 17b's **encrypted keyed-store namespaces** mechanism:
 `packages/hub/src/channels/state/encrypted-namespaces.ts` names the namespaces

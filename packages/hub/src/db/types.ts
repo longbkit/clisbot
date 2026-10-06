@@ -1711,7 +1711,7 @@ export interface Database {
  */
 export type ChannelConnectionChannel = Extract<
   SupportedChannelName,
-  "telegram" | "discord" | "zalo" | "zalouser" | "feishu" | "googlechat"
+  "telegram" | "discord" | "zalo" | "zalouser" | "whatsapp" | "feishu" | "googlechat"
 >;
 
 /** The bot identity a credential probe recorded. Never carries credential material. */
@@ -1745,7 +1745,8 @@ export interface ChannelBotIdentity {
  * because a credential is a different thing per channel: a bot token (Telegram,
  * Discord, Zalo), a bot token plus a Socket Mode app token (Slack), a four-field
  * app credential (Feishu), a service-account document (Google Chat), or — for
- * Zalo Personal — no secret at all, only the profile that names a QR session.
+ * the QR channels — no secret at all: the profile that names a Zalo Personal
+ * session, or the label of a WhatsApp linked device.
  */
 export interface ChannelConnectionCredentials {
   botToken?: string | undefined;
@@ -1774,6 +1775,10 @@ export interface ChannelConnectionCredentials {
    * session bytes rest in the encrypted keyed-store namespace
    * (`channels/state/encrypted-namespaces.ts`), never here. */
   profile?: string | undefined;
+  /** WhatsApp's account label — not a secret. The linked-device keys rest in
+   * the encrypted keyed-store namespace `auth`, never here; the account id is
+   * the identity, so this is only what the operator calls it. */
+  name?: string | undefined;
   /** Slack only: the Provider Application the bot credential belongs to. */
   providerApplicationId?: string | undefined;
 }

@@ -37,3 +37,9 @@ export { MediaFetchError, type MediaFetchErrorCode } from "../media/fetch-error.
 // (`packages/media-core/src/base64.ts`, `.../constants.ts`).
 export { canonicalizeBase64, estimateBase64DecodedBytes } from "../media-core/base64.js";
 export type { MediaKind } from "../media-core/constants.js";
+
+// WhatsApp port addition: the ported WhatsApp QR login renders the pairing code
+// as a PNG data URL (and upstream's terminal renderer). Same upstream barrel,
+// same source modules (`src/media/qr-image.ts`, `src/media/qr-terminal.ts`).
+export { renderQrPngBase64, renderQrPngDataUrl } from "../media/qr-image.js";
+export { renderQrTerminal } from "../media/qr-terminal.js";

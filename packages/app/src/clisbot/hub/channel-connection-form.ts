@@ -64,13 +64,18 @@ interface ChannelConnectionShape {
  * credential is called and what it is for, the request body says which keys the
  * `.strict()` schema will take. Telegram's catalog entry carries
  * `webhookUrl`/`webhookSecret`, for instance, while its Connection credential is
- * a bot token alone. Zalo Personal's Connection is a name with no credential:
- * the account is linked by a QR scan once it runs.
+ * a bot token alone. Zalo Personal's and WhatsApp's Connections are a name with
+ * no credential: the account is linked by a QR scan once it runs.
  */
 const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
   zalouser: {
     setup: "qr",
     fields: [],
+  },
+  // WhatsApp is QR-linked too; its one optional field is the account label.
+  whatsapp: {
+    setup: "qr",
+    fields: [{ key: "name", catalogKey: "name", kind: "text" }],
   },
   telegram: {
     setup: "token",

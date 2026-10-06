@@ -42,6 +42,10 @@ export interface ChannelMediaSource {
   mimeType?: string | undefined;
   /** Send an audio file as a voice note where the channel has one. */
   asVoice?: boolean | undefined;
+  /** Send an image or video as a document (no recompression) where the channel can. */
+  forceDocument?: boolean | undefined;
+  /** Play a video as an animated GIF where the channel can. */
+  gifPlayback?: boolean | undefined;
 }
 
 /** A file staged under the Hub's control, ready for a vertical's `sendMedia`. */
@@ -51,6 +55,9 @@ export interface StagedChannelMedia {
   mimeType?: string | undefined;
   sizeBytes: number;
   asVoice?: boolean | undefined;
+  /** Copied from the source after staging (`message-actions.ts` `postOneFile`). */
+  forceDocument?: boolean | undefined;
+  gifPlayback?: boolean | undefined;
   /** Removes bytes the stager wrote; called after upload or failure. */
   release?: (() => Promise<void>) | undefined;
 }

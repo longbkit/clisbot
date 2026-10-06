@@ -25,6 +25,7 @@
     "packages/channels/feishu/src/**",
     "packages/channels/zalo/src/**",
     "packages/channels/zalouser/src/**",
+    "packages/channels/whatsapp/src/**",
     "packages/channels/slack/src/format.ts",
     "packages/channels/slack/src/monitor/provider-support.ts",
     "packages/channels/slack/src/monitor/types.ts",

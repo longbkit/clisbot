@@ -482,6 +482,8 @@ describe("flatInboundNormalizer", () => {
       })?.conversation.kind;
     assert.equal(kind("zalouser", "direct"), "dm");
     assert.equal(kind("zalouser", "group"), "group");
+    assert.equal(kind("whatsapp", "direct"), "dm");
+    assert.equal(kind("whatsapp", "group"), "group");
     assert.equal(kind("zalo", "direct"), "dm");
     assert.equal(kind("zalo", "group"), "group");
     assert.equal(kind("feishu", "direct"), "dm");

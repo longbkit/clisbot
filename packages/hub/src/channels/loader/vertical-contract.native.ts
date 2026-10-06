@@ -93,6 +93,14 @@ const LATER_IN_REPO_CHANNELS = [
     // outbound file upload.
     outbound: ["sendText", "sendMedia"],
   },
+  {
+    channel: "whatsapp",
+    dir: inRepoPackageDir("@clisbot/channels-whatsapp"),
+    exportName: "whatsappPlugin",
+    // WhatsApp cannot edit a sent message; `sendMedia` uploads images,
+    // documents and audio natively.
+    outbound: ["sendText", "sendMedia"],
+  },
 ] as const;
 const HOISTED_DEPS = join(REPO_ROOT, "node_modules");
 
@@ -127,7 +135,7 @@ function scoutSupplyPresent(): boolean {
 
 const SKIP_IN_REPO = inRepoSupplyPresent()
   ? false
-  : "the in-repo channel verticals are not built (@clisbot/channels-{slack,telegram,discord,googlechat,feishu,zalo,zalouser,shared} dist missing)";
+  : "the in-repo channel verticals are not built (@clisbot/channels-{slack,telegram,discord,googlechat,feishu,zalo,zalouser,whatsapp,shared} dist missing)";
 const SKIP_SCOUT = scoutSupplyPresent()
   ? false
   : `pinned OpenClaw supply not extracted under ${SCOUT} (OPENCLAW_SCOUT); the live E2E covers the published/bundled regression via the registry`;

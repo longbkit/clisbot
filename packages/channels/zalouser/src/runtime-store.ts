@@ -36,6 +36,38 @@ export function getHostRuntime(): HostRuntime {
   return hostRuntime;
 }
 
+/**
+ * The runtime each account was started or set up with. The Hub imports this
+ * vertical once per channel and every account load overwrites the channel-wide
+ * slot above, so that slot is whichever account loaded last: anything that reads
+ * or writes ONE account's credentials resolves its runtime here instead.
+ */
+const accountRuntimes = new Map<string, HostRuntime>();
+
+/** The account was unloaded: its runtime (and the backing behind it) is gone. */
+export function forgetAccountHostRuntime(accountId: string): void {
+  accountRuntimes.delete(accountId);
+}
+
+/** Remember the runtime an account's credentials live behind. */
+export function rememberAccountHostRuntime(accountId: string, runtime: HostRuntime): void {
+  accountRuntimes.set(accountId, runtime);
+}
+
+/**
+ * One account's own HostRuntime: the one the Hub passed with the call, else the
+ * one the account started with. Never the channel-wide slot — with two accounts
+ * it would point a login or a logout at the other account's keys.
+ */
+export function accountHostRuntime(accountId: string, passed?: HostRuntime): HostRuntime {
+  const runtime = passed ?? accountRuntimes.get(accountId);
+  if (runtime === undefined) {
+    throw new Error(`zalouser account "${accountId}" has no host runtime yet; start the account first`);
+  }
+  if (passed !== undefined) accountRuntimes.set(accountId, passed);
+  return runtime;
+}
+
 /** The L3 processor for one account (created once per (runtime, account)); both
  * sessions' admission hands its normalized events to it. */
 export function registerAccountInbound(

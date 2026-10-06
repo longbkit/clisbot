@@ -34,6 +34,7 @@ const TRANSPORT_MODE: Record<string, string> = {
   feishu: "websocket",
   zalo: "polling",
   zalouser: "qr",
+  whatsapp: "qr",
 };
 
 function compiledAccount(
@@ -67,6 +68,8 @@ const CREDENTIALS: Record<string, Partial<AccountCarrierInput>> = {
   // Zalo Personal's Connection carries no secret at all — only the profile
   // label its QR session is stored under.
   zalouser: { profile: "long-personal" },
+  // WhatsApp's Connection carries only the non-secret account label.
+  whatsapp: { name: "Support line" },
 };
 
 /** The two carriers the supervisor hands the vertical (`accountAndCfg`). */
@@ -277,6 +280,26 @@ describe("drive-time account carriers", () => {
       compiled: compiledAccount("zalouser"),
     });
     assert.equal(built.account["profile"], ACCOUNT_ID);
+  });
+
+  it("hands WhatsApp only its account label and knobs — no credential, no profile", () => {
+    // The vertical's dist is not imported: the carrier is the account id plus an
+    // optional label, and the linked-device keys rest in the encrypted
+    // keyed-store namespace `auth`, never on a carrier.
+    const built = buildAccountCarriers("whatsapp", {
+      accountId: ACCOUNT_ID,
+      compiled: compiledAccount("whatsapp", { name: " Support line ", sendReadReceipts: false }),
+      name: "connection label",
+    });
+    assert.deepEqual(built.account, { accountId: ACCOUNT_ID, name: "Support line" });
+    assert.deepEqual(built.cfgAccount, { name: "Support line", sendReadReceipts: false });
+
+    const bare = buildAccountCarriers("whatsapp", {
+      accountId: ACCOUNT_ID,
+      compiled: compiledAccount("whatsapp"),
+    });
+    assert.deepEqual(bare.account, { accountId: ACCOUNT_ID });
+    assert.deepEqual(bare.cfgAccount, {});
   });
 
   it("refuses a Google Chat account whose connection carries no service account", () => {

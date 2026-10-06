@@ -37,6 +37,9 @@ export type IdentityChannel = "slack" | ChannelConnectionChannel;
  * - feishu: `open_id` is per app.
  * - zalo: an Official Account sees an OA-scoped user id.
  * - zalouser: not verified to be global across personal accounts.
+ * - whatsapp: a phone-number jid is global to WhatsApp, but group senders now
+ *   arrive as LIDs, so one person can reach two linked devices under different
+ *   ids. Not verified stable across accounts, so per account like zalouser.
  */
 export const CHANNEL_IDENTITY_REALM_SCOPE: Record<IdentityChannel, ChannelIdentityRealmScope> = {
   telegram: "channel",
@@ -46,6 +49,7 @@ export const CHANNEL_IDENTITY_REALM_SCOPE: Record<IdentityChannel, ChannelIdenti
   feishu: "bot",
   zalo: "bot",
   zalouser: "bot",
+  whatsapp: "bot",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;

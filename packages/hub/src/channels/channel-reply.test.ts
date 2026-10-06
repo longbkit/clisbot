@@ -189,7 +189,7 @@ describe("channel-reply MCP endpoint", () => {
   });
 
   it("offers file sends only where the channel uploads natively", () => {
-    for (const channel of ["slack", "telegram", "discord", "zalouser"] as const) {
+    for (const channel of ["slack", "telegram", "discord", "zalouser", "whatsapp"] as const) {
       assert.equal(isMediaChannel(channel), true, `${channel} uploads files`);
     }
     for (const channel of ["zalo", "googlechat", "feishu"] as const) {

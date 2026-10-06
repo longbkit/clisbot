@@ -411,6 +411,55 @@ describe("native card gating (inlineButtons)", () => {
     ]);
   });
 
+  it("hands WhatsApp the card buttons with no `inlineButtons` opt-in, and posts the outcome as a reply", async () => {
+    const { engine, postCalls, updateCalls } = makeEngine(
+      store,
+      new ManualClock(),
+      makeRoute(),
+      {},
+      "whatsapp",
+    );
+    await engine.handlePermissionRequest(
+      "agent-1",
+      requestOf({ id: "req-wa", name: "Bash", input: { command: "ls -la" } }),
+    );
+    const prompt = postCalls[0];
+    assert.equal(prompt?.blocks, undefined, "no Block Kit for WhatsApp");
+    assert.equal(prompt?.replyMarkup, undefined, "no Telegram keyboard for WhatsApp");
+    assert.match(prompt?.text ?? "", /approve req-wa/u, "the typed command stays in the prompt");
+    assert.deepEqual(
+      prompt?.cardButtons?.map((button) => [button.value, button.style]),
+      [
+        ["allow:req-wa", "primary"],
+        ["deny:req-wa", "danger"],
+      ],
+    );
+    const check = await engine.answerFromChannel("agent-1", INITIATOR, {
+      decision: "allow",
+      requestId: "req-wa",
+    });
+    assert.equal(check.answered, true);
+    assert.equal(updateCalls.length, 0, "WhatsApp cannot edit the prompt");
+    assert.equal(postCalls.length, 2, "the outcome is a new message");
+    assert.match(postCalls[1]?.text ?? "", /Approved Bash/u);
+    assert.equal(postCalls[1]?.replyToId, "1720000000.000001", "the outcome quotes the prompt");
+  });
+
+  it("hands WhatsApp one button per question option for the 1️⃣–4️⃣ reactions", async () => {
+    const { engine, postCalls } = makeEngine(
+      store,
+      new ManualClock(),
+      questionRoute(),
+      {},
+      "whatsapp",
+    );
+    await engine.handlePermissionRequest("agent-1", questionRequestOf({ id: "req-waq" }));
+    assert.deepEqual(
+      postCalls[0]?.cardButtons?.map((button) => button.value),
+      ["allow:req-waq:Biome", "allow:req-waq:Prettier", "allow:req-waq:Other", "deny:req-waq"],
+    );
+  });
+
   it("skips the in-place update when the prompt was posted text-only", async () => {
     const { engine, updateCalls } = makeEngine(store); // gate off: no card
     await engine.handlePermissionRequest(

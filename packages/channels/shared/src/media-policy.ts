@@ -27,9 +27,12 @@ export const DISCORD_MAX_MEDIA_BYTES = 10 * 1024 * 1024;
  * takes files far larger (about 1 GB); the Hub caps a post at 100 MB, read and
  * staged whole, until a larger one is needed. */
 export const ZALOUSER_MAX_MEDIA_BYTES = 100 * 1024 * 1024;
+/** WhatsApp: the linked-device socket uploads natively. 50 MB is upstream's
+ * `DEFAULT_WHATSAPP_MEDIA_MAX_MB`, used for inbound and outbound alike. */
+export const WHATSAPP_MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 
 /** The channel the G11 policy is applied under. */
-export type MediaChannel = "telegram" | "slack" | "discord" | "zalouser";
+export type MediaChannel = "telegram" | "slack" | "discord" | "zalouser" | "whatsapp";
 
 /** Why an outbound file may not be posted natively: the G11 gate is size-only
  * (an unknown/unmapped extension posts as `application/octet-stream`). */
@@ -41,6 +44,7 @@ const CHANNEL_LABEL: Record<MediaChannel, string> = {
   slack: "Slack",
   discord: "Discord",
   zalouser: "Zalo Personal",
+  whatsapp: "WhatsApp",
 };
 
 const MAX_MEDIA_BYTES: Record<MediaChannel, number> = {
@@ -48,6 +52,7 @@ const MAX_MEDIA_BYTES: Record<MediaChannel, number> = {
   slack: SLACK_MAX_MEDIA_BYTES,
   discord: DISCORD_MAX_MEDIA_BYTES,
   zalouser: ZALOUSER_MAX_MEDIA_BYTES,
+  whatsapp: WHATSAPP_MAX_MEDIA_BYTES,
 };
 
 /** The channel's G11 cap in bytes. */
@@ -71,6 +76,8 @@ const MAX_INBOUND_MEDIA_BYTES: Record<MediaChannel, number> = {
   // The Zalo Personal port downloads no inbound attachment (upstream-sync.json,
   // `monitor.ts`); the ceiling bounds one if it ever does.
   zalouser: ZALOUSER_MAX_MEDIA_BYTES,
+  // WhatsApp downloads inbound images, documents and audio up to the same cap.
+  whatsapp: WHATSAPP_MAX_MEDIA_BYTES,
 };
 
 /** The channel's inbound download ceiling in bytes. */

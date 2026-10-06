@@ -17,7 +17,7 @@ step() {
     echo "FAIL $name  (see $OUT/$name.txt)"; fail=1
   fi
 }
-for pkg in core markdown-core shared slack telegram discord googlechat feishu zalo zalouser; do
+for pkg in core markdown-core shared slack telegram discord googlechat feishu zalo zalouser whatsapp; do
   step "build-$pkg" npm run build --workspace="@clisbot/channels-$pkg"
 done
 step typecheck-hub npm run typecheck:node --workspace=@clisbot/hub
@@ -30,7 +30,7 @@ run_vitest() {
   local name="$1" dir="$2"; shift 2
   step "vitest-$name" bash -c "cd '$ROOT/$dir' && npx vitest run $* --maxWorkers=1 --no-file-parallelism"
 }
-for pkg in shared slack telegram discord googlechat feishu zalo zalouser core markdown-core; do
+for pkg in shared slack telegram discord googlechat feishu zalo zalouser whatsapp core markdown-core; do
   run_vitest "$pkg" "packages/channels/$pkg" src
 done
 run_vitest hub-channels packages/hub \

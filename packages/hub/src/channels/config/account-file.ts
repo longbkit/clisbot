@@ -22,6 +22,8 @@ export const DEFAULT_TRANSPORT_MODE: Record<SupportedChannelName, string> = {
   zalo: "polling",
   // Zalo Personal has one mode; the account is linked afterwards by a QR scan.
   zalouser: "qr",
+  // WhatsApp likewise: one mode, linked afterwards by a QR scan.
+  whatsapp: "qr",
 };
 
 export function channelAccountFilePath(channel: SupportedChannelName, account: string): string {

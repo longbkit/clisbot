@@ -96,3 +96,8 @@ export { sanitizeForPlainText, stripInternalRuntimeScaffolding } from "../infra/
 // ported Zalo webhook spool builds its payload error from. Same upstream
 // barrel, same source module (`src/channels/message/ingress-errors.ts`).
 export { createChannelIngressError } from "../channels/message/ingress-errors.js";
+
+// WhatsApp port addition: the ported WhatsApp send path quotes only the first
+// chunk of a multi-part answer in single-use reply modes. Same upstream barrel,
+// same source module (`src/infra/outbound/reply-policy.ts`).
+export { createReplyToFanout } from "../infra/outbound/reply-policy.js";

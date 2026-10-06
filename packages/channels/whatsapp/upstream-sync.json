@@ -1,0 +1,993 @@
+{
+  "upstreamRepo": "openclaw/openclaw",
+  "baselineCommit": "3928bad9bad",
+  "roots": [
+    {
+      "upstream": "extensions/whatsapp/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/account-config.ts",
+      "upstream": "extensions/whatsapp/src/account-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/account-ids.ts",
+      "upstream": "extensions/whatsapp/src/account-ids.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/account-types.ts",
+      "upstream": "extensions/whatsapp/src/account-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/accounts.ts",
+      "upstream": "extensions/whatsapp/src/accounts.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-010", "D-WA-011"]
+    },
+    {
+      "local": "src/action-runtime-target-auth.ts",
+      "upstream": "extensions/whatsapp/src/action-runtime-target-auth.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/action-runtime.ts",
+      "upstream": "extensions/whatsapp/src/action-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/active-listener.ts",
+      "upstream": "extensions/whatsapp/src/active-listener.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auth-store.runtime.ts",
+      "upstream": "extensions/whatsapp/src/auth-store.runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-011"]
+    },
+    {
+      "local": "src/auth-store.ts",
+      "upstream": "extensions/whatsapp/src/auth-store.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-010", "D-WA-012"]
+    },
+    {
+      "local": "src/channel-actions.runtime.ts",
+      "upstream": "extensions/whatsapp/src/channel-actions.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "upstream": "extensions/whatsapp/src/channel-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-react-action.runtime.ts",
+      "upstream": "extensions/whatsapp/src/channel-react-action.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-react-action.ts",
+      "upstream": "extensions/whatsapp/src/channel-react-action.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/connection-controller-runtime-context.ts",
+      "upstream": "extensions/whatsapp/src/connection-controller-runtime-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/connection-controller.ts",
+      "upstream": "extensions/whatsapp/src/connection-controller.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-001", "D-WA-012"]
+    },
+    {
+      "local": "src/connection-owner.ts",
+      "upstream": "extensions/whatsapp/src/connection-owner.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-010", "D-WA-014"]
+    },
+    {
+      "local": "src/creds-files.ts",
+      "upstream": "extensions/whatsapp/src/creds-files.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/creds-persistence.ts",
+      "upstream": "extensions/whatsapp/src/creds-persistence.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/document-filename.ts",
+      "upstream": "extensions/whatsapp/src/document-filename.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/account-config.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-025"]
+    },
+    {
+      "local": "src/fusion/auth-fs-promises.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/fusion/auth-fs-sync.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/fusion/auth-fs.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/fusion/auth-snapshot.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/fusion/auth-state.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/fusion/card-intake.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-032"]
+    },
+    {
+      "local": "src/fusion/file-lock.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-014"]
+    },
+    {
+      "local": "src/fusion/inbound-access.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-018"]
+    },
+    {
+      "local": "src/fusion/inbound-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-022"]
+    },
+    {
+      "local": "src/fusion/inbox.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-023"]
+    },
+    {
+      "local": "src/fusion/listener-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-024"]
+    },
+    {
+      "local": "src/fusion/media-runtime.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-015"]
+    },
+    {
+      "local": "src/fusion/media-store.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-021"]
+    },
+    {
+      "local": "src/fusion/message-actions.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-029"]
+    },
+    {
+      "local": "src/fusion/plugin-runtime.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-017"]
+    },
+    {
+      "local": "src/fusion/poll-intake.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-030"]
+    },
+    {
+      "local": "src/fusion/polls.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-030"]
+    },
+    {
+      "local": "src/fusion/proxy-agents.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-016"]
+    },
+    {
+      "local": "src/fusion/qr-setup.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-026"]
+    },
+    {
+      "local": "src/fusion/quotes.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-031"]
+    },
+    {
+      "local": "src/fusion/reaction-cards.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-032"]
+    },
+    {
+      "local": "src/fusion/read-receipt.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-019"]
+    },
+    {
+      "local": "src/fusion/runtime-config.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-020"]
+    },
+    {
+      "local": "src/fusion/runtime-env.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-012"]
+    },
+    {
+      "local": "src/fusion/state-paths.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-011"]
+    },
+    {
+      "local": "src/fusion/test-support.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/tools.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-033"]
+    },
+    {
+      "local": "src/fusion/typing.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-034"]
+    },
+    {
+      "local": "src/identity.ts",
+      "upstream": "extensions/whatsapp/src/identity.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/image-preview.ts",
+      "upstream": "extensions/whatsapp/src/image-preview.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-015"]
+    },
+    {
+      "local": "src/inbound/baileys-cache.ts",
+      "upstream": "extensions/whatsapp/src/inbound/baileys-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/dedupe.ts",
+      "upstream": "extensions/whatsapp/src/inbound/dedupe.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/extract.ts",
+      "upstream": "extensions/whatsapp/src/inbound/extract.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/group-metadata-cache.ts",
+      "upstream": "extensions/whatsapp/src/inbound/group-metadata-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/lifecycle.ts",
+      "upstream": "extensions/whatsapp/src/inbound/lifecycle.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/media-mimetype.ts",
+      "upstream": "extensions/whatsapp/src/inbound/media-mimetype.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/media.ts",
+      "upstream": "extensions/whatsapp/src/inbound/media.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-021"]
+    },
+    {
+      "local": "src/inbound/message-enrichment.ts",
+      "upstream": "extensions/whatsapp/src/inbound/message-enrichment.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/message-normalization.ts",
+      "upstream": "extensions/whatsapp/src/inbound/message-normalization.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-018"]
+    },
+    {
+      "local": "src/inbound/outbound-mentions.ts",
+      "upstream": "extensions/whatsapp/src/inbound/outbound-mentions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/runtime-api.ts",
+      "upstream": "extensions/whatsapp/src/inbound/runtime-api.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/send-api.ts",
+      "upstream": "extensions/whatsapp/src/inbound/send-api.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/send-result.ts",
+      "upstream": "extensions/whatsapp/src/inbound/send-result.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inbound/socket-session.ts",
+      "upstream": "extensions/whatsapp/src/inbound/socket-session.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-001", "D-WA-019"]
+    },
+    {
+      "local": "src/inbound/types.ts",
+      "upstream": "extensions/whatsapp/src/inbound/types.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-018"]
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-027"]
+    },
+    {
+      "local": "src/login-qr.ts",
+      "upstream": "extensions/whatsapp/src/login-qr.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-001", "D-WA-012", "D-WA-020"]
+    },
+    {
+      "local": "src/normalize-target.ts",
+      "upstream": "extensions/whatsapp/src/normalize-target.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalize.ts",
+      "upstream": "extensions/whatsapp/src/normalize.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound-media-contract.ts",
+      "upstream": "extensions/whatsapp/src/outbound-media-contract.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-001", "D-WA-015"]
+    },
+    {
+      "local": "src/outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-028"]
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/qr-image.ts",
+      "upstream": "extensions/whatsapp/src/qr-image.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/qr-terminal.ts",
+      "upstream": "extensions/whatsapp/src/qr-terminal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/quoted-message.ts",
+      "upstream": "extensions/whatsapp/src/quoted-message.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reaction-level.ts",
+      "upstream": "extensions/whatsapp/src/reaction-level.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reconnect.ts",
+      "upstream": "extensions/whatsapp/src/reconnect.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/resolve-outbound-target.ts",
+      "upstream": "extensions/whatsapp/src/resolve-outbound-target.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-WA-017"]
+    },
+    {
+      "local": "src/runtime.ts",
+      "upstream": "extensions/whatsapp/src/runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-017"]
+    },
+    {
+      "local": "src/send.ts",
+      "upstream": "extensions/whatsapp/src/send.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/session-errors.ts",
+      "upstream": "extensions/whatsapp/src/session-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/session.runtime.ts",
+      "upstream": "extensions/whatsapp/src/session.runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-010"]
+    },
+    {
+      "local": "src/session.ts",
+      "upstream": "extensions/whatsapp/src/session.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-001", "D-WA-002", "D-WA-010", "D-WA-012", "D-WA-016"]
+    },
+    {
+      "local": "src/socket-close.ts",
+      "upstream": "extensions/whatsapp/src/socket-close.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/socket-timing.ts",
+      "upstream": "extensions/whatsapp/src/socket-timing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/targets-runtime.ts",
+      "upstream": "extensions/whatsapp/src/targets-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-WA-001", "D-WA-010", "D-WA-011"]
+    },
+    {
+      "local": "src/text-runtime.ts",
+      "upstream": "extensions/whatsapp/src/text-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/vcard.ts",
+      "upstream": "extensions/whatsapp/src/vcard.ts",
+      "status": "verbatim"
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/whatsapp/src/agent-tools-call.ts",
+      "reason": "Agent tools (`whatsapp_login`, `whatsapp_call`) and the CLI login. Linking is the Hub's QR setup (`fusion/qr-setup.ts`, D-WA-026); voice calls need MeowCaller and a separate linked-device store and are not carried. The vertical's own agent tool is `whatsapp_send_location` (D-WA-033)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/agent-tools-login.ts",
+      "reason": "Agent tools (`whatsapp_login`, `whatsapp_call`) and the CLI login. Linking is the Hub's QR setup (`fusion/qr-setup.ts`, D-WA-026); voice calls need MeowCaller and a separate linked-device store and are not carried. The vertical's own agent tool is `whatsapp_send_location` (D-WA-033)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/approval-auth.ts",
+      "reason": "Native approval and question reactions resolve OpenClaw exec approvals and agent questions from emoji through OpenClaw's approval and question runtimes. Approvals and agent questions are the Hub's; the same 👍/👎 and 1️⃣–4️⃣ rendering over the Hub's card buttons is `fusion/reaction-cards.ts` (D-WA-032)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/approval-handler.runtime.ts",
+      "reason": "Native approval and question reactions resolve OpenClaw exec approvals and agent questions from emoji through OpenClaw's approval and question runtimes. Approvals and agent questions are the Hub's; the same 👍/👎 and 1️⃣–4️⃣ rendering over the Hub's card buttons is `fusion/reaction-cards.ts` (D-WA-032)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/approval-native.ts",
+      "reason": "Native approval and question reactions resolve OpenClaw exec approvals and agent questions from emoji through OpenClaw's approval and question runtimes. Approvals and agent questions are the Hub's; the same 👍/👎 and 1️⃣–4️⃣ rendering over the Hub's card buttons is `fusion/reaction-cards.ts` (D-WA-032)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/approval-reactions.ts",
+      "reason": "Native approval and question reactions resolve OpenClaw exec approvals and agent questions from emoji through OpenClaw's approval and question runtimes. Approvals and agent questions are the Hub's; the same 👍/👎 and 1️⃣–4️⃣ rendering over the Hub's card buttons is `fusion/reaction-cards.ts` (D-WA-032)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply.impl.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/config.runtime.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/constants.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/deliver-reply.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/loggers.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/mentions.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor-state.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/ack-emoji.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/ack-reaction.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/audio-preflight.runtime.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/broadcast.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/commands.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/group-activation.runtime.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/group-activation.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/group-gating.runtime.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/group-gating.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/group-members.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/inbound-context.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/inbound-dispatch.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/last-route.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/listener-log.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/message-line.runtime.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/message-line.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/on-message.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/peer.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/prepared-inbound.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/process-message.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/reaction-eligibility.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/reaction-participant.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/runtime-api.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/monitor/status-reaction.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/reply-resolver.runtime.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/types.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/auto-reply/util.ts",
+      "reason": "The OpenClaw agent side of the WhatsApp monitor: mention gating, group history, debounce, the reply resolver and delivery, ack/status reactions, broadcast groups and audio preflight. The Hub owns the agent turn, mention policy, batching and outbound delivery; the transport loop is `fusion/listener-session.ts` (D-WA-024) around the verbatim connection controller."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/channel-outbound.ts",
+      "reason": "OpenClaw's outbound adapter shape for its own delivery engine (payload normalization, chunker hand-off, retry). The Hub owns delivery and retry; `outbound.ts` (D-WA-028) posts through upstream's `send.ts`, which keeps chunking, formatting, mentions and media."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/channel-runtime-loader.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/channel.runtime.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/channel.setup.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/channel.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/command-policy.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/config-accessors.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/config-schema.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/config-ui-hints.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/directory-config.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/doctor-contract.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/doctor.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/group-config-path.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/group-intro.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/group-policy.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/group-session-contract.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/group-session-key.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/heartbeat.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound-policy.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/access-control.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/admission.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/durable-payload.ts",
+      "reason": "OpenClaw's SQLite-backed ingress queue and its payload codec. The Hub owns durable admission (`channel_ingress_queue`); WhatsApp is the push family, so `fusion/inbox.ts` admits each normalized event in place before the read receipt (D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/durable-receive.ts",
+      "reason": "OpenClaw's SQLite-backed ingress queue and its payload codec. The Hub owns durable admission (`channel_ingress_queue`); WhatsApp is the push family, so `fusion/inbox.ts` admits each normalized event in place before the read receipt (D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/group-conversation.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/ingress-lifecycle.ts",
+      "reason": "OpenClaw's SQLite-backed ingress queue and its payload codec. The Hub owns durable admission (`channel_ingress_queue`); WhatsApp is the push family, so `fusion/inbox.ts` admits each normalized event in place before the read receipt (D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/message-debounce.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/message-delivery.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/inbound/monitor.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/login.ts",
+      "reason": "Agent tools (`whatsapp_login`, `whatsapp_call`) and the CLI login. Linking is the Hub's QR setup (`fusion/qr-setup.ts`, D-WA-026); voice calls need MeowCaller and a separate linked-device store and are not carried. The vertical's own agent tool is `whatsapp_send_location` (D-WA-033)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/media.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/outbound-base.ts",
+      "reason": "OpenClaw's outbound adapter shape for its own delivery engine (payload normalization, chunker hand-off, retry). The Hub owns delivery and retry; `outbound.ts` (D-WA-028) posts through upstream's `send.ts`, which keeps chunking, formatting, mentions and media."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/outbound-retry.ts",
+      "reason": "OpenClaw's outbound adapter shape for its own delivery engine (payload normalization, chunker hand-off, retry). The Hub owns delivery and retry; `outbound.ts` (D-WA-028) posts through upstream's `send.ts`, which keeps chunking, formatting, mentions and media."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/outbound-send-deps.ts",
+      "reason": "OpenClaw's outbound adapter shape for its own delivery engine (payload normalization, chunker hand-off, retry). The Hub owns delivery and retry; `outbound.ts` (D-WA-028) posts through upstream's `send.ts`, which keeps chunking, formatting, mentions and media."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/qa-driver.runtime.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/question-reactions.ts",
+      "reason": "Native approval and question reactions resolve OpenClaw exec approvals and agent questions from emoji through OpenClaw's approval and question runtimes. Approvals and agent questions are the Hub's; the same 👍/👎 and 1️⃣–4️⃣ rendering over the Hub's card buttons is `fusion/reaction-cards.ts` (D-WA-032)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/runtime-group-policy.ts",
+      "reason": "The receive pipeline after the socket: access policy and pairing replies, the ingress-graph admission projection, debounce and dispatch. The Hub owns Routes, Rules, access and pairing; `fusion/inbox.ts` keeps the socket session, normalization and enrichment and replaces the rest (D-WA-018, D-WA-023)."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/security-contract.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/security-fix.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/session-contract.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/session-route.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/setup-core.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/setup-finalize.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/setup-surface.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/shared.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/state-migrations.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/status-issues.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/system-prompt.ts",
+      "reason": "OpenClaw plugin/host surface: plugin registration, setup wizard and doctor, config schema/UI hints, security audit, state migrations, status issues, directory config, heartbeat and system prompt. The Hub owns configuration, setup, status and diagnostics; the drive surface is `plugin.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/outbound-test-support.ts",
+      "reason": "Test doubles for the omitted outbound adapter (`outbound-base.ts`). The send path is covered by the carried `send.test.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/setup-test-helpers.ts",
+      "reason": "Test doubles for the omitted setup surface. QR setup is covered by `fusion/qr-setup.test.ts` and the carried `login-qr.test.ts`."
+    },
+    {
+      "upstream": "extensions/whatsapp/src/test-helpers.ts",
+      "reason": "Baileys/socket fixtures for the omitted monitor and the on-disk auth tests (`session.test.ts`, `auth-store*.test.ts`, `accounts.whatsapp-auth.test.ts`, `connection-owner.test.ts`), which exercise the auth model D-WA-010 replaces. The Fusion doubles are `fusion/test-support.ts`; the encrypted auth directory is covered by `fusion/auth-fs.test.ts`, and the live QR start was run against WhatsApp's servers."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-WA-001",
+      "reason": "`tsconfig.json` turns off `exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` so the upstream source compiles verbatim: OpenClaw's own tsconfig sets neither (same as D-ZU-003)."
+    },
+    {
+      "id": "D-WA-002",
+      "file": "src/session.ts",
+      "reason": "`session.ts` names the linked device `Clisbot` instead of `openclaw` in the Baileys browser tuple. WhatsApp shows this name under Linked Devices on the owner's phone; it is the product's name there, nothing else changes."
+    },
+    {
+      "id": "D-WA-010",
+      "reason": "The linked-device auth directory lives in the Hub's encrypted keyed store, never on disk. Upstream keeps `creds.json`, its backup and one file per Signal key under OpenClaw's OAuth dir and reaches them through `node:fs`, Baileys' `useMultiFileAuthState` and the fs-safe helpers. Those bytes are a replayable credential for a human's WhatsApp account, so the Hub's rule for QR sessions applies (encrypted at rest, runtime strategy §0.1 note 7). `fusion/auth-fs.ts` keeps the directory semantics — same file names, same backup/restore, ownership and logout flow — over the account's `auth` namespace; the ported files change only the import that reached `fs` (`auth-store.ts`, `accounts.ts`, `creds-files.ts`, `creds-persistence.ts`, `targets-runtime.ts`, `connection-owner.ts`, `session.ts` `ensureDir`) and `session.runtime.ts` exports a `useMultiFileAuthState` with Baileys' own body over that store (`fusion/auth-state.ts`). Writes are coalesced and an awaited write is durable. The Hub caps one stored value at 64KB and a paired device alone holds ~800 pre-keys, so each persist writes the snapshot as numbered parts under a new generation and switches the `auth-dir` header to it last: a persist that dies midway leaves the previous generation readable, and stray parts are swept on the next bind. Paths outside the virtual root read as missing and refuse writes, and an authored `authDir` is replaced (D-WA-025).",
+      "tests": ["src/fusion/auth-fs.test.ts"]
+    },
+    {
+      "id": "D-WA-011",
+      "reason": "`resolveOAuthDir` / `CONFIG_DIR` (OpenClaw's state and config dirs) resolve inside the virtual auth tree (`fusion/state-paths.ts`), so upstream's `<oauth>/whatsapp/<accountId>` arithmetic is unchanged and lands on the encrypted store. LID mappings are read from the account's auth dir only; OpenClaw's state-dir fallback has nothing to read.",
+      "tests": ["src/fusion/auth-fs.test.ts"]
+    },
+    {
+      "id": "D-WA-012",
+      "reason": "Theme formatters (`info`/`success`/`danger`/`warn`) are the identity and `RuntimeEnv.log` is always present (`fusion/runtime-env.ts`), the shape the ported `runtime.log(info(...))` calls need; core's carried `globals.ts` logs instead (D-CORE-232/233). Same boundary as the Slack vertical's `fusion/runtime-env.ts`."
+    },
+    {
+      "id": "D-WA-014",
+      "reason": "`connection-owner.ts` keeps upstream's in-process owner reservation (one socket per auth dir) but the cross-process PID lock file is a no-op lease (`fusion/file-lock.ts`): one Hub process owns an account and the auth dir is not on disk.",
+      "tests": ["src/fusion/auth-fs.test.ts"]
+    },
+    {
+      "id": "D-WA-015",
+      "reason": "`fusion/media-runtime.ts` adds the media helpers core does not carry: `resizeToJpeg` with `sharp` (the library Baileys itself uses for thumbnails) for the 32px image preview, and upstream's voice-note transcode — the same ffmpeg arguments as `src/media/audio-transcode.ts`, run against the `ffmpeg` on the Hub host (`FFMPEG_PATH` overrides) because core carries no ffmpeg executor (D-CORE-225). With no ffmpeg, non-Ogg audio fails with a message saying so; Ogg/Opus never needs it.",
+      "tests": [
+        "src/fusion/media-runtime.test.ts",
+        "src/image-preview.test.ts",
+        "src/send.voice-delivery.test.ts"
+      ]
+    },
+    {
+      "id": "D-WA-016",
+      "reason": "Upstream's env-proxy helpers wrap OpenClaw's internal `@openclaw/proxyline` and an undici dispatcher stack; the port may not depend on OpenClaw internals, so `fusion/proxy-agents.ts` builds the same three entry points on public libraries: `https-proxy-agent` for the WebSocket (the agent Baileys documents) and undici's `ProxyAgent` / `EnvHttpProxyAgent` for media uploads. Which proxy applies — lowercase first, HTTPS falling back to HTTP, `NO_PROXY` honored — is upstream's own `resolveEnvHttpProxyUrl` / `matchesNoProxy` (core `infra/net/proxy-env.ts`, verbatim). SOCKS/PAC are refused with upstream's message. `session.ts` changes only its import.",
+      "tests": ["src/fusion/proxy-agents.test.ts"]
+    },
+    {
+      "id": "D-WA-017",
+      "reason": "`runtime.ts` reads its plugin runtime from `fusion/plugin-runtime.ts`: the only member the WhatsApp code uses is `channel.runtimeContexts`, the in-process registry the connection controller publishes itself into, supplied from core's verbatim port (`plugins/runtime/channel-runtime-contexts.ts`). `runtime-store.ts` installs it at load.",
+      "tests": ["src/runtime.test.ts", "src/send.test.ts"]
+    },
+    {
+      "id": "D-WA-018",
+      "reason": "Access control is the Hub's (Routes, Rules, `access:`, pairing). `fusion/inbound-access.ts` replaces `inbound/access-control.ts` and `inbound/admission.ts` under upstream's names: it admits every message and keeps only the platform facts — self-chat mode, and dropping a DM the linked account sent itself unless it is the owner's self-chat. Upstream's pairing replies to strangers are not sent.",
+      "tests": ["src/fusion/inbound-access.test.ts"]
+    },
+    {
+      "id": "D-WA-019",
+      "reason": "`inbound/socket-session.ts` types `markRead` with upstream's `WhatsAppReadReceiptTarget`, moved to `fusion/read-receipt.ts` because its home (`inbound/durable-receive.ts`) is omitted."
+    },
+    {
+      "id": "D-WA-020",
+      "reason": "`login-qr.ts` reads its config from `fusion/runtime-config.ts`: the WhatsApp accounts this Hub process holds, assembled from each account's start and QR bind, instead of OpenClaw's config snapshot.",
+      "tests": ["src/login-qr.test.ts"]
+    },
+    {
+      "id": "D-WA-021",
+      "reason": "Inbound media is saved into the Hub's per-account download dir (`StartAccountContext.mediaDownloadDir`) through `fusion/media-store.ts`, scoped per receive with `AsyncLocalStorage` because one process runs several accounts; the size cap is upstream's, enforced while streaming."
+    },
+    {
+      "id": "D-WA-022",
+      "reason": "`fusion/inbound-adapter.ts` maps upstream's normalized and enriched message onto `ChannelInboundEvent`: chat jid as conversation and reply target, E.164 sender when known, upstream's identity rule for group mentions (a mentioned jid or the quoted author overlaps the linked account), a leading `/verb` after any @mentions as a command, and downloaded media in the shared `[Attached files]` manifest. A shared location, contact cards and an ad-reply context follow the body as upstream's labeled JSON blocks (`formatContextJsonBlock`, core-ported verbatim), and a reaction on a card prompt becomes a `callback` event (D-WA-032). Mention name regexes stay Hub policy.",
+      "tests": ["src/fusion/inbound-adapter.test.ts"]
+    },
+    {
+      "id": "D-WA-023",
+      "reason": "`fusion/inbox.ts` is upstream `attachWebInboxToSocket` with the delivery half replaced: the socket session, group metadata owner and web send API are upstream's; stale reconnect catch-up is skipped with upstream's grace; each message is normalized, enriched and admitted to the Hub in place (push family: Baileys acks before the handler, nothing is redelivered), retried, dropped loudly after the budget, and only then marked read.",
+      "tests": ["src/fusion/inbox.test.ts"]
+    },
+    {
+      "id": "D-WA-024",
+      "reason": "`fusion/listener-session.ts` drives upstream's verbatim `WhatsAppConnectionController` the way `auto-reply/monitor.ts` does (open, wait for close, decide, retry or stop) without the agent, system events, pending-delivery drain or SIGINT hook. A logged-out device ends with \"is not linked\", which the Hub turns into `needs-login`."
+    },
+    {
+      "id": "D-WA-025",
+      "reason": "`fusion/account-config.ts` folds the Hub carrier over the compiled account (a Connection label wins) and pins `authDir` to the account's encrypted virtual dir, replacing any authored path.",
+      "tests": ["src/fusion/account-config.test.ts"]
+    },
+    {
+      "id": "D-WA-026",
+      "reason": "`fusion/qr-setup.ts` exposes upstream's QR login (`startWebLoginWithQr`, `waitForWebLogin`, `logoutWeb`) as the Hub's five verbs; a poll returns a rotated QR image, and every verb flushes the auth store before answering.",
+      "tests": ["src/fusion/qr-setup.test.ts"]
+    },
+    {
+      "id": "D-WA-027",
+      "reason": "`lifecycle/start-account.ts`: an account whose stored creds carry no device identity fails the start with \"is not linked\" (upstream waits and prints a CLI hint), which is how the Hub learns to show the QR code. Log out (`fusion/qr-setup.ts` logout) first logs the live socket out, then ends the session through a signal the connection controller runs on (`fusion/listener-session.ts`), which also cuts a connect or a reconnect backoff when there is no socket, and waits for the listener to stop; it clears nothing until the account has stopped, so no session keeps running on the cleared keys.",
+      "tests": ["src/lifecycle/start-account.test.ts", "src/fusion/qr-setup.test.ts"]
+    },
+    {
+      "id": "D-WA-028",
+      "reason": "`outbound.ts` bridges the Hub's `sendText`/`sendMedia`/typing onto upstream `send.ts`, which keeps formatting, 4000-char chunking, group @mentions, media preparation and receipts. WhatsApp has no threads; `threadId` is ignored. `forceDocument` sends an image or video as a document (no recompression) and `gifPlayback` plays a video as a GIF; `cardButtons` become reactions (D-WA-032)."
+    },
+    {
+      "id": "D-WA-029",
+      "reason": "`fusion/message-actions.ts` exposes upstream's action set filtered to `react` and `poll` (files go through the Hub's `send`), under upstream's `actions.reactions` / `actions.polls` gates. `react` runs upstream's executor; `poll` reads core's shared poll params and calls upstream's `sendPollWhatsApp`, because upstream reached it through its omitted outbound adapter.",
+      "tests": ["src/fusion/message-actions.test.ts", "src/channel-react-action.test.ts"]
+    },
+    {
+      "id": "D-WA-030",
+      "reason": "Poll votes. Baileys 7 no longer decrypts votes (its block is commented out) and OpenClaw does not read them. `fusion/polls.ts` keeps each poll's chat, `messageSecret`, question and options in the account's keyed store (`polls`, 30-day TTL) — from the socket's cache right after a poll is sent, and from any poll creation seen — and decrypts a vote with Baileys' `decryptPollVote`, matching options by SHA-256 as `getAggregateVotesInPollMessage` does and trying each phone-JID/LID spelling of creator and voter. `fusion/poll-intake.ts` admits it as a `poll_answer` event, which the Hub records as activity.",
+      "tests": [
+        "src/fusion/polls.test.ts",
+        "src/fusion/poll-intake.test.ts",
+        "src/fusion/inbox.test.ts"
+      ]
+    },
+    {
+      "id": "D-WA-031",
+      "reason": "Quoting follows upstream's `replyToMode` (read in `auto-reply/monitor/process-message.ts`, default `off`): `first`/`batched` quote the answered message on the first chunk, `all` on every chunk; an explicit `replyToId` is quoted whatever the mode. The Hub's answer post carries no reply-to (only a message-tool send that names `replyTo` does, and that is quoted as explicit), so `fusion/quotes.ts` keeps each chat's latest admitted message and the next text post takes it. The quoted key is built from upstream's inbound cache, which the inbox now fills as upstream's delivery did.",
+      "tests": ["src/fusion/quotes.test.ts", "src/outbound.test.ts", "src/fusion/inbox.test.ts"]
+    },
+    {
+      "id": "D-WA-032",
+      "reason": "Approval and question cards as reactions. OpenClaw's `approval-reactions.ts`/`question-reactions.ts` call its own approval and question runtimes; the Hub owns both and hands the prompt's card buttons over as `cardButtons`. `fusion/reaction-cards.ts` maps them as upstream renders them: approve → 👍, deny/dismiss → 👎, a question's options → 1️⃣–4️⃣ (more than four, or free text only, stays text-only), appends the legend to the prompt, and keeps message id → reactions in the keyed store (`cards`, 7 days). `fusion/card-intake.ts` turns a matching reaction into a `callback` event carrying the button value, which the Hub re-authorizes like a click. WhatsApp cannot edit the prompt, so the Hub posts the outcome as a reply quoting it.",
+      "tests": [
+        "src/fusion/reaction-cards.test.ts",
+        "src/fusion/card-intake.test.ts",
+        "src/outbound.test.ts"
+      ]
+    },
+    {
+      "id": "D-WA-034",
+      "reason": "Typing for the whole turn. OpenClaw keeps WhatsApp's \"composing\" presence up from its reply dispatcher's typing loop (`onReplyStart` → `sendComposing`, re-sent on core's typing interval); the Hub replaces that dispatcher and calls `outbound.typing` once with `start` when it accepts the inbound and once with `stop` when the turn ends (`plane/processing.ts`). `fusion/typing.ts` re-sends \"composing\" every 6 s between the two — WhatsApp lets it lapse after ~25 s and clears it on every message this account sends — and sends \"paused\" on `stop`, as the Telegram and Zalo Personal verticals refresh theirs.",
+      "tests": ["src/fusion/typing.test.ts"]
+    },
+    {
+      "id": "D-WA-033",
+      "reason": "`fusion/tools.ts` publishes `whatsapp_send_location` on `plugin.agentTools`: core's message-action vocabulary has no location send and upstream WhatsApp sends no pins. The tool takes no target; it posts a native location message into the conversation the agent is answering (`deliveryContext.to`) through the account's live socket.",
+      "tests": ["src/fusion/tools.test.ts"]
+    }
+  ]
+}

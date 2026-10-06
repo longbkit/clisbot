@@ -31,11 +31,12 @@ const CHANNEL_PACKAGES = [
   "@clisbot/channels-googlechat",
   "@clisbot/channels-zalo",
   "@clisbot/channels-zalouser",
+  "@clisbot/channels-whatsapp",
 ] as const;
 
 /** Anything the fork could have leaked into the daemon's advertised contract. */
 const FORK_TERMS =
-  /channel|clisbot|fusion|slack|telegram|discord|feishu|googlechat|zalo|openclaw|\bbots?\b/i;
+  /channel|clisbot|fusion|slack|telegram|discord|feishu|googlechat|zalo|whatsapp|openclaw|\bbots?\b/i;
 
 let daemon: TestClisbotDaemon;
 

@@ -115,6 +115,8 @@ app.json
 # Product source must remain trackable even with a global plugins/ ignore.
 !/packages/server/src/server/plugins/
 !/packages/server/src/server/plugins/**
+!/packages/channels/core/src/plugins/
+!/packages/channels/core/src/plugins/**
 
 # Versioned Hub examples and fixtures are not local runtime homes.
 !/packages/hub/examples/single-repo-team-bot/.clisbot/

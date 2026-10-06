@@ -34,14 +34,21 @@ export function ChannelCatalogView() {
   const selectedChannel = chosenChannel ?? (compact ? null : (rows[0]?.channel ?? null));
   const [connecting, setConnecting] = useState(false);
   const selected = rows.find((row) => row.channel === selectedChannel) ?? null;
+  // The account a QR Connection just added here: its code shows without a click,
+  // once — leaving the channel forgets it, so coming back does not log in again.
+  const [justConnected, setJustConnected] = useState<string | null>(null);
   const select = useCallback((channel: string) => {
     setConnecting(false);
+    setJustConnected(null);
     setSelectedChannel(channel);
   }, []);
   const cancel = useCallback(() => setConnecting(false), []);
-  const back = useCallback(() => setSelectedChannel(null), []);
+  const back = useCallback(() => {
+    setJustConnected(null);
+    setSelectedChannel(null);
+  }, []);
   const connect = useCallback(() => setConnecting(true), []);
-  const save = useSaveConnection(selected?.entry, refresh, cancel);
+  const save = useSaveConnection(selected?.entry, refresh, cancel, setJustConnected);
   // Both columns open on a text label, so their cards start level; a button in
   // this header would make it taller than the detail's.
   const list = (
@@ -79,6 +86,7 @@ export function ChannelCatalogView() {
     selected === null ? null : (
       <ChannelSelection
         row={selected}
+        justConnected={justConnected}
         connecting={connecting}
         onConnect={connect}
         onCancel={cancel}
@@ -110,18 +118,25 @@ const CATALOG_STATE_TITLES: Readonly<Record<string, string>> = {
 
 function ChannelSelection({
   row,
+  justConnected,
   connecting,
   onConnect,
   onCancel,
   save,
 }: {
   row: ChannelCatalogRow;
+  /** The account whose Connection was just added here: its login code shows without a click. */
+  justConnected: string | null;
   connecting: boolean;
   onConnect(): void;
   onCancel(): void;
   save(body: Record<string, unknown>): Promise<ChannelConnectionProblem | null>;
 }) {
-  const account = row.accounts[0] ?? null;
+  // The just-added account, when there is one: a channel can hold several.
+  const account =
+    row.accounts.find((candidate) => candidate.accountId === justConnected) ??
+    row.accounts[0] ??
+    null;
   const entry = row.entry;
   return (
     <View style={styles.view}>
@@ -129,22 +144,37 @@ function ChannelSelection({
       {entry !== undefined && connecting && row.connectable ? (
         <ChannelConnectionSetup key={row.channel} entry={entry} save={save} onCancel={onCancel} />
       ) : null}
-      {/* QR linking runs on a real account; before one exists, Connect creates it. */}
+      {/* QR login runs on a real account; before one exists, Connect creates it. */}
       {entry?.auth === "qr" && account !== null ? (
-        <ChannelQrPanel channel={row.channel} accountId={account.accountId} />
+        <ChannelQrPanel
+          key={account.accountId}
+          channel={row.channel}
+          accountId={account.accountId}
+          autoStart={account.accountId === justConnected}
+        />
       ) : null}
       {entry === undefined ? null : <ChannelSupportSection entry={entry} />}
     </View>
   );
 }
 
-function ChannelQrPanel({ channel, accountId }: { channel: string; accountId: string }) {
+function ChannelQrPanel({
+  channel,
+  accountId,
+  autoStart,
+}: {
+  channel: string;
+  accountId: string;
+  autoStart: boolean;
+}) {
   const verbs = useChannelQrVerbs({ channel, accountId });
   return (
     <ChannelQrLinkPanel
-      accountId={accountId}
+      channel={channel}
       available={CHANNEL_QR_OPERATIONS_AVAILABLE}
       verbs={verbs}
+      framed
+      autoStart={autoStart}
     />
   );
 }
@@ -153,6 +183,8 @@ function useSaveConnection(
   entry: ChannelCatalogEntry | undefined,
   refresh: () => void,
   close: () => void,
+  /** The account a QR Connection was added with, for its login to start at once. */
+  qrAccountAdded: (accountId: string) => void,
 ): (body: Record<string, unknown>) => Promise<ChannelConnectionProblem | null> {
   const hub = useHubAccount();
   const create = useCallback(
@@ -160,9 +192,11 @@ function useSaveConnection(
       const created = await createChannelConnection(hub.api(), body);
       // A QR channel's login runs on its account, so the account comes now and
       // the QR code shows here; its Routes come after.
-      if (entry?.auth === "qr") await addQrChannelAccount(hub.api(), created);
+      if (entry?.auth !== "qr") return;
+      await addQrChannelAccount(hub.api(), created);
+      qrAccountAdded(created.name);
     },
-    [entry?.auth, hub],
+    [entry?.auth, hub, qrAccountAdded],
   );
   const save = useChannelConnectionSave(entry, create);
   return useCallback(

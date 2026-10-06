@@ -24,9 +24,15 @@ import type { SupportedChannelName } from "../catalog.js";
  * (`session-state.ts` `ZALOUSER_SESSION_NAMESPACE`), holding
  * `{ imei, cookie, userAgent, language }` — a complete, replayable credential
  * for a human's personal Zalo account.
+ *
+ * `whatsapp` → `auth`: the vertical keeps Baileys' linked-device auth state —
+ * `creds.json` plus the Signal keys (pre-keys, sessions, sender keys, app-state
+ * sync keys) — in this one namespace. It is a complete credential for the
+ * linked device: whoever holds it can read and send as that WhatsApp number.
  */
 const ENCRYPTED_STATE_NAMESPACES: Partial<Record<SupportedChannelName, readonly string[]>> = {
   zalouser: ["credentials"],
+  whatsapp: ["auth"],
 };
 
 /** The namespaces this channel stores encrypted; empty for every channel whose

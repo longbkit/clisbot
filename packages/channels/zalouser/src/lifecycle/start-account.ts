@@ -28,7 +28,11 @@ import {
   installZalouserSessionStore,
 } from "../fusion/session-store.js";
 import { probeZalouser } from "../probe.js";
-import { registerAccountInbound, unregisterAccountInbound } from "../runtime-store.js";
+import {
+  registerAccountInbound,
+  rememberAccountHostRuntime,
+  unregisterAccountInbound,
+} from "../runtime-store.js";
 import { resolveZaloOwnUserId } from "../zalo-js.js";
 
 /** `plugin.gateway.startAccount` — the drive surface entry. Resolves on abort. */
@@ -49,6 +53,7 @@ export async function startZalouserAccount(
 
   // The session store must exist BEFORE anything reads credentials: every
   // `zalo-js.ts` entry point resolves the API from the stored session.
+  rememberAccountHostRuntime(accountId, hostRuntime);
   installZalouserSessionStore(accountId, createHostRuntimeSessionStore({ hostRuntime, accountId }));
   await hydrateZalouserSessions(accountId);
 
@@ -56,7 +61,7 @@ export async function startZalouserAccount(
   if (!probe.ok) {
     installZalouserSessionStore(accountId, undefined);
     throw new Error(
-      `zalouser account "${accountId}" is not linked (profile "${profile}"): ${probe.error ?? "no saved Zalo session"}. Run the QR login (channel setup) to link it.`,
+      `zalouser account "${accountId}" is not logged in (profile "${profile}"): ${probe.error ?? "no saved Zalo session"}. Log in again by scanning the QR code.`,
     );
   }
   const ownUserId = await resolveZaloOwnUserId(profile).catch(() => "");

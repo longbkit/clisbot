@@ -392,7 +392,52 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
       extraTools: ["zalouser"],
       notes: [
         "Runtime vertical is in packages/channels/zalouser. Message actions: react only. Inbound: message, command. No threads, no inbound media download, no edits/deletes/pins/polls.",
-        "Linking requires a human QR scan through the channel-accounts QR operations; relink is expected, not exceptional. Personal-account automation has provider risk and identity constraints; requires an explicit live-test checklist.",
+        "Login requires a human QR scan through the channel-accounts QR operations; logging in again is expected, not exceptional. Personal-account automation has provider risk and identity constraints; requires an explicit live-test checklist.",
+      ],
+    },
+    {
+      id: "whatsapp",
+      label: "WhatsApp",
+      status: "in-repo",
+      auth: "qr",
+      transports: [
+        {
+          id: "qr",
+          label: "QR login",
+          requiredConfig: [],
+          setup:
+            "Log in by scanning the QR code in WhatsApp → Linked devices; the Hub stores the login keys encrypted at rest.",
+          supported: true,
+        },
+      ],
+      credentials: [
+        {
+          key: "name",
+          label: "Account label",
+          secret: false,
+          required: false,
+          help: "Non-secret label for this WhatsApp account; defaults to the account id.",
+        },
+      ],
+      capabilities: [
+        "text",
+        "mention",
+        "format",
+        "chunk",
+        "media",
+        "file",
+        "reaction",
+        "voice",
+        "video",
+        "location",
+        "poll",
+        "approval",
+      ],
+      extraTools: ["whatsapp_send_location"],
+      notes: [
+        "Log in by scanning a QR code in WhatsApp → Linked devices. WhatsApp can end the session, so expect to log in again.",
+        "Automating a personal number can break WhatsApp's terms; use a separate number. No threads (an answer quotes the message it answers when that message was a reply); no message edits.",
+        "Approval prompts and agent questions are answered by reacting: 👍 approves, 👎 denies, 1️⃣–4️⃣ pick an option. The typed command in the prompt works too.",
       ],
     },
     {

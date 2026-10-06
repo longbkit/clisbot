@@ -33,6 +33,7 @@ export const CHANNEL_CONNECTION_TABLES: Record<ChannelConnectionChannel, Channel
   feishu: schema.feishuConnections as unknown as ChannelConnectionTable,
   zalo: schema.zaloConnections as unknown as ChannelConnectionTable,
   zalouser: schema.zalouserConnections as unknown as ChannelConnectionTable,
+  whatsapp: schema.whatsappConnections as unknown as ChannelConnectionTable,
 };
 
 /** The same map as entries, for the listing and delete sweeps. */
@@ -61,6 +62,7 @@ export const CHANNEL_CREDENTIAL_FIELDS = [
   "serviceAccountFile",
   "subscription",
   "profile",
+  "name",
 ] as const;
 
 /**

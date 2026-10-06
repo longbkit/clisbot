@@ -23,6 +23,7 @@ import {
   FeishuTransportModeSchema,
   GoogleChatTransportModeSchema,
   ZalouserTransportModeSchema,
+  WhatsappTransportModeSchema,
   ZaloTransportModeSchema,
   TelegramTransportModeSchema,
   StreamingModeSchema,
@@ -486,6 +487,9 @@ export type FeishuTransport = z.infer<typeof FeishuTransportSchema>;
 export const ZalouserTransportSchema = transportSchema(ZalouserTransportModeSchema);
 export type ZalouserTransport = z.infer<typeof ZalouserTransportSchema>;
 
+export const WhatsappTransportSchema = transportSchema(WhatsappTransportModeSchema);
+export type WhatsappTransport = z.infer<typeof WhatsappTransportSchema>;
+
 export const ZaloTransportSchema = transportSchema(ZaloTransportModeSchema);
 export type ZaloTransport = z.infer<typeof ZaloTransportSchema>;
 
@@ -611,6 +615,27 @@ export const ZalouserAccountConfigSchema = z.looseObject({
     .optional(),
 });
 export type ZalouserAccountConfig = z.infer<typeof ZalouserAccountConfigSchema>;
+
+/** `channels.whatsapp.accounts.<id>` — the keys the ported `accounts.ts` and the
+ * outbound chunker read. There is NO credential key and no profile: the linked
+ * device's Baileys auth state is created by the QR scan and rests in the Hub's
+ * encrypted keyed-store namespace `auth`; the account id is the identity, so
+ * the only identity leaf here is the non-secret `name` label. */
+export const WhatsappAccountConfigSchema = z.looseObject({
+  enabled: z.boolean().optional(),
+  name: z.string().min(1).optional(),
+  /** Inbound and outbound media cap; the vertical defaults it to 50. */
+  mediaMaxMb: z.number().positive().optional(),
+  textChunkLimit: z.number().int().positive().optional(),
+  /** Blue ticks on admitted inbound messages; the vertical defaults it on. */
+  sendReadReceipts: z.boolean().optional(),
+  /** The linked number is also a human chatting with itself. */
+  selfChatMode: z.boolean().optional(),
+  /** Whether an answer visibly quotes the message it answers (upstream's
+   * values; default `off`). */
+  replyToMode: z.enum(["off", "first", "all", "batched"]).optional(),
+});
+export type WhatsappAccountConfig = z.infer<typeof WhatsappAccountConfigSchema>;
 
 /** The organization roles a Who may name. `admin` includes Owners; `member`
  * is every linked Member whatever their role. */

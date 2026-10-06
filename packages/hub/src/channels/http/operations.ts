@@ -162,6 +162,18 @@ const channelAddBodySchema = z.discriminatedUnion("channel", [
     .strict(),
   z
     .object({
+      channel: z.literal("whatsapp"),
+      account: z.string().min(1).max(128),
+      /** A non-secret label for the linked device; defaults to the account id.
+       * There is NO credential to supply here — the account is linked
+       * afterwards through the channel-accounts QR login. */
+      name: z.string().min(1).max(128).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
       channel: z.literal("googlechat"),
       account: z.string().min(1).max(128),
       /** The service-account JSON document, verbatim. */
@@ -543,6 +555,22 @@ const CHANNEL_CONNECTION_STORES: Record<
           channel: "zalouser",
           accountId: body.account,
           credentials: { profile: body.profile ?? body.account },
+        })
+      ).connectionId,
+  }),
+  // WhatsApp, like Zalo Personal, stores no operator secret: the Connection row
+  // is only a label, and the linked-device keys are created later by the QR scan
+  // (namespace `auth`, `channels/state/encrypted-namespaces.ts`).
+  whatsapp: store<"whatsapp">({
+    label: "WhatsApp account label",
+    credential: (body) => body.connectionId === undefined,
+    configure: async (database, organizationId, body) =>
+      (
+        await database.configureChannelConnection({
+          organizationId,
+          channel: "whatsapp",
+          accountId: body.account,
+          credentials: { name: body.name ?? body.account },
         })
       ).connectionId,
   }),

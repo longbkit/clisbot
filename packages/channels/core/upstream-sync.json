@@ -2181,6 +2181,94 @@
       "local": "src/utils/timer-delay.ts",
       "upstream": "src/utils/timer-delay.ts",
       "status": "verbatim"
+    },
+    {
+      "local": "src/infra/channel-runtime-context.ts",
+      "upstream": "src/infra/channel-runtime-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugins/runtime/channel-runtime-contexts.ts",
+      "upstream": "src/plugins/runtime/channel-runtime-contexts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/channel-runtime-context.ts",
+      "upstream": "src/plugin-sdk/channel-runtime-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/poll-runtime.ts",
+      "upstream": "src/plugin-sdk/poll-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/qr-runtime.ts",
+      "upstream": "src/media/qr-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/qr-terminal.ts",
+      "upstream": "src/media/qr-terminal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/qr-image.ts",
+      "upstream": "src/media/qr-image.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-703"]
+    },
+    {
+      "local": "src/plugin-sdk/account-configured-ids.ts",
+      "upstream": "src/plugin-sdk/account-configured-ids.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/account-core.ts",
+      "upstream": "src/plugin-sdk/account-core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-701"]
+    },
+    {
+      "local": "src/plugin-sdk/cli-runtime.ts",
+      "upstream": "src/plugin-sdk/cli-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-702"]
+    },
+    {
+      "local": "src/cli/command-format.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-702"]
+    },
+    {
+      "local": "src/logging/logger.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-700"]
+    },
+    {
+      "local": "src/config/types.whatsapp.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-704"]
+    },
+    {
+      "local": "src/infra/net/proxy-env.ts",
+      "upstream": "src/infra/net/proxy-env.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/reply/channel-prompt-context.ts",
+      "upstream": "src/auto-reply/reply/channel-prompt-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/reply/inbound-context-marker.ts",
+      "upstream": "src/auto-reply/reply/inbound-context-marker.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/reply/inbound-text.ts",
+      "upstream": "src/auto-reply/reply/inbound-text.ts",
+      "status": "verbatim"
     }
   ],
   "omitted": [
@@ -2966,6 +3054,31 @@
       "id": "D-CORE-343",
       "file": "src/plugin-sdk/interactive-runtime.ts",
       "reason": "Also re-exports the Fusion-owned `src/interactive/presentation-admission.ts` (D-W6-02): `normalizeMessagePresentation` requires a table `caption` that the message tool's schema marks optional, so a caption-less table reached the channel as nothing at all. Admission defaults the caption to the table's first header and reports every block the normalizer still refuses; the verbatim normalizer is unchanged."
+    },
+    {
+      "id": "D-CORE-700",
+      "file": "src/logging/logger.host-adapter.ts",
+      "reason": "`getChildLogger` / `toPinoLikeLogger` (upstream `src/logging/logger.ts`, re-exported from `runtime-env` and `logging-core`) and `logInfo` (`src/logger.ts`) hand out tslog sub-loggers of OpenClaw's root logger; the WhatsApp port needs them for Baileys' pino-shaped logger and its structured `logger.warn(obj, msg)` calls. Fusion's Hub owns logging (D-CORE-203), so a child logger is a subsystem logger named by its `module` binding, routed through the same Hub-owned sink; `trace` folds into `debug` and `fatal` into `error`."
+    },
+    {
+      "id": "D-CORE-701",
+      "file": "src/plugin-sdk/account-core.ts",
+      "reason": "The barrel takes `OpenClawConfig` from the carried channel-typed config (`config/types.openclaw.channels.ts`, D-CORE-239) instead of `config/config.ts`, takes `normalizeE164` / `resolveUserPath` from the carried utils subset (`utils.host-adapter.ts`, D-CORE-061), and omits `pathExists` (upstream's comes from `@openclaw/fs-safe`; no ported caller reads it). Every other export and `resolveAccountWithDefaultFallback` are upstream's."
+    },
+    {
+      "id": "D-CORE-702",
+      "file": "src/plugin-sdk/cli-runtime.ts",
+      "reason": "Upstream's deprecated CLI barrel re-exports OpenClaw's command formatter, command registration, argv parsing and terminal theme. Ported channel code reads two members: `formatCliCommand` for operator hints and `VERSION`. In Clisbot a QR channel is linked and unlinked from its Connection in the app, so `cli/command-format.host-adapter.ts` turns `openclaw channels login|logout` hints into that instruction (keeping the account id) and shows any other command under the Clisbot CLI name; `VERSION` is the channel package version."
+    },
+    {
+      "id": "D-CORE-703",
+      "file": "src/media/qr-image.ts",
+      "reason": "`writeQrPngTempFile` is not carried: it writes through `@openclaw/fs-safe`'s private temp workspace, and the one ported caller (the WhatsApp QR login) needs only the PNG data URL. The renderers are upstream's, verbatim; `qrcode` is the same dependency upstream lazy-loads."
+    },
+    {
+      "id": "D-CORE-704",
+      "file": "src/config/types.whatsapp.ts",
+      "reason": "Upstream composes the WhatsApp section out of the whole OpenClaw `config.json` type graph. As for Slack (D-CORE-238) and Telegram (D-CORE-202), the carried file keeps upstream's names, fields and doc comments for what the ported vertical reads, plus an open index signature, and `types.openclaw.channels.ts` types `channels.whatsapp` with it."
     }
   ]
 }

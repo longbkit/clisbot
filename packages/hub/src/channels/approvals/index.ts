@@ -43,6 +43,8 @@ import type {
 import {
   buildSlackCardBlocks,
   buildTelegramReplyKeyboard,
+  cardButtonsFor,
+  type CardButton,
   cardIdFor,
   decidedPromptText,
   inlineButtonsAllowedFor,
@@ -389,16 +391,28 @@ export class ApprovalEngine {
       responder: slackUserId !== undefined ? "" : (responderName ?? responderIdentity),
       cardMode: true,
     });
-    const result = await update({
-      channel: prompt.context.channel,
-      accountId: prompt.context.accountId,
-      to: location.to,
-      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
-      externalMessageId: location.externalMessageId,
-      text,
-      clearCard: true,
-      ...(slackUserId !== undefined ? { senderMention: `<@${slackUserId}>` } : {}),
-    });
+    // WhatsApp cannot edit the prompt (its reactions are the card): the outcome
+    // is a new message quoting the prompt, so the people who reacted see it.
+    const result =
+      prompt.context.channel === "whatsapp"
+        ? await this.context.post({
+            channel: prompt.context.channel,
+            accountId: prompt.context.accountId,
+            to: location.to,
+            ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
+            text,
+            replyToId: location.externalMessageId,
+          })
+        : await update({
+            channel: prompt.context.channel,
+            accountId: prompt.context.accountId,
+            to: location.to,
+            ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
+            externalMessageId: location.externalMessageId,
+            text,
+            clearCard: true,
+            ...(slackUserId !== undefined ? { senderMention: `<@${slackUserId}>` } : {}),
+          });
     if (!result.ok) {
       this.context.logger.warn("approval card in-place update failed", {
         agentId: prompt.context.agentId,
@@ -477,6 +491,7 @@ export class ApprovalEngine {
       text: promptText(request, initiatorOnly, card.questions),
       ...(card.blocks !== undefined ? { blocks: card.blocks } : {}),
       ...(card.replyMarkup !== undefined ? { replyMarkup: card.replyMarkup } : {}),
+      ...(card.cardButtons !== undefined ? { cardButtons: card.cardButtons } : {}),
     });
     if (!result.ok) {
       await this.context.store.failDelivery({
@@ -520,8 +535,22 @@ export class ApprovalEngine {
     questions?: QuestionInfo[];
     blocks?: Record<string, unknown>[];
     replyMarkup?: Record<string, unknown>;
+    cardButtons?: CardButton[];
   } {
     const questions = questionInfoFromRequest(request);
+    // WhatsApp has no buttons: the vertical renders the card's buttons as
+    // reactions on the prompt and hands a reaction back as the button's value
+    // (the same `callback` path a Telegram click takes). The text prompt keeps
+    // its typed command, so the reactions are additive and need no
+    // `inlineButtons` opt-in; the vertical reports `cardPosted` only when it
+    // rendered them.
+    if (context.channel === "whatsapp") {
+      return {
+        requested: true,
+        ...(questions !== undefined ? { questions } : {}),
+        cardButtons: cardButtonsFor(request, questions),
+      };
+    }
     const mode = context.account.transport["inlineButtons"];
     const allowed = inlineButtonsAllowedFor(
       isInlineButtonsMode(mode) ? mode : undefined,

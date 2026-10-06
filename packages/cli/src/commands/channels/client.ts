@@ -77,7 +77,13 @@ export interface ChannelSetupInput {
 export type BotTokenChannel = "telegram" | "discord" | "zalo";
 
 /** Every channel `channels add` can install. */
-export type AddableChannel = "slack" | BotTokenChannel | "feishu" | "googlechat" | "zalouser";
+export type AddableChannel =
+  | "slack"
+  | BotTokenChannel
+  | "feishu"
+  | "googlechat"
+  | "zalouser"
+  | "whatsapp";
 
 /** The Feishu custom-app credential (four fields; `domain` is not a secret). */
 export interface FeishuCredential {
@@ -107,6 +113,9 @@ export type ChannelAddInput = { setup?: ChannelSetupInput } & (
   /** Zalo Personal carries no secret: the account is linked afterwards by a QR
    * scan, so `profile` is just the label its session is stored under. */
   | { channel: "zalouser"; account: string; profile?: string }
+  /** WhatsApp carries no secret either: it is linked afterwards as a linked
+   * device by a QR scan, so `name` is only the account's label. */
+  | { channel: "whatsapp"; account: string; name?: string }
   | { channel: AddableChannel; account: string; connectionId: string }
 );
 

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateOutboundMedia,
   mediaFileName,
+  mediaInboundMaxBytesForChannel,
   mediaMaxBytesForChannel,
   mediaNotice,
   mimeFromExtension,
@@ -22,6 +23,9 @@ describe("G11 caps", () => {
     expect(mediaMaxBytesForChannel("slack")).toBe(250 * 1024 * 1024);
     expect(mediaMaxBytesForChannel("zalouser")).toBe(100 * 1024 * 1024);
     expect(mediaNotice("zalouser", "big.png")).toContain("Zalo Personal limit 100 MB");
+    expect(mediaMaxBytesForChannel("whatsapp")).toBe(50 * 1024 * 1024);
+    expect(mediaInboundMaxBytesForChannel("whatsapp")).toBe(50 * 1024 * 1024);
+    expect(mediaNotice("whatsapp", "big.pdf")).toContain("WhatsApp limit 50 MB");
   });
 });
 

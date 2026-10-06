@@ -41,6 +41,7 @@
     "packages/channels/feishu",
     "packages/channels/zalo",
     "packages/channels/zalouser",
+    "packages/channels/whatsapp",
     "packages/channels/slack",
     "packages/channels/core",
     "packages/channels/markdown-core"

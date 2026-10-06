@@ -112,6 +112,23 @@
       },
       "notices": "zalouser"
     },
+    "whatsapp": {
+      "channel": {
+        "package": "@openclaw/whatsapp",
+        "version": "2026.9.2",
+        "dist": {
+          "integrity": "sha512-vOWQIk7FpLHrhMmO+FaLi+pnFB82hiWNJJFJONkBuofERh2SMEz7EMut/vECFFEjFnmOZSVlYfRlxhbNkd/R6g=="
+        }
+      },
+      "loadMode": "in-repo",
+      "inRepoPackage": "@clisbot/channels-whatsapp",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/plugin.js",
+        "exportName": "whatsappPlugin"
+      },
+      "notices": "whatsapp"
+    },
     "zalo": {
       "channel": {
         "package": "@openclaw/zalo",

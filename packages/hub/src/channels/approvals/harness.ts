@@ -196,6 +196,8 @@ export interface CapturedPost {
   threadId?: string;
   blocks?: Record<string, unknown>[];
   replyMarkup?: Record<string, unknown>;
+  cardButtons?: ReadonlyArray<{ text: string; value: string; style?: "primary" | "danger" }>;
+  replyToId?: string;
 }
 
 /** One captured in-place update (the card's decided state). */
@@ -220,6 +222,7 @@ export function makeEngine(
   clock = new ManualClock(),
   route = makeRoute(),
   transport: Record<string, unknown> = {},
+  channel: StreamContext["channel"] = "slack",
 ): EngineHarness {
   const account = { ...makeAccount(route), transport };
   const posted: string[] = [];
@@ -240,6 +243,8 @@ export function makeEngine(
         ...(p.threadId !== undefined ? { threadId: p.threadId } : {}),
         ...(p.blocks !== undefined ? { blocks: p.blocks } : {}),
         ...(p.replyMarkup !== undefined ? { replyMarkup: p.replyMarkup } : {}),
+        ...(p.cardButtons !== undefined ? { cardButtons: p.cardButtons } : {}),
+        ...(p.replyToId !== undefined ? { replyToId: p.replyToId } : {}),
       });
       return { ok: true, externalMessageId: "1720000000.000001" };
     },
@@ -254,7 +259,7 @@ export function makeEngine(
   });
   const context: StreamContext = {
     agentId: "agent-1",
-    channel: "slack",
+    channel,
     accountId: ACCOUNT_ID,
     externalConversationId: "C0APP",
     externalThreadId: null,

@@ -3,9 +3,6 @@ import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
-import { Field } from "@/components/ui/form-field";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { ChannelIcon } from "@/clisbot/channels/channel-icon";
 import { channelApiProblem } from "../channel-api";
 import {
   channelConnectionProblem,
@@ -14,6 +11,7 @@ import {
 } from "../channel-connection-form";
 import type { ChannelCatalogEntry, ChannelCatalogState } from "../channel-catalog";
 import { useChannelCatalog } from "./channel-catalog-queries";
+import { ChannelPicker } from "./channel-picker";
 import { ChannelConnectionSetup } from "./channel-connection-setup";
 
 /**
@@ -44,16 +42,6 @@ export function AddChannelConnection({
     () => connectableChannelEntries(catalog.entries, { allowProviderApplications }),
     [allowProviderApplications, catalog.entries],
   );
-  // Each tab carries its brand mark so a Channel is recognizable before reading.
-  const channelOptions = useMemo(
-    () =>
-      entries.map((entry) => ({
-        value: entry.id,
-        label: entry.label,
-        icon: ({ size }: { size: number }) => <ChannelIcon channel={entry.id} size={size} />,
-      })),
-    [entries],
-  );
   const [choice, setChoice] = useState<string | null>(null);
   const selected = entries.find((entry) => entry.id === choice) ?? entries[0];
   const save = useChannelConnectionSave(selected, create);
@@ -61,14 +49,7 @@ export function AddChannelConnection({
   return (
     <View style={styles.view}>
       {entries.length > 1 ? (
-        <Field label="Channel">
-          <SegmentedControl
-            options={channelOptions}
-            value={selected.id}
-            onValueChange={setChoice}
-            size="sm"
-          />
-        </Field>
+        <ChannelPicker entries={entries} value={selected.id} onChange={setChoice} />
       ) : null}
       <ChannelConnectionSetup
         key={selected.id}
@@ -98,7 +79,7 @@ function NoConnectableChannel({ catalog }: { catalog: ChannelCatalogState }) {
     <Alert
       variant="info"
       title="No channel here accepts a pasted credential"
-      description="Every channel this Hub runs is either linked by QR or needs a Provider Application an instance operator administers."
+      description="Every channel this Hub runs is either logged in by QR or needs a Provider Application an instance operator administers."
     />
   );
 }

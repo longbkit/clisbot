@@ -1216,8 +1216,8 @@ routes:
     // that is not a channel at all — which is what it exists to refuse.
     expectCompileError(
       {
-        ["channels/whatsapp/main.yml"]: `
-channel: whatsapp
+        ["channels/signal/main.yml"]: `
+channel: signal
 accountId: main
 connectionId: connection-id
 transport: { mode: qr }
@@ -1251,6 +1251,48 @@ routes:
     assert.deepEqual(account.transport, { mode: "qr" });
     assert.equal(account.config["profile"], "long-personal");
     assert.equal(account.config["textChunkMode"], "newline");
+  });
+
+  it("compiles a WhatsApp account: the QR transport and the account label", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        ["channels/whatsapp/main.yml"]: `
+channel: whatsapp
+accountId: main
+connectionId: connection-id
+transport: { mode: qr }
+config:
+  name: Support line
+  textChunkLimit: 2000
+  sendReadReceipts: false
+routes:
+  - audience: [{ who: { roles: [member] }, where: { groups: all } }]
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.equal(account.channel, "whatsapp");
+    assert.deepEqual(account.transport, { mode: "qr" });
+    assert.equal(account.config["name"], "Support line");
+    assert.equal(account.config["sendReadReceipts"], false);
+  });
+
+  it("rejects a wrong-typed WhatsApp config knob at deploy", () => {
+    expectCompileError(
+      {
+        ["channels/whatsapp/main.yml"]: `
+channel: whatsapp
+accountId: main
+connectionId: connection-id
+transport: { mode: qr }
+config:
+  mediaMaxMb: "50"
+`,
+      },
+      /config/,
+    );
   });
 
   it("rejects an account file that still carries a catch-all fallback", () => {

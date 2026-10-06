@@ -12,11 +12,17 @@
 //    lifecycle binds it too, but a profile with no session fails the start —
 //    which is exactly when these verbs are used — so without `bindAccountSession`
 //    a freshly scanned credential would never reach the encrypted backing.
+//  * Every call names its account and carries that account's own HostRuntime.
+//    A vertical is imported once per channel, and each account load overwrites
+//    its channel-wide runtime slot, so a verb that fell back to that slot would
+//    log in or out against whichever account loaded last
+//    (docs/audits/2026-10-06-whatsapp-channel-review.md W1).
 //  * Nothing but the projected result leaves. Each verb's answer is rebuilt
 //    field by field, so a vertical that ever returns session bytes cannot leak
 //    them through this path.
 
 import type { ChannelPlugin } from "../loader/load-channel.js";
+import { getChannelRuntime } from "../loader/runtime-store.js";
 
 /** The five operations, under the vertical's own verb names. */
 export const QR_LOGIN_VERBS = ["start", "poll", "cancel", "relink", "logout"] as const;
@@ -149,6 +155,7 @@ function readClearResult(raw: unknown): { flag: boolean; message: string } {
  */
 export async function runQrLoginVerb(input: {
   plugin: ChannelPlugin;
+  channel: string;
   accountId: string;
   profile: string;
   verb: QrLoginVerb;
@@ -156,11 +163,21 @@ export async function runQrLoginVerb(input: {
   flushState?: () => Promise<void>;
 }): Promise<QrLoginResult> {
   const setup = setupSurface(input.plugin);
+  // The runtime the loader recorded for THIS account when it loaded the
+  // vertical: its keyed stores are the account's credential store.
+  const hostRuntime = getChannelRuntime(input.channel, input.accountId);
+  const scope = {
+    accountId: input.accountId,
+    ...(hostRuntime === undefined ? {} : { hostRuntime }),
+  };
   const bind = setup["bindAccountSession"];
   if (typeof bind === "function") {
-    await (bind as SetupVerbFn)({ accountId: input.accountId });
+    await (bind as SetupVerbFn)(scope);
   }
-  const answer = await verbFn(setup, SETUP_MEMBER[input.verb])({ profile: input.profile });
+  const answer = await verbFn(
+    setup,
+    SETUP_MEMBER[input.verb],
+  )({ profile: input.profile, ...scope });
   // A verb writes the session through the SYNC store surface, which cannot
   // await its own write, and the encrypted backing is write-behind. Answering
   // "linked" before that reached the database meant a Hub that stopped in the

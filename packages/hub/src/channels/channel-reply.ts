@@ -75,6 +75,8 @@ import {
  * renders the blocks instead (Slack Block Kit charts and tables). */
 export interface ChannelReplyPostOptions {
   presentation?: MessagePresentation | undefined;
+  /** The message the post quotes or replies to (`HubOutboundSendParams.replyToId`). */
+  replyToId?: string | undefined;
 }
 
 /** The seam the supervisor threads: the account's outbound post, addressed by

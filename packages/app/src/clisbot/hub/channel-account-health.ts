@@ -62,7 +62,7 @@ const TRANSPORT_LABELS: Readonly<Record<ChannelTransportState, string>> = {
   deferred: "Deferred",
   stopped: "Stopped",
   failed: "Failed",
-  "needs-login": "Needs linking",
+  "needs-login": "Needs login",
   disabled: "Disabled",
 };
 

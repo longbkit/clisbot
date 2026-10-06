@@ -16,11 +16,21 @@ describe("channel catalog", () => {
       "googlechat",
       "feishu",
       "zalouser",
+      "whatsapp",
       "zalo",
     ]);
     expect(
       CHANNEL_CATALOG.filter((entry) => entry.status === "in-repo").map((entry) => entry.id),
-    ).toEqual(["slack", "telegram", "discord", "googlechat", "feishu", "zalouser", "zalo"]);
+    ).toEqual([
+      "slack",
+      "telegram",
+      "discord",
+      "googlechat",
+      "feishu",
+      "zalouser",
+      "whatsapp",
+      "zalo",
+    ]);
     // Every catalogued channel now has an in-repo vertical.
     expect(CHANNEL_CATALOG.filter((entry) => entry.status === "planned").map((e) => e.id)).toEqual(
       [],
@@ -39,8 +49,8 @@ describe("channel catalog", () => {
     expect(isKnownChannel("zalouser")).toBe(true);
     expect(isSupportedChannel("zalouser")).toBe(true);
     // A channel that is not in the catalog at all is neither.
-    expect(isKnownChannel("whatsapp")).toBe(false);
-    expect(isSupportedChannel("whatsapp")).toBe(false);
+    expect(isKnownChannel("signal")).toBe(false);
+    expect(isSupportedChannel("signal")).toBe(false);
   });
 
   it("exposes setup metadata and direct third-party SDK references", () => {
@@ -131,7 +141,7 @@ describe("channel catalog", () => {
     // The discriminator the setup UI switches on; every other channel is token-shaped.
     expect(zalouser?.auth).toBe("qr");
     expect(CHANNEL_CATALOG.filter((entry) => entry.auth === "qr").map((entry) => entry.id)).toEqual(
-      ["zalouser"],
+      ["zalouser", "whatsapp"],
     );
     expect(zalouser?.sdkPackages).toEqual(["zca-js"]);
     // The transport needs the profile label, not a session directory: the
@@ -163,6 +173,45 @@ describe("channel catalog", () => {
       "voice",
     ]);
     expect(zalouser?.extraTools).toEqual(["zalouser"]);
+  });
+
+  it("marks WhatsApp as a QR login with no operator secret and no profile", () => {
+    const whatsapp = getChannelCatalogEntry("whatsapp");
+    expect(whatsapp?.auth).toBe("qr");
+    expect(whatsapp?.upstreamPackage).toBe("@openclaw/whatsapp");
+    expect(whatsapp?.sdkPackages).toEqual(["baileys"]);
+    // The account id is the identity; the transport needs no config key.
+    expect(whatsapp?.transports.map((transport) => transport.id)).toEqual(["qr"]);
+    expect(whatsapp?.transports[0]?.requiredConfig).toEqual([]);
+    expect(whatsapp?.credentials).toEqual([
+      {
+        key: "name",
+        label: "Account label",
+        secret: false,
+        required: false,
+        help: "Non-secret label for this WhatsApp account; defaults to the account id.",
+      },
+    ]);
+    // No threads (replies quote), no edit/delete.
+    for (const absent of ["thread", "edit", "delete", "presentation"]) {
+      expect(whatsapp?.capabilities).not.toContain(absent);
+    }
+    expect(whatsapp?.capabilities).toEqual([
+      "text",
+      "mention",
+      "format",
+      "chunk",
+      "media",
+      "file",
+      "reaction",
+      "voice",
+      "video",
+      "location",
+      "poll",
+      "approval",
+    ]);
+    // The vertical's registered tool name (`fusion/tools.ts` WHATSAPP_TOOL_NAMES).
+    expect(whatsapp?.extraTools).toEqual(["whatsapp_send_location"]);
   });
 
   it("fails closed for unknown channel ids", () => {

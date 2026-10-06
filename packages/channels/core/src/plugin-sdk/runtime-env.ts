@@ -33,3 +33,9 @@ export { createSubsystemLogger, setSubsystemLoggerSink } from "../logging/subsys
 // formats its stall/poll windows with the duration formatter upstream re-exports
 // from this same barrel.
 export { formatDurationPrecise } from "../infra/format-time/format-duration.js";
+
+// WhatsApp port addition: the ported WhatsApp session hands Baileys a pino-like
+// logger built from a child of the root logger. Upstream re-exports both from
+// `src/logging.ts`; the Fusion boundary is `logging/logger.host-adapter.ts`
+// (D-CORE-700), routed through the Hub-owned subsystem sink.
+export { getChildLogger, toPinoLikeLogger } from "../logging/logger.host-adapter.js";

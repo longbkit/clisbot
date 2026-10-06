@@ -91,3 +91,6 @@ export {
   stripAssistantInternalScaffolding,
 } from "../shared/text/assistant-visible-text.js";
 
+// WhatsApp port addition: the ported WhatsApp text runtime strips tool-call XML
+// before chunking. Same upstream barrel, same source module.
+export { stripToolCallXmlTags } from "../shared/text/assistant-visible-text.js";

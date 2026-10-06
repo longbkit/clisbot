@@ -24,3 +24,16 @@ export type {
   ChannelInboundMediaInput,
   MediaPlaceholderTextFact,
 } from "../channels/inbound-event/media.js";
+
+// WhatsApp port addition: the ported WhatsApp enrichment and quoted-message
+// readers render media as text. Same upstream barrel, same source module.
+export {
+  formatInboundMediaUnavailableText,
+  formatMediaPlaceholderText,
+} from "../channels/inbound-event/media.js";
+
+// WhatsApp port addition: shared contacts, location labels and other structured
+// inbound objects reach the agent as upstream's labelled, fence-neutralized JSON
+// context blocks (`src/auto-reply/reply/channel-prompt-context.ts`, verbatim).
+export { formatContextJsonBlock } from "../auto-reply/reply/channel-prompt-context.js";
+export { markInboundContextLabel } from "../auto-reply/reply/inbound-context-marker.js";

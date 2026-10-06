@@ -119,14 +119,14 @@ export function channelQrFailure(problem: {
     return {
       unavailable: false,
       message:
-        "This account is not set up on the Hub or is turned off. Add it as a Connection with a Route, then link it here.",
+        "This account is not set up on the Hub or is turned off. Add it as a Connection with a Route, then log in here.",
     };
   }
   if (problem.status === 404) {
     return {
       unavailable: true,
       message:
-        "This Hub does not serve QR linking for this channel. Update the Hub, then link the account here.",
+        "This Hub does not serve QR login for this channel. Update the Hub, then log in here.",
     };
   }
   if (problem.status === 0 && /timed out|connection closed/iu.test(problem.message)) {
@@ -139,7 +139,7 @@ export function channelQrFailure(problem: {
   if (problem.status === 503) {
     return {
       unavailable: false,
-      message: `${problem.message} The channel runtime has to be running to link an account.`,
+      message: `${problem.message} The channel runtime has to be running to log in.`,
     };
   }
   return { unavailable: false, message: problem.message };
@@ -151,7 +151,7 @@ export function openChannelQrLinking(input: { available: boolean }): ChannelQrMo
   let qrFilePath: string | null = null;
   let message: string | null = input.available
     ? null
-    : "This Hub does not serve QR linking for this channel.";
+    : "This Hub does not serve QR login for this channel.";
   let user: ChannelQrUser | null = null;
   let polling = false;
   let busy = false;
@@ -302,8 +302,42 @@ export function shouldPollChannelQr(state: ChannelQrState): boolean {
 }
 
 export const CHANNEL_QR_ACTION_LABELS: Readonly<Record<ChannelQrAction, string>> = {
-  start: "Show QR code",
-  relink: "Link a different account",
+  start: "Log in",
+  relink: "Log in with a different account",
   cancel: "Cancel",
-  logout: "Unlink",
+  logout: "Log out",
 };
+
+/** The phone app a QR login is scanned with, and where its scanner is. */
+export interface ChannelQrLoginGuide {
+  app: string;
+  steps: readonly string[];
+}
+
+const QR_LOGIN_GUIDES: Readonly<Record<string, ChannelQrLoginGuide>> = {
+  whatsapp: {
+    app: "WhatsApp",
+    steps: [
+      "Open WhatsApp on the phone with this number",
+      "Tap Settings (iPhone) or ⋮ (Android), then Linked devices",
+      "Tap Link a device and point the phone at this code",
+    ],
+  },
+  zalouser: {
+    app: "Zalo",
+    steps: [
+      "Open Zalo on the phone with this account",
+      "Tap the QR icon next to the search bar",
+      "Point the phone at this code, then confirm the login",
+    ],
+  },
+};
+
+export function channelQrLoginGuide(channel: string): ChannelQrLoginGuide {
+  return (
+    QR_LOGIN_GUIDES[channel] ?? {
+      app: "the app",
+      steps: ["Open the app on your phone", "Scan this code with its QR scanner"],
+    }
+  );
+}

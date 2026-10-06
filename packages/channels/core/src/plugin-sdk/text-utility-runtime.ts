@@ -79,3 +79,8 @@ export { escapeHtml } from "../shared/html-escape.js";
 // poll loop sleeps between status checks. Same upstream barrel, same source
 // module (`src/utils/sleep.ts`).
 export { sleep } from "../utils/sleep.js";
+
+// WhatsApp port addition: the ported WhatsApp socket, reconnect and target code
+// reads these from the same upstream barrel (`src/utils.ts` there; the carried
+// subset lives in `utils.host-adapter.ts`, D-CORE-061).
+export { clamp, ensureDir, normalizeE164 } from "../utils.host-adapter.js";
