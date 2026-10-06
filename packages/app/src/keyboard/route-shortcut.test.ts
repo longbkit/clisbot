@@ -436,3 +436,38 @@ describe("routeKeyboardShortcut — unknown actions", () => {
     ).toEqual<ShortcutAction>({ kind: "none" });
   });
 });
+
+describe("routeKeyboardShortcut — session lines (Clisbot)", () => {
+  // Status grouping with Agent sessions on: one workspace can own several numbered lines.
+  const SESSION_TARGETS = [
+    { serverId: "srv", workspaceId: "ws-a", agentId: "a-1" },
+    { serverId: "srv", workspaceId: "ws-b" },
+    { serverId: "srv", workspaceId: "ws-a", agentId: "a-2" },
+  ];
+
+  it("opens the session a numbered line names", () => {
+    expect(
+      routeKeyboardShortcut(
+        { action: "workspace.navigate.index", payload: { index: 3 } },
+        makeCtx({ sidebarShortcutTargets: SESSION_TARGETS }),
+      ),
+    ).toEqual<ShortcutAction>({
+      kind: "navigate-workspace",
+      serverId: "srv",
+      workspaceId: "ws-a",
+      agentId: "a-2",
+    });
+  });
+
+  it("steps from the session you are on, not its workspace's first line", () => {
+    expect(
+      routeKeyboardShortcut(
+        { action: "workspace.navigate.relative", payload: { delta: -1 } },
+        makeCtx({
+          sidebarShortcutTargets: SESSION_TARGETS,
+          navigationActiveWorkspace: { serverId: "srv", workspaceId: "ws-a", agentId: "a-2" },
+        }),
+      ),
+    ).toEqual<ShortcutAction>({ kind: "navigate-workspace", serverId: "srv", workspaceId: "ws-b" });
+  });
+});

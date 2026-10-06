@@ -242,6 +242,16 @@
       "deviation": ["D-FS-016"]
     },
     {
+      "local": "src/fusion/typing.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-022"]
+    },
+    {
+      "local": "src/fusion/typing.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-022"]
+    },
+    {
       "local": "src/identity-header.ts",
       "status": "verbatim",
       "upstream": "extensions/feishu/src/identity-header.ts"
@@ -549,7 +559,7 @@
     },
     {
       "upstream": "extensions/feishu/src/typing.ts",
-      "reason": "Typing indicator driven from the OpenClaw turn; the Hub streaming producer owns it."
+      "reason": "Typing indicator driven from the OpenClaw turn. The Hub owns the turn lifecycle; src/fusion/typing.ts keeps upstream's \"Typing\" reaction over the ported reactions.ts (D-FS-022)."
     },
     {
       "upstream": "extensions/feishu/src/card-action.ts",
@@ -819,6 +829,12 @@
       "id": "D-FS-021",
       "file": "src/channel-actions.ts",
       "reason": "Upstream declares the message-action adapter inline in the omitted channel.ts. The action set, target aliases, action gate and per-action argument names are kept over the ported API functions; actions that need the OpenClaw outbound delivery adapter (upload-file, sticker, presentation fallback) are refused rather than advertised."
+    },
+    {
+      "id": "D-FS-022",
+      "file": "src/fusion/typing.ts",
+      "reason": "The Hub's `plugin.outbound.typing` (`sync.progress`). Lark has no bot typing status, so it keeps upstream typing.ts's signal: a \"Typing\" reaction on the sender's message, added on `start` and removed on `stop` by the reaction id the add returned; it does not lapse, so nothing refreshes. The Route's `messageReaction` emoji is upper-cased to Lark's `emoji_type` and added best effort. Upstream's keepalive backoff (typing-backoff.ts) is not needed: one add and one remove per turn. A fault on the Typing reaction throws into the Hub's lease bookkeeping.",
+      "tests": ["src/fusion/typing.test.ts"]
     }
   ]
 }

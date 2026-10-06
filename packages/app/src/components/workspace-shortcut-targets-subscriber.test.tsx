@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,7 +16,7 @@ import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import type { HostProfile } from "@/types/host-connection";
 import { WorkspaceShortcutTargetsSubscriber } from "./workspace-shortcut-targets-subscriber";
-import { SidebarModelProvider } from "./sidebar/sidebar-model";
+import { SidebarModelProvider as BaseSidebarModelProvider } from "./sidebar/sidebar-model";
 import { defaultHostAppearance } from "@/hosts/appearance";
 
 // The sidebar lists only connected Hosts (a disconnected Host's cached directory is not shown), and
@@ -74,6 +75,16 @@ function setHostProfiles(hosts: HostProfile[]): void {
       setHostsAndSync: (hosts: HostProfile[]) => void;
     }
   ).setHostsAndSync(hosts);
+}
+
+// The model reads the Agent sessions setting (Clisbot), which goes through React Query.
+function SidebarModelProvider({ children }: { children: React.ReactNode }) {
+  const [queryClient] = React.useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BaseSidebarModelProvider>{children}</BaseSidebarModelProvider>
+    </QueryClientProvider>
+  );
 }
 
 describe("WorkspaceShortcutTargetsSubscriber", () => {

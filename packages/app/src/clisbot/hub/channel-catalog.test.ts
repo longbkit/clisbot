@@ -143,11 +143,11 @@ describe("catalog accessors", () => {
     expect(isConnectableChannel(planned)).toBe(false);
   });
 
-  it("summarizes prerequisites from the required credentials", () => {
+  it("summarizes the required credentials a supported transport uses", () => {
+    // Feishu's verification token is required only by its webhook transport,
+    // which is not supported yet, so it is not something to fetch.
     const feishu = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "feishu");
-    expect(feishu && channelPrerequisiteSummary(feishu)).toBe(
-      "App ID · App secret · Verification token",
-    );
+    expect(feishu && channelPrerequisiteSummary(feishu)).toBe("App ID · App secret");
     const zalouser = channelCatalogEntry(CHANNEL_CATALOG_FIXTURE, "zalouser");
     expect(zalouser && channelPrerequisiteSummary(zalouser)).toBe(
       "QR scan from the provider's own app",

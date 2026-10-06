@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
-import type { ChannelCatalogEntry } from "../channel-catalog";
+import { isSupportedTransport, type ChannelCatalogEntry } from "../channel-catalog";
 import {
   channelSeverityVariant,
   type ChannelAccountHealth,
@@ -71,6 +71,10 @@ function ChannelConnectGuide({ entry }: { entry: ChannelCatalogEntry }) {
                 {`Needs: ${transport.requiredConfig.map((key) => labels.get(key) ?? key).join(", ")}`}
               </Text>
             </View>
+            {isSupportedTransport(transport) ? null : (
+              // Ported but not yet run end to end, so a Connection cannot pick it.
+              <StatusBadge label="Not supported yet" variant="muted" />
+            )}
           </View>
         ))}
       </View>

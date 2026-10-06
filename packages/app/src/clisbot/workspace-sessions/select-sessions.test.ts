@@ -4,6 +4,15 @@ import type { Agent } from "@/stores/session-store";
 import { toggleExpandedWorkspaceKey } from "./expansion-store";
 import { DEFAULT_SIDEBAR_WORKSPACE_SESSIONS, SidebarWorkspaceSessionsSchema } from "./preferences";
 import { hasWorkspaceSessionLine, selectWorkspaceSessions } from "./select-sessions";
+import {
+  buildStatusSessionShortcutModel,
+  sessionStatusDisplayGroups,
+  type StatusDisplayGroup,
+  type StatusGroupItem,
+} from "./status-sessions";
+import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
+import { statusWorkspaceGroups } from "@/components/sidebar/sidebar-labels";
+import { buildStatusGroups } from "@/hooks/sidebar-status-view-model";
 
 const WORKSPACE_ID = "ws-1";
 
@@ -189,5 +198,119 @@ describe("hasWorkspaceSessionLine", () => {
         ).toBe(listed.has(agentId));
       }
     }
+  });
+});
+
+function makeWorkspace(
+  workspaceId: string,
+  statusBucket: SidebarWorkspaceEntry["statusBucket"],
+): SidebarWorkspaceEntry {
+  return {
+    workspaceKey: `srv:${workspaceId}`,
+    serverId: "srv",
+    workspaceId,
+    projectViewKey: "project",
+    projectName: "Project",
+    projectKind: "git",
+    workspaceKind: "worktree",
+    name: workspaceId,
+    workspaceDirectory: "",
+    workspaceDirectoryLabel: "",
+    title: null,
+    currentBranch: null,
+    statusBucket,
+    statusEnteredAt: null,
+    archivingAt: null,
+    diffStat: null,
+    prHint: null,
+    archiveHasUncommittedChanges: null,
+    archiveUnpushedCommitCount: null,
+    scripts: [],
+    hasRunningScripts: false,
+  };
+}
+
+function describeGroups(groups: StatusDisplayGroup[]) {
+  return groups.map((group) => [group.key, group.items.map(describeItem)]);
+}
+
+function describeItem(item: StatusGroupItem): string {
+  return item.kind === "session"
+    ? item.session.agent.id
+    : `workspace:${item.workspace.workspaceId}`;
+}
+
+describe("sessionStatusDisplayGroups", () => {
+  const workspaces = [
+    makeWorkspace(WORKSPACE_ID, "running"),
+    makeWorkspace("ws-2", "done"),
+    makeWorkspace("terminal-only", "done"),
+  ];
+  const groups = statusWorkspaceGroups(buildStatusGroups(workspaces, new Map()));
+  const source = sourceOf([
+    makeAgent({ id: "older-idle", createdAt: new Date("2026-09-01") }),
+    makeAgent({
+      id: "working",
+      turn: { phase: "open", turnId: null, startedAt: null, cancellationRequestId: null },
+    }),
+    makeAgent({
+      id: "messaged-idle",
+      createdAt: new Date("2026-09-01"),
+      lastUserMessageAt: new Date("2026-09-05"),
+    }),
+    makeAgent({ id: "other-workspace", workspaceId: "ws-2", createdAt: new Date("2026-09-03") }),
+    makeAgent({ id: "child", parentAgentId: "working" }),
+  ]);
+
+  function summarizeGroups(activeOnly: boolean) {
+    return describeGroups(
+      sessionStatusDisplayGroups({ groups, sources: new Map([["srv", source]]), activeOnly }),
+    );
+  }
+
+  it("files each session under its own status, most recently messaged first", () => {
+    expect(summarizeGroups(false)).toEqual([
+      ["running", ["working"]],
+      ["done", ["messaged-idle", "other-workspace", "older-idle", "workspace:terminal-only"]],
+    ]);
+  });
+
+  it("keeps a workspace without sessions as a row, and hides done sessions when activeOnly", () => {
+    expect(summarizeGroups(true)).toEqual([
+      ["running", ["working"]],
+      ["done", ["workspace:terminal-only"]],
+    ]);
+  });
+
+  it("keeps a workspace row while its host's sessions are not loaded", () => {
+    const loading = sessionStatusDisplayGroups({ groups, sources: new Map(), activeOnly: false });
+    expect(describeGroups(loading)).toEqual([
+      ["running", ["workspace:ws-1"]],
+      ["done", ["workspace:terminal-only", "workspace:ws-2"]],
+    ]);
+  });
+
+  it("numbers pinned rows first, then each open header's lines, and a session opens itself", () => {
+    const displayGroups = sessionStatusDisplayGroups({
+      groups,
+      sources: new Map([["srv", source]]),
+      activeOnly: false,
+    });
+    const pinned = makeWorkspace("pinned", "done");
+    const model = buildStatusSessionShortcutModel({
+      pinnedWorkspaces: [pinned],
+      pinnedCollapsed: false,
+      groups: displayGroups,
+      collapsedGroupKeys: new Set(["running"]),
+    });
+    expect(model.shortcutTargets).toEqual([
+      { serverId: "srv", workspaceId: "pinned" },
+      { serverId: "srv", workspaceId: WORKSPACE_ID, agentId: "messaged-idle" },
+      { serverId: "srv", workspaceId: "ws-2", agentId: "other-workspace" },
+      { serverId: "srv", workspaceId: WORKSPACE_ID, agentId: "older-idle" },
+      { serverId: "srv", workspaceId: "terminal-only" },
+    ]);
+    expect(model.shortcutIndexByWorkspaceKey.get(`srv:${WORKSPACE_ID}:older-idle`)).toBe(4);
+    expect(model.shortcutIndexByWorkspaceKey.has(`srv:${WORKSPACE_ID}:working`)).toBe(false);
   });
 });

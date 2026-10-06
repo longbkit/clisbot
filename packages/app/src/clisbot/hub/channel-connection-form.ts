@@ -10,9 +10,20 @@
  * Secret values never leave this module. `getState()` publishes `filled`, not the
  * value; only `requestBody()` reads them, and only to build the request.
  */
-import { isConnectableChannel, type ChannelCatalogEntry } from "./channel-catalog";
+import {
+  isConnectableChannel,
+  supportedTransports,
+  type ChannelCatalogEntry,
+} from "./channel-catalog";
 
 export type ChannelConnectionFieldKind = "text" | "secret" | "multiline" | "choice";
+
+export interface ChannelConnectionChoice {
+  readonly value: string;
+  readonly label: string;
+  /** One line under the label: what picking it means. */
+  readonly description?: string;
+}
 
 /**
  * The credential shape of a channel's `POST connections` body. `token` is one
@@ -30,7 +41,8 @@ interface ChannelConnectionFieldSpec {
   readonly label?: string;
   readonly help?: string;
   readonly kind: ChannelConnectionFieldKind;
-  readonly choices?: readonly { value: string; label: string }[];
+  /** The first choice is the default. */
+  readonly choices?: readonly ChannelConnectionChoice[];
   readonly required?: boolean;
   /** Required only while one of these transports is selected. */
   readonly requiredForTransports?: readonly string[];
@@ -103,11 +115,20 @@ const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
       {
         key: "domain",
         label: "Domain",
-        help: "Feishu is the mainland China tenant; Lark is the international one.",
         kind: "choice",
+        // The app exists on one platform only; the wrong one refuses the
+        // long connection with "Incorrect domain name".
         choices: [
-          { value: "feishu", label: "Feishu" },
-          { value: "lark", label: "Lark" },
+          {
+            value: "lark",
+            label: "Lark",
+            description: "larksuite.com — for apps made in the international Lark console.",
+          },
+          {
+            value: "feishu",
+            label: "Feishu",
+            description: "feishu.cn — for apps made in the mainland China Feishu console.",
+          },
         ],
         required: true,
       },
@@ -127,6 +148,13 @@ const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
         catalogKey: "serviceAccountFile",
         kind: "text",
         placeholder: "/etc/clisbot/googlechat.json",
+      },
+      {
+        key: "subscription",
+        catalogKey: "subscription",
+        kind: "text",
+        requiredForTransports: ["pubsub"],
+        placeholder: "projects/<project>/subscriptions/<name>",
       },
     ],
   },
@@ -193,7 +221,7 @@ export interface ChannelConnectionFieldState {
   label: string;
   help: string | null;
   kind: ChannelConnectionFieldKind;
-  choices: readonly { value: string; label: string }[] | null;
+  choices: readonly ChannelConnectionChoice[] | null;
   required: boolean;
   placeholder: string | null;
   /** Non-secret value, for choices and plain text. A secret publishes null. */
@@ -243,21 +271,35 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
   }
   let accountId = "";
   let accountTouched = false;
-  let transportId = entry.transports[0]?.id ?? null;
+  // Only the transports a Connection can use today are offered.
+  const transports = supportedTransports(entry).map(({ id, label }) => ({ id, label }));
+  const offered = new Set(transports.map(({ id }) => id));
+  let transportId = transports[0]?.id ?? null;
   let source: ServiceAccountSource | null = setup === "serviceAccount" ? "paste" : null;
   let submitting = false;
   let problem: ChannelConnectionProblem | null = null;
   let state = build();
   const listeners = new Set<() => void>();
 
+  /** The two service-account forms are one choice: only the chosen one shows. */
+  function isServiceAccountForm(spec: ChannelConnectionFieldSpec): boolean {
+    return (
+      setup === "serviceAccount" &&
+      (spec.key === "serviceAccount" || spec.key === "serviceAccountFile")
+    );
+  }
+
   function visible(spec: ChannelConnectionFieldSpec): boolean {
-    if (setup !== "serviceAccount") return true;
+    // A field only an unsupported transport needs (a webhook secret) is not asked for.
+    const only = spec.requiredForTransports;
+    if (only !== undefined && !only.some((id) => offered.has(id))) return false;
+    if (!isServiceAccountForm(spec)) return true;
     return spec.key === (source === "file" ? "serviceAccountFile" : "serviceAccount");
   }
 
   function required(spec: ChannelConnectionFieldSpec): boolean {
     if (spec.required === true) return true;
-    if (setup === "serviceAccount") return visible(spec);
+    if (isServiceAccountForm(spec)) return visible(spec);
     if (transportId === null) return false;
     return spec.requiredForTransports?.includes(transportId) === true;
   }
@@ -274,7 +316,7 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
       setup,
       accountId: setup === "slackApp" ? null : accountId,
       accountIdError,
-      transports: entry.transports.map(({ id, label }) => ({ id, label })),
+      transports,
       transportId,
       serviceAccountSource: source,
       fields,
@@ -311,6 +353,7 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
       publish();
     },
     setTransport(id) {
+      if (!offered.has(id)) return;
       transportId = id;
       publish();
     },

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
@@ -35,7 +36,13 @@ import { SessionTitleTooltip } from "./session-title-tooltip";
  *   selected fill from its workspace row (`useWorkspaceRowSelectionFill`), so only one row is filled.
  * - `visible`: showing in another pane of a split. Full-strength title, no fill.
  */
-type SessionLineState = "selected" | "visible" | "idle";
+export type SessionLineState = "selected" | "visible" | "idle";
+
+/**
+ * - `flush` / `indented`: under a workspace row, the title on the workspace title's rail.
+ * - `statusGroup`: in a workspace row's place under a status header, the mark on the row's rail.
+ */
+type SessionLinePlacement = "flush" | "indented" | "statusGroup";
 
 // The presentation module also imports the panel registry and terminal renderer. Load it only
 // when a session icon is actually rendered, after the app's navigator polyfill has run.
@@ -112,7 +119,7 @@ function OpenWorkspaceSessionList({
             state={state}
             fullTitles={fullTitles}
             details={details}
-            indented={indented}
+            placement={indented ? "indented" : "flush"}
             onPress={onSessionPress}
           />
         );
@@ -121,16 +128,7 @@ function OpenWorkspaceSessionList({
   );
 }
 
-const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
-  serverId,
-  workspaceId,
-  session,
-  state,
-  fullTitles,
-  details,
-  indented,
-  onPress,
-}: {
+export interface WorkspaceSessionRowProps {
   serverId: string;
   workspaceId: string;
   session: WorkspaceSessionItem;
@@ -138,9 +136,29 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   /** Wrap the title instead of cutting it; a cut title shows in full in a hover tooltip. */
   fullTitles: boolean;
   details: SidebarWorkspaceSessionDetails;
-  indented: boolean;
+  placement: SessionLinePlacement;
+  /** Names the workspace on a line that has no workspace row above it. */
+  workspaceLabel?: string;
+  /**
+   * Replaces the end of the title line — by default the session pin over Last activity. A line
+   * standing in a workspace row's place adds the row's menu and shortcut badge there.
+   */
+  renderTrailing?: (input: { rowHovered: boolean; activity: ReactElement | null }) => ReactNode;
   onPress?: () => void;
-}): ReactElement {
+}
+
+export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
+  serverId,
+  workspaceId,
+  session,
+  state,
+  fullTitles,
+  details,
+  placement,
+  workspaceLabel,
+  renderTrailing,
+  onPress,
+}: WorkspaceSessionRowProps): ReactElement {
   const { t } = useTranslation();
   const [rowHovered, setRowHovered] = useState(false);
   const hoverIn = useCallback(() => setRowHovered(true), []);
@@ -148,22 +166,15 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   const { agent } = session;
   const label = session.title ?? t("workspace.tabs.fallback.newAgent");
   const selected = state === "selected";
+  const wide = placement === "statusGroup";
   const titleRef = useRef<Text>(null);
   const handlePress = useCallback(() => {
     onPress?.();
     navigateToAgent({ serverId, workspaceId, agentId: agent.id });
   }, [onPress, serverId, workspaceId, agent.id]);
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
-  const rowStyle = useCallback(
-    ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.row,
-      indented && styles.rowIndented,
-      (hovered || rowHovered) && styles.rowHovered,
-      selected && styles.rowSelected,
-      pressed && styles.rowPressed,
-    ],
-    [indented, selected, rowHovered],
-  );
+  const rowStyle = useSessionRowStyle({ placement, selected, rowHovered });
+  const activity = details.lastActivity ? <LastActivity agent={agent} /> : null;
 
   const row = (
     <View style={sessionWrapper} onPointerEnter={hoverIn} onPointerLeave={hoverOut}>
@@ -185,6 +196,7 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
                   serverId={serverId}
                   active={state !== "idle"}
                   backdrop={resolveBackdrop(selected, hovered)}
+                  wide={wide}
                 />
                 <Text
                   ref={titleRef}
@@ -193,11 +205,21 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
                 >
                   {label}
                 </Text>
-                <SessionPinButton serverId={serverId} agentId={agent.id} hovered={rowHovered}>
-                  {details.lastActivity ? <LastActivity agent={agent} /> : null}
-                </SessionPinButton>
+                {renderTrailing ? (
+                  renderTrailing({ rowHovered, activity })
+                ) : (
+                  <SessionPinButton serverId={serverId} agentId={agent.id} hovered={rowHovered}>
+                    {activity}
+                  </SessionPinButton>
+                )}
               </View>
-              <SessionDetailLine serverId={serverId} session={session} details={details} />
+              <SessionDetailLine
+                serverId={serverId}
+                session={session}
+                details={details}
+                wide={wide}
+                workspaceLabel={workspaceLabel === label ? undefined : workspaceLabel}
+              />
             </>
           )}
         </Pressable>
@@ -211,6 +233,28 @@ const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
     </SessionTitleTooltip>
   );
 });
+
+function useSessionRowStyle({
+  placement,
+  selected,
+  rowHovered,
+}: {
+  placement: SessionLinePlacement;
+  selected: boolean;
+  rowHovered: boolean;
+}) {
+  return useCallback(
+    ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.row,
+      placement === "indented" && styles.rowIndented,
+      placement === "statusGroup" && styles.rowInStatusGroup,
+      (hovered || rowHovered) && styles.rowHovered,
+      selected && styles.rowSelected,
+      pressed && styles.rowPressed,
+    ],
+    [placement, selected, rowHovered],
+  );
+}
 
 function resolveBackdrop(selected: boolean, hovered: boolean): SidebarSurfaceBackdrop {
   if (selected) return "surfaceSidebarSelected";
@@ -231,11 +275,14 @@ function SessionMark({
   serverId,
   active,
   backdrop,
+  wide,
 }: {
   session: WorkspaceSessionItem;
   serverId: string;
   active: boolean;
   backdrop: SidebarSurfaceBackdrop;
+  /** The workspace row's leading column width, for a line standing in a row's place. */
+  wide: boolean;
 }): ReactElement {
   const { provider, id } = session.agent;
   const presentation = useMemo<WorkspaceTabPresentation>(
@@ -253,7 +300,7 @@ function SessionMark({
     [id, provider, serverId, session.title, session.statusBucket],
   );
   return (
-    <View style={styles.markSlot}>
+    <View style={[styles.markSlot, wide && styles.markSlotWide]}>
       <Suspense fallback={null}>
         <WorkspaceTabIcon
           presentation={presentation}
@@ -282,23 +329,34 @@ function SessionDetailLine({
   serverId,
   session,
   details,
+  wide,
+  workspaceLabel,
 }: {
   serverId: string;
   session: WorkspaceSessionItem;
   details: SidebarWorkspaceSessionDetails;
+  wide: boolean;
+  workspaceLabel?: string;
 }): ReactElement | null {
   const { agent } = session;
-  const leadingItems = useMemo(
-    () =>
-      details.model && agent.model
-        ? [
-            <Text key="model" style={styles.detailText} numberOfLines={1}>
-              {agent.model}
-            </Text>,
-          ]
-        : [],
-    [details.model, agent.model],
-  );
+  const leadingItems = useMemo(() => {
+    const items: ReactElement[] = [];
+    if (workspaceLabel) {
+      items.push(
+        <Text key="workspace" style={styles.detailText} numberOfLines={1}>
+          {workspaceLabel}
+        </Text>,
+      );
+    }
+    if (details.model && agent.model) {
+      items.push(
+        <Text key="model" style={styles.detailText} numberOfLines={1}>
+          {agent.model}
+        </Text>,
+      );
+    }
+    return items;
+  }, [workspaceLabel, details.model, agent.model]);
   return (
     <SessionMetadataLine
       serverId={serverId}
@@ -307,7 +365,7 @@ function SessionDetailLine({
       visible={details}
       channelsLabel="Session channels"
       leadingItems={leadingItems}
-      style={styles.detailLine}
+      style={wide ? styles.detailLineWide : styles.detailLine}
     />
   );
 }
@@ -332,6 +390,11 @@ const styles = StyleSheet.create((theme) => ({
   rowIndented: {
     paddingLeft: theme.spacing[2] + theme.spacing[2] + theme.iconSize.md + theme.spacing[2],
   },
+  // A status-grouped workspace row's indent (`sidebarWorkspaceRowStyles.rowIndented`), so the
+  // mark sits in the rows' leading column and the title on their title rail.
+  rowInStatusGroup: {
+    paddingLeft: theme.spacing[2] + theme.spacing[2],
+  },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
   },
@@ -354,6 +417,9 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     flexShrink: 0,
   },
+  markSlotWide: {
+    width: theme.iconSize.md,
+  },
   title: {
     flex: 1,
     minWidth: 0,
@@ -373,6 +439,9 @@ const styles = StyleSheet.create((theme) => ({
   // Under the title, past the mark, so detail items line up with the words they describe.
   detailLine: {
     paddingLeft: theme.iconSize.sm + theme.spacing[2],
+  },
+  detailLineWide: {
+    paddingLeft: theme.iconSize.md + theme.spacing[2],
   },
   detailText: {
     color: theme.colors.foregroundMuted,

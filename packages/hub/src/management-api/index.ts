@@ -234,6 +234,7 @@ const connectionRequestSchema = z.union([
         .object({
           serviceAccount: z.string().trim().min(1).optional(),
           serviceAccountFile: z.string().trim().min(1).optional(),
+          subscription: z.string().trim().min(1).optional(),
         })
         .strict(),
     })

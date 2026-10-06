@@ -81,3 +81,30 @@ function readConnectionCredentials(
   }
   return Object.keys(credentials).length > 0 ? credentials : undefined;
 }
+
+/** How the account receives Chat events (D-GC-020). */
+export type GoogleChatReceiveMode =
+  | { mode: "webhook" }
+  | { mode: "pubsub"; subscription: string | undefined };
+
+/**
+ * The receive mode the Hub compiled for this account, off the flat carrier's
+ * `transport.mode`. An account the Hub started before the carrier forwarded its
+ * transport has only ever been a webhook, so an absent mode reads as one. The
+ * subscription is a Connection field; an authored `subscription` is the fallback.
+ */
+export function resolveGoogleChatReceiveMode(
+  account: Record<string, unknown> | undefined,
+  config: Record<string, unknown>,
+): GoogleChatReceiveMode {
+  const transport = account?.["transport"];
+  const mode =
+    transport !== null && typeof transport === "object"
+      ? (transport as Record<string, unknown>)["mode"]
+      : undefined;
+  if (mode !== "pubsub") return { mode: "webhook" };
+  const subscription = [account?.["subscription"], config["subscription"]].find(
+    (value): value is string => typeof value === "string" && value.trim() !== "",
+  );
+  return { mode: "pubsub", subscription: subscription?.trim() };
+}

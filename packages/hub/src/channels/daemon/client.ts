@@ -225,6 +225,19 @@ export function connectEnrolledChannelDaemon(
 }
 
 /**
+ * The connection for an account with no Route: there is no Host to reach, so
+ * nothing is dialed and every call fails at once as a Host that is away.
+ */
+export function connectNoHostChannelDaemon(): DaemonConnection {
+  return connectEnrolledChannelDaemon({
+    hostLabel: "no Host (no Route)",
+    hostId: "",
+    resolveChannel: () => undefined,
+    subscribe: () => () => undefined,
+  });
+}
+
+/**
  * Open one trusted-client connection to a daemon. The `url` option serves the
  * relay-paired team/remote leg; otherwise the loopback target is discovered from
  * the pid lock / default port.

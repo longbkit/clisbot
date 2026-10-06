@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
-import { SelectField } from "@/components/ui/select-field";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import {
@@ -15,7 +14,8 @@ import {
   type ChannelConnectionProblem,
   type ServiceAccountSource,
 } from "../channel-connection-form";
-import type { ChannelCatalogEntry } from "../channel-catalog";
+import { supportedTransports, type ChannelCatalogEntry } from "../channel-catalog";
+import { RadioList } from "./channel-route-audience-controls";
 
 const SOURCE_OPTIONS: SegmentedControlOption<ServiceAccountSource>[] = [
   { value: "paste", label: "Paste JSON" },
@@ -47,7 +47,7 @@ export function ChannelConnectionSetup({
   return (
     <SettingsSection title={`Connect ${entry.label}`}>
       <View style={[settingsStyles.card, styles.form]}>
-        <Text style={settingsStyles.rowHint}>{entry.transports[0]?.setup ?? ""}</Text>
+        <Text style={settingsStyles.rowHint}>{supportedTransports(entry)[0]?.setup ?? ""}</Text>
         {state.setup === "qr" ? <Text style={settingsStyles.rowHint}>{QR_NEXT_STEP}</Text> : null}
         {state.transports.length > 1 && state.transportId !== null ? (
           <Field label="Transport">
@@ -154,32 +154,14 @@ function ConnectionField({
   onChange(key: string, value: string): void;
 }) {
   const change = useCallback((value: string) => onChange(field.key, value), [field.key, onChange]);
-  const choices = field.choices;
-  const display = useMemo(() => {
-    const selected = choices?.find((choice) => choice.value === field.value);
-    return selected === undefined ? null : { label: selected.label };
-  }, [choices, field.value]);
-  const options = useMemo(
-    () =>
-      (choices ?? []).map((choice) => ({
-        id: choice.value,
-        value: choice.value,
-        label: choice.label,
-      })),
-    [choices],
-  );
-  if (field.kind === "choice" && choices !== null) {
+  if (field.kind === "choice" && field.choices !== null) {
     return (
-      <SelectField
+      <RadioList
         label={field.label}
-        value={field.value}
-        selectedDisplay={display}
-        options={options}
+        options={field.choices}
+        selected={field.value ?? ""}
         onChange={change}
-        placeholder="Choose"
-        emptyText="No options"
         disabled={disabled}
-        {...(field.help === null ? {} : { hint: field.help })}
       />
     );
   }

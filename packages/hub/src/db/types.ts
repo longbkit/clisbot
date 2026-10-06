@@ -1761,10 +1761,18 @@ export interface ChannelConnectionCredentials {
   /** Google Chat service-account JSON, inline or by absolute path. */
   serviceAccount?: string | undefined;
   serviceAccountFile?: string | undefined;
-  /** Zalo Personal's credential profile — the ONLY non-secret member of this
-   * vocabulary. That channel has no operator secret at all: the profile names
-   * the QR session, and the session bytes rest in the encrypted keyed-store
-   * namespace (`channels/state/encrypted-namespaces.ts`), never here. */
+  /** Google Chat's Pub/Sub subscription — not a secret, but it belongs to the
+   * credential: the Connection was probed for the service account's right to
+   * consume exactly this one. */
+  subscription?: string | undefined;
+  /** Feishu's open platform, `feishu` or `lark` — not a secret, but it belongs
+   * to the app credential: the app id exists on one platform only, and the
+   * Connection was verified against that one. Absent means `feishu`. */
+  domain?: string | undefined;
+  /** Zalo Personal's credential profile — not a secret either. That channel has
+   * no operator secret at all: the profile names the QR session, and the
+   * session bytes rest in the encrypted keyed-store namespace
+   * (`channels/state/encrypted-namespaces.ts`), never here. */
   profile?: string | undefined;
   /** Slack only: the Provider Application the bot credential belongs to. */
   providerApplicationId?: string | undefined;

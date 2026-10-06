@@ -128,7 +128,7 @@ describe("catalog rows", () => {
   );
 
   it("lists every catalog channel in catalog order", () => {
-    expect(rows.slice(0, 7).map((row) => row.channel)).toEqual([
+    expect(rows.slice(0, 8).map((row) => row.channel)).toEqual([
       "slack",
       "telegram",
       "discord",

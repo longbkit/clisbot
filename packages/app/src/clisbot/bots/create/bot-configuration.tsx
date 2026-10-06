@@ -9,7 +9,8 @@ import { CombinedModelSelector } from "@/components/combined-model-selector";
 import { getProviderIcon } from "@/components/provider-icons";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 import type { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
-import { SetupCard, SetupRowView, SetupSelectRow } from "./bot-setup-rows";
+import { SetupCard, SetupRowView } from "./bot-setup-card";
+import { SetupSelectRow } from "./bot-setup-rows";
 
 interface Props {
   state: BotFormState;

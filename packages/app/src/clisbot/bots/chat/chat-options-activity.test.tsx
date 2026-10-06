@@ -51,6 +51,10 @@ vi.mock("../sidebar/pins", () => ({
   useResourcePins: () => ({ toggle: vi.fn(), isPinned: () => false }),
 }));
 vi.mock("../data/runtime", () => ({ refreshBotsAndChats: vi.fn() }));
+vi.mock("./use-connect-channel", () => ({
+  useCanConnectBotToChannel: () => () => false,
+  useOpenConnectBotToChannel: () => vi.fn(),
+}));
 vi.mock("./chat-options-context", () => ({
   useChatOptionsState: () => ({ visible: true, setVisible: state.setVisible }),
 }));

@@ -3,7 +3,12 @@
 // same labels. Actions that belong to the open page (tabs, Project actions, a fresh session)
 // stay in the chat options menu. Pure.
 
-export type ChatResourceActionId = "pin" | "bot-settings" | "group-settings" | "archive";
+export type ChatResourceActionId =
+  | "pin"
+  | "bot-settings"
+  | "connect-channel"
+  | "group-settings"
+  | "archive";
 
 export interface ChatResourceAction {
   id: ChatResourceActionId;
@@ -17,13 +22,20 @@ export interface ChatResourceActionsInput {
   target: "bot" | "direct" | "group";
   pinned: boolean;
   canConfigureBot?: boolean;
+  /** Adding a Route on the Hub that runs the Bot: an Organization Admin, on a Host the Hub knows. */
+  canConnectChannel?: boolean;
 }
 
-/** Pin first, settings next, archive last. A Bot row archives nothing: the row is the bot. */
+/**
+ * Pin first, settings next, then Connect to a channel…, archive last. A Bot row archives nothing:
+ * the row is the bot. A group runs several Bots, so it connects none of them to a channel.
+ */
 export function chatResourceActions(input: ChatResourceActionsInput): ChatResourceAction[] {
   const actions: ChatResourceAction[] = [pinAction(input.pinned)];
   if (input.target !== "group" && input.canConfigureBot)
     actions.push({ id: "bot-settings", label: "Bot settings" });
+  if (input.target !== "group" && input.canConnectChannel)
+    actions.push({ id: "connect-channel", label: "Connect to a channel…" });
   if (input.target === "group") actions.push({ id: "group-settings", label: "Group settings" });
   if (input.target !== "bot") actions.push({ id: "archive", label: "Archive chat…" });
   return actions;

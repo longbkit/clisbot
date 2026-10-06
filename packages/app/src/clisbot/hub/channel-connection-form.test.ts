@@ -36,22 +36,22 @@ describe("field shape per channel", () => {
     expect(model.getState().fields[0]?.label).toBe("Bot token");
   });
 
-  it("gives Feishu every credential the Hub accepts, plus its domain", () => {
-    expect(fieldKeys("feishu")).toEqual([
-      "appId",
-      "appSecret",
-      "verificationToken",
-      "encryptKey",
-      "domain",
-    ]);
+  it("gives Feishu its long-connection credentials and domain, no webhook secrets", () => {
+    expect(fieldKeys("feishu")).toEqual(["appId", "appSecret", "domain"]);
   });
 
   it("shows one Google Chat field at a time, chosen by the source toggle", () => {
     const model = openForm("googlechat");
     expect(model.getState().serviceAccountSource).toBe("paste");
-    expect(model.getState().fields.map((field) => field.key)).toEqual(["serviceAccount"]);
+    expect(model.getState().fields.map((field) => field.key)).toEqual([
+      "serviceAccount",
+      "subscription",
+    ]);
     model.setServiceAccountSource("file");
-    expect(model.getState().fields.map((field) => field.key)).toEqual(["serviceAccountFile"]);
+    expect(model.getState().fields.map((field) => field.key)).toEqual([
+      "serviceAccountFile",
+      "subscription",
+    ]);
   });
 
   it("names no account for Slack, whose Connection is named by the app", () => {
@@ -61,25 +61,28 @@ describe("field shape per channel", () => {
   });
 });
 
-describe("transport-driven requirements", () => {
-  it("requires Zalo's webhook secret only in webhook mode", () => {
-    const model = openForm("zalo");
-    expect(model.getState().transportId).toBe("polling");
-    expect(model.getState().fields[1]).toMatchObject({ key: "webhookSecret", required: false });
-    model.setTransport("webhook");
-    expect(model.getState().fields[1]).toMatchObject({ key: "webhookSecret", required: true });
+describe("transports a Connection can use", () => {
+  it("offers no webhook transport, so there is nothing to choose", () => {
+    for (const channel of ["slack", "telegram", "googlechat", "feishu", "zalo"]) {
+      const model = openForm(channel);
+      expect(model.getState().transports.map(({ id }) => id)).not.toContain("webhook");
+      model.setTransport("webhook");
+      expect(model.getState().transportId).not.toBe("webhook");
+    }
   });
 
-  it("requires Feishu's webhook verification fields only in webhook mode", () => {
-    const model = openForm("feishu");
-    const required = () =>
-      model
-        .getState()
-        .fields.filter((field) => field.required)
-        .map((field) => field.key);
-    expect(required()).toEqual(["appId", "appSecret", "domain"]);
-    model.setTransport("webhook");
-    expect(required()).toEqual(["appId", "appSecret", "verificationToken", "encryptKey", "domain"]);
+  it("does not ask for a secret only webhook mode needs", () => {
+    expect(fieldKeys("zalo")).not.toContain("webhookSecret");
+    expect(fieldKeys("telegram")).toEqual(["botToken"]);
+  });
+
+  it("still requires Google Chat's subscription for Cloud Pub/Sub", () => {
+    const model = openForm("googlechat");
+    expect(model.getState().transportId).toBe("pubsub");
+    expect(model.getState().fields.find((field) => field.key === "subscription")).toMatchObject({
+      required: true,
+      label: "Pub/Sub subscription",
+    });
   });
 });
 
@@ -97,13 +100,6 @@ describe("validation", () => {
     model.setField("appToken", "xoxb-nope");
     expect(model.getState().fields[0]?.error).toBe("This must start with xapp-.");
     expect(model.getState().canSubmit).toBe(false);
-  });
-
-  it("bounds the Zalo webhook secret", () => {
-    const model = openForm("zalo");
-    model.setTransport("webhook");
-    model.setField("webhookSecret", "short");
-    expect(model.getState().fields[1]?.error).toBe("Use at least 8 characters.");
   });
 
   it("rejects a service account that is not one", () => {
@@ -180,10 +176,10 @@ describe("submission", () => {
     model.setField("appId", "cli_1");
     model.setField("appSecret", "secret");
     expect(model.requestBody()).toMatchObject({
-      credentials: { appId: "cli_1", appSecret: "secret", domain: "feishu" },
+      credentials: { appId: "cli_1", appSecret: "secret", domain: "lark" },
     });
-    model.setField("domain", "lark");
-    expect(model.requestBody()).toMatchObject({ credentials: { domain: "lark" } });
+    model.setField("domain", "feishu");
+    expect(model.requestBody()).toMatchObject({ credentials: { domain: "feishu" } });
   });
 
   it("never publishes a secret value in the rendered state", () => {

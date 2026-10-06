@@ -1,5 +1,13 @@
 export const CHANNEL_ROUTE_TARGET_VALUES = ["agent", "automation"];
 
+/**
+ * "Start or continue a Bot" leads when there is a Bot to pick (or the Route already runs one);
+ * a new Route still starts on an Agent unless "Connect to a channel…" opened it on a Bot.
+ */
+export function channelRouteTargetValues(botOffered: boolean): string[] {
+  return botOffered ? ["bot", ...CHANNEL_ROUTE_TARGET_VALUES] : CHANNEL_ROUTE_TARGET_VALUES;
+}
+
 /** New Routes reply in a thread; editing retains the saved or legacy default. */
 export function initialChannelReplyAnchor(
   isEditing: boolean,

@@ -25,7 +25,7 @@ export type ShortcutCallbackName = "toggle-agent-list" | "toggle-both-sidebars" 
 export type ShortcutAction =
   | { kind: "none" }
   | { kind: "dispatch"; action: KeyboardActionDefinition }
-  | { kind: "navigate-workspace"; serverId: string; workspaceId: string }
+  | { kind: "navigate-workspace"; serverId: string; workspaceId: string; agentId?: string }
   | { kind: "navigate-last-workspace" }
   | { kind: "router-replace"; route: string }
   | { kind: "router-back" }
@@ -123,11 +123,7 @@ function routeWorkspaceNavigateIndex(
   if (!hasPayloadKey(payload, "index")) return NONE;
   const target = ctx.sidebarShortcutTargets[payload.index - 1] ?? null;
   if (!target) return NONE;
-  return {
-    kind: "navigate-workspace",
-    serverId: target.serverId,
-    workspaceId: target.workspaceId,
-  };
+  return { kind: "navigate-workspace", ...target };
 }
 
 function routeWorkspaceNavigateRelative(
@@ -142,16 +138,16 @@ function routeWorkspaceNavigateRelative(
   const target = getRelativeSidebarShortcutTarget({
     targets: ctx.sidebarShortcutTargets,
     currentTarget: currentWorkspace
-      ? { serverId: currentWorkspace.serverId, workspaceId: currentWorkspace.workspaceId }
+      ? {
+          serverId: currentWorkspace.serverId,
+          workspaceId: currentWorkspace.workspaceId,
+          agentId: ctx.navigationActiveWorkspace?.agentId,
+        }
       : null,
     delta: payload.delta,
   });
   if (!target) return NONE;
-  return {
-    kind: "navigate-workspace",
-    serverId: target.serverId,
-    workspaceId: target.workspaceId,
-  };
+  return { kind: "navigate-workspace", ...target };
 }
 
 function routeMessageInputAction(payload: KeyboardShortcutPayload): ShortcutAction {

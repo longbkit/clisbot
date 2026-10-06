@@ -1,6 +1,6 @@
 ---
 title: Google Chat channel
-description: Run an agent in Google Chat spaces and DMs through a Workspace app and a public HTTPS endpoint.
+description: Run an agent in Google Chat DMs and spaces through a Chat app whose events arrive over Cloud Pub/Sub — no public URL needed.
 nav: Google Chat
 order: 85
 category: Hub
@@ -8,42 +8,39 @@ category: Hub
 
 # Google Chat
 
-Google Chat is the one channel that cannot run on a laptop. It has no polling and no socket mode: Google POSTs events to a public HTTPS URL, and nothing happens until that URL exists.
+The Hub receives a Google Chat app's events over **Cloud Pub/Sub**: the app publishes to a topic and the Hub pulls from a subscription, so no public address is needed. Google's other delivery model, an HTTPS endpoint, is ported but **not supported yet** — it has never run against Google, and the Hub refuses an account that asks for it.
 
-## What you need
+A personal Google account can build a Chat app for its own direct messages. Joining spaces needs a Google Workspace account, and a work Workspace may need an admin to allow the app.
 
-1. In a Google Cloud project, create a **service account** and download its JSON key. That document is the whole credential — there is no bot token.
-2. Enable the **Google Chat API** on the project.
-3. Under **Google Chat API → Configuration**, create the Chat app: name it, enable **Receive 1:1 messages** and **Join spaces and group conversations**, and choose **App URL** as the connection setting, pointing at your public HTTPS endpoint.
-4. Decide how Google's request tokens are verified:
-   - `audienceType: app-url` — `audience` is that same app URL, and `appPrincipal` is the app's numeric OAuth 2.0 client id (21 digits, not an email).
-   - `audienceType: project-number` — `audience` is the Cloud project number.
-5. Publish the app to your Workspace domain or to named testers. **A Workspace admin has to approve it** before anyone can add it to a space.
-6. Add the app to a space and start a DM with it.
+## Set up with Cloud Pub/Sub
 
-### The public endpoint
+All of this is in one Google Cloud project.
 
-Hub publishes no endpoint of its own. Put a reverse proxy in front of the account's webhook listener and give Google that URL:
+1. Enable the **Google Chat API** and the **Cloud Pub/Sub API**.
+2. Create a **service account** and download a JSON key. The service account needs no project role.
+3. In Pub/Sub, create a **topic** (for example `clisbot-chat-events`) and a **pull subscription** on it (`clisbot-chat-events-sub`).
+4. On the **topic**, grant the **Pub/Sub Publisher** role to the account Google publishes with. A new Chat app is built as a Workspace add-on by default, and then that account is `service-<project number>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`. If you cleared **Build this Chat app as a Workspace add-on**, it is `chat-api-push@system.gserviceaccount.com`. With the wrong one, Google Chat answers "not responding" and Cloud Logging shows `Failed to publish message to Pub/Sub topic … PERMISSION_DENIED`.
+5. On the **subscription**, grant your service account the **Pub/Sub Subscriber** role. Grant it on the subscription, not the project.
+6. Under **Google Chat API → Configuration**: name the app, enable **Receive 1:1 messages** and **Join spaces and group conversations**, choose **Cloud Pub/Sub** as the connection setting and enter the topic, `projects/<project>/topics/<topic>`. Set visibility to yourself or your domain.
+7. Add the Connection in the app (**Channels → Add Connection → Google Chat**): paste the JSON key and the subscription name, `projects/<project>/subscriptions/<subscription>`. Or from the CLI:
 
-```caddyfile
-chat.example.com {
-  reverse_proxy 127.0.0.1:<listener port>
-}
-```
+   ```sh
+   clisbot channels add googlechat --account main \
+     --secret-file ./chat-service-account.json \
+     --subscription projects/my-project/subscriptions/clisbot-chat-events-sub
+   ```
 
-The listener answers `200` only after the event is durably stored. A failed store answers `503` so Google redelivers; a malformed envelope answers `400` so it does not.
+   The Hub mints a token from the key and checks that the service account may pull from the subscription before it stores anything. A missing role fails here with the role to grant.
 
-## Add it to Hub
+8. Add a Route, then open Google Chat, find the app, and message it — or add it to a space and mention it.
 
-The secret file is the downloaded service-account document itself:
+## HTTP endpoint (not supported yet)
 
-```sh
-clisbot channels add googlechat --account main --secret-file ./chat-service-account.json
-```
+The vertical carries upstream's webhook receiver (`transport: { mode: webhook }` with `audienceType`, `audience` and `webhookUrl`), but the Hub refuses it until it has run end to end against Google. Use Cloud Pub/Sub.
 
-It may instead be JSON naming `serviceAccountFile` (an absolute path on the daemon host) or `serviceAccount` (the document inline). Hub verifies the credential by minting an RS256 token before storing it.
+## Optional account settings
 
-The account also needs `audienceType`, `audience`, `webhookUrl`, and `botUser` in its Channel account configuration. The account refuses to start without all four.
+`botUser` (`users/<id>`, the app's own user) lets the app recognise a mention by its id as well as by the `users/app` alias. `allowBots: true` admits messages from other apps.
 
 ## Conversations it handles
 
@@ -51,7 +48,7 @@ Spaces, group conversations, and DMs. Message threads inside a space are support
 
 Inbound covers messages, a leading `/verb` line as a command, `CARD_CLICKED` as a callback carrying the button's action id and the clicking user, and `ADDED_TO_SPACE` / `REMOVED_FROM_SPACE` as member events. Mention detection reads Google's `USER_MENTION` annotations. Bot-authored and app-authored messages are filtered.
 
-Request authentication runs before the body is read past a pre-auth size cap: an ID-token verification for `app-url` (including the Workspace add-on issuer, bound to `appPrincipal`), or a signed-JWT verification against Google's Chat certificates for `project-number`.
+A message is acknowledged only after it is durably stored; a failed store returns it to the subscription for redelivery.
 
 ## What the agent can do
 
@@ -65,18 +62,21 @@ Replies use Google Chat's own markdown — bold, italic, strikethrough, code, `<
 - **No inbound media download.** An attachment-only message is refused as empty.
 - **No native approval card.** Card clicks still arrive as inbound callbacks for Hub's own approval policy.
 - **No typing indicator, reactions, pins, read-back, emoji discovery, or polls.** No service-account API exists for them, so the agent gets `unsupported_action` rather than a transport error.
-- **No Pub/Sub delivery.** HTTP webhook only.
 
 ## Verified live
 
-Nothing. Blocked on the public HTTPS endpoint and Workspace admin approval. The vertical's webhook receiver is exercised against a real local HTTP listener in tests; the Chat API itself has never been called with a real credential.
+2026-10-06: a personal Google account's Chat app built as a Workspace add-on, Cloud Pub/Sub delivery, codex agent. A direct message reached the Hub through the subscription, started a session, and the answer posted back into the same DM. Spaces, cards and the HTTP endpoint are not verified.
 
 ## Troubleshooting
 
-**Google reports the app is not responding.** The reverse proxy is not reaching the account's listener, or the account is not running. Check `clisbot channels status` first.
+**Adding the Connection says the service account cannot pull from the subscription.** Grant it Pub/Sub Subscriber on that subscription.
 
-**Every request is rejected as unauthenticated.** `audienceType` and `audience` disagree with what the Chat app configuration says. For `app-url` they must be the exact app URL, and `appPrincipal` must be the numeric client id.
+**Messages to the app get no answer and the account shows a pull error.** The subscription was deleted or the role was removed. `clisbot channels status` shows the last error.
 
-**The app cannot be added to a space.** It is not published, or a Workspace admin has not approved it.
+**Google Chat says the app is not responding.** Google cannot publish to the topic: grant Publisher to the account in step 4, or check the app's connection names this topic. Cloud Logging for the project shows the refused publish.
+
+**Messages arrive but replies fail with `insufficient authentication scopes`.** The account is signing with the host's own Google credentials instead of the service account; update the Hub.
+
+**The app cannot be added to a space.** It is not visible to you, or a Workspace admin has not allowed it.
 
 **A file the agent sent never appeared.** It cannot. See the upload limit above; the channel posts a notice in its place.

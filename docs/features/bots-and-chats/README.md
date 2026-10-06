@@ -25,8 +25,8 @@ things the daemon already has and adds nothing else at runtime:
 | Launch defaults    | Agent controls with the shape of an Agent profile                                                           |
 | Sessions           | Ordinary agent sessions created in the bot's Workspace                                                      |
 
-The Hub's Channel account is not a Bot and keeps its glossary entry. A Bot is what a Route will
-target in a later phase; the account stays the credential and audience owner.
+The Hub's Channel account is not a Bot and keeps its glossary entry. A Route can start a Bot
+(D15); the account stays the credential and audience owner.
 
 ## What a Chat is
 
@@ -139,7 +139,8 @@ not repeat DMs. The selected fill follows the open DM's Bot row or the active gr
 A sidebar row's menu and the open chat's options menu list the same resource actions, in the same
 order and words, from `chatResourceActions` (`packages/app/src/clisbot/bots/chat/chat-resource-actions.ts`):
 **Pin to sidebar**/**Unpin**, then **Bot settings** (a Bot row or DM, with configuration authority)
-or **Group settings** (a group), then **Archive chat…** (a chat, never a Bot row). Group settings from
+or **Group settings** (a group), then **Connect to a channel…** (a Bot row or DM, see D15), then
+**Archive chat…** (a chat, never a Bot row). Group settings from
 the sidebar opens the chat with `?panel=group-settings`, which opens the chat's own settings sheet.
 Page actions (Switch tab, Project actions, Start a fresh session) stay in the chat options menu.
 
@@ -263,15 +264,43 @@ sessions.
 ### D15. Hub boundary
 
 The Hub owns: chats with several humans, chats whose bots sit on different Hosts, chats exposed on
-external channels, and Routes that target a Bot. All of these are later phases. None changes the
-daemon Chat model.
+external channels, and Routes that start a Bot. None changes the daemon Chat model.
+
+**Routes that start a Bot (2026-10-06).** A user who has a Bot wants it on Telegram or Slack; they
+think from the Bot, not from the Hub's Connections. **Connect to a channel…** in the Bot row's menu
+and in a DM's Chat options opens Channels on Add Route with **What should happen** set to **Start or
+continue a Bot** and that Bot picked; the user configures the Connection, Rules and Replies in the
+ordinary Route form. Add Route opened from Channels offers the same choice first whenever a Bot is
+on offer, and still starts on an Agent. The action shows only for an Organization Admin (a
+Connection Admin cannot pick what a Route runs) and only for a Bot on a Host the Hub has enrolled.
+
+Options considered:
+
+1. A Bot target on the Hub (`bot: <botId>` on the Route), resolved on the Host at each turn. Editing
+   the Bot's model would reach its channels at once, but it changes the Route schema, the
+   compiler and the turn path, and a Hub without it refuses the Route.
+2. An app-side target over the schema the Hub has. The form writes the direct Agent target it
+   already writes: the environment is the Bot's Host, Project and folder, the agent is the Bot's
+   launch defaults, and the Route carries `workspace.organize: false`
+   (`packages/app/src/clisbot/hub/channel-route-bot.ts`).
+
+Decision: option 2. It needs no Hub, protocol or daemon change, and every Hub in service runs it.
+The form recognizes a Bot's Route when it reopens by those three facts: `organize: false`, no
+worktree, and an environment on a Bot's Host, Project and folder; an Agent Route on a Bot's folder
+that organizes workspaces stays an Agent. Saving a Bot's Route as an Agent's removes the Route's
+own `workspace` setting, so it stays an Agent when it reopens. The launch settings are copied at
+save, so changing the Bot does not change its Routes. The form says so when the Route's named
+agent differs from the Bot (provider, model, mode, thinking, feature values), and saving takes the
+Bot's current settings. A model someone chose for the Route from a conversation (`agentControls`)
+is replaced on save, and the form says that too. Option 1 stays open if copied settings turn out
+to drift in practice.
 
 ## Invariants
 
 - One session, two views: the chat screen and the cowork view render the same agent session.
 - The transcript never carries tool calls or progress.
 - The bot directory path never changes after creation.
-- Routes targeting a Bot (later) run sessions in the bot's Workspace and never mint workspaces per
+- Routes that start a Bot run sessions in the bot's Workspace and never mint workspaces per
   conversation (`workspace.organize` off).
 - With the flag off, nothing about bots or chats is registered, stored, or shown.
 
@@ -302,8 +331,8 @@ Per-area plans: [server-bot](plans/server-bot.md), [server-chat](plans/server-ch
 1. Bot record, storage, seeding, RPCs, flag; Chat record, transcript, fan-out rules, RPCs; app: Bots
    and Group chats sidebar sections, create-by-name, chat screen as a timeline rendering, switch to cowork;
    sharing through Project grants. Web, desktop and mobile from the one Expo app.
-2. Lead bot role, Schedules and Heartbeats attached to a Bot, Routes targeting a Bot on external
-   channels, share links.
+2. Lead bot role, Schedules and Heartbeats attached to a Bot, share links. Routes that start a Bot
+   shipped app-side on 2026-10-06 (D15); a Hub-side Bot target is still open.
 3. Hosted Hosts from the Hub, a high-density in-process provider, Hub conversation plane for chats
    with several humans.
 

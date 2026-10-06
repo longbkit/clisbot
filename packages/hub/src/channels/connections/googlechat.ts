@@ -27,7 +27,13 @@ import { createSign } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative as relative_, resolve } from "node:path";
 import type { ChannelBotIdentity, Database } from "../../db/types.js";
-import { ChannelCredentialProbeError, probeFetch, probeJson, readString } from "./probe.js";
+import {
+  ChannelCredentialProbeError,
+  probeFetch,
+  probeJson,
+  readRecord,
+  readString,
+} from "./probe.js";
 
 /** Upstream's own endpoint constants (`google-auth.runtime.ts`). */
 const GOOGLE_AUTH_URI = "https://accounts.google.com/o/oauth2/auth";
@@ -37,6 +43,13 @@ const GOOGLE_CLIENT_CERTS_URL_PREFIX = "https://www.googleapis.com/robot/v1/meta
 const GOOGLE_AUTH_UNIVERSE_DOMAIN = "googleapis.com";
 /** The one scope the Chat REST client needs (`api.ts`). */
 const CHAT_BOT_SCOPE = "https://www.googleapis.com/auth/chat.bot";
+/** The scope the `pubsub` receive mode pulls under (`fusion/pubsub-api.ts`). */
+const PUBSUB_SCOPE = "https://www.googleapis.com/auth/pubsub";
+const PUBSUB_API_BASE = "https://pubsub.googleapis.com/v1";
+/** What `subscriptions.pull` and `acknowledge` are authorized by. */
+const PUBSUB_CONSUME_PERMISSION = "pubsub.subscriptions.consume";
+/** The vertical's own `isPubSubSubscriptionName`. */
+const SUBSCRIPTION_NAME = /^projects\/[^/\s]+\/subscriptions\/[^/\s]+$/u;
 /** Upstream's `MAX_GOOGLE_CHAT_SERVICE_ACCOUNT_FILE_BYTES`. */
 export const MAX_SERVICE_ACCOUNT_BYTES = 64 * 1024;
 /** Where the FILE form may read from (colon-separated). `CLISBOT_`-aliased. */
@@ -130,11 +143,11 @@ function base64url(value: string | Buffer): string {
 }
 
 /** The RS256 self-signed JWT Google exchanges for an access token. */
-function signAssertion(account: GoogleChatServiceAccount): string {
+function signAssertion(account: GoogleChatServiceAccount, scope: string): string {
   const issuedAt = Math.floor(Date.now() / 1000);
   const claims = {
     iss: account.client_email,
-    scope: CHAT_BOT_SCOPE,
+    scope,
     aud: account.token_uri,
     iat: issuedAt,
     exp: issuedAt + 3600,
@@ -153,17 +166,33 @@ function signAssertion(account: GoogleChatServiceAccount): string {
   }
 }
 
-/** Validate the document, then mint one access token from it. */
+/** Validate the document, mint one access token from it, and — when the
+ * Connection receives through Pub/Sub — check the service account may consume
+ * the subscription, so a missing grant fails here rather than at every pull. */
 export async function probeGoogleChatServiceAccount(
   document: unknown,
+  subscription?: string,
 ): Promise<ChannelBotIdentity> {
   const account = parseGoogleChatServiceAccount(document);
+  const scope = subscription === undefined ? CHAT_BOT_SCOPE : `${CHAT_BOT_SCOPE} ${PUBSUB_SCOPE}`;
+  const token = await mintAccessToken(account, scope);
+  if (subscription !== undefined) await probeSubscription(token, subscription);
+  return {
+    // The service account's own email is its stable identity; the Chat app's
+    // `users/<id>` is a space-scoped fact the vertical resolves at start.
+    id: account.client_email,
+    ...(account.project_id === undefined ? {} : { username: account.project_id }),
+    probedAt: new Date().toISOString(),
+  };
+}
+
+async function mintAccessToken(account: GoogleChatServiceAccount, scope: string): Promise<string> {
   const response = await probeFetch("Google", account.token_uri, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: signAssertion(account),
+      assertion: signAssertion(account, scope),
     }).toString(),
   });
   const body: unknown = await probeJson(response);
@@ -180,16 +209,60 @@ export async function probeGoogleChatServiceAccount(
       false,
     );
   }
-  if (readString(body, "access_token") === undefined) {
+  const token = readString(body, "access_token");
+  if (token === undefined) {
     throw new ChannelCredentialProbeError("Google returned no access token", false);
   }
-  return {
-    // The service account's own email is its stable identity; the Chat app's
-    // `users/<id>` is a space-scoped fact the vertical resolves at start.
-    id: account.client_email,
-    ...(account.project_id === undefined ? {} : { username: account.project_id }),
-    probedAt: new Date().toISOString(),
-  };
+  return token;
+}
+
+/** `testIamPermissions` needs no permission of its own, so it answers for a
+ * service account that holds nothing at all on the subscription. */
+async function probeSubscription(token: string, subscription: string): Promise<void> {
+  const response = await probeFetch(
+    "Pub/Sub",
+    `${PUBSUB_API_BASE}/${subscription}:testIamPermissions`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ permissions: [PUBSUB_CONSUME_PERMISSION] }),
+    },
+  );
+  const body: unknown = await probeJson(response);
+  if (response.status === 404) {
+    throw new ChannelCredentialProbeError(
+      `Pub/Sub subscription ${subscription} does not exist`,
+      true,
+    );
+  }
+  if (!response.ok) {
+    const detail = readString(readRecord(body, "error"), "message");
+    throw new ChannelCredentialProbeError(
+      `Pub/Sub refused the subscription check (${response.status})${detail === undefined ? "" : `: ${detail}`}`,
+      response.status === 400 || response.status === 403,
+    );
+  }
+  const granted: unknown =
+    body !== null && typeof body === "object" ? Reflect.get(body, "permissions") : undefined;
+  if (!Array.isArray(granted) || !granted.includes(PUBSUB_CONSUME_PERMISSION)) {
+    throw new ChannelCredentialProbeError(
+      `the service account cannot pull from ${subscription}: grant it Pub/Sub Subscriber on the subscription`,
+      true,
+    );
+  }
+}
+
+/** The subscription's resource name, or a refusal naming the expected form. */
+export function parseGoogleChatSubscription(value: string | undefined): string | undefined {
+  const subscription = value?.trim();
+  if (subscription === undefined || subscription === "") return undefined;
+  if (!SUBSCRIPTION_NAME.test(subscription)) {
+    throw new ChannelCredentialProbeError(
+      `Pub/Sub subscription must be projects/<project>/subscriptions/<name>, got ${subscription}`,
+      true,
+    );
+  }
+  return subscription;
 }
 
 /**
@@ -279,9 +352,11 @@ export async function configureGoogleChatConnection(
     accountId: string;
     serviceAccount?: string | undefined;
     serviceAccountFile?: string | undefined;
+    subscription?: string | undefined;
   },
 ): Promise<{ connectionId: string; identity: ChannelBotIdentity }> {
   const { serviceAccount, serviceAccountFile } = input;
+  const subscription = parseGoogleChatSubscription(input.subscription);
   if ((serviceAccount === undefined) === (serviceAccountFile === undefined)) {
     throw new ChannelCredentialProbeError(
       "Supply exactly one of the service-account document or its file path",
@@ -290,13 +365,15 @@ export async function configureGoogleChatConnection(
   }
   const document =
     serviceAccount ?? (await readServiceAccountFile(serviceAccountFile as unknown as string));
-  const identity = await probeGoogleChatServiceAccount(document);
+  const identity = await probeGoogleChatServiceAccount(document, subscription);
   const { connectionId } = await database.configureChannelConnection({
     organizationId: input.organizationId,
     channel: "googlechat",
     accountId: input.accountId,
-    credentials:
-      serviceAccountFile === undefined ? { serviceAccount: document } : { serviceAccountFile },
+    credentials: {
+      ...(serviceAccountFile === undefined ? { serviceAccount: document } : { serviceAccountFile }),
+      ...(subscription === undefined ? {} : { subscription }),
+    },
     identity,
   });
   return { connectionId, identity };

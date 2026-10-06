@@ -1,4 +1,5 @@
-import { MoreHorizontal } from "lucide-react-native";
+import { MoreHorizontal, Trash2, type LucideIcon } from "lucide-react-native";
+import { useMemo } from "react";
 import type { GestureResponderEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -13,6 +14,10 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import type { Theme } from "@/styles/theme";
 
 const ThemedMoreHorizontal = withUnistyles(MoreHorizontal);
+function PlainMenuIcon({ icon: Icon, color }: { icon: LucideIcon; color?: string }) {
+  return <Icon size={14} color={color} />;
+}
+const MenuIcon = withUnistyles(PlainMenuIcon);
 const mutedColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 // The menu can sit inside a row that presses (a Route row opens its editor).
 function keepPressInMenu(event: GestureResponderEvent) {
@@ -25,7 +30,24 @@ function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
 /** Infrequent actions share Clisbot's menu presentation and confirmation handoff. */
 export interface ChannelMenuAction {
   label: string;
+  /** Every item carries one, so the labels share a rail. */
+  icon: LucideIcon;
   onSelect(): void;
+}
+
+/** One item, its icon on the menu's leading rail. */
+function ChannelMenuItem({
+  label,
+  icon,
+  onSelect,
+  disabled,
+}: ChannelMenuAction & { disabled: boolean }) {
+  const leading = useMemo(() => <MenuIcon icon={icon} uniProps={mutedColor} />, [icon]);
+  return (
+    <DropdownMenuItem disabled={disabled} leading={leading} onSelect={onSelect}>
+      {label}
+    </DropdownMenuItem>
+  );
 }
 
 export function ChannelActionsMenu({
@@ -54,14 +76,16 @@ export function ChannelActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sheetTitle={label}>
         {actions.map((action) => (
-          <DropdownMenuItem key={action.label} disabled={disabled} onSelect={action.onSelect}>
-            {action.label}
-          </DropdownMenuItem>
+          <ChannelMenuItem
+            key={action.label}
+            label={action.label}
+            icon={action.icon}
+            onSelect={action.onSelect}
+            disabled={disabled}
+          />
         ))}
         {remove === undefined ? null : (
-          <DropdownMenuItem disabled={disabled} onSelect={remove}>
-            Remove
-          </DropdownMenuItem>
+          <ChannelMenuItem label="Remove" icon={Trash2} onSelect={remove} disabled={disabled} />
         )}
       </DropdownMenuContent>
     </DropdownMenu>

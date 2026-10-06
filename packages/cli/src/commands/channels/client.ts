@@ -88,10 +88,12 @@ export interface FeishuCredential {
   domain?: "feishu" | "lark";
 }
 
-/** The Google Chat credential: the service-account document, or a path to it. */
+/** The Google Chat credential: the service-account document, or a path to it,
+ * and the Pub/Sub subscription the account receives on. */
 export interface GoogleChatCredential {
   serviceAccount?: string;
   serviceAccountFile?: string;
+  subscription?: string;
 }
 
 export type ChannelAddInput = { setup?: ChannelSetupInput } & (

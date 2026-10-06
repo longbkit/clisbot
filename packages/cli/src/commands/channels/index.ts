@@ -133,11 +133,17 @@ function addInput(channel: string, account: string, options: CommandOptions): Ch
       ...(typeof profile === "string" && profile !== "" ? { profile } : {}),
     };
   }
-  return channelCredentialFromFile(
+  const input = channelCredentialFromFile(
     channel,
     account,
     readSecretFile(requiredStringOption(options, "secret-file")),
   );
+  // Not a secret, so it may ride argv; it overrides one named in the file.
+  const subscription = options["subscription"];
+  if (input.channel === "googlechat" && typeof subscription === "string" && subscription !== "") {
+    return { ...input, subscription };
+  }
+  return input;
 }
 
 export type ChannelsListResult = ListResult<ChannelAccount>;
@@ -196,6 +202,10 @@ export function createChannelsCommand(): Command {
         .requiredOption("--account <id>", "Account id to install")
         .option("--connection-id <uuid>", "Existing Hub connection id")
         .option("--profile <label>", "Zalo Personal only: the QR session label")
+        .option(
+          "--subscription <name>",
+          "Google Chat only: the Pub/Sub pull subscription, projects/<project>/subscriptions/<name>",
+        )
         .option(
           "--secret-file <path>",
           "Credential file: a bot token (Telegram, Discord, Zalo), a JSON app credential (Feishu), or a service-account document (Google Chat)",

@@ -56,8 +56,10 @@ export const CHANNEL_CREDENTIAL_FIELDS = [
   "appSecret",
   "verificationToken",
   "encryptKey",
+  "domain",
   "serviceAccount",
   "serviceAccountFile",
+  "subscription",
   "profile",
 ] as const;
 

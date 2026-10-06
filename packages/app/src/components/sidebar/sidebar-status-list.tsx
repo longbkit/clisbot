@@ -25,6 +25,14 @@ import {
   useWorkspaceSessionsRowPress,
 } from "@/clisbot/workspace-sessions/model";
 import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
+import {
+  StatusSessionLine,
+  type SidebarWorkspaceMenuActions,
+} from "@/clisbot/workspace-sessions/status-session-line";
+import type {
+  StatusDisplayGroup,
+  StatusSessionGroupItem,
+} from "@/clisbot/workspace-sessions/status-sessions";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { type SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -120,7 +128,7 @@ function statusWorkspaceKeyExtractor(workspace: SidebarWorkspaceEntry): string {
 }
 
 interface StatusWorkspaceListProps {
-  groups: SidebarWorkspaceGroup[];
+  groups: StatusDisplayGroup[];
   pinnedWorkspaces: SidebarWorkspaceEntry[];
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndexByWorkspaceKey: Map<string, number>;
@@ -296,7 +304,7 @@ function StatusGroupList({
   supportsPinningByServerId,
   onToggleWorkspacePin,
 }: {
-  groups: SidebarWorkspaceGroup[];
+  groups: StatusDisplayGroup[];
   collapsedWorkspaceGroupKeys: ReadonlySet<string>;
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndex: Map<string, number>;
@@ -306,7 +314,7 @@ function StatusGroupList({
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
-  const renderGroup = (group: SidebarWorkspaceGroup) => (
+  const renderGroup = (group: StatusDisplayGroup) => (
     <StatusGroupRows
       key={group.key}
       group={group}
@@ -334,7 +342,7 @@ function StatusGroupRows({
   supportsPinningByServerId,
   onToggleWorkspacePin,
 }: {
-  group: SidebarWorkspaceGroup;
+  group: StatusDisplayGroup;
   collapsed: boolean;
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndex: Map<string, number>;
@@ -345,11 +353,11 @@ function StatusGroupRows({
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
   const {
-    visibleItems: visibleWorkspaces,
+    visibleItems,
     expanded: workspacesExpanded,
     canToggle: canToggleWorkspaces,
     toggleExpanded: toggleWorkspacesExpanded,
-  } = useLimitedSidebarGroup(group.rows);
+  } = useLimitedSidebarGroup(group.items);
 
   return (
     <View style={collapsed ? undefined : styles.statusGroupBlockExpanded}>
@@ -359,22 +367,34 @@ function StatusGroupRows({
           style={styles.statusWorkspaceListContainer}
           testID={`sidebar-status-group-rows-${group.key}`}
         >
-          {visibleWorkspaces.map((workspace) => (
-            <StatusWorkspaceRow
-              key={workspace.workspaceKey}
-              workspace={workspace}
-              {...buildStatusRowProjectPresentation({
-                workspace,
-                projectIconByProjectViewKey,
-                hostBadgeByServerId,
-              })}
-              shortcutNumber={shortcutIndex.get(workspace.workspaceKey) ?? null}
-              showShortcutBadge={showShortcutBadges}
-              canPin={supportsPinningByServerId.get(workspace.serverId) === true}
-              onToggleWorkspacePin={onToggleWorkspacePin}
-              onWorkspacePress={onWorkspacePress}
-            />
-          ))}
+          {visibleItems.map((item) =>
+            item.kind === "session" ? (
+              <StatusSessionRow
+                key={item.key}
+                item={item}
+                shortcutNumber={shortcutIndex.get(item.key) ?? null}
+                showShortcutBadge={showShortcutBadges}
+                canPin={supportsPinningByServerId.get(item.workspace.serverId) === true}
+                onToggleWorkspacePin={onToggleWorkspacePin}
+                onWorkspacePress={onWorkspacePress}
+              />
+            ) : (
+              <StatusWorkspaceRow
+                key={item.key}
+                workspace={item.workspace}
+                {...buildStatusRowProjectPresentation({
+                  workspace: item.workspace,
+                  projectIconByProjectViewKey,
+                  hostBadgeByServerId,
+                })}
+                shortcutNumber={shortcutIndex.get(item.workspace.workspaceKey) ?? null}
+                showShortcutBadge={showShortcutBadges}
+                canPin={supportsPinningByServerId.get(item.workspace.serverId) === true}
+                onToggleWorkspacePin={onToggleWorkspacePin}
+                onWorkspacePress={onWorkspacePress}
+              />
+            ),
+          )}
           {canToggleWorkspaces ? (
             <SidebarGroupToggleRow
               expanded={workspacesExpanded}
@@ -581,6 +601,53 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   );
 });
 
+/**
+ * Clisbot: a session line under a status header, in its workspace row's place. It carries that
+ * row's menu and a shortcut number of its own; pressing it opens the workspace on the session.
+ */
+const StatusSessionRow = memo(function StatusSessionRow({
+  item,
+  shortcutNumber,
+  showShortcutBadge,
+  canPin,
+  onToggleWorkspacePin,
+  onWorkspacePress,
+}: {
+  item: StatusSessionGroupItem;
+  shortcutNumber: number | null;
+  showShortcutBadge: boolean;
+  canPin: boolean;
+  onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+  onWorkspacePress?: () => void;
+}) {
+  const { workspace } = item;
+  const activeWorkspaceSelection = useActiveWorkspaceSelection();
+  const selected =
+    activeWorkspaceSelection?.serverId === workspace.serverId &&
+    activeWorkspaceSelection?.workspaceId === workspace.workspaceId;
+  const { actions, isArchiving, renameModal } = useStatusWorkspaceActions({
+    workspace,
+    selected,
+    canPin,
+    onToggleWorkspacePin,
+  });
+  return (
+    <>
+      <StatusSessionLine
+        workspace={workspace}
+        session={item.session}
+        workspaceSelected={selected}
+        menuActions={actions}
+        menuDisabled={isArchiving}
+        shortcutNumber={shortcutNumber}
+        showShortcutBadge={showShortcutBadge}
+        onPress={onWorkspacePress}
+      />
+      {renameModal}
+    </>
+  );
+});
+
 function StatusWorkspaceRowWithMenu({
   workspace,
   hostBadge,
@@ -618,6 +685,53 @@ function StatusWorkspaceRowWithMenu({
   isDragging?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
 }) {
+  const { actions, isArchiving, renameModal } = useStatusWorkspaceActions({
+    workspace,
+    selected,
+    canPin,
+    onToggleWorkspacePin,
+  });
+
+  return (
+    <>
+      <StatusWorkspaceRowInner
+        workspace={workspace}
+        hostBadge={hostBadge}
+        projectName={projectName}
+        projectIconDataUri={projectIconDataUri}
+        selected={selected}
+        shortcutNumber={shortcutNumber}
+        showShortcutBadge={showShortcutBadge}
+        onPress={onPress}
+        isArchiving={isArchiving}
+        {...actions}
+        reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+        inStatusGroup={inStatusGroup}
+        drag={drag}
+        isDragging={isDragging}
+        dragHandleProps={dragHandleProps}
+      />
+      {renameModal}
+    </>
+  );
+}
+
+/**
+ * What a workspace's menus act with — archive, rename, copy, read state, pin — and the rename
+ * modal they open. A workspace row and, under Status grouping with Agent sessions on, each of
+ * the workspace's session lines (Clisbot) offer the same menu, so both call this.
+ */
+function useStatusWorkspaceActions({
+  workspace,
+  selected,
+  canPin,
+  onToggleWorkspacePin,
+}: {
+  workspace: SidebarWorkspaceEntry;
+  selected: boolean;
+  canPin: boolean;
+  onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+}): { actions: SidebarWorkspaceMenuActions; isArchiving: boolean; renameModal: ReactNode } {
   const { t } = useTranslation();
   const toast = useToast();
   const [isHidingWorkspace, setIsHidingWorkspace] = useState(false);
@@ -694,44 +808,53 @@ function StatusWorkspaceRowWithMenu({
     },
   });
 
-  return (
-    <>
-      <StatusWorkspaceRowInner
-        workspace={workspace}
-        hostBadge={hostBadge}
-        projectName={projectName}
-        projectIconDataUri={projectIconDataUri}
-        selected={selected}
-        shortcutNumber={shortcutNumber}
-        showShortcutBadge={showShortcutBadge}
-        onPress={onPress}
-        isArchiving={isArchiving}
-        archiveLabel={t("sidebar.workspace.actions.archive")}
-        archiveStatus={isArchiving ? "pending" : "idle"}
-        archivePendingLabel={t("sidebar.workspace.actions.archiving")}
-        onArchive={handleArchive}
-        onCopyBranchName={workspace.projectKind === "git" ? handleCopyBranchName : undefined}
-        onCopyPath={handleCopyPath}
-        onRename={handleOpenRename}
-        onMarkAsRead={hasClearableAttention ? handleMarkAsRead : undefined}
-        onMarkAsUnread={canMarkUnread ? handleMarkAsUnread : undefined}
-        archiveShortcutKeys={selected ? archiveShortcutKeys : null}
-        isPinned={isPinned}
-        onTogglePin={onTogglePin}
-        reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-        inStatusGroup={inStatusGroup}
-        drag={drag}
-        isDragging={isDragging}
-        dragHandleProps={dragHandleProps}
-      />
+  const isGit = workspace.projectKind === "git";
+  const actions = useMemo<SidebarWorkspaceMenuActions>(
+    () => ({
+      archiveLabel: t("sidebar.workspace.actions.archive"),
+      archiveStatus: isArchiving ? "pending" : "idle",
+      archivePendingLabel: t("sidebar.workspace.actions.archiving"),
+      onArchive: handleArchive,
+      onCopyBranchName: isGit ? handleCopyBranchName : undefined,
+      onCopyPath: handleCopyPath,
+      onRename: handleOpenRename,
+      onMarkAsRead: hasClearableAttention ? handleMarkAsRead : undefined,
+      onMarkAsUnread: canMarkUnread ? handleMarkAsUnread : undefined,
+      archiveShortcutKeys: selected ? archiveShortcutKeys : null,
+      isPinned,
+      onTogglePin,
+    }),
+    [
+      t,
+      isArchiving,
+      handleArchive,
+      isGit,
+      handleCopyBranchName,
+      handleCopyPath,
+      handleOpenRename,
+      hasClearableAttention,
+      handleMarkAsRead,
+      canMarkUnread,
+      handleMarkAsUnread,
+      selected,
+      archiveShortcutKeys,
+      isPinned,
+      onTogglePin,
+    ],
+  );
+
+  return {
+    actions,
+    isArchiving,
+    renameModal: (
       <WorkspaceRenameModal
         visible={isRenameOpen}
         workspace={workspace}
         onClose={handleCloseRename}
         testID={`sidebar-workspace-rename-modal-${workspace.workspaceKey}`}
       />
-    </>
-  );
+    ),
+  };
 }
 
 interface StatusWorkspaceRowInnerProps {

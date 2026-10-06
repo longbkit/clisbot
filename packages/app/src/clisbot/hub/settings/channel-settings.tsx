@@ -38,21 +38,28 @@ import {
   type Dispatch,
   type ReactElement,
   type ReactNode,
+  type RefObject,
   type SetStateAction,
 } from "react";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { hostConnectionPresentation } from "@/clisbot/hub/channel-host-connection";
 import { RouteHostProvider, useRouteHost } from "./route-host-context";
-import { ChannelActionsMenu } from "./channel-actions-menu";
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  FileCode2,
+  Gauge,
+  History,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Send,
+} from "lucide-react-native";
+import { ChannelActionsMenu, type ChannelMenuAction } from "./channel-actions-menu";
 import { ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { ChoiceRow } from "./channel-route-behavior-rows";
-import {
-  AddRouteRow,
-  DrillChevron,
-  DrillRow,
-  keepPressInControl,
-  RuntimeDetailRow,
-} from "./channel-list-rows";
+import { DrillChevron, DrillRow, keepPressInControl, RuntimeDetailRow } from "./channel-list-rows";
 import {
   FoldedRouteFormSection,
   FoldedRouteFormSubgroup,
@@ -82,7 +89,7 @@ import { useHubAccount } from "../account-provider";
 import { HubApiError } from "../api-client";
 import { hubResourceQueryKey } from "../query-keys";
 import {
-  CHANNEL_ROUTE_TARGET_VALUES,
+  channelRouteTargetValues,
   initialChannelRouteTarget,
   initialChannelReplyAnchor,
   initialDmReplyAnchor,
@@ -109,6 +116,16 @@ import {
   type ChannelRouteQuestions,
 } from "../channel-configuration";
 import { routeEffectiveAgent, type ChannelRouteTarget } from "../channel-route-target";
+import {
+  botLaunchChanged,
+  botRouteTarget,
+  routeBotKey,
+  routeBotMatch,
+  type RouteBotOption,
+  type RouteBotRequest,
+} from "../channel-route-bot";
+import { useRouteBotOptions } from "./channel-route-bot-options";
+import { BotTargetFields } from "./channel-route-bot-target";
 import { inheritedChannelRouteConversation } from "../channel-route-conversation";
 import { inheritedChannelRouteToolActivity } from "../channel-route-tool-activity";
 import {
@@ -170,7 +187,7 @@ import { useWideContent } from "./wide-content";
 import { ViewTabs, type ViewTab } from "./view-tabs";
 
 type RecordValue = ChannelConfigurationRecord;
-type RouteTarget = "agent" | "automation";
+type RouteTarget = "bot" | "agent" | "automation";
 type ConfigurationKind = "account" | "route";
 type HubConnection = z.infer<typeof HubConnectionsSchema>["connections"][number];
 type HubConnections = z.infer<typeof HubConnectionsSchema>;
@@ -192,6 +209,7 @@ const EMPTY_AUTOMATIONS: HubAutomations = { automations: [] };
 const EMPTY_DAEMONS: HubDaemons = { daemons: [] };
 const EMPTY_TEAMS: HubTeams = { teams: [] };
 const ROUTE_TARGET_LABELS = {
+  bot: "Start or continue a Bot",
   agent: "Start or continue an Agent",
   automation: "Run an Automation",
 };
@@ -215,6 +233,8 @@ type ChannelEditor =
       connect?: boolean;
       /** A Connection with no Routes yet, preselected in the picker. */
       connectionId?: string;
+      /** "Connect to a channel…" on a Bot: the Route starts on that Bot. */
+      bot?: RouteBotRequest;
     }
   | { kind: "edit"; route: EditingRoute };
 
@@ -228,7 +248,15 @@ export interface AutomationChannelScope {
 export function ChannelSettings({
   automationName,
   embedded = false,
-}: Partial<AutomationChannelScope> & { embedded?: boolean } = {}) {
+  connectBot = null,
+  onConnectBotOpened,
+}: Partial<AutomationChannelScope> & {
+  embedded?: boolean;
+  /** "Connect to a channel…" asked for Add Route on this Bot. */
+  connectBot?: RouteBotRequest | null;
+  /** Called once the Add Route form opened on `connectBot`, to clear the request. */
+  onConnectBotOpened?: () => void;
+} = {}) {
   const hub = useHubAccount();
   const router = useRouter();
   const adminScope = useChannelRouteAdminScope();
@@ -266,6 +294,8 @@ export function ChannelSettings({
         automationName={automationName}
         embedded={embedded}
         adminAccounts={adminScope.status === "accounts" ? adminScope.accounts : null}
+        connectBot={connectBot}
+        onConnectBotOpened={onConnectBotOpened}
       />
     </ConfirmationProvider>
   );
@@ -298,10 +328,14 @@ function ChannelSettingsContent({
   automationName,
   embedded,
   adminAccounts,
+  connectBot,
+  onConnectBotOpened,
 }: Partial<AutomationChannelScope> & {
   embedded: boolean;
   /** The accounts a Connection Admin administers; null for the organization capability. */
   adminAccounts: readonly ChannelAccountRef[] | null;
+  connectBot: RouteBotRequest | null;
+  onConnectBotOpened: (() => void) | undefined;
 }) {
   const [choosingInput, setChoosingInput] = useState(false);
   const toggleChoosingInput = useCallback(() => setChoosingInput((current) => !current), []);
@@ -348,6 +382,16 @@ function ChannelSettingsContent({
     },
     [channels.data?.revision?.id],
   );
+  useConnectBotEditor({
+    connectBot,
+    // An Automation's inputs and a Connection Admin's editor cannot pick what a Route runs.
+    allowed: automationName === undefined && adminAccounts === null,
+    ready: channels.data !== undefined,
+    editing: editor !== null,
+    confirm: confirmDialog,
+    beginEdit,
+    onOpened: onConnectBotOpened,
+  });
   const [panel, setPanel] = useState<ConnectionsPanel | null>(null);
   const closePanel = useCallback(() => setPanel(null), []);
   const [channelView, setChannelView] = useState<ChannelView>("accounts");
@@ -942,6 +986,57 @@ interface SourceQuery<Data> {
 }
 
 /**
+ * Opens Add Route on the Bot "Connect to a channel…" named, once per request; a request that ends
+ * (the query cleared) lets the same Bot be asked for again. A Route form being edited is
+ * discarded only when the user agrees.
+ */
+function useConnectBotEditor({
+  connectBot,
+  allowed,
+  ready,
+  editing,
+  confirm,
+  beginEdit,
+  onOpened,
+}: {
+  connectBot: RouteBotRequest | null;
+  allowed: boolean;
+  ready: boolean;
+  editing: boolean;
+  confirm: ReturnType<typeof useConfirmation>;
+  beginEdit(next: ChannelEditor): void;
+  onOpened: (() => void) | undefined;
+}) {
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (connectBot === null) {
+      opened.current = null;
+      return;
+    }
+    // Nothing here may pick what a Route runs: the request is spent.
+    if (!allowed) {
+      onOpened?.();
+      return;
+    }
+    const key = routeBotKey(connectBot.serverId, connectBot.botId);
+    if (!ready || opened.current === key) return;
+    opened.current = key;
+    onOpened?.();
+    void (async () => {
+      if (editing && !(await confirm(DISCARD_ROUTE_DRAFT))) return;
+      beginEdit({ kind: "add", accountKey: null, fixed: false, bot: connectBot });
+    })();
+  }, [allowed, beginEdit, confirm, connectBot, editing, onOpened, ready]);
+}
+
+const DISCARD_ROUTE_DRAFT = {
+  title: "Discard this Route?",
+  message: "Connect to a channel… opens a new Route. The Route you are editing is not saved.",
+  confirmLabel: "Discard",
+  destructive: true,
+};
+
+/**
  * Revision history and Advanced YAML: organization-wide and rarely needed, so
  * they open from the Connections menu above the list, one at a time.
  */
@@ -1289,13 +1384,15 @@ function ConnectionsPageActions({
 }) {
   const actions = useMemo(
     () => [
-      ...(refreshing ? [] : [{ label: "Refresh status", onSelect: refreshStatus }]),
-      { label: "View activity", onSelect: () => openActivity(null) },
+      ...(refreshing
+        ? []
+        : [{ label: "Refresh status", icon: RefreshCw, onSelect: refreshStatus }]),
+      { label: "View activity", icon: Activity, onSelect: () => openActivity(null) },
       ...(adminScoped
         ? []
         : [
-            { label: "Revision history", onSelect: () => openPanel("history") },
-            { label: "Advanced YAML", onSelect: () => openPanel("yaml") },
+            { label: "Revision history", icon: History, onSelect: () => openPanel("history") },
+            { label: "Advanced YAML", icon: FileCode2, onSelect: () => openPanel("yaml") },
           ]),
     ],
     [adminScoped, openActivity, openPanel, refreshStatus, refreshing],
@@ -1438,6 +1535,7 @@ function ChannelManagementSection({
           existingAccounts={channels.accounts}
           editing={editing}
           initialAccountKey={accountKey}
+          initialBot={requestedBot(editor)}
           fixedAccount={fixedAccount}
           createdConnectionId={createdConnectionId}
           pending={pending}
@@ -1477,6 +1575,10 @@ function preselectedConnectionId(editor: ChannelEditor): string | null {
   return editor.kind === "add" ? (editor.connectionId ?? null) : null;
 }
 
+function requestedBot(editor: ChannelEditor): RouteBotRequest | null {
+  return editor.kind === "add" ? (editor.bot ?? null) : null;
+}
+
 function channelEditorTitle(editor: ChannelEditor, addingConnection: boolean): string {
   if (editor.kind === "edit") return `Edit Route ${String(editor.route.routeIndex + 1)}`;
   return addingConnection ? "Add Connection" : "Add Route";
@@ -1485,7 +1587,8 @@ function channelEditorTitle(editor: ChannelEditor, addingConnection: boolean): s
 function channelFormKey(editor: ChannelEditor): string {
   if (editor.kind === "edit")
     return `${editor.route.accountKey}:${String(editor.route.routeIndex)}`;
-  return `add-route:${editor.accountKey ?? ""}:${String(editor.fixed)}:${String(editor.connect === true)}:${editor.connectionId ?? ""}`;
+  const bot = editor.bot === undefined ? "" : routeBotKey(editor.bot.serverId, editor.bot.botId);
+  return `add-route:${editor.accountKey ?? ""}:${String(editor.fixed)}:${String(editor.connect === true)}:${editor.connectionId ?? ""}:${bot}`;
 }
 
 interface ChannelAccountListProps {
@@ -1646,8 +1749,8 @@ function ChannelAccountRow({
         editRoute={props.editRoute}
         moveRoute={props.moveRoute}
         removeRoute={props.removeRoute}
+        addRoute={menu.addRoute}
       />
-      <AddRouteRow disabled={pending} onPress={menu.addRoute} />
     </View>
   );
 }
@@ -1688,11 +1791,14 @@ interface ConnectionMenu {
   addRoute(): void;
   /** Absent for a Connection with no Routes: there is nothing to switch. */
   toggleEnabled?: (value: boolean) => void;
-  actions: { label: string; onSelect(): void }[];
+  actions: ChannelMenuAction[];
   remove?: () => void;
 }
 
-/** What the card does: add a Route (its last row), switch it, and its … menu. */
+/**
+ * What the card does: switch it, and its … menu. Add Route heads the menu once
+ * the Connection has a Route; before that it is the card's empty row's button.
+ */
 function useConnectionMenu({
   account,
   key,
@@ -1719,19 +1825,27 @@ function useConnectionMenu({
     runtimeAvailable: props.runtimeAvailable,
     runtime,
   });
+  const routed = arrayField(account, "routes").length > 0;
   return useMemo(
     () => ({
       addRoute: () => addRouteTo(key),
       toggleEnabled: (value: boolean) => void updateAccount(account, { enabled: value }),
       actions: [
-        { label: "Send test message", onSelect: () => setTesting(true) },
+        ...(routed ? [{ label: "Add Route", icon: Plus, onSelect: () => addRouteTo(key) }] : []),
+        { label: "Send test message", icon: Send, onSelect: () => setTesting(true) },
         ...(canRetry
-          ? [{ label: "Retry runtime", onSelect: () => void retryAccount(account) }]
+          ? [
+              {
+                label: "Retry runtime",
+                icon: RotateCcw,
+                onSelect: () => void retryAccount(account),
+              },
+            ]
           : []),
-        { label: "View activity", onSelect: () => openActivity(key) },
+        { label: "View activity", icon: Activity, onSelect: () => openActivity(key) },
         // The bot's own limits, and each conversation's: Bot messages per
         // minute lives only here, since a post belongs to no sender.
-        { label: "Limits", onSelect: () => setLimitsOpen(true) },
+        { label: "Limits", icon: Gauge, onSelect: () => setLimitsOpen(true) },
       ],
       ...(props.adminScoped ? {} : { remove: () => void removeAccount(account) }),
     }),
@@ -1740,6 +1854,7 @@ function useConnectionMenu({
       addRouteTo,
       canRetry,
       key,
+      routed,
       openActivity,
       props.adminScoped,
       removeAccount,
@@ -1843,9 +1958,8 @@ function UnroutedConnectionCard({
         menu={menu}
       />
       <View style={settingsStyles.rowBorder}>
-        <EmptyRow message="Nobody can talk to this bot until it has a Route." />
+        <NoRoutesRow pending={pending} addRoute={menu.addRoute} />
       </View>
-      <AddRouteRow disabled={pending} onPress={menu.addRoute} />
     </View>
   );
 }
@@ -2046,6 +2160,7 @@ function ChannelAccountRouteList({
   editRoute,
   moveRoute,
   removeRoute,
+  addRoute,
 }: {
   automationName?: string;
   visible: boolean;
@@ -2061,6 +2176,8 @@ function ChannelAccountRouteList({
   editRoute(route: EditingRoute): void;
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
+  /** Offered on the empty row: a Connection's first Route. */
+  addRoute?: () => void;
 }) {
   const inherited = useMemo(
     () =>
@@ -2079,7 +2196,11 @@ function ChannelAccountRouteList({
   if (routes.length === 0) {
     return (
       <View style={settingsStyles.rowBorder}>
-        <EmptyRow message="No Routes yet: nobody can talk to this bot." />
+        {addRoute === undefined ? (
+          <EmptyRow message={NO_ROUTES_MESSAGE} />
+        ) : (
+          <NoRoutesRow pending={pending} addRoute={addRoute} />
+        )}
       </View>
     );
   }
@@ -2254,6 +2375,7 @@ function useRouteMenu({
           ? [
               {
                 label: "Move up",
+                icon: ArrowUp,
                 onSelect: () => void moveRoute(account, routeIndex, routeIndex - 1),
               },
             ]
@@ -2262,6 +2384,7 @@ function useRouteMenu({
           ? [
               {
                 label: "Move down",
+                icon: ArrowDown,
                 onSelect: () => void moveRoute(account, routeIndex, routeIndex + 1),
               },
             ]
@@ -2414,6 +2537,54 @@ function ChannelRevisionLine({ revision, active }: { revision: HubRevision; acti
   );
 }
 
+/**
+ * "Start or continue a Bot": the Bots on offer, the one picked, and what saving changes on the
+ * Route being edited. A stored Route turns out to be a Bot's only once the Bots load, so the form
+ * switches to it then, unless the user already picked a target.
+ */
+function useRouteBotTarget(input: {
+  daemons: HubDaemon[];
+  initialBot: RouteBotRequest | null;
+  editedRoute: RecordValue | undefined;
+  editedEnvironment: RecordValue | null;
+  /** The Route's named agent, before a Route default set from a conversation. */
+  editedNamedAgent: RecordValue | null;
+  targetChosen: RefObject<boolean>;
+  setTarget: Dispatch<SetStateAction<RouteTarget>>;
+}) {
+  const { daemons, initialBot, editedRoute, editedEnvironment, editedNamedAgent } = input;
+  const { targetChosen, setTarget } = input;
+  const { options, loading } = useRouteBotOptions(daemons);
+  const [key, setKey] = useState<string | null>(() =>
+    initialBot === null ? null : routeBotKey(initialBot.serverId, initialBot.botId),
+  );
+  const stored = useMemo(
+    () => routeBotMatch(editedRoute, editedEnvironment, options),
+    [editedRoute, editedEnvironment, options],
+  );
+  const adopted = useRef(false);
+  useEffect(() => {
+    if (stored === null || adopted.current) return;
+    adopted.current = true;
+    if (!targetChosen.current) setTarget("bot");
+    setKey((current) => current ?? stored.key);
+  }, [setTarget, stored, targetChosen]);
+  const selected = options.find((option) => option.key === key) ?? null;
+  return {
+    options,
+    loading,
+    offered: options.length > 0,
+    selected,
+    setKey,
+    /** The Bot the stored Route runs: saved as an Agent, it drops its `workspace.organize`. */
+    storedBot: stored,
+    launchChanged:
+      stored !== null && selected?.key === stored.key && botLaunchChanged(stored, editedNamedAgent),
+    /** Saving a Bot target removes a Route default set from a conversation (`agentControls`). */
+    replacesRouteDefault: editedRoute?.["agentControls"] !== undefined,
+  };
+}
+
 function ChannelAccountForm({
   automationName: fixedAutomationName,
   connections,
@@ -2426,6 +2597,7 @@ function ChannelAccountForm({
   existingAccounts,
   editing,
   initialAccountKey,
+  initialBot,
   fixedAccount,
   createdConnectionId,
   pending,
@@ -2448,6 +2620,8 @@ function ChannelAccountForm({
   existingAccounts: RecordValue[];
   editing: EditingRoute | null;
   initialAccountKey: string | null;
+  /** The Bot a new Route starts on ("Connect to a channel…"), or null. */
+  initialBot: RouteBotRequest | null;
   /** The Connection is shown, not picked: an edit, or Add Route inside a Connection. */
   fixedAccount: boolean;
   createdConnectionId: string | null;
@@ -2556,7 +2730,7 @@ function ChannelAccountForm({
 
   const [routeLimits, setRouteLimits] = useState<ChannelLimitsDraft>(initial.routeLimits);
   const [target, setTarget] = useState<RouteTarget>(() =>
-    initialChannelRouteTarget(isEditing, editedWorkflow),
+    initialBot === null ? initialChannelRouteTarget(isEditing, editedWorkflow) : "bot",
   );
   const [automationName, setAutomationName] = useState<string | null>(
     fixedAutomationName ?? editedWorkflow,
@@ -2576,6 +2750,16 @@ function ChannelAccountForm({
     initial.agentConfiguration,
   );
   const [providerOptions, setProviderOptions] = useState(initial.providerOptions);
+  const targetChosen = useRef(false);
+  const routeBot = useRouteBotTarget({
+    daemons,
+    initialBot,
+    editedRoute,
+    editedEnvironment: initial.editedEnvironment,
+    editedNamedAgent: initial.editedNamedAgent,
+    targetChosen,
+    setTarget,
+  });
   const selection = channelFormSelection({
     existingAccounts,
     existingAccountKey,
@@ -2699,6 +2883,7 @@ function ChannelAccountForm({
     existingTarget,
     target,
     automationName,
+    bot: routeBot.selected,
     daemonId,
     projectId,
     cwd,
@@ -2771,7 +2956,10 @@ function ChannelAccountForm({
       setBehavior((current) => ({ ...current, questions: value as ChannelRouteQuestions })),
     [],
   );
-  const changeTarget = useCallback((value: string) => setTarget(value as RouteTarget), []);
+  const changeTarget = useCallback((value: string) => {
+    targetChosen.current = true;
+    setTarget(value as RouteTarget);
+  }, []);
   const showAutomationForm = useCallback(() => {
     if (selectedConnection === undefined) {
       setAutomationCreateError("Choose a Connection before creating its Automation.");
@@ -2814,6 +3002,8 @@ function ChannelAccountForm({
     const routeTarget = formRouteTarget(existingTarget, {
       target,
       automationName,
+      bot: routeBot.selected,
+      leavesBot: routeBot.storedBot !== null,
       daemonId,
       projectId,
       cwd,
@@ -2853,7 +3043,7 @@ function ChannelAccountForm({
       route: nextRoute,
       target:
         existingTarget === null
-          ? routeTargetReviewLabel(target, automationName, agentConfiguration)
+          ? routeTargetReviewLabel(target, automationName, routeBot.selected, agentConfiguration)
           : routeTargetSummary(existingTarget),
       audience: audienceRules.map((rule) => ruleSummary(rule, audienceNames, inheritedConditions)),
     };
@@ -2900,6 +3090,8 @@ function ChannelAccountForm({
     selectedAccount,
     selectedConnection,
     target,
+    routeBot.selected,
+    routeBot.storedBot,
     workspace,
     previewWarnings,
   ]);
@@ -3095,33 +3287,48 @@ function ChannelAccountForm({
           disabled={pending}
         />
       );
+    // The Bot's fields follow the choice; only one of the three targets shows its fields.
     return (
-      <RouteTargetFields
-        target={target}
-        changeTarget={changeTarget}
-        automationName={automationName}
-        automationDisplay={automationDisplay}
-        automationOptions={automationOptions}
-        setAutomationName={setAutomationName}
-        automationCreatePending={automationCreatePending}
-        showAutomationCreator={showAutomationCreator}
-        showAutomationForm={showAutomationForm}
-        automationCreateError={automationCreateError}
-        daemonId={daemonId}
-        daemonDisplay={daemonDisplay}
-        daemonOptions={daemonOptions}
-        changeDaemon={changeDaemon}
-        projectId={projectId}
-        setProjectId={setProjectId}
-        cwd={cwd}
-        setCwd={setCwd}
-        workspace={workspace}
-        setWorkspace={setWorkspace}
-        selectedDaemonServerId={selectedDaemonServerId}
-        agentConfiguration={agentConfiguration}
-        setAgentConfiguration={setAgentConfiguration}
-        pending={pending}
-      />
+      <>
+        <RouteTargetFields
+          target={target}
+          targetValues={channelRouteTargetValues(routeBot.offered || target === "bot")}
+          changeTarget={changeTarget}
+          automationName={automationName}
+          automationDisplay={automationDisplay}
+          automationOptions={automationOptions}
+          setAutomationName={setAutomationName}
+          automationCreatePending={automationCreatePending}
+          showAutomationCreator={showAutomationCreator}
+          showAutomationForm={showAutomationForm}
+          automationCreateError={automationCreateError}
+          daemonId={daemonId}
+          daemonDisplay={daemonDisplay}
+          daemonOptions={daemonOptions}
+          changeDaemon={changeDaemon}
+          projectId={projectId}
+          setProjectId={setProjectId}
+          cwd={cwd}
+          setCwd={setCwd}
+          workspace={workspace}
+          setWorkspace={setWorkspace}
+          selectedDaemonServerId={selectedDaemonServerId}
+          agentConfiguration={agentConfiguration}
+          setAgentConfiguration={setAgentConfiguration}
+          pending={pending}
+        />
+        {target === "bot" ? (
+          <BotTargetFields
+            options={routeBot.options}
+            loading={routeBot.loading}
+            selected={routeBot.selected}
+            onChange={routeBot.setKey}
+            launchChanged={routeBot.launchChanged}
+            replacesRouteDefault={routeBot.replacesRouteDefault}
+            pending={pending}
+          />
+        ) : null}
+      </>
     );
   };
   const renderTarget = () => (
@@ -3195,7 +3402,7 @@ function routeLimitFields(draft: ChannelLimitsDraft): readonly ChannelLimitName[
   return [...ROUTE_TOTAL_LIMIT_NAMES, ...legacy];
 }
 const WHAT_RUNS_INFO =
-  "The Agent or Automation that answers, and how it runs. Permissions: what happens when the provider asks before running a tool. Accept automatically answers every request with Allow, for a provider with no mode that runs unattended, or whose own auto mode still asks for review. A question from the Agent is not a permission; anyone who may talk here can answer it.";
+  "The Bot, Agent or Automation that answers, and how it runs. Permissions: what happens when the provider asks before running a tool. Accept automatically answers every request with Allow, for a provider with no mode that runs unattended, or whose own auto mode still asks for review. A question from the Agent is not a permission; anyone who may talk here can answer it.";
 
 /**
  * The accounts and resource a save writes: the edited Route replaced in place, a Connection's first Route (a new account) appended, or a Route inserted into
@@ -3388,6 +3595,7 @@ function AutomationReplyAuthority({
 
 function RouteTargetFields({
   target,
+  targetValues,
   changeTarget,
   automationName,
   automationDisplay,
@@ -3413,6 +3621,7 @@ function RouteTargetFields({
   pending,
 }: {
   target: RouteTarget;
+  targetValues: string[];
   changeTarget(value: string): void;
   automationName: string | null;
   automationDisplay: { label: string; description?: string } | null;
@@ -3441,7 +3650,7 @@ function RouteTargetFields({
     <>
       <ChoiceRow
         label="What should happen"
-        values={CHANNEL_ROUTE_TARGET_VALUES}
+        values={targetValues}
         selected={target}
         labels={ROUTE_TARGET_LABELS}
         note={target === "automation" ? EXPERIMENTAL_ROUTE_TARGET_NOTE : undefined}
@@ -3460,7 +3669,8 @@ function RouteTargetFields({
           automationCreateError={automationCreateError}
           pending={pending}
         />
-      ) : (
+      ) : null}
+      {target === "agent" ? (
         <AgentTargetFields
           daemonId={daemonId}
           daemonDisplay={daemonDisplay}
@@ -3477,7 +3687,7 @@ function RouteTargetFields({
           setAgentConfiguration={setAgentConfiguration}
           pending={pending}
         />
-      )}
+      ) : null}
     </>
   );
 }
@@ -3662,6 +3872,20 @@ function QueryFeedback({
   }
   const error = queries.find((query) => query.error)?.error;
   return error ? <Alert variant="error" title={error.message} /> : null;
+}
+
+const NO_ROUTES_MESSAGE = "No Routes yet: nobody can talk to this bot.";
+
+/** A Connection's empty Routes, with the one thing to do next beside it. */
+function NoRoutesRow({ pending, addRoute }: { pending: boolean; addRoute(): void }) {
+  return (
+    <View style={settingsStyles.row}>
+      <Text style={[settingsStyles.rowHint, styles.shrink]}>{NO_ROUTES_MESSAGE}</Text>
+      <Button size="sm" variant="ghost" leftIcon={Plus} disabled={pending} onPress={addRoute}>
+        Add Route
+      </Button>
+    </View>
+  );
 }
 
 function EmptyRow({ message }: { message: string }) {
@@ -4039,10 +4263,11 @@ function channelFormInitialState(
   const editedEnvironmentName = stringField(editedRoute, "environment") ?? "";
   // What the Route really starts: a `/promoteroutedefault` layer
   // (`agentControls`) over the named agent, so the form shows what runs.
-  const editedAgent = routeEffectiveAgent(
-    objectField(objectField(resource, "agents") ?? EMPTY_RECORD, editedAgentName),
-    editedRoute,
+  const editedNamedAgent = objectField(
+    objectField(resource, "agents") ?? EMPTY_RECORD,
+    editedAgentName,
   );
+  const editedAgent = routeEffectiveAgent(editedNamedAgent, editedRoute);
   const editedEnvironment = objectField(
     objectField(resource, "environments") ?? EMPTY_RECORD,
     editedEnvironmentName,
@@ -4060,6 +4285,8 @@ function channelFormInitialState(
     routeLimits: channelLimitsDraft(editedLimits),
     routeLimitsAuthored: Object.keys(editedLimits).length > 0,
     ...environment,
+    editedEnvironment,
+    editedNamedAgent,
     agentConfiguration: managedAgentConfiguration(editedAgent),
     providerOptions: formatOptionalObject(objectField(editedAgent ?? EMPTY_RECORD, "options")),
   };
@@ -4253,6 +4480,7 @@ function routeSaveBlocker(input: {
   existingTarget: RecordValue | null;
   target: RouteTarget;
   automationName: string | null;
+  bot: RouteBotOption | null;
   daemonId: string | null;
   projectId: string | null;
   cwd: string;
@@ -4271,6 +4499,7 @@ function routeSaveBlocker(input: {
   if (input.existingTarget !== null) return null;
   if (input.target === "automation")
     return input.automationName === null ? "Choose an Automation." : null;
+  if (input.target === "bot") return input.bot === null ? "Choose a Bot." : null;
   return agentTargetBlocker(input);
 }
 
@@ -4303,6 +4532,9 @@ function formRouteTarget(
 function buildRouteTarget(input: {
   target: RouteTarget;
   automationName: string | null;
+  bot: RouteBotOption | null;
+  /** The stored Route ran a Bot: as an Agent's it stops keeping sessions in place. */
+  leavesBot: boolean;
   daemonId: string | null;
   projectId: string | null;
   cwd: string;
@@ -4314,6 +4546,7 @@ function buildRouteTarget(input: {
     if (input.automationName === null) return null;
     return { kind: "automation", automationName: input.automationName };
   }
+  if (input.target === "bot") return input.bot === null ? null : botRouteTarget(input.bot);
   if (input.daemonId === null || input.projectId === null || !input.parsedProviderOptions.valid) {
     return null;
   }
@@ -4328,6 +4561,7 @@ function buildRouteTarget(input: {
     thinkingOptionId: input.agentConfiguration.thinkingOptionId,
   };
   if (input.worktree !== undefined) target.worktree = input.worktree;
+  if (input.leavesBot) target.workspaceOrganize = "inherit";
   if (Object.keys(input.agentConfiguration.featureValues).length > 0) {
     target.featureValues = input.agentConfiguration.featureValues;
   }
@@ -4350,9 +4584,11 @@ function routeConfirmationTitle(
 function routeTargetReviewLabel(
   target: RouteTarget,
   automationName: string | null,
+  bot: RouteBotOption | null,
   agent: ManagedAgentConfigurationValue,
 ): string {
   if (target === "automation") return `Automation · ${automationName ?? "Unavailable"}`;
+  if (target === "bot") return `Bot · ${bot?.bot.name ?? "Unavailable"}`;
   const model = agent.model.length > 0 ? ` / ${agent.model}` : "";
   return `Agent · ${agent.provider}${model}`;
 }
@@ -4381,6 +4617,7 @@ function formatOptionalObject(value: RecordValue | null): string {
 
 const styles = StyleSheet.create((theme) => ({
   hidden: { display: "none" },
+  shrink: { flexShrink: 1 },
   testPreview: {
     gap: theme.spacing[4],
   },

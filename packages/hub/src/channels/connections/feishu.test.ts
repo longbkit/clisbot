@@ -127,6 +127,22 @@ describe("Feishu app-credential probe", () => {
     );
   });
 
+  it("keeps the platform the app was verified on", async () => {
+    stubFeishu();
+    const database = createMemoryDatabase({ organizationIds: ["org"] });
+    const { connectionId } = await configureFeishuConnection(database, {
+      organizationId: "org",
+      accountId: "lark",
+      credential: { appId: APP_ID, appSecret: APP_SECRET, domain: "lark" },
+    });
+    const stored = await database.resolveChannelConnection({
+      organizationId: "org",
+      channel: "feishu",
+      connectionId,
+    });
+    assert.equal(stored?.domain, "lark");
+  });
+
   it("reports a rejected app credential without echoing the secret", async () => {
     stubFeishu();
     const database = createMemoryDatabase({ organizationIds: ["org"] });

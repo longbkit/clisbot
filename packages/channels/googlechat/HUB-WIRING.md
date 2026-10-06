@@ -147,7 +147,52 @@ Neither the project id nor a Pub/Sub subscription is a credential here: this
 vertical uses the **HTTP webhook** delivery model, not Pub/Sub. If Pub/Sub push
 delivery is wanted later it is a second transport, not a second credential.
 
-## 6. The public endpoint — the one real blocker
+## 6a. Cloud Pub/Sub delivery (D-GC-020, 2026-10-06)
+
+**Problem.** The webhook needs a public HTTPS URL, and a Hub on a laptop or
+private host has none. Live E2E sat blocked on §6 for a month.
+
+**Options.** (1) Ship the Clisbot service-proxy route from §6 — still needs
+public DNS and a reachable host. (2) Cloud Pub/Sub: the Chat app publishes to
+a topic and the account pulls from a subscription, the way Hermes Agent runs
+Google Chat. Push subscriptions need a public URL again, so only pull counts.
+
+**Decision.** Pub/Sub pull, as a second transport mode beside `webhook`, and
+the only one the Hub drives: `webhook` is refused at compile until it has run
+end to end. It costs the operator a topic, a subscription and two IAM grants;
+it removes the public endpoint, the reverse proxy and the JWT audience
+settings.
+
+- **Vertical.** `fusion/pubsub-session.ts` pulls, admits each event through the
+  same `fusion/admission.ts` the webhook uses, acks after admission and
+  releases (ack deadline 0) when admission throws. `fusion/pubsub-api.ts` is
+  three REST calls; the token is minted from the same validated service account
+  under the Pub/Sub scope. No request verification: the pull is authenticated,
+  and only `chat-api-push@system.gserviceaccount.com` may publish to the topic.
+- **Mode.** The carrier forwards the compiled `transport` on the flat
+  `ctx.account`; `resolveGoogleChatReceiveMode` reads it, and an account with no
+  mode reads as `webhook`, which is all one could be before.
+- **Subscription.** A Connection credential field (non-secret, like Feishu's
+  `domain`): the Connection is probed against exactly that subscription with
+  `testIamPermissions(pubsub.subscriptions.consume)`, which needs no permission
+  of its own, so a missing Subscriber grant fails at create. An authored
+  `config.subscription` is the fallback.
+- **Publisher.** A Chat app built as a Workspace add-on (the console default)
+  publishes as `service-<project number>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`,
+  not `chat-api-push@system.gserviceaccount.com`; granting only the latter
+  leaves Chat answering "not responding". Found live 2026-10-06.
+- **Carrier.** The ported `actions.ts` / `channel-actions.ts` resolve the account
+  from `cfg` alone, so the credential rides `cfgAccount` as well as the flat
+  carrier. Without it `google-auth-library` silently fell back to the host's
+  Application Default Credentials and every send failed with
+  `ACCESS_TOKEN_SCOPE_INSUFFICIENT`; `outbound.ts` now refuses a missing
+  credential instead.
+- **Verified live** 2026-10-06: personal-account add-on Chat app, DM → Pub/Sub
+  → Hub → codex session → reply in the same DM.
+- **Not done.** Pub/Sub push, Workspace Events API subscriptions, a typing
+  indicator (upstream's placeholder message lives in the omitted `monitor.ts`).
+
+## 6. The public endpoint — the one real blocker (webhook mode)
 
 Google Chat delivers events by POSTing to a **public HTTPS URL** configured on
 the Chat app in the Google Cloud console. There is no polling or socket mode.

@@ -1381,14 +1381,14 @@ transport: { mode: webhook }
 // --- Slices 14b/15b/16b: Google Chat, Feishu, Zalo -------------------------------
 
 describe("channel compile: the later in-repo verticals", () => {
-  it("compiles a Google Chat account and carries its webhook knobs verbatim", () => {
+  it("compiles a Google Chat account and carries its vertical knobs verbatim", () => {
     const plane = compileChannelControlPlane(
       input({
         ["channels/googlechat/workspace.yml"]: `
 channel: googlechat
 accountId: workspace
 connectionId: googlechat-workspace
-transport: { mode: webhook }
+transport: { mode: pubsub }
 config:
   audienceType: app-url
   audience: https://chat.example.com/googlechat
@@ -1408,7 +1408,7 @@ routes:
     );
     const account = plane.accounts[0]!;
     assert.equal(account.channel, "googlechat");
-    assert.deepEqual(account.transport, { mode: "webhook" });
+    assert.deepEqual(account.transport, { mode: "pubsub" });
     // The vertical's own account resolution reads these; the Hub passes them
     // through untouched (`supervisor/account-carriers.ts` googlechat).
     assert.equal(account.config["audienceType"], "app-url");
@@ -1492,7 +1492,7 @@ config: { webhookPort: "8443" }
 channel: googlechat
 accountId: workspace
 connectionId: googlechat-workspace
-transport: { mode: webhook }
+transport: { mode: pubsub }
 config: { audienceType: project }
 `,
       },
@@ -1512,6 +1512,23 @@ config: { streamingCard: true }
       }),
     );
     assert.equal(plane.accounts[0]!.config["streamingCard"], true);
+  });
+
+  it("compiles a Google Chat account that receives through Pub/Sub", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        ["channels/googlechat/workspace.yml"]: `
+channel: googlechat
+accountId: workspace
+connectionId: googlechat-workspace
+transport: { mode: pubsub }
+config: { subscription: projects/demo/subscriptions/chat-events, botUser: users/1234 }
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.deepEqual(account.transport, { mode: "pubsub" });
+    assert.equal(account.config["subscription"], "projects/demo/subscriptions/chat-events");
   });
 
   it("refuses a transport mode the Hub cannot receive events on", () => {
@@ -1537,7 +1554,19 @@ transport: { mode: webhook }
       },
       /zalo webhook transport is not implemented/,
     );
-    // Google Chat has no alternative delivery model, so its webhook IS drivable.
+    // Google Chat's webhook has never run against Google, so it is refused too.
+    expectCompileError(
+      {
+        ["channels/googlechat/workspace.yml"]: `
+channel: googlechat
+accountId: workspace
+connectionId: googlechat-workspace
+transport: { mode: webhook }
+`,
+      },
+      /googlechat webhook transport is not implemented/,
+    );
+    // Anything else is not a mode at all.
     expectCompileError(
       {
         ["channels/googlechat/workspace.yml"]: `

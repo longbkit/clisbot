@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CHANNEL_ROUTE_TARGET_VALUES,
   channelMembersAudienceLabel,
+  channelRouteTargetValues,
   initialChannelRouteTarget,
   initialChannelReplyAnchor,
   initialDmReplyAnchor,
@@ -32,6 +33,10 @@ describe("Channel onboarding defaults", () => {
     expect(initialDmReplyAnchor(true, undefined)).toEqual({});
     expect(initialDmReplyAnchor(true, "default")).toEqual({ dmReplyAnchor: "default" });
     expect(initialDmReplyAnchor(true, "thread")).toEqual({ dmReplyAnchor: "thread" });
+  });
+  it("leads with a Bot only when there is one to pick", () => {
+    expect(channelRouteTargetValues(true)).toEqual(["bot", "agent", "automation"]);
+    expect(channelRouteTargetValues(false)).toEqual(["agent", "automation"]);
   });
   it("offers Agent first for new Routes and preserves an edited Automation target", () => {
     expect(CHANNEL_ROUTE_TARGET_VALUES).toEqual(["agent", "automation"]);

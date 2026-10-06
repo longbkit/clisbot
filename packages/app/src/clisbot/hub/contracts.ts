@@ -1086,6 +1086,9 @@ export const HubChannelCatalogEntrySchema = z.object({
       label: z.string(),
       requiredConfig: z.array(z.string()),
       setup: z.string(),
+      /** `false` = offered by the integration but not usable yet (the webhook
+       * transports). Absent from a Hub older than the field: usable. */
+      supported: z.boolean().optional(),
     }),
   ),
   credentials: z.array(

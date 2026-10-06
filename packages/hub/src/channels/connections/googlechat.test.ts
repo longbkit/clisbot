@@ -95,6 +95,36 @@ function stubGoogle(status = 200): { assertions: string[] } {
   return { assertions };
 }
 
+const SUBSCRIPTION = "projects/fusion-chat/subscriptions/chat-events";
+
+/** Google's token endpoint plus Pub/Sub's `testIamPermissions` on the subscription. */
+function stubGoogleWithPubSub(pubsub: { status?: number; permissions?: string[] }): {
+  scopes: string[];
+  checks: string[];
+} {
+  const scopes: string[] = [];
+  const checks: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : input.toString();
+    const body = typeof init?.body === "string" ? init.body : "";
+    if (url === "https://oauth2.googleapis.com/token") {
+      const assertion = new URLSearchParams(body).get("assertion") ?? "";
+      const claims = Buffer.from(assertion.split(".")[1] ?? "", "base64url").toString();
+      scopes.push(/"scope":"([^"]+)"/u.exec(claims)?.[1] ?? "");
+      return Response.json({ access_token: "ya29.fusion", expires_in: 3599 });
+    }
+    assert.equal(url, `https://pubsub.googleapis.com/v1/${SUBSCRIPTION}:testIamPermissions`);
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer ya29.fusion");
+    checks.push(body);
+    const status = pubsub.status ?? 200;
+    if (status !== 200) return Response.json({ error: { message: "nope" } }, { status });
+    return Response.json(
+      pubsub.permissions === undefined ? {} : { permissions: pubsub.permissions },
+    );
+  }) as typeof fetch;
+  return { scopes, checks };
+}
+
 describe("Google Chat service-account probe", () => {
   it("mints one access token from a signed assertion", async () => {
     const { assertions } = stubGoogle();
@@ -261,5 +291,61 @@ describe("Google Chat service-account probe", () => {
         assert.equal(mine, theirs, label);
       }
     }
+  });
+});
+
+describe("Google Chat Pub/Sub subscription probe", () => {
+  const document = JSON.stringify(serviceAccount());
+
+  it("checks the service account may consume the subscription, then stores it", async () => {
+    const { scopes, checks } = stubGoogleWithPubSub({
+      permissions: ["pubsub.subscriptions.consume"],
+    });
+    const database = createMemoryDatabase({ organizationIds: ["org"] });
+    const { connectionId } = await configureGoogleChatConnection(database, {
+      organizationId: "org",
+      accountId: "workspace",
+      serviceAccount: document,
+      subscription: ` ${SUBSCRIPTION} `,
+    });
+    assert.deepEqual(scopes, [
+      "https://www.googleapis.com/auth/chat.bot https://www.googleapis.com/auth/pubsub",
+    ]);
+    assert.deepEqual(
+      checks.map((body): unknown => JSON.parse(body)),
+      [{ permissions: ["pubsub.subscriptions.consume"] }],
+    );
+    assert.deepEqual(
+      await database.resolveChannelConnection({
+        organizationId: "org",
+        channel: "googlechat",
+        connectionId,
+      }),
+      { serviceAccount: document, subscription: SUBSCRIPTION },
+    );
+  });
+
+  it("refuses a subscription the service account cannot pull from", async () => {
+    stubGoogleWithPubSub({ permissions: [] });
+    await assert.rejects(probeGoogleChatServiceAccount(document, SUBSCRIPTION), (error) => {
+      assert.ok(error instanceof ChannelCredentialProbeError);
+      assert.match(error.message, /grant it Pub\/Sub Subscriber/u);
+      return true;
+    });
+  });
+
+  it("refuses a subscription that does not exist, and a malformed name before any call", async () => {
+    stubGoogleWithPubSub({ status: 404 });
+    await assert.rejects(probeGoogleChatServiceAccount(document, SUBSCRIPTION), /does not exist/u);
+    const database = createMemoryDatabase({ organizationIds: ["org"] });
+    await assert.rejects(
+      configureGoogleChatConnection(database, {
+        organizationId: "org",
+        accountId: "workspace",
+        serviceAccount: document,
+        subscription: "chat-events",
+      }),
+      /projects\/<project>\/subscriptions\/<name>/u,
+    );
   });
 });

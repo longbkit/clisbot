@@ -196,7 +196,7 @@ const DRIVABLE_TRANSPORT_MODES: Record<keyof typeof TRANSPORT_SCHEMAS, string> =
   slack: "socket",
   telegram: "polling",
   discord: "gateway",
-  googlechat: "webhook",
+  googlechat: "pubsub",
   feishu: "websocket",
   zalouser: "qr",
   zalo: "polling",

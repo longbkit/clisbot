@@ -37,6 +37,7 @@ import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import {
   connectChannelDaemon,
   connectEnrolledChannelDaemon,
+  connectNoHostChannelDaemon,
   type ChannelDaemonClientOptions,
   type DaemonConnection,
 } from "../daemon/client.js";
@@ -1714,6 +1715,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * Dialing the daemon back stays for the two cases that ask for it: an
    * explicit daemon target (dev, or a self-host that wants it), and an account
    * whose Host this Hub cannot resolve.
+   *
+   * An account with no Route (a Connection just added) has no Host to
+   * reach. Dialing would carry no admission ticket and be refused every 30s, so
+   * it gets a Host that is away: replies that need no agent, like `/status`,
+   * still go out, and its first Route changes the revision and restarts it.
    */
   private async connectAccountDaemon(
     daemonOptions: ChannelDaemonClientOptions,
@@ -1754,9 +1760,22 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           : { onSubagentUpdate: daemonOptions.onSubagentUpdate }),
       });
     }
+    if (compiled.routes.length === 0 && this.ridesHostConnections()) {
+      return connectNoHostChannelDaemon();
+    }
     this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
     await this.applyDaemonTarget(daemonOptions, handle, compiled, snapshot);
     return connectChannelDaemon(daemonOptions);
+  }
+
+  /** This Hub reaches Hosts over their own connections, and was not told to dial one. */
+  private ridesHostConnections(): boolean {
+    return (
+      this.options.hostSessions?.() !== undefined &&
+      this.options.resolveDaemonTarget !== undefined &&
+      this.options.daemon?.url === undefined &&
+      this.options.daemon?.host === undefined
+    );
   }
 
   /** The enrolled Host this account routes to, when there is one to ride. */

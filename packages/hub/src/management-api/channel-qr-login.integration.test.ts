@@ -349,7 +349,7 @@ it("publishes the channel catalog behind the same management authority", async (
       id: string;
       auth: string;
       status: string;
-      transports: { id: string; requiredConfig: string[] }[];
+      transports: { id: string; requiredConfig: string[]; supported: boolean }[];
       credentials: { key: string; secret: boolean }[];
       capabilities: string[];
       extraTools: string[];
@@ -378,7 +378,21 @@ it("publishes the channel catalog behind the same management authority", async (
       requiredConfig: ["profile"],
       setup:
         "Scan the QR code with the personal Zalo client; the Hub stores the resulting session encrypted at rest.",
+      supported: true,
     },
+  ]);
+  // The webhook transports are published, labelled, and not usable yet.
+  const unsupported = channels.flatMap((entry) =>
+    entry.transports
+      .filter((transport) => !transport.supported)
+      .map(({ id }) => `${entry.id}:${id}`),
+  );
+  assert.deepEqual(unsupported, [
+    "slack:webhook",
+    "telegram:webhook",
+    "googlechat:webhook",
+    "feishu:webhook",
+    "zalo:webhook",
   ]);
   assert.deepEqual(
     zalouser?.credentials.map((credential) => credential.key),

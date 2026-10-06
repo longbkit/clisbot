@@ -127,6 +127,9 @@ export async function configureFeishuConnection(
       ...(input.credential.encryptKey === undefined
         ? {}
         : { encryptKey: input.credential.encryptKey.trim() }),
+      // The platform the probe above verified the app on; the account must
+      // connect to the same one or its long connection is refused.
+      ...(input.credential.domain === undefined ? {} : { domain: input.credential.domain }),
     },
     identity,
   });

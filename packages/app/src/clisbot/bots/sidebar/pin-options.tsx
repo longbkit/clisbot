@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
-import { Archive, Pin, PinOff, Settings, Users } from "lucide-react-native";
+import { Archive, Pin, PinOff, Plug, Settings, Users } from "lucide-react-native";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useMenuContext } from "@/components/ui/menu";
 import type { Rect } from "@/components/ui/menu/menu-anchor";
@@ -12,12 +12,14 @@ const UnpinIcon = withUnistyles(PinOff);
 const SettingsIcon = withUnistyles(Settings);
 const GroupIcon = withUnistyles(Users);
 const ArchiveIcon = withUnistyles(Archive);
+const ConnectIcon = withUnistyles(Plug);
 const iconColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 const ICONS = {
   pin: <PinIcon size={16} uniProps={iconColor} />,
   unpin: <UnpinIcon size={16} uniProps={iconColor} />,
   "bot-settings": <SettingsIcon size={16} uniProps={iconColor} />,
+  "connect-channel": <ConnectIcon size={16} uniProps={iconColor} />,
   "group-settings": <GroupIcon size={16} uniProps={iconColor} />,
   archive: <ArchiveIcon size={16} uniProps={iconColor} />,
 };

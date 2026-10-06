@@ -25,6 +25,10 @@ export type ChannelRouteTarget =
       thinkingOptionId?: string;
       featureValues?: Record<string, unknown>;
       options?: Record<string, unknown>;
+      /** The Route's own `workspace.organize`. `off` on a Bot's Route: its sessions stay in the
+       * Bot's own Workspace (docs/features/bots-and-chats/README.md, D15). `inherit` when a Bot's
+       * Route becomes an Agent's: the Route drops its own setting. Absent keeps what it has. */
+      workspaceOrganize?: "off" | "inherit";
     };
 
 /**

@@ -19,6 +19,16 @@ import {
   type WorkspaceSessionSource,
 } from "./select-sessions";
 import { parseShownAgents, serializeShownAgents, type ShownAgents } from "./shown-agents";
+import {
+  buildStatusSessionShortcutModel,
+  sessionStatusDisplayGroups,
+  workspaceStatusDisplayGroups,
+  type StatusDisplayGroup,
+} from "./status-sessions";
+import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
+import type { SidebarProjection } from "@/components/sidebar/sidebar-projection";
+import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
+import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 
 const EMPTY_SOURCE: WorkspaceSessionSource = { agents: new Map(), messageSubmissions: new Map() };
 
@@ -190,6 +200,20 @@ export function useWorkspaceHasSessions(input: { serverId: string; workspaceId: 
   );
 }
 
+/**
+ * The session in a workspace's focused pane, read once rather than subscribed — for a keyboard
+ * shortcut that steps from the session line you are on.
+ */
+export function readFocusedAgentId(input: {
+  serverId: string;
+  workspaceId: string;
+}): string | undefined {
+  const persistenceKey = buildWorkspaceTabPersistenceKey(input);
+  if (!persistenceKey) return undefined;
+  const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[persistenceKey];
+  return parseShownAgents(serializeShownAgents(layout)).selectedAgentId ?? undefined;
+}
+
 /** Which agents the workspace is showing; nothing is read while `enabled` is false. */
 export function useWorkspaceShownAgents(input: {
   serverId: string;
@@ -230,4 +254,71 @@ export function useWorkspaceRowSelectionFill(input: WorkspaceRef & { selected: b
     });
   });
   return input.selected && !lineSelected;
+}
+
+/**
+ * What status grouping lists, and what Cmd+1…9 walk. With Agent sessions on, the sessions are
+ * grouped by their own status instead of their workspace's and the numbers follow those lines;
+ * off, both are upstream's workspace rows. One result feeds the list and the shortcuts, so a
+ * badge never names a line the list does not show.
+ */
+export function useStatusSidebarView(input: {
+  projection: SidebarProjection;
+  groupMode: SidebarGroupMode;
+  pinnedCollapsed: boolean;
+  collapsedWorkspaceGroupKeys: ReadonlySet<string>;
+}): { workspaceGroups: StatusDisplayGroup[]; shortcutModel: SidebarShortcutModel } {
+  const { visible, activeOnly } = useSidebarWorkspaceSessions();
+  const sessionsShown = visible && input.groupMode === "status";
+  const { projection, pinnedCollapsed, collapsedWorkspaceGroupKeys } = input;
+  const workspaceGroups = useStatusDisplayGroups({
+    groups: projection.workspaceGroups,
+    sessionsShown,
+    activeOnly,
+  });
+  const shortcutModel = useMemo(
+    () =>
+      sessionsShown
+        ? buildStatusSessionShortcutModel({
+            pinnedWorkspaces: projection.pinnedGroups.pinnedChats,
+            pinnedCollapsed,
+            groups: workspaceGroups,
+            collapsedGroupKeys: collapsedWorkspaceGroupKeys,
+          })
+        : projection.shortcutModel,
+    [sessionsShown, projection, pinnedCollapsed, workspaceGroups, collapsedWorkspaceGroupKeys],
+  );
+  return { workspaceGroups, shortcutModel };
+}
+
+/**
+ * Reads only the `agents` and `messageSubmissions` maps of the hosts the groups hold, one list
+ * each, so the shallow compare skips unrelated store updates.
+ */
+function useStatusDisplayGroups(input: {
+  groups: readonly SidebarWorkspaceGroup[];
+  sessionsShown: boolean;
+  activeOnly: boolean;
+}): StatusDisplayGroup[] {
+  const { groups, sessionsShown, activeOnly } = input;
+  const serverIds = useMemo(
+    () => (sessionsShown ? [...new Set(groups.flatMap((g) => g.rows.map((r) => r.serverId)))] : []),
+    [sessionsShown, groups],
+  );
+  const agentMaps = useSessionStore(
+    useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+  );
+  const submissionMaps = useSessionStore(
+    useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+  );
+  return useMemo(() => {
+    if (!sessionsShown) return workspaceStatusDisplayGroups(groups);
+    const sources = new Map<string, WorkspaceSessionSource>();
+    serverIds.forEach((serverId, index) => {
+      const agents = agentMaps[index];
+      const messageSubmissions = submissionMaps[index];
+      if (agents && messageSubmissions) sources.set(serverId, { agents, messageSubmissions });
+    });
+    return sessionStatusDisplayGroups({ groups, sources, activeOnly });
+  }, [sessionsShown, activeOnly, groups, serverIds, agentMaps, submissionMaps]);
 }

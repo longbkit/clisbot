@@ -2,6 +2,8 @@ import {
   matchesSessionMetadata,
   sessionMetadataRecoveryNotice,
 } from "@/clisbot/session-storage/directory";
+import { useStatusSidebarView } from "@/clisbot/workspace-sessions/model";
+import type { StatusDisplayGroup } from "@/clisbot/workspace-sessions/status-sessions";
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import {
   useSidebarWorkspacesList,
@@ -21,7 +23,7 @@ import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 import { buildSidebarProjection } from "./sidebar-projection";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
-import { filterWorkspacesByLabels, type SidebarWorkspaceGroup } from "./sidebar-labels";
+import { filterWorkspacesByLabels } from "./sidebar-labels";
 import { filterWorkspacesByProjects, resolveActiveProjectFilters } from "./sidebar-project-filter";
 import {
   hasAuthoritativeWorkspaceLabelCatalog,
@@ -42,7 +44,7 @@ interface SidebarModel extends SidebarWorkspacesListResult {
   resolvedProjectFilters: readonly string[];
   hasProjectsBeforeFilter: boolean;
   groupMode: SidebarGroupMode;
-  workspaceGroups: SidebarWorkspaceGroup[];
+  workspaceGroups: StatusDisplayGroup[];
   projectIconTargets: SidebarProjectIconTarget[];
   pinnedGroups: PinnedSidebarGroups;
   collapsedProjectKeys: ReadonlySet<string>;
@@ -177,6 +179,13 @@ export function SidebarModelProvider({
     ],
   );
   const projection = useMemo(() => buildSidebarProjection(projectionInput), [projectionInput]);
+  // Clisbot: with Agent sessions on, Status grouping lists sessions and the shortcuts walk them.
+  const statusView = useStatusSidebarView({
+    projection,
+    groupMode,
+    pinnedCollapsed,
+    collapsedWorkspaceGroupKeys,
+  });
   const metadataRecoveryNotice = useMemo(
     () => sessionMetadataRecoveryNotice(workspaceEntriesByKey.values(), hasMetadataFilter),
     [workspaceEntriesByKey, hasMetadataFilter],
@@ -191,12 +200,12 @@ export function SidebarModelProvider({
       hasProjectsBeforeFilter: list.projects.length > 0,
       workspaceEntriesByKey: filteredWorkspaceEntriesByKey,
       groupMode,
-      workspaceGroups: projection.workspaceGroups,
+      workspaceGroups: statusView.workspaceGroups,
       projectIconTargets: projection.projectIconTargets,
       pinnedGroups: projection.pinnedGroups,
       collapsedProjectKeys,
       toggleProjectCollapsed,
-      shortcutModel: projection.shortcutModel,
+      shortcutModel: statusView.shortcutModel,
     }),
     [
       metadataRecoveryNotice,
@@ -206,6 +215,8 @@ export function SidebarModelProvider({
       list,
       filteredProjects,
       projection,
+      statusView.workspaceGroups,
+      statusView.shortcutModel,
       toggleProjectCollapsed,
       filteredWorkspaceEntriesByKey,
     ],

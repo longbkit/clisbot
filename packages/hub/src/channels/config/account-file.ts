@@ -14,9 +14,9 @@ export const DEFAULT_TRANSPORT_MODE: Record<SupportedChannelName, string> = {
   slack: "socket",
   telegram: "polling",
   discord: "gateway",
-  // Google Chat has no other delivery model; the operator fronts the account's
-  // listener with a reverse proxy (packages/channels/googlechat/HUB-WIRING.md).
-  googlechat: "webhook",
+  // Pub/Sub needs no public URL; the webhook needs a reverse proxy in front of
+  // the account's listener (packages/channels/googlechat/HUB-WIRING.md).
+  googlechat: "pubsub",
   // The long connection and the long poll need no public URL, so they lead.
   feishu: "websocket",
   zalo: "polling",

@@ -504,9 +504,10 @@ const SECRET = { secret: true } as const;
 // an OpenClaw-authored account uncompilable.
 
 /** `channels.googlechat.accounts.<id>` — the keys `lifecycle/start-account.ts`
- * and `accounts.ts` read. `audienceType`/`audience`/`webhookUrl` are required
- * for the account to start; the compiler checks their TYPES here and the
- * vertical refuses the start when one is missing. */
+ * and `accounts.ts` read. In `webhook` mode `audienceType`/`audience`/`webhookUrl`
+ * are required for the account to start; in `pubsub` mode the subscription is.
+ * The compiler checks their TYPES here and the vertical refuses the start when
+ * one is missing. */
 export const GoogleChatAccountConfigSchema = z.looseObject({
   audienceType: z.enum(["app-url", "project-number"]).optional(),
   audience: z.string().min(1).optional(),
@@ -517,6 +518,9 @@ export const GoogleChatAccountConfigSchema = z.looseObject({
   webhookPath: z.string().min(1).optional(),
   webhookPort: z.number().int().min(1).max(65_535).optional(),
   webhookHost: z.string().min(1).optional(),
+  /** `pubsub` mode: `projects/<project>/subscriptions/<name>`. The Connection's
+   * subscription wins; this is the fallback for an account without one. */
+  subscription: z.string().min(1).optional(),
   /** `users/<id>`; without it mention detection only knows the `users/app` alias. */
   botUser: z.string().min(1).optional(),
   allowBots: z.boolean().optional(),

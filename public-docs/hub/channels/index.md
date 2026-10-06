@@ -1,6 +1,6 @@
 ---
 title: Hub channels
-description: The seven chat platforms a Hub can run an agent in, what each one can do, and which capabilities have live evidence.
+description: The eight chat platforms a Hub can run an agent in, what each one can do, and which capabilities have live evidence.
 nav: Channels
 order: 81
 category: Hub
@@ -27,14 +27,14 @@ Three resources make that work, and they are separate on purpose:
 
 [How Hub works](/docs/hub/concepts) covers the resource model. This section covers the platforms.
 
-## The seven channels
+## The eight channels
 
 | Channel                                      | Credential                                 | Inbound transport                  | Needs a public HTTPS URL |
 | -------------------------------------------- | ------------------------------------------ | ---------------------------------- | ------------------------ |
 | [Slack](/docs/hub/channels/slack)            | Bot token + app token                      | Socket Mode, or Events API webhook | Webhook only             |
 | [Telegram](/docs/hub/channels/telegram)      | Bot token                                  | Bot API polling, or webhook        | Webhook only             |
 | [Discord](/docs/hub/channels/discord)        | Bot token                                  | Gateway                            | No                       |
-| [Google Chat](/docs/hub/channels/googlechat) | Service-account JSON                       | HTTP webhook                       | **Yes, always**          |
+| [Google Chat](/docs/hub/channels/googlechat) | Service-account JSON + subscription        | Cloud Pub/Sub                      | No                       |
 | [Feishu / Lark](/docs/hub/channels/feishu)   | App ID + app secret (+ webhook secrets)    | Long connection, or webhook        | Webhook only             |
 | [Zalo Official Bot](/docs/hub/channels/zalo) | Bot token                                  | Bot API polling, or webhook        | Webhook only             |
 | [Zalo Personal](/docs/hub/channels/zalouser) | A QR-linked session for a personal account | Push socket                        | No                       |
@@ -509,7 +509,7 @@ A capability is only "verified live" when a message from a real account on the r
 | Slack             | Yes — mention → reply in thread, long chunked replies, outbound files (2026-09-07).                            |
 | Telegram          | Yes — mention → reply, forum topics, files in and out, edit and poll actions, `/new` and `/stop` (2026-09-07). |
 | Discord           | No. Tested against a simulated platform only; needs a bot token and a test guild.                              |
-| Google Chat       | No. Blocked on a public HTTPS endpoint and Workspace admin approval.                                           |
+| Google Chat       | Yes, DMs over Cloud Pub/Sub (2026-10-06). Spaces, cards and the HTTP endpoint are not verified.                |
 | Feishu / Lark     | No. Tested against a faked Lark SDK client only; needs Lark app credentials.                                   |
 | Zalo Official Bot | No. Polling E2E is runnable with a bot token and a human sender; not yet run.                                  |
 | Zalo Personal     | No. Needs a human to scan a QR code.                                                                           |

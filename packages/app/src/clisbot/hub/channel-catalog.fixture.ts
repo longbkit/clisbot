@@ -1,7 +1,8 @@
 /**
  * The `GET channel-catalog` response, captured verbatim from the Hub's own
  * catalog (`packages/hub/src/channels/catalog.ts`, through the projection in
- * `packages/hub/src/management-api/channel-catalog.ts`) on 2026-09-07.
+ * `packages/hub/src/management-api/channel-catalog.ts`) on 2026-09-07; the
+ * transports' `supported` flags added 2026-10-06.
  *
  * A fixture, not a mirror. The app no longer carries a copy of the catalog: this
  * exists so the contract and the model can be tested against the real payload
@@ -25,12 +26,14 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           label: "Socket Mode",
           requiredConfig: ["appToken", "botToken"],
           setup: "Create a Slack app, enable Socket Mode, and grant bot/app scopes.",
+          supported: true,
         },
         {
           id: "webhook",
           label: "Events API webhook",
           requiredConfig: ["signingSecret", "botToken"],
           setup: "Expose the Events API endpoint and configure the signing secret.",
+          supported: false,
         },
       ],
       credentials: [
@@ -95,12 +98,14 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           label: "Bot API polling",
           requiredConfig: ["botToken"],
           setup: "Create a BotFather bot and provide its token.",
+          supported: true,
         },
         {
           id: "webhook",
           label: "Bot API webhook",
           requiredConfig: ["botToken", "webhookUrl", "webhookSecret"],
           setup: "Expose HTTPS webhook URL and configure the secret token.",
+          supported: false,
         },
       ],
       credentials: [
@@ -168,6 +173,7 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           requiredConfig: ["token"],
           setup:
             "Create a Discord application, enable the Message Content intent, and invite the bot with the bot + applications.commands scopes.",
+          supported: true,
         },
       ],
       credentials: [
@@ -216,11 +222,20 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
       auth: "token",
       transports: [
         {
+          id: "pubsub",
+          label: "Cloud Pub/Sub",
+          requiredConfig: ["serviceAccount", "subscription"],
+          setup:
+            "In one Google Cloud project: enable the Chat and Pub/Sub APIs, create a service account and its JSON key, a topic and a pull subscription. Grant Pub/Sub Publisher on the topic to service-<project number>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com (or chat-api-push@system.gserviceaccount.com if the app is not built as a Workspace add-on), and Pub/Sub Subscriber on the subscription to your service account. Then choose Cloud Pub/Sub in the Chat app's connection settings and enter the topic.",
+          supported: true,
+        },
+        {
           id: "webhook",
           label: "Google Chat HTTP app",
           requiredConfig: ["serviceAccount", "audienceType", "audience", "webhookUrl"],
           setup:
             "Create a Google Chat app in Google Workspace, point its HTTP endpoint at a public HTTPS URL that reverse-proxies to the account's webhook listener, and grant the app's service account.",
+          supported: false,
         },
       ],
       credentials: [
@@ -237,6 +252,13 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           secret: true,
           required: false,
           help: "Absolute path to the service-account JSON on the daemon host.",
+        },
+        {
+          key: "subscription",
+          label: "Pub/Sub subscription",
+          secret: false,
+          required: false,
+          help: "projects/<project>/subscriptions/<name> — the pull subscription on the topic the Chat app publishes to. Required for Cloud Pub/Sub.",
         },
       ],
       capabilities: [
@@ -268,6 +290,7 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           requiredConfig: ["appId", "appSecret"],
           setup:
             "Create a Feishu/Lark custom app, add the bot, and enable Event subscription -> Use long connection.",
+          supported: true,
         },
         {
           id: "webhook",
@@ -275,6 +298,7 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           requiredConfig: ["appId", "appSecret", "verificationToken", "encryptKey"],
           setup:
             "Publish a public HTTPS URL for the app's request URL and copy the verification token and encrypt key.",
+          supported: false,
         },
       ],
       credentials: [
@@ -352,6 +376,7 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           requiredConfig: ["profile"],
           setup:
             "Scan the QR code with the personal Zalo client; the Hub stores the resulting session encrypted at rest.",
+          supported: true,
         },
       ],
       credentials: [
@@ -381,12 +406,14 @@ export const CHANNEL_CATALOG_RESPONSE: unknown = {
           label: "Bot API polling",
           requiredConfig: ["botToken"],
           setup: "Create a bot at bot.zaloplatforms.com and provide its token.",
+          supported: true,
         },
         {
           id: "webhook",
           label: "Zalo webhook",
           requiredConfig: ["botToken", "webhookUrl", "webhookSecret"],
           setup: "Register the bot webhook on a public HTTPS URL and set its secret token.",
+          supported: false,
         },
       ],
       credentials: [

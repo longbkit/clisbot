@@ -105,12 +105,10 @@ describe("channel catalog", () => {
     expect(feishu?.capabilities).not.toContain("native-actions");
 
     const googlechat = getChannelCatalogEntry("googlechat");
-    expect(googlechat?.transports.map((transport) => transport.id)).toEqual(["webhook"]);
-    expect(googlechat?.transports[0]?.requiredConfig).toEqual([
-      "serviceAccount",
-      "audienceType",
-      "audience",
-      "webhookUrl",
+    // Pub/Sub needs no public URL, so it leads.
+    expect(googlechat?.transports.map(({ id, requiredConfig }) => [id, requiredConfig])).toEqual([
+      ["pubsub", ["serviceAccount", "subscription"]],
+      ["webhook", ["serviceAccount", "audienceType", "audience", "webhookUrl"]],
     ]);
     // Attachment upload is user-OAuth only and inbound media is not downloaded.
     expect(googlechat?.capabilities).not.toContain("media");

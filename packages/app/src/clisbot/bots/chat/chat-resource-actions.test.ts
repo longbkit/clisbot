@@ -27,3 +27,25 @@ test("a Bot row never archives", () => {
     "bot-settings",
   ]);
 });
+
+test("a Bot row and its DM offer Connect to a channel… after settings; a group never", () => {
+  const input = { pinned: false, canConfigureBot: true, canConnectChannel: true };
+  expect(ids({ target: "bot", ...input })).toEqual(["pin", "bot-settings", "connect-channel"]);
+  expect(ids({ target: "direct", ...input })).toEqual([
+    "pin",
+    "bot-settings",
+    "connect-channel",
+    "archive",
+  ]);
+  expect(ids({ target: "group", ...input })).toEqual(["pin", "group-settings", "archive"]);
+  expect(chatResourceActions({ target: "bot", ...input })[2]?.label).toBe("Connect to a channel…");
+});
+
+test("Connect to a channel… needs the authority to add a Route", () => {
+  expect(ids({ target: "bot", pinned: false, canConnectChannel: false })).toEqual(["pin"]);
+  expect(ids({ target: "direct", pinned: false, canConnectChannel: true })).toEqual([
+    "pin",
+    "connect-channel",
+    "archive",
+  ]);
+});

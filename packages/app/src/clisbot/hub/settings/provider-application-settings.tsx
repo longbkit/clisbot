@@ -55,18 +55,15 @@ const PROVIDER_OPTIONS: SelectFieldOption<HubProviderApplicationProvider>[] =
     value: provider,
     label: providerLabel(provider),
   }));
+// Webhooks ("Let Slack send events to a public Hub HTTPS address") come back
+// once the webhook transports are run end to end; the channel catalog labels
+// them "Not supported yet" until then. One option leaves nothing to choose.
 const SLACK_DELIVERY_OPTIONS: SelectFieldOption<"socket" | "webhook">[] = [
   {
     id: "socket",
     value: "socket",
     label: "Socket Mode",
     description: "Connect from Hub to Slack. No public HTTPS address needed.",
-  },
-  {
-    id: "webhook",
-    value: "webhook",
-    label: "Webhooks",
-    description: "Let Slack send events to a public Hub HTTPS address.",
   },
 ];
 const NOOP = () => undefined;
@@ -465,7 +462,9 @@ function ProviderApplicationSheet({
             size={size}
           />
         ) : null}
-        {state.provider === "slack" && state.mode === "create" ? (
+        {state.provider === "slack" &&
+        state.mode === "create" &&
+        SLACK_DELIVERY_OPTIONS.length > 1 ? (
           <SelectField
             label="Delivery"
             value={state.transport ?? "socket"}

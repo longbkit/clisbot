@@ -231,7 +231,7 @@ const DEFAULT_TRANSPORT_MODES: Readonly<Record<string, string>> = {
   slack: "socket",
   telegram: "polling",
   discord: "gateway",
-  googlechat: "webhook",
+  googlechat: "pubsub",
   feishu: "websocket",
   zalo: "polling",
   zalouser: "qr",
@@ -285,6 +285,7 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
       ...audiencePolicy,
       agent: direct.resourceName,
       environment: direct.resourceName,
+      ...(input.target.workspaceOrganize === "off" ? { workspace: { organize: false } } : {}),
     };
   }
   return {
@@ -410,6 +411,8 @@ export function replaceChannelRouteCandidate(
   // (`routeEffectiveAgent`), so a rebuilt agent target already carries it.
   // Kept, the layer would override whatever the form just saved.
   if (input.target.kind === "agent") delete route["agentControls"];
+  if (input.target.kind === "agent" && input.target.workspaceOrganize === "inherit")
+    delete route["workspace"];
   const nextResource = removeUnusedPreviousTargets({
     resource: candidate.resource,
     accounts: input.accounts,

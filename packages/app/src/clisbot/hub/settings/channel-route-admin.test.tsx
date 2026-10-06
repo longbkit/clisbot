@@ -296,6 +296,7 @@ describe("Connection Admin", { timeout: 20_000 }, () => {
     expect(screen.getByText(/Managed by Organization Admins/)).toBeTruthy();
     // They add Routes to their own Connection, but never connect a new one.
     expect(screen.queryByRole("button", { name: "Add Connection" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
     expect(screen.queryByRole("button", { name: "Connect a new one" })).toBeNull();
     expect(screen.queryByLabelText("Connection")).toBeNull();

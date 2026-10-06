@@ -33,3 +33,14 @@ export const MOVED_HUB_SECTIONS: Readonly<
 export function buildHubSettingsRoute<const Section extends HubSectionSlug>(section: Section) {
   return `/settings/hub/${section}` as const;
 }
+
+/** The query that opens Channels' Add Route on a Bot ("Connect to a channel…"). */
+export const CONNECT_BOT_PARAMS = { bot: "connectBot", host: "connectBotHost" } as const;
+
+export function buildConnectBotToChannelRoute(serverId: string, botId: string) {
+  const query = new URLSearchParams({
+    [CONNECT_BOT_PARAMS.bot]: botId,
+    [CONNECT_BOT_PARAMS.host]: serverId,
+  });
+  return `${buildHubSettingsRoute("channels")}?${query.toString()}` as const;
+}

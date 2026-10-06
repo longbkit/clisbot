@@ -8,6 +8,7 @@ import type { BotPayload } from "../data/contracts";
 import { refreshBotsAndChatsNow } from "../data/runtime";
 import { chatResourceActions, type ChatResourceActionId } from "./chat-resource-actions";
 import { useArchiveChat } from "./use-archive-chat";
+import { useCanConnectBotToChannel, useOpenConnectBotToChannel } from "./use-connect-channel";
 
 type HostClient = NonNullable<ReturnType<typeof useHostRuntimeClient>>;
 
@@ -86,23 +87,33 @@ export function useChatResourceMenu(input: {
     close();
     router.push(buildHostBotRoute(serverId, directBot.id));
   }, [directBot, close, router, serverId]);
+  const canConnect = useCanConnectBotToChannel();
+  const openConnect = useOpenConnectBotToChannel();
+  const canConnectChannel = directBot !== undefined && canConnect(serverId);
+  const connectChannel = useCallback(() => {
+    if (!directBot) return;
+    close();
+    openConnect(serverId, directBot.id);
+  }, [directBot, close, openConnect, serverId]);
   const actions = useMemo(
     () =>
       chatResourceActions({
         target: group ? "group" : "direct",
         pinned,
         canConfigureBot: directBot?.canConfigure,
+        canConnectChannel,
       }),
-    [group, pinned, directBot?.canConfigure],
+    [group, pinned, directBot?.canConfigure, canConnectChannel],
   );
   const runAction = useCallback(
     (id: ChatResourceActionId) => {
       if (id === "pin") return togglePin(pin);
       if (id === "bot-settings") return configureBot();
+      if (id === "connect-channel") return connectChannel();
       if (id === "group-settings") return openGroupSettings();
       void archive();
     },
-    [archive, togglePin, pin, configureBot, openGroupSettings],
+    [archive, togglePin, pin, configureBot, connectChannel, openGroupSettings],
   );
   return { actions, runAction };
 }

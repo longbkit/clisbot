@@ -8,6 +8,7 @@ import { chatResourceActions, type ChatResourceActionId } from "../chat/chat-res
 import { useArchiveChat } from "../chat/use-archive-chat";
 import { buildGroupSettingsRoute } from "../chat/chat-panel-param";
 import { useCreationRequest } from "./creation-request";
+import { useCanConnectBotToChannel, useOpenConnectBotToChannel } from "../chat/use-connect-channel";
 export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonly PinChat[]) {
   const router = useRouter();
   const { pins, toggle: togglePin, isPinned } = useResourcePins(chats);
@@ -34,12 +35,15 @@ export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonl
     isPinned({ kind, serverId, id });
   const closeMenu = useCallback(() => setMenu(null), []);
   const archiveChat = useArchiveChat();
+  const canConnectChannel = useCanConnectBotToChannel();
+  const connectChannel = useOpenConnectBotToChannel();
   const [error, setError] = useState<string | null>(null);
   const actions = menu
     ? chatResourceActions({
         target: menu.kind === "bot" ? "bot" : "group",
         pinned: isPinned(menu),
         canConfigureBot: menu.canConfigure,
+        canConnectChannel: menu.kind === "bot" && canConnectChannel(menu.serverId),
       })
     : [];
   const selectAction = useCallback(
@@ -54,9 +58,10 @@ export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonl
         );
       onBeforeNavigate?.();
       if (id === "bot-settings") return router.push(buildHostBotRoute(menu.serverId, menu.id));
+      if (id === "connect-channel") return connectChannel(menu.serverId, menu.id);
       router.push(buildGroupSettingsRoute(menu.serverId, menu.id));
     },
-    [menu, closeMenu, togglePin, archiveChat, onBeforeNavigate, router],
+    [menu, closeMenu, togglePin, archiveChat, onBeforeNavigate, router, connectChannel],
   );
   return { pins, menu, pinned, onBotMenu, onChatMenu, closeMenu, actions, selectAction, error };
 }

@@ -9,7 +9,17 @@
 | Cách dùng        | Gửi tin nhắn vào conversation được cấu hình    | Chạy trực tiếp, nhận event hoặc nhận tin nhắn qua Channel |
 | Quyền người dùng | Khớp một audience rule của Route (Who + Where) | `automation.run` khi chạy trực tiếp                       |
 
-Channel có thể chuyển vào một Automation hoặc **Start or continue an Agent** trực tiếp. Vì vậy không phải mọi tin nhắn Channel đều tạo Workflow run. Trong Automation, chọn tiếp tục cùng Agent vẫn tạo một Automation run mới cho mỗi yêu cầu.
+Channel có thể chuyển vào một Automation, **Start or continue an Agent** hoặc **Start or continue a Bot** trực tiếp. Vì vậy không phải mọi tin nhắn Channel đều tạo Workflow run. Trong Automation, chọn tiếp tục cùng Agent vẫn tạo một Automation run mới cho mỗi yêu cầu.
+
+## Đưa một Bot ra Channel
+
+Owner/Admin thực hiện:
+
+1. Mở menu **…** của Bot trong sidebar, hoặc **Chat options** khi đang chat riêng với Bot, rồi chọn **Connect to a channel…**.
+2. Form **Add Route** mở với **Start or continue a Bot** và Bot đã chọn. Host, Project và cấu hình AI là của Bot, form chỉ hiển thị để xem.
+3. Chọn Connection có sẵn hoặc **Connect a new one**, đặt Rules (ai được nhắn, ở đâu) và cách trả lời, rồi **Activate Route**.
+
+Route dùng cấu hình AI của Bot tại thời điểm lưu. Khi đổi model của Bot, mở Route và lưu lại để Route dùng cấu hình mới.
 
 ## Cấu hình một Automation nhận việc qua chat
 

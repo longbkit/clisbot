@@ -168,6 +168,8 @@ const channelAddBodySchema = z.discriminatedUnion("channel", [
       serviceAccount: z.string().min(1).optional(),
       /** Or its absolute path on the daemon host, for a secret mount. */
       serviceAccountFile: z.string().min(1).optional(),
+      /** The Pub/Sub pull subscription the account receives on. */
+      subscription: z.string().min(1).optional(),
       connectionId: z.string().uuid().optional(),
       setup: ChannelOnboardingSchema.optional(),
     })
@@ -572,6 +574,7 @@ const CHANNEL_CONNECTION_STORES: Record<
           accountId: body.account,
           serviceAccount: body.serviceAccount,
           serviceAccountFile: body.serviceAccountFile,
+          subscription: body.subscription,
         })
       ).connectionId,
   }),

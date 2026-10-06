@@ -50,7 +50,7 @@ import { useSidebarFooterItems } from "@/sidebar-nav/use-sidebar-footer-items";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import type { PinnedSidebarGroups } from "@/hooks/use-sidebar-pins";
 import { RetainedPanelActivity } from "@/components/retained-panel";
-import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
+import type { StatusDisplayGroup } from "@/clisbot/workspace-sessions/status-sessions";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { type SidebarGroupMode, useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
@@ -74,7 +74,7 @@ const FOOTER_SEARCH_MIN_WIDTH = 104;
 
 interface SidebarSharedProps {
   theme: SidebarTheme;
-  workspaceGroups: SidebarWorkspaceGroup[];
+  workspaceGroups: StatusDisplayGroup[];
   projectIconTargets: SidebarProjectIconTarget[];
   pinnedGroups: PinnedSidebarGroups;
   projects: SidebarProjectEntry[];

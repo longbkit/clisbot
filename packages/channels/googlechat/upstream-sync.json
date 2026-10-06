@@ -59,7 +59,7 @@
     {
       "local": "src/fusion/account-config.ts",
       "status": "fusion-owned",
-      "deviation": ["D-GC-007"]
+      "deviation": ["D-GC-007", "D-GC-020"]
     },
     {
       "local": "src/fusion/admission.ts",
@@ -74,6 +74,20 @@
       "local": "src/fusion/inbound-adapter.ts",
       "status": "fusion-owned",
       "deviation": ["D-GC-013"]
+    },
+    {
+      "local": "src/fusion/pubsub-api.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-020"]
+    },
+    {
+      "local": "src/fusion/pubsub-session.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/pubsub-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-020"]
     },
     {
       "local": "src/fusion/runtime.ts",
@@ -133,7 +147,7 @@
     {
       "local": "src/lifecycle/start-account.ts",
       "status": "fusion-owned",
-      "deviation": ["D-GC-015"]
+      "deviation": ["D-GC-015", "D-GC-020"]
     },
     {
       "local": "src/message-tool-api.test.ts",
@@ -410,6 +424,12 @@
       "id": "D-GC-019",
       "reason": "Test-only, mechanical: `vi.mock(\"openclaw/plugin-sdk/...\")` targets are rewritten to the local module the ported file now imports \u2014 `@clisbot/channels-core/plugin-sdk/webhook-request-guards` / `.../webhook-targets` in `monitor-webhook.test.ts`, and `./fusion/ssrf-fetch.js` in `google-auth.runtime.test.ts` (D-GC-005). The sync check's normalizer collapses `from`/`import()` specifiers but not `vi.mock`'s first argument, so these two files cannot be marked verbatim. No case, fixture or assertion differs.",
       "file": "src/monitor-webhook.test.ts"
+    },
+    {
+      "id": "D-GC-020",
+      "reason": "Adds a Cloud Pub/Sub pull receive mode upstream does not have. Upstream's Chat app is an HTTP endpoint only, which needs a public HTTPS URL a private Host does not have; a Chat app with a Pub/Sub connection publishes its events to a topic the account pulls from. A message is acked only after durable admission and released (ack deadline 0) when admission throws. The Pub/Sub token is minted from the same validated service account under the Pub/Sub scope, outside the ported `auth.ts` cache, which holds the Chat scope only.",
+      "file": "src/fusion/pubsub-session.ts",
+      "tests": ["src/fusion/pubsub-session.test.ts"]
     }
   ]
 }

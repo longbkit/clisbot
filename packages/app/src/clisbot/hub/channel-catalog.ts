@@ -99,10 +99,29 @@ export function isConnectableChannel(entry: ChannelCatalogEntry): boolean {
   return entry.status === "in-repo";
 }
 
-/** The one-line prerequisite an operator reads before opening the setup form. */
+type ChannelTransport = ChannelCatalogEntry["transports"][number];
+
+/** Can a Connection use this transport today? The Hub marks the ones it cannot. */
+export function isSupportedTransport(transport: ChannelTransport): boolean {
+  return transport.supported !== false;
+}
+
+/** The transports a Connection can be made with, in catalog order. */
+export function supportedTransports(entry: ChannelCatalogEntry): ChannelTransport[] {
+  return entry.transports.filter(isSupportedTransport);
+}
+
+/**
+ * The one-line prerequisite an operator reads before opening the setup form:
+ * the required credentials a supported transport uses, so a webhook-only
+ * secret is not listed as something to fetch.
+ */
 export function channelPrerequisiteSummary(entry: ChannelCatalogEntry): string {
   if (entry.auth === "qr") return "QR scan from the provider's own app";
-  const required = entry.credentials.filter((credential) => credential.required);
+  const used = new Set(supportedTransports(entry).flatMap(({ requiredConfig }) => requiredConfig));
+  const required = entry.credentials.filter(
+    (credential) => credential.required && (used.size === 0 || used.has(credential.key)),
+  );
   const names = (required.length > 0 ? required : entry.credentials).map(({ label }) => label);
   return names.join(" · ");
 }

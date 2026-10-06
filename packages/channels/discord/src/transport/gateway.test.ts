@@ -371,6 +371,66 @@ describe("gateway faults", () => {
     controller.abort();
   });
 
+  it("normalizes the raw MESSAGE_CREATE envelope the gateway dispatches", async () => {
+    // `internal/gateway.ts` hands MESSAGE_CREATE listeners the raw `APIMessage`
+    // (structures are mapped after the queue claim), not the enriched dispatch
+    // data. Reading the raw payload as mapped data dropped every message.
+    const events: unknown[] = [];
+    const warned: unknown[][] = [];
+    const controller = new AbortController();
+    const run = runDiscordGateway({
+      accountId: "main",
+      token: "test-token",
+      botId: BOT_ID,
+      applicationId: "111111111111111111",
+      intents: 0,
+      abortSignal: controller.signal,
+      webSocketCtor: FakeGatewaySocket as unknown as typeof import("ws").WebSocket,
+      logger: {
+        warn: (...args: unknown[]) => void warned.push(args),
+        error: (...args: unknown[]) => void warned.push(args),
+      } as never,
+      onEvent: async (event) => void events.push(event),
+    });
+    const socket = FakeGatewaySocket.last!;
+    socket.emit(
+      "message",
+      JSON.stringify({
+        op: 0,
+        t: "MESSAGE_CREATE",
+        s: 1,
+        d: {
+          id: "300000000000000003",
+          channel_id: "400000000000000004",
+          guild_id: "500000000000000005",
+          author: { id: "200000000000000002", username: "alice", global_name: "Alice" },
+          member: { nick: "Ali", roles: [] },
+          content: `<@${BOT_ID}> hello`,
+          timestamp: "2026-09-07T10:00:00.000Z",
+          mentions: [{ id: BOT_ID, username: "bot" }],
+          attachments: [],
+          embeds: [],
+          type: 0,
+        },
+      }),
+    );
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+
+    expect(events[0]).toMatchObject({
+      externalMessageId: "300000000000000003",
+      externalConversationId: "400000000000000004",
+      chatType: "channel",
+      senderId: "200000000000000002",
+      senderName: "Ali",
+      body: `<@${BOT_ID}> hello`,
+      wasMentioned: true,
+      isOwnMessage: false,
+    });
+    expect(warned).toEqual([]);
+    controller.abort();
+    await run;
+  });
+
   it("resolves as a clean stop when the account is aborted", async () => {
     const controller = new AbortController();
     const run = runDiscordGateway({

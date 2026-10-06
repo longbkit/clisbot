@@ -24,7 +24,7 @@ export function botRowDetail(
 ): string | null {
   const parts: Record<BotRowItem, string | null | undefined> = {
     host: bot.hostName,
-    ...launchParts(bot.launch ?? {}, entry),
+    ...botLaunchLabels(bot.launch ?? {}, entry),
     role: bot.description?.trim(),
   };
   return joinShown(parts, items);
@@ -32,7 +32,8 @@ export function botRowDetail(
 
 type SnapshotModel = NonNullable<ProviderSnapshotEntry["models"]>[number];
 
-function launchParts(
+/** Provider, model, permission mode and thinking, named from the Host's provider snapshot. */
+export function botLaunchLabels(
   launch: BotLaunch,
   entry: ProviderSnapshotEntry | undefined,
 ): Record<"provider" | "model" | "mode" | "thinking", string | null | undefined> {

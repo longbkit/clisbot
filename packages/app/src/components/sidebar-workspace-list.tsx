@@ -100,7 +100,7 @@ import { hasVisibleOrderChanged, mergeWithRemainder } from "@/utils/sidebar-reor
 import { confirmDialog } from "@/utils/confirm-dialog";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { SidebarStatusWorkspaceList } from "@/components/sidebar/sidebar-status-list";
-import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
+import type { StatusDisplayGroup } from "@/clisbot/workspace-sessions/status-sessions";
 import {
   SidebarWorkspaceContextMenu,
   SidebarWorkspaceMenu,
@@ -221,7 +221,7 @@ function selectionForSelectedWorkspace(
 }
 
 interface SidebarWorkspaceListProps {
-  workspaceGroups: SidebarWorkspaceGroup[];
+  workspaceGroups: StatusDisplayGroup[];
   /** What `useProjectIcons` is asked for, straight from the projection. See `SidebarProjection`. */
   projectIconTargets: SidebarProjectIconTarget[];
   pinnedGroups: PinnedSidebarGroups;
@@ -2112,7 +2112,7 @@ function SidebarGroupedModeList({
   parentGestureRef,
   dragGestureHostActive,
 }: {
-  workspaceGroups: SidebarWorkspaceGroup[];
+  workspaceGroups: StatusDisplayGroup[];
   pinnedGroups: PinnedSidebarGroups;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;

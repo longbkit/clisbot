@@ -10,7 +10,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { resolveDiscordAccount } from "@clisbot/channels-discord/dist/accounts.js";
 import { resolveFeishuDriveAccount } from "@clisbot/channels-feishu/dist/fusion/account-config.js";
-import { resolveGoogleChatDriveAccount } from "@clisbot/channels-googlechat/dist/fusion/account-config.js";
+import { resolveGoogleChatAccount } from "@clisbot/channels-googlechat/dist/accounts.js";
+import {
+  resolveGoogleChatDriveAccount,
+  resolveGoogleChatReceiveMode,
+} from "@clisbot/channels-googlechat/dist/fusion/account-config.js";
 // Telegram has two `resolveTelegramAccount` readers; the drive-time one
 // (`client/bot-api.ts`, positional args) is the one the Hub's cfg feeds.
 import { resolveTelegramAccount } from "@clisbot/channels-telegram/dist/client/bot-api.js";
@@ -171,6 +175,17 @@ describe("drive-time account carriers", () => {
     assert.equal(account.enabled, true);
   });
 
+  it("connects a Feishu account to the platform its Connection was verified on", () => {
+    const built = buildAccountCarriers("feishu", {
+      accountId: ACCOUNT_ID,
+      compiled: compiledAccount("feishu", { domain: "feishu" }),
+      ...CREDENTIALS["feishu"],
+      domain: "lark",
+    });
+    assert.equal(built.account["domain"], "lark");
+    assert.equal(built.cfgAccount["domain"], "lark");
+  });
+
   it("keeps the Feishu connection's app secret authoritative over an authored one", () => {
     const account = resolveFeishuDriveAccount(driveCtx("feishu", { appSecret: "authored" }));
     assert.equal(account.config.appSecret, "feishu-secret");
@@ -205,9 +220,36 @@ describe("drive-time account carriers", () => {
     // The public endpoint's port and host ride through to the vertical's own
     // `node:http` listener (packages/channels/googlechat/HUB-WIRING.md §6).
     assert.equal(chatConfig["webhookPort"], 8443);
-    const { account: flat } = carriers("googlechat");
+    const { account: flat, cfg } = carriers("googlechat");
     assert.equal("botToken" in flat, false);
     assert.equal("token" in flat, false);
+    // The ported send path reads `cfg` alone; without the credential there it
+    // would sign with the host's Application Default Credentials.
+    const sendAccount = resolveGoogleChatAccount({ cfg, accountId: ACCOUNT_ID });
+    assert.equal(sendAccount.credentialSource, "inline");
+    assert.deepEqual(sendAccount.credentials, { type: "service_account" });
+  });
+
+  it("hands Google Chat its Pub/Sub mode and the Connection's subscription", () => {
+    const subscription = "projects/demo/subscriptions/chat-events";
+    const built = buildAccountCarriers("googlechat", {
+      accountId: ACCOUNT_ID,
+      compiled: { ...compiledAccount("googlechat"), transport: { mode: "pubsub" } },
+      serviceAccount: '{"type":"service_account"}',
+      subscription,
+    });
+    assert.deepEqual(
+      resolveGoogleChatReceiveMode(built.account, {
+        subscription: "projects/x/subscriptions/authored",
+      }),
+      { mode: "pubsub", subscription },
+    );
+    // A webhook account reads as one, and so does a carrier with no transport.
+    const { account: webhook } = carriers("googlechat");
+    assert.deepEqual(resolveGoogleChatReceiveMode(webhook, {}), { mode: "webhook" });
+    assert.deepEqual(resolveGoogleChatReceiveMode({ accountId: ACCOUNT_ID }, {}), {
+      mode: "webhook",
+    });
   });
 
   it("hands Zalo Personal a profile and its knobs — and no credential field", () => {

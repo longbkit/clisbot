@@ -1,8 +1,9 @@
 // L4 account lifecycle (blueprint §6.5 L4, start-account.md): resolve the
 // account and its service-account credential, install the account's ported
 // plugin runtime, register the L3 inbound processor, then hand off to the L2
-// webhook session. The startAccount promise resolves only when
-// `ctx.abortSignal` fires — "start" is the transport lifetime.
+// receive session — the webhook listener or the Pub/Sub pull loop (D-GC-020).
+// The startAccount promise resolves only when `ctx.abortSignal` fires — "start"
+// is the transport lifetime.
 //
 // Upstream's equivalent is `gateway.ts` + `monitor.ts`'s
 // `monitorGoogleChatProvider`: it binds a route on the OpenClaw gateway server,
@@ -15,8 +16,17 @@ import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-co
 import { normalizeOptionalLowercaseString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { probeGoogleChat } from "../api.js";
 import type { GoogleChatAudienceType } from "../auth.js";
-import { createGoogleChatAdmission } from "../fusion/admission.js";
-import { resolveGoogleChatDriveAccount } from "../fusion/account-config.js";
+import type { ResolvedGoogleChatAccount } from "../accounts.js";
+import {
+  createGoogleChatAdmission,
+  type GoogleChatWebhookAdmission,
+} from "../fusion/admission.js";
+import {
+  resolveGoogleChatDriveAccount,
+  resolveGoogleChatReceiveMode,
+} from "../fusion/account-config.js";
+import { createGoogleChatPubSubClient } from "../fusion/pubsub-api.js";
+import { startGoogleChatPubSubSession } from "../fusion/pubsub-session.js";
 import { installGoogleChatRuntime } from "../fusion/runtime.js";
 import {
   resolveGoogleChatWebhookMode,
@@ -49,7 +59,7 @@ export async function startGoogleChatAccount(
   hostRuntime: HostRuntime,
 ): Promise<void> {
   const log = ctx.log;
-  const { accountId, abortSignal } = ctx;
+  const { accountId } = ctx;
   if (ctx.cfg === undefined || ctx.cfg === null) {
     throw new Error("googlechat startAccount requires a runtime config (ctx.cfg)");
   }
@@ -59,30 +69,16 @@ export async function startGoogleChatAccount(
       `googlechat account "${accountId}" has no usable service-account credential (source=${account.credentialSource}, status=${account.tokenStatus ?? "unknown"})`,
     );
   }
-  // Google signs every inbound request for the configured audience, so an
-  // account without one cannot authenticate ANY delivery. Upstream reports this
-  // as a blocked account rather than starting a route that refuses everything.
-  const audienceType = normalizeAudienceType(account.config.audienceType);
-  const audience = account.config.audience?.trim();
-  if (audienceType === undefined || audience === undefined || audience === "") {
-    throw new Error(
-      `googlechat account "${accountId}" needs channels.googlechat.audienceType (app-url|project-number) and channels.googlechat.audience; without them no inbound request can be verified`,
-    );
-  }
-  const webhook = resolveGoogleChatWebhookMode(account.config);
-  if (webhook === null) {
-    throw new Error(
-      `googlechat account "${accountId}" has an unparseable webhookUrl; no inbound webhook route was registered`,
-    );
-  }
-  warnAppPrincipalMisconfiguration({
-    accountId,
-    audienceType,
-    ...(account.config.appPrincipal === undefined
-      ? {}
-      : { appPrincipal: account.config.appPrincipal }),
-    ...(log?.warn === undefined ? {} : { log: (message: string) => log.warn(message) }),
-  });
+  const receive = resolveGoogleChatReceiveMode(
+    ctx.account,
+    account.config as unknown as Record<string, unknown>,
+  );
+  // Validated before anything is installed, so a misconfigured account fails
+  // its start with the reason instead of starting a transport that can't receive.
+  const transport =
+    receive.mode === "pubsub"
+      ? preparePubSub(ctx, account, receive.subscription)
+      : prepareWebhook(ctx, account);
 
   installGoogleChatRuntime(hostRuntime, accountId);
   // The identity probe is a real Chat API call, so a bad credential fails the
@@ -99,32 +95,105 @@ export async function startGoogleChatAccount(
     ...(account.config.allowBots === undefined ? {} : { allowBots: account.config.allowBots }),
     handleInbound: (event) => inbound.handleInbound(event),
   });
-  const target: WebhookTarget = {
-    account,
-    config: ctx.cfg as unknown as OpenClawConfig,
-    runtime: {
-      ...(log?.info === undefined ? {} : { log: (message: string) => log.info?.(message) }),
-      ...(log?.error === undefined ? {} : { error: (message: string) => log.error?.(message) }),
-    },
-    core: getGoogleChatRuntime(accountId),
-    path: webhook.path,
-    audienceType,
-    audience,
-    mediaMaxMb: account.config.mediaMaxMb ?? 20,
-    ingress: admission,
-  };
-  log?.info?.("googlechat account started", { accountId, webhookPath: webhook.path });
-  ctx.setStatus({ state: "connected", accountId, webhookPath: webhook.path, audienceType });
+  log?.info?.("googlechat account started", { accountId, ...transport.status });
+  ctx.setStatus({ state: "connected", accountId, ...transport.status });
   try {
-    await startGoogleChatWebhookSession({
-      target,
-      webhook,
-      abortSignal,
-      ...(log === undefined ? {} : { logger: log }),
-      setStatus: (patch) => ctx.setStatus({ accountId, ...patch }),
-    });
+    await transport.run(admission);
   } finally {
     unregisterAccountInbound(accountId, hostRuntime);
     ctx.setStatus({ state: "stopped", accountId });
   }
+}
+
+interface PreparedTransport {
+  status: Record<string, unknown>;
+  run(admission: GoogleChatWebhookAdmission): Promise<void>;
+}
+
+function prepareWebhook(
+  ctx: StartAccountContext,
+  account: ResolvedGoogleChatAccount,
+): PreparedTransport {
+  const { accountId, log } = ctx;
+  const { audienceType, audience, webhook } = resolveWebhookPlacement(account, accountId);
+  warnAppPrincipalMisconfiguration({
+    accountId,
+    audienceType,
+    ...(account.config.appPrincipal === undefined
+      ? {}
+      : { appPrincipal: account.config.appPrincipal }),
+    ...(log?.warn === undefined ? {} : { log: (message: string) => log.warn(message) }),
+  });
+  return {
+    status: { webhookPath: webhook.path, audienceType },
+    run: (admission) => {
+      const target: WebhookTarget = {
+        account,
+        config: ctx.cfg as unknown as OpenClawConfig,
+        runtime: {
+          ...(log?.info === undefined ? {} : { log: (message: string) => log.info?.(message) }),
+          ...(log?.error === undefined ? {} : { error: (message: string) => log.error?.(message) }),
+        },
+        core: getGoogleChatRuntime(accountId),
+        path: webhook.path,
+        audienceType,
+        audience,
+        mediaMaxMb: account.config.mediaMaxMb ?? 20,
+        ingress: admission,
+      };
+      return startGoogleChatWebhookSession({
+        target,
+        webhook,
+        abortSignal: ctx.abortSignal,
+        ...(log === undefined ? {} : { logger: log }),
+        setStatus: (patch) => ctx.setStatus({ accountId, ...patch }),
+      });
+    },
+  };
+}
+
+/** Google signs every inbound request for the configured audience, so an
+ * account without one cannot authenticate ANY delivery. Upstream reports this
+ * as a blocked account rather than starting a route that refuses everything. */
+function resolveWebhookPlacement(account: ResolvedGoogleChatAccount, accountId: string) {
+  const audienceType = normalizeAudienceType(account.config.audienceType);
+  const audience = account.config.audience?.trim();
+  if (audienceType === undefined || audience === undefined || audience === "") {
+    throw new Error(
+      `googlechat account "${accountId}" needs channels.googlechat.audienceType (app-url|project-number) and channels.googlechat.audience; without them no inbound request can be verified`,
+    );
+  }
+  const webhook = resolveGoogleChatWebhookMode(account.config);
+  if (webhook === null) {
+    throw new Error(
+      `googlechat account "${accountId}" has an unparseable webhookUrl; no inbound webhook route was registered`,
+    );
+  }
+  return { audienceType, audience, webhook };
+}
+
+function preparePubSub(
+  ctx: StartAccountContext,
+  account: ResolvedGoogleChatAccount,
+  subscription: string | undefined,
+): PreparedTransport {
+  const { accountId, log } = ctx;
+  if (subscription === undefined) {
+    throw new Error(
+      `googlechat account "${accountId}" receives through Pub/Sub but its Connection names no subscription (projects/<project>/subscriptions/<name>)`,
+    );
+  }
+  const client = createGoogleChatPubSubClient(account, subscription);
+  return {
+    status: { subscription },
+    run: (admission) =>
+      startGoogleChatPubSubSession({
+        client,
+        admission,
+        subscription,
+        abortSignal: ctx.abortSignal,
+        ...(log === undefined ? {} : { logger: log }),
+        setStatus: (patch) => ctx.setStatus({ accountId, ...patch }),
+      }),
+  };
 }

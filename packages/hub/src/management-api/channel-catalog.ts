@@ -28,6 +28,8 @@ export interface ManagementChannelCatalogEntry {
     label: string;
     requiredConfig: readonly string[];
     setup: string;
+    /** `false`: offered by the integration, not usable by a Connection yet. */
+    supported: boolean;
   }[];
   credentials: readonly {
     key: string;
@@ -56,6 +58,7 @@ export function channelCatalogView(): readonly ManagementChannelCatalogEntry[] {
       label: transport.label,
       requiredConfig: [...transport.requiredConfig],
       setup: transport.setup,
+      supported: transport.supported,
     })),
     credentials: entry.credentials.map((credential) => ({ ...credential })),
     capabilities: [...entry.capabilities],

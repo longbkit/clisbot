@@ -10,8 +10,11 @@ depending on `googleapis`; that client (`api.ts`) is carried verbatim.
 
 Hub wiring landed in a follow-up slice. [HUB-WIRING.md](HUB-WIRING.md) is the
 handoff document it was built from and stays the record of what the Hub side owns;
-`../../../docs/features/channels/README.md` describes the platform as built. Live E2E remains
-blocked on the public HTTPS endpoint, not on the wiring.
+`../../../docs/features/channels/README.md` describes the platform as built. Inbound
+arrives over Cloud Pub/Sub pull, which needs no public URL; the ported HTTP
+webhook is refused by the Hub until it has run end to end
+([HUB-WIRING.md §6a](HUB-WIRING.md#6a-cloud-pubsub-delivery-d-gc-020-2026-10-06)).
+Operator setup lives in `public-docs/hub/channels/googlechat.md`.
 
 ## What a live test needs
 
@@ -41,6 +44,7 @@ reads `.env` and no value here is a real credential — only names.
 | Env var                                | What it must be                                                                                     |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `GOOGLECHAT_SERVICE_ACCOUNT_JSON_PATH` | Path to the service-account JSON key. Never commit the file.                                        |
+| `GOOGLECHAT_SUBSCRIPTION`              | `projects/<project>/subscriptions/<name>`, the pull subscription, for Pub/Sub delivery.             |
 | `GOOGLECHAT_PROJECT_NUMBER`            | The Cloud project number, for `audienceType: "project-number"`.                                     |
 | `GOOGLECHAT_APP_URL`                   | The public HTTPS endpoint configured on the Chat app, for `audienceType: "app-url"`.                |
 | `GOOGLECHAT_APP_PRINCIPAL`             | The app's numeric OAuth 2.0 client id (21 digits). Only for `app-url`.                              |
@@ -56,9 +60,10 @@ outbound smoke test only. The required proof is external sender → webhook →
 agent turn → reply in the same space, then a REST read-back
 (`GET /v1/spaces/{space}/messages`) matching the returned message resource name.
 
-**Live E2E is blocked until the public endpoint exists.** Google Chat has no
-polling or socket mode; it only POSTs to a public HTTPS URL. See
-[HUB-WIRING.md §6](HUB-WIRING.md#6-the-public-endpoint--the-one-real-blocker).
+Pub/Sub needs no public endpoint, so live E2E runs on the dev Hub with
+`GOOGLECHAT_SUBSCRIPTION` (`projects/<project>/subscriptions/<name>`) on the
+Connection. The webhook path stays blocked on a public endpoint
+([HUB-WIRING.md §6](HUB-WIRING.md#6-the-public-endpoint--the-one-real-blocker-webhook-mode)).
 
 ### Minimal account config
 
@@ -66,25 +71,23 @@ polling or socket mode; it only POSTs to a public HTTPS URL. See
 channel: googlechat
 accountId: main
 connectionId: <hub connection id>
-audienceType: project-number
-audience: "<GOOGLECHAT_PROJECT_NUMBER>"
-webhookUrl: "<GOOGLECHAT_PUBLIC_URL>"
-botUser: "<GOOGLECHAT_TEST_BOT_USER_ID>"
+transport: { mode: pubsub }
+config:
+  botUser: "<GOOGLECHAT_TEST_BOT_USER_ID>"
 routes:
-  - match: { kind: dm }
-    agent: <agent>
-    environment: <environment>
-  - match: { kind: channel, ids: ["<GOOGLECHAT_TEST_SPACE_ID>"] }
+  - audience: [{ who: { anyone: true }, where: { dm: true } }]
     agent: <agent>
     environment: <environment>
 ```
 
-The service-account document lives in the Hub connection's credentials under
-`serviceAccount` (or `serviceAccountFile`), not in this file.
+The service-account document and the subscription live in the Hub connection's
+credentials (`serviceAccount` or `serviceAccountFile`, and `subscription`), not
+in this file. A webhook account uses `transport: { mode: webhook }` with
+`audienceType`, `audience` and `webhookUrl` under `config`.
 
 ## Supported today
 
-**Inbound** (HTTP webhook): `MESSAGE` in spaces, group chats and DMs; a leading
+**Inbound** (Cloud Pub/Sub pull or HTTP webhook): `MESSAGE` in spaces, group chats and DMs; a leading
 `/verb` line classified as a `command`; `CARD_CLICKED` as a `callback` carrying
 the button's action id, its parameter value and the clicking user;
 `ADDED_TO_SPACE` / `REMOVED_FROM_SPACE` as `member` events. Mention detection
@@ -131,8 +134,7 @@ Named here so nothing above is read as more than it is.
 - **Reactions, pin, read-back, emoji discovery, polls** — no service-account API
   on this channel. `supportsAction` refuses them, so the Hub answers
   `unsupported_action` rather than a transport error.
-- **Pub/Sub push delivery** — this vertical implements the HTTP webhook model
-  only.
+- **Pub/Sub push delivery** — push needs a public URL again; the vertical pulls.
 - **Proxy support for the auth transport** — upstream routes google-auth through
   OpenClaw's pinned-dispatcher stack, which honours explicit/env proxies and
   client TLS certs. The Fusion guard accepts a `dispatcherPolicy` and ignores it

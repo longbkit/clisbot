@@ -97,14 +97,16 @@ export function readGoogleChatSecret(contents: string): GoogleChatCredential {
   // The file the Google Cloud console downloads IS the credential; recognise it
   // rather than making the operator wrap it in another object.
   if (field(record, "client_email") !== undefined) return { serviceAccount: contents };
+  const subscription = field(record, "subscription");
+  const extra = subscription === undefined ? {} : { subscription };
   const serviceAccountFile = field(record, "serviceAccountFile");
-  if (serviceAccountFile !== undefined) return { serviceAccountFile };
+  if (serviceAccountFile !== undefined) return { serviceAccountFile, ...extra };
   const serviceAccount = record["serviceAccount"];
   if (typeof serviceAccount === "string" && serviceAccount.trim() !== "") {
-    return { serviceAccount: serviceAccount.trim() };
+    return { serviceAccount: serviceAccount.trim(), ...extra };
   }
   if (serviceAccount !== null && typeof serviceAccount === "object") {
-    return { serviceAccount: JSON.stringify(serviceAccount) };
+    return { serviceAccount: JSON.stringify(serviceAccount), ...extra };
   }
   invalid(
     "The Google Chat secret file must be a service-account document, or name `serviceAccount` or `serviceAccountFile`.",

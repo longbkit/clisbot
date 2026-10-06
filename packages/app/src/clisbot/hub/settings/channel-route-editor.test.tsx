@@ -8,6 +8,7 @@ import { HubApiError } from "../api-client";
 import { CHANNEL_CATALOG_RESPONSE } from "../channel-catalog.fixture";
 import { ChannelSettings } from "./channel-settings";
 import { HubSettingsDetailScrollProvider } from "./detail-scroll";
+import type { RouteBotOption } from "../channel-route-bot";
 
 const adapters = vi.hoisted(() => ({
   delete: vi.fn(),
@@ -20,7 +21,16 @@ const adapters = vi.hoisted(() => ({
   canManage: true,
   accountId: "owner",
   teamMembers: [] as { id: string; name: string; role?: string }[],
+  botOptions: [] as RouteBotOption[],
+  botListeners: new Set<() => void>(),
 }));
+/** Bots arriving after the form opened, as the Hosts answer. */
+function loadBots(options: RouteBotOption[]) {
+  act(() => {
+    adapters.botOptions = options;
+    for (const listener of adapters.botListeners) listener();
+  });
+}
 vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
     enabled: true,
@@ -299,6 +309,19 @@ vi.mock("./managed-workspace-fields", () => ({
   WORK_LOCATION_OPTIONS: [],
   WorktreeTargetFields: () => null,
 }));
+vi.mock("./channel-route-bot-options", () => ({
+  useRouteBotOptions: function BotOptionsAdapter() {
+    const [, rerender] = React.useReducer((count: number) => count + 1, 0);
+    React.useEffect(() => {
+      adapters.botListeners.add(rerender);
+      return () => void adapters.botListeners.delete(rerender);
+    }, []);
+    return { options: adapters.botOptions, loading: false };
+  },
+}));
+vi.mock("@/hooks/use-providers-snapshot", () => ({
+  useProvidersSnapshot: () => ({ entries: undefined }),
+}));
 vi.mock("./automation-settings", () => ({
   SingleAgentAutomationForm: function TestAutomation(props: { save(yaml: string): Promise<void> }) {
     const save = React.useCallback(() => void props.save("name: new-support"), [props]);
@@ -404,6 +427,7 @@ beforeEach(() => {
   adapters.canManage = true;
   adapters.accountId = "owner";
   adapters.teamMembers = [];
+  adapters.botOptions = [];
 });
 afterEach(() => {
   cleanup();
@@ -416,6 +440,13 @@ function startTestMessage() {
   fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
   fireEvent.click(screen.getByRole("button", { name: "Send test message" }));
   fireEvent.click(screen.getByRole("button", { name: "Preview and send" }));
+}
+/** Add Route on a Connection that has a Route heads the Connection's menu. */
+async function addRouteFromMenu(accountId = "support") {
+  fireEvent.click(
+    await screen.findByRole("button", { name: `Actions for ${accountId}` }, { timeout: 10_000 }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
 }
 /** Revision history and Advanced YAML open from the Connections page menu. */
 function openPagePanel(name: "Advanced YAML" | "Revision history") {
@@ -523,7 +554,11 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByText("Running")).toBeTruthy();
     expect(screen.queryByText(/1 route/)).toBeNull();
     expect(screen.queryByText(/First match wins/)).toBeNull();
+    // A Connection with a Route adds the next one from its menu, first item.
+    expect(screen.queryByRole("button", { name: "Add Route" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
     expect(screen.getByRole("button", { name: "Add Route" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for support" }));
     expect(screen.getByRole("button", { name: "Add Connection" })).toBeTruthy();
     // Where messages go, one line per Rule, then how it answers; no "Route 1"
     // for a single Route.
@@ -1283,7 +1318,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     );
     renderChannels();
     await screen.findByRole("button", { name: /^Edit Route/ });
-    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    await addRouteFromMenu();
     // The Host's Projects and providers load from the runtime it resolves to.
     expect(screen.getByLabelText("Selected Host runtime").textContent).toBe(expected);
   });
@@ -1293,7 +1328,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     await screen.findByRole("button", { name: /^Edit Route/ });
     // The card's Add Route belongs to that Connection, so the form names it
     // instead of offering a picker.
-    fireEvent.click(screen.getByRole("button", { name: "Add Route" }));
+    await addRouteFromMenu();
     expect(screen.queryByLabelText("Connection")).toBeNull();
     expect(screen.queryByRole("button", { name: "Connect a new one" })).toBeNull();
     expect(screen.queryByLabelText("Name")).toBeNull();
@@ -1341,7 +1376,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByLabelText("Provider options")).toBeNull();
     expect(screen.getByRole("button", { name: "Activate Route" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByRole("button", { name: "Add Route" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Actions for support" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
   });
 
@@ -1439,7 +1474,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByText("Telegram · new-account")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
     // The saved Route closed the form: the new Connection is on the page with its Route.
-    expect(screen.getAllByRole("button", { name: "Add Route" })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Actions for new-account" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
     fireEvent.click(screen.getByRole("button", { name: "Use an existing Connection" }));
     expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("");
@@ -1530,6 +1565,13 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.getByLabelText("App ID")).toBeTruthy();
     expect(screen.getByLabelText("App secret")).toBeTruthy();
     expect(screen.getByLabelText("Domain")).toBeTruthy();
+    // Lark is the default, and each platform says which console it is for.
+    expect(screen.getByRole("radio", { name: "Lark" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Feishu" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
+    expect(screen.getByText(/larksuite\.com/)).toBeTruthy();
+    expect(screen.getByText(/feishu\.cn/)).toBeTruthy();
     expect(screen.queryByLabelText("Bot token")).toBeNull();
   });
 
@@ -2276,3 +2318,300 @@ function slackInputDraftContext(stage: DraftContextValue["stage"]): DraftContext
 }
 
 type DraftContextValue = NonNullable<React.ContextType<typeof AutomationInputDraftContext>>;
+
+const LUNA_FOLDER = "/home/me/.clisbot/workspaces/luna";
+function lunaOption(launchDefaults: RouteBotOption["bot"]["launchDefaults"]): RouteBotOption {
+  return {
+    key: "server-mac/bot_luna",
+    serverId: "server-mac",
+    serverName: "Mac mini",
+    daemonId: "daemon-mac",
+    bot: {
+      id: "bot_luna",
+      slug: "luna",
+      name: "Luna",
+      description: "Support assistant",
+      projectId: "project-luna",
+      workspaceId: "workspace-luna",
+      cwd: LUNA_FOLDER,
+      kind: "personal",
+      launchDefaults,
+    },
+  };
+}
+const LUNA_LAUNCH = { provider: "codex", model: "gpt-5.6-luna", modeId: "auto" };
+
+const CONNECT_LUNA = { serverId: "server-mac", botId: "bot_luna" };
+function channelsWithRequest(
+  connectBot: { serverId: string; botId: string } | null,
+  onOpened: () => void,
+) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HubSettingsDetailScrollProvider onNavigate={adapters.scrollToTop}>
+        <ChannelSettings connectBot={connectBot} onConnectBotOpened={onOpened} />
+      </HubSettingsDetailScrollProvider>
+    </QueryClientProvider>
+  );
+}
+function renderConnectBot(onOpened: () => void) {
+  return render(channelsWithRequest(CONNECT_LUNA, onOpened));
+}
+const LUNA_ENVIRONMENT = {
+  kind: "daemon",
+  daemon: "daemon-mac",
+  projectId: "project-luna",
+  cwd: "/home/me/.clisbot/workspaces/luna",
+};
+/** The Connections page holding one Route that runs Luna. */
+function serveBotRoute(botRoute: Record<string, unknown>, agent: Record<string, unknown>) {
+  const stored = {
+    ...configuration,
+    resource: {
+      agents: { "channel-support": agent },
+      environments: { "channel-support": LUNA_ENVIRONMENT },
+    },
+    accounts: [{ ...account, routes: [botRoute] }],
+  };
+  adapters.get.mockImplementation(async (resource: string) =>
+    resource === "channel-configuration" ? stored : data[resource],
+  );
+}
+const LUNA_ROUTE = {
+  audience: [{ who: { roles: ["owner"] }, where: { dm: true } }],
+  agent: "channel-support",
+  environment: "channel-support",
+  workspace: { organize: false },
+};
+
+describe("Start or continue a Bot", { timeout: 20_000 }, () => {
+  it("Connect to a channel… opens Add Route on the Bot and saves what the Bot runs", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    const opened = vi.fn();
+    renderConnectBot(opened);
+    expect(await screen.findByText("Add Route", {}, { timeout: 10_000 })).toBeTruthy();
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText("Bot") as HTMLSelectElement).value).toBe("server-mac/bot_luna");
+    // The Bot decides Host, Project and AI configuration, so the form asks none of them.
+    expect(screen.queryByLabelText("Host")).toBeNull();
+    expect(screen.queryByText("Fast mode and provider options")).toBeNull();
+    expect(screen.getByText("Mac mini")).toBeTruthy();
+    expect(screen.getByText(/Runs in Luna's folder/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Connection"), {
+      target: { value: "account:slack:support" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    const candidate = adapters.put.mock.calls[0]![1];
+    const saved = candidate.accounts[0].routes[1];
+    expect(saved).toMatchObject({
+      agent: "channel-support",
+      environment: "channel-support",
+      workspace: { organize: false },
+    });
+    expect(candidate.resource.environments["channel-support"]).toEqual({
+      kind: "daemon",
+      daemon: "daemon-mac",
+      projectId: "project-luna",
+      cwd: LUNA_FOLDER,
+    });
+    expect(candidate.resource.agents["channel-support"]).toEqual({
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      mode: "auto",
+    });
+    expect(adapters.confirm.mock.calls[0]![0].message).toContain("Bot · Luna");
+  });
+
+  it("asks for a Bot before saving when the requested one is not on offer", async () => {
+    adapters.botOptions = [];
+    renderConnectBot(vi.fn());
+    expect(await screen.findByText("Add Route", {}, { timeout: 10_000 })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Connection"), {
+      target: { value: "account:slack:support" },
+    });
+    expect(screen.getByText("Choose a Bot.")).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Activate Route" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("offers a Bot beside an Agent on Add Route and still starts on an Agent", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    renderChannels();
+    await addRouteFromMenu();
+    expect(screen.getByRole("button", { name: "Start or continue a Bot" })).toBeTruthy();
+    expect(screen.getByLabelText("Host")).toBeTruthy();
+    expect(screen.queryByLabelText("Bot")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Start or continue a Bot" }));
+    expect(screen.getByLabelText("Bot")).toBeTruthy();
+    expect(screen.queryByLabelText("Host")).toBeNull();
+  });
+
+  it("does not offer a Bot when no Host the Hub knows runs one", async () => {
+    renderChannels();
+    await addRouteFromMenu();
+    expect(screen.queryByRole("button", { name: "Start or continue a Bot" })).toBeNull();
+  });
+
+  it("reopens a Bot's Route on its Bot and saves the Bot's current AI configuration", async () => {
+    adapters.botOptions = [lunaOption({ ...LUNA_LAUNCH, model: "gpt-5.7" })];
+    const botRoute = {
+      audience: [{ who: { roles: ["owner"] }, where: { dm: true } }],
+      agent: "channel-support",
+      environment: "channel-support",
+      workspace: { organize: false },
+      questions: "recommended",
+    };
+    const botConfiguration = {
+      ...configuration,
+      resource: {
+        agents: { "channel-support": { provider: "codex", model: "gpt-5.6-luna", mode: "auto" } },
+        environments: {
+          "channel-support": {
+            kind: "daemon",
+            daemon: "daemon-mac",
+            projectId: "project-luna",
+            cwd: LUNA_FOLDER,
+          },
+        },
+      },
+      accounts: [{ ...account, routes: [botRoute] }],
+    };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration" ? botConfiguration : data[resource],
+    );
+    await openEditor();
+    expect((screen.getByLabelText("Bot") as HTMLSelectElement).value).toBe("server-mac/bot_luna");
+    expect(
+      screen.getByText("Luna's AI configuration changed since this Route was saved"),
+    ).toBeTruthy();
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    const candidate = adapters.put.mock.calls[0]![1];
+    expect(candidate.accounts[0].routes[0]).toMatchObject({
+      agent: "channel-support",
+      environment: "channel-support",
+      workspace: { organize: false },
+      questions: "recommended",
+    });
+    expect(candidate.resource.agents["channel-support"].model).toBe("gpt-5.7");
+  });
+
+  it("keeps an Agent Route on the Bot's folder an Agent when it organizes workspaces", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    const agentRoute = {
+      audience: [{ who: { roles: ["owner"] }, where: { dm: true } }],
+      agent: "channel-support",
+      environment: "channel-support",
+    };
+    adapters.get.mockImplementation(async (resource: string) =>
+      resource === "channel-configuration"
+        ? {
+            ...configuration,
+            resource: {
+              agents: { "channel-support": { provider: "claude" } },
+              environments: {
+                "channel-support": {
+                  kind: "daemon",
+                  daemon: "daemon-mac",
+                  projectId: "project-luna",
+                  cwd: LUNA_FOLDER,
+                },
+              },
+            },
+            accounts: [{ ...account, routes: [agentRoute] }],
+          }
+        : data[resource],
+    );
+    await openEditor();
+    expect(screen.queryByLabelText("Bot")).toBeNull();
+    expect(screen.getByLabelText("Host")).toBeTruthy();
+  });
+});
+
+describe("Start or continue a Bot, editing and repeat requests", { timeout: 20_000 }, () => {
+  it("switches a stored Route to its Bot once the Bots load", async () => {
+    serveBotRoute(LUNA_ROUTE, { provider: "codex", model: "gpt-5.6-luna", mode: "auto" });
+    await openEditor();
+    expect(screen.getByLabelText("Host")).toBeTruthy();
+    loadBots([lunaOption(LUNA_LAUNCH)]);
+    expect((screen.getByLabelText("Bot") as HTMLSelectElement).value).toBe("server-mac/bot_luna");
+    expect(screen.queryByLabelText("Host")).toBeNull();
+    expect(screen.queryByText(/AI configuration changed/)).toBeNull();
+  });
+
+  it("keeps the target the user picked before the Bots loaded", async () => {
+    serveBotRoute(LUNA_ROUTE, { provider: "codex" });
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Run an Automation" }));
+    loadBots([lunaOption(LUNA_LAUNCH)]);
+    expect(screen.getByLabelText("Automation")).toBeTruthy();
+    expect(screen.queryByLabelText("Bot")).toBeNull();
+  });
+
+  it("saved as an Agent, a Bot's Route stops keeping sessions in place", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    serveBotRoute(LUNA_ROUTE, { provider: "codex", model: "gpt-5.6-luna", mode: "auto" });
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Start or continue an Agent" }));
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    const candidate = adapters.put.mock.calls[0]![1];
+    expect(candidate.accounts[0].routes[0]).not.toHaveProperty("workspace");
+    expect(candidate.resource.environments["channel-support"]).toMatchObject(LUNA_ENVIRONMENT);
+  });
+
+  it("says when saving replaces a model chosen in a conversation", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    serveBotRoute(
+      { ...LUNA_ROUTE, agentControls: { provider: "claude", model: "opus" } },
+      { provider: "codex", model: "gpt-5.6-luna", mode: "auto" },
+    );
+    await openEditor();
+    expect(screen.getByText("This Route runs a model chosen in a conversation")).toBeTruthy();
+    // The named agent still matches Luna, so her settings did not change.
+    expect(screen.queryByText(/AI configuration changed/)).toBeNull();
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(adapters.put).toHaveBeenCalledTimes(1));
+    expect(adapters.put.mock.calls[0]![1].accounts[0].routes[0]).not.toHaveProperty(
+      "agentControls",
+    );
+  });
+
+  it("opens the same Bot again after its first request ended", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    const opened = vi.fn();
+    const ui = renderConnectBot(opened);
+    await screen.findByLabelText("Bot", {}, { timeout: 10_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Bot")).toBeNull();
+    ui.rerender(channelsWithRequest(null, opened));
+    ui.rerender(channelsWithRequest(CONNECT_LUNA, opened));
+    expect(await screen.findByLabelText("Bot")).toBeTruthy();
+    expect(opened).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks before replacing a Route being edited", async () => {
+    adapters.botOptions = [lunaOption(LUNA_LAUNCH)];
+    const opened = vi.fn();
+    const ui = render(channelsWithRequest(null, opened));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Edit Route/ }, { timeout: 10_000 }),
+    );
+    await screen.findByText("Edit Route 1");
+    adapters.confirm.mockResolvedValueOnce(false);
+    ui.rerender(channelsWithRequest(CONNECT_LUNA, opened));
+    await waitFor(() =>
+      expect(adapters.confirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Discard this Route?" }),
+      ),
+    );
+    expect(screen.getByText("Edit Route 1")).toBeTruthy();
+    ui.rerender(channelsWithRequest(null, opened));
+    ui.rerender(channelsWithRequest(CONNECT_LUNA, opened));
+    expect(await screen.findByLabelText("Bot")).toBeTruthy();
+    expect(screen.queryByText("Edit Route 1")).toBeNull();
+    expect(opened).toHaveBeenCalledTimes(2);
+  });
+});

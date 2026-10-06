@@ -20,11 +20,12 @@
 import { Agent as HttpsAgent } from "node:https";
 import * as ws from "ws";
 import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
-import type { APIMessage } from "discord-api-types/v10";
+import { GatewayDispatchEvents, type APIMessage } from "discord-api-types/v10";
 import type { DiscordIntentsConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { Client } from "../internal/client.js";
 import { ClisbotInteractionListener, registerDiscordClisbotCommand } from "../fusion/commands.js";
 import * as discordGateway from "../internal/gateway.js";
+import { mapGatewayDispatchData } from "../internal/gateway-dispatch.js";
 import type { DiscordMessageDispatchData } from "../internal/listeners.js";
 import { MessageCreateListener } from "../internal/listeners.js";
 import { createDiscordDnsLookup } from "../network-config.js";
@@ -190,11 +191,15 @@ export async function runDiscordGateway(
   const stopped = observeGatewayFaults(gateway, params);
 
   class InboundMessageListener extends MessageCreateListener {
-    // The gateway dispatch mapper hands MESSAGE_CREATE listeners the enriched
-    // `DiscordMessageDispatchData` (`internal/gateway-dispatch.ts`); upstream's
-    // abstract signature still spells the raw `APIMessage`.
-    override async handle(raw: APIMessage): Promise<void> {
-      const data = raw as unknown as DiscordMessageDispatchData;
+    // The gateway hands MESSAGE_CREATE listeners the raw `APIMessage` — upstream
+    // maps structures only after its queue claim (`internal/gateway.ts`
+    // `handleDispatch`) — so the listener maps it into the enriched dispatch data.
+    override async handle(raw: APIMessage, client: Client): Promise<void> {
+      const data = mapGatewayDispatchData(
+        client,
+        GatewayDispatchEvents.MessageCreate,
+        raw,
+      ) as DiscordMessageDispatchData;
       const event = normalizeDiscordMessage({
         data,
         accountId: params.accountId,

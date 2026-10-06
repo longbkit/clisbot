@@ -2,7 +2,7 @@
 // editor, so the whole row presses and a chevron ends it; adding a Route is the
 // card's last row, kept apart from the Connection's switch in the header.
 
-import { ChevronRight, Plus } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import { useCallback, useState, type ReactNode } from "react";
 import {
   type GestureResponderEvent,
@@ -97,30 +97,9 @@ export function RuntimeDetailRow({ detail }: { detail: string }) {
   );
 }
 
-export function AddRouteRow({ disabled, onPress }: { disabled: boolean; onPress(): void }) {
-  return (
-    <View style={[settingsStyles.rowBorder, styles.addRow]}>
-      <View style={styles.addButton}>
-        <Button size="sm" variant="ghost" leftIcon={Plus} disabled={disabled} onPress={onPress}>
-          Add Route
-        </Button>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
   hovered: { backgroundColor: theme.colors.surface2 },
   detailRow: { flexDirection: "column", alignItems: "flex-start", gap: theme.spacing[1] },
   detail: { color: theme.colors.destructive, fontSize: theme.fontSize.sm },
   pressed: { backgroundColor: theme.colors.surface3 },
-  addRow: {
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2],
-  },
-  // The ghost button's own padding moves out, so its "+" sits on the rows' text rail.
-  addButton: {
-    alignItems: "flex-start",
-    marginLeft: -(theme.spacing[3] + 1),
-  },
 }));

@@ -26,6 +26,12 @@ export interface ChannelTransportMetadata {
   readonly requiredConfig: readonly string[];
   /** Human-readable setup action; credentials themselves never belong here. */
   readonly setup: string;
+  /**
+   * Whether a Connection may use this transport today. The webhook transports
+   * are ported but not yet run end to end against the platform, so the app
+   * labels them "Not supported yet" and offers no way to pick one.
+   */
+  readonly supported: boolean;
 }
 
 export interface ChannelCredentialMetadata {
@@ -95,12 +101,14 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         label: "Socket Mode",
         requiredConfig: ["appToken", "botToken"],
         setup: "Create a Slack app, enable Socket Mode, and grant bot/app scopes.",
+        supported: true,
       },
       {
         id: "webhook",
         label: "Events API webhook",
         requiredConfig: ["signingSecret", "botToken"],
         setup: "Expose the Events API endpoint and configure the signing secret.",
+        supported: false,
       },
     ],
     credentials: [
@@ -157,12 +165,14 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         label: "Bot API polling",
         requiredConfig: ["botToken"],
         setup: "Create a BotFather bot and provide its token.",
+        supported: true,
       },
       {
         id: "webhook",
         label: "Bot API webhook",
         requiredConfig: ["botToken", "webhookUrl", "webhookSecret"],
         setup: "Expose HTTPS webhook URL and configure the secret token.",
+        supported: false,
       },
     ],
     credentials: [
@@ -225,6 +235,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         requiredConfig: ["token"],
         setup:
           "Create a Discord application, enable the Message Content intent, and invite the bot with the bot + applications.commands scopes.",
+        supported: true,
       },
     ],
     credentials: [
@@ -269,12 +280,22 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     sdkPackages: ["google-auth-library"],
     transports: [
       {
+        id: "pubsub",
+        label: "Cloud Pub/Sub",
+        // `lifecycle/start-account.ts` refuses to start without both.
+        requiredConfig: ["serviceAccount", "subscription"],
+        setup:
+          "In one Google Cloud project: enable the Chat and Pub/Sub APIs, create a service account and its JSON key, a topic and a pull subscription. Grant Pub/Sub Publisher on the topic to service-<project number>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com (or chat-api-push@system.gserviceaccount.com if the app is not built as a Workspace add-on), and Pub/Sub Subscriber on the subscription to your service account. Then choose Cloud Pub/Sub in the Chat app's connection settings and enter the topic.",
+        supported: true,
+      },
+      {
         id: "webhook",
         label: "Google Chat HTTP app",
         // `lifecycle/start-account.ts` refuses to start without all four.
         requiredConfig: ["serviceAccount", "audienceType", "audience", "webhookUrl"],
         setup:
           "Create a Google Chat app in Google Workspace, point its HTTP endpoint at a public HTTPS URL that reverse-proxies to the account's webhook listener, and grant the app's service account.",
+        supported: false,
       },
     ],
     credentials: [
@@ -291,6 +312,13 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         secret: true,
         required: false,
         help: "Absolute path to the service-account JSON, inside the Hub's allowlisted secrets directory.",
+      },
+      {
+        key: "subscription",
+        label: "Pub/Sub subscription",
+        secret: false,
+        required: false,
+        help: "projects/<project>/subscriptions/<name> — the pull subscription on the topic the Chat app publishes to. Required for Cloud Pub/Sub.",
       },
     ],
     // Card clicks arrive INBOUND (`CARD_CLICKED`); the vertical renders no card,
@@ -310,7 +338,8 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
     ],
     extraTools: [],
     notes: [
-      "Google Chat sends messages to a public HTTPS address, so this Hub needs a reverse proxy in front of the Connection's webhook. A Google Workspace admin must approve the Chat app first.",
+      "Cloud Pub/Sub needs no public address: the Hub pulls the Chat app's events from a subscription. Adding the Connection checks that the service account may pull from it.",
+      "A personal Google account can build a Chat app for its own direct messages; joining spaces needs a Google Workspace account, and a work Workspace may need an admin to allow the app.",
       "Replies can be sent, edited and deleted. Files and images are not sent or read, and approval prompts are typed commands rather than cards.",
     ],
   },
@@ -327,6 +356,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         requiredConfig: ["appId", "appSecret"],
         setup:
           "Create a Feishu/Lark custom app, add the bot, and enable Event subscription -> Use long connection.",
+        supported: true,
       },
       {
         id: "webhook",
@@ -334,6 +364,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         requiredConfig: ["appId", "appSecret", "verificationToken", "encryptKey"],
         setup:
           "Publish a public HTTPS URL for the app's request URL and copy the verification token and encrypt key.",
+        supported: false,
       },
     ],
     credentials: [
@@ -423,6 +454,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         requiredConfig: ["profile"],
         setup:
           "Scan the QR code with the personal Zalo client; the Hub stores the resulting session encrypted at rest.",
+        supported: true,
       },
     ],
     credentials: [
@@ -459,6 +491,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         label: "Bot API polling",
         requiredConfig: ["botToken"],
         setup: "Create a bot at bot.zaloplatforms.com and provide its token.",
+        supported: true,
       },
       {
         id: "webhook",
@@ -467,6 +500,7 @@ export const CHANNEL_CATALOG: readonly ChannelCatalogEntry[] = [
         // every delivery with it and an unverifiable request must be refused.
         requiredConfig: ["botToken", "webhookUrl", "webhookSecret"],
         setup: "Register the bot webhook on a public HTTPS URL and set its secret token.",
+        supported: false,
       },
     ],
     credentials: [

@@ -166,11 +166,12 @@ export type TelegramTransportMode = z.infer<typeof TelegramTransportModeSchema>;
  * public URL the Hub does not expose yet, so it is not offered. */
 export const DiscordTransportModeSchema = z.enum(["gateway"]);
 export type DiscordTransportMode = z.infer<typeof DiscordTransportModeSchema>;
-/** Google Chat delivers only by HTTP POST to a public HTTPS URL — there is no
- * polling and no socket mode. The Hub publishes no endpoint of its own, so the
- * operator puts a reverse proxy in front of the account's own listener
- * (`packages/channels/googlechat/HUB-WIRING.md` §6). */
-export const GoogleChatTransportModeSchema = z.enum(["webhook"]);
+/** Google Chat's two delivery models. `pubsub` pulls the Chat app's events off
+ * a Cloud Pub/Sub subscription and needs no public URL; it is the one the Hub
+ * drives. `webhook` is Google POSTing to a public HTTPS URL through an
+ * operator's reverse proxy (`packages/channels/googlechat/HUB-WIRING.md` §6);
+ * it is accepted here and refused at compile until it has run end to end. */
+export const GoogleChatTransportModeSchema = z.enum(["pubsub", "webhook"]);
 export type GoogleChatTransportMode = z.infer<typeof GoogleChatTransportModeSchema>;
 /** Feishu's two upstream modes, under upstream's own `connectionMode` names.
  * `websocket` (the long connection) needs no public URL and is the default. */

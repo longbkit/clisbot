@@ -5,6 +5,8 @@ import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { setCommandCenterFocusRestoreElement } from "@/utils/command-center-focus-restore";
 import { getResidentBrowserWebview } from "@/desktop/browser/resident-webviews";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
+import { readFocusedAgentId } from "@/clisbot/workspace-sessions/model";
+import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { useKeyboardActionDispatcher } from "@/keyboard/keyboard-action-dispatcher-context";
 import {
   type ChordState,
@@ -172,7 +174,16 @@ export function useKeyboardShortcuts({
           serverId: action.serverId,
           workspaceId: action.workspaceId,
         };
-        navigateToWorkspace({ serverId: action.serverId, workspaceId: action.workspaceId });
+        // Clisbot: a session line's shortcut opens the workspace on that session.
+        if (action.agentId) {
+          navigateToAgent({
+            serverId: action.serverId,
+            workspaceId: action.workspaceId,
+            agentId: action.agentId,
+          });
+        } else {
+          navigateToWorkspace({ serverId: action.serverId, workspaceId: action.workspaceId });
+        }
         return true;
       case "navigate-last-workspace":
         if (navigateToLastWorkspace()) {
@@ -227,8 +238,9 @@ export function useKeyboardShortcuts({
         pathname,
         isMobile,
         sidebarShortcutTargets: store.sidebarShortcutWorkspaceTargets,
-        navigationActiveWorkspace:
+        navigationActiveWorkspace: withFocusedAgent(
           keyboardWorkspaceSelectionRef.current ?? activeWorkspaceSelection,
+        ),
         commandCenterOpen: store.commandCenterOpen,
         shortcutsDialogOpen: store.shortcutsDialogOpen,
       },
@@ -425,4 +437,16 @@ export function useKeyboardShortcuts({
     resetModifiers,
     shortcutsAvailable,
   ]);
+}
+
+/** Clisbot: the session you are on, so stepping through session lines starts from it. */
+function withFocusedAgent(
+  selection: { serverId: string; workspaceId: string } | null,
+): { serverId: string; workspaceId: string; agentId?: string } | null {
+  if (!selection) return null;
+  return {
+    serverId: selection.serverId,
+    workspaceId: selection.workspaceId,
+    agentId: readFocusedAgentId(selection),
+  };
 }

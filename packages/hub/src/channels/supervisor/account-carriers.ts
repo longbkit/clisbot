@@ -95,22 +95,34 @@ const ACCOUNT_CARRIERS: Record<
     };
   },
   // Google Chat has no token at all: the credential is a service-account JSON
-  // document (or a path to one). `fusion/account-config.ts` reads exactly these
-  // two names off the flat carrier.
-  googlechat: ({ accountId, compiled, serviceAccount, serviceAccountFile }) => {
+  // document (or a path to one), plus the Pub/Sub subscription it was probed
+  // against. `fusion/account-config.ts` reads these names and the compiled
+  // `transport.mode` (`pubsub` or `webhook`) off the flat carrier. The ported
+  // `actions.ts` / `channel-actions.ts` resolve the account from `cfg` alone, so
+  // the credential rides the entry too: without it `google-auth-library` falls
+  // back to the host's Application Default Credentials and every send fails
+  // with a token that has no `chat.bot` scope.
+  googlechat: ({ accountId, compiled, serviceAccount, serviceAccountFile, subscription }) => {
     if (serviceAccount === undefined && serviceAccountFile === undefined) {
       throw new Error("the Google Chat connection carries no service account");
     }
+    const credentials = present({ serviceAccount, serviceAccountFile });
     return {
-      account: { accountId, ...present({ serviceAccount, serviceAccountFile }) },
-      cfgAccount: { ...compiled.config },
+      account: {
+        accountId,
+        ...credentials,
+        ...present({ subscription }),
+        transport: compiled.transport,
+      },
+      cfgAccount: { ...compiled.config, ...credentials },
     };
   },
   // Feishu's credential is the app id + secret, plus the two event-subscription
   // secrets in webhook mode. `connectionMode` is the Hub's transport choice
   // under upstream's own key name, so the compiled transport decides the mode
-  // and an authored `connectionMode` cannot contradict it.
-  feishu: ({ accountId, compiled, appId, appSecret, verificationToken, encryptKey }) => {
+  // and an authored `connectionMode` cannot contradict it. The Connection's
+  // `domain` wins over an authored one: the app was verified on that platform.
+  feishu: ({ accountId, compiled, appId, appSecret, verificationToken, encryptKey, domain }) => {
     const connectionMode = String(compiled.transport["mode"] ?? "websocket");
     const credentials = present({
       appId: required(appId, "the Feishu connection carries no app id"),
@@ -118,15 +130,10 @@ const ACCOUNT_CARRIERS: Record<
       verificationToken,
       encryptKey,
     });
-    const domain = compiled.config["domain"];
+    const platform = present({ domain: domain ?? asLabel(compiled.config["domain"]) });
     return {
-      account: {
-        accountId,
-        ...credentials,
-        connectionMode,
-        ...(typeof domain === "string" ? { domain } : {}),
-      },
-      cfgAccount: { ...compiled.config, ...credentials, connectionMode },
+      account: { accountId, ...credentials, connectionMode, ...platform },
+      cfgAccount: { ...compiled.config, ...credentials, connectionMode, ...platform },
     };
   },
   // Zalo is Telegram-shaped: a flat `token` carrier plus the block merged onto

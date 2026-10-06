@@ -19,6 +19,7 @@ import { openHubAccountEntryForm, type HubAccountEntryMode } from "../account-en
 import { invitationTeams, type HubAccountState } from "../contracts";
 import { type HubSectionSlug } from "../navigation";
 import { ChannelSettings } from "./channel-settings";
+import { ChannelsSettingsRoute } from "./channels-settings-route";
 import { AutomationSettings } from "./automation-settings";
 import { HostsSettings } from "./hosts-settings";
 import { InstanceSettings } from "./instance-settings";
@@ -97,7 +98,7 @@ function SignedInHubSettings({
 
   switch (section) {
     case "channels":
-      return <ChannelSettings />;
+      return <ChannelsSettingsRoute />;
     case "automations":
       return (
         <AutomationSettings

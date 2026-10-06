@@ -7,6 +7,11 @@ import type { StatusGroup } from "@/hooks/sidebar-status-view-model";
 export interface SidebarShortcutWorkspaceTarget {
   serverId: string;
   workspaceId: string;
+  /**
+   * Clisbot: set when the line is a session — Status grouping with Agent sessions on lists
+   * sessions, and the shortcut opens the workspace on that session.
+   */
+  agentId?: string;
 }
 
 export interface SidebarShortcutModel {
@@ -97,11 +102,15 @@ export function getRelativeSidebarShortcutTarget(input: {
   }
 
   const currentTarget = input.currentTarget;
-  const currentIndex = input.targets.findIndex(
-    (target) =>
-      target.serverId === currentTarget.serverId &&
-      target.workspaceId === currentTarget.workspaceId,
-  );
+  const sameWorkspace = (target: SidebarShortcutWorkspaceTarget) =>
+    target.serverId === currentTarget.serverId && target.workspaceId === currentTarget.workspaceId;
+  // A workspace can own several session lines; the one you are in wins over its first line.
+  const exactIndex = currentTarget.agentId
+    ? input.targets.findIndex(
+        (target) => sameWorkspace(target) && target.agentId === currentTarget.agentId,
+      )
+    : -1;
+  const currentIndex = exactIndex >= 0 ? exactIndex : input.targets.findIndex(sameWorkspace);
   if (currentIndex < 0) {
     return input.targets[input.delta > 0 ? 0 : input.targets.length - 1] ?? null;
   }

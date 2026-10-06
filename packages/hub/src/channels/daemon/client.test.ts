@@ -4,7 +4,11 @@ import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { WebSocketServer } from "ws";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { connectChannelDaemon, type DaemonConnection } from "./client.js";
+import {
+  connectChannelDaemon,
+  connectNoHostChannelDaemon,
+  type DaemonConnection,
+} from "./client.js";
 import type { AgentSnapshot } from "./types.js";
 import { AgentRequestRefusedError } from "./agent-request-refusal.js";
 import { DaemonSessionProtocol } from "./session-protocol.js";
@@ -415,6 +419,16 @@ async function waitForCount(items: readonly unknown[], count: number): Promise<v
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 }
+
+describe("an account with no Route", () => {
+  it("dials nothing and fails every call at once as a Host that is away", async () => {
+    const daemon = connectNoHostChannelDaemon();
+    await assert.rejects(daemon.waitForConnected(50), /host_not_connected/u);
+    await assert.rejects(daemon.listAgents(), /host_not_connected/u);
+    assert.equal(daemon.getServerInfo(), undefined);
+    daemon.stop();
+  });
+});
 
 describe("channel trusted-client daemon connection", () => {
   let daemon: FakeDaemon;

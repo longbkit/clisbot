@@ -10,6 +10,7 @@
 import type { ChannelPlugin, HostRuntime } from "@clisbot/channels-shared";
 import { feishuChannelActions } from "./channel-actions.js";
 import { disposeFeishuRuntime } from "./fusion/runtime.js";
+import { feishuTyping } from "./fusion/typing.js";
 import {
   collectFeishuToolRegistrations,
   registerFeishuTools,
@@ -51,6 +52,11 @@ export const feishuPlugin: ChannelPlugin = {
     // COMPAT(clisbot-control-plane): the approval/progress card's in-place update.
     updateText,
     sendCard,
+    // The `sync.progress` liveness surface: a "Typing" reaction on the
+    // sender's message while a turn runs (Lark has no bot typing status).
+    typing: async (args: Record<string, unknown>) => {
+      await feishuTyping(args as never);
+    },
     // The ported Lark primitives, by their upstream names.
     sendMessageFeishu,
     sendCardFeishu,

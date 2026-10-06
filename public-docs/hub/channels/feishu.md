@@ -16,11 +16,13 @@ The long-connection transport needs no public address, which makes it the mode t
 
 1. Create a **custom app** in the Feishu or Lark developer console and add a bot to it.
 2. Copy the **App ID** (`cli_…`) and **App Secret**.
-3. Under **Event subscription**, choose **Use long connection**. The webhook alternative needs a public HTTPS request URL plus the verification token and encrypt key from the same page.
-4. Grant the app scopes. Messaging needs `im:message`, `im:message.group_at_msg`, `im:message:send_as_bot`, `im:chat:readonly`, and `im:resource`. Each tool family needs its own: `docx:document`, `drive:drive`, `wiki:wiki`, `bitable:app`.
-5. Add the bot to the chats it should answer in.
+3. Grant the app scopes. Messaging needs `im:message`, `im:message.group_at_msg`, `im:message:send_as_bot`, `im:chat:readonly`, and `im:resource`. Each tool family needs its own: `docx:document`, `drive:drive`, `wiki:wiki`, `bitable:app`.
+4. Add the Connection to Hub (below), so the bot holds its long connection open.
+5. Under **Events & Callbacks**, set the subscription mode to **Receive events through persistent connection**. The console only saves it while a client is connected, which is why the Connection comes first; **Verify** shows **Connected**. Then **Add Events**: **Message received** (`im.message.receive_v1`), **Bot added to group** (`im.chat.member.bot.added_v1`) and **Bot removed from group** (`im.chat.member.bot.deleted_v1`). The webhook alternative is [not supported yet](/docs/hub/channels#the-seven-channels).
+6. Under **Version Management & Release**, create and publish a version. Nothing above reaches the bot until a version with it is released.
+7. Add the bot to the chats it should answer in.
 
-Feishu and Lark are the same product on different hosts. `domain: feishu` uses `open.feishu.cn`; `domain: lark` uses `open.larksuite.com`.
+Feishu and Lark are the same product on different hosts. `domain: lark` uses `open.larksuite.com`, for apps made in the international Lark console; `domain: feishu` uses `open.feishu.cn`, for apps made in the mainland China Feishu console. An app exists on one of them only. The app's Add Connection form picks Lark unless you choose Feishu; the CLI secret file defaults to `feishu` when `domain` is absent.
 
 ## Add it to Hub
 
@@ -78,7 +80,11 @@ Nothing. The tool factories and the send path are driven against a faked Lark SD
 
 **Every call returns a permission error.** Ask the agent to call `feishu_app_scopes`. A scope granted in the console still needs the app version published.
 
+**The bot connects but never sees a message.** The Hub log shows `ws client ready` and nothing after it. The app has no **Message received** event, or the version that adds it is not published (steps 5 and 6).
+
 **The long connection will not open.** Event subscription is not set to **Use long connection** in the app console.
+
+**The log says `Incorrect domain name` (code 1000040351).** The Connection's domain is the other platform from the app's. Add the Connection again with the right **Domain**. A Connection saved before Hub kept the domain with it falls back to `feishu`, so a Lark app added that way needs saving again.
 
 **Webhook requests are rejected.** The encrypt key signs every inbound request; a missing or wrong `encryptKey` makes every delivery unverifiable, and an unverifiable request is refused rather than trusted.
 

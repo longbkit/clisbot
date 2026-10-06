@@ -38,6 +38,12 @@ async function withAccountRuntime<T>(
     ),
     accountId,
   });
+  // `google-auth-library` signs with the host's Application Default Credentials
+  // when it is handed none, and that token has no `chat.bot` scope. Refuse here
+  // so a carrier that lost the credential fails by name, not as a Chat 403.
+  if (account.credentialSource === "none" || account.tokenStatus === "configured_unavailable") {
+    throw new Error(`Google Chat account "${accountId}" has no usable service-account credential`);
+  }
   return await withGoogleChatAccount(accountId, () => run(account));
 }
 
