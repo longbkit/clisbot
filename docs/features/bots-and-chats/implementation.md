@@ -22,7 +22,8 @@ the plan gets corrected in the same commit.
   templates. Legacy adoption requires matching the existing workspace. Obsolete idle-agent and
   workspace-switch flags fail explicitly instead of silently doing nothing.
 - Published Bot markers through the existing Project catalog and grouped them in Access. Project
-  grants share Bots; Chat records, transcripts and their agent sessions remain private per creator.
+  grants share Bots; Chat records and transcripts remain private per creator. Their agent sessions
+  follow the Bot's Project grant since 2026-10-07 (README, D16).
   Both Bot defaults and actual resumed session configuration are checked against narrowed grants.
   App query/transcript caches are scoped by client generation and connection epoch, so a new
   admission must revalidate access before rendering old private data.
@@ -115,7 +116,7 @@ validated by this browser run.
 
 Targeted protocol, daemon, CLI, Hub and app checks passed during integration. Socket E2Es cover
 Bot creation, direct/group messages, mention routing, retry idempotence, push delivery and restart;
-a separate managed socket test covers shared Bots and private Chat/session visibility. Feature-off
+a separate managed socket test covers shared Bots, private Chats and Project-visible Chat sessions. Feature-off
 compatibility passes. Recovery tests cover completion receipts, accepted-but-undispatched messages,
 scoped interruption notices and stale sessions after participant removal or `/new`.
 

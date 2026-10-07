@@ -8,7 +8,7 @@ import { DaemonClient } from "../test-utils/daemon-client.js";
 import type { HubRelationshipRemote } from "../hub/relationship-remote.js";
 import type { ManagedAccessAdmission } from "../managed-access/types.js";
 
-test("shared Bot grants protect private Chat and ordinary agent timelines over WebSocket", async () => {
+test("shared Bot grants keep the Chat private and show its sessions to the Project over WebSocket", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "chat-managed-"));
   let projectId = "";
   const admission = (id: string): ManagedAccessAdmission => ({
@@ -108,9 +108,13 @@ test("shared Bot grants protect private Chat and ordinary agent timelines over W
     expect(denied.error).toBeTruthy();
     expect(denied.lines).toEqual([]);
     const agentId = (await alice.listChats()).chats[0]!.participants[0]!.agentId!;
-    expect((await bob.fetchAgents()).entries.map((entry) => entry.agent.id)).not.toContain(agentId);
-    await expect(bob.fetchAgentTimeline(agentId, { timeout: 1500 })).rejects.toThrow();
-    expect(await alice.fetchAgentTimeline(agentId)).toBeTruthy();
+    // The Chat stays the creator's; its Bot sessions follow the Bot's Project grant like any
+    // session in a Project (docs/features/bots-and-chats/README.md, D16).
+    expect((await bob.fetchAgents()).entries.map((entry) => entry.agent.id)).toContain(agentId);
+    expect(await bob.fetchAgentTimeline(agentId)).toBeTruthy();
+    expect((await outsider.fetchAgents()).entries.map((entry) => entry.agent.id)).not.toContain(
+      agentId,
+    );
   } finally {
     await Promise.all(clients.map((client) => client.close()));
     await daemon.close();

@@ -101,9 +101,6 @@ export class ManagedResourceAuthorizer {
     private readonly agentStorage: AgentStorageReader,
     private readonly terminalManager: TerminalManager | null,
     private readonly agentConfigurationSafety: AgentConfigurationSafetyResolver,
-    private readonly allowsPrivateAgent: (
-      labels: Record<string, string> | undefined,
-    ) => boolean = () => true,
   ) {
     // Mode off must retain the upstream path exactly: no registry reads,
     // subscriptions, managed state, or background rejection.
@@ -212,23 +209,22 @@ export class ManagedResourceAuthorizer {
     await this.ready();
     const live = this.agentManager.getAgent(agentId);
     const record = live ?? this.storedAgents.get(agentId) ?? (await this.agentStorage.get(agentId));
-    if (!record?.workspaceId || !this.allowsPrivateAgent(record.labels)) return false;
+    if (!record?.workspaceId) return false;
     if (!("lifecycle" in record)) this.storedAgents.set(record.id, record);
     return this.allowsWorkspace(record.workspaceId, privilege);
   }
 
   /**
-   * An agent record already in hand (a list entry): its own workspace and labels decide, with no
+   * An agent record already in hand (a list entry): its own workspace decides, with no
    * lookup, so a record the cache has not seen is judged exactly as the workspace check would.
    */
   allowsAgentRecordSync(
-    record: { workspaceId?: string | null; labels?: Record<string, string> },
+    record: { workspaceId?: string | null },
     privilege: ProjectPrivilege = "project.use",
   ): boolean {
     if (!this.isRestricted()) return true;
     return (
       typeof record.workspaceId === "string" &&
-      this.allowsPrivateAgent(record.labels) &&
       this.allowsWorkspaceSync(record.workspaceId, privilege)
     );
   }

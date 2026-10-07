@@ -301,6 +301,24 @@ Bot's current settings. A model someone chose for the Route from a conversation 
 is replaced on save, and the form says that too. Option 1 stays open if copied settings turn out
 to drift in practice.
 
+### D16. A Chat is private; its sessions follow the Project
+
+Decided 2026-10-07. Revises the phase-1 rule that hid a Chat's agent sessions from everyone but the
+Chat's creator ([implementation](implementation.md)).
+
+The Chat record and its transcript stay with the member who created it: `chat.list`,
+`chat.transcript.fetch` and the Chat pushes check `createdBy` (`ChatSession.allows` in
+`packages/server/src/server/session/chats/chat-session.ts`). The agent sessions behind it are
+ordinary sessions in the Bot's Workspace: anyone the Bot's Project grant admits sees them in the
+cowork view and may act on them as that grant allows, exactly like a session in any Project.
+
+Why: hiding the sessions promised more than it delivered. The Bot's directory and its `MEMORY.md`
+and `USER.md` are shared by everyone who uses the Bot, sessions a Route or the cowork view starts
+carry no Chat label and were never hidden, and an Admin entering through the Hub could not review
+what a Member's DM did. Per-person privacy is rolled out later as its own grant, together with
+per-person memory, once the controls for it are designed. Until then the Bot's Project grant is the
+one rule for who sees its sessions.
+
 ## Invariants
 
 - One session, two views: the chat screen and the cowork view render the same agent session.
