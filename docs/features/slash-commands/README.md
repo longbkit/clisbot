@@ -103,6 +103,7 @@ Implementation and verification notes are in [implementation-plan.md](implementa
 | `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | channel.use                                      |   •    |     —      |
 | `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³                                  |   •    |     —      |
 | `/project [list\|<id-or-name>\|clear]`                                                                    | Show or set the Project this conversation's next session lands in ([below](#project-selection)).               | channel.manage³                                  |   •    |     —      |
+| `/handoff [name]`                                                                                         | Handoff this conversation to a new topic in a chat group (e.g. Telegram forum supergroup).                     | channel.use                                      |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -223,7 +224,7 @@ Names are the contract users learn; these are chosen against
   fork + one-off, `/quick` = fresh + one-off. See [Starting sessions](#starting-sessions).
 - **Commands covered by this feature** — `/cowork`, `/me`, `/resume`, `/steer`,
   `/queue`, `/provider`, `/effort`, `/permission`, `/skill`, `/command`, `/fork`,
-  `/side`, `/quick`, `/routedefault`, `/promoteroutedefault`, `/project`, plus
+  `/side`, `/quick`, `/handoff`, `/routedefault`, `/promoteroutedefault`, `/project`, plus
   `list`/`search`
   on `/model`. `/status`, `/stop`, `/new`,
   `/agent`, `/model`, `/help`, `/approve`, `/deny` already ship.

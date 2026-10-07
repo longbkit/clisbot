@@ -71,16 +71,32 @@ const ZALO_MEDIA_UNAVAILABLE_NOTICE = "[zalo image attachment unavailable]";
 
 export function createZaloAdmission(options: ZaloAdmissionOptions): ZaloAdmission {
   const admit = async (update: ZaloUpdate): Promise<ZaloAdmissionResult> => {
+    options.logger?.warn?.("Zalo inbound update observed", {
+      eventName: update.event_name,
+      hasMessage: update.message !== undefined,
+      chatType: update.message?.chat?.chat_type,
+      hasText: typeof update.message?.text === "string",
+      textLength: typeof update.message?.text === "string" ? update.message.text.length : undefined,
+      hasCaption: typeof update.message?.caption === "string",
+      hasVoiceUrl: typeof Reflect.get(update.message ?? {}, "voice_url") === "string",
+      messageType: update.message?.message_type,
+    });
     const build = buildZaloInboundEvent(update, options);
-    if (!build.admit) return { kind: "ignored", reason: build.reason };
+    if (!build.admit) {
+      options.logger?.warn?.("Zalo inbound update ignored", { reason: build.reason });
+      return { kind: "ignored", reason: build.reason };
+    }
     const event =
       build.mediaUrl === undefined ? build.event : await foldPhoto(options, build.event, build.mediaUrl);
-    // A throw from here means the queue write failed: the caller answers 5xx /
-    // leaves the update unconsumed. Nothing has been acknowledged.
+    options.logger?.warn?.("Zalo normalized event", {
+      chatType: build.event.chatType,
+      conversationId: build.event.externalConversationId,
+      senderId: build.event.senderId,
+      bodyLength: build.event.body.length,
+      mentioned: build.event.wasMentioned,
+      messageId: build.event.externalMessageId,
+    });
     const decision = await options.handleInbound(event);
-    // The processor's own drops (in-flight duplicate, queue replay, empty body)
-    // are not faults: the event IS accounted for, so the ack stands without the
-    // durable marker.
     return decision.dispatched
       ? { kind: "durable" }
       : { kind: "ignored", reason: decision.reason ?? "not dispatched" };
@@ -90,16 +106,12 @@ export function createZaloAdmission(options: ZaloAdmissionOptions): ZaloAdmissio
     async receiveRaw(rawEvent: string): Promise<ZaloAdmissionResult> {
       let update: ZaloUpdate;
       try {
-        // Upstream's two-step: the admission facts first (the id the queue row
-        // is keyed by), then the full parse checked against that same id.
         const facts = inspectZaloWebhookEvent(rawEvent);
         update = parseClaimedUpdate(
           { version: ZALO_WEBHOOK_SPOOL_VERSION, rawEvent },
           facts.eventId,
         );
       } catch (error) {
-        // A payload the schemas refuse is permanently bad; redelivering it would
-        // only burn the retry budget, so it is a 400, not a 5xx.
         if (error instanceof ZaloWebhookPayloadError) {
           return { kind: "invalid", reason: error.message };
         }

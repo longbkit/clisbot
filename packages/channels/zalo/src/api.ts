@@ -54,11 +54,8 @@ export type ZaloMessage = {
 };
 
 export type ZaloUpdate = {
-  event_name:
-    | "message.text.received"
-    | "message.image.received"
-    | "message.sticker.received"
-    | "message.unsupported.received";
+  /** Zalo may add message event names without changing the message shape. */
+  event_name: string;
   message?: ZaloMessage;
 };
 

@@ -162,6 +162,7 @@ export const fr: TranslationResources = {
     clientCommands: {
       archiveAgent: "Archiver l'agent actuel",
       freshDraft: "Archivez cet agent et démarrez un nouveau brouillon",
+      handoffThread: "Transférer ce fil à Telegram (crée un sujet dans le groupe)",
     },
     github: {
       searching: "Recherche...",

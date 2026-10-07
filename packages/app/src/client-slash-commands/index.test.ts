@@ -68,6 +68,7 @@ describe("resolveClientSlashCommand", () => {
     ).toEqual([
       ["exit", ["quit", "q"], "immediate"],
       ["clear", ["new"], "immediate"],
+      ["handoff", ["topic"], "immediate"],
     ]);
   });
 
@@ -92,6 +93,25 @@ describe("resolveClientSlashCommand", () => {
     expect(resolveClientSlashCommand({ text: "/new", hasAttachments: false })).toMatchObject({
       name: "clear",
       kind: "replace-agent-with-draft",
+    });
+    expect(resolveClientSlashCommand({ text: "/handoff", hasAttachments: false })).toMatchObject({
+      name: "handoff",
+      kind: "handoff-thread",
+      execution: "immediate",
+    });
+    expect(
+      resolveClientSlashCommand({ text: "/handoff My Topic", hasAttachments: false }),
+    ).toMatchObject({
+      name: "handoff",
+      kind: "handoff-thread",
+      args: "My Topic",
+    });
+    expect(
+      resolveClientSlashCommand({ text: "/topic Bugfix", hasAttachments: false }),
+    ).toMatchObject({
+      name: "handoff",
+      kind: "handoff-thread",
+      args: "Bugfix",
     });
   });
 

@@ -109,6 +109,7 @@ import { applyLegacyDaemonWorkspaceOwnership } from "@/workspace/legacy-daemon-w
 import type { WorkspaceFileOpenRequest } from "@/workspace/file-open";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { buildDraftAgentSetup, type ClientSlashCommand } from "@/client-slash-commands";
+import { openExternalUrl } from "@/utils/open-external-url";
 
 interface ChatAgentStateShape {
   serverId: string | null;
@@ -1619,6 +1620,7 @@ function ActiveAgentComposer({
   const closeWorkspaceTab = useWorkspaceLayoutStore((state) => state.closeTab);
   const hideWorkspaceAgent = useWorkspaceLayoutStore((state) => state.hideAgent);
   const unpinWorkspaceAgent = useWorkspaceLayoutStore((state) => state.unpinAgent);
+  const runtimeClient = useHostRuntimeClient(serverId);
   const workspaceAttachmentScopeKey = useWorkspaceAttachmentScopeKey({
     serverId,
     cwd,
@@ -1650,6 +1652,38 @@ function ActiveAgentComposer({
         throw new Error("Agent not found");
       }
 
+      if (command.kind === "handoff-thread") {
+        const hubUrl = process.env.EXPO_PUBLIC_PASEO_HUB_URL ?? "http://127.0.0.1:6868";
+        const topicName = command.args || agent.title || undefined;
+        const response = await fetch(`${hubUrl}/api/v1/channels/handoff`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agentId, name: topicName }),
+        });
+        if (!response.ok) {
+          const err = (await response.json().catch(() => ({}))) as {
+            message?: string;
+            error?: string;
+          };
+          throw new Error(err.message ?? err.error ?? `Handoff failed (${response.status})`);
+        }
+        const data = (await response.json()) as {
+          topicUrl?: string;
+          name?: string;
+          topicId?: number;
+        };
+        if (data.topicUrl) {
+          void openExternalUrl(data.topicUrl);
+          if (runtimeClient) {
+            void runtimeClient.sendAgentMessage(
+              agentId,
+              `🚀 Thread handed off to Telegram topic: **${data.name}**\n${data.topicUrl}`,
+            );
+          }
+        }
+        return;
+      }
+
       const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
       if (workspaceKey) {
         unpinWorkspaceAgent(workspaceKey, agentId);
@@ -1677,6 +1711,7 @@ function ActiveAgentComposer({
       serverId,
       tabId,
       unpinWorkspaceAgent,
+      runtimeClient,
       workspaceId,
     ],
   );

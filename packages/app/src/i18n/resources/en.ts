@@ -157,6 +157,7 @@ export const en = {
     clientCommands: {
       archiveAgent: "Archive the current agent",
       freshDraft: "Archive this agent and start a fresh draft",
+      handoffThread: "Handoff this thread to Telegram (creates a topic in group)",
     },
     github: {
       searching: "Searching...",

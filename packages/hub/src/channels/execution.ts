@@ -51,6 +51,7 @@ import {
 import { ChannelLifecycleCommands } from "./commands-lifecycle.js";
 import { ChannelCommandDispatcher } from "./commands-dispatch.js";
 import { commandReplyAddress, channelIdentityText } from "./commands-context.js";
+import { runChannelMessageAction } from "./message-actions.js";
 import { expandDynamicCommand } from "./commands-extension.js";
 import {
   admitFollowUp,
@@ -650,6 +651,39 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         detach: detachChannelAgent,
         dispatchFresh: async (context) =>
           (await handleAgentMessage(context.message, context.account, context.route)).dispatched,
+        createTopic: async (params) => {
+          const outcome = await runChannelMessageAction({
+            organizationId: deps.organizationId,
+            channel: params.channel,
+            accountId: params.accountId,
+            action: "topic-create",
+            params: { name: params.name },
+            conversation: { to: params.chatId },
+            send: async () => ({ ok: true }),
+          });
+          if (!outcome.ok || !outcome.payload || typeof outcome.payload !== "object") {
+            throw new Error(outcome.error ?? "Failed to create forum topic.");
+          }
+          const payload = outcome.payload as { topicId?: number; name?: string; chatId?: string };
+          if (payload.topicId === undefined) {
+            throw new Error("Created topic did not return a topicId.");
+          }
+          return {
+            topicId: payload.topicId,
+            name: payload.name ?? params.name,
+            chatId: payload.chatId ?? params.chatId,
+          };
+        },
+        postToTopic: async (params) => {
+          const postResult = await deps.post({
+            channel: params.channel,
+            accountId: params.accountId,
+            to: params.chatId,
+            threadId: params.threadId,
+            text: params.text,
+          });
+          return postResult.ok;
+        },
       });
       commandDispatcher = new ChannelCommandDispatcher({
         plane: deps,

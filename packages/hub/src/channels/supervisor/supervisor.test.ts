@@ -466,6 +466,21 @@ describe("flatInboundNormalizer", () => {
     });
     assert.equal(message?.conversation.kind, "dm");
   });
+  it("maps a Zalo DM to a dm conversation", () => {
+    const message = flatInboundNormalizer({
+      channel: "zalo",
+      accountId: "bot-nha-so-5",
+      ctxPayload: {
+        Body: "hello",
+        ChatType: "direct",
+        ChatId: "zalo-user-1",
+        SenderId: "zalo-user-1",
+        MessageSid: "zalo-message-1",
+      },
+    });
+    assert.equal(message?.conversation.kind, "dm");
+    assert.equal(message?.senderIdentity, "zalo:zalo-user-1");
+  });
 
   it("drops an inbound message from a channel with no in-repo vertical", () => {
     const message = flatInboundNormalizer({

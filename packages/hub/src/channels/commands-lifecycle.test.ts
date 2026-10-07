@@ -186,6 +186,7 @@ function fixture(overrides: Partial<LifecycleCommandDependencies> = {}) {
     seed,
     bound,
     bindingInput,
+    store,
   };
 }
 
@@ -201,6 +202,14 @@ describe("channel lifecycle commands", () => {
     expect(f.dispatchFresh.mock.calls[0]?.[0]).toMatchObject({
       message: { text: "start fresh", mentionedBot: true },
     });
+  });
+  it("new clears old binding even when cancelAgent rejects", async () => {
+    const f = fixture();
+    f.cancelAgent.mockRejectedValueOnce(new Error("Agent 123 not found"));
+    await f.seed();
+    const outcome = await f.lifecycle.handle({ name: "new" }, f.context);
+    expect(outcome?.handled).toBe(true);
+    expect(await f.bound()).toBeUndefined();
   });
   it("consumes a successful new command even when acknowledgement delivery fails", async () => {
     const f = fixture();
@@ -504,5 +513,152 @@ describe("channel lifecycle commands", () => {
       steer: true,
       source: f.context.message,
     });
+  });
+  it("handoff creates a new forum topic, rebinds the agent, and posts link", async () => {
+    const createTopic = vi.fn(async (params) => ({
+      topicId: 77,
+      name: params.name,
+      chatId: params.chatId,
+    }));
+    const postToTopic = vi.fn(async () => true);
+    const f = fixture({ createTopic, postToTopic });
+    await f.seed();
+
+    const telegramContext = {
+      ...f.context,
+      account: { ...f.context.account, channel: "telegram" },
+      message: {
+        ...f.context.message,
+        channel: "telegram" as const,
+        conversation: {
+          kind: "channel" as const,
+          id: "-1001234567890",
+          rootConversationId: "-1001234567890",
+          threadId: null,
+        },
+      },
+    };
+
+    const outcome = await f.lifecycle.handle(
+      { name: "handoff", value: "Investigate Auth" },
+      telegramContext,
+    );
+    expect(outcome?.handled).toBe(true);
+    expect(createTopic).toHaveBeenCalledWith({
+      channel: "telegram",
+      accountId: "work",
+      chatId: "-1001234567890",
+      name: "Investigate Auth",
+    });
+    expect(postToTopic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "telegram",
+        chatId: "-1001234567890",
+        threadId: "77",
+      }),
+    );
+
+    // Old binding released
+    expect(await f.bound()).toBeUndefined();
+
+    // New binding exists for the new topic
+    const newBound = await f.store.findThreadBinding("lifecycle", "work", "-1001234567890", "77");
+    expect(newBound?.agentId).toBe(f.old.id);
+    expect(newBound?.status).toBe("bound");
+
+    // Replied with link to new topic
+    expect(outcome?.detail).toContain("https://t.me/c/1234567890/77");
+    expect(outcome?.detail).toContain("Investigate Auth");
+  });
+
+  it("handoff uses the agent title when no prompt is provided", async () => {
+    const createTopic = vi.fn(async (params) => ({
+      topicId: 88,
+      name: params.name,
+      chatId: params.chatId,
+    }));
+    const f = fixture({ createTopic });
+    f.old.title = "My Planned Work";
+    await f.seed();
+
+    const telegramContext = {
+      ...f.context,
+      account: { ...f.context.account, channel: "telegram" },
+      message: {
+        ...f.context.message,
+        channel: "telegram" as const,
+        conversation: {
+          kind: "channel" as const,
+          id: "-1001234567890",
+          rootConversationId: "-1001234567890",
+          threadId: null,
+        },
+      },
+    };
+
+    const outcome = await f.lifecycle.handle({ name: "handoff" }, telegramContext);
+    expect(outcome?.handled).toBe(true);
+    expect(createTopic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: f.old.title,
+      }),
+    );
+    expect(outcome?.detail).toContain("https://t.me/c/1234567890/88");
+  });
+
+  it("handoff supports explicit target chat in prompt", async () => {
+    const createTopic = vi.fn(async (params) => ({
+      topicId: 99,
+      name: params.name,
+      chatId: params.chatId,
+    }));
+    const f = fixture({ createTopic });
+    await f.seed();
+
+    const outcome = await f.lifecycle.handle(
+      { name: "handoff", value: "-1009876543210 Custom Topic" },
+      f.context,
+    );
+    expect(outcome?.handled).toBe(true);
+    expect(createTopic).toHaveBeenCalledWith({
+      channel: "telegram",
+      accountId: "default",
+      chatId: "-1009876543210",
+      name: "Custom Topic",
+    });
+    expect(outcome?.detail).toContain("https://t.me/c/9876543210/99");
+  });
+
+  it("handoff refuses when there is no bound session", async () => {
+    const f = fixture();
+    const outcome = await f.lifecycle.handle(
+      { name: "handoff", value: "Topic" },
+      { ...f.context, agentId: undefined },
+    );
+    expect(outcome?.handled).toBe(false);
+    expect(f.context.post).toHaveBeenCalledWith(
+      "No bound session to handoff. Start one with /new <message>.",
+    );
+  });
+
+  it("handoff refuses when no forum group can be resolved", async () => {
+    const createTopic = vi.fn();
+    const f = fixture({ createTopic });
+    await f.seed();
+
+    const nonTelegramContext = {
+      ...f.context,
+      route: { ...route, where: { ...route.where, conversations: [] } },
+      account: { ...f.context.account, channel: "slack", config: {} },
+    };
+
+    const outcome = await f.lifecycle.handle(
+      { name: "handoff", value: "Topic" },
+      nonTelegramContext,
+    );
+    expect(outcome?.handled).toBe(false);
+    expect(f.context.post).toHaveBeenCalledWith(
+      expect.stringContaining("No Telegram forum group specified or configured for handoff"),
+    );
   });
 });

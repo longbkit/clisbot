@@ -11,7 +11,12 @@ import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js"
 import { outboundAttachesTool } from "./config/enums.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
-import type { ChannelReplyAgentCapability, InboundMessage } from "./plane/types.js";
+import type {
+  ChannelReplyAgentCapability,
+  InboundConversationDetail,
+  InboundMessage,
+  SupportedChannelName,
+} from "./plane/types.js";
 import { ChannelCommandTurnQueue } from "./commands-lifecycle-queue.js";
 import { resolveSessionWorkspaceId } from "./workspace-organization.js";
 
@@ -25,13 +30,39 @@ export interface LifecycleCommandContext {
   /** Told the id of a session a command creates, so its run slot can follow it. */
   onAgentCreated?: ((agentId: string) => void) | undefined;
 }
+export interface CreateTopicParams {
+  channel: SupportedChannelName;
+  accountId: string;
+  chatId: string;
+  name: string;
+}
+
+export interface CreateTopicResult {
+  topicId: number;
+  name: string;
+  chatId: string;
+}
+
+export interface PostToTopicParams {
+  channel: SupportedChannelName;
+  accountId: string;
+  chatId: string;
+  threadId: string;
+  text: string;
+}
 
 export interface LifecycleCommandDependencies {
   organizationId: string;
   channelRevisionId?: string | null;
   daemon: DaemonConnection;
   logger?: import("./plane/types.js").PlaneLogger;
-  store: Pick<ChannelStore, "findThreadBinding" | "rebindThreadBinding" | "releaseThreadBinding">;
+  store: Pick<
+    ChannelStore,
+    | "findThreadBinding"
+    | "rebindThreadBinding"
+    | "releaseThreadBinding"
+    | "releaseAgentThreadBindings"
+  >;
   resolveConfig(
     context: LifecycleCommandContext,
     capability?: ChannelReplyAgentCapability,
@@ -46,6 +77,8 @@ export interface LifecycleCommandDependencies {
   authorizeResume(agent: AgentSnapshot, context: LifecycleCommandContext): Promise<boolean>;
   authorizeQueued?(context: LifecycleCommandContext): Promise<boolean>;
   dispatchFresh(context: LifecycleCommandContext): Promise<boolean>;
+  createTopic?(params: CreateTopicParams): Promise<CreateTopicResult>;
+  postToTopic?(params: PostToTopicParams): Promise<boolean>;
 }
 
 interface BindingChange {
@@ -54,7 +87,7 @@ interface BindingChange {
   context: LifecycleCommandContext;
 }
 
-const COMMANDS = new Set(["new", "resume", "fork", "side", "quick", "steer", "queue"]);
+const COMMANDS = new Set(["new", "resume", "fork", "side", "quick", "steer", "queue", "handoff"]);
 
 /** Direct session commands. The caller gates org Access before entering this handler. */
 export class ChannelLifecycleCommands {
@@ -93,6 +126,7 @@ export class ChannelLifecycleCommands {
     if (command.name === "steer" || command.name === "queue") {
       return this.turnCommand(command.name, context, prompt);
     }
+    if (command.name === "handoff") return this.handoff(context, prompt);
     return this.create(command.name, context, prompt);
   }
 
@@ -106,7 +140,9 @@ export class ChannelLifecycleCommands {
 
   private async fresh(context: LifecycleCommandContext, prompt?: string): Promise<string> {
     const key = deriveBindingKey(context.message, context.route);
-    if (context.agentId !== undefined) await this.deps.daemon.cancelAgent(context.agentId);
+    if (context.agentId !== undefined) {
+      await this.deps.daemon.cancelAgent(context.agentId).catch(() => undefined);
+    }
     const released = await this.deps.store.releaseThreadBinding({
       organizationId: this.deps.organizationId,
       accountId: context.account.accountId,
@@ -438,6 +474,115 @@ export class ChannelLifecycleCommands {
     this.queue.stop();
     this.oneOffs.clear();
   }
+  private async rebindHandoffTopic(
+    agentId: string,
+    topicResult: CreateTopicResult,
+    targetAccount: string,
+    context: LifecycleCommandContext,
+  ): Promise<ThreadBindingRecord> {
+    const newConversation: InboundConversationDetail = {
+      kind: "topic",
+      id: String(topicResult.topicId),
+      rootConversationId: topicResult.chatId,
+      threadId: String(topicResult.topicId),
+    };
+    return await this.deps.store.rebindThreadBinding({
+      organizationId: this.deps.organizationId,
+      channel: "telegram",
+      accountId: targetAccount,
+      externalConversationId: topicResult.chatId,
+      externalThreadId: String(topicResult.topicId),
+      expectedAgentId: null,
+      agentId,
+      initiator: context.message.senderIdentity,
+      route: {
+        ...bindingSummary(
+          context.route,
+          newConversation,
+          {
+            revisionId: this.deps.channelRevisionId ?? null,
+            position: routePosition(context.account, context.route),
+          },
+          topicResult.name,
+        ),
+        commandReplyPath: "relay",
+      },
+    });
+  }
+
+  private async handoff(context: LifecycleCommandContext, prompt?: string): Promise<string> {
+    if (!context.agentId)
+      throw new Error("No bound session to handoff. Start one with /new <message>.");
+    const agent = (await this.deps.daemon.listAgents()).find(
+      (entry) => entry.id === context.agentId,
+    );
+    if (agent === undefined) throw new Error("The bound session is unavailable.");
+
+    const parsed = parseHandoffPrompt(prompt);
+    const targetChatId = resolveTargetChatId(context, parsed.targetChatId);
+    if (!targetChatId) {
+      throw new Error(
+        "No Telegram forum group specified or configured for handoff. Usage: /handoff [-100groupId] <topic name>",
+      );
+    }
+    const topicName = parsed.topicName || agent.title?.trim() || `Thread ${agent.id.slice(0, 8)}`;
+    if (!this.deps.createTopic) throw new Error("Topic creation is not configured on this host.");
+
+    const targetAccount =
+      context.account.channel === "telegram" ? context.account.accountId : "default";
+    const topicResult = await this.deps.createTopic({
+      channel: "telegram",
+      accountId: targetAccount,
+      chatId: targetChatId,
+      name: topicName,
+    });
+
+    if (this.deps.store.releaseAgentThreadBindings) {
+      await this.deps.store
+        .releaseAgentThreadBindings(this.deps.organizationId, agent.id)
+        .catch(() => 0);
+    } else {
+      const previousKey = deriveBindingKey(context.message, context.route);
+      await this.deps.store
+        .releaseThreadBinding({
+          organizationId: this.deps.organizationId,
+          accountId: context.account.accountId,
+          ...previousKey,
+        })
+        .catch(() => undefined);
+    }
+
+    const newBinding = await this.rebindHandoffTopic(agent.id, topicResult, targetAccount, context);
+    const newConversation: InboundConversationDetail = {
+      kind: "topic",
+      id: String(topicResult.topicId),
+      rootConversationId: topicResult.chatId,
+      threadId: String(topicResult.topicId),
+    };
+    await this.deps.attach(newBinding, {
+      ...context,
+      message: {
+        ...context.message,
+        channel: "telegram",
+        conversation: newConversation,
+      },
+    });
+
+    if (this.deps.postToTopic) {
+      await this.deps
+        .postToTopic({
+          channel: "telegram",
+          accountId: targetAccount,
+          chatId: topicResult.chatId,
+          threadId: String(topicResult.topicId),
+          text: `🚀 **Thread Handed Off**\nContinued from session \`${agent.id}\`. You can continue working here!`,
+        })
+        .catch(() => undefined);
+    }
+
+    const topicUrl = formatTelegramTopicUrl(topicResult.chatId, topicResult.topicId);
+    return `Thread handed off to Telegram topic: **${topicResult.name}**\n${topicUrl}`;
+  }
 }
 
 export function isLifecycleTerminal(event: unknown): boolean {
@@ -448,4 +593,43 @@ export function isLifecycleTerminal(event: unknown): boolean {
     kind !== undefined &&
     ["turn_completed", "turn_failed", "turn_canceled", "turn_closed"].includes(kind)
   );
+}
+
+function parseHandoffPrompt(prompt?: string): { targetChatId?: string; topicName?: string } {
+  if (!prompt) return {};
+  const matchGroup = /^(-100\d+|@\w+)\s+(.+)$/u.exec(prompt);
+  if (matchGroup?.[1] && matchGroup[2]) {
+    return { targetChatId: matchGroup[1], topicName: matchGroup[2].trim() };
+  }
+  if (/^(-100\d+|@\w+)$/u.test(prompt)) {
+    return { targetChatId: prompt };
+  }
+  return { topicName: prompt };
+}
+
+function resolveTargetChatId(
+  context: LifecycleCommandContext,
+  parsedChatId?: string,
+): string | undefined {
+  if (parsedChatId) return parsedChatId;
+  const conversation = context.message.conversation;
+  if (context.message.channel === "telegram") {
+    if (conversation.rootConversationId?.startsWith("-100")) return conversation.rootConversationId;
+    if (conversation.id.startsWith("-100")) return conversation.id;
+  }
+  const routeChat = context.route.where.conversations.find((id) => id.startsWith("-100"));
+  if (routeChat) return routeChat;
+  const cfgGroup =
+    context.account.config?.["groupId"] ??
+    context.account.config?.["targetChatId"] ??
+    context.account.config?.["forumGroupId"];
+  if (typeof cfgGroup === "string" || typeof cfgGroup === "number") return String(cfgGroup);
+  return process.env["TELEGRAM_TEST_TOPIC_GROUP_ID"];
+}
+
+function formatTelegramTopicUrl(chatId: string, topicId: number): string {
+  if (chatId.startsWith("-100")) {
+    return `https://t.me/c/${chatId.replace(/^-100/, "")}/${topicId}`;
+  }
+  return `https://t.me/${chatId.replace(/^@/, "")}/${topicId}`;
 }

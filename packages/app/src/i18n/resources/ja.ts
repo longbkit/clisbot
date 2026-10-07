@@ -160,6 +160,7 @@ export const ja: TranslationResources = {
     clientCommands: {
       archiveAgent: "現在のエージェントをアーカイブ",
       freshDraft: "このエージェントをアーカイブして新しい下書きを開始",
+      handoffThread: "このスレッドをTelegramに引き継ぐ（グループ内にトピックを作成）",
     },
     github: {
       searching: "検索中...",

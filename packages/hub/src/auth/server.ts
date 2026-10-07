@@ -234,6 +234,25 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
   const auth = betterAuth({
     baseURL: options.baseURL,
     secret: options.secret,
+    trustedOrigins: async (request) => {
+      const origins: string[] = [];
+      if (options.baseURL) {
+        try {
+          origins.push(new URL(options.baseURL).origin);
+        } catch {}
+      }
+      const reqOrigin = request?.headers?.get("origin");
+      if (reqOrigin) origins.push(reqOrigin);
+      const host = request?.headers?.get("x-forwarded-host") ?? request?.headers?.get("host");
+      if (host) {
+        origins.push(`https://${host}`, `http://${host}`);
+      }
+      const envTrusted = process.env["BETTER_AUTH_TRUSTED_ORIGINS"];
+      if (envTrusted) {
+        origins.push(...envTrusted.split(",").map((s) => s.trim()));
+      }
+      return origins;
+    },
     ...(options.trustedClientIpHeader === undefined
       ? {}
       : {
@@ -648,7 +667,11 @@ function requireBrowserOrigin(headers: Headers, browserOrigin: string): void {
   const suppliedOrigin = headers.get("origin") ?? headers.get("referer");
   if (suppliedOrigin === null || suppliedOrigin === "null") throw new Error("invalid origin");
   try {
-    if (new URL(suppliedOrigin).origin === browserOrigin) return;
+    const origin = new URL(suppliedOrigin).origin;
+    if (origin === browserOrigin) return;
+    const envTrusted =
+      process.env["BETTER_AUTH_TRUSTED_ORIGINS"]?.split(",").map((s) => s.trim()) ?? [];
+    if (envTrusted.includes(origin)) return;
   } catch {
     // Invalid browser origins are rejected below.
   }
@@ -676,7 +699,11 @@ function rejectCrossOriginCookieMutation(
     return authBoundaryError("Missing or null Origin", "MISSING_OR_NULL_ORIGIN");
   }
   try {
-    if (new URL(suppliedOrigin).origin === browserOrigin) return undefined;
+    const origin = new URL(suppliedOrigin).origin;
+    if (origin === browserOrigin) return undefined;
+    const envTrusted =
+      process.env["BETTER_AUTH_TRUSTED_ORIGINS"]?.split(",").map((s) => s.trim()) ?? [];
+    if (envTrusted.includes(origin)) return undefined;
   } catch {
     // Invalid browser origins fail through the same public boundary as hostile origins.
   }

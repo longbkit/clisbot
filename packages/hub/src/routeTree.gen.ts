@@ -38,6 +38,7 @@ import { Route as AgentExecutionsExecutionIdMcpRouteImport } from './routes/agen
 import { Route as ApiV1UsersUsernameRouteImport } from './routes/api/v1/users/$username'
 import { Route as ApiV1CliAuthorizationsPollRouteImport } from './routes/api/v1/cli-authorizations/poll'
 import { Route as ApiV1ChannelsStatusRouteImport } from './routes/api/v1/channels/status'
+import { Route as ApiV1ChannelsHandoffRouteImport } from './routes/api/v1/channels/handoff'
 import { Route as ApiOpenAgentAgentIdRouteImport } from './routes/api/open/agent/$agentId'
 import { Route as ApiManagementV1SplatRouteImport } from './routes/api/management/v1/$'
 import { Route as ApiIntegrationsSlackEventsRouteImport } from './routes/api/integrations/slack/events'
@@ -211,6 +212,11 @@ const ApiV1CliAuthorizationsPollRoute =
 const ApiV1ChannelsStatusRoute = ApiV1ChannelsStatusRouteImport.update({
   id: '/status',
   path: '/status',
+  getParentRoute: () => ApiV1ChannelsRoute,
+} as any)
+const ApiV1ChannelsHandoffRoute = ApiV1ChannelsHandoffRouteImport.update({
+  id: '/handoff',
+  path: '/handoff',
   getParentRoute: () => ApiV1ChannelsRoute,
 } as any)
 const ApiOpenAgentAgentIdRoute = ApiOpenAgentAgentIdRouteImport.update({
@@ -425,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
   '/api/management/v1/$': typeof ApiManagementV1SplatRoute
   '/api/open/agent/$agentId': typeof ApiOpenAgentAgentIdRoute
+  '/api/v1/channels/handoff': typeof ApiV1ChannelsHandoffRoute
   '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
@@ -481,6 +488,7 @@ export interface FileRoutesByTo {
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
   '/api/management/v1/$': typeof ApiManagementV1SplatRoute
   '/api/open/agent/$agentId': typeof ApiOpenAgentAgentIdRoute
+  '/api/v1/channels/handoff': typeof ApiV1ChannelsHandoffRoute
   '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
@@ -541,6 +549,7 @@ export interface FileRoutesById {
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
   '/api/management/v1/$': typeof ApiManagementV1SplatRoute
   '/api/open/agent/$agentId': typeof ApiOpenAgentAgentIdRoute
+  '/api/v1/channels/handoff': typeof ApiV1ChannelsHandoffRoute
   '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
@@ -601,6 +610,7 @@ export interface FileRouteTypes {
     | '/api/integrations/slack/events'
     | '/api/management/v1/$'
     | '/api/open/agent/$agentId'
+    | '/api/v1/channels/handoff'
     | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
     | '/api/v1/users/$username'
@@ -657,6 +667,7 @@ export interface FileRouteTypes {
     | '/api/integrations/slack/events'
     | '/api/management/v1/$'
     | '/api/open/agent/$agentId'
+    | '/api/v1/channels/handoff'
     | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
     | '/api/v1/users/$username'
@@ -716,6 +727,7 @@ export interface FileRouteTypes {
     | '/api/integrations/slack/events'
     | '/api/management/v1/$'
     | '/api/open/agent/$agentId'
+    | '/api/v1/channels/handoff'
     | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
     | '/api/v1/users/$username'
@@ -971,6 +983,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/api/v1/channels/status'
       preLoaderRoute: typeof ApiV1ChannelsStatusRouteImport
+      parentRoute: typeof ApiV1ChannelsRoute
+    }
+    '/api/v1/channels/handoff': {
+      id: '/api/v1/channels/handoff'
+      path: '/handoff'
+      fullPath: '/api/v1/channels/handoff'
+      preLoaderRoute: typeof ApiV1ChannelsHandoffRouteImport
       parentRoute: typeof ApiV1ChannelsRoute
     }
     '/api/open/agent/$agentId': {
@@ -1263,10 +1282,12 @@ const ApiDaemonsDaemonIdRouteWithChildren =
   ApiDaemonsDaemonIdRoute._addFileChildren(ApiDaemonsDaemonIdRouteChildren)
 
 interface ApiV1ChannelsRouteChildren {
+  ApiV1ChannelsHandoffRoute: typeof ApiV1ChannelsHandoffRoute
   ApiV1ChannelsStatusRoute: typeof ApiV1ChannelsStatusRoute
 }
 
 const ApiV1ChannelsRouteChildren: ApiV1ChannelsRouteChildren = {
+  ApiV1ChannelsHandoffRoute: ApiV1ChannelsHandoffRoute,
   ApiV1ChannelsStatusRoute: ApiV1ChannelsStatusRoute,
 }
 

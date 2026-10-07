@@ -160,6 +160,7 @@ export const ptBR: TranslationResources = {
     clientCommands: {
       archiveAgent: "Arquivar o agente atual",
       freshDraft: "Arquivar este agente e iniciar um novo rascunho",
+      handoffThread: "Transferir esta conversa para o Telegram (cria um tópico no grupo)",
     },
     github: {
       searching: "Buscando...",

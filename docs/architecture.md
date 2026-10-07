@@ -192,7 +192,10 @@ layout rule, and [guides/developer-guide/channels-operations.md](guides/develope
 
 Electron wrapper for macOS, Linux, and Windows.
 
-- Can spawn the daemon as a managed subprocess
+- Packaged macOS builds ask macOS to open the app at login, and its normal
+  bootstrap starts the bundled daemon; daemon and Hub for a home can also be
+  kept running across logins independently of the app
+  ([login startup](development.md#macos-login-startup))
 - Native file access for workspace integration
 - Same WebSocket client as mobile app
 

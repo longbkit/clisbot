@@ -160,6 +160,7 @@ export const ko: TranslationResources = {
     clientCommands: {
       archiveAgent: "현재 에이전트 보관",
       freshDraft: "이 에이전트를 보관하고 새 초안을 시작합니다",
+      handoffThread: "이 스레드를 텔레그램으로 핸드오프 (그룹에 토픽 생성)",
     },
     github: {
       searching: "검색 중...",

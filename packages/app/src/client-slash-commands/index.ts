@@ -1,17 +1,24 @@
 import type { Agent } from "@/stores/session-store";
 import type { WorkspaceDraftTabSetup } from "@/workspace-tabs/model";
 
-export type ClientSlashCommandKind = "archive-agent" | "replace-agent-with-draft";
+export type ClientSlashCommandKind =
+  | "archive-agent"
+  | "replace-agent-with-draft"
+  | "handoff-thread";
 export type ClientSlashCommandExecution = "immediate" | "insert";
 
 export interface ClientSlashCommand {
   name: string;
   aliases: readonly string[];
   description: string;
-  descriptionKey: "composer.clientCommands.archiveAgent" | "composer.clientCommands.freshDraft";
+  descriptionKey:
+    | "composer.clientCommands.archiveAgent"
+    | "composer.clientCommands.freshDraft"
+    | "composer.clientCommands.handoffThread";
   argumentHint: string;
   kind: ClientSlashCommandKind;
   execution: ClientSlashCommandExecution;
+  args?: string;
 }
 
 export const CLIENT_SLASH_COMMANDS: readonly ClientSlashCommand[] = [
@@ -33,6 +40,15 @@ export const CLIENT_SLASH_COMMANDS: readonly ClientSlashCommand[] = [
     kind: "replace-agent-with-draft",
     execution: "immediate",
   },
+  {
+    name: "handoff",
+    aliases: ["topic"],
+    description: "Handoff this thread to Telegram (creates a topic in group)",
+    descriptionKey: "composer.clientCommands.handoffThread",
+    argumentHint: "[topic_name]",
+    kind: "handoff-thread",
+    execution: "immediate",
+  },
 ];
 
 const COMMAND_BY_NAME = new Map<string, ClientSlashCommand>();
@@ -46,7 +62,7 @@ for (const command of CLIENT_SLASH_COMMANDS) {
 export function resolveClientSlashCommand(input: {
   text: string;
   hasAttachments: boolean;
-}): ClientSlashCommand | null {
+}): (ClientSlashCommand & { args?: string }) | null {
   if (input.hasAttachments) {
     return null;
   }
@@ -56,12 +72,23 @@ export function resolveClientSlashCommand(input: {
     return null;
   }
 
-  const commandName = trimmed.slice(1);
-  if (!commandName || /\s/.test(commandName)) {
+  const match = /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(trimmed);
+  if (!match || !match[1]) {
     return null;
   }
 
-  return COMMAND_BY_NAME.get(commandName) ?? null;
+  const commandName = match[1];
+  const command = COMMAND_BY_NAME.get(commandName);
+  if (!command) {
+    return null;
+  }
+
+  const args = match[2]?.trim();
+  if (command.kind !== "handoff-thread" && args) {
+    return null;
+  }
+
+  return { ...command, ...(args ? { args } : {}) };
 }
 
 export function buildDraftAgentSetup(agent: Agent): WorkspaceDraftTabSetup {

@@ -160,6 +160,7 @@ export const zhCN: TranslationResources = {
     clientCommands: {
       archiveAgent: "归档当前 Agent",
       freshDraft: "归档此 Agent 并开始新的草稿",
+      handoffThread: "将此会话转交至 Telegram（在群组中创建话题）",
     },
     github: {
       searching: "正在搜索...",

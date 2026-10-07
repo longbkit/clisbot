@@ -98,6 +98,7 @@ import {
   stopDesktopManagedDaemonOnQuitIfNeeded,
 } from "./daemon/quit-lifecycle.js";
 import { runDesktopStartup } from "./desktop-startup.js";
+import { configureMacOSLoginItem } from "./system/login-item.js";
 import { registerBrowserAutomationIpc } from "./features/browser-automation/ipc.js";
 import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
 import { installAppUpdateOnQuit } from "./features/auto-updater.js";
@@ -922,6 +923,11 @@ async function bootstrap(): Promise<void> {
   }
 
   await app.whenReady();
+  configureMacOSLoginItem({
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+    app,
+  });
 
   const appDistDir = getAppDistDir();
   protocol.handle(APP_SCHEME, (request) => {

@@ -46,6 +46,13 @@ describe("buildZaloInboundEvent", () => {
     // Zalo sends seconds; the ctxPayload timestamp is milliseconds.
     expect(build.event.timestampMs).toBe(1_700_000_000_000);
   });
+  it("admits a text message when Zalo adds a new event name", () => {
+    const update = textUpdate();
+    update.event_name = "message.text.received.v2";
+    const build = buildZaloInboundEvent(update, { accountId: "default" });
+    expect(build.admit).toBe(true);
+    if (build.admit) expect(build.event.body).toBe("hello there");
+  });
 
   it("classifies a leading /verb as a command with its args", () => {
     const build = buildZaloInboundEvent(textUpdate({ text: "/Status  now please" }), {

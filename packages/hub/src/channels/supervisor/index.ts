@@ -260,6 +260,11 @@ function planeKindFor(
     if (chatType === "channel") return threadId !== null ? "thread" : "channel";
     return null;
   }
+  if (channel === "zalo" || channel === "zalouser") {
+    if (chatType === "direct") return "dm";
+    if (chatType === "group") return "group";
+    return null;
+  }
   return null;
 }
 
@@ -649,7 +654,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   private readonly options: ChannelSupervisorOptions;
   private readonly env: NodeJS.ProcessEnv;
   private readonly logger: PlaneLogger;
-  private readonly store: ChannelStore;
+  readonly store: ChannelStore;
   private readonly pinsPath: string;
   private readonly handles = new Map<string, AccountHandle>();
   /** Restarts an account whose transport died on its own (`account-restart.ts`). */

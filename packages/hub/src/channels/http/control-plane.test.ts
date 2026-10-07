@@ -442,6 +442,48 @@ describe("channel control-plane ops", () => {
     assert.deepEqual(await response.json(), { accounts: [] });
   });
 
+  it("degrades handoff when supervisor is unavailable", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const application = buildApp(database);
+    const response = await application.operations.handleChannelHandoff(
+      jsonRequest("/api/v1/channels/handoff", {
+        method: "POST",
+        body: { agentId: "agent-1", chatId: "-100123" },
+      }),
+    );
+    assert.equal(response.status, 503);
+  });
+
+  it("rejects handoff when no target chat can be resolved", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const prevEnv = process.env["TELEGRAM_TEST_TOPIC_GROUP_ID"];
+    delete process.env["TELEGRAM_TEST_TOPIC_GROUP_ID"];
+    try {
+      const { supervisor } = stubSupervisor([], {
+        channel: "telegram",
+        account: "default",
+        installed: true,
+        transport: "started",
+      });
+      (supervisor as unknown as { store: unknown }).store = {};
+      const application = buildApp(database, { supervisor });
+      const response = await application.operations.handleChannelHandoff(
+        jsonRequest("/api/v1/channels/handoff", {
+          method: "POST",
+          body: { agentId: "agent-1" },
+        }),
+      );
+      assert.equal(response.status, 400);
+      const json = await response.json();
+      assert.ok(json && typeof json === "object" && "error" in json);
+      assert.equal(json.error, "no_target_chat");
+    } finally {
+      if (prevEnv !== undefined) process.env["TELEGRAM_TEST_TOPIC_GROUP_ID"] = prevEnv;
+    }
+  });
+
   it("gates the channel-reply MCP endpoint: flag-off 404, no-server 503, non-loopback 401", async () => {
     // Flag off → the exact absent-404, before db or server state is consulted.
     process.env["PASEO_HUB_CHANNELS_ENABLED"] = "0";

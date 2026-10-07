@@ -11,6 +11,7 @@ import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
 // isolated: one account's failure never aborts the others.
 
 import type { Database } from "../../db/types.js";
+import type { ChannelStore } from "../../db/channels.js";
 import type { AgentExecutionRecord } from "../../db/types.js";
 import type { DaemonAgentStreamEvent } from "../../daemons/protocol.js";
 import type { DatabaseRuntime } from "../../db/runtime/index.js";
@@ -155,6 +156,7 @@ export interface ChannelSupervisorOptions {
 export interface ChannelSupervisor {
   /** Shared process-lifetime owner for direct and Automation reply capabilities. */
   readonly channelReplyCapabilities?: ChannelReplyCapabilityService;
+  readonly store?: ChannelStore;
   /** Mount-time recovery: install + start every enabled account (P13: isolated). */
   startAll(): Promise<void>;
   /** Teardown: stop every account's transport, plane, and daemon connection. */

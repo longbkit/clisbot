@@ -265,6 +265,15 @@ export const CHANNEL_COMMANDS = [
     usage: "/promoteroutedefault [undo]",
     description: "make this conversation's agent the route default",
   },
+  {
+    name: "handoff",
+    aliases: ["topic"],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/handoff [name]",
+    description: "handoff this session to a new topic in a chat group (e.g. Telegram)",
+  },
 ] as const;
 
 export type ChannelCommandName = (typeof CHANNEL_COMMANDS)[number]["name"];

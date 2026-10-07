@@ -107,9 +107,11 @@ export function buildZaloInboundEvent(
   ) {
     return { admit: false, reason: "unsupported-event" };
   }
-  if (update.event_name !== "message.text.received" && update.event_name !== "message.image.received") {
-    return { admit: false, reason: "not-a-turn-event" };
-  }
+  const hasPhoto = typeof message.photo_url === "string" && message.photo_url.trim() !== "";
+  const isImage = update.event_name === "message.image.received" || hasPhoto;
+  const hasText = typeof message.text === "string" && message.text.trim() !== "";
+  const isKnownTurn = update.event_name === "message.text.received" || isImage;
+  if (!isKnownTurn && !hasText) return { admit: false, reason: "not-a-turn-event" };
   const senderId = message.from?.id ?? "";
   if (senderId === "") return { admit: false, reason: "not-a-turn-event" };
   if (params.botId !== undefined && senderId === params.botId) {
@@ -118,7 +120,6 @@ export function buildZaloInboundEvent(
   if (message.from?.is_bot === true && params.allowBots !== true) {
     return { admit: false, reason: "bot-message" };
   }
-  const isImage = update.event_name === "message.image.received";
   const body = ((isImage ? message.caption : message.text) ?? "").trim();
   const mediaUrl = isImage ? message.photo_url?.trim() : undefined;
   if (body === "" && (mediaUrl === undefined || mediaUrl === "")) {

@@ -69,6 +69,7 @@ import { configureFeishuConnection } from "../connections/feishu.js";
 import { configureGoogleChatConnection } from "../connections/googlechat.js";
 import { ChannelCredentialProbeError } from "../connections/probe.js";
 import { configureZaloConnection } from "../connections/zalo.js";
+import { runChannelMessageAction } from "../message-actions.js";
 
 /** The nine ops: one per CLI verb plus the tool-path channel-reply MCP
  * endpoint (E4). Responses are JSON, RFC 7807 problems, or MCP payloads. */
@@ -82,6 +83,7 @@ export interface ChannelControlPlaneOps {
   addUser(request: Request): Promise<Response>;
   editUser(request: Request, username: string): Promise<Response>;
   handleChannelReplyMcp(request: Request, token: string): Promise<Response>;
+  handoffChannel(request: Request): Promise<Response>;
 }
 
 export interface ChannelControlPlaneOpsOptions {
@@ -233,6 +235,10 @@ export function createChannelControlPlaneOps(
         handleEditUser(database, request, username, options.supervisor),
       ),
     handleChannelReplyMcp: (request, token) => gateChannelReplyMcp(options, request, token),
+    handoffChannel: (request) =>
+      gate(options, request, (database) =>
+        handleHandoffChannel(database, request, options.supervisor),
+      ),
   };
 }
 
@@ -637,6 +643,94 @@ function handleChannelStatus(supervisor: ChannelSupervisor | null): Promise<Resp
     ),
   );
   return Promise.resolve(Response.json({ accounts }, { status: 200 }));
+}
+const ChannelHandoffSchema = z.object({
+  agentId: z.string().min(1),
+  name: z.string().optional(),
+  chatId: z.string().optional(),
+  channel: z.literal("telegram").default("telegram"),
+  accountId: z.string().optional().default("default"),
+});
+
+async function handleHandoffChannel(
+  database: Database,
+  request: Request,
+  supervisor: ChannelSupervisor | null,
+): Promise<Response> {
+  if (supervisor?.store === undefined) {
+    return Response.json({ error: "supervisor_unavailable" }, { status: 503 });
+  }
+  const channelStore = supervisor.store;
+  const snapshot = await loadSnapshot(database);
+  const organizationId = snapshot.organizationId;
+  const body = (await request.json().catch(() => null)) as unknown;
+  const parsed = ChannelHandoffSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json(
+      { error: "invalid_request", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+  const { agentId, name, channel, accountId } = parsed.data;
+  const targetChatId = parsed.data.chatId ?? process.env["TELEGRAM_TEST_TOPIC_GROUP_ID"];
+  if (!targetChatId) {
+    return Response.json(
+      { error: "no_target_chat", message: "No Telegram forum group specified or configured" },
+      { status: 400 },
+    );
+  }
+  const topicName = name?.trim() || `Thread ${agentId.slice(0, 8)}`;
+  const outcome = await runChannelMessageAction({
+    organizationId,
+    channel,
+    accountId,
+    action: "topic-create",
+    params: { name: topicName },
+    conversation: { to: targetChatId },
+    send: async () => ({ ok: true }),
+  });
+  if (!outcome.ok || !outcome.payload || typeof outcome.payload !== "object") {
+    return Response.json(
+      { error: "topic_creation_failed", message: outcome.error },
+      { status: 502 },
+    );
+  }
+  const payload = outcome.payload as { topicId?: number; name?: string; chatId?: string };
+  if (payload.topicId === undefined) {
+    return Response.json({ error: "missing_topic_id" }, { status: 502 });
+  }
+  const topicId = payload.topicId;
+  const finalChatId = payload.chatId ?? targetChatId;
+  const finalName = payload.name ?? topicName;
+
+  await channelStore.releaseAgentThreadBindings(organizationId, agentId).catch(() => 0);
+  const binding = await channelStore.rebindThreadBinding({
+    organizationId,
+    channel,
+    accountId,
+    externalConversationId: finalChatId,
+    externalThreadId: String(topicId),
+    expectedAgentId: null,
+    agentId,
+    initiator: "api:handoff",
+    route: {
+      match: { kind: "topic", id: String(topicId), rootConversationId: finalChatId },
+      target: { kind: "agent", agent: "default", environment: "default", template: null },
+      bindingKey: "thread",
+      replyAnchor: "thread",
+      conversationLabel: finalName,
+      commandReplyPath: "relay",
+    },
+  });
+  const cleanChatId = finalChatId.replace(/^-100/, "");
+  const topicUrl = finalChatId.startsWith("-100")
+    ? `https://t.me/c/${cleanChatId}/${topicId}`
+    : `https://t.me/${finalChatId.replace(/^@/, "")}/${topicId}`;
+
+  return Response.json(
+    { ok: true, topicId, name: finalName, chatId: finalChatId, topicUrl, bindingId: binding.id },
+    { status: 200 },
+  );
 }
 
 async function handleListUsers(database: Database): Promise<Response> {

@@ -160,6 +160,7 @@ export const ar: TranslationResources = {
     clientCommands: {
       archiveAgent: "أرشفة الوكيل الحالي",
       freshDraft: "أرشفة هذا الوكيل وابدأ مسودة جديدة",
+      handoffThread: "تسليم هذه المحادثة إلى تيليجرام (إنشاء موضوع في المجموعة)",
     },
     github: {
       searching: "جارٍ البحث...",

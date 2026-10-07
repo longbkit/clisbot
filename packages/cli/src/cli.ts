@@ -18,6 +18,8 @@ import { createChannelsCommand } from "./commands/channels/index.js";
 import { createUsersCommand } from "./commands/users/index.js";
 // COMPAT(clisbot-bot): the one-line channel-bot bootstrap group (implementation doc §2.1).
 import { createBotCommand } from "./commands/bot/index.js";
+// COMPAT(clisbot-autostart): macOS login autostart for the daemon and the Hub.
+import { createAutostartCommand } from "./commands/autostart/index.js";
 import { createHooksCommand } from "./commands/hooks.js";
 import { startCommand as daemonStartCommand } from "./commands/daemon/start.js";
 import { runStatusCommand as runDaemonStatusCommand } from "./commands/daemon/status.js";
@@ -187,6 +189,8 @@ export function createCli(): Command {
   program.addCommand(createUsersCommand());
   // COMPAT(clisbot-bot): one-line channel-bot bootstrap (implementation doc §2.1).
   program.addCommand(createBotCommand());
+  // COMPAT(clisbot-autostart): macOS login autostart for daemon + Hub.
+  program.addCommand(createAutostartCommand());
 
   // Chat commands
 

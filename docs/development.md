@@ -94,6 +94,36 @@ PASEO_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived wor
 
 In Paseo-managed worktree services, use the injected service environment rather than hardcoded root checkout ports.
 
+### macOS login startup
+
+Keep a home's daemon and Hub running across logins with launchd agents:
+
+```bash
+paseo autostart install --label-prefix ai.clisbot.fusion --listen 127.0.0.1:6770
+paseo autostart status
+paseo autostart uninstall
+```
+
+`install` writes `~/Library/LaunchAgents/<prefix>.daemon.plist` and
+`<prefix>.hub.plist`, reloads them, and starts them now; on a running target it
+replaces the loaded definition, which restarts that process. Each job runs
+`paseo daemon start --foreground` or `paseo hub start --foreground` with
+`RunAtLoad` and `KeepAlive{SuccessfulExit:false}`, so macOS starts it at login,
+restarts it after a crash, and leaves it stopped after a deliberate stop. Output
+lands in `<home>/state/launchd/<target>.{out,err}.log`.
+
+A login agent inherits none of your shell, so the plist carries exactly: `HOME`,
+a `PATH` starting with the installing one (provider binaries must resolve),
+`PASEO_HOME` and `CLISBOT_HOME`, `PASEO_LISTEN` from `--listen`, and each
+`--env KEY=VALUE`. The Hub job pins the port recorded in `hub-local.json` unless
+`--hub-port` overrides it; the Hub's built-in default is not the port an existing
+stack runs on. `--target daemon|hub` (repeatable) limits a run to one agent and
+`--home` picks the home (default `$PASEO_HOME`, then `$CLISBOT_HOME`, then
+`~/.paseo`). macOS only: another platform is refused rather than half-installed.
+
+Packaged macOS desktop builds ask macOS to open the app at login
+(`configureMacOSLoginItem`); development desktop runs do not.
+
 ### Expo Router
 
 Route ownership, startup restore, and native blank-screen gotchas live in

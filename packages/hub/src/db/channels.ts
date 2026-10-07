@@ -281,6 +281,31 @@ export class ChannelStore {
       return toThreadBinding(row);
     });
   }
+  /** Release any existing thread bindings for an agent (used during handoff). */
+  async releaseAgentThreadBindings(organizationId: string, agentId: string): Promise<number> {
+    return this.runtime.transaction(async (runtimeTransaction) => {
+      const transaction = runtimeTransaction.drizzle();
+      const rows = await transaction
+        .select({ id: schema.threadBindings.id })
+        .from(schema.threadBindings)
+        .where(
+          and(
+            eq(schema.threadBindings.organizationId, organizationId),
+            eq(schema.threadBindings.agentId, agentId),
+          ),
+        );
+      if (rows.length === 0) return 0;
+      await transaction
+        .delete(schema.threadBindings)
+        .where(
+          and(
+            eq(schema.threadBindings.organizationId, organizationId),
+            eq(schema.threadBindings.agentId, agentId),
+          ),
+        );
+      return rows.length;
+    });
+  }
 
   /** Atomically replace a conversation binding without exposing one Agent in two conversations. */
   async rebindThreadBinding(

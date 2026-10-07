@@ -3171,6 +3171,37 @@ describe("inbound event kinds", () => {
     );
   });
 
+  it("processes /handoff command through the execution plane", async () => {
+    const harness = makeHarness({ daemonAgents: [snapshotOf("agent-0", "Nightly build")] });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0HANDOFF",
+      rootConversationId: "C0HANDOFF",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal((bound.outcome as { agentId: string }).agentId, "agent-0");
+
+    harness.next.message = message({ text: "/handoff", conversation });
+    const handoff = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "command", EventFacts: { command: { name: "handoff", args: "" } } },
+    });
+    assert.equal(handoff.outcome?.kind, "command");
+    assert.match(
+      harness.posted.at(-1) ?? "",
+      /No Telegram forum group specified or configured for handoff/u,
+    );
+    await harness.plane.stop();
+  });
+
   it("ignores an unknown command that did not address the bot", async () => {
     const harness = alwaysReplyHarness();
     await harness.plane.start(harness.fake.daemon, store);

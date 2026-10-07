@@ -159,6 +159,7 @@ export interface HubOperations {
   handleChannelRemove(request: Request): Promise<Response>;
   handleChannelList(request: Request): Promise<Response>;
   handleChannelStatus(request: Request): Promise<Response>;
+  handleChannelHandoff(request: Request): Promise<Response>;
   handleUsersList(request: Request): Promise<Response>;
   handleUserShow(request: Request, username: string): Promise<Response>;
   handleUserAdd(request: Request): Promise<Response>;
@@ -426,6 +427,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
     handleChannelRemove: (request) => channelControlPlane.removeChannel(request),
     handleChannelList: (request) => channelControlPlane.listChannels(request),
     handleChannelStatus: (request) => channelControlPlane.channelStatus(request),
+    handleChannelHandoff: (request) => channelControlPlane.handoffChannel(request),
     handleUsersList: (request) => channelControlPlane.listUsers(request),
     handleUserShow: (request, username) => channelControlPlane.showUser(request, username),
     handleUserAdd: (request) => channelControlPlane.addUser(request),
