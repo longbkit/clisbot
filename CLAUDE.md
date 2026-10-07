@@ -323,7 +323,7 @@ Carried forward from the Clisbot T3Claw fusion `AGENTS.md`, re-targeted at the C
 
 ### Upstream compatibility first
 
-This stage prioritizes maximum compatibility with upstream Clisbot — see the [Upstream-Friendly Evolution principle](docs/overview/product-vision.md#upstream-friendly-evolution) in the product vision. Every Clisbot change must stay in its own scope — a dedicated package, folder, module, file, or function where possible — and be gated behind a feature flag that can switch it fully on or off. The target for any change: with it in place, an unmodified Clisbot app can still pair with the daemon and use it normally, and with the flag off the base Clisbot experience remains available. Verify both states before calling a change done.
+This stage prioritizes easy merges from upstream Paseo — see the [Upstream-Friendly Evolution principle](docs/overview/product-vision.md#upstream-friendly-evolution) in the product vision. Merge compatibility is the goal, not runtime interoperability: Clisbot does not pair with Paseo apps or daemons ([decision](docs/audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md#wire-contracts-follow-the-rename)). Every Clisbot change must stay in its own scope — a dedicated package, folder, module, file, or function where possible — and be gated behind a feature flag that can switch it fully on or off. The target for any change: with it in place, a Clisbot app without the change can still pair with the daemon and use it normally, and with the flag off the base Clisbot experience remains available. Verify both states before calling a change done.
 
 ### Readability first
 

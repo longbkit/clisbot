@@ -88,3 +88,49 @@ transformation is implemented.
 This decision supersedes the source-keeps-Paseo-names, publish-time-only rename,
 and `CLISBOT_*` to `PASEO_*` alias strategy in the historical
 [Hub integration implementation plan](2026-08-24-hub-integration-implementation.md).
+
+## Wire contracts follow the rename
+
+**Decided 2026-10-07.** The rename also covers the daemon wire protocol.
+Clisbot apps and daemons do not interoperate with Paseo apps or daemons, in
+either direction. Upstream code still merges through the transformation above.
+Running against a Paseo host is not supported.
+
+### Context
+
+The rebrand commit `3eae83f33` renamed wire names along with the rest of the
+source. Compared with `upstream/main`, the protocol package changed:
+
+| Kind          | Paseo                                                                                                                                | Clisbot                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| Fields        | `isPaseoOwnedWorktree`, `isPaseo`, `paseoOnly`, `paseoTools`                                                                         | `isClisbot…`, `clisbot…` |
+| Message types | `create_paseo_worktree_request`, `paseo_worktree_list_request`, `paseo_worktree_archive_request` and their responses                 | `…clisbot…`              |
+| Literals      | `application/paseo-review`, `application/paseo-forge-*`, `paseo.parent-agent-id`, `paseo.open-agent-tab.*`, the `paseo_` tool prefix | `…clisbot…`              |
+
+`v0.10.3`, `v0.11.0-beta.4` and `v0.11.0-beta.5` shipped with the Clisbot names.
+
+The break was found by pairing a Clisbot `0.10.2` app with a Paseo `0.9.2`
+daemon over `relay.paseo.sh`. Pairing and `hello` succeed. Then
+`fetch_agents_response` fails validation on
+`project.checkout.isClisbotOwnedWorktree`, the client drops the transport as a
+failed subscription and reconnects about every 3 seconds. The host shows
+Connecting, then **Subscription request failed**.
+
+### Options considered
+
+1. **Paseo names on the wire, Clisbot names in TypeScript.** Keeps
+   interoperability, but `v0.10.3` to `v0.11.0-beta.5` hosts would then need
+   `COMPAT` shims in both the client and the daemon, and every upstream sync
+   would need a wire-name exception list in the rename.
+2. **Accept both names.** Same shims, permanently, plus a rule for which name
+   each side sends.
+3. **Accept the break.** No shims, and no exceptions to the rename.
+
+### Decision
+
+Option 3. Clisbot is preparing its official release as its own product, and
+interoperating with Paseo hosts is not a product goal. A Paseo pairing offer
+still parses and pairs; the app does not reject Paseo hosts up front.
+
+The [protocol compatibility](../protocol-compatibility.md) rules still apply
+between Clisbot versions: from `v0.10.3` on, wire names do not change again.

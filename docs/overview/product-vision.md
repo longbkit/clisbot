@@ -12,7 +12,7 @@ Repository wiring:
 
 In the near term, the project must continuously prove that new changes from Paseo's `main` branch remain mergeable, without shipping an unreviewed moving target. Release-tag promotion and `main` rehearsal are separate gates: rehearsal detects conflicts and contract drift without changing the product baseline; promotion merges a named release only after dependency, typecheck, focused test, and channel E2E evidence pass. Early development must therefore keep upstream functional changes reviewable and Clisbot-specific changes as isolated as practical. New capabilities should be protected by feature toggles when appropriate, with clear integration boundaries that minimize upstream merge conflicts.
 
-The decided target is a fully branded Clisbot `main`: each new upstream snapshot is renamed before merging, including product-facing names, `CLISBOT_*` environment variables, and `clisbot://` links. There are no `PASEO_*` aliases or `paseo://` legacy handlers. The [rebrand and sync decision](../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md) records the Git tradeoff; the source migration and branch cutover remain to be implemented. Compatibility of host and client wire contracts is a separate question from naming and needs explicit validation.
+The decided target is a fully branded Clisbot `main`: each new upstream snapshot is renamed before merging, including product-facing names, `CLISBOT_*` environment variables, and `clisbot://` links. There are no `PASEO_*` aliases or `paseo://` legacy handlers. The [rebrand and sync decision](../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md) records the Git tradeoff; the source migration and branch cutover remain to be implemented. The rename covers wire contracts too, so Clisbot does not interoperate with Paseo apps or daemons ([decided 2026-10-07](../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md#wire-contracts-follow-the-rename)).
 
 ### Relationship to Clisbot T3Claw Fusion
 
@@ -71,9 +71,9 @@ This new generation of Clisbot is motivated by limitations in the previous archi
 
 Keep the Paseo foundation traceable through Git ancestry and a repeatable rename transformation while the Clisbot source and product use Clisbot names. Prefer feature toggles, adapters, plugins, and isolated modules for functional differences. Where possible, reuse upstream extension points rather than adding parallel systems. The [upstream sync playbook](../guides/developer-guide/upstream-sync-and-contribution.md) owns the merge procedure.
 
-### Paseo-Compatible Hosts
+### Paseo-Shaped Hosts
 
-Preserve the ability to participate in the Paseo ecosystem. A Clisbot host should remain compatible with Paseo's host, project, workspace, agent session, timeline, provider, and relay concepts wherever those concepts still fit. External work channels should attach to Paseo agent sessions rather than replacing or wrapping the timeline.
+Keep Paseo's host, project, workspace, agent session, timeline, provider, and relay concepts wherever they still fit, so upstream changes keep merging. This is about the model, not runtime interoperability: Clisbot apps and daemons do not pair with Paseo ones ([decided 2026-10-07](../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md#wire-contracts-follow-the-rename)). External work channels should attach to agent sessions rather than replacing or wrapping the timeline.
 
 ### Safe Team Operation
 
