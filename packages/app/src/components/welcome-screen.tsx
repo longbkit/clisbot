@@ -222,8 +222,17 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
   const handleCloseDirect = useCallback(() => setIsDirectOpen(false), []);
   const handleOpenRemoteSsh = useCallback(() => setIsRemoteSshOpen(true), []);
   const handleCloseRemoteSsh = useCallback(() => setIsRemoteSshOpen(false), []);
-  const handleOpenPasteLink = useCallback(() => setIsPasteLinkOpen(true), []);
+  const [pasteLinkInitialUrl, setPasteLinkInitialUrl] = useState<string>();
+  const handleOpenPasteLink = useCallback(() => {
+    setPasteLinkInitialUrl(undefined);
+    setIsPasteLinkOpen(true);
+  }, []);
   const handleClosePasteLink = useCallback(() => setIsPasteLinkOpen(false), []);
+  const handleDirectToPasteLink = useCallback((link?: string) => {
+    setIsDirectOpen(false);
+    setPasteLinkInitialUrl(link);
+    setIsPasteLinkOpen(true);
+  }, []);
   const handleScanQr = useCallback(() => {
     router.push("/pair-scan?source=onboarding");
   }, [router]);
@@ -344,6 +353,7 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
           visible={isDirectOpen}
           onClose={handleCloseDirect}
           onSaved={handleHostSaved}
+          onPasteLink={handleDirectToPasteLink}
         />
 
         <AddRemoteSshHostModal
@@ -354,6 +364,7 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
 
         <PairLinkModal
           visible={isPasteLinkOpen}
+          initialUrl={pasteLinkInitialUrl}
           onClose={handleClosePasteLink}
           onSaved={handleHostSaved}
         />

@@ -2,7 +2,7 @@ import { renderPairingQr } from "@clisbot/server/gateway-adapters";
 import { Command } from "commander";
 import { readFile } from "node:fs/promises";
 import { localControlCredentialPath } from "@clisbot/device-access/local-control";
-import type { HubDeviceOffer } from "@clisbot/protocol/device-pairing-offer";
+import { hubPairingOfferUrl, type HubDeviceOffer } from "@clisbot/protocol/device-pairing-offer";
 import { resolveLocalHubState, resolveLocalHubHome } from "./local-hub.js";
 
 export async function localHubDeviceRequest(
@@ -79,7 +79,8 @@ export function addHubDevicePairingCommands(hub: Command): void {
         home: resolveLocalHubHome(options),
         ttlMs: seconds * 1000,
       });
-      const url = `https://app.clisbot.com/#offer=${Buffer.from(JSON.stringify({ v: 4, hub: offer })).toString("base64url")}`;
+      if (!offer.pairing) throw new Error("The Hub did not return a pairing invitation");
+      const url = hubPairingOfferUrl({ ...offer, pairing: offer.pairing });
       if (options.json) console.log(JSON.stringify({ url, expiresAt: offer.pairing?.expiresAt }));
       else
         console.log(

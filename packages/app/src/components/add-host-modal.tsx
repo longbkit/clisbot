@@ -17,6 +17,7 @@ import {
 } from "@/utils/test-daemon-connection";
 import { AdaptiveModalSheet, AdaptiveTextInput, type SheetHeader } from "./adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
+import { Alert as InfoAlert } from "@/components/ui/alert";
 import { PairingTargetTracker } from "./pair-link-credentials";
 
 const FLEX_ONE_STYLE = { flex: 1 } as const;
@@ -291,9 +292,18 @@ export interface AddHostModalProps {
     hostname: string | null;
     isNewHost: boolean;
   }) => void;
+  /** Switches to the pairing-link flow, which needs no address, optionally with the link
+   * the person already typed. That flow knows Host, Hub-only and managed links. */
+  onPasteLink?: (link?: string) => void;
 }
 
-export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostModalProps) {
+export function AddHostModal({
+  visible,
+  onClose,
+  onCancel,
+  onSaved,
+  onPasteLink,
+}: AddHostModalProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const daemons = useHosts();
@@ -358,6 +368,12 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
   );
   const header = useMemo<SheetHeader>(() => ({ title: t("pairing.direct.title") }), [t]);
 
+  const handleHostChange = useCallback((value: string) => {
+    setHost(value);
+    // Tailscale Serve only answers HTTPS.
+    if (/\.ts\.net\.?$/i.test(value.trim())) setUseTls(true);
+  }, []);
+
   const handleClose = useCallback(() => {
     if (isSaving) return;
     clearInput();
@@ -406,6 +422,13 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
     if (isSaving) return;
 
     const relayUri = isAdvancedOpen ? advancedUri.trim() : "";
+    // A pairing link pasted into any field pairs, whichever field it landed in.
+    const pairingLink = [host.trim(), relayUri].find((value) => value.includes("#offer="));
+    if (pairingLink && onPasteLink) {
+      clearInput();
+      onPasteLink(pairingLink);
+      return;
+    }
     if (relayUri.startsWith("relay://") || relayUri.includes("#connect=")) {
       await handleSaveRelay(relayUri);
       return;
@@ -480,6 +503,8 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
     t,
     handleSaveRelay,
     useTls,
+    clearInput,
+    onPasteLink,
   ]);
 
   const handleSubmitEditing = useCallback(() => {
@@ -547,6 +572,7 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
       onClose={handleClose}
       testID="add-host-modal"
     >
+      {onPasteLink ? <PairingLinkNote disabled={isSaving} onPasteLink={onPasteLink} /> : null}
       <Text style={styles.helper}>{t("pairing.direct.helper")}</Text>
 
       <View style={styles.portRow}>
@@ -558,7 +584,7 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
             accessibilityLabel={t("pairing.direct.fields.host")}
             initialValue={host}
             resetKey={`direct-host-${inputResetKey}`}
-            onChangeText={setHost}
+            onChangeText={handleHostChange}
             placeholder="localhost"
             placeholderTextColor={theme.colors.placeholder}
             style={styles.input}
@@ -704,5 +730,23 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
         </Button>
       </View>
     </AdaptiveModalSheet>
+  );
+}
+
+function PairingLinkNote({
+  disabled,
+  onPasteLink,
+}: {
+  disabled: boolean;
+  onPasteLink(link?: string): void;
+}) {
+  const { t } = useTranslation();
+  const openPasteLink = useCallback(() => onPasteLink(), [onPasteLink]);
+  return (
+    <InfoAlert size="sm" variant="info" description={t("pairing.direct.pairingNote")}>
+      <Button variant="outline" size="sm" disabled={disabled} onPress={openPasteLink}>
+        {t("pairing.direct.pasteLink")}
+      </Button>
+    </InfoAlert>
   );
 }

@@ -1665,6 +1665,8 @@ export const ja: TranslationResources = {
       label: "ホストのパスワード",
     },
     connectionMethods: {
+      intro: "コンピューターで「デバイスをペアリング」を開きます。",
+      otherWays: "その他の方法",
       title: "接続を追加",
       direct: {
         title: "直接接続",
@@ -1676,16 +1678,18 @@ export const ja: TranslationResources = {
       },
       scanQr: {
         title: "QRコードをスキャン",
-        description: "暗号化されたリレー接続。",
+        description: "利用できる場合は Tailscale、それ以外は暗号化されたリレーを使います。",
       },
       pasteLink: {
         title: "ペアリングリンクを貼り付け",
-        description: "暗号化されたリレー接続。",
+        description: "QR コードと同じです。",
       },
     },
     direct: {
       title: "直接接続",
       helper: "Clisbotサーバーのアドレスを入力してください。",
+      pairingNote: "ペアリングリンクや QR がありますか？自動で設定されます。",
+      pasteLink: "リンクを貼り付け",
       fields: {
         host: "ホスト",
         port: "ポート",
@@ -1775,6 +1779,44 @@ export const ja: TranslationResources = {
       pairing: "ペアリング中...",
       unableToPair: "ホストをペアリングできません",
       errorTitle: "エラー",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "推奨",
+      description: "直接接続で最速です。相手のデバイスにも Tailscale が必要です。",
+      states: {
+        checking: "確認中…",
+        settingUp: "設定中…",
+        on: "オン",
+        notSetUp: "未設定",
+        missing: "未インストール",
+        signedOut: "サインアウト中",
+        stopped: "停止中",
+        httpsOff: "HTTPS オフ",
+        unavailable: "接続できません",
+      },
+      actions: {
+        setUp: "設定",
+        getTailscale: "Tailscale を入手",
+        enableOnTailnet: "tailnet で有効にする",
+        retry: "再試行",
+      },
+    },
+    routes: {
+      relayTitle: "暗号化されたリレー",
+      relayDescription: "どこからでも使え、設定は不要です。",
+      on: "オン",
+      off: "オフ",
+      turnOn: "オンにする",
+      noRoute: "QR コードを作るには Tailscale を設定するか、リレーをオンにしてください。",
+      contains: "含まれる経路: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "直接",
+        thisComputer: "このコンピューター",
+        relay: "リレー",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "ペアリングオファーを読み込み中...",
@@ -2406,6 +2448,9 @@ export const ja: TranslationResources = {
         removeErrorTitle: "エラー",
         removeErrorMessage: "接続を削除できません",
         timeout: "タイムアウト",
+        tailscaleHint:
+          "このホストは Tailscale にも対応しています。より速い直接接続のため、このデバイスで Tailscale をオンにしてください。",
+        getTailscale: "Tailscale を入手",
       },
       pairDevices: {
         title: "デバイスをペアリング",

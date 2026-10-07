@@ -29,6 +29,7 @@ import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-moda
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { Alert as InlineAlert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { TailscaleDeviceHint } from "@/device-access/tailscale-device-hint";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -473,6 +474,7 @@ function ConnectionsSection({ host }: { host: HostProfile }) {
 
   return (
     <SettingsSection title={t("settings.host.connections.title")}>
+      <TailscaleDeviceHint host={host} />
       <View style={settingsStyles.card} testID="host-page-connections-card">
         {host.connections.map((conn, index) => {
           const probe = probeByConnectionId.get(conn.id);

@@ -5677,6 +5677,30 @@ export class DaemonClient {
     return result;
   }
 
+  async getHostTailscale(): Promise<import("@clisbot/protocol/host-tailscale").HostTailscale> {
+    if (!this.lastServerInfoMessage?.features?.hostTailscale)
+      throw new Error("This Host cannot set up Tailscale from this connection");
+    const { tailscale } = await this.sendCorrelatedSessionRequest({
+      message: { type: "daemon.tailscale.status.request" },
+      responseType: "daemon.tailscale.status.response",
+      timeout: 60_000,
+    });
+    return tailscale;
+  }
+
+  async setUpHostTailscale(
+    options: { httpsPort?: number } = {},
+  ): Promise<import("@clisbot/protocol/host-tailscale").HostTailscale> {
+    if (!this.lastServerInfoMessage?.features?.hostTailscale)
+      throw new Error("This Host cannot set up Tailscale from this connection");
+    const { tailscale } = await this.sendCorrelatedSessionRequest({
+      message: { type: "daemon.tailscale.setup.request", ...options },
+      responseType: "daemon.tailscale.setup.response",
+      timeout: 120_000,
+    });
+    return tailscale;
+  }
+
   async collectDiagnostics(requestId?: string): Promise<DiagnosticsPayload> {
     return this.sendNamespacedCorrelatedSessionRequest({
       requestId,

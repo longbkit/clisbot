@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { HubDeviceOfferSchema } from "./device-pairing-offer.js";
+import { TailscaleStateSchema } from "./host-tailscale.js";
 
 // COMPAT(localHubStart): additive Host capability; older peers omit it.
 export const HubLocalStartOptionsSchema = z.object({
@@ -19,9 +20,7 @@ export const HubLocalStartResponseSchema = z.object({
     hub: HubDeviceOfferSchema,
     origin: z.string().max(2048).optional(),
     transport: z.enum(["tailscale", "relay", "local", "https"]).optional(),
-    tailscaleState: z
-      .enum(["ready", "missing", "stopped", "login-required", "unavailable"])
-      .optional(),
+    tailscaleState: TailscaleStateSchema.optional(),
     networkGuidance: z.string().max(4096).optional(),
   }),
 });

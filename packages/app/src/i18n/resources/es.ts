@@ -1694,6 +1694,8 @@ export const es: TranslationResources = {
       label: "Contraseña del host",
     },
     connectionMethods: {
+      intro: "En el ordenador, abre Emparejar dispositivo.",
+      otherWays: "Otras formas",
       title: "Agregar conexión",
       direct: {
         title: "Conexión directa",
@@ -1705,16 +1707,18 @@ export const es: TranslationResources = {
       },
       scanQr: {
         title: "Escanea el códigoQR",
-        description: "Conexión de retransmisión cifrada.",
+        description: "Usa Tailscale si está disponible; si no, retransmisión cifrada.",
       },
       pasteLink: {
         title: "Pegar enlace de emparejamiento",
-        description: "Conexión de retransmisión cifrada.",
+        description: "Igual que el código QR.",
       },
     },
     direct: {
       title: "Conexión directa",
       helper: "Ingrese la dirección de un servidorClisbot.",
+      pairingNote: "¿Tienes un enlace o QR de emparejamiento? Lo configura por ti.",
+      pasteLink: "Pegar enlace",
       fields: {
         host: "Host",
         port: "Puerto",
@@ -1805,6 +1809,44 @@ export const es: TranslationResources = {
       pairing: "Emparejamiento...",
       unableToPair: "No se puede emparejar el host",
       errorTitle: "Error",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "Recomendado",
+      description: "Directo y más rápido. El otro dispositivo también necesita Tailscale.",
+      states: {
+        checking: "Comprobando…",
+        settingUp: "Configurando…",
+        on: "Activo",
+        notSetUp: "Sin configurar",
+        missing: "No instalado",
+        signedOut: "Sesión cerrada",
+        stopped: "Detenido",
+        httpsOff: "HTTPS desactivado",
+        unavailable: "No accesible",
+      },
+      actions: {
+        setUp: "Configurar",
+        getTailscale: "Obtener Tailscale",
+        enableOnTailnet: "Activar en la tailnet",
+        retry: "Reintentar",
+      },
+    },
+    routes: {
+      relayTitle: "Retransmisión cifrada",
+      relayDescription: "Funciona en cualquier lugar, sin configuración.",
+      on: "Activa",
+      off: "Desactivada",
+      turnOn: "Activar",
+      noRoute: "Configura Tailscale o activa la retransmisión para crear un código QR.",
+      contains: "Incluye: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "Directa",
+        thisComputer: "Este ordenador",
+        relay: "Retransmisión",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "Cargando oferta de maridaje...",
@@ -2438,6 +2480,9 @@ export const es: TranslationResources = {
         removeErrorTitle: "Error",
         removeErrorMessage: "No se puede eliminar la conexión",
         timeout: "Se acabó el tiempo",
+        tailscaleHint:
+          "Este Host también ofrece Tailscale. Activa Tailscale en este dispositivo para una conexión directa más rápida.",
+        getTailscale: "Obtener Tailscale",
       },
       pairDevices: {
         title: "Emparejar dispositivos",

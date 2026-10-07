@@ -1683,6 +1683,8 @@ export const en = {
       label: "Host password",
     },
     connectionMethods: {
+      intro: "On the computer, open Host settings › Pair a device.",
+      otherWays: "Other ways",
       title: "Add connection",
       direct: {
         title: "Direct connection",
@@ -1694,16 +1696,18 @@ export const en = {
       },
       scanQr: {
         title: "Scan QR code",
-        description: "Encrypted relay connection.",
+        description: "Uses Tailscale when available, otherwise encrypted relay.",
       },
       pasteLink: {
         title: "Paste pairing link",
-        description: "Encrypted relay connection.",
+        description: "Same as the QR code.",
       },
     },
     direct: {
       title: "Direct connection",
       helper: "Enter the address of a Clisbot server.",
+      pairingNote: "Have a pairing link or QR? It sets this up for you.",
+      pasteLink: "Paste link",
       fields: {
         host: "Host",
         port: "Port",
@@ -1792,6 +1796,44 @@ export const en = {
       pairing: "Pairing...",
       unableToPair: "Unable to pair host",
       errorTitle: "Error",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "Recommended",
+      description: "Direct and fastest. The other device needs Tailscale too.",
+      states: {
+        checking: "Checking…",
+        settingUp: "Setting up…",
+        on: "On",
+        notSetUp: "Not set up",
+        missing: "Not installed",
+        signedOut: "Signed out",
+        stopped: "Not running",
+        httpsOff: "HTTPS off",
+        unavailable: "Not reachable",
+      },
+      actions: {
+        setUp: "Set up",
+        getTailscale: "Get Tailscale",
+        enableOnTailnet: "Enable on tailnet",
+        retry: "Retry",
+      },
+    },
+    routes: {
+      relayTitle: "Encrypted relay",
+      relayDescription: "Works anywhere, no setup.",
+      on: "On",
+      off: "Off",
+      turnOn: "Turn on",
+      noRoute: "Set up Tailscale or turn on relay to create a QR code.",
+      contains: "Contains: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "Direct",
+        thisComputer: "This computer",
+        relay: "Relay",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "Loading pairing offer...",
@@ -2516,6 +2558,9 @@ export const en = {
         removeErrorTitle: "Error",
         removeErrorMessage: "Unable to remove connection",
         timeout: "Timeout",
+        tailscaleHint:
+          "This Host also offers Tailscale. Turn on Tailscale on this device for a faster direct connection.",
+        getTailscale: "Get Tailscale",
       },
       pairDevices: {
         title: "Pair devices",

@@ -1630,6 +1630,8 @@ export const zhCN: TranslationResources = {
       label: "主机密码",
     },
     connectionMethods: {
+      intro: "在电脑上打开“配对设备”。",
+      otherWays: "其他方式",
       title: "添加连接",
       direct: {
         title: "直接连接",
@@ -1641,16 +1643,18 @@ export const zhCN: TranslationResources = {
       },
       scanQr: {
         title: "扫描二维码",
-        description: "加密 relay 连接。",
+        description: "可用时使用 Tailscale，否则使用加密 relay。",
       },
       pasteLink: {
         title: "粘贴配对链接",
-        description: "加密 relay 连接。",
+        description: "与二维码相同。",
       },
     },
     direct: {
       title: "直接连接",
       helper: "输入 Clisbot server 的地址。",
+      pairingNote: "有配对链接或二维码？它会自动完成设置。",
+      pasteLink: "粘贴链接",
       fields: {
         host: "Host",
         port: "端口",
@@ -1737,6 +1741,44 @@ export const zhCN: TranslationResources = {
       pairing: "正在配对...",
       unableToPair: "无法配对 host",
       errorTitle: "错误",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "推荐",
+      description: "直连，速度最快。另一台设备也需要 Tailscale。",
+      states: {
+        checking: "正在检查…",
+        settingUp: "正在设置…",
+        on: "已开启",
+        notSetUp: "未设置",
+        missing: "未安装",
+        signedOut: "未登录",
+        stopped: "未运行",
+        httpsOff: "HTTPS 未开启",
+        unavailable: "无法访问",
+      },
+      actions: {
+        setUp: "设置",
+        getTailscale: "获取 Tailscale",
+        enableOnTailnet: "在 tailnet 中开启",
+        retry: "重试",
+      },
+    },
+    routes: {
+      relayTitle: "加密 relay",
+      relayDescription: "随处可用，无需设置。",
+      on: "已开启",
+      off: "已关闭",
+      turnOn: "开启",
+      noRoute: "请设置 Tailscale 或开启 relay 以生成二维码。",
+      contains: "包含：{{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "直连",
+        thisComputer: "本机",
+        relay: "Relay",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "正在加载配对 offer...",
@@ -2357,6 +2399,8 @@ export const zhCN: TranslationResources = {
         removeErrorTitle: "错误",
         removeErrorMessage: "无法移除连接",
         timeout: "超时",
+        tailscaleHint: "此 Host 也提供 Tailscale。在本设备上开启 Tailscale 可获得更快的直连。",
+        getTailscale: "获取 Tailscale",
       },
       pairDevices: {
         title: "配对设备",

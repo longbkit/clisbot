@@ -9,12 +9,16 @@ import { prepareHub } from "./hub-launch.js";
 import { configureServingAdmission } from "./network-admission.js";
 import { localHubPairingOffer } from "../hub/device-pairing.js";
 import { launchGateway } from "./gateway-launch.js";
-import { configureTailscaleServe, detectTailscale, readTailscaleServePort } from "./tailscale.js";
+import { configureTailscaleServe, readTailscaleServePort } from "./tailscale.js";
 import { selectLocalPort } from "../hub/local-port.js";
 import { connectToDaemon } from "../../utils/client.js";
 import { enrollPersonalDaemon } from "./enrollment.js";
 import { withServiceLaunchLock } from "../../utils/service-launch-lock.js";
-import { renderPairingQr } from "@clisbot/server/gateway-adapters";
+import {
+  detectTailscale,
+  renderPairingQr,
+  tailscaleApprovalUrl,
+} from "@clisbot/server/gateway-adapters";
 
 export interface PersonalServingOptions {
   home?: string;
@@ -25,6 +29,8 @@ export interface PersonalServingOptions {
   label?: string;
   json?: boolean;
   port?: string;
+  /** Leave relay as configured; `onboard` turns it on as a fallback, the app's setup does not. */
+  preserveRelay?: boolean;
 }
 
 /** Internal composition behind the existing onboarding and Hub lifecycle commands. */
@@ -46,8 +52,9 @@ export async function startPersonalDaemon(
   mkdirSync(home, { recursive: true, mode: 0o700 });
   const network = await servingNetwork(options);
   return withServiceLaunchLock(path.join(home, "serve-launch"), async () => {
-    const daemon = await prepareDaemon(home, network.transport !== "local");
-    await configureDaemonRelay(home, network.transport !== "local");
+    const relay = !options.preserveRelay && network.transport !== "local";
+    const daemon = await prepareDaemon(home, relay);
+    if (relay) await configureDaemonRelay(home, true);
     const { gateway, origin, directEndpoint } = await exposeServices(
       options,
       home,
@@ -59,7 +66,7 @@ export async function startPersonalDaemon(
     const pairing = await resolveLocalPairingOffer({
       clisbotHome: home,
       devicePairing: true,
-      enableRelay: network.transport !== "local",
+      enableRelay: relay,
       direct: { endpoint: directEndpoint, useTls: origin.startsWith("https:") },
       ...(options.label ? { label: options.label } : {}),
     });
@@ -75,6 +82,7 @@ export async function startPersonalDaemon(
       transport: network.transport,
       tailscaleState: network.tailscaleState,
       networkGuidance: network.networkGuidance,
+      ...(network.tailscaleActionUrl ? { tailscaleActionUrl: network.tailscaleActionUrl } : {}),
       ...pairing,
     };
   });
@@ -119,6 +127,7 @@ export interface PersonalDaemonResult {
   relayEnabled: boolean;
   tailscaleState?: "ready" | "missing" | "login-required" | "stopped" | "unavailable";
   networkGuidance?: string;
+  tailscaleActionUrl?: string;
 }
 
 export interface PersonalServingResult extends PersonalDaemonResult {
@@ -279,6 +288,7 @@ async function servingNetwork(options: PersonalServingOptions): Promise<{
   tailscale?: { dnsName: string; port: number };
   tailscaleState?: "ready" | "missing" | "login-required" | "stopped" | "unavailable";
   networkGuidance?: string;
+  tailscaleActionUrl?: string;
 }> {
   const transport = options.transport ?? "tailscale";
   if (!["tailscale", "relay", "local", "https"].includes(transport))
@@ -365,8 +375,8 @@ async function exposeServices(
       if (process.stdin.isTTY && !options.json) throw error;
       network.transport = "relay";
       network.tailscaleState = "unavailable";
-      network.networkGuidance =
-        "Tailscale Serve could not expose this Host. Clisbot is using encrypted relay. Check HTTPS/Serve permissions (an Admin terminal on Windows), then retry. Existing Serve mappings were preserved.";
+      network.tailscaleActionUrl = tailscaleApprovalUrl(error);
+      network.networkGuidance = `Tailscale Serve could not expose this Host.${options.preserveRelay ? "" : " Clisbot is using encrypted relay."} ${network.tailscaleActionUrl ? "Enable Serve on your tailnet, then retry." : "Check HTTPS/Serve permissions (an Admin terminal on Windows), then retry."} Existing Serve mappings were preserved.`;
       delete network.tailscale;
       delete network.origin;
       console.error(network.networkGuidance);
@@ -384,6 +394,10 @@ async function exposeServices(
     }
   }
   const directEndpoint = `${new URL(origin).hostname}:${new URL(origin).port || (origin.startsWith("https:") ? "443" : "80")}`;
+  // The app's Set up Tailscale must not swap the saved route for a loopback one when Serve
+  // fails; `onboard` keeps its fallback to this machine's gateway.
+  if (options.preserveRelay && network.tailscaleState === "unavailable")
+    return { gateway, origin, directEndpoint };
   editPersistedConfig(home, "daemon.direct.endpoint", { value: directEndpoint });
   editPersistedConfig(home, "daemon.direct.useTls", { value: origin.startsWith("https:") });
   editPersistedConfig(home, "features.personalServing", { value: true });

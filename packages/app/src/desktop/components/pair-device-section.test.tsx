@@ -16,7 +16,10 @@ vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeSnapshot: () => ({ connectionStatus: "online" }),
 }));
 vi.mock("@/device-access/hub-profiles", () => ({ useHubProfiles: () => ({ profiles: [] }) }));
-vi.mock("@/device-access/pairing-offer", () => ({ appDevicePairingOffer: vi.fn() }));
+vi.mock("@/device-access/pairing-offer", () => ({
+  appDevicePairingOffer: vi.fn(),
+  pairingLinkRoutes: () => [],
+}));
 vi.mock("@/hooks/use-daemon-config", () => ({ useDaemonConfig: () => ({ patchConfig: vi.fn() }) }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/data/query", () => ({

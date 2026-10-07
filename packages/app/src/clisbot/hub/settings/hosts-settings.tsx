@@ -174,15 +174,31 @@ function AddHostSection({ command }: { command: string | null }) {
       info="Run this on the computer you want to add. It joins this organization; then choose who may use it in People & access › Access."
       trailing={accessLink}
     >
-      {command ? (
-        <HostEnrollmentCommand command={command} />
-      ) : (
-        <Text style={settingsStyles.rowHint}>
-          Add a Tailscale or HTTPS endpoint in Hub connections before enrolling another Host. This
-          device can continue using relay.
-        </Text>
-      )}
+      {command ? <HostEnrollmentCommand command={command} /> : <NeedsHubAddress />}
     </SettingsSection>
+  );
+}
+
+/** Enrolling needs an address other computers reach; relay alone carries this device only. */
+function NeedsHubAddress() {
+  const router = useRouter();
+  const openConnection = useCallback(
+    () =>
+      router.push({
+        pathname: "/settings/hub/[hubSection]",
+        params: { hubSection: "overview", hubPanel: "connection" },
+      }),
+    [router],
+  );
+  return (
+    <Alert
+      variant="info"
+      description="Other computers need an address to reach this Hub. This device can keep using relay."
+    >
+      <Button variant="outline" size="sm" onPress={openConnection}>
+        Set up Tailscale
+      </Button>
+    </Alert>
   );
 }
 

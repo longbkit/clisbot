@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { localHubCliLaunch } from "./local-start.js";
+import { localCliLaunch } from "./local-cli.js";
 
-describe("local Hub CLI launch", () => {
+describe("local CLI launch", () => {
   it("keeps npm CLI arguments separate from the shell", () => {
     const bin = "/home/user/Clisbot CLI/bin/clisbot";
-    expect(localHubCliLaunch(bin, () => true)).toEqual({
+    expect(localCliLaunch(bin, () => true)).toEqual({
       args: [bin],
       packaged: false,
     });
-    expect(localHubCliLaunch(bin, () => false)).toBeUndefined();
+    expect(localCliLaunch(bin, () => false)).toBeUndefined();
   });
 
   it.each([
@@ -19,11 +19,11 @@ describe("local Hub CLI launch", () => {
     const entry = `${archive}${separator}node_modules${separator}@clisbot${separator}cli${separator}dist${separator}index.js`;
     const runner = `${archive}.unpacked${separator}dist${separator}daemon${separator}node-entrypoint-runner.js`;
     const available = new Set([entry, runner]);
-    expect(localHubCliLaunch(bin, (value) => available.has(String(value)))).toEqual({
+    expect(localCliLaunch(bin, (value) => available.has(String(value)))).toEqual({
       args: ["--disable-warning=DEP0040", runner, "node-script", entry],
       packaged: true,
     });
     available.delete(runner);
-    expect(localHubCliLaunch(bin, (value) => available.has(String(value)))).toBeUndefined();
+    expect(localCliLaunch(bin, (value) => available.has(String(value)))).toBeUndefined();
   });
 });

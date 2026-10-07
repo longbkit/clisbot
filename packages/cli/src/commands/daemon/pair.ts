@@ -2,6 +2,7 @@ import { confirm, isCancel, log } from "@clack/prompts";
 import { Command } from "commander";
 import chalk from "chalk";
 import { generateLocalPairingOffer } from "@clisbot/server/pairing";
+import { detectTailscale } from "@clisbot/server/gateway-adapters";
 import { readDaemonInstance } from "@clisbot/server/daemon-control";
 import {
   readPersistedConfig,
@@ -30,6 +31,8 @@ interface PairOptions {
   label?: string;
   ttl?: string;
   direct?: string;
+  transport?: string;
+  httpsPort?: string;
 }
 
 export interface PairCommandOutput {
@@ -79,6 +82,8 @@ export function pairCommand(): Command {
     .option("--label <name>", "Label the device being paired")
     .option("--ttl <seconds>", "Invitation lifetime, 1–900 seconds", "300")
     .option("--direct <url>", "Direct ws://localhost or wss:// endpoint (Tailscale preferred)")
+    .option("--transport <kind>", "Set up a direct route before pairing: tailscale")
+    .option("--https-port <port>", "Tailscale HTTPS port owned by Clisbot")
     .action(
       withGlobalOptions((options: PairOptions, _command: Command) => runPairCommand(options)),
     );
@@ -248,6 +253,10 @@ export function printDirectConnectionGuidance(): void {
 export async function runPairCommand(options: PairOptions): Promise<void> {
   const output = createProcessOutput();
   const target = options.daemonTarget;
+  if (options.transport !== undefined) {
+    await runTailscalePairing(options, output);
+    return;
+  }
   const ttlMs = Number(options.ttl ?? "300") * 1000;
   if (!Number.isInteger(ttlMs) || ttlMs < 1000 || ttlMs > 900000)
     throw new Error("Invitation lifetime must be 1–900 seconds");
@@ -338,4 +347,54 @@ function directPairingEndpoint(value: string): NonNullable<DevicePairingOffer["d
 function configuredDirect(home: string): DevicePairingOffer["direct"] {
   const direct = readPersistedConfig(home, { defaultsIfMissing: true }).daemon?.direct;
   return direct?.endpoint ? { endpoint: direct.endpoint, useTls: direct.useTls } : undefined;
+}
+
+/** `--transport tailscale`: map this Host through Tailscale Serve, then print a link that
+ * carries the Tailscale route. The app's Set up Tailscale runs this with `--json`. */
+async function runTailscalePairing(options: PairOptions, output: PairCommandOutput): Promise<void> {
+  if (options.transport !== "tailscale")
+    throw new Error("--transport supports tailscale; use --direct for another route");
+  if (options.direct) throw new Error("Choose either --direct or --transport");
+  if (options.daemonTarget.kind !== "instance")
+    throw new Error("Set up Tailscale on the Host itself (--home), not over --host");
+  const status = await detectTailscale();
+  if (status.state !== "ready") {
+    const result = {
+      transport: "tailscale",
+      tailscaleState: status.state,
+      networkGuidance: status.guidance,
+    };
+    if (options.json) output.writeStdout(`${JSON.stringify(result)}\n`);
+    else output.writeStderr(`${status.guidance}\n`);
+    if (!options.json) output.setExitCode(1);
+    return;
+  }
+  // Dynamic: serve/index.ts imports this module's pairing helpers.
+  const { startPersonalDaemon } = await import("../serve/index.js");
+  const result = await startPersonalDaemon({
+    home: options.daemonTarget.home,
+    transport: "tailscale",
+    httpsPort: options.httpsPort,
+    label: options.label,
+    json: options.json,
+    preserveRelay: true,
+  });
+  if (options.json) {
+    output.writeStdout(`${JSON.stringify(result)}\n`);
+    return;
+  }
+  if (result.networkGuidance) output.writeStderr(`${result.networkGuidance}\n`);
+  if (!result.url) {
+    output.setExitCode(1);
+    return;
+  }
+  output.writeStdout(`Tailscale: ${result.origin}\n`);
+  output.writeStdout(
+    formatPairingInstructions({
+      url: result.url,
+      qr: result.qr,
+      connectionUri: null,
+      columns: output.columns,
+    }),
+  );
 }

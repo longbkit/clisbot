@@ -1648,6 +1648,8 @@ export const ar: TranslationResources = {
       label: "كلمة مرور المضيف",
     },
     connectionMethods: {
+      intro: "على الكمبيوتر، افتح إقران جهاز.",
+      otherWays: "طرق أخرى",
       title: "إضافة اتصال",
       direct: {
         title: "اتصال مباشر",
@@ -1659,16 +1661,18 @@ export const ar: TranslationResources = {
       },
       scanQr: {
         title: "مسح رمز QR",
-        description: "اتصال التتابع المشفر.",
+        description: "يستخدم Tailscale عند توفره، وإلا فالتتابع المشفر.",
       },
       pasteLink: {
         title: "الصق رابط الاقتران",
-        description: "اتصال التتابع المشفر.",
+        description: "مثل رمز QR.",
       },
     },
     direct: {
       title: "اتصال مباشر",
       helper: "أدخل عنوان خادم Clisbot.",
+      pairingNote: "هل لديك رابط إقران أو رمز QR؟ سيُعدّ هذا لك.",
+      pasteLink: "لصق الرابط",
       fields: {
         host: "Host",
         port: "ميناء",
@@ -1757,6 +1761,44 @@ export const ar: TranslationResources = {
       pairing: "الاقتران...",
       unableToPair: "غير قادر على إقران المضيف",
       errorTitle: "خطأ",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "موصى به",
+      description: "مباشر وأسرع. يحتاج الجهاز الآخر إلى Tailscale أيضًا.",
+      states: {
+        checking: "جارٍ التحقق…",
+        settingUp: "جارٍ الإعداد…",
+        on: "مفعّل",
+        notSetUp: "غير مُعدّ",
+        missing: "غير مثبت",
+        signedOut: "غير مسجّل الدخول",
+        stopped: "متوقف",
+        httpsOff: "HTTPS معطّل",
+        unavailable: "غير قابل للوصول",
+      },
+      actions: {
+        setUp: "إعداد",
+        getTailscale: "تنزيل Tailscale",
+        enableOnTailnet: "التفعيل على tailnet",
+        retry: "إعادة المحاولة",
+      },
+    },
+    routes: {
+      relayTitle: "التتابع المشفر",
+      relayDescription: "يعمل من أي مكان، دون إعداد.",
+      on: "مفعّل",
+      off: "معطّل",
+      turnOn: "تفعيل",
+      noRoute: "أعدّ Tailscale أو فعّل التتابع لإنشاء رمز QR.",
+      contains: "يتضمن: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "مباشر",
+        thisComputer: "هذا الكمبيوتر",
+        relay: "التتابع",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "جارٍ تحميل عرض الإقران...",
@@ -2384,6 +2426,9 @@ export const ar: TranslationResources = {
         removeErrorTitle: "خطأ",
         removeErrorMessage: "غير قادر على إزالة الاتصال",
         timeout: "نفذ الوقت",
+        tailscaleHint:
+          "يوفر هذا الـ Host أيضًا Tailscale. فعّل Tailscale على هذا الجهاز لاتصال مباشر أسرع.",
+        getTailscale: "تنزيل Tailscale",
       },
       pairDevices: {
         title: "إقران الأجهزة",

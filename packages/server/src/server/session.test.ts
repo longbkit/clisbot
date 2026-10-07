@@ -2075,6 +2075,52 @@ describe("daemon status + pairing RPC", () => {
     session.setPermissions([]);
     expect(session.canStartLocalHub()).toBe(false);
   });
+
+  test("only the Host owner reads or sets up Tailscale, through the injected runtime", async () => {
+    const tailscale = {
+      state: "ready" as const,
+      dnsName: "mac.tail1.ts.net",
+      origin: "https://mac.tail1.ts.net:8443",
+    };
+    const hostTailscale = {
+      read: vi.fn().mockResolvedValue(tailscale),
+      setUp: vi.fn().mockResolvedValue(tailscale),
+    };
+    const runtime = { listen: "127.0.0.1:6868", getRelayConfig: () => null, hostTailscale };
+    const guestMessages: SessionOutboundMessage[] = [];
+    const guest = createSessionForTest({ messages: guestMessages, daemonRuntimeConfig: runtime });
+    await guest.handleMessage({ type: "daemon.tailscale.setup.request", requestId: "guest" });
+    expect(hostTailscale.setUp).not.toHaveBeenCalled();
+    expect(guestMessages).toContainEqual({
+      type: "rpc_error",
+      payload: {
+        requestId: "guest",
+        requestType: "daemon.tailscale.setup.request",
+        error: "Tailscale on this Host needs this Host's independent owner credential",
+      },
+    });
+    const messages: SessionOutboundMessage[] = [];
+    const owner = createSessionForTest({
+      messages,
+      localHubOperator: true,
+      daemonRuntimeConfig: runtime,
+    });
+    await owner.handleMessage({ type: "daemon.tailscale.status.request", requestId: "read" });
+    await owner.handleMessage({
+      type: "daemon.tailscale.setup.request",
+      requestId: "set-up",
+      httpsPort: 8443,
+    });
+    expect(hostTailscale.setUp).toHaveBeenCalledWith({ httpsPort: 8443 });
+    expect(messages).toContainEqual({
+      type: "daemon.tailscale.status.response",
+      payload: { requestId: "read", tailscale },
+    });
+    expect(messages).toContainEqual({
+      type: "daemon.tailscale.setup.response",
+      payload: { requestId: "set-up", tailscale },
+    });
+  });
   const tempDirs: string[] = [];
 
   afterEach(() => {

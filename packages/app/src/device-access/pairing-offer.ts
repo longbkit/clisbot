@@ -2,6 +2,8 @@ import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { DevicePairingGrantSchema } from "@clisbot/protocol/device-access";
 import {
   parseDevicePairingOfferFromUrl,
+  parseHubPairingOfferFromUrl,
+  type DevicePairingOffer,
   type HubDeviceOffer,
 } from "@clisbot/protocol/device-pairing-offer";
 import { isElectronRuntime } from "@/desktop/host";
@@ -37,7 +39,8 @@ export async function appDevicePairingOffer(
   return result;
 }
 
-async function approvedHubOffer(profile: HubProfile): Promise<HubDeviceOffer> {
+/** A Hub invitation approved by this device as the Hub's instance operator. */
+export async function approvedHubOffer(profile: HubProfile): Promise<HubDeviceOffer> {
   const transport = new PairedHubTransport(profile);
   try {
     const capabilities = await readHubDeviceCapabilities(transport);
@@ -55,4 +58,39 @@ async function approvedHubOffer(profile: HubProfile): Promise<HubDeviceOffer> {
   } finally {
     transport.close();
   }
+}
+
+export type PairingRoute = "tailscale" | "direct" | "thisComputer" | "relay" | "hub";
+
+/** The routes a pairing link carries, in the order the app tries them. Host links (v3) and
+ * Hub-only links (v4) both count; a link that does not parse carries none. */
+export function pairingLinkRoutes(url: string): PairingRoute[] {
+  let offer: Pick<DevicePairingOffer, "direct" | "relay" | "hub"> | null;
+  try {
+    const hub = parseHubPairingOfferFromUrl(url)?.hub;
+    offer = hub
+      ? { ...hubDirect(hub.origin), relay: hub.relay }
+      : parseDevicePairingOfferFromUrl(url);
+  } catch {
+    return [];
+  }
+  if (!offer) return [];
+  const routes: PairingRoute[] = [];
+  if (offer.direct) routes.push(directRoute(offer.direct.endpoint));
+  if (offer.relay) routes.push("relay");
+  if (offer.hub?.pairing) routes.push("hub");
+  return routes;
+}
+
+function hubDirect(origin: string | undefined): Pick<DevicePairingOffer, "direct"> {
+  if (!origin) return {};
+  const url = new URL(origin);
+  return { direct: { endpoint: url.host, useTls: url.protocol === "https:" } };
+}
+
+function directRoute(endpoint: string): PairingRoute {
+  const host = endpoint.replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+  if (host.endsWith(".ts.net")) return "tailscale";
+  if (["localhost", "127.0.0.1", "::1"].includes(host)) return "thisComputer";
+  return "direct";
 }

@@ -1386,8 +1386,15 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     setIsRemoteSshVisible(true);
   }, []);
 
+  const [pasteLinkInitialUrl, setPasteLinkInitialUrl] = useState<string>();
   const handleSelectPasteLink = useCallback(() => {
     setIsAddHostMethodVisible(false);
+    setPasteLinkInitialUrl(undefined);
+    setIsPasteLinkVisible(true);
+  }, []);
+  const handleDirectToPasteLink = useCallback((link?: string) => {
+    setIsDirectHostVisible(false);
+    setPasteLinkInitialUrl(link);
     setIsPasteLinkVisible(true);
   }, []);
 
@@ -1626,6 +1633,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         onClose={closeAddConnectionFlow}
         onCancel={goBackToAddConnectionMethods}
         onSaved={handleHostAdded}
+        onPasteLink={handleDirectToPasteLink}
       />
       <AddRemoteSshHostModal
         visible={isRemoteSshVisible}
@@ -1635,6 +1643,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
       />
       <PairLinkModal
         visible={isPasteLinkVisible}
+        initialUrl={pasteLinkInitialUrl}
         onClose={closeAddConnectionFlow}
         onCancel={goBackToAddConnectionMethods}
         onSaved={handleHostAdded}

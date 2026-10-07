@@ -2455,6 +2455,8 @@ export class Session {
     );
   }
 
+  /** Starting a local Hub and mapping this Host through Tailscale both change what the
+   * Host serves, so both need the Host's own owner credential, never a Hub lease. */
   public canStartLocalHub(): boolean {
     return this.localHubOperator && this.authorization.allowsPermission("access.manage");
   }
@@ -3143,6 +3145,20 @@ export class Session {
           return undefined;
         }
         return this.daemonSession.handleLocalHubStartRequest(msg);
+      case "daemon.tailscale.status.request":
+      case "daemon.tailscale.setup.request":
+        if (!this.canStartLocalHub()) {
+          this.emit({
+            type: "rpc_error",
+            payload: {
+              requestId: msg.requestId,
+              requestType: msg.type,
+              error: "Tailscale on this Host needs this Host's independent owner credential",
+            },
+          });
+          return undefined;
+        }
+        return this.daemonSession.handleTailscaleRequest(msg);
       case "daemon.config.reload.request":
         this.daemonSession.handleConfigReloadRequest(msg);
         return undefined;

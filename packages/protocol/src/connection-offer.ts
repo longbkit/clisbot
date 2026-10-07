@@ -50,6 +50,18 @@ function decodeBase64UrlToUtf8(input: string): string {
   return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
+function encodeUtf8ToBase64Url(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return globalThis.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** The inverse of `decodeOfferFragmentPayload`, for links built outside the daemon. */
+export function encodeOfferFragmentPayload(value: unknown): string {
+  return encodeUtf8ToBase64Url(JSON.stringify(value));
+}
+
 export function decodeOfferFragmentPayload(encoded: string): unknown {
   const json = decodeBase64UrlToUtf8(encoded);
   return JSON.parse(json) as unknown;

@@ -1,7 +1,6 @@
 import { suggestedDeviceLabel } from "./device-label";
 import { z } from "zod";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { getDesktopHost } from "@/desktop/host";
 import {
   useHosts,
   getHostRuntimeStore,
@@ -18,7 +17,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { Plus, Server, Link } from "lucide-react-native";
+import { ChevronDown, ChevronRight, Plus, Server, Link } from "lucide-react-native";
 import { settingsStyles } from "@/styles/settings";
 import { parsePublicHubConnection } from "./google-sign-in";
 import { HubText as Text } from "./hub-text";
@@ -49,12 +48,18 @@ import {
   useHubProfiles,
   selectHubProfile,
   saveDiscoveredHub,
-  updateHubProfile,
-  validateHubRoutes,
   parseHubRelayUrl,
   type HubProfile,
 } from "./hub-profiles";
-import { PairedHubTransport, pairHub } from "./hub-transport";
+import { pairHub } from "./hub-transport";
+import {
+  canStartHubOnHost,
+  isTailscaleOrigin,
+  saveVerifiedHubRoutes,
+  startHubOnHost,
+} from "./hub-routes";
+import { HubRoutesCard } from "./hub-routes-card";
+import { HubPairDevicePanel } from "./hub-pair-device";
 import { fetchPublicHubIdentity } from "./hub-identity-check";
 import { HubIdentityRecovery } from "./hub-identity-recovery";
 import { readDeviceCredential } from "./credentials";
@@ -210,16 +215,11 @@ export function HubConnectionSettings() {
       const selected = hosts.find((host) => host.serverId === (hostId || hosts[0]?.serverId));
       if (!selected) throw new Error("Connect a Host before starting a Hub");
       if (!canStartHub) throw new Error("This Host cannot start a Hub from this connection");
-      const desktop = getDesktopHost();
-      const client = getHostRuntimeStore().getSnapshot(selected.serverId)?.client;
-      const result =
-        desktop?.invoke && selected.serverId === localServerId
-          ? await desktop.invoke("desktop_start_hub", {
-              serverId: selected.serverId,
-              label,
-            })
-          : await client?.startLocalHub({ label });
-      const value = result as { url?: string; transport?: string };
+      const value = await startHubOnHost({
+        serverId: selected.serverId,
+        localServerId,
+        label,
+      });
       if (!value?.url)
         throw new Error(
           "This Host does not support starting a Hub yet. Update its CLI and restart it when convenient.",
@@ -472,12 +472,9 @@ function useHubStartSupport(hosts: HostProfile[], hostId: string, localServerId:
   const selectedId = hosts.some((host) => host.serverId === hostId)
     ? hostId
     : (hosts[0]?.serverId ?? "");
-  const runtime = useHostRuntimeSnapshot(selectedId);
-  return Boolean(
-    selectedId &&
-    ((getDesktopHost()?.invoke && selectedId === localServerId) ||
-      runtime?.client?.getLastServerInfoMessage()?.features?.localHubStart === true),
-  );
+  // Subscribing re-evaluates when that Host reconnects with new features.
+  useHostRuntimeSnapshot(selectedId);
+  return Boolean(selectedId) && canStartHubOnHost(selectedId, localServerId);
 }
 
 type HubEntryNotice = "owner-required" | "blocked" | "pairing";
@@ -686,9 +683,16 @@ export function HubOverviewSettings() {
   const registry = useHubProfiles();
   const router = useRouter();
   const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
-  const [editing, setEditing] = useState(false);
-  const closeEditor = useCallback(() => setEditing(false), []);
+  // hubPanel=connection opens the editor from elsewhere, e.g. Hosts › Add a Host.
+  const [editing, setEditing] = useState(params.hubPanel === "connection");
+  const closeEditor = useCallback(() => {
+    setEditing(false);
+    if (params.hubPanel === "connection") router.setParams({ hubPanel: undefined });
+  }, [params.hubPanel, router]);
   const openEditor = useCallback(() => setEditing(true), []);
+  useEffect(() => {
+    if (params.hubPanel === "connection") setEditing(true);
+  }, [params.hubPanel]);
   const openDevices = useCallback(() => router.setParams({ hubPanel: "devices" }), [router]);
   const closeDevices = useCallback(() => router.setParams({ hubPanel: undefined }), [router]);
   if (!profile) return <HubConnectionSettings />;
@@ -710,11 +714,16 @@ export function HubOverviewSettings() {
         />
       ) : null}
       {!editing && params.hubPanel !== "devices" ? <WhatIsHub /> : null}
-      {params.transport === "relay" ? (
-        <HubContextNote>
-          Hub is available through encrypted relay. For a direct connection and best speed, install
-          and sign in to Tailscale on this Host and your phone.
-        </HubContextNote>
+      {params.transport === "relay" && !editing && !isTailscaleOrigin(profile.origin) ? (
+        <Alert
+          variant="info"
+          title="Hub is running on encrypted relay"
+          description="For a direct connection and best speed, set up Tailscale on the computer running this Hub."
+        >
+          <Button variant="outline" size="sm" onPress={openEditor}>
+            Set up Tailscale
+          </Button>
+        </Alert>
       ) : null}
       {editing ? (
         <SettingsSection title="Edit connection">
@@ -739,29 +748,16 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
   const save = useCallback(async () => {
     setBusy(true);
     setError(null);
-    let transport: PairedHubTransport | undefined;
     try {
-      const routes = {
+      await saveVerifiedHubRoutes(profile, {
+        label: label.trim(),
         origin: origin.trim() || undefined,
         relay: parseHubRelayUrl(relay) ?? undefined,
-      };
-      const candidate = { ...profile, ...routes };
-      validateHubRoutes(candidate);
-      transport = new PairedHubTransport(candidate);
-      // The encrypted handshake pins the saved key before a credential is sent.
-      const response = await transport.identity();
-      if (!response.ok || (await response.json()).hubId !== profile.hubId)
-        throw new Error("The new endpoint does not match this Hub");
-      await updateHubProfile(profile.hubId, {
-        label: label.trim(),
-        origin: routes.origin ?? null,
-        relay: routes.relay ?? null,
       });
       close();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Hub connection could not be saved");
     } finally {
-      transport?.close();
       setBusy(false);
     }
   }, [profile, label, origin, relay, close]);
@@ -773,6 +769,7 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
       <HubContextNote>
         Save or cancel to switch Hubs. These changes apply only on this device.
       </HubContextNote>
+      <HubRoutesCard profile={profile} onUpdated={close} />
       <View style={[settingsStyles.card, hubStyles.form]}>
         <Field
           label="Name on this device"
@@ -789,25 +786,14 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
           <Text style={hubStyles.hint}>Hub ID: {profile.hubId}</Text>
           <HubStatusBadge label="Verified" tone="success" />
         </View>
-        <Field label="HTTPS address">
-          <FormTextInput
-            initialValue={origin}
-            onChangeText={setOrigin}
-            accessibilityLabel="Hub HTTPS URL"
-            editable={!busy}
-          />
-        </Field>
-        <Field
-          label="Relay address"
-          hint="Keep the saved relay route to connect when direct access is unavailable."
-        >
-          <FormTextInput
-            initialValue={relay}
-            onChangeText={setRelay}
-            accessibilityLabel="Hub relay URL"
-            editable={!busy}
-          />
-        </Field>
+        <CustomAddressFields
+          initiallyOpen={Boolean(profile.origin) && !isTailscaleOrigin(profile.origin)}
+          origin={origin}
+          relay={relay}
+          setOrigin={setOrigin}
+          setRelay={setRelay}
+          busy={busy}
+        />
         <View style={hubStyles.actions}>
           <Button variant="outline" disabled={busy} onPress={close}>
             Cancel
@@ -826,6 +812,55 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
       <HubContextNote>
         The new endpoint must prove it is the same Hub before a saved credential is used.
       </HubContextNote>
+    </>
+  );
+}
+
+/** A Hub address typed by hand, folded away because Tailscale and relay need none. */
+function CustomAddressFields(props: {
+  initiallyOpen: boolean;
+  origin: string;
+  relay: string;
+  setOrigin(value: string): void;
+  setRelay(value: string): void;
+  busy: boolean;
+}) {
+  const [open, setOpen] = useState(props.initiallyOpen);
+  const toggle = useCallback(() => setOpen((value) => !value), []);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        leftIcon={open ? ChevronDown : ChevronRight}
+        onPress={toggle}
+        style={hubStyles.startAligned}
+      >
+        Custom address
+      </Button>
+      {open ? (
+        <>
+          <Field label="HTTPS address">
+            <FormTextInput
+              initialValue={props.origin}
+              onChangeText={props.setOrigin}
+              accessibilityLabel="Hub HTTPS URL"
+              editable={!props.busy}
+            />
+          </Field>
+          <Field
+            label="Relay address"
+            hint="Keep the saved relay route to connect when direct access is unavailable."
+          >
+            <FormTextInput
+              initialValue={props.relay}
+              onChangeText={props.setRelay}
+              accessibilityLabel="Hub relay URL"
+              editable={!props.busy}
+            />
+          </Field>
+        </>
+      ) : null}
     </>
   );
 }
@@ -900,6 +935,9 @@ function HubDeviceSettings({
   }, [profile.hubId]);
   const signIn = useCallback(() => router.push("/settings/hub/account"), [router]);
   const openPolicy = useCallback(() => router.push("/settings/hub/sign-in"), [router]);
+  const [pairing, setPairing] = useState(false);
+  const openPairing = useCallback(() => setPairing(true), []);
+  const closePairing = useCallback(() => setPairing(false), []);
   const request = useCallback(
     (action: HubDeviceAction) => {
       if (!transport) throw new Error("Hub is not connected");
@@ -919,7 +957,16 @@ function HubDeviceSettings({
       />
     );
   if (devices && capabilities?.canManageDevices)
-    return <PairedDeviceList request={request} lockHubSwitch currentDeviceId={currentDeviceId} />;
+    return (
+      <PairedDeviceList
+        request={request}
+        lockHubSwitch
+        currentDeviceId={currentDeviceId}
+        onPairDevice={openPairing}
+      >
+        {pairing ? <HubPairDevicePanel profile={profile} onClose={closePairing} /> : null}
+      </PairedDeviceList>
+    );
   if (!capabilities) return <HubContextNote>Checking Hub connection…</HubContextNote>;
   return (
     <>

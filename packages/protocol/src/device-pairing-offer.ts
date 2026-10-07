@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { DevicePairingGrantSchema } from "./device-access.js";
-import { decodeOfferFragmentPayload } from "./connection-offer.js";
+import {
+  DEFAULT_APP_BASE_URL,
+  decodeOfferFragmentPayload,
+  encodeOfferFragmentPayload,
+} from "./connection-offer.js";
 
 const EndpointSchema = z.object({
   endpoint: z.string().min(1).max(2048),
@@ -57,6 +61,14 @@ export function parseDevicePairingOfferFromUrl(input: string): DevicePairingOffe
   )
     throw new Error("Pairing identity mismatch");
   return offer;
+}
+
+/** A Hub-only pairing link (offer v4), as `clisbot hub pair` prints it. */
+export function hubPairingOfferUrl(
+  hub: HubPairingOffer["hub"],
+  appBaseUrl: string = DEFAULT_APP_BASE_URL,
+): string {
+  return `${appBaseUrl}/#offer=${encodeOfferFragmentPayload({ v: 4, hub })}`;
 }
 
 export function parseHubPairingOfferFromUrl(input: string): HubPairingOffer | null {

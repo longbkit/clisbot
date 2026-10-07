@@ -644,7 +644,8 @@ describe("Host administration", () => {
     adapters.connectionOrigin = null;
     adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
     renderSection();
-    await screen.findByText(/Add a Tailscale or HTTPS endpoint in Hub connections/);
+    await screen.findByText(/Other computers need an address to reach this Hub/);
+    expect(screen.getByRole("button", { name: "Set up Tailscale" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy command" })).toBeNull();
     expect(screen.getByText("Manage access")).toBeTruthy();
   });

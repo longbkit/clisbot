@@ -1677,6 +1677,8 @@ export const ru: TranslationResources = {
       label: "Пароль хоста",
     },
     connectionMethods: {
+      intro: "На компьютере откройте «Связать устройство».",
+      otherWays: "Другие способы",
       title: "Добавить подключение",
       direct: {
         title: "Прямое подключение",
@@ -1688,16 +1690,18 @@ export const ru: TranslationResources = {
       },
       scanQr: {
         title: "Сканировать QR-код",
-        description: "Зашифрованное подключение через ретранслятор.",
+        description: "Использует Tailscale, если он доступен, иначе зашифрованный ретранслятор.",
       },
       pasteLink: {
         title: "Вставить ссылку для сопряжения",
-        description: "Зашифрованное подключение через ретранслятор.",
+        description: "То же, что QR-код.",
       },
     },
     direct: {
       title: "Прямое подключение",
       helper: "Введите адрес сервера Clisbot.",
+      pairingNote: "Есть ссылка или QR-код для связывания? Они всё настроят.",
+      pasteLink: "Вставить ссылку",
       fields: {
         host: "Хост",
         port: "Порт",
@@ -1788,6 +1792,44 @@ export const ru: TranslationResources = {
       pairing: "Сопряжение...",
       unableToPair: "Не удалось выполнить сопряжение с хостом",
       errorTitle: "Ошибка",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "Рекомендуется",
+      description: "Напрямую и быстрее всего. На другом устройстве тоже нужен Tailscale.",
+      states: {
+        checking: "Проверка…",
+        settingUp: "Настройка…",
+        on: "Включён",
+        notSetUp: "Не настроен",
+        missing: "Не установлен",
+        signedOut: "Вход не выполнен",
+        stopped: "Не запущен",
+        httpsOff: "HTTPS выключен",
+        unavailable: "Недоступен",
+      },
+      actions: {
+        setUp: "Настроить",
+        getTailscale: "Скачать Tailscale",
+        enableOnTailnet: "Включить в tailnet",
+        retry: "Повторить",
+      },
+    },
+    routes: {
+      relayTitle: "Зашифрованный ретранслятор",
+      relayDescription: "Работает везде, без настройки.",
+      on: "Включён",
+      off: "Выключен",
+      turnOn: "Включить",
+      noRoute: "Настройте Tailscale или включите ретранслятор, чтобы создать QR-код.",
+      contains: "Содержит: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "Напрямую",
+        thisComputer: "Этот компьютер",
+        relay: "Ретранслятор",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "Загрузка данных для сопряжения...",
@@ -2425,6 +2467,9 @@ export const ru: TranslationResources = {
         removeErrorTitle: "Ошибка",
         removeErrorMessage: "Не удалось удалить подключение",
         timeout: "Время ожидания истекло",
+        tailscaleHint:
+          "Этот Host также поддерживает Tailscale. Включите Tailscale на этом устройстве для более быстрого прямого подключения.",
+        getTailscale: "Скачать Tailscale",
       },
       pairDevices: {
         title: "Подключение устройств",

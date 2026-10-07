@@ -2299,6 +2299,7 @@ export class VoiceAssistantWebSocketServer {
           hasDeviceAuthority: Boolean(this.credentialSource?.deviceAuthority),
           hasHubRelationships: Boolean(this.hubRelationships),
           hasLocalHubLauncher: Boolean(this.daemonRuntimeConfig?.startLocalHub),
+          hasHostTailscale: Boolean(this.daemonRuntimeConfig?.hostTailscale),
           canStartLocalHub: () => session.canStartLocalHub(),
         }),
         ...(this.agentManager.sessionStorageEnabled ? { agentSessionStorage: true } : {}),

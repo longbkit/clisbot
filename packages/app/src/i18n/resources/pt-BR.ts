@@ -1679,6 +1679,8 @@ export const ptBR: TranslationResources = {
       label: "Senha do host",
     },
     connectionMethods: {
+      intro: "No computador, abra Parear dispositivo.",
+      otherWays: "Outras formas",
       title: "Adicionar conexão",
       direct: {
         title: "Conexão direta",
@@ -1690,16 +1692,18 @@ export const ptBR: TranslationResources = {
       },
       scanQr: {
         title: "Escanear QR code",
-        description: "Conexão relay criptografada.",
+        description: "Usa Tailscale quando disponível; senão, relay criptografado.",
       },
       pasteLink: {
         title: "Colar link de pareamento",
-        description: "Conexão relay criptografada.",
+        description: "Igual ao código QR.",
       },
     },
     direct: {
       title: "Conexão direta",
       helper: "Informe o endereço de um servidor Clisbot.",
+      pairingNote: "Tem um link ou QR de pareamento? Ele configura isso para você.",
+      pasteLink: "Colar link",
       fields: {
         host: "Host",
         port: "Porta",
@@ -1790,6 +1794,44 @@ export const ptBR: TranslationResources = {
       pairing: "Pareando...",
       unableToPair: "Não foi possível parear host",
       errorTitle: "Erro",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "Recomendado",
+      description: "Direto e mais rápido. O outro dispositivo também precisa do Tailscale.",
+      states: {
+        checking: "Verificando…",
+        settingUp: "Configurando…",
+        on: "Ativo",
+        notSetUp: "Não configurado",
+        missing: "Não instalado",
+        signedOut: "Desconectado",
+        stopped: "Parado",
+        httpsOff: "HTTPS desativado",
+        unavailable: "Inacessível",
+      },
+      actions: {
+        setUp: "Configurar",
+        getTailscale: "Obter Tailscale",
+        enableOnTailnet: "Ativar na tailnet",
+        retry: "Tentar novamente",
+      },
+    },
+    routes: {
+      relayTitle: "Relay criptografado",
+      relayDescription: "Funciona em qualquer lugar, sem configuração.",
+      on: "Ativo",
+      off: "Desativado",
+      turnOn: "Ativar",
+      noRoute: "Configure o Tailscale ou ative o relay para criar um código QR.",
+      contains: "Contém: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "Direto",
+        thisComputer: "Este computador",
+        relay: "Relay",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "Carregando oferta de pareamento...",
@@ -2420,6 +2462,9 @@ export const ptBR: TranslationResources = {
         removeErrorTitle: "Erro",
         removeErrorMessage: "Não foi possível remover a conexão",
         timeout: "Timeout",
+        tailscaleHint:
+          "Este Host também oferece Tailscale. Ative o Tailscale neste dispositivo para uma conexão direta mais rápida.",
+        getTailscale: "Obter Tailscale",
       },
       pairDevices: {
         title: "Parear dispositivos",

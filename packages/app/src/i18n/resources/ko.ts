@@ -1659,6 +1659,8 @@ export const ko: TranslationResources = {
       label: "호스트 비밀번호",
     },
     connectionMethods: {
+      intro: "컴퓨터에서 기기 페어링을 여세요.",
+      otherWays: "다른 방법",
       title: "연결 추가",
       direct: {
         title: "직접 연결",
@@ -1670,16 +1672,18 @@ export const ko: TranslationResources = {
       },
       scanQr: {
         title: "QR 코드 스캔",
-        description: "암호화된 릴레이 연결.",
+        description: "가능하면 Tailscale을, 아니면 암호화된 릴레이를 사용합니다.",
       },
       pasteLink: {
         title: "페어링 링크 붙여넣기",
-        description: "암호화된 릴레이 연결.",
+        description: "QR 코드와 같습니다.",
       },
     },
     direct: {
       title: "직접 연결",
       helper: "Clisbot 서버의 주소를 입력하세요.",
+      pairingNote: "페어링 링크나 QR이 있나요? 자동으로 설정됩니다.",
+      pasteLink: "링크 붙여넣기",
       fields: {
         host: "호스트",
         port: "포트",
@@ -1767,6 +1771,44 @@ export const ko: TranslationResources = {
       pairing: "페어링 중...",
       unableToPair: "호스트를 페어링할 수 없습니다",
       errorTitle: "오류",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "권장",
+      description: "직접 연결되어 가장 빠릅니다. 다른 기기에도 Tailscale이 필요합니다.",
+      states: {
+        checking: "확인 중…",
+        settingUp: "설정 중…",
+        on: "켜짐",
+        notSetUp: "설정 안 됨",
+        missing: "설치 안 됨",
+        signedOut: "로그아웃됨",
+        stopped: "실행 안 됨",
+        httpsOff: "HTTPS 꺼짐",
+        unavailable: "연결 불가",
+      },
+      actions: {
+        setUp: "설정",
+        getTailscale: "Tailscale 받기",
+        enableOnTailnet: "tailnet에서 켜기",
+        retry: "다시 시도",
+      },
+    },
+    routes: {
+      relayTitle: "암호화된 릴레이",
+      relayDescription: "어디서나 작동하며 설정이 필요 없습니다.",
+      on: "켜짐",
+      off: "꺼짐",
+      turnOn: "켜기",
+      noRoute: "QR 코드를 만들려면 Tailscale을 설정하거나 릴레이를 켜세요.",
+      contains: "포함: {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "직접",
+        thisComputer: "이 컴퓨터",
+        relay: "릴레이",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "페어링 정보 불러오는 중...",
@@ -2395,6 +2437,9 @@ export const ko: TranslationResources = {
         removeErrorTitle: "오류",
         removeErrorMessage: "연결을 제거할 수 없습니다",
         timeout: "시간 초과",
+        tailscaleHint:
+          "이 호스트는 Tailscale도 제공합니다. 더 빠른 직접 연결을 위해 이 기기에서 Tailscale을 켜세요.",
+        getTailscale: "Tailscale 받기",
       },
       pairDevices: {
         title: "기기 페어링",

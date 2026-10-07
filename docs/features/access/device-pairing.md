@@ -46,7 +46,7 @@ Managed Access. Separate device trust, account authentication, authority and net
   again; read retries use fresh proofs. A write with a lost response is reported to the caller
   without automatic replay because its result is unknown.
 - Tailscale is the preferred direct route. Detect and guide installation/login; relay and
-  public HTTPS remain supported. Hub relay is required in v1, alongside daemon relay, so
+  public HTTPS remain supported. Turning it on from the app: [Connect over Tailscale](tailscale-connect.md). Hub relay is required in v1, alongside daemon relay, so
   onboarding works without installing or configuring Tailscale. Changing routes does not
   require pairing again. Future cloud relay entitlement can require its own cloud login
   without invalidating local credentials; relay connectivity is not deferred with billing.

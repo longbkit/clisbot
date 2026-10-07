@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { View } from "react-native";
-import { MoreHorizontal, Pencil, RefreshCw, Trash2 } from "lucide-react-native";
+import { MoreHorizontal, Pencil, QrCode, RefreshCw, Trash2 } from "lucide-react-native";
 import { HubText as Text } from "./hub-text";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,16 @@ export function PairedDeviceList({
   request,
   lockHubSwitch = false,
   currentDeviceId,
+  onPairDevice,
+  children,
 }: {
   request(action: DeviceAction): Promise<{ devices: Device[] }>;
   lockHubSwitch?: boolean;
   currentDeviceId?: string;
+  /** Offered where this list can also invite a device. */
+  onPairDevice?: () => void;
+  /** Shown above the list, e.g. the invitation just created. */
+  children?: ReactNode;
 }) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -83,12 +89,18 @@ export function PairedDeviceList({
         <Button variant="ghost" size="xs" leftIcon={RefreshCw} disabled={busy} onPress={refresh}>
           Refresh
         </Button>
+        {onPairDevice ? (
+          <Button variant="ghost" size="xs" leftIcon={QrCode} onPress={onPairDevice}>
+            Pair a device
+          </Button>
+        ) : null}
       </View>
     ),
-    [busy, refresh, revokeAll],
+    [busy, refresh, revokeAll, onPairDevice],
   );
   return (
     <SettingsSection title="Paired devices" trailing={headerActions}>
+      {children}
       {error ? <Text accessibilityRole="alert">{error}</Text> : null}
       <View style={settingsStyles.card}>
         {devices.map((device, index) => (

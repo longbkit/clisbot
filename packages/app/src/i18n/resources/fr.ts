@@ -1698,6 +1698,8 @@ export const fr: TranslationResources = {
       label: "Mot de passe de l’hôte",
     },
     connectionMethods: {
+      intro: "Sur l'ordinateur, ouvrez Associer un appareil.",
+      otherWays: "Autres méthodes",
       title: "Ajouter une connexion",
       direct: {
         title: "Connexion directe",
@@ -1709,16 +1711,18 @@ export const fr: TranslationResources = {
       },
       scanQr: {
         title: "Scanner le codeQR",
-        description: "Connexion relais cryptée.",
+        description: "Utilise Tailscale si disponible, sinon le relais chiffré.",
       },
       pasteLink: {
         title: "Coller le lien d'association",
-        description: "Connexion relais cryptée.",
+        description: "Identique au code QR.",
       },
     },
     direct: {
       title: "Connexion directe",
       helper: "Saisissez l'adresse d'un serveurClisbot.",
+      pairingNote: "Vous avez un lien ou un QR d'association ? Il configure tout pour vous.",
+      pasteLink: "Coller le lien",
       fields: {
         host: "Host",
         port: "Port",
@@ -1809,6 +1813,44 @@ export const fr: TranslationResources = {
       pairing: "L'appariement...",
       unableToPair: "Impossible de coupler l'hôte",
       errorTitle: "Erreur",
+    },
+    tailscale: {
+      title: "Tailscale",
+      recommended: "Recommandé",
+      description: "Direct et plus rapide. L'autre appareil doit aussi avoir Tailscale.",
+      states: {
+        checking: "Vérification…",
+        settingUp: "Configuration…",
+        on: "Actif",
+        notSetUp: "Non configuré",
+        missing: "Non installé",
+        signedOut: "Déconnecté",
+        stopped: "Arrêté",
+        httpsOff: "HTTPS désactivé",
+        unavailable: "Injoignable",
+      },
+      actions: {
+        setUp: "Configurer",
+        getTailscale: "Obtenir Tailscale",
+        enableOnTailnet: "Activer sur le tailnet",
+        retry: "Réessayer",
+      },
+    },
+    routes: {
+      relayTitle: "Relais chiffré",
+      relayDescription: "Fonctionne partout, sans configuration.",
+      on: "Actif",
+      off: "Désactivé",
+      turnOn: "Activer",
+      noRoute: "Configurez Tailscale ou activez le relais pour créer un code QR.",
+      contains: "Contient : {{routes}}",
+      route: {
+        tailscale: "Tailscale",
+        direct: "Direct",
+        thisComputer: "Cet ordinateur",
+        relay: "Relais",
+        hub: "Hub",
+      },
     },
     device: {
       loadingOffer: "Chargement de l'offre d'association...",
@@ -2443,6 +2485,9 @@ export const fr: TranslationResources = {
         removeErrorTitle: "Erreur",
         removeErrorMessage: "Impossible de supprimer la connexion",
         timeout: "Temps mort",
+        tailscaleHint:
+          "Ce Host propose aussi Tailscale. Activez Tailscale sur cet appareil pour une connexion directe plus rapide.",
+        getTailscale: "Obtenir Tailscale",
       },
       pairDevices: {
         title: "Associer des appareils",

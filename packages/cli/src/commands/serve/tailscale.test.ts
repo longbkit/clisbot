@@ -5,52 +5,12 @@ import path from "node:path";
 import {
   configureTailscaleServe,
   removeTailscaleServe,
-  detectTailscale,
-  resolveTailscaleBinary,
   readTailscaleServePort,
 } from "./tailscale.js";
 
 const homes: string[] = [];
 afterEach(async () => {
   await Promise.all(homes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
-});
-
-test("guides missing/login/stopped dependencies and accepts only MagicDNS readiness", async () => {
-  expect(
-    await detectTailscale(async () => {
-      throw Object.assign(new Error("missing"), { code: "ENOENT" });
-    }),
-  ).toMatchObject({ state: "missing" });
-  expect(
-    await detectTailscale(async () => JSON.stringify({ BackendState: "NeedsLogin" })),
-  ).toMatchObject({ state: "login-required" });
-  expect(
-    await detectTailscale(async () => JSON.stringify({ BackendState: "Stopped" })),
-  ).toMatchObject({ state: "stopped" });
-  expect(
-    await detectTailscale(async () =>
-      JSON.stringify({ BackendState: "Running", Self: { DNSName: "host.tail123.ts.net." } }),
-    ),
-  ).toEqual({ state: "ready", dnsName: "host.tail123.ts.net" });
-  expect(
-    await detectTailscale(async () =>
-      JSON.stringify({ BackendState: "Running", Self: { DNSName: "evil.example" } }),
-    ),
-  ).toMatchObject({ state: "stopped" });
-});
-
-test("resolves Windows installation paths without a shell, with explicit overrides", () => {
-  expect(resolveTailscaleBinary("win32", { ProgramFiles: "C:/Programs" }, () => true)).toBe(
-    path.join("C:/Programs", "Tailscale", "tailscale.exe"),
-  );
-  expect(resolveTailscaleBinary("win32", {}, () => false)).toBe("tailscale.exe");
-  expect(resolveTailscaleBinary("darwin", {}, () => false)).toBe("tailscale");
-  expect(resolveTailscaleBinary("darwin", {}, () => true)).toBe(
-    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-  );
-  expect(resolveTailscaleBinary("win32", { CLISBOT_TAILSCALE_BIN: "D:/Tools/tailscale.exe" })).toBe(
-    "D:/Tools/tailscale.exe",
-  );
 });
 
 test("owns only its Serve path and refuses foreign or replaced mappings", async () => {

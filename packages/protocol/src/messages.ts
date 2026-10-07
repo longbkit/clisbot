@@ -12,6 +12,12 @@ import { DeviceProofSchema, DeviceCredentialSchema } from "./device-access.js";
 import { DevicePairingOfferSchema } from "./device-pairing-offer.js";
 import { DaemonDevicesRequestSchema, DaemonDevicesResponseSchema } from "./daemon-devices.js";
 import { HubLocalStartRequestSchema, HubLocalStartResponseSchema } from "./hub-local.js";
+import {
+  DaemonTailscaleSetupRequestSchema,
+  DaemonTailscaleSetupResponseSchema,
+  DaemonTailscaleStatusRequestSchema,
+  DaemonTailscaleStatusResponseSchema,
+} from "./host-tailscale.js";
 import { HubConnectionSchema } from "./device-pairing-offer.js";
 import { SessionActorSchema, SessionAuthorshipShape } from "./session-authorship.js";
 import { AgentProfileSchema, AgentSkillSelectionSchema } from "./agent-profile.js";
@@ -3305,6 +3311,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferRequestSchema,
   DaemonDevicesRequestSchema,
   HubLocalStartRequestSchema,
+  DaemonTailscaleStatusRequestSchema,
+  DaemonTailscaleSetupRequestSchema,
   DaemonConfigReloadRequestSchema,
   HubManagementDaemonConnectRequestSchema,
   HubManagementDaemonGetStatusRequestSchema,
@@ -3655,6 +3663,9 @@ export const ServerInfoStatusPayloadSchema = z
         devicePairing: z.boolean().optional(),
         // COMPAT(localHubStart): absent on upstream/legacy or unauthorized sessions.
         localHubStart: z.boolean().optional(),
+        // COMPAT(hostTailscale): added in v0.10.3, remove after 2027-04-06. Absent on
+        // upstream/legacy or unauthorized sessions.
+        hostTailscale: z.boolean().optional(),
         // COMPAT(hubDiscovery): public metadata only, never an approved grant.
         hubDiscovery: z.boolean().optional(),
         // COMPAT(projectWorkspaceCreation): absent daemons require workspace.manage.
@@ -7128,6 +7139,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferResponseSchema,
   DaemonDevicesResponseSchema,
   HubLocalStartResponseSchema,
+  DaemonTailscaleStatusResponseSchema,
+  DaemonTailscaleSetupResponseSchema,
   DaemonConfigReloadResponseSchema,
   HubManagementDaemonConnectResponseSchema,
   HubManagementDaemonGetStatusResponseSchema,

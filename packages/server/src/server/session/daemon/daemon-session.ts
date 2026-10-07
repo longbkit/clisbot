@@ -24,6 +24,12 @@ export interface DaemonRuntimeConfig {
   startLocalHub?(
     options: import("@clisbot/protocol/hub-local").HubLocalStartOptions,
   ): Promise<import("@clisbot/protocol/hub-local").HubLocalStartResult>;
+  hostTailscale?: {
+    read(): Promise<import("@clisbot/protocol/host-tailscale").HostTailscale>;
+    setUp(options: {
+      httpsPort?: number;
+    }): Promise<import("@clisbot/protocol/host-tailscale").HostTailscale>;
+  };
   devices?: {
     authority: import("@clisbot/device-access/authority").DeviceAuthority;
     sessions(id: string): { clientId: string; connected: boolean }[];
@@ -96,6 +102,38 @@ export class DaemonSession {
           requestId: msg.requestId,
           requestType: msg.type,
           error: error instanceof Error ? error.message : "Hub startup failed",
+        },
+      });
+    }
+  }
+  async handleTailscaleRequest(
+    msg: Extract<
+      SessionInboundMessage,
+      { type: "daemon.tailscale.status.request" | "daemon.tailscale.setup.request" }
+    >,
+  ): Promise<void> {
+    try {
+      const hostTailscale = this.daemonRuntimeConfig?.hostTailscale;
+      if (!hostTailscale) throw new Error("Tailscale setup is unavailable on this Host");
+      if (msg.type === "daemon.tailscale.status.request") {
+        this.host.emit({
+          type: "daemon.tailscale.status.response",
+          payload: { requestId: msg.requestId, tailscale: await hostTailscale.read() },
+        });
+        return;
+      }
+      const tailscale = await hostTailscale.setUp({ httpsPort: msg.httpsPort });
+      this.host.emit({
+        type: "daemon.tailscale.setup.response",
+        payload: { requestId: msg.requestId, tailscale },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: msg.requestId,
+          requestType: msg.type,
+          error: error instanceof Error ? error.message : "Tailscale could not be checked",
         },
       });
     }

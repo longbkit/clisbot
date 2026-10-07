@@ -1,5 +1,7 @@
 import { createDaemonDeviceAuthority, createDeviceRuntimeAccess } from "./device-access/runtime.js";
-import { localHubCliEntrypoint, startHostLocalHub } from "./hub/local-start.js";
+import { startHostLocalHub } from "./hub/local-start.js";
+import { localCliEntrypoint } from "./local-cli.js";
+import { readHostTailscale, setUpHostTailscale } from "./network/host-tailscale.js";
 import { createPublishedConnectionOffer } from "./device-access/connection-offer.js";
 import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
 import { recoverStoredSessionAuthorship } from "./agent/session-storage/recover-session-authorship.js";
@@ -2047,8 +2049,15 @@ export async function createClisbotDaemon(
                 devicePairingEnabled: config.devicePairingEnabled,
                 devices: createDeviceRuntimeAccess(deviceAuthority, () => wsServer),
                 startLocalHub:
-                  config.devicePairingEnabled && localHubCliEntrypoint()
+                  config.devicePairingEnabled && localCliEntrypoint()
                     ? (options) => startHostLocalHub(config.clisbotHome, options)
+                    : undefined,
+                hostTailscale:
+                  config.devicePairingEnabled && localCliEntrypoint()
+                    ? {
+                        read: () => readHostTailscale(config.clisbotHome),
+                        setUp: (options) => setUpHostTailscale(config.clisbotHome, options),
+                      }
                     : undefined,
                 getRelayConfig: () =>
                   relayRuntime?.getConfig() ?? {

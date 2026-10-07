@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -39,6 +39,15 @@ const styles = StyleSheet.create((theme) => ({
   optionBody: {
     flex: 1,
   },
+  intro: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+  },
+  groupLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    marginTop: theme.spacing[2],
+  },
 }));
 
 export interface AddHostMethodModalProps {
@@ -61,22 +70,6 @@ export function AddHostMethodModal({
   const { t } = useTranslation();
   const header = useMemo<SheetHeader>(() => ({ title: t("pairing.connectionMethods.title") }), [t]);
 
-  const handleDirect = useCallback(() => {
-    onDirectConnection();
-  }, [onDirectConnection]);
-
-  const handleScan = useCallback(() => {
-    onScanQr();
-  }, [onScanQr]);
-
-  const handleRemoteSsh = useCallback(() => {
-    onRemoteSsh();
-  }, [onRemoteSsh]);
-
-  const handlePaste = useCallback(() => {
-    onPasteLink();
-  }, [onPasteLink]);
-
   return (
     <AdaptiveModalSheet
       header={header}
@@ -84,72 +77,64 @@ export function AddHostMethodModal({
       onClose={onClose}
       testID="add-host-method-modal"
     >
-      <Pressable
-        style={styles.option}
-        onPress={handleDirect}
-        accessibilityRole="button"
-        accessibilityLabel={t("pairing.connectionMethods.direct.title")}
-        testID="add-host-method-direct"
-      >
-        <ThemedLink2 size={18} uniProps={foregroundIconMapping} />
-        <View style={styles.optionBody}>
-          <Text style={styles.optionText}>{t("pairing.connectionMethods.direct.title")}</Text>
-          <Text style={styles.optionSubtext}>
-            {t("pairing.connectionMethods.direct.description")}
-          </Text>
-        </View>
-      </Pressable>
-
-      {isElectronRuntime() ? (
-        <Pressable
-          style={styles.option}
-          onPress={handleRemoteSsh}
-          accessibilityRole="button"
-          accessibilityLabel={t("pairing.connectionMethods.remoteSsh.title")}
-          testID="add-host-method-remote-ssh"
-        >
-          <ThemedTerminal size={18} uniProps={foregroundIconMapping} />
-          <View style={styles.optionBody}>
-            <Text style={styles.optionText}>{t("pairing.connectionMethods.remoteSsh.title")}</Text>
-            <Text style={styles.optionSubtext}>
-              {t("pairing.connectionMethods.remoteSsh.description")}
-            </Text>
-          </View>
-        </Pressable>
-      ) : null}
-
+      <Text style={styles.intro}>{t("pairing.connectionMethods.intro")}</Text>
       {isNative && !isFdroidBuild ? (
-        <Pressable
-          style={styles.option}
-          onPress={handleScan}
-          accessibilityRole="button"
-          accessibilityLabel={t("pairing.connectionMethods.scanQr.title")}
-        >
-          <ThemedQrCode size={18} uniProps={foregroundIconMapping} />
-          <View style={styles.optionBody}>
-            <Text style={styles.optionText}>{t("pairing.connectionMethods.scanQr.title")}</Text>
-            <Text style={styles.optionSubtext}>
-              {t("pairing.connectionMethods.scanQr.description")}
-            </Text>
-          </View>
-        </Pressable>
+        <MethodOption
+          icon={ThemedQrCode}
+          method="scanQr"
+          onPress={onScanQr}
+          testID="add-host-method-scan-qr"
+        />
       ) : null}
-
-      <Pressable
-        style={styles.option}
-        onPress={handlePaste}
-        accessibilityRole="button"
-        accessibilityLabel={t("pairing.connectionMethods.pasteLink.title")}
+      <MethodOption
+        icon={ThemedClipboardPaste}
+        method="pasteLink"
+        onPress={onPasteLink}
         testID="add-host-method-pair-link"
-      >
-        <ThemedClipboardPaste size={18} uniProps={foregroundIconMapping} />
-        <View style={styles.optionBody}>
-          <Text style={styles.optionText}>{t("pairing.connectionMethods.pasteLink.title")}</Text>
-          <Text style={styles.optionSubtext}>
-            {t("pairing.connectionMethods.pasteLink.description")}
-          </Text>
-        </View>
-      </Pressable>
+      />
+      <Text style={styles.groupLabel}>{t("pairing.connectionMethods.otherWays")}</Text>
+      <MethodOption
+        icon={ThemedLink2}
+        method="direct"
+        onPress={onDirectConnection}
+        testID="add-host-method-direct"
+      />
+      {isElectronRuntime() ? (
+        <MethodOption
+          icon={ThemedTerminal}
+          method="remoteSsh"
+          onPress={onRemoteSsh}
+          testID="add-host-method-remote-ssh"
+        />
+      ) : null}
     </AdaptiveModalSheet>
+  );
+}
+
+function MethodOption(props: {
+  icon: typeof ThemedQrCode;
+  method: "scanQr" | "pasteLink" | "direct" | "remoteSsh";
+  onPress: () => void;
+  testID: string;
+}) {
+  const { t } = useTranslation();
+  const Icon = props.icon;
+  const title = t(`pairing.connectionMethods.${props.method}.title`);
+  return (
+    <Pressable
+      style={styles.option}
+      onPress={props.onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      testID={props.testID}
+    >
+      <Icon size={18} uniProps={foregroundIconMapping} />
+      <View style={styles.optionBody}>
+        <Text style={styles.optionText}>{title}</Text>
+        <Text style={styles.optionSubtext}>
+          {t(`pairing.connectionMethods.${props.method}.description`)}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
