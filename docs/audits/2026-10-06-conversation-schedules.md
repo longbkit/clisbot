@@ -2,7 +2,8 @@
 
 Decision record. Status: **proposed**, not built. Covers an agent session in the
 app, a Chat with Bots in the app, and a channel conversation (Slack, Telegram,
-Zalo).
+Zalo). The grant scope it relies on is its own decision:
+[Grant scope: own or all](../features/access/grant-scope.md).
 
 ## Context
 
@@ -44,13 +45,23 @@ babysitting and the report landed in a session nobody read (commit `0d0012959`).
 | 11  | After a Hub restart the reply thread is unknown, so a run can land at the channel root.                                                                | `hub/channels/relay/index.ts:100`                                        |
 | 12  | In a group Chat a Heartbeat goes straight into one Bot's session and skips turn rules.                                                                 | `chats/chat-engine.ts`                                                   |
 | 13  | Agent tools are off by default (`daemon.mcp.injectIntoAgents` is `false`), so Bot and channel sessions have no schedule tools at all.                  | `server/config.ts:542`                                                   |
-| 14  | No limits: minimum interval, schedules per conversation.                                                                                               | —                                                                        |
+| 14  | No limits on how often a schedule runs, how many times, or how many schedules a channel holds.                                                         | —                                                                        |
 
 ## Decision
 
 One concept, **Schedule**, on the existing engine. A Schedule gains two optional
-facts: the conversation it belongs to and who created it. Everything else, the
-store, cron, run history, CLI, and the Automations page, stays shared.
+facts: the conversation it belongs to and who created it. The store, cron, run
+history, CLI and the Automations page stay shared.
+
+Authority follows the layer the user is on:
+
+- **App** (agent session, Chat): `automation.manage` on the schedule's Project,
+  with the grant's [scope](../features/access/grant-scope.md) deciding whether
+  the holder may change only their own schedules or everyone's.
+- **Channel**: the Route's Rules, like everything else a sender does there. A
+  sender's Host or Project grants are never consulted
+  ([2026-09-18 chat authority](2026-09-18-channel-chat-authority-and-limits.md),
+  [2026-10-05 Routes and Rules](2026-10-05-routes-and-rules.md)).
 
 ### Model
 
@@ -62,8 +73,8 @@ target: { type: "agent", agentId } | { type: "new-agent", config }
 conversation?:
   | { kind: "agent"; agentId: string }
   | { kind: "chat"; chatId: string; botId: string }
-  | { kind: "channel"; routeId: string; bindingKey: string; threadId?: string };
-createdBy?: { principalId: string; channelSenderId?: string };
+  | { kind: "channel"; connectionId: string; routeId: string; bindingKey: string; threadId?: string };
+createdBy?: SessionActor & { channelSenderId?: string }; // protocol/src/session-authorship.ts
 pausedReason?: string;
 ```
 
@@ -76,6 +87,9 @@ In the UI a Schedule has two attributes instead of two names:
 | A new session each time              | Nowhere           | `target: new-agent`                  | Today's Schedule                       |
 | This session (no conversation field) | The agent         | `target: agent`                      | Today's Heartbeat, unchanged           |
 
+The Fusion app labels both kinds **Schedule**; "Heartbeat" remains the code and
+upstream CLI name for "Runs in: this session".
+
 With `conversation` set, `target.agentId` is the session the last run used. The
 next run resolves the conversation's current session again, so `/new` keeps the
 schedule (#3).
@@ -84,7 +98,7 @@ Every schedule created from a conversation reports back to it, whichever
 "Runs in" the agent picks. Picking the wrong tool now costs context continuity,
 not a lost report (#2), which removes the reason the split was dangerous.
 
-### Wire compatibility
+### Wire compatibility and gating
 
 All new fields are optional object fields, so an old client parses a new
 daemon's `schedule/list` and ignores them. No new variant is added to the
@@ -92,69 +106,139 @@ daemon's `schedule/list` and ignores them. No new variant is added to the
 reject the whole response. A paused schedule with `pausedReason` is still
 `status: "paused"`.
 
-There is no flag of its own. The feature rides the Clisbot fusion gate and is
-advertised once as `server_info.features.conversationSchedules`. With the fusion
-gate off, no new fields are written and agent tools and RPCs behave as upstream.
-Today the fusion has no single master switch: each area has its own
-(`daemon.bots`, `daemon.managedAccess.mode`, `features.agentSessionStorage`), so
-which switch this rides is Q7.
+No flag of its own: the feature rides the Clisbot fusion gate and is advertised
+once as `server_info.features.conversationSchedules`. With the gate off, no new
+fields are written and agent tools and RPCs behave as upstream. Which existing
+switch is "the fusion gate" is Q1.
 
-### Authority: `automation.manage`, scoped by creator
+### Authority in the app
 
-`automation.manage` stays the one permission for schedules. What changes is its
-reach: it is narrowed to Projects, and changing someone else's schedule needs a
-second privilege.
+| Action on a Project's schedules                      | Needs                                     |
+| ---------------------------------------------------- | ----------------------------------------- |
+| See all of them                                      | `automation.manage`                       |
+| Create                                               | `automation.manage`                       |
+| Update, pause, resume, run once, delete **own**      | `automation.manage`, scope `own` or `all` |
+| Update, pause, resume, run once, delete **anyone's** | `automation.manage`, scope `all`          |
 
-| Privilege (Hub, on a Host or Project) | Unlocks on that Project's schedules                                             |
-| ------------------------------------- | ------------------------------------------------------------------------------- |
-| `automation.manage`                   | See all of them; create; update, pause, resume, run once, delete **own**        |
-| `automation.manage.others`            | Update, pause, resume, run once, delete **anyone's**; needs `automation.manage` |
+- **The schedule's Project**: the Project of the agent it runs in (`target:
+agent`), of its `cwd` (`target: new-agent`), or of the Bot (a Chat). A Host
+  grant reaches every Project on the Host.
+- **Own**: `createdBy` is the caller's principal. A schedule without
+  `createdBy` (written before this change, or from a local client) counts as
+  someone else's.
+- **Owner, daemon admins and clients without Managed Access** keep today's
+  meaning: every schedule, scope `all`.
+- The daemon permission stays upstream's `automation.manage`. As with
+  `workspace.manage` (`hub/src/access/store.ts:1377`), the Hub hands the
+  session the permission whenever any Project grants it, and the daemon narrows
+  each request to the Projects and scope that hold it.
+- An agent tool in an app session acts for the **requester of the turn** (the
+  Chat message's sender, the session's actor), never for the agent (#6).
+- Inside a conversation, lists show that conversation's schedules; the
+  Automations page shows every schedule the caller may see.
 
-- **Which Project a schedule belongs to**: the Project of the agent it runs in
-  (`target: agent`), of its `cwd` (`target: new-agent`), or of the Bot (a Chat).
-  A Host grant reaches every Project on the Host, as for every other privilege.
-- **Own** means `createdBy` is the caller's principal. A schedule written before
-  `createdBy` existed has no creator and needs `automation.manage.others`.
-- **Owner and daemon admins** (`daemon.manage`) hold both on everything; the
-  Automations page keeps working for them unchanged.
-- **Without Managed Access** (a local or paired client), the daemon permission
-  `automation.manage` keeps today's meaning: every schedule, own and others'.
+### Authority on a channel
 
-This follows the existing `workspace.manage` shape (`hub/src/access/store.ts:1377`):
-the Hub hands the daemon the session-wide `automation.manage` permission
-whenever any Project grants it, and the daemon narrows each request back to the
-Projects that hold it. The daemon permission names stay upstream's; only Hub
-privileges are added. `automation.manage.others` follows the
-`approval.command` / `approval.command.destructive` naming pair.
+A schedule on a channel is a message the sender asks to be sent later, run by
+the Route's configuration. So the same parties decide as for a message.
 
-Grants work the same on every surface. A Member, a Team, or the Guest group
-gets `automation.manage` on a Project like any other privilege, so a channel
-needs no privilege of its own: the sender's Hub authority on the bound
-session's Project decides.
+**A Rule decides who may schedule, and where.** A Rule gains one leaf, off by
+default (name provisional, Q6):
 
-An agent tool acts for the **requester of the turn** (the Chat message's sender,
-the channel sender, the session's actor), never for the agent (#6). A Hub
-connection never needs the daemon permission: it calls the scoped RPCs under
-`hub.execute` and passes the sender (#8).
+```yaml
+audience:
+  - who: { teams: [ops] }
+    where: { conversations: [C0OPS] }
+    interaction: { requireMention: true, allowSchedules: true }
+```
 
-| Where                    | See                                                   | Create              | Change own          | Change others'                          |
-| ------------------------ | ----------------------------------------------------- | ------------------- | ------------------- | --------------------------------------- |
-| Agent session in the app | `automation.manage` on the agent's Project            | `automation.manage` | `automation.manage` | `automation.manage.others`              |
-| Chat in the app          | `automation.manage` on the Bot's Project              | `automation.manage` | `automation.manage` | `automation.manage.others`              |
-| Channel conversation     | the sender's `automation.manage` on the bound Project | the same            | the same            | the sender's `automation.manage.others` |
-| Automations page         | `automation.manage`, Projects it reaches              | `automation.manage` | `automation.manage` | `automation.manage.others`              |
+| Action                                           | Who                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| See this conversation's schedules                | a sender any Rule admits here                                |
+| Create                                           | a sender admitted here by a Rule with `allowSchedules: true` |
+| Update, pause, resume, run once, delete own      | the creator, while still admitted by such a Rule             |
+| Update, pause, resume, run once, delete anyone's | Connection Admin (`channel.manage`)                          |
 
-Inside a conversation, lists show that conversation's schedules; the
-Automations page shows every schedule the caller may see.
+- **Asking the bot and typing `/schedule` are the same act.** The table applies
+  to both doors. When a sender asks the agent in words, the agent's schedule
+  tool is served by the Hub and checked against the turn's requester, the
+  sender. It is not checked against the agent's own authority: on a channel the
+  agent runs under the Route's configuration, so judging the agent would let
+  anyone the Route admits schedule through a sentence what `/schedule` refuses
+  them.
+- **Who the requester is.** The sender of the message the turn answers; in a
+  batched turn, the sender of the newest message. In a turn a schedule started,
+  the schedule's creator, so a run cannot schedule more than its creator may.
+  This needs new Hub state: today the capability's `requesterSenderId` is the
+  sender who **opened the thread** and is never restamped
+  (`channel-reply-capabilities.ts:35`, `noteTurn` at `:392`). `noteTurn` must
+  restamp the sender with the turn. A message steered into a running turn
+  (`/steer`, `whenBusy: steer`) makes the turn answer two senders; the tool
+  then requires both to be allowed.
+- **Project authority is checked once, at publish.** Turning `allowSchedules`
+  on means other people may start unattended, repeated runs on the Route's
+  Project, as auto-approved actions do. The publisher must be able to delegate
+  `automation.manage` on that Project, through the same delegation check that
+  covers the Route's Agent configuration and approvals
+  (`assertChannelConfigurationDelegation`, `hub/src/access/delegation.ts`).
+  Senders are never checked against Project grants.
+- **An Anyone Rule warns, it does not refuse**, like every other open-Route
+  choice.
+- **Re-publishing decides, revoking does not.** Revoking the publisher's grant
+  later does not rewrite the Route; re-publishing it with `allowSchedules` off
+  pauses the schedules that Rule admitted.
+- **Operators on the app**: a holder of `automation.manage` scope `all` on the
+  Project can also stop a channel schedule from the Automations page. That is
+  Host authority over the Host's own resources, not channel authority.
+
+### Limits on a channel
+
+Two kinds, configured on the Connection (`limits`) and on the Route
+(`limits`). Rules and conversations carry none.
+
+| Limit                         | Default | Range                      | Scope                                |
+| ----------------------------- | ------- | -------------------------- | ------------------------------------ |
+| Active schedules              | 20      | any whole number, or `off` | Connection and Route, each counted   |
+| Minimum interval between runs | 5 min   | 2 min or more              | per schedule; Route, else Connection |
+| Runs per schedule             | 20      | any whole number, or `off` | per schedule; Route, else Connection |
+
+```yaml
+limits:
+  schedules:
+    max: 20 # "off" = unlimited
+    minIntervalSeconds: 300 # refused below 120
+    maxRuns: 20 # "off" = unlimited
+```
+
+- **Active schedules** are counted at both scopes; a create fails when either
+  is full. Paused schedules count; completed and deleted ones do not.
+- **Interval and runs** resolve Route, then Connection, then the default. They
+  bound the schedule a sender may create: a cadence whose consecutive fire
+  times come closer than the minimum is refused (checked over the cron's next
+  occurrences, `schedule/cron.ts`), and a schedule created without `maxRuns`
+  gets the limit as its `maxRuns`. A larger `maxRuns` than the limit is
+  refused, naming the limit.
+- **2 minutes is a floor**, not a default: the schema refuses a lower value.
+- Each run is also a message, so it counts against the existing
+  Bot/Conversation/Route message and concurrency limits.
+- The key names follow `CHANNEL_LIMIT_NAMES`; final names are Q6.
+
+App surfaces keep upstream behavior: no new limits (Q5).
 
 ### Running
 
-Before each run the daemon checks that the creator still holds
-`automation.manage` on the schedule's Project and that the conversation still
-exists. If not, the schedule
-pauses with a `pausedReason` (creator lost access, Chat archived, Bot removed,
-Route deleted) and the conversation gets one line saying so. The run executes
-under the creator's identity (`withSessionOperationIdentity`) (#5).
+Before each run:
+
+- **App kinds**: the daemon checks that the creator still holds
+  `automation.manage` on the schedule's Project.
+- **Channel**: the Hub checks that a Rule with `allowSchedules` still admits
+  the creator in that conversation and that the Route still serves it.
+- **Both**: the conversation still exists.
+
+On a failed check the schedule pauses with a `pausedReason` (creator lost
+access, Chat archived, Bot removed, Rule changed, Route deleted) and the
+conversation gets one line saying so. The run executes under the creator's
+identity (`withSessionOperationIdentity`) (#5).
 
 Delivery by conversation kind:
 
@@ -162,47 +246,67 @@ Delivery by conversation kind:
   until its turn ends instead of failing (#4).
 - **`chat`**: `ChatService` appends a system line ("Scheduled: <name>") and
   dispatches it to the Bot like a message. It gets an expectation, turn rules
-  and hops apply, the per-Bot delivery queue absorbs a busy Bot (#12).
+  and hops apply, and the per-Bot delivery queue absorbs a busy Bot (#12).
 - **`channel`**: the daemon sends `channel.schedule.fire` to the Hub over the
   socket the Host already holds. The Hub turns it into an inbound event with
   source `schedule` and idempotency key `runId`, admits it to the binding's
   lane, and the Route's Reply method answers into `threadId` (#10, #11). With
-  no Hub connected the run fails with `hub_not_connected` and is not replayed,
-  matching the channel plane's no-auto-replay rule.
+  no Hub connected the run fails with `hub_not_connected` and is not replayed
+  (Q2).
 - **`new-agent` with a conversation**: the run starts a fresh agent as today.
-  Its final answer is delivered to the conversation by the same adapter
-  (system line in a Chat, post in the channel, notification prompt into the
-  agent) (#2).
-
-Each run counts against the conversation's limits. New limits: minimum interval
-and active schedules per conversation, on the Bot/Conversation/Route Limits for
-channels and a daemon default elsewhere (#14).
+  Its final answer is delivered to the conversation by the same adapter (#2).
 
 ## Surfaces
 
-### Agent tools: same names, scoped
+### Agent tools
 
 Tool names and parameters stay upstream's, so prompts and skills keep working.
 
-- `create_heartbeat`: Runs in this session. When the caller has a
-  conversation, it is attached automatically.
-- `create_schedule`: Runs in a new session. When the caller has a
-  conversation, it is attached automatically, so the result reports back here.
+- `create_heartbeat`: Runs in this session. The caller's conversation is
+  attached automatically.
+- `create_schedule`: Runs in a new session. The caller's conversation is
+  attached automatically, so the result reports back here.
 - `list_schedules`, `inspect_schedule`, `pause_schedule`, `resume_schedule`,
   `update_schedule`, `schedule_logs`, `run_schedule_once`, `delete_schedule`:
-  return and act on both kinds, checked against the requester's
-  `automation.manage` and `automation.manage.others` (#7). Inside a
-  conversation they list that conversation's schedules.
+  return and act on both kinds (#7). Inside a conversation they list that
+  conversation's schedules.
 - `delete_heartbeat` stays as an alias of `delete_schedule` for a Heartbeat.
 - Descriptions say where the result lands: "Reports back to this conversation."
 
-The caller's conversation is derived on the daemon: the `chatId`/`botId` labels
-on a Bot session (`chats/bot-sessions.ts:133`), the channel binding label the
-Hub sets when it binds an agent (to add), or the agent itself.
+Where they come from:
 
-Bot and channel sessions receive these tools whenever the fusion gate is on,
-even with `injectIntoAgents` off, through a per-session tool policy that exposes
-only the schedule tools (#13, Q4).
+- **App sessions** (an agent session, a Bot in a Chat): the daemon's `clisbot`
+  MCP server, checked by the app rules above. The caller's conversation is the
+  agent itself or the Bot session's `chatId`/`botId` labels
+  (`chats/bot-sessions.ts:133`).
+- **Channel-bound sessions**: the Hub's `channel_reply` MCP server serves the
+  same tool names and checks the turn's requester (above) against the Route's
+  Rules.
+  - The agent calls the Hub over HTTP at `publicBaseUrl/mcp/channel/<token>`
+    (`channels/control-plane.ts:321`); the Hub then creates the schedule on the
+    daemon through the Host socket (`schedule.conversation.create.request`
+    under `hub.execute`).
+  - Today the server is attached only on `tool` and `hybrid` Routes
+    (`outboundAttachesTool`, `control-plane.ts:317`). Schedules need it on
+    every Route, so a `relay` Route gets the server carrying the schedule tools
+    only, without the `message` tool.
+  - Preapproval depends on the provider. A `toolPolicy` on a provider without
+    `applyToolPolicy` fails the session create
+    (`agent/agent-manager.ts:6394`); that is why such providers fall back to
+    `relay` today ([2026-09-16 ACP preapproval](2026-09-16-acp-mcp-tool-preapproval.md)).
+    Where the provider supports exact preapproval, the schedule tools are
+    preapproved like `message`, since the Hub has authorized the call. Elsewhere
+    they are attached without preapproval, and the provider's permission prompt
+    goes through the Route's approval rules.
+  - Hiding the daemon's schedule tools in these sessions is new work: the
+    current tool policy is per provider (`clisbotTools.disabledTools`,
+    `clisbot-tool-policy.ts:14`), not per session.
+  - MCP servers are stored on the agent record and reused when a closed agent
+    reloads (`agent-manager.ts:256`). A session bound before the feature
+    shipped gets the tools on its next `/new`.
+
+Bot and channel sessions get their schedule tools whenever the fusion gate is
+on, even with `injectIntoAgents` off (#13, Q3).
 
 ### App
 
@@ -210,38 +314,36 @@ only the schedule tools (#13, Q4).
   Runs in, cadence, next and last run, creator. New opens the existing schedule
   form with Reports to = this agent.
 - **Chat**: chat options → Schedules (`chat-options-pages.tsx`), same list and
-  form, Reports to = this Chat, Bot picker in a group.
-- **Automations page**: unchanged for `automation.manage`; gains a Reports to
-  column. Under the fusion gate the "Heartbeat" label becomes "Schedule · runs in this
-  session" (Q1).
-- Lists update live from a `schedule.changed` push, filtered by scope (#9).
+  form, Reports to = this Chat, Bot picker in a group (Q4).
+- **Automations page**: gains a Reports to column and the Schedule label.
+- **Route form**: each Rule gets an "Allow schedules" switch; the Route and
+  Connection limits sections get the three schedule limits.
+- Lists update live from a `schedule.changed` push, filtered by authority (#9).
 
-### Channel
+### Channel commands
 
-| Command                                    | Does                                    | Requires                                                             |
-| ------------------------------------------ | --------------------------------------- | -------------------------------------------------------------------- |
-| `/schedule`                                | List this conversation's schedules      | `automation.manage`                                                  |
-| `/schedule every <cadence> <prompt>`       | Create, runs in this session            | `automation.manage`                                                  |
-| `/schedule every <cadence> --new <prompt>` | Create, runs in a new session each time | `automation.manage`                                                  |
-| `/schedule pause\|resume\|stop <id>`       | Change one                              | `automation.manage` for own, `automation.manage.others` for anyone's |
+| Command                                    | Does                                    | Who                                             |
+| ------------------------------------------ | --------------------------------------- | ----------------------------------------------- |
+| `/schedule`                                | List this conversation's schedules      | any admitted sender                             |
+| `/schedule every <cadence> <prompt>`       | Create, runs in this session            | sender admitted by a Rule with `allowSchedules` |
+| `/schedule every <cadence> --new <prompt>` | Create, runs in a new session each time | the same                                        |
+| `/schedule pause\|resume\|stop <id>`       | Change one                              | the creator, or Connection Admin                |
 
-`/status` shows how many schedules the conversation has. The channel reply tool
-needs no schedule tools of its own: the agent uses the scoped tools above.
+`/status` shows how many schedules the conversation has.
 
 ### RPCs
 
 New dotted RPCs, one family for all three conversation kinds:
 `schedule.conversation.list.request`, `…create…`, `…update…`, `…pause…`,
 `…resume…`, `…delete…`, `…run_once…`, each with a `conversation` scope, plus
-the `schedule.changed` push. They require `automation.manage`, narrowed to the
-schedule's Project, and `automation.manage.others` to change another creator's
-schedule. The existing flat `schedule/*` RPCs keep serving the Automations page
-with the same narrowing.
+the `schedule.changed` push.
 
-For a channel the Hub resolves the sender's privileges on the bound Project
-itself, then calls the family under `hub.execute` with `createdBy` set to the
-sender, limited to `conversation.kind: "channel"` for bindings it owns. A Hub
-connection never needs the daemon permission.
+- From the app they require `automation.manage`, narrowed to the schedule's
+  Project and the grant's scope. The existing flat `schedule/*` RPCs keep
+  serving the Automations page with the same narrowing.
+- From the Hub they run under `hub.execute`, limited to `conversation.kind:
+"channel"` for bindings the Hub owns. The Hub has already applied the Rules,
+  so the daemon checks no sender grant, as for every channel session.
 
 ### Hub fix that ships regardless
 
@@ -251,6 +353,8 @@ namespace and output budget (#10).
 
 ## Options considered
 
+### Overall shape
+
 | Option                                                        | Why not                                                                                      |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Keep Heartbeat as-is and patch around it                      | Leaves #2, #3, #5, #6, #10–#12.                                                              |
@@ -259,47 +363,63 @@ namespace and output budget (#10).
 | Hub Automations with a time trigger                           | In-app Chats must work without a Hub; a workflow is too heavy for "report every 30 minutes". |
 | New tool names (`schedule_create`, …) for conversations       | A second vocabulary for the same tools; scoping the existing tools does the job.             |
 
+### Who may schedule on a channel
+
+| Option                                                   | Why not                                                                                                         |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **A. A Rule leaf plus Connection/Route limits (chosen)** | —                                                                                                               |
+| B. One switch on the Route                               | "Who may" belongs to Rules; a Route cannot say "DMs yes, #general no", the problem 2026-10-05 fixed.            |
+| C. A personal grant, like `/command add`                 | `approval.config` is a Project privilege, the coupling chat authority removed. A schedule is not configuration. |
+| D. A new privilege granted on the Connection             | Brings grants back for chat senders, which 2026-09-19 removed; cannot vary by conversation.                     |
+| E. Connection Admins only                                | Too narrow: a team cannot set its own reminders. Kept as the "anyone's" authority.                              |
+| F. Any admitted sender, limits as the only gate          | Authority hidden in a number: "why can't I?" answered by "the limit is 0". Limits stay as the second gate.      |
+| G. Anyone proposes, a Connection Admin confirms          | Needs buttons on every channel and stalls without an admin; kept for later.                                     |
+
+### Which MCP server serves a channel session's schedule tools
+
+| Option                                                         | Why not                                                                                                                                                                                                  |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The Hub's `channel_reply` server (chosen)**                  | —                                                                                                                                                                                                        |
+| The daemon's `clisbot` server, unchanged                       | Checks nothing about the sender; anyone the Route admits schedules by asking (#6).                                                                                                                       |
+| The daemon's `clisbot` server, asking the Hub before each call | A new daemon-to-Hub authorization call, and the daemon must know which channel turn and sender it is serving. The Hub already holds the binding and, once `noteTurn` restamps the sender, the requester. |
+
 ## Phases
 
-1. **Core and agent sessions** (daemon + app, no Hub): fields, Project-narrowed
-   `automation.manage` with `automation.manage.others`, creator identity and
-   pre-run checks, busy queue, scoped agent tools, scoped
-   RPCs and push, the agent menu's Schedules.
+1. **Core and agent sessions** (daemon + app, no Hub): fields, grant scope,
+   Project-narrowed `automation.manage`, creator identity and pre-run checks,
+   busy queue, scoped agent tools, scoped RPCs and push, the agent menu's
+   Schedules.
 2. **Chat**: `chat` delivery through `ChatService`, chat options → Schedules,
    Bot-session tool policy.
-3. **Channel**: `channel.schedule.fire`, inbound source `schedule`, `/schedule`,
-   limits, binding label, `threadId`. The reply-tool turn fix can
-   land earlier on its own.
-4. **Follow-ups**: confirmation card when the requester lacks create authority
-   (Q6), CLI `clisbot schedule ls --conversation`.
+3. **Channel**: Rule leaf and publish check, schedule limits,
+   `channel.schedule.fire`, inbound source `schedule`, Hub-served tools,
+   `/schedule`, `threadId`. The reply-tool turn fix can land earlier on its own.
+4. **Follow-ups**: confirmation card (option G), CLI
+   `clisbot schedule ls --conversation`.
 
-Docs to update when built: `docs/glossary.md` (Schedule, Heartbeat),
-`docs/permissions.md` (the `automation.manage` row still says "loops"),
+Docs to update when built: `docs/glossary.md` (Schedule, Heartbeat, grant
+scope), `docs/permissions.md` (the `automation.manage` row still says "loops"),
 `docs/features/access/terminal-and-project-creation.md` (says
 `injectIntoAgents` defaults to true), `docs/features/slash-commands/README.md`,
+`docs/features/channels/conversation-flow.md` (inbound source `schedule`),
 `public-docs/schedules*.md`.
 
 ## Open questions
 
-- **Q1. Label.** Rename "Heartbeat" in the app to "Schedule · runs in this
-  session" under the fusion gate (proposed), or keep both words and record the split
-  in the glossary.
-- **Q2. Privilege names.** `automation.manage` on a Hub Project means schedules,
-  while the Hub's Automation resource (`automation.run`, Automation Admin) means
-  workflows. Keep the daemon's name for both levels (proposed:
-  `automation.manage`, `automation.manage.others`), or name the Hub privileges
-  after schedules (`schedule.manage`, `schedule.manage.others`) and map them to
-  the daemon permission.
-- **Q3. Hub offline at run time.** Fail the run without replay (proposed), or
-  run it once the Hub reconnects.
-- **Q4. Tools without `injectIntoAgents`.** Give Bot and channel sessions the
-  scoped schedule tools whenever the fusion gate is on (proposed), or require the
+- **Q1. Which switch is the fusion gate.** No single fusion master switch
+  exists; each area has its own (`daemon.bots`, `daemon.managedAccess.mode`,
+  `features.agentSessionStorage`). Ride Managed Access (not `off`), or
+  introduce one master switch and move the others under it.
+- **Q2. Hub offline at run time.** Fail the run without replay (proposed,
+  matching the channel plane's no-auto-replay rule), or run it once the Hub
+  reconnects.
+- **Q3. Tools without `injectIntoAgents`.** Give Bot and channel sessions their
+  schedule tools whenever the fusion gate is on (proposed), or require the
   global switch.
-- **Q5. Group Chat target.** Require a Bot per schedule (proposed for v1), or
+- **Q4. Group Chat target.** Require a Bot per schedule (proposed for v1), or
   allow "the room" and let turn rules pick.
-- **Q6. Requester without create authority.** Refuse and say who can create it
-  (proposed for v1), or post a confirmation card an authorized person accepts.
-- **Q7. Which switch.** No single fusion master switch exists. Ride Managed
-  Access (`daemon.managedAccess.mode` not `off`, proposed: the scoped privileges
-  only mean something there), ride `daemon.bots`, or introduce one master switch
-  and move the existing ones under it.
+- **Q5. Limits in the app.** Keep upstream behavior (proposed), or apply the
+  channel defaults to Chats too.
+- **Q6. Names.** The Rule leaf (`allowSchedules`) and the limit keys
+  (`limits.schedules.max`, `minIntervalSeconds`, `maxRuns`) are provisional
+  until a naming review.

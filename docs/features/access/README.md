@@ -3,6 +3,7 @@
 **What each level grants, on which resource, and what follows from granting it: [user guide — Quyền: cấp gì thì được gì](../../guides/user-guide/access/permissions.md).** How to grant: [Cấp Access](../../guides/user-guide/access/members-and-teams.md). The implementation rules live in [permissions](../../permissions.md#access-scopes).
 
 Who may manage people and grant access below the organization: [Delegated access](scoped-admins.md).
+Changing only what you created versus everyone's: [Grant scope: own or all](grant-scope.md) (proposed 2026-10-06).
 Terminal versus Terminal profiles, and where Projects may be created: [Terminal profiles and Project creation](terminal-and-project-creation.md) (built 2026-09-26).
 The screen itself (People & access › Access): its jobs, layout and interaction are in [The Access screen](access-screen.md).
 Personal onboarding, Hub login policy and pairing versus Managed Access: [Device pairing](device-pairing.md).
