@@ -7,6 +7,7 @@ import {
   segmentedIconSize,
   type SegmentedControlSize,
 } from "@/components/ui/control-geometry";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Theme } from "@/styles/theme";
 
 type SegmentedControlIconRenderer = (props: { color: string; size: number }) => ReactNode;
@@ -17,16 +18,68 @@ export interface SegmentedControlOption<T extends string> {
   icon?: SegmentedControlIconRenderer;
   disabled?: boolean;
   testID?: string;
+  /** Shown on hover (desktop only), for a label too short to say what the segment does. */
+  tooltip?: string;
 }
+
+/**
+ * `plain` — segments on whatever is behind them, the selected one filled `surface3`.
+ * `track` — the segments sit in one bordered rail and the selected one is the raised card a
+ * selected sidebar row is (`surfaceSidebarSelected` + `shadow.raised`). For a switcher that has to
+ * read as one control among rows of similar text, such as the sidebar's grouping tabs.
+ */
+export type SegmentedControlVariant = "plain" | "track";
 
 interface SegmentedControlProps<T extends string> {
   options: SegmentedControlOption<T>[];
   value: T;
   onValueChange: (value: T) => void;
   size?: SegmentedControlSize;
+  variant?: SegmentedControlVariant;
   hideLabels?: boolean;
+  /** Rendered inside the control after the segments — a menu trigger drawn as a segment. */
+  trailing?: ReactNode;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+}
+
+/**
+ * One segment's style, for the control's own segments and for a `trailing` element that has to
+ * look like one (a menu trigger), so the two never drift.
+ */
+export function segmentedSegmentStyle(input: {
+  size: SegmentedControlSize;
+  variant: SegmentedControlVariant;
+  selected: boolean;
+  hovered: boolean;
+  pressed: boolean;
+  disabled?: boolean;
+}): StyleProp<ViewStyle> {
+  const { selected, hovered, pressed } = input;
+  return [
+    styles.segment,
+    SEGMENT_SIZE_STYLES[input.size],
+    selected && (input.variant === "track" ? styles.segmentRaised : styles.segmentSelected),
+    hovered &&
+      !selected &&
+      (input.variant === "track" ? styles.segmentTrackHover : styles.segmentHover),
+    pressed && !selected && styles.segmentPressed,
+    input.disabled && styles.segmentDisabled,
+  ];
+}
+
+/** A segment's label style, for the same reason as `segmentedSegmentStyle`. */
+export function segmentedLabelStyle(input: {
+  size: SegmentedControlSize;
+  selected: boolean;
+  variant?: SegmentedControlVariant;
+}): StyleProp<TextStyle> {
+  return [
+    styles.label,
+    LABEL_SIZE_STYLES[input.size],
+    input.selected && styles.labelSelected,
+    input.selected && input.variant === "track" && styles.labelRaised,
+  ];
 }
 
 interface SegmentIconProps {
@@ -49,23 +102,23 @@ export function SegmentedControl<T extends string>({
   value,
   onValueChange,
   size = "md",
+  variant = "plain",
   hideLabels = false,
+  trailing,
   style,
   testID,
 }: SegmentedControlProps<T>) {
-  const sizeStyles = {
-    xs: { container: styles.containerXs, segment: styles.segmentXs, label: styles.labelXs },
-    sm: { container: styles.containerSm, segment: styles.segmentSm, label: styles.labelSm },
-    md: { container: styles.containerMd, segment: styles.segmentMd, label: styles.labelMd },
+  const containerSizeStyle = {
+    xs: styles.containerXs,
+    sm: styles.containerSm,
+    md: styles.containerMd,
   }[size];
-  const containerSizeStyle = sizeStyles.container;
-  const segmentSizeStyle = sizeStyles.segment;
-  const labelSizeStyle = sizeStyles.label;
   const iconSize = segmentedIconSize[size];
 
+  const trackStyle = variant === "track" ? TRACK_SIZE_STYLES[size] : null;
   const containerStyle = useMemo(
-    () => [styles.container, containerSizeStyle, style],
-    [containerSizeStyle, style],
+    () => [styles.container, containerSizeStyle, trackStyle && [styles.track, trackStyle], style],
+    [containerSizeStyle, trackStyle, style],
   );
 
   return (
@@ -80,13 +133,14 @@ export function SegmentedControl<T extends string>({
             isSelected={isSelected}
             iconSize={iconSize}
             hideLabels={hideLabels}
-            segmentSizeStyle={segmentSizeStyle}
-            labelSizeStyle={labelSizeStyle}
+            size={size}
+            variant={variant}
             currentValue={value}
             onValueChange={onValueChange}
           />
         );
       })}
+      {trailing}
     </View>
   );
 }
@@ -96,8 +150,8 @@ function SegmentItem<T extends string>({
   isSelected,
   iconSize,
   hideLabels,
-  segmentSizeStyle,
-  labelSizeStyle,
+  size,
+  variant,
   currentValue,
   onValueChange,
 }: {
@@ -105,14 +159,14 @@ function SegmentItem<T extends string>({
   isSelected: boolean;
   iconSize: number;
   hideLabels: boolean;
-  segmentSizeStyle: StyleProp<ViewStyle>;
-  labelSizeStyle: StyleProp<TextStyle>;
+  size: SegmentedControlSize;
+  variant: SegmentedControlVariant;
   currentValue: T;
   onValueChange: (value: T) => void;
 }) {
   const labelStyle = useMemo(
-    () => [styles.label, labelSizeStyle, isSelected && styles.labelSelected],
-    [labelSizeStyle, isSelected],
+    () => segmentedLabelStyle({ size, selected: isSelected, variant }),
+    [size, isSelected, variant],
   );
   const handlePress = useCallback(() => {
     if (!option.disabled && option.value !== currentValue) {
@@ -120,21 +174,22 @@ function SegmentItem<T extends string>({
     }
   }, [option.disabled, option.value, currentValue, onValueChange]);
   const pressableStyle = useCallback(
-    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.segment,
-      segmentSizeStyle,
-      isSelected && styles.segmentSelected,
-      Boolean(hovered) && !isSelected && styles.segmentHover,
-      pressed && !isSelected && styles.segmentPressed,
-      option.disabled && styles.segmentDisabled,
-    ],
-    [isSelected, option.disabled, segmentSizeStyle],
+    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) =>
+      segmentedSegmentStyle({
+        size,
+        variant,
+        selected: isSelected,
+        hovered: Boolean(hovered),
+        pressed,
+        disabled: option.disabled,
+      }),
+    [isSelected, option.disabled, size, variant],
   );
   const accessibilityState = useMemo(
     () => ({ selected: isSelected, disabled: option.disabled }),
     [isSelected, option.disabled],
   );
-  return (
+  const segment = (
     <Pressable
       accessibilityRole="button"
       accessibilityState={accessibilityState}
@@ -158,6 +213,15 @@ function SegmentItem<T extends string>({
       )}
     </Pressable>
   );
+  if (!option.tooltip) return segment;
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>{segment}</TooltipTrigger>
+      <TooltipContent side="bottom" align="center">
+        <Text>{option.tooltip}</Text>
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 const styles = StyleSheet.create((theme) => {
@@ -179,6 +243,9 @@ const styles = StyleSheet.create((theme) => {
     containerMd: {
       ...geometry.segmentedContainerMd,
     },
+    trackXs: { ...geometry.segmentedTrackXs },
+    trackSm: { ...geometry.segmentedTrackSm },
+    trackMd: { ...geometry.segmentedTrackMd },
     segment: {
       flexDirection: "row",
       alignItems: "center",
@@ -197,6 +264,17 @@ const styles = StyleSheet.create((theme) => {
     },
     segmentSelected: {
       backgroundColor: theme.colors.surface3,
+    },
+    track: {
+      backgroundColor: theme.colors.surfaceSegmentedTrack,
+      borderColor: "transparent",
+    },
+    segmentTrackHover: {
+      backgroundColor: theme.colors.surfaceSegmentedHover,
+    },
+    segmentRaised: {
+      backgroundColor: theme.colors.surfaceSegmentedSelected,
+      ...theme.shadow.raised,
     },
     segmentHover: {
       backgroundColor: theme.colors.surface2,
@@ -227,5 +305,26 @@ const styles = StyleSheet.create((theme) => {
     labelSelected: {
       color: theme.colors.foreground,
     },
+    labelRaised: {
+      fontWeight: theme.fontWeight.medium,
+    },
   };
 });
+
+const SEGMENT_SIZE_STYLES: Record<SegmentedControlSize, StyleProp<ViewStyle>> = {
+  xs: styles.segmentXs,
+  sm: styles.segmentSm,
+  md: styles.segmentMd,
+};
+
+const LABEL_SIZE_STYLES: Record<SegmentedControlSize, StyleProp<TextStyle>> = {
+  xs: styles.labelXs,
+  sm: styles.labelSm,
+  md: styles.labelMd,
+};
+
+const TRACK_SIZE_STYLES: Record<SegmentedControlSize, StyleProp<ViewStyle>> = {
+  xs: styles.trackXs,
+  sm: styles.trackSm,
+  md: styles.trackMd,
+};

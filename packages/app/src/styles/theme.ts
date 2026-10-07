@@ -290,6 +290,11 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceSettings: tint.surfaceSettings ?? tint.surface0,
     borderComposer: tint.border,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
+    // A tracked segmented control steps up from its rail: hover is lighter, the selected segment
+    // is the white raised card a selected sidebar row is (docs/design.md).
+    surfaceSegmentedTrack: "rgba(0, 0, 0, 0.06)",
+    surfaceSegmentedHover: tint.surfaceSidebarHover ?? tint.surface1,
+    surfaceSegmentedSelected: tint.surface0,
 
     foreground: tint.foreground,
     foregroundMuted: tint.foregroundMuted,
@@ -442,6 +447,10 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceSettings: tint.surface0,
     borderComposer: tint.borderAccent,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
+    // The same three steps up, without the shadow that does not read on a dark surface.
+    surfaceSegmentedTrack: tint.surface0,
+    surfaceSegmentedHover: tint.surface2,
+    surfaceSegmentedSelected: tint.surface3,
 
     foreground,
     foregroundMuted: tint.foregroundMuted,

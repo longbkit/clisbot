@@ -31,6 +31,7 @@ export const MIN_TOUCH_TARGET_SIZE = 48;
 const SEGMENTED_TIGHT_INSET = 2;
 const SEGMENTED_COMPACT_INSET = 2;
 const SEGMENTED_FIELD_INSET = 3;
+const SEGMENTED_TRACK_BORDER = 1;
 const SWITCH_TRACK_WIDTH = 34;
 const SWITCH_TRACK_HEIGHT = 20;
 const SWITCH_THUMB_SIZE = 16;
@@ -305,6 +306,11 @@ export function createControlGeometry(theme: Theme) {
       minHeight: CONTROL_HEIGHTS.field,
       padding: 0,
     },
+    // The `track` variant: the segments sit inside one bordered rail. Padding plus border is the
+    // inset the segment heights already leave, so a tracked control is as tall as an untracked one.
+    segmentedTrackXs: segmentedTrack(SEGMENTED_TIGHT_INSET, theme.borderRadius.xl),
+    segmentedTrackSm: segmentedTrack(SEGMENTED_COMPACT_INSET, theme.borderRadius.xl),
+    segmentedTrackMd: segmentedTrack(SEGMENTED_FIELD_INSET, theme.borderRadius["2xl"]),
     segmentedSegmentXs: {
       minHeight: CONTROL_HEIGHTS.tight - SEGMENTED_TIGHT_INSET * 2,
       paddingHorizontal: theme.spacing[2],
@@ -329,5 +335,14 @@ export function createControlGeometry(theme: Theme) {
     segmentedLabelMd: {
       fontSize: theme.fontSize.base,
     },
+  };
+}
+
+function segmentedTrack(inset: number, segmentRadius: number) {
+  return {
+    gap: 0,
+    padding: inset - SEGMENTED_TRACK_BORDER,
+    borderWidth: SEGMENTED_TRACK_BORDER,
+    borderRadius: segmentRadius + inset,
   };
 }
