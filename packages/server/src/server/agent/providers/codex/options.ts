@@ -53,6 +53,8 @@ export const CodexProviderOptionsSchema = z
       .object({
         network_proxy: z.union([z.boolean(), NetworkPolicySchema]).optional(),
         multi_agent_v2: z.boolean().optional(),
+        /** ChatGPT apps through Codex's `codex_apps` MCP server. */
+        apps: z.boolean().optional(),
       })
       .strict()
       .optional(),

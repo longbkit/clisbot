@@ -38,6 +38,8 @@ export interface ClisbotToolCatalog {
 export interface ClisbotToolRuntimeContext {
   callerAgentId?: string;
   clisbotToolPolicy?: ProviderClisbotToolsPolicy;
+  /** Overrides the Host's "Browser tools" for this caller (its Project's choice). */
+  browserToolsEnabled?: boolean;
   enableVoiceTools?: boolean;
   voiceOnly?: boolean;
 }

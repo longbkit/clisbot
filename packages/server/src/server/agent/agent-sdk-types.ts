@@ -627,6 +627,11 @@ export interface AgentSessionConfig {
   featureValues?: Record<string, unknown>;
   title?: string | null;
   providerOptions?: ProviderOptions;
+  /**
+   * Runtime-only: `false` turns off the provider's own app integrations (Codex `features.apps`)
+   * for this launch. Set from a Bot's Connectors; never stored.
+   */
+  builtInApps?: boolean;
   toolPolicy?: ToolPolicy;
   mcpServers?: Record<string, McpServerConfig>;
   /**
@@ -719,6 +724,12 @@ export interface AgentSession {
   setModel?(modelId: string | null): Promise<void>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void | AgentProviderNotice>;
   setFeature?(featureId: string, value: unknown): Promise<void>;
+  /**
+   * Hides these skills from the agent for the rest of the session, replacing the last list
+   * (docs/features/connectors/README.md, "Per session"). Providers without per-session skill
+   * control leave it out.
+   */
+  setSkillsOff?(skills: readonly string[]): Promise<void>;
   revertConversation?(input: { messageId: string }): Promise<void>;
   revertFiles?(input: { messageId: string }): Promise<void>;
   revertBoth?(input: { messageId: string }): Promise<void>;

@@ -163,6 +163,11 @@ import { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import { ScheduleService } from "./schedule/service.js";
 import { startChatRuntime } from "./chats/chat-runtime.js";
 import { createBotServiceFromConfig } from "./bots/index.js";
+import {
+  createConnectorsDaemon,
+  mountConnectorRelayBodyParser,
+} from "./connectors/connectors-daemon.js";
+import { connectorChatHooks } from "./connectors/connector-chats.js";
 import { DaemonConfigStore, type MutableDaemonConfig } from "./daemon-config-store.js";
 import { createOrchestrationSkills } from "./orchestration-skills/index.js";
 import { resolveConfigFromPersisted, type CliConfigOverrides } from "./config.js";
@@ -461,6 +466,7 @@ export interface ClisbotDaemonConfig {
   devicePairingEnabled?: boolean;
   managedAccessMode?: import("@clisbot/protocol/managed-access").ManagedAccessMode;
   bots?: import("./bots/bots-config.js").BotsConfig;
+  connectors?: import("./connectors/connectors-config.js").ConnectorsConfig;
   openai?: ClisbotOpenAIConfig;
   speech?: ClisbotSpeechConfig;
   voiceLlmProvider?: AgentProvider | null;
@@ -920,6 +926,8 @@ export async function createClisbotDaemon(
     }),
   );
 
+  // Before the default parser, which would refuse a large Connector call (connector-relay.ts).
+  mountConnectorRelayBodyParser(app, config.connectors);
   app.use(express.json());
 
   // Serve static files from public directory
@@ -1644,6 +1652,18 @@ export async function createClisbotDaemon(
     () => hubRelationships.publishProjects(),
   );
   const chatService = chatRuntime.service;
+  // Clisbot Connectors (docs/features/connectors/README.md); flag off keeps the daemon upstream-equivalent.
+  const connectors = createConnectorsDaemon({
+    config: config.connectors,
+    clisbotHome: config.clisbotHome,
+    logger,
+    botService,
+    agentManager,
+    projectRegistry,
+    workspaceRegistry,
+    browserToolsEnabled: () => browserToolsPolicy.isEnabled(),
+    ...connectorChatHooks(chatService, agentManager),
+  });
   logger.info({ elapsed: elapsed() }, "Loading persisted agent registry");
   const persistedRecords = await agentStorage.list();
   logger.info(
@@ -1706,7 +1726,7 @@ export async function createClisbotDaemon(
     clearWorkspaceArchiving: clearWorkspaceArchivingExternal,
     ensureWorkspaceForCreate: createAgentCommandDependencies.ensureWorkspaceForCreate,
     createClisbotWorktree: createAgentCommandDependencies.createClisbotWorktree,
-    browserToolsEnabled: browserToolsPolicy.isEnabled(),
+    browserToolsEnabled: runtime.browserToolsEnabled ?? browserToolsPolicy.isEnabled(),
     browserToolsBroker,
     clisbotToolPolicy:
       runtime.clisbotToolPolicy ??
@@ -1737,12 +1757,18 @@ export async function createClisbotDaemon(
     const agentMcpRoute = "/mcp/agents";
 
     const createAgentMcpSession = async (callerAgentId?: string) => {
+      // Clisbot Connectors: the Project's and the session's tool choices, read on every request.
+      const access = callerAgentId
+        ? await connectors.agentToolAccess(callerAgentId, {
+            policy: agentManager.getClisbotToolPolicy(callerAgentId),
+            browserTools: browserToolsPolicy.isEnabled(),
+          })
+        : undefined;
       const agentMcpServer = await createAgentMcpServer(
         createAgentToolHostDependencies({
           callerAgentId,
-          clisbotToolPolicy: callerAgentId
-            ? agentManager.getClisbotToolPolicy(callerAgentId)
-            : undefined,
+          clisbotToolPolicy: access?.policy,
+          browserToolsEnabled: access?.browserTools,
         }),
       );
 
@@ -1858,6 +1884,7 @@ export async function createClisbotDaemon(
     app.get(agentMcpRoute, handleAgentMcpRequest);
     app.delete(agentMcpRoute, handleAgentMcpRequest);
     logger.info({ route: agentMcpRoute, enabled: mcpEnabled }, "Agent MCP route mounted");
+    connectors.mountRelay(app);
   }
 
   const speechService = createSpeechService({
@@ -1904,6 +1931,7 @@ export async function createClisbotDaemon(
             agentMcpBaseUrl =
               !mcpEnabled || config.mcpInjectIntoAgents === false ? null : mcpBaseUrl;
             agentManager.setMcpBaseUrl(agentMcpBaseUrl);
+            connectors.setListenUrl(mcpBaseUrl);
             agentManager.setClisbotToolsEnabled(mcpEnabled && config.mcpInjectIntoAgents !== false);
             daemonConfigStore.onFieldChange("mcp.enabled", (value) => {
               mcpEnabled = value !== false;
@@ -2040,6 +2068,7 @@ export async function createClisbotDaemon(
               workspaceLabelService,
               botService ?? undefined,
               chatService,
+              connectors.service ?? undefined,
             );
             pluginRuntime.bindClisbotSessionHost(wsServer);
             const timelineViewers = wsServer;
@@ -2143,6 +2172,7 @@ export async function createClisbotDaemon(
     await speechService.stop();
     await chatRuntime.stop();
     await scheduleService.stop().catch(() => undefined);
+    await connectors.stop();
     await relayRuntime?.stop().catch(() => undefined);
     if (wsServer) {
       await wsServer.close();

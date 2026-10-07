@@ -6,6 +6,7 @@ import { resolveClisbotNodeEnv } from "./clisbot-env.js";
 import { z } from "zod";
 import { expandTilde } from "../utils/path.js";
 import { resolveBotsConfig, resolveBotsOverridePaths } from "./bots/bots-config.js";
+import { resolveConnectorsConfig } from "./connectors/connectors-config.js";
 
 import type { ClisbotDaemonConfig } from "./bootstrap.js";
 import {
@@ -665,6 +666,7 @@ export function resolveConfigFromPersisted(
     // belongs to a Hub (managed-access/hub-membership.ts).
     managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "external",
     bots: resolveBotsConfig({ env, persisted: persisted.daemon?.bots, clisbotHome }),
+    connectors: resolveConnectorsConfig({ env, persisted: persisted.daemon?.connectors }),
     openai,
     speech,
     voiceLlmProvider: voiceLlm.provider,

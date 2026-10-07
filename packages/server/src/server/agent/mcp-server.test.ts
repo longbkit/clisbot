@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { AGENT_TOOL_GROUPS, ALWAYS_ON_AGENT_TOOLS } from "@clisbot/protocol/connectors/agent-tools";
 import { describe, expect, it, vi } from "vitest";
 import { realpathSync } from "node:fs";
 import { access, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -109,6 +110,7 @@ interface RegisteredMcpTool {
     structuredContent: LooseStructuredContent;
     content?: LooseContentBlock[];
   }>;
+  enabled?: boolean;
 }
 
 interface RegisteredMcpToolWithHandler extends RegisteredMcpTool {
@@ -123,7 +125,8 @@ function lookupTool(
   name: string,
 ): RegisteredMcpTool | undefined {
   const tools: Record<string, RegisteredMcpTool> = Reflect.get(server, "_registeredTools");
-  return tools[name];
+  // A turned-off tool stays registered but disabled: the agent cannot see or call it.
+  return tools[name]?.enabled === false ? undefined : tools[name];
 }
 
 function registeredTool(
@@ -244,6 +247,8 @@ function buildAgentManagerSpies() {
     streamAgent: vi.fn(() => (async function* noop() {})()),
     waitForAgentRunStart: vi.fn().mockResolvedValue(undefined),
     respondToPermission: vi.fn(),
+    isDaemonPermissionRequest: vi.fn().mockReturnValue(false),
+    sessionOffList: vi.fn().mockResolvedValue(new Set<string>()),
     cancelAgentRun: vi.fn(),
     getPendingPermissions: vi.fn(),
     getRegisteredProviderIds: vi.fn().mockReturnValue(["claude"]),
@@ -1059,11 +1064,11 @@ describe("browser MCP tools", () => {
       expect(toolNames).not.toContain("browser_list_tabs");
       expect(toolNames).toEqual(expect.arrayContaining(["create_agent", "browser_snapshot"]));
       await expect(client.callTool({ name: "list_agents", arguments: {} })).resolves.toEqual({
-        content: [{ type: "text", text: "MCP error -32602: Tool list_agents not found" }],
+        content: [{ type: "text", text: "MCP error -32602: Tool list_agents disabled" }],
         isError: true,
       });
       await expect(client.callTool({ name: "browser_list_tabs", arguments: {} })).resolves.toEqual({
-        content: [{ type: "text", text: "MCP error -32602: Tool browser_list_tabs not found" }],
+        content: [{ type: "text", text: "MCP error -32602: Tool browser_list_tabs disabled" }],
         isError: true,
       });
       expect(broker.calls).toEqual([]);
@@ -1203,6 +1208,85 @@ describe("terminal MCP tools", () => {
       lines: ["from worker scrollback"],
       totalLines: 42,
     });
+  });
+});
+
+const AGENT_TOOL_NAMES = AGENT_TOOL_GROUPS.flatMap((group) => group.tools.map((tool) => tool.name));
+
+describe("the Agent tools table", () => {
+  const logger = createTestLogger();
+
+  it("names every tool the daemon offers agents, and nothing it does not", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      terminalManager: createTerminalManagerStub(),
+      scheduleService: {} as unknown as ScheduleService,
+      browserToolsEnabled: true,
+      browserToolsBroker: { execute: vi.fn() } as never,
+      logger,
+    });
+    const offered = Object.keys(Reflect.get(server, "_registeredTools") as object).filter(
+      (name) => !ALWAYS_ON_AGENT_TOOLS.includes(name),
+    );
+    const listed = AGENT_TOOL_NAMES;
+    // The app lists and switches tools from this table (docs/features/connectors/README.md).
+    expect(offered.filter((name) => !listed.includes(name))).toEqual([]);
+    expect(listed.filter((name) => !offered.includes(name))).toEqual([]);
+  });
+});
+
+describe("respond_to_permission MCP tool", () => {
+  const logger = createTestLogger();
+
+  it("leaves a Connector card to a person: an agent cannot approve its own send", async () => {
+    const { agentManager, spies } = createTestDeps();
+    spies.agentManager.isDaemonPermissionRequest.mockReturnValue(true);
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage: createTestDeps().agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      logger,
+    });
+    const tool = registeredTool(server, "respond_to_permission");
+
+    await expect(
+      tool.handler({
+        agentId: "agent-1",
+        requestId: "connector_send_1",
+        response: { behavior: "allow" },
+      }),
+    ).rejects.toThrow("Only a person");
+    expect(spies.agentManager.respondToPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe("update_agent MCP tool", () => {
+  const logger = createTestLogger();
+
+  it("will not let an agent change what its session leaves off", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      logger,
+    });
+    await expect(
+      registeredTool(server, "update_agent").handler({
+        agentId: "agent-1",
+        labels: { "clisbot.connectors-off": "" },
+      }),
+    ).rejects.toThrow("an agent cannot change it");
+    // Nor leave its Chat, whose list it would escape.
+    await expect(
+      registeredTool(server, "update_agent").handler({
+        agentId: "agent-1",
+        labels: { "clisbot.chat-id": "" },
+      }),
+    ).rejects.toThrow("an agent cannot change it");
   });
 });
 
@@ -3129,6 +3213,52 @@ describe("create_agent MCP tool", () => {
         },
         workspaceId: "wks_voice",
       },
+    );
+    await rm(baseDir, { recursive: true, force: true });
+  });
+
+  it("gives a caller's child what the caller leaves off, its Chat's list included", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const baseDir = await mkdtemp(join(tmpdir(), "clisbot-mcp-test-"));
+    spies.agentManager.getAgent.mockReturnValue({
+      id: "room-bot",
+      cwd: baseDir,
+      workspaceId: "wks_bot",
+      provider: "codex",
+      currentModeId: "full-access",
+    } as ManagedAgent);
+    spies.agentManager.sessionOffList.mockResolvedValue(
+      new Set(["gmail/GMAIL_SEND_EMAIL", "tools:browser"]),
+    );
+    spies.agentManager.createAgent.mockResolvedValue({
+      id: "child-agent",
+      cwd: baseDir,
+      lifecycle: "idle",
+      currentModeId: null,
+      availableModes: [],
+      config: { title: "Child" },
+    } as ManagedAgent);
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: "room-bot",
+      logger,
+    });
+    await registeredTool(server, "create_agent").handler({
+      ...subagentCurrentWorkspace(),
+      title: "Child",
+      provider: "codex/gpt-5.4",
+      initialPrompt: "Send the email",
+    });
+    expect(spies.agentManager.createAgent).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.objectContaining({
+        labels: expect.objectContaining({
+          "clisbot.connectors-off": "gmail/GMAIL_SEND_EMAIL,tools:browser",
+        }),
+      }),
     );
     await rm(baseDir, { recursive: true, force: true });
   });

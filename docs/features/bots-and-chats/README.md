@@ -185,7 +185,9 @@ The chat owner can change a group's name and everyday reply policy in **Chat opt
 settings**. The `chat.update` RPC is gated by `server_info.features.bots` (D10) and checks current
 Project access. Changes affect subsequent messages without resetting sessions or altering internal
 limits. Participant changes apply immediately; name/reply edits use Save. Older Hosts expose the
-current values with an update hint. Direct and archived chats cannot use this operation.
+current values with an update hint. Direct and archived chats cannot use this operation, except
+for the Chat's tools off list, which a direct chat has too
+([Connectors, "In a Chat"](../connectors/README.md#per-session)).
 
 ### D10. Feature flag
 
@@ -197,6 +199,8 @@ wins, then the file, then the default. Off: no RPC registered, no storage touche
 no sidebar entry; the daemon behaves byte-for-byte as upstream. The app is behavior-equivalent: its
 two route files and three sidebar insertion points exist in the bundle and return nothing while the
 Host reports no `bots` feature. That is the one recorded exception to byte-equivalence.
+Connectors carry their own flag (`daemon.connectors`), because they send data to a third party
+and are a feature of their own rather than a capability of Bots ([Connectors](../connectors/README.md)).
 
 `bots` is the only capability flag for the whole feature: bots, chats, attachments, voice routing,
 group settings and whatever ships on this branch later. Do not add per-capability flags

@@ -42,6 +42,11 @@ export const StoredChatRulesSchema = z
     room: z.object({ instructions: z.string().nullable().optional() }).strict().optional(),
     context: z.object({ maxMessages: z.number().int().positive().optional() }).strict().optional(),
     limits: StoredChatLimitsSchema.optional(),
+    /** What every Bot in the Chat leaves off (`ChatRulesSchema.tools`). */
+    tools: z
+      .object({ off: z.array(z.string()).optional() })
+      .strict()
+      .optional(),
   })
   .strict();
 export type StoredChatRules = z.infer<typeof StoredChatRulesSchema>;
@@ -108,6 +113,8 @@ export interface ResolvedChatRules {
    * (docs/features/bots-and-chats/implementation.md, "Chat limits in phase 1").
    */
   limits: Partial<Record<ChatLimitName, ChatLimitValue>>;
+  /** What every Bot in the Chat leaves off; empty = each Bot's own settings. */
+  tools: { off: string[] };
 }
 
 export const CHAT_RULE_DEFAULTS: ResolvedChatRules = {
@@ -117,6 +124,7 @@ export const CHAT_RULE_DEFAULTS: ResolvedChatRules = {
   room: { instructions: null },
   context: { maxMessages: 20 },
   limits: { maxInputCharacters: 8_000 },
+  tools: { off: [] },
 };
 
 export function resolveChatRules(rules: ChatRules | undefined): ResolvedChatRules {
@@ -132,6 +140,7 @@ export function resolveChatRules(rules: ChatRules | undefined): ResolvedChatRule
     room: { instructions: roomInstructionsOf(rules) },
     context: { maxMessages: rules?.context?.maxMessages ?? defaults.context.maxMessages },
     limits: { ...defaults.limits, ...rules?.limits },
+    tools: { off: rules?.tools?.off ?? [] },
   };
 }
 

@@ -50,6 +50,21 @@ describe("Clisbot daemon defaults", () => {
     expect(onByEnv.configReload?.overrideControlledPaths).toContain("daemon.bots.enabled");
   });
 
+  test("Connectors run unless turned off, and the Composio URL comes from the environment", async () => {
+    const unset = await createClisbotHome({ version: 1 });
+    expect(loadConfig(unset, { env: {} }).connectors).toEqual({
+      enabled: true,
+      composioApiUrl: "https://backend.composio.dev/api/v3.1",
+    });
+    const viaEnv = loadConfig(unset, {
+      env: { CLISBOT_CONNECTORS_ENABLED: "0", CLISBOT_COMPOSIO_API_URL: "http://127.0.0.1:7801/" },
+    }).connectors;
+    expect(viaEnv).toEqual({ enabled: false, composioApiUrl: "http://127.0.0.1:7801" });
+
+    const off = await createClisbotHome({ version: 1, daemon: { connectors: { enabled: false } } });
+    expect(loadConfig(off, { env: {} }).connectors?.enabled).toBe(false);
+  });
+
   test("the bots root resolves like the worktrees root", async () => {
     const relative = await createClisbotHome({
       version: 1,

@@ -31,6 +31,17 @@ export interface CreateChatInput {
 
 export type ChatChangeListener = (chat: StoredChat) => void;
 
+/**
+ * Sets the Chat's tools off list. An empty list leaves no `tools` key, so a Chat that never kept
+ * one stays readable by an older daemon, whose stored rules are strict.
+ */
+function withToolsOff(chat: StoredChat, toolsOff: readonly string[] | undefined): StoredChat {
+  if (toolsOff === undefined) return chat;
+  const { tools: _previous, ...rules } = chat.rules;
+  const off = [...new Set(toolsOff)].sort();
+  return { ...chat, rules: off.length > 0 ? { ...rules, tools: { off } } : rules };
+}
+
 export class ChatStore {
   private readonly cache = new Map<string, StoredChat>();
   private readonly writes = new KeyedSerialQueue();
@@ -147,23 +158,34 @@ export class ChatStore {
   updateSettings(chatId: string, input: ChatUpdatePatch): Promise<StoredChat> {
     const patch = ChatUpdatePatchSchema.parse(input);
     return this.update(chatId, (chat) => {
-      if (chat.kind !== "group" && !(chat.kind === undefined && chat.participants.length > 1))
-        throw new Error("Only group chats have editable group settings");
+      const group =
+        chat.kind === "group" || (chat.kind === undefined && chat.participants.length > 1);
+      // A direct chat keeps only its tools off list here; the rest are a group's settings.
+      const onlyTools = Object.keys(patch).every((key) => key === "toolsOff");
+      if (!group && !onlyTools) throw new Error("Only group chats have editable group settings");
       if (chat.archivedAt) throw new Error("Archived chats cannot be edited");
-      return {
-        ...chat,
-        ...(patch.title !== undefined ? { title: patch.title?.trim() || null } : {}),
-        rules: {
-          ...chat.rules,
-          ...(patch.requireMention !== undefined
-            ? { interaction: { ...chat.rules.interaction, requireMention: patch.requireMention } }
-            : {}),
-          ...(patch.roundsMax !== undefined ? { rounds: { max: patch.roundsMax } } : {}),
-          ...(patch.roomInstructions !== undefined
-            ? { room: { ...chat.rules.room, instructions: patch.roomInstructions?.trim() || null } }
-            : {}),
+      return withToolsOff(
+        {
+          ...chat,
+          ...(patch.title !== undefined ? { title: patch.title?.trim() || null } : {}),
+          rules: {
+            ...chat.rules,
+            ...(patch.requireMention !== undefined
+              ? { interaction: { ...chat.rules.interaction, requireMention: patch.requireMention } }
+              : {}),
+            ...(patch.roundsMax !== undefined ? { rounds: { max: patch.roundsMax } } : {}),
+            ...(patch.roomInstructions !== undefined
+              ? {
+                  room: {
+                    ...chat.rules.room,
+                    instructions: patch.roomInstructions?.trim() || null,
+                  },
+                }
+              : {}),
+          },
         },
-      };
+        patch.toolsOff,
+      );
     });
   }
 

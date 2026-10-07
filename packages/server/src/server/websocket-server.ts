@@ -118,6 +118,7 @@ import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.
 import type { WorkspaceLabelService } from "./workspace-labels/index.js";
 import type { ChatService } from "./chats/chat-service.js";
 import type { BotService } from "./bots/index.js";
+import type { ConnectorService } from "./connectors/connector-service.js";
 import {
   APPLICATION_SOCKET_LEASE_CHECK_INTERVAL_MS,
   ApplicationSocketLease,
@@ -772,6 +773,7 @@ export class VoiceAssistantWebSocketServer {
     workspaceLabelService?: WorkspaceLabelService,
     private readonly botService?: BotService,
     private readonly chatService?: ChatService,
+    private readonly connectorService?: ConnectorService,
   ) {
     this.logger = logger.child({ module: "websocket-server" });
     this.workspaceSetupRuntime = workspaceSetupRuntime;
@@ -1714,6 +1716,7 @@ export class VoiceAssistantWebSocketServer {
       workspaceLabelService: this.workspaceLabelService ?? undefined,
       botService: this.botService,
       chatService: this.chatService,
+      connectorService: this.connectorService,
       directorySync: this.directorySync,
       scheduleService: this.scheduleService,
       checkoutDiffManager: this.checkoutDiffManager,
@@ -2311,6 +2314,10 @@ export class VoiceAssistantWebSocketServer {
         ...(this.workspaceLabelService ? { workspaceLabels: true } : {}),
         // COMPAT(bots): Clisbot Bots, added in v0.9.2-fusion; remove the gate after 2027-03-31.
         ...(this.botService ? { bots: true } : {}),
+        // COMPAT(connectors): Clisbot Connectors, added in v0.10.2-fusion; remove the gate after 2027-06-30.
+        ...(this.connectorService ? { connectors: true } : {}),
+        // COMPAT(chatTools): a Chat's tools off list, added in v0.10.2-fusion; remove the gate after 2027-06-30.
+        ...(this.connectorService && this.botService ? { chatTools: true } : {}),
         // COMPAT(workspaceSetupRun): added in v0.7.3, remove gate after 2027-09-02.
         workspaceSetupRun: true,
         // COMPAT(providersSnapshot): keep optional until all clients rely on snapshot flow.

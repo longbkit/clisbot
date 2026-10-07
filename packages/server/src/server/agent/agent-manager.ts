@@ -2,6 +2,7 @@ import {
   pendingSessionEvents,
   PendingEventBudgetError,
 } from "./session-storage/pending-event-budget.js";
+import { readConnectorsOff, skillsInOffList } from "@clisbot/protocol/connectors/types";
 import { CommittedEventOutbox } from "./session-storage/committed-event-outbox.js";
 import { currentSessionOperationIdentity } from "./session-operation-context.js";
 import { isDeepStrictEqual } from "node:util";
@@ -62,6 +63,7 @@ import {
   type AgentRunResult,
   type AgentSession,
   type AgentSessionConfig,
+  type McpServerConfig,
   type SteerResult,
   type AgentStreamEvent,
   type AgentTimelineItem,
@@ -102,6 +104,7 @@ import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
 import { isPromptNotDeliveredError } from "./prompt-not-delivered-error.js";
 import {
   stripInternalClisbotMcpServer,
+  stripRuntimeMcpServers,
   withRuntimeClisbotMcpServer,
 } from "./runtime-mcp-config.js";
 import { resolveCreateAgentTitles } from "./create-agent-title.js";
@@ -152,6 +155,48 @@ function assertMcpServersSupported(
   if (Object.keys(storedConfig.mcpServers ?? {}).length > 0 && supportsMcpServers !== true) {
     throw new Error(`Provider '${provider}' does not support MCP servers`);
   }
+}
+
+/** Marks a permission request the daemon raised, so its answer never reaches the provider. */
+const DAEMON_PERMISSION_METADATA = "clisbotDaemonPermission";
+const DAEMON_PERMISSION_TIMEOUT_MS = 15 * 60_000;
+
+/** Runtime-only MCP servers for one launch, and the tools on them that need no prompt. */
+export interface RuntimeMcpServers {
+  servers: Record<string, McpServerConfig>;
+  preapproved: { server: string; tool: string }[];
+  /** `false` turns off the provider's own app integrations for this launch. */
+  builtInApps?: boolean;
+  /**
+   * The Project's choice for the Clisbot tools, over the Host's "Inject Clisbot tools": `true`
+   * gives them even when the Host does not, `false` withholds them; absent follows the Host.
+   */
+  clisbotTools?: boolean;
+}
+
+export type RuntimeMcpServersProvider = (params: {
+  agentId: string;
+  cwd: string | undefined;
+}) => Promise<RuntimeMcpServers>;
+
+/**
+ * Adds runtime servers to a launch config. Their preapprovals join the stored ones here, after
+ * validation: the stored config never names these servers, so it could not validate them.
+ */
+function withRuntimeServers(
+  config: AgentSessionConfig,
+  runtime: RuntimeMcpServers,
+): AgentSessionConfig {
+  const preapproved = [
+    ...(config.toolPolicy?.preapproved ?? []),
+    ...runtime.preapproved.map((ref) => ({ kind: "mcp" as const, ...ref })),
+  ];
+  return {
+    ...config,
+    mcpServers: { ...config.mcpServers, ...runtime.servers },
+    ...(preapproved.length > 0 ? { toolPolicy: { preapproved } } : {}),
+    ...(runtime.builtInApps === false ? { builtInApps: false } : {}),
+  };
 }
 
 export class AgentManagerShuttingDownError extends Error {
@@ -244,7 +289,7 @@ function buildStoredAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     config.systemPrompt = record.config.systemPrompt;
   }
   if (record.config.mcpServers != null) config.mcpServers = record.config.mcpServers;
-  return stripInternalClisbotMcpServer(config);
+  return stripRuntimeMcpServers(config);
 }
 
 export { AGENT_LIFECYCLE_STATUSES, type AgentLifecycleStatus };
@@ -847,6 +892,17 @@ export class AgentManager {
     provider: AgentProvider,
   ) => ProviderClisbotToolsPolicy | undefined;
   private appendSystemPrompt: string;
+  /** Runtime-only MCP servers per agent, e.g. a Project's Connectors (connectors/connector-runtime.ts). */
+  private runtimeMcpServers: RuntimeMcpServersProvider | null = null;
+  private sessionOffSource: ((agentId: string) => Promise<Set<string>>) | null = null;
+  /** The skills off list last handed to each live session, so an unchanged list is not resent. */
+  private readonly appliedSkillsOff = new Map<string, string>();
+  private readonly skillsRefreshes = new Map<string, Promise<void>>();
+  /** Request id → the agent it is on and what settles the daemon's wait for the person's answer. */
+  private readonly daemonPermissionWaiters = new Map<
+    string,
+    { agentId: string; settle: (response: AgentPermissionResponse) => void }
+  >();
   private onAgentAttention?: AgentAttentionCallback;
   private onAgentArchived?: AgentArchivedCallback;
   private onWorkspaceStateMayHaveChanged?: (params: { cwd: string }) => void;
@@ -998,6 +1054,136 @@ export class AgentManager {
 
   setClisbotToolsEnabled(enabled: boolean): void {
     this.clisbotToolsEnabled = enabled;
+  }
+
+  /** Whether the Host gives agents the Clisbot tools when their Project makes no choice. */
+  areClisbotToolsEnabled(): boolean {
+    return this.clisbotToolsEnabled;
+  }
+
+  setRuntimeMcpServers(provider: RuntimeMcpServersProvider | null): void {
+    this.runtimeMcpServers = provider;
+  }
+
+  /** Where a session's off list comes from when Connectors adds a Chat's to the label's. */
+  setSessionOffSource(source: ((agentId: string) => Promise<Set<string>>) | null): void {
+    this.sessionOffSource = source;
+  }
+
+  /** What the session leaves off now: its label's list, and its Chat's when Connectors adds it. */
+  async sessionOffList(agentId: string): Promise<Set<string>> {
+    if (this.sessionOffSource) return this.sessionOffSource(agentId);
+    return readConnectorsOff(this.agents.get(agentId)?.labels);
+  }
+
+  /**
+   * Raises a permission request on an agent's timeline that the daemon, not the provider,
+   * waits on: the app and channels show it like any other, and the answer resolves here.
+   * Unanswered requests are denied after DAEMON_PERMISSION_TIMEOUT_MS.
+   */
+  async requestDaemonPermission(
+    agentId: string,
+    request: Omit<AgentPermissionRequest, "provider">,
+  ): Promise<AgentPermissionResponse> {
+    const agent = this.requireSessionAgent(agentId);
+    if (this.daemonPermissionWaiters.has(request.id)) {
+      throw new Error(`A daemon permission request "${request.id}" is already open.`);
+    }
+    const full: AgentPermissionRequest = {
+      ...request,
+      provider: agent.provider,
+      metadata: { ...request.metadata, [DAEMON_PERMISSION_METADATA]: true },
+    };
+    let settle: (response: AgentPermissionResponse) => void = () => undefined;
+    const promise = new Promise<AgentPermissionResponse>((done) => {
+      settle = done;
+    });
+    const timer = setTimeout(() => {
+      void this.resolveDaemonPermission(agentId, full.id, {
+        behavior: "deny",
+        message: "No one answered in time.",
+      });
+    }, DAEMON_PERMISSION_TIMEOUT_MS);
+    timer.unref?.();
+    this.daemonPermissionWaiters.set(full.id, {
+      agentId,
+      settle: (response) => {
+        clearTimeout(timer);
+        settle(response);
+      },
+    });
+    void this.handleStreamEvent(agent, {
+      type: "permission_requested",
+      provider: agent.provider,
+      request: full,
+      ...(agent.activeTurnId ? { turnId: agent.activeTurnId } : {}),
+    });
+    return promise;
+  }
+
+  /** Answers a request the daemon raised itself, as a person would; unknown ids are ignored. */
+  async resolveDaemonPermission(
+    agentId: string,
+    requestId: string,
+    response: AgentPermissionResponse,
+  ): Promise<void> {
+    const agent = this.agents.get(agentId);
+    if (!agent || agent.session === null || !this.isDaemonPermission(agent, requestId)) {
+      // The agent is gone or its card was already cleared: still end the daemon's wait.
+      if (this.daemonPermissionWaiters.get(requestId)?.agentId === agentId) {
+        this.settleDaemonPermission(requestId, response);
+      }
+      return;
+    }
+    await this.answerDaemonPermission(agent as ActiveManagedAgent, requestId, response);
+  }
+
+  /**
+   * Whether a pending request on this agent was raised by the daemon itself (a Connector card).
+   * Only a person answers those: agent-facing tools refuse them (`tools/clisbot-tools.ts`).
+   */
+  isDaemonPermissionRequest(agentId: string, requestId: string): boolean {
+    const agent = this.agents.get(agentId);
+    return agent !== undefined && this.isDaemonPermission(agent, requestId);
+  }
+
+  private settleDaemonPermission(requestId: string, response: AgentPermissionResponse): void {
+    const waiter = this.daemonPermissionWaiters.get(requestId);
+    if (!waiter) return;
+    this.daemonPermissionWaiters.delete(requestId);
+    waiter.settle(response);
+  }
+
+  /** Ends every daemon wait on an agent that is closing; its cards go with its session. */
+  private denyDaemonPermissions(agentId: string, reason: string): void {
+    for (const [requestId, waiter] of this.daemonPermissionWaiters) {
+      if (waiter.agentId === agentId) {
+        this.settleDaemonPermission(requestId, { behavior: "deny", message: reason });
+      }
+    }
+  }
+
+  private isDaemonPermission(agent: LiveManagedAgent, requestId: string): boolean {
+    if (this.daemonPermissionWaiters.get(requestId)?.agentId === agent.id) return true;
+    return agent.pendingPermissions.get(requestId)?.metadata?.[DAEMON_PERMISSION_METADATA] === true;
+  }
+
+  private async answerDaemonPermission(
+    agent: ActiveManagedAgent,
+    requestId: string,
+    response: AgentPermissionResponse,
+  ): Promise<void> {
+    if (!agent.pendingPermissions.has(requestId)) {
+      this.settleDaemonPermission(requestId, response);
+      return;
+    }
+    await this.handleStreamEvent(agent, {
+      type: "permission_resolved",
+      provider: agent.provider,
+      requestId,
+      resolution: response,
+      ...(agent.activeTurnId ? { turnId: agent.activeTurnId } : {}),
+    });
   }
 
   setClisbotToolCatalogFactory(factory: ClisbotToolCatalogFactory | null): void {
@@ -1731,9 +1917,7 @@ export class AgentManager {
     );
     let handedToRegistration = false;
     try {
-      const importedConfig = await this.normalizeConfig(
-        stripInternalClisbotMcpServer(imported.config),
-      );
+      const importedConfig = await this.normalizeConfig(stripRuntimeMcpServers(imported.config));
       const timelineRows = buildImportedTimelineRows(
         imported.timeline,
         Boolean(this.durableTimelineStore),
@@ -2398,6 +2582,7 @@ export class AgentManager {
     const liveAgent = this.agents.get(agentId);
     if (liveAgent) {
       liveAgent.labels = applyLabelPatch(liveAgent.labels, patch);
+      void this.refreshSkillsOff(agentId);
       this.touchUpdatedAt(liveAgent);
       await this.persistSnapshot(liveAgent);
       this.emitState(liveAgent, { persist: false });
@@ -2407,6 +2592,40 @@ export class AgentManager {
 
     const nextRecord = await this.writeStoredMetadata(agentId, { labels: patch });
     return { record: nextRecord, live: false };
+  }
+
+  /**
+   * Hands the skills the session leaves off to the provider when they changed; one that cannot
+   * hide skills ignores it. The off list is the label's, or the source Connectors set (which adds
+   * the Chat's). A failure is logged: the list stays, and the next start applies it.
+   */
+  refreshSkillsOff(agentId: string): Promise<void> {
+    // One at a time per session, so a slower read cannot apply an older list over a newer one.
+    const run = (this.skillsRefreshes.get(agentId) ?? Promise.resolve()).then(() =>
+      this.applySkillsOff(agentId),
+    );
+    this.skillsRefreshes.set(agentId, run);
+    return run;
+  }
+
+  private async applySkillsOff(agentId: string): Promise<void> {
+    const agent = this.agents.get(agentId);
+    const session = agent?.session;
+    if (!agent || !session?.setSkillsOff) return;
+    try {
+      const off = this.sessionOffSource
+        ? await this.sessionOffSource(agentId)
+        : readConnectorsOff(agent.labels);
+      const skills = skillsInOffList(off);
+      const key = skills.join(",");
+      // A session starts with every skill on: nothing to send until one is off.
+      if ((this.appliedSkillsOff.get(agentId) ?? "") === key) return;
+      this.appliedSkillsOff.set(agentId, key);
+      await session.setSkillsOff(skills);
+    } catch (err) {
+      this.appliedSkillsOff.delete(agentId);
+      this.logger.warn({ err, agentId }, "Could not apply the session's skills off list");
+    }
   }
 
   private async writeStoredMetadata(
@@ -3568,7 +3787,9 @@ export class AgentManager {
     agent.inFlightPermissionResponses.add(requestId);
 
     try {
-      const result = await agent.session.respondToPermission(requestId, response);
+      const result = this.isDaemonPermission(agent, requestId)
+        ? await this.answerDaemonPermission(agent as ActiveManagedAgent, requestId, response)
+        : await agent.session.respondToPermission(requestId, response);
       agent.pendingPermissions.delete(requestId);
 
       try {
@@ -4110,6 +4331,10 @@ export class AgentManager {
       this.assertAcceptingAgentRegistrations();
       this.agents.set(resolvedAgentId, managed);
       registered = true;
+      // A new session starts with every skill on, so what was sent to the last one is forgotten;
+      // waiting here applies the list before the session's first prompt.
+      this.appliedSkillsOff.delete(resolvedAgentId);
+      await this.refreshSkillsOff(resolvedAgentId);
       // Initialize previousStatus to track transitions
       this.previousStatuses.set(resolvedAgentId, managed.lifecycle);
       await this.refreshRuntimeInfo(managed, { emit: false });
@@ -4334,7 +4559,10 @@ export class AgentManager {
   ): ManagedAgentClosed {
     this.agentStreamCoalescer.flushAndDiscard(agent.id);
     this.agents.delete(agent.id);
+    this.appliedSkillsOff.delete(agent.id);
+    this.skillsRefreshes.delete(agent.id);
     this.previousStatuses.delete(agent.id);
+    this.denyDaemonPermissions(agent.id, `The session ended (${cancelReason}).`);
     if (agent.unsubscribeSession) {
       agent.unsubscribeSession();
       agent.unsubscribeSession = null;
@@ -4734,9 +4962,19 @@ export class AgentManager {
 
     try {
       const pending = agent.session.getPendingPermissions();
-      agent.pendingPermissions = new Map(pending.map((request) => [request.id, request]));
+      // The provider knows only its own requests; the daemon's cards stay until answered.
+      const daemonCards = [...agent.pendingPermissions.values()].filter(
+        (request) => request.metadata?.[DAEMON_PERMISSION_METADATA] === true,
+      );
+      agent.pendingPermissions = new Map(
+        [...pending, ...daemonCards].map((request) => [request.id, request]),
+      );
     } catch {
-      agent.pendingPermissions.clear();
+      for (const [id, request] of agent.pendingPermissions) {
+        if (request.metadata?.[DAEMON_PERMISSION_METADATA] !== true) {
+          agent.pendingPermissions.delete(id);
+        }
+      }
     }
 
     this.syncFeaturesFromSession(agent);
@@ -5541,6 +5779,7 @@ export class AgentManager {
     flags: StreamEventFlags;
   }): void {
     const { agent, event, options, flags } = params;
+    this.settleDaemonPermission(event.requestId, event.resolution);
     agent.pendingPermissions.delete(event.requestId);
     this.refreshSessionPersistence(agent);
     if (!options?.fromHistory && agent.inFlightPermissionResponses.has(event.requestId)) {
@@ -5559,6 +5798,7 @@ export class AgentManager {
   ): void {
     for (const [requestId] of agent.pendingPermissions) {
       agent.pendingPermissions.delete(requestId);
+      this.settleDaemonPermission(requestId, { behavior: "deny", message });
       if (!options?.fromHistory) {
         this.dispatchStream(agent.id, {
           type: "permission_resolved",
@@ -6339,25 +6579,58 @@ export class AgentManager {
     agentId: string,
     options: { env?: Record<string, string>; purpose?: AgentResumePurpose } = {},
   ): Promise<PreparedSessionConfig> {
-    const storedConfig = await this.normalizeConfig(stripInternalClisbotMcpServer(config), {
+    const storedConfig = await this.normalizeConfig(stripRuntimeMcpServers(config), {
       env: options.env,
       purpose: options.purpose,
     });
-    const clisbotToolPolicy = this.clisbotToolsEnabled
-      ? this.resolveClisbotToolPolicy(storedConfig.provider)
-      : { enabled: false };
+    const runtime = await this.resolveRuntimeMcpServers(agentId, storedConfig.cwd);
+    const clisbotToolPolicy = this.launchClisbotToolPolicy(
+      storedConfig.provider,
+      runtime?.clisbotTools,
+    );
+    const withClisbot = withRuntimeClisbotMcpServer({
+      config: storedConfig,
+      agentId,
+      mcpBaseUrl: isClisbotToolPolicyEnabled(clisbotToolPolicy) ? this.mcpBaseUrl : null,
+      mcpAuthToken: this.mcpAuthToken,
+    });
     const launchConfig = this.applyDaemonAppendSystemPrompt(
-      withRuntimeClisbotMcpServer({
-        config: storedConfig,
-        agentId,
-        mcpBaseUrl:
-          this.clisbotToolsEnabled && isClisbotToolPolicyEnabled(clisbotToolPolicy)
-            ? this.mcpBaseUrl
-            : null,
-        mcpAuthToken: this.mcpAuthToken,
-      }),
+      runtime ? withRuntimeServers(withClisbot, runtime) : withClisbot,
     );
     return { storedConfig, launchConfig, clisbotToolPolicy };
+  }
+
+  /**
+   * The Clisbot tools a launch gets: the Project's choice when it made one, else the Host's
+   * "Inject Clisbot tools" with the provider's policy.
+   */
+  private launchClisbotToolPolicy(
+    provider: AgentProvider,
+    projectChoice: boolean | undefined,
+  ): ProviderClisbotToolsPolicy {
+    if (projectChoice === false) return { enabled: false };
+    const policy = this.resolveClisbotToolPolicy(provider) ?? {};
+    if (projectChoice === true) return { ...policy, enabled: true };
+    return this.clisbotToolsEnabled ? policy : { enabled: false };
+  }
+
+  /** A provider failure leaves the agent without those servers instead of failing its launch. */
+  private async resolveRuntimeMcpServers(
+    agentId: string,
+    cwd: string | undefined,
+  ): Promise<RuntimeMcpServers | null> {
+    if (!this.runtimeMcpServers) return null;
+    try {
+      const runtime = await this.runtimeMcpServers({ agentId, cwd });
+      const changes =
+        Object.keys(runtime.servers).length > 0 ||
+        runtime.builtInApps === false ||
+        runtime.clisbotTools !== undefined;
+      return changes ? runtime : null;
+    } catch (error) {
+      this.logger.warn({ err: error, agentId }, "Failed to resolve runtime MCP servers");
+      return null;
+    }
   }
 
   private applyDaemonAppendSystemPrompt(config: AgentSessionConfig): AgentSessionConfig {
@@ -6406,8 +6679,8 @@ export class AgentManager {
         CLISBOT_AGENT_CWD: cwd,
       },
     };
+    // The prepared policy already holds the Host's switch and the Project's choice.
     if (
-      this.clisbotToolsEnabled &&
       isClisbotToolPolicyEnabled(clisbotToolPolicy) &&
       client.capabilities.supportsNativeClisbotTools &&
       this.clisbotToolCatalogFactory

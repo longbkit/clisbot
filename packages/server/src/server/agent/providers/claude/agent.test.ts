@@ -871,6 +871,22 @@ describe("ClaudeAgentSession features", () => {
     ).resolves.toEqual([]);
   });
 
+  test("hides the skills a session turned off, at start and when the list changes", async () => {
+    const { queryFactory, queryMock } = createQueryMock();
+    const client = new ClaudeAgentClient({
+      logger,
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+    await session.setSkillsOff?.(["pdf"]);
+    await (session as unknown as { ensureQuery(): Promise<unknown> }).ensureQuery();
+    expect(queryMock.applyFlagSettings).toHaveBeenCalledWith({ skillOverrides: { pdf: "off" } });
+    await session.setSkillsOff?.([]);
+    expect(queryMock.applyFlagSettings).toHaveBeenLastCalledWith({ skillOverrides: null });
+    await session.close();
+  });
+
   test("passes initial fast mode through Claude flag settings", async () => {
     const { queryFactory, queryMock } = createQueryMock();
     const client = new ClaudeAgentClient({
@@ -2362,6 +2378,38 @@ describe("ClaudeAgentSession context window usage", () => {
         kind: "command",
       },
     ]);
+  });
+
+  test("calls a command a skill only when Claude lists it as one", async () => {
+    const queryFactory = vi.fn(() => ({
+      next: async () => ({ done: true, value: undefined }),
+      interrupt: async () => undefined,
+      return: async () => undefined,
+      close: () => undefined,
+      supportedCommands: async () => [
+        { name: "advisor", description: "Consult a stronger model", argumentHint: "" },
+        { name: "taste", description: "Shared standard", argumentHint: "" },
+      ],
+      reloadSkills: async () => ({
+        skills: [{ name: "taste", description: "Shared standard", argumentHint: "" }],
+      }),
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    }));
+    const client = new ClaudeAgentClient({
+      logger,
+      queryFactory: queryFactory as never,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+    const commands = await session.listCommands();
+    await session.close();
+    expect(Object.fromEntries(commands.map((command) => [command.name, command.kind]))).toEqual({
+      advisor: "command",
+      rewind: undefined,
+      taste: "skill",
+    });
   });
 
   test("deletes the persisted session jsonl on close when persistSession=false", async () => {

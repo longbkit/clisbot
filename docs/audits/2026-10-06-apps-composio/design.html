@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Clisbot · Apps (proposed design)</title>
+<style>
+  /* Tokens mirror packages/app/src/styles/theme.ts (Clisbot dark, Light). */
+  :root[data-theme="dark"] {
+    --surface0: #181b1a; --surface1: #1e2120; --surface2: #272a29; --surface3: #434645;
+    --sidebar: #141716; --sidebar-hover: #1e2120; --sidebar-selected: #434645;
+    --fg: #e6e8e7; --muted: #a1a5a4; --extra-muted: #717574;
+    --border: #252b2a; --border-accent: #2f3534;
+    --accent: #20744a; --accent-bright: #7ccba0; --accent-fg: #ffffff;
+    --success: #6cb17b; --danger: #d8847b; --warning: #c09664; --destructive: #c64f43;
+    --scrim: rgba(0, 0, 0, 0.55);
+  }
+  :root[data-theme="light"] {
+    --surface0: #ffffff; --surface1: #fafafa; --surface2: #f4f4f5; --surface3: #e2e2e2;
+    --sidebar: #fafafa; --sidebar-hover: #f4f4f5; --sidebar-selected: #e2e2e2;
+    --fg: #1d1c1d; --muted: #4a4a4a; --extra-muted: #8a8a8a;
+    --border: #d8d8d8; --border-accent: #c9c9c9;
+    --accent: #20744a; --accent-bright: #239956; --accent-fg: #ffffff;
+    --success: #3e704a; --danger: #9d433b; --warning: #7b5d39; --destructive: #b04138;
+    --scrim: rgba(0, 0, 0, 0.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0d0f0e; color: var(--fg);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  }
+  :root[data-theme="light"] body { background: #e9e9ea; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input { font: inherit; color: inherit; }
+
+  /* Doc chrome (not part of the product) */
+  .doc-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 12px 24px; color: #a1a5a4; font-size: 12px;
+  }
+  .doc-bar strong { color: #e6e8e7; font-weight: 500; margin-right: 8px; }
+  :root[data-theme="light"] .doc-bar, :root[data-theme="light"] .doc-note { color: #4a4a4a; }
+  :root[data-theme="light"] .doc-bar strong { color: #1d1c1d; }
+  :root[data-theme="light"] .doc-tab { border-color: #c9c9c9; }
+  .doc-tab {
+    border: 1px solid #2f3534; background: transparent; border-radius: 999px;
+    padding: 4px 12px; color: inherit; font-size: 12px;
+  }
+  .doc-tab[aria-selected="true"] { background: #20744a; border-color: #20744a; color: #fff; }
+  .doc-note { padding: 0 24px 12px; color: #a1a5a4; font-size: 12px; max-width: 1100px; }
+
+  /* Window */
+  .window {
+    margin: 0 24px 32px; height: 760px; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border); display: flex; background: var(--surface0); position: relative;
+  }
+  .screen { display: none; width: 100%; height: 100%; }
+  .screen.active { display: flex; }
+
+  /* App sidebar */
+  .app-sidebar {
+    width: 248px; flex: none; background: var(--sidebar); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 12px 8px;
+  }
+  .host-pick { display: flex; align-items: center; gap: 8px; padding: 6px 8px 12px; color: var(--fg); }
+  .host-pick .chev { margin-left: auto; color: var(--muted); }
+  .nav-row {
+    display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px;
+    border-radius: 6px; color: var(--fg); background: none; border: 0; width: 100%; text-align: left;
+  }
+  .nav-row:hover { background: var(--sidebar-hover); }
+  .nav-row.active { background: var(--sidebar-selected); }
+  .nav-row svg { color: var(--muted); }
+  .nav-row .new { margin-left: auto; font-size: 11px; color: var(--accent-bright); }
+  .side-label { font-size: 12px; font-weight: 500; color: var(--muted); padding: 16px 8px 6px; }
+  .side-item { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border-radius: 6px; }
+  .side-item.active { background: var(--sidebar-selected); }
+  .side-spacer { flex: 1; }
+
+  /* List column (settings-shell master) */
+  .master {
+    width: 320px; flex: none; border-right: 1px solid var(--border); background: var(--sidebar);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .master-head { padding: 20px 16px 12px; }
+  .screen-title { font-size: 20px; font-weight: 400; margin: 0 0 12px; }
+  .search {
+    display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface0);
+  }
+  .search input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; }
+  .search input::placeholder { color: var(--extra-muted); }
+  .search svg { color: var(--muted); flex: none; }
+  .chips { display: flex; gap: 6px; margin-top: 10px; }
+  .chip {
+    height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border);
+    background: transparent; font-size: 12px; color: var(--muted);
+  }
+  .chip[aria-pressed="true"] { background: var(--surface3); border-color: var(--border-accent); color: var(--fg); }
+  .chip .count { margin-left: 4px; color: var(--extra-muted); }
+  .list { overflow: auto; padding: 0 8px 16px; flex: 1; min-height: 0; }
+  .list-label { font-size: 12px; font-weight: 500; color: var(--muted); padding: 12px 8px 6px; }
+  .app-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; height: 44px; padding: 0 8px;
+    border: 0; border-radius: 6px; background: transparent; text-align: left;
+  }
+  .app-row:hover { background: var(--sidebar-hover); }
+  .app-row.selected { background: var(--sidebar-selected); }
+  .app-row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-foot { padding: 10px 8px; color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+
+  /* Identity tile (identity-colors.ts style: fill + white letter) */
+  .tile {
+    width: 24px; height: 24px; border-radius: 6px; flex: none; display: grid; place-items: center;
+    color: #fff; font-size: 12px; font-weight: 600;
+  }
+  .tile.lg { width: 40px; height: 40px; border-radius: 8px; font-size: 18px; }
+  .tile.mcp { background: var(--surface3) !important; color: var(--fg); }
+
+  /* Status badge (StatusBadge: status text on surface3 + border shell) */
+  .badge {
+    font-size: 12px; line-height: 20px; padding: 0 8px; border-radius: 999px; flex: none;
+    background: var(--surface3); border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  }
+  .badge.success { color: var(--success); }
+  .badge.warning { color: var(--warning); }
+  .badge.danger { color: var(--danger); }
+
+  /* Detail pane */
+  .detail { flex: 1; min-width: 0; overflow: auto; background: var(--surface0); }
+  .detail-inner { max-width: 760px; padding: 24px 32px 48px; }
+  .detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .detail-head h1 { font-size: 20px; font-weight: 400; margin: 0; }
+  .detail-head .sub { color: var(--muted); font-size: 12px; }
+  .detail-head .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .section { margin-top: 24px; }
+  .section-head {
+    display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500;
+    color: var(--muted); margin: 0 0 8px; text-transform: none;
+  }
+  .info {
+    width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted);
+    display: inline-grid; place-items: center; font-size: 9px; cursor: help;
+  }
+  .section-head .right { margin-left: auto; font-weight: 400; }
+  .card { background: var(--surface0); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  :root[data-theme="dark"] .card { background: var(--surface1); }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 52px; }
+  .row + .row { border-top: 1px solid var(--border); }
+  .row .title { flex: 1; min-width: 0; }
+  .row .hint { color: var(--muted); font-size: 12px; }
+  .row .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .row.stack { align-items: flex-start; }
+  .row .grid2 { display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; align-items: center; margin-top: 8px; }
+  .row .grid2 .lbl { color: var(--muted); font-size: 12px; }
+
+  /* Buttons (button.tsx variants) */
+  .btn {
+    height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 14px;
+  }
+  .btn.xs { height: 28px; font-size: 12px; padding: 0 10px; }
+  .btn.default { background: var(--accent); color: var(--accent-fg); }
+  .btn.secondary { background: var(--surface3); }
+  .btn.outline { background: transparent; border-color: var(--border-accent); }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--surface2); color: var(--fg); }
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+  .icon-btn { width: 28px; height: 28px; border-radius: 6px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; }
+  .icon-btn:hover { background: var(--surface2); color: var(--fg); }
+
+  /* Segmented control + select + switch */
+  .seg { justify-self: start; display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); }
+  .seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; font-size: 12px; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--surface3); color: var(--fg); }
+  .select {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface0); font-size: 12px;
+  }
+  .switch { width: 34px; height: 20px; border-radius: 999px; background: var(--surface3); position: relative; border: 0; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .switch[aria-checked="true"] { background: var(--accent); }
+  .switch[aria-checked="true"]::after { left: 16px; }
+  .field { height: 32px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface0); padding: 0 10px; width: 100%; outline: 0; }
+  .field::placeholder { color: var(--extra-muted); }
+
+  /* Browse grid (empty detail pane on desktop; the one new shape) */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .gcard {
+    border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: var(--surface0);
+    display: flex; flex-direction: column; gap: 10px; min-height: 128px; text-align: left;
+  }
+  :root[data-theme="dark"] .gcard { background: var(--surface1); }
+  .gcard:hover { border-color: var(--border-accent); }
+  .gcard .top { display: flex; gap: 10px; align-items: center; }
+  .gcard .desc { color: var(--muted); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .gcard .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+
+  .alert {
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; background: var(--surface2);
+    display: flex; gap: 12px; align-items: flex-start; font-size: 13px;
+  }
+  .alert .grow { flex: 1; }
+
+  /* Sheet (AdaptiveModalSheet) */
+  .scrim { position: absolute; inset: 0; background: var(--scrim); display: none; align-items: center; justify-content: center; }
+  .scrim.open { display: flex; }
+  .sheet { width: 520px; background: var(--surface0); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .sheet h2 { font-size: 16px; font-weight: 500; margin: 0 0 16px; }
+  .form-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 12px; }
+  .form-row[hidden] { display: none; }
+  .form-row .lbl { color: var(--muted); font-size: 12px; }
+  .form-row .help { grid-column: 2; color: var(--muted); font-size: 12px; margin-top: -4px; }
+  .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+  /* Phone frame */
+  .phone-wrap { display: flex; gap: 32px; padding: 24px; align-items: flex-start; justify-content: center; width: 100%; background: var(--surface2); }
+  .phone { width: 360px; height: 700px; border-radius: 28px; border: 1px solid var(--border); overflow: hidden; background: var(--surface0); display: flex; flex-direction: column; }
+  .back-header { display: flex; align-items: center; gap: 8px; padding: 14px 12px; border-bottom: 1px solid var(--border); }
+  .back-header .t { font-size: 16px; }
+  .phone .body { flex: 1; overflow: auto; padding: 12px; }
+</style>
+</head>
+<body>
+
+<div class="doc-bar" role="tablist">
+  <strong>Clisbot · Apps — proposed</strong>
+  <button class="doc-tab" data-screen="browse" aria-selected="true">1 · Apps (browse)</button>
+  <button class="doc-tab" data-screen="detail" aria-selected="false">2 · App detail</button>
+  <button class="doc-tab" data-screen="setup" aria-selected="false">3 · First run</button>
+  <button class="doc-tab" data-screen="bot" aria-selected="false">4 · Bot → Apps</button>
+  <button class="doc-tab" data-screen="mcp" aria-selected="false">5 · MCP servers</button>
+  <button class="doc-tab" data-screen="compact" aria-selected="false">6 · Compact</button>
+  <span style="flex:1"></span>
+  <button class="doc-tab" id="theme-toggle">Light / Dark</button>
+</div>
+<p class="doc-note" id="doc-note"></p>
+
+<div class="window" id="window">
+
+  <!-- 1 + 2 + 3 + 5 share the Apps shell; JS swaps the detail pane -->
+  <section class="screen" id="shell">
+    <nav class="app-sidebar">
+      <div class="host-pick">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>
+        This computer <span class="chev">▾</span>
+      </div>
+      <button class="nav-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New workspace</button>
+      <button class="nav-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Sessions</button>
+      <button class="nav-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</button>
+      <button class="nav-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Automations</button>
+      <button class="nav-row active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M17.5 14v7M14 17.5h7"/></svg>Apps<span class="new">new</span></button>
+      <div class="side-label">Bots</div>
+      <div class="side-item"><span class="tile" style="background:#b7791f">C</span>Chief of Staff</div>
+      <div class="side-item"><span class="tile" style="background:#2b6cb0">R</span>Release bot</div>
+      <div class="side-label">Projects</div>
+      <div class="side-item" style="color:var(--muted)">clisbot</div>
+      <div class="side-item" style="color:var(--muted)">website</div>
+      <div class="side-spacer"></div>
+      <div class="side-item" style="color:var(--muted)">Settings</div>
+    </nav>
+
+    <aside class="master">
+      <div class="master-head">
+        <h1 class="screen-title">Apps</h1>
+        <label class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search" placeholder="Search apps" />
+        </label>
+        <div class="chips" id="chips">
+          <button class="chip" data-filter="all" aria-pressed="true">All</button>
+          <button class="chip" data-filter="connected" aria-pressed="false">Connected<span class="count" id="connected-count">2</span></button>
+          <button class="chip" data-filter="mcp" aria-pressed="false">MCP servers<span class="count">1</span></button>
+        </div>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="list-foot" id="list-foot"></div>
+    </aside>
+
+    <main class="detail" id="detail"></main>
+  </section>
+
+  <!-- 4 · Bot settings -->
+  <section class="screen" id="bot">
+    <nav class="app-sidebar">
+      <div class="host-pick">This computer <span class="chev">▾</span></div>
+      <div class="side-label">Bots</div>
+      <div class="side-item active"><span class="tile" style="background:#b7791f">C</span>Chief of Staff</div>
+      <div class="side-item"><span class="tile" style="background:#2b6cb0">R</span>Release bot</div>
+      <div class="side-spacer"></div>
+    </nav>
+    <main class="detail">
+      <div class="detail-inner">
+        <div class="detail-head">
+          <span class="tile lg" style="background:#b7791f">C</span>
+          <div><h1>Chief of Staff</h1><div class="sub">Bot settings · Codex · gpt-5.6-luna</div></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">Instructions <span class="info" title="AGENTS.md, SOUL.md, MEMORY.md in the Bot's folder">i</span></div>
+          <div class="card"><div class="row"><div class="title">AGENTS.md, SOUL.md, MEMORY.md</div><button class="btn xs outline">Open folder</button></div></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">Apps <span class="info" title="Apps and MCP servers this Bot may use. Reads run without asking; anything that sends asks first unless you allow it.">i</span>
+            <span class="right"><button class="btn xs ghost" data-go="browse">Manage apps</button></span>
+          </div>
+          <div class="card">
+            <div class="row stack">
+              <span class="tile" style="background:#c53030">G</span>
+              <div class="title">
+                Gmail
+                <div class="grid2">
+                  <span class="lbl">Account</span><span><span class="select">work · long@acme.com ▾</span></span>
+                  <span class="lbl">Tools</span><span><span class="select">All 38 tools ▾</span></span>
+                  <span class="lbl">Access</span><span class="seg"><button aria-pressed="false">Read only</button><button aria-pressed="true">Read and write</button></span>
+                  <span class="lbl">Ask before sending</span><span><button class="switch" role="switch" aria-checked="true"></button></span>
+                </div>
+              </div>
+              <button class="icon-btn" title="More">⋯</button>
+            </div>
+            <div class="row stack">
+              <span class="tile" style="background:#2d3748">H</span>
+              <div class="title">
+                GitHub
+                <div class="grid2">
+                  <span class="lbl">Account</span><span><span class="select">longbkit ▾</span></span>
+                  <span class="lbl">Tools</span><span><span class="select">6 of 412 tools ▾</span></span>
+                  <span class="lbl">Access</span><span class="seg"><button aria-pressed="true">Read only</button><button aria-pressed="false">Read and write</button></span>
+                </div>
+              </div>
+              <button class="icon-btn" title="More">⋯</button>
+            </div>
+            <div class="row">
+              <span class="tile mcp">L</span>
+              <div class="title">linear <span class="hint">· MCP server</span></div>
+              <span class="select">All tools ▾</span>
+              <button class="icon-btn" title="More">⋯</button>
+            </div>
+            <div class="row"><button class="btn xs outline">+ Add app…</button><span class="hint">Only connected apps on this Host are offered.</span></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">Sending <span class="info" title="A send is any tool that sends, posts, publishes or replies on someone's behalf.">i</span></div>
+          <div class="card">
+            <div class="row"><div class="title">Daily send limit<div class="hint">Counted across every app this Bot uses</div></div><input class="field" style="width:80px" value="25" /></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 6 · Compact -->
+  <section class="screen" id="compact">
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="back-header"><span>‹</span><span class="t">Apps</span></div>
+        <div class="body">
+          <label class="search"><input placeholder="Search apps" /></label>
+          <div class="chips"><button class="chip" aria-pressed="true">All</button><button class="chip" aria-pressed="false">Connected<span class="count">2</span></button><button class="chip" aria-pressed="false">MCP<span class="count">1</span></button></div>
+          <div class="list-label">Connected</div>
+          <div class="card">
+            <div class="row"><span class="tile" style="background:#c53030">G</span><div class="title">Gmail</div><span class="badge success">Connected</span></div>
+            <div class="row"><span class="tile" style="background:#2d3748">H</span><div class="title">GitHub</div><span class="badge success">Connected</span></div>
+          </div>
+          <div class="list-label">All apps</div>
+          <div class="card">
+            <div class="row"><span class="tile" style="background:#1a202c">N</span><div class="title">Notion</div><span class="badge">Not connected</span></div>
+            <div class="row"><span class="tile" style="background:#6b46c1">S</span><div class="title">Slack</div><span class="badge">Not connected</span></div>
+            <div class="row"><span class="tile" style="background:#2b6cb0">C</span><div class="title">Google Calendar</div><span class="badge">Not connected</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="back-header"><span>‹</span><span class="t">Gmail</span></div>
+        <div class="body">
+          <div style="display:flex;gap:10px;align-items:center;margin:4px 0 16px"><span class="tile lg" style="background:#c53030">G</span><div>Gmail<div class="hint" style="color:var(--muted);font-size:12px">38 tools · via Composio</div></div></div>
+          <div class="section-head">Accounts</div>
+          <div class="card">
+            <div class="row"><div class="title">work<div class="hint">long@acme.com</div></div><span class="badge success">Connected</span></div>
+            <div class="row"><div class="title">personal<div class="hint">Waiting for sign-in</div></div><span class="badge warning">Pending</span></div>
+          </div>
+          <div style="margin-top:12px"><button class="btn outline" style="width:100%;justify-content:center">Connect another account</button></div>
+          <div class="section-head" style="margin-top:20px">Used by</div>
+          <div class="card">
+            <div class="row"><div class="title">Chief of Staff<div class="hint">work · Read and write · Ask before sending</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Add MCP server sheet -->
+  <div class="scrim" id="mcp-sheet">
+    <div class="sheet">
+      <h2>Add MCP server</h2>
+      <div class="form-row"><span class="lbl">Name</span><input class="field" value="linear" /><span class="help">Lowercase. Tools appear as linear__*.</span></div>
+      <div class="form-row"><span class="lbl">Transport</span><span class="seg" id="transport"><button aria-pressed="true" data-t="remote">Remote URL</button><button aria-pressed="false" data-t="local">Local command</button></span></div>
+      <div class="form-row" data-when="remote"><span class="lbl">URL</span><input class="field" value="https://mcp.linear.app/mcp" /></div>
+      <div class="form-row" data-when="remote"><span class="lbl">Headers</span><span style="display:flex;gap:8px"><input class="field" value="Authorization" style="width:140px" /><input class="field" type="password" value="Bearer lin_api_xxxxxxxx" /></span><span class="help">Stored on this Host only. Agents never see the value.</span></div>
+      <div class="form-row" data-when="local" hidden><span class="lbl">Command</span><input class="field" placeholder="npx -y @modelcontextprotocol/server-filesystem ~/notes" /></div>
+      <div class="form-row" data-when="local" hidden><span class="lbl">Environment</span><input class="field" placeholder="NAME=value" /><span class="help">Runs inside each agent that is granted this server.</span></div>
+      <div class="sheet-actions"><button class="btn ghost" data-close>Cancel</button><button class="btn default" data-close>Add server</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const APPS = [
+    { slug: "gmail", name: "Gmail", color: "#c53030", desc: "Read, search, draft and send email.", tools: 38, accounts: [
+      { alias: "work", who: "long@acme.com", status: "ACTIVE" },
+      { alias: "personal", who: "", status: "INITIATED" } ] },
+    { slug: "github", name: "GitHub", color: "#2d3748", desc: "Issues, pull requests, repositories and actions.", tools: 412, accounts: [
+      { alias: "default", who: "longbkit", status: "ACTIVE" } ] },
+    { slug: "notion", name: "Notion", color: "#1a202c", desc: "Pages, databases and comments.", tools: 41, accounts: [] },
+    { slug: "slack", name: "Slack", color: "#6b46c1", desc: "Messages, channels and users.", tools: 130, accounts: [] },
+    { slug: "googlecalendar", name: "Google Calendar", color: "#2b6cb0", desc: "Events, free/busy and invites.", tools: 27, accounts: [] },
+    { slug: "googlesheets", name: "Google Sheets", color: "#2f855a", desc: "Read and write spreadsheets.", tools: 33, accounts: [] },
+    { slug: "linear_app", name: "Linear", color: "#4c51bf", desc: "Issues, projects and cycles.", tools: 24, accounts: [] },
+    { slug: "outlook", name: "Outlook", color: "#2c5282", desc: "Microsoft email and calendar.", tools: 64, accounts: [] },
+    { slug: "supabase", name: "Supabase", color: "#276749", desc: "Postgres, auth and storage projects.", tools: 81, accounts: [] },
+    { slug: "googledrive", name: "Google Drive", color: "#b7791f", desc: "Files and folders.", tools: 52, accounts: [] },
+    { slug: "jira", name: "Jira", color: "#2b6cb0", desc: "Issues, sprints and boards.", tools: 90, accounts: [] },
+    { slug: "hubspot", name: "HubSpot", color: "#c05621", desc: "CRM contacts, deals and tickets.", tools: 210, accounts: [] },
+  ];
+  const MCP = [{ slug: "mcp:linear", name: "linear", mcp: true, desc: "https://mcp.linear.app/mcp", tools: 22, accounts: [{ alias: "Remote", who: "Authorization header set", status: "ACTIVE" }] }];
+  const NOTES = {
+    browse: "Settings-shell list+detail (design.md §9). With nothing selected, the desktop detail pane shows a grid of connected and popular apps — the one new shape, flagged for design review.",
+    detail: "Selecting an app opens its detail: accounts (several per app, aliased), which Bots use it and how, and its tools with read/send classification. Click Connect another account to see the pending state.",
+    setup: "First run on a Host with no Composio key. Custom MCP servers work without Composio, so they are offered beside it.",
+    bot: "Grants live on the Bot (D2). Read tools are preapproved; send tools go through the provider's permission prompt, and the daemon relay enforces Ask before sending even when permissions are bypassed.",
+    mcp: "MCP servers sit in the same list. Header and env values stay on the Host; the UI only shows names.",
+    compact: "Compact: the same list and detail components, full-screen with BackHeader.",
+  };
+
+  let filter = "all", query = "", selected = null, setupMode = false;
+  const $ = (id) => document.getElementById(id);
+  const isConnected = (a) => a.accounts.some((x) => x.status === "ACTIVE");
+  const tile = (a, cls = "") => `<span class="tile ${cls} ${a.mcp ? "mcp" : ""}" style="background:${a.color || ""}">${a.name[0].toUpperCase()}</span>`;
+  const badgeFor = (a) => {
+    if (a.mcp) return `<span class="badge success">Running</span>`;
+    if (isConnected(a)) return `<span class="badge success">Connected</span>`;
+    if (a.accounts.some((x) => x.status === "INITIATED")) return `<span class="badge warning">Pending</span>`;
+    return "";
+  };
+
+  function renderList() {
+    const q = query.toLowerCase();
+    const match = (a) => !q || a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q);
+    const pool = filter === "mcp" ? MCP : filter === "connected" ? APPS.filter(isConnected) : APPS;
+    const items = pool.filter(match);
+    const row = (a) => `<button class="app-row ${selected === a.slug ? "selected" : ""}" data-slug="${a.slug}">${tile(a)}<span class="name">${a.name}</span>${badgeFor(a)}</button>`;
+    let html = "";
+    if (setupMode && filter !== "mcp") { $("list").innerHTML = `<div class="list-label">Save a Composio key to browse apps.</div>`; $("list-foot").innerHTML = ""; return; }
+    if (filter === "all" && !q) {
+      html += `<div class="list-label">Connected</div>` + APPS.filter(isConnected).map(row).join("");
+      html += `<div class="list-label">All apps</div>` + APPS.filter((a) => !isConnected(a)).map(row).join("");
+    } else if (filter === "mcp") {
+      html += items.map(row).join("") + `<div style="padding:8px"><button class="btn xs outline" data-open-mcp>+ Add MCP server</button></div>`;
+    } else {
+      html += items.length ? items.map(row).join("") : `<div class="list-label">No apps match “${query}”.</div>`;
+    }
+    $("list").innerHTML = html;
+    $("list-foot").innerHTML = filter === "mcp" ? "" : `Showing ${q ? items.length : "1,000"} of 1,612 <button class="btn xs ghost">Load more</button>`;
+    $("connected-count").textContent = String(APPS.filter(isConnected).length);
+  }
+
+  function renderBrowse() {
+    const card = (a) => `<button class="gcard" data-slug="${a.slug}"><div class="top">${tile(a, "lg")}<div>${a.name}<div class="desc">${a.tools} tools</div></div></div><div class="desc">${a.desc}</div><div class="foot">${badgeFor(a) || "<span></span>"}<span class="btn xs ${isConnected(a) ? "ghost" : "outline"}">${isConnected(a) ? "Manage" : "Connect"}</span></div></button>`;
+    return `<div class="detail-inner" style="max-width:none">
+      <div class="section-head" style="margin-top:4px">Connected <span class="info" title="Apps with at least one signed-in account on this Host">i</span></div>
+      <div class="grid">${APPS.filter(isConnected).map(card).join("")}${MCP.map(card).join("")}</div>
+      <div class="section-head" style="margin-top:24px">Popular <span class="info" title="Ordered by Composio usage">i</span></div>
+      <div class="grid">${APPS.filter((a) => !isConnected(a)).map(card).join("")}</div>
+    </div>`;
+  }
+
+  function renderSetup() {
+    return `<div class="detail-inner">
+      <div class="detail-head"><div><h1>Apps on this Host</h1><div class="sub">Give your Bots access to email, calendars, issue trackers and more.</div></div></div>
+      <div class="section"><div class="section-head">Composio <span class="info" title="Composio stores app sign-ins and runs tool calls in its cloud. Free tier: 100,000 tool calls a month.">i</span></div>
+        <div class="card">
+          <div class="row stack"><div class="title">Connect 1,000+ apps<div class="hint">Sign-ins and tool calls run through Composio's cloud. Your code stays on this Host.</div>
+            <div style="display:flex;gap:8px;margin-top:10px"><input class="field" type="password" placeholder="Composio API key (ak_…)" /><button class="btn default" id="save-key">Save key</button></div></div></div>
+          <div class="row"><div class="title hint">No key yet? Create one at composio.dev → Settings → API keys.</div><button class="btn xs ghost">Open composio.dev</button></div>
+        </div></div>
+      <div class="section"><div class="section-head">MCP servers <span class="info" title="Servers you run or trust. Nothing leaves this Host unless the server sends it.">i</span></div>
+        <div class="card"><div class="row"><div class="title">Add a server you run yourself<div class="hint">Remote URL or local command, in the same format Claude Code uses.</div></div><button class="btn outline" data-open-mcp>Add MCP server</button></div></div></div>
+    </div>`;
+  }
+
+  function renderDetail(a) {
+    const statusBadge = (s) => s === "ACTIVE" ? `<span class="badge success">Connected</span>` : s === "INITIATED" ? `<span class="badge warning">Pending</span>` : `<span class="badge danger">${s === "EXPIRED" ? "Expired" : "Failed"}</span>`;
+    const acct = (x, i) => `<div class="row"><div class="title">${x.alias}<div class="hint">${x.who || "Waiting for sign-in in your browser"}</div></div>${statusBadge(x.status)}${x.status === "INITIATED" ? `<button class="btn xs outline" data-check="${i}">Check status</button>` : ""}<button class="icon-btn" title="Disconnect…">⋯</button></div>`;
+    const tools = a.mcp
+      ? [["list_issues", "Read"], ["create_issue", "Writes"], ["update_issue", "Writes"]]
+      : a.slug === "gmail"
+        ? [["GMAIL_FETCH_EMAILS", "Read"], ["GMAIL_SEARCH_EMAILS", "Read"], ["GMAIL_CREATE_DRAFT", "Writes"], ["GMAIL_SEND_EMAIL", "Sends"]]
+        : [[a.slug.toUpperCase() + "_LIST", "Read"], [a.slug.toUpperCase() + "_CREATE", "Writes"]];
+    const kindBadge = (k) => `<span class="badge ${k === "Sends" ? "warning" : ""}">${k}</span>`;
+    const usedBy = isConnected(a) || a.mcp
+      ? `<div class="row"><span class="tile" style="background:#b7791f">C</span><div class="title">Chief of Staff<div class="hint">${a.mcp ? "All tools" : (a.accounts[0].alias + " · Read and write · Ask before sending")}</div></div><button class="btn xs ghost" data-go="bot">Edit</button></div>
+         ${a.slug === "gmail" ? `<div class="row"><span class="tile" style="background:#2b6cb0">R</span><div class="title">Release bot<div class="hint">work · Read only</div></div><button class="btn xs ghost" data-go="bot">Edit</button></div>` : ""}`
+      : `<div class="row"><div class="title hint">No Bot uses ${a.name} yet. Grant it from a Bot's settings once an account is connected.</div></div>`;
+    const accounts = a.accounts.length ? a.accounts.map(acct).join("") : `<div class="row"><div class="title hint">No account connected.</div></div>`;
+    const primary = a.mcp ? `<button class="btn outline">Edit server</button>` : a.accounts.length ? `<button class="btn outline" id="connect">Connect another account</button>` : `<button class="btn default" id="connect">Connect</button>`;
+    return `<div class="detail-inner">
+      <div class="detail-head">${tile(a, "lg")}<div><h1>${a.name}</h1><div class="sub">${a.desc} · ${a.tools} tools · ${a.mcp ? "MCP server" : "via Composio"}</div></div><div class="actions">${primary}</div></div>
+      <div class="section"><div class="section-head">${a.mcp ? "Server" : "Accounts"} <span class="info" title="${a.mcp ? "Header values stay on this Host" : "Several accounts per app; each Bot picks which ones it may use"}">i</span></div><div class="card">${accounts}</div></div>
+      <div class="section"><div class="section-head">Used by <span class="info" title="Bots granted this app, and how">i</span></div><div class="card">${usedBy}</div></div>
+      <div class="section"><div class="section-head">Tools <span class="info" title="Read tools run without asking. Writes and Sends ask first unless the Bot allows them.">i</span><span class="right">${a.tools} tools</span></div><div class="card">${tools.map(([n, k]) => `<div class="row"><div class="title mono">${n}</div>${kindBadge(k)}</div>`).join("")}</div></div>
+    </div>`;
+  }
+
+  function renderPane() {
+    const all = [...APPS, ...MCP];
+    const a = all.find((x) => x.slug === selected);
+    $("detail").innerHTML = setupMode ? renderSetup() : a ? renderDetail(a) : renderBrowse();
+  }
+
+  function show(screen) {
+    document.querySelectorAll(".doc-tab[data-screen]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.screen === screen)));
+    $("doc-note").textContent = NOTES[screen];
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    $("mcp-sheet").classList.remove("open");
+    setupMode = screen === "setup";
+    if (screen === "bot" || screen === "compact") { $(screen).classList.add("active"); return; }
+    $("shell").classList.add("active");
+    if (screen === "browse") { selected = null; filter = "all"; }
+    if (screen === "detail") { selected = "gmail"; filter = "all"; }
+    if (screen === "mcp") { selected = "mcp:linear"; filter = "mcp"; }
+    if (screen === "setup") { selected = null; }
+    document.querySelectorAll(".chip[data-filter]").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.filter === filter)));
+    renderList(); renderPane();
+    if (screen === "mcp") $("mcp-sheet").classList.add("open");
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("button, [data-slug]");
+    if (!t) return;
+    if (t.dataset.screen) return show(t.dataset.screen);
+    if (t.id === "theme-toggle") { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark"; return; }
+    if (t.dataset.go) return show(t.dataset.go);
+    if (t.dataset.slug) { selected = t.dataset.slug; setupMode = false; renderList(); renderPane(); return; }
+    if (t.dataset.filter) { filter = t.dataset.filter; document.querySelectorAll(".chip[data-filter]").forEach((c) => c.setAttribute("aria-pressed", String(c === t))); renderList(); return; }
+    if (t.hasAttribute("data-open-mcp")) { $("mcp-sheet").classList.add("open"); return; }
+    if (t.hasAttribute("data-close")) { $("mcp-sheet").classList.remove("open"); return; }
+    if (t.id === "save-key") { setupMode = false; renderPane(); return; }
+    if (t.parentElement && t.parentElement.id === "transport") {
+      t.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === t)));
+      document.querySelectorAll("[data-when]").forEach((r) => { r.hidden = r.dataset.when !== t.dataset.t; });
+      return;
+    }
+    if (t.id === "connect") {
+      const a = APPS.find((x) => x.slug === selected);
+      if (!a) return;
+      a.accounts.push({ alias: a.accounts.length ? "account-" + (a.accounts.length + 1) : "default", who: "", status: "INITIATED" });
+      renderList(); renderPane(); return;
+    }
+    if (t.dataset.check !== undefined) {
+      const a = APPS.find((x) => x.slug === selected);
+      const acc = a.accounts[Number(t.dataset.check)];
+      acc.status = "ACTIVE"; acc.who = acc.who || (a.slug === "gmail" ? "long.personal@gmail.com" : "signed in");
+      renderList(); renderPane();
+    }
+  });
+  $("search").addEventListener("input", (e) => { query = e.target.value; renderList(); });
+  show("browse");
+</script>
+</body>
+</html>

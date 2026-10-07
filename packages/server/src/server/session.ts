@@ -131,7 +131,6 @@ import {
   dispatchChatMessage,
 } from "./session/chats/chat-session.js";
 import type { ChatService } from "./chats/chat-service.js";
-import { CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import { createAgentCommand } from "./agent/create-agent/create.js";
 import { resolveCreateAgentIntent, type CreateAgentIntent } from "./agent/create-agent/intent.js";
 import {
@@ -288,6 +287,12 @@ import {
   dispatchBotMessage,
   type BotSession,
 } from "./session/bots/bot-session.js";
+import type { ConnectorService } from "./connectors/connector-service.js";
+import {
+  createConnectorSession,
+  dispatchConnectorMessage,
+  type ConnectorSession,
+} from "./session/connectors/connector-session.js";
 import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { SessionAuthorization, type DaemonPermission } from "./authorization/index.js";
 import type { SessionResourceAuthorization } from "./managed-access/types.js";
@@ -495,6 +500,7 @@ export interface SessionOptions {
   workspaceLabelService?: WorkspaceLabelService;
   botService?: BotService;
   chatService?: ChatService;
+  connectorService?: ConnectorService;
   filesystem?: SessionFileSystem;
   scheduleService: ScheduleService;
   checkoutDiffManager: CheckoutDiffManager;
@@ -756,6 +762,7 @@ export class Session {
   private readonly resourceAuthorizer: ManagedResourceAuthorizer;
   private readonly terminalProfileSession: TerminalProfileSession;
   private readonly botSession: BotSession | null;
+  private readonly connectorSession: ConnectorSession | null;
   private readonly chatSession: ChatSession | null;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
@@ -931,10 +938,6 @@ export class Session {
       agentStorage,
       terminalManager,
       providerSnapshotManager,
-      (labels) =>
-        !options.chatService ||
-        !labels?.[CHAT_ID_LABEL] ||
-        this.chatSession?.allows(labels[CHAT_ID_LABEL]) === true,
     );
     this.appVersion = appVersion ?? null;
     this.clientCapabilities = parseClientCapabilities(clientCapabilities);
@@ -1217,6 +1220,15 @@ export class Session {
         authority: this.resourceAuthorizer,
       },
       this.sessionLogger,
+    );
+    this.connectorSession = createConnectorSession(
+      options.connectorService,
+      (msg) => this.emit(msg),
+      this.sessionLogger,
+      {
+        isRestricted: () => this.resourceAuthorizer.isRestricted(),
+        canManage: () => this.authorization.allowsPermission("daemon.manage"),
+      },
     );
     this.terminalController = new TerminalSessionController({
       terminalManager,
@@ -2621,6 +2633,7 @@ export class Session {
       this.dispatchWorkspaceSetupMessage(msg) ??
       this.dispatchWorkspaceAndProjectMessage(msg) ??
       dispatchBotMessage(this.botSession, msg, (reply) => this.emit(reply)) ??
+      dispatchConnectorMessage(this.connectorSession, msg, (reply) => this.emit(reply)) ??
       dispatchChatMessage(this.chatSession, msg, (reply) => this.emit(reply))
     );
   }

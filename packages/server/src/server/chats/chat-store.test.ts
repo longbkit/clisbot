@@ -42,6 +42,7 @@ describe("chat record", () => {
       room: { instructions: null },
       context: { maxMessages: 20 },
       limits: { maxInputCharacters: "off", maxRuntimeSeconds: 60 },
+      tools: { off: [] },
     });
     expect(limitValue(resolved, "maxInputCharacters")).toBeNull();
     expect(limitValue(resolved, "maxRuntimeSeconds")).toBe(60);
@@ -287,6 +288,22 @@ test("group settings persist without replacing internal limits or session bindin
   expect(cleared.rules.room).toEqual({ instructions: null });
   expect((await store.updateSettings(chat.id, { title: " " })).title).toBeNull();
   expect(() => store.updateSettings(chat.id, { title: "x".repeat(257) })).toThrow();
+});
+
+test("a chat keeps its tools off list, direct chats included, and nothing else changes", async () => {
+  const root = await temporary();
+  const store = new ChatStore(root, createTestLogger());
+  await store.create({ id: "direct-tools", kind: "direct", botIds: ["a"], title: "Before" });
+  const updated = await store.updateSettings("direct-tools", {
+    toolsOff: ["gmail", "tools:browser", "gmail"],
+  });
+  expect(updated.rules.tools).toEqual({ off: ["gmail", "tools:browser"] });
+  expect(updated.title).toBe("Before");
+  expect(await new ChatStore(root, createTestLogger()).get("direct-tools")).toEqual(updated);
+  // An empty list leaves no key, so an older daemon can still read the Chat.
+  expect(
+    (await store.updateSettings("direct-tools", { toolsOff: [] })).rules.tools,
+  ).toBeUndefined();
 });
 
 test("group settings reject direct and archived chats and unknown rule fields", async () => {

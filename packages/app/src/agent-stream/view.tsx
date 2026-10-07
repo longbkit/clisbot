@@ -122,6 +122,7 @@ import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
+import { ConnectorPermissionCard, readConnectorCard } from "@/clisbot/connectors/connector-card";
 
 // Shared element: AgentFace takes no props, so every response row reuses it.
 const AGENT_FACE = <AgentFace />;
@@ -1791,6 +1792,21 @@ export function PermissionRequestCard({
       <View>
         <QuestionFormCard
           permission={permission}
+          onRespond={handleResponse}
+          isResponding={isResponding}
+        />
+        {responseError}
+      </View>
+    );
+  }
+  // Clisbot Connectors: a held tool call waiting for an app to be connected or allowed.
+  const connectorCard = readConnectorCard(request.metadata);
+  if (connectorCard) {
+    return (
+      <View>
+        <ConnectorPermissionCard
+          card={connectorCard}
+          serverId={serverId}
           onRespond={handleResponse}
           isResponding={isResponding}
         />

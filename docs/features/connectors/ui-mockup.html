@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Connectors — UI mockup</title>
+    <!--
+  Mockup for the Connectors UI, built on docs/design.md: rows in a card (§5, §12), one trailing
+  slot per row, a row opens a sheet for its details (the Providers pattern), section help in the
+  header's info tip (§7), Remove behind a confirm (§3), one filled button per surface (§3).
+  Tokens follow the Light theme in packages/app/src/styles/theme.ts.
+-->
+    <style>
+      :root {
+        --fg: #1d1c1d;
+        --muted: #4a4a4a;
+        --chrome: #707070;
+        --s0: #ffffff;
+        --s1: #fafafa;
+        --s2: #f4f4f5;
+        --s3: #e9e9ea;
+        --border: #d8d8d8;
+        --accent: #3e704a;
+        --success: #3e704a;
+        --warning: #7b5d39;
+        --danger: #9d433b;
+        --r-md: 6px;
+        --r-lg: 8px;
+        --r-xl: 12px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.45 -apple-system,
+          BlinkMacSystemFont,
+          "Inter",
+          "Segoe UI",
+          sans-serif;
+        color: var(--fg);
+        background: #eceff1;
+      }
+      h1.page {
+        font-weight: 500;
+        font-size: 20px;
+        margin: 32px 40px 8px;
+      }
+      p.lede {
+        margin: 0 40px 24px;
+        color: var(--muted);
+        max-width: 820px;
+      }
+      .frame {
+        margin: 0 40px 40px;
+      }
+      .frame > .tag {
+        font-size: 12px;
+        color: var(--chrome);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 8px;
+      }
+      .window {
+        background: var(--s0);
+        border: 1px solid var(--border);
+        border-radius: var(--r-xl);
+        overflow: hidden;
+      }
+      .column {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 24px;
+      }
+      .title {
+        font-size: 26px;
+        font-weight: 400;
+        margin: 0 0 24px;
+      }
+
+      /* Section: structural label + info tip, then a card (§3, §7) */
+      .section {
+        margin-bottom: 32px;
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--muted);
+        font-weight: 500;
+        margin: 0 0 8px 4px;
+      }
+      .info {
+        width: 15px;
+        height: 15px;
+        border: 1.4px solid var(--chrome);
+        border-radius: 50%;
+        display: inline-grid;
+        place-items: center;
+        font-size: 10px;
+        color: var(--chrome);
+        font-weight: 600;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        background: var(--s0);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        min-height: 56px;
+      }
+      .row + .row {
+        border-top: 1px solid var(--border);
+      }
+      .row.press {
+        cursor: pointer;
+      }
+      .row.press:hover {
+        background: var(--s1);
+      }
+      .content {
+        flex: 1;
+        min-width: 0;
+      }
+      .t {
+        color: var(--fg);
+      }
+      .h {
+        color: var(--muted);
+        font-size: 12.5px;
+        margin-top: 2px;
+      }
+      .sep {
+        color: var(--chrome);
+        margin: 0 6px;
+      }
+      .trail {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--muted);
+      }
+      .chev {
+        color: var(--chrome);
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .logo {
+        width: 24px;
+        height: 24px;
+        border-radius: var(--r-md);
+        background: #fff;
+        display: grid;
+        place-items: center;
+        flex: none;
+        overflow: hidden;
+      }
+      .logo img {
+        width: 20px;
+        height: 20px;
+      }
+      .logo.lg {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--r-lg);
+      }
+      .logo.lg img {
+        width: 34px;
+        height: 34px;
+      }
+      .letter {
+        color: #fff;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .lg .letter {
+        font-size: 16px;
+      }
+
+      .switch {
+        width: 36px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--accent);
+        position: relative;
+        flex: none;
+      }
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .switch.off {
+        background: #cfcfd1;
+      }
+      .switch.off::after {
+        right: auto;
+        left: 2px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--r-md);
+        font: inherit;
+        border: 1px solid transparent;
+        background: var(--s3);
+        color: var(--fg);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.outline {
+        background: transparent;
+        border-color: #bdbdbd;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn.xs {
+        height: 28px;
+        font-size: 12.5px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--s3);
+        border: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .badge.ok {
+        color: var(--success);
+      }
+      .badge.warn {
+        color: var(--warning);
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+        background: var(--success);
+      }
+      .dot.warn {
+        background: var(--warning);
+      }
+
+      .seg {
+        display: inline-flex;
+        gap: 2px;
+      }
+      .seg span {
+        height: 32px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: var(--r-md);
+        color: var(--muted);
+      }
+      .seg span.on {
+        background: var(--s3);
+        color: var(--fg);
+      }
+
+      .radio {
+        display: flex;
+        gap: 12px;
+        padding: 14px 16px;
+      }
+      .radio + .radio {
+        border-top: 1px solid var(--border);
+      }
+      .rb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1.5px solid #9a9a9a;
+        margin-top: 2px;
+        flex: none;
+      }
+      .rb.on {
+        border: 5px solid var(--accent);
+      }
+
+      /* Sheet (AdaptiveModalSheet, desktop) */
+      .backdrop {
+        background: rgba(0, 0, 0, 0.42);
+        padding: 40px;
+        display: grid;
+        place-items: center;
+      }
+      .sheet {
+        width: 480px;
+        background: var(--s0);
+        border-radius: var(--r-xl);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+      }
+      .sheet-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 24px 12px;
+      }
+      .sheet-head .name {
+        font-weight: 500;
+        flex: 1;
+      }
+      .x {
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .sheet-body {
+        padding: 8px 24px 16px;
+      }
+      .sheet-body .section {
+        margin-bottom: 20px;
+      }
+      .sheet-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        border-top: 1px solid var(--border);
+      }
+      .fine {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      /* Connectors screen: list + detail (§9) */
+      .split {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        min-height: 760px;
+      }
+      .list {
+        background: var(--s1);
+        border-right: 1px solid var(--border);
+        padding: 16px 12px;
+      }
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 36px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--s0);
+        color: var(--chrome);
+        margin-bottom: 12px;
+      }
+      .filters {
+        display: flex;
+        gap: 2px;
+        margin-bottom: 16px;
+      }
+      .filters span {
+        height: 28px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: var(--r-md);
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .filters span.on {
+        background: var(--s3);
+        color: var(--fg);
+      }
+      .list-head {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12.5px;
+        margin: 14px 8px 6px;
+      }
+      .item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        border-radius: var(--r-lg);
+      }
+      .item.sel {
+        background: var(--s3);
+      }
+      .item .content {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .detail {
+        padding: 0;
+      }
+      .detail-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .detail-head .t {
+        font-weight: 400;
+        font-size: 15px;
+        flex: 1;
+      }
+
+      /* Chat cards */
+      .chat {
+        background: var(--s0);
+        padding: 24px;
+      }
+      .bubble {
+        max-width: 640px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+      }
+      .bubble .row {
+        align-items: flex-start;
+      }
+      .bubble .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 0 16px 14px;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 4px 12px;
+        padding: 0 16px 12px 52px;
+        font-size: 13px;
+      }
+      .kv dt {
+        color: var(--muted);
+      }
+      .kv dd {
+        margin: 0;
+      }
+      .note {
+        margin: 6px 0 0;
+        padding: 10px 12px;
+        border-left: 3px solid var(--border);
+        color: var(--muted);
+        font-size: 12.5px;
+        max-width: 720px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="page">Connectors — UI mockup</h1>
+    <p class="lede">
+      Every surface uses the same row: logo, name, a muted summary after a dot, one trailing
+      control. Details live one level down, in a sheet opened from the row, as on the Providers
+      page. Section help is the info tip, never a paragraph under the header. Remove is an outline
+      button inside the sheet, confirmed.
+    </p>
+
+    <!-- 1. Project / Bot settings -->
+    <div class="frame">
+      <div class="tag">1 · Project settings and Bot settings: the Connectors section</div>
+      <div class="window">
+        <div class="column">
+          <div class="title">clisbot-composio-live-project</div>
+
+          <div class="section">
+            <div class="section-head">Connectors <span class="info">i</span></div>
+            <div class="card">
+              <div class="row press">
+                <div class="logo">
+                  <img src="https://logos.composio.dev/api/googlecalendar" alt="" />
+                </div>
+                <div class="content">
+                  <span class="t">Google Calendar</span><span class="sep">·</span
+                  ><span class="h" style="display: inline">Read only · All tools</span>
+                </div>
+                <div class="trail">
+                  <div class="switch"></div>
+                  <span class="chev">›</span>
+                </div>
+              </div>
+              <div class="row press">
+                <div class="logo">
+                  <img src="https://logos.composio.dev/api/hackernews" alt="" />
+                </div>
+                <div class="content">
+                  <span class="t">Hacker News</span><span class="sep">·</span
+                  ><span class="h" style="display: inline">Read only · No sign-in needed</span>
+                </div>
+                <div class="trail">
+                  <div class="switch"></div>
+                  <span class="chev">›</span>
+                </div>
+              </div>
+              <div class="row press">
+                <div class="logo"><img src="https://logos.composio.dev/api/gmail" alt="" /></div>
+                <div class="content">
+                  <span class="t">Gmail</span><span class="sep">·</span
+                  ><span class="h" style="display: inline"
+                    ><span class="dot warn"></span>Not connected on this Host</span
+                  >
+                </div>
+                <div class="trail">
+                  <div class="switch"></div>
+                  <span class="chev">›</span>
+                </div>
+              </div>
+              <div class="row press">
+                <div class="logo" style="background: #a0623d"><span class="letter">N</span></div>
+                <div class="content">
+                  <span class="t">notes</span><span class="sep">·</span
+                  ><span class="h" style="display: inline">MCP server · All tools</span>
+                </div>
+                <div class="trail">
+                  <div class="switch off"></div>
+                  <span class="chev">›</span>
+                </div>
+              </div>
+              <div class="row">
+                <div class="content"></div>
+                <button class="btn outline">＋ Add connector</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">Sending <span class="info">i</span></div>
+            <div class="card">
+              <div class="row">
+                <div class="content">
+                  <div class="t">Ask before sending</div>
+                  <div class="h">
+                    Email, messages, invites, shares and payments wait for your answer in the chat
+                  </div>
+                </div>
+                <div class="switch"></div>
+              </div>
+              <div class="row">
+                <div class="content">
+                  <div class="t">Daily send limit</div>
+                  <div class="h">When sends run without asking</div>
+                </div>
+                <button class="btn outline">25 a day</button>
+              </div>
+              <div class="row">
+                <div class="content">
+                  <div class="t">Codex's own apps</div>
+                  <div class="h">
+                    ChatGPT apps connected in Codex skip Connectors' accounts, tool limits and send
+                    approvals
+                  </div>
+                </div>
+                <div class="switch"></div>
+              </div>
+            </div>
+          </div>
+          <p class="note">
+            Before: access, accounts, tools, Remove and an error line on every row, and a paragraph
+            under the card. After: one line per Connector; the summary says how it is set up; a
+            problem is a warning dot in the summary; the row opens sheet 2.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Per-app sheet -->
+    <div class="frame">
+      <div class="tag">2 · Sheet opened from a Connector row</div>
+      <div class="window backdrop">
+        <div class="sheet">
+          <div class="sheet-head">
+            <div class="logo">
+              <img src="https://logos.composio.dev/api/googlecalendar" alt="" />
+            </div>
+            <div class="name">Google Calendar</div>
+            <span class="x">✕</span>
+          </div>
+          <div class="sheet-body">
+            <div class="section">
+              <div class="section-head">Access</div>
+              <div class="card">
+                <div class="radio">
+                  <div class="rb on"></div>
+                  <div>
+                    <div class="t">Read only</div>
+                    <div class="h">Agents look things up; nothing changes</div>
+                  </div>
+                </div>
+                <div class="radio">
+                  <div class="rb"></div>
+                  <div>
+                    <div class="t">Read and write</div>
+                    <div class="h">
+                      Agents may create and change things. Sends still follow Ask before sending
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-head">Limits</div>
+              <div class="card">
+                <div class="row press">
+                  <div class="content"><div class="t">Accounts</div></div>
+                  <div class="trail">All accounts <span class="chev">›</span></div>
+                </div>
+                <div class="row press">
+                  <div class="content"><div class="t">Tools</div></div>
+                  <div class="trail">All 47 tools <span class="chev">›</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <button class="btn outline">Remove from Project</button>
+            <button class="btn primary">Done</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        Access has consequences to read, so it is a radio list (design.md §4). Accounts and Tools
+        drill into the existing pickers. An app that needs no sign-in has no Accounts row. Remove
+        opens confirmDialog.
+      </p>
+    </div>
+
+    <!-- 3. Session sheet -->
+    <div class="frame">
+      <div class="tag">3 · Composer chip "3 connectors" → this session</div>
+      <div class="window backdrop">
+        <div class="sheet">
+          <div class="sheet-head">
+            <div class="name">Connectors for this session</div>
+            <span class="info">i</span><span class="x" style="margin-left: 8px">✕</span>
+          </div>
+          <div class="sheet-body">
+            <div class="card">
+              <div class="row">
+                <div class="logo">
+                  <img src="https://logos.composio.dev/api/googlecalendar" alt="" />
+                </div>
+                <div class="content">
+                  <div class="t">Google Calendar</div>
+                  <div class="h">Read only</div>
+                </div>
+                <div class="switch"></div>
+              </div>
+              <div class="row">
+                <div class="logo">
+                  <img src="https://logos.composio.dev/api/hackernews" alt="" />
+                </div>
+                <div class="content">
+                  <div class="t">Hacker News</div>
+                  <div class="h">Read only</div>
+                </div>
+                <div class="switch"></div>
+              </div>
+              <div class="row">
+                <div class="logo" style="background: #a0623d"><span class="letter">N</span></div>
+                <div class="content">
+                  <div class="t">notes</div>
+                  <div class="h">MCP server</div>
+                </div>
+                <div class="switch off"></div>
+              </div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <button class="btn ghost">Project Connectors</button>
+            <button class="btn primary">Done</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        Names and logos from the catalog, not the slug ("Googlecalendar"). The explanation ("applies
+        from the agent's next call; the Project's Connectors stay as they are") moves into the
+        header's info tip.
+      </p>
+    </div>
+
+    <!-- 4. Connectors screen -->
+    <div class="frame">
+      <div class="tag">4 · Connectors screen (list + detail)</div>
+      <div class="window">
+        <div class="split">
+          <div class="list">
+            <div class="search">⌕ Search apps</div>
+            <div class="filters">
+              <span class="on">All</span><span>Connected</span><span>MCP servers</span>
+            </div>
+            <div class="item sel">
+              <span style="width: 24px; text-align: center; color: var(--muted)">⌂</span>
+              <div class="content t">Overview</div>
+            </div>
+            <div class="list-head">Connected</div>
+            <div class="item">
+              <div class="logo">
+                <img src="https://logos.composio.dev/api/googlecalendar" alt="" />
+              </div>
+              <div class="content">Google Calendar</div>
+            </div>
+            <div class="item">
+              <div class="logo" style="background: #a0623d"><span class="letter">N</span></div>
+              <div class="content">notes</div>
+            </div>
+            <div class="list-head">Apps · 1,599</div>
+            <div class="item">
+              <div class="logo"><img src="https://logos.composio.dev/api/gmail" alt="" /></div>
+              <div class="content">Gmail</div>
+            </div>
+            <div class="item">
+              <div class="logo"><img src="https://logos.composio.dev/api/github" alt="" /></div>
+              <div class="content">GitHub</div>
+            </div>
+            <div class="item">
+              <div class="logo"><img src="https://logos.composio.dev/api/notion" alt="" /></div>
+              <div class="content">Notion</div>
+            </div>
+            <div class="item">
+              <div class="logo"><img src="https://logos.composio.dev/api/slack" alt="" /></div>
+              <div class="content">Slack</div>
+            </div>
+            <div class="item">
+              <div class="logo">
+                <img src="https://logos.composio.dev/api/googlesheets" alt="" />
+              </div>
+              <div class="content">Google Sheets</div>
+            </div>
+            <div class="item">
+              <div class="logo"><img src="https://logos.composio.dev/api/outlook" alt="" /></div>
+              <div class="content">Outlook</div>
+            </div>
+          </div>
+          <div class="detail">
+            <div class="detail-head"><div class="t">Overview</div></div>
+            <div class="column">
+              <div class="section">
+                <div class="section-head">Composio <span class="info">i</span></div>
+                <div class="card">
+                  <div class="row">
+                    <div class="content">
+                      <div class="t">Project API key</div>
+                      <div class="h">ak_…TdgW · stays on this Host</div>
+                    </div>
+                    <button class="btn outline">Replace</button>
+                    <button class="btn ghost" title="More">⋯</button>
+                  </div>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head">Connected <span class="info">i</span></div>
+                <div class="card">
+                  <div class="row press">
+                    <div class="logo">
+                      <img src="https://logos.composio.dev/api/googlecalendar" alt="" />
+                    </div>
+                    <div class="content">
+                      <span class="t">Google Calendar</span><span class="sep">·</span
+                      ><span class="h" style="display: inline">1 account</span>
+                    </div>
+                    <div class="trail">
+                      <span class="badge ok">Connected</span><span class="chev">›</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head">MCP servers <span class="info">i</span></div>
+                <div class="card">
+                  <div class="row press">
+                    <div class="logo" style="background: #a0623d">
+                      <span class="letter">N</span>
+                    </div>
+                    <div class="content">
+                      <span class="t">notes</span><span class="sep">·</span
+                      ><span class="h" style="display: inline">Local command · node</span>
+                    </div>
+                    <div class="trail">
+                      <div class="switch"></div>
+                      <span class="chev">›</span>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="content"></div>
+                    <button class="btn outline">＋ Add MCP server</button>
+                  </div>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head">Popular <span class="info">i</span></div>
+                <div class="card">
+                  <div class="row press">
+                    <div class="logo">
+                      <img src="https://logos.composio.dev/api/gmail" alt="" />
+                    </div>
+                    <div class="content">
+                      <div class="t">Gmail</div>
+                      <div class="h">Email: read, search, send · 60 tools</div>
+                    </div>
+                    <button class="btn outline">Connect</button>
+                  </div>
+                  <div class="row press">
+                    <div class="logo">
+                      <img src="https://logos.composio.dev/api/github" alt="" />
+                    </div>
+                    <div class="content">
+                      <div class="t">GitHub</div>
+                      <div class="h">Issues, pull requests, code · 874 tools</div>
+                    </div>
+                    <button class="btn outline">Connect</button>
+                  </div>
+                  <div class="row press">
+                    <div class="logo">
+                      <img src="https://logos.composio.dev/api/hackernews" alt="" />
+                    </div>
+                    <div class="content">
+                      <div class="t">Hacker News</div>
+                      <div class="h">Stories and comments · 14 tools</div>
+                    </div>
+                    <span class="badge">No sign-in needed</span>
+                  </div>
+                  <div class="row press">
+                    <div class="logo">
+                      <img src="https://logos.composio.dev/api/notion" alt="" />
+                    </div>
+                    <div class="content">
+                      <div class="t">Notion</div>
+                      <div class="h">Pages, databases, notes · 54 tools</div>
+                    </div>
+                    <button class="btn outline">Connect</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        Overview is the first list item, as Settings' first page. Every block is a section with rows
+        in a card; the card grid goes. Key actions are outline buttons, Remove key sits in the ⋯
+        menu and confirms. Composio's own toolkit ("Composio") is not an app and is hidden. A server
+        shows "Local command · node", not the full path.
+      </p>
+    </div>
+
+    <!-- 5. Chat cards -->
+    <div class="frame">
+      <div class="tag">5 · Cards in the chat</div>
+      <div class="window chat grid2">
+        <div class="bubble">
+          <div class="row">
+            <div class="logo lg"><img src="https://logos.composio.dev/api/gmail" alt="" /></div>
+            <div class="content">
+              <div class="t">Connect Gmail to continue</div>
+              <div class="h">The agent waits while you sign in; the task goes on by itself</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn ghost">Not now</button
+            ><button class="btn primary">Connect Gmail</button>
+          </div>
+        </div>
+        <div class="bubble">
+          <div class="row">
+            <div class="logo lg">
+              <img src="https://logos.composio.dev/api/googlecalendar" alt="" />
+            </div>
+            <div class="content">
+              <div class="t">Google Calendar: Create event</div>
+              <div class="h">This agent wants to send something on your behalf</div>
+            </div>
+          </div>
+          <dl class="kv">
+            <dt>Title</dt>
+            <dd>Sync</dd>
+            <dt>When</dt>
+            <dd>Tue 13 Oct, 17:00 · 1 h</dd>
+            <dt>Invites</dt>
+            <dd>boss@co</dd>
+          </dl>
+          <div class="actions">
+            <button class="btn ghost">Deny</button><button class="btn primary">Allow once</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        The send card shows the arguments as labelled lines (who receives it first), not raw JSON.
+      </p>
+    </div>
+  </body>
+</html>

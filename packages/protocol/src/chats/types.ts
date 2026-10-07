@@ -54,6 +54,12 @@ export const ChatRulesSchema = z.object({
   room: z.object({ instructions: z.string().nullable().optional() }).optional(),
   context: z.object({ maxMessages: z.number().int().positive().optional() }).optional(),
   limits: ChatLimitsSchema.optional(),
+  /**
+   * What every Bot in this Chat leaves off, in the session off-list keys
+   * (`CONNECTORS_OFF_LABEL`): it only takes away from each Bot's own settings, and survives
+   * `/new` and new members (docs/features/connectors/README.md, "In a Chat").
+   */
+  tools: z.object({ off: z.array(z.string()).optional() }).optional(),
 });
 export type ChatRules = z.infer<typeof ChatRulesSchema>;
 

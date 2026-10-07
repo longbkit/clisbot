@@ -6,6 +6,9 @@ import type {
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { AGENT_TOOL_GROUPS } from "@clisbot/protocol/connectors/agent-tools";
+
+import { isClisbotToolEnabled } from "./clisbot-tool-policy.js";
 import { addModelVisibleStructuredContent } from "./tools/clisbot-tool-serialization.js";
 import {
   createClisbotToolCatalog,
@@ -50,6 +53,25 @@ export async function createAgentMcpServer(options: AgentMcpServerOptions): Prom
         toMcpToolResult(await catalog.executeTool(tool.name, args, { signal: context?.signal })),
     );
   }
+  registerTurnedOffTools(server, options);
 
   return server;
+}
+
+/**
+ * Tools the Project or the session turned off stay out of the list, but an agent that read the
+ * list earlier in its session may still call one: answer "Tool X disabled", not "not found", so it
+ * can tell the user the tool was switched off rather than missing.
+ */
+function registerTurnedOffTools(server: McpServer, options: AgentMcpServerOptions): void {
+  for (const group of AGENT_TOOL_GROUPS) {
+    for (const tool of group.tools) {
+      if (isClisbotToolEnabled(options.clisbotToolPolicy, tool.name)) continue;
+      server.registerTool(tool.name, { description: tool.description }, turnedOff).disable();
+    }
+  }
+}
+
+function turnedOff(): CallToolResult {
+  return { content: [{ type: "text", text: "This tool is turned off." }], isError: true };
 }

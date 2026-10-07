@@ -1,3 +1,5 @@
+import { CONNECTORS_OFF_LABEL, formatConnectorsOff } from "@clisbot/protocol/connectors/types";
+import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import { stat } from "node:fs/promises";
 import { z } from "zod";
 import { ensureValidJson } from "../../json-utils.js";
@@ -1489,7 +1491,7 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
           workspaceId: resolvedArgs.workspaceId,
           thinking: parsedArgs.settings?.thinkingOptionId,
           features: parsedArgs.settings?.features,
-          labels: parsedArgs.labels,
+          labels: await childLabels(agentManager, callerAgentId, parsedArgs.labels),
           mode: parsedArgs.settings?.modeId,
           background: requestedBackground,
           notifyOnFinish,
@@ -2191,6 +2193,7 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
       },
     },
     async ({ agentId, name, labels, settings }) => {
+      refuseProtectedLabels(labels);
       if (settings?.modeId !== undefined) {
         await agentManager.setAgentMode(agentId, settings.modeId);
       }
@@ -3180,6 +3183,10 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
       },
     },
     async ({ agentId, requestId, response }) => {
+      // A Connector card asks the person; an agent answering it would approve its own call.
+      if (agentManager.isDaemonPermissionRequest(agentId, requestId)) {
+        throw new Error("Only a person can answer this request, in Clisbot or on its channel.");
+      }
       await respondToAgentPermission({
         agentManager,
         agentId,
@@ -3255,4 +3262,35 @@ function archiveWorktreeDependencies(
       ),
     sessionLogger: context.logger,
   };
+}
+
+/**
+ * Clisbot Connectors: labels that decide what a session may use or which Chat it serves. The person
+ * sets them (the session's Tools) or the daemon does (a Bot's Chat session); an agent setting one
+ * could undo a limit, so `update_agent` and `create_agent` refuse them.
+ */
+const PROTECTED_LABELS = [CONNECTORS_OFF_LABEL, BOT_ID_LABEL, CHAT_ID_LABEL];
+
+function refuseProtectedLabels(labels: Record<string, string> | undefined): void {
+  const named = PROTECTED_LABELS.find((label) => labels && Object.hasOwn(labels, label));
+  if (named) {
+    throw new Error(`${named} is set by the person or the daemon; an agent cannot change it.`);
+  }
+}
+
+/**
+ * A child agent starts with what its caller leaves off, its Chat's list included: a session that
+ * may not send email cannot get a child that may. The child's label is its own to keep, and it
+ * cannot change it either.
+ */
+async function childLabels(
+  agentManager: Pick<AgentManager, "sessionOffList">,
+  callerAgentId: string | undefined,
+  labels: Record<string, string> | undefined,
+): Promise<Record<string, string> | undefined> {
+  refuseProtectedLabels(labels);
+  if (!callerAgentId) return labels;
+  const off = await agentManager.sessionOffList(callerAgentId);
+  if (off.size === 0) return labels;
+  return { ...labels, [CONNECTORS_OFF_LABEL]: formatConnectorsOff(off) };
 }

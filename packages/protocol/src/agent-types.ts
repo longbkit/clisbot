@@ -164,6 +164,8 @@ export interface AgentCapabilityFlags {
   supportsRewindConversation?: boolean;
   supportsRewindFiles?: boolean;
   supportsRewindBoth?: boolean;
+  /** Clisbot: the session can hide single skills (`AgentSession.setSkillsOff`). */
+  supportsSkillToggles?: boolean;
 }
 
 export interface AgentPersistenceHandle {

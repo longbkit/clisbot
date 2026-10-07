@@ -2178,6 +2178,134 @@ export class DaemonClient {
     });
   }
 
+  // Clisbot Connectors (docs/features/connectors/README.md); gated on features.connectors.
+  getConnectorSettings(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.settings.get.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.settings.get.response">({
+      message: { ...params, type: "connectors.settings.get.request" },
+    });
+  }
+
+  setComposioKey(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.composio.key.set.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.composio.key.set.response">({
+      message: { ...params, type: "connectors.composio.key.set.request" },
+    });
+  }
+
+  listConnectorCatalog(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.catalog.list.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.catalog.list.response">({
+      message: { ...params, type: "connectors.catalog.list.request" },
+    });
+  }
+
+  listConnectorAccounts(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.accounts.list.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.accounts.list.response">({
+      message: { ...params, type: "connectors.accounts.list.request" },
+    });
+  }
+
+  connectConnectorAccount(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.account.connect.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.account.connect.response">({
+      message: { ...params, type: "connectors.account.connect.request" },
+    });
+  }
+
+  removeConnectorAccount(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.account.remove.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.account.remove.response">({
+      message: { ...params, type: "connectors.account.remove.request" },
+    });
+  }
+
+  saveConnectorMcpServer(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.mcp_server.save.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.mcp_server.save.response">({
+      message: { ...params, type: "connectors.mcp_server.save.request" },
+    });
+  }
+
+  removeConnectorMcpServer(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.mcp_server.remove.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.mcp_server.remove.response">({
+      message: { ...params, type: "connectors.mcp_server.remove.request" },
+    });
+  }
+
+  listConnectorTools(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.tools.list.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.tools.list.response">({
+      message: { ...params, type: "connectors.tools.list.request" },
+    });
+  }
+
+  listConnectorProjectGrants() {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.project_grants.list.response">({
+      message: { type: "connectors.project_grants.list.request" },
+    });
+  }
+
+  setConnectorProjectGrant(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.project_grant.set.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.project_grant.set.response">({
+      message: { ...params, type: "connectors.project_grant.set.request" },
+    });
+  }
+
+  setConnectorSessionAllows(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "connectors.session_allows.set.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"connectors.session_allows.set.response">({
+      message: { ...params, type: "connectors.session_allows.set.request" },
+    });
+  }
+
   createChat(
     params: Omit<
       Extract<SessionInboundMessage, { type: "chat.create.request" }>,

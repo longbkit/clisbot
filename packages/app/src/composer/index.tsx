@@ -162,6 +162,7 @@ import {
   resolveWorkspaceFileDrop,
   type WorkspaceFileDragPayload,
 } from "@/attachments/workspace-file-drag";
+import { ConnectorsComposerChip } from "@/clisbot/connectors/composer-chip";
 
 const composerImageAttachmentPersister: Pick<
   AttachmentPersister,
@@ -322,21 +323,34 @@ interface RenderLeftContentArgs {
   focusInput: () => void;
   isCompactLayout: boolean;
   showAgentControls: boolean;
+  workspaceId: string | null | undefined;
 }
 
 function renderLeftContent(args: RenderLeftContentArgs): ReactElement | null {
   const { agentControls, agentId, serverId, focusInput, isCompactLayout } = args;
   if (!args.showAgentControls) return null;
-  if (resolveAgentControlsMode(agentControls) === "draft" && agentControls) {
-    return <DraftAgentControls {...agentControls} isCompactLayout={isCompactLayout} />;
-  }
-  return (
+  const draft = resolveAgentControlsMode(agentControls) === "draft" && agentControls;
+  const controls = draft ? (
+    <DraftAgentControls {...agentControls} isCompactLayout={isCompactLayout} />
+  ) : (
     <AgentControls
       agentId={agentId}
       serverId={serverId}
       onDropdownClose={focusInput}
       isCompactLayout={isCompactLayout}
     />
+  );
+  // Clisbot Connectors: the session's apps, after the agent controls; renders nothing without them.
+  return (
+    <>
+      {controls}
+      <ConnectorsComposerChip
+        serverId={serverId}
+        workspaceId={args.workspaceId}
+        agentId={draft ? null : agentId}
+        draftKey={draft ? agentId : null}
+      />
+    </>
   );
 }
 
@@ -2275,6 +2289,7 @@ function ComposerContentImpl({
         focusInput,
         isCompactLayout,
         showAgentControls: mode.showAgentControls && showAgentControls,
+        workspaceId,
       }),
     [
       agentControls,
@@ -2284,6 +2299,7 @@ function ComposerContentImpl({
       mode.showAgentControls,
       showAgentControls,
       serverId,
+      workspaceId,
     ],
   );
 

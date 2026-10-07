@@ -1,3 +1,4 @@
+import { ChatToolsContext, useChatToolsValue } from "@/clisbot/connectors/chat-tools";
 import { useSessionStore } from "@/stores/session-store";
 import { useResourcePrincipalScope } from "../data/resource-principal-scope";
 import { ConversationWorkspace } from "./conversation-workspace";
@@ -89,6 +90,8 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   }, [loadOlder, setError]);
   const group = chat ? isGroupChat(chat) : false;
   const working = group && [...heads.values()].some((head) => head.turnActive);
+  // Clisbot Connectors: the Chat's own tools off list, for the composer's Tools chip.
+  const chatTools = useChatToolsValue({ serverId, chat, bots: identities, group, client });
   const options = useChatHeaderOptions({
     chat,
     chatId,
@@ -110,29 +113,31 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           {error}
         </Text>
       ) : null}
-      <ConversationWorkspace
-        group={group}
-        serverId={serverId}
-        chatId={chatId}
-        accessScope={principalScope}
-        title={title}
-        bots={identities}
-        headerActions={options}
-      >
-        <ChatScreen
-          hideHeader
+      <ChatToolsContext.Provider value={chatTools}>
+        <ConversationWorkspace
+          group={group}
           serverId={serverId}
           chatId={chatId}
+          accessScope={principalScope}
           title={title}
           bots={identities}
-          group={group}
-          transcript={transcript.transcript.messages}
-          liveHeads={heads}
-          canSend={online && !sending}
-          onSubmitMessage={send}
-          onReachTop={reachTop}
-        />
-      </ConversationWorkspace>
+          headerActions={options}
+        >
+          <ChatScreen
+            hideHeader
+            serverId={serverId}
+            chatId={chatId}
+            title={title}
+            bots={identities}
+            group={group}
+            transcript={transcript.transcript.messages}
+            liveHeads={heads}
+            canSend={online && !sending}
+            onSubmitMessage={send}
+            onReachTop={reachTop}
+          />
+        </ConversationWorkspace>
+      </ChatToolsContext.Provider>
     </View>
   );
 }

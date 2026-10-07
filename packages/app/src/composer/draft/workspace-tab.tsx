@@ -52,6 +52,10 @@ import {
 } from "@/workspace-tabs/model";
 import { openWorkspaceChanges } from "@/workspace-tabs/open-supporting-view";
 import { useSettings } from "@/hooks/use-settings";
+import {
+  finishDraftConnectors,
+  draftConnectorsLabels,
+} from "@/clisbot/connectors/session-connectors";
 
 const EMPTY_PENDING_PERMISSIONS = new Map();
 const DRAFT_CAPABILITIES: AgentCapabilityFlags = {
@@ -136,6 +140,9 @@ function resolveDraftModeId(input: {
 
 async function submitDraftCreateRequest(input: {
   draftId: string;
+  serverId: string;
+  /** The composer's draft key, under which the Connectors chip keeps its picks. */
+  tabId: string;
   attempt: { clientMessageId: string };
   text: string;
   images?: UserMessageImageAttachment[];
@@ -196,6 +203,7 @@ async function submitDraftCreateRequest(input: {
 
   const attachmentsArray = Array.isArray(attachments) ? attachments : undefined;
   const imagesData = await encodeImages(images);
+  const connectorsOff = draftConnectorsLabels(input.serverId, input.tabId);
   const options = {
     idempotencyKey: input.draftId,
     config,
@@ -204,9 +212,18 @@ async function submitDraftCreateRequest(input: {
     clientMessageId: attempt.clientMessageId,
     ...(imagesData && imagesData.length > 0 ? { images: imagesData } : {}),
     ...(attachmentsArray && attachmentsArray.length > 0 ? { attachments: attachmentsArray } : {}),
+    // Clisbot Connectors: what this session leaves off, picked in the composer before it existed.
+    ...(connectorsOff ? { labels: connectorsOff } : {}),
   };
   const creation = useWorkspaceDraftSubmissionStore.getState().creationByDraftId[input.draftId];
   const result = creation ? await creation.retry(options) : await client.createAgent(options);
+  // The agent carries the label now; a failed create keeps the picks for the retry.
+  await finishDraftConnectors({
+    serverId: input.serverId,
+    draftKey: input.tabId,
+    agentId: result.id,
+    sent: connectorsOff,
+  });
 
   return {
     agentId: result.id,
@@ -493,6 +510,8 @@ export function WorkspaceDraftAgentTab({
       }
       return submitDraftCreateRequest({
         draftId,
+        serverId,
+        tabId,
         attempt,
         text,
         images,

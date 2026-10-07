@@ -116,8 +116,15 @@ export function createRequireBearerMiddleware(
 
 const SELF_AUTHENTICATING_ROUTES = new Set(["/api/files/download", "/mcp/agents"]);
 
+/** Connectors relay routes check their own per-agent capability token (connectors/connector-relay.ts). */
+const CONNECTORS_RELAY_PREFIX = "/mcp/connectors/";
+
 function isBearerFreeRoute(path: string): boolean {
-  return path === "/api/health" || SELF_AUTHENTICATING_ROUTES.has(path);
+  return (
+    path === "/api/health" ||
+    SELF_AUTHENTICATING_ROUTES.has(path) ||
+    path.startsWith(CONNECTORS_RELAY_PREFIX)
+  );
 }
 
 export function shouldBypassBearerAuth(method: string, path: string): boolean {

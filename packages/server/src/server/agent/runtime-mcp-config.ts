@@ -3,20 +3,31 @@ import type { AgentSessionConfig, McpServerConfig } from "./agent-sdk-types.js";
 const CLISBOT_MCP_SERVER_NAME = "clisbot";
 const CLISBOT_MCP_PATHNAME = "/mcp/agents";
 
+/** Connector entries are added per launch (connectors/connector-runtime.ts) and never stored. */
+const CONNECTORS_MCP_PREFIX = "connectors_";
+
+/** Removes the daemon's own `clisbot` entry, which a provider with native Clisbot tools replaces. */
 export function stripInternalClisbotMcpServer(config: AgentSessionConfig): AgentSessionConfig {
-  const mcpServers = config.mcpServers;
-  if (!mcpServers) {
-    return config;
-  }
+  const clisbotServer = config.mcpServers?.[CLISBOT_MCP_SERVER_NAME];
+  if (!clisbotServer || !isInternalClisbotMcpServer(clisbotServer)) return config;
+  return withoutMcpServers(config, [CLISBOT_MCP_SERVER_NAME]);
+}
 
-  const clisbotServer = mcpServers[CLISBOT_MCP_SERVER_NAME];
-  if (!clisbotServer || !isInternalClisbotMcpServer(clisbotServer)) {
-    return config;
-  }
+/**
+ * Removes every entry the daemon adds per launch: the `clisbot` entry and the Connectors. A stored
+ * config never keeps them; the next launch adds them again for what holds then.
+ */
+export function stripRuntimeMcpServers(config: AgentSessionConfig): AgentSessionConfig {
+  const stripped = stripInternalClisbotMcpServer(config);
+  const connectors = Object.keys(stripped.mcpServers ?? {}).filter((name) =>
+    name.startsWith(CONNECTORS_MCP_PREFIX),
+  );
+  return connectors.length > 0 ? withoutMcpServers(stripped, connectors) : stripped;
+}
 
-  const nextMcpServers = { ...mcpServers };
-  delete nextMcpServers[CLISBOT_MCP_SERVER_NAME];
-
+function withoutMcpServers(config: AgentSessionConfig, names: string[]): AgentSessionConfig {
+  const nextMcpServers = { ...config.mcpServers };
+  for (const name of names) delete nextMcpServers[name];
   const next = { ...config };
   if (Object.keys(nextMcpServers).length > 0) {
     next.mcpServers = nextMcpServers;

@@ -5267,6 +5267,13 @@ export class CodexAppServerAgentSession implements AgentSession {
       }
       innerConfig.mcp_servers = mcpServers;
     }
+    if (this.config.builtInApps === false) {
+      const features = innerConfig.features;
+      innerConfig.features = {
+        ...(features && typeof features === "object" ? features : {}),
+        apps: false,
+      };
+    }
     const configured = applyCodexToolPolicy(innerConfig, this.config.toolPolicy);
     return Object.keys(configured).length > 0 ? configured : null;
   }

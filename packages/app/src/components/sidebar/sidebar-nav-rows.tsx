@@ -1,5 +1,6 @@
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
+import { ConnectorsSidebarItem } from "@/clisbot/connectors/connectors-sidebar-item";
 import { router, usePathname } from "expo-router";
 import { CalendarClock, FolderPlus, History, Plus, Search } from "lucide-react-native";
 import { memo, useCallback, useMemo, type ComponentType } from "react";
@@ -37,7 +38,8 @@ export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps)
   const { items } = useSidebarNavItems();
   const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
 
-  if (visibleItems.length === 0) return null;
+  if (visibleItems.length === 0)
+    return <ConnectorsSidebarItem groupStyle={style} onBeforeNavigate={onBeforeNavigate} />;
 
   return (
     <View style={style}>
@@ -54,6 +56,7 @@ export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps)
         const Row = BUILTIN_ROWS[item.id];
         return <Row key={item.key} onBeforeNavigate={onBeforeNavigate} />;
       })}
+      <ConnectorsSidebarItem onBeforeNavigate={onBeforeNavigate} />
     </View>
   );
 }

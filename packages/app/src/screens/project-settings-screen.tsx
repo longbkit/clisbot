@@ -26,6 +26,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Switch } from "@/components/ui/switch";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { ProjectEditSheet } from "@/components/project-edit-sheet";
+import { WithConnectorsTab } from "@/clisbot/connectors/connectors-tab";
 import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { SettingsGroup } from "@/components/settings/headings/settings-group";
@@ -304,20 +305,26 @@ function ProjectSettingsBody({
         snapshot={editSnapshot}
       />
 
-      {renderContent({
-        readQuery,
-        loadedConfig,
-        loadedRevision,
-        hasUncommittedWorktreeSetupChanges,
-        readError,
-        selectedHost,
-        queryKey,
-        client,
-        onReload: handleReload,
-        isHostGone,
-        onBackToProjects,
-        showBackToProjects,
-      })}
+      <WithConnectorsTab
+        serverId={selectedHost.serverId}
+        projectId={selectedHost.projectId}
+        subject="project"
+      >
+        {renderContent({
+          readQuery,
+          loadedConfig,
+          loadedRevision,
+          hasUncommittedWorktreeSetupChanges,
+          readError,
+          selectedHost,
+          queryKey,
+          client,
+          onReload: handleReload,
+          isHostGone,
+          onBackToProjects,
+          showBackToProjects,
+        })}
+      </WithConnectorsTab>
     </View>
   );
 }

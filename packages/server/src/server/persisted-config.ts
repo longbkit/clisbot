@@ -303,6 +303,8 @@ export const PersistedConfigSchema = z
           .object({ enabled: z.boolean().optional(), root: z.string().optional() })
           .strict()
           .optional(),
+        // Clisbot Connectors (docs/features/connectors/README.md); read at startup only.
+        connectors: z.object({ enabled: z.boolean().optional() }).strict().optional(),
       })
       .strict()
       .transform(({ allowedHosts, ...daemon }) => {

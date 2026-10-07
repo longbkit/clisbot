@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import type { AgentSessionConfig } from "./agent-sdk-types.js";
-import { withRuntimeClisbotMcpServer } from "./runtime-mcp-config.js";
+import {
+  stripInternalClisbotMcpServer,
+  stripRuntimeMcpServers,
+  withRuntimeClisbotMcpServer,
+} from "./runtime-mcp-config.js";
 
 const BASE_CONFIG: AgentSessionConfig = {
   provider: "claude",
@@ -47,5 +51,27 @@ describe("withRuntimeClisbotMcpServer", () => {
     });
 
     expect(result.mcpServers).toBeUndefined();
+  });
+});
+
+describe("stripping the daemon's per-launch MCP servers", () => {
+  const launched: AgentSessionConfig = {
+    ...BASE_CONFIG,
+    mcpServers: {
+      clisbot: { type: "http", url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=a" },
+      connectors_composio: { type: "http", url: "http://127.0.0.1:6868/mcp/connectors/composio" },
+      mine: { type: "stdio", command: "notes" },
+    },
+  };
+
+  test("a provider with native Clisbot tools loses only the clisbot entry, not its Connectors", () => {
+    expect(Object.keys(stripInternalClisbotMcpServer(launched).mcpServers ?? {})).toEqual([
+      "connectors_composio",
+      "mine",
+    ]);
+  });
+
+  test("a stored config keeps neither", () => {
+    expect(Object.keys(stripRuntimeMcpServers(launched).mcpServers ?? {})).toEqual(["mine"]);
   });
 });

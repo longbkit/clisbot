@@ -323,8 +323,10 @@ Browser tools also require `daemon.browserTools.enabled` and a connected browser
 This policy controls the catalog presented to an agent. It is not an authorization boundary for
 agents that can access the host through a shell.
 
-`daemon.mcp.injectIntoAgents` is the global override. When it is `false`, no provider receives
-Clisbot tools; otherwise the provider policy applies. Provider and global policy are resolved when a
+`daemon.mcp.injectIntoAgents` is the Host default. When it is `false`, no provider receives
+Clisbot tools unless the session's Project turns them on; otherwise the provider policy applies. A
+Project can turn them on or off and narrow them per tool
+([Agent tools](features/connectors/README.md#agent-tools)). Provider and global policy are resolved when a
 session is created, resumed, imported, or reloaded, so configuration changes affect the next
 session rather than an already-running one.
 

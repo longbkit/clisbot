@@ -43,6 +43,7 @@ import {
 } from "./model-manifest.js";
 import { parsePartialJsonObject } from "./partial-json.js";
 import { ClaudeSidechainTracker } from "./sidechain-tracker.js";
+import { claudeSkillNames, skillOverridesFor } from "./claude-skills.js";
 import { ClaudeTaskState } from "./task-state.js";
 import {
   ClaudeTaskProtocolSource,
@@ -322,6 +323,7 @@ const CLAUDE_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindConversation: true,
   supportsRewindFiles: true,
   supportsRewindBoth: true,
+  supportsSkillToggles: true,
 };
 
 const DEFAULT_MODES: AgentMode[] = [
@@ -390,6 +392,15 @@ function classifyClaudeSlashCommand(commandName: string): AgentSlashCommand["kin
   // metadata. Keep obvious root-only/session controls out of inline autocomplete and
   // treat the rest as skills; the worst failure mode is an inert inline suggestion.
   return CLAUDE_ROOT_ONLY_COMMANDS.has(commandName) ? "command" : "skill";
+}
+
+/** Clisbot: Claude's own skill names decide, when it reported them. */
+function claudeCommandKind(
+  commandName: string,
+  skillNames: ReadonlySet<string> | null,
+): AgentSlashCommand["kind"] {
+  if (!skillNames) return classifyClaudeSlashCommand(commandName);
+  return skillNames.has(commandName) ? "skill" : "command";
 }
 
 type ClaudeAgentConfig = Omit<AgentSessionConfig, "providerOptions"> & {
@@ -2052,6 +2063,9 @@ class ClaudeAgentSession implements AgentSession {
   private readonly queryFactory?: ClaudeQueryFactory;
   private readonly resolveBinary: () => Promise<string>;
   private query: Query | null = null;
+  /** Clisbot: the skills this session turned off, and the skill names Claude reported. */
+  private skillsOff: readonly string[] = [];
+  private skillNames: ReadonlySet<string> | null = null;
   private childProcess: ChildProcess | null = null;
   private input: AsyncMessageInput<SDKUserMessage> | null = null;
   /** The exact SDK query/input pair that owns the current foreground turn. */
@@ -2757,9 +2771,18 @@ class ClaudeAgentSession implements AgentSession {
     );
   }
 
+  async setSkillsOff(skills: readonly string[]): Promise<void> {
+    this.skillsOff = [...skills];
+    if (this.query) {
+      await this.query.applyFlagSettings({ skillOverrides: skillOverridesFor(this.skillsOff) });
+    }
+  }
+
   async listCommands(): Promise<AgentSlashCommand[]> {
     const q = await this.ensureQuery();
     const commands = await q.supportedCommands();
+    this.skillNames = await claudeSkillNames(q, this.skillNames);
+    const skillNames = this.skillNames;
     const commandMap = new Map<string, AgentSlashCommand>();
     for (const cmd of commands) {
       if (!commandMap.has(cmd.name)) {
@@ -2767,7 +2790,7 @@ class ClaudeAgentSession implements AgentSession {
           name: cmd.name,
           description: cmd.description,
           argumentHint: cmd.argumentHint,
-          kind: classifyClaudeSlashCommand(cmd.name),
+          kind: claudeCommandKind(cmd.name, skillNames),
         });
       }
     }
@@ -3183,6 +3206,9 @@ class ClaudeAgentSession implements AgentSession {
     const fastMode = this.resolveFastModeSetting();
     if (fastMode !== null) {
       await this.query.applyFlagSettings({ fastMode });
+    }
+    if (this.skillsOff.length > 0) {
+      await this.query.applyFlagSettings({ skillOverrides: skillOverridesFor(this.skillsOff) });
     }
     // Do not kick off background control-plane queries here. Methods like
     // supportedCommands()/setPermissionMode() may execute immediately after
@@ -4578,6 +4604,7 @@ class ClaudeAgentSession implements AgentSession {
     if (message.subtype !== "init") {
       return { threadStartedSessionId: null, notice: null };
     }
+    if (Array.isArray(message.skills)) this.skillNames = new Set(message.skills);
 
     const msgRecord = toObjectRecord(message) ?? {};
     const newSessionId = extractSessionIdRaw({

@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { BotPayload } from "@clisbot/protocol/bots/types";
+import { WithConnectorsTab } from "@/clisbot/connectors/connectors-tab";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { SettingsCard, SettingsSection, SettingsAction } from "@/components/settings";
 import { MAX_CONTENT_WIDTH } from "@/constants/layout";
@@ -72,7 +73,12 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
             <Text style={styles.text}>You do not have permission to configure this bot.</Text>
           ) : null}
           {bot?.canConfigure === true ? (
-            <>
+            <WithConnectorsTab
+              serverId={serverId}
+              projectId={bot.projectId}
+              subject="bot"
+              provider={bot.launch.provider}
+            >
               <BotCreateForm
                 defaultServerId={serverId}
                 name={bot.name}
@@ -82,7 +88,7 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
                 onCancel={actions.cancel}
               />
               <BotManagementSections actions={actions} />
-            </>
+            </WithConnectorsTab>
           ) : null}
         </View>
       </ScrollView>

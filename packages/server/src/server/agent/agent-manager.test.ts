@@ -1,3 +1,4 @@
+import { CONNECTORS_OFF_LABEL } from "@clisbot/protocol/connectors/types";
 import { FileAgentTimelineStore } from "./session-storage/file-agent-timeline-store.js";
 import { pendingSessionEvents } from "./session-storage/pending-event-budget.js";
 import { SessionStorageOverloadError } from "./session-storage/store-admission.js";
@@ -12391,4 +12392,218 @@ test("startup notices reuse durable history while explicit disk refresh still re
     await manager.flush();
     rmSync(workdir, { recursive: true, force: true });
   }
+});
+
+test("a Project's choice of Clisbot tools wins over the Host's", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const client = new McpCapableTestAgentClient();
+  let ids = 0;
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    logger,
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
+    idFactory: () => `00000000-0000-4000-8000-00000000031${ids++}`,
+  });
+  // The Host does not inject the Clisbot tools.
+  manager.setClisbotToolsEnabled(false);
+  let choice: boolean | undefined = true;
+  manager.setRuntimeMcpServers(async () => ({
+    servers: {},
+    preapproved: [],
+    ...(choice === undefined ? {} : { clisbotTools: choice }),
+  }));
+  const create = () =>
+    manager.createAgent({ provider: "codex", cwd: workdir }, undefined, { workspaceId: undefined });
+
+  const on = await create();
+  expect(client.createdConfigs.at(-1)?.mcpServers).toHaveProperty("clisbot");
+  expect(manager.getClisbotToolPolicy(on.id)?.enabled).toBe(true);
+  choice = undefined;
+  await create();
+  expect(client.createdConfigs.at(-1)?.mcpServers ?? {}).not.toHaveProperty("clisbot");
+  // A Project that turns them off withholds them even when the Host gives them.
+  manager.setClisbotToolsEnabled(true);
+  choice = false;
+  await create();
+  expect(client.createdConfigs.at(-1)?.mcpServers ?? {}).not.toHaveProperty("clisbot");
+
+  rmSync(workdir, { recursive: true, force: true });
+});
+
+class SkillsTestSession extends TestAgentSession {
+  readonly skillsOffCalls: string[][] = [];
+
+  async setSkillsOff(skills: readonly string[]): Promise<void> {
+    this.skillsOffCalls.push([...skills]);
+  }
+}
+
+class SkillsTestAgentClient extends TestAgentClient {
+  readonly sessions: SkillsTestSession[] = [];
+
+  override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+    const session = new SkillsTestSession(config);
+    this.sessions.push(session);
+    return session;
+  }
+}
+
+test("hands the session's skills off list to the provider at start and when it changes", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const client = new SkillsTestAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000341",
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+    labels: { [CONNECTORS_OFF_LABEL]: "gmail,skill:pdf" },
+  });
+  const session = client.sessions[0]!;
+  expect(session.skillsOffCalls).toEqual([["pdf"]]);
+  await manager.setLabels(agent.id, { [CONNECTORS_OFF_LABEL]: "skill:docx,skill:pdf" });
+  // A change that leaves the skills as they are is not sent again.
+  await manager.setLabels(agent.id, { [CONNECTORS_OFF_LABEL]: "skill:docx,skill:pdf,mcp:notes" });
+  await manager.setLabels(agent.id, { [CONNECTORS_OFF_LABEL]: "" });
+  expect(session.skillsOffCalls).toEqual([["pdf"], ["docx", "pdf"], []]);
+
+  rmSync(workdir, { recursive: true, force: true });
+});
+
+test("runtime MCP servers reach the launch config but never the stored record", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const client = new McpCapableTestAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000301",
+  });
+  const asked: Array<{ agentId: string; cwd: string | undefined }> = [];
+  manager.setRuntimeMcpServers(async (params) => {
+    asked.push(params);
+    return {
+      servers: {
+        connectors_composio: { type: "http", url: "http://127.0.0.1:1/mcp/connectors/composio" },
+      },
+      preapproved: [{ server: "connectors_composio", tool: "COMPOSIO_SEARCH_TOOLS" }],
+    };
+  });
+
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  expect(asked).toEqual([{ agentId: snapshot.id, cwd: workdir }]);
+  expect(client.createdConfigs[0]?.mcpServers).toMatchObject({
+    connectors_composio: { type: "http" },
+  });
+  expect(client.createdConfigs[0]?.toolPolicy?.preapproved).toEqual([
+    { kind: "mcp", server: "connectors_composio", tool: "COMPOSIO_SEARCH_TOOLS" },
+  ]);
+  await manager.flush();
+  const record = await storage.get(snapshot.id);
+  expect(JSON.stringify(record)).not.toContain("connectors_composio");
+
+  rmSync(workdir, { recursive: true, force: true });
+});
+
+test("requestDaemonPermission shows a pending request and resolves with the person's answer", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const client = new TestAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000302",
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  const decided = manager.requestDaemonPermission(snapshot.id, {
+    id: "connector_abc",
+    name: "GMAIL_SEND_EMAIL",
+    kind: "tool",
+    title: "Send with Composio: GMAIL_SEND_EMAIL",
+  });
+  await vi.waitFor(() => {
+    expect(manager.getPendingPermissions(snapshot.id).map((request) => request.id)).toEqual([
+      "connector_abc",
+    ]);
+  });
+  // A second request with an open id would orphan the first one's waiter.
+  await expect(
+    manager.requestDaemonPermission(snapshot.id, { id: "connector_abc", name: "x", kind: "tool" }),
+  ).rejects.toThrow("already open");
+  // The provider never sees the answer: TestAgentSession would accept any id.
+  await manager.respondToPermission(snapshot.id, "connector_abc", {
+    behavior: "deny",
+    message: "not now",
+  });
+  await expect(decided).resolves.toEqual({ behavior: "deny", message: "not now" });
+  expect(manager.getPendingPermissions(snapshot.id)).toEqual([]);
+
+  // The daemon closes its own request, as the connect card does once the account is active.
+  const closing = manager.requestDaemonPermission(snapshot.id, {
+    id: "connector_def",
+    name: "connect:gmail",
+    kind: "tool",
+  });
+  await vi.waitFor(() => {
+    expect(manager.getPendingPermissions(snapshot.id)).toHaveLength(1);
+  });
+  await manager.resolveDaemonPermission(snapshot.id, "connector_def", { behavior: "allow" });
+  await expect(closing).resolves.toEqual({ behavior: "allow" });
+  await manager.resolveDaemonPermission(snapshot.id, "unknown", { behavior: "allow" });
+
+  rmSync(workdir, { recursive: true, force: true });
+});
+
+test("a daemon card outlives answers to other requests and ends with its agent", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000303",
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const first = manager.requestDaemonPermission(snapshot.id, {
+    id: "connector_send_1",
+    name: "GMAIL_SEND_EMAIL",
+    kind: "tool",
+  });
+  const second = manager.requestDaemonPermission(snapshot.id, {
+    id: "connector_send_2",
+    name: "SLACK_SEND_MESSAGE",
+    kind: "tool",
+  });
+  await vi.waitFor(() => {
+    expect(manager.getPendingPermissions(snapshot.id)).toHaveLength(2);
+  });
+  expect(manager.isDaemonPermissionRequest(snapshot.id, "connector_send_2")).toBe(true);
+  expect(manager.isDaemonPermissionRequest(snapshot.id, "provider_request")).toBe(false);
+
+  // Answering one refreshes the provider's requests; the provider never had the other one.
+  await manager.respondToPermission(snapshot.id, "connector_send_1", { behavior: "allow" });
+  await expect(first).resolves.toEqual({ behavior: "allow" });
+  expect(manager.getPendingPermissions(snapshot.id).map((request) => request.id)).toEqual([
+    "connector_send_2",
+  ]);
+
+  // Closing the agent ends the daemon's wait at once instead of after the timeout.
+  await manager.closeAgent(snapshot.id);
+  await expect(second).resolves.toMatchObject({ behavior: "deny" });
+
+  rmSync(workdir, { recursive: true, force: true });
 });
