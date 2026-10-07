@@ -137,12 +137,14 @@ there belongs to that user's DM, not to other people's sessions of a shared Bot.
 not repeat DMs. The selected fill follows the open DM's Bot row or the active group row.
 
 A sidebar row's menu and the open chat's options menu list the same resource actions, in the same
-order and words, from `chatResourceActions` (`packages/app/src/clisbot/bots/chat/chat-resource-actions.ts`):
-**Pin to sidebar**/**Unpin**, then **Bot settings** (a Bot row or DM, with configuration authority)
-or **Group settings** (a group), then **Connect to a channel…** (a Bot row or DM, see D15), then
-**Archive chat…** (a chat, never a Bot row). Group settings from
-the sidebar opens the chat with `?panel=group-settings`, which opens the chat's own settings sheet.
-Page actions (Switch tab, Project actions, Start a fresh session) stay in the chat options menu.
+order, words and icons, from `chatResourceActions` and `chat-resource-icons.tsx`
+(`packages/app/src/clisbot/bots/chat/`): **Bot settings** (a Bot row or DM, with configuration
+authority) or **Group settings** and **Members** (a group), then **Connect to a channel…** (a Bot
+row or DM, see D15), then **Pin to sidebar**/**Unpin**, and **Archive chat…** last (a chat, never a
+Bot row): the two that change where the chat sits close the list. Group settings and Members from
+the sidebar open the chat with `?panel=group-settings` or `?panel=members`, which opens the chat's
+own sheet. Page actions (Switch tab, Project actions, Start a fresh session) stay in the chat
+options menu, before Pin and Archive.
 
 Pinning a DM or its Bot represents the same sidebar item. Existing duplicate pins are resolved
 when the chat catalog loads; unpinning either surface removes the known aliases. Unknown/offline

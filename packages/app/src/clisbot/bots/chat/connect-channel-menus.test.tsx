@@ -47,9 +47,9 @@ describe("sidebar Bot row menu", () => {
   it("offers Connect to a channel… and opens Channels on the Bot", () => {
     const menu = openBotMenu("server-mac");
     expect(menu.current.actions.map((action) => action.id)).toEqual([
-      "pin",
       "bot-settings",
       "connect-channel",
+      "pin",
     ]);
     act(() => menu.current.selectAction("connect-channel"));
     expect(env.onBeforeNavigate).toHaveBeenCalledTimes(1);
@@ -59,7 +59,7 @@ describe("sidebar Bot row menu", () => {
 
   it("leaves it out when the Bot cannot run on a Route there", () => {
     const menu = openBotMenu("server-laptop");
-    expect(menu.current.actions.map((action) => action.id)).toEqual(["pin", "bot-settings"]);
+    expect(menu.current.actions.map((action) => action.id)).toEqual(["bot-settings", "pin"]);
   });
 });
 
@@ -82,6 +82,7 @@ describe("Chat options of a DM", () => {
         group,
         close,
         openGroupSettings: vi.fn(),
+        openMembers: vi.fn(),
         archive: vi.fn(async () => undefined),
       }),
     );
@@ -91,8 +92,8 @@ describe("Chat options of a DM", () => {
   it("offers Connect to a channel… for the DM's Bot and opens Channels on it", () => {
     const { result, close } = menu("server-mac", false);
     expect(result.current.actions.map((action) => action.id)).toEqual([
-      "pin",
       "connect-channel",
+      "pin",
       "archive",
     ]);
     act(() => result.current.runAction("connect-channel"));

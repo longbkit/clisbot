@@ -9,9 +9,15 @@ import { ConversationProjectActions } from "./conversation-project-actions";
 import { useConversationProjectContext } from "./conversation-project-context";
 import { GroupChatSettings } from "./group-chat-settings";
 
-export type ChatOptionsDetail = "participants" | "project" | null;
+export type ChatOptionsDetail = "group-settings" | "members" | "project" | null;
 
-/** The sheet the chat options menu opens: Group settings, Project actions, or an error. */
+const DETAIL_TITLES = {
+  "group-settings": "Group settings",
+  members: "Members",
+  project: "Project",
+};
+
+/** The sheet the chat options menu opens: Group settings, Members, Project actions, or an error. */
 export function ChatOptionsDetailsSheet({
   active,
   detail,
@@ -37,10 +43,7 @@ export function ChatOptionsDetailsSheet({
   onClose: () => void;
 }) {
   const project = useConversationProjectContext();
-  const header = useMemo(
-    () => ({ title: detail === "project" ? "Project" : "Group settings" }),
-    [detail],
-  );
+  const header = useMemo(() => ({ title: detail ? DETAIL_TITLES[detail] : "Chat" }), [detail]);
   return (
     <AdaptiveModalSheet
       visible={active && (detail !== null || error !== null)}
@@ -52,16 +55,16 @@ export function ChatOptionsDetailsSheet({
           {detail === "project" && project ? (
             <ConversationProjectActions project={project} onChoose={onClose} />
           ) : null}
-          {detail === "participants" && group ? (
-            <>
-              <ChatParticipantSettings
-                chat={chat}
-                bots={bots}
-                disabled={offline}
-                toggle={toggleParticipant}
-              />
-              <GroupChatSettings key={chat.id} serverId={serverId} chat={chat} onSaved={onClose} />
-            </>
+          {detail === "members" && group ? (
+            <ChatParticipantSettings
+              chat={chat}
+              bots={bots}
+              disabled={offline}
+              toggle={toggleParticipant}
+            />
+          ) : null}
+          {detail === "group-settings" && group ? (
+            <GroupChatSettings key={chat.id} serverId={serverId} chat={chat} onSaved={onClose} />
           ) : null}
           {error ? (
             <Text accessibilityRole="alert" style={styles.text}>

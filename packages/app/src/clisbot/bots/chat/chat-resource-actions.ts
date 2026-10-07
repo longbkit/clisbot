@@ -8,6 +8,7 @@ export type ChatResourceActionId =
   | "bot-settings"
   | "connect-channel"
   | "group-settings"
+  | "members"
   | "archive";
 
 export interface ChatResourceAction {
@@ -27,16 +28,21 @@ export interface ChatResourceActionsInput {
 }
 
 /**
- * Pin first, settings next, then Connect to a channel…, archive last. A Bot row archives nothing:
- * the row is the bot. A group runs several Bots, so it connects none of them to a channel.
+ * Settings first (and a group's Members), then Connect to a channel…, then Pin, archive last: the
+ * two that change where the chat sits close the list. A Bot row archives nothing: the row is the
+ * bot. A group runs several Bots, so it connects none of them to a channel.
  */
 export function chatResourceActions(input: ChatResourceActionsInput): ChatResourceAction[] {
-  const actions: ChatResourceAction[] = [pinAction(input.pinned)];
+  const actions: ChatResourceAction[] = [];
   if (input.target !== "group" && input.canConfigureBot)
     actions.push({ id: "bot-settings", label: "Bot settings" });
+  if (input.target === "group") {
+    actions.push({ id: "group-settings", label: "Group settings" });
+    actions.push({ id: "members", label: "Members" });
+  }
   if (input.target !== "group" && input.canConnectChannel)
     actions.push({ id: "connect-channel", label: "Connect to a channel…" });
-  if (input.target === "group") actions.push({ id: "group-settings", label: "Group settings" });
+  actions.push(pinAction(input.pinned));
   if (input.target !== "bot") actions.push({ id: "archive", label: "Archive chat…" });
   return actions;
 }

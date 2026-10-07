@@ -62,7 +62,7 @@ export function useChatMembership(serverId: string, chat: ChatPayload) {
   return { ...task, connected: client !== null, toggleParticipant, archive };
 }
 
-/** The chat's own actions (pin, settings, archive) and what selecting each one does. */
+/** The chat's own actions (settings, Members, pin, archive) and what selecting each one does. */
 export function useChatResourceMenu(input: {
   serverId: string;
   chat: ChatPayload;
@@ -70,9 +70,10 @@ export function useChatResourceMenu(input: {
   group: boolean;
   close: () => void;
   openGroupSettings: () => void;
+  openMembers: () => void;
   archive: () => Promise<void>;
 }) {
-  const { serverId, chat, bots, group, close, openGroupSettings, archive } = input;
+  const { serverId, chat, bots, group, close, openGroupSettings, openMembers, archive } = input;
   const router = useRouter();
   const pinChats = useMemo(() => [{ ...chat, serverId }], [chat, serverId]);
   const { toggle: togglePin, isPinned } = useResourcePins(pinChats);
@@ -111,9 +112,10 @@ export function useChatResourceMenu(input: {
       if (id === "bot-settings") return configureBot();
       if (id === "connect-channel") return connectChannel();
       if (id === "group-settings") return openGroupSettings();
+      if (id === "members") return openMembers();
       void archive();
     },
-    [archive, togglePin, pin, configureBot, connectChannel, openGroupSettings],
+    [archive, togglePin, pin, configureBot, connectChannel, openGroupSettings, openMembers],
   );
   return { actions, runAction };
 }

@@ -7,7 +7,13 @@ import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { BotPayload } from "../data/contracts";
 import type { ChatResourceAction, ChatResourceActionId } from "./chat-resource-actions";
-import { GROUP_SETTINGS_PANEL } from "./chat-panel-param";
+import { GROUP_SETTINGS_PANEL, MEMBERS_PANEL } from "./chat-panel-param";
+import {
+  FRESH_SESSION_ICON,
+  PROJECT_ACTIONS_ICON,
+  SWITCH_TAB_ICON,
+  resourceActionIcon,
+} from "./chat-resource-icons";
 import { isGroupChat } from "./chat-kind";
 import { ChatOptionsDetailsSheet, type ChatOptionsDetail } from "./chat-options-details";
 import { useChatOptionsPages } from "./chat-options-pages";
@@ -50,9 +56,10 @@ export function ChatOptions({
   useEffect(() => {
     if (!active) close();
   }, [active, close]);
-  const openGroupSettings = useCallback(() => setDetail("participants"), []);
+  const openGroupSettings = useCallback(() => setDetail("group-settings"), []);
+  const openMembers = useCallback(() => setDetail("members"), []);
   const openProject = useCallback(() => setDetail("project"), []);
-  useGroupSettingsPanel(group, openGroupSettings);
+  useChatPanelParam(group, setDetail);
   const { actions, runAction } = useChatResourceMenu({
     serverId,
     chat,
@@ -60,6 +67,7 @@ export function ChatOptions({
     group,
     close,
     openGroupSettings,
+    openMembers,
     archive: membership.archive,
   });
   const busy = membership.busy || !membership.connected;
@@ -88,7 +96,10 @@ export function ChatOptions({
   );
 }
 
-/** The trigger and the menu: tabs, the chat's own actions, Project actions, fresh session. */
+/**
+ * The trigger and the menu: tabs; the chat's settings, Members and channel; Project actions; then
+ * a fresh session, Pin and Archive, as the sidebar row's menu ends.
+ */
 function ChatOptionsMenu({
   group,
   actions,
@@ -112,6 +123,8 @@ function ChatOptionsMenu({
   const project = useConversationProjectContext();
   const { pages, tabCount } = useChatOptionsPages(group);
   const archiveAction = actions.find((action) => action.id === "archive");
+  const pinAction = actions.find((action) => action.id === "pin");
+  const middle = actions.filter((action) => action.id !== "archive" && action.id !== "pin");
   return (
     <DropdownMenu compactMode="sheet" open={visible} onOpenChange={setVisible}>
       <DropdownMenuTrigger
@@ -122,20 +135,28 @@ function ChatOptionsMenu({
         <ThemedEllipsis size={18} uniProps={mutedIconColorMapping} />
       </DropdownMenuTrigger>
       <DropdownMenuContent sheetTitle="Chat options" align="end" width={280} pages={pages}>
-        <DropdownMenuSubTrigger id="tabs" disabled={!tabCount} value={String(tabCount)}>
+        <DropdownMenuSubTrigger
+          id="tabs"
+          disabled={!tabCount}
+          value={String(tabCount)}
+          leading={SWITCH_TAB_ICON}
+        >
           Switch tab
         </DropdownMenuSubTrigger>
         <DropdownMenuSeparator />
-        {actions
-          .filter((action) => action.id !== "archive")
-          .map((action) => (
-            <ResourceActionItem key={action.id} action={action} onSelect={onAction} />
-          ))}
+        {middle.map((action) => (
+          <ResourceActionItem key={action.id} action={action} onSelect={onAction} />
+        ))}
         {project ? (
-          <DropdownMenuItem onSelect={onOpenProject}>Project actions</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onOpenProject} leading={PROJECT_ACTIONS_ICON}>
+            Project actions
+          </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
-        <DropdownMenuSubTrigger id="fresh">Start a fresh session</DropdownMenuSubTrigger>
+        <DropdownMenuSubTrigger id="fresh" leading={FRESH_SESSION_ICON}>
+          Start a fresh session
+        </DropdownMenuSubTrigger>
+        {pinAction ? <ResourceActionItem action={pinAction} onSelect={onAction} /> : null}
         {archiveAction ? (
           <ResourceActionItem
             action={archiveAction}
@@ -159,21 +180,28 @@ function ResourceActionItem({
 }) {
   const select = useCallback(() => onSelect(action.id), [action.id, onSelect]);
   return (
-    <DropdownMenuItem disabled={disabled} onSelect={select}>
+    <DropdownMenuItem disabled={disabled} onSelect={select} leading={resourceActionIcon(action)}>
       {action.label}
     </DropdownMenuItem>
   );
 }
 
-/** Opens Group settings once when the route asks for it (`?panel=group-settings`). */
-function useGroupSettingsPanel(group: boolean, open: () => void) {
+const PANEL_DETAILS: Record<string, ChatOptionsDetail> = {
+  [GROUP_SETTINGS_PANEL]: "group-settings",
+  [MEMBERS_PANEL]: "members",
+};
+
+/** Opens Group settings or Members once when the route asks (`?panel=group-settings|members`). */
+function useChatPanelParam(group: boolean, open: (detail: ChatOptionsDetail) => void) {
   const { panel } = useLocalSearchParams<{ panel?: string }>();
   const router = useRouter();
   const { setVisible } = useChatOptionsState();
   useEffect(() => {
-    if (panel !== GROUP_SETTINGS_PANEL || !group) return;
+    if (!group) return;
+    const detail = PANEL_DETAILS[panel ?? ""];
+    if (!detail) return;
     setVisible(false);
-    open();
+    open(detail);
     router.setParams({ panel: undefined });
   }, [panel, group, open, router, setVisible]);
 }
