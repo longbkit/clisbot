@@ -1015,6 +1015,10 @@ function WorkspaceHeaderTitleBar({
   onViewScriptTerminal,
   onOpenUrlInBrowserTab,
 }: WorkspaceHeaderTitleBarProps) {
+  const workspaceRef = useMemo(
+    () => ({ serverId: normalizedServerId, workspaceId: normalizedWorkspaceId }),
+    [normalizedServerId, normalizedWorkspaceId],
+  );
   return (
     <View style={styles.headerTitleContainer}>
       {isLoading ? (
@@ -1044,6 +1048,7 @@ function WorkspaceHeaderTitleBar({
             createTerminalDisabled={createTerminalDisabled}
             importAgentDisabled={importAgentDisabled}
             copyPathDisabled={copyPathDisabled}
+            workspaceRef={workspaceRef}
             onCreateDraftTab={onCreateDraftTab}
             onCreateTerminal={onCreateTerminal}
             onCreateTerminalWithProfile={onCreateTerminalWithProfile}
@@ -1060,6 +1065,7 @@ function WorkspaceHeaderTitleBar({
             showWorkspaceSetup={showWorkspaceSetup}
             importAgentDisabled={importAgentDisabled}
             copyPathDisabled={copyPathDisabled}
+            workspaceRef={workspaceRef}
             onOpenImportSheet={onOpenImportSheet}
             onCopyWorkspacePath={onCopyWorkspacePath}
             onCopyBranchName={onCopyBranchName}

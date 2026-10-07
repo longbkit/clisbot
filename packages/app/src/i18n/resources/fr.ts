@@ -735,6 +735,7 @@ export const fr: TranslationResources = {
         newBrowser: "Nouvel onglet du navigateur",
         importSession: "Session d'importation",
         copyPath: "Copier le chemin de l'espace de travail",
+        copyProjectPath: "Copier le chemin du projet",
         copyBranchName: "Copier le nom de la branche",
         showSetup: "Afficher la configuration",
       },
@@ -744,6 +745,7 @@ export const fr: TranslationResources = {
         terminalQueued:
           "Préparation de l'espace de travail, ouverture du terminal lorsque vous êtes prêt...",
         workspacePathCopiedLabel: "CheminWorkspace",
+        projectPathCopiedLabel: "Chemin du projet",
         branchNameCopiedLabel: "Nom de la succursale",
       },
     },

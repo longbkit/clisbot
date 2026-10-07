@@ -735,6 +735,7 @@ export const ru: TranslationResources = {
         newBrowser: "Новая вкладка браузера",
         importSession: "Импортировать сессию",
         copyPath: "Скопировать путь к рабочему пространству",
+        copyProjectPath: "Копировать путь проекта",
         copyBranchName: "Скопировать название ветки",
         showSetup: "Показать настройку рабочего пространства",
       },
@@ -744,6 +745,7 @@ export const ru: TranslationResources = {
         terminalQueued:
           "Рабочее пространство подготавливается. Терминал откроется, когда оно будет готово...",
         workspacePathCopiedLabel: "Путь к рабочему пространству",
+        projectPathCopiedLabel: "Путь проекта",
         branchNameCopiedLabel: "Имя ветки",
       },
     },

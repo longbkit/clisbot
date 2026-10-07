@@ -30,6 +30,7 @@ import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-l
 import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { wrappablePath } from "@/utils/shorten-path";
+import { CopyProjectPathItem } from "@/clisbot/workspace-header/copy-project-path-item";
 import type { Theme } from "@/styles/theme";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
@@ -77,6 +78,8 @@ export interface WorkspaceHeaderWorkspaceActions {
   showWorkspaceSetup: boolean;
   importAgentDisabled: boolean;
   copyPathDisabled: boolean;
+  /** Clisbot: which workspace, so the menu can offer Copy project path beside Copy workspace path. */
+  workspaceRef?: { serverId: string; workspaceId: string };
   onOpenImportSheet: () => void;
   onCopyWorkspacePath: () => void;
   onCopyBranchName: () => void;
@@ -89,6 +92,7 @@ function WorkspaceHeaderWorkspaceActionItems({
   showWorkspaceSetup,
   importAgentDisabled,
   copyPathDisabled,
+  workspaceRef,
   onOpenImportSheet,
   onCopyWorkspacePath,
   onCopyBranchName,
@@ -123,6 +127,7 @@ function WorkspaceHeaderWorkspaceActionItems({
       >
         {t("workspace.header.actions.importSession")}
       </DropdownMenuItem>
+      {workspaceRef ? <CopyProjectPathItem {...workspaceRef} /> : null}
       {showWorkspaceSetup ? (
         <>
           <DropdownMenuSeparator />
