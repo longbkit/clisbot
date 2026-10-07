@@ -69,7 +69,7 @@ used it. Only a Hub-only invitation from the Hub's own screen was missing.
 | #   | Screen                      | File                                                                                                 |
 | --- | --------------------------- | ---------------------------------------------------------------------------------------------------- |
 | A   | Host → Pair device          | [`pair-device-section.tsx`](../../../packages/app/src/desktop/components/pair-device-section.tsx)    |
-| B   | Add connection              | [`add-host-method-modal.tsx`](../../../packages/app/src/components/add-host-method-modal.tsx)        |
+| B   | Add connection, Welcome     | [`host-connection-methods.tsx`](../../../packages/app/src/components/host-connection-methods.tsx)    |
 | C   | Direct connection           | [`add-host-modal.tsx`](../../../packages/app/src/components/add-host-modal.tsx)                      |
 | D   | Host → Connections          | [`host-page.tsx`](../../../packages/app/src/screens/settings/host-page.tsx) `ConnectionsSection`     |
 | E   | Hub started on relay        | [`hub-settings.tsx`](../../../packages/app/src/device-access/hub-settings.tsx) `HubOverviewSettings` |
@@ -140,6 +140,13 @@ Before                                   After
 ▸ Paste pairing link                     Other ways
   Encrypted relay connection.            ▸ Direct connection   ▸ Remote SSH
 ```
+
+Welcome's **Your own computer** shows the same list as lifted cards, ahead of the Hub card, so
+both say where the link comes from and that it carries Tailscale; **How connecting works** opens
+[clisbot.com/docs/connectivity](../../../public-docs/connectivity.md). Where no QR can be scanned
+(web, F-Droid), Paste pairing link takes the QR row's description, since "Same as the QR code"
+would point at nothing. Nothing on Welcome is filled with accent: the cards and the Hub sign-in are
+choices, not one CTA.
 
 ### C. Direct connection
 

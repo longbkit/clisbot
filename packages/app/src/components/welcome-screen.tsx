@@ -3,15 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import {
-  QrCode,
-  Link2,
-  ClipboardPaste,
-  ExternalLink,
-  Settings,
-  Terminal,
-  X,
-} from "lucide-react-native";
+import { ExternalLink, Settings, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { HostProfile } from "@/types/host-connection";
 import { getHostRuntimeStore, isHostRuntimeConnected, useHosts } from "@/runtime/host-runtime";
@@ -27,19 +19,17 @@ import {
 } from "@/utils/host-routes";
 import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { openExternalUrl } from "@/utils/open-external-url";
-import { isFdroidBuild } from "@/constants/build-profile";
-import { isWeb, isNative } from "@/constants/platform";
-import { isElectronRuntime } from "@/desktop/host";
+import { isNative } from "@/constants/platform";
 import { HubWelcomeSignIn, WelcomeOwnComputerLabel } from "@/clisbot/hub/welcome-sign-in";
+import { HostConnectionMethods, type HostConnectionMethod } from "./host-connection-methods";
 import { ProductAnalyticsWelcomeNotice } from "@/clisbot/analytics/welcome-notice";
 
-interface WelcomeAction {
-  key: "scan-qr" | "direct-connection" | "remote-ssh" | "paste-pairing-link";
-  label: string;
-  testID: string;
-  icon: typeof QrCode;
-  onPress: () => void;
-}
+const ACTION_TEST_IDS: Record<HostConnectionMethod, string> = {
+  scanQr: "welcome-scan-qr",
+  pasteLink: "welcome-paste-pairing-link",
+  direct: "welcome-direct-connection",
+  remoteSsh: "welcome-remote-ssh",
+};
 
 const styles = StyleSheet.create((theme) => ({
   root: {
@@ -81,29 +71,6 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: 420,
     gap: theme.spacing[3],
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.spacing[3],
-    paddingVertical: theme.spacing[4],
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface2,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  actionButtonPrimary: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-  },
-  actionText: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
-  },
-  actionTextPrimary: {
-    color: theme.colors.accentForeground,
   },
   setupLink: {
     flexDirection: "row",
@@ -245,47 +212,6 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
     [onHostAdded, finishOnboarding],
   );
 
-  // One order on every platform, pairing methods first: scanning a QR code and pasting the link it
-  // encodes are the same connection, so they stay adjacent. Platforms drop the rows they lack
-  // instead of reordering the rest, and the first row that survives is the recommended one.
-  const actions: WelcomeAction[] = [
-    ...(isWeb || isFdroidBuild
-      ? []
-      : [
-          {
-            key: "scan-qr" as const,
-            label: t("pairing.connectionMethods.scanQr.title"),
-            testID: "welcome-scan-qr",
-            icon: QrCode,
-            onPress: handleScanQr,
-          },
-        ]),
-    {
-      key: "paste-pairing-link",
-      label: t("pairing.connectionMethods.pasteLink.title"),
-      testID: "welcome-paste-pairing-link",
-      icon: ClipboardPaste,
-      onPress: handleOpenPasteLink,
-    },
-    {
-      key: "direct-connection",
-      label: t("pairing.connectionMethods.direct.title"),
-      testID: "welcome-direct-connection",
-      icon: Link2,
-      onPress: handleOpenDirect,
-    },
-    ...(isElectronRuntime()
-      ? [
-          {
-            key: "remote-ssh" as const,
-            label: t("pairing.connectionMethods.remoteSsh.title"),
-            testID: "welcome-remote-ssh",
-            icon: Terminal,
-            onPress: handleOpenRemoteSsh,
-          },
-        ]
-      : []),
-  ];
   const scrollContentContainerStyle = useMemo(
     () => [styles.container, { paddingBottom: theme.spacing[6] + insets.bottom }],
     [theme.spacing, insets.bottom],
@@ -336,15 +262,20 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
             ) : null}
           </View>
 
-          {/* COMPAT(clisbot-welcome-hub-sign-in): managed Hosts beside adding a Host directly. */}
-          <HubWelcomeSignIn />
-
+          {/* Your own computer leads: pairing it is the way most people start. */}
           <View style={styles.actions}>
             <WelcomeOwnComputerLabel />
-            {actions.map((action, index) => (
-              <WelcomeActionButton key={action.key} action={action} primary={index === 0} />
-            ))}
+            <HostConnectionMethods
+              onScanQr={handleScanQr}
+              onPasteLink={handleOpenPasteLink}
+              onDirectConnection={handleOpenDirect}
+              onRemoteSsh={handleOpenRemoteSsh}
+              testIDs={ACTION_TEST_IDS}
+            />
           </View>
+
+          {/* COMPAT(clisbot-welcome-hub-sign-in): managed Hosts beside adding a Host directly. */}
+          <HubWelcomeSignIn />
         </View>
         <ProductAnalyticsWelcomeNotice />
         <Text style={styles.versionLabel}>{appVersionText}</Text>
@@ -370,30 +301,5 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
         />
       </ScrollView>
     </View>
-  );
-}
-
-interface WelcomeActionButtonProps {
-  action: WelcomeAction;
-  /** The recommended way to connect on this platform: the first row that the platform keeps. */
-  primary: boolean;
-}
-
-function WelcomeActionButton({ action, primary }: WelcomeActionButtonProps) {
-  const { theme } = useUnistyles();
-  const Icon = action.icon;
-  const buttonStyle = useMemo(
-    () => [styles.actionButton, primary ? styles.actionButtonPrimary : null],
-    [primary],
-  );
-  const textStyle = useMemo(
-    () => [styles.actionText, primary ? styles.actionTextPrimary : null],
-    [primary],
-  );
-  return (
-    <Pressable style={buttonStyle} onPress={action.onPress} testID={action.testID}>
-      <Icon size={18} color={primary ? theme.colors.accentForeground : theme.colors.foreground} />
-      <Text style={textStyle}>{action.label}</Text>
-    </Pressable>
   );
 }

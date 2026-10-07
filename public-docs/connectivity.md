@@ -8,7 +8,7 @@ category: Getting started
 
 # Connectivity
 
-Your Clisbot app connects to the daemon running on your computer or server. Clisbot Desktop and the CLI can tunnel through SSH. Mobile clients can connect through the Clisbot relay or directly with Tailscale.
+Your Clisbot app connects to the daemon running on your computer or server. Clisbot Desktop and the CLI can tunnel through SSH. A phone or browser pairs with the daemon: open **Pair a device** on the computer, then scan the QR code or paste the pairing link. The link carries every route the daemon offers, and the app tries Tailscale first and falls back to the relay.
 
 This is client-to-daemon transport. If you are looking for the service that starts agents from GitHub, Slack, and Discord events, that is [Hub](/docs/hub).
 
@@ -71,51 +71,63 @@ Confirm when prompted. Clisbot prints a QR code and pairing link. Scan the QR co
 
 ## Tailscale
 
-Install [Tailscale](https://tailscale.com/download) on the daemon machine and your phone. Sign in to the same tailnet on both devices.
+Tailscale is the fastest route: your phone reaches the daemon directly over your tailnet. Install [Tailscale](https://tailscale.com/download) on the daemon machine and on your phone, and sign in to the same tailnet on both.
 
-### 1. Find the daemon machine's Tailscale IP
+### Set up Tailscale from Clisbot Desktop
 
-Run this on the daemon machine:
+1. Open **Settings → your host → Pair a device**.
+2. Under **Ways to connect**, select **Set up** on the **Tailscale** row. Clisbot puts the daemon behind `tailscale serve` and shows its `*.ts.net` address when the row reads **On**.
+3. Scan the QR code with Clisbot on your phone, or choose **Paste pairing link** in the phone app. The QR code lists the routes it carries, for example **Contains: Tailscale · Relay**.
 
-```bash
-tailscale ip -4
-```
+The Tailscale row shows one action for each state:
 
-Copy the address it prints. The example below uses `100.101.102.103`.
+| State         | What to do                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| Not installed | Select **Get Tailscale**, install it on the daemon machine, then return.                          |
+| Signed out    | Sign in to Tailscale on the daemon machine, then select **Retry**.                                |
+| Not running   | Start Tailscale on the daemon machine, then select **Retry**.                                     |
+| HTTPS off     | Select **Enable on tailnet**. A tailnet admin turns on HTTPS certificates. Then select **Retry**. |
 
-### 2. Configure the daemon
+Setting up Tailscale does not turn the relay on or off.
 
-Open `~/.clisbot/config.json` and set `daemon.listen` to the Tailscale IP:
+### Set up Tailscale from the CLI
 
-```json
-{
-  "$schema": "https://clisbot.com/schemas/clisbot.config.v1.json",
-  "version": 1,
-  "daemon": {
-    "listen": "100.101.102.103:6868"
-  }
-}
-```
-
-Keep the other settings already in the file. If it has a `daemon` object, add `listen` inside that object.
-
-To restrict access with a password, see [Password authentication](/docs/configuration#password-authentication).
-
-Restart the daemon:
+Run on the daemon machine:
 
 ```bash
-clisbot daemon restart
+clisbot daemon pair --transport tailscale
 ```
 
-If Clisbot Desktop manages the daemon, use **Settings → your host → Overview → Restart daemon**.
+Clisbot maps the daemon through Tailscale Serve and prints a QR code and pairing link with the Tailscale route. Add `--https-port <port>` to use another HTTPS port.
 
-### 3. Connect the phone app
+### Connect without pairing
 
-1. Connect Tailscale on your phone.
-2. Open Clisbot and go to **Settings → Add host → Direct connection**.
-3. Enter the Tailscale IP in **Host**.
-4. Enter `6868` in **Port**.
-5. Leave **Use SSL** off and select **Connect**.
+To connect over Tailscale without a pairing link, make the daemon listen on its Tailscale IP and add it by address.
+
+1. Find the daemon machine's Tailscale IP:
+
+   ```bash
+   tailscale ip -4
+   ```
+
+   The example below uses `100.101.102.103`.
+
+2. Open `~/.clisbot/config.json` and set `daemon.listen` to that IP:
+
+   ```json
+   {
+     "$schema": "https://clisbot.com/schemas/clisbot.config.v1.json",
+     "version": 1,
+     "daemon": {
+       "listen": "100.101.102.103:6868"
+     }
+   }
+   ```
+
+   Keep the other settings in the file. If it has a `daemon` object, add `listen` inside it. To restrict access with a password, see [Password authentication](/docs/configuration#password-authentication).
+
+3. Restart the daemon with `clisbot daemon restart`, or **Settings → your host → Overview → Restart daemon** when Clisbot Desktop manages it.
+4. On the phone, connect Tailscale, open Clisbot and go to **Settings → Add host → Direct connection**. Enter the Tailscale IP in **Host** and `6868` in **Port**, leave **Use SSL** off and select **Connect**.
 
 If the host was already paired through the relay, Clisbot adds the direct connection to the same host.
 

@@ -6,6 +6,7 @@ import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useBotCreationHosts } from "@/clisbot/bots/feature";
 import { useCreationRequest } from "@/clisbot/bots/sidebar/creation-request";
 import type { Theme } from "@/styles/theme";
+import { settingsStyles } from "@/styles/settings";
 import { homeCopy } from "./copy";
 
 const BotIcon = withUnistyles(Bot);
@@ -70,6 +71,7 @@ function ActionCard({
   const hoverOut = useCallback(() => setHovered(false), []);
   const style = useCallback(
     ({ pressed }: { pressed: boolean }) => [
+      settingsStyles.card,
       styles.card,
       hovered && !disabled && styles.hovered,
       pressed && styles.pressed,
@@ -100,15 +102,8 @@ const ENABLED = { disabled: false };
 
 const styles = StyleSheet.create((theme) => ({
   row: { flexDirection: { xs: "column", md: "row" }, gap: theme.spacing[3] },
-  card: {
-    flex: 1,
-    padding: theme.spacing[4],
-    gap: theme.spacing[2],
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface0,
-  },
+  // The shell is the settings card (border, radius, lift); this only lays out the inside.
+  card: { flex: 1, padding: theme.spacing[4], gap: theme.spacing[2] },
   hovered: { backgroundColor: theme.colors.surface2 },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.5 },

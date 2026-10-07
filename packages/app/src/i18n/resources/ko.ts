@@ -1661,6 +1661,7 @@ export const ko: TranslationResources = {
     connectionMethods: {
       intro: "컴퓨터에서 기기 페어링을 여세요.",
       otherWays: "다른 방법",
+      docs: "연결 방식 알아보기",
       title: "연결 추가",
       direct: {
         title: "직접 연결",

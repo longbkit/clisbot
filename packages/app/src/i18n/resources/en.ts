@@ -1685,6 +1685,7 @@ export const en = {
     connectionMethods: {
       intro: "On the computer, open Host settings › Pair a device.",
       otherWays: "Other ways",
+      docs: "How connecting works",
       title: "Add connection",
       direct: {
         title: "Direct connection",

@@ -417,8 +417,9 @@ Hub. A Hub without the endpoint is reported and does not block enrollment.
      recovery actions, and make Welcome closable.
   3. Replace Welcome with Settings → Account once a Hub account exists.
 - **Decision:** option 2. Welcome is the screen that lists where Hosts come from:
-  `Managed Hosts` (a Hub) and `Your own computer` (QR, pairing link, direct,
-  Remote SSH). Both groups stay on screen in every state, ✕ closes Welcome to the
+  `Your own computer` (QR, pairing link, direct, Remote SSH) first, since pairing
+  one's own computer is how most people start (revised 2026-10-07), then `Managed
+Hosts` (a Hub). Both groups stay on screen in every state, ✕ closes Welcome to the
   home screen, and the home screen's **Add a Host** tile opens it again.
   Welcome leaves for the home screen the moment a Host comes online, which is
   right for onboarding and wrong for a visit whose point is to add another Host,

@@ -1632,6 +1632,7 @@ export const zhCN: TranslationResources = {
     connectionMethods: {
       intro: "在电脑上打开“配对设备”。",
       otherWays: "其他方式",
+      docs: "连接方式说明",
       title: "添加连接",
       direct: {
         title: "直接连接",

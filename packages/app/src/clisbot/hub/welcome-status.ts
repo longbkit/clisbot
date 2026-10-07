@@ -19,8 +19,8 @@ export interface HubWelcomeStatusView {
   message: string;
   actions: readonly HubWelcomeAction[];
   /**
-   * The action to take next, rendered as an ordinary button. The screen's one accent belongs to the
-   * connection methods below this card (`docs/design.md`, one accent per surface).
+   * The action to take next, rendered as an ordinary button. Welcome has no accent: the Hub card
+   * sits below the user's own computer, and both offer choices, not one CTA (`docs/design.md`).
    */
   primaryAction: HubWelcomeAction | null;
 }

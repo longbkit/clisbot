@@ -29,7 +29,7 @@ export function ClisbotHomeScreen() {
   }, [isCompact, openDesktopAgentList]);
   return (
     <View style={styles.container}>
-      <MenuHeader borderless />
+      <MenuHeader borderless transparent />
       <ScrollView contentContainerStyle={styles.content}>
         <TitlebarDragRegion />
         <ClisbotLogo size={44} />
@@ -73,7 +73,8 @@ function NoHost() {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: { flex: 1, backgroundColor: theme.colors.surface0 },
+  // The settings page surface, so the settings cards on it lift the same way they do there.
+  container: { flex: 1, backgroundColor: theme.colors.surfaceSettings },
   content: {
     flexGrow: 1,
     alignItems: "center",

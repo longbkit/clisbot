@@ -1679,6 +1679,7 @@ export const ru: TranslationResources = {
     connectionMethods: {
       intro: "На компьютере откройте «Связать устройство».",
       otherWays: "Другие способы",
+      docs: "Как работает подключение",
       title: "Добавить подключение",
       direct: {
         title: "Прямое подключение",

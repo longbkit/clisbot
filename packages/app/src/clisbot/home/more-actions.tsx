@@ -9,6 +9,7 @@ import { useImportSession } from "@/hooks/use-import-session";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { buildWelcomeRoute } from "@/utils/host-routes";
 import type { Theme } from "@/styles/theme";
+import { settingsStyles } from "@/styles/settings";
 import { homeCopy } from "./copy";
 
 const ImportIcon = withUnistyles(Inbox);
@@ -32,7 +33,7 @@ export function MoreActions() {
   return (
     <View style={styles.group}>
       <Text style={styles.heading}>{homeCopy.more.title}</Text>
-      <View style={styles.card}>
+      <View style={settingsStyles.card}>
         <ActionRow
           Icon={ImportIcon}
           title={t("openProject.tiles.importSession.title")}
@@ -112,12 +113,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
   },
-  card: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface0,
-  },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -125,7 +120,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[3],
     paddingHorizontal: theme.spacing[4],
   },
-  divider: { borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  divider: { borderBottomWidth: 1, borderBottomColor: theme.colors.borderSubtle },
   hovered: { backgroundColor: theme.colors.surface2 },
   text: { flex: 1, minWidth: 0, gap: 2 },
   title: { color: theme.colors.foreground, fontSize: theme.fontSize.base },

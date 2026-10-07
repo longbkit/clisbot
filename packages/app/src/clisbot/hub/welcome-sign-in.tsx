@@ -5,11 +5,13 @@ import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
+import { ExternalLink } from "@/components/ui/external-link";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeConnectionStatuses, useHosts } from "@/runtime/host-runtime";
 import { buildWelcomeRoute } from "@/utils/host-routes";
+import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "./account-provider";
 import { HubDaemonsSchema } from "./contracts";
 import { projectHubHostOnboarding, type HubHostOnboardingItem } from "./host-onboarding";
@@ -28,6 +30,7 @@ import {
 import { withEmail } from "@/clisbot/hub/account-email";
 
 const SIGN_IN_PARAM = "hubSignIn";
+const HUB_DOCS_URL = "https://clisbot.com/docs/hub";
 // Returning here keeps the reader on Welcome even when a Host is already online: the account they
 // just signed into still has a step to show.
 const WELCOME_SIGN_IN_RETURN_PATH = `${buildWelcomeRoute({ stay: true })}&${SIGN_IN_PARAM}=1`;
@@ -63,7 +66,7 @@ export function HubWelcomeSignIn() {
   return (
     <View style={styles.section}>
       <HubWelcomeSectionLabel />
-      <View style={styles.card}>
+      <View style={[settingsStyles.card, styles.card]}>
         <HubWelcomeCardHeader
           badge={card.kind === "status" ? card.view.badge : null}
           tone={card.kind === "status" ? card.view.tone : "muted"}
@@ -234,9 +237,12 @@ function HubWelcomeSignInActions({
   }
   return (
     <>
-      <Text style={styles.description}>
-        Sign in to use the Hosts and Projects your organization shares with you.
-      </Text>
+      <View style={styles.descriptionBlock}>
+        <Text style={styles.description}>
+          Sign in to use the Hosts and Projects your organization shares with you.
+        </Text>
+        <ExternalLink href={HUB_DOCS_URL} label="What is a Hub?" />
+      </View>
       {/* Native and desktop clients sign in on the Hub page they open, which offers every method. */}
       {hub.signInKind === "system-browser" ? (
         <Button onPress={signInThroughBrowser}>Sign in to Hub</Button>
@@ -245,7 +251,7 @@ function HubWelcomeSignInActions({
           {googleSignIn && startGoogle !== undefined ? (
             <Button onPress={continueWithGoogle}>Continue with Google</Button>
           ) : null}
-          <Button variant={googleSignIn ? "ghost" : "default"} onPress={openAccount}>
+          <Button variant={googleSignIn ? "ghost" : "secondary"} onPress={openAccount}>
             {googleSignIn ? "Use email and password instead" : "Sign in to Hub"}
           </Button>
         </>
@@ -361,20 +367,22 @@ const styles = StyleSheet.create((theme) => ({
   section: {
     width: "100%",
     maxWidth: 420,
-    // Separates managed Hosts from the Host connection buttons below them on Welcome.
-    marginBottom: theme.spacing[6],
+    // Separates managed Hosts from the Host connection methods above them on Welcome.
+    marginTop: theme.spacing[6],
     gap: theme.spacing[2],
   },
   sectionLabel: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
   },
+  descriptionBlock: {
+    gap: theme.spacing[1],
+    alignItems: "flex-start",
+  },
+  // The shell is the settings card (border, radius, lift), as the connection methods below it.
   card: {
     gap: theme.spacing[3],
     padding: theme.spacing[4],
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   headerRow: {
     flexDirection: "row",

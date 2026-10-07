@@ -1700,6 +1700,7 @@ export const fr: TranslationResources = {
     connectionMethods: {
       intro: "Sur l'ordinateur, ouvrez Associer un appareil.",
       otherWays: "Autres méthodes",
+      docs: "Fonctionnement de la connexion",
       title: "Ajouter une connexion",
       direct: {
         title: "Connexion directe",

@@ -1667,6 +1667,7 @@ export const ja: TranslationResources = {
     connectionMethods: {
       intro: "コンピューターで「デバイスをペアリング」を開きます。",
       otherWays: "その他の方法",
+      docs: "接続のしくみ",
       title: "接続を追加",
       direct: {
         title: "直接接続",

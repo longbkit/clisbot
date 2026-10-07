@@ -48,6 +48,9 @@ vi.mock("react-native", () => ({
 vi.mock("@/components/ui/alert", () => ({
   Alert: ({ title }: { title: string }) => <p>{title}</p>,
 }));
+vi.mock("@/components/ui/external-link", () => ({
+  ExternalLink: ({ href, label }: { href: string; label: string }) => <a href={href}>{label}</a>,
+}));
 vi.mock("@/components/ui/status-badge", () => ({
   StatusBadge: ({ label }: { label: string }) => <em>{label}</em>,
 }));
@@ -140,6 +143,13 @@ describe("Hub sign-in on Welcome", () => {
     expect(env.push).toHaveBeenCalledWith(accountRoute);
   });
 
+  it("links to the Hub guide on clisbot.com", () => {
+    render(<HubWelcomeSignIn />);
+    expect(screen.getByText("What is a Hub?").getAttribute("href")).toBe(
+      "https://clisbot.com/docs/hub",
+    );
+  });
+
   it("shows nothing at all when this build has no Hub", () => {
     env.hub = hubWith({ enabled: false });
     render(<HubWelcomeSignIn />);
@@ -151,7 +161,7 @@ describe("Hub sign-in on Welcome", () => {
     env.daemons = { daemons: [daemon()] };
     render(<HubWelcomeSignIn />);
     expect(screen.getByText("Clisbot Hub")).toBeTruthy();
-    expect(screen.getByText("a@vexere.com · Vexere")).toBeTruthy();
+    expect(screen.getByText("Vexere · a@vexere.com")).toBeTruthy();
     expect(screen.getByText("Connecting to acme-mac…")).toBeTruthy();
     expect(env.replace).not.toHaveBeenCalled();
   });

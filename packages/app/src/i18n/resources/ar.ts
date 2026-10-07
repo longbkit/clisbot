@@ -1650,6 +1650,7 @@ export const ar: TranslationResources = {
     connectionMethods: {
       intro: "على الكمبيوتر، افتح إقران جهاز.",
       otherWays: "طرق أخرى",
+      docs: "كيف يعمل الاتصال",
       title: "إضافة اتصال",
       direct: {
         title: "اتصال مباشر",

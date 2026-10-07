@@ -1696,6 +1696,7 @@ export const es: TranslationResources = {
     connectionMethods: {
       intro: "En el ordenador, abre Emparejar dispositivo.",
       otherWays: "Otras formas",
+      docs: "Cómo funciona la conexión",
       title: "Agregar conexión",
       direct: {
         title: "Conexión directa",

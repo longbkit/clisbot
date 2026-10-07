@@ -1681,6 +1681,7 @@ export const ptBR: TranslationResources = {
     connectionMethods: {
       intro: "No computador, abra Parear dispositivo.",
       otherWays: "Outras formas",
+      docs: "Como funciona a conexão",
       title: "Adicionar conexão",
       direct: {
         title: "Conexão direta",
