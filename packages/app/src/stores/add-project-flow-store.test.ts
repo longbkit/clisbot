@@ -9,7 +9,7 @@ it("keeps the active folder through a layout remount and discards it on close or
   const draft = {
     state: openAddProjectFlow({ hosts: [] }),
     browsing: true,
-    directoryPath: "/workspace/research",
+    browseInput: "/workspace/research/",
   };
   store.getState().saveDraft(id, draft);
   expect(store.getState().draft).toEqual(draft);

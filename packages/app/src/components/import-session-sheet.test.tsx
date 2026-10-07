@@ -149,7 +149,12 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
       title: string;
       subtitle?: ReactNode;
       actions?: ReactNode;
-      search?: { onChange: (value: string) => void; placeholder?: string; testID?: string };
+      search?: {
+        onChange: (value: string) => void;
+        placeholder?: string;
+        testID?: string;
+        trailing?: ReactNode;
+      };
     };
     children: ReactNode;
     testID?: string;
@@ -160,6 +165,7 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
         {header?.subtitle}
         {header?.actions}
         {header?.search ? <SheetSearchInput search={header.search} /> : null}
+        {header?.search?.trailing}
         {children}
       </section>
     ) : null,

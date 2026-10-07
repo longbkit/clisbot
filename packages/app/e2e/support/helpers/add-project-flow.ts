@@ -9,9 +9,17 @@ export type AddProjectFlowPage =
   | "new-directory-parent"
   | "new-directory-name";
 
-export type AddProjectMethod = "directory-search" | "browse" | "github" | "new-directory";
+export type AddProjectMethod =
+  | "directory-search"
+  | "browse"
+  | "browse-host"
+  | "github"
+  | "new-directory";
 
-const METHOD_DESTINATIONS: Record<Exclude<AddProjectMethod, "browse">, AddProjectFlowPage> = {
+const METHOD_DESTINATIONS: Record<
+  Exclude<AddProjectMethod, "browse" | "browse-host">,
+  AddProjectFlowPage
+> = {
   "directory-search": "directory-search",
   github: "github-search",
   "new-directory": "new-directory-parent",
@@ -66,7 +74,7 @@ export async function chooseAddProjectMethod(page: Page, method: AddProjectMetho
   const option = addProjectFlowMethod(page, method);
   await expect(option).toBeVisible();
   await option.click();
-  if (method !== "browse") {
+  if (method !== "browse" && method !== "browse-host") {
     await expectAddProjectPage(page, METHOD_DESTINATIONS[method]);
   }
 }

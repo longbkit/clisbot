@@ -9,7 +9,8 @@ export interface AddProjectFlowRequest {
 interface AddProjectDraft {
   state: AddProjectFlowState;
   browsing: boolean;
-  directoryPath: string;
+  /** The Host folder browser's path input, e.g. `~/dev/`. */
+  browseInput: string;
 }
 
 interface AddProjectFlowStoreState {

@@ -56,6 +56,8 @@ export interface SheetHeaderSearch {
   placeholder?: string;
   autoFocus?: boolean;
   testID?: string;
+  /** A control on the search line, e.g. a filter, so it does not take a row of its own. */
+  trailing?: ReactNode;
 }
 
 export interface SheetHeaderBack {
@@ -111,6 +113,11 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.spacing[2],
   },
+  // The search input carries its own vertical padding; a full bottom pad here
+  // would leave the title floating far above the field.
+  headerRowAboveSearch: {
+    paddingBottom: theme.spacing[1],
+  },
   headerBackButton: {
     borderRadius: theme.borderRadius.lg,
   },
@@ -147,7 +154,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.spacing[2],
     paddingHorizontal: theme.spacing[SHEET_HORIZONTAL_PADDING_SCALE],
-    paddingBottom: theme.spacing[3],
+    paddingBottom: theme.spacing[2],
   },
   // Inline variants for InlineHeaderView inside the desktop Combobox popover.
   // Horizontal padding matches the model picker's row indent: the picker uses
@@ -331,7 +338,7 @@ export function SheetHeaderView({
 
   return (
     <View style={styles.headerContainer} testID={testID}>
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, search && styles.headerRowAboveSearch]}>
         {handleBackPress ? (
           <Pressable
             onPress={handleBackPress}
@@ -389,6 +396,7 @@ export function SheetHeaderView({
             autoFocus={search.autoFocus}
             testID={search.testID}
           />
+          {search.trailing}
         </View>
       ) : null}
     </View>
@@ -448,6 +456,7 @@ export function InlineHeaderView({ header }: { header: SheetHeader }) {
             autoFocus={header.search.autoFocus}
             testID={header.search.testID}
           />
+          {header.search.trailing}
         </View>
       ) : null}
     </View>

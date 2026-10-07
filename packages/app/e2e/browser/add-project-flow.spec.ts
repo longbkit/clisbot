@@ -240,7 +240,7 @@ test.describe("Add Project command-center flow", () => {
     await expect(page.getByTestId("add-project-flow-loading")).toBeHidden();
   });
 
-  test("keyboard directory search adds the selected Project", async ({
+  test("keyboard directory search opens on Enter and adds on Mod+Enter", async ({
     page,
     projectPickerFixture,
   }) => {
@@ -253,6 +253,12 @@ test.describe("Add Project command-center flow", () => {
       timeout: 30_000,
     });
     await page.keyboard.press("Enter");
+    await expect(page.getByTestId("host-directory-browser-input")).toHaveValue(
+      `${projectPickerFixture.projectPath}/`,
+    );
+    await page.keyboard.press("Escape");
+    await expectAddProjectPage(page, "directory-search");
+    await page.keyboard.press("ControlOrMeta+Enter");
 
     const projectId = await expectOpenedProject(page, projectPickerFixture.projectName);
     projectPickerFixture.rememberProjectId(projectId);
@@ -263,6 +269,42 @@ test.describe("Add Project command-center flow", () => {
       projectPath: projectPickerFixture.projectPath,
     });
     await expectProjectHasNoWorkspaces(projectId);
+  });
+
+  test("folder browser opens folders on Enter and adds only on Mod+Enter", async ({
+    page,
+    projectPickerFixture,
+  }) => {
+    const parent = path.dirname(projectPickerFixture.projectPath);
+    const browserInput = page.getByTestId("host-directory-browser-input");
+    await gotoAppShell(page);
+    await openAddProjectFlow(page);
+    await addProjectFlowMethod(page, "browse-host").click();
+    await expect(browserInput).toHaveValue("~/");
+
+    await browserInput.fill(`${parent}/`);
+    await expect(
+      page.getByTestId(
+        `host-directory-browser-row-${encodeURIComponent(projectPickerFixture.projectName)}`,
+      ),
+    ).toBeVisible({ timeout: 30_000 });
+    await browserInput.press("Backspace");
+    await expect(browserInput).toHaveValue(`${path.dirname(parent)}/`);
+    await browserInput.fill(`${parent}/${projectPickerFixture.projectName}`);
+    await browserInput.press("Enter");
+    await expect(browserInput).toHaveValue(`${projectPickerFixture.projectPath}/`);
+    await expect(page.getByTestId("host-directory-browser-empty")).toBeVisible();
+    await expect(page).not.toHaveURL(/\/new\?/u);
+
+    await browserInput.press("ControlOrMeta+Enter");
+    const projectId = await expectOpenedProject(page, projectPickerFixture.projectName);
+    projectPickerFixture.rememberProjectId(projectId);
+    await expectNewWorkspaceForAddedProject(page, {
+      serverId: getServerId(),
+      projectId,
+      projectName: projectPickerFixture.projectName,
+      projectPath: projectPickerFixture.projectPath,
+    });
   });
 
   test("a complete repository URL remains selectable without a GitHub search result", async ({

@@ -3,17 +3,19 @@ import { Text, View, type StyleProp, type TextStyle, type ViewStyle } from "reac
 import { StyleSheet } from "react-native-unistyles";
 import { useKeyboardShortcutsAvailable } from "@/keyboard/availability";
 import { normalizeDisplayChord } from "@/components/ui/normalize-display-chord";
-import { formatShortcut, type ShortcutKey } from "@/utils/format-shortcut";
+import { formatShortcut, type ShortcutKey, type ShortcutLabels } from "@/utils/format-shortcut";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 
 export function Shortcut({
   keys,
   chord,
+  labels,
   style,
   textStyle,
 }: {
   keys?: ShortcutKey[];
   chord?: ShortcutKey[][];
+  labels?: ShortcutLabels;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 }): ReactElement | null {
@@ -40,7 +42,7 @@ export function Shortcut({
     return (
       <View style={badgeStyle}>
         <View style={styles.badgeBackground} />
-        <Text style={textCombinedStyle}>{formatShortcut(singleCombo, shortcutOs)}</Text>
+        <Text style={textCombinedStyle}>{formatShortcut(singleCombo, shortcutOs, labels)}</Text>
       </View>
     );
   }
@@ -51,7 +53,7 @@ export function Shortcut({
         return (
           <View key={combo.join("+")} style={styles.badge}>
             <View style={styles.badgeBackground} />
-            <Text style={textCombinedStyle}>{formatShortcut(combo, shortcutOs)}</Text>
+            <Text style={textCombinedStyle}>{formatShortcut(combo, shortcutOs, labels)}</Text>
           </View>
         );
       })}

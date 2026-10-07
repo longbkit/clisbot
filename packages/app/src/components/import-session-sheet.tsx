@@ -658,6 +658,55 @@ export function ImportSessionSheet({
   const handleShowAll = useCallback(() => setIsShowingAllDirectories(true), []);
   const handleLoadMore = useCallback(() => setPageLimit(nextPageLimit), []);
 
+  const showFilter = filterProviders.length > 1;
+  // Provider icons in the trigger follow the selected filter.
+  const SelectedProviderIcon =
+    selectedProvider === ALL_FILTER_VALUE ? Layers : getProviderIcon(selectedProvider, serverId);
+  const filterControl = useMemo(
+    () => (
+      <View ref={filterAnchorRef} collapsable={false} style={styles.filterTriggerWrap}>
+        <Pressable
+          onPress={handleFilterOpen}
+          style={filterTriggerStyle}
+          testID="import-session-filter-trigger"
+          accessibilityRole="button"
+          accessibilityLabel={`Filter: ${selectedProviderLabel}`}
+        >
+          <SelectedProviderIcon size={14} color={theme.colors.foregroundMuted} />
+          <Text style={styles.filterTriggerText} numberOfLines={1}>
+            {selectedProviderLabel}
+          </Text>
+          <ChevronDown size={14} color={theme.colors.foregroundMuted} />
+        </Pressable>
+        <Combobox
+          options={filterComboboxOptions}
+          value={selectedProvider}
+          onSelect={handleFilterSelect}
+          renderOption={renderFilterOption}
+          searchable={false}
+          title="Filter by provider"
+          open={isFilterOpen}
+          onOpenChange={setIsFilterOpen}
+          anchorRef={filterAnchorRef}
+          desktopPlacement="bottom-start"
+          desktopPreventInitialFlash
+        />
+      </View>
+    ),
+    [
+      SelectedProviderIcon,
+      filterComboboxOptions,
+      filterTriggerStyle,
+      handleFilterOpen,
+      handleFilterSelect,
+      isFilterOpen,
+      renderFilterOption,
+      selectedProvider,
+      selectedProviderLabel,
+      theme.colors.foregroundMuted,
+    ],
+  );
+
   const hosts = useHosts();
   const hostLabel = useMemo(
     () => hosts.find((host) => host.serverId === serverId)?.label ?? serverId ?? "",
@@ -683,12 +732,24 @@ export function ImportSessionSheet({
               // field has to be told to drop the text the state already dropped.
               resetKey: visible ? "open" : "closed",
               testID: "import-session-search",
+              trailing: showFilter ? filterControl : undefined,
             },
           }
         : {}),
       actions: <RefreshAction isRefreshing={isRefreshing} onPress={handleRefresh} />,
     }),
-    [handleRefresh, handleShowAll, hostLabel, isRefreshing, scopeCwd, supportsSearch, t, visible],
+    [
+      filterControl,
+      handleRefresh,
+      handleShowAll,
+      hostLabel,
+      isRefreshing,
+      scopeCwd,
+      showFilter,
+      supportsSearch,
+      t,
+      visible,
+    ],
   );
 
   const isSnapshotUnsupported = requiresHostUpgrade;
@@ -716,7 +777,6 @@ export function ImportSessionSheet({
     totalAlreadyImportedCount,
     providerLabelById,
   });
-  const showFilter = filterProviders.length > 1;
   const showLoadMore = hasMoreSessions(queries, pageLimit);
 
   return (
@@ -726,45 +786,10 @@ export function ImportSessionSheet({
       header={header}
       testID="import-session-sheet"
       desktopMaxWidth={560}
+      contentStyle={styles.content}
       snapPoints={IMPORT_SHEET_SNAP_POINTS}
     >
-      {showFilter ? (
-        <View ref={filterAnchorRef} collapsable={false} style={styles.filterTriggerWrap}>
-          <Pressable
-            onPress={handleFilterOpen}
-            style={filterTriggerStyle}
-            testID="import-session-filter-trigger"
-            accessibilityRole="button"
-            accessibilityLabel={`Filter: ${selectedProviderLabel}`}
-          >
-            {selectedProvider === ALL_FILTER_VALUE ? (
-              <Layers size={14} color={theme.colors.foregroundMuted} />
-            ) : (
-              (() => {
-                const ProviderIcon = getProviderIcon(selectedProvider, serverId);
-                return <ProviderIcon size={14} color={theme.colors.foregroundMuted} />;
-              })()
-            )}
-            <Text style={styles.filterTriggerText} numberOfLines={1}>
-              {selectedProviderLabel}
-            </Text>
-            <ChevronDown size={14} color={theme.colors.foregroundMuted} />
-          </Pressable>
-          <Combobox
-            options={filterComboboxOptions}
-            value={selectedProvider}
-            onSelect={handleFilterSelect}
-            renderOption={renderFilterOption}
-            searchable={false}
-            title="Filter by provider"
-            open={isFilterOpen}
-            onOpenChange={setIsFilterOpen}
-            anchorRef={filterAnchorRef}
-            desktopPlacement="bottom-start"
-            desktopPreventInitialFlash
-          />
-        </View>
-      ) : null}
+      {showFilter && !supportsSearch ? filterControl : null}
       <SheetStatusMessages
         isClientReady={Boolean(client)}
         isSnapshotUnsupported={isSnapshotUnsupported}
@@ -819,17 +844,20 @@ const styles = StyleSheet.create((theme) => ({
   subtitleAction: {
     marginHorizontal: -theme.spacing[2],
   },
+  content: {
+    paddingTop: theme.spacing[3],
+  },
   filterTriggerWrap: {
-    paddingBottom: theme.spacing[2],
+    flexShrink: 0,
   },
   filterTrigger: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1.5],
     alignSelf: "flex-start",
-    maxWidth: "100%",
-    paddingVertical: theme.spacing[1.5],
-    paddingHorizontal: theme.spacing[3],
+    maxWidth: 180,
+    paddingVertical: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.surface1,
     borderWidth: theme.borderWidth[1],
@@ -845,8 +873,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
     minWidth: 0,
     color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
+    fontSize: theme.fontSize.sm,
   },
   list: {
     gap: theme.spacing[1],
@@ -933,7 +960,7 @@ const styles = StyleSheet.create((theme) => ({
   errorText: {
     flexShrink: 1,
     minWidth: 0,
-    color: theme.colors.palette.red[300],
+    color: theme.colors.destructive,
     fontSize: theme.fontSize.sm,
   },
   emptyState: {

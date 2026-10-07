@@ -18,4 +18,12 @@ describe("formatShortcut", () => {
     expect(formatShortcut(["mod", "B"], "non-mac")).toBe("Ctrl+B");
     expect(formatShortcut(["mod", "E"], "non-mac")).toBe("Ctrl+E");
   });
+
+  it("spells Enter and Backspace in words mode", () => {
+    expect(formatShortcut(["mod", "Enter"], "mac", "words")).toBe("⌘ Enter");
+    expect(formatShortcut(["Backspace"], "mac", "words")).toBe("Backspace");
+    expect(formatShortcut(["Up"], "mac", "words")).toBe("↑");
+    expect(formatShortcut(["mod", "Enter"], "non-mac", "words")).toBe("Ctrl+Enter");
+    expect(formatShortcut(["mod", "Enter"], "mac")).toBe("⌘⏎");
+  });
 });

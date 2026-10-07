@@ -2,6 +2,11 @@ export type ShortcutKey = string;
 
 export type ShortcutOs = "mac" | "non-mac";
 
+/** `symbols` reads `⌘⏎` for tight tooltips; `words` reads `⌘ Enter` for key hints in a footer. */
+export type ShortcutLabels = "symbols" | "words";
+
+const WORD_KEYS = new Set(["Enter", "Backspace", "Space"]);
+
 const KEY_DISPLAY: Record<string, string> = {
   Backspace: "⌫",
   Enter: "⏎",
@@ -13,14 +18,19 @@ const KEY_DISPLAY: Record<string, string> = {
   Down: "↓",
 };
 
-function normalizeKey(key: string): string {
+function normalizeKey(key: string, labels: ShortcutLabels): string {
   if (!key) return "";
+  if (labels === "words" && WORD_KEYS.has(key)) return key;
   if (KEY_DISPLAY[key]) return KEY_DISPLAY[key];
   if (key.length === 1) return key.toUpperCase();
   return key;
 }
 
-export function formatShortcut(keys: ShortcutKey[], os: ShortcutOs): string {
+export function formatShortcut(
+  keys: ShortcutKey[],
+  os: ShortcutOs,
+  labels: ShortcutLabels = "symbols",
+): string {
   const normalized = keys.map((k) => (typeof k === "string" ? k : String(k)));
 
   if (os === "mac") {
@@ -37,12 +47,13 @@ export function formatShortcut(keys: ShortcutKey[], os: ShortcutOs): string {
     const mods = order.filter((k) => modifierSet.has(k)).map((k) => symbols[k] ?? "");
     const main = normalized
       .filter((k) => !order.includes(k))
-      .map(normalizeKey)
+      .map((k) => normalizeKey(k, labels))
       .join("");
-    return `${mods.join("")}${main}`;
+    const separator = labels === "words" && mods.length > 0 && main.length > 1 ? " " : "";
+    return `${mods.join("")}${separator}${main}`;
   }
 
-  const labels: Record<string, string> = {
+  const modifierLabels: Record<string, string> = {
     mod: "Ctrl",
     shift: "Shift",
     alt: "Alt",
@@ -50,7 +61,7 @@ export function formatShortcut(keys: ShortcutKey[], os: ShortcutOs): string {
     meta: "Win",
   };
   return normalized
-    .map((k) => labels[k] ?? normalizeKey(k))
+    .map((k) => modifierLabels[k] ?? normalizeKey(k, labels))
     .filter(Boolean)
     .join("+");
 }

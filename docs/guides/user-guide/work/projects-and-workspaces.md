@@ -7,8 +7,8 @@
 ## Tạo Project
 
 1. Kết nối đúng Host.
-2. Chọn **Add Project → Browse folders on Host**. Bắt đầu ở home của người chạy daemon; mở từng thư mục, dùng **Up one level** để lên cấp trên, hoặc nhập đường dẫn tuyệt đối rồi **Go**. Đây là thư mục trên Host, kể cả khi mở app từ điện thoại hay trình duyệt trên máy khác.
-3. Chọn thư mục chứa tài liệu hoặc code của công việc đó, rồi **Add this folder as a Project**. Có thể lọc theo tên; danh sách tối đa 100 thư mục mỗi lần, chỉ hiện các thư mục được quyền duyệt.
+2. Chọn **Add Project → Browse folders on Host**. Chỉ có một ô đường dẫn, bắt đầu ở `~/` (home của người chạy daemon). **Enter** mở thư mục đang chọn, hoặc tới đúng đường dẫn vừa gõ/dán; **Backspace** ở cuối đường dẫn lên cấp cha. Phần sau dấu `/` cuối cùng là bộ lọc theo tên. Đây là thư mục trên Host, kể cả khi mở app từ điện thoại hay trình duyệt trên máy khác.
+3. Thêm thư mục ô đường dẫn đang trỏ tới bằng nút **Add** hoặc **⌘/Ctrl+Enter**. Enter không bao giờ thêm Project. Danh sách tối đa 100 thư mục mỗi lần, chỉ hiện các thư mục được quyền duyệt. Ở **Search for directory** cũng vậy: Enter mở kết quả trong bộ duyệt, **Add** hoặc ⌘/Ctrl+Enter mới thêm.
 4. Chưa có thư mục: quay lại **New directory**, duyệt để chọn thư mục cha rồi đặt tên. Luồng clone GitHub cũng có bộ duyệt chọn thư mục cha.
 
 Host cũ chưa hỗ trợ Browse sẽ yêu cầu cập nhật; **Search for directory**, nhập đường dẫn và bộ chọn Finder trên desktop vẫn hoạt động như trước. Có thể **Close** bất kỳ lúc nào để về app; thêm Project không phải bước bắt buộc sau khi kết nối Host. Muốn tạo Bot, dùng **Create a Bot** ở trang kết nối hoặc **New bot** trong sidebar; Bot tự tạo workspace riêng.
