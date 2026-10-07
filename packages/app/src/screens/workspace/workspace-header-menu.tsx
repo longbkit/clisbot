@@ -29,6 +29,7 @@ import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
 import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { wrappablePath } from "@/utils/shorten-path";
 import type { Theme } from "@/styles/theme";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
@@ -68,6 +69,11 @@ const COMPACT_HEADER_BUTTON_HIT_SLOP = { top: 8, bottom: 8 } as const;
  */
 export interface WorkspaceHeaderWorkspaceActions {
   currentBranchName: string | null;
+  /**
+   * The folder the workspace works in: shown in full under Copy path, and (Clisbot Managed
+   * Access) the Project whose Terminal grants decide the mobile menu's terminal rows.
+   */
+  workspaceDirectory?: string | null;
   showWorkspaceSetup: boolean;
   importAgentDisabled: boolean;
   copyPathDisabled: boolean;
@@ -79,6 +85,7 @@ export interface WorkspaceHeaderWorkspaceActions {
 
 function WorkspaceHeaderWorkspaceActionItems({
   currentBranchName,
+  workspaceDirectory,
   showWorkspaceSetup,
   importAgentDisabled,
   copyPathDisabled,
@@ -95,6 +102,7 @@ function WorkspaceHeaderWorkspaceActionItems({
         leading={MENU_COPY_ICON}
         disabled={copyPathDisabled}
         onSelect={onCopyWorkspacePath}
+        description={wrappablePath(workspaceDirectory) || undefined}
       >
         {t("workspace.header.actions.copyPath")}
       </DropdownMenuItem>
@@ -158,7 +166,7 @@ export function WorkspaceHeaderMenuDesktop(props: WorkspaceHeaderWorkspaceAction
       >
         <WorkspaceHeaderMenuTriggerIcon />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" width={220} testID="workspace-header-menu">
+      <DropdownMenuContent align="start" width={300} testID="workspace-header-menu">
         <WorkspaceHeaderWorkspaceActionItems {...props} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -198,8 +206,6 @@ function HeaderMenuProfileItem({
 
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
   normalizedServerId: string;
-  /** Clisbot Managed Access: the Project whose Terminal grants decide the terminal rows. */
-  workspaceDirectory?: string | null;
   showCreateBrowserTab: boolean;
   createTerminalDisabled: boolean;
   onCreateDraftTab: () => void;
@@ -268,7 +274,10 @@ export function WorkspaceHeaderMenuMobile({
             {t("workspace.header.actions.newBrowser")}
           </DropdownMenuItem>
         ) : null}
-        <WorkspaceHeaderWorkspaceActionItems {...workspaceActions} />
+        <WorkspaceHeaderWorkspaceActionItems
+          {...workspaceActions}
+          workspaceDirectory={workspaceDirectory}
+        />
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{t("workspace.tabs.actions.terminalProfilesMenu")}</DropdownMenuLabel>
         {terminalAccess.shell ? (

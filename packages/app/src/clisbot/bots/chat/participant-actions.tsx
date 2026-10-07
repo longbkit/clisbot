@@ -58,13 +58,7 @@ export function ParticipantActions({
   }, [group, participants, serverId, remember, project?.botId]);
   return (
     <>
-      <ChatHeaderAction
-        label="Open in cowork"
-        text="Cowork"
-        icon={PanelsTopLeft}
-        iconSize={20}
-        onPress={open}
-      />
+      <ChatHeaderAction label="Open in cowork" text="Cowork" icon={PanelsTopLeft} onPress={open} />
       <AdaptiveModalSheet visible={visible} onClose={close} header={header}>
         <View style={styles.body}>
           {participants.map((participant) => (

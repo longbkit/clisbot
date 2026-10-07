@@ -1,4 +1,4 @@
-import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
+import { sectionRowIndent, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
 import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
@@ -1653,6 +1653,7 @@ function ProjectBlock({
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
+  const fusion = useBotsFeatureHosts().length > 0;
   const {
     visibleItems: visibleWorkspaces,
     expanded: workspacesExpanded,
@@ -1878,7 +1879,11 @@ function ProjectBlock({
         dragHandleProps={dragHandleProps}
       />
 
-      {projectChildren}
+      {fusion && projectChildren ? (
+        <View style={styles.projectChildrenIndented}>{projectChildren}</View>
+      ) : (
+        projectChildren
+      )}
     </View>
   );
 }
@@ -2597,6 +2602,11 @@ const styles = StyleSheet.create((theme) => ({
   projectListContainer: {
     width: "100%",
   },
+  // Clisbot: a project row stays on the Projects header's rail and is itself a heading; its
+  // workspaces and sessions sit in by the same step as rows under a section (`sectionRowIndent`).
+  projectChildrenIndented: {
+    paddingLeft: sectionRowIndent(theme),
+  },
   pinnedSection: {
     marginBottom: theme.spacing[1],
   },
@@ -2828,6 +2838,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   sidebarRowSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
+    ...theme.shadow.raised,
   },
   workspaceRowContainer: {
     position: "relative",

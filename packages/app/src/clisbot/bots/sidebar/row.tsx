@@ -6,6 +6,7 @@ import { MoreVertical } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
+import { sectionRowIndent } from "./section-header";
 
 const ThemedMoreVertical = withUnistyles(MoreVertical);
 const mutedColorMapping = (theme: Theme) => ({
@@ -166,6 +167,7 @@ const styles = StyleSheet.create((theme) => ({
   container: {
     position: "relative",
     marginBottom: theme.spacing[0.5],
+    paddingLeft: sectionRowIndent(theme),
   },
   row: {
     flex: 1,
@@ -182,7 +184,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   rowTouch: { minHeight: 44 },
   rowHovered: { backgroundColor: theme.colors.surfaceSidebarHover },
-  rowSelected: { backgroundColor: theme.colors.surfaceSidebarSelected },
+  rowSelected: { backgroundColor: theme.colors.surfaceSidebarSelected, ...theme.shadow.raised },
   rowPressed: { backgroundColor: theme.colors.surface2 },
   leadingSlot: {
     width: theme.iconSize.md,
@@ -200,7 +202,7 @@ const styles = StyleSheet.create((theme) => ({
   title: {
     flexShrink: 1,
     minWidth: 0,
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     lineHeight: TITLE_LINE_HEIGHT,
   },
@@ -209,11 +211,13 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
     lineHeight: TITLE_LINE_HEIGHT,
   },
   subtitle: {
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
+    lineHeight: 16,
   },
   trailingSlot: {
     minWidth: 28,
@@ -224,8 +228,9 @@ const styles = StyleSheet.create((theme) => ({
   trailingHidden: { opacity: 0 },
   trailing: {
     flexShrink: 0,
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
     lineHeight: TITLE_LINE_HEIGHT,
   },
   activeDot: {

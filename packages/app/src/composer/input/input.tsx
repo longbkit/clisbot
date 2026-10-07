@@ -1923,10 +1923,11 @@ const styles = StyleSheet.create((theme: Theme) => ({
     flexShrink: 1,
     flexDirection: "column",
     gap: theme.spacing[3],
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surfaceComposer,
     borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.borderAccent,
+    borderColor: theme.colors.borderComposer,
     borderRadius: theme.borderRadius["2xl"],
+    ...theme.shadow.composer,
     paddingVertical: {
       xs: theme.spacing[2],
       md: theme.spacing[4],
@@ -1973,7 +1974,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
     // line box is the same for every line. Web keeps the CSS value.
     ...(isWeb
       ? ({
-          lineHeight: theme.fontSize.content * 1.4,
+          lineHeight: theme.fontSize.content * 1.5,
           outlineStyle: "none",
           outlineWidth: 0,
           outlineColor: "transparent",

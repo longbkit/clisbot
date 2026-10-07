@@ -1294,5 +1294,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   sidebarRowSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
+    ...theme.shadow.raised,
   },
 }));

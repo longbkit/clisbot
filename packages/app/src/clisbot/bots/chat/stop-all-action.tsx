@@ -45,7 +45,6 @@ export function StopAllAction({
       label="Stop all bots"
       text="Stop all"
       icon={StopIcon}
-      iconSize={20}
       onPress={stop}
       disabled={!online || stopping}
     />

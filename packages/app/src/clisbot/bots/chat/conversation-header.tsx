@@ -15,6 +15,7 @@ import type { ChatBotIdentity } from "./chat-rows";
 type Project = ReturnType<typeof useConversationProject>;
 export function ConversationHeader({
   serverId,
+  avatar,
   title,
   project,
   singlePanel,
@@ -26,6 +27,7 @@ export function ConversationHeader({
   tabCount,
 }: {
   serverId: string;
+  avatar: ReactNode;
   title: string;
   project: Project;
   singlePanel: boolean;
@@ -51,6 +53,7 @@ export function ConversationHeader({
           icon={PanelRight}
           disabled={!project.source}
           onPress={openExplorer}
+          trailingEdge
         />
       </View>
     ),
@@ -69,6 +72,7 @@ export function ConversationHeader({
     <>
       <SidebarMenuToggle />
       <ConversationHeading
+        avatar={avatar}
         title={title}
         group={group}
         memberCount={memberCount}

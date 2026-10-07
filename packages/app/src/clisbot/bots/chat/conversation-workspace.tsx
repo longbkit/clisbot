@@ -18,6 +18,7 @@ import { ConversationContextProviders } from "./conversation-context-providers";
 import { ConversationTabsContext } from "./conversation-tabs-context";
 import { ChatOptionsProvider } from "./chat-options-context";
 import type { ChatBotIdentity } from "./chat-rows";
+import { ChatAvatar } from "./chat-avatar";
 interface ConversationWorkspaceProps {
   serverId: string;
   chatId: string;
@@ -58,6 +59,11 @@ export function ConversationWorkspace({
     singlePanel,
     ...project,
   });
+  const directBot = group ? null : (bots[0] ?? null);
+  const avatar = useMemo(
+    () => <ChatAvatar chatId={chatId} group={group} bot={directBot} size={24} />,
+    [chatId, group, directBot],
+  );
   const selector = useMemo(
     () => (bots.length > 1 ? <ConversationBotSelector project={project} /> : null),
     [bots.length, project],
@@ -65,6 +71,7 @@ export function ConversationWorkspace({
   const header = () => (
     <ConversationHeader
       {...{ serverId, title, project, singlePanel, selector, headerActions, openExplorer, group }}
+      avatar={avatar}
       memberCount={bots.length}
       tabCount={state.mainTabs.length}
     />

@@ -278,8 +278,12 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceDiffEmpty: tint.surfaceDiffEmpty,
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surfaceSidebarHover ?? tint.surface1,
-    surfaceSidebarSelected: tint.surface3,
+    // A selected sidebar row is a white card raised off the gray sidebar (`shadow.raised`).
+    surfaceSidebarSelected: tint.surface0,
     surfaceWorkspace: tint.surface0,
+    // The composer is a white card lifted by `shadow.composer` (docs/design.md).
+    surfaceComposer: tint.surface0,
+    borderComposer: tint.border,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
 
     foreground: tint.foreground,
@@ -341,8 +345,8 @@ const lightSemanticColors = buildLightSemanticColors({
   surface3: "#e2e2e2",
   surface4: "#cecece",
   surfaceDiffEmpty: "#f6f6f6",
-  surfaceSidebar: "#fafafa",
-  surfaceSidebarHover: "#f3f3f3",
+  surfaceSidebar: "#f5f5f5",
+  surfaceSidebarHover: "#ebebeb",
   foreground: "#1d1c1d",
   foregroundMuted: "#4a4a4a",
   foregroundExtraMuted: "#707070",
@@ -421,6 +425,9 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceSidebarHover: tint.surface1,
     surfaceSidebarSelected: tint.surface2,
     surfaceWorkspace: tint.surface1,
+    // A shadow does not read on dark surfaces; the composer stays a filled box one step up.
+    surfaceComposer: tint.surface1,
+    borderComposer: tint.borderAccent,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
 
     foreground,
@@ -693,6 +700,19 @@ const commonTheme: CommonTheme = {
 };
 
 const darkShadow = {
+  // Dark surfaces separate by lightness; a shadow does not read on them.
+  raised: {
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  composer: {
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
+    elevation: 0,
+  },
   sm: {
     shadowColor: "rgba(0, 0, 0, 0.25)",
     shadowOffset: { width: 0, height: 2 },
@@ -755,6 +775,20 @@ const pureBlackDarkColors = buildDarkSemanticColors({
 export const darkPureBlackTheme = buildDarkTheme(pureBlackDarkColors);
 
 const lightShadow = {
+  // A white card sitting on the gray sidebar: the selected row.
+  raised: {
+    shadowColor: "rgba(0, 0, 0, 0.08)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  // The white composer lifted off the white workspace.
+  composer: {
+    shadowColor: "rgba(0, 0, 0, 0.08)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 16,
+    elevation: 3,
+  },
   sm: {
     shadowColor: "rgba(0, 0, 0, 0.02)",
     shadowOffset: { width: 0, height: 2 },

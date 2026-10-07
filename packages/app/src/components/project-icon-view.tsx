@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { type StyleProp, Text, type TextStyle, View } from "react-native";
 import { ProjectIconImage } from "@/components/project-icon-image";
-import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
+import { deriveIdentityColorName, identityColor, identityTint } from "@/styles/identity-colors";
 
-const WHITE_TEXT = { color: "#ffffff" } as const;
 const FALLBACK_LAYOUT = { alignItems: "center", justifyContent: "center" } as const;
 
 /**
@@ -23,7 +22,8 @@ export function projectIconRadius(size: number): number {
 }
 
 /**
- * A project's icon: its chosen image, or a colored square carrying its initial.
+ * A project's icon: its chosen image, or a tinted square carrying its initial in the
+ * project's identity color — the same mark as a Bot's face (`BotFace`).
  *
  * Geometry lives here, not at the call site. It used to be five copies of the same
  * width/height/radius/centering block, which is how the radius drifted apart in the first
@@ -45,16 +45,20 @@ export function ProjectIconView({
 }) {
   // The uploaded image is sized but never clipped — see projectIconRadius.
   const box = useMemo(() => ({ width: size, height: size }), [size]);
+  const colorName = deriveIdentityColorName(projectViewKey);
   const fallbackStyles = useMemo(
     () => [
       box,
       { borderRadius: projectIconRadius(size) },
       FALLBACK_LAYOUT,
-      { backgroundColor: identityColor(deriveIdentityColorName(projectViewKey)) },
+      { backgroundColor: identityTint(colorName) },
     ],
-    [box, size, projectViewKey],
+    [box, size, colorName],
   );
-  const textStyles = useMemo(() => [textStyle, WHITE_TEXT], [textStyle]);
+  const textStyles = useMemo(
+    () => [textStyle, { color: identityColor(colorName), fontWeight: "600" as const }],
+    [textStyle, colorName],
+  );
 
   const fallback = useMemo(
     () => (

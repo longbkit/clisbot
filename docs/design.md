@@ -34,17 +34,19 @@ The authored interface ramp uses a 14px base. New native installs default to 15p
 
 Weight has three tiers, applied by role:
 
-- **Screen titles** — the title in app chrome — use `<ScreenTitle>` (`packages/app/src/components/headers/screen-title.tsx`), which renders `fontSize.base` at weight `400` on compact and `300` on desktop. The New workspace hero is the only larger product title; it uses `fontSize["2xl"]` (`packages/app/src/screens/new-workspace-screen.tsx`).
+- **Screen titles** — the title in app chrome — use `<ScreenTitle>` (`packages/app/src/components/headers/screen-title.tsx`), which renders `fontSize.base` at `fontWeight.medium`, the weight of the selected sidebar row it opened. A Chat heading puts the conversation's sidebar mark (`ChatAvatar`, `packages/app/src/clisbot/bots/chat/chat-avatar.tsx`) before its title, so the heading and the row read as one thing. A workspace heading shows the folder it works in on hover, and the header menu shows the same path in full under Copy workspace path; knowing which folder you are in should never take a copy (`packages/app/src/screens/workspace/workspace-path-tooltip.tsx`, `wrappablePath` in `packages/app/src/utils/shorten-path.ts`). The New workspace hero is the only larger product title; it uses `fontSize["2xl"]` (`packages/app/src/screens/new-workspace-screen.tsx`).
 - **Structural labels** use `fontWeight.medium`. This applies to section labels above a stack of rows (`packages/app/src/components/agent-list.tsx:519-523`, `packages/app/src/components/keyboard-shortcuts-dialog.tsx:63-67`), form field labels above an input inside a modal (`packages/app/src/components/add-host-modal.tsx:19-23`, `packages/app/src/components/pair-link-modal.tsx:24-28`), the title at the top of a modal/sheet/dialog (`packages/app/src/components/adaptive-modal-sheet.tsx:90-94`, `packages/app/src/components/ui/combobox.tsx:1607-1611`, `packages/app/src/components/welcome-screen.tsx:48-53`), action button labels in tight components such as the sidebar callout actions (`packages/app/src/components/sidebar-callout.tsx:218-221`), and inline data emphasis on dense metadata rows (`packages/app/src/components/git-diff-pane.tsx:2322-2327`, `packages/app/src/components/file-explorer-pane.tsx:1115-1122`).
 - **Content** uses `fontWeight.normal`. This applies to settings rows (`packages/app/src/styles/settings.ts`), sidebar primary list-item titles (`packages/app/src/components/sidebar-workspace-list.tsx:2680-2686`, `packages/app/src/components/agent-list.tsx:572-578`), `<Button>` text (`packages/app/src/components/ui/button.tsx:80-84`), `<StatusBadge>` text (`packages/app/src/components/ui/status-badge.tsx:56-60`), and `<SidebarCallout>` titles (`packages/app/src/components/sidebar-callout.tsx:175-180`).
 
-The rule, condensed: text that _names_ a surface or a group is `medium`. Text that lives _inside_ a surface or a group is `normal`. Top-of-screen titles are `<ScreenTitle>`, which is lighter still.
+The rule, condensed: text that _names_ a surface or a group is `medium`. Text that lives _inside_ a surface or a group is `normal`. Top-of-screen titles are `<ScreenTitle>`, also `medium`.
 
-Foreground is for the thing being acted on: row titles, section headings, the selected sidebar item. `foregroundMuted` is for context: hints, descriptions, secondary metadata, idle sidebar items, placeholders, status text.
+Foreground is for the thing being acted on: row titles, section headings, every sidebar row title. `foregroundMuted` is for context: hints, descriptions, secondary metadata, placeholders, status text.
+
+A sidebar row separates its lines by color, not size alone: the title is `foreground` (`fontWeight.medium` when selected or open), the line under it and the trailing time are `foregroundExtraMuted`, and the time uses tabular figures. Sidebar section labels (Pinned, Group chats, Bots, Projects) are `fontSize.sm`, `fontWeight.medium`, `foregroundExtraMuted`, so they read as group names rather than as rows. `#707070` on the `#f5f5f5` sidebar is 4.5:1, the floor for this text.
 
 Placeholder text is `colors.placeholder` (`#a1a1aa` in Light, each dark theme's `foregroundExtraMuted`), lighter than any text the user reads, so an empty field never reads as filled. Pass it as `placeholderTextColor`; `foregroundMuted` there is wrong.
 
-`foregroundExtraMuted` is reserved for passive chrome that must sit behind muted text, such as an always-visible window control. Use the solid token instead of lowering SVG opacity; per-path opacity makes overlapping icon strokes render unevenly. Interactive hover and pressed states return to `foreground`.
+`foregroundExtraMuted` is for passive chrome that must sit behind muted text, such as an always-visible window control, and for sidebar metadata and section labels as above. Use the solid token instead of lowering SVG opacity; per-path opacity makes overlapping icon strokes render unevenly. Interactive hover and pressed states return to `foreground`.
 
 The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text
 (`#1d1c1d`), dark gray secondary text and icons (`#4a4a4a`), and passive chrome (`#707070`).
@@ -52,10 +54,13 @@ Content sits on white: cards and inputs are `surface0`, grouped by a `#d8d8d8` b
 `surface1`/`surface2` stay at the near-white upstream values (`#fafafa`/`#f4f4f5`). Gray is
 for state and regions, never under text you read: muted text and placeholders drop below 4.5:1
 on `#f3f3f3`, and an input filled `#ededed` on a `#f3f3f3` card is 1.06:1, invisible. The
-sidebar is near-white (`#fafafa`); its hover is the light theme's own `surfaceSidebarHover`
-(`#f3f3f3`, because `surface1` is the sidebar's color), and selected navigation and workspace
-rows use `surfaceSidebarSelected` (`#e2e2e2`). Dark themes keep filled, borderless inputs
-(`inputBorder` is transparent there).
+sidebar is light gray (`#f5f5f5`); its hover is `surfaceSidebarHover` (`#ebebeb`), and the
+selected navigation, workspace, session and Bot rows are a white card raised off it:
+`surfaceSidebarSelected` is `surface0` plus `theme.shadow.raised`. Hover is gray and selection
+is white, so the two never read as one state; accent green is not a selection color because
+green already means running, added lines and the primary action. Dark themes select with
+`surface2` and their `shadow.raised` is empty, because a shadow does not read on a dark
+surface. Dark themes keep filled, borderless inputs (`inputBorder` is transparent there).
 
 Accent is the one CTA per surface. A `<Button variant="default">` filled with `accent` appears at most once on a page. Most pages have zero — settings is mostly toggles and text, the workspace pane is mostly content, the chat composer is the input itself.
 
@@ -78,6 +83,8 @@ The button is `<Button>` (`packages/app/src/components/ui/button.tsx`). It has f
 Header and toolbar controls use `interactionHighlight` for hovered, pressed, open, and selected
 backgrounds. It is a translucent semantic fill so the same control works over the main surface and
 the sidebar. Apply it as `backgroundColor`; setting `opacity` on the control also fades its content.
+
+Header glyphs are one size and one stroke: `iconButtonChromeGlyphSize("large")` (16pt) at stroke 1.5, as the sidebar and Explorer toggles draw them. A header button with a label (Cowork, Stop all) keeps that glyph and a `fontSize.base` label, with a little more padding on the label side. The first control pulls onto the left rail and the last onto the right rail by the same `spacing[2]`, so the two panel toggles mirror each other (`packages/app/src/clisbot/bots/chat/header-action.tsx`).
 
 `destructive` is filled with `destructive`. It only appears inside a confirm. The button on the page is `outline`; the destructive button is the confirm button inside the dialog.
 
@@ -106,6 +113,8 @@ Rows after the first inside a card carry `settingsStyles.rowBorder` — a single
 A list that is itself the page content — sidebar items in `sidebar-workspace-list.tsx`, the workspace list, the agent list (`packages/app/src/components/agent-list.tsx`) — uses spacing and surface, not borders, to separate items. Rows-in-a-card is an interior pattern; lists-as-pages are not.
 
 Pane chrome — the workspace pane header, the file-explorer header, the diff pane header — uses a single bottom border to separate the header from the content (`packages/app/src/components/git-diff-pane.tsx:2328-2331`). One border, no shadow.
+
+The composer is the one input that floats. It paints `surfaceComposer` with a `borderComposer` outline and `theme.shadow.composer`: in Light a white card with a soft shadow, so the place to type stands off the workspace; in dark themes a filled `surface1` box with `borderAccent` and an empty shadow (`packages/app/src/composer/input/input.tsx`). The tokens carry the scheme difference; a `theme.colorScheme` check inside a style did not resolve at runtime and left the box gray.
 
 `borderAccent` is reserved for the outline button. Inputs use `border`: `<FormTextInput>` and `<SelectField>` paint `colors.input` with an `inputBorder` at rest. Single-thing borders are wrong; a single bordered element is either a card with one row (use the card) or it does not need a border.
 
@@ -147,7 +156,10 @@ Sections sit apart. `<SettingsSection>` owns its own bottom margin; the next thi
 
 The app sidebar's top-level Pinned, Group chats, Bots and Projects headings share
 `BotsSectionHeader`, which owns a 12px gap above each section. Keep this gap when a section is
-empty or collapsed; rows inside a section retain their compact spacing.
+empty or collapsed; rows inside a section retain their compact spacing. Pinned, Group chats and
+Bots rows sit `sectionRowIndent` (8px) in from their header, hover and selected card included, so
+each section reads as a group with its items under it. Project rows stay on the header's rail: a
+project is itself a heading, and its workspaces and sessions sit in by the same step.
 
 A section or group explains itself through the `info` prop on `<SettingsSection>` or `<SettingsGroup>` — an info icon beside the header that opens a tooltip (`packages/app/src/components/settings/headings/settings-info-tip.tsx`). A muted paragraph between the header and the card is wrong: it sits in the section's own gap, so it reads as a second heading rather than as prose belonging to the header. Explanatory copy that describes one row belongs to that row, as `settingsStyles.rowHint` inside the card.
 
@@ -268,7 +280,7 @@ Status pills use the status token for text on the shared `surface3` and `border`
 
 Status dots — the small filled circles next to a host or agent name — are `borderRadius.full` filled with the status token. Which token a given agent state maps to is owned by `getStatusDotColor` (`packages/app/src/utils/status-dot-color.ts`); a row, a group header, and a project icon all call it rather than restating the mapping. They sit in the trailing slot of a sidebar row or as a leading marker on a status pill.
 
-Identity badges — the project icon, the sidebar host badge, and the PR-panel participant avatar — do not use the theme palette. They draw from the fixed ten-color identity table in `packages/app/src/styles/identity-colors.ts`, whose hexes are held to one contrast band so a color identifies rather than ranks. Project icons and PR avatars use it as a fill with a white letter — that is `identityColor`, one theme-independent hex per identity. Host badges use it as a _foreground_ on both the glyph and the label, which is a different contrast problem that the fill table cannot solve: no single hex clears 4.5:1 against both a near-white and a dark sidebar. Foregrounds therefore come from `identityForeground(name, colorScheme)`, one set per scheme, hue unchanged. That set is generated on the **status family's** lightness and chroma fraction, because a meta row puts a host badge beside a CI check and a diff stat, and two families at different lightness make the brighter one shout. Change the status band and this one changes with it. A host with no color assigned falls back to `foregroundMuted`. The table is theme-independent by design; do not fork it per theme, and do not add hexes to it without recomputing the band.
+Identity badges — the project icon, the sidebar host badge, and the PR-panel participant avatar — do not use the theme palette. They draw from the fixed ten-color identity table in `packages/app/src/styles/identity-colors.ts`, whose hexes are held to one contrast band so a color identifies rather than ranks. PR avatars use it as a fill with a white letter — that is `identityColor`, one theme-independent hex per identity. Generated project icons and Bot faces are one mark: a rounded square (`projectIconRadius`) filled with `identityTint` and lettered in `identityColor`, two initials for a Bot so `cfo` and `cto` stay apart (`packages/app/src/components/project-icon-view.tsx`, `packages/app/src/clisbot/bots/chat/bot-face.tsx`). Host badges use it as a _foreground_ on both the glyph and the label, which is a different contrast problem that the fill table cannot solve: no single hex clears 4.5:1 against both a near-white and a dark sidebar. Foregrounds therefore come from `identityForeground(name, colorScheme)`, one set per scheme, hue unchanged. That set is generated on the **status family's** lightness and chroma fraction, because a meta row puts a host badge beside a CI check and a diff stat, and two families at different lightness make the brighter one shout. Change the status band and this one changes with it. A host with no color assigned falls back to `foregroundMuted`. The table is theme-independent by design; do not fork it per theme, and do not add hexes to it without recomputing the band.
 
 New status pills use `<StatusBadge>`. Identity, shortcut, and interactive link badges remain separate because color does not encode status there.
 

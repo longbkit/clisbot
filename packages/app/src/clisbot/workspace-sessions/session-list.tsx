@@ -400,6 +400,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   rowSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
+    ...theme.shadow.raised,
   },
   rowPressed: {
     backgroundColor: theme.colors.surface2,
@@ -423,17 +424,18 @@ const styles = StyleSheet.create((theme) => ({
   title: {
     flex: 1,
     minWidth: 0,
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     lineHeight: TITLE_LINE_HEIGHT,
   },
   titleShown: {
-    color: theme.colors.foreground,
+    fontWeight: theme.fontWeight.medium,
   },
   trailing: {
     flexShrink: 0,
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
     lineHeight: TITLE_LINE_HEIGHT,
   },
   // Under the title, past the mark, so detail items line up with the words they describe.
@@ -444,7 +446,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingLeft: theme.iconSize.md + theme.spacing[2],
   },
   detailText: {
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
   },
 }));

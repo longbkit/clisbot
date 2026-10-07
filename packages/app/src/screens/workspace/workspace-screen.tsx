@@ -30,6 +30,7 @@ import invariant from "tiny-invariant";
 import { SidebarMenuToggle } from "@/components/headers/menu-header";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { ScreenTitle } from "@/components/headers/screen-title";
+import { WorkspacePathTooltip } from "./workspace-path-tooltip";
 import { HostBadge } from "@/hosts/host-badge";
 import { useHostBadges } from "@/hosts/use-host-badges";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -1021,14 +1022,16 @@ function WorkspaceHeaderTitleBar({
           <View style={styles.headerTitleSkeleton} />
         </View>
       ) : (
-        <View style={styles.headerTitleTextGroup}>
-          <ScreenTitle testID="workspace-header-title">{title}</ScreenTitle>
-          <WorkspaceHeaderProjectRow
-            subtitle={subtitle}
-            isSubtitleDistinct={isSubtitleDistinct}
-            serverId={normalizedServerId}
-          />
-        </View>
+        <WorkspacePathTooltip path={workspaceDirectory} enabled={!isMobile}>
+          <View style={styles.headerTitleTextGroup} collapsable={false}>
+            <ScreenTitle testID="workspace-header-title">{title}</ScreenTitle>
+            <WorkspaceHeaderProjectRow
+              subtitle={subtitle}
+              isSubtitleDistinct={isSubtitleDistinct}
+              serverId={normalizedServerId}
+            />
+          </View>
+        </WorkspacePathTooltip>
       )}
       <View style={styles.compactHeaderMenuCluster}>
         {isMobile ? (
@@ -1053,6 +1056,7 @@ function WorkspaceHeaderTitleBar({
         ) : (
           <WorkspaceHeaderMenuDesktop
             currentBranchName={currentBranchName}
+            workspaceDirectory={workspaceDirectory}
             showWorkspaceSetup={showWorkspaceSetup}
             importAgentDisabled={importAgentDisabled}
             copyPathDisabled={copyPathDisabled}

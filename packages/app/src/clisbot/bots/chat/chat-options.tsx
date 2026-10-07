@@ -28,7 +28,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { MenuTriggerState } from "@/components/ui/menu";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { iconButtonChromeStyle, mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
+import {
+  iconButtonChromeGlyphSize,
+  iconButtonChromeStyle,
+  extraMutedIconColorMapping,
+} from "@/components/ui/icon-button-chrome";
 import { useConversationProjectContext } from "./conversation-project-context";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
@@ -132,7 +136,10 @@ function ChatOptionsMenu({
         testID="chat-options-trigger"
         style={triggerStyle}
       >
-        <ThemedEllipsis size={18} uniProps={mutedIconColorMapping} />
+        <ThemedEllipsis
+          size={iconButtonChromeGlyphSize("large")}
+          uniProps={extraMutedIconColorMapping}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent sheetTitle="Chat options" align="end" width={280} pages={pages}>
         <DropdownMenuSubTrigger

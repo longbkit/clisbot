@@ -70,8 +70,12 @@ describe("Pure black theme", () => {
 describe("Sidebar interaction surfaces", () => {
   it("keeps Light selection distinct from the sidebar surface", () => {
     expect(lightTheme.colors.surfaceSidebarHover).not.toBe(lightTheme.colors.surfaceSidebar);
-    expect(lightTheme.colors.surfaceSidebarSelected).toBe(lightTheme.colors.surface3);
+    // The selected row is a white card on the gray sidebar, distinct from the gray hover.
+    expect(lightTheme.colors.surfaceSidebarSelected).toBe(lightTheme.colors.surface0);
     expect(lightTheme.colors.surfaceSidebarSelected).not.toBe(lightTheme.colors.surfaceSidebar);
+    expect(lightTheme.colors.surfaceSidebarSelected).not.toBe(
+      lightTheme.colors.surfaceSidebarHover,
+    );
   });
 
   it("derives Dark hover and selection from the first two raised surfaces", () => {

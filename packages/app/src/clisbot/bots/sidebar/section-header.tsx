@@ -26,7 +26,16 @@ const icons = {
   Pinned: withUnistyles(Pin),
 };
 const Fallback = withUnistyles(Layers);
-const color = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const color = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
+
+/**
+ * How far a section's rows sit in from its header, so Pinned, Group chats, Bots and Projects read
+ * as groups with their items under them. Rows, their hover and their selected card all move in;
+ * the header keeps the sidebar's rail.
+ */
+export function sectionRowIndent(theme: Theme): number {
+  return theme.spacing[2];
+}
 
 export function useSectionCollapsed(key: string) {
   const collapsed = useSidebarCollapsedSectionsStore((state) =>
@@ -144,9 +153,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: 8,
   },
   title: {
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
+    fontWeight: theme.fontWeight.medium,
     lineHeight: 20,
     flexShrink: 1,
   },

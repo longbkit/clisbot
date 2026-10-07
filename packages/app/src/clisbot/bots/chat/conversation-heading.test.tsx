@@ -45,16 +45,25 @@ function OptionsTrigger() {
     </>
   );
 }
+const TEAM_MARK = <span>team-mark</span>;
 it("opens the same menu state from the heading and the overflow trigger", () => {
   render(
     <ChatOptionsProvider>
-      <ConversationHeading title="Team" group memberCount={2} hostName="Mac" tabCount={2} />
+      <ConversationHeading
+        avatar={TEAM_MARK}
+        title="Team"
+        group
+        memberCount={2}
+        hostName="Mac"
+        tabCount={2}
+      />
       <OptionsTrigger />
     </ChatOptionsProvider>,
   );
   const heading = screen.getByRole("button", {
     name: "Team, 2 members · 2 tabs. Open chat options",
   });
+  expect(screen.getByText("team-mark")).toBeTruthy();
   fireEvent.click(heading);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(heading.getAttribute("aria-expanded")).toBe("true");
@@ -66,6 +75,7 @@ it("shows a DM's host and updates the tab count when the layout changes", () => 
   const { rerender } = render(
     <ChatOptionsProvider>
       <ConversationHeading
+        avatar={null}
         title="CTO"
         group={false}
         memberCount={1}
@@ -80,6 +90,7 @@ it("shows a DM's host and updates the tab count when the layout changes", () => 
   rerender(
     <ChatOptionsProvider>
       <ConversationHeading
+        avatar={null}
         title="CTO"
         group={false}
         memberCount={1}
@@ -96,7 +107,14 @@ it("shows a DM's host and updates the tab count when the layout changes", () => 
 it("uses the group summary even when one member remains", () => {
   render(
     <ChatOptionsProvider>
-      <ConversationHeading title="Team" group memberCount={1} hostName="Mac" tabCount={1} />
+      <ConversationHeading
+        avatar={null}
+        title="Team"
+        group
+        memberCount={1}
+        hostName="Mac"
+        tabCount={1}
+      />
     </ChatOptionsProvider>,
   );
   expect(

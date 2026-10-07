@@ -1,12 +1,12 @@
 import type { Rect } from "@/components/ui/menu/menu-anchor";
+import { ChatAvatar } from "../chat/chat-avatar";
 import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "expo-router";
 import { Text, View } from "react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
-import { Hash } from "lucide-react-native";
 import { botsCopy } from "../copy";
 import { buildHostChatRoute, parseChatRouteFromPathname } from "../routes";
 import { BotsSidebarRow } from "./row";
@@ -129,6 +129,7 @@ const ChatRow = memo(function ChatRow({
     [chat.hostName, chat.memberNames],
   );
   const detail = useChatRowDetail(detailInput);
+  const chatLeading = useMemo(() => <ChatAvatar chatId={chat.chatId} group />, [chat.chatId]);
   const handlePress = useCallback(() => onPress(chat), [chat, onPress]);
   const handleOpenMenu = useCallback(
     (anchor: Rect) => onOpenMenu?.(chat, anchor),
@@ -151,13 +152,6 @@ const ChatRow = memo(function ChatRow({
 });
 
 const chatsDisplayMenu = <SectionDisplayMenu section="chats" />;
-
-// A neutral leading mark keeps chat titles on the same rail as bot faces. Plain object, not a
-// Unistyles style, so building the element at module scope materialises nothing theme-bound.
-const ThemedHash = withUnistyles(Hash);
-const chatLeading = (
-  <ThemedHash size={16} uniProps={(theme) => ({ color: theme.colors.foregroundMuted })} />
-);
 
 const hintStyles = StyleSheet.create((theme) => ({
   hint: {

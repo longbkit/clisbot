@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shortenPath } from "./shorten-path";
+import { shortenPath, wrappablePath } from "./shorten-path";
 
 describe("shortenPath", () => {
   it("shortens a macOS home directory path", () => {
@@ -27,5 +27,15 @@ describe("shortenPath", () => {
 
   it("returns an empty string for an empty string", () => {
     expect(shortenPath("")).toBe("");
+  });
+});
+
+describe("wrappablePath", () => {
+  it("shortens home and lets the path break after each separator", () => {
+    expect(wrappablePath("/Users/me/dev/clisbot")).toBe("~/\u200bdev/\u200bclisbot");
+  });
+
+  it("returns an empty string for a missing path", () => {
+    expect(wrappablePath(null)).toBe("");
   });
 });

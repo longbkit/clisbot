@@ -148,6 +148,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   buttonSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
+    ...theme.shadow.raised,
   },
   label: {
     fontSize: theme.fontSize.base,
