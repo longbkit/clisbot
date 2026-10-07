@@ -195,9 +195,16 @@ export async function closeSidebarDisplayPreferences(page: Page): Promise<void> 
   await expect(page.getByTestId("sidebar-display-preferences-content")).toHaveCount(0);
 }
 
-export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
+export async function selectSidebarGrouping(
+  page: Page,
+  mode: "project" | "projectSession" | "statusWorkspace" | "status" | "workspace" | "session",
+): Promise<void> {
   await openSidebarDisplayPage(page, "sidebar-display-grouping");
-  await page.getByTestId("sidebar-grouping-status").click();
+  await page.getByTestId(`sidebar-grouping-${mode}`).click();
+}
+
+export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
+  await selectSidebarGrouping(page, "status");
 }
 
 export async function openMobileAgentSidebar(page: Page): Promise<void> {

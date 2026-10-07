@@ -4,6 +4,7 @@ import type {
   SidebarWorkspaceEntry,
   SidebarWorkspacePlacement,
 } from "@/hooks/use-sidebar-workspaces-list";
+import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { buildSidebarProjection } from "./sidebar-projection";
 
 function makeWorkspace(
@@ -63,10 +64,7 @@ function makeProject(
   };
 }
 
-function projectionInput(options?: {
-  groupMode?: "project" | "status";
-  pinnedCollapsed?: boolean;
-}) {
+function projectionInput(options?: { groupMode?: SidebarGroupMode; pinnedCollapsed?: boolean }) {
   const pinned = makeWorkspace("pinned", "running");
   const unpinned = makeWorkspace("unpinned", "needs_input");
   return {
@@ -92,7 +90,7 @@ function projectionInput(options?: {
  * Two projects, one workspace each, both labelled — so every grouping mode puts rows from more
  * than one project on screen, and a mode that asked for fewer icons than it renders would show it.
  */
-function twoProjectInput(groupMode: "project" | "status") {
+function twoProjectInput(groupMode: SidebarGroupMode) {
   const first = makeWorkspace("first", "running", ["Urgent"], "project");
   const second = makeWorkspace("second", "needs_input", ["Backend"], "other-project");
   return {
@@ -113,7 +111,14 @@ function twoProjectInput(groupMode: "project" | "status") {
 describe("buildSidebarProjection", () => {
   // The rule that outlived the bug it was written for: a project icon is fetched per project, so
   // whatever a mode groups by, the rows it produces can only reference projects already covered.
-  for (const groupMode of ["project", "status"] as const) {
+  for (const groupMode of [
+    "project",
+    "projectSession",
+    "statusWorkspace",
+    "status",
+    "workspace",
+    "session",
+  ] as const) {
     it(`covers every row ${groupMode} grouping renders with a project icon target`, () => {
       const projection = buildSidebarProjection(twoProjectInput(groupMode));
       const covered = new Set(projection.projectIconTargets.map((target) => target.projectViewKey));
@@ -136,6 +141,18 @@ describe("buildSidebarProjection", () => {
       expect([...renderedProjectViewKeys].filter((viewKey) => !covered.has(viewKey))).toEqual([]);
     });
   }
+
+  it("Workspace grouping lists the unpinned rows with no header, numbered after Pinned", () => {
+    const projection = buildSidebarProjection(projectionInput({ groupMode: "workspace" }));
+    const group = projection.workspaceGroups[0];
+    expect(projection.workspaceGroups).toHaveLength(1);
+    expect(group?.leading.kind).toBe("none");
+    expect(group?.rows.map((row) => row.workspaceId)).toEqual(["unpinned"]);
+    expect(projection.shortcutModel.shortcutTargets.map((target) => target.workspaceId)).toEqual([
+      "pinned",
+      "unpinned",
+    ]);
+  });
 
   it("uses one pin-aware projection for project rows and shortcut order", () => {
     const projection = buildSidebarProjection(projectionInput());

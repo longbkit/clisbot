@@ -18,16 +18,23 @@ import {
   type WorkspaceSessionItem,
   type WorkspaceSessionSource,
 } from "./select-sessions";
-import { parseShownAgents, serializeShownAgents, type ShownAgents } from "./shown-agents";
+import {
+  parseShownAgents,
+  serializeShownAgents,
+  shownAgentIds,
+  type ShownAgents,
+} from "./shown-agents";
+import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import {
   buildStatusSessionShortcutModel,
-  sessionStatusDisplayGroups,
+  sessionDisplayGroups,
   workspaceStatusDisplayGroups,
   type StatusDisplayGroup,
 } from "./status-sessions";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import type { SidebarProjection } from "@/components/sidebar/sidebar-projection";
-import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
+import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
+import { listsSessions, resolveSidebarGroupMode } from "./grouping";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 
 const EMPTY_SOURCE: WorkspaceSessionSource = { agents: new Map(), messageSubmissions: new Map() };
@@ -168,6 +175,7 @@ export function useWorkspaceSessions(input: {
   serverId: string;
   workspaceId: string;
   activeOnly: boolean;
+  keepAgentIds: ReadonlySet<string>;
 }): WorkspaceSessionItem[] {
   const source = useSessionStore(
     useShallow((state) => {
@@ -183,8 +191,9 @@ export function useWorkspaceSessions(input: {
         source,
         workspaceId: input.workspaceId,
         activeOnly: input.activeOnly,
+        keepAgentIds: input.keepAgentIds,
       }),
-    [source, input.workspaceId, input.activeOnly],
+    [source, input.workspaceId, input.activeOnly, input.keepAgentIds],
   );
 }
 
@@ -251,29 +260,38 @@ export function useWorkspaceRowSelectionFill(input: WorkspaceRef & { selected: b
       workspaceId: input.workspaceId,
       agentId: selectedAgentId,
       activeOnly: preference.activeOnly,
+      keepAgentIds: new Set([selectedAgentId]),
     });
   });
   return input.selected && !lineSelected;
 }
 
+/** The grouping the sidebar draws: the chosen mode, less the session modes while sessions are off. */
+export function useSidebarGroupMode(): SidebarGroupMode {
+  const mode = useSidebarViewStore((state) => state.groupMode);
+  const { visible } = useSidebarWorkspaceSessions();
+  return resolveSidebarGroupMode(mode, visible);
+}
+
 /**
- * What status grouping lists, and what Cmd+1…9 walk. With Agent sessions on, the sessions are
- * grouped by their own status instead of their workspace's and the numbers follow those lines;
- * off, both are upstream's workspace rows. One result feeds the list and the shortcuts, so a
- * badge never names a line the list does not show.
+ * What a grouped mode lists, and what Cmd+1…9 walk. In the session modes the sessions take their
+ * workspace rows' place and the numbers follow those lines; otherwise both are the workspace
+ * rows. One result feeds the list and the shortcuts, so a badge never names a line the list does
+ * not show.
  */
-export function useStatusSidebarView(input: {
+export function useGroupedSidebarView(input: {
   projection: SidebarProjection;
   groupMode: SidebarGroupMode;
   pinnedCollapsed: boolean;
   collapsedWorkspaceGroupKeys: ReadonlySet<string>;
 }): { workspaceGroups: StatusDisplayGroup[]; shortcutModel: SidebarShortcutModel } {
   const { visible, activeOnly } = useSidebarWorkspaceSessions();
-  const sessionsShown = visible && input.groupMode === "status";
+  const sessionsShown = visible && listsSessions(input.groupMode);
   const { projection, pinnedCollapsed, collapsedWorkspaceGroupKeys } = input;
-  const workspaceGroups = useStatusDisplayGroups({
+  const workspaceGroups = useDisplayGroups({
     groups: projection.workspaceGroups,
     sessionsShown,
+    byStatus: input.groupMode === "status",
     activeOnly,
   });
   const shortcutModel = useMemo(
@@ -295,12 +313,14 @@ export function useStatusSidebarView(input: {
  * Reads only the `agents` and `messageSubmissions` maps of the hosts the groups hold, one list
  * each, so the shallow compare skips unrelated store updates.
  */
-function useStatusDisplayGroups(input: {
+function useDisplayGroups(input: {
   groups: readonly SidebarWorkspaceGroup[];
   sessionsShown: boolean;
+  byStatus: boolean;
   activeOnly: boolean;
 }): StatusDisplayGroup[] {
-  const { groups, sessionsShown, activeOnly } = input;
+  const { groups, sessionsShown, byStatus, activeOnly } = input;
+  const keepAgentIds = useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly);
   const serverIds = useMemo(
     () => (sessionsShown ? [...new Set(groups.flatMap((g) => g.rows.map((r) => r.serverId)))] : []),
     [sessionsShown, groups],
@@ -319,6 +339,26 @@ function useStatusDisplayGroups(input: {
       const messageSubmissions = submissionMaps[index];
       if (agents && messageSubmissions) sources.set(serverId, { agents, messageSubmissions });
     });
-    return sessionStatusDisplayGroups({ groups, sources, activeOnly });
-  }, [sessionsShown, activeOnly, groups, serverIds, agentMaps, submissionMaps]);
+    return sessionDisplayGroups({ groups, sources, activeOnly, keepAgentIds, byStatus });
+  }, [
+    sessionsShown,
+    byStatus,
+    activeOnly,
+    keepAgentIds,
+    groups,
+    serverIds,
+    agentMaps,
+    submissionMaps,
+  ]);
+}
+
+/** The sessions the open workspace's panes show; empty outside a workspace or while `enabled` is off. */
+function useOpenWorkspaceShownAgentIds(enabled: boolean): ReadonlySet<string> {
+  const selection = useActiveWorkspaceSelection();
+  const shown = useWorkspaceShownAgents({
+    serverId: selection?.serverId ?? "",
+    workspaceId: selection?.workspaceId ?? "",
+    enabled: enabled && selection !== null,
+  });
+  return useMemo(() => shownAgentIds(shown), [shown]);
 }

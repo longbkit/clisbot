@@ -1,5 +1,6 @@
 import { WorkspaceMetadataRow } from "@/clisbot/session-storage/workspace-metadata-row";
 import { WorkspaceSessionsLeadingColumn } from "@/clisbot/workspace-sessions/expand-toggle";
+import { ProjectAboveLine, useProjectAbove } from "@/clisbot/workspace-sessions/project-above";
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -128,6 +129,8 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   // The workspace carries label names; their colors live in its host's catalog, so the row is
   // where the two meet — the meta line is handed finished definitions.
   const labels = useWorkspaceLabelDefinitions(workspace.serverId, workspace.labels);
+  // Clisbot: in a grouping without project headers, the project's name sits above the title.
+  const projectAbove = useProjectAbove();
   const workspaceBranchTextStyle = useMemo(
     () => [
       styles.workspaceBranchText,
@@ -139,6 +142,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
 
   return (
     <View style={styles.workspaceRowContent}>
+      {projectAbove ? <ProjectAboveLine name={workspace.projectName} /> : null}
       <View style={styles.workspaceRowMain}>
         <WorkspaceSessionsLeadingColumn
           serverId={workspace.serverId}
@@ -174,7 +178,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
           <WorkspaceMetadataRow workspace={workspace} />
           <WorkspaceMetaRow
             currentBranch={workspace.currentBranch}
-            projectName={leadingProjectName}
+            projectName={projectAbove ? null : leadingProjectName}
             hostBadge={hostBadge ?? null}
             prHint={workspace.prHint}
             serviceSummary={serviceSummary}

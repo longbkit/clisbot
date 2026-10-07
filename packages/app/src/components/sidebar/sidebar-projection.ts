@@ -18,6 +18,7 @@ import {
   type SidebarShortcutModel,
   type SidebarShortcutSection,
 } from "@/utils/sidebar-shortcuts";
+import { clisbotWorkspaceGroups } from "@/clisbot/workspace-sessions/grouping";
 import { statusWorkspaceGroups, type SidebarWorkspaceGroup } from "./sidebar-labels";
 
 export interface SidebarProjection {
@@ -60,7 +61,7 @@ export function buildSidebarProjection(input: SidebarProjectionInput): SidebarPr
   // One switch decides both what the list groups by and what the keyboard shortcuts walk, so the
   // two cannot disagree and a new grouping mode is a compile error here rather than a silent
   // fall-through to the project rows.
-  const workspaceGroups = buildWorkspaceGroups(input, unpinnedWorkspaces);
+  const workspaceGroups = buildWorkspaceGroups(input, unpinnedWorkspaces, pinnedGroups);
 
   const sections: SidebarShortcutSection[] = [];
   if (!input.pinnedCollapsed) {
@@ -90,17 +91,30 @@ export function buildSidebarProjection(input: SidebarProjectionInput): SidebarPr
   };
 }
 
-/** Project mode keeps its project headers and groups nothing; status mode groups the rows. */
+/**
+ * Project mode keeps its project headers and groups nothing; the status modes group the rows by
+ * status; the other Clisbot modes group them by project or not at all.
+ */
 function buildWorkspaceGroups(
   input: SidebarProjectionInput,
   unpinnedWorkspaces: SidebarWorkspaceEntry[],
+  pinnedGroups: PinnedSidebarGroups,
 ): SidebarWorkspaceGroup[] {
   switch (input.groupMode) {
     case "project":
       return [];
     case "status":
+    case "statusWorkspace":
       return statusWorkspaceGroups(
         buildStatusGroups(unpinnedWorkspaces, input.projectNamesByViewKey),
       );
+    case "projectSession":
+    case "workspace":
+    case "session":
+      return clisbotWorkspaceGroups({
+        mode: input.groupMode,
+        projects: pinnedGroups.unpinnedProjects,
+        workspaceEntriesByKey: input.workspaceEntriesByKey,
+      });
   }
 }

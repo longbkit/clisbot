@@ -1,4 +1,5 @@
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import { GROUP_MODE_MENU_ORDER } from "@/clisbot/workspace-sessions/grouping";
 import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
 import {
   workspaceSessionsMenuPage,
@@ -29,9 +30,13 @@ import {
   Diff,
   EyeOff,
   Folder,
+  FolderTree,
   GitBranch,
   GitPullRequest,
   Globe,
+  MessageSquare,
+  MessageSquareDashed,
+  Rows3,
   Server,
   Settings2,
   Tag,
@@ -101,7 +106,11 @@ type OptionIcon = ComponentType<{
 // current values, and a column of icons there would be decoration competing with the values.
 const GROUPING_ICONS: Record<SidebarGroupMode, OptionIcon> = {
   project: withUnistyles(Folder),
-  status: withUnistyles(CircleDashed),
+  projectSession: withUnistyles(FolderTree),
+  statusWorkspace: withUnistyles(CircleDashed),
+  status: withUnistyles(MessageSquareDashed),
+  workspace: withUnistyles(Rows3),
+  session: withUnistyles(MessageSquare),
 };
 
 const TITLE_SOURCE_ICONS: Record<WorkspaceTitleSource, OptionIcon> = {
@@ -138,13 +147,19 @@ const TRAILING_ICONS: Record<SidebarTrailingChoice, OptionIcon> = {
   timestamp: withUnistyles(Clock),
 };
 
-const GROUPING_MODES: readonly SidebarGroupMode[] = ["project", "status"];
+// Clisbot adds Project › Session, Status › Workspace, Workspace and Session; the session modes
+// need Agent sessions on and otherwise draw as their workspace twin (`resolveSidebarGroupMode`).
+const GROUPING_MODES = GROUP_MODE_MENU_ORDER;
 const TITLE_SOURCES: readonly WorkspaceTitleSource[] = ["title", "branch"];
 const TRAILING_CHOICES: readonly SidebarTrailingChoice[] = ["diff", "timestamp"];
 
 const GROUPING_LABEL_KEYS: Record<SidebarGroupMode, string> = {
   project: "sidebar.display.grouping.project",
+  projectSession: "sidebar.display.grouping.projectSession",
+  statusWorkspace: "sidebar.display.grouping.statusWorkspace",
   status: "sidebar.display.grouping.status",
+  workspace: "sidebar.display.grouping.workspace",
+  session: "sidebar.display.grouping.session",
 };
 
 const TITLE_SOURCE_LABEL_KEYS: Record<WorkspaceTitleSource, string> = {

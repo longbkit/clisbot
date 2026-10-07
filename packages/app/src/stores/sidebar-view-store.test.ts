@@ -126,6 +126,26 @@ describe("sidebar view store", () => {
     });
   });
 
+  it("counts each grouping pick", () => {
+    useSidebarViewStore.setState({ groupModeUsage: {} });
+    useSidebarViewStore.getState().setGroupMode("session");
+    useSidebarViewStore.getState().setGroupMode("session");
+    useSidebarViewStore.getState().setGroupMode("status");
+    expect(useSidebarViewStore.getState().groupModeUsage).toEqual({ session: 2, status: 1 });
+  });
+
+  it("keeps the Clisbot grouping modes and reads the retired label mode as project", () => {
+    for (const groupMode of [
+      "projectSession",
+      "statusWorkspace",
+      "workspace",
+      "session",
+    ] as const) {
+      expect(migrateSidebarViewState({ groupMode }).groupMode).toBe(groupMode);
+    }
+    expect(migrateSidebarViewState({ groupMode: "label" }).groupMode).toBe("project");
+  });
+
   it("migrates a pre-v2 single host filter to the multi-host list", () => {
     expect(
       migrateSidebarViewState({

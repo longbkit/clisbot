@@ -2,7 +2,7 @@ import {
   matchesSessionMetadata,
   sessionMetadataRecoveryNotice,
 } from "@/clisbot/session-storage/directory";
-import { useStatusSidebarView } from "@/clisbot/workspace-sessions/model";
+import { useGroupedSidebarView, useSidebarGroupMode } from "@/clisbot/workspace-sessions/model";
 import type { StatusDisplayGroup } from "@/clisbot/workspace-sessions/status-sessions";
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import {
@@ -62,7 +62,7 @@ export function SidebarModelProvider({
   children: ReactNode;
 }) {
   const list = useSidebarWorkspacesList({ enabled: active });
-  const groupMode = useSidebarViewStore((state) => state.groupMode);
+  const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
   const channelFilters = useSidebarViewStore((state) => state.channelFilters);
   const hasMetadataFilter = userFilters.length > 0 || channelFilters.length > 0;
@@ -179,8 +179,8 @@ export function SidebarModelProvider({
     ],
   );
   const projection = useMemo(() => buildSidebarProjection(projectionInput), [projectionInput]);
-  // Clisbot: with Agent sessions on, Status grouping lists sessions and the shortcuts walk them.
-  const statusView = useStatusSidebarView({
+  // Clisbot: with Agent sessions on, the session modes list sessions and the shortcuts walk them.
+  const statusView = useGroupedSidebarView({
     projection,
     groupMode,
     pinnedCollapsed,

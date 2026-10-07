@@ -40,7 +40,7 @@ export interface StatusDisplayGroup extends SidebarWorkspaceGroup {
   items: StatusGroupItem[];
 }
 
-/** Status mode as upstream draws it: each workspace row stays in its workspace's group. */
+/** The groups as given, one row per workspace — Status as upstream draws it, and Workspace. */
 export function workspaceStatusDisplayGroups(
   groups: readonly SidebarWorkspaceGroup[],
 ): StatusDisplayGroup[] {
@@ -51,65 +51,93 @@ export function workspaceStatusDisplayGroups(
 }
 
 /**
- * Status mode with Agent sessions on: the sessions themselves are grouped by status, so a
- * workspace whose sessions differ in status shows each one under the header it belongs to.
+ * The session modes with Agent sessions on: each workspace that has sessions is replaced by its
+ * sessions. Status files every session under its own status header, so a workspace whose
+ * sessions differ in status shows each one where it belongs; Project › Session and Session keep
+ * the groups they were given and list the sessions inside them.
  *
  * Inside a group the most recently messaged session comes first. That time only moves when
  * someone sends a message, so a line does not jump while its turn streams.
  */
-export function sessionStatusDisplayGroups(input: {
+export function sessionDisplayGroups(input: {
   groups: readonly SidebarWorkspaceGroup[];
   sources: ReadonlyMap<string, WorkspaceSessionSource>;
   activeOnly: boolean;
+  /** Sessions a pane shows, kept by Active sessions only. */
+  keepAgentIds?: ReadonlySet<string>;
+  byStatus: boolean;
 }): StatusDisplayGroup[] {
-  const buckets = new Map<StatusBucket, RankedItem[]>();
-  const add = (bucket: StatusBucket, item: RankedItem) => {
-    const items = buckets.get(bucket) ?? [];
-    items.push(item);
-    buckets.set(bucket, items);
-  };
   let order = 0;
-  for (const workspace of input.groups.flatMap((group) => group.rows)) {
-    const source = input.sources.get(workspace.serverId);
-    if (!source || listWorkspaceRootAgents(source.agents, workspace.workspaceId).length === 0) {
-      add(workspace.statusBucket, {
-        item: workspaceItem(workspace),
-        time: workspace.statusEnteredAt?.getTime() ?? null,
-        order: order++,
-      });
-      continue;
-    }
-    const sessions = selectWorkspaceSessions({
-      source,
-      workspaceId: workspace.workspaceId,
-      activeOnly: input.activeOnly,
+  const rank = (group: SidebarWorkspaceGroup): RankedItem[] =>
+    group.rows.flatMap((workspace) => rankWorkspace({ ...input, workspace, order: () => order++ }));
+  if (!input.byStatus) {
+    return input.groups.flatMap((group) => {
+      const ranked = rank(group);
+      if (ranked.length === 0) return [];
+      return [displayGroup({ ...group }, ranked)];
     });
-    for (const session of sessions) {
-      add(session.statusBucket, {
-        item: {
-          kind: "session",
-          key: `${workspace.workspaceKey}:${session.agent.id}`,
-          workspace,
-          session,
-        },
-        time: (session.agent.lastUserMessageAt ?? session.agent.createdAt).getTime(),
-        order: order++,
-      });
-    }
+  }
+  const buckets = new Map<StatusBucket, RankedItem[]>();
+  for (const entry of input.groups.flatMap(rank)) {
+    const items = buckets.get(entry.bucket) ?? [];
+    items.push(entry);
+    buckets.set(entry.bucket, items);
   }
   return STATUS_BUCKET_ORDER.flatMap((bucket) => {
     const ranked = buckets.get(bucket);
     if (!ranked) return [];
-    const items = ranked.sort(compareRanked).map((entry) => entry.item);
-    // The workspaces that have a line here, so `rows` still answers "which workspaces".
-    const rows = [...new Set(items.map((item) => item.workspace))];
     const leading = { kind: "status", bucket } as const;
-    return [{ key: bucket, label: STATUS_BUCKET_LABELS[bucket], rows, leading, items }];
+    return [displayGroup({ key: bucket, label: STATUS_BUCKET_LABELS[bucket], leading }, ranked)];
   });
+}
+
+/** One workspace's lines: its sessions, or its own row while it has none to list. */
+function rankWorkspace(input: {
+  workspace: SidebarWorkspaceEntry;
+  sources: ReadonlyMap<string, WorkspaceSessionSource>;
+  activeOnly: boolean;
+  keepAgentIds?: ReadonlySet<string>;
+  order: () => number;
+}): RankedItem[] {
+  const { workspace } = input;
+  const source = input.sources.get(workspace.serverId);
+  if (!source || listWorkspaceRootAgents(source.agents, workspace.workspaceId).length === 0) {
+    const time = workspace.statusEnteredAt?.getTime() ?? null;
+    const item = workspaceItem(workspace);
+    return [{ item, bucket: workspace.statusBucket, time, order: input.order() }];
+  }
+  const sessions = selectWorkspaceSessions({
+    source,
+    workspaceId: workspace.workspaceId,
+    activeOnly: input.activeOnly,
+    keepAgentIds: input.keepAgentIds,
+  });
+  return sessions.map((session) => ({
+    item: {
+      kind: "session",
+      key: `${workspace.workspaceKey}:${session.agent.id}`,
+      workspace,
+      session,
+    },
+    bucket: session.statusBucket,
+    time: (session.agent.lastUserMessageAt ?? session.agent.createdAt).getTime(),
+    order: input.order(),
+  }));
+}
+
+function displayGroup(
+  group: Omit<SidebarWorkspaceGroup, "rows">,
+  ranked: RankedItem[],
+): StatusDisplayGroup {
+  const items = ranked.sort(compareRanked).map((entry) => entry.item);
+  // The workspaces that have a line here, so `rows` still answers "which workspaces".
+  const rows = [...new Set(items.map((item) => item.workspace))];
+  return { ...group, rows, items };
 }
 
 interface RankedItem {
   item: StatusGroupItem;
+  bucket: StatusBucket;
   time: number | null;
   /** Position in the incoming workspace order — the tie-break, so equal times never swap. */
   order: number;
@@ -131,8 +159,8 @@ function workspaceItem(workspace: SidebarWorkspaceEntry): StatusGroupItem {
 const SHORTCUT_LIMIT = 9;
 
 /**
- * Cmd+1…9 for Status grouping with sessions: the numbers follow the lines as drawn — open Pinned
- * rows first, then each open status header's lines — and a session's number opens that session.
+ * Cmd+1…9 for the session modes: the numbers follow the lines as drawn — open Pinned rows first,
+ * then each open group's lines — and a session's number opens that session.
  * Indexed by item key (`workspaceKey` for a row, `workspaceKey:agentId` for a session line).
  */
 export function buildStatusSessionShortcutModel(input: {

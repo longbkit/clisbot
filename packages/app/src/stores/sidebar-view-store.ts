@@ -5,7 +5,20 @@ import { z } from "zod";
 import { workspaceLabelKey } from "@clisbot/protocol/workspace-labels";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
 
-export type SidebarGroupMode = "project" | "status";
+/**
+ * `project` (Project › Workspace) and `status` (Status › Session, or upstream's workspace rows
+ * with Agent sessions off) are upstream's ids. The rest are Clisbot's: `projectSession` lists
+ * sessions under project headers, `statusWorkspace` keeps workspace rows under status headers,
+ * `workspace` lists workspace rows with no header, and `session` lists sessions with no header.
+ * The session modes need Agent sessions on; see `resolveSidebarGroupMode`.
+ */
+export type SidebarGroupMode =
+  | "project"
+  | "projectSession"
+  | "statusWorkspace"
+  | "status"
+  | "workspace"
+  | "session";
 
 const SIDEBAR_VIEW_STORAGE_KEY = "sidebar-view";
 const LEGACY_SIDEBAR_GROUP_MODE_STORAGE_KEY = "sidebar-group-mode";
@@ -62,8 +75,12 @@ function toggleFilterEntry(list: readonly string[], key: string): string[] {
   return list.includes(key) ? list.filter((entry) => entry !== key) : [...list, key];
 }
 
+/** How many times each grouping was picked, so a quick switcher can offer the ones you use. */
+export type SidebarGroupModeUsage = Partial<Record<SidebarGroupMode, number>>;
+
 interface SidebarViewStoreState {
   groupMode: SidebarGroupMode;
+  groupModeUsage: SidebarGroupModeUsage;
   // Empty means "all hosts". A non-empty list pins the sidebar to those hosts.
   hostFilters: string[];
   /**
@@ -99,6 +116,7 @@ interface SidebarViewStoreState {
 
 interface SidebarViewPersistedState {
   groupMode: SidebarGroupMode;
+  groupModeUsage?: SidebarGroupModeUsage;
   hostFilters: string[];
   projectFilters: string[];
   labelFilter: SidebarLabelFilter;
@@ -106,12 +124,21 @@ interface SidebarViewPersistedState {
   channelFilters: string[];
 }
 
-const PersistedSidebarGroupModeSchema = z.enum(["project", "status", "label"]);
+const PersistedSidebarGroupModeSchema = z.enum([
+  "project",
+  "projectSession",
+  "statusWorkspace",
+  "status",
+  "workspace",
+  "session",
+  "label",
+]);
 const SidebarLabelFilterSchema = z.object({
   labels: z.array(z.string()),
 });
 const SidebarViewPersistedStateSchema = z.strictObject({
   groupMode: PersistedSidebarGroupModeSchema.optional(),
+  groupModeUsage: z.record(z.string(), z.number()).optional(),
   hostFilters: z.array(z.string()).optional(),
   hostFilter: z.string().nullable().optional(),
   projectFilters: z.array(z.string()).optional(),
@@ -174,7 +201,8 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   }
 
   return {
-    groupMode: state.groupMode === "status" ? "status" : "project",
+    // The retired `label` mode reads as project, as it always has.
+    groupMode: !state.groupMode || state.groupMode === "label" ? "project" : state.groupMode,
     hostFilters: readHostFilters(state),
     projectFilters: state.projectFilters ?? [],
     userFilters: state.userFilters ?? [],
@@ -214,6 +242,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
   persist(
     (set) => ({
       groupMode: "project",
+      groupModeUsage: {},
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
@@ -229,7 +258,14 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
           channelFilters: toggleFilterEntry(state.channelFilters, key),
         })),
       clearChannelFilters: () => set({ channelFilters: [] }),
-      setGroupMode: (mode) => set({ groupMode: mode }),
+      setGroupMode: (mode) =>
+        set((state) => ({
+          groupMode: mode,
+          groupModeUsage: {
+            ...state.groupModeUsage,
+            [mode]: (state.groupModeUsage[mode] ?? 0) + 1,
+          },
+        })),
       toggleHostFilter: (serverId) =>
         set((state) => ({ hostFilters: toggleFilterEntry(state.hostFilters, serverId) })),
       pinHostFilter: (serverId) => set({ hostFilters: [serverId] }),
@@ -285,6 +321,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       ),
       partialize: (state) => ({
         groupMode: state.groupMode,
+        groupModeUsage: state.groupModeUsage,
         hostFilters: state.hostFilters,
         projectFilters: state.projectFilters,
         labelFilter: state.labelFilter,

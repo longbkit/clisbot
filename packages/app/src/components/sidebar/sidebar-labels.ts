@@ -3,11 +3,20 @@ import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list"
 import { SIDEBAR_UNLABELLED_LABEL_KEY, type SidebarLabelFilter } from "@/stores/sidebar-view-store";
 import type { StatusBucket, StatusGroup } from "@/hooks/sidebar-status-view-model";
 
+/**
+ * What a group's header leads with. Clisbot adds `project` (a project header, its icon leading)
+ * and `none`, a group with no header whose rows sit directly in the Projects section.
+ */
+export type SidebarWorkspaceGroupLeading =
+  | { kind: "status"; bucket: StatusBucket }
+  | { kind: "project"; projectViewKey: string }
+  | { kind: "none" };
+
 export interface SidebarWorkspaceGroup {
   key: string;
   label: string;
   rows: SidebarWorkspaceEntry[];
-  leading: { kind: "status"; bucket: StatusBucket };
+  leading: SidebarWorkspaceGroupLeading;
 }
 
 export function statusWorkspaceGroups(groups: readonly StatusGroup[]): SidebarWorkspaceGroup[] {

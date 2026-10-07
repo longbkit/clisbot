@@ -1,4 +1,5 @@
 import { BotsSectionHeader, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
+import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { router } from "expo-router";
@@ -905,6 +906,7 @@ function WorkspacesSectionHeader() {
           onToggle={toggle}
           actions={displayPreferencesMenuElement}
         />
+        {collapsed ? null : <SidebarViewBar />}
         <SidebarActiveFilters />
       </View>
     );

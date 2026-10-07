@@ -1,4 +1,3 @@
-import { SessionPinButton } from "@/clisbot/bots/sidebar/session-pin";
 import {
   lazy,
   memo,
@@ -17,9 +16,7 @@ import { SessionMetadataLine } from "@/clisbot/session-storage/workspace-metadat
 import { getProviderIcon } from "@/components/provider-icons";
 import { isWeb } from "@/constants/platform";
 import type { WorkspaceTabPresentation } from "@/screens/workspace/workspace-tab-presentation";
-import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
-import { type Agent, useSessionStore } from "@/stores/session-store";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import {
   useSidebarWorkspaceSessions,
@@ -29,7 +26,10 @@ import {
 } from "./model";
 import type { SidebarWorkspaceSessionDetails } from "./preferences";
 import type { WorkspaceSessionItem } from "./select-sessions";
+import { ProjectAboveLine } from "./project-above";
+import { SessionLineTrailing, type SessionLineActionsInput } from "./session-line-trailing";
 import { SessionTitleTooltip } from "./session-title-tooltip";
+import { shownAgentIds } from "./shown-agents";
 
 /**
  * - `selected`: the agent in the workspace's focused pane — the session you are in. It takes the
@@ -40,9 +40,10 @@ export type SessionLineState = "selected" | "visible" | "idle";
 
 /**
  * - `flush` / `indented`: under a workspace row, the title on the workspace title's rail.
- * - `statusGroup`: in a workspace row's place under a status header, the mark on the row's rail.
+ * - `statusGroup`: in a workspace row's place under a group header, the mark on the row's rail.
+ * - `topLevel`: in a workspace row's place with no header above, flush like a pinned row.
  */
-type SessionLinePlacement = "flush" | "indented" | "statusGroup";
+export type SessionLinePlacement = "flush" | "indented" | "statusGroup" | "topLevel";
 
 // The presentation module also imports the panel registry and terminal renderer. Load it only
 // when a session icon is actually rendered, after the app's navigator polyfill has run.
@@ -99,8 +100,9 @@ function OpenWorkspaceSessionList({
   fullTitles: boolean;
   details: SidebarWorkspaceSessionDetails;
 }): ReactElement | null {
-  const sessions = useWorkspaceSessions({ serverId, workspaceId, activeOnly });
   const shown = useWorkspaceShownAgents({ serverId, workspaceId, enabled: selected });
+  const keepAgentIds = useMemo(() => shownAgentIds(shown), [shown]);
+  const sessions = useWorkspaceSessions({ serverId, workspaceId, activeOnly, keepAgentIds });
   if (sessions.length === 0) return null;
 
   return (
@@ -139,11 +141,15 @@ export interface WorkspaceSessionRowProps {
   placement: SessionLinePlacement;
   /** Names the workspace on a line that has no workspace row above it. */
   workspaceLabel?: string;
+  /** Names the project above the title, on a line that has no project header above it. */
+  projectLabel?: string;
+  /** The shortcut number, in Last activity's place while its modifier is held. */
+  badgeNumber?: number | null;
   /**
-   * Replaces the end of the title line — by default the session pin over Last activity. A line
-   * standing in a workspace row's place adds the row's menu and shortcut badge there.
+   * Actions after the pin on hover — a line standing in a workspace row's place adds the row's
+   * menu. See `SessionLineTrailing`.
    */
-  renderTrailing?: (input: { rowHovered: boolean; activity: ReactElement | null }) => ReactNode;
+  renderActions?: (input: SessionLineActionsInput) => ReactNode;
   onPress?: () => void;
 }
 
@@ -156,7 +162,9 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   details,
   placement,
   workspaceLabel,
-  renderTrailing,
+  projectLabel,
+  badgeNumber = null,
+  renderActions,
   onPress,
 }: WorkspaceSessionRowProps): ReactElement {
   const { t } = useTranslation();
@@ -166,7 +174,7 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   const { agent } = session;
   const label = session.title ?? t("workspace.tabs.fallback.newAgent");
   const selected = state === "selected";
-  const wide = placement === "statusGroup";
+  const wide = placement === "statusGroup" || placement === "topLevel";
   const titleRef = useRef<Text>(null);
   const handlePress = useCallback(() => {
     onPress?.();
@@ -174,7 +182,6 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   }, [onPress, serverId, workspaceId, agent.id]);
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const rowStyle = useSessionRowStyle({ placement, selected, rowHovered });
-  const activity = details.lastActivity ? <LastActivity agent={agent} /> : null;
 
   const row = (
     <View style={sessionWrapper} onPointerEnter={hoverIn} onPointerLeave={hoverOut}>
@@ -190,6 +197,7 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
         >
           {({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => (
             <>
+              {projectLabel ? <ProjectAboveLine name={projectLabel} /> : null}
               <View style={styles.titleLine}>
                 <SessionMark
                   session={session}
@@ -205,13 +213,15 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
                 >
                   {label}
                 </Text>
-                {renderTrailing ? (
-                  renderTrailing({ rowHovered, activity })
-                ) : (
-                  <SessionPinButton serverId={serverId} agentId={agent.id} hovered={rowHovered}>
-                    {activity}
-                  </SessionPinButton>
-                )}
+                <SessionLineTrailing
+                  serverId={serverId}
+                  rowHovered={rowHovered}
+                  selected={selected}
+                  agent={agent}
+                  showActivity={details.lastActivity}
+                  badgeNumber={badgeNumber}
+                  renderActions={renderActions}
+                />
               </View>
               <SessionDetailLine
                 serverId={serverId}
@@ -248,6 +258,7 @@ function useSessionRowStyle({
       styles.row,
       placement === "indented" && styles.rowIndented,
       placement === "statusGroup" && styles.rowInStatusGroup,
+      placement === "topLevel" && styles.rowTopLevel,
       (hovered || rowHovered) && styles.rowHovered,
       selected && styles.rowSelected,
       pressed && styles.rowPressed,
@@ -311,18 +322,6 @@ function SessionMark({
       </Suspense>
     </View>
   );
-}
-
-/**
- * Reads the store's `agentLastActivity` slice, as the agent directory does: activity is bumped
- * there without rewriting the agent, so `agent.lastActivityAt` alone goes stale mid-turn.
- */
-function LastActivity({ agent }: { agent: Agent }): ReactElement {
-  const date = useSessionStore(
-    (state) => state.agentLastActivity.get(agent.id) ?? agent.lastActivityAt,
-  );
-  const label = useCompactTimeAgo(date);
-  return <Text style={styles.trailing}>{label}</Text>;
 }
 
 function SessionDetailLine({
@@ -395,6 +394,11 @@ const styles = StyleSheet.create((theme) => ({
   rowInStatusGroup: {
     paddingLeft: theme.spacing[2] + theme.spacing[2],
   },
+  // A workspace row's own left padding, for a line with no header above it: the Session
+  // grouping, which lists straight under the Projects section.
+  rowTopLevel: {
+    paddingLeft: theme.spacing[2],
+  },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
   },
@@ -430,13 +434,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   titleShown: {
     fontWeight: theme.fontWeight.medium,
-  },
-  trailing: {
-    flexShrink: 0,
-    color: theme.colors.foregroundExtraMuted,
-    fontSize: theme.fontSize.sm,
-    fontVariant: ["tabular-nums"],
-    lineHeight: TITLE_LINE_HEIGHT,
   },
   // Under the title, past the mark, so detail items line up with the words they describe.
   detailLine: {

@@ -52,12 +52,26 @@ export function hasWorkspaceSessionLine(input: {
   workspaceId: string;
   agentId: string;
   activeOnly: boolean;
+  keepAgentIds?: ReadonlySet<string>;
 }): boolean {
   const agent = input.source.agents.get(input.agentId);
   if (!agent || !isWorkspaceSessionAgent(agent, input.source.agents, input.workspaceId)) {
     return false;
   }
-  return !input.activeOnly || deriveSessionStatusBucket(agent, input.source) !== "done";
+  return passesActiveOnly(input, agent.id, deriveSessionStatusBucket(agent, input.source));
+}
+
+/**
+ * Active sessions only hides the `done` sessions, except one a pane is showing: opening a
+ * session marks it read, and the line you just pressed must not vanish under you. It goes once
+ * you move on.
+ */
+function passesActiveOnly(
+  input: { activeOnly: boolean; keepAgentIds?: ReadonlySet<string> },
+  agentId: string,
+  bucket: SidebarStateBucket,
+): boolean {
+  return !input.activeOnly || bucket !== "done" || (input.keepAgentIds?.has(agentId) ?? false);
 }
 
 /**
@@ -84,13 +98,15 @@ export function selectWorkspaceSessions(input: {
   source: WorkspaceSessionSource;
   workspaceId: string;
   activeOnly: boolean;
+  /** Sessions a pane shows, kept by Active sessions only — see `passesActiveOnly`. */
+  keepAgentIds?: ReadonlySet<string>;
 }): WorkspaceSessionItem[] {
   const sessions = listWorkspaceRootAgents(input.source.agents, input.workspaceId).map((agent) => ({
     agent,
     title: resolveWorkspaceAgentTabLabel(agent.title),
     statusBucket: deriveSessionStatusBucket(agent, input.source),
   }));
-  return input.activeOnly
-    ? sessions.filter((session) => session.statusBucket !== "done")
-    : sessions;
+  return sessions.filter((session) =>
+    passesActiveOnly(input, session.agent.id, session.statusBucket),
+  );
 }

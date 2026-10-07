@@ -21,10 +21,13 @@ import {
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import type { GestureType } from "react-native-gesture-handler";
 import {
+  useSidebarWorkspaceSessions,
   useWorkspaceRowSelectionFill,
   useWorkspaceSessionsRowPress,
 } from "@/clisbot/workspace-sessions/model";
 import { WorkspaceSessionList } from "@/clisbot/workspace-sessions/session-list";
+import { ActiveOnlyEmptyNote } from "@/clisbot/workspace-sessions/view-bar";
+import { ProjectAboveProvider } from "@/clisbot/workspace-sessions/project-above";
 import {
   StatusSessionLine,
   type SidebarWorkspaceMenuActions,
@@ -89,6 +92,7 @@ import {
   SidebarWorkspaceMenu,
 } from "@/components/sidebar/sidebar-workspace-menu";
 import { PinnedSectionHeader } from "@/components/sidebar/pinned-section-header";
+import { ProjectStatusIndicator } from "@/components/sidebar/project-leading-visual";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import type { ToggleSidebarWorkspacePin } from "@/hooks/use-sidebar-workspace-pin";
@@ -328,6 +332,8 @@ function StatusGroupList({
       onToggleWorkspacePin={onToggleWorkspacePin}
     />
   );
+  // Clisbot: Active sessions only can leave nothing to list; say so instead of a blank section.
+  if (groups.length === 0) return <ActiveOnlyEmptyNote />;
   return <>{groups.map(renderGroup)}</>;
 }
 
@@ -358,52 +364,68 @@ function StatusGroupRows({
     canToggle: canToggleWorkspaces,
     toggleExpanded: toggleWorkspacesExpanded,
   } = useLimitedSidebarGroup(group.items);
+  // Clisbot: a group with no header (Workspace, Session) lists flush in the Projects section,
+  // and a group that is not a project names each row's project above its title.
+  const headed = group.leading.kind !== "none";
+  const open = !headed || !collapsed;
+  const { visible: sessionsVisible } = useSidebarWorkspaceSessions();
+  const projectAbove = sessionsVisible && group.leading.kind !== "project";
 
   return (
-    <View style={collapsed ? undefined : styles.statusGroupBlockExpanded}>
-      <StatusGroupHeader group={group} collapsed={collapsed} />
-      {!collapsed ? (
-        <View
-          style={styles.statusWorkspaceListContainer}
-          testID={`sidebar-status-group-rows-${group.key}`}
-        >
-          {visibleItems.map((item) =>
-            item.kind === "session" ? (
-              <StatusSessionRow
-                key={item.key}
-                item={item}
-                shortcutNumber={shortcutIndex.get(item.key) ?? null}
-                showShortcutBadge={showShortcutBadges}
-                canPin={supportsPinningByServerId.get(item.workspace.serverId) === true}
-                onToggleWorkspacePin={onToggleWorkspacePin}
-                onWorkspacePress={onWorkspacePress}
+    <View style={open ? styles.statusGroupBlockExpanded : undefined}>
+      {headed ? (
+        <StatusGroupHeader
+          group={group}
+          collapsed={collapsed}
+          projectIconByProjectViewKey={projectIconByProjectViewKey}
+        />
+      ) : null}
+      {open ? (
+        <ProjectAboveProvider value={projectAbove}>
+          <View
+            style={styles.statusWorkspaceListContainer}
+            testID={`sidebar-status-group-rows-${group.key}`}
+          >
+            {visibleItems.map((item) =>
+              item.kind === "session" ? (
+                <StatusSessionRow
+                  key={item.key}
+                  item={item}
+                  inGroup={headed}
+                  shortcutNumber={shortcutIndex.get(item.key) ?? null}
+                  showShortcutBadge={showShortcutBadges}
+                  canPin={supportsPinningByServerId.get(item.workspace.serverId) === true}
+                  onToggleWorkspacePin={onToggleWorkspacePin}
+                  onWorkspacePress={onWorkspacePress}
+                />
+              ) : (
+                <StatusWorkspaceRow
+                  key={item.key}
+                  workspace={item.workspace}
+                  {...buildStatusRowProjectPresentation({
+                    workspace: item.workspace,
+                    projectIconByProjectViewKey,
+                    hostBadgeByServerId,
+                  })}
+                  inStatusGroup={headed}
+                  shortcutNumber={shortcutIndex.get(item.workspace.workspaceKey) ?? null}
+                  showShortcutBadge={showShortcutBadges}
+                  canPin={supportsPinningByServerId.get(item.workspace.serverId) === true}
+                  onToggleWorkspacePin={onToggleWorkspacePin}
+                  onWorkspacePress={onWorkspacePress}
+                />
+              ),
+            )}
+            {canToggleWorkspaces ? (
+              <SidebarGroupToggleRow
+                expanded={workspacesExpanded}
+                onPress={toggleWorkspacesExpanded}
+                indented={headed}
+                testID={`sidebar-status-group-show-more-${group.key}`}
               />
-            ) : (
-              <StatusWorkspaceRow
-                key={item.key}
-                workspace={item.workspace}
-                {...buildStatusRowProjectPresentation({
-                  workspace: item.workspace,
-                  projectIconByProjectViewKey,
-                  hostBadgeByServerId,
-                })}
-                shortcutNumber={shortcutIndex.get(item.workspace.workspaceKey) ?? null}
-                showShortcutBadge={showShortcutBadges}
-                canPin={supportsPinningByServerId.get(item.workspace.serverId) === true}
-                onToggleWorkspacePin={onToggleWorkspacePin}
-                onWorkspacePress={onWorkspacePress}
-              />
-            ),
-          )}
-          {canToggleWorkspaces ? (
-            <SidebarGroupToggleRow
-              expanded={workspacesExpanded}
-              onPress={toggleWorkspacesExpanded}
-              indented
-              testID={`sidebar-status-group-show-more-${group.key}`}
-            />
-          ) : null}
-        </View>
+            ) : null}
+          </View>
+        </ProjectAboveProvider>
       ) : null}
     </View>
   );
@@ -434,9 +456,11 @@ function buildStatusRowProjectPresentation({
 function StatusGroupHeader({
   group,
   collapsed,
+  projectIconByProjectViewKey,
 }: {
   group: SidebarWorkspaceGroup;
   collapsed: boolean;
+  projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const toggleWorkspaceGroupCollapsed = useSidebarCollapsedSectionsStore(
@@ -470,7 +494,8 @@ function StatusGroupHeader({
         <View style={styles.statusGroupRowLeft}>
           <View style={styles.statusGroupLeadingVisualSlot}>
             <StatusGroupLeadingVisual
-              leading={group.leading}
+              group={group}
+              projectIconByProjectViewKey={projectIconByProjectViewKey}
               collapsed={collapsed}
               showChevron={isHovered}
             />
@@ -487,16 +512,31 @@ function StatusGroupHeader({
 }
 
 function StatusGroupLeadingVisual({
-  leading,
+  group,
+  projectIconByProjectViewKey,
   collapsed,
   showChevron,
 }: {
-  leading: SidebarWorkspaceGroup["leading"];
+  group: SidebarWorkspaceGroup;
+  projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   collapsed: boolean;
   showChevron: boolean;
 }) {
-  if (!showChevron) {
+  const { leading } = group;
+  if (!showChevron && leading.kind === "status") {
     return <StatusGroupIcon bucket={leading.bucket} />;
+  }
+  // Clisbot: a Project › Session header leads with the project's icon, as a project row does.
+  if (!showChevron && leading.kind === "project") {
+    return (
+      <ProjectStatusIndicator
+        iconDataUri={projectIconByProjectViewKey.get(leading.projectViewKey) ?? null}
+        displayName={group.label}
+        projectViewKey={leading.projectViewKey}
+        statusBucket={null}
+        backdrop="surfaceSidebar"
+      />
+    );
   }
   if (collapsed) {
     return <ThemedChevronRight size={14} uniProps={foregroundMutedColorMapping} />;
@@ -602,11 +642,13 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
 });
 
 /**
- * Clisbot: a session line under a status header, in its workspace row's place. It carries that
+ * Clisbot: a session line in its workspace row's place, under a status or project header or in
+ * the Session grouping's flat list. It carries that
  * row's menu and a shortcut number of its own; pressing it opens the workspace on the session.
  */
 const StatusSessionRow = memo(function StatusSessionRow({
   item,
+  inGroup,
   shortcutNumber,
   showShortcutBadge,
   canPin,
@@ -614,6 +656,8 @@ const StatusSessionRow = memo(function StatusSessionRow({
   onWorkspacePress,
 }: {
   item: StatusSessionGroupItem;
+  /** Under a header; the Session grouping's flat list has none. */
+  inGroup: boolean;
   shortcutNumber: number | null;
   showShortcutBadge: boolean;
   canPin: boolean;
@@ -636,6 +680,7 @@ const StatusSessionRow = memo(function StatusSessionRow({
       <StatusSessionLine
         workspace={workspace}
         session={item.session}
+        placement={inGroup ? "statusGroup" : "topLevel"}
         workspaceSelected={selected}
         menuActions={actions}
         menuDisabled={isArchiving}

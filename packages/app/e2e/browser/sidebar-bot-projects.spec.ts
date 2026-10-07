@@ -9,7 +9,7 @@ import {
   closeSidebarDisplayPreferences,
   openSidebarDisplayPage,
   pinWorkspaceFromSidebar,
-  selectSidebarStatusGrouping,
+  selectSidebarGrouping,
 } from "../support/helpers/sidebar";
 import { createTempDirectory } from "../support/helpers/workspace";
 
@@ -94,7 +94,8 @@ test("merges Bot projects into Projects and preserves session display options", 
     await option.click();
     await closeSidebarDisplayPreferences(page);
     await expect(projects.getByTestId(botRowId)).toBeVisible();
-    await selectSidebarStatusGrouping(page);
+    // Status › Workspace keeps the rows; Status › Session would file the sessions instead.
+    await selectSidebarGrouping(page, "statusWorkspace");
     await closeSidebarDisplayPreferences(page);
     await expect(botRow).toBeVisible();
     await expect(regularSession).toBeVisible();

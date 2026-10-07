@@ -13,6 +13,12 @@ export interface ShownAgents {
 
 export const NO_SHOWN_AGENTS: ShownAgents = { selectedAgentId: null, visibleAgentIds: new Set() };
 
+/** Every agent the panes show, focused or not — what Active sessions only never hides. */
+export function shownAgentIds(shown: ShownAgents): ReadonlySet<string> {
+  if (!shown.selectedAgentId) return shown.visibleAgentIds;
+  return new Set([shown.selectedAgentId, ...shown.visibleAgentIds]);
+}
+
 /**
  * Which agents a workspace layout is showing, read from each pane's focused tab **target**.
  *
