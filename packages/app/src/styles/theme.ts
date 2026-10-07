@@ -233,12 +233,16 @@ export interface LightThemeConfig {
   surfaceSidebar: string;
   /** Defaults to `surface1`; set when the sidebar itself is `surface1`. */
   surfaceSidebarHover?: string;
+  /** The page behind settings cards, so a white card stands off it. Defaults to `surface0`. */
+  surfaceSettings?: string;
   foreground: string;
   foregroundMuted: string;
   foregroundExtraMuted: string;
   /** Text in an empty field; defaults to `foregroundExtraMuted`. */
   placeholder?: string;
   border: string;
+  /** Divider between rows inside a card; lighter than the card's own border. Defaults to `border`. */
+  borderSubtle?: string;
   borderAccent: string;
   accent: string;
   accentBright: string;
@@ -283,6 +287,7 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceWorkspace: tint.surface0,
     // The composer is a white card lifted by `shadow.composer` (docs/design.md).
     surfaceComposer: tint.surface0,
+    surfaceSettings: tint.surfaceSettings ?? tint.surface0,
     borderComposer: tint.border,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
 
@@ -292,6 +297,7 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     placeholder: tint.placeholder ?? tint.foregroundExtraMuted,
 
     border: tint.border,
+    borderSubtle: tint.borderSubtle ?? tint.border,
     borderAccent: tint.borderAccent,
 
     accent: tint.accent,
@@ -346,15 +352,21 @@ const lightSemanticColors = buildLightSemanticColors({
   surface4: "#cecece",
   surfaceDiffEmpty: "#f6f6f6",
   surfaceSidebar: "#f5f5f5",
-  surfaceSidebarHover: "#ebebeb",
+  // Hover lightens toward the white selected card, half way, so hover and selection
+  // read as one direction with selection the stronger step.
+  surfaceSidebarHover: "#fafafa",
+  // T3 Code's page background, oklch(99.2% 0 0): neutral, one step under the white card.
+  surfaceSettings: "#fcfcfc",
   foreground: "#1d1c1d",
   foregroundMuted: "#4a4a4a",
   foregroundExtraMuted: "#707070",
   // Lighter than any text, so an empty field never reads as filled (macOS/iOS
   // placeholders sit at about a quarter of the label's weight).
   placeholder: "#a1a1aa",
-  border: "#d8d8d8",
-  borderAccent: "#c8c8c8",
+  // Two border weights: the card outline groups, the row divider inside it only separates.
+  border: "#e4e4e4",
+  borderSubtle: "#efefef",
+  borderAccent: "#d6d6d6",
   accent: "#20744A",
   accentBright: "#239956",
   accentForeground: "#ffffff",
@@ -427,6 +439,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceWorkspace: tint.surface1,
     // A shadow does not read on dark surfaces; the composer stays a filled box one step up.
     surfaceComposer: tint.surface1,
+    surfaceSettings: tint.surface0,
     borderComposer: tint.borderAccent,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
 
@@ -436,6 +449,8 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     placeholder: tint.placeholder ?? tint.foregroundExtraMuted,
 
     border: tint.border,
+    // Dark dividers are already faint; a lighter one would vanish.
+    borderSubtle: tint.border,
     borderAccent: tint.borderAccent,
 
     accent: tint.accent,
@@ -713,6 +728,12 @@ const darkShadow = {
     shadowRadius: 0,
     elevation: 0,
   },
+  card: {
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
+    elevation: 0,
+  },
   sm: {
     shadowColor: "rgba(0, 0, 0, 0.25)",
     shadowOffset: { width: 0, height: 2 },
@@ -788,6 +809,13 @@ const lightShadow = {
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 16,
     elevation: 3,
+  },
+  // A settings card: a soft lift so the group reads as one surface over the white page.
+  card: {
+    shadowColor: "rgba(0, 0, 0, 0.05)",
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 1,
   },
   sm: {
     shadowColor: "rgba(0, 0, 0, 0.02)",

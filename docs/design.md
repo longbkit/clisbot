@@ -50,14 +50,15 @@ Placeholder text is `colors.placeholder` (`#a1a1aa` in Light, each dark theme's 
 
 The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text
 (`#1d1c1d`), dark gray secondary text and icons (`#4a4a4a`), and passive chrome (`#707070`).
-Content sits on white: cards and inputs are `surface0`, grouped by a `#d8d8d8` border, and
+Content sits on white: cards and inputs are `surface0`, grouped by a `#e4e4e4` border, and
 `surface1`/`surface2` stay at the near-white upstream values (`#fafafa`/`#f4f4f5`). Gray is
 for state and regions, never under text you read: muted text and placeholders drop below 4.5:1
 on `#f3f3f3`, and an input filled `#ededed` on a `#f3f3f3` card is 1.06:1, invisible. The
-sidebar is light gray (`#f5f5f5`); its hover is `surfaceSidebarHover` (`#ebebeb`), and the
-selected navigation, workspace, session and Bot rows are a white card raised off it:
-`surfaceSidebarSelected` is `surface0` plus `theme.shadow.raised`. Hover is gray and selection
-is white, so the two never read as one state; accent green is not a selection color because
+sidebar is light gray (`#f5f5f5`); the selected navigation, workspace, session, Bot and
+Settings rows are a white card raised off it: `surfaceSidebarSelected` is `surface0` plus
+`theme.shadow.raised`. Hover moves the same way, half as far: `surfaceSidebarHover` (`#fafafa`)
+is lighter than the sidebar with no shadow, so a hovered row previews the selected one instead
+of sinking into a darker gray. Accent green is not a selection color because
 green already means running, added lines and the primary action. Dark themes select with
 `surface2` and their `shadow.raised` is empty, because a shadow does not read on a dark
 surface. Dark themes keep filled, borderless inputs (`inputBorder` is transparent there).
@@ -106,9 +107,9 @@ A `<Pressable>` wrapping a `<Text>` is a sixth variant. It is wrong. `<Button>` 
 
 Borders group, separate, or rarely emphasize.
 
-A logical block of related rows lives inside a card — one border around the whole group. The card primitive is `settingsStyles.card`; the keyboard-shortcuts dialog uses the same shape inline (`packages/app/src/components/keyboard-shortcuts-dialog.tsx:68-73`). The border defines what belongs together.
+A logical block of related rows lives inside a card — one border around the whole group. The card primitive is `settingsStyles.card`; the keyboard-shortcuts dialog uses the same shape inline (`packages/app/src/components/keyboard-shortcuts-dialog.tsx:68-73`). The border defines what belongs together. In Light the card also carries `theme.shadow.card` and sits on the `surfaceSettings` page (`#fcfcfc`, T3 Code's page background), so a white card stands off the page by a step rather than by a heavy outline. Dark themes leave both at no shadow and `surface0`.
 
-Rows after the first inside a card carry `settingsStyles.rowBorder` — a single top border. The first row never has one. The same divider pattern appears in the keyboard-shortcuts dialog rows (`packages/app/src/components/keyboard-shortcuts-dialog.tsx:74-83`). Rows do not need their own background to feel separated.
+Rows after the first inside a card carry `settingsStyles.rowBorder` — a single top border in `borderSubtle` (`#efefef` in Light), lighter than the card's own `border`. The outline groups; the divider only separates, so it must never read as strong as the outline. The first row never has one. The same divider pattern appears in the keyboard-shortcuts dialog rows (`packages/app/src/components/keyboard-shortcuts-dialog.tsx:74-83`). Rows do not need their own background to feel separated.
 
 A list that is itself the page content — sidebar items in `sidebar-workspace-list.tsx`, the workspace list, the agent list (`packages/app/src/components/agent-list.tsx`) — uses spacing and surface, not borders, to separate items. Rows-in-a-card is an interior pattern; lists-as-pages are not.
 

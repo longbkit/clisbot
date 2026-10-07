@@ -17,6 +17,7 @@ import { View, Text, Pressable } from "react-native";
 import { Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { BotFace } from "../chat/bot-face";
+import { settingsStyles } from "@/styles/settings";
 import { botsCopy } from "../copy";
 import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
 import { BotsSidebarRow } from "./row";
@@ -184,7 +185,7 @@ const botsDisplayMenu = <SectionDisplayMenu section="bots" />;
 /** The empty Bots section, styled like the Projects empty state (`SidebarProjectEmptyState`). */
 function FirstBotPrompt({ onPress }: { onPress: () => void }) {
   return (
-    <View style={firstBotStyles.container} testID="sidebar-bots-first">
+    <View style={[settingsStyles.card, firstBotStyles.container]} testID="sidebar-bots-first">
       <Text style={firstBotStyles.title}>{botsCopy.noBots}</Text>
       <Text style={firstBotStyles.description}>{botsCopy.firstBotHint}</Text>
       <Button variant="ghost" size="sm" leftIcon={Plus} onPress={onPress}>
@@ -201,8 +202,6 @@ const firstBotStyles = StyleSheet.create((theme) => ({
     paddingTop: theme.spacing[6],
     paddingBottom: theme.spacing[4],
     paddingHorizontal: theme.spacing[4],
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.surface0,
     alignItems: "center",
     gap: theme.spacing[3],
   },

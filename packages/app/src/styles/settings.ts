@@ -31,6 +31,7 @@ export const settingsStyles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     overflow: "hidden",
+    ...theme.shadow.card,
   },
   row: {
     flexDirection: "row",
@@ -62,7 +63,7 @@ export const settingsStyles = StyleSheet.create((theme) => ({
   },
   rowBorder: {
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: theme.colors.borderSubtle,
   },
   rowContent: {
     flex: 1,

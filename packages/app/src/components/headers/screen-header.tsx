@@ -19,6 +19,8 @@ interface ScreenHeaderProps {
   leftStyle?: StyleProp<ViewStyle>;
   rightStyle?: StyleProp<ViewStyle>;
   borderless?: boolean;
+  /** Let the page's own background show through, for a page that is not `surface0`. */
+  transparent?: boolean;
   onRowLayout?: (event: LayoutChangeEvent) => void;
 }
 
@@ -32,6 +34,7 @@ export function ScreenHeader({
   leftStyle,
   rightStyle,
   borderless,
+  transparent,
   onRowLayout,
 }: ScreenHeaderProps) {
   const { theme } = useUnistyles();
@@ -50,7 +53,10 @@ export function ScreenHeader({
   const rightCombinedStyle = useMemo(() => [styles.right, rightStyle], [rightStyle]);
 
   return (
-    <ComposerDockBackground style={styles.header} testID="composer-dock-header">
+    <ComposerDockBackground
+      style={transparent ? styles.headerTransparent : styles.header}
+      testID="composer-dock-header"
+    >
       <View style={innerStyle}>
         <WindowChromeSafeArea
           placement="inline"
@@ -70,6 +76,9 @@ export function ScreenHeader({
 const styles = StyleSheet.create((theme) => ({
   header: {
     backgroundColor: theme.colors.surface0,
+  },
+  headerTransparent: {
+    backgroundColor: "transparent",
   },
   inner: {},
   row: {

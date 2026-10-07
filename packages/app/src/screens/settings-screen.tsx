@@ -811,8 +811,8 @@ function SidebarSectionButton<Section extends string>({
     [isSelected, disabled],
   );
   const labelStyle = useMemo(
-    () => [sidebarStyles.label, isSelected && { color: theme.colors.foreground }],
-    [isSelected, theme.colors.foreground],
+    () => [sidebarStyles.label, isSelected && sidebarStyles.labelSelected],
+    [isSelected],
   );
   return (
     <Pressable
@@ -857,8 +857,8 @@ function SidebarHostSectionButton({
   }, [onSelect, itemId]);
   const accessibilityState = useMemo(() => ({ selected: isSelected }), [isSelected]);
   const labelStyle = useMemo(
-    () => [sidebarStyles.label, isSelected && { color: theme.colors.foreground }],
-    [isSelected, theme.colors.foreground],
+    () => [sidebarStyles.label, isSelected && sidebarStyles.labelSelected],
+    [isSelected],
   );
   return (
     <Pressable
@@ -1676,7 +1676,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
 
   if (isCompactLayout) {
     return (
-      <View style={styles.container}>
+      <View style={styles.detailContainer}>
         <BackHeader
           title={pageHeading}
           titleAccessory={detailHeader?.titleAccessory}
@@ -1723,7 +1723,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         <WindowChromeRegion corners="top-right">
           <View style={desktopStyles.contentPane} testID="settings-detail-pane">
             {/* Keep the titlebar region while standard page headings live in the content. */}
-            <ScreenHeader borderless />
+            <ScreenHeader borderless transparent />
             <ScrollView
               ref={detailScrollRef}
               style={styles.scrollView}
@@ -1764,6 +1764,11 @@ const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface0,
+  },
+  // A detail page is off-white so its white cards stand off it.
+  detailContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceSettings,
   },
   scrollView: {
     flex: 1,
@@ -1831,15 +1836,16 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 
-const desktopStyles = StyleSheet.create({
+const desktopStyles = StyleSheet.create((theme) => ({
   row: {
     flex: 1,
     flexDirection: "row",
   },
   contentPane: {
     flex: 1,
+    backgroundColor: theme.colors.surfaceSettings,
   },
-});
+}));
 
 const sidebarStyles = StyleSheet.create((theme) => ({
   desktopContainer: {
@@ -1887,14 +1893,21 @@ const sidebarStyles = StyleSheet.create((theme) => ({
   itemHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
   },
+  // Same as the app sidebar: hover is gray, selection is a white card raised off it.
   itemSelected: {
-    backgroundColor: theme.colors.surfaceSidebarHover,
+    backgroundColor: theme.colors.surfaceSidebarSelected,
+    ...theme.shadow.raised,
   },
   label: {
     fontSize: theme.fontSize.base,
     color: theme.colors.foregroundMuted,
     fontWeight: theme.fontWeight.normal,
     flex: 1,
+  },
+  // A selected row title is foreground and medium, as in the app sidebar (docs/design.md).
+  labelSelected: {
+    color: theme.colors.foreground,
+    fontWeight: theme.fontWeight.medium,
   },
   pickerTrigger: {
     flexDirection: "row",

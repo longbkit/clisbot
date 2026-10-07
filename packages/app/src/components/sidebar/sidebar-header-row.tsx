@@ -71,7 +71,11 @@ export function SidebarHeaderRow({
             size={variant === "compact" ? ICON_SIZE.sm : ICON_SIZE.md}
             uniProps={isHighlighted ? foregroundColorMapping : foregroundMutedColorMapping}
           />
-          <SidebarHeaderRowLabel label={label} isHighlighted={isHighlighted} />
+          <SidebarHeaderRowLabel
+            label={label}
+            isHighlighted={isHighlighted}
+            isSelected={isActive}
+          />
           {shortcutKeys && Boolean(state.hovered) ? (
             <Shortcut chord={shortcutKeys} style={styles.shortcut} />
           ) : null}
@@ -101,13 +105,19 @@ export function SidebarHeaderRow({
 function SidebarHeaderRowLabel({
   label,
   isHighlighted,
+  isSelected,
 }: {
   label: string;
   isHighlighted: boolean;
+  isSelected: boolean;
 }) {
   const labelStyle = useMemo(
-    () => [styles.label, isHighlighted && styles.labelHighlighted],
-    [isHighlighted],
+    () => [
+      styles.label,
+      isHighlighted && styles.labelHighlighted,
+      isSelected && styles.labelSelected,
+    ],
+    [isHighlighted, isSelected],
   );
   return <Text style={labelStyle}>{label}</Text>;
 }
@@ -157,6 +167,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   labelHighlighted: {
     color: theme.colors.foreground,
+  },
+  // Hover only darkens; selection also goes medium, so the weight never flickers on hover.
+  labelSelected: {
+    fontWeight: theme.fontWeight.medium,
   },
   shortcut: {
     marginLeft: "auto",

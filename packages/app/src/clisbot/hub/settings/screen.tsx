@@ -757,7 +757,6 @@ function SignedOutHubAccount({
   const submitDisabled = pending || !fields.canSubmit;
   return (
     <SettingsSection title="Hub account">
-      <Alert variant="info" title={title} description={description} />
       {state.invitationUnavailable === true ? (
         <Alert
           variant="warning"
@@ -765,7 +764,12 @@ function SignedOutHubAccount({
           description="It may have expired or already been used. Ask an organization owner for a new invitation."
         />
       ) : null}
+      {/* One card: what signing in is for, then the ways to do it. */}
       <View style={[settingsStyles.card, styles.form]}>
+        <View>
+          <Text style={styles.formTitle}>{title}</Text>
+          <Text style={settingsStyles.rowHint}>{description}</Text>
+        </View>
         <GoogleFirstSignIn
           googleSignIn={state.googleSignIn === true}
           hub={hub}
@@ -885,6 +889,11 @@ const styles = StyleSheet.create((theme) => ({
   form: {
     padding: theme.spacing[4],
     gap: theme.spacing[3],
+  },
+  formTitle: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
   },
   actions: {
     flexDirection: "row",

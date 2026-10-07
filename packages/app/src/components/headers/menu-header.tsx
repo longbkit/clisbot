@@ -16,6 +16,8 @@ interface MenuHeaderProps {
   title?: string;
   rightContent?: ReactNode;
   borderless?: boolean;
+  /** Let the page background show through, for a page that is not `surface0`. */
+  transparent?: boolean;
 }
 
 interface SidebarMenuToggleProps {
@@ -141,7 +143,7 @@ export function WindowSidebarMenuToggle({ style, ...props }: SidebarMenuTogglePr
   );
 }
 
-export function MenuHeader({ title, rightContent, borderless }: MenuHeaderProps) {
+export function MenuHeader({ title, rightContent, borderless, transparent }: MenuHeaderProps) {
   return (
     <ScreenHeader
       left={
@@ -153,6 +155,7 @@ export function MenuHeader({ title, rightContent, borderless }: MenuHeaderProps)
       right={rightContent}
       leftStyle={styles.left}
       borderless={borderless}
+      transparent={transparent}
     />
   );
 }

@@ -5,6 +5,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { useSidebarModel } from "./sidebar-model";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { settingsStyles } from "@/styles/settings";
 
 /**
  * The two things the sidebar's workspace list says when it has no rows.
@@ -19,7 +20,7 @@ export function SidebarFilterEmptyState() {
   const clearAllFilters = useSidebarViewStore((state) => state.clearAllFilters);
 
   return (
-    <View style={styles.container} testID="sidebar-filter-empty-state">
+    <View style={[settingsStyles.card, styles.container]} testID="sidebar-filter-empty-state">
       <Text style={styles.title}>{t("sidebar.filterEmpty.title")}</Text>
       <Text style={styles.description}>{t("sidebar.filterEmpty.description")}</Text>
       <Button variant="ghost" size="sm" onPress={clearAllFilters}>
@@ -53,7 +54,7 @@ export function SidebarProjectEmptyState({
   const { t } = useTranslation();
 
   return (
-    <View style={styles.container} testID="sidebar-project-empty-state">
+    <View style={[settingsStyles.card, styles.container]} testID="sidebar-project-empty-state">
       <Text style={styles.title}>{t("sidebar.project.empty.title")}</Text>
       <Text style={styles.description}>{t("sidebar.project.empty.description")}</Text>
       <Button variant="ghost" size="sm" leftIcon={Plus} onPress={onAddProject}>
@@ -73,8 +74,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.spacing[6],
     paddingBottom: theme.spacing[4],
     paddingHorizontal: theme.spacing[4],
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.surface0,
     alignItems: "center",
     gap: theme.spacing[3],
   },
