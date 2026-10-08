@@ -3,7 +3,7 @@
 **2026-10-08.** Paseo `v0.11.1` was transformed with the Clisbot rename and visual kit,
 then merged into `main` on `sync/promotion-v0.11.1`. This records the inputs, the
 conflicts and how they were resolved, the integration fixes the merge needed, and
-what was and was not verified. Procedure: [upstream sync playbook](../../guides/developer-guide/upstream-sync-and-contribution.md#recurring-promotion-procedure-after-the-rebrand-cutover).
+what was and was not verified. Procedure: [upstream sync playbook](../../guides/developer-guide/upstream-sync-and-contribution.md#procedure).
 
 ## Inputs
 

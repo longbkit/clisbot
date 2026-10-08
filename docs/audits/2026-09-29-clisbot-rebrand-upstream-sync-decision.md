@@ -8,7 +8,7 @@ describe the current branch.
 
 The old `origin/main` was backed up on GitHub as
 `clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
-The [one-time cutover](../guides/developer-guide/upstream-sync-and-contribution.md#one-time-cutover-make-fusion-the-clisbot-main)
+The [one-time cutover](2026-10-09-upstream-sync-history.md#one-time-cutover-make-fusion-the-clisbot-main)
 that pushes the verified, fully rebranded Fusion tip to `origin/main` is a
 separate step after the initial transformed-upstream merge into Fusion and
 before recurring upstream-sync merges into `main`.

@@ -64,7 +64,7 @@ replace. This audit's contact sheets and future concept images are excluded.
    added or changed assets, embedded SVG paths, screenshots, and consumers.
 2. Use [the favicon list](favicons.md) and the inventory as a starting point;
    inspect new paths too. A text scan cannot detect names rendered into pixels.
-3. Apply the checked-in kit using the [playbook](../../guides/developer-guide/upstream-sync-and-contribution.md#visual-branding-transform).
+3. Apply the checked-in kit using the [playbook](../../guides/developer-guide/upstream-sync-and-contribution.md#visual-branding).
    Review the Clisbot artwork at app-icon and 16/32 px favicon sizes,
    in monochrome and both backgrounds. Check status dots separately.
 4. Review website identity and publication destinations. Keep upstream credit

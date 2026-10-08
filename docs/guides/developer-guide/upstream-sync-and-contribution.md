@@ -1,233 +1,272 @@
 # Upstream Sync & Contribution Playbook
 
-How the Clisbot fusion tracks `getpaseo/paseo` and how fixes flow back to it.
-Read this before syncing upstream or opening an upstream PR. The channel
-verticals track a second upstream — OpenClaw — on its own mechanism; that one
-is [OpenClaw channel source manifests](#openclaw-channel-source-manifests).
+How Clisbot tracks `getpaseo/paseo` and how fixes flow back to it. Read it before
+syncing upstream or opening an upstream PR. The channel verticals track a second
+upstream, OpenClaw, on their own mechanism:
+[OpenClaw channel source manifests](#openclaw-channel-source-manifests).
 
-**Rebrand decision, 2026-09-29:** the target product branch is a fully branded
-Clisbot `main`. Each upstream snapshot will be renamed before it is merged;
-see the [decision and Git evidence](../../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md).
-**Cutover accepted, 2026-10-01:** the user confirmed Slack works and approved
-promoting `rebrand/clisbot-fusion-test` (runtime code `a21735240`) to `main`.
-The acceptance record and carried follow-ups are in the
-[merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md#main-cutover-acceptance-2026-10-01).
-Use the recurring transformed-upstream procedure for the new product branch;
-the original Fusion branch stays as a reference.
+Each upstream release is renamed to Clisbot before it is merged
+([decision](../../audits/2026-09-29-clisbot-rebrand-upstream-sync-decision.md)).
+How Clisbot `main` got here (the 2026-10-01 cutover, the earlier raw-upstream
+procedure, past merges) is in the
+[sync history](../../audits/2026-10-09-upstream-sync-history.md). Past merge
+audits: [v0.10.2](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md),
+[v0.11.1](../../audits/2026-09-30-clisbot-branding/merge-v0.11.1.md).
 
-## The three repos, each with one job
+## The three repos
 
-- **`getpaseo/paseo` (upstream)** — read-only for us. Source of all Paseo code.
-- **`longbkit/paseo` (fork)** — PR staging only. GitHub requires contribution
-  PRs to come from a fork when the account has no write access to upstream:
+- **`getpaseo/paseo` (upstream)**: read-only for us.
+- **`longbkit/paseo` (fork)**: staging for upstream PRs only. GitHub needs a fork
+  because the account cannot push to upstream. Its `main` is a lazy mirror.
+- **`longbkit/clisbot:main`**: the one product line. Everything that is not an
+  upstream PR lands here.
 
-  ```
-  $ git push --dry-run upstream main:main
-  ERROR: Permission to getpaseo/paseo.git denied to longbkit.
-  ```
+Clisbot serves one UI on daemon port `6868`; Hub port `6870` is backend only.
+The daemon Hub proxy, runtime UI hint and Hub dashboard filter are Clisbot
+extensions, not text substitutions; keep their hooks through a merge
+([publication review](../../audits/2026-09-30-clisbot-branding/publication-review.md#one-ui-and-a-backend-only-hub)).
 
-  The fork's `main` is a lazy mirror: update it when cutting a contribution
-  branch. It is not a sync relay.
+## When to sync
 
-- **`longbkit/clisbot:main`** — the
-  single product line. One long-lived branch. Don't grow a second product line
-  in the fork clone; upstream-facing work happens in the fork, everything else
-  lands here.
+- **Promotion** merges a named upstream release tag into `main` and runs every
+  gate below. Promote when upstream tags a release, before a Clisbot release, or
+  when you need an upstream fix (or cherry-pick just that fix).
+- **Rehearsal** test-merges current `upstream/main` in a disposable worktree
+  through step 6, records the result, and is thrown away. Rehearse when upstream
+  `main` moves materially in app/server/protocol, or once per active week. A
+  failed rehearsal becomes tracked work, never a moved baseline.
 
-Publication identity uses additional contextual rules in
-`scripts/rebrand-templates/publication.mjs`: shared Clisbot image references,
-Long Luong / `clisbot@gmail.com`, removal of inherited testimonial displays,
-and exclusion of archived upstream blog articles. See the
-[publication review](../../audits/2026-09-30-clisbot-branding/publication-review.md)
-for retained source credit and unresolved publication claims. Container modes
-are owned by [the Docker guide](../../docker.md#service-modes).
+## Procedure
 
-Clisbot serves one shared UI on daemon port `6868`; Hub port `6870` is backend
-only. The optional daemon Hub proxy, runtime UI hint and Hub dashboard filter
-are Fusion extensions, not text substitutions. Preserve their hooks during
-merge and run the focused checks listed in the
-[publication review](../../audits/2026-09-30-clisbot-branding/publication-review.md#one-ui-and-a-backend-only-hub).
+Budget a day. v0.11.1 (244 upstream commits) produced 318 conflicting files and
+56 compile errors that Git did not flag. Work in worktrees on a disk with room
+(each needs its own `npm ci`, about 3 GB). Keep logs and scratch output outside
+the repo, or in `.debug/scratch/`.
 
-## Sync policy: release baselines plus main rehearsals
-
-Upstream moves fast. The fusion therefore separates two jobs:
-
-- **Rehearsal:** regularly test a merge of current `upstream/main` in a clean,
-  disposable worktree. Record overlap, semantic seams, dependency validation,
-  typecheck, and focused tests. Never publish the rehearsal merge.
-- **Promotion:** merge a named upstream release tag into the product branch.
-  Run the complete gate, then publish a verified tag only after every required
-  check passes.
-
-This keeps the product reproducible without discovering months of drift at the
-next release. The OpenClaw verticals remain independently pinned supply; that
-external-supply policy is not evidence that the Paseo foundation should ignore
-`main` between releases.
-
-Promote when:
-
-- an upstream release tag is cut,
-- a Clisbot release is about to be cut,
-- a specific upstream fix is needed (wait for the next tag, or cherry-pick
-  just that fix).
-
-Rehearse when `main` moves materially in app/server/protocol or at least once
-per active development week. A rehearsal failure becomes tracked work; it does
-not silently move the product baseline.
-
-### Prepare Fusion before the one-time cutover
-
-**Current test integration, 2026-09-30:** Paseo `v0.10.2` was selected instead of
-`v0.10.1` and merged into `rebrand/clisbot-fusion-test` after user approval.
-See [independent upstream validation](../../audits/2026-09-30-clisbot-branding/upstream-v0.10.2-validation.md)
-and [the actual merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md)
-(75 files / 179 conflict hunks, normalized-base resolution, integration fixes
-and remaining acceptance gates). The user accepted the resulting candidate
-on 2026-10-01 after the channel packaging fix and a successful Slack test.
-
-1. Apply and verify the repeatable text and visual rebrand on
-   `rebrand/clisbot-fusion-test`, the isolated Fusion candidate. Keep
-   `clisbot-paseoclaw-fusion` as the pre-cutover reference while testing.
-2. Pick the upstream release tag to become the initial official baseline.
-   Fetch its raw commit, create a disposable branch from it, run the same
-   text and visual transformation, test it independently, and commit that result.
-   The selected branch is `rebrand/upstream-v0.10.2-test`.
-3. After the user's merge confirmation, merge that transformed branch into
-   `rebrand/clisbot-fusion-test`. Record conflict files, causes and resolutions;
-   retain upstream functionality with Clisbot names. Rerun rename and branding
-   checks, reconcile the lockfile, and pass the affected build and runtime gates.
-4. Record the verified candidate SHA on `rebrand/clisbot-fusion-test` and build
-   the app for acceptance. A separate user confirmation authorizes promoting
-   this exact SHA to `origin/main`. Keep `clisbot-paseoclaw-fusion` temporarily
-   for reference. The disposable upstream branch name may be deleted after merge.
-
-For step 3, use the transformed-upstream Git sequence below with
-`rebrand/clisbot-fusion-test` in place of `main`, and with its clean worktree in
-place of `<main-worktree>`. The recurring procedure below targets `main` only
-after the cutover.
-
-### One-time cutover: make Fusion the Clisbot `main`
-
-This step comes **after** the rebranded Fusion branch has merged the selected
-transformed upstream baseline and passed its gates. It comes **before** later
-upstream promotions directly into `main`. Promotion requires a separate user
-confirmation of the verified candidate SHA.
-
-The 2026-10-01 approval covers runtime code `a21735240` plus the documentation
-commit recording this acceptance. It retains the temporary service endpoints
-and carries the audit's remaining checks as follow-up work; it does not claim
-that every proposed regression check passed. Do not create a `sync-verified-*`
-tag from this acceptance alone.
-
-The old GitHub `main` was backed up on 2026-09-29 as
-`origin/clisbot-v1-tmux-acp-deprecated` at `21baca297f5995fb1dd3d0dc354d64a252dba9e9`.
-Before cutover, verify that this backup still points to the old `origin/main`
-commit. The old `main` and Fusion branch have no common ancestor. GitHub rejected
-the initial force-with-lease attempt because `main` forbids non-fast-forward
-updates. Preserve the old history with a one-time `ours` merge whose first
-parent is the accepted Fusion tip and second parent is old `main`. This keeps
-the Fusion files and allows a normal fast-forward push without changing branch
-protection. This strategy is only for replacing the retired product; never use
-it for recurring upstream merges. If remote `main` moved, stop and review it.
+### 1. Fetch the release and transform it
 
 ```bash
-git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
-# After full rebrand and validation, record the exact approved Fusion commit.
-git switch -c sync/fusion-main-cutover <verified-fusion-sha>
-git merge --no-ff --no-commit --strategy=ours --allow-unrelated-histories <verified-old-main-sha>
-# Record acceptance/cutover docs, then commit. Only docs may differ from Fusion.
-git commit -m "Merge accepted Fusion into main while preserving retired history"
-git diff --exit-code <verified-fusion-sha> HEAD -- . ':!docs'
-git merge-base --is-ancestor <verified-old-main-sha> HEAD
-git push origin HEAD:refs/heads/main
-git ls-remote --heads origin main clisbot-v1-tmux-acp-deprecated
+git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
+git rev-parse 'refs/upstream-releases/vX.Y.Z^{}'      # record the raw commit
+git worktree add -b sync/rebranded-vX.Y.Z <rebrand-wt> refs/upstream-releases/vX.Y.Z
+node scripts/rebrand-clisbot.mjs --root <rebrand-wt> --apply \
+  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
+node scripts/branding/apply.mjs --root <rebrand-wt>            # dry run, review
+node scripts/branding/apply.mjs --root <rebrand-wt> --apply
+(cd <rebrand-wt> && <main>/node_modules/.bin/oxfmt . && <main>/node_modules/.bin/oxlint)
+git -c core.excludesFile=/dev/null -C <rebrand-wt> add -A
+node scripts/rebrand-clisbot.mjs --root <rebrand-wt> --check \
+  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
 ```
 
-The final check must show `main` at the cutover merge SHA and the backup at its
-original SHA. The cutover tree must match the accepted Fusion code, with only
-the acceptance documentation added. Only then does the promotion procedure
-below apply to official Clisbot `main`.
+- The rename script stops on upstream copy it does not recognize (README
+  sections, landing-page blocks). Update the script and its test on `main` first,
+  in their own commit, then rerun. Run `node --test scripts/rebrand-clisbot.test.mjs`.
+- It also stops **after** moving files when Git ignores a destination. A
+  machine-wide `plugins/` ignore hides `clisbot-plugin.json` files; staging with
+  `core.excludesFile=/dev/null` covers that. Repository and `.git/info/exclude`
+  rules still apply: add narrow exceptions, never `git add -f .`.
+- Run the [file completeness gate](#file-completeness-gate) on the snapshot, scan
+  the remaining `paseo` matches, then commit "Rebrand upstream vX.Y.Z for Clisbot
+  sync".
 
-### Recurring promotion procedure after the rebrand cutover
+### 2. Merge and classify against the normalized base
 
-1. Fetch a named upstream release into `refs/upstream-releases/` and verify its
-   commit. Make a disposable sync branch from that **raw** commit.
-2. Run the version-controlled, deterministic rename transformation from the
-   Fusion worktree against the upstream snapshot, including paths and product
-   documentation. Verify it is idempotent, review every remaining Paseo-name
-   match, then commit the transformed snapshot on the sync branch.
-3. Merge the transformed branch into Clisbot `main` in a clean worktree.
-   Resolve overlaps by retaining upstream functional changes with Clisbot
-   names. Git may report the same renamed line again: its merge base is the
-   previous raw upstream commit, not the previous transformed snapshot.
-4. Rerun the transformation and old-name scan on the merged tree. Reconcile
-   dependency manifests and lockfile; run the build, typecheck, focused tests,
-   and required live/release gates. Commit the merge only after review.
-5. Run `scripts/upstream-sync/clisbot-change-survival.py --since <previous
-merge> --pre <main before> --post <merged>` and review every missing line.
-   It catches what the normalized base cannot: a line where Clisbot kept
-   upstream's raw text (a temporary `paseo` endpoint) is taken from the renamed
-   upstream without a conflict. Compare failing tests against the pre-merge
-   commit before calling them regressions.
-6. Delete the disposable sync branch name and create the verified sync tag.
-   The merge commit keeps the transformed snapshot and raw upstream history;
-   no old `sync/rebranded-*` branch names need to remain.
+Git's merge base is a raw upstream commit, so every renamed line conflicts. Build
+the same base renamed and formatted, and compare against that:
 
-Last promotion: Paseo `v0.11.1` on 2026-10-08 —
-[merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.11.1.md) (318 conflicting
-files, the integration fixes the merge needed, and open follow-ups).
+```bash
+git worktree add -b sync/promotion-vX.Y.Z <merge-wt> main
+git -C <merge-wt> -c merge.conflictStyle=zdiff3 merge --no-ff --no-commit sync/rebranded-vX.Y.Z
+scripts/upstream-sync/normalized-base.sh "$(git -C <merge-wt> merge-base HEAD MERGE_HEAD)" <nbase-wt>
+(cd <merge-wt> && python3 scripts/upstream-sync/resolve-conflicts.py --nbase <nbase-wt>)          # report
+(cd <merge-wt> && python3 scripts/upstream-sync/resolve-conflicts.py --nbase <nbase-wt> --apply --json <log>)
+```
 
-### File completeness and publication gate
+`--apply` stages files where only one side differs from the normalized base and
+files that merge cleanly three ways, and rewrites the rest with conflict markers
+whose base arm is the normalized base (784 raw hunks became 238 for v0.11.1).
+Archive the original conflict copies first if the audit needs them.
 
-Read the [2026-10-01 lesson](../../lessons/2026-10-01-rebrand-file-completeness.md)
-before the next sync. Run this gate on the transformed upstream snapshot and
-again on the merged Fusion candidate, before either commit:
+- **One-sided** files (upstream deleted, Clisbot edited): delete when Clisbot
+  only renamed them (`diff` against the normalized base is empty); otherwise move
+  the Clisbot edit to upstream's replacement.
+- **Package manifests**: take upstream's version bumps, keep Clisbot's
+  dependencies and scripts, and bump the Clisbot-only packages' pins on upstream
+  packages (`device-access`, `hub`) too. Then
+  `python3 scripts/upstream-sync/merge-lockfile.py --nbase <nbase-wt>` and
+  `npm install --package-lock-only --ignore-scripts`.
+- **Real overlaps**: keep both features. Upstream's structure wins; re-apply the
+  Clisbot addition on top of it. Read upstream's commit for the reason
+  (`git log c<base>..refs/upstream-releases/vX.Y.Z -- <raw path>`).
+- When "both sides added" hunks sit at the end of a file or block, the shared
+  closing line belongs to both: `a + "});\n" + c`, not `a + c`. Run
+  `npm run format` as soon as the markers are gone; it reports these as parse
+  errors.
+- Subagents help with the hand-resolved files, but give each a disjoint file
+  list and small batches: a parallel batch can hit the session rate limit and
+  stop with nothing written.
 
-1. Compare expected transformed paths from the baseline with the Git index.
-   Review every deletion; a clean working tree and `--check` cannot detect a
-   renamed file that was never staged. Verify the committed tree afterward.
-2. Resolve ignored destinations using `git check-ignore -v --no-index` and
-   narrow repository exceptions or `git add -f -- <exact-source-path>`.
-   The rename guard stops **after** files move; stage the corrected result,
-   then run `--check`. Disabling global ignores does not disable repository
-   or `.git/info/exclude` rules.
-3. Verify imports, npm script paths, package exports, branding assets and
-   symlinks. Run the affected tests; typecheck may exclude tests/manual scripts.
-4. Review staged files for scratch output, runtime state, secrets and real
-   identities in examples. Keep raw session artifacts in `.debug/scratch/`.
-5. Record intentional exclusions, verification results and unrun live checks
-   in the sync audit. Ancestry and file presence do not prove behavior survived.
+### 3. Build, then typecheck
 
-Use the [2026-10-01 Fusion feature review](../../audits/2026-09-30-clisbot-branding/fusion-regression.md) as the grouping template: record changed shared integration points even when a feature’s own files are unchanged, and distinguish known premerge failures from new regressions.
+A fresh worktree typechecks against built output; without it you get thousands
+of false errors.
 
-### Current rename rules and remaining-name review
+```bash
+npm ci && npm ls --workspaces --depth=0
+npm run build:server && npm run build:channels && npm run build:app-deps
+npm run typecheck && npm run lint && npm run format
+```
 
-**Track renamed files explicitly:** on 2026-10-01, an audit recovered 16 source
-files omitted during rebrand staging: 15 Hub example/fixture files under
-`.clisbot/` and one Plugin API integration test hidden by a machine-wide
-`plugins/` ignore. The rename script now fails after applying a rename if Git
-ignores any destination. Add narrow repository exceptions or force-add only
-the listed source paths, then stage and check again. Never force-add the whole
-checkout; local runtime homes and credentials must stay ignored.
-The [file-completeness follow-up](../../audits/2026-09-30-clisbot-branding/file-completeness.md) records the full-tree comparison and stale-import checks.
+Typecheck is where the real merge damage shows. Expect Clisbot code calling an
+upstream API that changed without any text conflict:
 
-The test branch's [rename script](../../../scripts/rebrand-clisbot.mjs) applies
-the following rules to Git-tracked paths and UTF-8 text. These are string and
-path rules, not a semantic determination that every retained old name is valid.
+- an export renamed or moved (`getProviderIcon` → `useProviderIcon`,
+  `ui/menu/menu-anchor` → `ui/anchor`, `use-compact-time-ago` → `use-time-ago`);
+- a type that gained required fields (panel manifests, `ForwardedAgentSession`,
+  which also forwards every optional session member);
+- an upstream replacement for a Clisbot helper that drops Clisbot fields: check
+  [the seams](#seams-to-check-every-sync);
+- new i18n keys missing from Clisbot-only locales (`vi.ts`, the `vi` block of
+  `plugin-settings.ts`);
+- new hand-styled inputs that need the light-theme tokens (`colors.input`,
+  `colors.placeholder`, see [design.md](../../design.md)).
 
-Repository URLs also match escaped slashes in regexes and `%2F` separators in
-encoded login return URLs. The transform repairs old `getpaseo/clisbot` forms
-in those encodings; upstream relay repository references remain protected.
+Lint must report the same files as `main` before the merge.
 
-The production relay is now `relay.clisbot.com:443` with TLS. Keep
-`--keep-upstream-endpoints` limited to isolated upstream reference branches.
-`docker/relay/` is protected from product text replacement because its pinned
-external Elixir release retains `PASEO_RELAY_*` and `paseo_relay` names. The
-transform keeps `deploy-relay.yml` manual-only under Clisbot naming and
-keeps the Worker deployment option separate from the current official relay route
-through maintained Wrangler templates.
-See [relay deployment](../../relay-deployment.md) for the independent server
-release process and private credential storage.
+### 4. Check every Clisbot commit survived
+
+```bash
+python3 scripts/upstream-sync/clisbot-change-survival.py \
+  --since <previous sync merge> --pre <main before> --post <merge-wt HEAD> \
+  [--exclude <retired history ref>] --json <log>
+```
+
+It lists, per Clisbot commit, the lines it added that were present before the
+merge and are missing after it. Classify each as an intended adaptation or a
+loss. It catches what the normalized base cannot: where Clisbot kept upstream's
+raw text, Git sees that side as unchanged and takes the renamed upstream line
+with no conflict (this lost the hosted Hub origin in v0.11.1). Also compare
+binary files and check that no file Clisbot deleted came back.
+
+### 5. Test against a baseline
+
+Run the tests for files touched by conflicts and fixes, then the Clisbot-owned
+areas: app `src/clisbot`, device access, sidebar nav, hosts, i18n; server
+connectors, chats, managed access, device access, network, bots, schedules,
+session storage; Hub `src/daemons`, `src/channels`, the channel loader and
+contract (`npm run test:loader:native`, `test:contract:native`), and
+`npm run test:sim-boot`. Run vitest from the package directory. Never run a
+whole workspace suite.
+
+Hub tests need Docker. With Colima:
+
+```bash
+export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock \
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock TESTCONTAINERS_RYUK_DISABLED=true
+```
+
+Do not call a failure a regression until it passes on the pre-merge commit:
+`git worktree add --detach <baseline-wt> <main before>`, `npm ci`, the same
+builds, the same test file. In v0.11.1 every remaining failure (22) also failed
+before the merge.
+
+### 6. Run the app and look at it
+
+```bash
+npm run build:daemon-web-ui
+CLISBOT_HOME=<tmp> CLISBOT_LISTEN=127.0.0.1:<port> CLISBOT_WEB_UI_ENABLED=true \
+  CLISBOT_RELAY_ENABLED=false packages/cli/bin/clisbot daemon run &
+node scripts/upstream-sync/web-tour.mjs --url http://127.0.0.1:<port> --out <dir>
+```
+
+Before the tour, run one real agent turn (`clisbot run --provider
+codex/gpt-5.6-luna "Reply with exactly: OK"`), create a Bot in the UI and chat
+with it, and add a schedule, so the screens have content. The tour covers home,
+Connectors, Automations, settings (language, appearance, sidebar), Create bot,
+Add connection, Vietnamese, Welcome, mobile and dark, and fails on any page
+error. Run it against a baseline build too when something looks off. Leave
+Usage out of saved screenshots: it shows account emails.
+
+### 7. Record, commit, promote
+
+- Write the merge audit next to the previous ones: inputs and SHAs, conflict
+  counts and classification, decisions, integration fixes, survival result,
+  test results with their baseline, screenshots, what was not run.
+- Commit the merge from the merge worktree (its `node_modules` are current; the
+  pre-commit hook typechecks). Fast-forward `main`:
+  `git -C <main> merge --ff-only sync/promotion-vX.Y.Z`. If it refuses because
+  `main` moved, reconcile first.
+- After the user approves: push, tag `clisbot/sync-verified-YYYY-MM-DD-vX.Y.Z`
+  ([tags](#tags)), remove the worktrees and the `sync/*` branches. The merge
+  commit keeps both histories.
+- The `main` checkout needs `npm install` afterwards; until then its hook
+  typecheck fails on the new dependencies.
+
+Other sessions may share the checkout. Check `git status` before and after you
+touch it, discard only named paths (`git checkout -- <path>`, never `.`), and
+leave staged work you did not make alone.
+
+## File completeness gate
+
+Run on the transformed snapshot and on the merged tree, before each commit
+([2026-10-01 lesson](../../lessons/2026-10-01-rebrand-file-completeness.md)):
+
+1. Compare the expected renamed paths with the Git index. A clean tree and a
+   passing `--check` cannot see a renamed file that was never staged.
+2. Explain every deletion. Expected ones: the archived upstream blog posts and
+   runtime files Clisbot removed (`cli-client-id`).
+3. Check imports, npm script paths, package exports, branding assets and
+   symlinks.
+4. Review staged paths for scratch output, runtime state, secrets and real
+   identities.
+
+## Seams to check every sync
+
+Files both sides change. Git may merge them cleanly and still break them.
+
+- **Sidebar footer**: upstream's footer rows (Usage, plugin rows) and Clisbot's
+  bottom bar share `sidebarFooterItems`; `sidebar-nav/footer-model.ts` and
+  `sidebar-nav/model.ts` each keep the other's keys; `left-sidebar.tsx` and
+  `settings/sidebar/sidebar-nav-section.tsx` render both. Clisbot's header order
+  is `builtinOrder` on upstream's section model.
+- **Pairing**: `runtime/host-runtime.ts`, `pair-link-modal.tsx`,
+  `hosts/pair-scan-model.ts`. Clisbot device and Hub links are handled before
+  upstream's host confirmation; v5 offers are refused before it.
+- **Server info**: `stores/session-store.ts` `toDaemonServerInfo` must carry
+  `botCreationAllowed` and `permissions`, or Bot creation and managed access
+  break after a reconnect.
+- **Light theme**: `styles/theme.ts` (light values, `surfaceSidebarHover`,
+  `input`, `inputBorder`, `placeholder`), `styles/settings.ts` (cards on
+  `surface0`), `form-field.tsx`, `select-field.tsx`. Hand-styled inputs use
+  `colors.input`; every `placeholderTextColor` uses `colors.placeholder`.
+  Search, find, menu and read-only fields stay filled.
+- **Cards**: sidebar empty states and the home cards use `settingsStyles.card`.
+- **Providers**: `provider-registry.ts` (custom ACP providers pass
+  `exactMcpPreapproval` to the client), `acp-agent.ts` (Clisbot's handshake
+  timeouts and 1 s shutdown budget), OpenCode `event-consumer.ts` (Clisbot's
+  first-record deadline).
+- **Daemon client**: the pending-send queue keeps the message so an aborted
+  request is removed.
+- **Settings screen**: Clisbot's detail layout (Hub picker, wide content,
+  `SettingsDetailContent`) instead of upstream's `PageLayout`.
+- **Hub** (`getpaseo/hub`, merged into `packages/hub`):
+  `daemons/registry.ts` (`sessionChannel`, `sessionAccess`,
+  `subscribeDaemonSession`, and edits in the socket-close handler, inbound
+  dispatch and `receiveRpcError`), `daemons/protocol.ts`, `app.ts` and
+  `application-runtime.ts` (`COMPAT(clisbot-control-plane)` seams).
+
+Add a seam here when a merge breaks it; remove one when the code moves into a
+Clisbot-owned folder.
+
+## Rename rules
+
+[`scripts/rebrand-clisbot.mjs`](../../../scripts/rebrand-clisbot.mjs) applies
+these to Git-tracked paths and UTF-8 text. They are string rules, not proof that
+a remaining old name is valid. `--check` only proves another run changes
+nothing. After each transform and each merge, scan tracked contents and paths
+for `paseo` and classify each match as provenance, an intentional endpoint, or
+work left.
 
 | Input                                                                                                                                                                                               | Current rule                                                                                                                                                                                                                                                                                                                                                                                | Review when syncing                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -246,388 +285,98 @@ release process and private credential storage.
 | Upstream Discord invite and old X/Reddit badges                                                                                                                                                     | Rewrite the Discord invite to `https://discord.gg/awGmcmFXC`; remove the previous maintainer's X badge and the unclaimed Reddit badge.                                                                                                                                                                                                                                                      | Review new upstream community links individually; this rule covers the known old invite and badges, not every possible new URL.                                                                                                                                                      |
 | Four README introductions, concept, author, license, and attribution sections                                                                                                                       | Replace the centered tagline and subtitle, opening description, and provider-choice bullet in each locale. Insert localized Concept, author story, and Attribution sections; place the author story after Concept. Replace the known README License summary with the Clisbot summary. Remove the inherited Related projects lists; preserve the Chinese relay TLS guide as its own section. | The deliberate `Paseo` names and `getpaseo/paseo` links in Concept and Attribution identify the source project. Update the copy in the script and templates together when messaging changes.                                                                                         |
 
-The three introductory paragraphs (desktop workspace, agent platform, and bot)
-come from `scripts/rebrand-templates/readme-*-intro.md`. The script replaces the
-body between `<!-- clisbot:intro:start -->` and `<!-- clisbot:intro:end -->`, so
-future copy edits can update these templates and rerun the transformation.
+Repository URLs also match escaped slashes in regexes and `%2F` in encoded login
+return URLs. `docker/relay/` is protected because its pinned Elixir release keeps
+`PASEO_RELAY_*` names ([relay deployment](../../relay-deployment.md)).
+`--keep-upstream-endpoints` keeps `app.paseo.sh` and `relay.paseo.sh`; use it only
+on disposable reference branches, never on a promoted snapshot.
 
-The README's "40+ agent options" means five enabled-by-default definitions in
-[the provider manifest](../../../packages/protocol/src/provider-manifest.ts)
-plus 38 entries in [the ACP catalog](../../../packages/app/src/data/acp-provider-catalog.ts)
-at the time of this test. Catalog entries still require their agent CLI and
-configuration. Grok is a catalog preset; Antigravity is documented as a
-[custom ACP provider](../../custom-providers.md). Recount and update all four
-README versions and the script when either source changes.
+The README introductions come from `scripts/rebrand-templates/readme-*-intro.md`,
+between `<!-- clisbot:intro:start -->` and `<!-- clisbot:intro:end -->`. "40+
+agent options" counts the built-in providers in the
+[provider manifest](../../../packages/protocol/src/provider-manifest.ts) and
+plugins (7 at v0.11.1) plus the
+[ACP catalog](../../../packages/app/src/data/acp-provider-catalog.ts) (38);
+recount and update the four READMEs and the script when either changes.
 
-Files with binary or invalid UTF-8 contents are skipped. `--check` verifies
-that another run would make no further changes; it does **not** validate the
-names left behind. With `--keep-upstream-endpoints`, a successful check still
-allows upstream service hosts. Production checks use the default Clisbot host
-transform and verify the pairing URL and embedded relay separately. After each
-transformed-upstream commit and after each merge,
-scan both tracked contents and paths case-insensitively for `paseo`, then
-classify every remaining match as provenance, an intentional test endpoint, or
-work still required before release. Do not treat the table as a blanket
-allowlist for new upstream text.
+Publication identity (operator text, attribution, authorship, testimonials,
+store IDs, community links) is reviewed separately:
+[publication review](../../audits/2026-09-30-clisbot-branding/publication-review.md).
 
-Also use the [Clisbot branding audit](../../audits/2026-09-30-clisbot-branding/README.md)
-after transforming upstream and after resolving a merge. Its
-[file inventory](../../audits/2026-09-30-clisbot-branding/inventory.md),
-[favicon coverage](../../audits/2026-09-30-clisbot-branding/favicons.md), and image
-evidence cover names rendered into pixels and SVG geometry that a text rename
-cannot change. Compare new or changed assets and their consumers with this
-baseline, including app/desktop icons, splash, Hub glyphs, website/README images,
-and store screenshots. The audit counts are dated evidence, not a permanent
-allowlist.
+## Visual branding
 
-Review publication identity separately: legal/operator text, source attribution,
-blog authorship, testimonials, store IDs, and external community destinations.
-The audit found upstream quotations renamed to Clisbot and an unchanged upstream
-App Store ID; a successful `--check` does not make those claims or destinations
-correct. The [selected branding concept and backup](../../audits/2026-09-30-clisbot-branding/concept-b1-workspace-chat.md)
-record the current visual direction. Apply the production kit using the following
-step; the [production report](../../audits/2026-09-30-clisbot-branding/production-artifacts.md)
-records its coverage and verification.
-
-### Visual branding transform
-
-After the text/path rename, run `scripts/branding/apply.mjs` from the Fusion
-checkout against the transformed upstream worktree. It installs the versioned
+After the rename, `scripts/branding/apply.mjs` installs the versioned
 [Flow / Ocean 02 kit](../../../assets/branding/clisbot/README.md) and updates
-inline logo geometry and image configuration. Use the **same kit bytes** on
-Fusion and upstream; do not regenerate screenshots independently on each branch.
+inline logo geometry and image configuration. It dry-runs by default; review,
+`--apply`, then `--check`. Unknown logo geometry or a missing consumer stops it
+before writing: update the transform first. Use the same kit bytes on both
+sides; rebuild the kit only when the artwork changes. The manifest covers known
+consumers, so look at image paths the release adds. Coverage baseline:
+[branding audit](../../audits/2026-09-30-clisbot-branding/README.md).
 
-The script defaults to a dry run. Review that report, apply it, then run `--check`.
-Unknown logo geometry or missing consumers stop the batch before any writes;
-review those upstream changes and update the transform before continuing.
-Hub patches are skipped only when the upstream snapshot has no Hub package.
-Fastlane screenshot symlinks are replaced with regular Android images to keep
-the website's iPhone images independent.
+## Tags
 
-Keep `scripts/branding/**` and `assets/branding/**` out of the general text rename.
-They contain upstream matching anchors, artwork provenance and third-party font
-licenses. Rebuild the kit in Fusion only when artwork or marketing UI changes,
-then apply that revision to both sides before the next merge. After a merge,
-rerun both text and visual checks and inspect newly added upstream image paths;
-the manifest covers known consumers, not assets introduced by future releases.
-
-Git command skeleton for one release, run from a clean checkout after the
-cutover. `<main-worktree>` is the worktree with `main` checked out; the two
-other paths are new disposable worktrees. Run the same
-`scripts/rebrand-clisbot.mjs` from the Fusion checkout against each raw
-upstream worktree. Stage renamed paths before `--check` because the script
-enumerates the Git index.
-
-```bash
-git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
-git rev-parse 'refs/upstream-releases/vX.Y.Z^{}' # verify the raw upstream commit
-git worktree add -b sync/rebranded-vX.Y.Z <rebrand-worktree> refs/upstream-releases/vX.Y.Z
-node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --apply \
-  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
-node scripts/branding/apply.mjs --root <rebrand-worktree>
-node scripts/branding/apply.mjs --root <rebrand-worktree> --apply
-node scripts/branding/apply.mjs --root <rebrand-worktree> --check
-# In <rebrand-worktree>, install dependencies, then run npm run format and
-# npm run lint. The broad rename changes wrapping in many docs/source files.
-# Disable machine-wide ignore rules when staging the transformed snapshot.
-# Repository .gitignore rules still apply.
-git -c core.excludesFile=/dev/null -C <rebrand-worktree> add -A
-node scripts/rebrand-clisbot.mjs --root <rebrand-worktree> --check \
-  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
-# Complete the file-completeness/publication gate above before committing.
-git -C <rebrand-worktree> diff --cached --name-status -M
-git -C <rebrand-worktree> diff --cached --check
-git -C <rebrand-worktree> commit -m "Rebrand upstream vX.Y.Z for Clisbot sync"
-
-git worktree add -b sync/promotion-vX.Y.Z <promotion-worktree> main
-git -C <promotion-worktree> merge --no-ff --no-commit sync/rebranded-vX.Y.Z
-# Resolve conflicts; rerun the text rename/check and old-name scan.
-node scripts/branding/apply.mjs --root <promotion-worktree> --check
-# If needed, review and apply the visual transform; run the release gates.
-git -c core.excludesFile=/dev/null -C <promotion-worktree> add -A
-# Repeat the gate against both Fusion and transformed-upstream baselines.
-git -C <promotion-worktree> diff --cached --name-status -M
-git -C <promotion-worktree> diff --cached --check
-git -C <promotion-worktree> commit -m "Sync rebranded upstream vX.Y.Z"
-
-git -C <main-worktree> merge --ff-only sync/promotion-vX.Y.Z
-git -C <main-worktree> tag clisbot/sync-verified-YYYY-MM-DD-vX.Y.Z
-git -C <main-worktree> worktree remove <promotion-worktree>
-git -C <main-worktree> worktree remove <rebrand-worktree>
-git -C <main-worktree> branch -d sync/promotion-vX.Y.Z
-git -C <main-worktree> branch -d sync/rebranded-vX.Y.Z
-```
-
-For rename conflicts, apply the same rebrand transform and formatter to a
-temporary copy of the actual merge base, without changing Git ancestry.
-Compare whole-file contents against this normalized base: keep Fusion when
-upstream equals it, take upstream when Fusion equals it, otherwise attempt a
-three-way content merge using it as the base.
-Review remaining conflicts and run affected tests; a clean content merge
-does not guarantee behavioral compatibility.
-
-Stop if the final fast-forward fails because `main` moved during validation;
-reconcile that movement before tagging or deleting the worktrees. Review the
-staged merge diff before committing, especially lockfile changes. The current
-procedure below lists the dependency and typecheck gates; add the focused and
-live checks required by the release being promoted.
-
-Use the same default Clisbot transform and checks for disposable `upstream/main`
-rehearsals intended for promotion. No legacy `paseo://` handler or `PASEO_*`
-environment alias is part of the target Clisbot product. The script preserves
-dated audits, lessons, and this upstream playbook as historical/provenance records.
-
-Use `--keep-upstream-endpoints` only on disposable reference branches that
-explicitly test upstream services. It keeps `app.paseo.sh`, `relay.paseo.sh`,
-and `hub.paseo.sh`, while site/documentation links become `clisbot.com`. Do not
-promote a snapshot transformed with that flag to production.
-
-Historical: the initial rebrand and 2026-10-01 cutover retained that temporary
-exception; the [validation record](../../audits/2026-09-30-clisbot-branding/evidence/upstream-v0.10.2-validation.json)
-shows `appHost` and `relayHost` as `null`. The current official pairing and relay
-endpoints are owned by [relay deployment](../../relay-deployment.md). The branches use Expo owner
-`lbk-company` and project ID `9314cc2c-4abe-4637-b1cf-647fbbfbd807`.
-Confirm project access and mobile signing before running EAS builds. The
-temporary service endpoints, publication identity, and native-build/storefront
-appearance still need review before public release.
-
-### Historical raw-upstream procedure before the cutover
-
-Retained for provenance. Use the transformed-upstream procedure above for `main`.
-
-```bash
-git worktree add --detach <clean-sync-worktree> clisbot-paseoclaw-fusion
-cd <clean-sync-worktree>
-test -z "$(git status --porcelain)"           # required clean boundary
-git tag clisbot/fork-tip-$(date +%Y-%m-%d)   # mark the product tip
-git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
-git rev-parse refs/upstream-releases/vX.Y.Z^{} # verify against the Paseo release commit
-git merge --no-commit --no-ff refs/upstream-releases/vX.Y.Z
-# resolve the shared files below
-npm install --package-lock-only --ignore-scripts
-npm ci                                      # trusted checkout; native tools need lifecycle setup
-npm ls --workspaces --depth=0
-# Add exact `npm ls <package> --depth=0` checks for pins changed by the release.
-npm run typecheck
-# channel-plane E2E per docs/lessons/2026-08-26-integration-seams-before-live-e2e.md
-git commit -m "Sync upstream vX.Y.Z"
-# Fast-forward the product branch to the checked merge commit. Preserve and
-# reapply any existing worktree changes, then validate overlapping paths.
-# only after every required gate passes:
-git tag clisbot/sync-verified-$(date +%Y-%m-%d)-vX.Y.Z
-```
-
-### Tags: `refs/tags/` mirrors `origin`, nothing else
-
-Both upstreams publish `v*` tags into the same flat namespace as our fork, and
-whichever fetch ran last wins. On 2026-09-14 local `v0.8.0` pointed at the **Hub**
-release, so `git checkout v0.8.0` produced the wrong repository's code, and
-`git fetch upstream --tags` refused to repair it (`would clobber existing tag`).
-Five of origin's own tags — `v0.1.39`, `v0.1.41`, `v0.1.43`, `v0.1.50`, `v0.1.53`
-— also name a different Paseo commit.
-
-Run `scripts/setup-git-remotes.sh` once per clone. It sets both upstreams to
-branches-only, so `refs/tags/` holds our fork's releases and matches `origin`
-exactly. Git config is per clone, so a fresh checkout needs it again.
-
-Fetch an upstream release on demand, into its own namespace, and verify the
-peeled commit before merging — neither a bare tag name nor the root package
-version proves the merged baseline:
+Both upstreams publish `v*` tags into the same namespace as our fork, and the
+last fetch wins (on 2026-09-14 local `v0.8.0` named the Hub release). Run
+`scripts/setup-git-remotes.sh` once per clone: it makes both upstreams
+branches-only, so `refs/tags/` matches `origin`. Fetch upstream releases into
+their own namespaces and verify the peeled commit:
 
 ```bash
 git fetch --no-tags upstream     refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
 git fetch --no-tags hub-upstream refs/tags/vX.Y.Z:refs/hub-releases/vX.Y.Z
-git rev-parse refs/upstream-releases/vX.Y.Z^{}
 ```
 
-A verified sync point is a tag we own, so push it: `clisbot/sync-verified-*`
-belongs on `origin` like any other fork tag. Scratch markers (`clisbot/fork-tip-*`,
-`backup/*`) stay local and get deleted once the sync lands.
+`clisbot/sync-verified-*` tags are ours: push them. Scratch markers stay local.
 
-Keep a dirty product checkout intact while preparing the merge in the detached
-worktree. The final branch update must preserve its tracked and untracked work.
+## Merge, not rebase
 
-### Shared-file overlap surface
-
-Measure this surface again for every sync. The 2026-08-30 merge overlapped
-four metadata/doc files; the 2026-09-06 comparison from `74a377ff6` to Paseo
-`v0.7.2` overlaps 12 files with committed Fusion changes:
-
-- `package.json` — upstream adds scripts and version/license; Clisbot adds
-  the `hub`/`channels` workspaces. Keep both.
-- `package-lock.json` — use the upstream release lock as the base and resolve
-  all manifests first. Reconcile with
-  `npm install --package-lock-only --ignore-scripts`, review the lock diff, and
-  require clean `npm ci` plus the
-  scoped `npm ls` checks below. Do not use `--ignore-scripts` for the test
-  install: native tools such as `tsgo` need their package setup intact.
-- `packages/cli/package.json` — update Paseo dependencies together while keeping
-  the independently versioned Hub dependency.
-- `packages/app/package.json`, `packages/app/src/app/_layout.tsx`, and
-  `packages/app/src/components/left-sidebar.tsx` — preserve Fusion navigation
-  while adopting upstream mobile animation changes.
-- `packages/client/src/daemon-client.ts` and its test,
-  `packages/protocol/src/messages.ts`, and `packages/server/src/server/session.ts`
-  — preserve managed access and channel integration contracts.
-- `packages/server/src/server/agent/providers/codex-app-server-agent.ts` and its
-  test — retain Fusion behavior alongside the upstream paginated rewind fix.
-- The light theme ([design.md](../../design.md), "Light palette"):
-  `packages/app/src/styles/theme.ts` (light values, the optional
-  `surfaceSidebarHover`, the `input`/`inputBorder` tokens),
-  `packages/app/src/styles/settings.ts` (card on `surface0`),
-  `packages/app/src/components/ui/form-field.tsx` and `select-field.tsx` (input
-  fill and rest border), and one assertion in `theme.test.ts`. Keep the white
-  cards and bordered inputs; take upstream's other edits. A trial merge of
-  `upstream/main` on 2026-10-05 merged all four cleanly. Hand-styled form
-  inputs paint `colors.input` instead of `surface2`, one line each, in
-  `add-host-modal.tsx`, `pair-link-modal.tsx`, `provider-diagnostic-sheet.tsx`,
-  `pair-device-section.tsx`, `project-settings-screen.tsx` and
-  `appearance-section.tsx`; search, find, menu and read-only fields stay filled.
-  Every `placeholderTextColor` reads `colors.placeholder` (a theme token the
-  fork adds) instead of `foregroundMuted`: one-line edits in about 19 app files.
-  An upstream input added later needs the same edit.
-- The sidebar footer (since v0.11.1): upstream's footer rows (Usage, plugin
-  rows) and Clisbot's bottom bar share `sidebarFooterItems`;
-  `sidebar-nav/footer-model.ts` and `sidebar-nav/model.ts` each keep the other's
-  keys. `left-sidebar.tsx` and `settings/sidebar/sidebar-nav-section.tsx` render both.
-- Pairing (`runtime/host-runtime.ts`, `pair-link-modal.tsx`, `hosts/pair-scan-model.ts`):
-  Clisbot device and Hub links run before upstream's host confirmation.
-- `stores/session-store.ts` `toDaemonServerInfo` carries Clisbot's
-  `botCreationAllowed` and `permissions`; an upstream rewrite that drops them
-  breaks Bot creation and managed access after a reconnect.
-
-`getpaseo/hub` has its own overlap, from the channel plane driving a Host over
-the connection that Host holds to the Hub
-([decision](../../audits/2026-09-20-channel-host-transport.md)):
-
-- `packages/hub/src/daemons/registry.ts` — the heaviest of the set. A Fusion
-  block (`sessionChannel`, `sessionAccess`, `subscribeDaemonSession`) plus three
-  edits inside live methods: the socket-close handler, the inbound dispatch
-  chain, and `receiveRpcError`. Expect conflicts here first.
-- `packages/hub/src/daemons/protocol.ts` — additive (`DaemonSessionChannel`,
-  `DaemonSessionAccess`).
-- `packages/hub/src/app.ts` and `packages/hub/src/application-runtime.ts` — one
-  `publishDaemonSessions` field and a late-bound `hostSessions` thread through
-  the composition root; one-line hunks, tagged `COMPAT(clisbot-control-plane)`
-  like every other seam in those two files.
-- `packages/hub/src/daemons/registry.test.ts` and
-  `daemons/test-utils/daemon-registry-harness.ts` — appended helpers.
-- `packages/hub/src/daemons/registry.session.test.ts` — a Fusion file inside an
-  upstream directory.
-
-On the Paseo side the same change adds `packages/cli/src/commands/hub/init.ts`,
-`permissions.ts` and `init-flow.test.ts` (the default permission set a Hub
-connection asks for), and `packages/server/src/server/session.ts` already on the
-list gains the first-message agent naming.
-
-These are files changed on both sides, not proof that all will conflict.
-Record separately: overlap files, actual textual conflicts reported by Git,
-and semantic conflicts found by validation. The `v0.7.2` merge has textual
-conflicts in `package-lock.json` and `packages/cli/package.json`; the remaining
-overlap auto-merges and still needs focused validation.
-
-## Why merge, not rebase, for sync
-
-Merge joins two parallel lines of work; rebase replays unshared commits on a
-new base. The sync case is the first.
-
-| Criterion           | Merge                                           | Rebase                                                                  |
-| ------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
-| Fork history        | Clisbot commits keep their hashes; audit stable | every hash rewritten; the fork point stops being an ancestor of the tip |
-| Conflict resolution | each shared file resolved once                  | re-resolved per replayed commit that touches the region                 |
-| Push                | plain `git push`                                | force-push on every sync                                                |
-| Future syncs        | next sync merges only the delta                 | replays all Clisbot commits again                                       |
-
-Rebase wins for small unshared branches — that is what the contribution flow
-below uses.
+Sync merges: Clisbot commits keep their hashes, each shared file is resolved
+once, `main` never needs a force-push, and the next sync merges only the delta.
+Rebase is for small unshared branches, such as upstream PRs.
 
 ## Contributing back to upstream
 
-1. Cut a clean branch from `upstream/main` in the fork clone — never from the
-   fusion branch:
-
-   ```bash
-   cd ~/projects/paseo-forked
-   git fetch upstream
-   git checkout -b fix/<short-name> upstream/main
-   ```
-
-2. Bring the fix in. Write it fresh on this branch (preferred; a
-   contribution is one focused change), or cherry-pick the relevant commits
-   from the fusion branch:
-
-   ```bash
-   git fetch /path/to/fusion clisbot-paseoclaw-fusion
-   git cherry-pick <sha>
-   ```
-
+1. In the fork clone, branch from `upstream/main`, never from Clisbot:
+   `git fetch upstream && git checkout -b fix/<name> upstream/main`.
+2. Write the fix fresh, or cherry-pick it from Clisbot.
 3. Add a regression test that fails on the old code for the reported reason.
-4. If upstream/main moved: `git fetch upstream && git rebase upstream/main`.
-   Safe here: small branch, unshared, only you use it.
-5. `npm run typecheck` plus targeted tests, then
-   `git push --force-with-lease origin fix/<short-name>`.
-6. Open the PR `longbkit/paseo:fix/<name>` → `getpaseo/paseo:main` with
-   "Allow edits by maintainers" enabled and the QA evidence from
-   `CONTRIBUTING.md` (commands + output, test results, screenshots/video for
-   UI, platform matrix).
+4. Rebase on `upstream/main` if it moved; run typecheck and targeted tests;
+   `git push --force-with-lease origin fix/<name>`.
+5. Open `longbkit/paseo:fix/<name>` → `getpaseo/paseo:main` with "Allow edits by
+   maintainers" and the QA evidence from `CONTRIBUTING.md`.
 
-Hard rule: never merge the fusion branch into an upstream PR. That drags in
-the whole channel plane and the PR gets rejected.
+Never merge Clisbot into an upstream PR; it drags in the whole channel plane.
 
-## The release gate
+## Release gate
 
-A Clisbot release is a tag on the fusion branch. Its notes state the upstream
-tag it is based on. A merge commit is not a verified sync point: dependency
-reproducibility, typecheck, focused tests, and required live channel evidence
-must be green before creating the `sync-verified-*` tag or cutting a release.
+A Clisbot release is a tag on `main` whose notes name the upstream release it is
+based on. A merge commit is not a verified sync point: reproducible install,
+typecheck, focused tests and the required live channel evidence come first.
 
 ## Keeping the merge path cheap
 
-The KPI is "pull N upstream commits in one afternoon and the channel plane
-survives", not sync frequency. Maintain it by:
+The goal is merging a release in a day with the channel plane intact.
 
-- keeping Clisbot changes additive in its own namespaces
-  (`packages/hub`, `packages/channels/*`, new CLI commands);
-- minimizing edits to shared files and measuring the overlap at every sync;
-- tracking the seam surface: which upstream symbols the channel plane
-  consumes. As of 2026-08-30 that is one import of `@getpaseo/server` in
-  `packages/hub/src/e2e/harness/source-paseo.ts` (dev-only E2E harness).
-  Re-verify this list at every sync.
+- Keep Clisbot changes additive, in its own folders (`packages/hub`,
+  `packages/channels/*`, `src/clisbot/*`, new CLI commands). Push a change into a
+  Clisbot folder rather than an upstream file whenever both work.
+- When you must edit an upstream file, keep the edit small and mark it, and
+  extend upstream's structure rather than replacing it (`builtinOrder` rather
+  than a second nav model).
+- Measure overlap by upstream lines replaced, not lines added. `packages/hub`
+  maps to the root of `getpaseo/hub`; `packages/channels/*/upstream-sync.json`
+  carries per-file status. Worked example:
+  [agent session storage: upstream blast radius](../../features/agent-session-storage/upstream-blast-radius.md).
+- Treat a failing upstream test as a missing feature gate, not a stale assertion.
 
-Measure the overlap by upstream lines _replaced_, not lines added — an additive
-hunk almost always merges clean. Resolve which upstream a file answers to first:
-`packages/hub` maps to the **root** of `getpaseo/hub`, and each
-`packages/channels/*/upstream-sync.json` carries a per-file `verbatim` /
-`fusion-owned` status. Testing a path against `upstream/main` alone reports both
-of those as "not upstream", which is wrong. A worked ledger of that measurement,
-with a per-module why / what-if-unchanged / verdict, is
-[agent session storage: upstream blast radius][session-storage-blast-radius].
-Two rules it demonstrates: push a change down into a fusion-original folder rather
-than into an upstream file whenever both would work, and treat a failing
-upstream test as a missing feature gate rather than a stale assertion.
-
-[session-storage-blast-radius]: ../../features/agent-session-storage/upstream-blast-radius.md
-
-## When a vendor base becomes right
-
-If a day comes when Clisbot must pin an old upstream release
-(compliance/stability) while still backporting fixes, promote the fork to a
-vendor base: that release plus a minimal backport set, with the fusion based
-on it. Cost: two Clisbot diff layers to maintain and review. Don't adopt it
-preemptively.
-
-## Hygiene
-
-- After pushing the fusion branch to `origin` (longbkit/clisbot), re-track it:
-  `git branch -u origin/clisbot-paseoclaw-fusion`. Tracking `upstream/main`
-  makes `git status` ahead/behind numbers meaningless for local work.
-- Dev state lives in `.dev/paseo-home` inside the checkout; the packaged
-  app's `~/.paseo` (port 6767) is never touched. Dev daemon: 6768; Expo: 8081. Use `npm run cli -- ...` for the dev daemon, not the global binary.
-  See `docs/development.md`.
+If Clisbot ever has to pin an old upstream release while backporting fixes,
+make the fork a vendor base (that release plus a minimal backport set). It
+doubles the diff layers; do not adopt it early.
 
 ## OpenClaw channel source manifests
 
-Everything above is about Paseo. The packages under `packages/channels/*` also
+The packages under `packages/channels/*` also
 track OpenClaw source (`~/projects/openclaw-private`), which is a different
 problem: we copy files out of it rather than merge branches. Each package owns
 `upstream-sync.json` and `scripts/channel-upstream-sync.mjs` reads it.
@@ -707,81 +456,4 @@ the next: the manifest holds one baseline for the whole package, so a
 half-synced package fails `check` (verbatim files at the new commit, baseline
 still at the old one) until the `adapted` files are merged too.
 
-### The 2026-09-07 rehearsal (one real week of upstream)
-
-Rehearsed on `e54cb3cb857` → `5d8067a4483` (2026-08-30 → 2026-09-06, 163
-changed production files under the channel roots) in a copy at
-`/tmp/sync-rehearsal`, with the five packages rewound to the older commit so
-`check` passed there first. Numbers for the `verbatim` pass:
-
-| Package         | Mapped files changed | clean | conflict | new upstream | deleted |
-| --------------- | -------------------- | ----- | -------- | ------------ | ------- |
-| `markdown-core` | 25 / 54              | 25    | 0        | 4            | 0       |
-| `telegram`      | 26 / 140             | 20    | 0        | 0            | 2       |
-| `slack`         | 30 / 96              | 19    | 0        | 3            | 0       |
-| `core`          | 104 / 327            | 56    | 0        | 633          | 72      |
-
-120 files merged, zero conflicts, about 90 s of tool time. 118 of the 120 came
-out byte-identical to the hand port at the same commit; the other two needed one
-import line each, both named in the run's notes. Hand work: those two lines, and
-15 upstream files added inside the range (3 `markdown-core`, 3 `slack`,
-9 `core`) which have to be ported and listed — roughly 40 minutes. Afterwards
-all five packages typechecked and their suites passed (`markdown-core` 654,
-`core` 214, `slack` 886, `telegram` 865 of 866 — the one failure pre-exists in
-the working tree — `shared` 35).
-
-`--include-adapted` is the expensive half: 50 of the changed `adapted` files
-conflicted (`core` 45, `telegram` 3, `slack` 2) because an adapted file differs
-from the base in the same region the delta touches. Budget a hand resolution per
-adapted file that upstream moved, and keep `adapted` for files that genuinely
-need it.
-
-Upstream also added 13 test files inside the range and 12 of them have no local
-counterpart. `apply` does not surface that: test files are excluded from the
-manifest and from the added/deleted lists, so upstream's new coverage has to be
-swept separately.
-
-Three things the run does not do. `core` cherry-picks files out of shared
-upstream directories, so its added/deleted lists are those whole directories
-(633 and 72) rather than a port backlog — the `unported import` notes are the
-targeted version of the same fact. A rename arrives as one added and one deleted
-file, never as a rename. And one upstream file (`fs-safe-advanced.ts`) holds a
-literal NUL inside a regex class, which `git merge-file` refuses as binary; that
-file reports `skipped (merge refused: …)` and the rest of the package continues.
-
-## Paseo v0.7.2 merge (2026-09-06)
-
-The incoming release is `9400a49af670fdb5db4af58e73f8df98588dbea9`, with
-19 upstream commits after the previously merged `74a377ff6` (which already
-includes `v0.7.0-beta.3`). Hub stays at `0.8.0`; the channel packages stay at
-`0.1.0`. The overlap and conflict resolutions are recorded above.
-
-The lock reconciliation starts from the release lock and retains Fusion pins
-where upstream did not change the dependency version. It also removes stale
-Hub-local React/React DOM `19.2.7` entries and their scheduler: the Hub manifest
-already requires `19.1.0`, which resolves from the root. Keeping those stale
-entries made a clean install report invalid direct dependencies.
-
-The clean merge passed `npm ci` with lifecycle scripts, `npm ls --workspaces
---depth=0`, server/CLI and channel/Hub-node builds, workspace typecheck,
-formatting, lint on all 137 changed code files, and 480 focused tests
-across server (271), protocol (18), client (117), app (43), and channel
-control-plane/daemon-client (31). Repository-wide lint still reports 84 errors
-outside the merge paths, including historical probe and revision scripts.
-
-This is not a `sync-verified-*` release point. Live Slack/Telegram round-trips
-have not been verified: the fixed `.clisbot-dev` fixture lacks the old
-`secrets/slack--work` and `secrets/telegram--work` files and has no daemon on 6867. A separate Hub is already running on 6868 from `.clisbot-dev-01`; do not
-reuse or restart it as if it were the fixed test fixture. Native/mobile platform
-QA also remains outside this Linux merge validation.
-
-## Reference snapshot (2026-08-30)
-
-- Fork point: `b5f58322` (2026-08-23, "fix: update lockfile signatures and
-  Nix hash [skip ci]").
-- Fusion branch at snapshot: 111 commits ahead, 104 behind upstream.
-- Upstream tags at snapshot: latest `v0.7.0-beta.2` (2026-08-28); main was 19
-  commits ahead of it.
-- Notable upstream changes since the fork point: license AGPL-3.0 →
-  Apache-2.0, SSH remote daemon access, plugin Git sources, ACP steering,
-  release cycle 0.5.x → 0.7.0-beta.
+The 2026-09-07 one-week rehearsal of `apply` (120 files, zero conflicts on `verbatim`, about 50 hand-resolved `adapted` files) is in the [sync history](../../audits/2026-10-09-upstream-sync-history.md#openclaw-apply-rehearsal-2026-09-07).

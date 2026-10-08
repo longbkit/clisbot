@@ -19,7 +19,7 @@ master files, font licensing, export formats and rebuild commands.
   `npm run branding:pack` and excluded from Git. The pack includes masters,
   fonts, exports, preview, manifest, README and project LICENSE.
 - [Repeatable application script](../../../scripts/branding/apply.mjs).
-  The [upstream playbook](../../guides/developer-guide/upstream-sync-and-contribution.md#visual-branding-transform)
+  The [upstream playbook](../../guides/developer-guide/upstream-sync-and-contribution.md#visual-branding)
   places this step after the text/path rename and checks it again after a merge.
 
 ## Replacement coverage
