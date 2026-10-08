@@ -23,6 +23,7 @@ import {
 export { MenuRoot as DropdownMenu };
 export { MenuTrigger as DropdownMenuTrigger };
 export { MenuItem as DropdownMenuItem };
+export { MenuItemAction as DropdownMenuItemAction } from "@/components/ui/menu";
 export { MenuLabel as DropdownMenuLabel };
 export { MenuSeparator as DropdownMenuSeparator };
 export { MenuHint as DropdownMenuHint };

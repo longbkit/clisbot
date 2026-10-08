@@ -1,7 +1,8 @@
 # Grant scope: own or all
 
-Status: **proposed** 2026-10-06, not built. First consumer:
-[Schedules that belong to a conversation](../../audits/2026-10-06-conversation-schedules.md).
+Status: **deferred** 2026-10-07, not built. It was proposed for
+[schedules](../../audits/2026-10-06-conversation-schedules.md), which ship without
+it: a schedule an agent tool creates has no human creator to compare against.
 
 ## Problem
 
@@ -44,7 +45,7 @@ scope: z.enum(["own", "all"]).optional(),
   `own`. A Project row cannot narrow a Host row, as for every other constraint.
 - **Owner, daemon admins, clients without Managed Access**: `all`.
 - **Only privileges that opt in honor it.** A privilege honors scope once its
-  resource records a creator. First: `automation.manage` (schedules). Next
+  resource records a creator. First: `schedule.manage` (schedules). Next
   candidates: `workspace.manage` for archiving one's own worktrees, Bots,
   Terminal launches.
 

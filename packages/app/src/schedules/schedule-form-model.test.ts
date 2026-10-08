@@ -186,6 +186,68 @@ function applyPreferences(form: ReturnType<typeof open>, preferences: FormPrefer
 }
 
 describe("schedule form model", () => {
+  it("creates a heartbeat for a preset session: Run in is fixed and a prompt is required", () => {
+    const form = open({
+      mode: "create",
+      presetAgentId: "agent-1",
+      defaults: { serverId: "host-a", projectTargets: PROJECT_TARGETS, preferences: {} },
+    });
+
+    expect(form.getState()).toMatchObject({
+      targetKind: "agent",
+      targetKindLocked: true,
+      targetAgentId: "agent-1",
+      canSubmit: false,
+    });
+    form.setTargetKind("new-agent");
+    expect(form.getState().targetKind).toBe("agent");
+
+    form.setPrompt("Check CI");
+    expect(form.getState().canSubmit).toBe(true);
+  });
+
+  it("switches Run in to an existing session and needs one picked", () => {
+    const form = open({
+      mode: "create",
+      defaults: { serverId: "host-a", projectTargets: PROJECT_TARGETS, preferences: {} },
+    });
+
+    expect(form.getState().targetKindLocked).toBe(false);
+    form.setTargetKind("agent");
+    form.setPrompt("Check CI");
+    expect(form.getState().canSubmit).toBe(false);
+
+    form.setTargetAgent("agent-2");
+    expect(form.getState()).toMatchObject({ targetAgentId: "agent-2", canSubmit: true });
+  });
+
+  it("offers an existing workspace only where the host supports it, and requires one picked", () => {
+    const supporting = openWithHosts({
+      mode: "create",
+      hosts: [{ serverId: "host-a", label: "Host A", supportsExistingWorkspace: true }],
+      defaults: { serverId: "host-a", projectTargets: PROJECT_TARGETS, preferences: {} },
+    });
+    supporting.setProject(PROJECT_TARGETS[0]!.optionId, { label: "Project A" });
+    expect(supporting.getState()).toMatchObject({
+      canUseExistingWorkspace: true,
+      selectedProjectViewKey: "project-a",
+    });
+    expect(supporting.getState().disclosure.showIsolationField).toBe(true);
+
+    supporting.setExistingWorkspace("");
+    supporting.setPrompt("Triage");
+    expect(supporting.getState().canSubmit).toBe(false);
+    supporting.setExistingWorkspace("wks_1");
+    expect(supporting.getState().disclosure.showArchiveOnFinishField).toBe(false);
+
+    const older = open({
+      mode: "create",
+      defaults: { serverId: "host-a", projectTargets: PROJECT_TARGETS, preferences: {} },
+    });
+    older.setProject(PROJECT_TARGETS[0]!.optionId, { label: "Project A" });
+    expect(older.getState().canUseExistingWorkspace).toBe(false);
+  });
+
   it("opens edit from the schedule host snapshot and completes that host resolution", () => {
     const previous = open({
       mode: "edit",

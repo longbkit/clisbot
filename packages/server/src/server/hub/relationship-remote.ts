@@ -168,7 +168,9 @@ const AccessTicketAdmissionSchema = z.object({
   projects: z.array(
     z.object({
       projectId: z.string().min(1),
-      privileges: z.array(z.enum(PROJECT_PRIVILEGES)),
+      // Unknown privileges are dropped: privileges only add, so a ticket from a newer Hub grants
+      // this daemon less, never more. The Hub also leaves out what the header below omits.
+      privileges: z.array(z.string()),
       agentConfigurations: z.array(
         z.object({
           providerId: z.string().min(1),
@@ -187,6 +189,11 @@ const AccessTicketAdmissionSchema = z.object({
   daemonPrivileges: z.array(z.string()).optional(),
   leaseExpiresAt: z.string().datetime(),
 });
+
+/** Tells the Hub which Project privileges this daemon enforces (hub/src/managed-access). */
+const PROJECT_PRIVILEGES_HEADER = {
+  "x-clisbot-project-privileges": PROJECT_PRIVILEGES.join(","),
+};
 
 function ensureWebSocketMatchesHubOrigin(hubOrigin: string, webSocketUrl: string): void {
   const hub = new URL(hubOrigin);
@@ -308,6 +315,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
           "content-type": "application/json",
           authorization: `Bearer ${input.credential}`,
           "x-clisbot-daemon-id": input.daemonId,
+          ...PROJECT_PRIVILEGES_HEADER,
         },
         body: JSON.stringify({
           accessTicket: input.accessTicket,
@@ -359,6 +367,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
           "content-type": "application/json",
           authorization: `Bearer ${input.credential}`,
           "x-clisbot-daemon-id": input.daemonId,
+          ...PROJECT_PRIVILEGES_HEADER,
         },
         body: JSON.stringify({ leaseId: input.leaseId }),
         signal,
@@ -514,7 +523,7 @@ function parseAccessAdmission(value: unknown): ManagedAccessAdmission {
       admission.projects.map((project) => [
         project.projectId,
         {
-          privileges: new Set(project.privileges),
+          privileges: new Set(project.privileges.filter(isProjectPrivilege)),
           agentConfigurations: project.agentConfigurations,
           ...(project.terminalProfiles === undefined
             ? {}

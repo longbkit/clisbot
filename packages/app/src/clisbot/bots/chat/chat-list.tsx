@@ -1,4 +1,6 @@
 import { useStableEvent } from "@/hooks/use-stable-event";
+import { HeartbeatRunMarker } from "@/clisbot/heartbeats/heartbeat-run-marker";
+import { useChatTurnHeartbeats } from "@/clisbot/heartbeats/use-chat-turn-heartbeats";
 import { useChatKeyboardDismiss } from "./use-chat-keyboard-dismiss";
 import { useChatScrollPosition } from "./use-chat-scroll-position";
 import { usePinchZoomPassthrough } from "./use-pinch-zoom-passthrough";
@@ -63,6 +65,8 @@ export const ChatList = memo(function ChatList({
     },
   );
   const data = useMemo(() => rows.toReversed(), [rows]);
+  // Clisbot: a heartbeat a Bot made in a turn shows as its card above that turn's reply.
+  const heartbeatsByLine = useChatTurnHeartbeats(serverId, rows);
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatRenderRow>) => {
       // Inverted: the row after this one in reading order sits at `index - 1`.
@@ -76,11 +80,12 @@ export const ChatList = memo(function ChatList({
             bots={bots}
             members={members}
             closesGroup={closesGroup}
+            heartbeatIds={item.kind === "bot" ? heartbeatsByLine.get(item.line.id) : undefined}
           />
         </View>
       );
     },
-    [bots, data, members, serverId],
+    [bots, data, heartbeatsByLine, members, serverId],
   );
   return (
     <FlatList
@@ -108,12 +113,14 @@ function ChatRowView({
   bots,
   members,
   closesGroup,
+  heartbeatIds,
 }: {
   row: ChatRenderRow;
   serverId: string;
   bots: ReadonlyMap<string, ChatBotIdentity>;
   members: readonly MentionMember[];
   closesGroup: boolean;
+  heartbeatIds?: readonly string[];
 }) {
   switch (row.kind) {
     case "user":
@@ -128,11 +135,14 @@ function ChatRowView({
             bot={botIdentity(bots, row.botId)}
             serverId={serverId}
             members={members}
+            heartbeatIds={heartbeatIds}
           />
         </BotWorkspaceContext>
       );
     case "system":
       return <ChatSystemRow row={row} />;
+    case "heartbeat":
+      return <HeartbeatRunMarker message={row.label} />;
     case "live":
       return (
         <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>

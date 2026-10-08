@@ -287,6 +287,8 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceWorkspace: tint.surface0,
     // The composer is a white card lifted by `shadow.composer` (docs/design.md).
     surfaceComposer: tint.surface0,
+    // A dropdown menu is a white card lifted by `shadow.popover`, above whatever it opens over.
+    surfacePopover: tint.surface0,
     surfaceSettings: tint.surfaceSettings ?? tint.surface0,
     borderComposer: tint.border,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
@@ -444,6 +446,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceWorkspace: tint.surface1,
     // A shadow does not read on dark surfaces; the composer stays a filled box one step up.
     surfaceComposer: tint.surface1,
+    surfacePopover: tint.surface1,
     surfaceSettings: tint.surface0,
     borderComposer: tint.borderAccent,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
@@ -743,6 +746,12 @@ const darkShadow = {
     shadowRadius: 0,
     elevation: 0,
   },
+  popover: {
+    shadowColor: "rgba(0, 0, 0, 0.20)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 8,
+  },
   sm: {
     shadowColor: "rgba(0, 0, 0, 0.25)",
     shadowOffset: { width: 0, height: 2 },
@@ -825,6 +834,13 @@ const lightShadow = {
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
     elevation: 1,
+  },
+  // A dropdown menu floats over content, so it lifts clearly: a white card with a wide, soft shadow.
+  popover: {
+    shadowColor: "rgba(0, 0, 0, 0.14)",
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 28,
+    elevation: 8,
   },
   sm: {
     shadowColor: "rgba(0, 0, 0, 0.02)",

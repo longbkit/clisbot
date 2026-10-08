@@ -70,6 +70,8 @@ import {
   BotUpdateRequestSchema,
   BotArchiveRequestSchema,
   BotTemplateSeedRequestSchema,
+  BotTemplatePreviewRequestSchema,
+  BotTemplatePreviewResponseSchema,
   BotCreateResponseSchema,
   BotListResponseSchema,
   BotUpdateResponseSchema,
@@ -3280,6 +3282,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   BotUpdateRequestSchema,
   BotArchiveRequestSchema,
   BotTemplateSeedRequestSchema,
+  BotTemplatePreviewRequestSchema,
   ConnectorsSettingsGetRequestSchema,
   ConnectorsComposioKeySetRequestSchema,
   ConnectorsCatalogListRequestSchema,
@@ -3691,6 +3694,10 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(bots): Clisbot Bots & Chats, one gate for the whole feature (bots, chats, attachments,
         // group settings); added in v0.9.2-fusion; remove the gate after 2027-03-31 once the daemon floor advertises it.
         bots: z.boolean().optional(),
+        // COMPAT(botTemplatePreview): `bot.template.preview`, `template.seed` and a per-file
+        // `template.overwrite` on `bot.create`, for a bot made from an existing Project; added in
+        // v0.10.3-fusion; remove the gate after 2027-04-08.
+        botTemplatePreview: z.boolean().optional(),
         // COMPAT(connectors): Clisbot Connectors (Composio apps and MCP servers for Bots); added in
         // v0.10.2-fusion; remove the gate after 2027-06-30 once the daemon floor advertises it.
         connectors: z.boolean().optional(),
@@ -3860,6 +3867,10 @@ export const ServerInfoStatusPayloadSchema = z
         agentProfiles: z.boolean().optional(),
         // COMPAT(agentConfigApply): added in v0.3.2, remove gate after 2027-02-11.
         agentConfigApply: z.boolean().optional(),
+        // COMPAT(scheduleExistingWorkspace): added in v0.10.3, remove gate after 2027-04-07.
+        scheduleExistingWorkspace: z.boolean().optional(),
+        // COMPAT(scheduleChatDelivery): added in v0.10.3, remove gate after 2027-04-07.
+        scheduleChatDelivery: z.boolean().optional(),
       })
       .optional(),
   })
@@ -7056,6 +7067,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   BotUpdateResponseSchema,
   BotArchiveResponseSchema,
   BotTemplateSeedResponseSchema,
+  BotTemplatePreviewResponseSchema,
   BotUpdatedSchema,
   ConnectorsSettingsGetResponseSchema,
   ConnectorsComposioKeySetResponseSchema,

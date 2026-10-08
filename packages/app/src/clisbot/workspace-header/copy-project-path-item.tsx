@@ -11,7 +11,7 @@ import {
 import { useToast } from "@/contexts/toast-context";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import type { Theme } from "@/styles/theme";
-import { wrappablePath } from "@/utils/shorten-path";
+import { shortenPath } from "@/utils/shorten-path";
 
 const ThemedCopy = withUnistyles(Copy);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -21,7 +21,7 @@ const COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
  * The project's own group in the workspace header menu: its name as the heading, then Copy
  * project path with the root under it. A worktree lives away from its project's root, so the root
  * is the path you need for anything project-wide. The name is a heading rather than a line of the
- * item's description, which holds two lines — the path gets both, as the workspace path does.
+ * item's description, which keeps the path on one line, cut in the middle, as the workspace path.
  * It reads the workspace itself, so the upstream header only hands it which workspace this is.
  */
 export function CopyProjectPathItem({
@@ -56,7 +56,9 @@ export function CopyProjectPathItem({
         testID="workspace-header-copy-project-path"
         leading={COPY_ICON}
         onSelect={handleSelect}
-        description={wrappablePath(project.rootPath) || undefined}
+        description={shortenPath(project.rootPath) || undefined}
+        descriptionLines={1}
+        descriptionEllipsize="middle"
       >
         {t("workspace.header.actions.copyProjectPath")}
       </DropdownMenuItem>

@@ -1614,6 +1614,7 @@ export async function createClisbotDaemon(
     createDirectoryWorkspace: createScheduleLocalWorkspaceExternal,
     createClisbotWorktreeWorkspace: createScheduleClisbotWorktreeExternal,
     archiveWorkspace: archiveScheduleWorkspaceExternal,
+    findWorkspace: async (workspaceId) => (await workspaceRegistry?.get(workspaceId)) ?? null,
   });
   await scheduleService.start();
   agentManager.setAgentArchivedCallback(async (agentId) => {
@@ -1649,11 +1650,13 @@ export async function createClisbotDaemon(
       agentStorage,
       createAgent,
       durableTimelineStore: sessionStorage.agentManagerOptions.durableTimelineStore,
+      schedules: scheduleService,
       logger,
     },
     () => hubRelationships.publishProjects(),
   );
   const chatService = chatRuntime.service;
+  scheduleService.attachChats(chatService);
   // Clisbot Connectors (docs/features/connectors/README.md); flag off keeps the daemon upstream-equivalent.
   const connectors = createConnectorsDaemon({
     config: config.connectors,

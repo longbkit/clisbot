@@ -18,6 +18,9 @@ export const PROJECT_PRIVILEGES = [
   "terminal.use",
   // Launch only granted Terminal profiles; the daemon resolves the command.
   "terminal.profile.use",
+  // See, create, change and delete the Project's schedules and heartbeats
+  // (docs/audits/2026-10-06-conversation-schedules.md).
+  "schedule.manage",
   "approval.file",
   "approval.config",
   "approval.command",

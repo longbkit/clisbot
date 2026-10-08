@@ -44,6 +44,13 @@ import {
   workspaceManagementTarget,
 } from "./workspace-management.js";
 import { allowsBotInbound, allowsBotOutbound } from "./bot-access.js";
+import {
+  allowsScheduleInbound,
+  filterVisibleSchedules,
+  type ScheduleAccessResolver,
+} from "./schedule-access.js";
+import type { StoredSchedule } from "@clisbot/protocol/schedule/types";
+import type { NewAgentScheduleConfig } from "./schedule-access.js";
 
 interface AgentStorageReader {
   get(agentId: string): Promise<StoredAgentRecord | null>;
@@ -101,6 +108,11 @@ export class ManagedResourceAuthorizer {
     private readonly agentStorage: AgentStorageReader,
     private readonly terminalManager: TerminalManager | null,
     private readonly agentConfigurationSafety: AgentConfigurationSafetyResolver,
+    private readonly findSchedule: (
+      scheduleId: string,
+    ) => Promise<StoredSchedule | null> = async () => null,
+    /** Whether this session may post in a Chat (`ChatSession.allowsSend`); no Chats, no Chat. */
+    private readonly allowsChatSend: (chatId: string) => boolean = () => false,
   ) {
     // Mode off must retain the upstream path exactly: no registry reads,
     // subscriptions, managed state, or background rejection.
@@ -732,7 +744,7 @@ export class ManagedResourceAuthorizer {
 
     if (message.type.startsWith("workspace.label.")) return false;
 
-    const management = await this.allowsWorkspaceManagementInbound(message);
+    const management = await this.allowsManagementInbound(message);
     if (management !== undefined) return management;
     if (message.type.startsWith("chat.")) return true; // ChatSession resolves private Chat authority.
     const bot = allowsBotInbound(message, this.authorization, this.admittedProjectCreations);
@@ -787,6 +799,65 @@ export class ManagedResourceAuthorizer {
     }
     if (checks.length === 0) return true;
     return (await Promise.all(checks)).every(Boolean);
+  }
+
+  /**
+   * Requests whose Project is named inside them rather than by a top-level id: schedules (in the
+   * target or the stored schedule) and workspace management.
+   */
+  private async allowsManagementInbound(
+    message: SessionInboundMessage,
+  ): Promise<boolean | undefined> {
+    return (
+      (await allowsScheduleInbound(message, this.scheduleAccess())) ??
+      (await this.allowsWorkspaceManagementInbound(message))
+    );
+  }
+
+  /** The schedules of Projects where this session holds `schedule.manage`; all of them when unrestricted. */
+  async filterSchedules<T extends StoredSchedule>(schedules: readonly T[]): Promise<T[]> {
+    if (!this.isRestricted()) return [...schedules];
+    await this.ready();
+    return filterVisibleSchedules(schedules, this.scheduleAccess());
+  }
+
+  private scheduleAccess(): ScheduleAccessResolver {
+    return {
+      allowsAgent: (agentId, privilege) => this.allowsAgent(agentId, privilege),
+      allowsCwd: (cwd, privilege) => this.allowsCwd(cwd, privilege),
+      allowsWorkspace: (workspaceId, privilege) => this.allowsWorkspace(workspaceId, privilege),
+      allowsChatSend: this.allowsChatSend,
+      allowsLaunch: (config) => this.allowsScheduleLaunch(config),
+      findSchedule: this.findSchedule,
+    };
+  }
+
+  /**
+   * A `new-agent` schedule launches what `create_agent` would let this session launch, and no
+   * more: the run is unattended, so no approval stands between it and the configuration. Raw
+   * launch fields the schedule form never sets are refused outright.
+   */
+  private async allowsScheduleLaunch(config: NewAgentScheduleConfig): Promise<boolean> {
+    if (config.mcpServers || config.systemPrompt !== undefined || config.providerOptions) {
+      return false;
+    }
+    const workspace = config.workspaceId
+      ? (this.workspaces.get(config.workspaceId) ??
+        (await this.workspaceRegistry.get(config.workspaceId)))
+      : null;
+    const projectId = workspace ? workspace.projectId : await this.projectIdForCwd(config.cwd);
+    if (!projectId) return false;
+    // Without a mode the run takes the provider's unattended one, which needs every approval.
+    const grant = this.authorization.project(projectId);
+    if (!config.modeId && !(grant && hasEveryApprovalPrivilege(grant.privileges))) return false;
+    return this.allowsAgentConfigurationForProject(projectId, config.workspaceId, {
+      provider: config.provider,
+      cwd: config.cwd,
+      ...(config.modeId ? { modeId: config.modeId } : {}),
+      ...(config.model ? { model: config.model } : {}),
+      ...(config.thinkingOptionId ? { thinkingOptionId: config.thinkingOptionId } : {}),
+      ...(config.featureValues ? { featureValues: config.featureValues } : {}),
+    });
   }
 
   /** Session-file downloads are agent-scoped; every other workspace-file op is rooted at a cwd. */

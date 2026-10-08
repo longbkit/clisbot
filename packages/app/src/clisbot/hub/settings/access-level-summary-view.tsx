@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -38,6 +39,7 @@ export function AccessLevelSummary({
   subjectKind: SubjectKind | undefined;
   qrLogin: boolean;
 }) {
+  const { t } = useTranslation();
   if (privileges.length === 0) return null;
   const summary = summarizeAccess({ privileges, resourceKind, subjectKind, qrLogin });
   const changes =
@@ -46,17 +48,17 @@ export function AccessLevelSummary({
       : accessChanges({ before: savedPrivileges, after: privileges, resourceKind });
   const details = [
     effectLines(null, summary.allows),
-    effectLines("Not included", summary.withholds),
-    effectLines("Saving adds", changes?.added ?? []),
-    effectLines("Saving removes", changes?.removed ?? []),
+    effectLines(t("hub.access.summary.notIncluded"), summary.withholds),
+    effectLines(t("hub.access.summary.savingAdds"), changes?.added ?? []),
+    effectLines(t("hub.access.summary.savingRemoves"), changes?.removed ?? []),
   ].filter((section): section is string => section !== null);
   return (
     <View style={styles.container} testID="access-level-summary">
-      <Alert title="This access allows" description={details.join("\n\n")} />
+      <Alert title={t("hub.access.summary.allowsTitle")} description={details.join("\n\n")} />
       {summary.cautions.length > 0 ? (
         <Alert
           variant="warning"
-          title="Before you grant"
+          title={t("hub.access.summary.beforeYouGrant")}
           description={effectLines(null, summary.cautions) ?? undefined}
         />
       ) : null}

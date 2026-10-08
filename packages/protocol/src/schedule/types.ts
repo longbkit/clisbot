@@ -21,6 +21,12 @@ export const ScheduleTargetSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("agent"),
     agentId: z.guid(),
+    // The Chat this Bot session belongs to: each run is posted there as a line and the Chat
+    // delivers it, so the run and the reply show in the transcript and follow its turn rules.
+    chatId: z.string().trim().min(1).optional(),
+    // A group Chat: the Bots each run tags, so only they answer. Unset tags the Bot whose
+    // session this is. Ignored without `chatId`.
+    mentionBotIds: z.array(z.string().trim().min(1)).optional(),
   }),
   z.object({
     type: z.literal("new-agent"),
@@ -32,6 +38,9 @@ export const ScheduleTargetSchema = z.discriminatedUnion("type", [
       thinkingOptionId: z.string().trim().min(1).optional(),
       archiveOnFinish: z.boolean().optional(),
       isolation: z.enum(["local", "worktree"]).optional(),
+      // Run each session in this existing workspace instead of creating one;
+      // isolation is ignored and the workspace is never archived by a run.
+      workspaceId: z.string().trim().min(1).optional(),
       title: z.string().trim().min(1).nullable().optional(),
       providerOptions: z.record(z.string(), z.json()).optional(),
       featureValues: z.record(z.string(), z.unknown()).optional(),
@@ -75,6 +84,9 @@ export type StoredSchedule = z.infer<typeof StoredScheduleSchema>;
 
 export const ScheduleSummarySchema = StoredScheduleSchema.omit({
   runs: true,
+}).extend({
+  /** Finished runs, for "run 3 of 10" in a list that does not carry the runs themselves. */
+  runCount: z.number().int().nonnegative().optional(),
 });
 export type ScheduleSummary = z.infer<typeof ScheduleSummarySchema>;
 
@@ -96,6 +108,7 @@ export interface UpdateScheduleNewAgentConfig {
   archiveOnFinish?: boolean;
   isolation?: "local" | "worktree";
   cwd?: string;
+  workspaceId?: string | null;
 }
 
 export interface UpdateScheduleInput {

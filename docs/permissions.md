@@ -28,7 +28,7 @@ A pairing invitation is neither. It is an expiring, single-use exchange that cre
 | `workspace.read`    | Projects, workspaces, agents, timelines, files, diffs, and terminal output |
 | `workspace.write`   | Prompts, agent control, files, terminals, git operations, and scripts      |
 | `workspace.manage`  | Create, rename, archive, and remove projects and workspaces                |
-| `automation.manage` | Schedules, heartbeats, and loops                                           |
+| `automation.manage` | Schedules and heartbeats                                                   |
 | `hub.execute`       | Agent lifecycle, workspace titling, observation, and recovery              |
 
 Connecting a daemon to a Hub asks for `hub.execute`, `daemon.read`, `workspace.read`,
@@ -46,6 +46,45 @@ Owner, operator, and viewer are UI presets expanded into explicit permissions. D
 Permissions are additive allows. Missing authority denies the operation. Do not add deny precedence.
 
 ## Resources
+
+### Daemon permissions and Project privileges
+
+A Managed Access session passes two lists. Read every name against the list it
+belongs to.
+
+|            | Daemon permissions                                                        | Project privileges                                                                   |
+| ---------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Defined in | `DAEMON_PERMISSIONS` (`packages/protocol/src/messages.ts`), from upstream | `PROJECT_PRIVILEGES` (`packages/protocol/src/managed-access-privileges.ts`), Clisbot |
+| Held by    | One connection, daemon-wide                                               | One Project, through a Hub grant                                                     |
+| Checked    | By the daemon first (`authorization/operation-permissions.ts`)            | By the Hub when granting; by the daemon on the resource the operation names          |
+| Examples   | `workspace.write`, `automation.manage`, `hub.execute`                     | `terminal.use`, `agent.create`, `approval.other`                                     |
+
+Project privileges are the Project subset of the Hub's privileges
+(`ACCESS_PRIVILEGES`, `hub/src/access/contract.ts`). The Hub and the daemon
+import the same list, so `terminal.use` is one check on both sides, not a
+translation. The access ticket's lease carries the session's daemon permissions
+and each Project's privileges (`hub/src/access/store.ts`), and an operation must
+pass both gates (`REQUIRED_PRIVILEGE_BY_OPERATION` maps the second).
+
+Terminal RPCs need only `workspace.write` at the first gate, which every Member
+session holds, so `terminal.use` alone decides. When the first gate needs a
+permission a Member session does not hold, the Hub adds that permission once any
+Project holds the matching privilege, and the daemon narrows each request back to
+those Projects. `workspace.manage` works this way.
+
+`workspace.manage` is in both lists, and `daemon.manage` is also the Hub's
+Administrator privilege. Say which list you mean. A new Project privilege takes a
+product name and never reuses a daemon permission name.
+
+`schedule.manage` follows the `workspace.manage` shape. Every Project level carries
+it as a preset the grant can switch off. The lease adds `automation.manage` once
+any Project holds it, and the daemon narrows each `schedule/*` request to the
+schedule's Project (the session a heartbeat runs in, the folder or workspace a
+schedule runs in) and refuses the `loop/*` stubs to such a session
+(`managed-access/schedule-access.ts`;
+[decision](audits/2026-10-06-conversation-schedules.md#managed-access-schedulemanage)).
+
+### Managed Access resources
 
 The base semantic permissions are daemon-wide. Clisbot Managed Access additionally enforces
 Project grants on requests and outbound observations; see the
@@ -136,11 +175,14 @@ unattended modes, `toolPolicy.preapproved`, and auto-accept delegation until an
 operator re-saves it — re-selecting its access level is enough. Nothing warns
 about this, so check assignments that relied on unattended execution.
 
-Update every daemon before re-saving. A daemon rejects an access ticket carrying
-a Project privilege it does not know, so a re-saved assignment locks its subject
-out of any daemon that predates `approval.other`.
+A daemon drops a Project privilege it does not know, so a ticket from a newer Hub
+grants it less, never more. Daemons that send the `x-clisbot-project-privileges`
+header also never receive one they lack: the Hub leaves it out, with any session
+permission it brings (`hub/src/managed-access/daemon-privileges.ts`). A daemon
+that predates both rejects the whole ticket, so update daemons before re-saving
+an assignment that gains a privilege.
 
-`developer` and `full_access` carry every approval leaf; `full_access` differs by `workspace.manage` alone.
+`developer` and `full_access` carry every approval leaf; `full_access` adds `workspace.manage`, `terminal.use` and Can share.
 
 Future base grants may select workspaces or agents, but operation classification remains inside the authorization module:
 

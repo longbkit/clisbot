@@ -19,6 +19,7 @@ export { MenuSubTrigger } from "./menu-sub";
 export {
   MenuHint,
   MenuItem,
+  MenuItemAction,
   MenuLabel,
   MenuSeparator,
   MenuTextField,

@@ -2314,7 +2314,9 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(workspaceLabels): added in v0.5.0, remove after 2027-08-14.
         ...(this.workspaceLabelService ? { workspaceLabels: true } : {}),
         // COMPAT(bots): Clisbot Bots, added in v0.9.2-fusion; remove the gate after 2027-03-31.
-        ...(this.botService ? { bots: true } : {}),
+        // COMPAT(botTemplatePreview): a bot from an existing Project; added in v0.10.3-fusion,
+        // remove the gate after 2027-04-08.
+        ...(this.botService ? { bots: true, botTemplatePreview: true } : {}),
         // COMPAT(connectors): Clisbot Connectors, added in v0.10.2-fusion; remove the gate after 2027-06-30.
         ...(this.connectorService ? { connectors: true } : {}),
         // COMPAT(chatTools): a Chat's tools off list, added in v0.10.2-fusion; remove the gate after 2027-06-30.
@@ -2469,8 +2471,20 @@ export class VoiceAssistantWebSocketServer {
         agentProfiles: true,
         // COMPAT(agentConfigApply): added in v0.3.2, remove gate after 2027-02-11.
         agentConfigApply: true,
+        ...this.clisbotScheduleFeatures(),
       },
     };
+  }
+
+  private clisbotScheduleFeatures() {
+    return {
+      // COMPAT(scheduleExistingWorkspace): added in v0.10.3, remove gate after 2027-04-07.
+      // A `new-agent` schedule may run each session in an existing workspace.
+      scheduleExistingWorkspace: true,
+      // COMPAT(scheduleChatDelivery): added in v0.10.3, remove gate after 2027-04-07.
+      // A heartbeat on a Bot session may run through its Chat (`target.chatId`); only with Chats.
+      ...(this.chatService ? { scheduleChatDelivery: true } : {}),
+    } as const;
   }
 
   private createServerInfoMessage(

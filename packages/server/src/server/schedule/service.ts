@@ -17,6 +17,13 @@ import { type BoundCreateAgentCommand, formatProviderModel } from "../agent/crea
 import type { PersistedWorkspaceRecord } from "../workspace-registry.js";
 import type { CreateClisbotWorktreeWorkflowResult } from "../worktree-session.js";
 import { ScheduleStore } from "./store.js";
+import {
+  chatHeartbeatBotId,
+  chatHeartbeatPost,
+  isChatScheduleTarget,
+  type ChatScheduleTarget,
+  type ScheduleChats,
+} from "./chat-delivery.js";
 import { computeNextRunAt, validateScheduleCadence } from "./cron.js";
 import type {
   CreateScheduleInput,
@@ -28,6 +35,8 @@ import type {
   UpdateScheduleNewAgentConfig,
 } from "@clisbot/protocol/schedule/types";
 import type { FirstAgentContext } from "@clisbot/protocol/messages";
+import { formatHeartbeatRunNotice } from "@clisbot/protocol/schedule/heartbeat-notice";
+import { CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 
 const SCHEDULE_TICK_INTERVAL_MS = 1000;
 
@@ -39,6 +48,22 @@ export class ScheduleTargetGoneError extends Error {
     super(message);
     this.name = "ScheduleTargetGoneError";
   }
+}
+
+/**
+ * An agent re-registering its heartbeat by name sends a plain target; a Chat delivery set on the
+ * same session stays, so the heartbeat keeps reaching the Chat.
+ */
+function keepChatDelivery(current: ScheduleTarget, next: ScheduleTarget): ScheduleTarget {
+  if (current.type !== "agent" || next.type !== "agent" || current.agentId !== next.agentId) {
+    return next;
+  }
+  if (next.chatId !== undefined || current.chatId === undefined) return next;
+  return {
+    ...next,
+    chatId: current.chatId,
+    ...(current.mentionBotIds ? { mentionBotIds: current.mentionBotIds } : {}),
+  };
 }
 
 function trimOptionalName(value: string | null | undefined): string | null {
@@ -113,6 +138,14 @@ function applyNewAgentConfig(
   if (patch.isolation !== undefined) {
     config.isolation = patch.isolation;
   }
+  if (patch.workspaceId !== undefined) {
+    const trimmed = patch.workspaceId?.trim();
+    if (trimmed) {
+      config.workspaceId = trimmed;
+    } else {
+      delete config.workspaceId;
+    }
+  }
   return { ...target, config };
 }
 
@@ -126,6 +159,18 @@ function normalizeMaxRuns(value: number | null | undefined): number | null {
   return value;
 }
 
+/** A schedule's name, else the first line of its prompt. */
+function scheduleTitle(schedule: StoredSchedule): string {
+  const name = schedule.name?.trim();
+  if (name) return name;
+  return (
+    schedule.prompt
+      .split("\n")
+      .find((line) => line.trim())
+      ?.trim() ?? schedule.id
+  );
+}
+
 function countCompletedRuns(schedule: StoredSchedule): number {
   return schedule.runs.filter((run) => run.status !== "running").length;
 }
@@ -133,7 +178,12 @@ function countCompletedRuns(schedule: StoredSchedule): number {
 function shouldArchiveScheduleRunWorkspace(input: {
   agentId: string | null;
   archiveOnFinish?: boolean;
+  existingWorkspace?: boolean;
 }): boolean {
+  // A run never archives a workspace it did not create.
+  if (input.existingWorkspace) {
+    return false;
+  }
   return input.agentId === null || (input.archiveOnFinish ?? true);
 }
 
@@ -218,6 +268,7 @@ type ScheduleAgentManager = Pick<
     | "runAgent"
     | "waitForAgentEvent"
     | "waitForAgentClose"
+    | "appendTimelineItem"
   >;
 
 interface ScheduleWorkspaceCreateInput {
@@ -238,6 +289,8 @@ export interface ScheduleServiceOptions {
     input: ScheduleWorkspaceCreateInput,
   ) => Promise<CreateClisbotWorktreeWorkflowResult>;
   archiveWorkspace: (workspaceId: string) => Promise<void>;
+  /** Looks up an existing workspace a `new-agent` schedule runs in (`config.workspaceId`). */
+  findWorkspace?: (workspaceId: string) => Promise<PersistedWorkspaceRecord | null>;
   now?: () => Date;
   runner?: (schedule: StoredSchedule, runId: string) => Promise<ScheduleExecutionResult>;
 }
@@ -255,12 +308,14 @@ export class ScheduleService {
     input: ScheduleWorkspaceCreateInput,
   ) => Promise<CreateClisbotWorktreeWorkflowResult>;
   private readonly archiveWorkspace: (workspaceId: string) => Promise<void>;
+  private readonly findWorkspace: (workspaceId: string) => Promise<PersistedWorkspaceRecord | null>;
   private readonly now: () => Date;
   private readonly runner: (
     schedule: StoredSchedule,
     runId: string,
   ) => Promise<ScheduleExecutionResult>;
   private readonly runningScheduleIds = new Set<string>();
+  private chats: ScheduleChats | null = null;
   private tickTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: ScheduleServiceOptions) {
@@ -272,8 +327,14 @@ export class ScheduleService {
     this.createDirectoryWorkspace = options.createDirectoryWorkspace;
     this.createClisbotWorktreeWorkspace = options.createClisbotWorktreeWorkspace;
     this.archiveWorkspace = options.archiveWorkspace;
+    this.findWorkspace = options.findWorkspace ?? (async () => null);
     this.now = options.now ?? (() => new Date());
-    this.runner = options.runner ?? ((schedule, runId) => this.executeSchedule(schedule, runId));
+    this.runner =
+      options.runner ??
+      ((schedule, runId) =>
+        isChatScheduleTarget(schedule.target)
+          ? this.executeChatRun(schedule, schedule.target, runId)
+          : this.executeSchedule(schedule, runId));
   }
 
   async start(): Promise<void> {
@@ -301,6 +362,7 @@ export class ScheduleService {
   async create(input: CreateScheduleInput): Promise<StoredSchedule> {
     const prompt = normalizePrompt(input.prompt);
     validateScheduleCadence(input.cadence);
+    await this.assertChatTarget(input.target);
     return this.createScheduleRecord(input, {
       name: trimOptionalName(input.name),
       prompt,
@@ -350,6 +412,7 @@ export class ScheduleService {
       return this.createScheduleRecord(input, { name, prompt, target: input.target });
     }
 
+    await this.assertChatTarget(input.target);
     const inputTarget = input.target;
     return this.store.upsertByNameAndTarget(name, inputTarget, {
       create: async () => {
@@ -365,7 +428,7 @@ export class ScheduleService {
           name,
           prompt,
           cadence,
-          target: inputTarget,
+          target: keepChatDelivery(current.target, inputTarget),
           status: "active",
           pausedAt: null,
           nextRunAt: nextRunAt.toISOString(),
@@ -377,8 +440,35 @@ export class ScheduleService {
     });
   }
 
+  /**
+   * Where an agent's own heartbeat runs: through its Chat when it is a Bot session in one, so the
+   * reply lands in the transcript instead of a session the Chat does not read.
+   */
+  async heartbeatTargetFor(agentId: string): Promise<ScheduleTarget> {
+    const chatId = this.chats
+      ? (await this.agentStorage.get(agentId))?.labels[CHAT_ID_LABEL]
+      : undefined;
+    return chatId ? { type: "agent", agentId, chatId } : { type: "agent", agentId };
+  }
+
+  /** A `chatId` names this Bot session's own Chat, on a host whose Chats run. */
+  private async assertChatTarget(target: ScheduleTarget): Promise<void> {
+    if (!isChatScheduleTarget(target)) return;
+    if (!this.chats) throw new Error("Chats are not running on this host");
+    await chatHeartbeatBotId(target, this.agentStorage);
+  }
+
+  /** Lets heartbeats with a `chatId` run through their Chat; unset while chats are off. */
+  attachChats(chats: ScheduleChats | undefined): void {
+    this.chats = chats ?? null;
+  }
+
   async list(): Promise<StoredSchedule[]> {
     return this.store.list();
+  }
+
+  async find(id: string): Promise<StoredSchedule | null> {
+    return this.store.get(id);
   }
 
   async inspect(id: string): Promise<StoredSchedule> {
@@ -483,13 +573,45 @@ export class ScheduleService {
     await this.store.delete(id);
   }
 
-  async completeForAgent(agentId: string): Promise<number> {
-    const now = this.now();
+  /**
+   * Points every unfinished heartbeat of `fromAgentId` at `toAgentId`. A Chat calls this when a
+   * Bot's fresh session replaces the old one, so its heartbeats keep reporting into the Chat.
+   */
+  async retargetAgent(fromAgentId: string, toAgentId: string): Promise<number> {
+    if (fromAgentId === toAgentId) {
+      return 0;
+    }
     const schedules = await this.store.list();
     const matches = schedules.filter(
       (schedule) =>
         schedule.target.type === "agent" &&
+        schedule.target.agentId === fromAgentId &&
+        schedule.status !== "completed",
+    );
+    for (const match of matches) {
+      await this.store.update(match.id, (schedule) =>
+        schedule.target.type === "agent" && schedule.target.agentId === fromAgentId
+          ? {
+              ...schedule,
+              target: { ...schedule.target, agentId: toAgentId },
+              updatedAt: this.now().toISOString(),
+            }
+          : schedule,
+      );
+    }
+    return matches.length;
+  }
+
+  async completeForAgent(agentId: string): Promise<number> {
+    const now = this.now();
+    const schedules = await this.store.list();
+    // A heartbeat through its Chat follows the Bot, not this session: the Chat starts the next
+    // session and `retargetAgent` moves it there.
+    const matches = schedules.filter(
+      (schedule) =>
+        schedule.target.type === "agent" &&
         schedule.target.agentId === agentId &&
+        !isChatScheduleTarget(schedule.target) &&
         schedule.status !== "completed",
     );
     const results = await Promise.allSettled(
@@ -563,6 +685,10 @@ export class ScheduleService {
       if (new Date(schedule.nextRunAt).getTime() > now.getTime()) {
         continue;
       }
+      // Chats start after this service; a due Chat run waits for them instead of failing.
+      if (isChatScheduleTarget(schedule.target) && !this.chats) {
+        continue;
+      }
       await this.runSchedule(schedule, now);
     }
   }
@@ -609,6 +735,7 @@ export class ScheduleService {
           shouldArchiveScheduleRunWorkspace({
             agentId: runningRun.agentId,
             archiveOnFinish: updated.target.config.archiveOnFinish,
+            existingWorkspace: updated.target.config.workspaceId !== undefined,
           })
         ) {
           interruptedWorkspaces.push({
@@ -855,6 +982,7 @@ export class ScheduleService {
       if (this.agentManager.hasInFlightRun(agent.id)) {
         throw new Error(`Agent ${agent.id} already has an active run`);
       }
+      await this.markHeartbeatRun(schedule, agent.id);
       await startAgentRun(this.agentManager, agent.id, wrappedPrompt, this.logger, {
         replaceRunning: true,
         activeTurnBehavior: "steer",
@@ -882,11 +1010,10 @@ export class ScheduleService {
     if (!config) {
       throw new Error(`Schedule ${schedule.id} target changed during execution`);
     }
-    await this.assertNewAgentCwdDirectory(config.cwd);
     let workspace: PersistedWorkspaceRecord | null = null;
     let agentId: string | null = null;
     try {
-      workspace = await this.createScheduleRunWorkspace(config, schedule.prompt);
+      workspace = await this.resolveRunWorkspace(config, schedule.prompt);
       await this.recordRunWorkspace({
         scheduleId: schedule.id,
         runId,
@@ -949,7 +1076,11 @@ export class ScheduleService {
     } finally {
       if (
         workspace &&
-        shouldArchiveScheduleRunWorkspace({ agentId, archiveOnFinish: config.archiveOnFinish })
+        shouldArchiveScheduleRunWorkspace({
+          agentId,
+          archiveOnFinish: config.archiveOnFinish,
+          existingWorkspace: config.workspaceId !== undefined,
+        })
       ) {
         try {
           await this.archiveWorkspace(workspace.workspaceId);
@@ -967,6 +1098,80 @@ export class ScheduleService {
         }
       }
     }
+  }
+
+  /** Posts the run into the Chat; the Chat prompts the Bot's current session and keeps the reply. */
+  private async executeChatRun(
+    schedule: StoredSchedule,
+    target: ChatScheduleTarget,
+    runId: string,
+  ): Promise<ScheduleExecutionResult> {
+    if (!this.chats) throw new Error("Chats are not running on this host");
+    // An archived session is fine: the Chat delivers to the Bot's current one.
+    if (!(await this.agentStorage.get(target.agentId))) {
+      throw new ScheduleTargetGoneError(`Agent ${target.agentId} is gone`);
+    }
+    const botId = await chatHeartbeatBotId(target, this.agentStorage);
+    const title = scheduleTitle(schedule);
+    const result = await this.chats.postScheduled(
+      chatHeartbeatPost({
+        schedule,
+        target,
+        botId,
+        runId,
+        run: countCompletedRuns(schedule) + 1,
+        title,
+      }),
+    );
+    if (result.status === "gone") throw new ScheduleTargetGoneError(result.reason);
+    return { agentId: result.agentId ?? target.agentId, output: null };
+  }
+
+  /**
+   * The session's timeline gets a line before each heartbeat run, so its reply reads as a run and
+   * not as the agent talking on its own. A failed write never stops the run.
+   */
+  private async markHeartbeatRun(schedule: StoredSchedule, agentId: string): Promise<void> {
+    const notice = formatHeartbeatRunNotice({
+      title: scheduleTitle(schedule),
+      run: countCompletedRuns(schedule) + 1,
+      maxRuns: schedule.maxRuns,
+    });
+    try {
+      await this.agentManager.appendTimelineItem(agentId, {
+        type: "notification",
+        level: "info",
+        message: notice,
+      });
+    } catch (error) {
+      this.logger.warn({ err: error, agentId, scheduleId: schedule.id }, "heartbeat.notice_failed");
+    }
+  }
+
+  /** The workspace a `new-agent` run uses: the configured existing one, or a fresh one. */
+  private async resolveRunWorkspace(
+    config: Extract<ScheduleTarget, { type: "new-agent" }>["config"],
+    prompt: string,
+  ): Promise<PersistedWorkspaceRecord> {
+    if (config.workspaceId) {
+      return this.resolveExistingRunWorkspace(config.workspaceId);
+    }
+    await this.assertNewAgentCwdDirectory(config.cwd);
+    return this.createScheduleRunWorkspace(config, prompt);
+  }
+
+  private async resolveExistingRunWorkspace(
+    workspaceId: string,
+  ): Promise<PersistedWorkspaceRecord> {
+    const workspace = await this.findWorkspace(workspaceId);
+    if (!workspace) {
+      throw new ScheduleTargetGoneError(`Workspace ${workspaceId} no longer exists`);
+    }
+    if (workspace.archivedAt) {
+      throw new ScheduleTargetGoneError(`Workspace ${workspaceId} is archived`);
+    }
+    await this.assertNewAgentCwdDirectory(workspace.cwd);
+    return workspace;
   }
 
   private async createScheduleRunWorkspace(

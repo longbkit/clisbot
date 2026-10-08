@@ -20,6 +20,8 @@ export type ChatRenderRow =
   | { kind: "user"; key: string; line: ChatMessage; opensGroup: boolean }
   | { kind: "bot"; key: string; line: ChatMessage; botId: string; opensGroup: boolean }
   | { kind: "system"; key: string; line: ChatMessage }
+  /** A heartbeat run posted into the chat: a marker, not a message from the user. */
+  | { kind: "heartbeat"; key: string; line: ChatMessage; label: string }
   | {
       kind: "live";
       key: string;
@@ -41,7 +43,7 @@ export interface ChatRenderModel {
 export function chatRowSender(row: ChatRenderRow | undefined): string | null {
   if (!row) return null;
   if (row.kind === "user") return "user";
-  if (row.kind === "system") return null;
+  if (row.kind === "system" || row.kind === "heartbeat") return null;
   return `bot:${row.botId}`;
 }
 
@@ -50,11 +52,26 @@ const senderOf = chatRowSender;
 function transcriptRow(line: ChatMessage, previous: ChatRenderRow | undefined): ChatRenderRow {
   const key = `line:${line.id}`;
   if (line.sender.kind === "system") return { kind: "system", key, line };
+  // Only the daemon sets `scheduleRun`; a sender name alone could be any user's.
+  if (line.scheduleRun && line.sender.kind === "user") {
+    return { kind: "heartbeat", key, line, label: line.sender.displayName ?? "" };
+  }
   if (line.sender.kind === "user") {
     return { kind: "user", key, line, opensGroup: senderOf(previous) !== "user" };
   }
   const botId = line.sender.botId;
-  return { kind: "bot", key, line, botId, opensGroup: senderOf(previous) !== `bot:${botId}` };
+  return { kind: "bot", key, line, botId, opensGroup: opensBotGroup(line, botId, previous) };
+}
+
+/**
+ * A bot line joins the line above when the same bot wrote both in one turn. A later turn with no
+ * prompt between, such as a heartbeat run in a session, starts its own group with the face.
+ */
+function opensBotGroup(line: ChatMessage, botId: string, previous: ChatRenderRow | undefined) {
+  if (senderOf(previous) !== `bot:${botId}`) return true;
+  const turn = line.reply?.turnId;
+  const previousTurn = previous?.kind === "bot" ? previous.line.reply?.turnId : undefined;
+  return turn !== undefined && previousTurn !== undefined && turn !== previousTurn;
 }
 
 /** The bot's lines that came out of this agent, newest last. */

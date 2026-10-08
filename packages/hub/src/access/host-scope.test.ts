@@ -388,6 +388,17 @@ it("puts workspace.manage in the ticket only for Full access, and marks it Host-
     );
     const developer = await resolve();
     expect(developer?.permissions).not.toContain("workspace.manage");
+    // Schedules ride every level: the daemon's first gate opens, and it narrows to these Projects.
+    expect(developer?.permissions).toContain("automation.manage");
+    expect(
+      developer?.projects.every(({ privileges }) => privileges.includes("schedule.manage")),
+    ).toBe(true);
+    const withoutSchedules = RESOURCE_ACCESS_LEVELS.daemon.developer.filter(
+      (privilege) => privilege !== "schedule.manage",
+    );
+    await grant("daemon", TEST_DAEMON_ID, withoutSchedules);
+    expect((await resolve())?.permissions).not.toContain("automation.manage");
+    await grant("daemon", TEST_DAEMON_ID, RESOURCE_ACCESS_LEVELS.daemon.developer);
     expect(developer?.daemonPrivileges).not.toContain("workspace.manage");
     expect(RESOURCE_ACCESS_LEVELS.project.developer).not.toContain("workspace.manage");
     expect(projectB).toBeDefined();

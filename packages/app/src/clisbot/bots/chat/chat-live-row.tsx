@@ -6,6 +6,7 @@ import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { AssistantMessage, Notification, ToolCall } from "@/components/message";
 import type { StreamItem } from "@/types/stream";
 import { RunningTurnFooter } from "@/agent-stream/turn-footer";
+import { ACTOR_AVATAR_SIZE } from "@/clisbot/session-storage/actor-metrics";
 import { BotFace } from "./bot-face";
 import type { ChatBotIdentity } from "./chat-rows";
 import type { ChatRenderRow } from "./render-model";
@@ -85,7 +86,9 @@ export const ChatLiveRow = memo(function ChatLiveRow({
 }) {
   const client = useHostRuntimeClient(serverId);
   const face = useMemo(
-    () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
+    () => (
+      <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} size={ACTOR_AVATAR_SIZE} />
+    ),
     [bot.avatar, bot.botId, bot.name],
   );
   const showWorking = row.inProgress && row.permissions.length === 0;

@@ -21,6 +21,7 @@ export const ACCESS_PRIVILEGES = [
   "agent.fast.use",
   "terminal.use",
   "terminal.profile.use",
+  "schedule.manage",
   "approval.file",
   "approval.config",
   "approval.command",
@@ -186,11 +187,16 @@ export const AccessAssignmentBatchInputSchema = z
   .strict();
 export type AccessAssignmentBatchInput = z.infer<typeof AccessAssignmentBatchInputSchema>;
 
-/** Read-only Agent work: no shell, no Workspace creation, no risky approvals. */
+/**
+ * Read-only Agent work: no shell, no Workspace creation, no risky approvals. Every level carries
+ * Schedules (`schedule.manage`) as a preset the grant can switch off
+ * (docs/audits/2026-10-06-conversation-schedules.md).
+ */
 const OFFICE_WORKER_PROJECT_PRIVILEGES = [
   "project.use",
   "agent.interact",
   "agent.create",
+  "schedule.manage",
   "approval.file",
 ] as const satisfies readonly AccessPrivilege[];
 
@@ -201,6 +207,7 @@ const DEVELOPER_PROJECT_PRIVILEGES = [
   "agent.interact",
   "agent.create",
   "terminal.profile.use",
+  "schedule.manage",
   "approval.file",
   "approval.config",
   "approval.command",

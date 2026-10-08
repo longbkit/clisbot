@@ -369,6 +369,77 @@ describe("ChatEngine", () => {
     expect(h.sent).toHaveLength(1);
   });
 
+  test("a heartbeat run reaches only the Bots it was set to tag, whatever its text says", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
+    const heartbeat = {
+      kind: "automation" as const,
+      id: "sch_1",
+      displayName: "Heartbeat · Standup",
+    };
+    const post = (text: string, messageId: string, mentionBotIds?: string[]) =>
+      h.engine.postScheduled({
+        chatId: "cht_1",
+        botId: beta.id,
+        text,
+        messageId,
+        actor: heartbeat,
+        scheduleRun: { scheduleId: "sch_1", run: 1 },
+        ...(mentionBotIds ? { mentionBotIds } : {}),
+      });
+    // Its own Bot when nothing was chosen, even if the prompt tags another one.
+    expect(await post("@alpha standup", "schedule-sch_1-r1")).toEqual({
+      status: "posted",
+      agentId: null,
+    });
+    expect(await post("@alpha standup", "schedule-sch_1-r1")).toEqual({
+      status: "posted",
+      agentId: null,
+    });
+    await h.engine.idle();
+    expect(await h.lines("cht_1")).toHaveLength(1);
+    expect(h.appended[0]).toMatchObject({
+      text: "@beta @alpha standup",
+      deliveryBotIds: [beta.id],
+      scheduleRun: { scheduleId: "sch_1", run: 1 },
+    });
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_b-1"]);
+
+    // Several chosen Bots are tagged and answer one at a time, as an addressed user line.
+    await post("standup", "schedule-sch_1-r2", [alpha.id, beta.id]);
+    await h.engine.idle();
+    expect(h.appended[1]).toMatchObject({
+      text: "@alpha @beta standup",
+      deliveryBotIds: [alpha.id, beta.id],
+    });
+
+    await h.engine.removeParticipant("cht_1", beta.id);
+    expect(await post("standup", "schedule-sch_1-r3")).toEqual({
+      status: "gone",
+      reason: "The Bot left the Chat",
+    });
+  });
+
+  test("a heartbeat run over the chat's input limit is refused like a user line", async () => {
+    const h = await harness();
+    await h.store.create({
+      id: "cht_1",
+      botIds: [alpha.id],
+      rules: { limits: { maxInputCharacters: 5 } },
+    });
+    await expect(
+      h.engine.postScheduled({
+        chatId: "cht_1",
+        botId: alpha.id,
+        text: "far too long",
+        messageId: "schedule-sch_1-r1",
+        actor: { kind: "automation", id: "sch_1" },
+        scheduleRun: { scheduleId: "sch_1", run: 1 },
+      }),
+    ).rejects.toThrow("at most 5");
+    expect(await h.lines("cht_1")).toHaveLength(0);
+  });
+
   test("a failed turn and a delivery failure each leave a system line and the room moves on", async () => {
     const h = await harness({ failPromptFor: ["agent-bot_b-2"] });
     await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });

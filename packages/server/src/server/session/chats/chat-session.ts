@@ -59,6 +59,15 @@ export class ChatSession {
       return projectId !== undefined && this.authority.allowsProject(projectId, "project.use");
     });
   }
+  /** May post in the Chat: it is theirs and they may talk to every Bot in it (`requireRun`). */
+  allowsSend(chatId: string): boolean {
+    const chat = this.service.record(chatId);
+    if (!chat || !this.allows(chatId)) return false;
+    return chat.participants.every(({ botId }) => {
+      const projectId = this.projects.get(botId);
+      return projectId !== undefined && this.authority.allowsProject(projectId, "agent.interact");
+    });
+  }
   private async requireBot(botId: string): Promise<void> {
     const bot = await this.bots.get(botId);
     if (!bot || bot.archivedAt || !this.authority.allowsProject(bot.projectId, "project.use"))

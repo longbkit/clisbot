@@ -164,6 +164,25 @@ and a column of icons there is decoration competing with the values you actually
   between `surface1` and `surface2`, which put it within a hair of the hover fill and made
   separators disappear against a hovered row.
 
+## Entity rows
+
+A menu that lists things rather than actions (heartbeats, sessions, paths) uses
+one row shape, so these menus read the same everywhere:
+
+- **Title, then one line of detail.** `descriptionLines={1}` keeps every row the
+  same height; a path takes `descriptionEllipsize="middle"` so both its root and
+  its leaf stay readable. Two wrapping lines make a list ragged.
+- **The row opens the thing.** An action on it that must not open it, such as
+  pause, is a `MenuItemAction` in the trailing slot; it stops the press from
+  reaching the row.
+- **Groups get a `MenuLabel` with `numberOfLines={1}`.** A group that leads
+  somewhere else, such as another session, is a row with a `›` leading icon whose
+  `onSelect` navigates.
+- **The add row comes last in its group**, with a `+` icon.
+
+The Heartbeats menu (`clisbot/heartbeats/heartbeats-menu.tsx`) and the
+workspace header's copy-path rows are the examples.
+
 ## When a decision earns a submenu
 
 Put a decision behind a submenu when its options are not the point — the current _value_ is. The

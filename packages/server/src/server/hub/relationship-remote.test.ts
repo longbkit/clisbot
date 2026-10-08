@@ -639,8 +639,13 @@ test("controller redials once after a failed upgrade without also handling its c
   expect(clock.pendingTasks()).toBe(0);
 });
 
-async function startHubReturning(status: number, body?: unknown): Promise<string> {
-  const server = createServer((_request, response) => {
+async function startHubReturning(
+  status: number,
+  body?: unknown,
+  onRequest?: (headers: import("node:http").IncomingHttpHeaders) => void,
+): Promise<string> {
+  const server = createServer((request, response) => {
+    onRequest?.(request.headers);
     if (body === undefined) response.writeHead(status).end();
     else
       response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
@@ -952,7 +957,7 @@ test("admits Terminal profiles per Project and the folder rules of creating Host
   expect(admitted.projectFolders).toEqual([{ allow: ["/workspace/**"], deny: [] }]);
 });
 
-test("admits the Host privileges it knows, ignores the rest, and stays strict per Project", async () => {
+test("admits the privileges it knows and ignores the rest, on the Host and per Project", async () => {
   const admission = {
     leaseId: "00000000-0000-4000-8000-000000000001",
     principalId: "membership",
@@ -980,17 +985,29 @@ test("admits the Host privileges it knows, ignores the rest, and stays strict pe
 
   const admitted = await consume(admission);
   expect([...(admitted.daemonPrivileges ?? [])]).toEqual(["workspace.manage"]);
+
+  // The daemon tells the Hub which Project privileges it enforces, so none it lacks is issued.
+  let declared: string | undefined;
+  await remote.consumeAccessTicket({
+    hubOrigin: await startHubReturning(200, admission, (headers) => {
+      declared = headers["x-clisbot-project-privileges"] as string | undefined;
+    }),
+    credential: "credential",
+    daemonId: "daemon-1",
+    accessTicket: "ticket",
+    clientId: "client",
+  });
+  expect(declared?.split(",")).toContain("schedule.manage");
   expect(admitted.projects.get("project-a")?.privileges.has("workspace.manage")).toBe(true);
 
   // A Hub that predates the field admits with no Host-wide privilege.
   const { daemonPrivileges: _dropped, ...older } = admission;
   expect([...((await consume(older)).daemonPrivileges ?? [])]).toEqual([]);
 
-  // An unknown Project privilege rejects the whole ticket instead of granting less.
-  await expect(
-    consume({
-      ...admission,
-      projects: [{ ...admission.projects[0], privileges: ["project.use", "a.future.privilege"] }],
-    }),
-  ).rejects.toThrow();
+  // An unknown Project privilege is dropped: privileges only add, so the ticket grants less.
+  const newer = await consume({
+    ...admission,
+    projects: [{ ...admission.projects[0], privileges: ["project.use", "a.future.privilege"] }],
+  });
+  expect([...(newer.projects.get("project-a")?.privileges ?? [])]).toEqual(["project.use"]);
 });

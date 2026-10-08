@@ -13,9 +13,11 @@ import {
   Notification,
   UserMessage,
 } from "@/components/message";
-import { botsCopy } from "../copy";
+import { i18n } from "@/i18n/i18next";
+import { ACTOR_AVATAR_SIZE } from "@/clisbot/session-storage/actor-metrics";
 import { BotFace } from "./bot-face";
 import type { ChatRenderRow } from "./render-model";
+import { HeartbeatCard } from "@/clisbot/heartbeats/heartbeat-created-card";
 
 /** What the chat needs to draw a participant; the screen builds it from the bot records. */
 export interface ChatBotIdentity {
@@ -36,7 +38,7 @@ export function botIdentity(
   bots: ReadonlyMap<string, ChatBotIdentity>,
   botId: string,
 ): ChatBotIdentity {
-  return bots.get(botId) ?? { botId, name: botsCopy.bot };
+  return bots.get(botId) ?? { botId, name: i18n.t("bots.chat.screen.botFallback") };
 }
 
 export const ChatUserRow = memo(function ChatUserRow({
@@ -77,11 +79,14 @@ export const ChatBotRow = memo(function ChatBotRow({
   bot,
   serverId,
   members = NO_MEMBERS,
+  heartbeatIds,
 }: {
   row: Extract<ChatRenderRow, { kind: "bot" }>;
   bot: ChatBotIdentity;
   serverId: string;
   members?: readonly MentionMember[];
+  /** Heartbeats this reply's turn created, shown as cards above its text. */
+  heartbeatIds?: readonly string[];
 }) {
   const client = useHostRuntimeClient(serverId);
   const message = useMemo(
@@ -94,7 +99,9 @@ export const ChatBotRow = memo(function ChatBotRow({
     [members, row.line.text],
   );
   const face = useMemo(
-    () => <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} />,
+    () => (
+      <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} size={ACTOR_AVATAR_SIZE} />
+    ),
     [bot.avatar, bot.botId, bot.name],
   );
   // Copy and time show on hover, as under a user message; touch has no hover, so they stay.
@@ -105,6 +112,9 @@ export const ChatBotRow = memo(function ChatBotRow({
   return (
     <View onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
       <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
+        {heartbeatIds?.map((id) => (
+          <HeartbeatCard key={id} serverId={serverId} scheduleId={id} />
+        ))}
         <AssistantMessage
           occurrenceKey={row.key}
           message={message}

@@ -48,6 +48,7 @@ function selection(
     accessLevel,
     canShare: true,
     terminal: false,
+    schedules: false,
     terminalProfiles: null,
     projectFolders: null,
     agentConfigurations: [],

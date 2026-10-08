@@ -27,6 +27,8 @@ interface ConversationWorkspaceProps {
   bots: readonly ChatBotIdentity[];
   group: boolean;
   headerActions?: ReactNode;
+  /** Right after the heading: the chat's ⋯ and Heartbeats, as the workspace header places its own. */
+  headingActions?: ReactNode;
   children: ReactNode;
 }
 /** Conversation layout, RPC source context, and existing panel UI have separate owners. */
@@ -38,6 +40,7 @@ export function ConversationWorkspace({
   bots,
   group,
   headerActions,
+  headingActions,
   children,
 }: ConversationWorkspaceProps) {
   const focused = useIsFocused();
@@ -61,8 +64,8 @@ export function ConversationWorkspace({
   });
   const directBot = group ? null : (bots[0] ?? null);
   const avatar = useMemo(
-    () => <ChatAvatar chatId={chatId} group={group} bot={directBot} size={24} />,
-    [chatId, group, directBot],
+    () => <ChatAvatar chatId={chatId} group={group} bot={directBot} members={bots} size={32} />,
+    [chatId, group, directBot, bots],
   );
   const selector = useMemo(
     () => (bots.length > 1 ? <ConversationBotSelector project={project} /> : null),
@@ -71,6 +74,7 @@ export function ConversationWorkspace({
   const header = () => (
     <ConversationHeader
       {...{ serverId, title, project, singlePanel, selector, headerActions, openExplorer, group }}
+      headingActions={headingActions}
       avatar={avatar}
       memberCount={bots.length}
       tabCount={state.mainTabs.length}

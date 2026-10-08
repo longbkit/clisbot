@@ -40,6 +40,9 @@ import {
   buildScheduleProjectTargets,
 } from "@/schedules/schedule-project-targets";
 import type { ScheduleSummary } from "@clisbot/protocol/schedule/types";
+import { ScheduleDetailSheet } from "@/clisbot/schedules/schedule-detail-sheet";
+import { useCanCreateSchedules } from "@/clisbot/schedules/use-schedule-detail";
+import { navigateToAgent } from "@/utils/navigate-to-agent";
 
 type FormState =
   | { mode: "closed" }
@@ -108,10 +111,29 @@ export function SchedulesScreenContent({
   }, [hosts, selectedHost]);
 
   const openCreate = useCallback(() => setForm({ mode: "create" }), []);
-  const openEdit = useCallback((schedule: AggregatedSchedule) => {
-    setForm({ mode: "edit", serverId: schedule.serverId, schedule });
-  }, []);
+  // Clisbot Managed Access: New schedule only where some host grants `schedule.manage`.
+  const canCreate = useCanCreateSchedules();
   const closeForm = useCallback(() => setForm({ mode: "closed" }), []);
+  // Clisbot: a row opens the shared detail sheet; its More settings opens the form.
+  const [detail, setDetail] = useState<{ serverId: string; scheduleId: string } | null>(null);
+  const openDetail = useCallback((schedule: AggregatedSchedule) => {
+    setDetail({ serverId: schedule.serverId, scheduleId: schedule.id });
+  }, []);
+  const closeDetail = useCallback(() => setDetail(null), []);
+  const editSettings = useCallback(
+    (schedule: ScheduleSummary) => {
+      if (!detail) return;
+      setDetail(null);
+      setForm({ mode: "edit", serverId: detail.serverId, schedule });
+    },
+    [detail],
+  );
+  const openAgent = useCallback(
+    (agentId: string) => {
+      if (detail) navigateToAgent({ serverId: detail.serverId, agentId });
+    },
+    [detail],
+  );
 
   const agentsByKey = useMemo(() => {
     const map = new Map<string, ScheduleTargetAgent>();
@@ -181,9 +203,18 @@ export function SchedulesScreenContent({
         selectedHost={selectedHost}
         onSelectHost={setSelectedHost}
         onRetry={refetch}
-        onCreate={openCreate}
-        onEdit={openEdit}
+        onCreate={canCreate ? openCreate : undefined}
+        onEdit={openDetail}
       />
+      {detail ? (
+        <ScheduleDetailSheet
+          serverId={detail.serverId}
+          scheduleId={detail.scheduleId}
+          onClose={closeDetail}
+          onOpenAgent={openAgent}
+          onEditSettings={editSettings}
+        />
+      ) : null}
       <ScheduleFormSheet
         serverId={form.mode === "edit" ? form.serverId : undefined}
         visible={form.mode === "create" || form.mode === "edit"}
@@ -221,7 +252,7 @@ function SchedulesScreenBody({
   selectedHost: string;
   onSelectHost: (serverId: string) => void;
   onRetry: () => void;
-  onCreate: () => void;
+  onCreate?: () => void;
   onEdit: (schedule: AggregatedSchedule) => void;
 }): ReactElement {
   const bodyState = resolveSchedulesScreenBodyState({ loadState, showLoadError });
@@ -287,15 +318,17 @@ function SchedulesScreenBody({
             testID="schedules-status-filter"
           />
         </View>
-        <Button
-          variant="outline"
-          leftIcon={Plus}
-          onPress={onCreate}
-          size="sm"
-          testID="schedules-new"
-        >
-          New schedule
-        </Button>
+        {onCreate ? (
+          <Button
+            variant="outline"
+            leftIcon={Plus}
+            onPress={onCreate}
+            size="sm"
+            testID="schedules-new"
+          >
+            New schedule
+          </Button>
+        ) : null}
       </View>
       <ScrollView
         style={styles.scroll}
@@ -315,7 +348,7 @@ function SchedulesEmptyState({
   onCreate,
   testID,
 }: {
-  onCreate: () => void;
+  onCreate?: () => void;
   testID?: string;
 }): ReactElement {
   return (
@@ -326,9 +359,11 @@ function SchedulesEmptyState({
         <Text style={styles.emptyDescription}>Schedules run agents on a cadence.</Text>
         <ExternalLink href="https://clisbot.com/docs/schedules" label="See docs" />
       </View>
-      <Button variant="outline" leftIcon={Plus} onPress={onCreate} testID="schedules-empty-new">
-        New schedule
-      </Button>
+      {onCreate ? (
+        <Button variant="outline" leftIcon={Plus} onPress={onCreate} testID="schedules-empty-new">
+          New schedule
+        </Button>
+      ) : null}
     </View>
   );
 }

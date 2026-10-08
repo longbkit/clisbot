@@ -69,6 +69,7 @@ Inside a running Clisbot agent, create a heartbeat for that same conversation:
 ```bash
 clisbot heartbeat create \
   --cron "*/20 * * * *" \
+  --max-runs 12 \
   --name heartbeat \
   "Check the current task state and continue with the next useful step."
 ```
@@ -76,11 +77,11 @@ clisbot heartbeat create \
 The heartbeat interface is deliberately small:
 
 ```bash
-clisbot heartbeat update <id> --cron "*/10 * * * *"
+clisbot heartbeat update <id> --cron "*/10 * * * *" --max-runs 6
 clisbot heartbeat delete <id>
 ```
 
-Updating a heartbeat changes only its cron cadence and optional time zone. Its target and prompt stay fixed. Heartbeat commands require `CLISBOT_AGENT_ID`, which Clisbot sets inside agent sessions.
+Updating a heartbeat changes its cron cadence, optional time zone, and Max runs. Its target and prompt stay fixed. Heartbeat commands require `CLISBOT_AGENT_ID`, which Clisbot sets inside agent sessions.
 
 Heartbeats require a raw `--cron` expression. The `--every` presets below are available only for new-agent schedules.
 
@@ -102,6 +103,8 @@ clisbot schedule delete <id>
 Use `--cron "<expr>"` for a 5-field cron expression. For common cron-compatible cadences, `--every <duration>` accepts presets such as `5m` or `1h` and compiles them to cron. It does not create a rolling interval anchored to creation time.
 
 Schedules default to UTC. Pass `--timezone <IANA>` to interpret cron fields in a local wall-clock time zone, for example `--timezone America/New_York`. The persisted `nextRunAt` is still a UTC instant, but it is computed from that local time zone so recurring jobs stay at the same local time across daylight saving time changes.
+
+A schedule or heartbeat that repeats more than once a day needs `--max-runs`, so a short cadence never runs without end. Every N minutes, hourly, and `0 9,17 * * *` all count; a daily or weekly time does not. Max runs counts every run since the schedule was created.
 
 Schedules wait for the next matching cron time by default. Pass `--run-now` to start one immediate run on creation.
 

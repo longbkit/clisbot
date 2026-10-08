@@ -4648,7 +4648,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_schedule");
@@ -4672,7 +4675,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_schedule");
@@ -4681,17 +4687,20 @@ describe("create_schedule MCP tool", () => {
       prompt: "say hello",
       cron: "*/5 * * * *",
       provider: "codex",
+      maxRuns: 3,
     });
     await tool.handler({
       prompt: "say hello again",
       cron: "*/10 * * * *",
       provider: "codex/gpt-5.4",
+      maxRuns: 3,
     });
     await tool.handler({
       prompt: "say hello in a worktree",
       cron: "*/15 * * * *",
       provider: "codex",
       isolation: "worktree",
+      maxRuns: 3,
     });
 
     expect(createOrReplace).toHaveBeenNthCalledWith(
@@ -4756,7 +4765,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       callerAgentId: "parent-agent",
       logger,
     });
@@ -4765,6 +4777,7 @@ describe("create_schedule MCP tool", () => {
     const response = await tool.handler({
       prompt: "say hello",
       cron: "*/5 * * * *",
+      maxRuns: 3,
     });
 
     expect(response.structuredContent.target).toEqual({
@@ -4788,7 +4801,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_schedule");
@@ -4818,7 +4834,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_schedule");
@@ -4840,7 +4859,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_schedule");
@@ -4862,7 +4884,10 @@ describe("create_schedule MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_schedule");
@@ -4901,7 +4926,10 @@ describe("create_heartbeat MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       callerAgentId: "parent-agent",
       logger,
     });
@@ -4912,6 +4940,7 @@ describe("create_heartbeat MCP tool", () => {
       cron: "*/15 * * * *",
       timezone: "America/New_York",
       name: "status heartbeat",
+      maxRuns: 3,
     });
 
     expect(createOrReplace).toHaveBeenCalledWith(
@@ -4928,6 +4957,36 @@ describe("create_heartbeat MCP tool", () => {
     );
   });
 
+  it("refuses a heartbeat that repeats within the day without max runs", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    spies.agentManager.getAgent.mockReturnValue({
+      id: "parent-agent",
+      provider: "codex",
+      cwd: REPO_CWD,
+      lifecycle: "idle",
+      availableModes: [],
+      config: { title: "Parent agent" },
+    } as unknown as ManagedAgent);
+    const createOrReplace = vi.fn();
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
+      callerAgentId: "parent-agent",
+      logger,
+    });
+    const tool = registeredTool(server, "create_heartbeat");
+
+    await expect(
+      invokeToolWithParsedInput(tool, { prompt: "check", cron: "*/15 * * * *" }),
+    ).rejects.toThrow(/set Max runs/);
+    expect(createOrReplace).not.toHaveBeenCalled();
+  });
+
   it("requires an agent-scoped session", async () => {
     const { agentManager, agentStorage } = createTestDeps();
     const createOrReplace = vi.fn();
@@ -4935,7 +4994,10 @@ describe("create_heartbeat MCP tool", () => {
       agentManager,
       agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      scheduleService: {
+        createOrReplace,
+        heartbeatTargetFor: async (agentId: string) => ({ type: "agent", agentId }),
+      } as unknown as ScheduleService,
       logger,
     });
     const tool = registeredTool(server, "create_heartbeat");
@@ -5013,16 +5075,16 @@ describe("update_schedule MCP tool", () => {
       id: "schedule-1",
       name: "test schedule",
       prompt: "say hello",
-      cadence: { type: "every", everyMs: 300000 },
+      cadence: { type: "cron", expression: "0 9 * * *" },
       target: { type: "new-agent", config: { provider: "claude", cwd: "/tmp" } },
       status: "active",
       createdAt: "2026-04-11T00:00:00.000Z",
       updatedAt: "2026-04-11T00:00:00.000Z",
-      nextRunAt: "2026-04-11T00:05:00.000Z",
+      nextRunAt: "2026-04-11T09:00:00.000Z",
       lastRunAt: null,
       pausedAt: null,
       expiresAt: null,
-      maxRuns: null,
+      maxRuns: 10,
       runs: [],
     };
   }
@@ -5315,6 +5377,27 @@ describe("update_schedule MCP tool", () => {
         modeId: null,
       },
     });
+  });
+
+  it("refuses to clear max runs on a schedule that repeats within the day", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const stored = {
+      ...makeStoredSchedule(),
+      cadence: { type: "every" as const, everyMs: 300000 },
+    };
+    const update = vi.fn(async (_input: UpdateScheduleInput) => stored);
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      scheduleService: scheduleServiceWithUpdate(update, stored),
+      logger,
+    });
+    const tool = registeredTool(server, "update_schedule");
+
+    await expect(tool.handler({ id: "schedule-1", maxRuns: null })).rejects.toThrow(/set Max runs/);
+    await expect(tool.handler({ id: "schedule-1", prompt: "still runs" })).resolves.toBeDefined();
+    expect(update).toHaveBeenCalledTimes(1);
   });
 
   it("rejects conflicting model and expiry inputs", async () => {

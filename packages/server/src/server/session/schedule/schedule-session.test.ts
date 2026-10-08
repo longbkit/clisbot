@@ -52,6 +52,7 @@ describe("ScheduleSession", () => {
       requestId: "sc1",
       prompt: "p",
       cadence: { type: "every", everyMs: 1000 },
+      maxRuns: 5,
       target: { type: "agent", agentId: "a" },
     });
 
@@ -91,10 +92,99 @@ describe("ScheduleSession", () => {
       requestId: "sc2",
       prompt: "p",
       cadence: { type: "every", everyMs: 1000 },
+      maxRuns: 5,
       target: { type: "self", agentId: "agent-9" },
     });
 
     expect(received?.target).toEqual({ type: "agent", agentId: "agent-9" });
     expect(findByType(emitted, "schedule/create/response")?.payload.error).toBeNull();
+  });
+
+  it("schedule/create refuses a schedule that repeats within the day without max runs", async () => {
+    let created = false;
+    const { session, emitted } = makeSession({
+      create: async () => {
+        created = true;
+        throw new Error("not reached");
+      },
+    });
+
+    await session.handleScheduleCreateRequest({
+      type: "schedule/create",
+      requestId: "sc3",
+      prompt: "p",
+      cadence: { type: "cron", expression: "*/5 * * * *" },
+      target: { type: "agent", agentId: "a" },
+    });
+
+    expect(created).toBe(false);
+    expect(findByType(emitted, "rpc_error")?.payload.error).toMatch(/set Max runs/);
+  });
+
+  describe("schedule/update and Max runs", () => {
+    const older = {
+      id: "s4",
+      name: null,
+      prompt: "p",
+      cadence: { type: "cron" as const, expression: "*/5 * * * *" },
+      target: { type: "agent" as const, agentId: "a" },
+      status: "active" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      nextRunAt: null,
+      lastRunAt: null,
+      pausedAt: null,
+      expiresAt: null,
+      maxRuns: null,
+      runs: [],
+    };
+
+    function updateSession() {
+      const updates: unknown[] = [];
+      const made = makeSession({
+        inspect: async () => older,
+        update: async (input: unknown) => {
+          updates.push(input);
+          return older;
+        },
+      });
+      return { ...made, updates };
+    }
+
+    it("renames a schedule stored without Max runs", async () => {
+      const { session, emitted, updates } = updateSession();
+      await session.handleScheduleUpdateRequest({
+        type: "schedule/update",
+        requestId: "su1",
+        scheduleId: "s4",
+        name: "Renamed",
+      });
+      expect(updates).toEqual([{ id: "s4", name: "Renamed" }]);
+      expect(findByType(emitted, "rpc_error")).toBeUndefined();
+    });
+
+    it("refuses a new cadence within the day when no Max runs is stored", async () => {
+      const { session, emitted, updates } = updateSession();
+      await session.handleScheduleUpdateRequest({
+        type: "schedule/update",
+        requestId: "su2",
+        scheduleId: "s4",
+        cadence: { type: "cron", expression: "*/10 * * * *" },
+      });
+      expect(updates).toEqual([]);
+      expect(findByType(emitted, "rpc_error")?.payload.error).toMatch(/set Max runs/);
+    });
+
+    it("accepts the cadence once Max runs comes with it", async () => {
+      const { session, updates } = updateSession();
+      await session.handleScheduleUpdateRequest({
+        type: "schedule/update",
+        requestId: "su3",
+        scheduleId: "s4",
+        cadence: { type: "cron", expression: "*/10 * * * *" },
+        maxRuns: 6,
+      });
+      expect(updates).toHaveLength(1);
+    });
   });
 });

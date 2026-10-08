@@ -14,6 +14,10 @@ import {
   useSessionStorageReadable,
 } from "@/clisbot/session-storage/capability";
 import { AgentFace } from "@/clisbot/session-storage/actor";
+import { HeartbeatCard } from "@/clisbot/heartbeats/heartbeat-created-card";
+import { heartbeatIdFromToolCall } from "@/clisbot/heartbeats/heartbeat-tool-call";
+import { HeartbeatRunMarker } from "@/clisbot/heartbeats/heartbeat-run-marker";
+import { isHeartbeatRunNotice } from "@clisbot/protocol/schedule/heartbeat-notice";
 import { ActorGutterInset, ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
@@ -936,7 +940,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             );
           }
 
-          return (
+          const toolCall = (
             <>
               <ToolCallSlot
                 itemId={item.id}
@@ -954,6 +958,19 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
               <ToolPermissionActivity toolCallId={data.callId} position={item.timelineCursor} />
             </>
           );
+          // Clisbot Heartbeats: a created heartbeat renders as a card that manages it.
+          const heartbeatId =
+            data.status === "completed" ? heartbeatIdFromToolCall(data.name, data.detail) : null;
+          if (heartbeatId) {
+            return (
+              <HeartbeatCard
+                serverId={resolvedServerId}
+                scheduleId={heartbeatId}
+                fallback={toolCall}
+              />
+            );
+          }
+          return toolCall;
         }
 
         const data = payload.data;
@@ -971,7 +988,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           />
         );
       },
-      [context.cwd, setInlineDetailsExpanded, handleToolCallOpenFile],
+      [context.cwd, resolvedServerId, setInlineDetailsExpanded, handleToolCallOpenFile],
     );
 
     // Read through a stable event so live group updates do not change the renderer identity
@@ -1075,6 +1092,10 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             return renderToolCallItem(layoutItem, item);
 
           case "notification":
+            // Clisbot Heartbeats: the daemon's run line draws as a marker.
+            if (isHeartbeatRunNotice(item.message)) {
+              return <HeartbeatRunMarker message={item.message} />;
+            }
             return <Notification level={item.level} message={item.message} />;
 
           case "todo_list":

@@ -24,6 +24,10 @@ vi.mock("./use-chat-scroll-position", () => ({
 vi.mock("./use-chat-keyboard-dismiss", () => ({ useChatKeyboardDismiss: () => state.dismiss }));
 vi.mock("./bot-workspace-context", () => ({ BotWorkspaceContext: "div" }));
 vi.mock("./chat-live-row", () => ({ ChatLiveRow: "div" }));
+vi.mock("@/clisbot/heartbeats/heartbeat-run-marker", () => ({ HeartbeatRunMarker: "div" }));
+vi.mock("@/clisbot/heartbeats/use-chat-turn-heartbeats", () => ({
+  useChatTurnHeartbeats: () => new Map(),
+}));
 vi.mock("./chat-rows", () => ({
   ChatBotRow: "div",
   ChatSystemRow: "div",

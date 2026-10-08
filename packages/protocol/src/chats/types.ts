@@ -103,6 +103,11 @@ export const ChatMessagePayloadSchema = z.object({
   deliveryBotIds: z.array(z.string()).optional(),
   /** 0 for a user line; a bot line answering a hop-n line is hop n+1. */
   hop: z.number().int().nonnegative(),
+  /**
+   * Set only by the daemon on a heartbeat run it posts (never from a client), so a client can
+   * draw the line as the run marker; the sender name alone could be any user's.
+   */
+  scheduleRun: z.object({ scheduleId: z.string(), run: z.number().int().positive() }).optional(),
 });
 export type ChatMessagePayload = z.infer<typeof ChatMessagePayloadSchema>;
 

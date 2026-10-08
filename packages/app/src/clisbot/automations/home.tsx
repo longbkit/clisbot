@@ -1,9 +1,17 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { Button } from "@/components/ui/button";
 import { ScheduleFormSheet } from "@/components/schedules/schedule-form-sheet";
+import {
+  ScheduleDetailSheet,
+  ScheduleStatusBadge,
+} from "@/clisbot/schedules/schedule-detail-sheet";
+import { useCanCreateSchedules } from "@/clisbot/schedules/use-schedule-detail";
+import { heartbeatMeta } from "@/clisbot/heartbeats/use-heartbeats";
+import { resolveScheduleTitle } from "@/utils/schedule-format";
 import { useSchedules, type AggregatedSchedule } from "@/hooks/use-schedules";
 import { useFetchQuery } from "@/data/query";
 import { useHubAccount } from "../hub/account-provider";
@@ -73,9 +81,16 @@ function HomeSection({
 
 function HomeSchedules({ onSeeAll }: { onSeeAll: () => void }) {
   const { loadState, hostErrors, isError, refetch } = useSchedules();
+  const canCreate = useCanCreateSchedules();
   const [form, setForm] = useState<"create" | AggregatedSchedule | null>(null);
+  const [detail, setDetail] = useState<AggregatedSchedule | null>(null);
   const open = useCallback(() => setForm("create"), []);
   const close = useCallback(() => setForm(null), []);
+  const closeDetail = useCallback(() => setDetail(null), []);
+  const editSettings = useCallback(() => {
+    setForm(detail);
+    setDetail(null);
+  }, [detail]);
   const ready = loadState.status === "loaded";
   let content: ReactNode;
   if (!ready)
@@ -91,12 +106,12 @@ function HomeSchedules({ onSeeAll }: { onSeeAll: () => void }) {
         <SchedulePreview
           key={`${schedule.serverId}:${schedule.id}`}
           schedule={schedule}
-          onOpen={setForm}
+          onOpen={setDetail}
         />
       ));
   else content = <Text style={styles.text}>No schedules yet.</Text>;
   return (
-    <HomeSection title="Schedules" onCreate={open} onSeeAll={onSeeAll}>
+    <HomeSection title="Schedules" onCreate={canCreate ? open : undefined} onSeeAll={onSeeAll}>
       {content}
       {hostErrors.map((error) => (
         <Text key={error.serverId} style={styles.text}>
@@ -115,6 +130,14 @@ function HomeSchedules({ onSeeAll }: { onSeeAll: () => void }) {
         serverId={form && form !== "create" ? form.serverId : undefined}
         onClose={close}
       />
+      {detail ? (
+        <ScheduleDetailSheet
+          serverId={detail.serverId}
+          scheduleId={detail.id}
+          onClose={closeDetail}
+          onEditSettings={editSettings}
+        />
+      ) : null}
     </HomeSection>
   );
 }
@@ -125,12 +148,30 @@ function SchedulePreview({
   schedule: AggregatedSchedule;
   onOpen: (schedule: AggregatedSchedule) => void;
 }) {
+  const { t } = useTranslation();
   const open = useCallback(() => onOpen(schedule), [onOpen, schedule]);
   return (
-    <Button variant="ghost" onPress={open}>
-      {schedule.name} · {schedule.serverName}
-    </Button>
+    <Pressable
+      onPress={open}
+      style={previewRowStyle}
+      accessibilityRole="button"
+      testID={`automations-home-schedule-${schedule.id}`}
+    >
+      <View style={styles.rowHead}>
+        <Text style={styles.rowTitle} numberOfLines={1}>
+          {resolveScheduleTitle(schedule)}
+        </Text>
+        <ScheduleStatusBadge schedule={schedule} />
+      </View>
+      <Text style={styles.text} numberOfLines={1}>
+        {heartbeatMeta(schedule, t, { withStatus: false })} · {schedule.serverName}
+      </Text>
+    </Pressable>
   );
+}
+
+function previewRowStyle({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) {
+  return [styles.row, (hovered || pressed) && styles.rowActive];
 }
 
 function HomeAutomations({ onOpen }: { onOpen: OpenAutomation }) {
@@ -209,4 +250,15 @@ const styles = StyleSheet.create((theme) => ({
   title: { color: theme.colors.foreground, fontSize: theme.fontSize.lg },
   text: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
+  // One schedule per row, as in the heartbeat menu: name, then cadence, next run and Host.
+  row: {
+    gap: theme.spacing[1],
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
+    marginHorizontal: -theme.spacing[3],
+    borderRadius: theme.borderRadius.md,
+  },
+  rowActive: { backgroundColor: theme.colors.surface2 },
+  rowHead: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  rowTitle: { flexShrink: 1, color: theme.colors.foreground, fontSize: theme.fontSize.base },
 }));

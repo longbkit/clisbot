@@ -87,11 +87,14 @@ test.describe("Schedules", () => {
     cleanupTasks.push(() => deleteSeededSchedule(workspace, scheduleId));
 
     await page.goto(buildSchedulesRoute());
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     const row = page.getByTestId(`schedule-row-${scheduleId}`);
     await expect(row).toBeVisible({ timeout: 30_000 });
     await expect(row).toContainText(workspace.projectDisplayName, { timeout: 30_000 });
 
     await row.click();
+    await page.getByTestId("schedule-detail-more-settings").click();
     const formSheet = page.getByTestId("schedule-form-sheet");
     await expect(formSheet).toBeVisible({ timeout: 10_000 });
     await expectStableHeight(formSheet);
@@ -113,8 +116,7 @@ test.describe("Schedules", () => {
     await expectSettled(modeTrigger);
     await expect(page.getByTestId("cadence-mode")).toHaveCount(0);
     await expect(page.getByTestId("cadence-interval-value")).toHaveCount(0);
-    await expect(page.getByTestId("schedule-cadence-preset-trigger")).toContainText("Daily 9:00");
-    await expect(page.getByText(/Times are in/)).toHaveCount(0);
+    await expect(page.getByTestId("cadence-time")).toHaveValue("09:00");
     await expect(formSheet.getByText("Cron", { exact: true })).toHaveCount(0);
   });
 
@@ -133,6 +135,8 @@ test.describe("Schedules", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await page.goto(buildSchedulesRoute());
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     await addScheduleHostAndReload({
       page,
       serverId: secondary.serverId,
@@ -140,10 +144,13 @@ test.describe("Schedules", () => {
       port: secondary.port,
     });
     await page.reload();
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
 
     const row = page.getByTestId(`schedule-row-${scheduleId}`);
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.click();
+    await page.getByTestId("schedule-detail-more-settings").click();
 
     const formSheet = page.getByTestId("schedule-form-sheet");
     await expect(formSheet).toBeVisible({ timeout: 10_000 });
@@ -163,7 +170,7 @@ test.describe("Schedules", () => {
     await expect(modeTrigger).toContainText("Load Test", { timeout: 30_000 });
     await expectSettled(modeTrigger);
     await expect(page.getByTestId("cadence-mode")).toHaveCount(0);
-    await expect(page.getByTestId("schedule-cadence-preset-trigger")).toContainText("Daily 9:00");
+    await expect(page.getByTestId("cadence-time")).toHaveValue("09:00");
   });
 
   test("create opens pristine after closing an edit form", async ({ page }) => {
@@ -174,9 +181,12 @@ test.describe("Schedules", () => {
     cleanupTasks.push(() => deleteSeededSchedule(workspace, scheduleId));
 
     await page.goto(buildSchedulesRoute());
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     const row = page.getByTestId(`schedule-row-${scheduleId}`);
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.click();
+    await page.getByTestId("schedule-detail-more-settings").click();
     const formSheet = page.getByTestId("schedule-form-sheet");
     await expect(formSheet).toBeVisible({ timeout: 10_000 });
     await expectStableHeight(formSheet);

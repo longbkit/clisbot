@@ -3,6 +3,11 @@ import { authenticateDaemonRequest } from "../daemons/registration.js";
 import type { Database } from "../db/types.js";
 import { reportFailure } from "../failures/index.js";
 import { AccessTicketError, AccessTicketService } from "./tickets.js";
+import {
+  DAEMON_PROJECT_PRIVILEGES_HEADER,
+  daemonKnownPrivileges,
+  limitAuthorityToDaemon,
+} from "./daemon-privileges.js";
 
 const consumptionBodySchema = z
   .object({
@@ -61,7 +66,7 @@ export async function consumeDaemonAccessTicket(
   if (!body.success) return Response.json({ error: "invalid_request" }, { status: 400 });
   try {
     const admission = await tickets.consume({ daemonId, ...body.data });
-    return accessAdmissionResponse(admission);
+    return accessAdmissionResponse(admission, request);
   } catch (error) {
     if (error instanceof AccessTicketError) {
       return Response.json({ error: error.code }, { status: 401 });
@@ -86,7 +91,7 @@ export async function refreshDaemonAccessLease(
   if (!body.success) return Response.json({ error: "invalid_request" }, { status: 400 });
   try {
     const admission = await tickets.refresh({ daemonId, leaseId: body.data.leaseId });
-    return accessAdmissionResponse(admission);
+    return accessAdmissionResponse(admission, request);
   } catch (error) {
     if (error instanceof AccessTicketError) {
       return Response.json({ error: error.code }, { status: 401 });
@@ -96,8 +101,13 @@ export async function refreshDaemonAccessLease(
 }
 
 function accessAdmissionResponse(
-  admission: Awaited<ReturnType<AccessTicketService["consume"]>>,
+  issued: Awaited<ReturnType<AccessTicketService["consume"]>>,
+  request: Request,
 ): Response {
+  const admission = limitAuthorityToDaemon(
+    issued,
+    daemonKnownPrivileges(request.headers.get(DAEMON_PROJECT_PRIVILEGES_HEADER)),
+  );
   return Response.json({
     leaseId: admission.leaseId,
     principalId: admission.principalId,

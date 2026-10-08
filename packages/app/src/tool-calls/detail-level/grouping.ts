@@ -1,4 +1,5 @@
 import type { ToolCallDetail } from "@clisbot/protocol/agent-types";
+import { isCreateHeartbeatToolCall } from "@/clisbot/heartbeats/heartbeat-tool-call";
 import type { StreamItem, ToolCallItem } from "@/types/stream";
 
 export interface ToolCallDescriptor {
@@ -67,7 +68,12 @@ export function isGroupableToolCall(item: StreamItem): item is ToolCallItem {
     return false;
   }
   const descriptor = describeToolCall(item);
-  return descriptor.detail.type !== "plan" && descriptor.name.trim().toLowerCase() !== "speak";
+  return (
+    descriptor.detail.type !== "plan" &&
+    descriptor.name.trim().toLowerCase() !== "speak" &&
+    // Clisbot Heartbeats: a created heartbeat is a card, never folded into a group.
+    !isCreateHeartbeatToolCall(descriptor.name, descriptor.detail)
+  );
 }
 
 function createRun(calls: readonly ToolCallItem[], isSealed: boolean): ToolCallRun {

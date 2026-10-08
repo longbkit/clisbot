@@ -67,6 +67,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "agent.fast.use",
     "terminal.use",
     "terminal.profile.use",
+    "schedule.manage",
     "approval.file",
     "approval.config",
     "approval.command",
@@ -84,6 +85,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
     "agent.fast.use",
     "terminal.use",
     "terminal.profile.use",
+    "schedule.manage",
     "approval.file",
     "approval.config",
     "approval.command",
@@ -107,6 +109,7 @@ const PROJECT_PRIVILEGES = new Set<AccessPrivilege>([
   "agent.fast.use",
   "terminal.use",
   "terminal.profile.use",
+  "schedule.manage",
   "approval.file",
   "approval.config",
   "approval.command",
@@ -1380,6 +1383,11 @@ export class AccessStore {
     const managesWorkspaces =
       daemonPrivileges.includes("workspace.manage") ||
       projects.some(({ privileges }) => privileges.includes("workspace.manage"));
+    // Same shape for schedules: `schedule/*` needs `automation.manage` at the daemon's first gate,
+    // and the daemon narrows it back to Projects holding `schedule.manage`.
+    const managesSchedules =
+      daemonPrivileges.includes("schedule.manage") ||
+      projects.some(({ privileges }) => privileges.includes("schedule.manage"));
     return {
       principalId: membership.id,
       organizationId: input.organizationId,
@@ -1388,6 +1396,7 @@ export class AccessStore {
       permissions: [
         ...DAEMON_SESSION_PERMISSIONS,
         ...(managesWorkspaces ? (["workspace.manage"] as const) : []),
+        ...(managesSchedules ? (["automation.manage"] as const) : []),
       ],
       resourceMode: "projects",
       projects,

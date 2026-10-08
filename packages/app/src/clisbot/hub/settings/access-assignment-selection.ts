@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { parseChannelAccountResourceId } from "../conversation-picker";
 import { accessLevelLabel, parseSubjectKey, resourceKey } from "./access-catalog";
 import type {
@@ -18,8 +19,10 @@ import {
 import {
   canShareState,
   levelOptionsWithinHoldings,
+  offersScheduleSwitch,
   offersTerminalSwitch,
   withCanShare,
+  withSchedules,
   withTerminal,
   type CanShareState,
 } from "./access-level-choice";
@@ -43,6 +46,8 @@ export interface AssignmentSelection {
   canShare: CanShareState;
   /** The Terminal (shell) switch is offered for this level. */
   terminalSwitch: boolean;
+  /** The Schedules switch is offered for this level. */
+  scheduleSwitch: boolean;
   /** The grant launches Terminal profiles and must name which. */
   needsTerminalProfiles: boolean;
   /** The profiles it names: the draft's choice, else the grantor's default. */
@@ -66,6 +71,7 @@ export function resolveAssignmentSelection(input: {
   accessLevel: string | null;
   canShare: boolean;
   terminal: boolean;
+  schedules: boolean;
   terminalProfiles: MultiSelection | null;
   projectFolders: { allow: string[]; deny: string[] } | null;
   agentConfigurations: AgentConfigurationDraft[];
@@ -96,7 +102,7 @@ export function resolveAssignmentSelection(input: {
     levelOptions.unshift({
       id: "current",
       value: "current",
-      label: "Current privileges",
+      label: accessLevelLabel("current"),
       description: currentPrivilegesDescription(input.catalog, input.editing),
     });
   const levelPrivileges =
@@ -106,7 +112,8 @@ export function resolveAssignmentSelection(input: {
   const canShare =
     resource === undefined ? "hidden" : canShareState(resource.kind, levelPrivileges);
   const switches = grantSwitches(resource, levelPrivileges, holdings, input);
-  const { privileges, terminalSwitch, needsTerminalProfiles, createsProjects } = switches;
+  const { privileges, terminalSwitch, scheduleSwitch, needsTerminalProfiles, createsProjects } =
+    switches;
   // A Host assignment fans out to every Project on that Host, so it names Agent
   // choices for the same reason a Project assignment does.
   const needsAgentConfiguration =
@@ -132,6 +139,7 @@ export function resolveAssignmentSelection(input: {
     holdings,
     canShare,
     terminalSwitch,
+    scheduleSwitch,
     needsTerminalProfiles,
     createsProjects,
     terminalProfiles: switches.terminalProfiles,
@@ -155,6 +163,7 @@ function grantSwitches(
   input: {
     canShare: boolean;
     terminal: boolean;
+    schedules: boolean;
     terminalProfiles: MultiSelection | null;
     projectFolders: { allow: string[]; deny: string[] } | null;
   },
@@ -167,6 +176,7 @@ function grantSwitches(
     return {
       privileges: [...levelPrivileges],
       terminalSwitch: false,
+      scheduleSwitch: false,
       needsTerminalProfiles: false,
       createsProjects: false,
       terminalProfiles,
@@ -174,10 +184,14 @@ function grantSwitches(
       complete: true,
     };
   }
-  const privileges = withTerminal(
+  const privileges = withSchedules(
     resource.kind,
-    withCanShare(resource.kind, levelPrivileges, input.canShare),
-    input.terminal,
+    withTerminal(
+      resource.kind,
+      withCanShare(resource.kind, levelPrivileges, input.canShare),
+      input.terminal,
+    ),
+    input.schedules,
   );
   const scopesProjects = resource.kind === "project" || resource.kind === "daemon";
   const needsTerminalProfiles = scopesProjects && privileges.includes("terminal.profile.use");
@@ -188,6 +202,7 @@ function grantSwitches(
   return {
     privileges,
     terminalSwitch: offersTerminalSwitch(resource.kind, levelPrivileges),
+    scheduleSwitch: offersScheduleSwitch(resource.kind, levelPrivileges),
     needsTerminalProfiles,
     createsProjects,
     terminalProfiles,
@@ -221,6 +236,6 @@ function constraintsAreComplete(input: {
 function currentPrivilegesDescription(catalog: AccessCatalog, editing: AccessAssignment): string {
   const level = matchingAccessLevel(catalog.accessLevels, editing.resourceKind, editing.privileges);
   return level === undefined
-    ? "Keep the custom privileges saved on this assignment."
-    : `Keep the saved privileges, which match ${accessLevelLabel(level)}.`;
+    ? i18n.t("hub.access.current.custom")
+    : i18n.t("hub.access.current.matches", { level: accessLevelLabel(level) });
 }

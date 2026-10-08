@@ -541,11 +541,11 @@ const styles = StyleSheet.create((theme) => ({
     left: 0,
   },
   content: {
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surfacePopover,
     borderWidth: 1,
     borderColor: theme.colors.borderAccent,
     borderRadius: theme.borderRadius.lg,
     overflow: "hidden",
-    ...theme.shadow.md,
+    ...theme.shadow.popover,
   },
 }));

@@ -938,6 +938,8 @@ export class Session {
       agentStorage,
       terminalManager,
       providerSnapshotManager,
+      (scheduleId) => scheduleService.find(scheduleId),
+      (chatId) => this.chatSession?.allowsSend(chatId) ?? false,
     );
     this.appVersion = appVersion ?? null;
     this.clientCapabilities = parseClientCapabilities(clientCapabilities);
@@ -1083,7 +1085,10 @@ export class Session {
       logger: this.sessionLogger,
     });
     this.scheduleSession = new ScheduleSession({
-      host: { emit: (msg) => this.emit(msg) },
+      host: {
+        emit: (msg) => this.emit(msg),
+        filterSchedules: (schedules) => this.resourceAuthorizer.filterSchedules(schedules),
+      },
       scheduleService,
       logger: this.sessionLogger,
     });

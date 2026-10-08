@@ -1,6 +1,7 @@
 import { useConversationSourceLabelsBridge } from "@/clisbot/bots/chat/conversation-source-labels";
 import { confirmPanelClose } from "@/panels/confirm-panel-close";
 import { BackToChatAction } from "@/clisbot/bots/chat/cowork-return";
+import { WorkspaceHeartbeatsButton } from "@/clisbot/heartbeats/workspace-heartbeats-button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { JsonValue } from "@clisbot/protocol/agent-types";
 import { getOpenAgentTabLabel } from "@clisbot/protocol/agent-labels";
@@ -965,6 +966,8 @@ interface WorkspaceHeaderTitleBarProps {
   currentBranchName: string | null;
   normalizedServerId: string;
   normalizedWorkspaceId: string;
+  /** Clisbot Heartbeats: the focused agent tab leads the header's heartbeat list. */
+  focusedAgentId: string | null;
   workspaceScripts: WorkspaceDescriptor["scripts"];
   liveTerminalIds: string[];
   showWorkspaceSetup: boolean;
@@ -994,6 +997,7 @@ function WorkspaceHeaderTitleBar({
   currentBranchName,
   normalizedServerId,
   normalizedWorkspaceId,
+  focusedAgentId,
   workspaceScripts,
   liveTerminalIds,
   showWorkspaceSetup,
@@ -1072,6 +1076,11 @@ function WorkspaceHeaderTitleBar({
             onOpenSetupTab={onOpenSetupTab}
           />
         )}
+        <WorkspaceHeartbeatsButton
+          serverId={normalizedServerId}
+          workspaceId={normalizedWorkspaceId}
+          focusedAgentId={focusedAgentId}
+        />
         {isMobile && workspaceScripts.length > 0 ? (
           <WorkspaceScriptsButton
             serverId={normalizedServerId}
@@ -3933,6 +3942,7 @@ function WorkspaceScreenContent({
                 currentBranchName={currentBranchName}
                 normalizedServerId={normalizedServerId}
                 normalizedWorkspaceId={normalizedWorkspaceId}
+                focusedAgentId={focusedPaneAgentId}
                 workspaceScripts={workspaceScripts}
                 liveTerminalIds={liveTerminalIds}
                 showWorkspaceSetup={showWorkspaceSetup}
@@ -3963,6 +3973,7 @@ function WorkspaceScreenContent({
       canOpenImportSheet,
       createTerminalDisabled,
       currentBranchName,
+      focusedPaneAgentId,
       handleCopyBranchName,
       handleCopyWorkspacePath,
       handleCreateBrowserTab,

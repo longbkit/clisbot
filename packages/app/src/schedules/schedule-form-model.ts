@@ -38,11 +38,15 @@ export interface ScheduleFormHost {
   serverId: string;
   label: string;
   supportsWorkspaceMultiplicity?: boolean;
+  /** The host can run each session of a schedule in an existing workspace. */
+  supportsExistingWorkspace?: boolean;
 }
 
 export interface ScheduleFormSnapshot {
   mode: "create" | "edit";
   schedule?: ScheduleSummary & { serverId?: string; serverName?: string };
+  /** Creating a heartbeat for this session: Run in is fixed to it. */
+  presetAgentId?: string;
   hosts: readonly ScheduleFormHost[];
   defaults: {
     serverId?: string | null;
@@ -84,6 +88,15 @@ type ProviderResolutionStatus = "idle" | "pending" | "complete";
 export interface ScheduleFormState {
   mode: "create" | "edit";
   targetKind: ScheduleFormTargetKind;
+  /** Run in is fixed by the caller (a heartbeat for one session) or by editing. */
+  targetKindLocked: boolean;
+  /** The existing session a heartbeat runs in (target `agent`). */
+  targetAgentId: string | null;
+  /** The existing workspace each session of a `new-agent` schedule runs in, or null for a new one. */
+  existingWorkspaceId: string | null;
+  canUseExistingWorkspace: boolean;
+  /** The chosen project's key, so a picker can list that project's workspaces. */
+  selectedProjectViewKey: string | null;
   name: string;
   prompt: string;
   maxRuns: string;
@@ -136,6 +149,9 @@ export interface ScheduleFormModel {
   setMaxRuns: (value: string) => void;
   setCadence: (value: ScheduleCadence) => void;
   setIsolation: (value: "local" | "worktree") => void;
+  setTargetKind: (value: ScheduleFormTargetKind) => void;
+  setTargetAgent: (agentId: string | null) => void;
+  setExistingWorkspace: (workspaceId: string | null) => void;
   setArchiveOnFinish: (value: boolean) => void;
   setSubmitError: (value: string | null) => void;
 }
@@ -377,7 +393,38 @@ function resolveTargetKind(snapshot: ScheduleFormSnapshot): ScheduleFormTargetKi
   if (snapshot.mode === "edit" && snapshot.schedule?.target.type === "agent") {
     return "agent";
   }
+  if (snapshot.mode === "create" && snapshot.presetAgentId) {
+    return "agent";
+  }
   return "new-agent";
+}
+
+/** Where the schedule runs, as the form opens: Run in, the session, the existing workspace. */
+function initialRunInState(
+  snapshot: ScheduleFormSnapshot,
+  config: ReturnType<typeof newAgentConfig>,
+): Pick<
+  ScheduleFormState,
+  | "targetKindLocked"
+  | "targetAgentId"
+  | "existingWorkspaceId"
+  | "canUseExistingWorkspace"
+  | "selectedProjectViewKey"
+> {
+  return {
+    targetKindLocked: snapshot.mode === "edit" || snapshot.presetAgentId !== undefined,
+    targetAgentId: resolveInitialTargetAgentId(snapshot),
+    existingWorkspaceId: config?.workspaceId ?? null,
+    canUseExistingWorkspace: false,
+    selectedProjectViewKey: null,
+  };
+}
+
+function resolveInitialTargetAgentId(snapshot: ScheduleFormSnapshot): string | null {
+  if (snapshot.schedule?.target.type === "agent") {
+    return snapshot.schedule.target.agentId;
+  }
+  return snapshot.presetAgentId ?? null;
 }
 
 function buildProviderSnapshotRequest(input: {
@@ -509,6 +556,16 @@ function resolveEffectiveIsolation(input: {
   return "local";
 }
 
+function selectedHostSupportsExistingWorkspace(input: {
+  hosts: readonly ScheduleFormHost[];
+  selectedServerId: string | null;
+}): boolean {
+  return (
+    input.hosts.find((entry) => entry.serverId === input.selectedServerId)
+      ?.supportsExistingWorkspace === true
+  );
+}
+
 function resolveDisclosure(state: ScheduleFormState): ScheduleDisclosureState {
   if (state.targetKind === "agent") {
     return {
@@ -532,9 +589,12 @@ function resolveDisclosure(state: ScheduleFormState): ScheduleDisclosureState {
     showThinkingField:
       showModelField && hasSelectedModel && state.availableThinkingOptions.length > 0,
     showModeField: showModelField && hasSelectedProvider && state.modeOptions.length > 0,
-    showIsolationField: hasProject && state.canUseWorktreeIsolation,
+    showIsolationField:
+      hasProject && (state.canUseWorktreeIsolation || state.canUseExistingWorkspace),
+    // An existing workspace is never archived by a run, so there is nothing to choose.
     showArchiveOnFinishField:
       hasProject &&
+      state.existingWorkspaceId === null &&
       selectedHostSupportsWorkspaceMultiplicity({
         hosts: state.hosts,
         selectedServerId: state.selectedServerId,
@@ -544,9 +604,20 @@ function resolveDisclosure(state: ScheduleFormState): ScheduleDisclosureState {
 
 function resolveCanSubmit(state: ScheduleFormState): boolean {
   if (state.targetKind === "agent") {
+    if (state.mode === "create") {
+      return (
+        state.submitCadence !== undefined &&
+        state.targetAgentId !== null &&
+        state.prompt.trim().length > 0
+      );
+    }
     return state.submitCadence !== undefined;
   }
   if (state.prompt.trim().length === 0) {
+    return false;
+  }
+  // Existing workspace chosen as the isolation, but no workspace picked yet.
+  if (state.existingWorkspaceId === "") {
     return false;
   }
   const hasWorkingDir = state.workingDir.trim().length > 0;
@@ -606,6 +677,7 @@ function updateDerivedState(input: {
       cwd: input.state.workingDir,
     }),
     selectedProjectOptionId: projectTarget?.optionId ?? input.state.selectedProjectOptionId,
+    selectedProjectViewKey: projectTarget?.projectViewKey ?? null,
     selectedModelDisplay: resolveModelDisplay({
       entries: input.providerEntries,
       provider: input.state.selectedProvider,
@@ -619,6 +691,10 @@ function updateDerivedState(input: {
     modeOptions,
     availableThinkingOptions,
     canUseWorktreeIsolation,
+    canUseExistingWorkspace: selectedHostSupportsExistingWorkspace({
+      hosts: input.hosts,
+      selectedServerId: input.state.selectedServerId,
+    }),
     effectiveIsolation,
     submitArchiveOnFinish: canSubmitWorkspaceLifecycleOptions
       ? input.state.archiveOnFinish
@@ -654,6 +730,7 @@ function buildInitialState(snapshot: ScheduleFormSnapshot): ScheduleFormState {
   const state: ScheduleFormState = {
     mode: snapshot.mode,
     targetKind,
+    ...initialRunInState(snapshot, config),
     name: snapshot.schedule?.name ?? "",
     prompt: snapshot.schedule?.prompt ?? "",
     maxRuns: formatInitialMaxRuns(snapshot.schedule),
@@ -1017,6 +1094,8 @@ export function openScheduleForm(snapshot: ScheduleFormSnapshot): ScheduleFormMo
           projectDisplay: null,
           selectedProjectOptionId: "",
           providerResolutionByServerId: {},
+          targetAgentId: state.targetKindLocked ? state.targetAgentId : null,
+          existingWorkspaceId: null,
         }),
       );
     },
@@ -1039,6 +1118,7 @@ export function openScheduleForm(snapshot: ScheduleFormSnapshot): ScheduleFormMo
         workingDir: target.cwd,
         projectDisplay: display,
         selectedProjectOptionId: target.optionId,
+        existingWorkspaceId: target.cwd === state.workingDir ? state.existingWorkspaceId : null,
       };
       publish(providerScopeChanged ? clearProviderSelection(nextState) : nextState);
       if (!providerScopeChanged) {
@@ -1120,6 +1200,21 @@ export function openScheduleForm(snapshot: ScheduleFormSnapshot): ScheduleFormMo
     },
     setArchiveOnFinish(value) {
       publish({ ...state, archiveOnFinish: value });
+    },
+    setTargetKind(value) {
+      if (closed || state.targetKindLocked || state.targetKind === value) {
+        return;
+      }
+      publish({ ...state, targetKind: value });
+      if (value === "new-agent" && providerEntries.length === 0) {
+        requestProviderSnapshot(state.selectedServerId, state.workingDir);
+      }
+    },
+    setTargetAgent(agentId) {
+      publish({ ...state, targetAgentId: agentId });
+    },
+    setExistingWorkspace(workspaceId) {
+      publish({ ...state, existingWorkspaceId: workspaceId });
     },
     setSubmitError(value) {
       publish({ ...state, submitError: value });

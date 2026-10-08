@@ -159,6 +159,8 @@ test.describe("Schedules project target", () => {
     await waitForSidebarHydration(page);
     await page.goto(buildSchedulesRoute());
     await page.setViewportSize(MOBILE_SHEET_VIEWPORT);
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     await expect(page.getByTestId("schedules-empty-new")).toBeVisible({ timeout: 30_000 });
 
     await openNewScheduleSheet(page);
@@ -182,9 +184,11 @@ test.describe("Schedules project target", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
 
-    await page.getByRole("button", { name: "Schedules" }).click();
+    await page.getByRole("button", { name: "Automations" }).click();
     await expect(page).toHaveURL(/\/schedules$/);
     await expect(page).not.toHaveURL(/\/h\//);
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     await expect(page.getByTestId("schedules-empty")).toBeVisible();
 
     await page.getByTestId("schedules-empty-new").click();
@@ -217,15 +221,18 @@ test.describe("Schedules project target", () => {
     await expectSettled(page.getByTestId("schedule-thinking-trigger"));
     await expect(page.getByTestId("schedule-mode-trigger")).toBeVisible();
     await expectSettled(page.getByTestId("schedule-mode-trigger"));
-    await expect(page.getByTestId("schedule-isolation-trigger")).toHaveCount(0);
+    // A plain folder has no worktrees, but a run can still reuse one of its workspaces.
+    await page.getByTestId("schedule-isolation-trigger").click();
+    await expect(page.getByTestId("schedule-isolation-existing")).toBeVisible();
+    await expect(page.getByTestId("schedule-isolation-worktree")).toHaveCount(0);
+    await page.getByTestId("schedule-isolation-local").click();
     await expect(page.getByText("Worktree isolation is available for git projects.")).toHaveCount(
       0,
     );
 
-    await page.getByTestId("schedule-cadence-preset-trigger").click();
-    await page.getByTestId("schedule-cadence-preset-daily-9").click();
-    await expect(page.getByTestId("schedule-cadence-preset-trigger")).toContainText("Daily 9:00");
-    await expect(page.getByTestId("cadence-cron-expression")).toHaveValue("0 9 * * *");
+    await page.getByTestId("cadence-mode-daily").click();
+    await page.getByTestId("cadence-time").fill("09:00");
+    await expect(page.getByTestId("cadence-time")).toHaveValue("09:00");
 
     await page.getByLabel("Schedule name").fill(scheduleName);
     await page.getByLabel("Prompt").fill("Summarize the project status.");
@@ -246,6 +253,7 @@ test.describe("Schedules project target", () => {
       label: secondary.label,
       port: secondary.port,
     });
+    await page.getByRole("tab", { name: "Schedules" }).click();
 
     const hostFilterTrigger = page.getByTestId("schedules-host-filter-trigger");
     await expect(hostFilterTrigger).toBeVisible({ timeout: 30_000 });
@@ -269,12 +277,16 @@ test.describe("Schedules project target", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await page.goto(buildSchedulesRoute());
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     await addScheduleHostAndReload({
       page,
       serverId: secondary.serverId,
       label: secondary.label,
       port: secondary.port,
     });
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     await expect(page.getByTestId("schedules-empty")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("schedules-empty-new").click();
     const formSheet = page.getByTestId("schedule-form-sheet");
@@ -349,6 +361,8 @@ test.describe("Schedules project target", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await page.goto(buildSchedulesRoute());
+    // /schedules opens the Automations home; the list is its Schedules tab.
+    await page.getByRole("tab", { name: "Schedules" }).click();
     await expect(page.getByTestId("schedules-empty-new")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("schedules-empty-new").click();
 
@@ -366,8 +380,10 @@ test.describe("Schedules project target", () => {
     await page.getByTestId("schedule-archive-on-finish-switch").click();
     await page.getByLabel("Schedule name").fill(scheduleName);
     await page.getByLabel("Prompt").fill("Run with custom workspace cleanup.");
-    await page.getByTestId("schedule-cadence-preset-trigger").click();
-    await page.getByTestId("schedule-cadence-preset-every-hour").click();
+    await page.getByTestId("cadence-quick-hourly").click();
+    // Hourly repeats within the day, so Create waits for Max runs.
+    await expect(page.getByRole("button", { name: "Create schedule" })).toBeDisabled();
+    await page.getByTestId("schedule-max-runs-input").fill("5");
     await page.getByRole("button", { name: "Create schedule" }).click();
 
     await expect(page.getByTestId("schedule-form-sheet")).toHaveCount(0, { timeout: 30_000 });
@@ -380,6 +396,7 @@ test.describe("Schedules project target", () => {
 
     const scheduleId = await findScheduleIdByName(workspace, scheduleName);
     await page.getByTestId(`schedule-row-${scheduleId}`).click();
+    await page.getByTestId("schedule-detail-more-settings").click();
     const formSheet = page.getByTestId("schedule-form-sheet");
     await expect(formSheet).toBeVisible({ timeout: 10_000 });
     await expectStableHeight(formSheet);

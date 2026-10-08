@@ -18,6 +18,8 @@ import {
   type BotLookup,
   type ChatPublisher,
   type SendMessageInput,
+  type ScheduledLineInput,
+  type ScheduledLineResult,
   type SendMessageResult,
 } from "./chat-engine.js";
 import { ChatStore } from "./chat-store.js";
@@ -37,6 +39,8 @@ export interface ChatServiceOptions {
   publisher: ChatPublisher;
   /** The durable session store, when session storage is on; restart reconciliation reads it. */
   durableTimelineStore?: Pick<AgentTimelineStore, "getSubmittedUserMessage" | "getEpoch">;
+  /** Heartbeats follow a Bot's fresh session in a Chat. */
+  schedules?: { retargetAgent(fromAgentId: string, toAgentId: string): Promise<number> };
   logger: Logger;
 }
 
@@ -72,6 +76,8 @@ export interface ChatService {
   removeParticipant(chatId: string, botId: string): Promise<ChatPayload>;
   archive(chatId: string): Promise<ChatPayload>;
   send(input: SendMessageInput): Promise<SendMessageResult>;
+  /** A heartbeat run that goes through the Chat (docs/audits/2026-10-06-conversation-schedules.md). */
+  postScheduled(input: ScheduledLineInput): Promise<ScheduledLineResult>;
   fetchTranscript(chatId: string, options?: TranscriptFetchOptions): Promise<TranscriptWindow>;
   /** `/new` for one bot in one chat (D7). */
   newSession(chatId: string, botId: string): Promise<void>;
@@ -173,6 +179,17 @@ function createEngine(
     store,
     createAgent: options.createAgent,
     ensureLoaded: (agentId) => ensureAgentLoaded(agentId, { agentManager, agentStorage, logger }),
+    moveHeartbeats: async (fromAgentIds, toAgentId) => {
+      const schedules = options.schedules;
+      if (!schedules) return;
+      for (const fromAgentId of fromAgentIds) {
+        await schedules
+          .retargetAgent(fromAgentId, toAgentId)
+          .catch((err: unknown) =>
+            logger.warn({ err, fromAgentId, toAgentId }, "chat.heartbeats.move_failed"),
+          );
+      }
+    },
   });
   return new ChatEngine({
     store,
@@ -287,6 +304,7 @@ function chatWrites({ options, store, engine }: ChatServiceParts): ChatWrites {
       return engine.payload(await store.archive(chatId));
     },
     send: (input) => engine.send(input),
+    postScheduled: (input) => engine.postScheduled(input),
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
     stopDiscussion: (chatId) => engine.stopDiscussion(chatId),
   };

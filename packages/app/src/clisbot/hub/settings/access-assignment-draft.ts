@@ -2,7 +2,11 @@ import { useCallback, useState } from "react";
 import { accessConstraintDraft } from "./access-assignment-edit";
 import { subjectKey, type AccessAssignment, type AccessCatalog } from "./access-catalog";
 import { CAN_SHARE_PRIVILEGE } from "./access-grantor";
-import { confirmAdministratorLevel, levelSwitchPresets } from "./access-level-choice";
+import {
+  confirmAdministratorLevel,
+  levelSwitchPresets,
+  SCHEDULE_PRIVILEGE,
+} from "./access-level-choice";
 import {
   agentConfigurationDraftFrom,
   createAgentConfigurationDraft,
@@ -23,6 +27,8 @@ function initialAssignmentDraft(
     accessLevel: editing ? "current" : null,
     canShare: editing?.privileges.includes(CAN_SHARE_PRIVILEGE) ?? false,
     terminal: editing?.privileges.includes("terminal.use") ?? false,
+    // A row saved before Schedules existed starts off; re-selecting its level turns it on.
+    schedules: editing?.privileges.includes(SCHEDULE_PRIVILEGE) ?? false,
     // A new grant has no choice yet; the form offers the grantor's default.
     terminalProfiles: editing ? (constraints.terminalProfiles as MultiSelection) : null,
     projectFolders: constraints.projectFolders,
@@ -51,6 +57,7 @@ export function useAccessAssignmentDraft(
   const [accessLevel, setAccessLevel] = useState(initial.accessLevel);
   const [canShare, setCanShare] = useState(initial.canShare);
   const [terminal, setTerminal] = useState(initial.terminal);
+  const [schedules, setSchedules] = useState(initial.schedules);
   const [terminalProfiles, setTerminalProfiles] = useState<MultiSelection | null>(
     initial.terminalProfiles,
   );
@@ -65,6 +72,7 @@ export function useAccessAssignmentDraft(
     setAccessLevel(null);
     setCanShare(false);
     setTerminal(false);
+    setSchedules(false);
     setTerminalProfiles(null);
     setProjectFolders(null);
     setFastMode(false);
@@ -82,6 +90,7 @@ export function useAccessAssignmentDraft(
         const presets = levelSwitchPresets(accessLevels[kind]?.[value] ?? []);
         setCanShare(presets.canShare);
         setTerminal(presets.terminal);
+        setSchedules(presets.schedules);
       })(),
     [accessLevels, isCurrent, resourceKeyValue],
   );
@@ -108,6 +117,8 @@ export function useAccessAssignmentDraft(
     setCanShare,
     terminal,
     setTerminal,
+    schedules,
+    setSchedules,
     terminalProfiles,
     setTerminalProfiles,
     projectFolders,

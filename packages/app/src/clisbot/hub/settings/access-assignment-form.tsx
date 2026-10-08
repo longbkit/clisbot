@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Alert } from "@/components/ui/alert";
@@ -15,6 +16,7 @@ import {
 } from "./access-assignment-selection";
 import { grantedPrivileges, submitAccessAssignment } from "./access-assignment-submit";
 import { CanShareField } from "./access-can-share-field";
+import { SchedulesField } from "./access-schedules-field";
 import {
   canShareResource,
   shareableAgentConfigurationCatalog,
@@ -33,7 +35,6 @@ import {
   type HubTeam,
 } from "./access-catalog";
 import { accessSettingsStyles as styles } from "./access-settings-styles";
-import { countLabel } from "./labels";
 import { MultiSelectField } from "./multi-select-field";
 import { ProjectFolderFields, TerminalAccessFields } from "./access-terminal-fields";
 import {
@@ -62,19 +63,22 @@ export function GrantAccessContent({
   assignableSubjects,
   ...props
 }: AccessAssignmentFormProps & { assignableSubjects: number }) {
+  const { t } = useTranslation();
   // A sheet over the Access list, as Invite people is over People: the form is
   // there only while someone is granting or editing.
   const header = useMemo(
-    () => ({ title: props.editing ? "Edit access" : "Grant access" }),
-    [props.editing],
+    () => ({
+      title: props.editing ? t("hub.access.form.editAccess") : t("hub.access.form.grantAccess"),
+    }),
+    [props.editing, t],
   );
   return (
     <AdaptiveModalSheet visible header={header} onClose={props.cancelEdit} desktopMaxWidth={560}>
       {assignableSubjects === 0 ? (
         <Alert
           variant="info"
-          title="No setup needed for one owner"
-          description="Invite a Member or create a Team only when someone else needs access."
+          title={t("hub.access.form.noSetupTitle")}
+          description={t("hub.access.form.noSetupDescription")}
         />
       ) : (
         <AccessAssignmentForm {...props} />
@@ -97,6 +101,7 @@ function AccessAssignmentForm({
   pending,
   save,
 }: AccessAssignmentFormProps) {
+  const { t } = useTranslation();
   const isCurrent = useMountedAccessScope();
   const draft = useAccessAssignmentDraft(
     editing,
@@ -127,6 +132,7 @@ function AccessAssignmentForm({
     accessLevel: draft.accessLevel,
     canShare: draft.canShare,
     terminal: draft.terminal,
+    schedules: draft.schedules,
     terminalProfiles: draft.terminalProfiles,
     projectFolders: draft.projectFolders,
     agentConfigurations: draft.agentConfigurations,
@@ -164,63 +170,47 @@ function AccessAssignmentForm({
       teams,
     ],
   );
-
-  const sharedTeam =
-    editing?.subjectKind === "team" ? teams.find(({ id }) => id === editing.subjectId) : undefined;
   return (
     <View style={styles.sheetForm}>
-      {sharedTeam === undefined ? null : (
-        <Alert
-          variant="warning"
-          title={`This is Team ${sharedTeam.name}'s grant`}
-          description={`Saving changes it for everyone in the Team (${countLabel(sharedTeam.userIds.length, "Member")}). To change one person only, grant them directly instead.`}
-        />
-      )}
-      {!draft.constraintsValid ? (
-        <Alert
-          variant="error"
-          title="These constraints cannot be edited by this app version."
-          description="Use a compatible app to preserve this assignment safely."
-        />
-      ) : null}
+      <FormNotices editing={editing} teams={teams} constraintsValid={draft.constraintsValid} />
       <SelectField
-        label="Team, Member or Guest"
+        label={t("hub.access.form.subjectLabel")}
         value={draft.subjectKeyValue}
         selectedDisplay={selectedOptionDisplay(subjectOptions, draft.subjectKeyValue)}
         options={subjectOptions}
         onChange={draft.setSubjectKeyValue}
-        placeholder="Choose a Team, Member or Guest"
-        emptyText="Create a Team or invite a Member first."
+        placeholder={t("hub.access.form.subjectPlaceholder")}
+        emptyText={t("hub.access.form.subjectEmpty")}
         searchable
-        searchPlaceholder="Search Teams, Members, Guest, or email"
+        searchPlaceholder={t("hub.access.form.subjectSearch")}
         maxOptionsPerGroup={50}
-        title="Team, Member or Guest"
+        title={t("hub.access.form.subjectLabel")}
         disabled={identityDisabled}
       />
       <SelectField
-        label="Resource"
+        label={t("hub.access.form.resourceLabel")}
         value={draft.resourceKeyValue}
         selectedDisplay={selectedOptionDisplay(resourceOptions, draft.resourceKeyValue)}
         options={resourceOptions}
         onChange={draft.changeResource}
-        placeholder="Choose a Host, Project, Team, Connection, or Automation"
-        emptyText="No resources you can share are available."
+        placeholder={t("hub.access.form.resourcePlaceholder")}
+        emptyText={t("hub.access.form.resourceEmpty")}
         searchable
-        searchPlaceholder="Search resources or parent Host"
+        searchPlaceholder={t("hub.access.form.resourceSearch")}
         maxOptionsPerGroup={50}
-        title="Resource"
+        title={t("hub.access.form.resourceLabel")}
         disabled={identityDisabled}
       />
       {siblingOptions.length > 0 ? (
         <MultiSelectField
-          label="Also apply to"
-          hint="Projects on the same Host, each written as its own assignment. To cover every Project, including ones added later, grant the Host instead."
+          label={t("hub.access.form.alsoApplyLabel")}
+          hint={t("hub.access.form.alsoApplyHint")}
           options={siblingOptions}
           value={draft.alsoResourceKeys}
           onChange={draft.changeAlsoResources}
           disabled={identityDisabled}
-          placeholder="Only the Resource above"
-          searchPlaceholder="Search Projects"
+          placeholder={t("hub.access.form.alsoApplyPlaceholder")}
+          searchPlaceholder={t("hub.access.form.searchProjects")}
         />
       ) : null}
       <AccessLevelFields
@@ -265,15 +255,54 @@ function AccessAssignmentForm({
         />
       ) : null}
       {grantorError !== null ? (
-        <Alert variant="error" title="Above what you can grant" description={grantorError} />
+        <Alert
+          variant="error"
+          title={t("hub.access.form.grantorErrorTitle")}
+          description={grantorError}
+        />
       ) : null}
       <Button disabled={pending || !selection.valid || !draft.constraintsValid} onPress={submit}>
-        {editing ? "Save access" : "Grant access"}
+        {editing ? t("hub.access.form.saveAccess") : t("hub.access.form.grantAccess")}
       </Button>
       <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
-        Cancel
+        {t("hub.access.form.cancel")}
       </Button>
     </View>
+  );
+}
+
+/** What to read before editing: a Team grant changes it for the whole Team. */
+function FormNotices({
+  editing,
+  teams,
+  constraintsValid,
+}: {
+  editing: AccessAssignment | null;
+  teams: HubTeam[];
+  constraintsValid: boolean;
+}) {
+  const { t } = useTranslation();
+  const sharedTeam =
+    editing?.subjectKind === "team" ? teams.find(({ id }) => id === editing.subjectId) : undefined;
+  return (
+    <>
+      {sharedTeam === undefined ? null : (
+        <Alert
+          variant="warning"
+          title={t("hub.access.form.teamGrantTitle", { name: sharedTeam.name })}
+          description={t("hub.access.form.teamGrantDescription", {
+            count: sharedTeam.userIds.length,
+          })}
+        />
+      )}
+      {constraintsValid ? null : (
+        <Alert
+          variant="error"
+          title={t("hub.access.form.constraintsTitle")}
+          description={t("hub.access.form.constraintsDescription")}
+        />
+      )}
+    </>
   );
 }
 
@@ -291,22 +320,23 @@ function AccessLevelFields({
   pending: boolean;
   qrLogin: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <SelectField
-        label="Access level"
+        label={t("hub.access.form.accessLevelLabel")}
         value={draft.accessLevel}
         selectedDisplay={selectedOptionDisplay(selection.levelOptions, draft.accessLevel)}
         options={selection.levelOptions}
         onChange={draft.changeLevel}
-        placeholder="Choose an access level"
-        emptyText="Choose a supported resource first."
-        title="Access level"
+        placeholder={t("hub.access.form.accessLevelPlaceholder")}
+        emptyText={t("hub.access.form.accessLevelEmpty")}
+        title={t("hub.access.form.accessLevelLabel")}
         disabled={pending || selection.resource === undefined}
       />
       {selection.levelsAboveOwn.length > 0 ? (
         <Text style={settingsStyles.rowHint}>
-          Above your own level, not offered: {selection.levelsAboveOwn.join(", ")}
+          {t("hub.access.form.aboveOwn", { levels: selection.levelsAboveOwn.join(", ") })}
         </Text>
       ) : null}
       {selection.resource ? (
@@ -317,6 +347,9 @@ function AccessLevelFields({
           onChange={draft.setCanShare}
           disabled={pending}
         />
+      ) : null}
+      {selection.scheduleSwitch ? (
+        <SchedulesField value={draft.schedules} onChange={draft.setSchedules} disabled={pending} />
       ) : null}
       {selection.resource ? (
         <AccessLevelSummary
@@ -351,10 +384,11 @@ function AgentConfigurationSection({
   setFastMode(value: boolean): void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {/* A field label like "Access level" above it; the rows explain themselves. */}
-      <Field label="Allowed Agent configurations">
+      <Field label={t("hub.access.form.agentConfigurationsLabel")}>
         {catalog?.providers.length ? (
           <View style={styles.configurationList}>
             {configurations.map((configuration, index) => (
@@ -369,29 +403,27 @@ function AgentConfigurationSection({
               />
             ))}
             <Button size="xs" variant="outline" disabled={pending} onPress={addConfiguration}>
-              Add Agent configuration
+              {t("hub.access.form.addAgentConfiguration")}
             </Button>
           </View>
         ) : (
           <Alert
             variant="warning"
-            title="Agent choices are not available yet"
-            description="Keep the Host connected, then reopen Access after its Provider catalog is published."
+            title={t("hub.access.form.agentChoicesUnavailableTitle")}
+            description={t("hub.access.form.agentChoicesUnavailableDescription")}
           />
         )}
       </Field>
       <View style={styles.switchRow}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>Use Fast mode</Text>
-          <Text style={settingsStyles.rowHint}>
-            Off by default because Fast mode may cost more.
-          </Text>
+          <Text style={settingsStyles.rowTitle}>{t("hub.access.form.useFastMode")}</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.access.form.fastModeHint")}</Text>
         </View>
         <Switch
           value={fastMode}
           onValueChange={setFastMode}
           disabled={pending}
-          accessibilityLabel="Use Fast mode"
+          accessibilityLabel={t("hub.access.form.useFastMode")}
         />
       </View>
     </>

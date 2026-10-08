@@ -93,6 +93,39 @@ describe("buildChatRenderModel", () => {
     expect(rows[2]).toMatchObject({ opensGroup: true });
   });
 
+  it("a heartbeat run is a marker, not a user line, and reopens the next group", () => {
+    const name = "Heartbeat · Standup · run 2 of 5";
+    const heartbeat = { kind: "user", id: "sch_1", displayName: name } as const;
+    const run = { ...line(heartbeat, 2), scheduleRun: { scheduleId: "sch_1", run: 2 } };
+    // A user who named themselves like a heartbeat stays a user line.
+    const lookalike = line({ kind: "user", id: "usr_2", displayName: name }, 4);
+    const rows = buildChatRenderModel(
+      [line(user, 1), run, line(user, 3), lookalike],
+      new Map(),
+    ).rows;
+    expect(rows.map((row) => row.kind)).toEqual(["user", "heartbeat", "user", "user"]);
+    expect(rows[1]).toMatchObject({ label: "Heartbeat · Standup · run 2 of 5" });
+    expect(rows[2]).toMatchObject({ opensGroup: true });
+  });
+
+  it("keeps a turn's lines together but gives a later turn from the same bot its own group", () => {
+    const turn = (at: number, turnId: string) => ({
+      ...line(botA, at),
+      reply: { agentId: "agent-a", turnId },
+    });
+    // Two lines of one turn, then a heartbeat run in the session with no prompt between.
+    const rows = buildChatRenderModel(
+      [line(user, 1), turn(2, "t1"), turn(3, "t1"), turn(9, "t2")],
+      new Map(),
+    ).rows;
+    expect(rows.map((row) => ("opensGroup" in row ? row.opensGroup : null))).toEqual([
+      true,
+      true,
+      false,
+      true,
+    ]);
+  });
+
   it("drops live items a transcript line already references and keeps newer ones", () => {
     const transcript = [
       line(user, 1),

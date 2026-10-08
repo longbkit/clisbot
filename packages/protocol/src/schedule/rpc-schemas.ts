@@ -14,10 +14,7 @@ const ScheduleCreateTargetSchema = z.discriminatedUnion("type", [
     type: z.literal("self"),
     agentId: z.guid(),
   }),
-  z.object({
-    type: z.literal("agent"),
-    agentId: z.guid(),
-  }),
+  ScheduleTargetSchema.options[0],
   z.object({
     type: z.literal("new-agent"),
     config: ScheduleCreateNewAgentConfigSchema,
@@ -85,6 +82,7 @@ const ScheduleUpdateNewAgentConfigSchema = z.object({
   archiveOnFinish: z.boolean().optional(),
   isolation: z.enum(["local", "worktree"]).optional(),
   cwd: z.string().trim().min(1).optional(),
+  workspaceId: z.string().trim().min(1).nullable().optional(),
 });
 
 export const ScheduleUpdateRequestSchema = z.object({

@@ -3,6 +3,7 @@ import { Ellipsis } from "lucide-react-native";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { BotPayload } from "../data/contracts";
@@ -117,6 +118,7 @@ function ChatOptionsMenu({
   onOpenProject: () => void;
   archiveDisabled: boolean;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const triggerStyle = useCallback(
     (state: MenuTriggerState) =>
@@ -132,7 +134,7 @@ function ChatOptionsMenu({
   return (
     <DropdownMenu compactMode="sheet" open={visible} onOpenChange={setVisible}>
       <DropdownMenuTrigger
-        accessibilityLabel="Chat options"
+        accessibilityLabel={t("bots.chat.options.title")}
         testID="chat-options-trigger"
         style={triggerStyle}
       >
@@ -141,14 +143,19 @@ function ChatOptionsMenu({
           uniProps={extraMutedIconColorMapping}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent sheetTitle="Chat options" align="end" width={280} pages={pages}>
+      <DropdownMenuContent
+        sheetTitle={t("bots.chat.options.title")}
+        align="start"
+        width={280}
+        pages={pages}
+      >
         <DropdownMenuSubTrigger
           id="tabs"
           disabled={!tabCount}
           value={String(tabCount)}
           leading={SWITCH_TAB_ICON}
         >
-          Switch tab
+          {t("bots.chat.options.switchTab")}
         </DropdownMenuSubTrigger>
         <DropdownMenuSeparator />
         {middle.map((action) => (
@@ -156,12 +163,12 @@ function ChatOptionsMenu({
         ))}
         {project ? (
           <DropdownMenuItem onSelect={onOpenProject} leading={PROJECT_ACTIONS_ICON}>
-            Project actions
+            {t("bots.chat.options.projectActions")}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuSubTrigger id="fresh" leading={FRESH_SESSION_ICON}>
-          Start a fresh session
+          {t("bots.chat.options.freshSession")}
         </DropdownMenuSubTrigger>
         {pinAction ? <ResourceActionItem action={pinAction} onSelect={onAction} /> : null}
         {archiveAction ? (

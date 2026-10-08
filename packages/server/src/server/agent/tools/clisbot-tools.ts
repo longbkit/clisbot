@@ -1,4 +1,5 @@
 import { CONNECTORS_OFF_LABEL, formatConnectorsOff } from "@clisbot/protocol/connectors/types";
+import { assertRunLimit, assertRunLimitForUpdate } from "../../schedule/run-limit.js";
 import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import { stat } from "node:fs/promises";
 import { z } from "zod";
@@ -2573,7 +2574,12 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
         ),
         cwd: z.string().optional(),
         isolation: z.enum(["local", "worktree"]).optional(),
-        maxRuns: z.number().int().positive().optional(),
+        maxRuns: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Required when the cron repeats more than once a day."),
         expiresIn: z.string().optional(),
       },
       outputSchema: ScheduleSummarySchema.shape,
@@ -2584,12 +2590,14 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
       }
 
       const expiresAt = buildScheduleExpiry(expiresIn);
+      const cadence = buildCronScheduleCadence({
+        cron,
+        ...(timezone !== undefined ? { timezone } : {}),
+      });
+      assertRunLimit(cadence, maxRuns);
       const schedule = await scheduleService.createOrReplace({
         prompt: prompt.trim(),
-        cadence: buildCronScheduleCadence({
-          cron,
-          ...(timezone !== undefined ? { timezone } : {}),
-        }),
+        cadence,
         target: resolveNewAgentScheduleTarget({ provider, cwd, isolation }),
         ...(name?.trim() ? { name: name.trim() } : {}),
         ...(maxRuns === undefined ? {} : { maxRuns }),
@@ -2618,7 +2626,12 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
           .optional()
           .describe("IANA time zone for the cron cadence. For example: America/New_York."),
         name: z.string().optional(),
-        maxRuns: z.number().int().positive().optional(),
+        maxRuns: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Required when the cron repeats more than once a day."),
         expiresIn: z.string().optional(),
       },
       outputSchema: ScheduleSummarySchema.shape,
@@ -2633,13 +2646,15 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
       resolveCallerAgent();
 
       const expiresAt = buildScheduleExpiry(expiresIn);
+      const cadence = buildCronScheduleCadence({
+        cron,
+        ...(timezone !== undefined ? { timezone } : {}),
+      });
+      assertRunLimit(cadence, maxRuns);
       const schedule = await scheduleService.createOrReplace({
         prompt: prompt.trim(),
-        cadence: buildCronScheduleCadence({
-          cron,
-          ...(timezone !== undefined ? { timezone } : {}),
-        }),
-        target: { type: "agent", agentId: callerAgentId },
+        cadence,
+        target: await scheduleService.heartbeatTargetFor(callerAgentId),
         ...(name?.trim() ? { name: name.trim() } : {}),
         ...(maxRuns === undefined ? {} : { maxRuns }),
         ...(expiresAt === undefined ? {} : { expiresAt }),
@@ -2825,7 +2840,9 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
             .positive()
             .nullable()
             .optional()
-            .describe("New max runs limit (null to clear)."),
+            .describe(
+              "New max runs limit (null to clear; refused when the cron repeats more than once a day).",
+            ),
           provider: z
             .string()
             .trim()
@@ -2861,8 +2878,10 @@ export function createClisbotToolCatalog(options: ClisbotToolHostDependencies): 
         throw new Error("Schedule service is not configured");
       }
 
-      await requireScheduleTarget(input.id, "new-agent");
-      const schedule = await scheduleService.update(buildScheduleUpdateInput(input));
+      const current = await requireScheduleTarget(input.id, "new-agent");
+      const update = buildScheduleUpdateInput(input);
+      await assertRunLimitForUpdate(async () => current, update);
+      const schedule = await scheduleService.update(update);
 
       return {
         content: [],

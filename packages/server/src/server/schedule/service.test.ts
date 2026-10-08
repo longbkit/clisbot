@@ -269,6 +269,7 @@ function buildAgentRecord(params: {
   cwd: string;
   iso: string;
   archivedAt?: string | null;
+  labels?: Record<string, string>;
 }) {
   return {
     id: params.id,
@@ -279,7 +280,7 @@ function buildAgentRecord(params: {
     lastActivityAt: params.iso,
     lastUserMessageAt: null,
     title: params.id,
-    labels: {},
+    labels: params.labels ?? {},
     lastStatus: "closed" as const,
     lastModeId: "default",
     config: { modeId: "default" },
@@ -496,6 +497,45 @@ describe("ScheduleService", () => {
       expect.stringContaining(`Schedule fired (id=${schedule.id}, run=`),
       undefined,
     ]);
+  });
+
+  test("marks each heartbeat run in the session's timeline before the prompt", async () => {
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    const agent = await manager.createAgent({ provider: "claude", cwd: tempDir }, undefined, {
+      workspaceId: undefined,
+    });
+    const order: string[] = [];
+    vi.spyOn(manager, "appendTimelineItem").mockImplementation(async (_agentId, item) => {
+      order.push(item.type === "notification" ? item.message : item.type);
+      return { seq: 1, epoch: "e" };
+    });
+    vi.spyOn(manager, "steerOrReplaceActiveTurn").mockImplementation(async () => {
+      order.push("prompt");
+      return undefined as never;
+    });
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+    });
+    const schedule = await service.create({
+      name: "Check CI",
+      prompt: "Check CI and report",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId: agent.id },
+      maxRuns: 20,
+    });
+
+    await service.runOnce(schedule.id).catch(() => undefined);
+
+    expect(order.slice(0, 2)).toEqual(["Heartbeat · Check CI · run 1 of 20", "prompt"]);
   });
 
   test("titles scheduled new agents from the schedule prompt", async () => {
@@ -3322,5 +3362,282 @@ describe("ScheduleService", () => {
     now = new Date("2026-01-01T00:01:00.000Z");
     expect(await service.completeForAgent(agentId)).toBe(1);
     expect(await service.completeForAgent(agentId)).toBe(0);
+  });
+
+  test("runs a new-agent schedule in an existing workspace and never archives it", async () => {
+    const existing: PersistedWorkspaceRecord = {
+      workspaceId: "wks_existing_target",
+      projectId: "test-project",
+      cwd: tempDir,
+      kind: "directory",
+      displayName: "test-project",
+      title: "Existing",
+      branch: null,
+      baseBranch: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      archivedAt: null,
+    };
+    const createdIn: Array<string | undefined> = [];
+    const archived: string[] = [];
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      findWorkspace: async (workspaceId) =>
+        workspaceId === existing.workspaceId ? existing : null,
+      createDirectoryWorkspace: async () => {
+        throw new Error("must not create a workspace");
+      },
+      archiveWorkspace: async (workspaceId) => {
+        archived.push(workspaceId);
+      },
+      createAgent: async (input) => {
+        createdIn.push(input.workspaceId);
+        throw new Error("stop after placement");
+      },
+      now: () => now,
+    });
+    const created = await service.create({
+      prompt: "run in place",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: {
+        type: "new-agent",
+        config: { provider: "claude", cwd: tempDir, workspaceId: existing.workspaceId },
+      },
+      runOnCreate: false,
+    });
+
+    await expect(
+      (service as unknown as ScheduleServiceInternals).executeSchedule(created, "run-in-place"),
+    ).rejects.toThrow("stop after placement");
+
+    expect(createdIn).toEqual([existing.workspaceId]);
+    expect(archived).toEqual([]);
+  });
+
+  test("an archived existing workspace ends the schedule as target gone", async () => {
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      findWorkspace: async (workspaceId) => ({
+        workspaceId,
+        projectId: "test-project",
+        cwd: tempDir,
+        kind: "directory",
+        displayName: "test-project",
+        title: null,
+        branch: null,
+        baseBranch: null,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        archivedAt: now.toISOString(),
+      }),
+      now: () => now,
+    });
+    const created = await service.create({
+      prompt: "run in place",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: {
+        type: "new-agent",
+        config: { provider: "claude", cwd: tempDir, workspaceId: "wks_gone" },
+      },
+      runOnCreate: false,
+    });
+
+    await service.runOnce(created.id);
+
+    expect(await service.inspect(created.id)).toMatchObject({
+      status: "completed",
+      runs: [
+        expect.objectContaining({ status: "failed", error: "Workspace wks_gone is archived" }),
+      ],
+    });
+  });
+
+  test("retargetAgent moves unfinished heartbeats to a new session", async () => {
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+      runner: async () => ({ agentId: null, output: "ok" }),
+    });
+    const oldAgentId = "44444444-4444-4444-8444-444444444444";
+    const newAgentId = "55555555-5555-4555-8555-555555555555";
+    const active = await service.create({
+      prompt: "keep watching",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId: oldAgentId },
+    });
+    const done = await service.create({
+      prompt: "finished",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId: oldAgentId },
+    });
+    await service.completeForAgent(oldAgentId);
+    await service.resume(active.id).catch(() => undefined);
+
+    expect(await service.retargetAgent(oldAgentId, newAgentId)).toBe(0);
+
+    const fresh = await service.create({
+      prompt: "fresh",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId: oldAgentId },
+    });
+    expect(await service.retargetAgent(oldAgentId, newAgentId)).toBe(1);
+    expect((await service.inspect(fresh.id)).target).toEqual({
+      type: "agent",
+      agentId: newAgentId,
+    });
+    expect((await service.inspect(done.id)).target).toEqual({ type: "agent", agentId: oldAgentId });
+  });
+  test("a chat heartbeat posts each run into its Chat instead of prompting the session", async () => {
+    const agentId = "77777777-7777-4777-8777-777777777777";
+    await agentStorage.upsert(
+      buildAgentRecord({
+        id: agentId,
+        cwd: tempDir,
+        iso: now.toISOString(),
+        labels: { "clisbot.bot-id": "bot_a", "clisbot.chat-id": "chat_1" },
+      }),
+    );
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+    });
+    const chatTarget = { type: "agent" as const, agentId, chatId: "chat_1" };
+    // Without Chats on the host a Chat target is refused, and a Chat must be the session's own.
+    await expect(
+      service.create({
+        prompt: "standup",
+        cadence: { type: "every", everyMs: 60_000 },
+        target: chatTarget,
+      }),
+    ).rejects.toThrow("Chats are not running on this host");
+    const posts: unknown[] = [];
+    service.attachChats({
+      postScheduled: async (post) => {
+        posts.push(post);
+        return posts.length === 1
+          ? { status: "posted", agentId }
+          : { status: "gone", reason: "The Bot left the Chat" };
+      },
+    });
+    await expect(
+      service.create({
+        prompt: "standup",
+        cadence: { type: "every", everyMs: 60_000 },
+        target: { type: "agent", agentId, chatId: "chat_2" },
+      }),
+    ).rejects.toThrow("is not a Bot session of Chat chat_2");
+
+    const schedule = await service.create({
+      name: "Standup",
+      prompt: "standup",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId, chatId: "chat_1" },
+    });
+    const first = await service.runOnce(schedule.id);
+    expect(posts[0]).toEqual({
+      chatId: "chat_1",
+      botId: "bot_a",
+      text: "standup",
+      messageId: `schedule-${schedule.id}-${first.runs[0]!.id}`,
+      actor: { kind: "automation", id: schedule.id, displayName: "Heartbeat · Standup · run 1" },
+      scheduleRun: { scheduleId: schedule.id, run: 1 },
+    });
+    expect(first.runs[0]).toMatchObject({ status: "succeeded", agentId });
+
+    const second = await service.runOnce(schedule.id);
+    expect(second.status).toBe("completed");
+    expect(second.runs.at(-1)).toMatchObject({ status: "failed", error: "The Bot left the Chat" });
+
+    const newAgentId = "88888888-8888-4888-8888-888888888888";
+    const kept = await service.create({
+      prompt: "kept",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId, chatId: "chat_1" },
+    });
+    await service.retargetAgent(agentId, newAgentId);
+    expect((await service.inspect(kept.id)).target).toEqual({
+      type: "agent",
+      agentId: newAgentId,
+      chatId: "chat_1",
+    });
+  });
+
+  test("a chat heartbeat follows its Bot: archiving, re-registering and a late Chat start", async () => {
+    const agentId = "99999999-9999-4999-8999-999999999999";
+    await agentStorage.upsert(
+      buildAgentRecord({
+        id: agentId,
+        cwd: tempDir,
+        iso: now.toISOString(),
+        labels: { "clisbot.bot-id": "bot_a", "clisbot.chat-id": "chat_1" },
+      }),
+    );
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+    });
+    const posts: unknown[] = [];
+    service.attachChats({
+      postScheduled: async (post) => {
+        posts.push(post);
+        return { status: "posted", agentId };
+      },
+    });
+    // The agent's own heartbeat goes through its Chat, and re-registering by name keeps that.
+    expect(await service.heartbeatTargetFor(agentId)).toEqual({
+      type: "agent",
+      agentId,
+      chatId: "chat_1",
+    });
+    const beat = await service.createOrReplace({
+      name: "digest",
+      prompt: "digest",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId, chatId: "chat_1", mentionBotIds: ["bot_a", "bot_b"] },
+      runOnCreate: false,
+    });
+    await service.createOrReplace({
+      name: "digest",
+      prompt: "digest v2",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "agent", agentId },
+      runOnCreate: false,
+    });
+    expect((await service.inspect(beat.id)).target).toEqual({
+      type: "agent",
+      agentId,
+      chatId: "chat_1",
+      mentionBotIds: ["bot_a", "bot_b"],
+    });
+
+    // Archiving the session does not end it; the Chat starts the next one.
+    expect(await service.completeForAgent(agentId)).toBe(0);
+    expect((await service.inspect(beat.id)).status).toBe("active");
+
+    // A due run waits while Chats are not attached, then runs once they are.
+    service.attachChats(undefined);
+    now = new Date(now.getTime() + 120_000);
+    await service.tick();
+    expect((await service.inspect(beat.id)).runs).toHaveLength(0);
   });
 });

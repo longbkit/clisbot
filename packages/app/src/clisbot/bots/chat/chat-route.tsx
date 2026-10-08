@@ -9,11 +9,13 @@ import { botsSessionScope, scopedTranscriptKey } from "../data/session-scope";
 import { useIsFocused } from "@react-navigation/native";
 import { useChatLiveHeads } from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
+import { ChatHeartbeatsButton } from "@/clisbot/heartbeats/chat-heartbeats-button";
 import { isGroupChat } from "./chat-kind";
 import { ParticipantActions } from "./participant-actions";
 import { StopAllAction } from "./stop-all-action";
 import { useCallback, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { View, Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
@@ -37,6 +39,7 @@ export default function ChatRoute() {
   );
 }
 function Gate() {
+  const { t } = useTranslation();
   const { serverId = "", chatId = "" } = useLocalSearchParams<{
     serverId: string;
     chatId: string;
@@ -48,8 +51,8 @@ function Gate() {
     return (
       <Text>
         {status === "online"
-          ? "Bots and Chats is not enabled on this Host."
-          : "Connecting to Host…"}
+          ? t("bots.chat.route.notEnabled")
+          : t("bots.chat.common.connectingToHost")}
       </Text>
     );
   return (
@@ -61,6 +64,7 @@ function Gate() {
   );
 }
 function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: string }) {
+  const { t } = useTranslation();
   const snapshot = useHostRuntimeSnapshot(serverId);
   const key = scopedTranscriptKey(serverId, chatId, snapshot);
   const principalScope = useResourcePrincipalScope();
@@ -92,22 +96,27 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const working = group && [...heads.values()].some((head) => head.turnActive);
   // Clisbot Connectors: the Chat's own tools off list, for the composer's Tools chip.
   const chatTools = useChatToolsValue({ serverId, chat, bots: identities, group, client });
+  const headingActions = useChatHeadingActions({ chat, serverId, botRows });
   const options = useChatHeaderOptions({
     chat,
     chatId,
     serverId,
-    botRows,
     workspaceByBotId,
     working,
     setError,
   });
   if (transcript.loadState.status === "error")
     return <Text accessibilityRole="alert">{transcript.loadState.message}</Text>;
-  if (!chat) return <Text>{error ?? (online ? "Loading chat…" : "Connecting to Host…")}</Text>;
+  if (!chat)
+    return (
+      <Text>
+        {error ?? (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
+      </Text>
+    );
   const title = chat.title ?? identities.map((b) => b.name).join(", ");
   return (
     <View style={styles.root}>
-      {!online ? <Text style={styles.error}>Host is offline. Your draft is saved.</Text> : null}
+      {!online ? <Text style={styles.error}>{t("bots.chat.route.offline")}</Text> : null}
       {error ? (
         <Text accessibilityRole="alert" style={styles.error}>
           {error}
@@ -122,6 +131,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
           title={title}
           bots={identities}
           headerActions={options}
+          headingActions={headingActions}
         >
           <ChatScreen
             hideHeader
@@ -183,7 +193,6 @@ function useChatHeaderOptions({
   chat,
   chatId,
   serverId,
-  botRows,
   workspaceByBotId,
   working,
   setError,
@@ -191,7 +200,6 @@ function useChatHeaderOptions({
   chat: ChatPayload | null;
   chatId: string;
   serverId: string;
-  botRows: ChatIdentities["botRows"];
   workspaceByBotId: ChatIdentities["workspaceByBotId"];
   working: boolean;
   setError: (value: string | null) => void;
@@ -208,10 +216,31 @@ function useChatHeaderOptions({
             participants={chat.participants}
             group={isGroupChat(chat)}
           />
-          <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
         </View>
       ) : null,
-    [botRows, chat, chatId, serverId, workspaceByBotId, working, setError],
+    [chat, chatId, serverId, workspaceByBotId, working, setError],
+  );
+}
+
+/** The chat's ⋯ and Heartbeats, right after the heading as in the workspace header. */
+function useChatHeadingActions({
+  chat,
+  serverId,
+  botRows,
+}: {
+  chat: ChatPayload | null;
+  serverId: string;
+  botRows: ChatIdentities["botRows"];
+}) {
+  return useMemo(
+    () =>
+      chat ? (
+        <>
+          <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
+          <ChatHeartbeatsButton serverId={serverId} chat={chat} />
+        </>
+      ) : null,
+    [botRows, chat, serverId],
   );
 }
 

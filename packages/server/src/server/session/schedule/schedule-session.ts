@@ -1,9 +1,13 @@
 import type pino from "pino";
+import { assertRunLimit, assertRunLimitForUpdate } from "../../schedule/run-limit.js";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
+import type { StoredSchedule } from "@clisbot/protocol/schedule/types";
 import type { ScheduleService } from "../../schedule/service.js";
 
 export interface ScheduleSessionHost {
   emit(msg: SessionOutboundMessage): void;
+  /** Drops schedules the session may not see (Managed Access Project scope). */
+  filterSchedules?(schedules: StoredSchedule[]): Promise<StoredSchedule[]>;
 }
 
 export interface ScheduleSessionOptions {
@@ -29,8 +33,8 @@ export class ScheduleSession {
     SessionOutboundMessage,
     { type: "schedule/list/response" }
   >["payload"]["schedules"][number] {
-    const { runs: _runs, ...summary } = schedule;
-    return summary;
+    const { runs, ...summary } = schedule;
+    return { ...summary, runCount: runs.filter((run) => run.status !== "running").length };
   }
 
   private emitScheduleRpcError(
@@ -72,6 +76,7 @@ export class ScheduleSession {
         request.target.type === "self"
           ? { type: "agent" as const, agentId: request.target.agentId }
           : request.target;
+      assertRunLimit(request.cadence, request.maxRuns);
       const schedule = await this.scheduleService.create({
         prompt: request.prompt,
         name: request.name,
@@ -98,7 +103,10 @@ export class ScheduleSession {
     request: Extract<SessionInboundMessage, { type: "schedule/list" }>,
   ): Promise<void> {
     try {
-      const schedules = await this.scheduleService.list();
+      const listed = await this.scheduleService.list();
+      const schedules = this.host.filterSchedules
+        ? await this.host.filterSchedules(listed)
+        : listed;
       this.host.emit({
         type: "schedule/list/response",
         payload: {
@@ -224,6 +232,10 @@ export class ScheduleSession {
     request: Extract<SessionInboundMessage, { type: "schedule/update" }>,
   ): Promise<void> {
     try {
+      await assertRunLimitForUpdate(() => this.scheduleService.inspect(request.scheduleId), {
+        cadence: request.cadence,
+        maxRuns: request.maxRuns,
+      });
       const schedule = await this.scheduleService.update({
         id: request.scheduleId,
         ...(request.name !== undefined ? { name: request.name } : {}),

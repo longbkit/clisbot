@@ -83,13 +83,68 @@ export function MenuPage({ depth, children }: PropsWithChildren<{ depth: number 
 export function MenuLabel({
   children,
   style,
+  numberOfLines,
   testID,
-}: PropsWithChildren<{ style?: ViewStyle | ViewStyle[]; testID?: string }>): ReactElement {
+}: PropsWithChildren<{
+  style?: ViewStyle | ViewStyle[];
+  /** A section heading naming an entity (a session, a project) stays on one line. */
+  numberOfLines?: number;
+  testID?: string;
+}>): ReactElement {
   const labelContainerStyle = useMemo(() => [styles.labelContainer, style], [style]);
   return (
     <View style={labelContainerStyle} testID={testID}>
-      <Text style={styles.labelText}>{children}</Text>
+      <Text style={styles.labelText} numberOfLines={numberOfLines}>
+        {children}
+      </Text>
     </View>
+  );
+}
+
+/**
+ * A small icon button in a row's trailing slot: an action on the thing the row stands for
+ * (pause a schedule) that must not also choose the row. It stops the press from reaching the
+ * row, so the row's own `onSelect` keeps meaning "open it".
+ */
+export function MenuItemAction({
+  icon,
+  label,
+  onPress,
+  disabled = false,
+  testID,
+}: {
+  icon: ReactElement;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+}): ReactElement {
+  const handlePress = useCallback(
+    (event: { stopPropagation?: () => void }) => {
+      event.stopPropagation?.();
+      onPress();
+    },
+    [onPress],
+  );
+  const actionStyle = useCallback(
+    ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.action,
+      (hovered || pressed) && !disabled ? styles.actionHovered : null,
+      disabled ? styles.itemDisabled : null,
+    ],
+    [disabled],
+  );
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={handlePress}
+      style={actionStyle}
+      testID={testID}
+    >
+      {icon}
+    </Pressable>
   );
 }
 
@@ -222,9 +277,32 @@ function resolveItemLabel(input: {
   return children;
 }
 
+function MenuItemDescription({
+  children,
+  lines = 2,
+  ellipsize = "tail",
+}: {
+  children: string;
+  lines?: 1 | 2;
+  ellipsize?: "tail" | "middle";
+}): ReactElement {
+  return (
+    <Text numberOfLines={lines} ellipsizeMode={ellipsize} style={styles.itemDescription}>
+      {children}
+    </Text>
+  );
+}
+
 export interface MenuItemProps {
   style?: StyleProp<ViewStyle>;
   description?: string;
+  /**
+   * Lines the description may take. One line keeps a list of entity rows (a path, a schedule's
+   * next run) on one rhythm; see "Entity rows" in docs/menus.md.
+   */
+  descriptionLines?: 1 | 2;
+  /** Where a one-line description gives way. `middle` keeps both ends of a path. */
+  descriptionEllipsize?: "tail" | "middle";
   onSelect?: () => void;
   disabled?: boolean;
   muted?: boolean;
@@ -259,6 +337,8 @@ export function MenuItem({
   children,
   style,
   description,
+  descriptionLines,
+  descriptionEllipsize,
   onSelect,
   disabled,
   muted = false,
@@ -361,9 +441,9 @@ export function MenuItem({
           {label}
         </Text>
         {description && !isPending && !isSuccess ? (
-          <Text numberOfLines={2} style={styles.itemDescription}>
+          <MenuItemDescription lines={descriptionLines} ellipsize={descriptionEllipsize}>
             {description}
-          </Text>
+          </MenuItemDescription>
         ) : null}
       </View>
       {trailingContent ? <View style={styles.trailingSlot}>{trailingContent}</View> : null}
@@ -394,9 +474,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.spacing[2],
     paddingBottom: theme.spacing[1],
   },
+  // Group headings step back from the rows they head.
   labelText: {
     fontSize: theme.fontSize.sm,
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
   },
   // `border` sits between surface1 and surface2, which put it within a hair of the hover fill and
   // made separators vanish against a hovered row. `borderAccent` is the colour the menu surface
@@ -515,7 +596,7 @@ const styles = StyleSheet.create((theme) => ({
   itemDescription: {
     marginTop: 2,
     fontSize: theme.fontSize.sm,
-    color: theme.colors.foregroundMuted,
+    color: theme.colors.foregroundExtraMuted,
   },
   checkSlot: {
     width: 16,
@@ -535,5 +616,16 @@ const styles = StyleSheet.create((theme) => ({
   itemContent: {
     flexShrink: 1,
     minWidth: 0,
+  },
+  // Half a row tall, so a row carrying actions keeps the row height.
+  action: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.borderRadius.base,
+  },
+  actionHovered: {
+    backgroundColor: theme.colors.surface3,
   },
 }));

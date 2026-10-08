@@ -5316,6 +5316,7 @@ describe("schedule dispatch routing", () => {
         requestId: "rt-sched-create",
         prompt: "p",
         cadence: { type: "every", everyMs: 1000 },
+        maxRuns: 3,
         target: { type: "agent", agentId: "00000000-0000-0000-0000-000000000000" },
       },
       code: "schedule_request_failed",

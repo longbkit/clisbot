@@ -8,6 +8,7 @@ import { resolveClientMessageId } from "../client-message-id.js";
 import { wrapSpokenInput } from "../voice-config.js";
 import type { ChatMessageFiles, SendMessageInput, SendMessageResult } from "./chat-engine.js";
 import type { ChatBot } from "./chat-record.js";
+import type { MentionableParticipant } from "./mentions.js";
 import {
   type RoomContractInput,
   renderRoomContract,
@@ -104,4 +105,23 @@ function messageContent(input: { text: string } & ChatMessageFiles): string {
       a.type === "uploaded_file" ? Object.assign({}, a, { path: undefined }) : a,
     ),
   });
+}
+
+/**
+ * Who a heartbeat run reaches and what it says: the Bots it was set to tag that are still members
+ * (else its own Bot), and in a group their tags before the prompt so the room reads who it is for.
+ */
+export function scheduledLine(
+  members: readonly MentionableParticipant[],
+  input: { botId: string; mentionBotIds?: readonly string[]; text: string },
+  group: boolean,
+): { targets: string[]; text: string } {
+  const present = new Set(members.map((member) => member.botId));
+  const chosen = (input.mentionBotIds ?? []).filter((botId) => present.has(botId));
+  const targets = [...new Set(chosen.length > 0 ? chosen : [input.botId])];
+  if (!group) return { targets, text: input.text };
+  const tags = targets.map(
+    (botId) => `@${members.find((member) => member.botId === botId)?.slug ?? botId}`,
+  );
+  return { targets, text: `${tags.join(" ")} ${input.text}` };
 }

@@ -26,6 +26,11 @@ export interface BotSessionsDependencies {
   createAgent: BoundCreateAgentCommand;
   /** Loads (resumes) the session; throws when the provider cannot resume it. */
   ensureLoaded: (agentId: string) => Promise<unknown>;
+  /**
+   * Points the pair's heartbeats from its earlier sessions at the new one, so they keep reporting
+   * into the Chat after `/new` (docs/audits/2026-10-06-conversation-schedules.md). Never throws.
+   */
+  moveHeartbeats?: (fromAgentIds: readonly string[], toAgentId: string) => Promise<void>;
 }
 
 /** What a session created by `resolve` starts with. */
@@ -139,7 +144,16 @@ export class BotSessions {
     );
     const agentId = result.snapshot.id;
     await this.deps.store.setParticipantAgent(chat.id, bot.id, agentId);
+    await this.moveHeartbeats(chat.id, bot.id, agentId);
     return { agentId, created: true, replaced };
+  }
+
+  private async moveHeartbeats(chatId: string, botId: string, agentId: string): Promise<void> {
+    if (!this.deps.moveHeartbeats) return;
+    const earlier = (await this.deps.agentStorage.list())
+      .filter((record) => record.id !== agentId && belongsTo(record, chatId, botId))
+      .map((record) => record.id);
+    if (earlier.length > 0) await this.deps.moveHeartbeats(earlier, agentId);
   }
 }
 

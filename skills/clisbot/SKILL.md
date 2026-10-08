@@ -98,6 +98,8 @@ Only set feature IDs returned by `inspect_provider`. For Codex fast mode, look f
 
 **`create_heartbeat`** — sends you a prompt on a cron cadence. Required: `prompt`, `cron`. Optional: `timezone`, `name`, `maxRuns`, `expiresIn`. Use for reminders, PR/build babysitting, and status checks that should return to this conversation.
 
+Both refuse a cron that repeats more than once a day without `maxRuns`: every N minutes, hourly, or several times a day all need it. Once a day or less needs none.
+
 **`delete_heartbeat`** stops it. MCP intentionally exposes no heartbeat update tool; delete and recreate when its task or cadence changes.
 
 Schedules have the full list/inspect/update/pause/resume/run-once/log/delete surface. Heartbeats deliberately do not.
@@ -122,8 +124,8 @@ clisbot run --provider codex/gpt-5.4 --mode full-access --workspace <workspace-i
 clisbot run --provider codex/gpt-5.4 --mode full-access --new-workspace worktree --worktree-mode branch-off --new-branch fix-x --base origin/main "<prompt>"
 clisbot send <agent-id> "<follow-up>"
 clisbot ls
-clisbot schedule create --cron "*/15 * * * *" "ping main build"
-clisbot heartbeat create --cron "*/15 * * * *" "check the build"
+clisbot schedule create --cron "*/15 * * * *" --max-runs 8 "ping main build"
+clisbot heartbeat create --cron "*/15 * * * *" --max-runs 8 "check the build"
 ```
 
 Discover with `clisbot --help` and `clisbot <cmd> --help`.

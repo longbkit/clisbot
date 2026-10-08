@@ -64,7 +64,8 @@ function createGitRepo(): string {
 }
 
 async function createNewAgentSchedule(options: ScheduleCreateOptions): Promise<ScheduleSummary> {
-  const response = await ctx.client.scheduleCreate(options);
+  // A schedule that repeats within the day needs Max runs.
+  const response = await ctx.client.scheduleCreate({ maxRuns: 10, ...options });
   if (response.error || !response.schedule) {
     throw new Error(response.error ?? "schedule/create returned no schedule");
   }

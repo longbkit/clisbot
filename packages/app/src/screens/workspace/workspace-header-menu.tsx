@@ -29,7 +29,7 @@ import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
 import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
-import { wrappablePath } from "@/utils/shorten-path";
+import { shortenPath } from "@/utils/shorten-path";
 import { CopyProjectPathItem } from "@/clisbot/workspace-header/copy-project-path-item";
 import type { Theme } from "@/styles/theme";
 
@@ -106,7 +106,9 @@ function WorkspaceHeaderWorkspaceActionItems({
         leading={MENU_COPY_ICON}
         disabled={copyPathDisabled}
         onSelect={onCopyWorkspacePath}
-        description={wrappablePath(workspaceDirectory) || undefined}
+        description={shortenPath(workspaceDirectory) || undefined}
+        descriptionLines={1}
+        descriptionEllipsize="middle"
       >
         {t("workspace.header.actions.copyPath")}
       </DropdownMenuItem>

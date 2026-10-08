@@ -19,6 +19,14 @@ interface HeartbeatOptions extends CommandOptions {
   expiresIn?: string;
 }
 
+function parseMaxRunsOption(raw: string | undefined): number | undefined {
+  const maxRuns = raw ? Number.parseInt(raw, 10) : undefined;
+  if (maxRuns !== undefined && (!Number.isSafeInteger(maxRuns) || maxRuns <= 0)) {
+    throw new Error("--max-runs must be a positive integer");
+  }
+  return maxRuns;
+}
+
 interface HeartbeatDeleteRow {
   id: string;
   status: "deleted";
@@ -66,10 +74,7 @@ async function runCreateHeartbeat(
   }
   const { client } = await connectScheduleClient(options.daemonTarget);
   try {
-    const maxRuns = options.maxRuns ? Number.parseInt(options.maxRuns, 10) : undefined;
-    if (maxRuns !== undefined && (!Number.isSafeInteger(maxRuns) || maxRuns <= 0)) {
-      throw new Error("--max-runs must be a positive integer");
-    }
+    const maxRuns = parseMaxRunsOption(options.maxRuns);
     const payload = await client.scheduleCreate({
       prompt: prompt.trim(),
       cadence: {
@@ -105,6 +110,7 @@ async function runUpdateHeartbeat(
   if (!cron) {
     throw new Error("--cron is required");
   }
+  const maxRuns = parseMaxRunsOption(options.maxRuns);
   const { client } = await connectScheduleClient(options.daemonTarget);
   try {
     await requireOwnedHeartbeat(client, id, agentId);
@@ -115,6 +121,7 @@ async function runUpdateHeartbeat(
         expression: cron,
         ...(options.timezone?.trim() ? { timezone: options.timezone.trim() } : {}),
       },
+      ...(maxRuns ? { maxRuns } : {}),
     });
     if (payload.error || !payload.schedule) {
       throw new Error(payload.error ?? `Heartbeat update failed: ${id}`);
@@ -162,7 +169,10 @@ export function createHeartbeatCommand(): Command {
       .requiredOption("--cron <expr>", "Five-field cron cadence")
       .option("--timezone <iana>", "IANA time zone")
       .option("--name <name>", "Heartbeat name")
-      .option("--max-runs <n>", "Maximum number of runs")
+      .option(
+        "--max-runs <n>",
+        "Maximum number of runs; required when it repeats more than once a day",
+      )
       .option("--expires-in <duration>", "Time to live"),
   ).action(withOutput(runCreateHeartbeat));
   addJsonAndDaemonHostOptions(
@@ -171,7 +181,11 @@ export function createHeartbeatCommand(): Command {
       .description("Change a heartbeat cron cadence")
       .argument("<id>", "Heartbeat ID")
       .requiredOption("--cron <expr>", "Five-field cron cadence")
-      .option("--timezone <iana>", "IANA time zone"),
+      .option("--timezone <iana>", "IANA time zone")
+      .option(
+        "--max-runs <n>",
+        "Maximum number of runs; required when it repeats more than once a day",
+      ),
   ).action(withOutput(runUpdateHeartbeat));
   addJsonAndDaemonHostOptions(
     heartbeat.command("delete").description("Delete a heartbeat").argument("<id>", "Heartbeat ID"),

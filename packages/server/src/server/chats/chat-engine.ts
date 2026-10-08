@@ -35,6 +35,7 @@ import {
   agentPromptFor,
   botReplyLine,
   duplicateSend,
+  scheduledLine,
   errorLine,
   messageContentDigest,
   replacementNotice,
@@ -102,6 +103,22 @@ export interface SendMessageResult {
   targets: string[];
   duplicate: boolean;
 }
+
+export interface ScheduledLineInput {
+  chatId: string;
+  /** The Bot whose heartbeat this is; it must still be in the Chat. */
+  botId: string;
+  /** A group Chat: the Bots the run tags; the heartbeat's Bot when unset. */
+  mentionBotIds?: readonly string[];
+  text: string;
+  messageId: string;
+  actor: SessionActor;
+  scheduleRun: { scheduleId: string; run: number };
+}
+
+export type ScheduledLineResult =
+  | { status: "posted"; agentId: string | null }
+  | { status: "gone"; reason: string };
 
 export class ChatEngine implements TurnTrackerHost {
   readonly tracker: TurnTracker;
@@ -180,6 +197,39 @@ export class ChatEngine implements TurnTrackerHost {
       else if (discussion) this.discussions.stop(chat.id);
       else this.track(this.fanOut(chat.id, decision, line));
       return { messageId: id, seq: line.seq, targets: decision.targets, duplicate: false };
+    });
+  }
+
+  /**
+   * A heartbeat run posted into the chat as its own line. Only the Bots it was set to tag answer,
+   * whatever its text mentions, and the chat's input limit and turn rules apply as to a user line.
+   * The run id makes a retried post a duplicate, not a second line.
+   */
+  postScheduled(input: ScheduledLineInput): Promise<ScheduledLineResult> {
+    return this.queue.run(input.chatId, async () => {
+      const chat = await this.deps.store.get(input.chatId);
+      if (!chat || chat.archivedAt) return { status: "gone", reason: "The Chat is gone" };
+      const participant = chat.participants.find((entry) => entry.botId === input.botId);
+      if (!participant) return { status: "gone", reason: "The Bot left the Chat" };
+      const posted = { status: "posted" as const, agentId: participant.agentId ?? null };
+      if (await this.deps.transcriptOf(chat.id).findById(input.messageId)) return posted;
+      const group = chatKindOf(chat) === "group";
+      const { targets, text } = scheduledLine(await this.members(chat), input, group);
+      const refusal = inputLimitError(resolveChatRules(chat.rules), text);
+      if (refusal) throw new Error(refusal);
+      const line = await this.appendLine(chat.id, {
+        id: input.messageId,
+        at: this.now(),
+        sender: chatUserSender(input.actor),
+        text,
+        hop: 0,
+        deliveryBotIds: targets,
+        scheduleRun: input.scheduleRun,
+      });
+      // A group takes the floor as an addressed user line does; a direct chat has one Bot.
+      if (group) this.track(this.discussions.start(chat.id, "addressed", targets));
+      else this.track(this.fanOut(chat.id, { targets }, line));
+      return posted;
     });
   }
 

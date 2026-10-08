@@ -1,5 +1,6 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { View, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { PanelRight } from "lucide-react-native";
 import { SidebarMenuToggle } from "@/components/headers/menu-header";
@@ -21,6 +22,7 @@ export function ConversationHeader({
   singlePanel,
   selector,
   headerActions,
+  headingActions,
   openExplorer,
   group,
   memberCount,
@@ -33,13 +35,16 @@ export function ConversationHeader({
   singlePanel: boolean;
   selector: ReactNode;
   headerActions: ReactNode;
+  headingActions?: ReactNode;
   openExplorer: () => void;
   group: boolean;
   memberCount: number;
   tabCount: number;
 }) {
+  const { t } = useTranslation();
   const hosts = useHosts();
-  const hostName = hosts.find((host) => host.serverId === serverId)?.label ?? "Host";
+  const hostName =
+    hosts.find((host) => host.serverId === serverId)?.label ?? t("bots.chat.header.hostFallback");
   const right = useMemo(
     () => (
       <View style={styles.actions}>
@@ -49,7 +54,9 @@ export function ConversationHeader({
         ) : null}
         {headerActions}
         <ChatHeaderAction
-          label={project.source ? "Files and changes" : "Project access is required to view files"}
+          label={
+            project.source ? t("bots.chat.header.files") : t("bots.chat.header.filesNeedAccess")
+          }
           icon={PanelRight}
           disabled={!project.source}
           onPress={openExplorer}
@@ -66,6 +73,7 @@ export function ConversationHeader({
       serverId,
       headerActions,
       openExplorer,
+      t,
     ],
   );
   const left = (
@@ -79,18 +87,20 @@ export function ConversationHeader({
         hostName={hostName}
         tabCount={tabCount}
       />
+      {headingActions ? <View style={styles.headingActions}>{headingActions}</View> : null}
     </>
   );
   return <ScreenHeader left={left} right={right} />;
 }
 
 export function ConversationBotSelector({ project }: { project: Project }) {
+  const { t } = useTranslation();
   const choose = useCallback(() => project.setChooser(true), [project]);
   return (
     <ComboboxTrigger
       ref={project.chooserAnchorRef}
       accessibilityRole="button"
-      accessibilityLabel="Choose bot project"
+      accessibilityLabel={t("bots.chat.common.chooseBotProject")}
       onPress={choose}
       style={styles.botSelector}
     >
@@ -107,6 +117,7 @@ export function ConversationBotChooser({
   project: Project;
   bots: readonly ChatBotIdentity[];
 }) {
+  const { t } = useTranslation();
   const options = useMemo(() => bots.map((bot) => ({ id: bot.botId, label: bot.name })), [bots]);
   return (
     <Combobox
@@ -117,9 +128,9 @@ export function ConversationBotChooser({
       onOpenChange={project.setChooser}
       anchorRef={project.chooserAnchorRef}
       searchable
-      searchPlaceholder="Search bots…"
-      emptyText="No bots found"
-      title="Bot project"
+      searchPlaceholder={t("bots.chat.header.searchBots")}
+      emptyText={t("bots.chat.header.noBots")}
+      title={t("bots.chat.header.botProject")}
       desktopPlacement="bottom-start"
       desktopMinWidth={280}
     />
@@ -127,6 +138,7 @@ export function ConversationBotChooser({
 }
 const styles = StyleSheet.create((theme) => ({
   actions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  headingActions: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 },
   botSelector: {
     minHeight: { xs: 48, md: 32 },
     flexDirection: "row",

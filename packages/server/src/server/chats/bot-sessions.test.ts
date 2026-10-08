@@ -43,6 +43,7 @@ async function harness(
   options: {
     agents?: StoredAgentRecord[];
     failsToLoad?: string[];
+    moveHeartbeats?: BotSessionsDependencies["moveHeartbeats"];
   } = {},
 ) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "bot-sessions-"));
@@ -70,6 +71,7 @@ async function harness(
       loaded.push(id);
       if (options.failsToLoad?.includes(id)) throw new Error(`cannot resume ${id}`);
     },
+    moveHeartbeats: options.moveHeartbeats,
   };
   return { store, chat, sessions: new BotSessions(deps), created, loaded };
 }
@@ -180,5 +182,20 @@ describe("BotSessions", () => {
       created: true,
       replaced: null,
     });
+  });
+
+  test("a fresh session takes over the heartbeats of the pair's earlier sessions", async () => {
+    const moves: Array<{ from: readonly string[]; to: string }> = [];
+    const { chat, sessions } = await harness({
+      moveHeartbeats: async (from, to) => {
+        moves.push({ from, to });
+      },
+    });
+    await sessions.resolve(chat, bot);
+    expect(moves).toEqual([]);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await sessions.reset("cht_1", bot.id);
+    await sessions.resolve(chat, bot);
+    expect(moves).toEqual([{ from: ["agent-new-1"], to: "agent-new-2" }]);
   });
 });

@@ -16,8 +16,10 @@ import {
   canShareState,
   levelOptionsWithinHoldings,
   levelSwitchPresets,
+  offersScheduleSwitch,
   offersTerminalSwitch,
   withCanShare,
+  withSchedules,
   withTerminal,
 } from "./access-level-choice";
 
@@ -238,7 +240,18 @@ describe("Terminal switch and profiles on a level", () => {
     expect(levelSwitchPresets([...DEVELOPER_LEVEL, "terminal.use", "hub.access.manage"])).toEqual({
       canShare: true,
       terminal: true,
+      schedules: false,
     });
+  });
+
+  it("offers the Schedules switch on every level that uses Projects, never on Administrator", () => {
+    expect(offersScheduleSwitch("project", ["project.use"])).toBe(true);
+    expect(offersScheduleSwitch("daemon", ["daemon.connect"])).toBe(false);
+    expect(offersScheduleSwitch("daemon", ["daemon.connect", "daemon.manage"])).toBe(false);
+    expect(withSchedules("project", ["project.use", "schedule.manage"], false)).toEqual([
+      "project.use",
+    ]);
+    expect(levelSwitchPresets(["project.use", "schedule.manage"]).schedules).toBe(true);
   });
 
   it("passes on only the profiles the viewer holds, or all with the shell", () => {

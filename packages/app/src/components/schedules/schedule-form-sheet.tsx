@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { Text, View } from "react-native";
-import { Brain, Folder, GitBranch } from "lucide-react-native";
+import { Brain, Folder, FolderOpen, GitBranch } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { AgentProvider } from "@clisbot/protocol/agent-types";
 import type { ScheduleCadence, ScheduleSummary } from "@clisbot/protocol/schedule/types";
@@ -20,12 +20,18 @@ import { ComboboxItem } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { HostStatusDotSlot } from "@/components/hosts/host-picker";
+import { HostPickerOption } from "@/components/hosts/host-picker";
 import { createControlGeometry, type FieldControlSize } from "@/components/ui/control-geometry";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
 import { getProviderIcon } from "@/components/provider-icons";
-import { CadenceEditor } from "@/components/schedules/cadence-editor";
+// Clisbot: every N minutes or hours, daily, weekly or cron, with quick picks, in place of the
+// upstream preset-plus-cron editor (same props).
+import { CadencePicker as CadenceEditor } from "@/clisbot/schedules/cadence-picker";
+import { MaxRunsField } from "@/clisbot/schedules/max-runs-field";
+import { ScheduleRepeatRow, SCHEDULE_SHEET_WIDTH } from "@/clisbot/schedules/schedule-repeat-row";
+import { missingMaxRuns, parseMaxRuns } from "@/clisbot/schedules/max-runs";
+import { runLimitErrorForUpdate } from "@clisbot/protocol/schedule/run-limit";
 import {
   SelectField,
   SelectFieldTrigger,
@@ -57,6 +63,19 @@ import type {
 import { validateCron } from "@/utils/schedule-format";
 import { toErrorMessage } from "@/utils/error-messages";
 import { getDeviceTimeZone } from "@/utils/device-timezone";
+import {
+  RunInField,
+  ScheduleSessionField,
+  ExistingWorkspaceHint,
+  ScheduleWorkspaceField,
+  useScheduleChatId,
+} from "@/clisbot/schedules/run-in-fields";
+import { canManageSchedules } from "@/clisbot/schedules/use-schedule-detail";
+import {
+  ScheduleMentionsField,
+  useScheduleMentions,
+  type ScheduleMentions,
+} from "@/clisbot/schedules/schedule-mentions-field";
 
 export interface ScheduleFormSheetProps {
   serverId?: string;
@@ -64,11 +83,69 @@ export interface ScheduleFormSheetProps {
   onClose: () => void;
   mode: "create" | "edit";
   schedule?: ScheduleSummary;
+  /** Create a heartbeat that runs in this session; Run in is fixed to it. */
+  presetAgentId?: string;
 }
 
-function parseMaxRuns(raw: string): number | null {
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+type IsolationChoice = "local" | "worktree" | "existing";
+
+const ISOLATION_LABELS: Record<IsolationChoice, string> = {
+  local: "Local",
+  worktree: "Worktree",
+  existing: "Existing workspace",
+};
+
+/** Where each run's session lives when created: an existing workspace, or a new one and how. */
+function newWorkspaceConfig(state: ScheduleFormState) {
+  if (state.existingWorkspaceId) return { workspaceId: state.existingWorkspaceId };
+  return {
+    ...(state.submitArchiveOnFinish !== undefined
+      ? { archiveOnFinish: state.submitArchiveOnFinish }
+      : {}),
+    ...(state.submitIsolation !== undefined ? { isolation: state.submitIsolation } : {}),
+  };
+}
+
+/** Editing: set or clear the existing workspace, only where the host knows the field. */
+function existingWorkspacePatch(state: ScheduleFormState) {
+  return state.canUseExistingWorkspace ? { workspaceId: state.existingWorkspaceId || null } : {};
+}
+
+/** A project is chosen on a host whose daemon predates `config.workspaceId`. */
+function needsHostForExistingWorkspace(state: ScheduleFormState): boolean {
+  if (!state.disclosure.showProjectField || !state.workingDir) return false;
+  const host = state.hosts.find((entry) => entry.serverId === state.selectedServerId);
+  return host?.supportsExistingWorkspace !== true;
+}
+
+function submitLabel(mode: "create" | "edit", targetKind: ScheduleFormState["targetKind"]) {
+  if (mode === "edit") return "Save changes";
+  return targetKind === "agent" ? "Create heartbeat" : "Create schedule";
+}
+
+/**
+ * What an edit changes of the cadence and Max runs. Only those answer to the Max runs rule, so a
+ * schedule saved without Max runs before the rule can still be renamed or moved.
+ */
+function runLimitChange(
+  state: ScheduleFormState,
+  schedule: ScheduleSummary,
+): { cadence?: NonNullable<ScheduleFormState["submitCadence"]>; maxRuns?: number | null } {
+  const maxRuns = parseMaxRuns(state.maxRuns);
+  return {
+    ...(state.submitCadence && !equal(state.submitCadence, schedule.cadence)
+      ? { cadence: state.submitCadence }
+      : {}),
+    ...(maxRuns !== (schedule.maxRuns ?? null) ? { maxRuns } : {}),
+  };
+}
+
+/** The daemon would refuse the form: it repeats within the day and leaves Max runs empty. */
+function missesMaxRuns(state: ScheduleFormState, schedule: ScheduleSummary | undefined): boolean {
+  if (state.mode === "edit" && schedule) {
+    return runLimitErrorForUpdate(schedule, runLimitChange(state, schedule)) !== null;
+  }
+  return missingMaxRuns(state.cadence, state.maxRuns);
 }
 
 function requireCronCadence(
@@ -109,25 +186,36 @@ function openKey(props: ScheduleFormSheetProps): string {
   if (props.mode === "edit") {
     return `edit:${props.serverId ?? ""}:${props.schedule?.id ?? ""}`;
   }
-  return `create:${props.serverId ?? ""}`;
+  return `create:${props.serverId ?? ""}:${props.presetAgentId ?? ""}`;
 }
 
 function selectScheduleHosts(
   hosts: readonly { serverId: string; label: string }[],
+  mode: "create" | "edit",
 ): (state: ReturnType<typeof useSessionStore.getState>) => ScheduleFormHost[] {
   return (state) =>
-    hosts.map((host) => ({
-      serverId: host.serverId,
-      label: host.label,
-      supportsWorkspaceMultiplicity:
-        state.sessions[host.serverId]?.serverInfo?.features?.workspaceMultiplicity === true,
-    }));
+    hosts
+      // Clisbot Managed Access: only hosts that grant `schedule.manage` take new schedules.
+      .filter(
+        (host) =>
+          mode === "edit" ||
+          canManageSchedules(state.sessions[host.serverId]?.serverInfo?.permissions),
+      )
+      .map((host) => ({
+        serverId: host.serverId,
+        label: host.label,
+        supportsWorkspaceMultiplicity:
+          state.sessions[host.serverId]?.serverInfo?.features?.workspaceMultiplicity === true,
+        supportsExistingWorkspace:
+          state.sessions[host.serverId]?.serverInfo?.features?.scheduleExistingWorkspace === true,
+      }));
 }
 
 function buildSnapshot(input: {
   mode: "create" | "edit";
   serverId: string | undefined;
   schedule: ScheduleSummary | undefined;
+  presetAgentId: string | undefined;
   hosts: readonly ScheduleFormHost[];
   projectTargets: ReturnType<typeof buildScheduleProjectTargets>;
   preferences: FormPreferences;
@@ -139,6 +227,7 @@ function buildSnapshot(input: {
   return {
     mode: input.mode,
     schedule,
+    ...(input.presetAgentId ? { presetAgentId: input.presetAgentId } : {}),
     hosts: input.hosts,
     defaults: {
       serverId: resolveCreateServerId({
@@ -238,13 +327,14 @@ function OpenScheduleFormSheet({
   onDismiss,
   mode,
   schedule,
+  presetAgentId,
 }: ScheduleFormSheetProps & { onDismiss: () => void }): ReactElement {
   const controlSize: FieldControlSize = useIsCompactFormFactor() ? "md" : "sm";
   const { projects } = useProjects();
   const hostProfiles = useHosts();
   const hosts = useStoreWithEqualityFn(
     useSessionStore,
-    useMemo(() => selectScheduleHosts(hostProfiles), [hostProfiles]),
+    useMemo(() => selectScheduleHosts(hostProfiles, mode), [hostProfiles, mode]),
     equal,
   );
   const { preferences, updatePreferences } = useFormPreferences();
@@ -256,12 +346,13 @@ function OpenScheduleFormSheet({
         mode,
         serverId,
         schedule,
+        presetAgentId,
         hosts,
         projectTargets,
         preferences,
         timezone,
       }),
-    [hosts, mode, preferences, projectTargets, schedule, serverId, timezone],
+    [hosts, mode, preferences, presetAgentId, projectTargets, schedule, serverId, timezone],
   );
   const model = useScheduleFormModel(snapshot);
   const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
@@ -275,7 +366,14 @@ function OpenScheduleFormSheet({
   const isSubmitting = isCreating || isUpdating;
   const cadenceError =
     state.cadence.type === "cron" ? validateCron(state.cadence.expression) : null;
-  const canSubmit = state.canSubmit && cadenceError === null && !isSubmitting;
+  const chatId = useScheduleChatId(state.selectedServerId, state.targetAgentId);
+  const mentions = useScheduleMentions(state.selectedServerId, state.targetAgentId, chatId);
+  const canSubmit =
+    state.canSubmit &&
+    cadenceError === null &&
+    !isSubmitting &&
+    !(mentions.options.length > 0 && mentions.value.length === 0) &&
+    !missesMaxRuns(state, schedule);
   const agentTargetLabel = useMemo(() => {
     if (!schedule || schedule.target.type !== "agent") {
       return null;
@@ -315,15 +413,34 @@ function OpenScheduleFormSheet({
   ]);
 
   const submitAgentTarget = useCallback(async (): Promise<boolean> => {
-    if (!schedule || !state.submitCadence) {
+    if (!state.submitCadence) {
       return false;
     }
-    await updateSchedule({
-      id: schedule.id,
-      cadence: state.submitCadence,
-    });
+    if (mode === "create") {
+      if (!state.targetAgentId) {
+        return false;
+      }
+      const maxRuns = parseMaxRuns(state.maxRuns);
+      await createSchedule({
+        prompt: state.prompt.trim(),
+        name: state.name.trim() || undefined,
+        cadence: state.submitCadence,
+        target: {
+          type: "agent",
+          agentId: state.targetAgentId,
+          ...(chatId ? { chatId } : {}),
+          ...(chatId && mentions.options.length > 0 ? { mentionBotIds: mentions.value } : {}),
+        },
+        ...(maxRuns != null ? { maxRuns } : {}),
+      });
+      return true;
+    }
+    if (!schedule) {
+      return false;
+    }
+    await updateSchedule({ id: schedule.id, ...runLimitChange(state, schedule) });
     return true;
-  }, [schedule, state.submitCadence, updateSchedule]);
+  }, [chatId, createSchedule, mentions, mode, schedule, state, updateSchedule]);
 
   const submitNewAgent = useCallback(async (): Promise<boolean> => {
     const provider = state.selectedProvider;
@@ -339,7 +456,7 @@ function OpenScheduleFormSheet({
         id: schedule.id,
         name: state.name.trim() || null,
         prompt: state.prompt.trim(),
-        ...(state.submitCadence ? { cadence: state.submitCadence } : {}),
+        ...runLimitChange(state, schedule),
         newAgentConfig: {
           provider,
           model: state.selectedModel || null,
@@ -350,8 +467,8 @@ function OpenScheduleFormSheet({
             ? { archiveOnFinish: state.submitArchiveOnFinish }
             : {}),
           ...(state.submitIsolation !== undefined ? { isolation: state.submitIsolation } : {}),
+          ...existingWorkspacePatch(state),
         },
-        maxRuns,
       });
       return true;
     }
@@ -368,10 +485,7 @@ function OpenScheduleFormSheet({
           model: state.selectedModel || undefined,
           modeId: state.selectedMode || undefined,
           thinkingOptionId: state.selectedThinkingOptionId || undefined,
-          ...(state.submitArchiveOnFinish !== undefined
-            ? { archiveOnFinish: state.submitArchiveOnFinish }
-            : {}),
-          ...(state.submitIsolation !== undefined ? { isolation: state.submitIsolation } : {}),
+          ...newWorkspaceConfig(state),
           title: state.name.trim() || undefined,
         },
       },
@@ -402,10 +516,10 @@ function OpenScheduleFormSheet({
 
   const header = useMemo<SheetHeader>(() => {
     if (mode !== "edit") {
-      return { title: "New schedule" };
+      return { title: state.targetKind === "agent" ? "New heartbeat" : "New schedule" };
     }
     return { title: schedule?.target.type === "agent" ? "Edit heartbeat" : "Edit schedule" };
-  }, [mode, schedule?.target.type]);
+  }, [mode, schedule?.target.type, state.targetKind]);
 
   const footer = useMemo(
     () => (
@@ -426,11 +540,11 @@ function OpenScheduleFormSheet({
           loading={isSubmitting}
           testID="schedule-form-submit"
         >
-          {mode === "edit" ? "Save changes" : "Create schedule"}
+          {submitLabel(mode, state.targetKind)}
         </Button>
       </View>
     ),
-    [canSubmit, handleSubmitPress, isSubmitting, mode, onClose],
+    [canSubmit, handleSubmitPress, isSubmitting, mode, onClose, state.targetKind],
   );
 
   return (
@@ -440,6 +554,7 @@ function OpenScheduleFormSheet({
       onClose={onClose}
       onDismiss={onDismiss}
       footer={footer}
+      desktopMaxWidth={SCHEDULE_SHEET_WIDTH}
       testID="schedule-form-sheet"
     >
       <ScheduleFormFields
@@ -450,6 +565,7 @@ function OpenScheduleFormSheet({
         controlSize={controlSize}
         cadenceError={cadenceError}
         mutationServerId={mutationServerId}
+        mentions={mentions}
       />
     </AdaptiveModalSheet>
   );
@@ -463,6 +579,7 @@ interface ScheduleFormFieldsProps {
   controlSize: FieldControlSize;
   cadenceError: string | null;
   mutationServerId: string;
+  mentions: ScheduleMentions;
 }
 
 function ScheduleFormFields({
@@ -473,17 +590,38 @@ function ScheduleFormFields({
   controlSize,
   cadenceError,
   mutationServerId,
+  mentions,
 }: ScheduleFormFieldsProps): ReactElement {
+  if (state.targetKind === "agent" && state.mode === "create") {
+    return (
+      <HeartbeatCreateFields
+        model={model}
+        state={state}
+        controlSize={controlSize}
+        cadenceError={cadenceError}
+        mentions={mentions}
+      />
+    );
+  }
   if (state.targetKind === "agent") {
     return (
       <>
         <ScheduleAgentTargetField label={agentTargetLabel} size={controlSize} />
-        <CadenceEditor
-          value={state.cadence}
-          onChange={model.setCadence}
-          error={cadenceError ?? undefined}
-          size={controlSize}
-        />
+        <ScheduleRepeatRow>
+          <CadenceEditor
+            value={state.cadence}
+            onChange={model.setCadence}
+            error={cadenceError ?? undefined}
+            size={controlSize}
+          />
+          <MaxRunsField
+            cadence={state.cadence}
+            value={state.maxRuns}
+            onChange={model.setMaxRuns}
+            size={controlSize}
+            testID="schedule-max-runs-input"
+          />
+        </ScheduleRepeatRow>
         {state.submitError ? <Text style={styles.submitError}>{state.submitError}</Text> : null}
       </>
     );
@@ -491,6 +629,9 @@ function ScheduleFormFields({
 
   return (
     <>
+      {state.targetKindLocked ? null : (
+        <RunInField value={state.targetKind} onChange={model.setTargetKind} size={controlSize} />
+      )}
       <Field label="Name">
         <FormTextInput
           size={controlSize}
@@ -528,25 +669,135 @@ function ScheduleFormFields({
         mutationServerId={mutationServerId}
       />
 
-      <CadenceEditor
-        value={state.cadence}
-        onChange={model.setCadence}
-        error={cadenceError ?? undefined}
-        size={controlSize}
-      />
-
-      <Field label="Max runs">
-        <FormTextInput
+      <ScheduleRepeatRow>
+        <CadenceEditor
+          value={state.cadence}
+          onChange={model.setCadence}
+          error={cadenceError ?? undefined}
+          size={controlSize}
+        />
+        <MaxRunsField
+          cadence={state.cadence}
+          value={state.maxRuns}
+          onChange={model.setMaxRuns}
           size={controlSize}
           testID="schedule-max-runs-input"
-          accessibilityLabel="Max runs"
-          initialValue={state.maxRuns}
-          onChangeText={model.setMaxRuns}
-          placeholder="Unlimited"
-          keyboardType="number-pad"
+        />
+      </ScheduleRepeatRow>
+
+      {state.submitError ? <Text style={styles.submitError}>{state.submitError}</Text> : null}
+    </>
+  );
+}
+
+/** Creating a heartbeat: the session it runs in, then what to send and how often. */
+function HeartbeatCreateFields({
+  model,
+  state,
+  controlSize,
+  cadenceError,
+  mentions,
+}: {
+  model: ScheduleFormModel;
+  state: ScheduleFormState;
+  controlSize: FieldControlSize;
+  cadenceError: string | null;
+  mentions: ScheduleMentions;
+}): ReactElement {
+  const hostOptions = useMemo<SelectFieldOption<string>[]>(
+    () =>
+      state.hosts.map((host) => ({
+        id: host.serverId,
+        value: host.serverId,
+        label: host.label,
+        testID: buildScheduleHostOptionTestId(host.serverId),
+      })),
+    [state.hosts],
+  );
+  const selectedHost = state.hosts.find((host) => host.serverId === state.selectedServerId);
+  const selectedHostDisplay = useMemo(
+    () => (selectedHost ? { label: selectedHost.label } : null),
+    [selectedHost],
+  );
+  const handleSelectSession = useCallback(
+    (agentId: string) => model.setTargetAgent(agentId),
+    [model],
+  );
+  const renderHostOption = useCallback(
+    (input: SelectFieldRenderOptionInput<string>) => <HostOptionItem {...input} />,
+    [],
+  );
+  return (
+    <>
+      {state.targetKindLocked ? null : (
+        <RunInField value={state.targetKind} onChange={model.setTargetKind} size={controlSize} />
+      )}
+      {!state.targetKindLocked && state.hosts.length > 1 ? (
+        <SelectField
+          label="Host"
+          value={state.selectedServerId}
+          selectedDisplay={selectedHostDisplay}
+          options={hostOptions}
+          onChange={model.setHost}
+          placeholder="Select host"
+          emptyText="No hosts found"
+          searchable
+          searchPlaceholder="Search by name or ID"
+          title="Host"
+          size={controlSize}
+          triggerTestID="schedule-host-trigger"
+          renderOption={renderHostOption}
+        />
+      ) : null}
+      <ScheduleSessionField
+        serverId={state.selectedServerId}
+        agentId={state.targetAgentId}
+        locked={state.targetKindLocked}
+        onChange={handleSelectSession}
+        size={controlSize}
+      />
+      <ScheduleMentionsField mentions={mentions} />
+      <Field label="Name">
+        <FormTextInput
+          size={controlSize}
+          testID="schedule-name-input"
+          accessibilityLabel="Heartbeat name"
+          initialValue={state.name}
+          onChangeText={model.setName}
+          placeholder="Optional"
+          autoCapitalize="none"
+          autoCorrect={false}
         />
       </Field>
-
+      <Field label="Prompt">
+        <FormTextInput
+          size={controlSize}
+          testID="schedule-prompt-input"
+          accessibilityLabel="Prompt"
+          initialValue={state.prompt}
+          onChangeText={model.setPrompt}
+          placeholder="What should the session do each run?"
+          style={styles.multilineInput}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+      </Field>
+      <ScheduleRepeatRow>
+        <CadenceEditor
+          value={state.cadence}
+          onChange={model.setCadence}
+          error={cadenceError ?? undefined}
+          size={controlSize}
+        />
+        <MaxRunsField
+          cadence={state.cadence}
+          value={state.maxRuns}
+          onChange={model.setMaxRuns}
+          size={controlSize}
+          testID="schedule-max-runs-input"
+        />
+      </ScheduleRepeatRow>
       {state.submitError ? <Text style={styles.submitError}>{state.submitError}</Text> : null}
     </>
   );
@@ -712,7 +963,8 @@ function ScheduleTargetFields({
           placeholder="Select host"
           emptyText="No hosts found"
           disabled={state.mode === "edit"}
-          searchable={false}
+          searchable
+          searchPlaceholder="Search by name or ID"
           title="Host"
           size={controlSize}
           triggerTestID="schedule-host-trigger"
@@ -798,6 +1050,18 @@ function ScheduleTargetFields({
         <ScheduleIsolationField model={model} state={state} size={controlSize} />
       ) : null}
 
+      <ExistingWorkspaceHint visible={needsHostForExistingWorkspace(state)} />
+
+      {state.disclosure.showIsolationField && state.existingWorkspaceId !== null ? (
+        <ScheduleWorkspaceField
+          serverId={state.selectedServerId}
+          projectViewKey={state.selectedProjectViewKey}
+          workspaceId={state.existingWorkspaceId}
+          onChange={model.setExistingWorkspace}
+          size={controlSize}
+        />
+      ) : null}
+
       {state.disclosure.showArchiveOnFinishField ? (
         <Field label="Archive on finish">
           <Switch
@@ -821,7 +1085,7 @@ function ScheduleIsolationField({
   state: ScheduleFormState;
   size: FieldControlSize;
 }): ReactElement {
-  const options = useMemo<SelectFieldOption<"local" | "worktree">[]>(
+  const options = useMemo<SelectFieldOption<IsolationChoice>[]>(
     () => [
       {
         id: "local",
@@ -829,48 +1093,63 @@ function ScheduleIsolationField({
         label: "Local",
         testID: "schedule-isolation-local",
       },
-      {
-        id: "worktree",
-        value: "worktree",
-        label: "Worktree",
-        testID: "schedule-isolation-worktree",
-      },
+      ...(state.canUseWorktreeIsolation
+        ? [
+            {
+              id: "worktree",
+              value: "worktree" as const,
+              label: "Worktree",
+              testID: "schedule-isolation-worktree",
+            },
+          ]
+        : []),
+      ...(state.canUseExistingWorkspace
+        ? [
+            {
+              id: "existing",
+              value: "existing" as const,
+              label: "Existing workspace",
+              testID: "schedule-isolation-existing",
+            },
+          ]
+        : []),
     ],
-    [],
+    [state.canUseExistingWorkspace, state.canUseWorktreeIsolation],
   );
+  const choice: IsolationChoice =
+    state.existingWorkspaceId !== null ? "existing" : state.effectiveIsolation;
   const selectedDisplay = useMemo<SelectFieldDisplay>(
-    () => ({ label: state.effectiveIsolation === "worktree" ? "Worktree" : "Local" }),
-    [state.effectiveIsolation],
+    () => ({ label: ISOLATION_LABELS[choice] }),
+    [choice],
   );
   const triggerLeading = useMemo(
     () => (
       <View style={styles.optionIconBox}>
-        {state.effectiveIsolation === "worktree" ? (
-          <GitBranch size={16} color={styles.providerIcon.color} />
-        ) : (
-          <Folder size={16} color={styles.providerIcon.color} />
-        )}
+        <IsolationIcon value={choice} />
       </View>
     ),
-    [state.effectiveIsolation],
+    [choice],
   );
   const handleSelectIsolation = useCallback(
-    (value: "local" | "worktree") => {
+    (value: IsolationChoice) => {
+      if (value === "existing") {
+        model.setExistingWorkspace(state.existingWorkspaceId ?? "");
+        return;
+      }
+      model.setExistingWorkspace(null);
       model.setIsolation(value);
     },
-    [model],
+    [model, state.existingWorkspaceId],
   );
   const renderIsolationOption = useCallback(
-    (input: SelectFieldRenderOptionInput<"local" | "worktree">) => (
-      <IsolationOptionItem {...input} />
-    ),
+    (input: SelectFieldRenderOptionInput<IsolationChoice>) => <IsolationOptionItem {...input} />,
     [],
   );
 
   return (
     <SelectField
       label="Isolation"
-      value={state.effectiveIsolation}
+      value={choice}
       selectedDisplay={selectedDisplay}
       options={options}
       onChange={handleSelectIsolation}
@@ -914,20 +1193,22 @@ function ScheduleAgentTargetField({
   );
 }
 
+function IsolationIcon({ value }: { value: IsolationChoice }): ReactElement {
+  if (value === "worktree") return <GitBranch size={16} color={styles.providerIcon.color} />;
+  if (value === "existing") return <FolderOpen size={16} color={styles.providerIcon.color} />;
+  return <Folder size={16} color={styles.providerIcon.color} />;
+}
+
 function IsolationOptionItem({
   option,
   selected,
   active,
   onPress,
-}: SelectFieldRenderOptionInput<"local" | "worktree">): ReactElement {
+}: SelectFieldRenderOptionInput<IsolationChoice>): ReactElement {
   const leadingSlot = useMemo(
     () => (
       <View style={styles.optionIconBox}>
-        {option.value === "worktree" ? (
-          <GitBranch size={16} color={styles.providerIcon.color} />
-        ) : (
-          <Folder size={16} color={styles.providerIcon.color} />
-        )}
+        <IsolationIcon value={option.value} />
       </View>
     ),
     [option.value],
@@ -945,22 +1226,22 @@ function IsolationOptionItem({
   );
 }
 
+// Clisbot: the app's standard host row (status, Host ID, connection), as in the host pickers.
 function HostOptionItem({
   option,
   selected,
   active,
   onPress,
 }: SelectFieldRenderOptionInput<string>): ReactElement {
-  const leadingSlot = useMemo(() => <HostStatusDotSlot serverId={option.value} />, [option.value]);
-
   return (
-    <ComboboxItem
-      testID={option.testID}
+    <HostPickerOption
+      serverId={option.value}
       label={option.label}
+      showActiveConnection
       selected={selected}
       active={active}
       onPress={onPress}
-      leadingSlot={leadingSlot}
+      testID={option.testID}
     />
   );
 }

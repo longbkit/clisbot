@@ -900,6 +900,8 @@ export interface CreateScheduleOptions {
           thinkingOptionId?: string;
           archiveOnFinish?: boolean;
           isolation?: "local" | "worktree";
+          /** Run each session in this existing workspace (`features.scheduleExistingWorkspace`). */
+          workspaceId?: string;
           title?: string | null;
           providerOptions?: AgentSessionConfig["providerOptions"];
           systemPrompt?: string;
@@ -923,6 +925,7 @@ export interface UpdateScheduleNewAgentConfig {
   archiveOnFinish?: boolean;
   isolation?: "local" | "worktree";
   cwd?: string;
+  workspaceId?: string | null;
 }
 export interface UpdateScheduleOptions {
   id: string;
@@ -2175,6 +2178,18 @@ export class DaemonClient {
   ) {
     return this.sendNamespacedCorrelatedSessionRequest<"bot.template.seed.response">({
       message: { ...params, type: "bot.template.seed.request" },
+    });
+  }
+
+  // COMPAT(botTemplatePreview): gated on features.botTemplatePreview.
+  previewBotTemplate(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "bot.template.preview.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"bot.template.preview.response">({
+      message: { ...params, type: "bot.template.preview.request" },
     });
   }
 

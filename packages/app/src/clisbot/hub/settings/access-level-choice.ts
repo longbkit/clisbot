@@ -1,4 +1,5 @@
 import type { SelectFieldOption } from "@/components/ui/select-field";
+import { i18n } from "@/i18n/i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { accessLevelLabel, type AccessResourceKind } from "./access-catalog";
 import {
@@ -52,14 +53,45 @@ export function withTerminal(
   return terminal ? [...without, "terminal.use"] : without;
 }
 
-/** Where a level starts its Can share and Terminal switches: what the level itself names. */
+export const SCHEDULE_PRIVILEGE = "schedule.manage";
+
+/**
+ * The Schedules switch on a Host or Project grant: every level that uses Projects carries it
+ * as a preset the grant can switch off; Administrator has it all
+ * (docs/audits/2026-10-06-conversation-schedules.md).
+ */
+export function offersScheduleSwitch(
+  resourceKind: AccessResourceKind,
+  levelPrivileges: readonly string[],
+): boolean {
+  return (
+    (resourceKind === "daemon" || resourceKind === "project") &&
+    !levelPrivileges.includes("daemon.manage") &&
+    levelPrivileges.includes("project.use")
+  );
+}
+
+/** The level's privileges with the Schedules switch applied. */
+export function withSchedules(
+  resourceKind: AccessResourceKind,
+  levelPrivileges: readonly string[],
+  schedules: boolean,
+): string[] {
+  if (!offersScheduleSwitch(resourceKind, levelPrivileges)) return [...levelPrivileges];
+  const without = levelPrivileges.filter((privilege) => privilege !== SCHEDULE_PRIVILEGE);
+  return schedules ? [...without, SCHEDULE_PRIVILEGE] : without;
+}
+
+/** Where a level starts its Can share, Terminal and Schedules switches: what the level names. */
 export function levelSwitchPresets(levelPrivileges: readonly string[]): {
   canShare: boolean;
   terminal: boolean;
+  schedules: boolean;
 } {
   return {
     canShare: levelPrivileges.includes(CAN_SHARE_PRIVILEGE),
     terminal: levelPrivileges.includes("terminal.use"),
+    schedules: levelPrivileges.includes(SCHEDULE_PRIVILEGE),
   };
 }
 
@@ -90,9 +122,9 @@ export function levelOptionsWithinHoldings(
   const options: SelectFieldOption<string>[] = [];
   const aboveOwn: string[] = [];
   for (const [id, privileges] of Object.entries(accessLevels)) {
-    const minimal = withTerminal(
+    const minimal = withSchedules(
       resourceKind,
-      withCanShare(resourceKind, privileges, false),
+      withTerminal(resourceKind, withCanShare(resourceKind, privileges, false), false),
       false,
     );
     if (!privilegesWithinHoldings(holdings, minimal)) {
@@ -109,14 +141,11 @@ export function levelOptionsWithinHoldings(
   return { options, aboveOwn };
 }
 
-export const ADMINISTRATOR_WARNING =
-  "This person will control the daemon: restart, install plugins, use every Model, see every Project. Organization Admins will be notified.";
-
 /** Asks before the Administrator level is even selected; false keeps the previous level. */
 export function confirmAdministratorLevel(): Promise<boolean> {
   return confirmDialog({
-    title: "Grant Administrator?",
-    message: ADMINISTRATOR_WARNING,
-    confirmLabel: "Choose Administrator",
+    title: i18n.t("hub.access.administrator.title"),
+    message: i18n.t("hub.access.administrator.warning"),
+    confirmLabel: i18n.t("hub.access.administrator.confirm"),
   });
 }

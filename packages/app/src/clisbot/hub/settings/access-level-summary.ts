@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import type { AccessResourceKind, SubjectKind } from "./access-catalog";
 import { CAN_SHARE_PRIVILEGE } from "./access-grantor";
 
@@ -25,24 +26,23 @@ const APPROVALS = [
 /** Unattended execution is gated on holding every approval leaf the daemon checks. */
 const EVERY_APPROVAL = [...APPROVALS, "approval.channel"] as const;
 
-const LEVEL_DESCRIPTIONS: Record<string, string | ((kind: AccessResourceKind) => string)> = {
-  connect: "Connect to the Host. Grants no Project on its own.",
-  office_worker: "Use agents in existing workspaces. No terminal, no shell commands.",
-  developer:
-    "Agents, Terminal profiles, worktrees, and every approval. No shell by default; cannot create or manage Projects.",
+// Resolved when read, so a language change reaches the next render.
+const LEVEL_DESCRIPTIONS: Record<string, (kind: AccessResourceKind) => string> = {
+  connect: () => i18n.t("hub.access.levelDescriptions.connect"),
+  office_worker: () => i18n.t("hub.access.levelDescriptions.officeWorker"),
+  developer: () => i18n.t("hub.access.levelDescriptions.developer"),
   full_access: (kind) =>
     kind === "daemon"
-      ? "Developer and the shell, plus create Projects where this Host allows and manage every Project on it."
-      : "Developer and the shell, plus rename, remove, and archive this Project and its workspaces.",
-  administrator: "Operate this Host with any model. Always can share.",
-  use: "Talk to the bot in the chosen conversations.",
-  manage:
-    "Manage this bot's Routes, defaults, and audience rules, on the app and in chat, and appoint other Admins.",
-  run: "Run this Automation.",
+      ? i18n.t("hub.access.levelDescriptions.fullAccessHost")
+      : i18n.t("hub.access.levelDescriptions.fullAccessProject"),
+  administrator: () => i18n.t("hub.access.levelDescriptions.administrator"),
+  use: () => i18n.t("hub.access.levelDescriptions.use"),
+  manage: () => i18n.t("hub.access.levelDescriptions.manage"),
+  run: () => i18n.t("hub.access.levelDescriptions.run"),
   admin: (kind) =>
     kind === "team"
-      ? "Add or remove people in this Team, invite into it, appoint another Team Admin."
-      : "Run, edit, enable, or delete this Automation, and grant Run or Admin on it.",
+      ? i18n.t("hub.access.levelDescriptions.adminTeam")
+      : i18n.t("hub.access.levelDescriptions.adminAutomation"),
 };
 
 /**
@@ -58,8 +58,9 @@ export function sharesAccess(resourceKind: AccessResourceKind, privileges: reado
 }
 
 export function canShareDescription(resourceKind: AccessResourceKind): string {
-  const scope = resourceKind === "daemon" ? "Host" : "Project";
-  return `Add, change, or remove people on this ${scope}, up to their own level`;
+  return resourceKind === "daemon"
+    ? i18n.t("hub.access.canShare.host")
+    : i18n.t("hub.access.canShare.project");
 }
 
 /** One line for a level in the picker, or undefined for a level with no description. */
@@ -67,8 +68,7 @@ export function accessLevelDescription(
   levelId: string,
   resourceKind: AccessResourceKind,
 ): string | undefined {
-  const description = LEVEL_DESCRIPTIONS[levelId];
-  return typeof description === "function" ? description(resourceKind) : description;
+  return LEVEL_DESCRIPTIONS[levelId]?.(resourceKind);
 }
 
 /** The effects a grant of these privileges on this kind of resource has. */
@@ -82,7 +82,7 @@ export function summarizeAccess(input: {
   const held = new Set(input.privileges);
   const summary: AccessSummary = { allows: [], withholds: [], cautions: [] };
   if (input.subjectKind === "guest") {
-    summary.cautions.push("Guest is every channel sender without a linked Member, not one person");
+    summary.cautions.push(i18n.t("hub.access.effects.guestCaution"));
   }
   if (input.resourceKind === "team") {
     summarizeTeamAdmin(held, summary);
@@ -93,12 +93,10 @@ export function summarizeAccess(input: {
     return summary;
   }
   if (held.has("daemon.manage")) {
-    summary.allows.push("Operate this Host: restart, update, settings, providers, and plugins");
-    summary.allows.push("Every Project, workspace, agent, and terminal on this Host");
+    summary.allows.push(i18n.t("hub.access.effects.operateHost"));
+    summary.allows.push(i18n.t("hub.access.effects.everythingOnHost"));
     summary.allows.push(canShareDescription(input.resourceKind));
-    summary.cautions.push(
-      "Not limited to the allowed models, and can change who reaches this Host",
-    );
+    summary.cautions.push(i18n.t("hub.access.effects.administratorCaution"));
     return summary;
   }
   summarizeProjectWork(held, input.resourceKind, summary);
@@ -108,9 +106,9 @@ export function summarizeAccess(input: {
 
 function summarizeTeamAdmin(held: ReadonlySet<string>, summary: AccessSummary): void {
   if (!held.has(CAN_SHARE_PRIVILEGE)) return;
-  summary.allows.push("Add or remove people in this Team and invite Members into it");
-  summary.allows.push("Appoint another Team Admin");
-  summary.withholds.push("Cannot change the Team's access grants or delete the Team");
+  summary.allows.push(i18n.t("hub.access.effects.teamAddRemove"));
+  summary.allows.push(i18n.t("hub.access.effects.teamAppoint"));
+  summary.withholds.push(i18n.t("hub.access.effects.teamWithheld"));
 }
 
 function summarizeRoutes(
@@ -119,28 +117,20 @@ function summarizeRoutes(
   qrLogin: boolean,
 ): void {
   if (held.has("channel.manage")) {
-    summary.allows.push(
-      "Edit this Connection's Routes, including each Route's audience rules (who the bot answers, and where)",
-    );
-    summary.allows.push("Change Route defaults, on the app or from chat with /promoteroutedefault");
-    summary.allows.push(
-      "Read the bot's activity: each incoming message, which Route took it, and why one was ignored or refused",
-    );
-    if (qrLogin) summary.allows.push("Log the account back in by QR scan when its session expires");
+    summary.allows.push(i18n.t("hub.access.effects.routesEdit"));
+    summary.allows.push(i18n.t("hub.access.effects.routesDefaults"));
+    summary.allows.push(i18n.t("hub.access.effects.routesActivity"));
+    if (qrLogin) summary.allows.push(i18n.t("hub.access.effects.routesQrLogin"));
     if (held.has(CAN_SHARE_PRIVILEGE))
-      summary.allows.push("Appoint another Admin on this Connection");
+      summary.allows.push(i18n.t("hub.access.effects.routesAppoint"));
     // Delegation: only a change to what a Route runs is checked, against the saver's own grants.
-    summary.cautions.push(
-      "When this Admin changes what a Route runs (its agent, model, or automatic approvals), the change must fit within their own Host and Project access",
-    );
-    summary.withholds.push(
-      "Talking to the bot. Being Admin does not add anyone to a Route's audience; the audience rules decide who the bot answers",
-    );
-    summary.withholds.push("Seeing or replacing the bot token (Organization Admins only)");
+    summary.cautions.push(i18n.t("hub.access.effects.routesDelegationCaution"));
+    summary.withholds.push(i18n.t("hub.access.effects.routesNotTalking"));
+    summary.withholds.push(i18n.t("hub.access.effects.routesNoToken"));
   }
-  if (held.has("automation.run")) summary.allows.push("Run this Automation");
+  if (held.has("automation.run")) summary.allows.push(i18n.t("hub.access.effects.automationRun"));
   if (held.has("automation.run") && held.has(CAN_SHARE_PRIVILEGE)) {
-    summary.allows.push("Edit, enable, or delete this Automation, and grant Run or Admin on it");
+    summary.allows.push(i18n.t("hub.access.effects.automationAdmin"));
   }
 }
 
@@ -153,24 +143,24 @@ function summarizeProjectWork(
   if (held.has("project.use")) {
     summary.allows.push(
       onHost
-        ? "Use every Project on this Host, including Projects added later"
-        : "Use this Project and its workspaces",
+        ? i18n.t("hub.access.effects.useEveryProject")
+        : i18n.t("hub.access.effects.useProject"),
     );
-    if (onHost)
-      summary.cautions.push("A Project assignment can add to this grant, never narrow it");
+    if (onHost) summary.cautions.push(i18n.t("hub.access.effects.hostGrantCaution"));
   } else if (held.has("daemon.connect")) {
-    summary.allows.push("Connect to this Host");
-    summary.withholds.push("No Project until one is granted");
+    summary.allows.push(i18n.t("hub.access.effects.connectHost"));
+    summary.withholds.push(i18n.t("hub.access.effects.noProject"));
     return;
   }
-  allowIf(held, "agent.interact", "Chat with agents and switch their model", summary);
-  allowIf(held, "agent.create", "Start agent sessions with the allowed models", summary);
-  allowIf(held, "agent.fast.use", "Use Fast mode, which may cost more", summary);
-  allowIf(held, "workspace.create", "Create workspaces and worktrees", summary);
-  allowIf(held, "terminal.use", "Open a shell and run any command", summary);
+  allowIf(held, "agent.interact", i18n.t("hub.access.effects.chat"), summary);
+  allowIf(held, "agent.create", i18n.t("hub.access.effects.startSessions"), summary);
+  allowIf(held, "agent.fast.use", i18n.t("hub.access.effects.fastMode"), summary);
+  allowIf(held, "workspace.create", i18n.t("hub.access.effects.createWorkspaces"), summary);
+  allowIf(held, "schedule.manage", i18n.t("hub.access.effects.manageSchedules"), summary);
+  allowIf(held, "terminal.use", i18n.t("hub.access.effects.shell"), summary);
   if (!held.has("terminal.use")) {
-    allowIf(held, "terminal.profile.use", "Open the chosen Terminal profiles", summary);
-    summary.withholds.push("No shell");
+    allowIf(held, "terminal.profile.use", i18n.t("hub.access.effects.terminalProfiles"), summary);
+    summary.withholds.push(i18n.t("hub.access.effects.noShell"));
   }
   summarizeApprovals(held, summary);
   summarizeManagement(held, onHost, summary);
@@ -179,24 +169,29 @@ function summarizeProjectWork(
     held.has("approval.command") ||
     held.has("terminal.profile.use")
   ) {
-    summary.cautions.push(
-      "Terminals and approved commands run as the Host's account, beyond Project and model limits",
-    );
+    summary.cautions.push(i18n.t("hub.access.effects.terminalCaution"));
   }
 }
 
 function summarizeApprovals(held: ReadonlySet<string>, summary: AccessSummary): void {
   if (EVERY_APPROVAL.every((privilege) => held.has(privilege))) {
-    summary.allows.push("Approve every action, destructive commands included");
-    summary.allows.push("Run agents without asking for approval");
+    summary.allows.push(i18n.t("hub.access.effects.approveEverything"));
+    summary.allows.push(i18n.t("hub.access.effects.unattended"));
     return;
   }
-  allowIf(held, "approval.file", "Approve file edits", summary);
-  allowIf(held, "approval.config", "Approve configuration changes", summary);
-  allowIf(held, "approval.command", "Approve shell commands", summary);
-  allowIf(held, "approval.command.destructive", "Approve destructive commands", summary);
-  allowIf(held, "approval.other", "Approve other tools, such as web fetch and MCP tools", summary);
-  if (!held.has("approval.command")) summary.withholds.push("Cannot approve shell commands");
+  allowIf(held, "approval.file", i18n.t("hub.access.effects.approveFiles"), summary);
+  allowIf(held, "approval.config", i18n.t("hub.access.effects.approveConfig"), summary);
+  allowIf(held, "approval.command", i18n.t("hub.access.effects.approveCommands"), summary);
+  allowIf(
+    held,
+    "approval.command.destructive",
+    i18n.t("hub.access.effects.approveDestructive"),
+    summary,
+  );
+  allowIf(held, "approval.other", i18n.t("hub.access.effects.approveOther"), summary);
+  if (!held.has("approval.command")) {
+    summary.withholds.push(i18n.t("hub.access.effects.cannotApproveCommands"));
+  }
 }
 
 function summarizeManagement(
@@ -206,25 +201,19 @@ function summarizeManagement(
 ): void {
   if (!held.has("workspace.manage")) {
     if (!held.has("workspace.create")) {
-      summary.withholds.push("Cannot create workspaces or worktrees");
+      summary.withholds.push(i18n.t("hub.access.effects.cannotCreateWorkspaces"));
     }
-    summary.withholds.push("Cannot create, rename, or remove Projects");
+    summary.withholds.push(i18n.t("hub.access.effects.cannotManageProjects"));
     return;
   }
-  if (onHost) summary.allows.push("Create Projects where this Host allows");
+  if (onHost) summary.allows.push(i18n.t("hub.access.effects.createProjects"));
   summary.allows.push(
     onHost
-      ? "Rename, remove, or archive any Project, workspace, or worktree on this Host"
-      : "Rename, remove, or archive this Project and its workspaces and worktrees",
+      ? i18n.t("hub.access.effects.manageHostProjects")
+      : i18n.t("hub.access.effects.manageProject"),
   );
-  summary.cautions.push(
-    "Removing a Project stops every agent in it, including other people's; cleaning a worktree can delete it from disk",
-  );
-  if (onHost) {
-    summary.cautions.push(
-      "Any folder this Host's Project folder policy allows can become a Project",
-    );
-  }
+  summary.cautions.push(i18n.t("hub.access.effects.removeCaution"));
+  if (onHost) summary.cautions.push(i18n.t("hub.access.effects.folderCaution"));
 }
 
 function allowIf(
@@ -275,7 +264,7 @@ export function matchingAccessLevel(
 function levelPrivileges(resourceKind: AccessResourceKind, privileges: readonly string[]) {
   const flags =
     resourceKind === "daemon" || resourceKind === "project"
-      ? ["agent.fast.use", CAN_SHARE_PRIVILEGE, "terminal.use"]
+      ? ["agent.fast.use", CAN_SHARE_PRIVILEGE, "terminal.use", "schedule.manage"]
       : ["agent.fast.use"];
   return privileges.filter((privilege) => !flags.includes(privilege));
 }
@@ -284,7 +273,8 @@ function levelPrivileges(resourceKind: AccessResourceKind, privileges: readonly 
 export function effectLines(title: string | null, effects: readonly string[]): string | null {
   if (effects.length === 0) return null;
   const bullets = effects.map((effect) => `• ${effect}`);
-  return (title === null ? bullets : [`${title}:`, ...bullets]).join("\n");
+  const heading = title === null ? [] : [i18n.t("hub.access.summary.heading", { title })];
+  return [...heading, ...bullets].join("\n");
 }
 
 /** The channel of a Connection resource id: the Hub writes `<channel>/<accountId>`, URL-encoded. */
