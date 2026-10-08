@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { HubProblemSchema } from "./contracts";
 import type { HubRequestInput, HubTransport } from "./transport/contract";
+import { i18n } from "@/i18n/i18next";
 
 export class HubApiError extends Error {
   constructor(
@@ -99,6 +100,6 @@ async function throwResponse(response: Response): Promise<never> {
     payload.success ? payload.data.error : "request_failed",
     payload.success
       ? (payload.data.message ?? payload.data.error)
-      : `Hub request failed (${response.status}).`,
+      : i18n.t("hub.account.errors.requestFailedStatus", { status: response.status }),
   );
 }

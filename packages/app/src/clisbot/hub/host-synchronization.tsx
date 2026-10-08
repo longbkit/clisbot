@@ -4,6 +4,7 @@ import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
 import type { HubHostManagement } from "@/types/host-connection";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "./account-provider";
 import { HubAccessTicketSchema } from "./contracts";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
@@ -195,16 +196,17 @@ function HubHostBinding({
         management: { ...management, daemonSlug: labelRef.current, managedAccessMode },
       });
       if (profile === null) {
-        throw new Error(
-          "A saved Host conflicts with this Hub's connection details. Check the Host's Connections settings.",
-        );
+        throw new Error(i18n.t("hub.account.synchronization.conflictWithHint"));
       }
       if (!disposed && existing) await store.restartHostConnection(synchronizedOffer.serverId);
     }).catch((error: unknown) => {
       unregister();
       if (!disposed) {
         setHubHostSynchronizationFailure(synchronizationKey, {
-          message: error instanceof Error ? error.message : "Unable to add this Host to Clisbot.",
+          message:
+            error instanceof Error
+              ? error.message
+              : i18n.t("hub.account.synchronization.addFailed"),
           retry,
         });
       }
@@ -245,12 +247,14 @@ function HubHostBinding({
           managedAccessMode,
         },
       });
-      if (profile === null)
-        throw new Error("A saved Host conflicts with this Hub's connection details.");
+      if (profile === null) throw new Error(i18n.t("hub.account.synchronization.conflict"));
     }).catch((error: unknown) => {
       if (!disposed) {
         setHubHostSynchronizationFailure(synchronizationKey, {
-          message: error instanceof Error ? error.message : "Unable to update the Host name.",
+          message:
+            error instanceof Error
+              ? error.message
+              : i18n.t("hub.account.synchronization.renameFailed"),
           retry,
         });
       }

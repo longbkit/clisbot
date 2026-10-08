@@ -5,6 +5,7 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { Pin, PinOff } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
@@ -24,6 +25,7 @@ export function SessionPinButton({ serverId, agentId }: { serverId: string; agen
   const enabled = useBotsFeatureHosts().length > 0;
   const compact = useIsCompactFormFactor() || isNative;
   const { pins, toggle } = useResourcePins();
+  const { t } = useTranslation();
   const pinned = pins.some((p) => pinKey(p) === pinKey({ kind: "session", serverId, id: agentId }));
   const onPress = useCallback(
     (event: GestureResponderEvent) => {
@@ -45,7 +47,9 @@ export function SessionPinButton({ serverId, agentId }: { serverId: string; agen
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={pinned ? "Unpin session" : "Pin session"}
+      accessibilityLabel={
+        pinned ? t("bots.workspace.sidebar.unpinSession") : t("bots.workspace.sidebar.pinSession")
+      }
       onPress={onPress}
       style={style}
       testID={`sidebar-session-pin-${agentId}`}

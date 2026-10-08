@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
 import { subjectAssignments } from "../access-catalog";
-import { countLabel } from "../labels";
 import { tableStyles } from "../table-styles";
 import { MemberTeamsModal } from "./member-teams-modal";
 import { RowActionsMenu } from "./row-actions-menu";
@@ -29,6 +29,7 @@ export function MemberTeamsSection({
   resources: TeamResources;
   actions: TeamActions;
 }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const open = useCallback(() => {
     actions.setMutationError(null);
@@ -41,21 +42,21 @@ export function MemberTeamsSection({
     () =>
       canEdit ? (
         <Button size="sm" variant="outline" disabled={actions.pending} onPress={open}>
-          {joined.length === 0 ? "Add to a Team" : "Edit Teams"}
+          {joined.length === 0 ? t("hub.team.actions.addToTeam") : t("hub.team.actions.editTeams")}
         </Button>
       ) : null,
-    [actions.pending, canEdit, joined.length, open],
+    [actions.pending, canEdit, joined.length, open, t],
   );
   // Only readers of access assignments see what each Team grants.
   const assignments = resources.canManageResources
     ? resources.assignments.data?.assignments
     : undefined;
   return (
-    <SettingsSection title="Teams" trailing={editButton}>
+    <SettingsSection title={t("hub.team.memberDetail.teams.title")} trailing={editButton}>
       <View style={settingsStyles.card}>
         {joined.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
-            <Text style={settingsStyles.rowHint}>Not in any Team yet.</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.team.memberDetail.teams.none")}</Text>
           </View>
         ) : (
           joined.map((team, index) => (
@@ -101,19 +102,20 @@ function JoinedTeamRow({
   canManage: boolean;
   actions: TeamActions;
 }) {
+  const { t } = useTranslation();
   const { removeTeamMember, pending } = actions;
   const items = useMemo(
     () => [
       {
-        label: "Remove from Team",
+        label: t("hub.team.memberDetail.teams.removeFromTeam"),
         destructive: true,
         disabled: pending,
         onSelect: () => removeTeamMember(team.id, member.userId),
       },
     ],
-    [member.userId, pending, removeTeamMember, team.id],
+    [member.userId, pending, removeTeamMember, t, team.id],
   );
-  const members = countLabel(team.userIds.length, "Member");
+  const members = t("hub.team.counts.members", { count: team.userIds.length });
   return (
     <View
       style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null, tableStyles.body]}
@@ -125,7 +127,11 @@ function JoinedTeamRow({
         </Text>
       </View>
       {canManage ? (
-        <RowActionsMenu label={`Actions for ${team.name}`} actions={items} disabled={pending} />
+        <RowActionsMenu
+          label={t("hub.team.actions.actionsFor", { name: team.name })}
+          actions={items}
+          disabled={pending}
+        />
       ) : null}
     </View>
   );

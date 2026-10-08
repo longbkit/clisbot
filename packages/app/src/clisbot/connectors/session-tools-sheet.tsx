@@ -1,5 +1,7 @@
+import type { TFunction } from "i18next";
 import { Settings2 } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useRouter, type Href } from "expo-router";
@@ -12,16 +14,17 @@ import { buildProjectSettingsRoute } from "@/utils/host-routes";
 import { buildHostBotRoute } from "@/clisbot/bots/routes";
 import { toErrorMessage } from "@/utils/error-messages";
 import { AgentToolGroupIcon } from "./agent-tools-section";
+import { agentToolGroupDescription, agentToolGroupLabel } from "./agent-tool-copy";
 import { ConnectorLogo } from "./connector-logo";
 import { useConnectorLookup, type ConnectorLookup } from "./connector-lookup";
 import { TOOLS_VIEW_QUERY } from "./connectors-tab";
 import { setSessionKeptTools, type SessionOffEdit } from "./session-connectors";
 import {
   SKILLS_PAGE,
-  SKILLS_PAGE_HEADER,
   SkillsPage,
   SkillsSection,
   skillsInfo,
+  skillsPageHeader,
   useSessionSkills,
   type SessionSkills,
 } from "./session-skills";
@@ -118,7 +121,7 @@ export function SessionToolsSheet({
       manage: nav.manage,
       onError: setError,
       allows,
-      words: scope ? { owner: "Bot", here: "chat" } : { owner: "Project", here: "session" },
+      owner: scope ? "bot" : "project",
       editAllows: allowsOwner ? (edit) => editSessionAllows(serverId, allowsOwner, edit) : null,
     }),
     [allows, allowsOwner, defaults, nav.manage, saveGrant, scope, serverId],
@@ -222,16 +225,18 @@ function useSheetHeader(input: {
   setSearch(query: string): void;
 }): SheetHeader {
   const { page, grant, lookup, skills, running, scope, back, setSearch } = input;
+  const { t } = useTranslation();
   return useMemo(() => {
-    const backTo = { onPress: back, accessibilityLabel: "Back to tools" };
+    const backTo = { onPress: back, accessibilityLabel: t("connectors.tools.sheet.backToTools") };
     if (page.kind === "skills") {
+      const header = skillsPageHeader();
       return {
-        ...SKILLS_PAGE_HEADER,
+        ...header,
         back: backTo,
-        actions: <SettingsInfoTip title="Skills" info={skillsInfo(skills.switchable)} />,
+        actions: <SettingsInfoTip title={header.title} info={skillsInfo(skills.switchable)} />,
         search: {
           onChange: setSearch,
-          placeholder: "Search skills",
+          placeholder: t("connectors.tools.skills.search"),
           testID: "session-skills-search",
         },
       };
@@ -239,8 +244,8 @@ function useSheetHeader(input: {
     if (page.kind === "group") {
       const { group } = page.entry;
       return {
-        title: group.label,
-        subtitle: group.description,
+        title: agentToolGroupLabel(group),
+        subtitle: agentToolGroupDescription(group),
         leading: <AgentToolGroupIcon group={group.id} />,
         back: backTo,
       };
@@ -254,34 +259,36 @@ function useSheetHeader(input: {
         back: backTo,
         search: {
           onChange: setSearch,
-          placeholder: "Search tools",
+          placeholder: t("connectors.tools.common.searchTools"),
           testID: "session-tools-search",
         },
       };
     }
-    return listHeader(running, scope);
-  }, [back, grant, lookup, page, running, scope, setSearch, skills.switchable]);
+    return listHeader(running, scope, t);
+  }, [back, grant, lookup, page, running, scope, setSearch, skills.switchable, t]);
 }
 
 /** The first page's header: this session, or the picked Bot in this Chat. */
-function listHeader(running: boolean, scope: SheetScope | null): SheetHeader {
+function listHeader(running: boolean, scope: SheetScope | null, t: TFunction): SheetHeader {
   const when = running
-    ? "Applies from the agent's next call, whether you turn one off or back on."
-    : "Applies to the session you are about to start.";
+    ? t("connectors.tools.sheet.whenRunning")
+    : t("connectors.tools.sheet.whenDraft");
   if (!scope) {
-    const info = `${when} The Project's tools and Connectors stay as they are.`;
-    return {
-      title: "Tools for this session",
-      actions: <SettingsInfoTip title="Tools for this session" info={info} />,
-    };
+    const title = t("connectors.tools.sheet.title");
+    const info = t("connectors.tools.sheet.projectInfo", { when });
+    return { title, actions: <SettingsInfoTip title={title} info={info} /> };
   }
-  const where = scope.group ? "this group chat" : "this chat";
-  const pick = scope.group ? " Pick another Bot in the chat header to change its tools." : "";
-  const info = `${when} Only ${scope.botName} in ${where} changes; its other chats and the Bot's settings stay as they are.${pick}`;
+  const bot = scope.botName;
+  const title = t("connectors.tools.sheet.botTitle", { bot });
+  const info = scope.group
+    ? t("connectors.tools.sheet.botInfoGroup", { when, bot })
+    : t("connectors.tools.sheet.botInfo", { when, bot });
   return {
-    title: `Tools for ${scope.botName}`,
-    subtitle: scope.group ? "In this group chat" : "In this chat",
-    actions: <SettingsInfoTip title={`Tools for ${scope.botName}`} info={info} />,
+    title,
+    subtitle: scope.group
+      ? t("connectors.tools.sheet.inGroupChat")
+      : t("connectors.tools.sheet.inChat"),
+    actions: <SettingsInfoTip title={title} info={info} />,
   };
 }
 
@@ -292,6 +299,7 @@ function useSheetFooter(input: {
   onClose(): void;
 }) {
   const { page, apply, nav, onClose } = input;
+  const { t } = useTranslation();
   const group = page.kind === "group" ? page.entry : null;
   const setAll = useCallback(
     (on: boolean) => {
@@ -307,10 +315,10 @@ function useSheetFooter(input: {
         {page.kind === "group" ? (
           <View style={styles.footerGroup}>
             <Button variant="ghost" size="sm" onPress={all}>
-              All
+              {t("connectors.tools.common.all")}
             </Button>
             <Button variant="ghost" size="sm" onPress={none}>
-              None
+              {t("connectors.tools.common.none")}
             </Button>
           </View>
         ) : null}
@@ -322,16 +330,16 @@ function useSheetFooter(input: {
             onPress={nav.manage}
             testID="composer-connectors-edit"
           >
-            Manage tools
+            {t("connectors.tools.sheet.manage")}
           </Button>
         ) : null}
         {page.kind === "connector" || page.kind === "skills" ? <View /> : null}
         <Button variant="default" onPress={onClose}>
-          Done
+          {t("connectors.tools.common.done")}
         </Button>
       </View>
     ),
-    [all, nav.manage, none, onClose, page.kind],
+    [all, nav.manage, none, onClose, page.kind, t],
   );
 }
 

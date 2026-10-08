@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 
 export const CLISBOT_CLIENT_ID = "clisbot-client";
 export const HUB_ACCESS_SCOPE = "hub:access";
@@ -17,18 +18,18 @@ export function authorizationCodeFromCallback(input: {
 }): string {
   const callback = new URL(input.callbackUrl);
   if (callback.searchParams.get("state") !== input.state) {
-    throw new Error("Hub sign-in state mismatch.");
+    throw new Error(i18n.t("hub.account.signIn.stateMismatch"));
   }
   if (callback.searchParams.get("iss") !== input.issuer) {
-    throw new Error("Unexpected Hub issuer.");
+    throw new Error(i18n.t("hub.account.signIn.unexpectedIssuer"));
   }
   const authorizationError = callback.searchParams.get("error");
   if (authorizationError !== null) {
-    throw new Error(`Hub sign-in failed: ${authorizationError}`);
+    throw new Error(i18n.t("hub.account.signIn.failed", { error: authorizationError }));
   }
   const code = callback.searchParams.get("code");
   if (code === null || code.length === 0) {
-    throw new Error("Hub did not return an authorization code.");
+    throw new Error(i18n.t("hub.account.signIn.noAuthorizationCode"));
   }
   return code;
 }

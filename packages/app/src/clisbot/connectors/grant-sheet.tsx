@@ -1,7 +1,9 @@
 import { ChevronRight } from "lucide-react-native";
+import type { TFunction } from "i18next";
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import {
   connectorAccessOf,
   type ConnectorAccess,
@@ -36,14 +38,20 @@ const ThemedChevron = withUnistyles(ChevronRight, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 
-const ACCESS_OPTIONS: readonly RadioOption<ConnectorAccess>[] = [
-  { value: "read", label: "Read only", description: "Agents look things up; nothing changes" },
-  {
-    value: "write",
-    label: "Read and write",
-    description: "Agents may create and change things. Sends still follow Ask before sending",
-  },
-];
+function accessOptions(t: TFunction): readonly RadioOption<ConnectorAccess>[] {
+  return [
+    {
+      value: "read",
+      label: t("connectors.screen.common.readOnly"),
+      description: t("connectors.screen.grantSheet.readHint"),
+    },
+    {
+      value: "write",
+      label: t("connectors.screen.common.readWrite"),
+      description: t("connectors.screen.grantSheet.writeHint"),
+    },
+  ];
+}
 
 export type GrantPicker = "tools" | "accounts";
 
@@ -64,13 +72,14 @@ export function GrantSheet({
   onManage(): void;
   onClose(): void;
 }) {
+  const { t } = useTranslation();
   const name = target.kind === "app" ? lookup.name(target.slug) : target.name;
   const remove = useRemove(target, name, apply, onClose);
   const pickTools = useCallback(() => onPick("tools"), [onPick]);
   const header = useMemo(
     () => ({
       title: name,
-      subtitle: target.kind === "app" ? undefined : "MCP server",
+      subtitle: target.kind === "app" ? undefined : t("connectors.screen.common.mcpServer"),
       leading:
         target.kind === "app" ? (
           <ConnectorLogo slug={target.slug} name={name} logo={lookup.logo(target.slug)} />
@@ -78,20 +87,20 @@ export function GrantSheet({
           <ConnectorLogo slug={serverLogoKey(target.name)} name={name} />
         ),
     }),
-    [lookup, name, target],
+    [lookup, name, t, target],
   );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <Button variant="outline" size="sm" onPress={remove} testID="connector-grant-remove">
-          Remove from Project
+          {t("connectors.screen.grantSheet.removeFromProject")}
         </Button>
         <Button variant="default" onPress={onClose}>
-          Done
+          {t("connectors.screen.common.done")}
         </Button>
       </View>
     ),
-    [onClose, remove],
+    [onClose, remove, t],
   );
   return (
     <AdaptiveModalSheet
@@ -114,7 +123,7 @@ export function GrantSheet({
       ) : (
         <View style={settingsStyles.card}>
           <LimitRow
-            label="Tools"
+            label={t("connectors.screen.common.tools")}
             value={toolSelectionLabel(grant?.mcpServers?.[target.name]?.tools ?? "all")}
             onPress={pickTools}
           />
@@ -139,6 +148,7 @@ function AppSettings({
   onPick(picker: GrantPicker): void;
   onManage(): void;
 }) {
+  const { t } = useTranslation();
   const app = grant?.apps?.[slug];
   const setAccess = useCallback(
     (access: ConnectorAccess) => apply((current) => setAppAccess(current, slug, access)),
@@ -152,17 +162,17 @@ function AppSettings({
       {lookup.connected(slug) ? null : (
         <Alert
           variant="warning"
-          title={`${lookup.name(slug)} is not connected on this Host`}
-          description="Agents get a connect card when they need it"
+          title={t("connectors.screen.grantSheet.notConnectedTitle", { app: lookup.name(slug) })}
+          description={t("connectors.screen.grantSheet.notConnectedHint")}
         >
           <Button variant="outline" size="sm" onPress={onManage}>
-            Open Connectors
+            {t("connectors.screen.grantSheet.openConnectors")}
           </Button>
         </Alert>
       )}
       <RadioList
-        label="Access"
-        options={ACCESS_OPTIONS}
+        label={t("connectors.screen.grantSheet.access")}
+        options={accessOptions(t)}
         selected={connectorAccessOf(app.access)}
         onChange={setAccess}
         disabled={false}
@@ -170,13 +180,13 @@ function AppSettings({
       <View style={settingsStyles.card}>
         {lookup.noAuth(slug) ? null : (
           <LimitRow
-            label="Accounts"
+            label={t("connectors.screen.common.accounts")}
             value={accountSelectionLabel(app.accounts, lookup.accounts(slug))}
             onPress={pickAccounts}
           />
         )}
         <LimitRow
-          label="Tools"
+          label={t("connectors.screen.common.tools")}
           value={toolSelectionLabel(app.tools)}
           bordered={!lookup.noAuth(slug)}
           onPress={pickTools}
@@ -198,10 +208,11 @@ function LimitRow({
   bordered?: boolean;
   onPress(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={t("connectors.screen.grantSheet.limitLabel", { label, value })}
       onPress={onPress}
       style={bordered ? [settingsStyles.row, settingsStyles.rowBorder] : settingsStyles.row}
     >
@@ -220,11 +231,12 @@ function useRemove(
   apply: (edit: GrantEdit) => void,
   onClose: () => void,
 ) {
+  const { t } = useTranslation();
   return useCallback(async () => {
     const confirmed = await confirmDialog({
-      title: `Remove ${name}?`,
-      message: "Agents in this Project stop using it. Its access and tool choices are forgotten.",
-      confirmLabel: "Remove",
+      title: t("connectors.screen.common.removeTitle", { name }),
+      message: t("connectors.screen.grantSheet.removeMessage"),
+      confirmLabel: t("connectors.screen.common.remove"),
       destructive: true,
     });
     if (!confirmed) return;
@@ -232,7 +244,7 @@ function useRemove(
     apply((grant) =>
       target.kind === "app" ? revokeApp(grant, target.slug) : revokeMcpServer(grant, target.name),
     );
-  }, [apply, name, onClose, target]);
+  }, [apply, name, onClose, t, target]);
 }
 
 const styles = StyleSheet.create((theme) => ({

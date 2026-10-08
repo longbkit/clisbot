@@ -2,11 +2,15 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useCallback, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import type { HubProfile } from "./hub-profiles";
 import { HubConnectionSettings, HubOverviewSettings, HubLoginPolicySettings } from "./hub-settings";
 import { HubPicker } from "./hub-picker";
 import { PairedDeviceList } from "./device-list";
 import { isHubSwitchLocked } from "./hub-edit-lock";
+
+// The assertions read the English copy.
+beforeEach(() => i18n.changeLanguage("en"));
 
 const state = vi.hoisted(() => ({
   params: {} as Record<string, string>,

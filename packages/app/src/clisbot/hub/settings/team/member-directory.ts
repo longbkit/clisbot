@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+import { i18n } from "@/i18n/i18next";
 import { identityCoversConnection } from "../../channel-identity-directory";
 import type { IdentityRealm } from "../channel-identity-link-realms";
 import type { FilterChip } from "../filter-chips";
@@ -65,16 +67,25 @@ function matchesFilter(row: MemberDirectoryRow, filter: MemberFilter): boolean {
 }
 
 /** The Members overview: every count is a filter. "No chat account" needs the organization's identities. */
-export function memberChips(rows: readonly MemberDirectoryRow[]): FilterChip<MemberFilter>[] {
+export function memberChips(
+  rows: readonly MemberDirectoryRow[],
+  t: TFunction,
+): FilterChip<MemberFilter>[] {
   const count = (filter: MemberFilter) => rows.filter((row) => matchesFilter(row, filter)).length;
   const chatVisible = rows.some(({ chat }) => chat !== undefined && chat.length > 0);
   return [
-    { value: "all", label: "Members", count: rows.length },
-    { value: "owners", label: "Owners", count: count("owners") },
-    { value: "admins", label: "Admins", count: count("admins") },
-    { value: "noTeam", label: "No Team", count: count("noTeam") },
+    { value: "all", label: t("hub.team.members.chips.all"), count: rows.length },
+    { value: "owners", label: t("hub.team.members.chips.owners"), count: count("owners") },
+    { value: "admins", label: t("hub.team.members.chips.admins"), count: count("admins") },
+    { value: "noTeam", label: t("hub.team.members.chips.noTeam"), count: count("noTeam") },
     ...(chatVisible
-      ? [{ value: "noChat" as const, label: "No chat account", count: count("noChat") }]
+      ? [
+          {
+            value: "noChat" as const,
+            label: t("hub.team.members.chips.noChat"),
+            count: count("noChat"),
+          },
+        ]
       : []),
   ];
 }
@@ -97,5 +108,7 @@ export function filterMemberRows(
 
 export function memberTeamNames(member: HubMember, teams: readonly HubTeam[]): string {
   if (teams.length > 0) return teams.map(({ name }) => name).join(", ");
-  return member.role === "owner" ? "Full access, no Team needed" : "No Team";
+  return member.role === "owner"
+    ? i18n.t("hub.team.members.ownerNoTeam")
+    : i18n.t("hub.team.members.noTeam");
 }

@@ -5,6 +5,7 @@ import type { MutableDaemonConfig } from "@clisbot/protocol/messages";
 import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { daemonConfigQueryKey } from "@/data/daemon-config";
 import { getHostRuntimeStore, useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
+import { i18n } from "@/i18n/i18next";
 import type { HubDaemonsSchema } from "../contracts";
 import { hubResourceQueryKey } from "../query-keys";
 
@@ -68,8 +69,7 @@ export function useManagedAccessTransition(input: {
       if (devicePairing && sessionClosed && !reported) {
         setTransition({
           status: "failed",
-          message:
-            "Unable to confirm the Host's access mode. Refresh its Hub connection and try again.",
+          message: i18n.t("hub.settings.managedAccessTransition.unconfirmed"),
         });
         return;
       }
@@ -116,8 +116,7 @@ export function useManagedAccessTransition(input: {
     const timeout = setTimeout(() => {
       setTransition({
         status: "failed",
-        message:
-          "This Host did not reconnect. Use Reconnect in Settings → Hosts, or check its daemon.",
+        message: i18n.t("hub.settings.managedAccessTransition.noReconnect"),
         ...(devicePairing && target === "off" ? { mode: target } : {}),
       });
     }, RECONNECT_TIMEOUT_MS);
@@ -128,16 +127,23 @@ export function useManagedAccessTransition(input: {
   return { transition, switchMode, finishPairing };
 }
 
+// Matching reads the daemon's English text, including this fallback for a non-Error rejection.
+const UPDATE_FAILED = "Unable to update managed access.";
+
 function closedForManagedAccess(error: unknown): boolean {
-  return /managed access/i.test(describe(error));
+  return /managed access/i.test(error instanceof Error ? error.message : UPDATE_FAILED);
 }
 
 function closedForDeviceCredential(error: unknown): boolean {
-  return /daemon device credentials are now required/i.test(describe(error));
+  return /daemon device credentials are now required/i.test(
+    error instanceof Error ? error.message : UPDATE_FAILED,
+  );
 }
 
 function describe(error: unknown): string {
-  return error instanceof Error ? error.message : "Unable to update managed access.";
+  return error instanceof Error
+    ? error.message
+    : i18n.t("hub.settings.managedAccessTransition.updateFailed");
 }
 
 async function waitForHubMode(

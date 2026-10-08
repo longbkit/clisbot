@@ -1,5 +1,9 @@
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
+import { bots } from "./bots";
+import { heartbeats } from "./heartbeats";
+import { connectors } from "./connectors";
+import { hub } from "./hub";
 
 export const ja: TranslationResources = {
   paneFind: {
@@ -1262,6 +1266,7 @@ export const ja: TranslationResources = {
         copyPath: "パスをコピー",
         copyBranchName: "ブランチ名をコピー",
         rename: "ワークスペースの名前を変更",
+        renameSession: "セッションの名前を変更",
         pin: "上部に固定",
         unpin: "固定解除",
         archive: "アーカイブ",
@@ -2191,6 +2196,7 @@ export const ja: TranslationResources = {
           ko: "韓国語",
           ptBR: "ブラジルポルトガル語",
           ru: "ロシア語",
+          vi: "ベトナム語",
           zhCN: "簡体字中国語",
         },
       },
@@ -2834,4 +2840,8 @@ export const ja: TranslationResources = {
       },
     },
   },
+  hub: hub.ja,
+  connectors: connectors.ja,
+  bots: bots.ja,
+  heartbeats: heartbeats.ja,
 } as const;

@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { mcpServerSummary } from "./model";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorMcpServer } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export function BrowseServersSection({
   onSelect(name: string): void;
   onAdd(): void;
 }) {
+  const { t } = useTranslation();
   const add = useMemo(
     () => (
       <Button
@@ -28,15 +30,15 @@ export function BrowseServersSection({
         onPress={onAdd}
         testID="connectors-browse-add-mcp"
       >
-        Add MCP server
+        {t("connectors.screen.common.addMcpServer")}
       </Button>
     ),
-    [onAdd],
+    [onAdd, t],
   );
   return (
     <SettingsSection
-      title="MCP servers"
-      info="Servers you run or trust. Nothing leaves this Host unless the server itself sends it."
+      title={t("connectors.screen.common.mcpServers")}
+      info={t("connectors.screen.browse.serversInfo")}
       trailing={add}
     >
       {servers.length === 0 ? null : (

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Switch } from "@/components/ui/switch";
 import { settingsStyles } from "@/styles/settings";
@@ -24,22 +25,25 @@ export function CanShareField({
   onChange(value: boolean): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   if (state === "hidden") return null;
   const locked = state === "locked";
+  const description = canShareDescription(resourceKind);
   return (
     <View style={styles.switchRow}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Can share</Text>
+        <Text style={settingsStyles.rowTitle}>{t("hub.access.canShare.label")}</Text>
         <Text style={settingsStyles.rowHint}>
-          {canShareDescription(resourceKind)}
-          {locked ? ". Always on for this level." : "."}
+          {locked
+            ? t("hub.access.canShare.hintLocked", { description })
+            : t("hub.access.canShare.hint", { description })}
         </Text>
       </View>
       <Switch
         value={locked || value}
         onValueChange={onChange}
         disabled={disabled || locked}
-        accessibilityLabel="Can share"
+        accessibilityLabel={t("hub.access.canShare.label")}
       />
     </View>
   );

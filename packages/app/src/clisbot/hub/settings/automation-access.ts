@@ -5,6 +5,7 @@
  * below are the ones this feature adds and will fold into it.
  */
 import { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 import { HubAutomationSchema, type HubEffectiveAccessSchema } from "../contracts";
 
 /** Admin manages this one Automation and who gets into it; Run only runs it and sees results. */
@@ -94,7 +95,9 @@ export function filterAutomations<Automation extends Pick<HubScopedAutomation, "
 }
 
 export function automationScopeLabel(scope: HubAutomationScope | undefined): string {
-  return scope === "run" ? "Run" : "Admin";
+  return scope === "run"
+    ? i18n.t("hub.automations.scope.run")
+    : i18n.t("hub.automations.scope.admin");
 }
 
 /**
@@ -104,7 +107,10 @@ export function automationScopeLabel(scope: HubAutomationScope | undefined): str
 export function automationRunWarning(
   automation: Pick<HubScopedAutomation, "author" | "target">,
 ): string {
-  const author = automation.author?.name ?? "its author";
-  const target = automation.target?.projectName ?? automation.target?.daemonName ?? "its Project";
-  return `Runs with ${author}'s access on ${target}. The runner sees results but gets no Project access in the app.`;
+  const author = automation.author?.name ?? i18n.t("hub.automations.access.itsAuthor");
+  const target =
+    automation.target?.projectName ??
+    automation.target?.daemonName ??
+    i18n.t("hub.automations.access.itsProject");
+  return i18n.t("hub.automations.access.runWarning", { author, target });
 }

@@ -7,6 +7,7 @@ import {
   mentionTokens,
   ROOM_WIDE_MENTIONS,
 } from "@clisbot/protocol/chats/mentions";
+import { i18n } from "@/i18n/i18next";
 
 export interface MentionMember {
   slug: string;
@@ -43,7 +44,7 @@ export function memberMentionOptions(
             type: "chat_member",
             id: `member:${EVERYONE}`,
             label: `@${EVERYONE}`,
-            description: "Everyone in this group",
+            description: i18n.t("bots.chat.mentions.everyone"),
             token: EVERYONE,
           },
         ]

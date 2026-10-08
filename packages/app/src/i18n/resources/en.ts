@@ -1,3 +1,8 @@
+import { bots } from "./bots";
+import { heartbeats } from "./heartbeats";
+import { connectors } from "./connectors";
+import { hub } from "./hub";
+
 export const en = {
   paneFind: {
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
@@ -1256,6 +1261,7 @@ export const en = {
         copyPath: "Copy path",
         copyBranchName: "Copy branch name",
         rename: "Rename workspace",
+        renameSession: "Rename session",
         pin: "Pin to top",
         unpin: "Unpin",
         archive: "Archive",
@@ -2305,6 +2311,7 @@ export const en = {
           ko: "Korean",
           ptBR: "Brazilian Portuguese",
           ru: "Russian",
+          vi: "Vietnamese",
           zhCN: "Simplified Chinese",
         },
       },
@@ -2943,6 +2950,10 @@ export const en = {
       },
     },
   },
+  hub: hub.en,
+  connectors: connectors.en,
+  bots: bots.en,
+  heartbeats: heartbeats.en,
 } as const;
 
 type WidenStringLeaves<T> = {

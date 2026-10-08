@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -6,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import {
   openChannelConnectionForm,
@@ -17,20 +20,18 @@ import {
 import { supportedTransports, type ChannelCatalogEntry } from "../channel-catalog";
 import { RadioList } from "./channel-route-audience-controls";
 
-const SOURCE_OPTIONS: SegmentedControlOption<ServiceAccountSource>[] = [
-  { value: "paste", label: "Paste JSON" },
-  { value: "file", label: "File on host" },
-];
+function sourceOptions(t: TFunction): SegmentedControlOption<ServiceAccountSource>[] {
+  return [
+    { value: "paste", label: t("hub.channels.setup.pasteJson") },
+    { value: "file", label: t("hub.channels.setup.fileOnHost") },
+  ];
+}
 
 /**
  * The catalog-driven Add-connection form. `save` posts the body and answers with
  * the Hub's problem, or null when the Connection was created; the caller closes
  * the form on null.
  */
-/** A QR channel has nothing to paste: the scan happens on the Connection's card. */
-const QR_NEXT_STEP =
-  "Nothing to paste. Once it is added, scan its QR code with the phone signed in to this Zalo account, then give it a Route so people can reach it.";
-
 export function ChannelConnectionSetup({
   entry,
   save,
@@ -40,17 +41,22 @@ export function ChannelConnectionSetup({
   save(body: Record<string, unknown>): Promise<ChannelConnectionProblem | null>;
   onCancel?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation();
+  const options = useMemo(() => sourceOptions(t), [t]);
   const [model] = useState(() => openChannelConnectionForm(entry));
   useEffect(() => () => model.close(), [model]);
   const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
   const submit = useSubmit(model, save);
   return (
-    <SettingsSection title={`Connect ${entry.label}`}>
+    <SettingsSection title={t("hub.channels.catalogDetail.connect", { label: entry.label })}>
       <View style={[settingsStyles.card, styles.form]}>
         <Text style={settingsStyles.rowHint}>{supportedTransports(entry)[0]?.setup ?? ""}</Text>
-        {state.setup === "qr" ? <Text style={settingsStyles.rowHint}>{QR_NEXT_STEP}</Text> : null}
+        {/* A QR channel has nothing to paste: the scan happens on the Connection's card. */}
+        {state.setup === "qr" ? (
+          <Text style={settingsStyles.rowHint}>{t("hub.channels.setup.qrNextStep")}</Text>
+        ) : null}
         {state.transports.length > 1 && state.transportId !== null ? (
-          <Field label="Transport">
+          <Field label={t("hub.channels.setup.transport")}>
             <SegmentedControl
               options={state.transports.map(({ id, label }) => ({ value: id, label }))}
               value={state.transportId}
@@ -61,8 +67,8 @@ export function ChannelConnectionSetup({
         ) : null}
         {state.accountId === null ? null : (
           <Field
-            label="Account name"
-            hint="How this Connection is named in Clisbot."
+            label={t("hub.channels.setup.accountName")}
+            hint={t("hub.channels.setup.accountNameHint")}
             error={state.accountIdError}
           >
             <FormTextInput
@@ -76,9 +82,9 @@ export function ChannelConnectionSetup({
           </Field>
         )}
         {state.serviceAccountSource === null ? null : (
-          <Field label="Credential source">
+          <Field label={t("hub.channels.setup.credentialSource")}>
             <SegmentedControl
-              options={SOURCE_OPTIONS}
+              options={options}
               value={state.serviceAccountSource}
               onValueChange={model.setServiceAccountSource}
               size="sm"
@@ -106,11 +112,13 @@ export function ChannelConnectionSetup({
         )}
         <View style={styles.actions}>
           <Button disabled={!state.canSubmit} loading={state.submitting} onPress={submit}>
-            {state.setup === "qr" ? "Add Connection" : "Verify and add Connection"}
+            {state.setup === "qr"
+              ? t("hub.channels.accounts.addConnection")
+              : t("hub.channels.setup.verifyAndAdd")}
           </Button>
           {onCancel === undefined ? null : (
             <Button variant="ghost" disabled={state.submitting} onPress={onCancel}>
-              Cancel
+              {t("hub.channels.card.cancel")}
             </Button>
           )}
         </View>
@@ -134,8 +142,9 @@ function useSubmit(
         else model.setProblem(problem);
       } catch (error) {
         model.setProblem({
-          title: "The Hub could not be reached",
-          detail: error instanceof Error ? error.message : "The request failed.",
+          title: i18n.t("hub.channels.setup.hubUnreachable"),
+          detail:
+            error instanceof Error ? error.message : i18n.t("hub.channels.setup.requestFailed"),
           hint: null,
           retryable: true,
         });
@@ -153,6 +162,7 @@ function ConnectionField({
   disabled: boolean;
   onChange(key: string, value: string): void;
 }) {
+  const { t } = useTranslation();
   const change = useCallback((value: string) => onChange(field.key, value), [field.key, onChange]);
   if (field.kind === "choice" && field.choices !== null) {
     return (
@@ -167,7 +177,9 @@ function ConnectionField({
   }
   return (
     <Field
-      label={field.required ? field.label : `${field.label} (optional)`}
+      label={
+        field.required ? field.label : t("hub.channels.setup.optional", { label: field.label })
+      }
       error={field.error}
       {...(field.help === null ? {} : { hint: field.help })}
     >

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Text } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import type { SelectFieldOption } from "@/components/ui/select-field";
@@ -21,8 +22,9 @@ export function QueryFeedback({
 }: {
   queries: Array<{ isPending: boolean; error: Error | null }>;
 }) {
+  const { t } = useTranslation();
   if (queries.some((query) => query.isPending)) {
-    return <Text style={settingsStyles.rowHint}>Loading…</Text>;
+    return <Text style={settingsStyles.rowHint}>{t("hub.channels.loading")}</Text>;
   }
   const error = queries.find((query) => query.error)?.error;
   return error ? <Alert variant="error" title={error.message} /> : null;

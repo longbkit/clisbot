@@ -1,6 +1,7 @@
 import type { HostTailscale } from "@clisbot/protocol/host-tailscale";
 import type { HubLocalStartResult } from "@clisbot/protocol/hub-local";
 import { getDesktopHost } from "@/desktop/host";
+import { i18n } from "@/i18n/i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { updateHubProfile, validateHubRoutes, type HubProfile } from "./hub-profiles";
 import { PairedHubTransport } from "./hub-transport";
@@ -26,7 +27,7 @@ export async function saveVerifiedHubRoutes(
   try {
     const response = await transport.identity();
     if (!response.ok || (await response.json()).hubId !== profile.hubId)
-      throw new Error("The new endpoint does not match this Hub");
+      throw new Error(i18n.t("hub.connection.errors.endpointMismatch"));
     await updateHubProfile(profile.hubId, {
       ...(routes.label !== undefined ? { label: routes.label } : {}),
       origin: routes.origin ?? null,

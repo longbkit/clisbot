@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ViewTabs, type ViewTab } from "../hub/settings/view-tabs";
@@ -21,11 +22,6 @@ import { useProjectGrant } from "./project-grants";
 
 type SettingsView = "settings" | "tools";
 
-const TABS: readonly ViewTab<SettingsView>[] = [
-  { value: "settings", label: "Settings" },
-  { value: "tools", label: "Tools" },
-];
-
 /** The route query that opens the Tools view directly; `view=connectors` is its first name. */
 export const TOOLS_VIEW_QUERY = "view=tools";
 
@@ -33,6 +29,14 @@ export function WithConnectorsTab({
   children,
   ...grant
 }: ConnectorsGrantSectionProps & { children: ReactNode }) {
+  const { t } = useTranslation();
+  const tabs = useMemo<readonly ViewTab<SettingsView>[]>(
+    () => [
+      { value: "settings", label: t("connectors.screen.common.settings") },
+      { value: "tools", label: t("connectors.screen.common.tools") },
+    ],
+    [t],
+  );
   const enabled = useHostConnectorsFeature(grant.serverId);
   const saved = useProjectGrant(grant.serverId, grant.projectId, enabled);
   const params = useLocalSearchParams<{ view?: string }>();
@@ -43,7 +47,7 @@ export function WithConnectorsTab({
   return (
     <>
       <View style={styles.tabs}>
-        <ViewTabs tabs={TABS} value={view} onChange={setView} />
+        <ViewTabs tabs={tabs} value={view} onChange={setView} />
       </View>
       {view === "settings" ? children : <ConnectorsGrantSection {...grant} />}
     </>

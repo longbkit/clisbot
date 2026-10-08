@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Square, type LucideProps } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import { useHostRuntimeClient, useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import { ChatHeaderAction } from "./header-action";
 
@@ -22,6 +23,7 @@ export function StopAllAction({
   working: boolean;
   onError: (message: string) => void;
 }) {
+  const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
   const [stopping, setStopping] = useState(false);
@@ -42,8 +44,8 @@ export function StopAllAction({
   if (!working) return null;
   return (
     <ChatHeaderAction
-      label="Stop all bots"
-      text="Stop all"
+      label={t("bots.chat.stop.label")}
+      text={t("bots.chat.stop.text")}
       icon={StopIcon}
       onPress={stop}
       disabled={!online || stopping}

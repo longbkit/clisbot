@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useFetchQuery } from "@/data/query";
-import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
@@ -12,6 +13,7 @@ import { hubResourceQueryKey } from "../query-keys";
 import { buildHubSettingsRoute } from "../navigation";
 import { HubChannelConfigurationSchema } from "../contracts";
 import {
+  confirmRemoveAccess,
   GRANTOR_ERROR_CODE,
   useAccessMutation,
   useEffectiveAccess,
@@ -100,6 +102,7 @@ function ManagedAccessSettings({
   initialResource: string | null;
   authority: ViewerAuthority;
 }) {
+  const { t } = useTranslation();
   const isCurrent = useMountedAccessScope();
   const hub = useHubAccount();
   const { assignments, catalog, members, teams } = useManagedAccessQueries();
@@ -121,12 +124,7 @@ function ManagedAccessSettings({
 
   const removeAssignment = useCallback(
     async (assignmentId: string) => {
-      const confirmed = await confirmDialog({
-        title: "Remove access?",
-        message: "The Member or Team will lose this explicit resource access.",
-        confirmLabel: "Remove access",
-        destructive: true,
-      });
+      const confirmed = await confirmRemoveAccess();
       if (!confirmed || !isCurrent()) return;
       await runMutation(() =>
         hub.api().delete(`access-assignments/${encodeURIComponent(assignmentId)}`),
@@ -158,7 +156,7 @@ function ManagedAccessSettings({
       <QueryFeedback queries={[assignments, catalog, members, teams]} />
       {queryFailed ? (
         <Button size="sm" variant="outline" onPress={retry}>
-          Retry Access
+          {t("hub.access.page.retryAccess")}
         </Button>
       ) : null}
       {mutationError && grantorError === null ? (
@@ -223,6 +221,7 @@ function ManagedAccessContent({
   save(body: unknown, batch?: boolean): Promise<void>;
   remove(assignmentId: string): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const directory = useAccessDirectory(members, teams);
   const rows = useMemo(
     () =>
@@ -253,7 +252,7 @@ function ManagedAccessContent({
   const subjectOptions = useMemo(() => assignmentSubjectOptions(members, teams), [members, teams]);
   return (
     <View>
-      <SettingsSection title="Access" info={accessInfo(authority.unrestricted)}>
+      <SettingsSection title={t("hub.access.title")} info={accessInfo(authority.unrestricted, t)}>
         <AccessBrowser
           entries={browser.entries}
           grouping={browser.grouping}
@@ -300,11 +299,8 @@ function ManagedAccessContent({
 }
 
 /** The page's explanation, in its header's info tip rather than a box above the list. */
-function accessInfo(unrestricted: boolean): string {
-  const who = unrestricted
-    ? "The owner can use every current and future resource. Members and Guest start with no resource access; Guest grants apply to channel senders without a linked Member."
-    : "You can add, change, or remove people on the resources you can share, up to your own level. Grants above your level show locked.";
-  return `${who} A Member's access includes their own grants and their Teams'; editing a Team grant affects every Member in it.`;
+function accessInfo(unrestricted: boolean, t: TFunction): string {
+  return unrestricted ? t("hub.access.page.infoOwner") : t("hub.access.page.infoSharer");
 }
 
 /** Names for the ids that rows, events, and confirmations show. */
@@ -321,10 +317,8 @@ function useAccessDirectory(members: HubMember[], teams: HubTeam[]) {
   );
 }
 
-const PUBLIC_ROUTES_INFO =
-  "Anyone in these conversations can chat with the Route's Agent without a grant. Chatting gives no Host or Project access. The audience is set on the Route in Channels.";
-
 function PublicRoutesAccessSection() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const router = useRouter();
   const configuration = useFetchQuery({
@@ -347,28 +341,28 @@ function PublicRoutesAccessSection() {
   const manageButton = useMemo(
     () => (
       <Button size="sm" variant="ghost" onPress={openChannels}>
-        Manage in Channels
+        {t("hub.access.publicRoutes.manage")}
       </Button>
     ),
-    [openChannels],
+    [openChannels, t],
   );
   const routes = publicAccessRoutes(configuration.data?.accounts ?? []);
   return (
     <SettingsSection
-      title="Routes open to anyone"
-      info={PUBLIC_ROUTES_INFO}
+      title={t("hub.access.publicRoutes.title")}
+      info={t("hub.access.publicRoutes.info")}
       trailing={manageButton}
     >
       <QueryFeedback queries={[configuration]} />
       {configuration.error ? (
         <Button size="sm" variant="outline" onPress={retry}>
-          Retry
+          {t("hub.access.page.retry")}
         </Button>
       ) : null}
       {configuration.data ? (
         <View style={settingsStyles.card}>
           {routes.length === 0 ? (
-            <EmptyRow message="No Routes are open to anyone." />
+            <EmptyRow message={t("hub.access.publicRoutes.empty")} />
           ) : (
             routes.map((route, index) => (
               <View
@@ -376,8 +370,9 @@ function PublicRoutesAccessSection() {
                 style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
               >
                 <Text style={settingsStyles.rowTitle}>
-                  {route.account}
-                  {route.enabled ? "" : " · Disabled"}
+                  {route.enabled
+                    ? route.account
+                    : t("hub.access.publicRoutes.disabled", { account: route.account })}
                 </Text>
                 <Text style={settingsStyles.rowHint}>
                   {route.conversations} → {route.target}

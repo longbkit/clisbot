@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { AgentProfile } from "@clisbot/protocol/agent-profile";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Field } from "@/components/ui/form-field";
@@ -25,9 +26,10 @@ interface Props {
  * always shown; a row with nothing to choose shows the value the bot will use.
  */
 export function BotConfiguration({ state, model, size, providerSnapshot, hosts }: Props) {
+  const { t } = useTranslation();
   return (
     <>
-      <Field label="AI configuration">
+      <Field label={t("bots.workspace.botForm.aiConfiguration")}>
         <SetupCard>
           <HostRow state={state} model={model} hosts={hosts} />
           <ModelRow state={state} model={model} providerSnapshot={providerSnapshot} />
@@ -41,6 +43,7 @@ export function BotConfiguration({ state, model, size, providerSnapshot, hosts }
 }
 
 function HostRow({ state, model, hosts }: Pick<Props, "state" | "model" | "hosts">) {
+  const { t } = useTranslation();
   const options = useMemo(
     () => hosts.map((host) => ({ id: host.serverId, label: host.label })),
     [hosts],
@@ -54,14 +57,14 @@ function HostRow({ state, model, hosts }: Pick<Props, "state" | "model" | "hosts
   );
   return (
     <SetupSelectRow
-      label="Host"
+      label={t("bots.workspace.shared.form.host")}
       first
-      value={state.selectedHostDisplay?.label ?? "Choose a Host"}
+      value={state.selectedHostDisplay?.label ?? t("bots.workspace.botForm.chooseHost")}
       placeholder={!state.selectedHostDisplay}
       options={options}
       selectedId={state.selectedServerId}
       onChange={choose}
-      emptyText="No eligible Hosts connected"
+      emptyText={t("bots.workspace.botForm.noHosts")}
       testID="bot-host-row"
     />
   );
@@ -69,6 +72,7 @@ function HostRow({ state, model, hosts }: Pick<Props, "state" | "model" | "hosts
 
 /** Provider and model in one picker: the row names both, with the provider's icon. */
 function ModelRow({ state, model, providerSnapshot }: Omit<Props, "hosts" | "size">) {
+  const { t } = useTranslation();
   const providerLabel =
     state.modelSelectorProviders.find((provider) => provider.id === state.selectedProvider)
       ?.label ?? state.selectedProvider;
@@ -86,10 +90,12 @@ function ModelRow({ state, model, providerSnapshot }: Omit<Props, "hosts" | "siz
         },
     ) => {
       const modelLabel = state.selectedModelDisplay?.label ?? input.selectedModelLabel;
-      const empty = providerSnapshot.isLoading ? "Checking available models…" : "Choose a model";
+      const empty = providerSnapshot.isLoading
+        ? t("bots.workspace.botForm.checkingModels")
+        : t("bots.workspace.botForm.chooseModel");
       return (
         <SetupRowView
-          label="Model"
+          label={t("bots.workspace.shared.form.model")}
           value={providerLabel ? `${providerLabel} · ${modelLabel}` : empty}
           placeholder={!providerLabel}
           leading={leading}
@@ -99,7 +105,7 @@ function ModelRow({ state, model, providerSnapshot }: Omit<Props, "hosts" | "siz
         />
       );
     },
-    [leading, providerLabel, providerSnapshot.isLoading, state.selectedModelDisplay],
+    [leading, providerLabel, providerSnapshot.isLoading, state.selectedModelDisplay, t],
   );
   return (
     <CombinedModelSelector
@@ -119,24 +125,26 @@ function ModelRow({ state, model, providerSnapshot }: Omit<Props, "hosts" | "siz
 }
 
 function PermissionsRow({ state, model }: Pick<Props, "state" | "model">) {
+  const { t } = useTranslation();
   const options = useMemo(
     () => state.modeOptions.map((option) => ({ id: option.id, label: option.label })),
     [state.modeOptions],
   );
   return (
     <SetupSelectRow
-      label="Permissions"
+      label={t("bots.workspace.botForm.permissions")}
       value={state.selectedModeDisplay.label}
       options={options}
       selectedId={state.selectedMode}
       onChange={model.setMode}
-      emptyText="No permission modes available"
+      emptyText={t("bots.workspace.botForm.noPermissionModes")}
       testID="bot-permissions-row"
     />
   );
 }
 
 function ThinkingRow({ state, model }: Pick<Props, "state" | "model">) {
+  const { t } = useTranslation();
   const options = useMemo(
     () =>
       state.availableThinkingOptions.map((option) => ({
@@ -147,12 +155,12 @@ function ThinkingRow({ state, model }: Pick<Props, "state" | "model">) {
   );
   return (
     <SetupSelectRow
-      label="Thinking"
-      value={state.selectedThinkingDisplay?.label ?? "Model default"}
+      label={t("bots.workspace.shared.form.thinking")}
+      value={state.selectedThinkingDisplay?.label ?? t("bots.workspace.botForm.modelDefault")}
       options={options}
       selectedId={state.selectedThinkingOptionId}
       onChange={model.setThinkingOption}
-      emptyText="No thinking options available"
+      emptyText={t("bots.workspace.botForm.noThinkingOptions")}
       last
       testID="bot-thinking-row"
     />
@@ -195,6 +203,7 @@ function BotProfiles({
   size: "sm" | "md";
 }) {
   const profiles = useBotProfiles(serverId);
+  const { t } = useTranslation();
   const apply = useCallback(
     (id: string) => {
       const profile = profiles.find((item) => item.id === id);
@@ -207,8 +216,8 @@ function BotProfiles({
   if (!profiles.length) return null;
   return (
     <SelectField
-      label="Apply agent profile"
-      hint="Fill in saved model, permissions and thinking settings. The template stays unchanged."
+      label={t("bots.workspace.botForm.profileLabel")}
+      hint={t("bots.workspace.botForm.profileHint")}
       value={null}
       selectedDisplay={null}
       options={profiles.map((profile) => ({
@@ -217,8 +226,8 @@ function BotProfiles({
         label: profile.name,
       }))}
       onChange={apply}
-      placeholder="Use saved AI settings…"
-      emptyText="No saved profiles"
+      placeholder={t("bots.workspace.botForm.profilePlaceholder")}
+      emptyText={t("bots.workspace.botForm.noProfiles")}
       size={size}
       searchable
     />

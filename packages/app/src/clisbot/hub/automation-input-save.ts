@@ -1,5 +1,6 @@
 import { parse } from "yaml";
 import type { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 import type { HubApiClient } from "./api-client";
 import { createAutomation } from "./automation-management";
 import { saveChangedAccounts } from "./channel-account-requests";
@@ -52,8 +53,8 @@ export async function saveAutomationWithInputs(
   progress: AutomationInputSaveProgress,
 ) {
   if (parse(yaml).enabled === false)
-    throw new Error("Channel inputs require an active Automation. Enable Active before saving.");
-  let stage = "Automation";
+    throw new Error(i18n.t("hub.automations.inputSave.activeRequired"));
+  let stage: "automation" | "channelInputs" = "automation";
   try {
     if (!progress.automation) progress.automation = await createAutomation(api, yaml);
     else if (progress.automation.yaml !== yaml) {
@@ -67,7 +68,7 @@ export async function saveAutomationWithInputs(
         HubAutomationSchema,
       );
     }
-    stage = "Channel inputs";
+    stage = "channelInputs";
     const candidate = { accounts: draft.accounts, resource: draft.resource, policy: draft.policy };
     const source = JSON.stringify(candidate);
     if (source !== progress.channelSource) {
@@ -80,8 +81,17 @@ export async function saveAutomationWithInputs(
     }
     return progress.automation;
   } catch (cause) {
+    const options = {
+      progress: progress.automation
+        ? i18n.t("hub.automations.inputSave.savedButIncomplete")
+        : i18n.t("hub.automations.inputSave.nothingSaved"),
+      cause:
+        cause instanceof Error ? cause.message : i18n.t("hub.automations.inputSave.requestFailed"),
+    };
     throw new Error(
-      `${stage} could not be saved. ${progress.automation ? "The Automation is saved and active, but input setup is incomplete; retry to finish." : "No Automation has been saved."} ${cause instanceof Error ? cause.message : "Request failed."}`,
+      stage === "automation"
+        ? i18n.t("hub.automations.inputSave.automationFailed", options)
+        : i18n.t("hub.automations.inputSave.channelInputsFailed", options),
       { cause },
     );
   }

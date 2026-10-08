@@ -1,13 +1,16 @@
 import { ChevronRight } from "lucide-react-native";
 import { useCallback, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ConnectorGrant } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { Switch } from "@/components/ui/switch";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE } from "@/styles/theme";
 import { AgentToolGroupIcon } from "./agent-tools-section";
+import { agentToolGroupDescription, agentToolGroupLabel } from "./agent-tool-copy";
 import { setGroupOn, toolCountSummary } from "./agent-tools-model";
 import { ConnectorLogo, serverLogoKey } from "./connector-logo";
 import type { ConnectorLookup } from "./connector-lookup";
@@ -20,7 +23,7 @@ import {
   type SessionOffEdit,
 } from "./session-connectors";
 import type { SessionConnector, SessionToolGroup, SessionTools } from "./session-tools";
-import type { ProjectEdits } from "./session-tool-pages";
+import { offInOwner, type ProjectEdits } from "./session-tool-pages";
 import { withAllows } from "./session-allows";
 import { agentToolOffKey } from "@clisbot/protocol/connectors/agent-tools";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -59,14 +62,17 @@ export function ListPage({
   onOpen(page: string): void;
   onAllConnectors(): void;
 }) {
+  const { t } = useTranslation();
   const allConnectors = useMemo(
-    () => <SectionLink label="All connectors" onPress={onAllConnectors} />,
-    [onAllConnectors],
+    () => (
+      <SectionLink label={t("connectors.tools.common.allConnectors")} onPress={onAllConnectors} />
+    ),
+    [onAllConnectors, t],
   );
   return (
     <>
       {tools.groups.length > 0 ? (
-        <SettingsSection title="Clisbot tools">
+        <SettingsSection title={t("connectors.tools.common.clisbotTools")}>
           <View style={settingsStyles.card}>
             {tools.groups.map((entry, index) => (
               <GroupRow
@@ -83,7 +89,7 @@ export function ListPage({
         </SettingsSection>
       ) : null}
       {tools.connectors.length > 0 ? (
-        <SettingsSection title="Connectors" trailing={allConnectors}>
+        <SettingsSection title={t("connectors.tools.common.connectors")} trailing={allConnectors}>
           <View style={settingsStyles.card}>
             {tools.connectors.map((entry, index) => (
               <ConnectorRow
@@ -195,10 +201,9 @@ async function turnOnGroupPastProject(
       return;
     }
     const confirmed = await confirmDialog({
-      title: `Turn on ${group.label}?`,
-      message:
-        "These tools are off in this Project. Turning them on here turns them on for every session of the Project.",
-      confirmLabel: "Turn on for Project",
+      title: i18n.t("connectors.tools.common.turnOnTitle", { name: agentToolGroupLabel(group) }),
+      message: i18n.t("connectors.tools.pages.confirmGroup"),
+      confirmLabel: i18n.t("connectors.tools.common.turnOnForProject"),
     });
     if (!confirmed) return;
     await project.save((grant) => setGroupOn(grant, group, true, project.defaults));
@@ -254,8 +259,8 @@ function GroupRow({
     <OpeningRow
       page={groupPage(group.id)}
       icon={icon}
-      title={group.label}
-      summary={`${offInProject ? `Off in this ${project.words.owner}` : toolCountSummary(kept.length, group.tools.length)} · ${group.description}`}
+      title={agentToolGroupLabel(group)}
+      summary={`${offInProject ? offInOwner(project.owner) : toolCountSummary(kept.length, group.tools.length)} · ${agentToolGroupDescription(group)}`}
       bordered={bordered}
       on={kept.length > 0}
       onSwitch={toggle}
@@ -282,6 +287,7 @@ function ConnectorRow({
   apply: Apply;
   onOpen(page: string): void;
 }) {
+  const { t } = useTranslation();
   const change = useCallback(
     () => apply((current) => toggled(current, entry.key)),
     [apply, entry.key],
@@ -292,7 +298,10 @@ function ConnectorRow({
     [display.logo, display.name, display.slug],
   );
   const toolsOff = [...off].filter((key) => key.startsWith(`${entry.key}/`)).length;
-  const summary = toolsOff > 0 ? `${display.summary} · ${toolsOff} off here` : display.summary;
+  const summary =
+    toolsOff > 0
+      ? `${display.summary} · ${t("connectors.tools.common.offHere", { count: toolsOff })}`
+      : display.summary;
   return (
     <OpeningRow
       page={connectorPage(entry.key)}
@@ -330,7 +339,7 @@ export function connectorDisplay(
     name,
     logo: undefined,
     slug: serverLogoKey(name),
-    summary: `MCP server · ${toolSelectionLabel(tools)}`,
+    summary: i18n.t("connectors.tools.list.mcpServer", { tools: toolSelectionLabel(tools) }),
   };
 }
 

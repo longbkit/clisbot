@@ -2,6 +2,7 @@
 // supplies the catalog and the actions. Both sections appear only for a query, like Workspaces
 // and Agents; a contribution section ranks above those by match quality.
 import type { CommandCenterContribution, CommandCenterIcon } from "@/command-center/contributions";
+import { i18n } from "@/i18n/i18next";
 import type { HostTagged } from "../data/aggregate";
 import type { BotPayload, ChatPayload } from "../data/contracts";
 import { isDirectChat } from "../sidebar/sidebar-model";
@@ -47,8 +48,12 @@ function botContribution(
     presentation: {
       kind: "action",
       title: bot.name,
-      subtitle: subtitleOf(source, bot.serverName, bot.description?.trim() || "No role yet"),
-      sectionTitle: "Bots",
+      subtitle: subtitleOf(
+        source,
+        bot.serverName,
+        bot.description?.trim() || i18n.t("bots.chat.common.noRole"),
+      ),
+      sectionTitle: i18n.t("bots.chat.search.bots"),
       icon: source.icons.bot,
     },
   };
@@ -72,7 +77,7 @@ function groupContribution(
       kind: "action",
       title: chat.title,
       subtitle: subtitleOf(source, chat.serverName, members.join(", ")),
-      sectionTitle: "Group chats",
+      sectionTitle: i18n.t("bots.chat.search.groupChats"),
       icon: source.icons.group,
     },
   };
@@ -97,10 +102,23 @@ function creationContributions(source: BotSearchSource): CommandCenterContributi
     }) satisfies CommandCenterContribution;
   return [
     ...(source.canCreateBot
-      ? [action("new-bot", "New bot", 20, source.createBot, ["bot", "assistant"])]
+      ? [
+          action("new-bot", i18n.t("bots.chat.search.newBot"), 20, source.createBot, [
+            "bot",
+            "assistant",
+          ]),
+        ]
       : []),
     ...(source.canCreateGroup
-      ? [action("new-group-chat", "New group chat", 21, source.createGroup, ["group", "room"])]
+      ? [
+          action(
+            "new-group-chat",
+            i18n.t("bots.chat.search.newGroupChat"),
+            21,
+            source.createGroup,
+            ["group", "room"],
+          ),
+        ]
       : []),
   ];
 }

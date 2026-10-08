@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
@@ -24,28 +25,28 @@ export function AddConnectorSheet({
   onChoose(choice: ConnectorChoice): void;
   onManage(): void;
 }) {
+  const { t } = useTranslation();
+  const header = useMemo(() => ({ title: t("connectors.screen.common.addConnector") }), [t]);
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <Button variant="ghost" onPress={onManage}>
-          Connect more apps…
+          {t("connectors.screen.addSheet.connectMore")}
         </Button>
       </View>
     ),
-    [onManage],
+    [onManage, t],
   );
   return (
     <AdaptiveModalSheet
-      header={HEADER}
+      header={header}
       visible={visible}
       onClose={onClose}
       footer={footer}
       desktopMaxWidth={480}
     >
       {choices.length === 0 ? (
-        <Text style={settingsStyles.rowHint}>
-          Every app and MCP server on this Host is already added. Connect more in Connectors.
-        </Text>
+        <Text style={settingsStyles.rowHint}>{t("connectors.screen.addSheet.allAdded")}</Text>
       ) : (
         <View style={settingsStyles.card}>
           {choices.map((choice, index) => (
@@ -75,6 +76,7 @@ function ChoiceRow({
   bordered: boolean;
   onChoose(choice: ConnectorChoice): void;
 }) {
+  const { t } = useTranslation();
   const press = useCallback(() => onChoose(choice), [choice, onChoose]);
   const slug = choice.kind === "app" ? choice.slug : serverLogoKey(choice.name);
   return (
@@ -90,12 +92,14 @@ function ChoiceRow({
         logo={choice.kind === "app" ? choice.logo : undefined}
       />
       <Text style={[settingsStyles.rowTitle, settingsStyles.rowContent]}>{choice.name}</Text>
-      <Text style={settingsStyles.rowHint}>{choice.kind === "app" ? "App" : "MCP server"}</Text>
+      <Text style={settingsStyles.rowHint}>
+        {choice.kind === "app"
+          ? t("connectors.screen.common.app")
+          : t("connectors.screen.common.mcpServer")}
+      </Text>
     </Pressable>
   );
 }
-
-const HEADER = { title: "Add connector" };
 
 function rowStyle({ pressed }: { pressed: boolean }) {
   return [styles.row, pressed ? styles.pressed : null];

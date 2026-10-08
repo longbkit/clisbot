@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { i18n } from "@/i18n/i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { HubTeamMembershipSchema, HubTeamSchema } from "../../contracts";
 import type { HubAccount, HubRun, HubTeam, TeamResources } from "./types";
@@ -32,7 +33,8 @@ export function useHubRun() {
     try {
       await operation();
     } catch (error) {
-      const failure = error instanceof Error ? error : new Error("Hub request failed.");
+      const failure =
+        error instanceof Error ? error : new Error(i18n.t("hub.team.errors.requestFailed"));
       setMutationError(failure.message);
       throw failure;
     } finally {
@@ -96,9 +98,9 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
   const removeTeam = useCallback(
     async (teamId: string, name: string) => {
       const confirmed = await confirmDialog({
-        title: `Delete ${name}?`,
-        message: "The Team and its access assignments will be removed.",
-        confirmLabel: "Delete Team",
+        title: i18n.t("hub.team.teamDetail.deleteConfirm.title", { name }),
+        message: i18n.t("hub.team.teamDetail.deleteConfirm.message"),
+        confirmLabel: i18n.t("hub.team.teamDetail.delete"),
         destructive: true,
       });
       if (!confirmed) return false;
@@ -112,10 +114,9 @@ export function useTeamActions(hub: HubAccount, resources: TeamResources): TeamA
   const removeMember = useCallback(
     async (memberId: string, name: string) => {
       const confirmed = await confirmDialog({
-        title: `Remove ${name}?`,
-        message:
-          "This removes the Member from the organization, every Team, and all direct resource access.",
-        confirmLabel: "Remove Member",
+        title: i18n.t("hub.team.members.remove.title", { name }),
+        message: i18n.t("hub.team.members.remove.message"),
+        confirmLabel: i18n.t("hub.team.members.remove.confirm"),
         destructive: true,
       });
       if (!confirmed) return false;
@@ -154,7 +155,7 @@ function useAddTeamMembers(
     async (teamId: string, userIds: string[]) => {
       const notAdded: string[] = [];
       await run(async () => {
-        let reason = "Hub request failed.";
+        let reason = i18n.t("hub.team.errors.requestFailed");
         for (const userId of userIds) {
           try {
             await addTeamMember(teamId, userId);
@@ -173,7 +174,7 @@ function useAddTeamMembers(
         if (notAdded.length > 0) {
           const added = userIds.length - notAdded.length;
           throw new Error(
-            `Added ${String(added)} of ${String(userIds.length)} Members. ${reason} The rest are still selected.`,
+            i18n.t("hub.team.errors.partialAdd", { added, total: userIds.length, reason }),
           );
         }
       });
@@ -208,7 +209,7 @@ function useSetMemberTeams(
         const refused = results.find((result) => result.status === "rejected");
         if (refused !== undefined) {
           const reason = refused.reason instanceof Error ? refused.reason.message : "";
-          throw new Error(`Some Team changes were not saved. ${reason}`.trim());
+          throw new Error(i18n.t("hub.team.errors.teamChangesNotSaved", { reason }).trim());
         }
       }),
     [addTeamMember, assignments, hub, run, teams],

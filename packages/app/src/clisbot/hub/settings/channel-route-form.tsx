@@ -11,6 +11,7 @@ import { AudienceRulesEditor, type AudienceOption } from "./channel-route-audien
 import { useRulePeople } from "./channel-route-rule-people";
 import { ruleSummary } from "./channel-route-rule-summary";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FoldedRouteFormSubgroup,
   RouteFormSection,
@@ -160,6 +161,7 @@ export function ChannelAccountForm({
   createRouteAutomation,
   save,
 }: ChannelAccountFormProps) {
+  const { t } = useTranslation();
   const inputDraft = useContext(AutomationInputDraftContext);
   const previewWarnings = useChannelConfigurationPreview();
   const confirmDialog = useConfirmation();
@@ -376,11 +378,13 @@ export function ChannelAccountForm({
     };
     const confirmed = await confirmDialog({
       title: inputDraft
-        ? "Use this input in the Automation?"
+        ? t("hub.routes.review.useInputTitle")
         : routeConfirmationTitle(open, approvalChoice, isEditing),
       message: routeReviewMessage(review),
       body: routeReviewBody(review),
-      confirmLabel: inputDraft ? "Use input" : channelFormSubmitLabel(isEditing),
+      confirmLabel: inputDraft
+        ? t("hub.routes.review.useInput")
+        : channelFormSubmitLabel(isEditing),
       destructive: open || approvalChoice === "auto-allow",
     });
     if (!confirmed || !mounted.current) return;
@@ -422,15 +426,16 @@ export function ChannelAccountForm({
     routeBot.storedBot,
     workspace,
     previewWarnings,
+    t,
   ]);
 
   const renderAudience = () => (
-    <RouteFormSection title="Rules" info={RULES_INFO}>
+    <RouteFormSection title={t("hub.routes.form.rules")} info={t("hub.routes.form.rulesInfo")}>
       {hubPredatesRules ? (
         <Alert
           variant="warning"
-          title="Update this Hub to edit this Route"
-          description="It keeps a mention or text condition on the Route, which this app saves on each rule instead. Saving here would drop it. Update the Hub; it moves the condition onto the Route's rules when it starts."
+          title={t("hub.routes.form.predatesTitle")}
+          description={t("hub.routes.form.predatesDescription")}
         />
       ) : null}
       <AudienceRulesEditor
@@ -462,7 +467,7 @@ export function ChannelAccountForm({
     />
   );
   const renderReplies = () => (
-    <RouteFormSection title="Replies">
+    <RouteFormSection title={t("hub.routes.form.replies")}>
       <RouteReplyFields
         places={replyPlaces}
         behavior={replyBehavior}
@@ -491,8 +496,8 @@ export function ChannelAccountForm({
       />
       {adminScoped || fixedAutomationName !== undefined || target !== "agent" ? null : (
         <FoldedRouteFormSubgroup
-          title="Advanced options"
-          summary="Fast mode and provider options"
+          title={t("hub.routes.form.advanced")}
+          summary={t("hub.routes.form.advancedSummary")}
           inUse={
             initial.providerOptions.trim().length > 0 ||
             initial.agentConfiguration.featureValues["fast_mode"] === true
@@ -513,7 +518,11 @@ export function ChannelAccountForm({
   );
   const renderTargetChoice = () => {
     if (fixedAutomationName !== undefined)
-      return <Text style={settingsStyles.rowTitle}>{`Automation · ${fixedAutomationName}`}</Text>;
+      return (
+        <Text style={settingsStyles.rowTitle}>
+          {t("hub.routes.review.automationTarget", { name: fixedAutomationName })}
+        </Text>
+      );
     if (adminScoped)
       return (
         <ChannelRouteAdminTarget
@@ -569,7 +578,10 @@ export function ChannelAccountForm({
     );
   };
   const renderTarget = () => (
-    <RouteFormSection title="What runs" info={WHAT_RUNS_INFO}>
+    <RouteFormSection
+      title={t("hub.routes.form.whatRuns")}
+      info={t("hub.routes.form.whatRunsInfo")}
+    >
       {renderTargetChoice()}
       {renderRunSettings()}
     </RouteFormSection>
@@ -579,7 +591,7 @@ export function ChannelAccountForm({
     return (
       <SingleAgentAutomationForm
         key={selectedConnection?.provider}
-        title="Create Automation for this Route"
+        title={t("hub.routes.form.createAutomation")}
         channelReplyProvider={
           channelReplyProviderName(selectedConnection?.provider ?? null) ?? undefined
         }
@@ -630,14 +642,14 @@ export function ChannelAccountForm({
       ) : null}
       <View style={styles.formActions}>
         <Button disabled={pending || !canSave || duplicateAccount} onPress={submit}>
-          {inputDraft ? "Use input" : channelFormSubmitLabel(isEditing)}
+          {inputDraft ? t("hub.routes.review.useInput") : channelFormSubmitLabel(isEditing)}
         </Button>
         {/* A greyed button says nothing on its own: name the step it waits for. */}
         {saveBlocker === null || pending ? null : (
           <Text style={[settingsStyles.rowHint, styles.saveBlocker]}>{saveBlocker}</Text>
         )}
         <Button variant="ghost" disabled={pending} onPress={cancelEdit}>
-          Cancel
+          {t("hub.routes.common.cancel")}
         </Button>
       </View>
       {renderAutomationCreator()}
@@ -645,11 +657,7 @@ export function ChannelAccountForm({
   );
 }
 
-const RULES_INFO =
-  "A Route is where messages go; its Rules are the ways in, and a message reaches the Route when it matches any Rule. Each Rule says where (direct messages or group chats), who may talk there, and when a message gets in: a mention, a follow-up, or text it must contain. A sender no Route lets in is refused.";
 const NO_ROUTE_LIMITS: ChannelLimits = {};
-const WHAT_RUNS_INFO =
-  "The Bot, Agent or Automation that answers, and how it runs. Permissions: what happens when the provider asks before running a tool. Accept automatically answers every request with Allow, for a provider with no mode that runs unattended, or whose own auto mode still asks for review. A question from the Agent is not a permission; anyone who may talk here can answer it.";
 
 const styles = StyleSheet.create((theme) => ({
   formActions: {

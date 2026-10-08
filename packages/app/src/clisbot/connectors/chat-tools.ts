@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
+import { i18n } from "@/i18n/i18next";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostedOffList, type SessionOffEdit } from "./session-connectors";
 
@@ -55,7 +56,7 @@ export function useChatToolsValue(input: {
   const chatId = chat?.id ?? null;
   const write = useCallback(
     async (next: ReadonlySet<string>) => {
-      if (!client || !chatId) throw new Error("This Host is not connected.");
+      if (!client || !chatId) throw new Error(i18n.t("connectors.tools.common.hostNotConnected"));
       const answer = await client.updateChat({ chatId, patch: { toolsOff: [...next] } });
       if (answer.error) throw new Error(answer.error);
     },

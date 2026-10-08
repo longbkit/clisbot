@@ -1,13 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { SelectField } from "@/components/ui/select-field";
 
 const CHOICES = [1, 2, 3, 5, 8, 10, 15, 20] as const;
-
-function roundsLabel(rounds: number): string {
-  return rounds === 1 ? "1 round" : `${rounds} rounds`;
-}
 
 /**
  * The guard rail on a group discussion (docs/features/bots-and-chats/plans/group-discussion.md):
@@ -24,6 +21,7 @@ export function RoundsField({
   disabled: boolean;
   size: "sm" | "md";
 }) {
+  const { t } = useTranslation();
   const options = useMemo(() => {
     const values = CHOICES.includes(value as (typeof CHOICES)[number])
       ? [...CHOICES]
@@ -31,28 +29,28 @@ export function RoundsField({
     return values.map((rounds) => ({
       id: String(rounds),
       value: String(rounds),
-      label: roundsLabel(rounds),
+      label: t("bots.chat.rounds.count", { count: rounds }),
     }));
-  }, [value]);
+  }, [value, t]);
   const select = useCallback((next: string) => onChange(Number(next)), [onChange]);
-  const selected = useMemo(() => ({ label: roundsLabel(value) }), [value]);
+  const selected = useMemo(
+    () => ({ label: t("bots.chat.rounds.count", { count: value }) }),
+    [value, t],
+  );
   return (
     <View style={styles.field}>
       <SelectField
-        label="Discussion limit"
+        label={t("bots.chat.rounds.label")}
         value={String(value)}
         selectedDisplay={selected}
         options={options}
         onChange={select}
         disabled={disabled}
-        placeholder="Choose a limit"
-        emptyText="No limits"
+        placeholder={t("bots.chat.rounds.placeholder")}
+        emptyText={t("bots.chat.rounds.empty")}
         size={size}
       />
-      <Text style={styles.hint}>
-        The most rounds bots take before the discussion stops. They stop earlier once the question
-        is settled.
-      </Text>
+      <Text style={styles.hint}>{t("bots.chat.rounds.hint")}</Text>
     </View>
   );
 }

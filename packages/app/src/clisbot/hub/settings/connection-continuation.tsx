@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -10,15 +11,13 @@ export function HubConnectionContinuationNotice({
 }: {
   continuation: ReturnType<typeof useHubConnectionContinuation>;
 }) {
+  const { t } = useTranslation();
   if (continuation.url === null) return null;
   return (
     <Alert
       variant={continuation.error === null ? "info" : "warning"}
-      title="Continue provider setup"
-      description={
-        continuation.error ??
-        "Complete setup on the provider page, then return to review the Connection status. Use Continue setup if the page did not open."
-      }
+      title={t("hub.settings.connectionContinuation.title")}
+      description={continuation.error ?? t("hub.settings.connectionContinuation.description")}
     >
       <View style={styles.actions}>
         <Button
@@ -27,7 +26,7 @@ export function HubConnectionContinuationNotice({
           loading={continuation.pending}
           onPress={continuation.retry}
         >
-          Continue setup
+          {t("hub.settings.connectionContinuation.continueSetup")}
         </Button>
         <Button
           size="sm"
@@ -35,7 +34,7 @@ export function HubConnectionContinuationNotice({
           disabled={continuation.pending}
           onPress={continuation.dismiss}
         >
-          Dismiss
+          {t("hub.settings.connectionContinuation.dismiss")}
         </Button>
       </View>
     </Alert>

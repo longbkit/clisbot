@@ -1,10 +1,15 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SelectField } from "@/components/ui/select-field";
 import { settingsStyles } from "@/styles/settings";
-import { capitalizeLabel } from "../labels";
-import { memberRoleLockReason, memberRoleOptions, type OrganizationRole } from "./member-role";
+import {
+  memberRoleLockReason,
+  memberRoleOptions,
+  roleLabel,
+  type OrganizationRole,
+} from "./member-role";
 import type { HubCapabilities, HubMember } from "./types";
 
 /**
@@ -24,9 +29,10 @@ export function MemberRoleSelect({
   pending: boolean;
   setRole(member: HubMember, role: OrganizationRole): Promise<void>;
 }) {
-  const options = useMemo(() => memberRoleOptions(capabilities), [capabilities]);
+  const { t } = useTranslation();
+  const options = useMemo(() => memberRoleOptions(capabilities, t), [capabilities, t]);
   const lockReason = memberRoleLockReason(member, members, capabilities);
-  const display = useMemo(() => ({ label: capitalizeLabel(member.role) }), [member.role]);
+  const display = useMemo(() => ({ label: roleLabel(member.role, t) }), [member.role, t]);
   const change = useCallback(
     (role: OrganizationRole) => {
       if (role !== member.role) void setRole(member, role);
@@ -41,14 +47,14 @@ export function MemberRoleSelect({
       <SelectField
         size="sm"
         field={false}
-        label="Role"
+        label={t("hub.team.role.label")}
         value={member.role}
         selectedDisplay={display}
         options={options}
         onChange={change}
-        placeholder="Role"
-        emptyText="No roles are available."
-        title={`Role of ${member.name}`}
+        placeholder={t("hub.team.role.label")}
+        emptyText={t("hub.team.role.empty")}
+        title={t("hub.team.role.title", { name: member.name })}
         disabled={pending || lockReason !== null}
       />
       {lockReason === null ? null : <Text style={settingsStyles.rowHint}>{lockReason}</Text>}

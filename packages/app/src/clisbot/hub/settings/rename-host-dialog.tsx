@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AdaptiveRenameModal } from "@/components/rename-modal";
 import { HubApiError } from "../api-client";
 
@@ -8,34 +9,42 @@ interface RenameHostDialogProps {
   onClose(): void;
 }
 
+const RENAME_ERROR_KEYS: Record<string, string | undefined> = {
+  daemon_slug_conflict: "hub.settings.renameHost.conflict",
+  daemon_unavailable: "hub.settings.renameHost.unavailable",
+  forbidden: "hub.settings.renameHost.forbidden",
+};
+
 export function RenameHostDialog({ name, onSave, onClose }: RenameHostDialogProps) {
+  const { t } = useTranslation();
   const [initialName] = useState(name);
-  async function save(value: string) {
-    try {
-      await onSave(value.trim());
-    } catch (error) {
-      if (!(error instanceof HubApiError)) throw error;
-      if (error.code === "daemon_slug_conflict") {
-        throw new Error("Another Host already uses that name. Choose a different name.");
+  const save = useCallback(
+    async (value: string) => {
+      try {
+        await onSave(value.trim());
+      } catch (error) {
+        if (!(error instanceof HubApiError)) throw error;
+        const messageKey = RENAME_ERROR_KEYS[error.code];
+        if (messageKey) throw new Error(t(messageKey), { cause: error });
+        throw error;
       }
-      if (error.code === "daemon_unavailable") {
-        throw new Error("This Host is no longer available. Refresh Hosts.");
-      }
-      if (error.code === "forbidden") {
-        throw new Error("You no longer have permission to rename this Host.");
-      }
-      throw error;
-    }
-  }
+    },
+    [onSave, t],
+  );
+  const validate = useCallback(
+    (value: string) =>
+      value.trim() === initialName ? t("hub.settings.renameHost.enterDifferentName") : null,
+    [initialName, t],
+  );
   return (
     <AdaptiveRenameModal
       visible
-      title="Rename Host"
+      title={t("hub.settings.renameHost.title")}
       initialValue={initialName}
-      description="This changes the Host name shared with everyone in this Hub organization. Names are saved in lowercase, with hyphens instead of spaces."
-      submitLabel="Save name"
+      description={t("hub.settings.renameHost.description")}
+      submitLabel={t("hub.settings.renameHost.save")}
       maxLength={100}
-      validate={(value) => (value.trim() === initialName ? "Enter a different name." : null)}
+      validate={validate}
       onSubmit={save}
       onClose={onClose}
       testID="rename-host-dialog"

@@ -1,3 +1,5 @@
+import { i18n } from "@/i18n/i18next";
+
 export interface GroupChatDraft {
   serverId: string;
   botIds: string[];
@@ -30,7 +32,8 @@ export function toggleGroupBot(draft: GroupChatDraft, botId: string): GroupChatD
 export function groupChatRequest(draft: GroupChatDraft, availableBotIds: readonly string[]) {
   const botIds = draft.botIds.filter((id) => availableBotIds.includes(id));
   // One bot is a group too: several group chats with the same bot keep separate topics apart.
-  if (!draft.serverId || botIds.length < 1) throw new Error("Choose at least one bot on one Host");
+  if (!draft.serverId || botIds.length < 1)
+    throw new Error(i18n.t("bots.workspace.errors.chooseBot"));
   return {
     kind: "group" as const,
     botIds,

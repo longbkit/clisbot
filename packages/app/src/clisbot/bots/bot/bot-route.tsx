@@ -3,6 +3,7 @@ import { BotCreateForm } from "../create/bot-create-sheet";
 import { botView } from "../data/contracts";
 import { useState, useEffect, useCallback } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { BotPayload } from "@clisbot/protocol/bots/types";
@@ -37,12 +38,13 @@ function Gate() {
   const snapshot = useHostRuntimeSnapshot(serverId);
   const enabled = useHostBotsFeature(serverId);
   const status = useHostRuntimeConnectionStatus(serverId);
+  const { t } = useTranslation();
   if (!enabled)
     return (
       <Text>
         {status === "online"
-          ? "Bots and Chats is not enabled on this Host."
-          : "Connecting to Host…"}
+          ? t("bots.workspace.botSettings.featureOff")
+          : t("bots.workspace.botSettings.connecting")}
       </Text>
     );
   return (
@@ -56,12 +58,15 @@ function Gate() {
 function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
   const client = useHostRuntimeClient(serverId);
   const hosts = useBotsFeatureHosts();
-  const hostLabel = hosts.find((host) => host.serverId === serverId)?.label ?? "Current Host";
+  const { t } = useTranslation();
+  const hostLabel =
+    hosts.find((host) => host.serverId === serverId)?.label ??
+    t("bots.workspace.botSettings.currentHost");
   const { bot, error, setError } = useBotRecord(client, botId);
   const actions = useBotSettingsActions({ client, serverId, botId, bot, setError });
   return (
     <View style={styles.screen}>
-      <MenuHeader title="Bot settings" />
+      <MenuHeader title={t("bots.workspace.shared.botSettings")} />
       <ScrollView>
         <View style={styles.content}>
           {error ? (
@@ -70,7 +75,7 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
             </Text>
           ) : null}
           {bot && bot.canConfigure !== true ? (
-            <Text style={styles.text}>You do not have permission to configure this bot.</Text>
+            <Text style={styles.text}>{t("bots.workspace.botSettings.noPermission")}</Text>
           ) : null}
           {bot?.canConfigure === true ? (
             <WithConnectorsTab
@@ -99,6 +104,7 @@ function BotSettings({ serverId, botId }: { serverId: string; botId: string }) {
 function useBotRecord(client: HostRuntimeClient, botId: string) {
   const [bot, setBot] = useState<BotPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
   useEffect(() => {
     let active = true;
     if (client)
@@ -108,7 +114,7 @@ function useBotRecord(client: HostRuntimeClient, botId: string) {
           if (!active) return undefined;
           const row = r.bots.find((b) => b.id === botId);
           setBot(row ?? null);
-          if (!row) setError(r.error ?? "Bot is no longer available");
+          if (!row) setError(r.error ?? t("bots.workspace.botSettings.unavailable"));
           return undefined;
         })
         .catch((e) => {
@@ -117,7 +123,7 @@ function useBotRecord(client: HostRuntimeClient, botId: string) {
     return () => {
       active = false;
     };
-  }, [botId, client]);
+  }, [botId, client, t]);
   return { bot, error, setError };
 }
 
@@ -167,14 +173,15 @@ function useArchiveBot({
   setError: (value: string | null) => void;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const archive = useCallback(async () => {
     if (!client || bot?.canConfigure !== true) return;
     if (
       !(await confirmDialog({
-        title: "Archive bot?",
-        message: "This bot will leave the active list. Its workspace and memory are kept.",
-        confirmLabel: "Archive bot",
+        title: t("bots.workspace.botSettings.archiveTitle"),
+        message: t("bots.workspace.botSettings.archiveMessage"),
+        confirmLabel: t("bots.workspace.shared.archiveBot"),
         destructive: true,
       }))
     )
@@ -191,7 +198,7 @@ function useArchiveBot({
     } finally {
       setBusy(false);
     }
-  }, [client, botId, router, bot?.canConfigure, setError]);
+  }, [client, botId, router, bot?.canConfigure, setError, t]);
   const archiveAction = useCallback(() => {
     void archive();
   }, [archive]);
@@ -199,30 +206,31 @@ function useArchiveBot({
 }
 
 function BotManagementSections({ actions }: { actions: BotSettingsActions }) {
+  const { t } = useTranslation();
   return (
     <>
-      <SettingsSection title="Project and access">
+      <SettingsSection title={t("bots.workspace.botSettings.projectAndAccess")}>
         <SettingsCard>
           <SettingsAction
-            label="Project settings"
-            hint="Manage the workspace this bot works in."
-            actionLabel="Open"
+            label={t("bots.workspace.botSettings.projectSettings")}
+            hint={t("bots.workspace.botSettings.projectSettingsHint")}
+            actionLabel={t("bots.workspace.botSettings.open")}
             onPress={actions.projectAction}
           />
           <SettingsAction
-            label="Team access"
-            hint="Share through Project Access. Each person’s chat history stays private."
-            actionLabel="Manage"
+            label={t("bots.workspace.botSettings.teamAccess")}
+            hint={t("bots.workspace.botSettings.teamAccessHint")}
+            actionLabel={t("bots.workspace.botSettings.manage")}
             onPress={actions.accessAction}
           />
         </SettingsCard>
       </SettingsSection>
-      <SettingsSection title="Archive" flush>
+      <SettingsSection title={t("bots.workspace.botSettings.archive")} flush>
         <SettingsCard>
           <SettingsAction
-            label="Archive bot"
-            hint="Keep its workspace and memory while removing it from the active list."
-            actionLabel="Archive…"
+            label={t("bots.workspace.shared.archiveBot")}
+            hint={t("bots.workspace.botSettings.archiveHint")}
+            actionLabel={t("bots.workspace.botSettings.archiveAction")}
             disabled={actions.busy}
             onPress={actions.archiveAction}
           />

@@ -1,5 +1,7 @@
 import { ConnectionSelfLink } from "./channel-route-rule-link";
 import { useCallback, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { Activity, Gauge, Plus, RotateCcw, Send } from "lucide-react-native";
 import { ChannelActionsMenu, type ChannelMenuAction } from "./channel-actions-menu";
@@ -10,6 +12,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { ChannelAccountLimitsPanel } from "./channel-limits-fields";
 import { channelConnectionDetail } from "../channel-identity-directory";
@@ -26,10 +29,10 @@ import {
   type RecordValue,
 } from "./channel-settings-types";
 import {
-  MANAGED_BY_ORGANIZATION,
   arrayField,
   channelAccountKey,
   channelLabel,
+  managedByOrganization,
   stringField,
 } from "./channel-settings-records";
 import { ConnectionTestMessage } from "./channel-connection-test-message";
@@ -107,7 +110,7 @@ export function ChannelAccountRow({
         channel={channel}
         accountId={accountId}
         // The workspace or bot name the platform reports; the account id is the title already.
-        detail={adminScoped ? MANAGED_BY_ORGANIZATION : connectionDetail(connection, accountId)}
+        detail={adminScoped ? managedByOrganization() : connectionDetail(connection, accountId)}
         status={channelRuntimePresentation(enabled, runtimeAvailable, runtime)}
         enabled={enabled}
         pending={pending}
@@ -179,12 +182,13 @@ function ConnectionLimits({
     [account, close, updateAccount],
   );
   const cancel = useCallback(() => close(false), [close]);
+  const { t } = useTranslation();
   return (
     <View style={settingsStyles.rowBorder}>
       <ChannelAccountLimitsPanel limits={account["limits"]} pending={pending} save={save} />
       <View style={styles.limitsCancel}>
         <Button size="sm" variant="ghost" disabled={pending} onPress={cancel}>
-          Cancel
+          {t("hub.channels.card.cancel")}
         </Button>
       </View>
     </View>
@@ -222,6 +226,7 @@ function useConnectionMenu({
   setLimitsOpen(value: boolean): void;
   props: ChannelAccountRowProps;
 }): ConnectionMenu {
+  const { t } = useTranslation();
   const { addRouteTo, openActivity, retryAccount, updateAccount, removeAccount } = props;
   const canRetry = canRetryRuntime({
     connection,
@@ -234,23 +239,15 @@ function useConnectionMenu({
     () => ({
       addRoute: () => addRouteTo(key),
       toggleEnabled: (value: boolean) => void updateAccount(account, { enabled: value }),
-      actions: [
-        ...(routed ? [{ label: "Add Route", icon: Plus, onSelect: () => addRouteTo(key) }] : []),
-        { label: "Send test message", icon: Send, onSelect: () => setTesting(true) },
-        ...(canRetry
-          ? [
-              {
-                label: "Retry runtime",
-                icon: RotateCcw,
-                onSelect: () => void retryAccount(account),
-              },
-            ]
-          : []),
-        { label: "View activity", icon: Activity, onSelect: () => openActivity(key) },
-        // The bot's own limits, and each conversation's: Bot messages per
-        // minute lives only here, since a post belongs to no sender.
-        { label: "Limits", icon: Gauge, onSelect: () => setLimitsOpen(true) },
-      ],
+      actions: connectionMenuActions(t, {
+        routed,
+        canRetry,
+        addRoute: () => addRouteTo(key),
+        test: () => setTesting(true),
+        retry: () => void retryAccount(account),
+        activity: () => openActivity(key),
+        limits: () => setLimitsOpen(true),
+      }),
       ...(props.adminScoped ? {} : { remove: () => void removeAccount(account) }),
     }),
     [
@@ -265,9 +262,47 @@ function useConnectionMenu({
       retryAccount,
       setLimitsOpen,
       setTesting,
+      t,
       updateAccount,
     ],
   );
+}
+
+function connectionMenuActions(
+  t: TFunction,
+  input: {
+    routed: boolean;
+    canRetry: boolean;
+    addRoute(): void;
+    test(): void;
+    retry(): void;
+    activity(): void;
+    limits(): void;
+  },
+): ChannelMenuAction[] {
+  const addRoute = {
+    label: t("hub.channels.card.addRoute"),
+    icon: Plus,
+    onSelect: input.addRoute,
+  };
+  const retry = {
+    label: t("hub.channels.card.retryRuntime"),
+    icon: RotateCcw,
+    onSelect: input.retry,
+  };
+  return [
+    ...(input.routed ? [addRoute] : []),
+    { label: t("hub.channels.card.sendTest"), icon: Send, onSelect: input.test },
+    ...(input.canRetry ? [retry] : []),
+    {
+      label: t("hub.channels.accounts.viewActivity"),
+      icon: Activity,
+      onSelect: input.activity,
+    },
+    // The bot's own limits, and each conversation's: Bot messages per
+    // minute lives only here, since a post belongs to no sender.
+    { label: t("hub.channels.card.limits"), icon: Gauge, onSelect: input.limits },
+  ];
 }
 
 /** One line: what the Connection is, whether it runs, and what can be done with it. */
@@ -288,6 +323,7 @@ function ConnectionHeader({
   pending: boolean;
   menu: ConnectionMenu;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const catalog = useChannelCatalog();
   return (
@@ -312,12 +348,16 @@ function ConnectionHeader({
             value={enabled}
             onValueChange={menu.toggleEnabled}
             disabled={pending}
-            accessibilityLabel={`${enabled ? "Disable" : "Enable"} ${accountId}`}
+            accessibilityLabel={
+              enabled
+                ? t("hub.channels.card.disable", { name: accountId })
+                : t("hub.channels.card.enable", { name: accountId })
+            }
           />
         )}
         {menu.actions.length === 0 && menu.remove === undefined ? null : (
           <ChannelActionsMenu
-            label={`Actions for ${accountId}`}
+            label={t("hub.channels.card.actionsFor", { name: accountId })}
             disabled={pending}
             actions={menu.actions}
             {...(menu.remove === undefined ? {} : { remove: menu.remove })}
@@ -344,6 +384,7 @@ export function UnroutedConnectionCard({
   addRoute(connectionId: string): void;
   disconnect(connection: HubConnection): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const menu = useMemo<ConnectionMenu>(
     () => ({
       addRoute: () => addRoute(connection.id),
@@ -352,13 +393,17 @@ export function UnroutedConnectionCard({
     }),
     [addRoute, connection, disconnect],
   );
+  const noRoutes = useMemo(
+    () => ({ label: t("hub.channels.card.noRoutes"), variant: "warning" as const }),
+    [t],
+  );
   return (
     <View style={settingsStyles.card}>
       <ConnectionHeader
         channel={connection.provider}
         accountId={connection.name}
         detail={connection.externalName}
-        status={NO_ROUTES_STATUS}
+        status={noRoutes}
         enabled={false}
         pending={pending}
         menu={menu}
@@ -370,11 +415,10 @@ export function UnroutedConnectionCard({
   );
 }
 
-const NO_ROUTES_STATUS = { label: "No Routes", variant: "warning" } as const;
-
 /** The platform's name for the bot or workspace, unless it only repeats the account id. */
 function connectionDetail(connection: HubConnection | undefined, accountId: string): string | null {
-  if (connection === undefined) return "Connection unavailable";
+  if (connection === undefined)
+    return i18n.t("hub.channels.identityDirectory.connectionUnavailable");
   const detail = channelConnectionDetail(connection);
   if (detail === accountId) return null;
   return detail.endsWith(` · ${accountId}`) ? detail.slice(0, -` · ${accountId}`.length) : detail;
@@ -421,13 +465,18 @@ function ConnectionRuntimeFacts({
   // The Hub reports `needs-login` for a QR-auth account whose profile has no live
   // session. That is the whole signal: nothing else says an account is linkable.
   const needsLogin = runtime?.transport === "needs-login";
+  const { t } = useTranslation();
   return (
     <>
       {loaded ? null : (
         <View style={[settingsStyles.row, settingsStyles.rowBorder, styles.statusPanel]}>
-          <Text
-            style={settingsStyles.rowHint}
-          >{`Configuration revision ${revisionVersion ?? "—"} · Integrity ${runtime?.integrity ?? "not-checked"} · Load ${runtime?.loadTrace ?? "not-loaded"}`}</Text>
+          <Text style={settingsStyles.rowHint}>
+            {t("hub.channels.card.runtimeFacts", {
+              revision: revisionVersion ?? "—",
+              integrity: runtime?.integrity ?? "not-checked",
+              load: runtime?.loadTrace ?? "not-loaded",
+            })}
+          </Text>
         </View>
       )}
       {needsLogin ? <ChannelAccountQrLinking channel={channel} accountId={accountId} /> : null}
@@ -452,7 +501,7 @@ function channelRuntimePresentation(
   runtimeAvailable: boolean | undefined,
   runtime: HubRuntimeAccount | undefined,
 ): { label: string; variant: StatusBadgeVariant } {
-  if (!enabled) return { label: "Off", variant: "muted" };
+  if (!enabled) return { label: i18n.t("hub.channels.card.off"), variant: "muted" };
   const label = channelRuntimeLabel(runtimeAvailable, runtime);
   if (runtime?.transport === "started") return { label, variant: "success" };
   if (runtimeAvailable === false || runtime?.transport === "failed")
@@ -466,21 +515,21 @@ function channelRuntimeLabel(
   runtimeAvailable: boolean | undefined,
   runtime: { transport: string } | undefined,
 ): string {
-  if (runtimeAvailable === false) return "Runtime unavailable";
-  if (runtimeAvailable === undefined) return "Checking runtime";
-  if (runtime === undefined) return "Not started";
+  if (runtimeAvailable === false) return i18n.t("hub.channels.card.runtimeUnavailable");
+  if (runtimeAvailable === undefined) return i18n.t("hub.channels.card.checkingRuntime");
+  if (runtime === undefined) return i18n.t("hub.channels.card.notStarted");
   switch (runtime.transport) {
     case "started":
-      return "Running";
+      return i18n.t("hub.channels.transport.started");
     case "starting":
-      return "Starting";
+      return i18n.t("hub.channels.transport.starting");
     case "failed":
-      return "Runtime error";
+      return i18n.t("hub.channels.card.runtimeError");
     case "deferred":
-      return "Waiting";
+      return i18n.t("hub.channels.card.waiting");
     // The Hub's word for a QR-auth account whose profile has no live session.
     case "needs-login":
-      return "Needs login";
+      return i18n.t("hub.channels.transport.needsLogin");
     default:
       return channelLabel(runtime.transport);
   }

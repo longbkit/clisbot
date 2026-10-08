@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DEFAULT_CONNECTOR_DAILY_SEND_LIMIT,
   type ConnectorGrant,
@@ -26,6 +27,7 @@ export function SendingSection({
   /** Codex's own apps: only for sessions that may run Codex. */
   showBuiltInApps: boolean;
 }) {
+  const { t } = useTranslation();
   const ask = (grant?.sends ?? "ask") === "ask";
   const setAsk = useCallback(
     (value: boolean) => apply((current) => ({ ...current, sends: value ? "ask" : "allow" })),
@@ -46,14 +48,14 @@ export function SendingSection({
   if (!showSends && !showBuiltInApps) return null;
   return (
     <SettingsSection
-      title="Sending"
-      info="Sending covers anything someone else receives: email, messages, posts, invites, shares and payments."
+      title={t("connectors.screen.sending.title")}
+      info={t("connectors.screen.sending.info")}
     >
       <SettingsCard>
         {showSends ? (
           <SettingsSwitch
-            label="Ask before sending"
-            hint="Each send waits for your answer in the chat"
+            label={t("connectors.screen.sending.ask")}
+            hint={t("connectors.screen.sending.askHint")}
             value={ask}
             onValueChange={setAsk}
           />
@@ -66,8 +68,8 @@ export function SendingSection({
         ) : null}
         {showBuiltInApps ? (
           <SettingsSwitch
-            label="Codex's own apps"
-            hint="ChatGPT apps connected in Codex skip Connectors' accounts, tool limits and send approvals. Applies from the next session"
+            label={t("connectors.screen.sending.builtIn")}
+            hint={t("connectors.screen.sending.builtInHint")}
             value={grant?.builtInApps !== false}
             onValueChange={setBuiltIn}
           />

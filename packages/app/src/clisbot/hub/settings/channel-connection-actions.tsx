@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 import { HubApiError } from "../api-client";
 import {
   HubChannelRuntimeRetrySchema,
@@ -42,12 +43,14 @@ export function useAccountActions({
             consumer.resourceKind !== "channel_account" || consumer.resourceId !== resourceId,
         ) ?? [];
       const confirmed = await confirmDialog({
-        title: `Remove ${accountId}?`,
+        title: i18n.t("hub.channels.connectionActions.removeTitle", { name: accountId }),
         message:
           remainingConsumers.length > 0
-            ? `This removes all of its Routes, so nobody can talk to this bot. The Connection's credential stays, in use by ${remainingConsumers.map(({ name }) => name).join(", ")}.`
-            : `This removes all of its Routes, so nobody can talk to this bot. You can also disconnect its credential next.`,
-        confirmLabel: "Remove Routes",
+            ? i18n.t("hub.channels.connectionActions.removeShared", {
+                consumers: remainingConsumers.map(({ name }) => name).join(", "),
+              })
+            : i18n.t("hub.channels.connectionActions.removeOnly"),
+        confirmLabel: i18n.t("hub.channels.connectionActions.removeRoutes"),
         destructive: true,
       });
       if (!confirmed) return;
@@ -62,10 +65,10 @@ export function useAccountActions({
         await connections.refetch();
         if (connectionId === null || remainingConsumers.length > 0) return;
         const disconnect = await confirmDialog({
-          title: "Disconnect its credential too?",
-          message: "This removes its saved credentials and Channel identity mappings.",
-          confirmLabel: "Disconnect",
-          cancelLabel: "Keep credential",
+          title: i18n.t("hub.channels.connectionActions.disconnectTooTitle"),
+          message: i18n.t("hub.channels.connectionActions.disconnectMessage"),
+          confirmLabel: i18n.t("hub.channels.connectionActions.disconnect"),
+          cancelLabel: i18n.t("hub.channels.connectionActions.keepCredential"),
           destructive: true,
         });
         if (!disconnect) return;
@@ -105,7 +108,11 @@ export function useAccountActions({
           );
         await runtimeStatus.refetch();
         if (response.status?.transport !== "started") {
-          throw new Error(response.status?.detail ?? response.result.detail ?? "Retry failed.");
+          throw new Error(
+            response.status?.detail ??
+              response.result.detail ??
+              i18n.t("hub.channels.connectionActions.retryFailed"),
+          );
         }
       });
     },
@@ -116,9 +123,9 @@ export function useAccountActions({
   const disconnectConnection = useCallback(
     async (connection: HubConnection) => {
       const confirmed = await confirmDialog({
-        title: `Disconnect ${connection.name}?`,
-        message: "This removes its saved credentials and Channel identity mappings.",
-        confirmLabel: "Disconnect",
+        title: i18n.t("hub.channels.connectionActions.disconnectTitle", { name: connection.name }),
+        message: i18n.t("hub.channels.connectionActions.disconnectMessage"),
+        confirmLabel: i18n.t("hub.channels.connectionActions.disconnect"),
         destructive: true,
       });
       if (!confirmed) return;
@@ -158,10 +165,11 @@ export function useRouteActions({
     async (account: RecordValue, routeIndex: number) => {
       const routes = arrayField(account, "routes") as RecordValue[];
       const confirmed = await confirmDialog({
-        title: `Remove Route ${String(routeIndex + 1)}?`,
-        message:
-          "New messages will no longer use this Route. Existing bound sessions keep their captured target until they end or become invalid.",
-        confirmLabel: "Remove Route",
+        title: i18n.t("hub.channels.connectionActions.removeRouteTitle", {
+          position: routeIndex + 1,
+        }),
+        message: i18n.t("hub.channels.connectionActions.removeRouteMessage"),
+        confirmLabel: i18n.t("hub.channels.connectionActions.removeRoute"),
         destructive: true,
       });
       if (!confirmed) return;
@@ -222,17 +230,16 @@ export function useTestMessage({
             .get(`${resource}/test-preview?${params.toString()}`, HubChannelTestPreviewSchema);
         } catch (error) {
           if (error instanceof HubApiError && error.status === 404)
-            throw new Error(
-              "This Hub cannot preview test messages. Update the Hub before sending a test.",
-              { cause: error },
-            );
+            throw new Error(i18n.t("hub.channels.connectionActions.previewUnavailable"), {
+              cause: error,
+            });
           throw error;
         }
         const confirmed = await confirmDialog({
-          title: "Send test message?",
-          message: "Review the destination and exact message before sending.",
+          title: i18n.t("hub.channels.connectionActions.sendTestTitle"),
+          message: i18n.t("hub.channels.connectionActions.sendTestMessage"),
           body: <ChannelTestPreview preview={preview} />,
-          confirmLabel: "Send test message",
+          confirmLabel: i18n.t("hub.channels.connectionActions.sendTest"),
         });
         if (!confirmed) return;
         await hub.api().post(
@@ -245,7 +252,11 @@ export function useTestMessage({
           },
           HubChannelTestSchema,
         );
-        setTestResult(`Test message sent to ${preview.label ?? preview.conversationId}.`);
+        setTestResult(
+          i18n.t("hub.channels.connectionActions.testSent", {
+            target: preview.label ?? preview.conversationId,
+          }),
+        );
       });
     },
     [hub, mutate, confirmDialog],

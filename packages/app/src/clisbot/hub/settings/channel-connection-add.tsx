@@ -1,5 +1,6 @@
 import { useHubEditLock } from "@/device-access/hub-edit-lock";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -63,14 +64,21 @@ export function AddChannelConnection({
 
 /** Nothing to offer: the catalog is not loaded, or this Hub runs no such channel. */
 function NoConnectableChannel({ catalog }: { catalog: ChannelCatalogState }) {
+  const { t } = useTranslation();
   if (catalog.availability === "loading") {
-    return <Alert variant="info" title="Loading channels" description={catalog.message ?? ""} />;
+    return (
+      <Alert
+        variant="info"
+        title={t("hub.channels.catalogView.loading")}
+        description={catalog.message ?? ""}
+      />
+    );
   }
   if (catalog.availability !== "available") {
     return (
       <Alert
         variant="warning"
-        title="Catalog not available on this Hub"
+        title={t("hub.channels.catalogView.unavailable")}
         description={catalog.message ?? ""}
       />
     );
@@ -78,8 +86,8 @@ function NoConnectableChannel({ catalog }: { catalog: ChannelCatalogState }) {
   return (
     <Alert
       variant="info"
-      title="No channel here accepts a pasted credential"
-      description="Every channel this Hub runs is either logged in by QR or needs a Provider Application an instance operator administers."
+      title={t("hub.channels.connectionAdd.noneTitle")}
+      description={t("hub.channels.connectionAdd.noneBody")}
     />
   );
 }

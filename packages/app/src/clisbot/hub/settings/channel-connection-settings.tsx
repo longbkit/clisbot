@@ -3,6 +3,7 @@
 // Status details / Manage Connection buttons that showed nothing until pressed.
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { settingsStyles } from "@/styles/settings";
 export function ConnectionSettingRow({
   title,
   value,
-  actionLabel = "Show",
+  actionLabel,
   children,
 }: {
   title: string;
@@ -22,9 +23,13 @@ export function ConnectionSettingRow({
   actionLabel?: string;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((current) => !current), []);
   const state = useMemo(() => ({ expanded: open }), [open]);
+  const verb = open
+    ? t("hub.channels.connectionSettings.hide")
+    : (actionLabel ?? t("hub.channels.connectionSettings.show"));
   return (
     <View style={settingsStyles.rowBorder}>
       <View style={[settingsStyles.row, styles.row]}>
@@ -37,9 +42,12 @@ export function ConnectionSettingRow({
           variant="ghost"
           onPress={toggle}
           accessibilityState={state}
-          accessibilityLabel={`${open ? "Hide" : actionLabel} ${title}`}
+          accessibilityLabel={t("hub.channels.connectionSettings.toggleLabel", {
+            verb,
+            title,
+          })}
         >
-          {open ? "Hide" : actionLabel}
+          {verb}
         </Button>
       </View>
       {open ? <View style={styles.panel}>{children}</View> : null}
@@ -64,6 +72,7 @@ export function ConnectionTestMessagePanel({
   send(conversationId: string): void;
   close(): void;
 }) {
+  const { t } = useTranslation();
   const [destination, setDestination] = useState<string | null>(initialDestination);
   const selected = destinations.find((option) => option.value === destination);
   const display = useMemo(
@@ -82,23 +91,23 @@ export function ConnectionTestMessagePanel({
   return (
     <View style={[settingsStyles.row, styles.testPanel]}>
       <SelectField
-        label="Send a test message to"
+        label={t("hub.channels.connectionSettings.testTo")}
         value={destination}
         selectedDisplay={display}
         options={destinations}
         onChange={setDestination}
-        placeholder="Choose a conversation"
-        emptyText="The bot has not seen a conversation yet. Message it first, or add one to a Route."
+        placeholder={t("hub.channels.connectionSettings.chooseConversation")}
+        emptyText={t("hub.channels.connectionSettings.noConversation")}
         searchable={destinations.length > 6}
-        title="Send a test message to"
+        title={t("hub.channels.connectionSettings.testTo")}
         disabled={pending}
       />
       <View style={styles.actions}>
         <Button size="sm" disabled={pending || destination === null} onPress={submit}>
-          Preview and send
+          {t("hub.channels.connectionSettings.previewAndSend")}
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onPress={close}>
-          Cancel
+          {t("hub.channels.card.cancel")}
         </Button>
       </View>
     </View>

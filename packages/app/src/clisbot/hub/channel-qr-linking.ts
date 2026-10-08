@@ -19,6 +19,8 @@
  * "generate a new one", not "something is broken".
  */
 
+import { i18n } from "@/i18n/i18next";
+
 export const CHANNEL_QR_TTL_MS = 180_000;
 
 export type ChannelQrPhase =
@@ -118,28 +120,25 @@ export function channelQrFailure(problem: {
   if (problem.status === 404 && problem.code === "channel_account_unavailable") {
     return {
       unavailable: false,
-      message:
-        "This account is not set up on the Hub or is turned off. Add it as a Connection with a Route, then log in here.",
+      message: i18n.t("hub.channels.qr.accountUnavailable"),
     };
   }
   if (problem.status === 404) {
     return {
       unavailable: true,
-      message:
-        "This Hub does not serve QR login for this channel. Update the Hub, then log in here.",
+      message: i18n.t("hub.channels.qr.notServedUpdate"),
     };
   }
   if (problem.status === 0 && /timed out|connection closed/iu.test(problem.message)) {
     return {
       unavailable: false,
-      message:
-        "The Hub took too long to prepare the QR code; the first one after adding an account can. Try again.",
+      message: i18n.t("hub.channels.qr.timedOut"),
     };
   }
   if (problem.status === 503) {
     return {
       unavailable: false,
-      message: `${problem.message} The channel runtime has to be running to log in.`,
+      message: i18n.t("hub.channels.qr.runtimeDown", { message: problem.message }),
     };
   }
   return { unavailable: false, message: problem.message };
@@ -149,9 +148,7 @@ export function openChannelQrLinking(input: { available: boolean }): ChannelQrMo
   let phase: ChannelQrPhase = input.available ? "idle" : "unavailable";
   let qrDataUrl: string | null = null;
   let qrFilePath: string | null = null;
-  let message: string | null = input.available
-    ? null
-    : "This Hub does not serve QR login for this channel.";
+  let message: string | null = input.available ? null : i18n.t("hub.channels.qr.notServed");
   let user: ChannelQrUser | null = null;
   let polling = false;
   let busy = false;
@@ -289,7 +286,7 @@ export function openChannelQrLinking(input: { available: boolean }): ChannelQrMo
       if (phase === "pending" && expiresAt !== null && at >= expiresAt) {
         clearCode();
         phase = "expired";
-        message = "The QR code expired. Generate a new one.";
+        message = i18n.t("hub.channels.qr.expired");
       }
       publish();
     },
@@ -301,12 +298,12 @@ export function shouldPollChannelQr(state: ChannelQrState): boolean {
   return state.phase === "pending" && !state.polling && !state.busy;
 }
 
-export const CHANNEL_QR_ACTION_LABELS: Readonly<Record<ChannelQrAction, string>> = {
-  start: "Log in",
-  relink: "Log in with a different account",
-  cancel: "Cancel",
-  logout: "Log out",
-};
+export function channelQrActionLabel(action: ChannelQrAction): string {
+  if (action === "start") return i18n.t("hub.channels.qr.action.start");
+  if (action === "relink") return i18n.t("hub.channels.qr.action.relink");
+  if (action === "cancel") return i18n.t("hub.channels.qr.action.cancel");
+  return i18n.t("hub.channels.qr.action.logout");
+}
 
 /** The phone app a QR login is scanned with, and where its scanner is. */
 export interface ChannelQrLoginGuide {
@@ -314,30 +311,33 @@ export interface ChannelQrLoginGuide {
   steps: readonly string[];
 }
 
-const QR_LOGIN_GUIDES: Readonly<Record<string, ChannelQrLoginGuide>> = {
-  whatsapp: {
+const QR_LOGIN_GUIDES: Readonly<Record<string, () => ChannelQrLoginGuide>> = {
+  whatsapp: () => ({
     app: "WhatsApp",
     steps: [
-      "Open WhatsApp on the phone with this number",
-      "Tap Settings (iPhone) or ⋮ (Android), then Linked devices",
-      "Tap Link a device and point the phone at this code",
+      i18n.t("hub.channels.qr.guide.whatsappOpen"),
+      i18n.t("hub.channels.qr.guide.whatsappSettings"),
+      i18n.t("hub.channels.qr.guide.whatsappLink"),
     ],
-  },
-  zalouser: {
+  }),
+  zalouser: () => ({
     app: "Zalo",
     steps: [
-      "Open Zalo on the phone with this account",
-      "Tap the QR icon next to the search bar",
-      "Point the phone at this code, then confirm the login",
+      i18n.t("hub.channels.qr.guide.zaloOpen"),
+      i18n.t("hub.channels.qr.guide.zaloIcon"),
+      i18n.t("hub.channels.qr.guide.zaloPoint"),
     ],
-  },
+  }),
 };
 
 export function channelQrLoginGuide(channel: string): ChannelQrLoginGuide {
   return (
-    QR_LOGIN_GUIDES[channel] ?? {
-      app: "the app",
-      steps: ["Open the app on your phone", "Scan this code with its QR scanner"],
+    QR_LOGIN_GUIDES[channel]?.() ?? {
+      app: i18n.t("hub.channels.qr.guide.theApp"),
+      steps: [
+        i18n.t("hub.channels.qr.guide.genericOpen"),
+        i18n.t("hub.channels.qr.guide.genericScan"),
+      ],
     }
   );
 }

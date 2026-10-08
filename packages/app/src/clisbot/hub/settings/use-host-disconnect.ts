@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useHubAccount } from "../account-provider";
 import { hubResourceQueryKey } from "../query-keys";
@@ -9,6 +10,7 @@ import { hubResourceQueryKey } from "../query-keys";
  * after leaving the page does nothing; a successful disconnect is never replayed.
  */
 export function useHostDisconnect(daemonId: string, name: string) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const queryClient = useQueryClient();
   const mounted = useRef(true);
@@ -21,9 +23,9 @@ export function useHostDisconnect(daemonId: string, name: string) {
   const mutation = useMutation({
     mutationFn: async () => {
       const confirmed = await confirmDialog({
-        title: "Disconnect Host?",
-        message: `Disconnect ${name} from Hub and stop its Hub work? Enroll it again to reconnect.`,
-        confirmLabel: "Disconnect",
+        title: t("hub.settings.hostDisconnect.title"),
+        message: t("hub.settings.hostDisconnect.message", { name }),
+        confirmLabel: t("hub.settings.hostDisconnect.confirm"),
         destructive: true,
       });
       if (!confirmed || !mounted.current) return false;

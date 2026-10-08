@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { FormTextInput } from "@/components/ui/form-field";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import {
   CHANNEL_LIMIT_NAMES,
@@ -11,11 +13,11 @@ import {
 } from "../channel-configuration";
 import { SettingRow } from "./channel-route-behavior-rows";
 import {
-  LIMITS_NOTE,
-  LIMIT_LABELS,
-  LIMIT_UNITS,
   NO_DEFAULTS,
   channelLimitsDraft,
+  limitLabel,
+  limitUnit,
+  limitsNote,
   parseChannelLimitsDraft,
   type ChannelLimitDefaults,
   type ChannelLimitsDraft,
@@ -44,6 +46,7 @@ export function ChannelLimitsFields({
   error?: string | null;
   disabled: boolean;
 }) {
+  useTranslation();
   const change = useCallback(
     (name: ChannelLimitName, next: LimitDraft) =>
       setDraft((current) => ({ ...current, [name]: next })),
@@ -51,7 +54,7 @@ export function ChannelLimitsFields({
   );
   return (
     <View style={styles.fields}>
-      {note ? <Text style={styles.note}>{LIMITS_NOTE}</Text> : null}
+      {note ? <Text style={styles.note}>{limitsNote()}</Text> : null}
       {names.map((name) => (
         <LimitRow
           key={name}
@@ -85,6 +88,7 @@ function LimitRow({
   onChange(name: ChannelLimitName, next: LimitDraft): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const off = entry.mode === "off";
   const type = useCallback(
     (value: string) =>
@@ -98,7 +102,7 @@ function LimitRow({
     () => onChange(name, off ? { mode: "default", value: "" } : { mode: "off", value: "" }),
     [name, off, onChange],
   );
-  const label = LIMIT_LABELS[name];
+  const label = limitLabel(name);
   return (
     <SettingRow label={label}>
       <View style={styles.numberInput}>
@@ -114,7 +118,7 @@ function LimitRow({
         />
       </View>
       {/* Fixed slots for the unit and the action, so every row's field lines up. */}
-      <Text style={styles.unit}>{LIMIT_UNITS[name] ?? ""}</Text>
+      <Text style={styles.unit}>{limitUnit(name)}</Text>
       <View style={styles.offSlot}>
         {defaultValue === undefined && !off ? null : (
           <Button
@@ -122,9 +126,13 @@ function LimitRow({
             variant="ghost"
             disabled={disabled}
             onPress={toggleOff}
-            accessibilityLabel={`${label}: ${off ? "use default" : "turn off"}`}
+            accessibilityLabel={
+              off
+                ? t("hub.channels.limits.useDefaultLabel", { label })
+                : t("hub.channels.limits.turnOffLabel", { label })
+            }
           >
-            {off ? "Use default" : "Turn off"}
+            {off ? t("hub.channels.limits.useDefault") : t("hub.channels.limits.turnOff")}
           </Button>
         )}
       </View>
@@ -133,8 +141,10 @@ function LimitRow({
 }
 
 function placeholder(off: boolean, defaultValue: number | undefined): string {
-  if (off) return "Off";
-  return defaultValue === undefined ? "No limit" : `Default ${String(defaultValue)}`;
+  if (off) return i18n.t("hub.channels.limits.off");
+  return defaultValue === undefined
+    ? i18n.t("hub.channels.limits.noLimit")
+    : i18n.t("hub.channels.limits.defaultValue", { value: defaultValue });
 }
 
 /** The Bot's own limits and the limits each of its Conversations gets. */
@@ -147,6 +157,7 @@ export function ChannelAccountLimitsPanel({
   pending: boolean;
   save(limits: ChannelAccountLimits | undefined): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const record =
     typeof limits === "object" && limits !== null ? (limits as Record<string, unknown>) : {};
   const [bot, setBot] = useState(() => channelLimitsDraft(record));
@@ -167,8 +178,8 @@ export function ChannelAccountLimitsPanel({
   return (
     <View style={settingsStyles.row}>
       <View style={[settingsStyles.rowContent, styles.panel]}>
-        <Text style={settingsStyles.rowTitle}>Whole bot</Text>
-        <Text style={settingsStyles.rowHint}>Every conversation of this bot together.</Text>
+        <Text style={settingsStyles.rowTitle}>{t("hub.channels.limits.wholeBot")}</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.channels.limits.wholeBotHint")}</Text>
         <ChannelLimitsFields
           draft={bot}
           setDraft={setBot}
@@ -176,10 +187,10 @@ export function ChannelAccountLimitsPanel({
           error={parsedBot.valid ? null : parsedBot.error}
           disabled={pending}
         />
-        <Text style={[settingsStyles.rowTitle, styles.group]}>Each conversation</Text>
-        <Text style={settingsStyles.rowHint}>
-          Each channel, group or DM on its own, its threads included.
+        <Text style={[settingsStyles.rowTitle, styles.group]}>
+          {t("hub.channels.limits.eachConversation")}
         </Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.channels.limits.eachConversationHint")}</Text>
         <ChannelLimitsFields
           draft={conversation}
           setDraft={setConversation}
@@ -193,7 +204,7 @@ export function ChannelAccountLimitsPanel({
           disabled={pending || !parsedBot.valid || !parsedConversation.valid}
           onPress={submit}
         >
-          Save limits
+          {t("hub.channels.limits.save")}
         </Button>
       </View>
     </View>

@@ -9,6 +9,7 @@ import { ja } from "./resources/ja";
 import { ko } from "./resources/ko";
 import { ptBR } from "./resources/pt-BR";
 import { ru } from "./resources/ru";
+import { vi } from "./resources/vi";
 import { zhCN } from "./resources/zh-CN";
 
 function flattenKeys(value: unknown, prefix = ""): string[] {
@@ -113,6 +114,7 @@ describe("translation resources", () => {
     expect(flattenKeys(ko).sort()).toEqual(englishKeys);
     expect(flattenKeys(ptBR).sort()).toEqual(englishKeys);
     expect(flattenKeys(ru).sort()).toEqual(englishKeys);
+    expect(flattenKeys(vi).sort()).toEqual(englishKeys);
     expect(flattenKeys(zhCN).sort()).toEqual(englishKeys);
   });
 
@@ -126,11 +128,12 @@ describe("translation resources", () => {
     expect(countMatchingEnglishStrings(ko)).toBeLessThan(maxFallbackStrings);
     expect(countMatchingEnglishStrings(ptBR)).toBeLessThan(maxFallbackStrings);
     expect(countMatchingEnglishStrings(ru)).toBeLessThan(maxFallbackStrings);
+    expect(countMatchingEnglishStrings(vi)).toBeLessThan(maxFallbackStrings);
     expect(countMatchingEnglishStrings(zhCN)).toBeLessThan(maxFallbackStrings);
   });
 
   it("localizes the pull request empty state in every supported language", () => {
-    for (const resource of [ar, es, fr, ja, ko, ptBR, ru, zhCN]) {
+    for (const resource of [ar, es, fr, ja, ko, ptBR, ru, vi, zhCN]) {
       expect(resource.panels.pullRequest.emptyTitle).not.toBe(en.panels.pullRequest.emptyTitle);
       expect(resource.panels.pullRequest.emptyDescription).not.toBe(
         en.panels.pullRequest.emptyDescription,
@@ -146,6 +149,7 @@ describe("translation resources", () => {
     expect(findInterpolationMismatches(ko)).toEqual([]);
     expect(findInterpolationMismatches(ptBR)).toEqual([]);
     expect(findInterpolationMismatches(ru)).toEqual([]);
+    expect(findInterpolationMismatches(vi)).toEqual([]);
     expect(findInterpolationMismatches(zhCN)).toEqual([]);
   });
 

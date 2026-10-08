@@ -1,4 +1,5 @@
 import { type SelectFieldOption } from "@/components/ui/select-field";
+import { i18n } from "@/i18n/i18next";
 import { type ConfigurationKind, type RecordValue } from "./channel-settings-types";
 import {
   arrayField,
@@ -70,7 +71,7 @@ export function routeDestinationOptions(
     .map((account) => {
       const connection = connections.find(({ id }) => id === stringField(account, "connectionId"));
       const count = arrayField(account, "routes").length;
-      const routes = `${String(count)} Route${count === 1 ? "" : "s"}`;
+      const routes = i18n.t("hub.routes.destination.routes", { count });
       const value = routeDestinationValue({ kind: "account", key: channelAccountKey(account) });
       return {
         id: value,
@@ -88,7 +89,7 @@ export function routeDestinationOptions(
         id: value,
         value,
         label: `${channelName(connection.provider)} · ${connection.name}`,
-        description: "No Routes yet",
+        description: i18n.t("hub.routes.destination.noRoutes"),
       };
     });
   return [...existing, ...unused];

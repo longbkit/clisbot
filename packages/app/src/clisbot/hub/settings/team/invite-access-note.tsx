@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { subjectAssignments } from "../access-catalog";
@@ -19,6 +20,7 @@ export function InviteAccessNote({
   resources: TeamResources;
   teamIds: readonly string[];
 }) {
+  const { t } = useTranslation();
   const { assignments } = resources;
   const retry = useCallback(() => void assignments.refetch(), [assignments]);
   if (teamIds.length === 0 || !resources.canManageResources) return null;
@@ -26,11 +28,11 @@ export function InviteAccessNote({
     return (
       <Alert
         variant="error"
-        title="Team access unavailable"
-        description="Refresh the Teams' access before adding people."
+        title={t("hub.team.invite.accessUnavailable.title")}
+        description={t("hub.team.invite.accessUnavailable.description")}
       >
         <Button size="sm" variant="outline" onPress={retry}>
-          Retry
+          {t("common.actions.retry")}
         </Button>
       </Alert>
     );
@@ -42,7 +44,7 @@ export function InviteAccessNote({
   return (
     <Alert
       variant="info"
-      title="Everyone receives the chosen Teams' access"
+      title={t("hub.team.invite.accessGranted")}
       description={teamAccessLine(granted)}
     />
   );

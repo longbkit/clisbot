@@ -2,6 +2,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useConversationProjectContext } from "./conversation-project-context";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { memo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { conversationFilePath } from "./source-file-path";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -39,6 +40,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSubmitMessage,
   mentionMembers,
 }: ChatComposerProps) {
+  const { t } = useTranslation();
   const attachmentsSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
@@ -62,7 +64,7 @@ export const ChatComposer = memo(function ChatComposer({
         realtimeVoiceEnabled={attachmentsSupported}
         showAgentControls={project?.canConfigure === true}
         pendingSessionReason={
-          !project?.agentId ? "Send a message to start this bot session." : undefined
+          !project?.agentId ? t("bots.chat.composer.pendingSession") : undefined
         }
         serverId={serverId}
         isPaneFocused={active}

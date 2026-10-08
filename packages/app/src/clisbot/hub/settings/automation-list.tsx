@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { ChevronRight } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import {
   automationScopeLabel,
@@ -31,22 +33,31 @@ export function AutomationList({
   /** Opens the Automation's configuration so an Admin can enable it again. */
   review(automationId: string): void;
 }) {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<AutomationListFilter>(canManage ? "all" : "mine");
   const chips = useMemo<FilterChip<AutomationListFilter>[]>(
     () => [
       {
         value: "mine",
-        label: "Mine",
+        label: t("hub.automations.list.mine"),
         count: filterAutomations(automations, "mine", viewerUserId).length,
       },
       {
         value: "shared",
-        label: "Shared with me",
+        label: t("hub.automations.list.shared"),
         count: filterAutomations(automations, "shared", viewerUserId).length,
       },
-      ...(canManage ? [{ value: "all" as const, label: "All", count: automations.length }] : []),
+      ...(canManage
+        ? [
+            {
+              value: "all" as const,
+              label: t("hub.automations.list.all"),
+              count: automations.length,
+            },
+          ]
+        : []),
     ],
-    [automations, canManage, viewerUserId],
+    [automations, canManage, t, viewerUserId],
   );
   const visible = filterAutomations(automations, filter, viewerUserId);
   return (
@@ -55,7 +66,7 @@ export function AutomationList({
       <View style={settingsStyles.card}>
         {visible.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
-            <Text style={settingsStyles.rowHint}>No Automations match this filter.</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.automations.list.noMatch")}</Text>
           </View>
         ) : (
           visible.map((automation, index) => (
@@ -84,6 +95,7 @@ function ScopedAutomationRow({
   open(automationId: string): void;
   review(automationId: string): void;
 }) {
+  const { t } = useTranslation();
   const openAutomation = useCallback(() => open(automation.id), [automation.id, open]);
   const reviewAutomation = useCallback(() => review(automation.id), [automation.id, review]);
   const paused = typeof automation.pausedReason === "string";
@@ -92,15 +104,20 @@ function ScopedAutomationRow({
     <View style={[tableStyles.body, bordered ? settingsStyles.rowBorder : null]}>
       <AutomationListRow
         name={automation.name}
-        description={`${state} · ${automationScopeLabel(automation.scope)}`}
+        description={t("hub.automations.list.rowDescription", {
+          state,
+          scope: automationScopeLabel(automation.scope),
+        })}
         open={openAutomation}
       />
       {paused ? (
         <View style={styles.pausedRow}>
-          <Text style={settingsStyles.rowError}>{`Paused: ${automation.pausedReason}`}</Text>
+          <Text style={settingsStyles.rowError}>
+            {t("hub.automations.pausedReason", { reason: automation.pausedReason })}
+          </Text>
           {automation.scope !== "run" ? (
             <Button size="sm" variant="outline" onPress={reviewAutomation}>
-              Review and enable
+              {t("hub.automations.list.reviewAndEnable")}
             </Button>
           ) : null}
         </View>
@@ -110,8 +127,10 @@ function ScopedAutomationRow({
 }
 
 function automationStateLabel(automation: Pick<HubScopedAutomation, "enabled" | "pausedReason">) {
-  if (typeof automation.pausedReason === "string") return "Paused";
-  return automation.enabled ? "Active" : "Disabled";
+  if (typeof automation.pausedReason === "string") return i18n.t("hub.automations.state.paused");
+  return automation.enabled
+    ? i18n.t("hub.automations.state.active")
+    : i18n.t("hub.automations.state.disabled");
 }
 
 export function AutomationListRow({
@@ -123,6 +142,7 @@ export function AutomationListRow({
   description?: string;
   open(): void;
 }) {
+  const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const enter = useCallback(() => setHovered(true), []);
   const leave = useCallback(() => setHovered(false), []);
@@ -138,7 +158,7 @@ export function AutomationListRow({
     <View onPointerEnter={enter} onPointerLeave={leave}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open ${name}`}
+        accessibilityLabel={t("hub.automations.list.open", { name })}
         onPress={open}
         style={rowStyle}
       >

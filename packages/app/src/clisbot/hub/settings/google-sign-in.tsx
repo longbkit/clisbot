@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export function GoogleSignInButton({
   /** The recommended way in, styled as the main action. */
   primary?: boolean;
 }) {
+  const { t } = useTranslation();
   const start = hub.signInWithGoogle;
   const continueWithGoogle = useCallback(() => {
     if (start !== undefined) void run(() => start({ claimInstance }));
@@ -37,7 +39,7 @@ export function GoogleSignInButton({
       disabled={pending}
       onPress={continueWithGoogle}
     >
-      {hub.googleSignInLabel ?? "Continue with Google"}
+      {hub.googleSignInLabel ?? t("hub.settings.googleSignIn.continueWithGoogle")}
     </Button>
   );
 }
@@ -60,19 +62,20 @@ export function GoogleFirstInstanceSetup({
   run: HubRun;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [passwordChosen, setPasswordChosen] = useState(false);
   const choosePassword = useCallback(() => setPasswordChosen(true), []);
   if (!googleSignIn || hub.signInWithGoogle === undefined || passwordChosen) return children;
   return (
-    <SettingsSection title="Set up Hub">
+    <SettingsSection title={t("hub.settings.googleSignIn.setupTitle")}>
       <Alert
         variant="info"
-        title="Create the first account"
-        description="The first account becomes Owner and receives full access to every current and future organization resource. Continue with Google to use an address Google has verified."
+        title={t("hub.settings.googleSignIn.setupAlertTitle")}
+        description={t("hub.settings.googleSignIn.setupAlertDescription")}
       />
       <GoogleSignInButton visible hub={hub} pending={pending} run={run} claimInstance primary />
       <Button variant="ghost" disabled={pending} onPress={choosePassword}>
-        Set up with email and password instead
+        {t("hub.settings.googleSignIn.usePasswordForSetup")}
       </Button>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
     </SettingsSection>
@@ -97,6 +100,7 @@ export function GoogleFirstSignIn({
   run: HubRun;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [emailChosen, setEmailChosen] = useState(false);
   const chooseEmail = useCallback(() => setEmailChosen(true), []);
   if (!googleSignIn || hub.signInWithGoogle === undefined) return children;
@@ -112,7 +116,7 @@ export function GoogleFirstSignIn({
     <>
       <GoogleSignInButton visible hub={hub} pending={pending} run={run} primary />
       <Button variant="ghost" disabled={pending} onPress={chooseEmail}>
-        Use email and password instead
+        {t("hub.settings.googleSignIn.useEmailAndPassword")}
       </Button>
     </>
   );

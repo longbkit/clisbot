@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -8,6 +9,7 @@ import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { EmailRegistrationButton, EmailRegistrationCompletion } from "./email-registration";
 import { GoogleFirstInstanceSetup, GoogleFirstSignIn } from "./google-sign-in";
@@ -26,7 +28,7 @@ import { InstanceSettings } from "./instance-settings";
 import { IntegrationsSettings } from "./integrations-settings";
 import { ChannelIdentitySelfLinkSettings } from "./channel-identity-self-link";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
-import { capitalizeLabel as channelLabel } from "./labels";
+import { organizationRoleLabel } from "./labels";
 import { InfoRow } from "./resource-rows";
 import { TeamSettings } from "./team/team-settings";
 import { BackLink } from "./back-link";
@@ -89,9 +91,10 @@ function SignedInHubSettings({
   section: Exclude<HubSectionSlug, "account" | "hosts" | "hubs" | "overview" | "sign-in">;
   initialAutomationCreate?: boolean;
 }) {
+  const { t } = useTranslation();
   const account = useHubAccount();
   if (!account.enabled) return null;
-  if (account.loading) return <StateMessage message="Loading Hub account…" />;
+  if (account.loading) return <StateMessage message={t("hub.settings.account.loading")} />;
   // Sign in where the section was asked for; signing in changes this component's
   // key in HubSettingsContent, so the section renders without a trip to Account.
   if (!account.signedIn) return <HubAccountSettings />;
@@ -116,10 +119,11 @@ function SignedInHubSettings({
 }
 
 function HubAccountSettings() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   if (hub.connection?.accountAuthentication === "personal") return <HubOverviewSettings />;
   if (!hub.enabled) return null;
-  if (hub.loading) return <StateMessage message="Loading Hub account..." />;
+  if (hub.loading) return <StateMessage message={t("hub.settings.account.loadingDots")} />;
   const state = hub.state;
   // A registration link creates a new account; it only applies to a signed-out browser.
   if (hub.registrationToken && state?.status === "signedOut") {
@@ -145,13 +149,14 @@ function HubAccountSettings() {
 
 /** Account session management is independent of organization or resource access. */
 function AuthenticatedAccountTabs({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<"profile" | "sessions">("profile");
   return (
     <View>
       <SegmentedControl
         options={[
-          { value: "profile", label: "Profile" },
-          { value: "sessions", label: "Sessions" },
+          { value: "profile", label: t("hub.settings.account.profileTab") },
+          { value: "sessions", label: t("hub.settings.account.sessionsTab") },
         ]}
         value={tab}
         onValueChange={setTab}
@@ -168,6 +173,7 @@ function HubAccountSettingsEntry({
   hub: HubAccount;
   invitation: HubInvitation | undefined;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const registry = useHubProfiles();
   const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
@@ -182,31 +188,29 @@ function HubAccountSettingsEntry({
   }, [hub]);
   if (setupBlocked)
     return (
-      <SettingsSection title="Owner setup">
+      <SettingsSection title={t("hub.settings.account.ownerSetup")}>
         <Alert
           variant="warning"
-          title="Hub setup needs operator recovery"
-          description="This Hub cannot safely offer first-owner creation. Ask the person operating it to repair setup from its local computer. A URL or ordinary pairing cannot reopen owner setup."
+          title={t("hub.settings.account.setupBlockedTitle")}
+          description={t("hub.settings.account.setupBlockedDescription")}
         />
       </SettingsSection>
     );
   if (setupUnavailable && state?.status === "instanceSetupRequired")
     return (
-      <SettingsSection title="Owner setup">
+      <SettingsSection title={t("hub.settings.account.ownerSetup")}>
         <Alert
           variant="warning"
-          title="New owner setup approval needed"
-          description="No owner account was created by this attempt. Ask the Hub operator for a new setup QR or link, then try again."
+          title={t("hub.settings.account.setupApprovalTitle")}
+          description={t("hub.settings.account.setupApprovalDescription")}
         />
         <Button variant="outline" onPress={retryAccount} disabled={pending}>
-          Check setup status
+          {t("hub.settings.account.checkSetupStatus")}
         </Button>
         <Button variant="outline" onPress={scanOwnerSetup} disabled={pending}>
-          Scan new setup QR
+          {t("hub.settings.account.scanSetupQr")}
         </Button>
-        <Text style={settingsStyles.rowHint}>
-          Your device pairing and your owner setup approval are separate.
-        </Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.settings.account.pairingSeparate")}</Text>
       </SettingsSection>
     );
 
@@ -318,19 +322,7 @@ function HubAccountSettingsForm({
   }
 
   if (state?.status !== "signedOut") {
-    return (
-      <SettingsSection title="Hub account">
-        <Alert
-          variant="error"
-          title="Hub account state is unavailable"
-          description={hub.error ?? "Check the Hub connection and try again."}
-        >
-          <Button size="sm" variant="outline" disabled={pending} onPress={retryAccount}>
-            Retry
-          </Button>
-        </Alert>
-      </SettingsSection>
-    );
+    return <AccountStateUnavailable error={hub.error} pending={pending} retry={retryAccount} />;
   }
 
   return (
@@ -344,6 +336,31 @@ function HubAccountSettingsForm({
       pending={pending}
       run={run}
     />
+  );
+}
+
+function AccountStateUnavailable({
+  error,
+  pending,
+  retry,
+}: {
+  error: string | null | undefined;
+  pending: boolean;
+  retry(): void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <SettingsSection title={t("hub.settings.account.hubAccount")}>
+      <Alert
+        variant="error"
+        title={t("hub.settings.account.stateUnavailableTitle")}
+        description={error ?? t("hub.settings.account.stateUnavailableDescription")}
+      >
+        <Button size="sm" variant="outline" disabled={pending} onPress={retry}>
+          {t("hub.settings.account.retry")}
+        </Button>
+      </Alert>
+    </SettingsSection>
   );
 }
 
@@ -413,24 +430,25 @@ function UnavailableAccountInvitation({
   pending: boolean;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
   const retry = useCallback(() => void run(hub.refresh), [hub.refresh, run]);
   return (
-    <SettingsSection title="Invitation">
+    <SettingsSection title={t("hub.settings.account.invitation")}>
       <Alert
         variant="warning"
-        title="This invitation is unavailable"
-        description="It may have expired, already been used, or belong to another account. Sign in with the invited account or ask an organization owner for a new invitation."
+        title={t("hub.settings.account.invitationUnavailableTitle")}
+        description={t("hub.settings.account.invitationUnavailableSignedIn")}
       />
       <View style={settingsStyles.card}>
-        <InfoRow title="Signed in as" hint={accountEmail} />
+        <InfoRow title={t("hub.settings.account.signedInAs")} hint={accountEmail} />
       </View>
       <View style={styles.actions}>
         <Button variant="outline" disabled={pending} onPress={retry}>
-          Retry
+          {t("hub.settings.account.retry")}
         </Button>
         <Button variant="outline" disabled={pending} onPress={signOut}>
-          Sign out
+          {t("hub.settings.account.signOut")}
         </Button>
       </View>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
@@ -451,6 +469,7 @@ function InvitationAcceptance({
   pending: boolean;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const accept = useCallback(
     () => void run(() => hub.acceptInvitation(invitation.id)),
     [hub, invitation.id, run],
@@ -461,27 +480,35 @@ function InvitationAcceptance({
     .join(", ");
   const description =
     teamNames.length === 0
-      ? "Joining the organization does not grant access to any Host, Project, Channel, or Automation. An owner or admin assigns that separately."
-      : `You will join ${teamNames} and receive their current access after accepting.`;
+      ? t("hub.settings.account.joinNoTeams")
+      : t("hub.settings.account.joinTeams", { teams: teamNames });
+  const role = organizationRoleLabel(invitation.role);
   return (
-    <SettingsSection title={`Join ${invitation.organization.name}`}>
+    <SettingsSection
+      title={t("hub.settings.account.joinTitle", { organization: invitation.organization.name })}
+    >
       <Alert
         variant="info"
-        title={`${invitation.inviterName} invited you as ${channelLabel(invitation.role)}`}
+        title={t("hub.settings.account.invitedAs", { inviter: invitation.inviterName, role })}
         description={description}
       />
       <View style={settingsStyles.card}>
-        <InfoRow title="Organization" hint={invitation.organization.name} />
-        <InfoRow title="Account" hint={accountEmail} bordered />
-        <InfoRow title="Organization role" hint={channelLabel(invitation.role)} bordered />
-        {teamNames.length === 0 ? null : <InfoRow title="Teams" hint={teamNames} bordered />}
+        <InfoRow
+          title={t("hub.settings.account.organization")}
+          hint={invitation.organization.name}
+        />
+        <InfoRow title={t("hub.settings.account.account")} hint={accountEmail} bordered />
+        <InfoRow title={t("hub.settings.account.organizationRole")} hint={role} bordered />
+        {teamNames.length === 0 ? null : (
+          <InfoRow title={t("hub.settings.account.teams")} hint={teamNames} bordered />
+        )}
       </View>
       <View style={styles.actions}>
         <Button disabled={pending} loading={pending} onPress={accept}>
-          Accept invitation
+          {t("hub.settings.account.acceptInvitation")}
         </Button>
         <Button variant="outline" disabled={pending} onPress={signOut}>
-          Sign out
+          {t("hub.settings.account.signOut")}
         </Button>
       </View>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
@@ -500,6 +527,7 @@ function ActiveHubAccount({
   pending: boolean;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [showIdentity, setShowIdentity] = useState(false);
   const openIdentity = useCallback(() => setShowIdentity(true), []);
@@ -508,7 +536,7 @@ function ActiveHubAccount({
     setShowIdentity(false);
     router.setParams({ channelConnectionId: undefined });
   }, [router]);
-  const role = channelLabel(state.membership.role);
+  const role = organizationRoleLabel(state.membership.role);
   const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
   const identityVisible =
     showIdentity ||
@@ -520,7 +548,7 @@ function ActiveHubAccount({
   if (identityVisible)
     return (
       <View>
-        <BackLink to="Account" onPress={backToAccount} />
+        <BackLink to={t("hub.settings.navigation.account")} onPress={backToAccount} />
         <ChannelIdentitySelfLinkSettings />
       </View>
     );
@@ -547,7 +575,7 @@ function ActiveHubAccount({
       <View style={styles.signOut}>
         {hub.error ? <Alert variant="error" title={hub.error} /> : null}
         <Button size="sm" variant="outline" disabled={pending} onPress={signOut}>
-          Sign out
+          {t("hub.settings.account.signOut")}
         </Button>
       </View>
     </View>
@@ -565,16 +593,17 @@ function BrowserHubAuthentication({
   pending: boolean;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const signIn = useCallback(() => void run(() => hub.signIn()), [hub, run]);
   return (
-    <SettingsSection title="Hub account">
+    <SettingsSection title={t("hub.settings.account.hubAccount")}>
       <Alert
         variant="info"
         title={browserAuthenticationTitle(state)}
-        description="Authentication opens securely in your system browser and returns to Clisbot when complete."
+        description={t("hub.settings.account.browserDescription")}
       />
       <Button disabled={pending} loading={pending} onPress={signIn}>
-        Continue in browser
+        {t("hub.settings.account.continueInBrowser")}
       </Button>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
     </SettingsSection>
@@ -582,15 +611,20 @@ function BrowserHubAuthentication({
 }
 
 function browserAuthenticationTitle(state: HubAccountState | null): string {
-  if (state?.status === "instanceSetupRequired") return "Set up your Hub";
-  if (state?.status === "passwordChangeRequired") return "Password change required";
-  if (state?.status === "signedOut" && state.invitation !== undefined) {
-    return `Join ${state.invitation.organization.name}`;
+  if (state?.status === "instanceSetupRequired") return i18n.t("hub.settings.account.setUpYourHub");
+  if (state?.status === "passwordChangeRequired") {
+    return i18n.t("hub.settings.account.passwordChangeRequired");
   }
-  return "Sign in to Hub";
+  if (state?.status === "signedOut" && state.invitation !== undefined) {
+    return i18n.t("hub.settings.account.joinTitle", {
+      organization: state.invitation.organization.name,
+    });
+  }
+  return i18n.t("hub.settings.account.signInToHub");
 }
 
 function InstanceSetup({ hub, pending, run, form, fields }: AccountEntryFormProps) {
+  const { t } = useTranslation();
   useHubEditLock();
   const { email, password, confirmPassword, passwordsMatch } = fields;
   const { setEmail, setPassword, setConfirmPassword } = form;
@@ -601,25 +635,28 @@ function InstanceSetup({ hub, pending, run, form, fields }: AccountEntryFormProp
     [email, hub, password, run],
   );
   return (
-    <SettingsSection title="Set up Hub">
+    <SettingsSection title={t("hub.settings.account.setUpHub")}>
       <Alert
         variant="info"
-        title="Create the first account"
-        description="The first account becomes Owner and receives full access to every current and future organization resource."
+        title={t("hub.settings.account.createFirstAccount")}
+        description={t("hub.settings.account.createFirstAccountDescription")}
       />
       <View style={[settingsStyles.card, styles.form]}>
-        <Field label="Email">
+        <Field label={t("hub.settings.account.email")}>
           <FormTextInput
             size={fieldSize}
             initialValue={email}
             onChangeText={setEmail}
-            placeholder="owner@example.com"
+            placeholder={t("hub.settings.account.ownerEmailPlaceholder")}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!pending}
           />
         </Field>
-        <Field label="Password" hint="Use at least 12 characters.">
+        <Field
+          label={t("hub.settings.account.password")}
+          hint={t("hub.settings.account.passwordHint")}
+        >
           <FormTextInput
             size={fieldSize}
             initialValue={password}
@@ -628,7 +665,10 @@ function InstanceSetup({ hub, pending, run, form, fields }: AccountEntryFormProp
             editable={!pending}
           />
         </Field>
-        <Field label="Confirm password" error={passwordMismatch(confirmPassword, passwordsMatch)}>
+        <Field
+          label={t("hub.settings.account.confirmPassword")}
+          error={passwordMismatch(confirmPassword, passwordsMatch)}
+        >
           <FormTextInput
             size={fieldSize}
             initialValue={confirmPassword}
@@ -638,7 +678,7 @@ function InstanceSetup({ hub, pending, run, form, fields }: AccountEntryFormProp
           />
         </Field>
         <Button disabled={pending || !fields.canSubmit} loading={pending} onPress={createOwner}>
-          Create owner account
+          {t("hub.settings.account.createOwnerAccount")}
         </Button>
       </View>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
@@ -656,6 +696,7 @@ function PasswordChange({
 }: AccountEntryFormProps & {
   state: Extract<HubAccountState, { status: "passwordChangeRequired" }>;
 }) {
+  const { t } = useTranslation();
   const { currentPassword, password, confirmPassword, passwordsMatch } = fields;
   const { setCurrentPassword, setPassword, setConfirmPassword } = form;
   const compact = useIsCompactFormFactor();
@@ -665,14 +706,14 @@ function PasswordChange({
     [currentPassword, hub, password, run],
   );
   return (
-    <SettingsSection title="Choose a new password">
+    <SettingsSection title={t("hub.settings.account.chooseNewPassword")}>
       <Alert
         variant="info"
-        title={`Signed in as ${state.account.email}`}
-        description="Replace the temporary password before continuing. Other sessions will be signed out."
+        title={t("hub.settings.account.signedInAsEmail", { email: state.account.email })}
+        description={t("hub.settings.account.replaceTemporaryPassword")}
       />
       <View style={[settingsStyles.card, styles.form]}>
-        <Field label="Current password">
+        <Field label={t("hub.settings.account.currentPassword")}>
           <FormTextInput
             size={fieldSize}
             initialValue={currentPassword}
@@ -681,7 +722,10 @@ function PasswordChange({
             editable={!pending}
           />
         </Field>
-        <Field label="New password" hint="Use at least 12 characters.">
+        <Field
+          label={t("hub.settings.account.newPassword")}
+          hint={t("hub.settings.account.passwordHint")}
+        >
           <FormTextInput
             size={fieldSize}
             initialValue={password}
@@ -691,7 +735,7 @@ function PasswordChange({
           />
         </Field>
         <Field
-          label="Confirm new password"
+          label={t("hub.settings.account.confirmNewPassword")}
           error={passwordMismatch(confirmPassword, passwordsMatch)}
         >
           <FormTextInput
@@ -703,7 +747,7 @@ function PasswordChange({
           />
         </Field>
         <Button disabled={pending || !fields.canSubmit} loading={pending} onPress={savePassword}>
-          Save password
+          {t("hub.settings.account.savePassword")}
         </Button>
       </View>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
@@ -712,7 +756,9 @@ function PasswordChange({
 }
 
 function passwordMismatch(confirmPassword: string, passwordsMatch: boolean): string | null {
-  return !passwordsMatch && confirmPassword.length > 0 ? "Passwords do not match." : null;
+  return !passwordsMatch && confirmPassword.length > 0
+    ? i18n.t("hub.settings.account.passwordsDoNotMatch")
+    : null;
 }
 
 function SignedOutHubAccount({
@@ -727,6 +773,7 @@ function SignedOutHubAccount({
   state: Extract<HubAccountState, { status: "signedOut" }>;
   invitation: HubInvitation | undefined;
 }) {
+  const { t } = useTranslation();
   const { name, email, password, confirmPassword, passwordsMatch } = fields;
   const { setName, setEmail, setPassword, setConfirmPassword, setEntryMode } = form;
   const compact = useIsCompactFormFactor();
@@ -752,23 +799,21 @@ function SignedOutHubAccount({
     () => setEntryMode(signingUp ? "signIn" : "signUp"),
     [setEntryMode, signingUp],
   );
-  const title = signedOutTitle(invitation, signingUp);
-  const description = signedOutDescription(invitation);
   const submitDisabled = pending || !fields.canSubmit;
   return (
-    <SettingsSection title="Hub account">
+    <SettingsSection title={t("hub.settings.account.hubAccount")}>
       {state.invitationUnavailable === true ? (
         <Alert
           variant="warning"
-          title="This invitation is unavailable"
-          description="It may have expired or already been used. Ask an organization owner for a new invitation."
+          title={t("hub.settings.account.invitationUnavailableTitle")}
+          description={t("hub.settings.account.invitationUnavailableSignedOut")}
         />
       ) : null}
       {/* One card: what signing in is for, then the ways to do it. */}
       <View style={[settingsStyles.card, styles.form]}>
         <View>
-          <Text style={styles.formTitle}>{title}</Text>
-          <Text style={settingsStyles.rowHint}>{description}</Text>
+          <Text style={styles.formTitle}>{signedOutTitle(invitation, signingUp)}</Text>
+          <Text style={settingsStyles.rowHint}>{signedOutDescription(invitation)}</Text>
         </View>
         <GoogleFirstSignIn
           googleSignIn={state.googleSignIn === true}
@@ -777,29 +822,29 @@ function SignedOutHubAccount({
           run={run}
         >
           {signingUp ? (
-            <Field label="Name">
+            <Field label={t("hub.settings.account.name")}>
               <FormTextInput
                 size={fieldSize}
                 initialValue={name}
                 onChangeText={setName}
-                placeholder="Your name"
+                placeholder={t("hub.settings.account.namePlaceholder")}
                 editable={!pending}
               />
             </Field>
           ) : null}
-          <Field label="Email">
+          <Field label={t("hub.settings.account.email")}>
             <FormTextInput
               size={fieldSize}
               key={invitedEmail ?? "email"}
               initialValue={email}
               onChangeText={setEmail}
-              placeholder="you@example.com"
+              placeholder={t("hub.settings.account.emailPlaceholder")}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!pending && invitedEmail === undefined}
             />
           </Field>
-          <Field label="Password" hint={signingUp ? "Use at least 12 characters." : undefined}>
+          <Field label={t("hub.settings.account.password")} hint={passwordHint(signingUp)}>
             <FormTextInput
               size={fieldSize}
               initialValue={password}
@@ -810,7 +855,7 @@ function SignedOutHubAccount({
           </Field>
           {signingUp ? (
             <Field
-              label="Confirm password"
+              label={t("hub.settings.account.confirmPassword")}
               error={passwordMismatch(confirmPassword, passwordsMatch)}
             >
               <FormTextInput
@@ -823,7 +868,7 @@ function SignedOutHubAccount({
             </Field>
           ) : null}
           <Button disabled={submitDisabled} loading={pending} onPress={submit}>
-            {signingUp ? "Create account" : "Sign in"}
+            {submitLabel(signingUp)}
           </Button>
           <EmailRegistrationButton
             visible={state.emailSelfRegistration === true && invitation === undefined}
@@ -833,7 +878,7 @@ function SignedOutHubAccount({
           />
           {maySignUp ? (
             <Button variant="ghost" disabled={pending} onPress={toggleEntryMode}>
-              {signingUp ? "Already have an account? Sign in" : "Create an account"}
+              {entryModeToggleLabel(signingUp)}
             </Button>
           ) : null}
         </GoogleFirstSignIn>
@@ -844,20 +889,45 @@ function SignedOutHubAccount({
   );
 }
 
+function passwordHint(signingUp: boolean): string | undefined {
+  return signingUp ? i18n.t("hub.settings.account.passwordHint") : undefined;
+}
+
+function submitLabel(signingUp: boolean): string {
+  return signingUp
+    ? i18n.t("hub.settings.account.createAccount")
+    : i18n.t("hub.settings.account.signIn");
+}
+
+function entryModeToggleLabel(signingUp: boolean): string {
+  return signingUp
+    ? i18n.t("hub.settings.account.alreadyHaveAccount")
+    : i18n.t("hub.settings.account.createAnAccount");
+}
+
 function signedOutTitle(invitation: HubInvitation | undefined, signingUp: boolean): string {
-  if (invitation !== undefined) return `Join ${invitation.organization.name}`;
-  return signingUp ? "Create a Hub account" : "Sign in to Hub";
+  if (invitation !== undefined) {
+    return i18n.t("hub.settings.account.joinTitle", {
+      organization: invitation.organization.name,
+    });
+  }
+  return signingUp
+    ? i18n.t("hub.settings.account.createHubAccount")
+    : i18n.t("hub.settings.account.signInToHub");
 }
 
 function signedOutDescription(invitation: HubInvitation | undefined): string {
   if (invitation === undefined) {
-    return "Use one Hub account to manage Channels and connect to the Hosts you can access.";
+    return i18n.t("hub.settings.account.signedOutDescription");
   }
-  const teamNames = invitationTeams(invitation)
+  const teams = invitationTeams(invitation)
     .map(({ name }) => name)
     .join(", ");
-  const team = teamNames.length === 0 ? "" : ` in ${teamNames}`;
-  return `${invitation.inviterName} invited you as ${channelLabel(invitation.role)}${team}. The invitation is bound to the invited email.`;
+  const inviter = invitation.inviterName;
+  const role = organizationRoleLabel(invitation.role);
+  return teams.length === 0
+    ? i18n.t("hub.settings.account.invitedDescription", { inviter, role })
+    : i18n.t("hub.settings.account.invitedToTeamsDescription", { inviter, role, teams });
 }
 
 function mayCreateAccount(
@@ -869,12 +939,12 @@ function mayCreateAccount(
 
 function registrationMessage(state: Extract<HubAccountState, { status: "signedOut" }>): string {
   if (state.registration === "invite_only") {
-    return "Accounts are created by invitation. Ask an organization owner to invite you.";
+    return i18n.t("hub.settings.account.inviteOnly");
   }
   if (state.registration === "domain_self_registration") {
-    return "Accounts are created by invitation or with an allowed company email address.";
+    return i18n.t("hub.settings.account.domainSelfRegistration");
   }
-  return "This Hub is not accepting new accounts.";
+  return i18n.t("hub.settings.account.registrationClosed");
 }
 
 function StateMessage({ message }: { message: string }) {

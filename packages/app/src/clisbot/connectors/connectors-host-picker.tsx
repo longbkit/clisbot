@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 
@@ -12,10 +13,17 @@ export function ConnectorsHostPicker({
   value: string;
   onChange(serverId: string): void;
 }) {
-  const label = hosts.find((host) => host.serverId === value)?.label ?? "Host";
+  const { t } = useTranslation();
+  const label =
+    hosts.find((host) => host.serverId === value)?.label ??
+    t("connectors.screen.hostPicker.fallback");
   return (
     <DropdownMenu>
-      <DropdownTrigger accessibilityRole="button" accessibilityLabel={`Host: ${label}`} size="sm">
+      <DropdownTrigger
+        accessibilityRole="button"
+        accessibilityLabel={t("connectors.screen.hostPicker.label", { label })}
+        size="sm"
+      >
         {label}
       </DropdownTrigger>
       <DropdownMenuContent side="bottom" align="start" width={240}>

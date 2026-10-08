@@ -9,7 +9,9 @@ import { ja } from "./resources/ja";
 import { ko } from "./resources/ko";
 import { ptBR } from "./resources/pt-BR";
 import { ru } from "./resources/ru";
+import { vi } from "./resources/vi";
 import { zhCN } from "./resources/zh-CN";
+import { withPluralForms } from "./plural-forms";
 
 const i18n = createInstance();
 
@@ -19,14 +21,15 @@ observeI18nInit(
     fallbackLng: "en",
     lng: "en",
     resources: {
-      ar: { translation: ar },
+      ar: { translation: withPluralForms("ar", ar) },
       en: { translation: en },
       es: { translation: es },
       fr: { translation: fr },
       ja: { translation: ja },
       ko: { translation: ko },
       "pt-BR": { translation: ptBR },
-      ru: { translation: ru },
+      ru: { translation: withPluralForms("ru", ru) },
+      vi: { translation: vi },
       "zh-CN": { translation: zhCN },
     },
     interpolation: {

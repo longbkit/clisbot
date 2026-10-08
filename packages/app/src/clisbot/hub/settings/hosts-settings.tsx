@@ -5,6 +5,7 @@
 
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,8 @@ import { HostsConnectionCount } from "./hosts-settings-label";
  * variable rather than an Expo config extra, because Metro caches the inlined app manifest. */
 const DEV_CLI_COMMAND = process.env.EXPO_PUBLIC_CLISBOT_DEV_CLI_COMMAND?.trim() || undefined;
 
-const INFO =
-  "Hosts you added directly and organization Hosts you may access. Organization access is set in People & access › Access.";
-
 export function HostsSettings() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const inventory = useHostsSettingsInventory();
   const { daemons, status, retry } = inventory;
@@ -41,34 +40,34 @@ export function HostsSettings() {
   const refreshAction = useMemo(
     () => (
       <Button size="sm" variant="ghost" loading={daemons.isFetching} onPress={retry}>
-        Refresh Hosts
+        {t("hub.settings.hosts.refresh")}
       </Button>
     ),
-    [daemons.isFetching, retry],
+    [daemons.isFetching, retry, t],
   );
 
   return (
     <View>
       <SettingsSection
-        title="Hosts"
+        title={t("hub.settings.hosts.title")}
         titleAccessory={connectionCount}
-        info={signedIn ? INFO : "Hosts added on this device and their connection status."}
+        info={signedIn ? t("hub.settings.hosts.info") : t("hub.settings.hosts.infoSignedOut")}
         trailing={signedIn ? refreshAction : undefined}
         testID="settings-hosts-list"
       >
         {status === "error" ? (
           <Alert
             variant="error"
-            title="Hosts unavailable"
+            title={t("hub.settings.hosts.unavailableTitle")}
             description={
               signedIn
-                ? "Clisbot could not refresh your Hosts. Check your connection and use Refresh Hosts to try again."
-                : "Clisbot could not load your Hub account. Check your connection and try again."
+                ? t("hub.settings.hosts.unavailableSignedIn")
+                : t("hub.settings.hosts.unavailableSignedOut")
             }
           >
             {!signedIn ? (
               <Button size="sm" variant="outline" loading={hub.loading} onPress={retry}>
-                Retry
+                {t("hub.settings.hosts.retry")}
               </Button>
             ) : null}
           </Alert>
@@ -98,28 +97,29 @@ function HostsSettingsContent({
   canManage: boolean;
   openAddProject: ReturnType<typeof useOpenAddProject>;
 }) {
+  const { t } = useTranslation();
   const hasHosts = totalCount > 0;
   if (status === "error" && !hasHosts) return null;
   let content: ReactNode = null;
   if (status === "loading" && !hasHosts) {
-    content = <Text style={settingsStyles.rowHint}>Loading Hosts...</Text>;
+    content = <Text style={settingsStyles.rowHint}>{t("hub.settings.hosts.loading")}</Text>;
   } else if (daemons.data !== undefined && !hasHosts && signedIn && !canManage) {
     content = (
       <Alert
         variant="info"
-        title="No Hosts available"
-        description="Ask an organization owner or admin to give you access to a Host and Project."
+        title={t("hub.settings.hosts.noneAvailableTitle")}
+        description={t("hub.settings.hosts.noneAvailableDescription")}
       />
     );
   } else if (!hasHosts && (!signedIn || daemons.data !== undefined)) {
     content = (
       <Alert
         variant="info"
-        title="No Hosts yet"
+        title={t("hub.settings.hosts.noneYetTitle")}
         description={
           canManage
-            ? "Follow the steps under Add a Host to connect a computer."
-            : "Use Add host to connect a computer."
+            ? t("hub.settings.hosts.noneYetCanManage")
+            : t("hub.settings.hosts.noneYetDevice")
         }
       />
     );
@@ -151,6 +151,7 @@ function HostsSettingsContent({
 
 /** How to add a Host, always at hand for an Organization Admin, and where its access is set. */
 function AddHostSection({ command }: { command: string | null }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const openAccess = useCallback(
     () =>
@@ -163,15 +164,15 @@ function AddHostSection({ command }: { command: string | null }) {
   const accessLink = useMemo(
     () => (
       <Button size="sm" variant="ghost" onPress={openAccess}>
-        Manage access
+        {t("hub.settings.hosts.manageAccess")}
       </Button>
     ),
-    [openAccess],
+    [openAccess, t],
   );
   return (
     <SettingsSection
-      title="Add a Host"
-      info="Run this on the computer you want to add. It joins this organization; then choose who may use it in People & access › Access."
+      title={t("hub.settings.hosts.addTitle")}
+      info={t("hub.settings.hosts.addInfo")}
       trailing={accessLink}
     >
       {command ? <HostEnrollmentCommand command={command} /> : <NeedsHubAddress />}
@@ -181,6 +182,7 @@ function AddHostSection({ command }: { command: string | null }) {
 
 /** Enrolling needs an address other computers reach; relay alone carries this device only. */
 function NeedsHubAddress() {
+  const { t } = useTranslation();
   const router = useRouter();
   const openConnection = useCallback(
     () =>
@@ -191,23 +193,21 @@ function NeedsHubAddress() {
     [router],
   );
   return (
-    <Alert
-      variant="info"
-      description="Other computers need an address to reach this Hub. This device can keep using relay."
-    >
+    <Alert variant="info" description={t("hub.settings.hosts.needsAddress")}>
       <Button variant="outline" size="sm" onPress={openConnection}>
-        Set up Tailscale
+        {t("hub.settings.hosts.setUpTailscale")}
       </Button>
     </Alert>
   );
 }
 
 function HostEnrollmentCommand({ command }: { command: string }) {
+  const { t } = useTranslation();
   return (
     <>
-      <Text style={settingsStyles.rowHint}>Run on the computer you want to connect:</Text>
+      <Text style={settingsStyles.rowHint}>{t("hub.settings.hosts.runOnComputer")}</Text>
       <CopyableCommand command={command} />
-      <Text style={settingsStyles.rowHint}>Open the terminal link and approve.</Text>
+      <Text style={settingsStyles.rowHint}>{t("hub.settings.hosts.openLinkAndApprove")}</Text>
     </>
   );
 }

@@ -1,4 +1,6 @@
+import type { TFunction } from "i18next";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   UNMENTIONED_VALUES,
   WHEN_BUSY_VALUES,
@@ -29,24 +31,29 @@ import { FoldedRouteFormSection } from "./channel-route-form-sections";
 // folded, like Limits: the defaults suit most Routes.
 
 // Every row explains itself; what each one does in detail is in the ⓘ.
-const MESSAGE_HANDLING_INFO =
-  "Catch up: when someone mentions the Agent, it first reads what was said since its last reply, as background, not as instructions. Batch message bursts: several messages sent in a row get one answer. While the Agent is busy: Steer adds a new message to the work in progress, Queue holds it until that work is done. Every message names its sender, e.g. An Nguyễn (slack:U0000000001): …";
-const UNMENTIONED_LABELS: Record<ChannelRouteUnmentioned, string> = {
-  everyone: "Everyone",
-  "allowed-senders": "Allowed senders only",
-  none: "No one",
-};
+function unmentionedLabels(t: TFunction): Record<ChannelRouteUnmentioned, string> {
+  return {
+    everyone: t("hub.routes.conversation.unmentioned.everyone"),
+    "allowed-senders": t("hub.routes.conversation.unmentioned.allowedSenders"),
+    none: t("hub.routes.conversation.unmentioned.none"),
+  };
+}
 // The app's own words for the same choice (Settings → General, "Default
 // send"): Enter steers the running turn, Command/Ctrl+Enter queues it.
-const WHEN_BUSY_LABELS: Record<ChannelRouteWhenBusy, string> = {
-  steer: "Steer",
-  queue: "Queue",
-};
-const BATCHING_ROWS: { name: BatchingFieldName; label: string; unit?: string }[] = [
-  { name: "pauseSeconds", label: "Send after no new messages for", unit: "seconds" },
-  { name: "maxWaitSeconds", label: "Send anyway after", unit: "seconds" },
-  { name: "maxMessages", label: "Max messages per batch" },
-];
+function whenBusyLabels(t: TFunction): Record<ChannelRouteWhenBusy, string> {
+  return {
+    steer: t("hub.routes.conversation.whenBusy.steer"),
+    queue: t("hub.routes.conversation.whenBusy.queue"),
+  };
+}
+function batchingRows(t: TFunction): { name: BatchingFieldName; label: string; unit?: string }[] {
+  const seconds = t("hub.routes.common.secondsUnit");
+  return [
+    { name: "pauseSeconds", label: t("hub.routes.conversation.pauseSeconds"), unit: seconds },
+    { name: "maxWaitSeconds", label: t("hub.routes.conversation.maxWaitSeconds"), unit: seconds },
+    { name: "maxMessages", label: t("hub.routes.conversation.maxMessages") },
+  ];
+}
 
 export interface RouteConversationCommands {
   changeUnmentioned(value: string): void;
@@ -103,27 +110,28 @@ export function RouteConversationSection({
   showUnmentioned: boolean;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const shown = routeConversationDisplay(draft);
   return (
     <FoldedRouteFormSection
-      title="Incoming messages"
-      info={MESSAGE_HANDLING_INFO}
-      summary={messageHandlingSummary(draft, shown)}
+      title={t("hub.routes.conversation.title")}
+      info={t("hub.routes.conversation.info")}
+      summary={messageHandlingSummary(t, draft, shown)}
       inUse={shown.inUse}
     >
       {showUnmentioned ? (
         <ChoiceRow
-          label="Catch up on missed messages from"
+          label={t("hub.routes.conversation.catchUpFrom")}
           values={UNMENTIONED_VALUES}
           selected={shown.unmentioned}
-          labels={UNMENTIONED_LABELS}
+          labels={unmentionedLabels(t)}
           onChange={commands.changeUnmentioned}
           disabled={pending}
         />
       ) : null}
       <RouteNumberRow
-        label="Catch-up limit"
-        unit="messages"
+        label={t("hub.routes.conversation.catchUpLimit")}
+        unit={t("hub.routes.common.messagesUnit")}
         value={shown.maxMessages}
         error={parsed.errors.maxMessages}
         onChange={commands.changeMaxMessages}
@@ -131,11 +139,11 @@ export function RouteConversationSection({
       />
       <RouteBatchingFields shown={shown} parsed={parsed} commands={commands} pending={pending} />
       <ChoiceRow
-        label="New message while the Agent is busy"
+        label={t("hub.routes.conversation.newWhileBusy")}
         layout="row"
         values={WHEN_BUSY_VALUES}
         selected={shown.whenBusy}
-        labels={WHEN_BUSY_LABELS}
+        labels={whenBusyLabels(t)}
         onChange={commands.changeWhenBusy}
         disabled={pending}
       />
@@ -154,16 +162,17 @@ function RouteBatchingFields({
   commands: RouteConversationCommands;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <RouteBehaviorSwitch
-        label="Batch message bursts"
+        label={t("hub.routes.conversation.batchBursts")}
         value={shown.batchingOn}
         onChange={commands.changeBatchingOn}
         disabled={pending}
       />
       {shown.batchingOn
-        ? BATCHING_ROWS.map(({ name, label, unit }) => (
+        ? batchingRows(t).map(({ name, label, unit }) => (
             <BatchingRow
               key={name}
               name={name}
@@ -192,28 +201,41 @@ function BatchingRow({
   return <RouteNumberRow {...row} onChange={change} />;
 }
 
-const BATCHING_SUMMARIES: Record<string, string> = {
-  true: "Batches message bursts",
-  false: "No batching",
-};
+function catchUpSummary(t: TFunction, unmentioned: ChannelRouteUnmentioned): string {
+  if (unmentioned === "everyone") return t("hub.routes.conversation.summaryCatchUpFrom.everyone");
+  if (unmentioned === "allowed-senders")
+    return t("hub.routes.conversation.summaryCatchUpFrom.allowedSenders");
+  return t("hub.routes.conversation.summaryCatchUpFrom.none");
+}
+
+function batchingSummary(t: TFunction, on: boolean): string {
+  return on
+    ? t("hub.routes.conversation.summaryBatching")
+    : t("hub.routes.conversation.summaryNoBatching");
+}
+
+function whenBusySummary(t: TFunction, whenBusy: ChannelRouteWhenBusy): string {
+  return whenBusy === "steer"
+    ? t("hub.routes.conversation.summaryWhenBusy.steer")
+    : t("hub.routes.conversation.summaryWhenBusy.queue");
+}
 
 /**
  * The folded line names only what this Route changed, so an untouched Route
  * reads "Default" (as Limits does) instead of a line of values to decode.
  */
 function messageHandlingSummary(
+  t: TFunction,
   draft: RouteConversationDraft,
   shown: ReturnType<typeof routeConversationDisplay>,
 ): string {
   const changed = [
-    draft.unmentioned === undefined
+    draft.unmentioned === undefined ? null : catchUpSummary(t, shown.unmentioned),
+    draft.maxMessages === undefined
       ? null
-      : `Catches up from: ${UNMENTIONED_LABELS[shown.unmentioned].toLowerCase()}`,
-    draft.maxMessages === undefined ? null : `Catch-up limit: ${shown.maxMessages}`,
-    draft.batching === undefined ? null : BATCHING_SUMMARIES[String(shown.batchingOn)],
-    draft.whenBusy === undefined
-      ? null
-      : `If busy: ${WHEN_BUSY_LABELS[shown.whenBusy].toLowerCase()}`,
+      : t("hub.routes.conversation.summaryCatchUpLimit", { limit: shown.maxMessages }),
+    draft.batching === undefined ? null : batchingSummary(t, shown.batchingOn),
+    draft.whenBusy === undefined ? null : whenBusySummary(t, shown.whenBusy),
   ].filter((item) => item !== null);
-  return changed.length === 0 ? "Default" : changed.join(" · ");
+  return changed.length === 0 ? t("hub.routes.common.default") : changed.join(" · ");
 }

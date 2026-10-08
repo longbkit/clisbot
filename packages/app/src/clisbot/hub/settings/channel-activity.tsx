@@ -1,6 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
@@ -11,6 +13,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { useChannelCatalog } from "./channel-catalog-queries";
 import { HubChannelActivitySchema, HubConnectionsSchema } from "../contracts";
@@ -25,20 +28,22 @@ type Connection = z.infer<typeof HubConnectionsSchema>["connections"][number];
 const EMPTY_ACCOUNTS: AccountRecord[] = [];
 const EMPTY_CONNECTIONS: Connection[] = [];
 type AccountRecord = Record<string, unknown>;
-const OUTCOMES: Record<ActivityEntry["outcome"], string> = {
-  bound: "Agent started",
-  steered: "Sent to existing Agent",
-  workflow: "Automation invoked",
-  ignored: "Ignored",
+const OUTCOMES: Record<ActivityEntry["outcome"], (t: TFunction) => string> = {
+  bound: (t) => t("hub.channels.activity.outcome.bound"),
+  steered: (t) => t("hub.channels.activity.outcome.steered"),
+  workflow: (t) => t("hub.channels.activity.outcome.workflow"),
+  ignored: (t) => t("hub.channels.activity.outcome.ignored"),
   // The access plane refused the sender before any turn (`access:` in slice 23).
-  denied: "Sender not allowed",
-  error: "Failed",
+  denied: (t) => t("hub.channels.activity.outcome.denied"),
+  error: (t) => t("hub.channels.activity.outcome.error"),
 };
 const ALL = "all";
-const OUTCOME_OPTIONS: SelectFieldOption<string>[] = [
-  { id: ALL, value: ALL, label: "All outcomes" },
-  ...Object.entries(OUTCOMES).map(([value, label]) => ({ id: value, value, label })),
-];
+function outcomeOptions(t: TFunction): SelectFieldOption<string>[] {
+  return [
+    { id: ALL, value: ALL, label: t("hub.channels.activity.allOutcomes") },
+    ...Object.entries(OUTCOMES).map(([value, label]) => ({ id: value, value, label: label(t) })),
+  ];
+}
 
 export interface ChannelActivityState {
   accountKey: string;
@@ -76,6 +81,7 @@ export function ChannelActivity({
   state: ChannelActivityState;
   onChange: ChangeActivity;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const catalog = useChannelCatalog();
   const state = useMemo(() => {
@@ -88,7 +94,9 @@ export function ChannelActivity({
   }, [accountScoped, accounts, requestedState]);
   const accountOptions = useMemo<SelectFieldOption<string>[]>(
     () => [
-      ...(accountScoped ? [] : [{ id: ALL, value: ALL, label: "All accounts" }]),
+      ...(accountScoped
+        ? []
+        : [{ id: ALL, value: ALL, label: t("hub.channels.activity.allAccounts") }]),
       ...accounts.flatMap((account) => {
         if (typeof account.channel !== "string" || typeof account.accountId !== "string") return [];
         const value = `${account.channel}:${account.accountId}`;
@@ -103,21 +111,21 @@ export function ChannelActivity({
     ],
     // The catalog arrives after the accounts do; without it here the options
     // would keep the fallback label for the rest of the session.
-    [accountScoped, accounts, catalog.entries],
+    [accountScoped, accounts, catalog.entries, t],
   );
   const selectedAccount = accounts.find(
     (account) => `${String(account.channel)}:${String(account.accountId)}` === state.accountKey,
   );
   const routeOptions = useMemo<SelectFieldOption<string>[]>(
     () => [
-      { id: ALL, value: ALL, label: "All Routes" },
+      { id: ALL, value: ALL, label: t("hub.channels.activity.allRoutes") },
       ...(Array.isArray(selectedAccount?.routes) ? selectedAccount.routes : []).map((_, index) => ({
         id: String(index),
         value: String(index),
-        label: `Route ${index + 1}`,
+        label: t("hub.channels.activity.route", { position: index + 1 }),
       })),
     ],
-    [selectedAccount?.routes],
+    [selectedAccount?.routes, t],
   );
   const changeAccount = useCallback(
     (accountKey: string) =>
@@ -152,54 +160,53 @@ export function ChannelActivity({
   const routeDisplay = useMemo(
     () =>
       routeOptions.find(({ value }) => value === state.route) ?? {
-        label: `Route ${Number(state.route) + 1}`,
+        label: t("hub.channels.activity.route", { position: Number(state.route) + 1 }),
       },
-    [routeOptions, state.route],
+    [routeOptions, state.route, t],
   );
+  const outcomes = useMemo(() => outcomeOptions(t), [t]);
   const size = compact ? "md" : "sm";
   return (
-    <SettingsSection title="Channel activity">
-      <Text style={settingsStyles.rowHint}>
-        Inbound Route results, newest first. Open an event for details and recovery.
-      </Text>
+    <SettingsSection title={t("hub.channels.activity.title")}>
+      <Text style={settingsStyles.rowHint}>{t("hub.channels.activity.hint")}</Text>
       <View style={styles.filters}>
         <View style={styles.filter}>
           <SelectField
-            label="Connection"
+            label={t("hub.channels.activity.connection")}
             value={state.accountKey}
             selectedDisplay={accountDisplay}
             options={accountOptions}
             onChange={changeAccount}
             searchable
             size={size}
-            placeholder="All accounts"
-            emptyText="No Connections"
+            placeholder={t("hub.channels.activity.allAccounts")}
+            emptyText={t("hub.channels.activity.noConnections")}
           />
         </View>
         {state.accountKey !== ALL ? (
           <View style={styles.filter}>
             <SelectField
-              label="Route"
+              label={t("hub.channels.activity.routeLabel")}
               value={state.route}
               selectedDisplay={routeDisplay}
               options={routeOptions}
               onChange={changeRoute}
               size={size}
-              placeholder="All Routes"
-              emptyText="No Routes"
+              placeholder={t("hub.channels.activity.allRoutes")}
+              emptyText={t("hub.channels.activity.noRoutes")}
             />
           </View>
         ) : null}
         <View style={styles.filter}>
           <SelectField
-            label="Outcome"
+            label={t("hub.channels.activity.outcomeLabel")}
             value={state.outcome}
-            selectedDisplay={OUTCOME_OPTIONS.find(({ value }) => value === state.outcome) ?? null}
-            options={OUTCOME_OPTIONS}
+            selectedDisplay={outcomes.find(({ value }) => value === state.outcome) ?? null}
+            options={outcomes}
             onChange={changeOutcome}
             size={size}
-            placeholder="All outcomes"
-            emptyText="No outcomes"
+            placeholder={t("hub.channels.activity.allOutcomes")}
+            emptyText={t("hub.channels.activity.noOutcomes")}
           />
         </View>
       </View>
@@ -388,10 +395,13 @@ function ChannelActivityList({
   clearFilters(): void;
   navigate(entry: ActivityEntry): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.results}>
       <View style={styles.toolbar}>
-        <Text style={settingsStyles.rowHint}>{`Page ${displayedPage + 1} · up to 25 events`}</Text>
+        <Text style={settingsStyles.rowHint}>
+          {t("hub.channels.activity.page", { page: displayedPage + 1 })}
+        </Text>
         <Button
           size="sm"
           variant="outline"
@@ -399,29 +409,28 @@ function ChannelActivityList({
           loading={fetching}
           onPress={refresh}
         >
-          Refresh activity
+          {t("hub.channels.activity.refresh")}
         </Button>
       </View>
-      {fetching ? <Text style={settingsStyles.rowHint}>Loading Channel activity…</Text> : null}
+      {fetching ? (
+        <Text style={settingsStyles.rowHint}>{t("hub.channels.activity.loading")}</Text>
+      ) : null}
       {error ? (
         <Alert
           variant="warning"
-          title="Channel activity is unavailable"
+          title={t("hub.channels.activity.unavailableTitle")}
           description={
             page
-              ? "The requested page could not load. The last loaded events remain below; use Refresh activity to retry."
-              : "Retry with Refresh activity. If this Hub version does not provide Channel activity, update the Hub to use this view."
+              ? t("hub.channels.activity.pageFailed")
+              : t("hub.channels.activity.unavailableBody")
           }
         />
       ) : null}
       {page?.activity.length === 0 && !fetching ? (
         <View style={settingsStyles.row}>
-          <Text style={settingsStyles.rowHint}>
-            No events match these filters. Only messages evaluated against a Route appear here. Test
-            reply checks outbound delivery only.
-          </Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.channels.activity.empty")}</Text>
           <Button size="sm" variant="ghost" onPress={clearFilters}>
-            Clear filters
+            {t("hub.channels.activity.clearFilters")}
           </Button>
         </View>
       ) : null}
@@ -439,16 +448,18 @@ function ChannelActivityList({
       ) : null}
       <View style={styles.toolbar}>
         <Button size="sm" variant="ghost" disabled={pageIndex === 0 || fetching} onPress={newer}>
-          Newer
+          {t("hub.channels.activity.newer")}
         </Button>
-        <Text style={settingsStyles.rowHint}>{page ? `${page.activity.length} events` : ""}</Text>
+        <Text style={settingsStyles.rowHint}>
+          {page ? t("hub.channels.activity.events", { count: page.activity.length }) : ""}
+        </Text>
         <Button
           size="sm"
           variant="ghost"
           disabled={!page?.nextCursor || fetching || showingPrevious || !!error}
           onPress={older}
         >
-          Older
+          {t("hub.channels.activity.older")}
         </Button>
       </View>
     </View>
@@ -464,6 +475,7 @@ function ChannelActivityRow({
   bordered: boolean;
   select(entry: ActivityEntry): void;
 }) {
+  const { t } = useTranslation();
   const open = useCallback(() => select(entry), [entry, select]);
   const catalog = useChannelCatalog();
   return (
@@ -476,11 +488,11 @@ function ChannelActivityRow({
         <Text
           style={settingsStyles.rowHint}
           numberOfLines={1}
-        >{`${activityChannelLabel(catalog.entries, entry.channel)} · ${entry.accountId ?? "Account"}`}</Text>
+        >{`${activityChannelLabel(catalog.entries, entry.channel)} · ${entry.accountId ?? t("hub.channels.activity.account")}`}</Text>
         <Text style={settingsStyles.rowHint}>{new Date(entry.createdAt).toLocaleString()}</Text>
       </View>
       <Button size="sm" variant="ghost" onPress={open}>
-        Details
+        {t("hub.channels.activity.details")}
       </Button>
     </View>
   );
@@ -494,28 +506,38 @@ function ChannelActivityDetails({
   connectionId?: string;
   back(): void;
 }) {
+  const { t } = useTranslation();
   const catalog = useChannelCatalog();
   const recovery = entry.outcome === "ignored" ? channelAccessRecovery(entry.outcomeDetail) : null;
   return (
     <View style={styles.results}>
-      <BackLink to="Activity" onPress={back} />
-      <Text style={settingsStyles.rowHint}>
-        Route positions describe the configuration when this event was recorded.
-      </Text>
+      <BackLink to={t("hub.channels.activity.backTo")} onPress={back} />
+      <Text style={settingsStyles.rowHint}>{t("hub.channels.activity.positionsHint")}</Text>
       <View style={settingsStyles.card}>
         <ActivityDetail
           label={`${routeLabel(entry)} · ${outcomeLabel(entry)}`}
-          value={`${activityChannelLabel(catalog.entries, entry.channel)} · ${entry.accountId ?? "Account"}`}
+          value={`${activityChannelLabel(catalog.entries, entry.channel)} · ${entry.accountId ?? t("hub.channels.activity.account")}`}
         />
-        <ActivityDetail label="Time" value={new Date(entry.createdAt).toLocaleString()} />
-        <ActivityDetail label="Conversation" value={entry.conversationId} />
-        {entry.threadId ? <ActivityDetail label="Thread" value={entry.threadId} /> : null}
-        <ActivityDetail label="Sender" value={entry.providerSenderId} />
+        <ActivityDetail
+          label={t("hub.channels.activity.time")}
+          value={new Date(entry.createdAt).toLocaleString()}
+        />
+        <ActivityDetail
+          label={t("hub.channels.activity.conversation")}
+          value={entry.conversationId}
+        />
+        {entry.threadId ? (
+          <ActivityDetail label={t("hub.channels.activity.thread")} value={entry.threadId} />
+        ) : null}
+        <ActivityDetail label={t("hub.channels.activity.sender")} value={entry.providerSenderId} />
         {entry.limitReason ? (
-          <ActivityDetail label="Route limit" value={entry.limitReason.replaceAll("_", " ")} />
+          <ActivityDetail
+            label={t("hub.channels.activity.routeLimit")}
+            value={entry.limitReason.replaceAll("_", " ")}
+          />
         ) : null}
         {entry.outcomeDetail && recovery === null ? (
-          <ActivityDetail label="Result" value={entry.outcomeDetail} />
+          <ActivityDetail label={t("hub.channels.activity.result")} value={entry.outcomeDetail} />
         ) : null}
       </View>
       {recovery ? <ChannelAccessRecovery recovery={recovery} connectionId={connectionId} /> : null}
@@ -533,10 +555,12 @@ function ActivityDetail({ label, value }: { label: string; value: string }) {
   );
 }
 function routeLabel(entry: ActivityEntry): string {
-  return `Route ${entry.routePosition + 1}`;
+  return i18n.t("hub.channels.activity.route", { position: entry.routePosition + 1 });
 }
 function outcomeLabel(entry: ActivityEntry): string {
-  return entry.limitDecision === "denied" ? "Blocked by Route limits" : OUTCOMES[entry.outcome];
+  return entry.limitDecision === "denied"
+    ? i18n.t("hub.channels.activity.blockedByLimits")
+    : OUTCOMES[entry.outcome](i18n.t);
 }
 /**
  * The Hub owns the supported channel set, so its catalog names the Channel
@@ -547,7 +571,7 @@ function activityChannelLabel(
   catalog: readonly ChannelCatalogEntry[],
   channel: string | undefined,
 ): string {
-  if (channel === undefined || channel.length === 0) return "Channel";
+  if (channel === undefined || channel.length === 0) return i18n.t("hub.channels.activity.channel");
   return channelCatalogLabel(catalog, channel);
 }
 const styles = StyleSheet.create((theme) => ({
@@ -572,25 +596,22 @@ function channelAccessRecovery(reason: string | null | undefined): AccessRecover
   switch (reason) {
     case "sender identity is not linked to a Hub Member on this Connection":
       return {
-        title: "Sender identity needs verification",
-        description:
-          "If this was your message, link your own Slack or Telegram identity to this Connection. Otherwise, ask the sender to link theirs in Account settings. Then send a new message; ignored messages are not replayed.",
+        title: i18n.t("hub.channels.activity.recovery.identityTitle"),
+        description: i18n.t("hub.channels.activity.recovery.identityBody"),
         identity: true,
         access: false,
       };
     case "linked Hub Member does not have access to this conversation":
       return {
-        title: "Sender needs conversation access",
-        description:
-          "The sender's Channel identity is verified. An Organization or Connection Admin must add them to the audience of a Route on this Connection that covers this conversation, then the sender can try again.",
+        title: i18n.t("hub.channels.activity.recovery.accessTitle"),
+        description: i18n.t("hub.channels.activity.recovery.accessBody"),
         identity: false,
         access: true,
       };
     case "sender may not trigger this route":
       return {
-        title: "Check the sender's identity and access",
-        description:
-          "This older event does not identify the missing requirement. The sender needs a verified identity on this Connection and permission for this conversation. If this was your message, link your identity; then check Member or Team access and send a new message.",
+        title: i18n.t("hub.channels.activity.recovery.legacyTitle"),
+        description: i18n.t("hub.channels.activity.recovery.legacyBody"),
         identity: true,
         access: true,
       };
@@ -605,6 +626,7 @@ function ChannelAccessRecovery({
   recovery: AccessRecovery;
   connectionId?: string;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const linkIdentity = useCallback(
     () =>
@@ -629,18 +651,17 @@ function ChannelAccessRecovery({
     <Alert variant="warning" title={recovery.title} description={recovery.description}>
       {recovery.identity && connectionId ? (
         <Button size="sm" variant="outline" onPress={linkIdentity}>
-          Link my identity on current Connection
+          {t("hub.channels.activity.recovery.linkIdentity")}
         </Button>
       ) : null}
       {recovery.identity && !connectionId ? (
         <Text style={settingsStyles.rowHint}>
-          This account has no current Connection available for identity linking. Check its
-          configuration before retrying.
+          {t("hub.channels.activity.recovery.noConnection")}
         </Text>
       ) : null}
       {recovery.access ? (
         <Button size="sm" variant="outline" onPress={manageAccess}>
-          Manage access
+          {t("hub.channels.activity.recovery.manageAccess")}
         </Button>
       ) : null}
     </Alert>

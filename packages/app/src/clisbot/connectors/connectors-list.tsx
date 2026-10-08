@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { i18n } from "@/i18n/i18next";
 import { SearchField } from "@/components/ui/search-field";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -38,23 +40,28 @@ export interface ConnectorsListProps {
 
 /** The master column: search, the three filters, then apps and servers as rows. */
 export function ConnectorsList(props: ConnectorsListProps) {
+  const { t } = useTranslation();
   const chips = useMemo(
     () =>
       [
-        { value: "all", label: "All", count: props.counts.all },
-        { value: "connected", label: "Connected", count: props.counts.connected },
-        { value: "mcp", label: "MCP servers", count: props.counts.mcp },
+        { value: "all", label: t("connectors.screen.list.all"), count: props.counts.all },
+        {
+          value: "connected",
+          label: t("connectors.screen.common.connected"),
+          count: props.counts.connected,
+        },
+        { value: "mcp", label: t("connectors.screen.common.mcpServers"), count: props.counts.mcp },
       ] as const,
-    [props.counts],
+    [props.counts, t],
   );
   return (
     <View style={styles.column}>
       <SearchField
         value={props.search}
         onChangeText={props.onSearch}
-        placeholder="Search apps"
-        accessibilityLabel="Search apps"
-        clearAccessibilityLabel="Clear search"
+        placeholder={t("connectors.screen.list.search")}
+        accessibilityLabel={t("connectors.screen.list.search")}
+        clearAccessibilityLabel={t("connectors.screen.list.clearSearch")}
         testID="connectors-search"
       />
       <FilterChips chips={chips} value={props.filter} onChange={props.onFilter} />
@@ -133,10 +140,15 @@ function ListFooter({
   loadingMore,
   onLoadMore,
 }: NonNullable<ConnectorsListProps["footer"]>) {
+  const { t } = useTranslation();
   const count =
     total !== undefined && total > shown
-      ? `Showing ${shown.toLocaleString()} of ${total.toLocaleString()} apps`
-      : `${shown.toLocaleString()} apps`;
+      ? t("connectors.screen.list.showing", {
+          count: total,
+          shown: shown.toLocaleString(),
+          total: total.toLocaleString(),
+        })
+      : t("connectors.screen.list.appCount", { count: shown, shown: shown.toLocaleString() });
   return (
     <View style={styles.footer}>
       <Text style={settingsStyles.rowHint}>{count}</Text>
@@ -148,7 +160,7 @@ function ListFooter({
           disabled={loadingMore}
           onPress={onLoadMore}
         >
-          Load more
+          {t("connectors.screen.list.loadMore")}
         </Button>
       ) : null}
     </View>
@@ -158,8 +170,11 @@ function ListFooter({
 function rowBadge(
   state: ConnectorListRow["state"],
 ): { label: string; variant: "success" | "warning" | "error" | "muted" } | null {
-  if (state === "server") return { label: "MCP server", variant: "muted" };
-  if (state === "server-off") return { label: "Off", variant: "muted" };
+  if (state === "server") {
+    return { label: i18n.t("connectors.screen.common.mcpServer"), variant: "muted" };
+  }
+  if (state === "server-off")
+    return { label: i18n.t("connectors.screen.common.off"), variant: "muted" };
   if (state === "none") return null;
   return { label: APP_STATE_LABELS[state], variant: APP_STATE_VARIANTS[state] };
 }

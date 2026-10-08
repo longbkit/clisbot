@@ -7,6 +7,7 @@ import type {
   HubTeamsSchema,
 } from "../contracts";
 import { withEmail } from "@/clisbot/hub/account-email";
+import { i18n } from "@/i18n/i18next";
 
 export type AccessCatalog = z.infer<typeof HubAccessCatalogSchema>;
 export type AccessResource = AccessCatalog["resources"][number];
@@ -19,8 +20,9 @@ export type AgentConfigurationCatalog = NonNullable<AccessResource["agentConfigu
 
 /** Also accepts a raw kind, so a route param can address a resource before the catalog loads. */
 /** What being an Owner grants, said once for every screen that explains the role. */
-export const OWNER_ACCESS_HINT =
-  "Full access to every current and future Host, Project, Channel, and Automation, with no grant needed.";
+export function ownerAccessHint(): string {
+  return i18n.t("hub.access.ownerAccessHint");
+}
 
 export function resourceKey(resource: { kind: string; id: string }): string {
   return `${resource.kind}\0${resource.id}`;
@@ -36,14 +38,7 @@ export function assignmentResourceOptions(
   availableOnly: boolean,
 ): SelectFieldOption<string>[] {
   const names = new Map(resources.map((resource) => [resourceKey(resource), resource.name]));
-  const groups = {
-    organization: "Organizations",
-    daemon: "Hosts",
-    project: "Projects",
-    team: "Teams",
-    channel_account: "Connections",
-    automation: "Automations",
-  };
+  const groups = resourceKindPluralLabels();
   return resources
     .filter(({ kind, available }) => kind !== "organization" && (!availableOnly || available))
     .map((resource) => {
@@ -55,9 +50,13 @@ export function assignmentResourceOptions(
         id: resourceKey(resource),
         value: resourceKey(resource),
         label: resource.name,
-        group: bot ? "Bots" : groups[resource.kind],
+        group: bot ? i18n.t("hub.access.kindsPlural.bot") : groups[resource.kind],
         description:
-          [bot ? "Bot" : null, parent, !resource.available ? "Unavailable" : null]
+          [
+            bot ? i18n.t("hub.access.kinds.bot") : null,
+            parent,
+            !resource.available ? i18n.t("hub.access.unavailable") : null,
+          ]
             .filter(Boolean)
             .join(" · ") || resourceKindLabel(resource.kind),
       };
@@ -73,8 +72,8 @@ export function assignmentSubjectOptions(
       id: `team:${team.id}`,
       value: subjectKey("team", team.id),
       label: team.name,
-      description: `${String(team.userIds.length)} ${team.userIds.length === 1 ? "Member" : "Members"}`,
-      group: "Teams",
+      description: i18n.t("hub.access.memberCount", { count: team.userIds.length }),
+      group: i18n.t("hub.access.kindsPlural.team"),
     })),
     ...members
       .filter(({ role }) => role !== "owner")
@@ -83,14 +82,14 @@ export function assignmentSubjectOptions(
         value: subjectKey("member", member.id),
         label: withEmail(member.name, member.email),
         description: member.email,
-        group: "Members",
+        group: i18n.t("hub.access.kindsPlural.member"),
       })),
     {
       id: "guest:guest",
       value: subjectKey("guest", "guest"),
-      label: "Guest",
-      description: "Channel senders without a linked Member",
-      group: "Guest",
+      label: i18n.t("hub.access.kinds.guest"),
+      description: i18n.t("hub.access.guestDescription"),
+      group: i18n.t("hub.access.kinds.guest"),
     },
   ];
 }
@@ -124,46 +123,58 @@ export function selectedOptionDisplay(
 
 export function resourceKindLabel(kind: AccessResourceKind): string {
   return {
-    organization: "Organization",
-    daemon: "Host",
-    project: "Project",
-    team: "Team",
-    channel_account: "Connection",
-    automation: "Automation",
-  }[kind];
+    organization: () => i18n.t("hub.access.kinds.organization"),
+    daemon: () => i18n.t("hub.access.kinds.daemon"),
+    project: () => i18n.t("hub.access.kinds.project"),
+    team: () => i18n.t("hub.access.kinds.team"),
+    channel_account: () => i18n.t("hub.access.kinds.channelAccount"),
+    automation: () => i18n.t("hub.access.kinds.automation"),
+  }[kind]();
 }
 
+/** Resource kinds as list groups and filters: "Hosts", "Projects". */
+export function resourceKindPluralLabels(): Record<AccessResourceKind, string> {
+  return {
+    organization: i18n.t("hub.access.kindsPlural.organization"),
+    daemon: i18n.t("hub.access.kindsPlural.daemon"),
+    project: i18n.t("hub.access.kindsPlural.project"),
+    team: i18n.t("hub.access.kindsPlural.team"),
+    channel_account: i18n.t("hub.access.kindsPlural.channelAccount"),
+    automation: i18n.t("hub.access.kindsPlural.automation"),
+  };
+}
+
+const ACCESS_LEVEL_LABELS: Record<string, () => string> = {
+  current: () => i18n.t("hub.access.levels.current"),
+  connect: () => i18n.t("hub.access.levels.connect"),
+  administrator: () => i18n.t("hub.access.levels.administrator"),
+  office_worker: () => i18n.t("hub.access.levels.officeWorker"),
+  developer: () => i18n.t("hub.access.levels.developer"),
+  full_access: () => i18n.t("hub.access.levels.fullAccess"),
+  use: () => i18n.t("hub.access.levels.use"),
+  // The wire key stays `manage`; the scope is always named (Connection Admin).
+  manage: () => i18n.t("hub.access.levels.admin"),
+  admin: () => i18n.t("hub.access.levels.admin"),
+  run: () => i18n.t("hub.access.levels.run"),
+};
+
 export function accessLevelLabel(value: string): string {
-  return (
-    {
-      current: "Current privileges",
-      connect: "Connect",
-      administrator: "Administrator",
-      office_worker: "Office worker",
-      developer: "Developer",
-      full_access: "Full access",
-      use: "Use",
-      // The wire key stays `manage`; the scope is always named (Connection Admin).
-      manage: "Admin",
-      admin: "Admin",
-      run: "Run",
-    }[value] ?? value
-  );
+  return ACCESS_LEVEL_LABELS[value]?.() ?? value;
 }
 
 export function privilegeLabel(value: string): string {
   return value.replaceAll(".", " ");
 }
 
+const CONVERSATION_LABELS: Record<string, () => string> = {
+  specific: () => i18n.t("hub.access.conversations.specific"),
+  direct_messages: () => i18n.t("hub.access.conversations.directMessages"),
+  public_channels: () => i18n.t("hub.access.conversations.publicChannels"),
+  all: () => i18n.t("hub.access.conversations.all"),
+};
+
 export function conversationLabel(value: string): string {
-  return (
-    {
-      specific: "Specific conversations",
-      direct_messages: "Direct messages",
-      public_channels: "Public conversations",
-      all: "All conversations",
-    }[value] ?? value
-  );
+  return CONVERSATION_LABELS[value]?.() ?? value;
 }
 
 export function constraintSummary(constraints: Record<string, unknown>): string | null {
@@ -176,8 +187,8 @@ export function constraintSummary(constraints: Record<string, unknown>): string 
         const ids = Reflect.get(conversation, "conversationIds");
         values.push(
           Array.isArray(ids)
-            ? `${String(ids.length)} specific conversation${ids.length === 1 ? "" : "s"}`
-            : "Specific conversations",
+            ? i18n.t("hub.access.constraints.specificConversations", { count: ids.length })
+            : i18n.t("hub.access.conversations.specific"),
         );
       } else {
         values.push(conversationLabel(kind));
@@ -187,18 +198,20 @@ export function constraintSummary(constraints: Record<string, unknown>): string 
   const agentConfigurations = constraints["agentConfigurations"];
   if (Array.isArray(agentConfigurations)) {
     values.push(
-      `${String(agentConfigurations.length)} Agent configuration${agentConfigurations.length === 1 ? "" : "s"}`,
+      i18n.t("hub.access.constraints.agentConfigurations", {
+        count: agentConfigurations.length,
+      }),
     );
   }
   const terminalProfiles = constraints["terminalProfiles"];
-  if (terminalProfiles === "*") values.push("All Terminal profiles");
+  if (terminalProfiles === "*") values.push(i18n.t("hub.access.constraints.allTerminalProfiles"));
   else if (Array.isArray(terminalProfiles)) {
     values.push(
-      `${String(terminalProfiles.length)} Terminal profile${terminalProfiles.length === 1 ? "" : "s"}`,
+      i18n.t("hub.access.constraints.terminalProfiles", { count: terminalProfiles.length }),
     );
   }
   if (typeof constraints["projectFolders"] === "object" && constraints["projectFolders"] !== null) {
-    values.push("Narrowed Project folders");
+    values.push(i18n.t("hub.access.constraints.narrowedProjectFolders"));
   }
   return values.length === 0 ? null : values.join(" · ");
 }
@@ -217,8 +230,8 @@ export function grantorName(
   memberNameByUserId: ReadonlyMap<string, string>,
 ): string {
   const userId = assignment.createdByUserId ?? null;
-  if (userId === null) return "Hub";
-  return memberNameByUserId.get(userId) ?? "Former Member";
+  if (userId === null) return i18n.t("hub.access.grantor.hub");
+  return memberNameByUserId.get(userId) ?? i18n.t("hub.access.grantor.formerMember");
 }
 
 /** Assignments held by one subject, e.g. every grant to a Team. */

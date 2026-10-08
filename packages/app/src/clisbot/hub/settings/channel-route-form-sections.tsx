@@ -1,10 +1,13 @@
+import type { TFunction } from "i18next";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SettingsInfoTip } from "@/components/settings/headings/settings-info-tip";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import type { ChannelRouteBehavior, ChannelRouteQuestions } from "../channel-configuration";
 import { ChoiceRow, RouteBehaviorSwitch } from "./channel-route-behavior-rows";
@@ -22,43 +25,55 @@ import {
 export type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 
 const OUTBOUND_PATH_VALUES = ["hybrid", "relay", "tool"];
-const OUTBOUND_PATH_LABELS = {
-  hybrid: "Hybrid",
-  relay: "Text forward",
-  tool: "Channel tool only",
-};
-const OUTBOUND_PATH_DESCRIPTIONS = {
-  hybrid: "The answer as text, plus files, reactions and edits through the Channel tool",
-  relay: "The answer as text only",
-  tool: "The Agent sends what it chooses through the Channel tool",
-};
+function outboundPathLabels(t: TFunction) {
+  return {
+    hybrid: t("hub.routes.sections.outboundPaths.hybrid"),
+    relay: t("hub.routes.sections.outboundPaths.relay"),
+    tool: t("hub.routes.sections.outboundPaths.tool"),
+  };
+}
+function outboundPathDescriptions(t: TFunction) {
+  return {
+    hybrid: t("hub.routes.sections.outboundPathDescriptions.hybrid"),
+    relay: t("hub.routes.sections.outboundPathDescriptions.relay"),
+    tool: t("hub.routes.sections.outboundPathDescriptions.tool"),
+  };
+}
 const APPROVAL_VALUES = ["require", "auto-deny", "auto-allow"];
 const CUSTOM_APPROVAL_VALUES = ["custom", ...APPROVAL_VALUES];
-const APPROVAL_LABELS = {
-  custom: "Custom YAML",
-  require: "Ask authorized members",
-  "auto-deny": "Deny",
-  "auto-allow": "Accept automatically",
-};
-const APPROVAL_DESCRIPTIONS = {
-  custom: "The rules written in this Route's YAML",
-  require: "Someone with approval rights answers in the conversation",
-  "auto-deny": "Every request is refused; the Agent goes on without it",
-  "auto-allow": "Every request is allowed",
-};
+function approvalLabels(t: TFunction) {
+  return {
+    custom: t("hub.routes.sections.approvals.custom"),
+    require: t("hub.routes.sections.approvals.require"),
+    "auto-deny": t("hub.routes.sections.approvals.autoDeny"),
+    "auto-allow": t("hub.routes.sections.approvals.autoAllow"),
+  };
+}
+function approvalDescriptions(t: TFunction) {
+  return {
+    custom: t("hub.routes.sections.approvalDescriptions.custom"),
+    require: t("hub.routes.sections.approvalDescriptions.require"),
+    "auto-deny": t("hub.routes.sections.approvalDescriptions.autoDeny"),
+    "auto-allow": t("hub.routes.sections.approvalDescriptions.autoAllow"),
+  };
+}
 export const QUESTION_VALUES: ChannelRouteQuestions[] = ["ask", "recommended", "agent-decides"];
 /** What the Hub does with a question when the Route sets none. */
 export const DEFAULT_ROUTE_QUESTIONS: ChannelRouteQuestions = "ask";
-const QUESTION_LABELS: Record<ChannelRouteQuestions, string> = {
-  ask: "Ask in the conversation",
-  recommended: "Pick the recommended answer",
-  "agent-decides": "Let the Agent decide",
-};
-const QUESTION_DESCRIPTIONS: Record<ChannelRouteQuestions, string> = {
-  ask: "Anyone this Route lets in can answer",
-  recommended: "The option marked recommended is picked, else the first",
-  "agent-decides": "The Agent is told nobody can answer and picks for itself",
-};
+function questionLabels(t: TFunction): Record<ChannelRouteQuestions, string> {
+  return {
+    ask: t("hub.routes.sections.questions.ask"),
+    recommended: t("hub.routes.sections.questions.recommended"),
+    "agent-decides": t("hub.routes.sections.questions.agentDecides"),
+  };
+}
+function questionDescriptions(t: TFunction): Record<ChannelRouteQuestions, string> {
+  return {
+    ask: t("hub.routes.sections.questionDescriptions.ask"),
+    recommended: t("hub.routes.sections.questionDescriptions.recommended"),
+    "agent-decides": t("hub.routes.sections.questionDescriptions.agentDecides"),
+  };
+}
 
 /** One section of the Route form: a heading and one card of fields. */
 export function RouteFormSection({
@@ -96,6 +111,7 @@ export function FoldedRouteFormSection({
   inUse: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(inUse);
   const toggle = useCallback(() => setOpen((value) => !value), []);
   const state = useMemo(() => ({ expanded: open }), [open]);
@@ -105,11 +121,11 @@ export function FoldedRouteFormSection({
     () => (
       <View style={styles.sectionTrailing}>
         <Button size="xs" variant="ghost" onPress={toggle} accessibilityState={state}>
-          {open ? "Hide" : "Show"}
+          {open ? t("hub.routes.common.hide") : t("hub.routes.common.show")}
         </Button>
       </View>
     ),
-    [open, state, toggle],
+    [open, state, t, toggle],
   );
   const foldedTrailing = useMemo(
     () => (
@@ -184,6 +200,7 @@ export function FoldedRouteFormSubgroup({
   inUse: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(inUse);
   const toggle = useCallback(() => setOpen((value) => !value), []);
   const state = useMemo(() => ({ expanded: open }), [open]);
@@ -194,12 +211,16 @@ export function FoldedRouteFormSubgroup({
         variant="ghost"
         onPress={toggle}
         accessibilityState={state}
-        accessibilityLabel={`${open ? "Hide" : "Show"} ${title}`}
+        accessibilityLabel={
+          open
+            ? t("hub.routes.sections.hideTitle", { title })
+            : t("hub.routes.sections.showTitle", { title })
+        }
       >
-        {open ? "Hide" : "Show"}
+        {open ? t("hub.routes.common.hide") : t("hub.routes.common.show")}
       </Button>
     ),
-    [open, state, title, toggle],
+    [open, state, t, title, toggle],
   );
   const foldedTrailing = useMemo(
     () => (
@@ -240,13 +261,15 @@ export interface RouteReplyFieldsProps {
 /** How replies reach the conversation. */
 export function RouteReplyFields(props: RouteReplyFieldsProps) {
   const { places, behavior, pending } = props;
+  const { t } = useTranslation();
   // Named by place only when the Route covers both: one switch reads plainly.
   const both = places.dms && places.groups;
+  const thread = t("hub.routes.sections.replyThread");
   return (
     <>
       {places.groups ? (
         <RouteBehaviorSwitch
-          label={both ? "Reply in a thread in group chats" : "Reply in a thread"}
+          label={both ? t("hub.routes.sections.replyThreadGroups") : thread}
           value={behavior.replyAnchor === "thread"}
           onChange={props.changeReplyThread}
           disabled={pending}
@@ -254,18 +277,18 @@ export function RouteReplyFields(props: RouteReplyFieldsProps) {
       ) : null}
       {places.dms ? (
         <RouteBehaviorSwitch
-          label={both ? "Reply in a thread in DMs" : "Reply in a thread"}
+          label={both ? t("hub.routes.sections.replyThreadDms") : thread}
           value={behavior.dmReplyAnchor === "thread"}
           onChange={props.changeDmReplyThread}
           disabled={pending}
         />
       ) : null}
       <ChoiceRow
-        label="Reply method"
+        label={t("hub.routes.sections.replyMethod")}
         values={OUTBOUND_PATH_VALUES}
         selected={behavior.outboundPath}
-        labels={OUTBOUND_PATH_LABELS}
-        descriptions={OUTBOUND_PATH_DESCRIPTIONS}
+        labels={outboundPathLabels(t)}
+        descriptions={outboundPathDescriptions(t)}
         onChange={props.changeOutboundPath}
         disabled={pending}
       />
@@ -276,32 +299,33 @@ export function RouteReplyFields(props: RouteReplyFieldsProps) {
 
 function RelayBehaviorFields(props: RouteReplyFieldsProps) {
   const { behavior, pending } = props;
+  const { t } = useTranslation();
   if (behavior.outboundPath === "tool") {
     return (
       <Alert
         variant="info"
-        title="The Agent controls replies"
-        description="The Agent can send text and files from the selected Project to this conversation without a separate approval. File sending requires the Hub to access the Project folder. Text forward is disabled to avoid duplicate replies. If the Agent ends without replying, its last message is sent instead."
+        title={t("hub.routes.sections.agentControlsTitle")}
+        description={t("hub.routes.sections.agentControlsDescription")}
       />
     );
   }
   return (
     <>
       <RouteBehaviorSwitch
-        label="Send final answers"
+        label={t("hub.routes.sections.sendFinalAnswers")}
         value={behavior.finalAnswers}
         onChange={props.changeFinalAnswers}
         disabled={pending}
       />
       <RouteBehaviorSwitch
-        label="Send progress messages"
+        label={t("hub.routes.sections.sendProgressMessages")}
         value={behavior.progressMessage}
         onChange={props.changeProgressMessage}
         disabled={pending}
       />
       <RouteToolActivityFields {...props.toolActivity} pending={pending} />
       <RouteBehaviorSwitch
-        label="Show typing indicator"
+        label={t("hub.routes.sections.showTypingIndicator")}
         value={behavior.typingIndicator}
         onChange={props.changeTypingIndicator}
         disabled={pending}
@@ -328,23 +352,24 @@ export function RoutePermissionFields({
   changeApprovalChoice(value: string): void;
   changeQuestions(value: string): void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <ChoiceRow
-        label="Permission requests"
+        label={t("hub.routes.sections.permissionRequests")}
         values={approvalChoice === "custom" ? CUSTOM_APPROVAL_VALUES : APPROVAL_VALUES}
         selected={approvalChoice}
-        labels={APPROVAL_LABELS}
-        descriptions={APPROVAL_DESCRIPTIONS}
+        labels={approvalLabels(t)}
+        descriptions={approvalDescriptions(t)}
         onChange={changeApprovalChoice}
         disabled={pending}
       />
       <ChoiceRow
-        label="Questions from the Agent"
+        label={t("hub.routes.sections.questionsLabel")}
         values={QUESTION_VALUES}
         selected={questions}
-        labels={QUESTION_LABELS}
-        descriptions={QUESTION_DESCRIPTIONS}
+        labels={questionLabels(t)}
+        descriptions={questionDescriptions(t)}
         onChange={changeQuestions}
         disabled={pending}
       />
@@ -357,18 +382,20 @@ export function approvalSummary(
   approvalChoice: RouteApprovalChoice,
   questions: ChannelRouteQuestions | undefined,
 ): string {
-  const requests = APPROVAL_SUMMARIES[approvalChoice];
-  if (questions === "recommended") return `${requests}, recommended answers picked`;
-  if (questions === "agent-decides") return `${requests}, the Agent answers its questions`;
+  const requests = approvalChoiceSummary(approvalChoice);
+  if (questions === "recommended")
+    return i18n.t("hub.routes.approvalSummaries.withRecommended", { requests });
+  if (questions === "agent-decides")
+    return i18n.t("hub.routes.approvalSummaries.withAgentDecides", { requests });
   return requests;
 }
 
-const APPROVAL_SUMMARIES: Record<RouteApprovalChoice, string> = {
-  require: "Ask for approval",
-  "auto-deny": "Requests denied",
-  "auto-allow": "Requests accepted automatically",
-  custom: "Custom approvals",
-};
+function approvalChoiceSummary(approvalChoice: RouteApprovalChoice): string {
+  if (approvalChoice === "require") return i18n.t("hub.routes.approvalSummaries.require");
+  if (approvalChoice === "auto-deny") return i18n.t("hub.routes.approvalSummaries.autoDeny");
+  if (approvalChoice === "auto-allow") return i18n.t("hub.routes.approvalSummaries.autoAllow");
+  return i18n.t("hub.routes.approvalSummaries.custom");
+}
 
 const styles = StyleSheet.create((theme) => ({
   card: {

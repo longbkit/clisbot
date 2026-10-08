@@ -4,6 +4,7 @@
 
 import { Plus } from "lucide-react-native";
 import React, { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ import { ruleSummary, type AudienceNames } from "./channel-route-rule-summary";
 import { RuleWhoFields } from "./channel-route-rule-who";
 
 export type { AudienceOption };
-export { OPEN_AUDIENCE_WARNING } from "./channel-route-rule-who";
+export { openAudienceWarning } from "./channel-route-rule-who";
 
 interface AudienceRulesEditorProps {
   rules: AudienceRuleDraft[];
@@ -54,6 +55,7 @@ type Update = (change: (rule: AudienceRuleDraft) => AudienceRuleDraft) => void;
 
 export function AudienceRulesEditor(props: AudienceRulesEditorProps) {
   const { rules, setRules, disabled } = props;
+  const { t } = useTranslation();
   // A lone Rule is the Route's only way in, so it is always open. From two
   // Rules on, one is open at a time: a new Rule opens and folds the others.
   const [openRuleId, setOpenRuleId] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function AudienceRulesEditor(props: AudienceRulesEditorProps) {
           finish the rule above it. */}
       <View style={styles.addRule}>
         <Button size="sm" variant="ghost" leftIcon={Plus} disabled={disabled} onPress={addRule}>
-          Add another rule
+          {t("hub.routes.rules.addAnother")}
         </Button>
       </View>
     </View>
@@ -110,16 +112,20 @@ export function AudienceRulesEditor(props: AudienceRulesEditorProps) {
 /** What every Rule needs to know about the account the Route belongs to. */
 function useRulePlace({ channel, observedChannel, accountId }: AudienceRulesEditorProps) {
   const catalog = useChannelCatalog();
+  const { t } = useTranslation();
   return useMemo<AudienceWherePlace>(
     () => ({
-      channelName: channel === null ? "the channel" : channelCatalogLabel(catalog.entries, channel),
+      channelName:
+        channel === null
+          ? t("hub.routes.common.theChannel")
+          : channelCatalogLabel(catalog.entries, channel),
       reportsVisibility: channelReportsVisibility(
         channel === null ? undefined : channelCatalogEntry(catalog.entries, channel),
       ),
       observedChannel,
       accountId,
     }),
-    [accountId, catalog.entries, channel, observedChannel],
+    [accountId, catalog.entries, channel, observedChannel, t],
   );
 }
 
@@ -147,6 +153,7 @@ function AudienceRuleRow({
   update(index: number, change: (rule: AudienceRuleDraft) => AudienceRuleDraft): void;
   remove(index: number): void;
 }) {
+  const { t } = useTranslation();
   const updateThis = useCallback<Update>((change) => update(index, change), [index, update]);
   const problem = ruleProblemAt(rule, editor.inherited);
   // An open Rule shows a Where or Who problem under that field; the rest, and
@@ -156,7 +163,7 @@ function AudienceRuleRow({
   return (
     <View
       style={framed ? styles.rule : styles.loneRule}
-      accessibilityLabel={`Rule ${String(index + 1)}`}
+      accessibilityLabel={t("hub.routes.rules.rule", { number: index + 1 })}
     >
       {framed ? (
         <RuleHeader
@@ -194,25 +201,34 @@ function RuleHeader({
   remove(index: number): void;
   disabled: boolean;
 }) {
-  const label = `Rule ${String(index + 1)}`;
+  const { t } = useTranslation();
+  const number = index + 1;
   const toggleOpen = useCallback(() => toggle(rule.id), [rule.id, toggle]);
   const removeRow = useCallback(() => remove(index), [index, remove]);
   const state = useMemo(() => ({ expanded: open }), [open]);
   return (
     <View style={styles.ruleHeader}>
-      <Text style={styles.ruleTitle}>{label}</Text>
+      <Text style={styles.ruleTitle}>{t("hub.routes.rules.rule", { number })}</Text>
       <View style={styles.actions}>
         <Button
           size="xs"
           variant="ghost"
           onPress={toggleOpen}
           accessibilityState={state}
-          accessibilityLabel={`${open ? "Collapse" : "Edit"} ${label}`}
+          accessibilityLabel={
+            open
+              ? t("hub.routes.rules.collapse", { number })
+              : t("hub.routes.rules.edit", { number })
+          }
         >
-          {open ? "Hide" : "Edit"}
+          {open ? t("hub.routes.common.hide") : t("hub.routes.common.edit")}
         </Button>
         {/* Behind the menu, so a press meant for Edit never removes a rule. */}
-        <ChannelActionsMenu label={`Actions for ${label}`} disabled={disabled} remove={removeRow} />
+        <ChannelActionsMenu
+          label={t("hub.routes.rules.actions", { number })}
+          disabled={disabled}
+          remove={removeRow}
+        />
       </View>
     </View>
   );

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
@@ -8,9 +9,15 @@ import { SettingsSection } from "@/components/settings";
 import { SettingsInfoTip } from "@/components/settings/headings/settings-info-tip";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { toErrorMessage } from "@/utils/error-messages";
 import { AgentToolGroupIcon } from "./agent-tools-section";
+import {
+  agentToolDescription,
+  agentToolGroupDescription,
+  agentToolGroupLabel,
+} from "./agent-tool-copy";
 import { toolCountSummary } from "./agent-tools-model";
 import { ConnectorLogo } from "./connector-logo";
 import { ToolLabel } from "./connector-detail-parts";
@@ -27,7 +34,7 @@ import {
   type SessionToolSet,
 } from "./session-connectors";
 import { SessionSwitchRow } from "./session-switch-row";
-import { KIND_BADGES } from "./session-tool-pages";
+import { kindBadge } from "./session-tool-pages";
 import { OpeningRow, SectionLink, connectorDisplay } from "./session-tools-list";
 
 /**
@@ -46,9 +53,6 @@ const ThemedSpinner = withUnistyles(LoadingSpinner, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 
-const ROOM_INFO =
-  "Turning something off here turns it off for every Bot in this chat, Bots added later included, and it stays after /new. Each Bot's own settings still decide what it has: change those in Bot settings, and the room follows unless it turned that thing off.";
-
 function pageOf(id: string | null, room: RoomTools): Page {
   const group = room.groups.find((entry) => `group:${entry.group.id}` === id);
   if (group) return { kind: "group", entry: group };
@@ -58,8 +62,10 @@ function pageOf(id: string | null, room: RoomTools): Page {
 
 /** Who has a tool, when not every Bot that could does: "Only writer". */
 function holdersNote(holders: readonly string[] | undefined, all: readonly string[]) {
-  if (!holders || holders.length === 0) return "No Bot here has it";
-  return holders.length < all.length ? `Only ${botsLabel(holders)}` : undefined;
+  if (!holders || holders.length === 0) return i18n.t("connectors.tools.room.noHolder");
+  return holders.length < all.length
+    ? i18n.t("connectors.tools.room.onlyHolders", { bots: botsLabel(holders) })
+    : undefined;
 }
 
 export function RoomToolsSheet({
@@ -75,6 +81,7 @@ export function RoomToolsSheet({
   update(edit: SessionOffEdit): Promise<void>;
   onClose(): void;
 }) {
+  const { t } = useTranslation();
   const lookup = useConnectorLookup(serverId);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -101,11 +108,11 @@ export function RoomToolsSheet({
     () => (
       <View style={styles.footer}>
         <Button variant="default" onPress={onClose}>
-          Done
+          {t("connectors.tools.common.done")}
         </Button>
       </View>
     ),
-    [onClose],
+    [onClose, t],
   );
   return (
     <AdaptiveModalSheet
@@ -151,12 +158,13 @@ function useRoomHeader(
   back: () => void,
   setSearch: (query: string) => void,
 ): SheetHeader {
+  const { t } = useTranslation();
   return useMemo(() => {
-    const backTo = { onPress: back, accessibilityLabel: "Back to the room's tools" };
+    const backTo = { onPress: back, accessibilityLabel: t("connectors.tools.room.back") };
     if (page.kind === "group") {
       return {
-        title: page.entry.group.label,
-        subtitle: page.entry.group.description,
+        title: agentToolGroupLabel(page.entry.group),
+        subtitle: agentToolGroupDescription(page.entry.group),
         leading: <AgentToolGroupIcon group={page.entry.group.id} />,
         back: backTo,
       };
@@ -165,18 +173,25 @@ function useRoomHeader(
       const display = connectorDisplay(page.entry, page.entry.holders[0]?.grant, lookup);
       return {
         title: display.name,
-        subtitle: `Used by ${botsLabel(page.entry.holders.map((holder) => holder.name))}`,
+        subtitle: t("connectors.tools.room.usedBy", {
+          bots: botsLabel(page.entry.holders.map((holder) => holder.name)),
+        }),
         leading: <ConnectorLogo slug={display.slug} name={display.name} logo={display.logo} />,
         back: backTo,
-        search: { onChange: setSearch, placeholder: "Search tools", testID: "room-tools-search" },
+        search: {
+          onChange: setSearch,
+          placeholder: t("connectors.tools.common.searchTools"),
+          testID: "room-tools-search",
+        },
       };
     }
+    const title = t("connectors.tools.room.title");
     return {
-      title: "Tools in this room",
-      subtitle: "For every Bot in this group chat",
-      actions: <SettingsInfoTip title="Tools in this room" info={ROOM_INFO} />,
+      title,
+      subtitle: t("connectors.tools.room.subtitle"),
+      actions: <SettingsInfoTip title={title} info={t("connectors.tools.room.info")} />,
     };
-  }, [back, lookup, page, setSearch]);
+  }, [back, lookup, page, setSearch, t]);
 }
 
 function RoomList({
@@ -194,14 +209,17 @@ function RoomList({
   onOpen(page: string): void;
   onAllConnectors(): void;
 }) {
+  const { t } = useTranslation();
   const allLink = useMemo(
-    () => <SectionLink label="All connectors" onPress={onAllConnectors} />,
-    [onAllConnectors],
+    () => (
+      <SectionLink label={t("connectors.tools.common.allConnectors")} onPress={onAllConnectors} />
+    ),
+    [onAllConnectors, t],
   );
   return (
     <>
       {room.groups.length > 0 ? (
-        <SettingsSection title="Clisbot tools">
+        <SettingsSection title={t("connectors.tools.common.clisbotTools")}>
           <View style={settingsStyles.card}>
             {room.groups.map((entry, index) => (
               <RoomGroupRow
@@ -217,7 +235,7 @@ function RoomList({
         </SettingsSection>
       ) : null}
       {room.connectors.length > 0 ? (
-        <SettingsSection title="Connectors" trailing={allLink}>
+        <SettingsSection title={t("connectors.tools.common.connectors")} trailing={allLink}>
           <View style={settingsStyles.card}>
             {room.connectors.map((entry, index) => (
               <RoomConnectorRow
@@ -235,7 +253,7 @@ function RoomList({
       ) : null}
       {room.groups.length + room.connectors.length === 0 ? (
         <Text style={[settingsStyles.rowHint, styles.empty]}>
-          No Bot here has tools or Connectors.
+          {t("connectors.tools.room.empty")}
         </Text>
       ) : null}
     </>
@@ -271,7 +289,7 @@ function RoomGroupRow({
     <OpeningRow
       page={`group:${group.id}`}
       icon={icon}
-      title={group.label}
+      title={agentToolGroupLabel(group)}
       summary={`${toolCountSummary(kept.length, set.given.length)} · ${botsLabel(entry.bots)}`}
       bordered={bordered}
       on={kept.length > 0}
@@ -297,6 +315,7 @@ function RoomConnectorRow({
   apply: Apply;
   onOpen(page: string): void;
 }) {
+  const { t } = useTranslation();
   const change = useCallback(
     () => apply((current) => toggled(current, entry.key)),
     [apply, entry.key],
@@ -313,7 +332,9 @@ function RoomConnectorRow({
       page={`connector:${entry.key}`}
       icon={icon}
       title={display.name}
-      summary={toolsOff > 0 ? `${who} · ${toolsOff} off here` : who}
+      summary={
+        toolsOff > 0 ? `${who} · ${t("connectors.tools.common.offHere", { count: toolsOff })}` : who
+      }
       bordered={bordered}
       on={!off.has(entry.key)}
       onSwitch={change}
@@ -356,11 +377,11 @@ function RoomGroupPage({
             value={kept.includes(tool.name)}
             disabled={!holders}
             onToggle={holders ? toggle : undefined}
-            label={tool.description}
+            label={agentToolDescription(tool)}
             note={holdersNote(holders, entry.bots)}
             testID={`room-tool-${tool.name}`}
           >
-            <Text style={settingsStyles.rowTitle}>{tool.description}</Text>
+            <Text style={settingsStyles.rowTitle}>{agentToolDescription(tool)}</Text>
             <Text style={styles.name}>{tool.name}</Text>
           </SessionSwitchRow>
         );
@@ -439,7 +460,7 @@ function RoomConnectorPage({
             key={tool.name}
             id={tool.name}
             bordered={index > 0}
-            badge={KIND_BADGES[connectorToolKindOf(tool.kind)]}
+            badge={kindBadge(connectorToolKindOf(tool.kind))}
             value={kept.includes(tool.name)}
             disabled={who.length === 0}
             onToggle={who.length > 0 ? toggle : undefined}

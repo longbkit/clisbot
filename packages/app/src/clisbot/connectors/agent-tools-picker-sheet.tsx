@@ -1,10 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { AgentToolGroup } from "@clisbot/protocol/connectors/agent-tools";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
+import {
+  agentToolDescription,
+  agentToolGroupDescription,
+  agentToolGroupLabel,
+} from "./agent-tool-copy";
 import { CheckOption } from "./check-option";
 
 /**
@@ -22,6 +28,7 @@ export function AgentToolsPickerSheet({
   onClose(): void;
   onSave(enabled: string[]): void;
 }) {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState<string[]>([...initial]);
   const toggle = useCallback(
     (name: string) =>
@@ -34,31 +41,34 @@ export function AgentToolsPickerSheet({
   const none = useCallback(() => setEnabled([]), []);
   const save = useCallback(() => onSave(enabled), [enabled, onSave]);
   const header = useMemo(
-    () => ({ title: `${group.label} tools`, subtitle: group.description }),
-    [group],
+    () => ({
+      title: t("connectors.tools.agentTools.groupTools", { group: agentToolGroupLabel(group) }),
+      subtitle: agentToolGroupDescription(group),
+    }),
+    [group, t],
   );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <View style={styles.group}>
           <Button variant="ghost" size="sm" onPress={all}>
-            All
+            {t("connectors.tools.common.all")}
           </Button>
           <Button variant="ghost" size="sm" onPress={none}>
-            None
+            {t("connectors.tools.common.none")}
           </Button>
         </View>
         <View style={styles.group}>
           <Button variant="ghost" onPress={onClose}>
-            Cancel
+            {t("connectors.tools.common.cancel")}
           </Button>
           <Button variant="default" onPress={save} testID="agent-tools-save">
-            Save
+            {t("connectors.tools.common.save")}
           </Button>
         </View>
       </View>
     ),
-    [all, none, onClose, save],
+    [all, none, onClose, save, t],
   );
   return (
     <AdaptiveModalSheet
@@ -80,7 +90,7 @@ export function AgentToolsPickerSheet({
             testID={`agent-tool-${tool.name}`}
           >
             <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>{tool.description}</Text>
+              <Text style={settingsStyles.rowTitle}>{agentToolDescription(tool)}</Text>
               <Text style={styles.name}>{tool.name}</Text>
             </View>
           </CheckOption>

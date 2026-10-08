@@ -1,6 +1,7 @@
 import { getDesktopHost } from "@/desktop/host";
 import type { HubConfiguration } from "../config";
 import type { GoogleSignInContext, HubRequestInput, HubTransport } from "./contract";
+import { i18n } from "@/i18n/i18next";
 
 export function createHubTransport(configuration: HubConfiguration): HubTransport {
   const bridge = getDesktopHost()?.hub;
@@ -26,7 +27,7 @@ class BrowserHubTransport implements HubTransport {
 
   async signIn(input?: { email: string; password: string }): Promise<void> {
     this.assertSameOrigin();
-    if (input === undefined) throw new Error("Email and password are required.");
+    if (input === undefined) throw new Error(i18n.t("hub.account.signIn.emailAndPasswordRequired"));
     const response = await fetch(new URL("/api/auth/sign-in/email", this.origin), {
       method: "POST",
       credentials: "include",
@@ -55,7 +56,7 @@ class BrowserHubTransport implements HubTransport {
     });
     const url: unknown = Reflect.get(Object(await response.json().catch(() => ({}))), "url");
     if (!response.ok || typeof url !== "string") {
-      throw new Error("Hub couldn't start Google sign-in.");
+      throw new Error(i18n.t("hub.account.signIn.googleStartFailed"));
     }
     window.location.assign(url);
   }
@@ -68,14 +69,12 @@ class BrowserHubTransport implements HubTransport {
       headers: { "content-type": "application/json" },
       body: "{}",
     });
-    if (!response.ok) throw new Error("Hub sign-out failed.");
+    if (!response.ok) throw new Error(i18n.t("hub.account.signIn.signOutFailed"));
   }
 
   private assertSameOrigin(): void {
     if (window.location.origin !== this.origin) {
-      throw new Error(
-        "Browser Hub access requires the Clisbot client to be served from the Hub origin.",
-      );
+      throw new Error(i18n.t("hub.account.signIn.browserOriginRequired"));
     }
   }
 }
@@ -96,7 +95,8 @@ class ElectronHubTransport implements HubTransport {
       path: assertHubPath(path),
       ...input,
     });
-    if (result === undefined) throw new Error("Desktop Hub bridge is unavailable.");
+    if (result === undefined)
+      throw new Error(i18n.t("hub.account.signIn.desktopBridgeUnavailable"));
     return new Response(result.body, { status: result.status, headers: result.headers });
   }
 
@@ -104,7 +104,8 @@ class ElectronHubTransport implements HubTransport {
     _input?: { email: string; password: string },
     context?: { invitationId?: string },
   ): Promise<void> {
-    if (this.bridge.signIn === undefined) throw new Error("Desktop Hub sign-in is unavailable.");
+    if (this.bridge.signIn === undefined)
+      throw new Error(i18n.t("hub.account.signIn.desktopSignInUnavailable"));
     await this.bridge.signIn({
       origin: this.origin,
       ...(context?.invitationId === undefined ? {} : { invitationId: context.invitationId }),
@@ -112,16 +113,17 @@ class ElectronHubTransport implements HubTransport {
   }
 
   async signOut(): Promise<void> {
-    if (this.bridge.signOut === undefined) throw new Error("Desktop Hub sign-out is unavailable.");
+    if (this.bridge.signOut === undefined)
+      throw new Error(i18n.t("hub.account.signIn.desktopSignOutUnavailable"));
     await this.bridge.signOut({ origin: this.origin });
   }
 }
 
 function signInFailureMessage(code: unknown): string {
   if (code === "registration_closed") {
-    return "This account isn't admitted to this Hub. Ask an organization owner to invite you.";
+    return i18n.t("hub.account.signIn.notAdmitted");
   }
-  return "The email or password is incorrect.";
+  return i18n.t("hub.account.signIn.incorrectCredentials");
 }
 
 function assertHubPath(path: string): string {

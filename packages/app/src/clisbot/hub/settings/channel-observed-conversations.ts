@@ -6,7 +6,7 @@ import { useHubAccount } from "../account-provider";
 import { hubResourceQueryKey } from "../query-keys";
 import { HubObservedChannelConversationsSchema } from "../contracts";
 import { type HubTeam } from "./channel-settings-types";
-import { channelLabel } from "./channel-settings-records";
+import { conversationKindLabel } from "../conversation-picker";
 
 /** The conversations the bot has seen on one account, for naming stored ids. */
 export function useObservedConversations(
@@ -69,6 +69,8 @@ export function channelDestinationLabel(
   const named = candidates.find((item) => item.id === id && item.label);
   if (!named?.label || named.label === id) return id;
   const lock = named.visibility === "private" ? "🔒 " : "";
-  if (named.threadId !== null) return `${lock}${named.label} · ${channelLabel(named.kind)} ${id}`;
+  if (named.threadId !== null) {
+    return `${lock}${named.label} · ${conversationKindLabel(named.kind)} ${id}`;
+  }
   return `${lock}${named.label} (${id})`;
 }

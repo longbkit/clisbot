@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorMcpServer } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { DetailHeader, ToolsSection, UsedBySection } from "./connector-detail-parts";
@@ -26,6 +28,7 @@ export function McpServerDetail({
   onEdit(): void;
   onRemoved(): void;
 }) {
+  const { t } = useTranslation();
   const tools = useConnectorTools(
     serverId,
     useMemo(() => ({ mcpServer: server.name }), [server.name]),
@@ -35,30 +38,45 @@ export function McpServerDetail({
     server.transport === "http"
       ? (server.url ?? "")
       : [server.command, ...(server.args ?? [])].join(" ");
-  const runsAt = server.transport === "http" ? "Remote MCP server" : "Runs on this Host";
-  const subtitle = server.enabled === false ? `${runsAt} · Off` : runsAt;
+  const runsAt =
+    server.transport === "http"
+      ? t("connectors.screen.mcp.remote")
+      : t("connectors.screen.mcp.local");
+  const subtitle =
+    server.enabled === false ? `${runsAt} · ${t("connectors.screen.common.off")}` : runsAt;
   const editAction = useMemo(
     () => (
       <Button variant="outline" size="sm" onPress={onEdit} testID="connectors-mcp-edit">
-        Edit server
+        {t("connectors.screen.mcp.editServer")}
       </Button>
     ),
-    [onEdit],
+    [onEdit, t],
   );
   return (
     <View>
       <DetailHeader slug={server.name} name={server.name} subtitle={subtitle} action={editAction} />
       <SettingsSection
-        title="Server"
-        info="Secret values stay on this Host. Agents reach a remote server through the Host, so they never hold its headers."
+        title={t("connectors.screen.mcp.server")}
+        info={t("connectors.screen.mcp.serverInfo")}
       >
         <View style={settingsStyles.card}>
           <McpServerToggle serverId={serverId} server={server} />
           <View style={settingsStyles.rowBorder}>
-            <Row label={server.transport === "http" ? "URL" : "Command"} value={where} />
+            <Row
+              label={
+                server.transport === "http"
+                  ? t("connectors.screen.mcp.url")
+                  : t("connectors.screen.mcp.command")
+              }
+              value={where}
+            />
           </View>
           <Row
-            label={server.transport === "http" ? "Headers" : "Environment"}
+            label={
+              server.transport === "http"
+                ? t("connectors.screen.mcp.headers")
+                : t("connectors.screen.mcp.environment")
+            }
             value={secretNames(server)}
             bordered
           />
@@ -67,12 +85,12 @@ export function McpServerDetail({
       <UsedBySection
         serverId={serverId}
         uses={uses}
-        empty={`Nothing uses ${server.name} yet. Add it in a Bot's or Project's settings → Connectors.`}
+        empty={t("connectors.screen.common.usedByEmpty", { name: server.name })}
       />
       <ToolsSection tools={tools.data} loading={tools.isLoading} error={tools.error} />
       <View style={styles.remove}>
         <Button variant="ghost" size="sm" loading={remove.busy} onPress={remove.run}>
-          Remove server…
+          {t("connectors.screen.mcp.removeServer")}
         </Button>
         {remove.error ? <Text style={settingsStyles.rowError}>{remove.error}</Text> : null}
       </View>
@@ -82,7 +100,7 @@ export function McpServerDetail({
 
 function secretNames(server: ConnectorMcpServer): string {
   const names = server.transport === "http" ? server.headerKeys : server.envKeys;
-  return names?.length ? names.join(", ") : "None";
+  return names?.length ? names.join(", ") : i18n.t("connectors.screen.mcp.none");
 }
 
 function Row({
@@ -105,14 +123,14 @@ function Row({
 }
 
 function useRemove(serverId: string, name: string, onRemoved: () => void) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = useCallback(async () => {
     const confirmed = await confirmDialog({
-      title: `Remove ${name}?`,
-      message:
-        "Agents that use it lose its tools from their next session. Its stored headers and variables are deleted.",
-      confirmLabel: "Remove server",
+      title: t("connectors.screen.common.removeTitle", { name }),
+      message: t("connectors.screen.mcp.removeMessage"),
+      confirmLabel: t("connectors.screen.mcp.removeConfirm"),
       destructive: true,
     });
     if (!confirmed) return;
@@ -125,7 +143,7 @@ function useRemove(serverId: string, name: string, onRemoved: () => void) {
     } finally {
       setBusy(false);
     }
-  }, [name, onRemoved, serverId]);
+  }, [name, onRemoved, serverId, t]);
   return { busy, error, run: () => void run() };
 }
 

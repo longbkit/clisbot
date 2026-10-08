@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   Pressable,
   Text,
@@ -38,29 +40,35 @@ interface IdPickerLabels {
   manualField: string;
   manualHint: string;
   unavailable: string;
+  showManual: string;
+  hideManual: string;
 }
 
-const CONVERSATION_LABELS: IdPickerLabels = {
-  choose: "Choose conversations",
-  search: "Search by name or provider ID",
-  empty: "No conversation matches this search.",
-  manualField: "Conversation IDs",
-  manualHint:
-    "Enter multiple IDs separated by commas or new lines. These update the selected conversations above.",
-  unavailable:
-    "Conversation names are unavailable. Your selected IDs are unchanged; you can enter IDs manually.",
-};
+function conversationLabels(t: TFunction): IdPickerLabels {
+  return {
+    choose: t("hub.channels.idPicker.conversations.choose"),
+    search: t("hub.channels.idPicker.conversations.search"),
+    empty: t("hub.channels.idPicker.conversations.empty"),
+    manualField: t("hub.channels.idPicker.conversations.manualField"),
+    manualHint: t("hub.channels.idPicker.conversations.manualHint"),
+    unavailable: t("hub.channels.idPicker.conversations.unavailable"),
+    showManual: t("hub.channels.idPicker.showManual"),
+    hideManual: t("hub.channels.idPicker.hideManual"),
+  };
+}
 
-const SENDER_LABELS: IdPickerLabels = {
-  choose: "Choose people who messaged the bot",
-  search: "Search by name, username or ID",
-  empty: "Nobody without a Hub account matches this search.",
-  manualField: "Sender IDs",
-  manualHint:
-    "Channel user ids, separated by commas or new lines: U0ALICE or slack:U0ALICE. Use this for someone who has not messaged the bot yet.",
-  unavailable:
-    "The people who messaged this bot are unavailable. Your selected IDs are unchanged; you can enter IDs manually.",
-};
+function senderLabels(t: TFunction): IdPickerLabels {
+  return {
+    choose: t("hub.channels.idPicker.senders.choose"),
+    search: t("hub.channels.idPicker.senders.search"),
+    empty: t("hub.channels.idPicker.senders.empty"),
+    manualField: t("hub.channels.idPicker.senders.manualField"),
+    manualHint: t("hub.channels.idPicker.senders.manualHint"),
+    unavailable: t("hub.channels.idPicker.senders.unavailable"),
+    showManual: t("hub.channels.idPicker.showManual"),
+    hideManual: t("hub.channels.idPicker.hideManual"),
+  };
+}
 
 /** Reads one per-account directory list (`conversations` or `senders`). */
 function useAccountDirectory<Schema extends z.ZodType>(
@@ -120,6 +128,8 @@ export function ConversationSelectionFields({
   hint: string;
   placeholder: string;
 }) {
+  const { t } = useTranslation();
+  const labels = useMemo(() => conversationLabels(t), [t]);
   const observations = useAccountDirectory(
     "conversations",
     channel,
@@ -142,7 +152,7 @@ export function ConversationSelectionFields({
     <IdSelectionFields
       pickerKey={`${channel}:${accountId}:${kind}`}
       options={options}
-      labels={CONVERSATION_LABELS}
+      labels={labels}
       loadFailed={Boolean(observations.error)}
       value={value}
       onChange={onChange}
@@ -152,8 +162,6 @@ export function ConversationSelectionFields({
     />
   );
 }
-
-const SENDERS_HINT = "People without a Hub account, by their channel user ID.";
 
 /**
  * People who messaged this bot and are not linked to a Member: a Route's
@@ -165,7 +173,7 @@ export function SenderSelectionFields({
   channel,
   accountId,
   among = null,
-  hint = SENDERS_HINT,
+  hint,
   value,
   onChange,
   disabled,
@@ -178,6 +186,8 @@ export function SenderSelectionFields({
   onChange(value: string): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
+  const labels = useMemo(() => senderLabels(t), [t]);
   const senders = useAccountDirectory(
     "senders",
     channel,
@@ -204,12 +214,12 @@ export function SenderSelectionFields({
     <IdSelectionFields
       pickerKey={`${channel}:${accountId}:senders`}
       options={options}
-      labels={SENDER_LABELS}
+      labels={labels}
       loadFailed={Boolean(senders.error)}
       value={value}
       onChange={onChange}
       disabled={disabled}
-      hint={hint}
+      hint={hint ?? t("hub.channels.idPicker.sendersHint")}
       placeholder="U0ALICE, U0BOB"
       manualIds={among === null}
     />
@@ -288,7 +298,7 @@ function IdSelectionFields({
         ) : null}
         {manualIds ? (
           <Button size="sm" variant="outline" onPress={toggleManualEntry} disabled={disabled}>
-            {manualEntry ? "Hide ID entry" : "Enter IDs"}
+            {manualEntry ? labels.hideManual : labels.showManual}
           </Button>
         ) : null}
       </View>
@@ -337,6 +347,7 @@ function SelectedConversation({
   onChange(ids: readonly string[]): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const remove = useCallback(
     () => onChange(selectedIds.filter((selected) => selected !== id)),
     [id, onChange, selectedIds],
@@ -357,7 +368,7 @@ function SelectedConversation({
         size="sm"
         variant="ghost"
         leftIcon={X}
-        accessibilityLabel={`Remove ${option?.label ?? id}`}
+        accessibilityLabel={t("hub.channels.idPicker.remove", { name: option?.label ?? id })}
         disabled={disabled}
         onPress={remove}
       />

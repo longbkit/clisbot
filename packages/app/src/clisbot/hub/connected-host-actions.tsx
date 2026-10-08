@@ -1,7 +1,8 @@
 import { mutedIconColorMapping } from "@/components/ui/icon-color";
 import { Bot, FolderOpen, Server, ChevronRight } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { useCallback, useState, type ComponentType } from "react";
+import { useCallback, useMemo, useState, type ComponentType } from "react";
+import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
@@ -19,7 +20,6 @@ import { useBotSidebarActions } from "../bots/sidebar/use-sidebar-actions";
 import { buildHubSettingsRoute } from "./navigation";
 
 const EMPTY_CHATS: [] = [];
-const BOT_HEADER = { title: "New bot" };
 const SNAP_POINTS = ["95%"];
 const CONTENT_STYLE = { padding: 0 };
 
@@ -31,6 +31,7 @@ export function ConnectedHostActions({
   serverId: string;
   connected: boolean;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const openAddProject = useOpenAddProject();
   const creationHosts = useBotCreationHosts();
@@ -67,51 +68,23 @@ export function ConnectedHostActions({
     [router],
   );
   const home = useCallback(() => router.push(buildOpenProjectRoute()), [router]);
+  const botHeader = useMemo(() => ({ title: t("hub.account.nextSteps.newBot") }), [t]);
   return (
     <>
-      <SettingsSection title="What would you like to do next?">
-        <Text style={settingsStyles.rowHint}>Choose a next step, or continue to Home.</Text>
-        <View style={settingsStyles.card}>
-          {canCreateBot ? (
-            <NextStepRow
-              icon={Bot}
-              title="Create a Bot"
-              description="Give an assistant a role and its own workspace."
-              onPress={createBot}
-            />
-          ) : null}
-          {canAddProject ? (
-            <NextStepRow
-              icon={FolderOpen}
-              title="Add a Project"
-              description="Work with documents or code in a folder on this Host."
-              onPress={addProject}
-            />
-          ) : null}
-          <NextStepRow
-            icon={Server}
-            title="Add another Host"
-            description="Connect another computer through Hub or directly."
-            onPress={addHost}
-            last
-          />
-        </View>
+      <SettingsSection title={t("hub.account.nextSteps.title")}>
+        <Text style={settingsStyles.rowHint}>{t("hub.account.nextSteps.hint")}</Text>
+        <NextStepsCard
+          onCreateBot={canCreateBot ? createBot : null}
+          onAddProject={canAddProject ? addProject : null}
+          onAddHost={addHost}
+        />
         {error ? <Text accessibilityRole="alert">{error}</Text> : null}
-        {addingHost ? (
-          <View style={styles.hostChoices}>
-            <Button variant="outline" onPress={openManaged}>
-              Add managed Host via Hub
-            </Button>
-            <Button variant="outline" onPress={openDirect}>
-              Connect a direct Host
-            </Button>
-          </View>
-        ) : null}
-        <Button onPress={home}>Continue to Home</Button>
+        {addingHost ? <AddHostChoices onManaged={openManaged} onDirect={openDirect} /> : null}
+        <Button onPress={home}>{t("hub.account.nextSteps.continueHome")}</Button>
       </SettingsSection>
       <AdaptiveModalSheet
         visible={botOpen && canCreateBot}
-        header={BOT_HEADER}
+        header={botHeader}
         scrollable={false}
         snapPoints={SNAP_POINTS}
         contentStyle={CONTENT_STYLE}
@@ -134,6 +107,60 @@ export function ConnectedHostActions({
         onSaved={directSaved}
       />
     </>
+  );
+}
+
+/** The next steps this Host offers; a step whose handler is `null` is not available here. */
+function NextStepsCard({
+  onCreateBot,
+  onAddProject,
+  onAddHost,
+}: {
+  onCreateBot: (() => void) | null;
+  onAddProject: (() => void) | null;
+  onAddHost(): void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={settingsStyles.card}>
+      {onCreateBot ? (
+        <NextStepRow
+          icon={Bot}
+          title={t("hub.account.nextSteps.createBot")}
+          description={t("hub.account.nextSteps.createBotDescription")}
+          onPress={onCreateBot}
+        />
+      ) : null}
+      {onAddProject ? (
+        <NextStepRow
+          icon={FolderOpen}
+          title={t("hub.account.nextSteps.addProject")}
+          description={t("hub.account.nextSteps.addProjectDescription")}
+          onPress={onAddProject}
+        />
+      ) : null}
+      <NextStepRow
+        icon={Server}
+        title={t("hub.account.nextSteps.addHost")}
+        description={t("hub.account.nextSteps.addHostDescription")}
+        onPress={onAddHost}
+        last
+      />
+    </View>
+  );
+}
+
+function AddHostChoices({ onManaged, onDirect }: { onManaged(): void; onDirect(): void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.hostChoices}>
+      <Button variant="outline" onPress={onManaged}>
+        {t("hub.account.nextSteps.managedHost")}
+      </Button>
+      <Button variant="outline" onPress={onDirect}>
+        {t("hub.account.nextSteps.directHost")}
+      </Button>
+    </View>
   );
 }
 

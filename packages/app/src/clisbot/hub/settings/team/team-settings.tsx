@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
@@ -10,9 +11,9 @@ import { InvitePeopleModal } from "./invite-people-modal";
 import { SelectedMemberDetail } from "./member-detail";
 import { MemberTeamsModal } from "./member-teams-modal";
 import { MembersTab } from "./members-tab";
-import { peopleViews, usePeopleView } from "./people-views";
+import { usePeopleTabs } from "./people-views";
 import { SelectedTeamDetail } from "./team-detail";
-import { canInvitePeople, canSeeInvitations, managesPeople } from "./team-membership";
+import { canInvitePeople } from "./team-membership";
 import { TeamsTab } from "./teams-tab";
 import { useMemberRoleAction } from "./use-people-actions";
 import { usePeopleResources } from "./use-people-resources";
@@ -27,6 +28,7 @@ export function TeamSettings() {
   // One width for every tab and detail (the Members table needs it), so
   // switching tabs never resizes the page. A phone is full width anyway.
   useWideContent(!useIsCompactFormFactor());
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const resources = usePeopleResources(hub);
   const { authority } = resources;
@@ -34,20 +36,16 @@ export function TeamSettings() {
   const setRole = useMemberRoleAction(hub, resources, actions.run);
   const { selection, setSelection, back, manageAccess } = usePeopleSelection();
   const people = useInvitePeople(actions, setRole, setSelection);
-  const views = useMemo(
-    () => peopleViews(canSeeInvitations(authority), managesPeople(authority)),
-    [authority],
-  );
-  const [view, setView] = usePeopleView(views);
+  const { views, view, setView } = usePeopleTabs(authority);
   const canInvite = canInvitePeople(authority) && view !== "access";
   const inviteButton = useMemo(
     () =>
       canInvite ? (
         <Button size="xs" variant="default" disabled={actions.pending} onPress={people.openInvite}>
-          Invite people
+          {t("hub.team.people.invitePeople")}
         </Button>
       ) : null,
-    [actions.pending, canInvite, people.openInvite],
+    [actions.pending, canInvite, people.openInvite, t],
   );
   const modal =
     people.invite.request === null ? null : (
@@ -100,7 +98,7 @@ export function TeamSettings() {
   }
   return (
     <View>
-      <SettingsSection title="People & access" trailing={inviteButton}>
+      <SettingsSection title={t("hub.team.people.title")} trailing={inviteButton}>
         <ViewTabs tabs={views} value={view} onChange={setView} />
         {people.notice === null ? null : <Alert variant="success" title={people.notice} />}
       </SettingsSection>

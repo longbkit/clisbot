@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ConnectorMcpServer } from "@clisbot/protocol/connectors/types";
 import { SettingsSwitch } from "@/components/settings";
 import { saveMcpServer } from "./data";
@@ -15,6 +16,7 @@ export function McpServerToggle({
   serverId: string;
   server: ConnectorMcpServer;
 }) {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const toggle = useCallback(
     async (enabled: boolean) => {
@@ -39,8 +41,8 @@ export function McpServerToggle({
   const onValueChange = useCallback((value: boolean) => void toggle(value), [toggle]);
   return (
     <SettingsSwitch
-      label="On everywhere"
-      hint="Off keeps the server and each Project's tools; no agent can reach it until you turn it back on."
+      label={t("connectors.screen.mcp.toggle")}
+      hint={t("connectors.screen.mcp.toggleHint")}
       value={server.enabled !== false}
       onValueChange={onValueChange}
       error={error ?? undefined}

@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import {
   CONNECTOR_CARD_METADATA,
   ConnectorCardSchema,
@@ -47,6 +48,7 @@ export function ConnectorPermissionCard(props: ConnectorPermissionCardProps) {
  * lines. Allow once sends this call only; the same send again asks again.
  */
 function SendCard({ card, isResponding, onRespond }: ConnectorPermissionCardProps) {
+  const { t } = useTranslation();
   const deny = useCallback(
     () => onRespond({ behavior: "deny", message: "The person declined this send." }),
     [onRespond],
@@ -56,8 +58,8 @@ function SendCard({ card, isResponding, onRespond }: ConnectorPermissionCardProp
     <View style={styles.card} testID="connector-send-card">
       <CardHeader
         card={card}
-        title={card.title ?? `${card.appName}: send`}
-        hint="This agent wants to send something on your behalf. Check who receives it."
+        title={card.title ?? t("connectors.screen.card.sendTitle", { app: card.appName })}
+        hint={t("connectors.screen.card.sendHint")}
       />
       {card.fields && card.fields.length > 0 ? (
         <View style={styles.fields}>
@@ -73,10 +75,10 @@ function SendCard({ card, isResponding, onRespond }: ConnectorPermissionCardProp
       ) : null}
       <View style={styles.actions}>
         <Button variant="ghost" size="sm" onPress={deny} disabled={isResponding}>
-          Deny
+          {t("connectors.screen.common.deny")}
         </Button>
         <Button size="sm" onPress={allow} disabled={isResponding} testID="connector-card-send">
-          Allow once
+          {t("connectors.screen.card.allowOnce")}
         </Button>
       </View>
     </View>
@@ -96,6 +98,7 @@ function CardHeader({ card, title, hint }: { card: ConnectorCard; title: string;
 }
 
 function ConnectCard({ card, serverId, isResponding, onRespond }: ConnectorPermissionCardProps) {
+  const { t } = useTranslation();
   const connect = useConnectAccount(serverId, card.app);
   const stop = useCallback(
     () => onRespond({ behavior: "deny", message: `Not connecting ${card.appName} now.` }),
@@ -107,22 +110,24 @@ function ConnectCard({ card, serverId, isResponding, onRespond }: ConnectorPermi
       <CardHeader
         card={card}
         title={
-          waiting ? "Finish signing in in your browser" : `${card.appName} isn't connected yet`
+          waiting
+            ? t("connectors.screen.common.finishSignIn")
+            : t("connectors.screen.card.notConnected", { app: card.appName })
         }
         hint={
           waiting
-            ? "The task continues on its own when you are done."
-            : "This agent needs it to continue. The sign-in opens in your browser."
+            ? t("connectors.screen.card.waitingHint")
+            : t("connectors.screen.card.connectHint")
         }
       />
       {connect.error ? <Text style={styles.error}>{connect.error}</Text> : null}
       <View style={styles.actions}>
         <Button variant="ghost" size="sm" onPress={stop} disabled={isResponding}>
-          {waiting ? "Cancel" : "Not now"}
+          {waiting ? t("connectors.screen.common.cancel") : t("connectors.screen.card.notNow")}
         </Button>
         {waiting ? (
           <Button variant="outline" size="sm" onPress={connect.reopen}>
-            Open sign-in again
+            {t("connectors.screen.card.openSignInAgain")}
           </Button>
         ) : (
           <Button
@@ -131,7 +136,7 @@ function ConnectCard({ card, serverId, isResponding, onRespond }: ConnectorPermi
             onPress={connect.start}
             testID="connector-card-connect"
           >
-            {`Connect ${card.appName}`}
+            {t("connectors.screen.card.connectApp", { app: card.appName })}
           </Button>
         )}
       </View>
@@ -139,12 +144,15 @@ function ConnectCard({ card, serverId, isResponding, onRespond }: ConnectorPermi
   );
 }
 
-const ACCESS_OPTIONS = [
-  { value: "read" as const, label: "Read only" },
-  { value: "write" as const, label: "Read and write" },
-];
-
 function GrantCard({ card, serverId, isResponding, onRespond }: ConnectorPermissionCardProps) {
+  const { t } = useTranslation();
+  const accessOptions = useMemo(
+    () => [
+      { value: "read" as const, label: t("connectors.screen.common.readOnly") },
+      { value: "write" as const, label: t("connectors.screen.common.readWrite") },
+    ],
+    [t],
+  );
   const [access, setAccess] = useState<ConnectorAccess>("read");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,11 +177,11 @@ function GrantCard({ card, serverId, isResponding, onRespond }: ConnectorPermiss
     <View style={styles.card} testID="connector-grant-card">
       <CardHeader
         card={card}
-        title={`Use ${card.appName} in this Project?`}
-        hint="This agent wants an app the Project's Connectors do not include. Every session in the Project will be able to use it."
+        title={t("connectors.screen.card.grantTitle", { app: card.appName })}
+        hint={t("connectors.screen.card.grantHint")}
       />
       <SegmentedControl<ConnectorAccess>
-        options={ACCESS_OPTIONS}
+        options={accessOptions}
         value={access}
         onValueChange={setAccess}
         size="sm"
@@ -181,7 +189,7 @@ function GrantCard({ card, serverId, isResponding, onRespond }: ConnectorPermiss
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.actions}>
         <Button variant="ghost" size="sm" onPress={deny} disabled={isResponding || saving}>
-          Deny
+          {t("connectors.screen.common.deny")}
         </Button>
         <Button
           size="sm"
@@ -190,7 +198,7 @@ function GrantCard({ card, serverId, isResponding, onRespond }: ConnectorPermiss
           onPress={allowPress}
           testID="connector-card-allow"
         >
-          {`Allow ${card.appName}`}
+          {t("connectors.screen.card.allowApp", { app: card.appName })}
         </Button>
       </View>
     </View>

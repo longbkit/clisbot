@@ -1,6 +1,7 @@
 import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { DevicePairingOffer } from "@clisbot/protocol/device-pairing-offer";
 import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
+import { i18n } from "@/i18n/i18next";
 import { createAppWebSocketFactory } from "@/runtime/websocket-factory";
 import type { HostProfile } from "@/types/host-connection";
 import { prepareDevicePairing, daemonDeviceAccess } from "./credentials";
@@ -12,7 +13,7 @@ export async function pairDaemon(
   deviceLabel = suggestedDeviceLabel(),
 ): Promise<string | null> {
   if (offer.pairing.expiresAt <= Date.now())
-    throw new Error("Pairing invitation expired; print a new QR code");
+    throw new Error(i18n.t("hub.connection.errors.hostInvitationExpired"));
   await prepareDevicePairing(offer.serverId, offer.pairing.token, deviceLabel);
   let failure: unknown;
   for (const connection of profile.connections) {
@@ -39,7 +40,8 @@ export async function pairDaemon(
     try {
       await client.connect();
       const info = client.getLastServerInfoMessage();
-      if (info?.serverId !== offer.serverId) throw new Error("Unexpected Host identity");
+      if (info?.serverId !== offer.serverId)
+        throw new Error(i18n.t("hub.connection.errors.unexpectedHost"));
       return info.hostname ?? null;
     } catch (error) {
       failure = error;
@@ -49,5 +51,5 @@ export async function pairDaemon(
   }
   throw failure instanceof Error
     ? failure
-    : new Error("Unable to reach the Host; check Tailscale or relay");
+    : new Error(i18n.t("hub.connection.errors.hostUnreachable"));
 }

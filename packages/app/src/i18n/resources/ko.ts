@@ -1,5 +1,9 @@
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
+import { bots } from "./bots";
+import { heartbeats } from "./heartbeats";
+import { connectors } from "./connectors";
+import { hub } from "./hub";
 
 export const ko: TranslationResources = {
   paneFind: {
@@ -1255,6 +1259,7 @@ export const ko: TranslationResources = {
         copyPath: "경로 복사",
         copyBranchName: "브랜치 이름 복사",
         rename: "워크스페이스 이름 변경",
+        renameSession: "세션 이름 변경",
         pin: "상단에 고정",
         unpin: "고정 해제",
         archive: "보관",
@@ -2184,6 +2189,7 @@ export const ko: TranslationResources = {
           ko: "한국어",
           ptBR: "브라질 포르투갈어",
           ru: "Русский",
+          vi: "베트남어",
           zhCN: "简体中文",
         },
       },
@@ -2821,4 +2827,8 @@ export const ko: TranslationResources = {
       },
     },
   },
+  hub: hub.ko,
+  connectors: connectors.ko,
+  bots: bots.ko,
+  heartbeats: heartbeats.ko,
 };

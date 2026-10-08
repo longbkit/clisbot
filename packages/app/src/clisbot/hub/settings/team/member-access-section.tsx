@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -14,7 +15,6 @@ import type { GrantActions } from "../access-grants-table";
 import { useRemoveGrant } from "../access-queries";
 import { GrantAccessMenu, type GrantChoice } from "../access-grant-menu";
 import { GrantAccessSheet } from "../access-grant-sheet";
-import { countLabel } from "../labels";
 import { InfoRow } from "../resource-rows";
 import { SubjectGrantsTable } from "../subject-grants-table";
 import type {
@@ -59,6 +59,7 @@ export function MemberAccessSection({
   run(operation: () => Promise<void>): Promise<boolean>;
   manageAccess(): void;
 }) {
+  const { t } = useTranslation();
   const assignments = resources.assignments.data?.assignments ?? NO_ASSIGNMENTS;
   const directCount = subjectAssignments(assignments, "member", member.id).length;
   const joined = useMemo(
@@ -93,30 +94,27 @@ export function MemberAccessSection({
   );
   const manage = useMemo(
     () => (
-      <View style={styles.actions}>
-        {hasGrants ? (
-          <Button size="sm" variant="ghost" disabled={pending} onPress={manageAccess}>
-            Open in Access
-          </Button>
-        ) : null}
-        {/* An Owner already reaches everything; a grant would change nothing. */}
-        {member.role === "owner" ? null : (
-          <GrantButton member={member} teams={joined} disabled={pending} grant={setGranting} />
-        )}
-      </View>
+      <AccessActions
+        member={member}
+        teams={joined}
+        open={hasGrants ? manageAccess : null}
+        disabled={pending}
+        grant={setGranting}
+      />
     ),
     [hasGrants, joined, manageAccess, member, pending, setGranting],
   );
   return (
     <SettingsSection
-      title="Access"
-      info={`What ${member.name} can use: ${countLabel(directCount, "direct grant")}, and their Teams' grants marked with the Team.`}
+      title={t("hub.team.memberDetail.access.title")}
+      info={t("hub.team.memberDetail.access.info", {
+        name: member.name,
+        grants: t("hub.team.memberDetail.access.directGrants", { count: directCount }),
+      })}
       trailing={manage}
     >
       {member.role === "owner" ? (
-        <View style={settingsStyles.card}>
-          <InfoRow title="Everything" hint="An Owner's access is automatic; no grant is needed." />
-        </View>
+        <OwnerAccessRow />
       ) : (
         <SubjectGrantsTable
           subjectKind="member"
@@ -126,7 +124,7 @@ export function MemberAccessSection({
           accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
           members={resources.members.data?.members ?? NO_MEMBERS}
           teams={teams}
-          empty="No access yet. Grant some, or add them to a Team that has it."
+          empty={t("hub.team.memberDetail.access.empty")}
           actions={actions}
         />
       )}
@@ -143,6 +141,49 @@ export function MemberAccessSection({
   );
 }
 
+/** An Owner reaches everything without a grant. */
+function OwnerAccessRow() {
+  const { t } = useTranslation();
+  return (
+    <View style={settingsStyles.card}>
+      <InfoRow
+        title={t("hub.team.memberDetail.access.everything")}
+        hint={t("hub.team.memberDetail.access.ownerHint")}
+      />
+    </View>
+  );
+}
+
+/** Open in Access when there are grants to open, and Grant access… for anyone but an Owner. */
+function AccessActions({
+  member,
+  teams,
+  open,
+  disabled,
+  grant,
+}: {
+  member: HubMember;
+  teams: readonly HubTeam[];
+  open: (() => void) | null;
+  disabled: boolean;
+  grant(subject: string): void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.actions}>
+      {open === null ? null : (
+        <Button size="sm" variant="ghost" disabled={disabled} onPress={open}>
+          {t("hub.team.memberDetail.access.openInAccess")}
+        </Button>
+      )}
+      {/* An Owner already reaches everything; a grant would change nothing. */}
+      {member.role === "owner" ? null : (
+        <GrantButton member={member} teams={teams} disabled={disabled} grant={grant} />
+      )}
+    </View>
+  );
+}
+
 /** A menu with the Member's Teams first when they are in any; otherwise a plain button. */
 function GrantButton({
   member,
@@ -155,6 +196,7 @@ function GrantButton({
   disabled: boolean;
   grant(subject: string): void;
 }) {
+  const { t } = useTranslation();
   const self = useMemo<GrantChoice>(
     () => ({ key: subjectKey("member", member.id), title: member.name }),
     [member.id, member.name],
@@ -171,7 +213,7 @@ function GrantButton({
     );
   return (
     <Button size="sm" variant="outline" disabled={disabled} onPress={grantSelf}>
-      Grant access…
+      {t("hub.team.memberDetail.access.grantAccess")}
     </Button>
   );
 }

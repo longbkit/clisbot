@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 
@@ -17,22 +18,23 @@ export function BotDescriptionField({
   model: BotFormModel;
   size: "sm" | "md";
 }) {
+  const { t } = useTranslation();
   return (
     <Field
-      label="Role"
+      label={t("bots.workspace.botForm.role")}
       hint={
         state.description.trim()
-          ? "Other bots in a group read this to decide when to tag this bot."
-          : "Optional. Add one so other bots in a group know when to tag this bot; without it they only know its name."
+          ? t("bots.workspace.botForm.roleHint")
+          : t("bots.workspace.botForm.roleHintEmpty")
       }
     >
       <FormTextInput
-        accessibilityLabel="Bot role"
+        accessibilityLabel={t("bots.workspace.botForm.roleLabel")}
         size={size}
         initialValue={state.description}
         onChangeText={model.setDescription}
         maxLength={BOT_DESCRIPTION_MAX_CHARS}
-        placeholder="For example, Owns product scope and priorities"
+        placeholder={t("bots.workspace.botForm.rolePlaceholder")}
       />
     </Field>
   );

@@ -3,6 +3,7 @@
 // the person configuring a Rule that names them never leaves the form.
 
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -44,6 +45,7 @@ export function ConnectionSelfLink({
   account: ChannelConfigurationRecord;
   connection: HubConnection | undefined;
 }) {
+  const { t } = useTranslation();
   const catalog = useChannelCatalog();
   const enabled = account["enabled"] !== false;
   const people = useRulePeople({
@@ -69,12 +71,14 @@ export function ConnectionSelfLink({
   if (!named || !enabled || people.connection === undefined) return null;
   const channel = typeof account["channel"] === "string" ? account["channel"] : null;
   const channelName =
-    channel === null ? "the channel" : channelCatalogLabel(catalog.entries, channel);
+    channel === null
+      ? t("hub.routes.common.theChannel")
+      : channelCatalogLabel(catalog.entries, channel);
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
       <LinkMyAccount connection={people.connection} channelName={channelName} people={people}>
         <Text style={settingsStyles.rowHint}>
-          {`The bot can't recognize you on ${channelName} yet, so the Rules that name you do not let you in.`}
+          {t("hub.routes.link.connectionUnlinked", { channel: channelName })}
         </Text>
       </LinkMyAccount>
     </View>
@@ -93,6 +97,7 @@ export function LinkMyAccount({
   /** Why the link matters here, above the button. */
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,16 +114,18 @@ export function LinkMyAccount({
       )
       .then(setChallenge)
       .catch((failure: unknown) =>
-        setError(failure instanceof Error ? failure.message : "The Hub could not create a code."),
+        setError(
+          failure instanceof Error ? failure.message : t("hub.routes.link.createCodeFailed"),
+        ),
       )
       .finally(() => setPending(false));
-  }, [connection.id, hub]);
+  }, [connection.id, hub, t]);
   if (connection.canLinkIdentity === false) {
     return (
       <Alert
         variant="warning"
-        title={`The bot can't recognize you on ${channelName} yet`}
-        description="Link your account from Account settings → Linked identities."
+        title={t("hub.routes.link.cannotLinkTitle", { channel: channelName })}
+        description={t("hub.routes.link.cannotLinkDescription")}
       />
     );
   }
@@ -128,7 +135,9 @@ export function LinkMyAccount({
       {challenge === null ? (
         <View style={styles.action}>
           <Button size="sm" variant="outline" disabled={pending} onPress={issue}>
-            {pending ? "Creating code…" : `Link my ${channelName} account`}
+            {pending
+              ? t("hub.routes.link.creatingCode")
+              : t("hub.routes.link.linkAccount", { channel: channelName })}
           </Button>
         </View>
       ) : (
@@ -160,6 +169,7 @@ function IssuedCode({
   pending: boolean;
   refresh(): void;
 }) {
+  const { t } = useTranslation();
   const expired = useExpired(challenge.expiresAt);
   // The form drops the prompt once the link shows up in the Hub's identities;
   // nothing can land after the code expires.
@@ -167,19 +177,23 @@ function IssuedCode({
   if (expired) {
     return (
       <View style={styles.action}>
-        <Text style={settingsStyles.rowHint}>This code expired.</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.routes.link.expired")}</Text>
         <Button size="sm" variant="outline" disabled={pending} onPress={reissue}>
-          {pending ? "Creating code…" : "Create a new code"}
+          {pending ? t("hub.routes.link.creatingCode") : t("hub.routes.link.newCode")}
         </Button>
       </View>
     );
   }
   return (
     <>
-      <Text style={settingsStyles.rowHint}>{`Send this to the bot in ${channelName}:`}</Text>
-      <CopyableCommand command={challenge.command} copyLabel="Copy link command" />
       <Text style={settingsStyles.rowHint}>
-        {`Use it before ${new Date(challenge.expiresAt).toLocaleTimeString()}. This form updates when the link lands.`}
+        {t("hub.routes.link.sendThis", { channel: channelName })}
+      </Text>
+      <CopyableCommand command={challenge.command} copyLabel={t("hub.routes.link.copyCommand")} />
+      <Text style={settingsStyles.rowHint}>
+        {t("hub.routes.link.useBefore", {
+          time: new Date(challenge.expiresAt).toLocaleTimeString(),
+        })}
       </Text>
     </>
   );

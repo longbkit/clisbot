@@ -1,5 +1,6 @@
 import { Plug } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AgentControlTrigger } from "@/composer/agent-controls/control";
 import { useSessionStore } from "@/stores/session-store";
 import { selectWorkspace } from "@/stores/session-store-hooks/selectors";
@@ -24,6 +25,7 @@ function useBotProjects(serverId: string, chat: ChatTools): (string | null)[] {
 }
 
 export function RoomToolsChip({ chat }: { chat: ChatTools }) {
+  const { t } = useTranslation();
   const grants = useProjectGrants(chat.serverId);
   const projectIds = useBotProjects(chat.serverId, chat);
   const room = useMemo(() => {
@@ -42,7 +44,8 @@ export function RoomToolsChip({ chat }: { chat: ChatTools }) {
   const hide = useCallback(() => setOpen(false), []);
   if (!grants.data || room.groups.length + room.connectors.length === 0) return null;
   const on = roomOnCount(room, chat.off);
-  const label = on === 0 ? "Room tools off" : `Room tools · ${on}`;
+  const label =
+    on === 0 ? t("connectors.tools.room.chipOff") : t("connectors.tools.room.chipCount", { on });
   return (
     <>
       <AgentControlTrigger
@@ -52,7 +55,7 @@ export function RoomToolsChip({ chat }: { chat: ChatTools }) {
         value={label}
         open={open}
         onPress={show}
-        accessibilityLabel={`Tools in this room: ${label}`}
+        accessibilityLabel={t("connectors.tools.room.chipAccessibilityLabel", { label })}
         testID="composer-room-tools-chip"
       />
       {open ? (

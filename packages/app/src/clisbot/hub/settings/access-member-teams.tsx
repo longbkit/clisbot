@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { settingsStyles } from "@/styles/settings";
@@ -16,13 +17,14 @@ export function AccessMemberTeams({
   teams: readonly AccessEntry[];
   onSelect(key: string): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.block}>
-      <Text style={styles.label}>Teams</Text>
+      <Text style={styles.label}>{t("hub.access.browser.teams")}</Text>
       <View style={settingsStyles.card}>
         {teams.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
-            <Text style={tableStyles.cellText}>Not in any Team.</Text>
+            <Text style={tableStyles.cellText}>{t("hub.access.browser.notInTeam")}</Text>
           </View>
         ) : (
           teams.map((team, index) => (
@@ -43,6 +45,7 @@ function TeamLine({
   bordered: boolean;
   onSelect(key: string): void;
 }) {
+  const { t } = useTranslation();
   const press = useCallback(() => onSelect(team.key), [onSelect, team.key]);
   const style = useCallback(
     ({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
@@ -57,7 +60,7 @@ function TeamLine({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open Team ${team.title}`}
+      accessibilityLabel={t("hub.access.browser.openTeam", { name: team.title })}
       onPress={press}
       style={style}
     >

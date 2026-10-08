@@ -2,7 +2,11 @@
 import React, { type ReactNode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { AccountSessions } from "./account-sessions";
+
+// The assertions read the English copy.
+beforeEach(() => i18n.changeLanguage("en"));
 
 const fixture = vi.hoisted(() => ({
   hub: {

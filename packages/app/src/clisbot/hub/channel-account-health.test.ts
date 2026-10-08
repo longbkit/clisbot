@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  CHANNEL_STATUS_LABELS,
   channelAccountHealthRows,
   channelCatalogRows,
+  channelStatusLabel,
 } from "./channel-account-health";
 import { CHANNEL_CATALOG_FIXTURE as catalog } from "./channel-catalog.fixture";
 
@@ -143,8 +143,8 @@ describe("catalog rows", () => {
   it("marks a QR channel as connectable", () => {
     const zalouser = rows.find((row) => row.channel === "zalouser");
     expect(zalouser).toMatchObject({ status: "in-repo", connectable: true });
-    expect(CHANNEL_STATUS_LABELS["planned"]).toBe("Coming soon");
-    expect(CHANNEL_STATUS_LABELS["unknown"]).toBe("Reported by this Hub");
+    expect(channelStatusLabel("planned")).toBe("Coming soon");
+    expect(channelStatusLabel("unknown")).toBe("Reported by this Hub");
   });
 
   it("groups accounts under their channel", () => {

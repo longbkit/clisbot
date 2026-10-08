@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { beforeAll, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import type { ReactNode } from "react";
 const mocks = vi.hoisted(() => ({
   props: {} as Record<string, unknown>,
@@ -39,6 +40,8 @@ vi.mock("@/composer/draft/input-draft", () => ({
   },
 }));
 import { ChatComposer } from "./chat-composer";
+// The copy under test is the English UI text.
+beforeAll(() => i18n.changeLanguage("en"));
 it("keeps one conversation draft while selected bot controls and workspace change", () => {
   mocks.context = {
     agentId: "analyst-session",

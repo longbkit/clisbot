@@ -6,6 +6,7 @@
 // is that fact, so the Hosts screen and a Route row read one thing.
 
 import type { StatusBadgeVariant } from "@/components/ui/status-badge";
+import { i18n } from "@/i18n/i18next";
 
 export interface HubHostConnection {
   /** What the Host is called in the UI. */
@@ -47,8 +48,14 @@ export function hostConnectionPresentation(connection: HubHostConnection): {
   variant: StatusBadgeVariant;
 } {
   return connection.connected
-    ? { label: `Host ${connection.label}`, variant: "success" }
-    : { label: `Host ${connection.label} offline`, variant: "warning" };
+    ? {
+        label: i18n.t("hub.channels.hostConnection.host", { host: connection.label }),
+        variant: "success",
+      }
+    : {
+        label: i18n.t("hub.channels.hostConnection.hostOffline", { host: connection.label }),
+        variant: "warning",
+      };
 }
 
 /** The Hosts screen says the same thing about the Hub's own link. */
@@ -56,9 +63,13 @@ export function hubLinkPresentation(presence: string): {
   label: string;
   variant: StatusBadgeVariant;
 } {
-  if (presence === "connected") return { label: "Hub connected", variant: "success" };
-  if (presence === "offline") return { label: "Hub offline", variant: "warning" };
-  return { label: "Hub unknown", variant: "muted" };
+  if (presence === "connected") {
+    return { label: i18n.t("hub.channels.hostConnection.hubConnected"), variant: "success" };
+  }
+  if (presence === "offline") {
+    return { label: i18n.t("hub.channels.hostConnection.hubOffline"), variant: "warning" };
+  }
+  return { label: i18n.t("hub.channels.hostConnection.hubUnknown"), variant: "muted" };
 }
 
 function stringAt(record: Unknowns, key: string): string | undefined {

@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { isSupportedTransport, type ChannelCatalogEntry } from "../channel-catalog";
 import {
@@ -23,27 +25,28 @@ export function ChannelCatalogDetail({
   row: ChannelCatalogRow;
   onConnect?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation();
   return (
     <SettingsSection title={row.label}>
       {row.entry === undefined ? (
         <Alert
           variant="info"
-          title="Not in this Hub's catalog"
-          description="This Hub runs the channel but publishes no catalog entry for it. Its accounts and queue still appear here; its setup guidance does not."
+          title={t("hub.channels.catalogDetail.notInCatalogTitle")}
+          description={t("hub.channels.catalogDetail.notInCatalogBody")}
         />
       ) : null}
       {row.status === "planned" ? (
         <Alert
           variant="info"
-          title="Coming soon"
-          description={`${row.label} has no runtime on this Hub yet, so it cannot be connected.`}
+          title={t("hub.channels.catalogDetail.comingSoon")}
+          description={t("hub.channels.catalogDetail.plannedBody", { label: row.label })}
         />
       ) : null}
       <ChannelAccountHealthCard accounts={row.accounts} />
       {onConnect === undefined || !row.connectable ? null : (
         <View style={styles.actions}>
           <Button size="sm" onPress={onConnect}>
-            {`Connect ${row.label}`}
+            {t("hub.channels.catalogDetail.connect", { label: row.label })}
           </Button>
         </View>
       )}
@@ -54,10 +57,11 @@ export function ChannelCatalogDetail({
 
 /** How a Connection of this channel is made, and what to know first. */
 function ChannelConnectGuide({ entry }: { entry: ChannelCatalogEntry }) {
+  const { t } = useTranslation();
   const labels = new Map(entry.credentials.map(({ key, label }) => [key, label]));
   return (
     <>
-      <Text style={styles.heading}>How it connects</Text>
+      <Text style={styles.heading}>{t("hub.channels.catalogDetail.howItConnects")}</Text>
       <View style={settingsStyles.card}>
         {entry.transports.map((transport, index) => (
           <View
@@ -68,19 +72,24 @@ function ChannelConnectGuide({ entry }: { entry: ChannelCatalogEntry }) {
               <Text style={settingsStyles.rowTitle}>{transport.label}</Text>
               <Text style={settingsStyles.rowHint}>{transport.setup}</Text>
               <Text style={settingsStyles.rowHint}>
-                {`Needs: ${transport.requiredConfig.map((key) => labels.get(key) ?? key).join(", ")}`}
+                {t("hub.channels.catalogDetail.needs", {
+                  items: transport.requiredConfig.map((key) => labels.get(key) ?? key).join(", "),
+                })}
               </Text>
             </View>
             {isSupportedTransport(transport) ? null : (
               // Ported but not yet run end to end, so a Connection cannot pick it.
-              <StatusBadge label="Not supported yet" variant="muted" />
+              <StatusBadge
+                label={t("hub.channels.catalogDetail.notSupportedYet")}
+                variant="muted"
+              />
             )}
           </View>
         ))}
       </View>
       {entry.notes.length === 0 ? null : (
         <>
-          <Text style={styles.heading}>Before you connect</Text>
+          <Text style={styles.heading}>{t("hub.channels.catalogDetail.beforeYouConnect")}</Text>
           {entry.notes.map((note) => (
             <Text key={note} style={settingsStyles.rowHint}>
               {note}
@@ -93,11 +102,12 @@ function ChannelConnectGuide({ entry }: { entry: ChannelCatalogEntry }) {
 }
 
 function ChannelAccountHealthCard({ accounts }: { accounts: readonly ChannelAccountHealth[] }) {
+  const { t } = useTranslation();
   if (accounts.length === 0) {
     return (
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
-          <Text style={settingsStyles.rowHint}>No Connection uses this channel yet.</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.channels.catalogDetail.noConnection")}</Text>
         </View>
       </View>
     );
@@ -118,6 +128,7 @@ function ChannelAccountHealthRow({
   account: ChannelAccountHealth;
   bordered: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
@@ -129,7 +140,7 @@ function ChannelAccountHealthRow({
         )}
       </View>
       <StatusBadge
-        label={account.enabled ? account.transportLabel : "Disabled"}
+        label={account.enabled ? account.transportLabel : t("hub.channels.transport.disabled")}
         variant={channelSeverityVariant(account.severity)}
       />
     </View>
@@ -142,15 +153,18 @@ function identityLine(account: ChannelAccountHealth): string {
       ? account.connectionName
       : `${account.identity} · ${account.connectionName}`;
   }
-  if (account.connectionId === null) return "No Connection is referenced by this account.";
-  return "The referenced Connection is unavailable.";
+  if (account.connectionId === null) return i18n.t("hub.channels.catalogDetail.noReference");
+  return i18n.t("hub.channels.catalogDetail.referenceUnavailable");
 }
 
 function queueLine(account: ChannelAccountHealth): string {
-  if (account.ingressSummary === null) return "This Hub reports no queue depth for this account.";
+  if (account.ingressSummary === null) return i18n.t("hub.channels.catalogDetail.noQueueDepth");
   return account.oldestPending === null
     ? account.ingressSummary
-    : `${account.ingressSummary} · oldest ${account.oldestPending}`;
+    : i18n.t("hub.channels.catalogDetail.withOldest", {
+        summary: account.ingressSummary,
+        age: account.oldestPending,
+      });
 }
 
 const styles = StyleSheet.create((theme) => ({

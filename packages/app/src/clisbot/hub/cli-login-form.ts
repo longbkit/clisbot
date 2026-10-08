@@ -1,4 +1,5 @@
 import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
+import { i18n } from "@/i18n/i18next";
 import { HUB_HOST_DISCOVERY_WINDOW_MS, type DaemonReference } from "./managed-host-discovery";
 
 export interface CliLoginFormState {
@@ -105,7 +106,8 @@ export function openCliLoginForm(input: {
       } catch (cause) {
         if (lifetime !== attemptLifetime) return;
         publish({
-          error: cause instanceof Error ? cause.message : "Unable to record CLI login decision.",
+          error:
+            cause instanceof Error ? cause.message : i18n.t("hub.account.cliLogin.decisionError"),
         });
       } finally {
         if (lifetime === attemptLifetime) publish({ pending: false });

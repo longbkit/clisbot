@@ -10,6 +10,7 @@ import {
   type ChannelRouteBehavior,
   type ChannelRouteQuestions,
 } from "../channel-configuration";
+import { i18n } from "@/i18n/i18next";
 import { type RecordValue } from "./channel-settings-types";
 import { arrayField, objectField, stringField } from "./channel-settings-records";
 
@@ -98,16 +99,16 @@ export function behaviorWithApprovalChoice(
   return approvalChoice === "custom" ? settings : { ...settings, approvalMode: approvalChoice };
 }
 
-const ROUTE_REPLY_SUMMARIES: Record<ChannelRouteBehavior["outboundPath"], string> = {
-  hybrid: "Hybrid: text answers, plus the Channel tool for files and actions",
-  relay: "Text forward",
-  tool: "Channel tool only: text and Project files, preapproved",
-};
+function routeReplySummaryText(outboundPath: ChannelRouteBehavior["outboundPath"]): string {
+  if (outboundPath === "hybrid") return i18n.t("hub.routes.replySummaries.hybrid");
+  if (outboundPath === "relay") return i18n.t("hub.routes.replySummaries.relay");
+  return i18n.t("hub.routes.replySummaries.tool");
+}
 
 export function routeReplySummary(route: RecordValue): string {
   const { outboundPath, outboundPathInherited } = routeBehaviorDraft(route).behavior;
-  if (outboundPathInherited === true) return "Inherited from the Connection or organization";
-  return ROUTE_REPLY_SUMMARIES[outboundPath];
+  if (outboundPathInherited === true) return i18n.t("hub.routes.replySummaries.inherited");
+  return routeReplySummaryText(outboundPath);
 }
 
 export function routeToolRequestSummary(route: RecordValue): string {

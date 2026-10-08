@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,6 @@ import { settingsStyles } from "@/styles/settings";
 import { useChannelCatalog } from "../channel-catalog-queries";
 import { identityRealms } from "../channel-identity-link-realms";
 import { FilterChips } from "../filter-chips";
-import { countLabel } from "../labels";
 import { EmptyRow, ResourceFeedbackGroup } from "../resource-rows";
 import {
   filterMemberRows,
@@ -33,6 +33,7 @@ export function MembersTab({
   pending: boolean;
   handlers: MemberRowHandlers;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MemberFilter>("all");
   const [showAll, setShowAll] = useState(false);
@@ -56,28 +57,28 @@ export function MembersTab({
       teams.data,
     ],
   );
-  const chips = useMemo(() => memberChips(rows), [rows]);
+  const chips = useMemo(() => memberChips(rows, t), [rows, t]);
   const visible = useMemo(() => filterMemberRows(rows, query, filter), [filter, query, rows]);
   const shown = showAll ? visible : visible.slice(0, PAGE_SIZE);
   const expand = useCallback(() => setShowAll(true), []);
   const capabilities = hub.signedIn?.capabilities;
   return (
     <View>
-      <SettingsSection title="Overview">
+      <SettingsSection title={t("hub.team.members.overview")}>
         <ResourceFeedbackGroup queries={[members, teams, identities]} />
         <FilterChips<MemberFilter> chips={chips} value={filter} onChange={setFilter} />
       </SettingsSection>
-      <SettingsSection title="Members">
+      <SettingsSection title={t("hub.team.members.title")}>
         <SearchField
           value={query}
           onChangeText={setQuery}
-          placeholder="Search name, email, or Team"
-          clearAccessibilityLabel="Clear Member search"
+          placeholder={t("hub.team.members.searchPlaceholder")}
+          clearAccessibilityLabel={t("hub.team.members.clearSearch")}
         />
         <Text style={settingsStyles.rowHint}>
           {visible.length === rows.length
-            ? countLabel(rows.length, "Member")
-            : `${String(visible.length)} of ${countLabel(rows.length, "Member")}`}
+            ? t("hub.team.counts.members", { count: rows.length })
+            : t("hub.team.members.filtered", { shown: visible.length, count: rows.length })}
         </Text>
         <View style={settingsStyles.card}>
           {shown.length === 0 ? null : (
@@ -88,7 +89,9 @@ export function MembersTab({
           )}
           {shown.length === 0 ? (
             <EmptyRow
-              message={rows.length === 0 ? "No Members are available." : "No Members match."}
+              message={
+                rows.length === 0 ? t("hub.team.members.empty") : t("hub.team.members.noMatch")
+              }
             />
           ) : (
             shown.map((row) => (
@@ -108,7 +111,7 @@ export function MembersTab({
         </View>
         {shown.length < visible.length ? (
           <Button variant="outline" size="sm" onPress={expand}>
-            {`Show all ${String(visible.length)}`}
+            {t("hub.team.members.showAll", { total: visible.length })}
           </Button>
         ) : null}
       </SettingsSection>

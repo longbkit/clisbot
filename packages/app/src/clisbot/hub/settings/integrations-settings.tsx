@@ -5,6 +5,7 @@
 
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { HubConnectionContinuationSchema, HubConnectionsSchema } from "../contracts";
 import { buildHubSettingsRoute } from "../navigation";
@@ -32,10 +34,8 @@ type Connections = z.infer<typeof HubConnectionsSchema>;
 type Connection = Connections["connections"][number];
 type ProviderApplication = Connections["providerApplications"][number];
 
-const INFO =
-  "Apps your organization is connected to, such as a GitHub App install that starts Automations. Slack and Telegram bots that chat are Connections under Channels.";
-
 export function IntegrationsSettings() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const router = useRouter();
   const canManage = hub.signedIn?.capabilities.manageResources === true;
@@ -51,16 +51,20 @@ export function IntegrationsSettings() {
     () =>
       canManage && applications.length > 0 ? (
         <Button size="sm" onPress={openChooser}>
-          Connect…
+          {t("hub.settings.integrations.connectButton")}
         </Button>
       ) : null,
-    [applications.length, canManage, openChooser],
+    [applications.length, canManage, openChooser, t],
   );
   const listed = (connections.data?.connections ?? []).filter(isIntegration);
   return (
     <View>
       <HubConnectionResultNotice />
-      <SettingsSection title="Connected apps" info={INFO} trailing={connectButton}>
+      <SettingsSection
+        title={t("hub.settings.integrations.title")}
+        info={t("hub.settings.integrations.info")}
+        trailing={connectButton}
+      >
         {error ? <Alert variant="error" title={error} /> : null}
         <ResourceFeedback query={connections} />
         {connections.data === undefined ? null : (
@@ -80,8 +84,8 @@ export function IntegrationsSettings() {
             )}
             <View style={settingsStyles.rowBorder}>
               <SettingsLinkRow
-                label="Slack and Telegram chat bots"
-                hint="Set up in Channels"
+                label={t("hub.settings.integrations.chatBots")}
+                hint={t("hub.settings.integrations.chatBotsHint")}
                 onPress={openChannels}
               />
             </View>
@@ -97,8 +101,8 @@ export function IntegrationsSettings() {
 /** What an empty list says next: Connect when an app is offered, else where apps come from. */
 function emptyMessage(canConnect: boolean): string {
   return canConnect
-    ? "No apps connected. Use Connect to add one."
-    : "No apps connected. The Hub operator adds GitHub, Slack, Discord or Linear apps in Instance settings.";
+    ? i18n.t("hub.settings.integrations.emptyCanConnect")
+    : i18n.t("hub.settings.integrations.emptyOperator");
 }
 
 /** Listed here unless a Channel Route uses it: that one is managed with its Channel. */
@@ -107,13 +111,14 @@ function isIntegration(connection: Connection): boolean {
 }
 
 function useDisconnect(refetch: () => unknown, setError: (message: string | null) => void) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   return useCallback(
     async (connection: Connection) => {
       const confirmed = await confirmDialog({
-        title: `Disconnect ${connection.name}?`,
-        message: "Its saved credential and the Channel identities linked through it are removed.",
-        confirmLabel: "Disconnect",
+        title: t("hub.settings.integrations.disconnectTitle", { name: connection.name }),
+        message: t("hub.settings.integrations.disconnectMessage"),
+        confirmLabel: t("hub.settings.integrations.disconnect"),
         destructive: true,
       });
       if (!confirmed) return;
@@ -122,10 +127,12 @@ function useDisconnect(refetch: () => unknown, setError: (message: string | null
         await hub.api().delete(`connections/${encodeURIComponent(connection.id)}`);
         await refetch();
       } catch (error) {
-        setError(error instanceof Error ? error.message : "Hub request failed.");
+        setError(
+          error instanceof Error ? error.message : t("hub.settings.integrations.requestFailed"),
+        );
       }
     },
-    [hub, refetch, setError],
+    [hub, refetch, setError, t],
   );
 }
 
@@ -140,17 +147,21 @@ function IntegrationRow({
   canManage: boolean;
   disconnect(connection: Connection): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const used = connection.consumers.map(({ name }) => name).join(", ");
   const actions = useMemo(
     () => [
       {
-        label: connection.consumers.length > 0 ? "Disconnect (in use)" : "Disconnect",
+        label:
+          connection.consumers.length > 0
+            ? t("hub.settings.integrations.disconnectInUse")
+            : t("hub.settings.integrations.disconnect"),
         onSelect: () => void disconnect(connection),
         destructive: true,
         disabled: connection.consumers.length > 0,
       },
     ],
-    [connection, disconnect],
+    [connection, disconnect, t],
   );
   const connected = connection.status === "connected";
   return (
@@ -163,16 +174,20 @@ function IntegrationRow({
           <Text style={settingsStyles.rowHint}>{connection.externalName}</Text>
         ) : null}
         <Text style={settingsStyles.rowHint}>
-          {used.length === 0 ? "Not used yet" : `Used by ${used}`}
+          {used.length === 0
+            ? t("hub.settings.integrations.notUsedYet")
+            : t("hub.settings.integrations.usedBy", { names: used })}
         </Text>
       </View>
       <StatusBadge
-        label={connected ? "Connected" : capitalizeLabel(connection.status)}
+        label={
+          connected ? t("hub.settings.integrations.connected") : capitalizeLabel(connection.status)
+        }
         variant={connected ? "success" : "warning"}
       />
       {canManage ? (
         <RowActionsMenu
-          label={`Actions for ${connection.name}`}
+          label={t("hub.settings.integrations.actionsFor", { name: connection.name })}
           actions={actions}
           disabled={false}
         />
@@ -189,6 +204,7 @@ function ConnectSheet({
   applications: readonly ProviderApplication[];
   close(): void;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const continuation = useHubConnectionContinuation();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -208,14 +224,16 @@ function ConnectSheet({
           );
         await continuation.open(result.url);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Hub request failed.");
+        setError(
+          cause instanceof Error ? cause.message : t("hub.settings.integrations.requestFailed"),
+        );
       } finally {
         setPendingId(null);
       }
     },
-    [continuation, hub],
+    [continuation, hub, t],
   );
-  const header = useMemo(() => ({ title: "Connect an app" }), []);
+  const header = useMemo(() => ({ title: t("hub.settings.integrations.connectSheetTitle") }), [t]);
   return (
     <AdaptiveModalSheet visible header={header} onClose={close} desktopMaxWidth={480}>
       <View style={styles.sheet}>

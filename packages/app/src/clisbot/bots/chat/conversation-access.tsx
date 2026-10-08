@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import { View, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { usePaneContext } from "@/panels/pane-context";
 import { getPanelRegistration } from "@/panels/panel-registry";
 import { useWorkspace } from "@/stores/session-store-hooks";
@@ -14,6 +15,7 @@ export function isConversationDocumentTarget(target: WorkspaceTabTarget) {
 }
 /** Recheck live project access before mounting panels which can read or mutate files. */
 export function ConversationResourcePanel() {
+  const { t } = useTranslation();
   const { serverId, workspaceId, target } = usePaneContext();
   const allowed = useContext(ConversationAccessContext);
   const workspace = useWorkspace(serverId, workspaceId);
@@ -24,7 +26,7 @@ export function ConversationResourcePanel() {
   if (!permitted)
     return (
       <View>
-        <Text>Project access is required to view this content.</Text>
+        <Text>{t("bots.chat.access.required")}</Text>
       </View>
     );
   const Component = getPanelRegistration(target.kind)?.component;

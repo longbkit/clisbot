@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,13 +26,9 @@ import {
   type HubAccessAssignment,
 } from "./automation-access-grant";
 
-const SCOPE_OPTIONS = [
-  { id: "run", value: "run" as const, label: "Run" },
-  { id: "admin", value: "admin" as const, label: "Admin" },
-];
-
 /** Who may run or administer this Automation, with the Run warning beside the grant. */
 export function AutomationAccessSection({ automation }: { automation: HubScopedAutomation }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
@@ -91,12 +88,12 @@ export function AutomationAccessSection({ automation }: { automation: HubScopedA
   const granted = new Set(rows.map(({ subjectId }) => subjectId));
   const candidates = (members.data?.members ?? []).filter(({ id }) => !granted.has(id));
   return (
-    <SettingsSection title="Access">
+    <SettingsSection title={t("hub.automations.access.title")}>
       <Alert variant="warning" title={automationRunWarning(automation)} />
       {error ? <Alert variant="error" title={error} /> : null}
       <View style={settingsStyles.card}>
         {rows.length === 0 ? (
-          <Text style={settingsStyles.rowHint}>No one else has access to this Automation.</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.automations.access.noOne")}</Text>
         ) : (
           rows.map((row, index) => (
             <AssignmentRow
@@ -128,24 +125,25 @@ function AssignmentRow({
   pending: boolean;
   remove(assignmentId: string): void;
 }) {
+  const { t } = useTranslation();
   const removeRow = useCallback(() => remove(row.id), [remove, row.id]);
+  const scope = automationScopeLabel(assignmentScope(row));
   return (
     <View style={[settingsStyles.row, border ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{name}</Text>
         <Text style={settingsStyles.rowHint}>
-          {row.subjectKind === "team" ? "Team · " : ""}
-          {automationScopeLabel(assignmentScope(row))}
+          {row.subjectKind === "team" ? t("hub.automations.access.teamScope", { scope }) : scope}
         </Text>
       </View>
       <Button
         size="sm"
         variant="outline"
         disabled={pending}
-        accessibilityLabel={`Remove ${name}`}
+        accessibilityLabel={t("hub.automations.access.removeName", { name })}
         onPress={removeRow}
       >
-        Remove
+        {t("hub.automations.access.remove")}
       </Button>
     </View>
   );
@@ -160,6 +158,7 @@ function GrantForm({
   pending: boolean;
   grant(membershipId: string, level: HubAutomationScope): void;
 }) {
+  const { t } = useTranslation();
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [level, setLevel] = useState<HubAutomationScope>("run");
   const options = useMemo(
@@ -171,7 +170,17 @@ function GrantForm({
     () => (selected === undefined ? null : { label: selected.label }),
     [selected],
   );
-  const levelDisplay = useMemo(() => ({ label: automationScopeLabel(level) }), [level]);
+  const levelOptions = useMemo(
+    () => [
+      { id: "run", value: "run" as const, label: t("hub.automations.scope.run") },
+      { id: "admin", value: "admin" as const, label: t("hub.automations.scope.admin") },
+    ],
+    [t],
+  );
+  const levelDisplay = useMemo(
+    () => ({ label: levelOptions.find(({ value }) => value === level)?.label ?? level }),
+    [level, levelOptions],
+  );
   const submit = useCallback(() => {
     if (membershipId === null) return;
     grant(membershipId, level);
@@ -180,22 +189,22 @@ function GrantForm({
   return (
     <View style={styles.form}>
       <SelectField
-        label="Member"
+        label={t("hub.automations.access.member")}
         value={membershipId}
         selectedDisplay={selectedDisplay}
-        placeholder="Choose a Member"
-        emptyText="Every Member already has access."
+        placeholder={t("hub.automations.access.chooseMember")}
+        emptyText={t("hub.automations.access.everyMemberHasAccess")}
         options={options}
         onChange={setMembershipId}
         disabled={pending}
       />
       <SelectField
-        label="Level"
+        label={t("hub.automations.access.level")}
         value={level}
         selectedDisplay={levelDisplay}
-        placeholder="Choose a level"
+        placeholder={t("hub.automations.access.chooseLevel")}
         emptyText=""
-        options={SCOPE_OPTIONS}
+        options={levelOptions}
         onChange={setLevel}
         disabled={pending}
       />
@@ -205,7 +214,7 @@ function GrantForm({
         disabled={pending || membershipId === null}
         onPress={submit}
       >
-        Grant access
+        {t("hub.automations.access.grant")}
       </Button>
     </View>
   );

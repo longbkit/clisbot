@@ -9,6 +9,7 @@
  * A denial is final on the Hub — the row keeps its decision and the sender
  * cannot re-request — so a decided row stays visible and offers no action.
  */
+import { i18n } from "@/i18n/i18next";
 import type { HubChannelPairing } from "./contracts";
 
 export type ChannelPairingStatus = HubChannelPairing["status"];
@@ -25,10 +26,10 @@ export interface ChannelPairingRow {
   decidable: boolean;
 }
 
-const STATUS_LABELS: Readonly<Record<ChannelPairingStatus, string>> = {
-  pending: "Waiting",
-  approved: "Approved",
-  denied: "Denied",
+const STATUS_LABELS: Readonly<Record<ChannelPairingStatus, () => string>> = {
+  pending: () => i18n.t("hub.channels.pairing.status.pending"),
+  approved: () => i18n.t("hub.channels.pairing.status.approved"),
+  denied: () => i18n.t("hub.channels.pairing.status.denied"),
 };
 
 const STATUS_ORDER: Readonly<Record<ChannelPairingStatus, number>> = {
@@ -50,8 +51,12 @@ export function channelPairingRows(
     .map((pairing) => ({
       senderIdentity: pairing.senderIdentity,
       title: pairing.senderName ?? pairing.senderIdentity,
-      detail: `Code ${pairing.code} · ${pairing.senderIdentity} · in ${pairing.externalConversationId}`,
-      statusLabel: STATUS_LABELS[pairing.status],
+      detail: i18n.t("hub.channels.pairing.detail", {
+        code: pairing.code,
+        sender: pairing.senderIdentity,
+        conversation: pairing.externalConversationId,
+      }),
+      statusLabel: STATUS_LABELS[pairing.status](),
       status: pairing.status,
       decidable: pairing.status === "pending",
     }));
@@ -66,7 +71,7 @@ export function pendingChannelPairings(
 /** The one line the Access section shows before anyone expands the queue. */
 export function channelPairingSummary(rows: readonly ChannelPairingRow[]): string {
   const waiting = pendingChannelPairings(rows).length;
-  if (rows.length === 0) return "No one has asked to use this account.";
-  if (waiting === 0) return "Every pairing request has been decided.";
-  return `${String(waiting)} ${waiting === 1 ? "person is" : "people are"} waiting for a decision.`;
+  if (rows.length === 0) return i18n.t("hub.channels.pairing.summaryEmpty");
+  if (waiting === 0) return i18n.t("hub.channels.pairing.summaryDecided");
+  return i18n.t("hub.channels.pairing.summaryWaiting", { count: waiting });
 }

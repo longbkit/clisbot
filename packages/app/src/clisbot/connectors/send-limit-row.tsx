@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { MAX_CONNECTOR_DAILY_SEND_LIMIT } from "@clisbot/protocol/connectors/types";
 import { SettingsRow } from "@/components/settings";
 import { FormTextInput } from "@/components/ui/form-field";
@@ -12,25 +13,26 @@ export function SendLimitRow({
   value: number;
   onChange(limit: number): void;
 }) {
+  const { t } = useTranslation();
   const [text, setText] = useState(String(value));
   const [error, setError] = useState<string | null>(null);
   const commit = useCallback(() => {
     const limit = Number(text.trim());
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_CONNECTOR_DAILY_SEND_LIMIT) {
-      setError(`Enter a whole number from 1 to ${MAX_CONNECTOR_DAILY_SEND_LIMIT}.`);
+      setError(t("connectors.screen.sending.limitError", { max: MAX_CONNECTOR_DAILY_SEND_LIMIT }));
       return;
     }
     setError(null);
     if (limit !== value) onChange(limit);
-  }, [onChange, text, value]);
+  }, [onChange, t, text, value]);
   return (
     <SettingsRow
-      label="Sends a day"
-      hint="Counted across every app, per Project; resets at midnight on the Host."
+      label={t("connectors.screen.sending.limit")}
+      hint={t("connectors.screen.sending.limitHint")}
       error={error ?? undefined}
     >
       <FormTextInput
-        accessibilityLabel="Sends a day"
+        accessibilityLabel={t("connectors.screen.sending.limit")}
         initialValue={String(value)}
         keyboardType="number-pad"
         size="sm"

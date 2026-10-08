@@ -1,5 +1,6 @@
 import { Building2 } from "lucide-react-native";
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -11,7 +12,7 @@ import { settingsStyles } from "@/styles/settings";
 import type { Theme } from "@/styles/theme";
 import type { useHubAccount } from "../account-provider";
 import type { HubAccountState } from "../contracts";
-import { roleLabel } from "../organization-identity";
+import { organizationRoleLabel } from "./labels";
 
 type HubAccount = ReturnType<typeof useHubAccount>;
 type HubRun = (operation: () => Promise<void>) => Promise<void>;
@@ -42,20 +43,28 @@ export function OrganizationSelection({
   setOrganizationName(name: string): void;
   canCreate: boolean;
 }) {
+  const { t } = useTranslation();
   const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
   const hasMemberships = state.memberships.length > 0;
+  const email = state.account.email;
   return (
-    <SettingsSection title={hasMemberships ? "Choose an organization" : "Create an organization"}>
+    <SettingsSection
+      title={
+        hasMemberships
+          ? t("hub.settings.organizationSelection.chooseTitle")
+          : t("hub.settings.organizationSelection.createTitle")
+      }
+    >
       <Text style={settingsStyles.rowHint}>
         {hasMemberships
-          ? `Signed in as ${state.account.email}. Open the organization you want to work in; its Hosts, Projects, and settings follow that choice.`
-          : `Signed in as ${state.account.email}.`}
+          ? t("hub.settings.organizationSelection.signedInChoose", { email })
+          : t("hub.settings.organizationSelection.signedIn", { email })}
       </Text>
       {!hasMemberships && !state.canCreateOrganization ? (
         <Alert
           variant="info"
-          title="No organization available"
-          description="Ask an organization owner or admin for an invitation, or sign in with another account."
+          title={t("hub.settings.organizationSelection.noneTitle")}
+          description={t("hub.settings.organizationSelection.noneDescription")}
         />
       ) : null}
       {hasMemberships ? (
@@ -83,7 +92,7 @@ export function OrganizationSelection({
         />
       ) : null}
       <Button variant="ghost" disabled={pending} onPress={signOut}>
-        Sign out
+        {t("hub.settings.organizationSelection.signOut")}
       </Button>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
     </SettingsSection>
@@ -103,6 +112,7 @@ function OrganizationChoice({
   select(organizationId: string): Promise<void>;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const choose = useCallback(
     () => void run(() => select(membership.id)),
     [membership.id, run, select],
@@ -116,12 +126,12 @@ function OrganizationChoice({
             {membership.name}
           </Text>
           <Text style={settingsStyles.rowHint} numberOfLines={1}>
-            {`${roleLabel(membership.role)} · ${membership.slug}`}
+            {`${organizationRoleLabel(membership.role)} · ${membership.slug}`}
           </Text>
         </View>
       </View>
       <Button size="sm" disabled={pending} onPress={choose}>
-        Open
+        {t("hub.settings.organizationSelection.open")}
       </Button>
     </View>
   );
@@ -142,6 +152,7 @@ function CreateOrganizationForm({
   setOrganizationName(name: string): void;
   canCreate: boolean;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const create = useCallback(
     () => void run(() => hub.createOrganization(organizationName.trim())),
@@ -149,17 +160,17 @@ function CreateOrganizationForm({
   );
   return (
     <View style={[settingsStyles.card, styles.form]}>
-      <Field label="New organization name">
+      <Field label={t("hub.settings.organizationSelection.newNameLabel")}>
         <FormTextInput
           size={compact ? "md" : "sm"}
           initialValue={organizationName}
           onChangeText={setOrganizationName}
-          placeholder="Acme"
+          placeholder={t("hub.settings.organizationSelection.newNamePlaceholder")}
           editable={!pending}
         />
       </Field>
       <Button variant="outline" disabled={pending || !canCreate} onPress={create}>
-        Create organization
+        {t("hub.settings.organizationSelection.create")}
       </Button>
     </View>
   );

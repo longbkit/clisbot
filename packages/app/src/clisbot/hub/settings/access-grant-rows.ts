@@ -2,6 +2,7 @@
 // modifiers), grouped by who holds it or by what it is on.
 // Pure functions, no React: docs/features/access/access-screen.md.
 
+import { i18n } from "@/i18n/i18next";
 import {
   accessLevelLabel,
   constraintSummary,
@@ -18,7 +19,6 @@ import {
 } from "./access-catalog";
 import { privilegesWithinHoldings, viewerHoldings, type ViewerAuthority } from "./access-grantor";
 import { matchingAccessLevel } from "./access-level-summary";
-import { countLabel } from "./labels";
 
 export type GrantGrouping = "subject" | "resource";
 
@@ -88,15 +88,23 @@ export function grantRows(input: GrantRowInput): GrantRow[] {
 
 function grantDetails(assignment: AccessAssignment, canShare: boolean): string[] {
   const limits = constraintSummary(assignment.constraints);
-  const shell = assignment.privileges.includes("terminal.use") ? ["Terminal"] : [];
-  return [...(canShare ? ["Can share"] : []), ...shell, ...(limits === null ? [] : [limits])];
+  const shell = assignment.privileges.includes("terminal.use")
+    ? [i18n.t("hub.access.rows.terminal")]
+    : [];
+  const share = canShare ? [i18n.t("hub.access.canShare.label")] : [];
+  return [...share, ...shell, ...(limits === null ? [] : [limits])];
 }
 
 function subjectName(kind: SubjectKind, id: string, input: GrantRowInput): string {
-  if (kind === "guest") return "Guest";
+  if (kind === "guest") return i18n.t("hub.access.kinds.guest");
   if (kind === "team")
-    return input.teams.find((team) => team.id === id)?.name ?? "Unavailable Team";
-  return input.members.find((member) => member.id === id)?.name ?? "Former Member";
+    return (
+      input.teams.find((team) => team.id === id)?.name ?? i18n.t("hub.access.rows.unavailableTeam")
+    );
+  return (
+    input.members.find((member) => member.id === id)?.name ??
+    i18n.t("hub.access.grantor.formerMember")
+  );
 }
 
 function resourceCell(
@@ -174,11 +182,21 @@ function addTeamRowsToMembers(
       rows
         .filter((row) => row.subject.kind === "team" && row.subject.id === team.id)
         .map((row) =>
-          reached(row, `${row.key}:${member.id}`, `Team ${team.name}`, `team:${team.id}`),
+          reached(
+            row,
+            `${row.key}:${member.id}`,
+            i18n.t("hub.access.rows.viaTeam", { name: team.name }),
+            `team:${team.id}`,
+          ),
         ),
     );
     if (inherited.length === 0 && !groups.has(key)) continue;
-    const group = groups.get(key) ?? { key, title: member.name, subtitle: "Member", rows: [] };
+    const group = groups.get(key) ?? {
+      key,
+      title: member.name,
+      subtitle: i18n.t("hub.access.kinds.member"),
+      rows: [],
+    };
     group.rows.push(...inherited);
     groups.set(key, group);
   }
@@ -188,10 +206,10 @@ function subjectSubtitle(
   subject: GrantRow["subject"],
   directory: { members: readonly HubMember[]; teams: readonly HubTeam[] },
 ): string {
-  if (subject.kind === "guest") return "Channel senders without a linked Member";
-  if (subject.kind === "member") return "Member";
+  if (subject.kind === "guest") return i18n.t("hub.access.guestDescription");
+  if (subject.kind === "member") return i18n.t("hub.access.kinds.member");
   const count = directory.teams.find((team) => team.id === subject.id)?.userIds.length ?? 0;
-  return `Team · ${String(count)} Member${count === 1 ? "" : "s"}`;
+  return i18n.t("hub.access.teamMemberCount", { count });
 }
 
 const SUBJECT_ORDER: Record<SubjectKind, number> = { team: 0, member: 1, guest: 2 };
@@ -230,13 +248,18 @@ function addHostRowsToProjects(
           row.assignment?.privileges.includes("project.use") === true,
       )
       .map((row) =>
-        reached(row, `${row.key}:${project.id}`, `Host ${row.resource.name}`, `daemon:${hostId}`),
+        reached(
+          row,
+          `${row.key}:${project.id}`,
+          i18n.t("hub.access.rows.viaHost", { name: row.resource.name }),
+          `daemon:${hostId}`,
+        ),
       );
     if (reachedRows.length === 0 && !groups.has(key)) continue;
     const group = groups.get(key) ?? {
       key,
       title: project.name,
-      subtitle: `Project · ${resources.find(({ kind, id }) => kind === "daemon" && id === hostId)?.name ?? hostId}`,
+      subtitle: `${resourceKindLabel("project")} · ${resources.find(({ kind, id }) => kind === "daemon" && id === hostId)?.name ?? hostId}`,
       rows: [],
     };
     group.rows.push(...reachedRows);
@@ -297,10 +320,10 @@ export function assignmentSubjectName(
   teamById: Map<string, string>,
   memberById: Map<string, string>,
 ): string {
-  if (subject.kind === "guest") return "Guest";
+  if (subject.kind === "guest") return i18n.t("hub.access.kinds.guest");
   return subject.kind === "team"
-    ? (teamById.get(subject.id) ?? "Team")
-    : (memberById.get(subject.id) ?? "Member");
+    ? (teamById.get(subject.id) ?? i18n.t("hub.access.kinds.team"))
+    : (memberById.get(subject.id) ?? i18n.t("hub.access.kinds.member"));
 }
 
 /**
@@ -313,10 +336,11 @@ export function grantedAccessLabel(
 ): string {
   const level = matchingAccessLevel(accessLevels, assignment.resourceKind, assignment.privileges);
   if (level === undefined) {
-    return `Custom · ${countLabel(assignment.privileges.length, "privilege")}`;
+    return i18n.t("hub.access.rows.custom", { count: assignment.privileges.length });
   }
-  const fastMode = assignment.privileges.includes("agent.fast.use") ? " + Fast mode" : "";
-  return `${accessLevelLabel(level)}${fastMode}`;
+  return assignment.privileges.includes("agent.fast.use")
+    ? i18n.t("hub.access.rows.withFastMode", { level: accessLevelLabel(level) })
+    : accessLevelLabel(level);
 }
 
 /** Above the viewer's own level on that resource: shown, not changeable. */
@@ -362,20 +386,23 @@ export function effectiveGrantRows(
     const limits = constraintSummary(grant.constraints);
     return {
       key: `${grant.assignmentId}:${grant.source.kind}`,
-      subject: { kind: "member", id: "self", name: "You" },
+      subject: { kind: "member", id: "self", name: i18n.t("hub.access.rows.you") },
       resource: {
         kind: grant.resource.kind,
         id: grant.resource.id,
         name: grant.resource.name,
         context: [
           parent === undefined ? kind : `${kind} · ${parent.name}`,
-          ...(grant.resource.available ? [] : ["Unavailable"]),
+          ...(grant.resource.available ? [] : [i18n.t("hub.access.unavailable")]),
         ].join(" · "),
       },
       level: effectiveLevel(grant.resource.kind, grant.privileges, accessLevels),
       details: limits === null ? [] : [limits],
       grantedBy: null,
-      via: grant.source.kind === "team" ? `Team ${grant.source.teamName}` : null,
+      via:
+        grant.source.kind === "team"
+          ? i18n.t("hub.access.rows.viaTeam", { name: grant.source.teamName })
+          : null,
       viaKey: null,
       assignment: null,
       locked: false,
@@ -392,7 +419,7 @@ function effectiveLevel(
     return grantedAccessLabel({ resourceKind, privileges: [...privileges] }, accessLevels);
   // COMPAT(effective-access-levels): added 2026-09-19, remove after 2027-03-19.
   // A Hub without the Level catalog on effective access: name the privileges.
-  return countLabel(privileges.length, "privilege");
+  return i18n.t("hub.access.rows.privileges", { count: privileges.length });
 }
 
 /** One subject's grants: a Team's, or a Member's own and their Teams'. */

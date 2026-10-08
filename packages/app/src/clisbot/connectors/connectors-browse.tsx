@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react-native";
 import { useCallback } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorCatalogItem, ConnectorMcpServer } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
@@ -43,17 +44,21 @@ export function ConnectorsBrowse({
   onSelectServer(name: string): void;
   onAddServer(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View>
       {connected.length > 0 ? (
-        <SettingsSection title="Connected" info="Apps with at least one account on this Host.">
+        <SettingsSection
+          title={t("connectors.screen.common.connected")}
+          info={t("connectors.screen.browse.connectedInfo")}
+        >
           <AppRows cards={connected} onSelect={onSelect} />
         </SettingsSection>
       ) : null}
       <ServersSection servers={servers} onSelect={onSelectServer} onAdd={onAddServer} />
       <SettingsSection
-        title="Popular"
-        info="Most used across Composio. Search or scroll the list for every app."
+        title={t("connectors.screen.browse.popular")}
+        info={t("connectors.screen.browse.popularInfo")}
       >
         <AppRows cards={popular.slice(0, BROWSE_ROW_LIMIT)} onSelect={onSelect} />
       </SettingsSection>
@@ -81,10 +86,14 @@ function AppRow({
   bordered: boolean;
   onSelect(slug: string): void;
 }) {
+  const { t } = useTranslation();
   const { item, state } = card;
   const press = useCallback(() => onSelect(item.slug), [item.slug, onSelect]);
   // The tool count first: a long description is cut at the end of the line.
-  const hint = [item.toolsCount ? `${item.toolsCount} tools` : null, item.description]
+  const hint = [
+    item.toolsCount ? t("connectors.screen.common.toolCount", { count: item.toolsCount }) : null,
+    item.description,
+  ]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -120,6 +129,7 @@ function Trailing({
   state: AppConnectionState;
   onPress(): void;
 }) {
+  const { t } = useTranslation();
   if (state !== "none") {
     return (
       <View style={styles.trailing}>
@@ -128,10 +138,12 @@ function Trailing({
       </View>
     );
   }
-  if (item.noAuth) return <StatusBadge label="No sign-in needed" variant="muted" />;
+  if (item.noAuth) {
+    return <StatusBadge label={t("connectors.screen.common.noSignIn")} variant="muted" />;
+  }
   return (
     <Button size="sm" variant="outline" onPress={onPress}>
-      Connect
+      {t("connectors.screen.common.connect")}
     </Button>
   );
 }

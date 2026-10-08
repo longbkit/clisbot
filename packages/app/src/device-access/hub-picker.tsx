@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
@@ -9,6 +10,7 @@ import { HubLockIcon, hubMutedIconProps } from "./hub-ui";
 import { useHubSwitchLocked } from "./hub-edit-lock";
 
 export function HubPicker({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
   const registry = useHubProfiles();
   const account = useHubAccount();
   const locked = useHubSwitchLocked();
@@ -21,29 +23,34 @@ export function HubPicker({ compact = false }: { compact?: boolean }) {
       registry.profiles.map((profile) => ({
         id: profile.hubId,
         label: profile.label,
-        description: profile.origin ?? "Encrypted relay",
+        description: profile.origin ?? t("hub.connection.common.encryptedRelay"),
       })),
-    [registry.profiles],
+    [registry.profiles, t],
   );
-  let status = "Sign in required";
+  let status = t("hub.connection.status.signInRequired");
   if (account.signedIn) {
     status =
       account.connection?.accountAuthentication === "personal"
-        ? "No account sign-in required"
+        ? t("hub.connection.common.noAccountSignIn")
         : `${account.signedIn.account.email} · ${account.signedIn.membership.role}`;
-  } else if (account.loading) status = "Connecting…";
-  else if (account.error) status = "Unavailable";
+  } else if (account.loading) status = t("hub.connection.status.connecting");
+  else if (account.error) status = t("hub.connection.status.unavailable");
   const chevron = useMemo(
     () => (locked ? <HubLockIcon size={14} uniProps={hubMutedIconProps} /> : undefined),
     [locked],
   );
   const showPicker = useCallback(() => setOpen(true), []);
-  const select = useCallback((id: string) => {
-    setError(null);
-    void selectHubProfile(id).catch((caught) =>
-      setError(caught instanceof Error ? caught.message : "Hub could not be selected"),
-    );
-  }, []);
+  const select = useCallback(
+    (id: string) => {
+      setError(null);
+      void selectHubProfile(id).catch((caught) =>
+        setError(
+          caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotSelect"),
+        ),
+      );
+    },
+    [t],
+  );
   if (!current) return null;
   return (
     <>
@@ -55,7 +62,9 @@ export function HubPicker({ compact = false }: { compact?: boolean }) {
         block
         style={[styles.trigger, compact ? styles.compact : styles.sidebar, locked && styles.locked]}
         onPress={showPicker}
-        accessibilityLabel={locked ? "Save or cancel before switching Hub" : "Switch Hub"}
+        accessibilityLabel={
+          locked ? t("hub.connection.picker.lockedA11y") : t("hub.connection.picker.switch")
+        }
         testID={compact ? "hub-title-picker" : "hub-sidebar-picker"}
       >
         {/* In the sidebar the dot takes an icon's room, so the name lines up
@@ -82,8 +91,8 @@ export function HubPicker({ compact = false }: { compact?: boolean }) {
         onOpenChange={setOpen}
         anchorRef={anchor}
         searchable
-        title="Switch Hub"
-        searchPlaceholder="Search Hubs…"
+        title={t("hub.connection.picker.switch")}
+        searchPlaceholder={t("hub.connection.picker.search")}
         desktopMinWidth={260}
       />
       {error ? (

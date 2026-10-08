@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
@@ -20,6 +21,7 @@ export function ConnectAccountSheet({
   onClose(): void;
   onSubmit(alias: string): void;
 }) {
+  const { t } = useTranslation();
   const [alias, setAlias] = useState("");
   const submit = useCallback(() => {
     if (alias.trim()) onSubmit(alias.trim());
@@ -28,7 +30,7 @@ export function ConnectAccountSheet({
     () => (
       <View style={styles.footer}>
         <Button variant="ghost" onPress={onClose}>
-          Cancel
+          {t("connectors.screen.common.cancel")}
         </Button>
         <Button
           variant="default"
@@ -36,13 +38,16 @@ export function ConnectAccountSheet({
           onPress={submit}
           testID="connectors-alias-submit"
         >
-          Continue in browser
+          {t("connectors.screen.connectAccount.continue")}
         </Button>
       </View>
     ),
-    [alias, onClose, submit],
+    [alias, onClose, submit, t],
   );
-  const header = useMemo(() => ({ title: `Connect another ${appName} account` }), [appName]);
+  const header = useMemo(
+    () => ({ title: t("connectors.screen.connectAccount.title", { app: appName }) }),
+    [appName, t],
+  );
   return (
     <AdaptiveModalSheet
       header={header}
@@ -52,13 +57,13 @@ export function ConnectAccountSheet({
       desktopMaxWidth={480}
     >
       <Field
-        label="Account name"
-        hint="Shown to you and in each Bot's settings, for example work or personal."
+        label={t("connectors.screen.connectAccount.nameLabel")}
+        hint={t("connectors.screen.connectAccount.nameHint")}
       >
         <FormTextInput
           key={String(visible)}
-          accessibilityLabel="Account name"
-          placeholder="work"
+          accessibilityLabel={t("connectors.screen.connectAccount.nameLabel")}
+          placeholder={t("connectors.screen.connectAccount.namePlaceholder")}
           autoCapitalize="none"
           autoFocus
           onChangeText={setAlias}

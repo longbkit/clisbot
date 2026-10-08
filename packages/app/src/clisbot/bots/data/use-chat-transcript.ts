@@ -2,6 +2,7 @@ import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
+import { i18n } from "@/i18n/i18next";
 import { toErrorMessage } from "@/utils/error-messages";
 import type { BotsRuntime } from "./client";
 import type { ChatTranscriptPage } from "./contracts";
@@ -29,7 +30,7 @@ async function fetchPage(
   input: { serverId: string; chatId: string; beforeSeq?: number },
 ): Promise<ChatTranscriptPage> {
   const client = runtime.getClient(input.serverId);
-  if (!client) throw new Error("Host is not connected");
+  if (!client) throw new Error(i18n.t("bots.workspace.errors.hostNotConnected"));
   const page = await client.chatTranscriptFetch({
     chatId: input.chatId,
     beforeSeq: input.beforeSeq,

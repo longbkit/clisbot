@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { AdaptiveRenameModal } from "@/components/rename-modal";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -35,6 +36,7 @@ export function TeamsTab({
   actions: TeamActions;
   select(value: TeamSelection): void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const openCreate = useCallback(() => setCreating(true), []);
@@ -66,14 +68,14 @@ export function TeamsTab({
     () =>
       canManage ? (
         <Button size="xs" variant="outline" disabled={actions.pending} onPress={openCreate}>
-          New Team
+          {t("hub.team.teams.newTeam")}
         </Button>
       ) : null,
-    [actions.pending, canManage, openCreate],
+    [actions.pending, canManage, openCreate, t],
   );
   return (
     <View>
-      <SettingsSection title="Teams" trailing={newTeam}>
+      <SettingsSection title={t("hub.team.teams.title")} trailing={newTeam}>
         <ResourceFeedbackGroup
           queries={[
             resources.teams,
@@ -86,18 +88,14 @@ export function TeamsTab({
           <SearchField
             value={query}
             onChangeText={setQuery}
-            placeholder="Search Teams"
-            clearAccessibilityLabel="Clear Team search"
+            placeholder={t("hub.team.teams.search")}
+            clearAccessibilityLabel={t("hub.team.teams.clearSearch")}
           />
         ) : null}
         <View style={settingsStyles.card}>
           {rows.length === 0 ? (
             <EmptyRow
-              message={
-                teams.length === 0
-                  ? "No Teams. Owners already have full access."
-                  : "No Teams match."
-              }
+              message={teams.length === 0 ? t("hub.team.teams.empty") : t("hub.team.teams.noMatch")}
             />
           ) : (
             rows.map((row, index) => (
@@ -109,10 +107,10 @@ export function TeamsTab({
       {creating ? (
         <AdaptiveRenameModal
           visible
-          title="New Team"
+          title={t("hub.team.teams.newTeam")}
           initialValue=""
-          placeholder="Team name"
-          submitLabel="Create Team"
+          placeholder={t("hub.team.teams.namePlaceholder")}
+          submitLabel={t("hub.team.teams.create")}
           maxLength={100}
           onSubmit={createTeam}
           onClose={closeCreate}

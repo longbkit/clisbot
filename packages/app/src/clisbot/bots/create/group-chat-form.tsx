@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField } from "@/components/ui/select-field";
@@ -9,13 +10,6 @@ import { BotMembersField } from "../chat/bot-members-field";
 import { BotFormLayout } from "./form-layout";
 import { useGroupChatForm, type GroupChatFormProps } from "./use-group-chat-form";
 
-const ALL_REPLY = { label: "Everyone, one at a time, unless you @mention a bot" };
-const MENTION_REPLY = { label: "Only bots you @mention" };
-const REPLY_OPTIONS = [
-  { id: "all", value: "all", ...ALL_REPLY },
-  { id: "mentioned", value: "mentioned", ...MENTION_REPLY },
-];
-
 type Form = ReturnType<typeof useGroupChatForm>;
 
 /**
@@ -24,6 +18,7 @@ type Form = ReturnType<typeof useGroupChatForm>;
  */
 export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
   const form = useGroupChatForm({ bots, hosts, onCreated });
+  const { t } = useTranslation();
   const size = useIsCompactFormFactor() ? "md" : "sm";
   const canCreate =
     hosts.some((host) => host.serverId === form.draft.serverId) &&
@@ -32,10 +27,12 @@ export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
   const footer = useMemo(
     () => (
       <Button size={size} variant="default" disabled={!canCreate} onPress={form.submit}>
-        {form.busy ? "Creating…" : "Create group chat"}
+        {form.busy
+          ? t("bots.workspace.groupChatForm.creating")
+          : t("bots.workspace.shared.createGroupChat")}
       </Button>
     ),
-    [size, canCreate, form.submit, form.busy],
+    [size, canCreate, form.submit, form.busy, t],
   );
   return (
     <BotFormLayout footer={footer}>
@@ -49,31 +46,53 @@ export function GroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
         autoOpen={form.draft.serverId !== ""}
         size={size}
       />
-      <Field label="Group name" hint="Optional. Without one, the group shows its members' names.">
+      <Field
+        label={t("bots.workspace.groupChatForm.groupName")}
+        hint={t("bots.workspace.groupChatForm.groupNameHint")}
+      >
         <FormTextInput
           size={size}
-          accessibilityLabel="Group name"
+          accessibilityLabel={t("bots.workspace.groupChatForm.groupName")}
           initialValue={form.draft.title}
           onChangeText={form.setTitle}
-          placeholder="For example, Product launch"
+          placeholder={t("bots.workspace.groupChatForm.groupNamePlaceholder")}
         />
       </Field>
-      <SelectField
-        label="Who replies?"
-        value={form.draft.requireMention ? "mentioned" : "all"}
-        selectedDisplay={form.draft.requireMention ? MENTION_REPLY : ALL_REPLY}
-        options={REPLY_OPTIONS}
-        onChange={form.setReply}
-        placeholder="Choose who replies"
-        emptyText="No reply options"
-        size={size}
-      />
+      <ReplyField form={form} size={size} />
       {form.error ? (
         <Text accessibilityRole="alert" style={styles.error}>
           {form.error}
         </Text>
       ) : null}
     </BotFormLayout>
+  );
+}
+
+function ReplyField({ form, size }: { form: Form; size: "sm" | "md" }) {
+  const { t } = useTranslation();
+  const options = useMemo(
+    () => [
+      { id: "all", value: "all", label: t("bots.workspace.groupChatForm.replyAll") },
+      {
+        id: "mentioned",
+        value: "mentioned",
+        label: t("bots.workspace.groupChatForm.replyMentioned"),
+      },
+    ],
+    [t],
+  );
+  const selected = form.draft.requireMention ? options[1]! : options[0]!;
+  return (
+    <SelectField
+      label={t("bots.workspace.groupChatForm.whoReplies")}
+      value={selected.value}
+      selectedDisplay={selected}
+      options={options}
+      onChange={form.setReply}
+      placeholder={t("bots.workspace.groupChatForm.chooseWhoReplies")}
+      emptyText={t("bots.workspace.groupChatForm.noReplyOptions")}
+      size={size}
+    />
   );
 }
 
@@ -92,17 +111,20 @@ function HostField({
     [hosts],
   );
   const selected = hosts.find((host) => host.serverId === form.draft.serverId) ?? null;
+  const { t } = useTranslation();
   if (hosts.length === 1 && hosts[0]?.serverId === form.draft.serverId) return null;
   return (
     <SelectField
-      label="Host"
+      label={t("bots.workspace.shared.form.host")}
       value={form.draft.serverId}
       selectedDisplay={selected}
       options={options}
       onChange={form.selectHost}
-      placeholder="Choose a Host"
-      emptyText="No eligible Hosts connected"
-      hint={form.draft.botIds.length > 0 ? "Changing Host clears the selected bots." : undefined}
+      placeholder={t("bots.workspace.botForm.chooseHost")}
+      emptyText={t("bots.workspace.botForm.noHosts")}
+      hint={
+        form.draft.botIds.length > 0 ? t("bots.workspace.groupChatForm.hostChangeHint") : undefined
+      }
       size={size}
     />
   );

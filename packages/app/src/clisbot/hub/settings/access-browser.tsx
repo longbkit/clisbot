@@ -3,6 +3,8 @@
 // then the entry on its own screen. docs/features/access/access-screen.md.
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Pressable,
   Text,
@@ -48,11 +50,6 @@ const SPLIT_MIN_WIDTH = 880;
 
 /** Enough to scan; the rest are one press or a search away. */
 const PAGE_SIZE = 50;
-
-const VIEW_OPTIONS: SegmentedControlOption<GrantGrouping>[] = [
-  { value: "subject", label: "People and Teams" },
-  { value: "resource", label: "Resources" },
-];
 
 /**
  * How the list is narrowed right now. It lives above the list, so opening an
@@ -109,6 +106,7 @@ export function AccessBrowser({
   /** Opens the grant sheet on this entry. */
   grantTo(entry: AccessEntry): void;
 }) {
+  const { t } = useTranslation();
   const list = useEntryListState();
   const compactFormFactor = useIsCompactFormFactor();
   const [width, setWidth] = useState<number | null>(null);
@@ -136,7 +134,7 @@ export function AccessBrowser({
   );
   const detail =
     selected === null ? (
-      <Text style={styles.muted}>Choose someone or something on the left to see its access.</Text>
+      <Text style={styles.muted}>{t("hub.access.browser.chooseEntry")}</Text>
     ) : (
       <EntryDetail
         entry={selected}
@@ -150,21 +148,13 @@ export function AccessBrowser({
   if (compact && selected !== null)
     return (
       <View style={styles.stack} onLayout={measure}>
-        <BackLink to="Access" onPress={back} />
+        <BackLink to={t("hub.access.title")} onPress={back} />
         {detail}
       </View>
     );
   return (
     <View style={styles.stack} onLayout={measure}>
-      <View style={styles.viewBy}>
-        <Text style={styles.viewByLabel}>View access by</Text>
-        <SegmentedControl
-          options={VIEW_OPTIONS}
-          value={grouping}
-          onValueChange={changeGrouping}
-          size="sm"
-        />
-      </View>
+      <ViewByControl grouping={grouping} onChange={changeGrouping} />
       <View style={compact ? null : styles.columns}>
         <View style={compact ? null : styles.master}>
           <EntryList
@@ -178,6 +168,30 @@ export function AccessBrowser({
         </View>
         {compact ? null : <View style={styles.detail}>{detail}</View>}
       </View>
+    </View>
+  );
+}
+
+/** "View access by": the axis the list holds, people and Teams or resources. */
+function ViewByControl({
+  grouping,
+  onChange,
+}: {
+  grouping: GrantGrouping;
+  onChange(grouping: GrantGrouping): void;
+}) {
+  const { t } = useTranslation();
+  const options = useMemo<SegmentedControlOption<GrantGrouping>[]>(
+    () => [
+      { value: "subject", label: t("hub.access.browser.peopleAndTeams") },
+      { value: "resource", label: t("hub.access.browser.resources") },
+    ],
+    [t],
+  );
+  return (
+    <View style={styles.viewBy}>
+      <Text style={styles.viewByLabel}>{t("hub.access.browser.viewBy")}</Text>
+      <SegmentedControl options={options} value={grouping} onValueChange={onChange} size="sm" />
     </View>
   );
 }
@@ -198,6 +212,7 @@ function EntryList({
   drillIn: boolean;
   onSelect(key: string): void;
 }) {
+  const { t } = useTranslation();
   const { filter, search, shown } = list;
   const chips = useMemo(() => entryFilterChips(entries, grouping), [entries, grouping]);
   const visible = useMemo(() => filterEntries(entries, filter, search), [entries, filter, search]);
@@ -207,14 +222,18 @@ function EntryList({
       <SearchField
         value={search}
         onChangeText={list.setSearch}
-        placeholder={grouping === "subject" ? "Search people and Teams" : "Search resources"}
-        clearAccessibilityLabel="Clear Access search"
+        placeholder={
+          grouping === "subject"
+            ? t("hub.access.browser.searchPeople")
+            : t("hub.access.browser.searchResources")
+        }
+        clearAccessibilityLabel={t("hub.access.browser.clearSearch")}
       />
       <FilterChips chips={chips} value={filter} onChange={list.setFilter} />
       <View style={settingsStyles.card}>
         {visible.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
-            <Text style={styles.muted}>Nothing matches.</Text>
+            <Text style={styles.muted}>{t("hub.access.browser.nothingMatches")}</Text>
           </View>
         ) : (
           visible
@@ -233,7 +252,10 @@ function EntryList({
       </View>
       {remaining > 0 ? (
         <Button size="sm" variant="ghost" onPress={list.showMore}>
-          {`Show ${String(Math.min(remaining, PAGE_SIZE))} more of ${String(remaining)}`}
+          {t("hub.access.browser.showMore", {
+            shown: Math.min(remaining, PAGE_SIZE),
+            remaining,
+          })}
         </Button>
       ) : null}
     </View>
@@ -298,6 +320,7 @@ function EntryDetail({
   grantTo(entry: AccessEntry): void;
   onSelect(key: string): void;
 }) {
+  const { t } = useTranslation();
   const grant = useCallback(() => grantTo(entry), [entry, grantTo]);
   // A Member in Teams is steered to grant through one of them; see GrantAccessMenu.
   const grantButton = useMemo(
@@ -311,10 +334,10 @@ function EntryDetail({
         />
       ) : (
         <Button size="sm" variant="outline" disabled={actions.pending} onPress={grant}>
-          Grant access…
+          {t("hub.access.form.grantAccessEllipsis")}
         </Button>
       ),
-    [actions.pending, entry, grant, grantTo, teams],
+    [actions.pending, entry, grant, grantTo, t, teams],
   );
   const rowActions = useMemo<GrantActions>(
     () => ({
@@ -340,14 +363,14 @@ function EntryDetail({
         subtitle={entry.subtitle}
         actions={entry.role === "owner" ? null : grantButton}
       />
-      {entry.role === undefined ? null : <Alert {...ROLE_ACCESS_NOTES[entry.role]} />}
+      {entry.role === undefined ? null : <Alert {...roleAccessNote(entry.role, t)} />}
       {entry.teamKeys === undefined ? null : (
         <AccessMemberTeams teams={teams} onSelect={onSelect} />
       )}
       <AccessGrantsTable
         rows={entry.rows}
         grouping={grouping}
-        empty={emptyGrants(entry, grouping)}
+        empty={emptyGrants(entry, grouping, t)}
         actions={rowActions}
       />
     </View>
@@ -357,30 +380,29 @@ function EntryDetail({
 const NO_ENTRIES: AccessEntry[] = [];
 
 /** What an organization role reaches without a grant, called out over the grants. */
-const ROLE_ACCESS_NOTES: Record<
-  RoleAccess,
-  { variant: "success" | "info"; title: string; description: string }
-> = {
-  owner: {
-    variant: "success",
-    title: "Owner · full access",
-    description:
-      "Every Host, Project, Connection, and Automation, including ones added later. No grant needed.",
-  },
-  admin: {
-    variant: "info",
-    title: "Organization Admin",
-    description:
-      "Manages Members, Teams, Connections, and Access. Hosts and Projects still need a grant.",
-  },
-};
+function roleAccessNote(
+  role: RoleAccess,
+  t: TFunction,
+): { variant: "success" | "info"; title: string; description: string } {
+  return role === "owner"
+    ? {
+        variant: "success",
+        title: t("hub.access.browser.ownerNoteTitle"),
+        description: t("hub.access.browser.ownerNote"),
+      }
+    : {
+        variant: "info",
+        title: t("hub.access.browser.adminNoteTitle"),
+        description: t("hub.access.browser.adminNote"),
+      };
+}
 
 /** The empty grants table, worded so it never contradicts the role above it. */
-function emptyGrants(entry: AccessEntry, grouping: GrantGrouping): string {
-  if (grouping === "resource") return "No one has access yet, other than Owners.";
-  if (entry.role === "owner") return "No grants, and none needed.";
-  if (entry.role === "admin") return "No grants yet. Grant one for a Host or Project.";
-  return "No access yet. Grant some, or add them to a Team that has it.";
+function emptyGrants(entry: AccessEntry, grouping: GrantGrouping, t: TFunction): string {
+  if (grouping === "resource") return t("hub.access.browser.emptyResource");
+  if (entry.role === "owner") return t("hub.access.browser.emptyOwner");
+  if (entry.role === "admin") return t("hub.access.browser.emptyAdmin");
+  return t("hub.access.browser.emptyMember");
 }
 
 const styles = StyleSheet.create((theme) => ({

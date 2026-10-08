@@ -1,5 +1,6 @@
 import type { StatusBadgeVariant } from "@/components/ui/status-badge";
 import type { HostRuntimeConnectionStatus } from "@/runtime/host-runtime";
+import { i18n } from "@/i18n/i18next";
 
 export type HubHostOnboardingStatus =
   | "waiting"
@@ -74,12 +75,12 @@ function daemonOnboardingStatus(
 
 export function hubHostConnectionOfferHint(presence: string): string {
   if (presence === "offline") {
-    return "This Host is not connected to Hub. Start Clisbot on that computer and check clisbot hub status, then refresh Hosts.";
+    return i18n.t("hub.account.hostStatus.offerOffline");
   }
   if (presence === "connected") {
-    return "This Host is connected to Hub but has not shared connection details. Check that relay is enabled on that computer, then refresh Hosts.";
+    return i18n.t("hub.account.hostStatus.offerConnected");
   }
-  return "This Host's connection status is unavailable. Check clisbot hub status on that computer, then refresh Hosts.";
+  return i18n.t("hub.account.hostStatus.offerUnavailable");
 }
 
 function hostOnboardingStatus(
@@ -100,40 +101,46 @@ export function hubHostStatusPresentation(status: HubHostOnboardingStatus): {
   variant: StatusBadgeVariant;
 } {
   if (status === "online") {
-    return { label: "Online", description: "Ready for Projects and Agents", variant: "success" };
+    return {
+      label: i18n.t("hub.account.hostStatus.online"),
+      description: i18n.t("hub.account.hostStatus.onlineDescription"),
+      variant: "success",
+    };
   }
   if (status === "connecting") {
     return {
-      label: "Connecting",
-      description: "Clisbot is connecting to this Host",
+      label: i18n.t("hub.account.hostStatus.connecting"),
+      description: i18n.t("hub.account.hostStatus.connectingDescription"),
       variant: "muted",
     };
   }
   if (status === "waiting") {
     return {
-      label: "Waiting for connection",
+      label: i18n.t("hub.account.hostStatus.waiting"),
       description: hubHostConnectionOfferHint("connected"),
       variant: "muted",
     };
   }
   if (status === "unavailable") {
     return {
-      label: "Status unavailable",
+      label: i18n.t("hub.account.hostStatus.unavailable"),
       description: hubHostConnectionOfferHint("unavailable"),
       variant: "muted",
     };
   }
   if (status === "offline" || status === "error") {
     return {
-      label: status === "offline" ? "Offline" : "Connection failed",
-      description:
-        "Clisbot can't reach this Host. Reconnect, or check its daemon on that computer:",
+      label:
+        status === "offline"
+          ? i18n.t("hub.account.hostStatus.offline")
+          : i18n.t("hub.account.hostStatus.failed"),
+      description: i18n.t("hub.account.hostStatus.unreachableDescription"),
       variant: status === "offline" ? "muted" : "error",
     };
   }
   return {
-    label: "Registering",
-    description: "Clisbot is adding this Daemon as a Host",
+    label: i18n.t("hub.account.hostStatus.registering"),
+    description: i18n.t("hub.account.hostStatus.registeringDescription"),
     variant: "muted",
   };
 }

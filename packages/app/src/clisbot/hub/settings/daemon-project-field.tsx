@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { SelectFieldOption } from "@/components/ui/select-field";
 import { SelectField } from "@/components/ui/select-field";
 import { useFetchQuery } from "@/data/query";
 import { settingsStyles } from "@/styles/settings";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { hubResourceQueryKey } from "../query-keys";
 import { HubDaemonProjectsSchema } from "../contracts";
@@ -66,6 +68,7 @@ function ProjectDirectoryField({
   workspace,
   disabled,
 }: DaemonProjectFieldProps) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
@@ -131,19 +134,17 @@ function ProjectDirectoryField({
     // sit tighter together than the form's spacing between unrelated fields.
     <View style={styles.group}>
       <SelectField
-        label="Project"
+        label={t("hub.settings.projectField.project")}
         value={directory.projectId}
         selectedDisplay={selectedDisplay}
         options={options}
         onChange={changeProject}
-        placeholder="Choose a Project"
-        emptyText={
-          projects.isPending ? "Loading Projects…" : "No active Projects are reported by this Host."
-        }
+        placeholder={t("hub.settings.projectField.chooseProject")}
+        emptyText={projectsEmptyText(projects.isPending)}
         hint={directory.rootPath ?? undefined}
         error={projects.error?.message ?? null}
         searchable={options.length > 6}
-        title="Project"
+        title={t("hub.settings.projectField.project")}
         disabled={disabled || daemonId === null}
       />
       {directory.projectId === null ? null : (
@@ -179,6 +180,7 @@ function ProjectDirectoryControls({
   workspace: DaemonProjectFieldProps["workspace"];
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {directory.rootPath === null ? (
@@ -195,7 +197,7 @@ function ProjectDirectoryControls({
             disabled={disabled || loadingRoot}
             onPress={refreshProjects}
           >
-            Refresh Projects
+            {t("hub.settings.projectField.refreshProjects")}
           </Button>
         </View>
       ) : null}
@@ -223,11 +225,12 @@ function CustomDirectoryFields({
   model: ProjectDirectoryForm;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const customDirectory = directory.mode !== "project";
   return (
     <>
       <SwitchRowControl
-        label="Use a custom working directory"
+        label={t("hub.settings.projectField.customDirectory")}
         value={customDirectory}
         onChange={model.setCustomDirectory}
         disabled={disabled}
@@ -255,6 +258,7 @@ function WorkLocationFields({
   workspace: NonNullable<DaemonProjectFieldProps["workspace"]>;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const { value, onChange } = workspace;
   const location = workLocation(value, directory);
   const choose = useCallback(
@@ -273,7 +277,7 @@ function WorkLocationFields({
   return (
     <>
       <SwitchRowControl
-        label="Work outside the Project folder"
+        label={t("hub.settings.projectField.workOutside")}
         value={location !== null}
         onChange={toggle}
         disabled={disabled}
@@ -281,14 +285,14 @@ function WorkLocationFields({
       {location === null ? null : (
         <>
           <SelectField
-            label="Where the Agent works"
+            label={t("hub.settings.projectField.whereAgentWorks")}
             value={location}
             selectedDisplay={selectedDisplay}
             options={WORK_LOCATION_OPTIONS}
             onChange={choose}
-            placeholder="Choose where the Agent works"
-            emptyText="No choices are available."
-            title="Where the Agent works"
+            placeholder={t("hub.settings.projectField.chooseWhereAgentWorks")}
+            emptyText={t("hub.settings.projectField.noChoices")}
+            title={t("hub.settings.projectField.whereAgentWorks")}
             disabled={disabled}
           />
           {location === "folder" ? (
@@ -320,16 +324,19 @@ function WorkingDirectoryField({
   model: ProjectDirectoryForm;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <Field
-      label="Working directory"
-      hint="Absolute path on this Host, within the selected Project."
+      label={t("hub.settings.projectField.workingDirectory")}
+      hint={t("hub.settings.projectField.workingDirectoryHint")}
     >
       <FormTextInput
         key={directory.projectId}
         initialValue={directory.cwd}
         onChangeText={model.setCwd}
-        placeholder={directory.rootPath ?? "Absolute path within the Project"}
+        placeholder={
+          directory.rootPath ?? t("hub.settings.projectField.workingDirectoryPlaceholder")
+        }
         autoCapitalize="none"
         autoCorrect={false}
         editable={!disabled}
@@ -373,10 +380,15 @@ function projectRootPath(
 }
 
 function projectFolderHint(loading: boolean, online: boolean): string {
-  if (loading) return "Loading Project folder…";
-  if (online)
-    return "Project folder is unavailable. Refresh Projects or check access on this Host.";
-  return "Connect this Host to load the Project folder.";
+  if (loading) return i18n.t("hub.settings.projectField.loadingFolder");
+  if (online) return i18n.t("hub.settings.projectField.folderUnavailable");
+  return i18n.t("hub.settings.projectField.connectToLoadFolder");
+}
+
+function projectsEmptyText(pending: boolean): string {
+  return pending
+    ? i18n.t("hub.settings.projectField.loadingProjects")
+    : i18n.t("hub.settings.projectField.noProjects");
 }
 
 const styles = StyleSheet.create((theme) => ({

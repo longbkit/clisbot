@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { countLabel } from "../labels";
+import { i18n } from "@/i18n/i18next";
 import { teamAccessReady } from "./invite-access-note";
 import {
   applyTeamAdditions,
@@ -149,7 +149,9 @@ export function useSubmitInvite({
       });
       const done = plan.members.length + plan.invitees.length - failures.length;
       const details = failures.map(({ label, message }) => `${label}: ${message}`).join("; ");
-      throw new Error(`${String(done)} of ${String(done + failures.length)} done. ${details}`);
+      throw new Error(
+        i18n.t("hub.team.invite.partial", { done, total: done + failures.length, details }),
+      );
     });
   }, [actions, draft.role, draft.textResetKey, hub, onDone, plan, resources, update]);
 }
@@ -157,8 +159,10 @@ export function useSubmitInvite({
 function inviteResult(plan: TeamAdditionPlan): string {
   const added = plan.teamIds.length > 0 ? plan.members.length : 0;
   const parts = [
-    ...(added > 0 ? [`Added ${countLabel(added, "Member")} to Teams`] : []),
-    ...(plan.invitees.length > 0 ? [`Sent ${countLabel(plan.invitees.length, "invitation")}`] : []),
+    ...(added > 0 ? [i18n.t("hub.team.invite.result.added", { count: added })] : []),
+    ...(plan.invitees.length > 0
+      ? [i18n.t("hub.team.invite.result.sent", { count: plan.invitees.length })]
+      : []),
   ];
-  return `${parts.join(" · ")}.`;
+  return i18n.t("hub.team.invite.result.summary", { parts: parts.join(" · ") });
 }

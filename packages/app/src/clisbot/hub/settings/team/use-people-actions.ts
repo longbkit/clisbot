@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { i18n } from "@/i18n/i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { HubApiError } from "../../api-client";
@@ -62,7 +63,7 @@ export function useTeamAdminAction(hub: HubAccount, resources: TeamResources, ru
         } catch (error) {
           if (error instanceof HubApiError && (error.status === 400 || error.status === 404)) {
             setUnsupported(true);
-            throw new Error("Team Admin is not available on this Hub yet.", { cause: error });
+            throw new Error(i18n.t("hub.team.errors.teamAdminUnsupported"), { cause: error });
           }
           throw error;
         }
@@ -111,9 +112,9 @@ export function useIdentityActions(hub: HubAccount, resources: TeamResources, ru
   const unlink = useCallback(
     async (id: string) => {
       const confirmed = await confirmDialog({
-        title: "Unlink this chat account?",
-        message: "Messages from this account will no longer resolve to the Member.",
-        confirmLabel: "Unlink",
+        title: i18n.t("hub.team.memberDetail.chat.unlinkConfirm.title"),
+        message: i18n.t("hub.team.memberDetail.chat.unlinkConfirm.message"),
+        confirmLabel: i18n.t("hub.team.memberDetail.chat.unlinkConfirm.confirm"),
         destructive: true,
       });
       if (!confirmed) return;

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, type ComponentType, type ReactElement } from "react";
 import { View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import {
   Bot,
   Brain,
@@ -39,20 +40,41 @@ const muted = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const ThemedSettings2 = withUnistyles(Settings2);
 const ICON_SIZE = 14;
 
-const BOT_ITEMS: Record<BotRowItem, { label: string; icon: Icon }> = {
-  host: { label: "Host", icon: withUnistyles(Server) },
-  provider: { label: "Provider", icon: withUnistyles(Sparkles) },
-  model: { label: "Model", icon: withUnistyles(Cpu) },
-  mode: { label: "Permissions", icon: withUnistyles(ShieldCheck) },
-  thinking: { label: "Thinking", icon: withUnistyles(Brain) },
-  role: { label: "Role", icon: withUnistyles(FileText) },
+const BOT_ICONS: Record<BotRowItem, Icon> = {
+  host: withUnistyles(Server),
+  provider: withUnistyles(Sparkles),
+  model: withUnistyles(Cpu),
+  mode: withUnistyles(ShieldCheck),
+  thinking: withUnistyles(Brain),
+  role: withUnistyles(FileText),
 };
 
-const CHAT_ITEMS: Record<ChatRowItem, { label: string; icon: Icon }> = {
-  host: { label: "Host", icon: withUnistyles(Server) },
-  memberCount: { label: "Bot count", icon: withUnistyles(Bot) },
-  members: { label: "Members", icon: withUnistyles(Users) },
+const CHAT_ICONS: Record<ChatRowItem, Icon> = {
+  host: withUnistyles(Server),
+  memberCount: withUnistyles(Bot),
+  members: withUnistyles(Users),
 };
+
+function useItemLabels() {
+  const { t } = useTranslation();
+  return useMemo(() => {
+    const host = t("bots.workspace.shared.form.host");
+    const bots: Record<BotRowItem, string> = {
+      host,
+      provider: t("bots.workspace.shared.form.provider"),
+      model: t("bots.workspace.shared.form.model"),
+      mode: t("bots.workspace.botForm.permissions"),
+      thinking: t("bots.workspace.shared.form.thinking"),
+      role: t("bots.workspace.botForm.role"),
+    };
+    const chats: Record<ChatRowItem, string> = {
+      host,
+      memberCount: t("bots.workspace.display.botCount"),
+      members: t("bots.workspace.display.members"),
+    };
+    return { bots, chats };
+  }, [t]);
+}
 
 /**
  * The Bots or Group chats counterpart of the Projects display menu: what each row shows, and,
@@ -60,6 +82,7 @@ const CHAT_ITEMS: Record<ChatRowItem, { label: string; icon: Icon }> = {
  */
 export function SectionDisplayMenu({ section }: { section: SidebarSection }): ReactElement {
   const hosts = useBotsFeatureHosts();
+  const { t } = useTranslation();
   const hostFilter = useSidebarDisplayStore((state) => state.hostFilters[section]);
   const showHostFilter = hosts.length > 1 || hostFilter.length > 0;
   const triggerStyle = useCallback(
@@ -71,18 +94,27 @@ export function SectionDisplayMenu({ section }: { section: SidebarSection }): Re
   );
   const pages = useMemo<MenuPageDefinition[]>(
     () => [
-      { id: "show", title: "Show", content: <ShowPage section={section} /> },
-      { id: "host", title: "Host", content: <HostPage section={section} hosts={hosts} /> },
+      {
+        id: "show",
+        title: t("bots.workspace.display.show"),
+        content: <ShowPage section={section} />,
+      },
+      {
+        id: "host",
+        title: t("bots.workspace.shared.form.host"),
+        content: <HostPage section={section} hosts={hosts} />,
+      },
     ],
-    [section, hosts],
+    [section, hosts, t],
   );
-  const title = section === "bots" ? "Bots" : "Group chats";
+  const title =
+    section === "bots" ? t("bots.workspace.shared.bots") : t("bots.workspace.shared.groupChats");
   return (
     <MenuRoot compactMode="sheet">
       <MenuTrigger
         style={triggerStyle}
         accessibilityRole={isWeb ? undefined : "button"}
-        accessibilityLabel={`${title} display preferences`}
+        accessibilityLabel={t("bots.workspace.display.menuLabel", { section: title })}
         testID={`sidebar-${section}-display-menu`}
       >
         <View style={styles.glyph}>
@@ -91,12 +123,12 @@ export function SectionDisplayMenu({ section }: { section: SidebarSection }): Re
         </View>
       </MenuTrigger>
       <MenuSurface align="end" width={232} pages={pages} sheetTitle={title}>
-        <MenuSubTrigger id="show">Show</MenuSubTrigger>
+        <MenuSubTrigger id="show">{t("bots.workspace.display.show")}</MenuSubTrigger>
         {showHostFilter ? (
           <>
             <MenuSeparator />
             <MenuSubTrigger id="host" indicator={hostFilter.length > 0}>
-              Host
+              {t("bots.workspace.shared.form.host")}
             </MenuSubTrigger>
           </>
         ) : null}
@@ -111,6 +143,7 @@ function ShowPage({ section }: { section: SidebarSection }): ReactElement {
   const chatItems = useSidebarDisplayStore((state) => state.chatRowItems);
   const toggleBot = useSidebarDisplayStore((state) => state.toggleBotRowItem);
   const toggleChat = useSidebarDisplayStore((state) => state.toggleChatRowItem);
+  const labels = useItemLabels();
   if (section === "bots")
     return (
       <>
@@ -118,7 +151,8 @@ function ShowPage({ section }: { section: SidebarSection }): ReactElement {
           <ToggleItem
             key={item}
             value={item}
-            {...BOT_ITEMS[item]}
+            label={labels.bots[item]}
+            icon={BOT_ICONS[item]}
             selected={botItems[item]}
             onToggle={toggleBot}
             testID={`sidebar-bots-show-${item}`}
@@ -132,7 +166,8 @@ function ShowPage({ section }: { section: SidebarSection }): ReactElement {
         <ToggleItem
           key={item}
           value={item}
-          {...CHAT_ITEMS[item]}
+          label={labels.chats[item]}
+          icon={CHAT_ICONS[item]}
           selected={chatItems[item]}
           onToggle={toggleChat}
           testID={`sidebar-chats-show-${item}`}
@@ -185,10 +220,11 @@ function HostPage({
   const clear = useSidebarDisplayStore((state) => state.clearHostFilter);
   const all = useCallback(() => clear(section), [clear, section]);
   const pick = useCallback((serverId: string) => toggle(section, serverId), [section, toggle]);
+  const { t } = useTranslation();
   return (
     <>
       <MenuItem selected={hostFilter.length === 0} closeOnSelect={false} onSelect={all}>
-        All Hosts
+        {t("bots.workspace.shared.allHosts")}
       </MenuItem>
       {hosts.map((host) => (
         <HostItem

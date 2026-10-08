@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
@@ -9,9 +10,6 @@ import {
   type LinkedChannelIdentity,
 } from "../channel-identity-directory";
 
-const INFO =
-  "Link the accounts you use in Slack, Telegram, Discord, and other chat apps so the organization's bots recognize you and run your messages with your Hub access.";
-
 /** Account's view of the Member's own linked chat accounts, and the entry to linking more. */
 export function ChannelIdentitiesSection({
   pending,
@@ -20,6 +18,7 @@ export function ChannelIdentitiesSection({
   pending: boolean;
   onManage(): void;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const directory = useChannelIdentityDirectory();
   const identities = directory.identitiesOf(hub.signedIn?.membership.id);
@@ -30,15 +29,19 @@ export function ChannelIdentitiesSection({
         variant="outline"
         disabled={pending}
         onPress={onManage}
-        accessibilityLabel="Manage chat accounts"
+        accessibilityLabel={t("hub.channels.identities.manageLabel")}
       >
-        Manage
+        {t("hub.channels.identities.manage")}
       </Button>
     ),
-    [onManage, pending],
+    [onManage, pending, t],
   );
   return (
-    <SettingsSection title="Chat accounts" info={INFO} trailing={manage}>
+    <SettingsSection
+      title={t("hub.channels.identities.title")}
+      info={t("hub.channels.identities.info")}
+      trailing={manage}
+    >
       <View style={settingsStyles.card}>
         <LinkedIdentityRows
           identities={identities}
@@ -59,11 +62,12 @@ function LinkedIdentityRows({
   pending: boolean;
   error: Error | null;
 }) {
+  const { t } = useTranslation();
   if (error !== null || (identities.length === 0 && !pending)) {
     return (
       <View style={settingsStyles.row}>
         <Text style={settingsStyles.rowHint}>
-          {error?.message ?? "No chat accounts are linked yet."}
+          {error?.message ?? t("hub.channels.identities.empty")}
         </Text>
       </View>
     );
@@ -76,7 +80,9 @@ function LinkedIdentityRows({
     >
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{identity.description}</Text>
-        <Text style={settingsStyles.rowHint}>{`Account ${identity.subject}`}</Text>
+        <Text style={settingsStyles.rowHint}>
+          {t("hub.channels.identities.account", { subject: identity.subject })}
+        </Text>
       </View>
     </View>
   ));

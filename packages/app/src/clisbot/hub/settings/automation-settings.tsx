@@ -16,6 +16,7 @@ import {
   type SetStateAction,
 } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
 import { ScreenTitle } from "@/components/headers/screen-title";
@@ -27,6 +28,7 @@ import { SelectField, type SelectFieldOption } from "@/components/ui/select-fiel
 import { Switch } from "@/components/ui/switch";
 import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
 import { useFetchQuery } from "@/data/query";
+import { i18n } from "@/i18n/i18next";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
@@ -82,9 +84,6 @@ import { ViewTabs, type ViewTab } from "./view-tabs";
 import { HubEmptyState } from "./empty-state";
 import { Plus, Workflow } from "lucide-react-native";
 
-const AUTOMATIONS_INFO =
-  "An Automation runs an Agent on a Project when something happens: on a schedule, a GitHub event, or a chat message, or when someone runs it.";
-
 export interface AutomationConnection {
   id: string;
   provider: string;
@@ -110,43 +109,40 @@ interface AutomationEventDefinition {
   description: string;
 }
 
-const AUTOMATION_EVENTS: readonly AutomationEventDefinition[] = [
-  {
-    name: "manual.run",
-    label: "Manual or API run",
-    description: "Starts when an authorized caller supplies the declared inputs.",
-  },
-  {
-    name: "slack.mention",
-    label: "Slack mention",
-    provider: "slack",
-    description: "Starts for a mention received by one Slack Connection.",
-  },
-  {
-    name: "discord.mention",
-    label: "Discord mention",
-    provider: "discord",
-    description: "Starts for a mention received by one Discord Connection.",
-  },
-  {
-    name: "github.issue_comment",
-    label: "GitHub issue comment",
-    provider: "github",
-    description: "Starts for an issue or pull-request comment on one GitHub Connection.",
-  },
-  {
-    name: "linear.issue_created",
-    label: "Linear issue created",
-    provider: "linear",
-    description: "Starts when one Linear Connection receives a new issue.",
-  },
-];
-
-const INPUT_TYPE_OPTIONS: SelectFieldOption<AutomationInputValue["type"]>[] = [
-  { id: "string", value: "string", label: "Text" },
-  { id: "number", value: "number", label: "Number" },
-  { id: "boolean", value: "boolean", label: "On or off" },
-];
+/** The direct events the structured editor offers, worded in the current language. */
+function automationEvents(): readonly AutomationEventDefinition[] {
+  return [
+    {
+      name: "manual.run",
+      label: i18n.t("hub.automations.events.manualRun.label"),
+      description: i18n.t("hub.automations.events.manualRun.description"),
+    },
+    {
+      name: "slack.mention",
+      label: i18n.t("hub.automations.events.slackMention.label"),
+      provider: "slack",
+      description: i18n.t("hub.automations.events.slackMention.description"),
+    },
+    {
+      name: "discord.mention",
+      label: i18n.t("hub.automations.events.discordMention.label"),
+      provider: "discord",
+      description: i18n.t("hub.automations.events.discordMention.description"),
+    },
+    {
+      name: "github.issue_comment",
+      label: i18n.t("hub.automations.events.githubIssueComment.label"),
+      provider: "github",
+      description: i18n.t("hub.automations.events.githubIssueComment.description"),
+    },
+    {
+      name: "linear.issue_created",
+      label: i18n.t("hub.automations.events.linearIssueCreated.label"),
+      provider: "linear",
+      description: i18n.t("hub.automations.events.linearIssueCreated.description"),
+    },
+  ];
+}
 
 export interface AutomationSettingsProps {
   initialCreate?: boolean;
@@ -158,6 +154,7 @@ export function AutomationSettings({
   ChannelInputs,
   initialCreate = false,
 }: AutomationSettingsProps = {}) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
@@ -229,12 +226,12 @@ export function AutomationSettings({
         setCreating(false);
         setSelectedAutomationId(created.id);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Hub request failed.");
+        setError(cause instanceof Error ? cause.message : t("hub.automations.hubRequestFailed"));
       } finally {
         setPending(false);
       }
     },
-    [automations, hub],
+    [automations, hub, t],
   );
   const openAutomation = useCallback((automationId: string) => {
     setDetailView("overview");
@@ -282,18 +279,18 @@ export function AutomationSettings({
     () =>
       viewer.canCreate ? (
         <Button size="sm" variant="outline" leftIcon={Plus} onPress={startCreate}>
-          New Automation
+          {t("hub.automations.newAutomation")}
         </Button>
       ) : undefined,
-    [startCreate, viewer.canCreate],
+    [startCreate, t, viewer.canCreate],
   );
 
   return (
     <View>
       {!selectedAutomationId && !creating ? (
         <SettingsSection
-          title="Automations"
-          info={AUTOMATIONS_INFO}
+          title={t("hub.automations.title")}
+          info={t("hub.automations.info")}
           // Empty, the button is the empty state's own action, so it is not shown twice.
           trailing={automations.data?.automations.length === 0 ? undefined : newAutomationButton}
         >
@@ -302,8 +299,12 @@ export function AutomationSettings({
           {automations.data?.automations.length === 0 ? (
             <HubEmptyState
               icon={Workflow}
-              title={viewer.canCreate ? "No Automations yet" : "No Automations are shared with you"}
-              description={AUTOMATIONS_INFO}
+              title={
+                viewer.canCreate
+                  ? t("hub.automations.empty.title")
+                  : t("hub.automations.empty.sharedTitle")
+              }
+              description={t("hub.automations.info")}
               action={newAutomationButton}
             />
           ) : (
@@ -377,16 +378,19 @@ function AutomationDetailHeading({
   close(): void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
-      <BackLink to="Automations" onPress={close} disabled={disabled} />
+      <BackLink to={t("hub.automations.title")} onPress={close} disabled={disabled} />
       <View style={styles.detailHeading}>
         <View style={styles.headingTitle}>
           <ScreenTitle>{name}</ScreenTitle>
         </View>
         {enabled !== undefined ? (
           <StatusBadge
-            label={enabled ? "Active" : "Disabled"}
+            label={
+              enabled ? t("hub.automations.state.active") : t("hub.automations.state.disabled")
+            }
             variant={enabled ? "success" : "muted"}
           />
         ) : null}
@@ -413,12 +417,14 @@ function canRunAutomation(
 }
 
 type AutomationDetailView = "overview" | "channels" | "configuration" | "runs" | "revisions";
-const AUTOMATION_DETAIL_VIEWS: ViewTab<AutomationDetailView>[] = [
-  { value: "overview", label: "Overview" },
-  { value: "configuration", label: "Configuration" },
-  { value: "runs", label: "Runs" },
-  { value: "revisions", label: "Revisions" },
-];
+function automationDetailViews(): ViewTab<AutomationDetailView>[] {
+  return [
+    { value: "overview", label: i18n.t("hub.automations.detail.tabs.overview") },
+    { value: "configuration", label: i18n.t("hub.automations.detail.tabs.configuration") },
+    { value: "runs", label: i18n.t("hub.automations.detail.tabs.runs") },
+    { value: "revisions", label: i18n.t("hub.automations.detail.tabs.revisions") },
+  ];
+}
 
 // eslint-disable-next-line complexity -- one detail route owns its mutually exclusive view states.
 function AutomationDetail({
@@ -451,6 +457,7 @@ function AutomationDetail({
   close(): void;
   saved(): Promise<unknown>;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const accountId = hub.signedIn?.account.id ?? null;
@@ -486,8 +493,8 @@ function AutomationDetail({
   });
   const [view, setView] = useState<AutomationDetailView>(initialView);
   const detailViews = canManage
-    ? AUTOMATION_DETAIL_VIEWS
-    : AUTOMATION_DETAIL_VIEWS.filter(({ value }) => value === "overview" || value === "runs");
+    ? automationDetailViews()
+    : automationDetailViews().filter(({ value }) => value === "overview" || value === "runs");
   const configurationVisited = useLatchedBoolean(view === "configuration");
   const [yaml, setYaml] = useState(() => {
     const source = automation?.yaml ?? "";
@@ -533,17 +540,17 @@ function AutomationDetail({
         setYaml(source);
         await saved();
         await Promise.all([history.refetch(), activity.refetch()]);
-        setResult({ tone: "success", message: "Automation activated." });
+        setResult({ tone: "success", message: t("hub.automations.detail.activated") });
       } catch (cause) {
         setResult({
           tone: "error",
-          message: cause instanceof Error ? cause.message : "Save failed.",
+          message: cause instanceof Error ? cause.message : t("hub.automations.detail.saveFailed"),
         });
       } finally {
         setPending(null);
       }
     },
-    [activity, automation, history, hub, saved, yaml],
+    [activity, automation, history, hub, saved, t, yaml],
   );
   const refreshActivity = useCallback(() => activity.refetch(), [activity]);
   const saveStructured = useCallback(
@@ -555,10 +562,10 @@ function AutomationDetail({
 
   if (automation === null) {
     return (
-      <SettingsSection title="Automation">
-        <Alert variant="error" title="Automation is unavailable." />
+      <SettingsSection title={t("hub.automations.detail.automation")}>
+        <Alert variant="error" title={t("hub.automations.detail.unavailable")} />
         <Button size="sm" variant="outline" onPress={close}>
-          Close
+          {t("common.actions.close")}
         </Button>
       </SettingsSection>
     );
@@ -585,60 +592,74 @@ function AutomationDetail({
         <ViewTabs tabs={detailViews} value={view} onChange={setView} />
       </View>
       {typeof automation.pausedReason === "string" ? (
-        <Alert variant="warning" title={`Paused: ${automation.pausedReason}`}>
+        <Alert
+          variant="warning"
+          title={t("hub.automations.pausedReason", { reason: automation.pausedReason })}
+        >
           {canManage
-            ? "Review the Automation and enable it again under Configuration."
-            : "An Admin of this Automation can enable it again."}
+            ? t("hub.automations.detail.pausedReviewAdmin")
+            : t("hub.automations.detail.pausedReviewMember")}
         </Alert>
       ) : null}
       {view === "configuration" && result ? (
         <Alert variant={result.tone} title={result.message} />
       ) : null}
       {view === "overview" ? (
-        <SettingsSection title="Workflow">
+        <SettingsSection title={t("hub.automations.detail.workflow")}>
           <View style={settingsStyles.card}>
             <SummaryRow
-              title="Type"
-              hint={`${workflowSteps} ${workflowSteps === 1 ? "step" : "steps"}`}
+              title={t("hub.automations.detail.type")}
+              hint={t("hub.automations.detail.steps", { count: workflowSteps })}
             />
             {structuredValue?.description ? (
-              <SummaryRow title="Description" hint={structuredValue.description} border />
+              <SummaryRow
+                title={t("hub.automations.detail.description")}
+                hint={structuredValue.description}
+                border
+              />
             ) : null}
             {structuredValue ? (
               <>
                 <SummaryRow
-                  title="Host"
+                  title={t("hub.automations.detail.host")}
                   hint={
                     daemons.find(
                       ({ id, slug }) =>
                         id === structuredValue.daemonId || slug === structuredValue.daemonId,
-                    )?.slug ?? "Unavailable Host"
+                    )?.slug ?? t("hub.automations.detail.unavailableHost")
                   }
                   border
                 />
-                <SummaryRow title="Working directory" hint={structuredValue.cwd} border />
                 <SummaryRow
-                  title="Agent"
+                  title={t("hub.automations.detail.workingDirectory")}
+                  hint={structuredValue.cwd}
+                  border
+                />
+                <SummaryRow
+                  title={t("hub.automations.detail.agent")}
                   hint={`${structuredValue.provider}${structuredValue.model ? ` · ${structuredValue.model}` : ""}`}
                   border
                 />
                 <SummaryRow
-                  title="Declared outputs"
+                  title={t("hub.automations.detail.declaredOutputs")}
                   hint={
                     structuredValue.outputs.length === 0
-                      ? "No explicit output grants; direct events retain their native reply defaults"
+                      ? t("hub.automations.detail.noExplicitOutputs")
                       : structuredValue.outputs
-                          .map((output) => `${output.type} · ${output.max ?? "Unlimited"}`)
+                          .map(
+                            (output) =>
+                              `${output.type} · ${output.max ?? t("hub.automations.unlimited")}`,
+                          )
                           .join("; ")
                   }
                   border
                 />
                 <SummaryRow
-                  title="Conversation continuity"
+                  title={t("hub.automations.detail.continuity")}
                   hint={
                     structuredValue.reuseBinding
-                      ? "Continue a compatible Agent in the same conversation"
-                      : "Create a new Agent for each run"
+                      ? t("hub.automations.detail.continueAgent")
+                      : t("hub.automations.detail.newAgentEachRun")
                   }
                   border
                 />
@@ -655,7 +676,7 @@ function AutomationDetail({
         />
       ) : null}
       {view === "overview" ? (
-        <SettingsSection title="Inputs">
+        <SettingsSection title={t("hub.automations.detail.inputs")}>
           <View style={settingsStyles.card}>
             {structuredValue?.events.map((event, index) => (
               <SummaryRow
@@ -669,12 +690,14 @@ function AutomationDetail({
               <SummaryRow
                 key={`${backlink.channel}:${backlink.accountId}:${String(backlink.routePosition)}`}
                 title={`${capitalize(backlink.channel)} · ${backlink.accountId}`}
-                hint={`Route ${String(backlink.routePosition + 1)}`}
+                hint={t("hub.automations.detail.routeNumber", {
+                  number: backlink.routePosition + 1,
+                })}
                 border={(structuredValue?.events.length ?? 0) + index > 0}
               />
             ))}
             {(structuredValue?.events.length ?? 0) === 0 && backlinks.length === 0 ? (
-              <EmptyRow message="See Advanced YAML for this Automation's triggers." />
+              <EmptyRow message={t("hub.automations.detail.seeAdvancedYaml")} />
             ) : null}
           </View>
         </SettingsSection>
@@ -696,7 +719,7 @@ function AutomationDetail({
         </View>
       ) : null}
       {view === "revisions" ? (
-        <SettingsSection title="Revision history">
+        <SettingsSection title={t("hub.automations.detail.revisionHistory")}>
           <View style={settingsStyles.card}>
             {history.data?.revisions.map((revision, index) => (
               <View
@@ -705,14 +728,16 @@ function AutomationDetail({
               >
                 <View style={settingsStyles.rowContent}>
                   <Text style={settingsStyles.rowTitle}>
-                    {`Revision ${String(revision.version)}${revision.id === automation.activeRevisionId ? " · Active" : ""}`}
+                    {revision.id === automation.activeRevisionId
+                      ? t("hub.automations.detail.revisionActive", { version: revision.version })
+                      : t("hub.automations.detail.revision", { version: revision.version })}
                   </Text>
                   <Text style={settingsStyles.rowHint}>
                     {new Date(revision.createdAt).toLocaleString()}
                   </Text>
                 </View>
               </View>
-            )) ?? <EmptyRow message="Loading revisions…" />}
+            )) ?? <EmptyRow message={t("hub.automations.detail.loadingRevisions")} />}
           </View>
         </SettingsSection>
       ) : null}
@@ -732,6 +757,7 @@ function AutomationRunForm({
   inputs: readonly AutomationInputValue[];
   completed(): Promise<unknown>;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const [prompt, setPrompt] = useState("");
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -761,7 +787,7 @@ function AutomationRunForm({
       if (response.status === "dispatched") {
         setResult({
           tone: "success",
-          message: `Run ${response.workflowStatus}.`,
+          message: t(`hub.automations.run.dispatched.${response.workflowStatus}`),
         });
         await completed();
       } else {
@@ -770,22 +796,22 @@ function AutomationRunForm({
     } catch (cause) {
       setResult({
         tone: "error",
-        message: cause instanceof Error ? cause.message : "Automation run failed.",
+        message: cause instanceof Error ? cause.message : t("hub.automations.run.failed"),
       });
     } finally {
       setPending(false);
     }
-  }, [automationId, completed, hub, parsed, prompt]);
+  }, [automationId, completed, hub, parsed, prompt, t]);
   const runAutomation = useCallback(() => {
     void run();
   }, [run]);
 
   return (
-    <SettingsSection title="Run">
+    <SettingsSection title={t("hub.automations.run.title")}>
       <Alert
         variant="info"
-        title="Run the active revision"
-        description="Only the prompt and declared inputs can change. The target, Agent controls, limits, and output actions remain fixed."
+        title={t("hub.automations.run.infoTitle")}
+        description={t("hub.automations.run.infoDescription")}
       />
       <View style={[settingsStyles.card, styles.form]}>
         {inputs.map((input) => (
@@ -797,17 +823,14 @@ function AutomationRunForm({
             pending={pending}
           />
         ))}
-        <Field
-          label="Prompt"
-          hint="The request supplied to the active Automation. It cannot change the configured target or Agent authority."
-        >
+        <Field label={t("hub.automations.run.prompt")} hint={t("hub.automations.run.promptHint")}>
           <FormTextInput initialValue="" onChangeText={setPrompt} multiline editable={!pending} />
         </Field>
         {!parsed.ok ? <Alert variant="error" title={parsed.message} /> : null}
         {result ? <Alert variant={result.tone} title={result.message} /> : null}
         <View style={styles.actions}>
           <Button size="sm" disabled={pending || !parsed.ok} onPress={runAutomation}>
-            {pending ? "Starting…" : "Run Automation"}
+            {pending ? t("hub.automations.run.starting") : t("hub.automations.run.submit")}
           </Button>
         </View>
       </View>
@@ -856,7 +879,10 @@ function parseAutomationRunInputs(
     const raw = values[definition.name] ?? "";
     if (raw.length === 0) {
       if (definition.required && definition.default === undefined) {
-        return { ok: false, message: `${humanize(definition.name)} is required.` };
+        return {
+          ok: false,
+          message: i18n.t("hub.automations.run.required", { name: humanize(definition.name) }),
+        };
       }
       continue;
     }
@@ -864,11 +890,17 @@ function parseAutomationRunInputs(
     if (definition.type === "number") {
       value = Number(raw);
       if (!Number.isFinite(value)) {
-        return { ok: false, message: `${humanize(definition.name)} must be a number.` };
+        return {
+          ok: false,
+          message: i18n.t("hub.automations.run.mustBeNumber", { name: humanize(definition.name) }),
+        };
       }
     } else if (definition.type === "boolean") {
       if (raw !== "true" && raw !== "false") {
-        return { ok: false, message: `${humanize(definition.name)} must be true or false.` };
+        return {
+          ok: false,
+          message: i18n.t("hub.automations.run.mustBeBoolean", { name: humanize(definition.name) }),
+        };
       }
       value = raw === "true";
     }
@@ -878,7 +910,7 @@ function parseAutomationRunInputs(
     ) {
       return {
         ok: false,
-        message: `${humanize(definition.name)} must be one of the configured choices.`,
+        message: i18n.t("hub.automations.run.mustBeChoice", { name: humanize(definition.name) }),
       };
     }
     inputs[definition.name] = value;
@@ -887,9 +919,16 @@ function parseAutomationRunInputs(
 }
 
 function runInputHint(input: AutomationInputValue): string {
-  const requirement = input.required ? "Required" : "Optional";
   const choices = input.choices?.map(String).join(", ");
-  return `${requirement} ${input.type}${choices ? ` · Choices: ${choices}` : ""}`;
+  const options = { type: input.type, choices };
+  if (choices) {
+    return input.required
+      ? i18n.t("hub.automations.run.hint.requiredChoices", options)
+      : i18n.t("hub.automations.run.hint.optionalChoices", options);
+  }
+  return input.required
+    ? i18n.t("hub.automations.run.hint.required", options)
+    : i18n.t("hub.automations.run.hint.optional", options);
 }
 
 function automationRunResultMessage(
@@ -897,26 +936,26 @@ function automationRunResultMessage(
 ): string {
   switch (result.status) {
     case "invalid_input":
-      return result.issues[0]?.message ?? "The declared inputs are invalid.";
+      return result.issues[0]?.message ?? i18n.t("hub.automations.run.errors.invalidInput");
     case "actor_forbidden":
-      return "Your account is not allowed by this Automation's manual trigger.";
+      return i18n.t("hub.automations.run.errors.actorForbidden");
     case "daemon_offline":
-      return "The configured Host is offline.";
+      return i18n.t("hub.automations.run.errors.daemonOffline");
     case "expected_configuration_not_current":
-      return "The active revision changed. Review it and run again.";
+      return i18n.t("hub.automations.run.errors.notCurrent");
     case "configuration_not_found":
     case "trigger_not_found":
-      return "The active Automation cannot accept a manual run.";
+      return i18n.t("hub.automations.run.errors.cannotAcceptManualRun");
     case "dispatch_conflict":
-      return "The run could not be resolved. Try again.";
+      return i18n.t("hub.automations.run.errors.dispatchConflict");
     case "infrastructure_unavailable":
-      return "Automation runtime is unavailable.";
+      return i18n.t("hub.automations.run.errors.runtimeUnavailable");
   }
 }
 
 // eslint-disable-next-line complexity -- this stateful editor keeps one Automation draft coherent.
 export function SingleAgentAutomationForm({
-  title = "Create Automation",
+  title,
   initialValue = null,
   channelReplyProvider,
   prioritizeReplies = false,
@@ -946,6 +985,7 @@ export function SingleAgentAutomationForm({
   cancel?: () => void;
   save(yaml: string, draft?: AutomationChannelDraft | null): void | Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowSource, setWorkflowSource] = useState<string | null>(null);
   const [editingChannelInput, setEditingChannelInput] = useState(false);
@@ -1077,7 +1117,7 @@ export function SingleAgentAutomationForm({
     normalizedInputNames.every((inputName) => inputName.length > 0) &&
     new Set(normalizedInputNames).size === normalizedInputNames.length;
   const eventsValid = events.every((event) => {
-    const definition = AUTOMATION_EVENTS.find(({ name: eventName }) => eventName === event.name);
+    const definition = automationEvents().find(({ name: eventName }) => eventName === event.name);
     return definition?.provider === undefined || Boolean(event.connection);
   });
   const daemonOptions = useMemo<SelectFieldOption<string>[]>(
@@ -1169,7 +1209,9 @@ export function SingleAgentAutomationForm({
           workflow.addStep();
           setWorkflowSource(workflow.getState().yaml);
         } catch (cause) {
-          setWorkflowError(cause instanceof Error ? cause.message : "Could not add step");
+          setWorkflowError(
+            cause instanceof Error ? cause.message : t("hub.automations.form.couldNotAddStep"),
+          );
         }
       } else void save(source, channelDraft);
     },
@@ -1193,6 +1235,7 @@ export function SingleAgentAutomationForm({
       projectId,
       reuseBinding,
       save,
+      t,
       workspace,
     ],
   );
@@ -1244,26 +1287,26 @@ export function SingleAgentAutomationForm({
       />
     );
   return (
-    <SettingsSection title={title}>
+    <SettingsSection title={title ?? t("hub.automations.createAutomation")}>
       {workflowError ? <Alert variant="error" title={workflowError} /> : null}
       {prioritizeReplies ? (
         <View style={[settingsStyles.card, styles.form]}>
-          <Text style={styles.sectionTitle}>Channel replies</Text>
+          <Text style={styles.sectionTitle}>{t("hub.automations.form.channelReplies")}</Text>
           {replyFields}
           <Button size="sm" disabled={pending || !canSave} onPress={activateAutomation}>
-            Save reply settings
+            {t("hub.automations.form.saveReplySettings")}
           </Button>
         </View>
       ) : null}
       <View style={[settingsStyles.card, styles.form]}>
         <Field
-          label="Name"
+          label={t("hub.automations.form.name")}
           hint={
             normalizedName && normalizedName !== name.trim()
-              ? `Saved as ${normalizedName}`
+              ? t("hub.automations.form.savedAs", { name: normalizedName })
               : undefined
           }
-          error={duplicate ? "An Automation with this name already exists." : null}
+          error={duplicate ? t("hub.automations.form.duplicate") : null}
         >
           <FormTextInput
             initialValue={initialValue?.name ?? ""}
@@ -1276,34 +1319,37 @@ export function SingleAgentAutomationForm({
             }
           />
         </Field>
-        <Field label="Description" hint="Optional. Explain when this Automation should be used.">
+        <Field
+          label={t("hub.automations.form.description")}
+          hint={t("hub.automations.form.descriptionHint")}
+        >
           <FormTextInput
             initialValue={initialValue?.description ?? ""}
             onChangeText={setDescription}
-            placeholder="Triage a customer request and prepare a response."
+            placeholder={t("hub.automations.form.descriptionPlaceholder")}
             multiline
             editable={!pending}
           />
         </Field>
         <SwitchRow
-          title="Active"
-          hint="Inactive Automations keep their revision but do not accept new runs."
+          title={t("hub.automations.form.active")}
+          hint={t("hub.automations.form.activeHint")}
           value={enabled}
           onValueChange={setEnabled}
           disabled={pending}
-          accessibilityLabel="Automation active"
+          accessibilityLabel={t("hub.automations.form.activeLabel")}
         />
       </View>
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-        <Text style={styles.sectionTitle}>Inputs</Text>
+        <Text style={styles.sectionTitle}>{t("hub.automations.form.inputs")}</Text>
         <Button
           size="sm"
           variant="outline"
           disabled={pending || editingChannelInput}
           onPress={openSources}
         >
-          Add input
+          {t("hub.automations.form.addInput")}
         </Button>
         <View style={styles.actions}>
           {ChannelInputs && hasSlackInputs ? (
@@ -1313,7 +1359,7 @@ export function SingleAgentAutomationForm({
               disabled={pending || editingChannelInput}
               onPress={editSlackInputs}
             >
-              Edit Slack inputs
+              {t("hub.automations.form.editSlackInputs")}
             </Button>
           ) : null}
           {ChannelInputs && hasTelegramInputs ? (
@@ -1323,16 +1369,16 @@ export function SingleAgentAutomationForm({
               disabled={pending || editingChannelInput}
               onPress={editTelegramInputs}
             >
-              Edit Telegram inputs
+              {t("hub.automations.form.editTelegramInputs")}
             </Button>
           ) : null}
         </View>
         {addingSource ? (
           <SelectField
-            label="Input source"
+            label={t("hub.automations.form.inputSource")}
             selectedDisplay={null}
-            emptyText="No input sources available."
-            title="Add input"
+            emptyText={t("hub.automations.form.noInputSources")}
+            title={t("hub.automations.form.addInput")}
             value={null}
             options={[
               ...(ChannelInputs
@@ -1341,24 +1387,23 @@ export function SingleAgentAutomationForm({
                     { id: "telegram", value: "telegram", label: "Telegram" },
                   ]
                 : []),
-              ...AUTOMATION_EVENTS.filter((event) => event.name !== "slack.mention").map(
-                (event) => ({
+              ...automationEvents()
+                .filter((event) => event.name !== "slack.mention")
+                .map((event) => ({
                   id: event.name,
                   value: event.name,
-                  label: event.provider ? capitalize(event.provider) : "Manual / API",
-                }),
-              ),
+                  label: event.provider
+                    ? capitalize(event.provider)
+                    : t("hub.automations.events.manualApi"),
+                })),
             ]}
             onChange={chooseSource}
-            placeholder="Choose an input source"
+            placeholder={t("hub.automations.form.chooseInputSource")}
             disabled={pending}
           />
         ) : null}
         {channelDraft && !enabled ? (
-          <Alert
-            variant="error"
-            title="Enable Active to save Channel inputs. Routes require an active Automation."
-          />
+          <Alert variant="error" title={t("hub.automations.form.enableActiveForChannel")} />
         ) : null}
         {channelProvider && ChannelInputs ? (
           <>
@@ -1367,7 +1412,7 @@ export function SingleAgentAutomationForm({
                 <ChannelInputs key={channelProvider} automationName={normalizedName} />
               </AutomationInputDraftContext.Provider>
             ) : (
-              <Alert variant="info" title="Enter an Automation name to configure Channel inputs." />
+              <Alert variant="info" title={t("hub.automations.form.enterNameForChannel")} />
             )}
             {!prioritizeReplies ? (
               <ChannelReplyOutputFields
@@ -1382,31 +1427,31 @@ export function SingleAgentAutomationForm({
             ) : null}
           </>
         ) : null}
-        {AUTOMATION_EVENTS.filter((definition) =>
-          events.some((event) => event.name === definition.name),
-        ).map((definition) => (
-          <AutomationEventEditor
-            key={definition.name}
-            definition={definition}
-            event={events.find(({ name: eventName }) => eventName === definition.name)}
-            connections={connections}
-            replyLimit={
-              definition.provider === undefined
-                ? ""
-                : (replyLimits[`${definition.provider}.reply`] ?? "")
-            }
-            replyLimitsValid={replyLimitsValid}
-            pending={pending}
-            updateEvent={updateEvent}
-            setEvents={setEvents}
-            setReplyLimits={setReplyLimits}
-          />
-        ))}
+        {automationEvents()
+          .filter((definition) => events.some((event) => event.name === definition.name))
+          .map((definition) => (
+            <AutomationEventEditor
+              key={definition.name}
+              definition={definition}
+              event={events.find(({ name: eventName }) => eventName === definition.name)}
+              connections={connections}
+              replyLimit={
+                definition.provider === undefined
+                  ? ""
+                  : (replyLimits[`${definition.provider}.reply`] ?? "")
+              }
+              replyLimitsValid={replyLimitsValid}
+              pending={pending}
+              updateEvent={updateEvent}
+              setEvents={setEvents}
+              setReplyLimits={setReplyLimits}
+            />
+          ))}
         {events
           .filter(
             ({ name: eventName }) =>
               eventName !== "channel.message" &&
-              !AUTOMATION_EVENTS.some(({ name: definitionName }) => definitionName === eventName),
+              !automationEvents().some(({ name: definitionName }) => definitionName === eventName),
           )
           .map((event) => (
             <LegacyAutomationEvent
@@ -1417,16 +1462,13 @@ export function SingleAgentAutomationForm({
             />
           ))}
         {!eventsValid ? (
-          <Alert variant="error" title="Choose a Connection for each selected provider event." />
+          <Alert variant="error" title={t("hub.automations.form.chooseConnectionForEvents")} />
         ) : null}
       </View>
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-        <Text style={styles.sectionTitle}>Parameters</Text>
-        <Text style={settingsStyles.rowHint}>
-          Callers may supply only these parameters. Parameters never replace the fixed Host,
-          Project, Agent controls, or output actions.
-        </Text>
+        <Text style={styles.sectionTitle}>{t("hub.automations.form.parameters")}</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.automations.form.parametersHint")}</Text>
         {inputs.map((input, index) => (
           <AutomationInputEditor
             key={input.editorId}
@@ -1437,28 +1479,25 @@ export function SingleAgentAutomationForm({
           />
         ))}
         {!inputsValid ? (
-          <Alert
-            variant="error"
-            title="Every input needs a unique name that starts with a letter."
-          />
+          <Alert variant="error" title={t("hub.automations.form.uniqueInputNames")} />
         ) : null}
         <Button size="xs" variant="outline" disabled={pending || !inputsValid} onPress={addInput}>
-          Add parameter
+          {t("hub.automations.form.addParameter")}
         </Button>
       </View>
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-        <Text style={styles.sectionTitle}>Target and Agent</Text>
+        <Text style={styles.sectionTitle}>{t("hub.automations.form.targetAndAgent")}</Text>
         <SelectField
-          label="Host"
+          label={t("hub.automations.form.host")}
           value={daemonId}
           selectedDisplay={selectedDaemonDisplay}
           options={daemonOptions}
           onChange={changeDaemon}
-          placeholder="Choose a Host"
-          emptyText="Enroll a Daemon first."
+          placeholder={t("hub.automations.form.chooseHost")}
+          emptyText={t("hub.automations.form.enrollDaemon")}
           searchable={daemonOptions.length > 6}
-          title="Host"
+          title={t("hub.automations.form.host")}
           disabled={pending}
         />
         <DaemonProjectField
@@ -1479,17 +1518,17 @@ export function SingleAgentAutomationForm({
           disabled={pending}
         />
         <SwitchRow
-          title="Continue the same Agent"
-          hint="When a Route on a Connection invokes this Automation, reuse a compatible Agent for the same Channel conversation. Other event runs still create a new Agent."
+          title={t("hub.automations.form.continueAgent")}
+          hint={t("hub.automations.form.continueAgentHint")}
           value={reuseBinding}
           onValueChange={setReuseBinding}
           disabled={pending}
-          accessibilityLabel="Continue the same Agent for Channel runs"
+          accessibilityLabel={t("hub.automations.form.continueAgentLabel")}
         />
         <Field
-          label="Provider options"
-          hint="Optional JSON object for provider-specific settings."
-          error={options.valid ? null : "Enter a JSON object."}
+          label={t("hub.automations.form.providerOptions")}
+          hint={t("hub.automations.form.providerOptionsHint")}
+          error={options.valid ? null : t("hub.automations.form.enterJsonObject")}
         >
           <FormTextInput
             initialValue={
@@ -1506,8 +1545,8 @@ export function SingleAgentAutomationForm({
           />
         </Field>
         <Field
-          label="Instruction"
-          hint="The direct event payload, Channel message, or manual input is appended automatically."
+          label={t("hub.automations.form.instruction")}
+          hint={t("hub.automations.form.instructionHint")}
         >
           <FormTextInput
             initialValue={initialValue?.instruction ?? "Help the user with this request."}
@@ -1519,16 +1558,13 @@ export function SingleAgentAutomationForm({
       </View>
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-        <Text style={styles.sectionTitle}>Limits and outputs</Text>
-        <Text style={settingsStyles.rowHint}>
-          Channel replies apply when a Route on a Connection invokes this Automation. Direct event
-          reply settings remain above.
-        </Text>
+        <Text style={styles.sectionTitle}>{t("hub.automations.form.limitsAndOutputs")}</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.automations.form.limitsHint")}</Text>
         {!prioritizeReplies ? replyFields : null}
 
         <Field
-          label="Maximum runtime"
-          hint="Examples: 30m, 2h. The Hub rejects values above its instance ceiling."
+          label={t("hub.automations.form.maxRuntime")}
+          hint={t("hub.automations.form.maxRuntimeHint")}
         >
           <FormTextInput
             initialValue={initialValue?.maxRuntime ?? "2h"}
@@ -1539,7 +1575,10 @@ export function SingleAgentAutomationForm({
             editable={!pending}
           />
         </Field>
-        <Field label="Idle timeout" hint="Stops a run that makes no progress for this long.">
+        <Field
+          label={t("hub.automations.form.idleTimeout")}
+          hint={t("hub.automations.form.idleTimeoutHint")}
+        >
           <FormTextInput
             initialValue={initialValue?.idleTimeout ?? "10m"}
             onChangeText={setIdleTimeout}
@@ -1550,17 +1589,17 @@ export function SingleAgentAutomationForm({
           />
         </Field>
         <SwitchRow
-          title="Archive Agent when finished"
-          hint="Keeps completed Automation Agents out of active workspace lists."
+          title={t("hub.automations.form.archive")}
+          hint={t("hub.automations.form.archiveHint")}
           value={autoArchive}
           onValueChange={setAutoArchive}
           disabled={pending}
-          accessibilityLabel="Archive Agent when Automation finishes"
+          accessibilityLabel={t("hub.automations.form.archiveLabel")}
         />
         <Field
-          label="Structured result schema"
-          hint="Optional JSON Schema for the result recorded when the Agent finishes."
-          error={parsedOutputSchema.valid ? null : "Enter a JSON object."}
+          label={t("hub.automations.form.resultSchema")}
+          hint={t("hub.automations.form.resultSchemaHint")}
+          error={parsedOutputSchema.valid ? null : t("hub.automations.form.enterJsonObject")}
         >
           <FormTextInput
             initialValue={
@@ -1579,7 +1618,7 @@ export function SingleAgentAutomationForm({
       </View>
 
       <Button size="sm" variant="outline" disabled={pending || !canSave} onPress={addStep}>
-        Add step
+        {t("hub.automations.form.addStep")}
       </Button>
 
       <AutomationReview
@@ -1594,11 +1633,13 @@ export function SingleAgentAutomationForm({
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
         <Button disabled={pending || !canSave} onPress={activateAutomation}>
-          {initialValue === null ? "Create Automation" : "Activate Automation changes"}
+          {initialValue === null
+            ? t("hub.automations.createAutomation")
+            : t("hub.automations.form.activateChanges")}
         </Button>
         {cancel ? (
           <Button variant="ghost" disabled={pending} onPress={cancel}>
-            Cancel
+            {t("common.actions.cancel")}
           </Button>
         ) : null}
       </View>
@@ -1623,6 +1664,7 @@ function ChannelReplyOutputFields({
   setProviders: Dispatch<SetStateAction<Array<"slack" | "telegram">>>;
   setLimits: Dispatch<SetStateAction<Record<string, string>>>;
 }) {
+  const { t } = useTranslation();
   const label = provider === "slack" ? "Slack" : "Telegram";
   const toggle = useCallback(
     (value: boolean) => {
@@ -1641,23 +1683,23 @@ function ChannelReplyOutputFields({
   return (
     <>
       <SwitchRow
-        title={`Allow ${label} Channel replies`}
-        hint={`The Agent may reply to the invoking ${label} conversation. A Route using Channel tools also allows Project files without a separate approval.`}
+        title={t("hub.automations.replies.allow", { channel: label })}
+        hint={t("hub.automations.replies.allowHint", { channel: label })}
         value={enabled}
         onValueChange={toggle}
         disabled={pending}
-        accessibilityLabel={`Allow ${label} Channel replies`}
+        accessibilityLabel={t("hub.automations.replies.allow", { channel: label })}
       />
       {enabled ? (
         <Field
-          label={`Maximum ${label} replies`}
-          hint="Leave empty for unlimited replies within the Route's existing policy."
-          error={limitsValid ? null : "Enter a positive whole number."}
+          label={t("hub.automations.replies.max", { channel: label })}
+          hint={t("hub.automations.replies.maxHint")}
+          error={limitsValid ? null : t("hub.automations.replies.positiveWholeNumber")}
         >
           <FormTextInput
             initialValue={limit}
             onChangeText={changeLimit}
-            placeholder="Unlimited"
+            placeholder={t("hub.automations.unlimited")}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!pending}
@@ -1689,6 +1731,7 @@ function AutomationEventEditor({
   setEvents: Dispatch<SetStateAction<AutomationEventValue[]>>;
   setReplyLimits: Dispatch<SetStateAction<Record<string, string>>>;
 }) {
+  const { t } = useTranslation();
   const connectionOptions = useMemo<SelectFieldOption<string>[]>(
     () =>
       connections
@@ -1756,34 +1799,36 @@ function AutomationEventEditor({
       <View style={styles.actions}>
         <Text style={settingsStyles.rowTitle}>{definition.label}</Text>
         <Button size="xs" variant="ghost" onPress={removeEvent} disabled={pending}>
-          Remove {definition.label}
+          {t("hub.automations.eventEditor.remove", { label: definition.label })}
         </Button>
       </View>
       <Text style={settingsStyles.rowHint}>{definition.description}</Text>
       {definition.name === "slack.mention" ? (
-        <Text style={settingsStyles.rowHint}>
-          Existing direct event. New Slack inputs use Routes on a Connection.
-        </Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.automations.eventEditor.legacySlack")}</Text>
       ) : null}
       {event !== undefined && definition.provider !== undefined ? (
         <>
           <SelectField
-            label="Connection"
+            label={t("hub.automations.eventEditor.connection")}
             value={event.connection ?? null}
             selectedDisplay={selectedConnectionDisplay}
             options={connectionOptions}
             onChange={changeConnection}
-            placeholder={`Choose a ${capitalize(definition.provider)} Connection`}
-            emptyText={`Configure a ${capitalize(definition.provider)} Connection first.`}
+            placeholder={t("hub.automations.eventEditor.chooseConnection", {
+              provider: capitalize(definition.provider),
+            })}
+            emptyText={t("hub.automations.eventEditor.configureConnection", {
+              provider: capitalize(definition.provider),
+            })}
             searchable={connectionOptions.length > 6}
-            title={`${definition.label} Connection`}
+            title={t("hub.automations.eventEditor.connectionTitle", { label: definition.label })}
             disabled={pending}
           />
           {definition.provider === "github" ? (
             <>
               <Field
-                label="Repository"
-                hint="Optional owner/repository filter. Leave empty for repositories available to this Connection."
+                label={t("hub.automations.eventEditor.repository")}
+                hint={t("hub.automations.eventEditor.repositoryHint")}
               >
                 <FormTextInput
                   initialValue={event.repository ?? ""}
@@ -1795,8 +1840,8 @@ function AutomationEventEditor({
                 />
               </Field>
               <Field
-                label="Comment contains"
-                hint="Optional text required in the comment, for example @bot review."
+                label={t("hub.automations.eventEditor.commentContains")}
+                hint={t("hub.automations.eventEditor.commentContainsHint")}
               >
                 <FormTextInput
                   initialValue={event.contains ?? ""}
@@ -1805,13 +1850,13 @@ function AutomationEventEditor({
                 />
               </Field>
               <Text style={settingsStyles.rowHint}>
-                Replies are posted to the issue or pull request that supplied the comment.
+                {t("hub.automations.eventEditor.repliesPosted")}
               </Text>
             </>
           ) : null}
           <Field
-            label="Allowed provider users"
-            hint='Comma-separated provider user IDs. Use "*" only when every sender on this Connection may start the Automation.'
+            label={t("hub.automations.eventEditor.allowedUsers")}
+            hint={t("hub.automations.eventEditor.allowedUsersHint")}
           >
             <FormTextInput
               initialValue={(event.allowedUsers ?? ["*"]).join(", ")}
@@ -1823,14 +1868,14 @@ function AutomationEventEditor({
             />
           </Field>
           <Field
-            label="Maximum replies"
-            hint="Optional. Leave empty for the event's current unlimited reply action."
-            error={replyLimitsValid ? null : "Enter a positive whole number."}
+            label={t("hub.automations.eventEditor.maxReplies")}
+            hint={t("hub.automations.eventEditor.maxRepliesHint")}
+            error={replyLimitsValid ? null : t("hub.automations.replies.positiveWholeNumber")}
           >
             <FormTextInput
               initialValue={replyLimit}
               onChangeText={changeReplyLimit}
-              placeholder="Unlimited"
+              placeholder={t("hub.automations.unlimited")}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!pending}
@@ -1851,6 +1896,7 @@ function LegacyAutomationEvent({
   pending: boolean;
   setEvents: Dispatch<SetStateAction<AutomationEventValue[]>>;
 }) {
+  const { t } = useTranslation();
   const remove = useCallback(() => {
     setEvents((current) => current.filter(({ name }) => name !== event.name));
   }, [event.name, setEvents]);
@@ -1858,12 +1904,10 @@ function LegacyAutomationEvent({
     <View style={styles.eventFields}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{eventLabel(event.name)}</Text>
-        <Text style={settingsStyles.rowHint}>
-          Existing event retained by the structured editor.
-        </Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.automations.eventEditor.legacyHint")}</Text>
       </View>
       <Button size="xs" variant="ghost" disabled={pending} onPress={remove}>
-        Remove
+        {t("hub.automations.eventEditor.removeEvent")}
       </Button>
     </View>
   );
@@ -1880,11 +1924,20 @@ function AutomationInputEditor({
   pending: boolean;
   setInputs: Dispatch<SetStateAction<AutomationInputDraft[]>>;
 }) {
+  const { t } = useTranslation();
+  const typeOptions = useMemo<SelectFieldOption<AutomationInputValue["type"]>[]>(
+    () => [
+      { id: "string", value: "string", label: t("hub.automations.inputEditor.types.string") },
+      { id: "number", value: "number", label: t("hub.automations.inputEditor.types.number") },
+      { id: "boolean", value: "boolean", label: t("hub.automations.inputEditor.types.boolean") },
+    ],
+    [t],
+  );
   const selectedTypeDisplay = useMemo(
     () => ({
-      label: INPUT_TYPE_OPTIONS.find(({ value }) => value === input.type)?.label ?? input.type,
+      label: typeOptions.find(({ value }) => value === input.type)?.label ?? input.type,
     }),
-    [input.type],
+    [input.type, typeOptions],
   );
   const changeName = useCallback(
     (inputName: string) => {
@@ -1922,7 +1975,10 @@ function AutomationInputEditor({
 
   return (
     <View style={styles.inputRow}>
-      <Field label={`Input ${String(index + 1)}`} hint={automationInputHint(input)}>
+      <Field
+        label={t("hub.automations.inputEditor.label", { number: index + 1 })}
+        hint={automationInputHint(input)}
+      >
         <FormTextInput
           initialValue={input.name}
           onChangeText={changeName}
@@ -1933,26 +1989,26 @@ function AutomationInputEditor({
         />
       </Field>
       <SelectField
-        label="Type"
+        label={t("hub.automations.inputEditor.type")}
         value={input.type}
         selectedDisplay={selectedTypeDisplay}
-        options={INPUT_TYPE_OPTIONS}
+        options={typeOptions}
         onChange={changeType}
-        placeholder="Choose an input type"
-        emptyText="No input types are available."
-        title="Input type"
+        placeholder={t("hub.automations.inputEditor.chooseType")}
+        emptyText={t("hub.automations.inputEditor.noTypes")}
+        title={t("hub.automations.inputEditor.typeTitle")}
         disabled={pending}
       />
       <SwitchRow
-        title="Required"
-        hint="Reject a run that omits this input."
+        title={t("hub.automations.inputEditor.required")}
+        hint={t("hub.automations.inputEditor.requiredHint")}
         value={input.required}
         onValueChange={changeRequired}
         disabled={pending}
-        accessibilityLabel={`Require input ${String(index + 1)}`}
+        accessibilityLabel={t("hub.automations.inputEditor.requireLabel", { number: index + 1 })}
       />
       <Button size="xs" variant="ghost" disabled={pending} onPress={remove}>
-        Remove input
+        {t("hub.automations.inputEditor.remove")}
       </Button>
     </View>
   );
@@ -1960,8 +2016,14 @@ function AutomationInputEditor({
 
 function automationInputHint(input: AutomationInputValue): string | undefined {
   const facts: string[] = [];
-  if (input.default !== undefined) facts.push(`Default: ${String(input.default)}`);
-  if (input.choices !== undefined) facts.push(`Choices: ${input.choices.join(", ")}`);
+  if (input.default !== undefined) {
+    facts.push(i18n.t("hub.automations.inputEditor.default", { value: String(input.default) }));
+  }
+  if (input.choices !== undefined) {
+    facts.push(
+      i18n.t("hub.automations.inputEditor.choices", { choices: input.choices.join(", ") }),
+    );
+  }
   return facts.length === 0 ? undefined : facts.join(" · ");
 }
 
@@ -1982,13 +2044,14 @@ function AutomationReview({
   events: readonly AutomationEventValue[];
   outputs: readonly AutomationOutputValue[];
 }) {
+  const { t } = useTranslation();
   const automaticActions = [
-    "Finish and record the run",
+    t("hub.automations.review.finishAndRecord"),
     ...new Set(
       events.flatMap((event) => {
         const provider = event.name.split(".", 1)[0];
         return ["slack", "discord", "github", "linear"].includes(provider)
-          ? [`Reply to the triggering ${capitalize(provider)} conversation`]
+          ? [t("hub.automations.review.replyToTrigger", { provider: capitalize(provider) })]
           : [];
       }),
     ),
@@ -1996,41 +2059,45 @@ function AutomationReview({
   ];
   return (
     <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-      <Text style={styles.sectionTitle}>Review</Text>
+      <Text style={styles.sectionTitle}>{t("hub.automations.review.title")}</Text>
       <SummaryRow
-        title="Target"
+        title={t("hub.automations.review.target")}
         hint={
-          daemon && projectId ? `${daemon} · Project ${projectId}` : "Choose a Host and Project"
+          daemon && projectId
+            ? t("hub.automations.review.targetValue", { daemon, project: projectId })
+            : t("hub.automations.review.chooseHostAndProject")
         }
       />
       <SummaryRow
-        title="Agent"
+        title={t("hub.automations.review.agent")}
         hint={
           [agent.provider, agent.model, agent.thinkingOptionId, agent.mode]
             .filter(Boolean)
-            .join(" · ") || "Choose an Agent configuration"
+            .join(" · ") || t("hub.automations.review.chooseAgent")
         }
         border
       />
       <SummaryRow
-        title="Runtime ceiling"
-        hint={`${maxRuntime || "Not set"} · idle ${idleTimeout || "not set"}`}
+        title={t("hub.automations.review.runtimeCeiling")}
+        hint={t("hub.automations.review.runtimeValue", {
+          maxRuntime: maxRuntime || t("hub.automations.review.notSet"),
+          idleTimeout: idleTimeout || t("hub.automations.review.idleNotSet"),
+        })}
         border
       />
-      <SummaryRow title="Automatic Hub actions" hint={automaticActions.join("; ")} border />
+      <SummaryRow
+        title={t("hub.automations.review.automaticActions")}
+        hint={automaticActions.join("; ")}
+        border
+      />
       {agent.featureValues["fast_mode"] === true ? (
         <Alert
           variant="warning"
-          title="Fast mode may increase Provider cost"
-          description="Activation still requires the author's Fast-mode authority, and the Daemon checks the fixed Agent configuration again when a run starts."
+          title={t("hub.automations.review.fastModeTitle")}
+          description={t("hub.automations.review.fastModeDescription")}
         />
       ) : null}
-      <Text style={settingsStyles.rowHint}>
-        Native file and command tools follow the selected Mode and Daemon approval policy. Channel
-        tool replies are separately preapproved for the invoking conversation, including files
-        within the selected Project when the Hub can access that folder. Callers cannot change these
-        fixed targets or grants through an input or prompt.
-      </Text>
+      <Text style={settingsStyles.rowHint}>{t("hub.automations.review.toolPolicy")}</Text>
     </View>
   );
 }
@@ -2086,7 +2153,8 @@ function SummaryRow({
 }
 
 function QueryFeedback({ pending, error }: { pending: boolean; error: Error | null }) {
-  if (pending) return <Text style={settingsStyles.rowHint}>Loading…</Text>;
+  const { t } = useTranslation();
+  if (pending) return <Text style={settingsStyles.rowHint}>{t("hub.automations.loading")}</Text>;
   return error ? <Alert variant="error" title={error.message} /> : null;
 }
 
@@ -2120,14 +2188,18 @@ function commaSeparated(value: string): string[] {
 }
 
 function automationEventHint(event: AutomationEventValue): string {
-  if (event.connection) return `Connection: ${event.connection}`;
-  return event.name === "manual.run" ? "Available to an authorized API caller" : "Configured event";
+  if (event.connection) {
+    return i18n.t("hub.automations.events.connectionHint", { connection: event.connection });
+  }
+  return event.name === "manual.run"
+    ? i18n.t("hub.automations.events.manualHint")
+    : i18n.t("hub.automations.events.configuredHint");
 }
 
 function eventLabel(eventName: string): string {
   return (
-    AUTOMATION_EVENTS.find(({ name }) => name === eventName)?.label ??
-    (eventName === "channel.message" ? "Routes" : eventName)
+    automationEvents().find(({ name }) => name === eventName)?.label ??
+    (eventName === "channel.message" ? i18n.t("hub.automations.events.routes") : eventName)
   );
 }
 

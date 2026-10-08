@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
@@ -17,13 +19,18 @@ const INVITATION_SEARCH_THRESHOLD = 6;
 
 function invitationChips(
   invitations: readonly HubManagedInvitation[],
+  t: TFunction,
 ): FilterChip<InvitationFilter>[] {
   // No Expired chip: the Hub lists only invitations that have not expired yet.
   const count = (state: "expiringSoon") =>
     invitations.filter(({ expiresAt }) => invitationState(expiresAt) === state).length;
   return [
-    { value: "all", label: "Invitations", count: invitations.length },
-    { value: "expiringSoon", label: "Expiring soon", count: count("expiringSoon") },
+    { value: "all", label: t("hub.team.invitations.chips.all"), count: invitations.length },
+    {
+      value: "expiringSoon",
+      label: t("hub.team.invitations.chips.expiringSoon"),
+      count: count("expiringSoon"),
+    },
   ];
 }
 
@@ -36,34 +43,37 @@ export function InvitationsTab({
   invitations: readonly HubManagedInvitation[];
   actions: TeamActions;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<InvitationFilter>("all");
   const invitationActions = useInvitationActions(hub, actions.run);
-  const chips = useMemo(() => invitationChips(invitations), [invitations]);
+  const chips = useMemo(() => invitationChips(invitations, t), [invitations, t]);
   const visible = useMemo(
     () => filterInvitations(invitations, filter, query),
     [filter, invitations, query],
   );
   return (
     <View>
-      <SettingsSection title="Overview">
+      <SettingsSection title={t("hub.team.invitations.overview")}>
         <FilterChips<InvitationFilter> chips={chips} value={filter} onChange={setFilter} />
         {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
       </SettingsSection>
-      <SettingsSection title="Invitations">
+      <SettingsSection title={t("hub.team.invitations.title")}>
         {invitations.length > INVITATION_SEARCH_THRESHOLD ? (
           <SearchField
             value={query}
             onChangeText={setQuery}
-            placeholder="Search email or Team"
-            clearAccessibilityLabel="Clear invitation search"
+            placeholder={t("hub.team.invitations.search")}
+            clearAccessibilityLabel={t("hub.team.invitations.clearSearch")}
           />
         ) : null}
         <View style={settingsStyles.card}>
           {visible.length === 0 ? (
             <EmptyRow
               message={
-                invitations.length === 0 ? "No pending invitations." : "No invitations match."
+                invitations.length === 0
+                  ? t("hub.team.invitations.empty")
+                  : t("hub.team.invitations.noMatch")
               }
             />
           ) : (

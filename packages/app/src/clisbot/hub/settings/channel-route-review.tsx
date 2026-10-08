@@ -1,5 +1,6 @@
 import { type RouteApprovalChoice } from "./channel-route-form-sections";
 import { Text, View } from "react-native";
+import { i18n } from "@/i18n/i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { type RouteBotOption } from "../channel-route-bot";
 import { type ManagedAgentConfigurationValue } from "./managed-agent-configuration-fields";
@@ -39,19 +40,22 @@ export function warningsForRoute(
  * platform dialog's plain text cannot drift apart. */
 function routeReviewFacts(input: RouteReviewInput): { label: string; value: string }[] {
   return [
-    { label: "Rules", value: input.audience.join("\n") },
-    { label: "Target", value: input.target },
-    { label: "Reply method", value: routeReplySummary(input.route) },
-    { label: "Permission requests", value: routeToolRequestSummary(input.route) },
+    { label: i18n.t("hub.routes.review.rules"), value: input.audience.join("\n") },
+    { label: i18n.t("hub.routes.review.target"), value: input.target },
+    { label: i18n.t("hub.routes.review.replyMethod"), value: routeReplySummary(input.route) },
+    {
+      label: i18n.t("hub.routes.review.permissionRequests"),
+      value: routeToolRequestSummary(input.route),
+    },
     ...(input.warnings.length === 0
       ? []
-      : [{ label: "Warnings", value: input.warnings.join("\n") }]),
+      : [{ label: i18n.t("hub.routes.review.warnings"), value: input.warnings.join("\n") }]),
   ];
 }
 
 export function routeReviewMessage(input: RouteReviewInput): string {
   return routeReviewFacts(input)
-    .map(({ label, value }) => `${label}: ${value}`)
+    .map(({ label, value }) => i18n.t("hub.routes.review.fact", { label, value }))
     .join("\n");
 }
 
@@ -74,9 +78,11 @@ export function routeConfirmationTitle(
   approvalChoice: RouteApprovalChoice,
   isEditing: boolean,
 ): string {
-  if (open) return "Open this Route to anyone in the matching conversations?";
-  if (approvalChoice === "auto-allow") return "Accept every permission request automatically?";
-  return isEditing ? "Save Route?" : "Activate Route?";
+  if (open) return i18n.t("hub.routes.review.openTitle");
+  if (approvalChoice === "auto-allow") return i18n.t("hub.routes.review.autoAllowTitle");
+  return isEditing
+    ? i18n.t("hub.routes.review.saveTitle")
+    : i18n.t("hub.routes.review.activateTitle");
 }
 
 export function routeTargetReviewLabel(
@@ -85,14 +91,21 @@ export function routeTargetReviewLabel(
   bot: RouteBotOption | null,
   agent: ManagedAgentConfigurationValue,
 ): string {
-  if (target === "automation") return `Automation · ${automationName ?? "Unavailable"}`;
-  if (target === "bot") return `Bot · ${bot?.bot.name ?? "Unavailable"}`;
-  const model = agent.model.length > 0 ? ` / ${agent.model}` : "";
-  return `Agent · ${agent.provider}${model}`;
+  const unavailable = i18n.t("hub.routes.common.unavailable");
+  if (target === "automation")
+    return i18n.t("hub.routes.review.automationTarget", { name: automationName ?? unavailable });
+  if (target === "bot")
+    return i18n.t("hub.routes.review.botTarget", { name: bot?.bot.name ?? unavailable });
+  if (agent.model.length === 0)
+    return i18n.t("hub.routes.review.agentTarget", { provider: agent.provider });
+  return i18n.t("hub.routes.review.agentModelTarget", {
+    provider: agent.provider,
+    model: agent.model,
+  });
 }
 
 export function channelFormSubmitLabel(isEditing: boolean): string {
-  return isEditing ? "Save Route" : "Activate Route";
+  return isEditing ? i18n.t("hub.routes.review.save") : i18n.t("hub.routes.review.activate");
 }
 
 const styles = StyleSheet.create((theme) => ({

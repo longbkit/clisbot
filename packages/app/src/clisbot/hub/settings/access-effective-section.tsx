@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -11,6 +12,7 @@ import { AccessGrantsTable } from "./access-grants-table";
  * in the same list everyone else reads, without actions.
  */
 export function MemberAccessSettings({ access }: { access: EffectiveAccess | undefined }) {
+  const { t } = useTranslation();
   const rows = useMemo(
     () =>
       access === undefined || access.owner
@@ -28,20 +30,20 @@ export function MemberAccessSettings({ access }: { access: EffectiveAccess | und
   return (
     <View>
       <SettingsSection
-        title="Your access"
-        info="Your own grants and your Teams'. Ask an Organization Admin, or whoever shares a resource, to change them."
+        title={t("hub.access.yourAccess.title")}
+        info={t("hub.access.yourAccess.info")}
       >
         {access?.owner ? (
           <Alert
             variant="info"
-            title="Owner access is automatic"
-            description="You can use every current and future Hub resource."
+            title={t("hub.access.yourAccess.ownerTitle")}
+            description={t("hub.access.yourAccess.ownerDescription")}
           />
         ) : (
           <AccessGrantsTable
             rows={rows}
             grouping="subject"
-            empty="No resource access has been granted to you yet."
+            empty={t("hub.access.yourAccess.empty")}
           />
         )}
       </SettingsSection>

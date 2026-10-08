@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { WorkspaceActions } from "@/git/workspace-actions";
@@ -12,16 +13,19 @@ export function ConversationProjectActions({
   project: ConversationProjectContextValue;
   onChoose?: () => void;
 }) {
+  const { t } = useTranslation();
   const choose = useCallback(() => {
     onChoose?.();
     project?.chooseBot();
   }, [onChoose, project]);
   return (
     <View style={styles.root}>
-      <Text style={styles.label}>Project · {project.botName}</Text>
+      <Text style={styles.label}>
+        {t("bots.chat.projectActions.label", { bot: project.botName })}
+      </Text>
       {project.group ? (
         <Button variant="ghost" onPress={choose}>
-          Choose bot project
+          {t("bots.chat.common.chooseBotProject")}
         </Button>
       ) : null}
       {project.cwd && project.isGit ? (
@@ -29,8 +33,8 @@ export function ConversationProjectActions({
       ) : (
         <Text style={styles.label}>
           {project.cwd
-            ? "This project does not use Git."
-            : "Project access is required to view files and changes."}
+            ? t("bots.chat.projectActions.noGit")
+            : t("bots.chat.projectActions.needAccess")}
         </Text>
       )}
     </View>

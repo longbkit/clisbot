@@ -7,6 +7,7 @@ import {
   type HubDeviceOffer,
 } from "@clisbot/protocol/device-pairing-offer";
 import { isElectronRuntime } from "@/desktop/host";
+import { i18n } from "@/i18n/i18next";
 import { getDesktopDaemonPairingOffer } from "@/desktop/daemon/desktop-daemon";
 import type { HubProfile } from "./hub-profiles";
 import { PairedHubTransport } from "./hub-transport";
@@ -33,9 +34,7 @@ export async function appDevicePairingOffer(
   }
   if (profile) return client.getDaemonPairingOffer({ hub: await approvedHubOffer(profile) });
   if (offer.managedAccessMode === "external")
-    throw new Error(
-      "Pair this Host's Hub and sign in as its instance operator, or ask its operator for `clisbot hub pair`.",
-    );
+    throw new Error(i18n.t("hub.connection.errors.pairHubFirst"));
   return result;
 }
 
@@ -45,15 +44,19 @@ export async function approvedHubOffer(profile: HubProfile): Promise<HubDeviceOf
   try {
     const capabilities = await readHubDeviceCapabilities(transport);
     if (capabilities.hubId !== profile.hubId || !capabilities.canManageDevices)
-      throw new Error("The Hub instance operator must approve pairing another device.");
+      throw new Error(i18n.t("hub.connection.errors.operatorMustApprove"));
     const response = await transport.request("/api/auth/clisbot/device/invitations", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{}",
     });
-    if (!response.ok) throw new Error(`Hub pairing invitation failed (${response.status})`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("hub.connection.errors.invitationFailed", { status: response.status }),
+      );
     const pairing = DevicePairingGrantSchema.parse(await response.json());
-    if (pairing.backendId !== profile.hubId) throw new Error("Hub pairing identity mismatch");
+    if (pairing.backendId !== profile.hubId)
+      throw new Error(i18n.t("hub.connection.errors.hubPairingMismatch"));
     return { ...profile, pairing };
   } finally {
     transport.close();

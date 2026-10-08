@@ -1,11 +1,13 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/select-field";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useHubAccount } from "../account-provider";
@@ -56,6 +58,7 @@ function ChannelIdentitySelfLinkForm({
 }: {
   requestedConnectionId: string | null;
 }) {
+  const { t } = useTranslation();
   const catalog = useChannelCatalog();
   const mutation = useMutationState();
   const [chosenRealmKey, setChosenRealmKey] = useState<string | null>(null);
@@ -100,11 +103,11 @@ function ChannelIdentitySelfLinkForm({
   if (reads.membershipId === null) return null;
   return (
     <View>
-      <SettingsSection title="Channel identity setup">
+      <SettingsSection title={t("hub.channels.selfLink.title")}>
         <Alert
           variant="info"
-          title="Link the accounts you chat from"
-          description="Link once for each place you chat — a Slack workspace, or all of Telegram, Discord, or Google Chat — and every bot there recognizes you. Feishu and Zalo bots are linked one at a time. Linking only proves who you are; what you can do still follows the access you were given."
+          title={t("hub.channels.selfLink.introTitle")}
+          description={t("hub.channels.selfLink.introBody")}
         />
         <QueryFeedback queries={[reads.identities, reads.connections]} />
         <RefreshButton reads={reads} pending={mutation.pending} />
@@ -160,7 +163,7 @@ function useMutationState() {
     try {
       await action();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Hub request failed.");
+      setError(failure instanceof Error ? failure.message : i18n.t("hub.channels.selfLink.failed"));
     } finally {
       setPending(false);
     }
@@ -209,10 +212,9 @@ function useUnlinkIdentity(run: RunMutation, refetch: () => Promise<unknown>) {
   return useCallback(
     async (id: string) => {
       const confirmed = await confirmDialog({
-        title: "Unlink your Channel identity?",
-        message:
-          "Messages from this account will stop resolving to your Hub account on every bot this link covers.",
-        confirmLabel: "Unlink identity",
+        title: i18n.t("hub.channels.selfLink.unlinkTitle"),
+        message: i18n.t("hub.channels.selfLink.unlinkMessage"),
+        confirmLabel: i18n.t("hub.channels.selfLink.unlinkConfirm"),
         destructive: true,
       });
       if (!confirmed) return;
@@ -232,13 +234,14 @@ function RefreshButton({
   reads: ReturnType<typeof useOwnChannelIdentities>;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const { identities, connections } = reads;
   const refresh = useCallback(() => {
     void Promise.all([identities.refetch(), connections.refetch()]);
   }, [identities, connections]);
   return (
     <Button size="sm" variant="outline" disabled={pending} onPress={refresh}>
-      Refresh identities
+      {t("hub.channels.selfLink.refresh")}
     </Button>
   );
 }
@@ -258,9 +261,10 @@ function LinkRealmSection({
   landed: LinkRealm | null;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const selectedKey = realms.selected?.key ?? null;
   return (
-    <SettingsSection title="Link a new identity">
+    <SettingsSection title={t("hub.channels.selfLink.linkNew")}>
       <View style={[settingsStyles.card, styles.form]}>
         {landed === null ? null : <LinkedNotice realm={landed} />}
         {realms.options.length === 0 ? (
@@ -268,19 +272,19 @@ function LinkRealmSection({
         ) : (
           <>
             <SelectField
-              label="Where you chat"
+              label={t("hub.channels.selfLink.where")}
               value={selectedKey}
               selectedDisplay={selectedOptionDisplay(realms.options, selectedKey)}
               options={realms.options}
               onChange={chooseRealm}
-              placeholder="Choose where you chat"
+              placeholder={t("hub.channels.selfLink.wherePlaceholder")}
               emptyText={realms.emptyText}
               searchable={realms.options.length > 6}
-              title="Where you chat"
+              title={t("hub.channels.selfLink.where")}
               disabled={pending}
             />
             <Button disabled={pending || realms.selected === undefined} onPress={createChallenge}>
-              {pending ? "Creating code…" : "Create link code"}
+              {pending ? t("hub.channels.selfLink.creating") : t("hub.channels.selfLink.create")}
             </Button>
           </>
         )}
@@ -307,13 +311,15 @@ function LinkedIdentitiesSection({
   pending: boolean;
   unlink(id: string): Promise<void>;
 }) {
-  if (!loaded) return <SettingsSection title="Linked identities">{null}</SettingsSection>;
+  const { t } = useTranslation();
+  const title = t("hub.channels.selfLink.linked");
+  if (!loaded) return <SettingsSection title={title}>{null}</SettingsSection>;
   return (
-    <SettingsSection title="Linked identities">
+    <SettingsSection title={title}>
       <View style={settingsStyles.card}>
         {ownIdentities.length === 0 ? (
           <View style={settingsStyles.row}>
-            <Text style={settingsStyles.rowHint}>No chat accounts are linked yet.</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.channels.identities.empty")}</Text>
           </View>
         ) : (
           ownIdentities.map((identity, index) => (
@@ -349,36 +355,38 @@ function RequestedConnectionFeedback({
   selected: boolean;
   alreadyLinked: boolean;
 }) {
+  const { t } = useTranslation();
   if (requested === null || !ready || selected) return null;
   if (alreadyLinked) {
     return (
       <Alert
         variant="info"
-        title="You are already linked here"
-        description="The bot that sent you here already recognizes you. Send your message again."
+        title={t("hub.channels.selfLink.alreadyTitle")}
+        description={t("hub.channels.selfLink.alreadyBody")}
       />
     );
   }
   return (
     <Alert
       variant="warning"
-      title="That bot is no longer available"
-      description="Refresh, or choose where you chat below. Ask an owner if the bot you expected is missing."
+      title={t("hub.channels.selfLink.goneTitle")}
+      description={t("hub.channels.selfLink.goneBody")}
     />
   );
 }
 
 /** What a landed link now covers, so nobody links the same place bot by bot. */
 function LinkedNotice({ realm }: { realm: LinkRealm }) {
+  const { t } = useTranslation();
   const reach =
     realm.scope === "bot"
-      ? `${realm.label} now recognizes you. ${realm.channelLabel} gives each bot its own user ids, so link other ${realm.channelLabel} bots separately.`
-      : `Every bot here now recognizes you: ${realm.botNames.join(", ")}.`;
+      ? t("hub.channels.selfLink.noticeBot", { label: realm.label, channel: realm.channelLabel })
+      : t("hub.channels.selfLink.noticeAll", { bots: realm.botNames.join(", ") });
   return (
     <Alert
       variant="success"
-      title={`Linked: ${realm.label}`}
-      description={`${reach} Send your original message again.`}
+      title={t("hub.channels.selfLink.noticeTitle", { label: realm.label })}
+      description={t("hub.channels.selfLink.noticeBody", { reach })}
     />
   );
 }
@@ -387,30 +395,35 @@ function LinkedNotice({ realm }: { realm: LinkRealm }) {
 function linkInstruction(realm: LinkRealm): string {
   const bots = realm.botNames.join(", ");
   if (realm.provider === "slack") {
-    const who = realm.scope === "bot" ? "the bot" : "any bot of this workspace";
-    return `In Slack, mention ${who} (${bots}) in a conversation where it is present, then paste this command in that message. Send it from your own Slack account.`;
+    return realm.scope === "bot"
+      ? i18n.t("hub.channels.selfLink.slackBot", { bots })
+      : i18n.t("hub.channels.selfLink.slackAny", { bots });
   }
-  const target = realm.scope === "bot" ? `the bot ${bots}` : `any one of these bots: ${bots}`;
-  return `Send this command from your own ${realm.channelLabel} account to ${target}. In a direct message send it as is; in a group, mention the bot in the same message.`;
+  return realm.scope === "bot"
+    ? i18n.t("hub.channels.selfLink.sendBot", { channel: realm.channelLabel, bots })
+    : i18n.t("hub.channels.selfLink.sendAny", { channel: realm.channelLabel, bots });
 }
 
 function ChannelIdentityChallenge({ challenge }: { challenge: IssuedChallenge }) {
+  const { t } = useTranslation();
   const expired = useExpired(challenge.expiresAt);
   if (expired) {
     return (
       <Alert
         variant="warning"
-        title="This link code expired"
-        description="Create a new code and send it within its time limit."
+        title={t("hub.channels.selfLink.expiredTitle")}
+        description={t("hub.channels.selfLink.expiredBody")}
       />
     );
   }
   return (
     <View style={styles.challenge}>
       <Text style={settingsStyles.rowHint}>{linkInstruction(challenge.realm)}</Text>
-      <CopyableCommand command={challenge.command} copyLabel="Copy link command" />
+      <CopyableCommand command={challenge.command} copyLabel={t("hub.channels.selfLink.copy")} />
       <Text style={settingsStyles.rowHint}>
-        {`Use it once before ${new Date(challenge.expiresAt).toLocaleTimeString()}, and do not share it. Waiting for your message — this page updates by itself.`}
+        {t("hub.channels.selfLink.useOnce", {
+          time: new Date(challenge.expiresAt).toLocaleTimeString(),
+        })}
       </Text>
     </View>
   );
@@ -425,12 +438,13 @@ function IdentityUnlinkButton({
   pending: boolean;
   unlink(id: string): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const handlePress = useCallback(() => {
     void unlink(identityId);
   }, [identityId, unlink]);
   return (
     <Button size="xs" variant="ghost" disabled={pending} onPress={handlePress}>
-      Unlink
+      {t("hub.channels.selfLink.unlink")}
     </Button>
   );
 }

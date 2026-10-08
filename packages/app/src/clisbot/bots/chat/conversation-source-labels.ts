@@ -1,5 +1,6 @@
 import { createContext, createElement, useCallback, useContext, type ReactNode } from "react";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { i18n } from "@/i18n/i18next";
 export const ConversationSourceLabelsContext = createContext<ReadonlyMap<string, string>>(
   new Map(),
 );
@@ -10,7 +11,8 @@ export function conversationTabContextLabel(
   labels: ReadonlyMap<string, string>,
   group: boolean,
 ) {
-  if (target.kind === "conversation") return group ? "Group conversation" : undefined;
+  if (target.kind === "conversation")
+    return group ? i18n.t("bots.chat.tabs.groupConversation") : undefined;
   const source = target.workspaceContext;
   const bot =
     group && source ? labels.get(JSON.stringify([source.serverId, source.workspaceId])) : undefined;

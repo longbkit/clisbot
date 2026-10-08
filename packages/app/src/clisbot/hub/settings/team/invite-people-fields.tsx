@@ -1,21 +1,26 @@
 import { useCallback, useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { capitalizeLabel, countLabel } from "../labels";
 import {
   MultiSelectField,
   type MultiSelectCreate,
   type MultiSelection,
 } from "../multi-select-field";
+import { roleLabel } from "./member-role";
 import type { TeamAdditionPlan } from "./team-additions";
 import type { HubTeam, InvitationRole } from "./types";
 import type { InviteDraftState } from "./use-invite-people";
 
-const ROLE_OPTIONS: SelectFieldOption<InvitationRole>[] = [
-  { id: "member", value: "member", label: "Member" },
-  { id: "admin", value: "admin", label: "Admin" },
-];
+function roleOptions(t: TFunction): SelectFieldOption<InvitationRole>[] {
+  return [
+    { id: "member", value: "member", label: roleLabel("member", t) },
+    { id: "admin", value: "admin", label: roleLabel("admin", t) },
+  ];
+}
 
 export function InvitePeopleFields({
   draftState,
@@ -37,6 +42,7 @@ export function InvitePeopleFields({
   /** For people who may create Teams: a typed name that matches no Team creates one. */
   createTeam: MultiSelectCreate | undefined;
 }) {
+  const { t } = useTranslation();
   const { draft, update } = draftState;
   const compact = useIsCompactFormFactor();
   const setText = useCallback((text: string) => update({ text }), [update]);
@@ -51,20 +57,25 @@ export function InvitePeopleFields({
         id: team.id,
         value: team.id,
         label: team.name,
-        description: countLabel(team.userIds.length, "Member"),
+        description: t("hub.team.counts.members", { count: team.userIds.length }),
       })),
-    [teams],
+    [t, teams],
   );
-  const roleDisplay = useMemo(() => ({ label: capitalizeLabel(draft.role) }), [draft.role]);
+  const roles = useMemo(() => roleOptions(t), [t]);
+  const roleDisplay = useMemo(() => ({ label: roleLabel(draft.role, t) }), [draft.role, t]);
   return (
     <>
-      <Field label="People" hint={peopleHint(plan)} error={peopleError(plan, unknown)}>
+      <Field
+        label={t("hub.team.invite.people.label")}
+        hint={peopleHint(plan)}
+        error={peopleError(plan, unknown)}
+      >
         <FormTextInput
           size={compact ? "md" : "sm"}
           initialValue={draft.text}
           resetKey={draft.textResetKey}
           onChangeText={setText}
-          placeholder={"Alice, bob@example.com\nanother@example.com"}
+          placeholder={t("hub.team.invite.people.placeholder")}
           multiline
           autoCapitalize="none"
           autoCorrect={false}
@@ -72,29 +83,37 @@ export function InvitePeopleFields({
         />
       </Field>
       <MultiSelectField
-        label="Teams"
+        label={t("hub.team.teamPicker.label")}
         hint={teamsHint(teams.length, createTeam !== undefined)}
         options={teamOptions}
         value={draft.teamIds}
         onChange={chooseTeams}
         disabled={disabled || (teams.length === 0 && createTeam === undefined)}
-        placeholder={createTeam === undefined ? "Choose Teams" : "Choose or create Teams"}
-        searchPlaceholder={createTeam === undefined ? "Team name" : "Team name, or a new one"}
+        placeholder={
+          createTeam === undefined
+            ? t("hub.team.teamPicker.choose")
+            : t("hub.team.teamPicker.chooseOrCreate")
+        }
+        searchPlaceholder={
+          createTeam === undefined
+            ? t("hub.team.teamPicker.search")
+            : t("hub.team.teamPicker.searchOrCreate")
+        }
         {...(createTeam === undefined ? {} : { create: createTeam })}
       />
       {plan.invitees.length > 0 ? (
         <SelectField
           size={compact ? "md" : "sm"}
-          label="Organization role for new people"
+          label={t("hub.team.invite.role.label")}
           value={draft.role}
           selectedDisplay={roleDisplay}
-          options={ROLE_OPTIONS}
+          options={roles}
           onChange={setRole}
-          placeholder="Choose a role"
-          emptyText="No organization roles are available."
-          title="Organization role"
+          placeholder={t("hub.team.invite.role.placeholder")}
+          emptyText={t("hub.team.invite.role.empty")}
+          title={t("hub.team.invite.role.title")}
           disabled={disabled || roleLocked}
-          hint={roleLocked ? "Team Admins invite people as Members." : undefined}
+          hint={roleLocked ? t("hub.team.invite.role.locked") : undefined}
         />
       ) : null}
     </>
@@ -102,27 +121,33 @@ export function InvitePeopleFields({
 }
 
 function teamsHint(teams: number, canCreate: boolean): string {
-  if (teams > 0) return "People join every Team you choose.";
-  return canCreate ? "Type a name to create a Team." : "Create a Team first.";
+  if (teams > 0) return i18n.t("hub.team.invite.teamsHint");
+  return canCreate
+    ? i18n.t("hub.team.teamPicker.typeToCreate")
+    : i18n.t("hub.team.teamPicker.createFirst");
 }
 
 function peopleHint(plan: TeamAdditionPlan): string {
   const parts = [
-    ...(plan.members.length > 0 ? [`${countLabel(plan.members.length, "Member")} recognized`] : []),
+    ...(plan.members.length > 0
+      ? [i18n.t("hub.team.invite.people.recognized", { count: plan.members.length })]
+      : []),
     ...(plan.invitees.length > 0
-      ? [`${countLabel(plan.invitees.length, "new person", "new people")} to invite`]
+      ? [i18n.t("hub.team.invite.people.toInvite", { count: plan.invitees.length })]
       : []),
   ];
-  if (parts.length === 0) {
-    return "Names of Members or emails, separated by commas or new lines. Existing Members are recognized.";
-  }
-  return `${parts.join(" · ")}.`;
+  if (parts.length === 0) return i18n.t("hub.team.invite.people.hint");
+  return i18n.t("hub.team.invite.people.summary", { parts: parts.join(" · ") });
 }
 
 function peopleError(plan: TeamAdditionPlan, unknown: readonly string[]): string | undefined {
   const problems = [
-    ...(plan.invalid.length > 0 ? [`Not an email: ${plan.invalid.join(", ")}`] : []),
-    ...(unknown.length > 0 ? [`Not a Member: ${unknown.join(", ")}`] : []),
+    ...(plan.invalid.length > 0
+      ? [i18n.t("hub.team.invite.people.notEmail", { entries: plan.invalid.join(", ") })]
+      : []),
+    ...(unknown.length > 0
+      ? [i18n.t("hub.team.invite.people.notMember", { entries: unknown.join(", ") })]
+      : []),
   ];
   return problems.length === 0 ? undefined : problems.join(" · ");
 }

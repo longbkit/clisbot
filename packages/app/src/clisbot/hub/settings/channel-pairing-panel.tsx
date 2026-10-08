@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -34,13 +35,14 @@ export function ChannelPairingPanel({
   accountId: string;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const queue = useChannelPairingQueue(channel, accountId);
   if (queue.unavailable) {
     return (
       <Alert
         variant="info"
-        title="Pairing is not available on this Hub"
-        description="Update the Hub to a build that serves the pairing queue to approve senders from here."
+        title={t("hub.channels.pairingPanel.unavailableTitle")}
+        description={t("hub.channels.pairingPanel.unavailableBody")}
       />
     );
   }
@@ -50,7 +52,7 @@ export function ChannelPairingPanel({
       {queue.error === null ? null : (
         <Alert
           variant="warning"
-          title="Pairing requests are unavailable"
+          title={t("hub.channels.pairingPanel.requestsUnavailable")}
           description={queue.error}
         />
       )}
@@ -85,6 +87,7 @@ function PairingRow({
   deciding: boolean;
   decide(senderIdentity: string, decision: "approve" | "deny"): void;
 }) {
+  const { t } = useTranslation();
   const approve = useCallback(() => decide(row.senderIdentity, "approve"), [decide, row]);
   const deny = useCallback(() => decide(row.senderIdentity, "deny"), [decide, row]);
   return (
@@ -102,10 +105,10 @@ function PairingRow({
             loading={deciding}
             onPress={approve}
           >
-            Approve
+            {t("hub.channels.pairingPanel.approve")}
           </Button>
           <Button size="xs" variant="outline" disabled={disabled} onPress={deny}>
-            Deny
+            {t("hub.channels.pairingPanel.deny")}
           </Button>
         </View>
       ) : (
@@ -128,6 +131,7 @@ interface ChannelPairingQueue {
 }
 
 function useChannelPairingQueue(channel: string, accountId: string): ChannelPairingQueue {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
   const [deciding, setDeciding] = useState<string | null>(null);
@@ -159,11 +163,13 @@ function useChannelPairingQueue(channel: string, accountId: string): ChannelPair
       void decideChannelPairing(hub.api(), { channel, accountId }, { senderIdentity, decision })
         .then(() => refetch())
         .catch((cause: unknown) =>
-          setDecisionError(cause instanceof Error ? cause.message : "The decision was not saved."),
+          setDecisionError(
+            cause instanceof Error ? cause.message : t("hub.channels.pairingPanel.notSaved"),
+          ),
         )
         .finally(() => setDeciding(null));
     },
-    [accountId, channel, hub, refetch],
+    [accountId, channel, hub, refetch, t],
   );
   return {
     rows,

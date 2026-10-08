@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { hubPairingOfferUrl } from "@clisbot/protocol/device-pairing-offer";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,13 @@ import { approvedHubOffer } from "./pairing-offer";
 /** A Hub-only invitation for another device, from the Hub's own screen. Host pairing can
  * carry the same grant; this is for a Hub reached without pairing its Host. */
 export function HubPairDevicePanel({ profile, onClose }: { profile: HubProfile; onClose(): void }) {
+  const { t } = useTranslation();
   const [attempt, setAttempt] = useState(0);
   const link = useFetchQuery({
     queryKey: ["hub-pairing-link", profile.hubId, attempt],
     queryFn: async () => {
       const { hubId, publicKey, origin, relay, pairing } = await approvedHubOffer(profile);
-      if (!pairing) throw new Error("The Hub did not return a pairing invitation");
+      if (!pairing) throw new Error(t("hub.connection.errors.noInvitation"));
       return hubPairingOfferUrl({ hubId, publicKey, origin, relay, pairing });
     },
     dataShape: "value",
@@ -31,24 +33,21 @@ export function HubPairDevicePanel({ profile, onClose }: { profile: HubProfile; 
   return (
     <View style={[settingsStyles.card, styles.panel]}>
       {link.data ? (
-        <PairingLinkPanel
-          url={link.data}
-          hint="Scan with Clisbot on the other device. The link works once and expires in 5 minutes."
-        />
+        <PairingLinkPanel url={link.data} hint={t("hub.connection.pairDevice.hint")} />
       ) : null}
       {link.error ? (
         <Alert variant="error" description={link.error.message}>
           <Button variant="outline" size="sm" onPress={fresh}>
-            Retry
+            {t("hub.connection.common.retry")}
           </Button>
         </Alert>
       ) : null}
       <View style={styles.actions}>
         <Button variant="outline" size="sm" onPress={fresh} disabled={link.isFetching}>
-          New link
+          {t("hub.connection.pairDevice.newLink")}
         </Button>
         <Button variant="outline" size="sm" onPress={onClose}>
-          Done
+          {t("hub.connection.pairDevice.done")}
         </Button>
       </View>
     </View>

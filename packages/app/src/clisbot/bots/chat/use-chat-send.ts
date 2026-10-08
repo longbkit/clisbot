@@ -2,6 +2,7 @@ import type { MessagePayload } from "@/composer/types";
 import { splitComposerAttachmentsForSubmit } from "@/composer/attachments/submit";
 import { encodeImages } from "@/utils/encode-images";
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { generateDraftId } from "@/stores/draft-keys";
@@ -18,16 +19,15 @@ export function useChatSend(
   setError: Dispatch<SetStateAction<string | null>>,
   attachmentsSupported = false,
 ) {
+  const { t } = useTranslation();
   const [sending, setSending] = useState(false);
   const send = useCallback(
     async (payload: MessagePayload) => {
       const { text } = payload;
-      if (!client || !online) throw new Error("Host is disconnected");
-      if (!chat) throw new Error("Chat is not available");
+      if (!client || !online) throw new Error(t("bots.chat.common.hostDisconnected"));
+      if (!chat) throw new Error(t("bots.chat.send.chatUnavailable"));
       if (payload.attachments.length > 0 && !attachmentsSupported)
-        throw new Error(
-          "This Host needs an update before it can receive chat attachments. Your draft is saved.",
-        );
+        throw new Error(t("bots.chat.send.attachmentsNeedUpdate"));
       const attempt = attempts.forChat(client, chatId);
       setSending(true);
       setError(null);
@@ -71,7 +71,7 @@ export function useChatSend(
         setSending(false);
       }
     },
-    [client, online, chat, chatId, setChat, setError, attachmentsSupported],
+    [client, online, chat, chatId, setChat, setError, attachmentsSupported, t],
   );
   return { send, sending };
 }

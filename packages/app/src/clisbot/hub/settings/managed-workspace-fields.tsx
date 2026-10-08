@@ -1,8 +1,10 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import type { SelectFieldOption } from "@/components/ui/select-field";
+import { i18n } from "@/i18n/i18next";
 import type { WorkspaceBehavior, WorkspaceConfigurationValue } from "../workspace-configuration";
 
 /**
@@ -12,30 +14,47 @@ import type { WorkspaceBehavior, WorkspaceConfigurationValue } from "../workspac
  */
 export type WorkLocation = "folder" | Exclude<WorkspaceBehavior, "project">;
 
+// Labels are getters so a module-level list still reads the current language.
 export const WORK_LOCATION_OPTIONS: SelectFieldOption<WorkLocation>[] = [
   {
     id: "folder",
     value: "folder",
-    label: "A folder inside the Project",
-    description: "Work in a subfolder of the Project folder.",
+    get label() {
+      return i18n.t("hub.access.workLocation.folderLabel");
+    },
+    get description() {
+      return i18n.t("hub.access.workLocation.folderDescription");
+    },
   },
   {
     id: "branch-off",
     value: "branch-off",
-    label: "New isolated worktree",
-    description: "Create a new branch and worktree for this Agent.",
+    get label() {
+      return i18n.t("hub.access.workLocation.branchOffLabel");
+    },
+    get description() {
+      return i18n.t("hub.access.workLocation.branchOffDescription");
+    },
   },
   {
     id: "checkout-branch",
     value: "checkout-branch",
-    label: "Existing branch",
-    description: "Check out an existing branch in an isolated worktree.",
+    get label() {
+      return i18n.t("hub.access.workLocation.checkoutBranchLabel");
+    },
+    get description() {
+      return i18n.t("hub.access.workLocation.checkoutBranchDescription");
+    },
   },
   {
     id: "checkout-pr",
     value: "checkout-pr",
-    label: "Pull request",
-    description: "Check out a pull request in an isolated worktree.",
+    get label() {
+      return i18n.t("hub.access.workLocation.checkoutPrLabel");
+    },
+    get description() {
+      return i18n.t("hub.access.workLocation.checkoutPrDescription");
+    },
   },
 ];
 
@@ -52,6 +71,7 @@ export function WorktreeTargetFields({
   onChange(value: WorkspaceConfigurationValue): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const setNewBranch = useCallback(
     (newBranch: string) => onChange({ ...value, newBranch }),
     [onChange, value],
@@ -68,7 +88,10 @@ export function WorktreeTargetFields({
   if (value.behavior === "branch-off")
     return (
       <View style={styles.group}>
-        <Field label="New branch" hint="Required branch name for the new worktree.">
+        <Field
+          label={t("hub.access.workLocation.newBranch")}
+          hint={t("hub.access.workLocation.newBranchHint")}
+        >
           <FormTextInput
             initialValue={value.newBranch}
             onChangeText={setNewBranch}
@@ -78,7 +101,10 @@ export function WorktreeTargetFields({
             editable={!disabled}
           />
         </Field>
-        <Field label="Base branch" hint="Optional. The repository default is used when empty.">
+        <Field
+          label={t("hub.access.workLocation.baseBranch")}
+          hint={t("hub.access.workLocation.baseBranchHint")}
+        >
           <FormTextInput
             initialValue={value.base}
             onChangeText={setBase}
@@ -92,7 +118,10 @@ export function WorktreeTargetFields({
     );
   if (value.behavior === "checkout-branch")
     return (
-      <Field label="Branch" hint="Existing local or remote branch name.">
+      <Field
+        label={t("hub.access.workLocation.branch")}
+        hint={t("hub.access.workLocation.branchHint")}
+      >
         <FormTextInput
           initialValue={value.branch}
           onChangeText={setBranch}
@@ -105,7 +134,7 @@ export function WorktreeTargetFields({
     );
   if (value.behavior === "checkout-pr")
     return (
-      <Field label="Pull request number">
+      <Field label={t("hub.access.workLocation.pullRequestNumber")}>
         <FormTextInput
           initialValue={value.pullRequestNumber}
           onChangeText={setPullRequestNumber}

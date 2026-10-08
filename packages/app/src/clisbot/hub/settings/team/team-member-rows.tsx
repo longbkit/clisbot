@@ -1,20 +1,29 @@
 import { useCallback, useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
 import { settingsStyles } from "@/styles/settings";
-import { capitalizeLabel } from "../labels";
 import { EmptyRow } from "../resource-rows";
+import { roleLabel } from "./member-role";
 import { teamRoleOf, type TeamRole } from "./team-admin";
 import type { HubMember, HubTeam, TeamResources } from "./types";
 import type { useTeamAdminAction } from "./use-people-actions";
 import { withEmail } from "@/clisbot/hub/account-email";
 
-const TEAM_ROLE_OPTIONS: SelectFieldOption<TeamRole>[] = [
-  { id: "member", value: "member", label: "Member" },
-  { id: "admin", value: "admin", label: "Admin", description: "Manages who is in the Team" },
-];
+function teamRoleOptions(t: TFunction): SelectFieldOption<TeamRole>[] {
+  return [
+    { id: "member", value: "member", label: roleLabel("member", t) },
+    {
+      id: "admin",
+      value: "admin",
+      label: roleLabel("admin", t),
+      description: t("hub.team.teamDetail.roles.adminDescription"),
+    },
+  ];
+}
 
 /** Who is in the Team, each with their Team role. Team Admin manages membership, not the Team's grants. */
 export function TeamMemberRows({
@@ -32,6 +41,7 @@ export function TeamMemberRows({
   teamAdmin: ReturnType<typeof useTeamAdminAction>;
   removeMember(userId: string): void;
 }) {
+  const { t } = useTranslation();
   const members = (resources.members.data?.members ?? []).filter(({ userId }) =>
     team.userIds.includes(userId),
   );
@@ -39,7 +49,7 @@ export function TeamMemberRows({
   return (
     <View style={settingsStyles.card}>
       {members.length === 0 ? (
-        <EmptyRow message="No Members in this Team yet" />
+        <EmptyRow message={t("hub.team.teamDetail.noMembers")} />
       ) : (
         members.map((member, index) => (
           <TeamMemberRow
@@ -78,8 +88,10 @@ function TeamMemberRow({
   teamAdmin: ReturnType<typeof useTeamAdminAction>;
   removeMember(userId: string): void;
 }) {
+  const { t } = useTranslation();
   const remove = useCallback(() => removeMember(member.userId), [member.userId, removeMember]);
-  const display = useMemo(() => ({ label: capitalizeLabel(role) }), [role]);
+  const display = useMemo(() => ({ label: roleLabel(role, t) }), [role, t]);
+  const options = useMemo(() => teamRoleOptions(t), [t]);
   const change = useCallback(
     (next: TeamRole) => {
       if (next !== role) teamAdmin.setTeamRole(team.id, member, next);
@@ -91,26 +103,26 @@ function TeamMemberRow({
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{member.name}</Text>
         <Text style={settingsStyles.rowHint}>
-          {withEmail(capitalizeLabel(member.role), member.email)}
+          {withEmail(roleLabel(member.role, t), member.email)}
         </Text>
       </View>
       {canManage ? (
         <View style={styles.trailing}>
           <SelectField
             size="sm"
-            label="Team role"
+            label={t("hub.team.teamDetail.roles.label")}
             value={role}
             selectedDisplay={display}
-            options={TEAM_ROLE_OPTIONS}
+            options={options}
             onChange={change}
-            placeholder="Team role"
-            emptyText="No Team roles are available."
-            title={`Team role of ${member.name}`}
+            placeholder={t("hub.team.teamDetail.roles.label")}
+            emptyText={t("hub.team.teamDetail.roles.empty")}
+            title={t("hub.team.teamDetail.roles.title", { name: member.name })}
             disabled={pending || teamAdmin.unsupported}
-            hint={teamAdmin.unsupported ? "Team Admin needs a newer Hub." : undefined}
+            hint={teamAdmin.unsupported ? t("hub.team.teamDetail.roles.needsNewerHub") : undefined}
           />
           <Button size="xs" variant="ghost" disabled={pending} onPress={remove}>
-            Remove
+            {t("hub.team.actions.remove")}
           </Button>
         </View>
       ) : null}

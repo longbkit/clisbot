@@ -1,6 +1,7 @@
 import { HubDeviceOfferSchema } from "@clisbot/protocol/device-pairing-offer";
 import { parseHubConfiguration } from "@/clisbot/hub/config";
 import { Buffer } from "buffer";
+import { i18n } from "@/i18n/i18next";
 
 const IdentitySchema = HubDeviceOfferSchema.pick({
   hubId: true,
@@ -56,27 +57,15 @@ export async function fetchPublicHubIdentity(
     if (!response.ok) {
       controller.abort();
       void response.body?.cancel().catch(() => undefined);
-      throw new Error(
-        "This Hub could not be reached. Check the address, or use its connection link for an encrypted relay route.",
-      );
+      throw new Error(i18n.t("hub.connection.errors.unreachable"));
     }
     return await readPublicHubIdentityResponse(response, controller);
   } catch (error) {
-    if (timedOut)
-      throw new Error(
-        "Connection timed out. Check the Hub address and network, then retry. For Tailscale, make sure it is connected on both devices; otherwise use a Hub connection link for relay.",
-        { cause: error },
-      );
+    if (timedOut) throw new Error(i18n.t("hub.connection.errors.timedOut"), { cause: error });
     if (error instanceof TypeError || (error instanceof Error && error.name === "AbortError"))
-      throw new Error(
-        "Could not reach this Hub. Check the address and network, or use a Hub connection link to connect through relay.",
-        { cause: error },
-      );
+      throw new Error(i18n.t("hub.connection.errors.couldNotReach"), { cause: error });
     if (error instanceof SyntaxError)
-      throw new Error(
-        "This address did not return a valid Hub response. Check the URL and try again.",
-        { cause: error },
-      );
+      throw new Error(i18n.t("hub.connection.errors.invalidResponse"), { cause: error });
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -92,14 +81,14 @@ export async function readPublicHubIdentityResponse(
   if (contentLength !== null && Number(contentLength) > MAX_IDENTITY_BYTES) {
     controller.abort();
     void response.body?.cancel().catch(() => undefined);
-    throw new Error("Hub identity response is too large");
+    throw new Error(i18n.t("hub.connection.errors.identityTooLarge"));
   }
   if (!response.body?.getReader) {
     // Native fetch implementations may expose only text, rather than a readable byte stream.
     const body = await response.text();
     if (body.length > MAX_IDENTITY_BYTES || Buffer.byteLength(body, "utf8") > MAX_IDENTITY_BYTES) {
       controller.abort();
-      throw new Error("Hub identity response is too large");
+      throw new Error(i18n.t("hub.connection.errors.identityTooLarge"));
     }
     return JSON.parse(body);
   }
@@ -114,7 +103,7 @@ export async function readPublicHubIdentityResponse(
       if (bytes > MAX_IDENTITY_BYTES) {
         controller.abort();
         void reader.cancel().catch(() => undefined);
-        throw new Error("Hub identity response is too large");
+        throw new Error(i18n.t("hub.connection.errors.identityTooLarge"));
       }
       chunks.push(chunk.value);
     }

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { ParticipantActions } from "./participant-actions";
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock("./cowork-return", () => ({ rememberCoworkOrigin: vi.fn() }));
@@ -54,6 +55,8 @@ vi.mock("react-native", () => ({
     </button>
   ),
 }));
+// The copy under test is the English UI text.
+beforeAll(() => i18n.changeLanguage("en"));
 afterEach(() => {
   cleanup();
   navigate.mockClear();

@@ -4,6 +4,7 @@ import { useChannelSettingsQueries } from "./channel-settings-hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import { useConfirmation } from "@/components/confirmation-provider";
+import { i18n } from "@/i18n/i18next";
 import { hubResourceQueryKey } from "../query-keys";
 import {
   HubChannelConfigurationSchema,
@@ -38,7 +39,9 @@ export function useChannelMutation() {
       await operation();
       return true;
     } catch (error) {
-      setMutationError(error instanceof Error ? error.message : "Hub request failed.");
+      setMutationError(
+        error instanceof Error ? error.message : i18n.t("hub.channels.selfLink.failed"),
+      );
       return false;
     } finally {
       setPending(false);
@@ -62,7 +65,7 @@ export function useReplaceConfiguration(
       policy = channels.data?.policy ?? {},
     ) => {
       const current = channels.data;
-      if (current === undefined) throw new Error("Channel configuration is still loading.");
+      if (current === undefined) throw new Error(i18n.t("hub.channels.mutations.stillLoading"));
       const candidate = {
         policy,
         accounts,
@@ -148,7 +151,7 @@ export function useRouteEditorSaves({
     (accounts: RecordValue[], resource: RecordValue) => {
       void mutate(async () => {
         if (inputDraft) {
-          if (!channels.data) throw new Error("Channel configuration is still loading.");
+          if (!channels.data) throw new Error(i18n.t("hub.channels.mutations.stillLoading"));
           inputDraft.stage({
             ...draftBaseline(
               inputDraft.draft,
@@ -173,9 +176,7 @@ export function useRouteEditorSaves({
               ),
             );
         if ((currentConfiguration?.revision?.id ?? null) !== editorRevisionId) {
-          throw new Error(
-            "Channel configuration changed while editing. Cancel and reopen this Route before saving.",
-          );
+          throw new Error(i18n.t("hub.channels.mutations.changedWhileEditing"));
         }
         await replaceConfiguration(accounts, resource);
         setEditor(null);

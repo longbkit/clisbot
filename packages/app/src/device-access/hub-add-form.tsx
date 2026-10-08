@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { settingsStyles } from "@/styles/settings";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ interface HubAddFormProps {
 }
 
 export function HubAddForm(props: HubAddFormProps) {
+  const { t } = useTranslation();
   if (props.intent === "add" || (props.noHubs && props.intent === null))
     return (
       <>
@@ -37,7 +39,7 @@ export function HubAddForm(props: HubAddFormProps) {
         {props.intent === "add" ? (
           <View style={styles.actions}>
             <Button variant="outline" disabled={props.busy} onPress={props.cancel}>
-              Cancel
+              {t("hub.connection.common.cancel")}
             </Button>
           </View>
         ) : null}
@@ -47,28 +49,28 @@ export function HubAddForm(props: HubAddFormProps) {
 }
 
 function StartHubForm(props: HubAddFormProps) {
+  const { t } = useTranslation();
   return (
     <View style={[settingsStyles.card, styles.form]}>
-      <Text style={styles.title}>Start your own Hub</Text>
-      <Text style={styles.hint}>
-        Choose a connected Host to run it. Your Host keeps running its agents independently.
-      </Text>
-      <Field label="Host">{props.hostPicker}</Field>
-      <HubStatusBadge label="Personal Hub · No account sign-in required" />
+      <Text style={styles.title}>{t("hub.connection.add.startTitle")}</Text>
+      <Text style={styles.hint}>{t("hub.connection.add.startBody")}</Text>
+      <Field label={t("hub.connection.common.host")}>{props.hostPicker}</Field>
+      <HubStatusBadge label={t("hub.connection.add.personalBadge")} />
       {props.hasHosts && !props.canStartHub ? (
         <Alert
           variant="info"
-          title="This connection cannot start a Hub"
-          description="Update the CLI on this Host and pair this device with its independent owner access. Hub account access alone does not allow starting a Hub. The local operator can also run clisbot hub start --personal on that Host, then share its connection link."
+          title={t("hub.connection.add.cannotStartTitle")}
+          description={t("hub.connection.add.cannotStartBody")}
         />
       ) : null}
       <DeviceLabelField {...props} />
-      <Text style={styles.hint}>
-        Tailscale on your Host and phone is preferred for speed. Relay works without Tailscale
-        setup.
-      </Text>
+      <Text style={styles.hint}>{t("hub.connection.add.preferTailscale")}</Text>
       {props.error ? (
-        <Alert variant="error" title="Hub setup could not finish" description={props.error} />
+        <Alert
+          variant="error"
+          title={t("hub.connection.add.setupFailedTitle")}
+          description={props.error}
+        />
       ) : null}
       <HubFormActions {...props} starting />
     </View>
@@ -76,20 +78,18 @@ function StartHubForm(props: HubAddFormProps) {
 }
 
 function ConnectHubForm(props: HubAddFormProps) {
+  const { t } = useTranslation();
   return (
     <>
       <View style={[settingsStyles.card, styles.form]}>
-        <Text style={styles.title}>Connect existing Hub</Text>
-        <Text style={styles.hint}>
-          Use a Hub already running on another computer or provided by your team. Clisbot checks how
-          to connect.
-        </Text>
-        <Field label="Hub URL" hint="Tailscale HTTPS, public HTTPS or a Hub connection link.">
+        <Text style={styles.title}>{t("hub.connection.add.connectExisting")}</Text>
+        <Text style={styles.hint}>{t("hub.connection.add.connectBody")}</Text>
+        <Field label={t("hub.connection.add.urlLabel")} hint={t("hub.connection.add.urlHint")}>
           <FormTextInput
             initialValue={props.link}
             onChangeText={props.setLink}
-            accessibilityLabel="Hub URL or pairing link"
-            placeholder="Paste a Hub URL or connection link"
+            accessibilityLabel={t("hub.connection.add.urlA11y")}
+            placeholder={t("hub.connection.add.urlPlaceholder")}
             editable={!props.busy}
             autoCapitalize="none"
             autoCorrect={false}
@@ -97,29 +97,31 @@ function ConnectHubForm(props: HubAddFormProps) {
           />
         </Field>
         {props.error ? (
-          <Alert variant="error" title="Could not connect to Hub" description={props.error} />
+          <Alert
+            variant="error"
+            title={t("hub.connection.add.connectFailedTitle")}
+            description={props.error}
+          />
         ) : (
           props.entryNotice
         )}
         <DeviceLabelField {...props} />
         <HubFormActions {...props} starting={false} />
       </View>
-      <HubContextNote>
-        A Hub with account sign-in and completed owner setup needs no manual pairing. Personal Hubs
-        and first-owner setup require an approved pairing link.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.add.accountNote")}</HubContextNote>
     </>
   );
 }
 
 function DeviceLabelField(props: Pick<HubAddFormProps, "label" | "setLabel" | "busy">) {
+  const { t } = useTranslation();
   return (
-    <Field label="This device" hint="Use a name you will recognize in the paired-device list.">
+    <Field label={t("hub.connection.add.thisDevice")} hint={t("hub.connection.add.deviceHint")}>
       <FormTextInput
         initialValue={props.label}
         onChangeText={props.setLabel}
-        accessibilityLabel="Device label"
-        placeholder="This device"
+        accessibilityLabel={t("hub.connection.common.deviceLabel")}
+        placeholder={t("hub.connection.add.thisDevice")}
         editable={!props.busy}
       />
     </Field>
@@ -127,16 +129,21 @@ function DeviceLabelField(props: Pick<HubAddFormProps, "label" | "setLabel" | "b
 }
 
 function HubFormActions(props: HubAddFormProps & { starting: boolean }) {
-  const idleLabel = props.starting ? "Start Hub and connect this device" : "Connect Hub";
-  const busyLabel = props.starting ? "Starting Hub..." : "Connecting...";
+  const { t } = useTranslation();
+  const idleLabel = props.starting
+    ? t("hub.connection.add.startAndConnect")
+    : t("hub.connection.add.connectHub");
+  const busyLabel = props.starting
+    ? t("hub.connection.add.startingHub")
+    : t("hub.connection.common.connecting");
   return (
     <View style={styles.actions}>
       <Button variant="outline" disabled={props.busy} onPress={props.cancel}>
-        Cancel
+        {t("hub.connection.common.cancel")}
       </Button>
       {!props.starting ? (
         <Button variant="outline" disabled={props.busy} onPress={props.scan}>
-          Scan QR code
+          {t("hub.connection.add.scanQr")}
         </Button>
       ) : null}
       <Button

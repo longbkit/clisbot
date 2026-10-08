@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
@@ -31,6 +32,8 @@ export function BotTargetFields({
   replacesRouteDefault: boolean;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
+  const loadingText = t("hub.routes.bot.loading");
   const selectOptions = useMemo<SelectFieldOption<string>[]>(
     () => options.map(botSelectOption),
     [options],
@@ -42,37 +45,35 @@ export function BotTargetFields({
   return (
     <>
       <SelectField
-        label="Bot"
+        label={t("hub.routes.bot.label")}
         value={selected?.key ?? null}
         selectedDisplay={selectedDisplay}
         options={selectOptions}
         onChange={onChange}
-        placeholder={loading ? "Loading Bots…" : "Choose a Bot"}
-        emptyText={loading ? "Loading Bots…" : NO_BOTS}
+        placeholder={loading ? loadingText : t("hub.routes.bot.choose")}
+        emptyText={loading ? loadingText : t("hub.routes.bot.none")}
         searchable={selectOptions.length > 6}
-        title="Bot"
+        title={t("hub.routes.bot.label")}
         disabled={pending}
       />
       {selected === null ? null : <BotLaunchSummary option={selected} />}
       {selected !== null && launchChanged ? (
         <Alert
           variant="info"
-          title={`${selected.bot.name}'s AI configuration changed since this Route was saved`}
-          description={`Saving runs what ${selected.bot.name} has now.`}
+          title={t("hub.routes.bot.launchChangedTitle", { bot: selected.bot.name })}
+          description={t("hub.routes.bot.launchChangedDescription", { bot: selected.bot.name })}
         />
       ) : null}
       {selected !== null && replacesRouteDefault ? (
         <Alert
           variant="info"
-          title="This Route runs a model chosen in a conversation"
-          description={`Saving goes back to ${selected.bot.name}'s AI configuration.`}
+          title={t("hub.routes.bot.routeDefaultTitle")}
+          description={t("hub.routes.bot.routeDefaultDescription", { bot: selected.bot.name })}
         />
       ) : null}
     </>
   );
 }
-
-const NO_BOTS = "No Bot runs on a Host this Hub has enrolled.";
 
 function botSelectOption(option: RouteBotOption): SelectFieldOption<string> {
   const role = option.bot.description?.trim();
@@ -86,6 +87,7 @@ function botSelectOption(option: RouteBotOption): SelectFieldOption<string> {
 
 /** The Bot's Host and launch settings, named the way the Bot's own form names them. */
 function BotLaunchSummary({ option }: { option: RouteBotOption }) {
+  const { t } = useTranslation();
   const launch = option.bot.launchDefaults;
   const { entries } = useProvidersSnapshot(option.serverId);
   const entry = entries?.find((candidate) => candidate.provider === launch.provider);
@@ -94,13 +96,13 @@ function BotLaunchSummary({ option }: { option: RouteBotOption }) {
   return (
     <>
       <SetupCard>
-        <ReadOnlySetupRow label="Host" value={option.serverName} first />
-        <ReadOnlySetupRow label="Model" value={model} />
-        <ReadOnlySetupRow label="Permissions" value={labels.mode} />
-        <ReadOnlySetupRow label="Thinking" value={labels.thinking} last />
+        <ReadOnlySetupRow label={t("hub.routes.bot.host")} value={option.serverName} first />
+        <ReadOnlySetupRow label={t("hub.routes.bot.model")} value={model} />
+        <ReadOnlySetupRow label={t("hub.routes.bot.permissions")} value={labels.mode} />
+        <ReadOnlySetupRow label={t("hub.routes.bot.thinking")} value={labels.thinking} last />
       </SetupCard>
       <Text style={settingsStyles.rowHint}>
-        {`Runs in ${option.bot.name}'s folder and keeps every conversation in its Workspace. Change what it runs in ${option.bot.name}'s Bot settings.`}
+        {t("hub.routes.bot.runsIn", { bot: option.bot.name })}
       </Text>
     </>
   );
@@ -117,10 +119,11 @@ function ReadOnlySetupRow({
   first?: boolean;
   last?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <SetupRowView
       label={label}
-      value={value || "Default"}
+      value={value || t("hub.routes.common.default")}
       placeholder={!value}
       first={first === true}
       last={last === true}

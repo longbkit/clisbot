@@ -1,5 +1,6 @@
 import { ConfigurationYamlInput } from "./configuration-yaml-input";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
@@ -50,6 +51,7 @@ export function useChannelYamlForm(channels: HubChannelConfiguration | undefined
 }
 
 function ChannelYamlEditor({ model, pending, error, validate, save, close }: ConfigurationProps) {
+  const { t } = useTranslation();
   const state = useSyncExternalStore(model.subscribe, model.getState);
   const [expanded, setExpanded] = useState(close !== undefined);
   const toggle = useCallback(() => {
@@ -67,23 +69,17 @@ function ChannelYamlEditor({ model, pending, error, validate, save, close }: Con
   return (
     <View style={styles.section}>
       <Button size="sm" variant="ghost" onPress={toggle} accessibilityState={disclosureState}>
-        {expanded ? "Hide Advanced YAML" : "Advanced YAML"}
+        {expanded ? t("hub.channels.yaml.hide") : t("hub.channels.yaml.show")}
       </Button>
       {expanded ? (
         <View style={styles.editor}>
-          <Text style={settingsStyles.rowHint}>
-            Edit the complete configuration, including shared resources and every account. Changes
-            can affect several Routes.
-          </Text>
-          <Field
-            label="Configuration YAML"
-            hint="Keep resource, policy, and accounts. Validate checks your draft; Activate validates again before saving."
-          >
+          <Text style={settingsStyles.rowHint}>{t("hub.channels.yaml.intro")}</Text>
+          <Field label={t("hub.channels.yaml.fieldLabel")} hint={t("hub.channels.yaml.fieldHint")}>
             <ConfigurationYamlInput
               key={state.inputRevision}
               initialValue={state.source}
               onChangeText={model.change}
-              accessibilityLabel="Channel configuration YAML"
+              accessibilityLabel={t("hub.channels.yaml.inputLabel")}
               dataSet={CODE_SURFACE_DATASET}
               multiline
               numberOfLines={16}
@@ -102,7 +98,7 @@ function ChannelYamlEditor({ model, pending, error, validate, save, close }: Con
               loading={state.validation === "pending"}
               onPress={runValidation}
             >
-              Validate
+              {t("hub.channels.yaml.validate")}
             </Button>
             <Button
               size="sm"
@@ -111,11 +107,11 @@ function ChannelYamlEditor({ model, pending, error, validate, save, close }: Con
               loading={busy}
               onPress={activate}
             >
-              Activate YAML
+              {t("hub.channels.yaml.activate")}
             </Button>
             {state.dirty || state.stale ? (
               <Button size="sm" variant="ghost" disabled={busy} onPress={model.reload}>
-                Discard edits and reload
+                {t("hub.channels.yaml.discard")}
               </Button>
             ) : null}
           </View>
@@ -132,19 +128,24 @@ function YamlStatus({
   state: ReturnType<ReturnType<typeof openChannelYamlForm>["getState"]>;
   error?: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {state.stale ? (
         <Alert
           variant="warning"
-          title="Configuration changed while you were editing"
-          description="Your draft is preserved. Copy any edits you want to keep, then discard this draft and reload the current configuration before activating."
+          title={t("hub.channels.yaml.staleTitle")}
+          description={t("hub.channels.yaml.staleBody")}
         />
       ) : null}
       {state.validation === "error" || error ? (
         <Alert
           variant="error"
-          title={state.validation === "error" ? state.message : (error ?? "Activation failed.")}
+          title={
+            state.validation === "error"
+              ? state.message
+              : (error ?? t("hub.channels.yaml.activationFailed"))
+          }
         />
       ) : null}
       {state.validation !== "error" && state.message ? (
@@ -153,7 +154,7 @@ function YamlStatus({
         </Text>
       ) : null}
       {state.dirty && !state.stale ? (
-        <Text style={settingsStyles.rowHint}>Unsaved changes</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.channels.yaml.unsaved")}</Text>
       ) : null}
     </>
   );

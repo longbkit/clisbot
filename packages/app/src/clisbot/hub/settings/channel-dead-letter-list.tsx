@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -19,11 +20,12 @@ export function ChannelDeadLetterList({
   selected: ReadonlySet<string>;
   onToggle(id: string): void;
 }) {
+  const { t } = useTranslation();
   if (events.length === 0) {
     return (
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
-          <Text style={settingsStyles.rowHint}>No dead-lettered events.</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.channels.deadLetters.empty")}</Text>
         </View>
       </View>
     );
@@ -57,6 +59,7 @@ function DeadLetterRow({
   selected: boolean;
   onToggle(id: string): void;
 }) {
+  const { t } = useTranslation();
   const row = channelDeadLetterRow(event, catalog);
   const toggle = useCallback(() => onToggle(event.id), [event.id, onToggle]);
   const state = useMemo(() => ({ checked: selected }), [selected]);
@@ -81,7 +84,11 @@ function DeadLetterRow({
         <Text style={settingsStyles.rowError}>{row.reason}</Text>
       </View>
       <StatusBadge
-        label={selected ? "Selected" : channelIngressStatusLabel(event.status)}
+        label={
+          selected
+            ? t("hub.channels.deadLetters.selected")
+            : channelIngressStatusLabel(event.status)
+        }
         variant={selected ? "warning" : "error"}
       />
     </Pressable>

@@ -7,6 +7,7 @@
  * evidence, so a per-Connection "verified" state would only ever read "not
  * verified" (2026-09-19 decision, docs/audits/2026-09-19-connection-naming-and-route-flow.md).
  */
+import { i18n } from "@/i18n/i18next";
 import type { ChannelCatalogEntry } from "./channel-catalog";
 
 export type ChannelTransportState =
@@ -19,57 +20,57 @@ export type ChannelTransportState =
   | "needs-login"
   | "disabled";
 
-export const CHANNEL_CAPABILITY_LABELS: Readonly<Record<string, string>> = {
-  text: "Text messages",
-  thread: "Threads",
-  mention: "Mentions",
-  format: "Rich formatting",
-  chunk: "Long-message chunking",
-  media: "Media",
-  file: "File attachments",
-  reaction: "Reactions",
-  edit: "Edit messages",
-  delete: "Delete messages",
-  voice: "Voice messages",
-  video: "Video",
-  "video-note": "Video notes",
-  location: "Location",
-  poll: "Polls",
-  topic: "Forum topics",
-  presentation: "Tables and charts",
-  buttons: "Buttons",
-  select: "Select menus",
-  approval: "Approval prompts",
-  "native-actions": "Native commands",
-  "group-dm": "Group DMs",
-  "emoji-discovery": "Emoji discovery",
-  visibility: "Public and private groups",
+export const CHANNEL_CAPABILITY_LABELS: Readonly<Record<string, () => string>> = {
+  text: () => i18n.t("hub.channels.capability.text"),
+  thread: () => i18n.t("hub.channels.capability.thread"),
+  mention: () => i18n.t("hub.channels.capability.mention"),
+  format: () => i18n.t("hub.channels.capability.format"),
+  chunk: () => i18n.t("hub.channels.capability.chunk"),
+  media: () => i18n.t("hub.channels.capability.media"),
+  file: () => i18n.t("hub.channels.capability.file"),
+  reaction: () => i18n.t("hub.channels.capability.reaction"),
+  edit: () => i18n.t("hub.channels.capability.edit"),
+  delete: () => i18n.t("hub.channels.capability.delete"),
+  voice: () => i18n.t("hub.channels.capability.voice"),
+  video: () => i18n.t("hub.channels.capability.video"),
+  "video-note": () => i18n.t("hub.channels.capability.videoNote"),
+  location: () => i18n.t("hub.channels.capability.location"),
+  poll: () => i18n.t("hub.channels.capability.poll"),
+  topic: () => i18n.t("hub.channels.capability.topic"),
+  presentation: () => i18n.t("hub.channels.capability.presentation"),
+  buttons: () => i18n.t("hub.channels.capability.buttons"),
+  select: () => i18n.t("hub.channels.capability.select"),
+  approval: () => i18n.t("hub.channels.capability.approval"),
+  "native-actions": () => i18n.t("hub.channels.capability.nativeActions"),
+  "group-dm": () => i18n.t("hub.channels.capability.groupDm"),
+  "emoji-discovery": () => i18n.t("hub.channels.capability.emojiDiscovery"),
+  visibility: () => i18n.t("hub.channels.capability.visibility"),
 };
 
 /**
  * Capabilities the catalog lists but its own notes narrow. Each entry restates
  * a note on the matching catalog entry; nothing is invented here.
  */
-const CAPABILITY_RESTRICTIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+const CAPABILITY_RESTRICTIONS: Readonly<Record<string, Readonly<Record<string, () => string>>>> = {
   discord: {
-    reaction: "Outbound reactions only; inbound reaction events are not wired yet.",
-    "native-actions": "Slash commands and interaction callbacks are not wired yet.",
+    reaction: () => i18n.t("hub.channels.capabilityLimit.discordReaction"),
+    "native-actions": () => i18n.t("hub.channels.capabilityLimit.discordNativeActions"),
   },
   googlechat: {
-    buttons: "Card clicks arrive inbound; the Hub renders no card of its own.",
-    select: "Card clicks arrive inbound; the Hub renders no card of its own.",
+    buttons: () => i18n.t("hub.channels.capabilityLimit.cardClicks"),
+    select: () => i18n.t("hub.channels.capabilityLimit.cardClicks"),
   },
   feishu: {
-    buttons: "Card clicks arrive inbound; the Hub renders no Lark card of its own.",
-    select: "Card clicks arrive inbound; the Hub renders no Lark card of its own.",
+    buttons: () => i18n.t("hub.channels.capabilityLimit.larkCardClicks"),
+    select: () => i18n.t("hub.channels.capabilityLimit.larkCardClicks"),
   },
   zalo: {
-    media: "Inbound images only; the Zalo Bot API has no upload endpoint.",
+    media: () => i18n.t("hub.channels.capabilityLimit.zaloMedia"),
   },
 };
 
 export function channelCapabilityLabel(capability: string): string {
-  return CHANNEL_CAPABILITY_LABELS[capability] ?? capability;
+  return CHANNEL_CAPABILITY_LABELS[capability]?.() ?? capability;
 }
 
 export interface ChannelSupport {
@@ -90,7 +91,7 @@ export function channelSupport(entry: ChannelCatalogEntry): ChannelSupport {
     const limit = limits[capability];
     if (!claimed.has(capability)) support.unsupported.push(label);
     else if (limit === undefined) support.supported.push(label);
-    else support.limited.push({ label, limit });
+    else support.limited.push({ label, limit: limit() });
   }
   return support;
 }

@@ -21,8 +21,9 @@ describe("parseAppLanguage", () => {
   it("offers system plus all supported languages", () => {
     expect(LANGUAGE_OPTIONS.map((option) => option.value)).toEqual([
       "system",
-      "ar",
       "en",
+      "vi",
+      "ar",
       "es",
       "fr",
       "ja",
@@ -31,6 +32,13 @@ describe("parseAppLanguage", () => {
       "ru",
       "zh-CN",
     ]);
+  });
+
+  it("names Vietnamese natively and follows a Vietnamese system language", () => {
+    const vietnamese = LANGUAGE_OPTIONS.find((option) => option.value === "vi")!;
+    expect(formatLanguageOptionLabel(vietnamese, "en", "System")).toBe("Tiếng Việt - Vietnamese");
+    expect(formatLanguageOptionLabel(vietnamese, "vi", "Theo hệ thống")).toBe("Tiếng Việt");
+    expect(resolveSupportedLocale("system", ["vi-VN"])).toBe("vi");
   });
 });
 

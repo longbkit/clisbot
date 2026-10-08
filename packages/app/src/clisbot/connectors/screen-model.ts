@@ -3,6 +3,7 @@ import type {
   ConnectorCatalogItem,
   ConnectorMcpServer,
 } from "@clisbot/protocol/connectors/types";
+import { i18n } from "@/i18n/i18next";
 import {
   appState,
   connectedOutsideCatalog,
@@ -89,21 +90,32 @@ export function buildSections(input: {
   const toRow = (item: ConnectorCatalogItem) =>
     catalogRow(item, appState(input.accountMap.get(item.slug)?.accounts));
   const { lists, shown } = input;
+  const connected = i18n.t("connectors.screen.common.connected");
   if (input.filter === "mcp") {
     return input.servers.length
-      ? [{ title: "MCP servers", rows: input.servers.map(serverRow) }]
+      ? [
+          {
+            title: i18n.t("connectors.screen.common.mcpServers"),
+            rows: input.servers.map(serverRow),
+          },
+        ]
       : [];
   }
   if (input.filter === "connected") {
     return lists.connected.length
-      ? [{ title: "Connected", rows: lists.connected.slice(0, shown).map(toRow) }]
+      ? [{ title: connected, rows: lists.connected.slice(0, shown).map(toRow) }]
       : [];
   }
   if (input.search.trim())
-    return [{ title: "Results", rows: lists.all.slice(0, shown).map(toRow) }];
+    return [
+      {
+        title: i18n.t("connectors.screen.list.results"),
+        rows: lists.all.slice(0, shown).map(toRow),
+      },
+    ];
   const others = lists.others.slice(0, Math.max(0, shown - lists.connected.length));
   return [
-    ...(lists.connected.length ? [{ title: "Connected", rows: lists.connected.map(toRow) }] : []),
-    { title: "All apps", rows: others.map(toRow) },
+    ...(lists.connected.length ? [{ title: connected, rows: lists.connected.map(toRow) }] : []),
+    { title: i18n.t("connectors.screen.list.allApps"), rows: others.map(toRow) },
   ];
 }

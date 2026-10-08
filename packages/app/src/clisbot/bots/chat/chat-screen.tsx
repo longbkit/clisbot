@@ -2,10 +2,10 @@ import type { MessagePayload } from "@/composer/types";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { ComposerDock } from "@/composer/dock";
 import { useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { MenuHeader } from "@/components/headers/menu-header";
-import { botsCopy } from "../copy";
 import type { ChatMessage } from "../data/contracts";
 import { ChatComposer } from "./chat-composer";
 import { mentionMembersOf } from "./member-mentions";
@@ -50,6 +50,7 @@ export function ChatScreen({
   headerRight,
   hideHeader = false,
 }: ChatScreenProps) {
+  const { t } = useTranslation();
   const model = useMemo(
     () => buildChatRenderModel(transcript, liveHeads, { group }),
     [group, liveHeads, transcript],
@@ -57,7 +58,9 @@ export function ChatScreen({
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.botId, bot] as const)), [bots]);
   const members = useMemo(() => mentionMembersOf(bots), [bots]);
   const placeholder =
-    bots.length === 1 && bots[0] ? botsCopy.messageBot(bots[0].name) : botsCopy.messagePlaceholder;
+    bots.length === 1 && bots[0]
+      ? t("bots.chat.screen.messageBot", { name: bots[0].name })
+      : t("bots.chat.screen.messagePlaceholder");
   return (
     <View style={styles.container} testID={`chat-screen-${chatId}`}>
       {!hideHeader ? <MenuHeader title={title} rightContent={headerRight} /> : null}

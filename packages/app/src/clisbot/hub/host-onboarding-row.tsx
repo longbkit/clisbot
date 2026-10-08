@@ -1,6 +1,7 @@
 import { hubLinkPresentation } from "./channel-host-connection";
 import { useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export function HubHostOnboardingRow({
   cliCommand: string;
   openAddProject(preferredHostId?: string): void;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const failure = useHubHostSynchronizationFailure(
     hubHostSynchronizationKey({
@@ -69,7 +71,9 @@ export function HubHostOnboardingRow({
         <StatusBadge {...hubLinkPresentation(item.hubPresence)} />
       </View>
       <Text style={settingsStyles.rowHint} selectable>
-        {item.serverId ? `Host ID: ${item.serverId}` : `Hub ID: ${item.daemonId}`}
+        {item.serverId
+          ? t("hub.account.hostRow.hostId", { id: item.serverId })
+          : t("hub.account.hostRow.hubId", { id: item.daemonId })}
       </Text>
       <Text style={failure === null ? settingsStyles.rowHint : settingsStyles.rowError}>
         {failure?.message ?? description}
@@ -78,7 +82,10 @@ export function HubHostOnboardingRow({
         <Text style={settingsStyles.rowError}>{disconnect.error.message}</Text>
       ) : null}
       {unreachable ? (
-        <CopyableCommand command={`${cliCommand} daemon status`} copyLabel="Copy" />
+        <CopyableCommand
+          command={`${cliCommand} daemon status`}
+          copyLabel={t("hub.account.hostRow.copy")}
+        />
       ) : null}
       <View style={styles.actions}>
         <HostPrimaryAction item={item} failure={failure} openAddProject={openAddProject} />
@@ -100,18 +107,27 @@ function HostDisconnectMenu({
   item: HubHostOnboardingItem;
   host: ReturnType<typeof useHostDisconnect>;
 }) {
+  const { t } = useTranslation();
   const actions = useMemo(
     () => [
       {
-        label: host.done ? "Disconnected" : "Disconnect",
+        label: host.done
+          ? t("hub.account.hostRow.disconnected")
+          : t("hub.account.hostRow.disconnect"),
         destructive: true,
         disabled: host.pending || host.done,
         onSelect: host.disconnect,
       },
     ],
-    [host.disconnect, host.done, host.pending],
+    [host.disconnect, host.done, host.pending, t],
   );
-  return <RowActionsMenu label={`Actions for ${item.label}`} actions={actions} disabled={false} />;
+  return (
+    <RowActionsMenu
+      label={t("hub.account.hostRow.actionsFor", { label: item.label })}
+      actions={actions}
+      disabled={false}
+    />
+  );
 }
 
 /** Retry a failed synchronization, reconnect an unreachable Host, or open an online one. */
@@ -124,6 +140,7 @@ function HostPrimaryAction({
   failure: SynchronizationFailure | null;
   openAddProject(preferredHostId?: string): void;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { serverId, canManage, status } = item;
   const reconnect = useCallback(() => {
@@ -137,7 +154,7 @@ function HostPrimaryAction({
   if (failure !== null) {
     return (
       <Button size="sm" variant="outline" onPress={failure.retry}>
-        Retry
+        {t("hub.account.hostRow.retry")}
       </Button>
     );
   }
@@ -145,14 +162,14 @@ function HostPrimaryAction({
   if (status === "online") {
     return (
       <Button size="sm" variant="outline" onPress={open}>
-        {canManage ? "Add project" : "Open Host"}
+        {canManage ? t("hub.account.hostRow.addProject") : t("hub.account.hostRow.openHost")}
       </Button>
     );
   }
   if (status !== "offline" && status !== "error") return null;
   return (
     <Button size="sm" variant="outline" onPress={reconnect}>
-      Reconnect
+      {t("hub.account.hostRow.reconnect")}
     </Button>
   );
 }
@@ -164,6 +181,7 @@ function HostConnectionsAction({
   item: HubHostOnboardingItem;
   failure: SynchronizationFailure | null;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { serverId } = item;
   const openConnections = useCallback(() => {
@@ -176,7 +194,7 @@ function HostConnectionsAction({
   if (hidden) return null;
   return (
     <Button size="sm" variant="ghost" onPress={openConnections}>
-      Connections
+      {t("hub.account.hostRow.connections")}
     </Button>
   );
 }

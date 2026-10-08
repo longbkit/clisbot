@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -20,15 +21,18 @@ export function MemberChatCell({
   pending: boolean;
   onLink(): void;
 }) {
+  const { t } = useTranslation();
   if (links.length === 0) {
-    return <Text style={tableStyles.cellText}>No chat bots yet</Text>;
+    return <Text style={tableStyles.cellText}>{t("hub.team.members.chat.none")}</Text>;
   }
   return (
     <View style={styles.list}>
       {links.map((link) => (
         <View key={link.key} style={styles.line}>
           <Text style={tableStyles.cellText}>
-            {link.linked ? `✓ ${link.label}` : `${link.label} · not linked`}
+            {link.linked
+              ? t("hub.team.members.chat.linked", { label: link.label })
+              : t("hub.team.members.chat.notLinked", { label: link.label })}
           </Text>
           {link.linked || !canLink ? null : (
             <Button
@@ -36,9 +40,9 @@ export function MemberChatCell({
               variant="ghost"
               disabled={pending}
               onPress={onLink}
-              accessibilityLabel={`Link ${link.label}`}
+              accessibilityLabel={t("hub.team.members.chat.linkLabel", { label: link.label })}
             >
-              Link
+              {t("hub.team.members.chat.link")}
             </Button>
           )}
         </View>

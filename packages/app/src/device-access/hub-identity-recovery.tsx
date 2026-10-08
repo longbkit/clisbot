@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { digest } from "@clisbot/device-access/proof";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ export function HubIdentityRecovery({
   onReview(): void;
   fallback: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [change, setChange] = useState<{
     profile: HubProfile;
     value: HubIdentityChange;
@@ -40,24 +42,24 @@ export function HubIdentityRecovery({
     <>
       <Alert
         variant="warning"
-        title="Hub identity changed"
-        description="The Hub at this address no longer matches the saved Hub identity. Check it with the Hub operator before reconnecting."
+        title={t("hub.connection.identity.changedTitle")}
+        description={t("hub.connection.identity.changedBody")}
       >
         <Button variant="outline" onPress={onReview}>
-          Review connection
+          {t("hub.connection.identity.review")}
         </Button>
       </Alert>
-      <SettingsSection title="Hub identity">
+      <SettingsSection title={t("hub.connection.identity.section")}>
         <View style={settingsStyles.card}>
-          <IdentityRow title="Saved identity" identity={change.value.saved} />
-          <IdentityRow title="Identity at this address" identity={change.value.observed} bordered />
+          <IdentityRow title={t("hub.connection.identity.saved")} identity={change.value.saved} />
+          <IdentityRow
+            title={t("hub.connection.identity.observed")}
+            identity={change.value.observed}
+            bordered
+          />
         </View>
       </SettingsSection>
-      <HubContextNote>
-        Saved credentials remain withheld from the changed identity. Ask the operator to restore the
-        correct Hub key or provide a verified connection link. Reviewing the connection keeps the
-        saved identity unchanged.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.identity.note")}</HubContextNote>
     </>
   );
 }
@@ -71,13 +73,16 @@ function IdentityRow({
   identity: HubIdentityChange["saved"];
   bordered?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.row, bordered && settingsStyles.rowBorder]}>
       <Text style={styles.title}>{title}</Text>
       <View style={styles.values}>
-        <Text selectable>Hub {identity.hubId}</Text>
+        <Text selectable>{t("hub.connection.identity.hub", { id: identity.hubId })}</Text>
         <Text selectable style={styles.hint}>
-          Key fingerprint {digest(identity.publicKey).slice(0, 16)}
+          {t("hub.connection.identity.fingerprint", {
+            value: digest(identity.publicKey).slice(0, 16),
+          })}
         </Text>
       </View>
     </View>

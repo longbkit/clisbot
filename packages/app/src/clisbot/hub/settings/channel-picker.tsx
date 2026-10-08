@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ChannelIcon } from "@/clisbot/channels/channel-icon";
@@ -43,6 +44,7 @@ export function ChannelPicker({
   value: string;
   onChange(channel: string): void;
 }) {
+  const { t } = useTranslation();
   const popular = useMemo(() => popularChannelEntries(entries), [entries]);
   const segments = useMemo<SegmentedControlOption<string>[]>(
     () =>
@@ -74,16 +76,16 @@ export function ChannelPicker({
       ),
     [entries, listed],
   );
-  const allLabel = `All ${String(entries.length)} channels`;
+  const allLabel = t("hub.channels.picker.allCount", { count: entries.length });
   return (
-    <Field label="Channel">
+    <Field label={t("hub.channels.picker.channel")}>
       <View style={styles.row}>
         {segments.length > 1 ? (
           <SegmentedControl options={segments} value={value} onValueChange={onChange} size="sm" />
         ) : null}
         <View style={styles.all}>
           <SelectField
-            label="All channels"
+            label={t("hub.channels.catalogView.allChannels")}
             field={false}
             size="sm"
             value={listed}
@@ -91,10 +93,10 @@ export function ChannelPicker({
             options={options}
             onChange={onChange}
             placeholder={allLabel}
-            emptyText="No channel matches"
+            emptyText={t("hub.channels.picker.noMatch")}
             searchable
-            searchPlaceholder="Search channels"
-            title="Channel"
+            searchPlaceholder={t("hub.channels.picker.search")}
+            title={t("hub.channels.picker.channel")}
             triggerLeading={icon}
             renderOption={renderChannelOption}
           />

@@ -6,6 +6,7 @@
  * operations surfaces call lives here, so a resource string is written once and
  * a screen never spells one out inline.
  */
+import { i18n } from "@/i18n/i18next";
 import { HubApiError, type HubApiClient } from "./api-client";
 import {
   HubChannelIngressEventsSchema,
@@ -189,6 +190,6 @@ export function channelApiProblem(error: unknown): {
   return {
     status: 0,
     code: "request_failed",
-    message: error instanceof Error ? error.message : "The Hub could not be reached.",
+    message: error instanceof Error ? error.message : i18n.t("hub.channels.api.hubUnreachable"),
   };
 }

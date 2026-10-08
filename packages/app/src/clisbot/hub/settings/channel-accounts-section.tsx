@@ -1,5 +1,6 @@
 import { AdvancedConfigurationSection, useChannelYamlForm } from "./channel-advanced-configuration";
 import { useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Activity, FileCode2, History, RefreshCw } from "lucide-react-native";
 import { ChannelActionsMenu } from "./channel-actions-menu";
 import { View } from "react-native";
@@ -133,6 +134,7 @@ export function ChannelAccountsSection({
   /** The panel opened from the page menu, shown above the list. */
   children?: ReactNode;
 }) {
+  const { t } = useTranslation();
   const trailing = useMemo(
     () => (
       <ConnectionsPageActions
@@ -148,7 +150,11 @@ export function ChannelAccountsSection({
     [adminScoped, addConnection, openActivity, openPanel, pending, refreshStatus, refreshing],
   );
   return (
-    <SettingsSection title="Connections" info={CONNECTIONS_INFO} trailing={trailing}>
+    <SettingsSection
+      title={t("hub.channels.accounts.title")}
+      info={t("hub.channels.accounts.info")}
+      trailing={trailing}
+    >
       <QueryFeedback queries={queries} />
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
       {testResult ? <Alert variant="success" title={testResult} /> : null}
@@ -205,36 +211,56 @@ function ConnectionsPageActions({
   openActivity(accountKey: string | null): void;
   openPanel(panel: ConnectionsPanel): void;
 }) {
+  const { t } = useTranslation();
   const actions = useMemo(
     () => [
       ...(refreshing
         ? []
-        : [{ label: "Refresh status", icon: RefreshCw, onSelect: refreshStatus }]),
-      { label: "View activity", icon: Activity, onSelect: () => openActivity(null) },
+        : [
+            {
+              label: t("hub.channels.accounts.refreshStatus"),
+              icon: RefreshCw,
+              onSelect: refreshStatus,
+            },
+          ]),
+      {
+        label: t("hub.channels.accounts.viewActivity"),
+        icon: Activity,
+        onSelect: () => openActivity(null),
+      },
       ...(adminScoped
         ? []
         : [
-            { label: "Revision history", icon: History, onSelect: () => openPanel("history") },
-            { label: "Advanced YAML", icon: FileCode2, onSelect: () => openPanel("yaml") },
+            {
+              label: t("hub.channels.accounts.revisionHistory"),
+              icon: History,
+              onSelect: () => openPanel("history"),
+            },
+            {
+              label: t("hub.channels.accounts.advancedYaml"),
+              icon: FileCode2,
+              onSelect: () => openPanel("yaml"),
+            },
           ]),
     ],
-    [adminScoped, openActivity, openPanel, refreshStatus, refreshing],
+    [adminScoped, openActivity, openPanel, refreshStatus, refreshing, t],
   );
   return (
     <View style={styles.headerActions}>
       {/* A Connection Admin cannot connect a bot: they add Routes on their own. */}
       {adminScoped ? null : (
         <Button size="xs" variant="outline" disabled={pending} onPress={addConnection}>
-          Add Connection
+          {t("hub.channels.accounts.addConnection")}
         </Button>
       )}
-      <ChannelActionsMenu label="More Connection actions" disabled={false} actions={actions} />
+      <ChannelActionsMenu
+        label={t("hub.channels.accounts.moreActions")}
+        disabled={false}
+        actions={actions}
+      />
     </View>
   );
 }
-
-const CONNECTIONS_INFO =
-  "A Connection is one bot on one channel, such as a Slack workspace install or a Telegram bot. Its Routes decide who may talk to it, where, and which Agent or Automation answers; the first Route that matches a message wins.";
 
 /**
  * Every Connection with its Routes, on one screen: one compact card per
@@ -248,14 +274,15 @@ function ChannelAccountList({
   disconnectConnection,
   ...props
 }: ChannelAccountListProps) {
+  const { t } = useTranslation();
   if (accounts.length === 0 && unrouted.length === 0) {
     return (
       <View style={settingsStyles.card}>
         <EmptyRow
           message={
             props.adminScoped
-              ? "No Connection is shared with you yet."
-              : "No Connections yet. Add Connection connects a bot and adds its first Route."
+              ? t("hub.channels.accounts.emptyShared")
+              : t("hub.channels.accounts.empty")
           }
         />
       </View>

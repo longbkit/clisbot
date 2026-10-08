@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { HubTransport } from "@/clisbot/hub/transport/contract";
+import { i18n } from "@/i18n/i18next";
 
 const CapabilitiesSchema = z.object({
   hubId: z.string(),
@@ -15,7 +16,7 @@ export type HubDeviceCapabilities = z.infer<typeof CapabilitiesSchema>;
 
 export class HubDeviceCapabilityError extends Error {
   constructor(readonly status: number) {
-    super("Hub access is unavailable");
+    super(i18n.t("hub.connection.errors.accessUnavailable"));
   }
 }
 

@@ -1,5 +1,9 @@
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
+import { bots } from "./bots";
+import { heartbeats } from "./heartbeats";
+import { connectors } from "./connectors";
+import { hub } from "./hub";
 
 export const zhCN: TranslationResources = {
   paneFind: {
@@ -1238,6 +1242,7 @@ export const zhCN: TranslationResources = {
         copyPath: "复制路径",
         copyBranchName: "复制分支名称",
         rename: "重命名 workspace",
+        renameSession: "重命名会话",
         pin: "置顶",
         unpin: "取消置顶",
         archive: "归档",
@@ -2147,6 +2152,7 @@ export const zhCN: TranslationResources = {
           ko: "한국어",
           ptBR: "Português brasileiro",
           ru: "Русский",
+          vi: "越南语",
           zhCN: "简体中文",
         },
       },
@@ -2772,4 +2778,8 @@ export const zhCN: TranslationResources = {
       },
     },
   },
+  hub: hub["zh-CN"],
+  connectors: connectors["zh-CN"],
+  bots: bots["zh-CN"],
+  heartbeats: heartbeats["zh-CN"],
 };

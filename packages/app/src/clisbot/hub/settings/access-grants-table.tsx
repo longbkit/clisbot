@@ -4,6 +4,8 @@
 // docs/features/access/access-screen.md
 
 import { useCallback, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -14,7 +16,11 @@ import type { GrantGrouping, GrantRow } from "./access-grant-rows";
 import { tableStyles } from "./table-styles";
 import { RowActionsMenu } from "./team/row-actions-menu";
 
-const SUBJECT_KIND_LABELS = { team: "Team", member: "Member", guest: "Guest" } as const;
+/** Team, Member, or Guest: what the person or group a row names is. */
+function subjectKindLabel(kind: GrantRow["subject"]["kind"], t: TFunction): string {
+  if (kind === "team") return t("hub.access.kinds.team");
+  return kind === "member" ? t("hub.access.kinds.member") : t("hub.access.kinds.guest");
+}
 
 export interface GrantActions {
   pending: boolean;
@@ -85,16 +91,21 @@ interface Columns {
 }
 
 function HeaderRow({ grouping, columns }: { grouping: GrantGrouping; columns: Columns }) {
+  const { t } = useTranslation();
   return (
     <View style={[settingsStyles.row, styles.tableRow, tableStyles.header]}>
       <Text style={[tableStyles.headerCell, styles.thing]}>
-        {grouping === "subject" ? "Resource" : "Who"}
+        {grouping === "subject" ? t("hub.access.table.resource") : t("hub.access.table.who")}
       </Text>
-      {columns.via ? <Text style={[tableStyles.headerCell, styles.via]}>Access via</Text> : null}
-      <Text style={[tableStyles.headerCell, styles.level]}>Level</Text>
-      <Text style={[tableStyles.headerCell, styles.details]}>Details</Text>
+      {columns.via ? (
+        <Text style={[tableStyles.headerCell, styles.via]}>{t("hub.access.table.accessVia")}</Text>
+      ) : null}
+      <Text style={[tableStyles.headerCell, styles.level]}>{t("hub.access.table.level")}</Text>
+      <Text style={[tableStyles.headerCell, styles.details]}>{t("hub.access.table.details")}</Text>
       {columns.grantedBy ? (
-        <Text style={[tableStyles.headerCell, styles.grantedBy]}>Granted by</Text>
+        <Text style={[tableStyles.headerCell, styles.grantedBy]}>
+          {t("hub.access.table.grantedBy")}
+        </Text>
       ) : null}
       {columns.actions ? <View style={styles.actions} /> : null}
     </View>
@@ -116,11 +127,14 @@ function GrantRowView({
   columns: Columns;
   actions: GrantActions | undefined;
 }) {
+  const { t } = useTranslation();
   const thing =
     grouping === "subject"
       ? { name: row.resource.name, context: row.resource.context }
-      : { name: row.subject.name, context: SUBJECT_KIND_LABELS[row.subject.kind] };
-  const details = [...row.details, ...(row.via === null || columns.via ? [] : [`via ${row.via}`])];
+      : { name: row.subject.name, context: subjectKindLabel(row.subject.kind, t) };
+  const viaDetail =
+    row.via === null || columns.via ? [] : [t("hub.access.table.via", { via: row.via })];
+  const details = [...row.details, ...viaDetail];
   const trailing = actions === undefined ? null : <GrantRowActions row={row} actions={actions} />;
   const via = columns.via ? <ViaCell row={row} open={actions?.openVia} /> : null;
   if (compact) {
@@ -137,17 +151,17 @@ function GrantRowView({
           <Thing name={thing.name} context={thing.context} />
           {trailing}
         </View>
-        {via === null ? null : <Labelled label="Access via">{via}</Labelled>}
-        <Labelled label="Level">
+        {via === null ? null : <Labelled label={t("hub.access.table.accessVia")}>{via}</Labelled>}
+        <Labelled label={t("hub.access.table.level")}>
           <Text style={styles.value}>{row.level}</Text>
         </Labelled>
         {details.length === 0 ? null : (
-          <Labelled label="Details">
+          <Labelled label={t("hub.access.table.details")}>
             <Text style={styles.muted}>{details.join(", ")}</Text>
           </Labelled>
         )}
         {row.grantedBy === null ? null : (
-          <Labelled label="Granted by">
+          <Labelled label={t("hub.access.table.grantedBy")}>
             <Text style={styles.muted}>{row.grantedBy}</Text>
           </Labelled>
         )}
@@ -179,15 +193,21 @@ function GrantRowView({
 
 /** Direct, or the Team the grant comes from, which opens that Team when it can. */
 function ViaCell({ row, open }: { row: GrantRow; open: ((viaKey: string) => void) | undefined }) {
+  const { t } = useTranslation();
   const { viaKey } = row;
   const press = useCallback(() => {
     if (viaKey !== null) open?.(viaKey);
   }, [open, viaKey]);
-  if (row.via === null) return <Text style={styles.value}>Direct</Text>;
+  if (row.via === null) return <Text style={styles.value}>{t("hub.access.table.direct")}</Text>;
   if (open === undefined || viaKey === null) return <Text style={styles.value}>{row.via}</Text>;
   return (
     <View style={styles.viaLink}>
-      <Button size="xs" variant="ghost" onPress={press} accessibilityLabel={`Open ${row.via}`}>
+      <Button
+        size="xs"
+        variant="ghost"
+        onPress={press}
+        accessibilityLabel={t("hub.access.table.open", { via: row.via })}
+      >
         {row.via}
       </Button>
     </View>
@@ -218,27 +238,31 @@ function Labelled({ label, children }: { label: string; children: ReactNode }) {
  * Team or grants the same resource to this person alone. A row above the viewer's level says so.
  */
 function GrantRowActions({ row, actions }: { row: GrantRow; actions: GrantActions }) {
+  const { t } = useTranslation();
   const { assignment } = row;
   const edit = useCallback(() => {
     if (assignment !== null) actions.edit(assignment);
   }, [actions, assignment]);
-  const menu = useMemo(() => rowMenu(row, actions), [actions, row]);
+  const menu = useMemo(() => rowMenu(row, actions, t), [actions, row, t]);
   if (assignment === null) return <View style={styles.actions} />;
   if (row.locked) {
     return (
       <View style={styles.actions}>
-        <Text style={styles.muted}>Above your level</Text>
+        <Text style={styles.muted}>{t("hub.access.table.aboveYourLevel")}</Text>
       </View>
     );
   }
   return (
     <View style={[styles.actions, styles.actionButtons]}>
       <Button size="xs" variant="ghost" disabled={actions.pending} onPress={edit}>
-        {row.via === null ? "Edit" : `Edit on ${viaKindLabel(row.viaKey)}`}
+        {editLabel(row, t)}
       </Button>
       {menu.length === 0 ? null : (
         <RowActionsMenu
-          label={`Actions for ${row.subject.name} on ${row.resource.name}`}
+          label={t("hub.access.table.rowActions", {
+            subject: row.subject.name,
+            resource: row.resource.name,
+          })}
           actions={menu}
           disabled={actions.pending}
         />
@@ -247,28 +271,35 @@ function GrantRowActions({ row, actions }: { row: GrantRow; actions: GrantAction
   );
 }
 
-function rowMenu(row: GrantRow, actions: GrantActions) {
+function rowMenu(row: GrantRow, actions: GrantActions, t: TFunction) {
   const { assignment, viaKey } = row;
   if (assignment === null) return [];
   if (row.via === null) {
     return [
-      { label: "Remove", destructive: true, onSelect: () => void actions.remove(assignment.id) },
+      {
+        label: t("hub.access.table.remove"),
+        destructive: true,
+        onSelect: () => void actions.remove(assignment.id),
+      },
     ];
   }
   const { openVia, grantDirect } = actions;
   return [
     ...(openVia === undefined || viaKey === null
       ? []
-      : [{ label: `Open ${row.via}`, onSelect: () => openVia(viaKey) }]),
+      : [{ label: t("hub.access.table.open", { via: row.via }), onSelect: () => openVia(viaKey) }]),
     ...(grantDirect === undefined
       ? []
-      : [{ label: "Grant directly instead…", onSelect: () => grantDirect(row) }]),
+      : [{ label: t("hub.access.table.grantDirectly"), onSelect: () => grantDirect(row) }]),
   ];
 }
 
-/** "Team" or "Host", from the entry key a row comes through. */
-function viaKindLabel(viaKey: string | null): string {
-  return viaKey?.startsWith("daemon:") === true ? "Host" : "Team";
+/** Edit, or "Edit on Team" / "Edit on Host" for a row that comes through one. */
+function editLabel(row: GrantRow, t: TFunction): string {
+  if (row.via === null) return t("hub.access.table.edit");
+  return row.viaKey?.startsWith("daemon:") === true
+    ? t("hub.access.table.editOnHost")
+    : t("hub.access.table.editOnTeam");
 }
 
 const styles = StyleSheet.create((theme) => ({

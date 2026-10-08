@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { connectorToolKindOf } from "@clisbot/protocol/connectors/types";
@@ -34,6 +35,7 @@ export function ToolPickerSheet({
   onClose(): void;
   onSave(selection: ConnectorToolSelection): void;
 }) {
+  const { t } = useTranslation();
   const tools = useConnectorTools(serverId, target);
   const [selection, setSelection] = useState(initial);
   const [search, setSearch] = useState("");
@@ -50,31 +52,34 @@ export function ToolPickerSheet({
   const none = useCallback(() => setSelection([]), []);
   const save = useCallback(() => onSave(selection), [onSave, selection]);
   const header = useMemo(
-    () => ({ title, search: { onChange: setSearch, placeholder: "Search tools" } }),
-    [title],
+    () => ({
+      title,
+      search: { onChange: setSearch, placeholder: t("connectors.tools.common.searchTools") },
+    }),
+    [t, title],
   );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <View style={styles.group}>
           <Button variant="ghost" size="sm" onPress={all}>
-            All
+            {t("connectors.tools.common.all")}
           </Button>
           <Button variant="ghost" size="sm" onPress={none}>
-            None
+            {t("connectors.tools.common.none")}
           </Button>
         </View>
         <View style={styles.group}>
           <Button variant="ghost" onPress={onClose}>
-            Cancel
+            {t("connectors.tools.common.cancel")}
           </Button>
           <Button variant="default" onPress={save} testID="connectors-tools-save">
-            Save
+            {t("connectors.tools.common.save")}
           </Button>
         </View>
       </View>
     ),
-    [all, none, onClose, save],
+    [all, none, onClose, save, t],
   );
   return (
     <AdaptiveModalSheet

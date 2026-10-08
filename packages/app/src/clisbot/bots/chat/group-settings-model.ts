@@ -4,6 +4,7 @@ import {
   type ChatUpdatePatch,
 } from "@clisbot/protocol/chats/rpc-schemas";
 import { DEFAULT_CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/room";
+import { i18n } from "@/i18n/i18next";
 export interface GroupSettingsDraft {
   title: string;
   requireMention: boolean;
@@ -26,11 +27,11 @@ export function groupSettingsPatch(
   original: GroupSettingsDraft,
 ): ChatUpdatePatch | null {
   const title = draft.title.trim();
-  if (title.length > 256) throw new Error("Use 256 characters or fewer for the group name.");
+  if (title.length > 256) throw new Error(i18n.t("bots.chat.group.nameTooLong", { max: 256 }));
   const instructions = draft.roomInstructions.trim();
   if (instructions.length > CHAT_ROOM_INSTRUCTIONS_MAX_CHARS)
     throw new Error(
-      `Use ${CHAT_ROOM_INSTRUCTIONS_MAX_CHARS} characters or fewer for the room instructions.`,
+      i18n.t("bots.chat.group.instructionsTooLong", { max: CHAT_ROOM_INSTRUCTIONS_MAX_CHARS }),
     );
   const patch: ChatUpdatePatch = {};
   if (title !== original.title.trim()) patch.title = title || null;

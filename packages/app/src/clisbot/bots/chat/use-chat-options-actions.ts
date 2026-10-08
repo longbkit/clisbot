@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { buildHostBotRoute } from "../routes";
@@ -36,6 +37,7 @@ function useSerialTask(client: HostClient | null) {
 
 /** Participant toggling and Archive chat…, sharing one busy flag and one error. */
 export function useChatMembership(serverId: string, chat: ChatPayload) {
+  const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const task = useSerialTask(client);
   const { run } = task;
@@ -44,7 +46,7 @@ export function useChatMembership(serverId: string, chat: ChatPayload) {
       run(async (host) => {
         const exists = chat.participants.some((p) => p.botId === botId);
         if (exists && chat.participants.length === 1)
-          throw new Error("A chat needs at least one bot");
+          throw new Error(t("bots.chat.membership.needsOneBot"));
         const r = exists
           ? await host.removeChatParticipant({ chatId: chat.id, botId })
           : await host.addChatParticipant({ chatId: chat.id, botId });
@@ -52,7 +54,7 @@ export function useChatMembership(serverId: string, chat: ChatPayload) {
         // Stay busy until the chat refetches, so the next change reads who is in it now.
         await refreshBotsAndChatsNow();
       }),
-    [chat, run],
+    [chat, run, t],
   );
   const archiveChat = useArchiveChat();
   const archive = useCallback(

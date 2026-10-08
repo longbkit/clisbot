@@ -1,4 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
@@ -6,7 +9,6 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { SelectFieldOption } from "@/components/ui/select-field";
 import { settingsStyles } from "@/styles/settings";
-import { countLabel } from "../labels";
 import { MultiSelectField, type MultiSelection } from "../multi-select-field";
 import { canManageTeamMembership, memberTeamChanges } from "./team-membership";
 import type { HubMember, HubTeam, PeopleAuthority, TeamResources } from "./types";
@@ -61,6 +63,7 @@ function MemberTeamsSheet({
   actions: TeamActions;
   close(): void;
 }) {
+  const { t } = useTranslation();
   const managed = useMemo(
     () => teams.filter(({ id }) => canManageTeamMembership(authority, id)),
     [authority, teams],
@@ -80,20 +83,23 @@ function MemberTeamsSheet({
     if (await setMemberTeams(member.userId, changes)) close();
   }, [changes, close, member.userId, setMemberTeams]);
   const press = useCallback(() => void save(), [save]);
-  const options = useMemo(() => teamOptions(managed), [managed]);
-  const header = useMemo(() => ({ title: `Teams for ${member.name}` }), [member.name]);
+  const options = useMemo(() => teamOptions(managed, t), [managed, t]);
+  const header = useMemo(
+    () => ({ title: t("hub.team.memberTeams.title", { name: member.name }) }),
+    [member.name, t],
+  );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <Button variant="secondary" disabled={pending} onPress={close}>
-          Cancel
+          {t("common.actions.cancel")}
         </Button>
         <Button disabled={!changed || pending} loading={pending} onPress={press}>
-          Save
+          {t("hub.team.actions.save")}
         </Button>
       </View>
     ),
-    [changed, close, pending, press],
+    [changed, close, pending, press, t],
   );
   const others = teams.filter(
     ({ id, userIds }) => userIds.includes(member.userId) && !managed.some((team) => team.id === id),
@@ -108,19 +114,25 @@ function MemberTeamsSheet({
     >
       <View style={styles.body}>
         <MultiSelectField
-          label="Teams"
+          label={t("hub.team.teamPicker.label")}
           hint={teamsHint(managed.length, canCreate, changes)}
           options={options}
           value={chosen}
           onChange={choose}
           disabled={pending || (managed.length === 0 && !canCreate)}
-          placeholder={canCreate ? "Choose or create Teams" : "Choose Teams"}
-          searchPlaceholder={canCreate ? "Team name, or a new one" : "Team name"}
+          placeholder={
+            canCreate ? t("hub.team.teamPicker.chooseOrCreate") : t("hub.team.teamPicker.choose")
+          }
+          searchPlaceholder={
+            canCreate ? t("hub.team.teamPicker.searchOrCreate") : t("hub.team.teamPicker.search")
+          }
           {...(create === undefined ? {} : { create })}
         />
         {others.length === 0 ? null : (
           <Text style={settingsStyles.rowHint}>
-            {`Also in ${others.map(({ name }) => name).join(", ")}, managed by their Team Admins.`}
+            {t("hub.team.memberTeams.alsoIn", {
+              teams: others.map(({ name }) => name).join(", "),
+            })}
           </Text>
         )}
         {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
@@ -129,12 +141,12 @@ function MemberTeamsSheet({
   );
 }
 
-function teamOptions(teams: readonly HubTeam[]): SelectFieldOption<string>[] {
+function teamOptions(teams: readonly HubTeam[], t: TFunction): SelectFieldOption<string>[] {
   return teams.map((team) => ({
     id: team.id,
     value: team.id,
     label: team.name,
-    description: countLabel(team.userIds.length, "Member"),
+    description: t("hub.team.counts.members", { count: team.userIds.length }),
   }));
 }
 
@@ -143,16 +155,21 @@ function teamsHint(
   canCreate: boolean,
   { add, remove }: { add: string[]; remove: string[] },
 ): string {
-  if (managed === 0) return canCreate ? "Type a name to create a Team." : "Create a Team first.";
+  if (managed === 0) {
+    return canCreate
+      ? i18n.t("hub.team.teamPicker.typeToCreate")
+      : i18n.t("hub.team.teamPicker.createFirst");
+  }
   const parts = [
-    ...(add.length > 0 ? [`joins ${countLabel(add.length, "Team")}`] : []),
-    ...(remove.length > 0 ? [`leaves ${countLabel(remove.length, "Team")}`] : []),
+    ...(add.length > 0 ? [i18n.t("hub.team.memberTeams.joins", { count: add.length })] : []),
+    ...(remove.length > 0 ? [i18n.t("hub.team.memberTeams.leaves", { count: remove.length })] : []),
   ];
   if (parts.length === 0) {
-    const pick = canCreate ? "Pick Teams or type a new name" : "Pick Teams";
-    return `${pick}; remove one to take them out of it.`;
+    return canCreate
+      ? i18n.t("hub.team.memberTeams.pickOrCreate")
+      : i18n.t("hub.team.memberTeams.pick");
   }
-  return `On save: ${parts.join(", ")}.`;
+  return i18n.t("hub.team.memberTeams.onSave", { changes: parts.join(", ") });
 }
 
 const styles = StyleSheet.create((theme) => ({

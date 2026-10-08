@@ -6,6 +6,7 @@ import {
   type AgentToolGroup,
 } from "@clisbot/protocol/connectors/agent-tools";
 import type { ConnectorGrant } from "@clisbot/protocol/connectors/types";
+import { i18n } from "@/i18n/i18next";
 import type { AgentToolDefaults } from "./project-grants";
 import type { SessionToolSet } from "./session-connectors";
 
@@ -116,8 +117,10 @@ export function setGroupOn(
 
 /** "All 10 tools", "3 of 10 tools", "Off". */
 export function toolCountSummary(on: number, total: number): string {
-  if (on === 0) return "Off";
-  return on === total ? `All ${on} tools` : `${on} of ${total} tools`;
+  if (on === 0) return i18n.t("connectors.tools.counts.off");
+  return on === total
+    ? i18n.t("connectors.tools.counts.allTools", { count: on })
+    : i18n.t("connectors.tools.counts.someTools", { on, count: total });
 }
 
 export function groupSummary(
@@ -130,13 +133,15 @@ export function groupSummary(
     group.tools.length,
   );
   return isBrowserGroup(group) && grant?.browserTools === undefined
-    ? `${summary} · Host default`
+    ? i18n.t("connectors.tools.agentTools.withHostDefault", { summary })
     : summary;
 }
 
 export function hostDefaultLabel(value: boolean | undefined): string {
-  if (value === undefined) return "Host default";
-  return value ? "Host default: on" : "Host default: off";
+  if (value === undefined) return i18n.t("connectors.tools.agentTools.hostDefault");
+  return value
+    ? i18n.t("connectors.tools.agentTools.hostDefaultOn")
+    : i18n.t("connectors.tools.agentTools.hostDefaultOff");
 }
 
 function withAgentTools(

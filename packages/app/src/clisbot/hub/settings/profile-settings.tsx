@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Image, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -32,6 +33,7 @@ export function ProfileSettings({
   pending: boolean;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const fieldSize = compact ? "md" : "sm";
   const [editing, setEditing] = useState(false);
@@ -54,7 +56,7 @@ export function ProfileSettings({
   const editable = hub.signInKind === "password";
   if (!editing) {
     return (
-      <SettingsSection title="Profile">
+      <SettingsSection title={t("hub.settings.profile.title")}>
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
             {account.image ? <ProfileImage uri={account.image} /> : null}
@@ -64,12 +66,12 @@ export function ProfileSettings({
                 <Text style={settingsStyles.rowHint}>{account.email}</Text>
               ) : null}
               {isInstanceOperator ? (
-                <Text style={settingsStyles.rowHint}>Operator of this Hub instance</Text>
+                <Text style={settingsStyles.rowHint}>{t("hub.settings.profile.operator")}</Text>
               ) : null}
             </View>
             {editable ? (
               <Button size="sm" variant="outline" disabled={pending} onPress={startEditing}>
-                Edit
+                {t("hub.settings.profile.edit")}
               </Button>
             ) : null}
           </View>
@@ -78,10 +80,10 @@ export function ProfileSettings({
     );
   }
   return (
-    <SettingsSection title="Profile">
+    <SettingsSection title={t("hub.settings.profile.title")}>
       <View style={[settingsStyles.card, styles.form]}>
         {account.image ? <ProfileImage uri={account.image} /> : null}
-        <Field label="Display name">
+        <Field label={t("hub.settings.profile.displayName")}>
           <FormTextInput
             size={fieldSize}
             initialValue={name}
@@ -90,8 +92,8 @@ export function ProfileSettings({
           />
         </Field>
         <Field
-          label="Profile image link"
-          hint="An https link, for example your Google or Gravatar photo. Leave empty to remove it."
+          label={t("hub.settings.profile.imageLabel")}
+          hint={t("hub.settings.profile.imageHint")}
         >
           <FormTextInput
             size={fieldSize}
@@ -105,10 +107,10 @@ export function ProfileSettings({
         </Field>
         <View style={styles.actions}>
           <Button disabled={pending || name.trim().length === 0} loading={pending} onPress={save}>
-            Save profile
+            {t("hub.settings.profile.save")}
           </Button>
           <Button variant="ghost" disabled={pending} onPress={cancel}>
-            Cancel
+            {t("hub.settings.profile.cancel")}
           </Button>
         </View>
       </View>

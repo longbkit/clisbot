@@ -1,4 +1,5 @@
 import { type Dispatch, type SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 import { FoldedRouteFormSection, RouteFormSection } from "./channel-route-form-sections";
 import { ChannelIcon } from "@/clisbot/channels/channel-icon";
 import { Text, View } from "react-native";
@@ -56,8 +57,9 @@ export function RouteConnectionSection({
   duplicateAccount: boolean;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
-    <RouteFormSection title="Connection">
+    <RouteFormSection title={t("hub.routes.connection.title")}>
       {fixedAccount ? (
         <View style={styles.channelTitle}>
           <ChannelIcon channel={stringField(account, "channel") ?? undefined} size={14} />
@@ -67,29 +69,29 @@ export function RouteConnectionSection({
         <View style={styles.accountRow}>
           <View style={styles.accountSelect}>
             <SelectField
-              label="Connection"
+              label={t("hub.routes.connection.title")}
               field={false}
               value={destinationValue}
               selectedDisplay={destinationDisplay}
               options={destinationOptions}
               onChange={changeDestination}
-              placeholder="Choose a Connection"
-              emptyText="Nothing is connected yet."
+              placeholder={t("hub.routes.connection.choose")}
+              emptyText={t("hub.routes.connection.empty")}
               searchable={destinationOptions.length > 6}
-              title="Connection"
+              title={t("hub.routes.connection.title")}
               disabled={pending}
             />
           </View>
           {connectChannelAccount === undefined ? null : (
             <View style={styles.accountConnect}>
-              <Text style={styles.accountOr}>Or</Text>
+              <Text style={styles.accountOr}>{t("hub.routes.connection.or")}</Text>
               <Button
                 size="sm"
                 variant={destinationOptions.length === 0 ? "secondary" : "outline"}
                 disabled={pending}
                 onPress={connectChannelAccount}
               >
-                Connect a new one
+                {t("hub.routes.connection.connectNew")}
               </Button>
             </View>
           )}
@@ -99,8 +101,8 @@ export function RouteConnectionSection({
         // A Connection's first Route also names the bot in Clisbot; the name
         // defaults from the Connection and is what the list shows.
         <Field
-          label="Name"
-          error={duplicateAccount ? "Another Connection on this channel uses this name." : null}
+          label={t("hub.routes.connection.name")}
+          error={duplicateAccount ? t("hub.routes.connection.duplicateName") : null}
         >
           <FormTextInput
             key={connectionId ?? ""}
@@ -133,11 +135,13 @@ export function RouteLimitsSection({
   inUse: boolean;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
+  const noLimits = t("hub.routes.common.noLimits");
   return (
     <FoldedRouteFormSection
-      title="Route limits"
-      info={LIMITS_INFO}
-      summary={parsed.valid ? channelLimitsSummary(parsed.value, names, "No limits") : parsed.error}
+      title={t("hub.routes.routeLimits.title")}
+      info={t("hub.routes.routeLimits.info")}
+      summary={parsed.valid ? channelLimitsSummary(parsed.value, names, noLimits) : parsed.error}
       inUse={inUse}
     >
       <ChannelLimitsFields
@@ -150,16 +154,11 @@ export function RouteLimitsSection({
         disabled={pending}
       />
       {names.length > ROUTE_TOTAL_LIMIT_NAMES.length ? (
-        <Text style={settingsStyles.rowHint}>{LEGACY_ROUTE_LIMITS_NOTE}</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.routes.routeLimits.legacyNote")}</Text>
       ) : null}
     </FoldedRouteFormSection>
   );
 }
-
-const LIMITS_INFO =
-  "Totals for every Rule of this Route together, across every conversation it matches. Over a limit, messages and runs wait their turn. Limits for the people who come in are on each Rule; the bot's own, including Bot messages per minute, are on the Connection, under Limits.";
-const LEGACY_ROUTE_LIMITS_NOTE =
-  "Limits under the totals were set on the Route by an earlier version and still apply to everyone on it. Per-person limits now belong on each Rule, and Bot messages per minute on the Connection.";
 
 const styles = StyleSheet.create((theme) => ({
   accountRow: {

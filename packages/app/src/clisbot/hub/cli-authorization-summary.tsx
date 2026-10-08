@@ -1,4 +1,5 @@
 import type { HubEnrollmentRequest } from "@clisbot/protocol/messages";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Text } from "react-native";
@@ -6,14 +7,6 @@ import { Alert } from "@/components/ui/alert";
 import { settingsStyles } from "@/styles/settings";
 import { DetailRow, OrganizationTitle } from "./organization-identity";
 import { withEmail } from "@/clisbot/hub/account-email";
-
-/** What an approved CLI credential can do, stated against the organization it acts in. */
-const CLI_CREDENTIAL_IMPACTS = [
-  "List Projects and read their configuration",
-  "Install triggers and configuration",
-  "Enroll Hosts; each enrolled Host joins this organization",
-  "Start Automation runs",
-] as const;
 
 export interface CliAuthorizationSubject {
   enrollment?: HubEnrollmentRequest | null;
@@ -30,30 +23,53 @@ export interface CliAuthorizationSubject {
  * it only proves this is the terminal the user started.
  */
 export function CliAuthorizationSummary(subject: CliAuthorizationSubject) {
+  const { t } = useTranslation();
+  const organization = subject.organization.name;
   return (
     <View style={styles.stack}>
       <View style={[settingsStyles.card, styles.card]}>
         <Text style={styles.eyebrow}>
           {subject.enrollment
-            ? "Connect Host to organization"
-            : "Advanced CLI access for organization"}
+            ? t("hub.account.cliSummary.connectHostEyebrow")
+            : t("hub.account.cliSummary.advancedAccessEyebrow")}
         </Text>
-        <OrganizationTitle name={subject.organization.name} />
-        <DetailRow label="Organization ID" value={subject.organization.slug} />
+        <OrganizationTitle name={organization} />
+        <DetailRow
+          label={t("hub.account.cliSummary.organizationId")}
+          value={subject.organization.slug}
+        />
         {subject.account ? (
           <DetailRow
-            label="Approved by"
+            label={t("hub.account.cliSummary.approvedBy")}
             value={withEmail(subject.account.roleLabel, subject.account.email)}
           />
         ) : null}
-        {subject.hubOrigin ? <DetailRow label="Hub" value={subject.hubOrigin} /> : null}
-        <DetailRow label="Code" value={subject.code} hint="Must match the code in your terminal" />
-        <DetailRow label="Request expires" value={formatExpiry(subject.expiresAt)} />
+        {subject.hubOrigin ? (
+          <DetailRow label={t("hub.account.cliSummary.hub")} value={subject.hubOrigin} />
+        ) : null}
+        <DetailRow
+          label={t("hub.account.cliSummary.code")}
+          value={subject.code}
+          hint={t("hub.account.cliSummary.codeHint")}
+        />
+        <DetailRow
+          label={t("hub.account.cliSummary.requestExpires")}
+          value={formatExpiry(subject.expiresAt)}
+        />
         {subject.enrollment ? (
           <>
-            <DetailRow label="Host" value={subject.enrollment.hostname} />
-            <DetailRow label="Host ID" value={subject.enrollment.serverId} />
-            <DetailRow label="Host public key" value={subject.enrollment.daemonPublicKey} />
+            <DetailRow
+              label={t("hub.account.cliSummary.host")}
+              value={subject.enrollment.hostname}
+            />
+            <DetailRow
+              label={t("hub.account.cliSummary.hostId")}
+              value={subject.enrollment.serverId}
+            />
+            <DetailRow
+              label={t("hub.account.cliSummary.hostPublicKey")}
+              value={subject.enrollment.daemonPublicKey}
+            />
           </>
         ) : null}
       </View>
@@ -61,17 +77,38 @@ export function CliAuthorizationSummary(subject: CliAuthorizationSubject) {
         variant="warning"
         title={
           subject.enrollment
-            ? `Allow ${subject.organization.name} to use this Host`
-            : `This CLI will act for ${subject.organization.name}`
+            ? t("hub.account.cliSummary.allowHost", { organization })
+            : t("hub.account.cliSummary.actFor", { organization })
         }
         description={
           subject.enrollment
-            ? `Hub permissions on this Host: ${subject.enrollment.permissions.length ? subject.enrollment.permissions.join(", ") : "None"}.\n\nApproval allows one enrollment of this Host before the request expires. The Host then keeps its own connection credential. No CLI administration credential is created. Disconnect the Host to remove its local connection, or revoke it in Hub.`
-            : `${CLI_CREDENTIAL_IMPACTS.map((impact) => `• ${impact}`).join("\n")}\n\nThe credential has no automatic expiry. An owner or admin must revoke it in Hub → Configuration → API keys. CLI logout only removes its local copy. Use hub connect for Host onboarding.`
+            ? t("hub.account.cliSummary.hostPermissions", {
+                permissions: permissionList(subject.enrollment, t),
+              })
+            : credentialImpacts(t)
         }
       />
     </View>
   );
+}
+
+type Translate = ReturnType<typeof useTranslation>["t"];
+
+function permissionList(enrollment: HubEnrollmentRequest, t: Translate): string {
+  return enrollment.permissions.length
+    ? enrollment.permissions.join(", ")
+    : t("hub.account.cliSummary.noPermissions");
+}
+
+/** What an approved CLI credential can do, stated against the organization it acts in. */
+function credentialImpacts(t: Translate): string {
+  const impacts = [
+    t("hub.account.cliSummary.impacts.listProjects"),
+    t("hub.account.cliSummary.impacts.installTriggers"),
+    t("hub.account.cliSummary.impacts.enrollHosts"),
+    t("hub.account.cliSummary.impacts.startRuns"),
+  ];
+  return `${impacts.map((impact) => `• ${impact}`).join("\n")}\n\n${t("hub.account.cliSummary.credentialNotice")}`;
 }
 
 function formatExpiry(expiresAt: string): string {

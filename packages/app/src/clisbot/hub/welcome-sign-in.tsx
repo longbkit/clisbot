@@ -172,19 +172,20 @@ function HubWelcomeActionButton({
   loading: boolean;
   onRun: (action: HubWelcomeAction) => void;
 }) {
+  const { t } = useTranslation();
   const press = useCallback(() => onRun(action), [action, onRun]);
   return (
     <Button size="sm" variant={primary ? "secondary" : "ghost"} loading={loading} onPress={press}>
-      {actionLabel(action)}
+      {actionLabel(action, t)}
     </Button>
   );
 }
 
-function actionLabel(action: HubWelcomeAction): string {
-  if (action === "account") return "Account";
+function actionLabel(action: HubWelcomeAction, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (action === "account") return t("hub.account.welcome.actions.account");
   // Same label as Settings → Account so one action keeps one name (docs/glossary.md).
-  if (action === "refreshHosts") return "Refresh Hosts";
-  return "Retry";
+  if (action === "refreshHosts") return t("hub.account.welcome.actions.refreshHosts");
+  return t("hub.account.welcome.actions.retry");
 }
 
 /**
@@ -201,12 +202,13 @@ export function WelcomeOwnComputerLabel() {
 
 /** Placed now so a second Hub does not change this layout later; one Hub origin per app today. */
 function AddAnotherHubRow() {
+  const { t } = useTranslation();
   return (
     <View style={styles.addHubRow}>
       <Button size="sm" variant="ghost" disabled>
-        + Add another Hub
+        {t("hub.account.welcome.addAnotherHub")}
       </Button>
-      <Text style={styles.hint}>One Hub per app for now.</Text>
+      <Text style={styles.hint}>{t("hub.account.welcome.oneHubPerApp")}</Text>
     </View>
   );
 }
@@ -220,6 +222,7 @@ function HubWelcomeSignInActions({
   setupRequired: boolean;
   onAttempt: (attempted: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const openAccount = useCallback(() => router.push(buildHubSettingsRoute("account")), [router]);
   const startGoogle = hub.signInWithGoogle;
@@ -233,26 +236,28 @@ function HubWelcomeSignInActions({
     void hub.signIn().catch(() => onAttempt(false));
   }, [hub, onAttempt]);
   if (setupRequired) {
-    return <Button onPress={openAccount}>Set up Hub</Button>;
+    return <Button onPress={openAccount}>{t("hub.account.welcome.setUpHub")}</Button>;
   }
   return (
     <>
       <View style={styles.descriptionBlock}>
-        <Text style={styles.description}>
-          Sign in to use the Hosts and Projects your organization shares with you.
-        </Text>
-        <ExternalLink href={HUB_DOCS_URL} label="What is a Hub?" />
+        <Text style={styles.description}>{t("hub.account.welcome.description")}</Text>
+        <ExternalLink href={HUB_DOCS_URL} label={t("hub.account.welcome.whatIsHub")} />
       </View>
       {/* Native and desktop clients sign in on the Hub page they open, which offers every method. */}
       {hub.signInKind === "system-browser" ? (
-        <Button onPress={signInThroughBrowser}>Sign in to Hub</Button>
+        <Button onPress={signInThroughBrowser}>{t("hub.account.welcome.signIn")}</Button>
       ) : (
         <>
           {googleSignIn && startGoogle !== undefined ? (
-            <Button onPress={continueWithGoogle}>Continue with Google</Button>
+            <Button onPress={continueWithGoogle}>
+              {t("hub.account.welcome.continueWithGoogle")}
+            </Button>
           ) : null}
           <Button variant={googleSignIn ? "ghost" : "secondary"} onPress={openAccount}>
-            {googleSignIn ? "Use email and password instead" : "Sign in to Hub"}
+            {googleSignIn
+              ? t("hub.account.welcome.useEmailAndPassword")
+              : t("hub.account.welcome.signIn")}
           </Button>
         </>
       )}

@@ -20,6 +20,7 @@ import {
   type ChannelIngressSeverity,
 } from "./channel-ingress-operations";
 import type { HubChannelIngressCounts } from "./contracts";
+import { i18n } from "@/i18n/i18next";
 
 export interface ChannelRuntimeRow {
   channel: string;
@@ -56,14 +57,14 @@ export interface ChannelAccountHealth {
   severity: ChannelIngressSeverity;
 }
 
-const TRANSPORT_LABELS: Readonly<Record<ChannelTransportState, string>> = {
-  starting: "Starting",
-  started: "Running",
-  deferred: "Deferred",
-  stopped: "Stopped",
-  failed: "Failed",
-  "needs-login": "Needs login",
-  disabled: "Disabled",
+const TRANSPORT_LABELS: Readonly<Record<ChannelTransportState, () => string>> = {
+  starting: () => i18n.t("hub.channels.transport.starting"),
+  started: () => i18n.t("hub.channels.transport.started"),
+  deferred: () => i18n.t("hub.channels.transport.deferred"),
+  stopped: () => i18n.t("hub.channels.transport.stopped"),
+  failed: () => i18n.t("hub.channels.transport.failed"),
+  "needs-login": () => i18n.t("hub.channels.transport.needsLogin"),
+  disabled: () => i18n.t("hub.channels.transport.disabled"),
 };
 
 const TRANSPORT_SEVERITY: Readonly<Record<ChannelTransportState, ChannelIngressSeverity>> = {
@@ -112,7 +113,10 @@ export function channelAccountHealthRows(input: {
         accountId,
         enabled: account["enabled"] !== false,
         transport: status?.transport ?? null,
-        transportLabel: status === undefined ? "Not running" : TRANSPORT_LABELS[status.transport],
+        transportLabel:
+          status === undefined
+            ? i18n.t("hub.channels.transport.notRunning")
+            : TRANSPORT_LABELS[status.transport](),
         detail: status?.detail ?? null,
         identity: connection?.externalName ?? null,
         connectionId,
@@ -185,11 +189,11 @@ export function channelCatalogRows(
   return [...rows, ...extra];
 }
 
-export const CHANNEL_STATUS_LABELS: Readonly<Record<ChannelCatalogRow["status"], string>> = {
-  "in-repo": "Available",
-  planned: "Coming soon",
-  unknown: "Reported by this Hub",
-};
+export function channelStatusLabel(status: ChannelCatalogRow["status"]): string {
+  if (status === "in-repo") return i18n.t("hub.channels.catalogStatus.available");
+  if (status === "planned") return i18n.t("hub.channels.catalogStatus.planned");
+  return i18n.t("hub.channels.catalogStatus.unknown");
+}
 
 /** Severity as a `<StatusBadge>` variant. */
 export function channelSeverityVariant(

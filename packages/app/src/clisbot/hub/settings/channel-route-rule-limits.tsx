@@ -3,13 +3,15 @@
 // the Rule sets one; a leaf it leaves alone shows what it meets instead.
 
 import React, { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
 import type { ChannelLimits } from "../channel-configuration";
 import type { AudienceRuleDraft } from "./channel-route-audience";
 import {
-  LIMITS_NOTE,
   RULE_LIMIT_NAMES,
   channelLimitsSummary,
   limitsAuthored,
+  limitsNote,
   parseChannelLimitsDraft,
   ruleLimitDefaults,
   type ChannelLimitsDraft,
@@ -31,6 +33,7 @@ export function RuleLimitFields({
   disabled: boolean;
   update: Update;
 }) {
+  const { t } = useTranslation();
   const defaults = useMemo(
     () => ruleLimitDefaults(routeLimits, rule.who.anyone),
     [routeLimits, rule.who.anyone],
@@ -43,8 +46,8 @@ export function RuleLimitFields({
   const parsed = parseChannelLimitsDraft(rule.limits, RULE_LIMIT_NAMES);
   return (
     <FoldedRouteFormSubgroup
-      title="Limits"
-      info={LIMITS_NOTE}
+      title={t("hub.routes.ruleLimits.title")}
+      info={limitsNote()}
       summary={limitsLine(rule.limits, defaults)}
       inUse={limitsAuthored(rule.limits, RULE_LIMIT_NAMES)}
     >
@@ -67,5 +70,7 @@ function limitsLine(draft: ChannelLimitsDraft, defaults: object): string {
     const parsed = parseChannelLimitsDraft(draft, RULE_LIMIT_NAMES);
     return parsed.valid ? channelLimitsSummary(parsed.value, RULE_LIMIT_NAMES) : parsed.error;
   }
-  return Object.keys(defaults).length === 0 ? "No limits" : "Default limits";
+  return Object.keys(defaults).length === 0
+    ? i18n.t("hub.routes.common.noLimits")
+    : i18n.t("hub.routes.ruleLimits.defaults");
 }

@@ -2,6 +2,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorMcpServer } from "@clisbot/protocol/connectors/types";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -19,6 +20,7 @@ import { useConnectorsScreen } from "./use-connectors-screen";
  * (design.md §9): two columns on a wide screen, the list then one item on a phone.
  */
 export function ConnectorsScreen() {
+  const { t } = useTranslation();
   const hosts = useConnectorsFeatureHosts();
   // Bot and Project settings open this screen on their own Host.
   const params = useLocalSearchParams<{ serverId?: string }>();
@@ -27,12 +29,10 @@ export function ConnectorsScreen() {
     hosts.find((host) => host.serverId === chosenHost)?.serverId ?? hosts[0]?.serverId ?? null;
   return (
     <View style={styles.page}>
-      <MenuHeader title="Connectors" />
+      <MenuHeader title={t("connectors.screen.common.connectors")} />
       {serverId === null ? (
         <View style={styles.empty}>
-          <Text style={settingsStyles.rowHint}>
-            No connected Host offers Connectors. Update the Host to use them.
-          </Text>
+          <Text style={settingsStyles.rowHint}>{t("connectors.screen.screen.noHost")}</Text>
         </View>
       ) : (
         <ConnectorsBody key={serverId} serverId={serverId} hosts={hosts} onHost={setChosenHost} />
@@ -52,6 +52,7 @@ function ConnectorsBody({
   hosts: { serverId: string; label: string }[];
   onHost(id: string): void;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const screen = useConnectorsScreen(serverId);
   const sheet = useServerSheet(screen.showServer);
@@ -88,7 +89,11 @@ function ConnectorsBody({
   if (compact) {
     return (
       <ScrollView contentContainerStyle={styles.compactContent}>
-        {screen.selection === null ? master : <BackLink to="Connectors" onPress={back} />}
+        {screen.selection === null ? (
+          master
+        ) : (
+          <BackLink to={t("connectors.screen.common.connectors")} onPress={back} />
+        )}
         {screen.selection === null ? null : detail}
         {sheetView}
       </ScrollView>

@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { i18n } from "@/i18n/i18next";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { HubAccessEventsSchema } from "../contracts";
@@ -30,38 +32,38 @@ interface EventContext {
  * Automations the Hub paused. Collapsed by default: it is a review list, not
  * something to act on daily.
  */
-const EVENTS_INFO =
-  "Every Administrator grant on a Host, with who made it, and every Automation the Hub paused. Organization Admins are also notified.";
-
 export function AccessEventsSection({
   pending,
   remove,
   ...context
 }: EventContext & { pending: boolean; remove(assignmentId: string): Promise<void> }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
   const events = useHubResource(EVENTS_RESOURCE, HubAccessEventsSchema, expanded);
   const trailing = useMemo(
     () => (
       <Button size="sm" variant="ghost" onPress={toggle}>
-        {expanded ? "Hide" : "Show"}
+        {expanded ? t("hub.access.events.hide") : t("hub.access.events.show")}
       </Button>
     ),
-    [expanded, toggle],
+    [expanded, t, toggle],
   );
   return (
-    <SettingsSection title="Access events" info={EVENTS_INFO} trailing={trailing}>
+    <SettingsSection
+      title={t("hub.access.events.title")}
+      info={t("hub.access.events.info")}
+      trailing={trailing}
+    >
       <View style={settingsStyles.card}>
         {expanded ? null : (
           <View style={settingsStyles.row}>
-            <Text style={settingsStyles.rowHint}>
-              Administrator grants on a Host and paused Automations.
-            </Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.access.events.collapsedHint")}</Text>
           </View>
         )}
         {expanded ? <QueryFeedback queries={[events]} /> : null}
         {expanded && events.data?.events.length === 0 ? (
-          <EmptyRow message="No access events yet." />
+          <EmptyRow message={t("hub.access.events.empty")} />
         ) : null}
         {expanded
           ? events.data?.events.map((event) => (
@@ -90,6 +92,7 @@ function AccessEventRow({
   pending: boolean;
   remove(assignmentId: string): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const revocable = revocableAdministratorGrant(event, context);
   const revoke = useCallback(() => {
     if (revocable !== undefined) void remove(revocable.id);
@@ -102,7 +105,7 @@ function AccessEventRow({
       </View>
       {revocable === undefined ? null : (
         <Button size="xs" variant="ghost" disabled={pending} onPress={revoke}>
-          Revoke
+          {t("hub.access.events.revoke")}
         </Button>
       )}
     </View>
@@ -121,11 +124,18 @@ export function describeAccessEvent(event: AccessEvent, context: EventContext): 
     context.memberById,
   );
   if (event.kind === "automation_paused") {
-    return `Hub paused Automation ${resourceName}: its author ${subject} lost access to a target`;
+    return i18n.t("hub.access.events.automationPaused", { resource: resourceName, subject });
   }
   const actor =
-    event.actorUserId === null ? "Hub" : context.memberNameByUserId.get(event.actorUserId);
-  return `${actor ?? "A former Member"} granted Administrator on ${resourceName} to ${subject}`;
+    event.actorUserId === null
+      ? i18n.t("hub.access.grantor.hub")
+      : context.memberNameByUserId.get(event.actorUserId);
+  return actor === undefined
+    ? i18n.t("hub.access.events.administratorGrantedByFormerMember", {
+        resource: resourceName,
+        subject,
+      })
+    : i18n.t("hub.access.events.administratorGranted", { actor, resource: resourceName, subject });
 }
 
 /**

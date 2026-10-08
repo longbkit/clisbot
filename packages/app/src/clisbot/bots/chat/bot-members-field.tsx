@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { X } from "lucide-react-native";
 import { Combobox, ComboboxItem, type ComboboxOption } from "@/components/ui/combobox";
 import { Field } from "@/components/ui/form-field";
@@ -44,12 +45,15 @@ export function BotMembersField({
   autoOpen?: boolean;
   size?: "sm" | "md";
 }) {
+  const { t } = useTranslation();
   const count = useMemo(
-    () => <Text style={styles.count}>{countLabel(members.length)}</Text>,
-    [members.length],
+    () => (
+      <Text style={styles.count}>{t("bots.chat.members.count", { count: members.length })}</Text>
+    ),
+    [members.length, t],
   );
   return (
-    <Field label="Members" trailing={count}>
+    <Field label={t("bots.chat.common.members")} trailing={count}>
       <View style={styles.stack}>
         <AddBotSearch
           available={available}
@@ -76,10 +80,6 @@ export function BotMembersField({
   );
 }
 
-function countLabel(count: number): string {
-  return count === 1 ? "1 bot" : `${count} bots`;
-}
-
 function AddBotSearch({
   available,
   onAdd,
@@ -93,6 +93,7 @@ function AddBotSearch({
   autoOpen: boolean;
   size: "sm" | "md";
 }) {
+  const { t } = useTranslation();
   const anchorRef = useRef<View>(null);
   const [open, setOpen] = useState(autoOpen && available.length > 0);
   const byId = useMemo(() => new Map(available.map((bot) => [bot.id, bot])), [available]);
@@ -113,7 +114,7 @@ function AddBotSearch({
     [byId],
   );
   const placeholder =
-    available.length > 0 ? "Add a bot — search by name or role" : "All bots added";
+    available.length > 0 ? t("bots.chat.members.addPlaceholder") : t("bots.chat.members.allAdded");
   return (
     <>
       <View ref={anchorRef} collapsable={false}>
@@ -121,7 +122,7 @@ function AddBotSearch({
           onPress={toggleOpen}
           disabled={disabled || available.length === 0}
           accessibilityRole="button"
-          accessibilityLabel="Add a bot"
+          accessibilityLabel={t("bots.chat.members.addBot")}
         >
           {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
             <SelectFieldTrigger
@@ -144,9 +145,9 @@ function AddBotSearch({
         renderOption={renderOption}
         searchable
         keepOpenOnSelect
-        searchPlaceholder="Search by name or role"
-        emptyText="No bots match"
-        title="Add a bot"
+        searchPlaceholder={t("bots.chat.members.searchPlaceholder")}
+        emptyText={t("bots.chat.members.noMatch")}
+        title={t("bots.chat.members.addBot")}
       />
     </>
   );
@@ -164,6 +165,7 @@ function BotOption({
   active: boolean;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   const face = useMemo(
     () => (bot ? <BotFace botId={bot.id} name={bot.name} avatar={bot.avatar} /> : null),
     [bot],
@@ -171,7 +173,7 @@ function BotOption({
   return (
     <ComboboxItem
       label={option.label}
-      description={option.description ?? "No role yet"}
+      description={option.description ?? t("bots.chat.common.noRole")}
       active={active}
       onPress={onPress}
       leadingSlot={face}
@@ -190,6 +192,7 @@ function MemberRow({
   removable: boolean;
   onRemove: (botId: string) => void;
 }) {
+  const { t } = useTranslation();
   const remove = useCallback(() => onRemove(bot.id), [bot.id, onRemove]);
   const rowStyle = useMemo(
     () => [settingsStyles.row, withBorder ? settingsStyles.rowBorder : null, styles.row],
@@ -204,14 +207,14 @@ function MemberRow({
           {bot.name}
         </Text>
         <Text style={settingsStyles.rowHint} numberOfLines={1}>
-          {role || "No role yet"}
+          {role || t("bots.chat.common.noRole")}
         </Text>
       </View>
       {removable ? (
         <Pressable
           onPress={remove}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${bot.name}`}
+          accessibilityLabel={t("bots.chat.members.remove", { name: bot.name })}
           style={removeStyle}
         >
           <RemoveIcon size={16} uniProps={mutedIcon} />

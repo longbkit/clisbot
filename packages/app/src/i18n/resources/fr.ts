@@ -1,5 +1,9 @@
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
+import { bots } from "./bots";
+import { heartbeats } from "./heartbeats";
+import { connectors } from "./connectors";
+import { hub } from "./hub";
 
 export const fr: TranslationResources = {
   paneFind: {
@@ -1285,6 +1289,7 @@ export const fr: TranslationResources = {
         copyPath: "Copier le chemin",
         copyBranchName: "Copier le nom de la branche",
         rename: "Renommer l'espace de travail",
+        renameSession: "Renommer la session",
         pin: "Épingler en haut",
         unpin: "Désépingler",
         archive: "Archive",
@@ -2228,6 +2233,7 @@ export const fr: TranslationResources = {
           ko: "한국어",
           ptBR: "Português brasileiro",
           ru: "Русский",
+          vi: "vietnamien",
           zhCN: "中文",
         },
       },
@@ -2876,4 +2882,8 @@ export const fr: TranslationResources = {
       },
     },
   },
+  hub: hub.fr,
+  connectors: connectors.fr,
+  bots: bots.fr,
+  heartbeats: heartbeats.fr,
 };

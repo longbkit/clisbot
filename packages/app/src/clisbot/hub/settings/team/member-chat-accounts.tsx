@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
@@ -22,9 +23,6 @@ import { useIdentityActions } from "./use-people-actions";
 const NO_IDENTITIES: HubIdentity[] = [];
 const NO_CONNECTIONS: HubConnection[] = [];
 
-const INFO =
-  "One Member can link several chat accounts. A link covers its identity realm: every Telegram, Discord, or Google Chat bot; one Slack workspace; or one Feishu or Zalo bot. Members link their own from Account; only an instance operator links one by its raw provider id.";
-
 /** The chat accounts the Member is recognized from, and the operator's way to link one by hand. */
 export function MemberChatAccounts({
   hub,
@@ -39,6 +37,7 @@ export function MemberChatAccounts({
   run: HubRun;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const catalog = useChannelCatalog();
   const { unlink, link } = useIdentityActions(hub, resources, run);
   const [linking, setLinking] = useState(false);
@@ -61,18 +60,25 @@ export function MemberChatAccounts({
     () =>
       operator ? (
         <Button size="sm" variant="outline" disabled={pending} onPress={open}>
-          Link account…
+          {t("hub.team.memberDetail.chat.linkAccount")}
         </Button>
       ) : null,
-    [open, operator, pending],
+    [open, operator, pending, t],
   );
-  const header = useMemo(() => ({ title: `Link a chat account to ${member.name}` }), [member.name]);
+  const header = useMemo(
+    () => ({ title: t("hub.team.memberDetail.chat.linkTitle", { name: member.name }) }),
+    [member.name, t],
+  );
   return (
-    <SettingsSection title="Chat accounts" info={INFO} trailing={linkButton}>
+    <SettingsSection
+      title={t("hub.team.memberDetail.chat.title")}
+      info={t("hub.team.memberDetail.chat.info")}
+      trailing={linkButton}
+    >
       <View style={settingsStyles.card}>
         {identities.length === 0 ? (
           <View style={[settingsStyles.row, tableStyles.body]}>
-            <Text style={settingsStyles.rowHint}>No chat accounts linked yet.</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.team.memberDetail.chat.none")}</Text>
           </View>
         ) : (
           identities.map((identity, index) => (
@@ -91,8 +97,11 @@ export function MemberChatAccounts({
                 </Text>
                 <Text style={settingsStyles.rowHint}>
                   {identity.displayName === null || identity.displayName === undefined
-                    ? `Account ${identity.externalSubjectId}`
-                    : `${identity.displayName} · ${identity.externalSubjectId}`}
+                    ? t("hub.team.memberDetail.chat.account", { id: identity.externalSubjectId })
+                    : t("hub.team.memberDetail.chat.namedAccount", {
+                        name: identity.displayName,
+                        id: identity.externalSubjectId,
+                      })}
                 </Text>
               </View>
               <IdentityMenu identity={identity} pending={pending} unlink={unlink} />
@@ -124,20 +133,23 @@ function IdentityMenu({
   pending: boolean;
   unlink(id: string): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const items = useMemo(
     () => [
       {
-        label: "Unlink",
+        label: t("hub.team.memberDetail.chat.unlink"),
         destructive: true,
         disabled: pending,
         onSelect: () => void unlink(identity.id),
       },
     ],
-    [identity.id, pending, unlink],
+    [identity.id, pending, t, unlink],
   );
   return (
     <RowActionsMenu
-      label={`Actions for ${identity.displayName ?? identity.externalSubjectId}`}
+      label={t("hub.team.actions.actionsFor", {
+        name: identity.displayName ?? identity.externalSubjectId,
+      })}
       actions={items}
       disabled={pending}
     />

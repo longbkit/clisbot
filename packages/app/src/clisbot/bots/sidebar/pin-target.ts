@@ -1,4 +1,5 @@
 import type { ResourcePin } from "./pins";
+import { i18n } from "@/i18n/i18next";
 import type { BotPayload, ChatPayload } from "../data/contracts";
 import type { HostTagged } from "../data/aggregate";
 import type { SidebarProjectEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -31,7 +32,10 @@ export function resolvePinTarget(
   if (pin.kind === "chat") {
     const chat = catalog.chats.find((c) => c.serverId === pin.serverId && c.id === pin.id);
     return chat
-      ? { title: chat.title || "Group chat", route: buildHostChatRoute(pin.serverId, pin.id) }
+      ? {
+          title: chat.title || i18n.t("bots.workspace.sidebar.groupChat"),
+          route: buildHostChatRoute(pin.serverId, pin.id),
+        }
       : null;
   }
   if (pin.kind === "project") {
@@ -54,7 +58,7 @@ export function resolvePinTarget(
   );
   return agent && accessible && !agent.archivedAt
     ? {
-        title: agent.title || "Session",
+        title: agent.title || i18n.t("bots.workspace.sidebar.session"),
         route: buildHostAgentDetailRoute(pin.serverId, pin.id, agent.workspaceId ?? undefined),
       }
     : null;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createDeviceKey, digest } from "@clisbot/device-access/proof";
 import type { DaemonClientConfig } from "@clisbot/client/internal/daemon-client";
 import { readSecret, writeSecret, lockSecret } from "./secret-storage";
+import { i18n } from "@/i18n/i18next";
 
 const CredentialSchema = z.object({
   backendId: z.string(),
@@ -24,7 +25,8 @@ export async function readDeviceCredential(
   const value = await readSecret(storageKey(backendId));
   if (!value) return null;
   const credential = CredentialSchema.parse(JSON.parse(value));
-  if (credential.backendId !== backendId) throw new Error("Device credential identity mismatch");
+  if (credential.backendId !== backendId)
+    throw new Error(i18n.t("hub.connection.errors.credentialMismatch"));
   return credential;
 }
 
@@ -48,14 +50,14 @@ export async function prepareDeviceLogin(backendId: string): Promise<StoredDevic
     return current ?? { backendId, key: createDeviceKey(await Crypto.getRandomBytesAsync(32)) };
   });
   const credential = await readDeviceCredential(backendId);
-  if (!credential) throw new Error("Device key could not be saved");
+  if (!credential) throw new Error(i18n.t("hub.connection.errors.keyNotSaved"));
   return credential;
 }
 
 export async function saveDeviceCredential(backendId: string, credentialId: string): Promise<void> {
   await updateCredential(backendId, async () => {
     const current = await readDeviceCredential(backendId);
-    if (!current) throw new Error("Device key unavailable; pair this device again");
+    if (!current) throw new Error(i18n.t("hub.connection.errors.keyUnavailable"));
     return { backendId, key: current.key, credentialId };
   });
 }
@@ -84,7 +86,7 @@ export async function daemonDeviceAccess(
   pairing = false,
 ): Promise<NonNullable<DaemonClientConfig["deviceAccess"]>> {
   const credential = await readDeviceCredential(backendId);
-  if (!credential) throw new Error("Device credential unavailable; pair this Host again");
+  if (!credential) throw new Error(i18n.t("hub.connection.errors.credentialUnavailable"));
   return {
     ...credential,
     ...(pairing && credential.invitationLabel ? { label: credential.invitationLabel } : {}),

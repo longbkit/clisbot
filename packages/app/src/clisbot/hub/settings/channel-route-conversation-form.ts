@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import {
   CONTEXT_MAX_MESSAGES_CEILING,
   DEFAULT_CHANNEL_BATCHING,
@@ -41,10 +42,17 @@ export type ParsedRouteConversation =
   | { valid: true; value: ChannelRouteConversation; errors: RouteConversationErrors }
   | { valid: false; errors: RouteConversationErrors };
 
-const WHOLE_NUMBER_ERROR = "Use a positive whole number.";
-const CONTEXT_MESSAGES_ERROR = `Use a whole number from 0 to ${String(CONTEXT_MAX_MESSAGES_CEILING)}.`;
-const SECONDS_ERROR = "Use a number of seconds above 0.";
-const MAX_WAIT_ERROR = "Must be longer than the pause.";
+/** The section's field errors, in the reader's language when they show. */
+function conversationErrors() {
+  return {
+    wholeNumber: i18n.t("hub.routes.conversation.errors.wholeNumber"),
+    contextMessages: i18n.t("hub.routes.conversation.errors.contextMessages", {
+      max: String(CONTEXT_MAX_MESSAGES_CEILING),
+    }),
+    seconds: i18n.t("hub.routes.conversation.errors.seconds"),
+    maxWait: i18n.t("hub.routes.conversation.errors.maxWait"),
+  };
+}
 
 /**
  * Opens the draft from the stored Route and what it inherits
@@ -117,7 +125,7 @@ export function parseRouteConversationDraft(
   const maxMessagesInvalid = draft.maxMessages !== undefined && maxMessages === undefined;
   const batching = draft.batching === "on" ? parseBatching(shownBatchingFields(draft)) : null;
   const errors: RouteConversationErrors = {
-    ...(maxMessagesInvalid ? { maxMessages: CONTEXT_MESSAGES_ERROR } : {}),
+    ...(maxMessagesInvalid ? { maxMessages: conversationErrors().contextMessages } : {}),
     batching: batching !== null && !batching.valid ? batching.errors : {},
   };
   if (maxMessagesInvalid || (batching !== null && !batching.valid)) {
@@ -142,13 +150,14 @@ function parseBatching(
   const pauseSeconds = seconds(fields.pauseSeconds);
   const maxWaitSeconds = seconds(fields.maxWaitSeconds);
   const maxMessages = wholeNumber(fields.maxMessages);
+  const text = conversationErrors();
   const errors: BatchingErrors = {
-    ...(pauseSeconds === undefined ? { pauseSeconds: SECONDS_ERROR } : {}),
-    ...(maxWaitSeconds === undefined ? { maxWaitSeconds: SECONDS_ERROR } : {}),
+    ...(pauseSeconds === undefined ? { pauseSeconds: text.seconds } : {}),
+    ...(maxWaitSeconds === undefined ? { maxWaitSeconds: text.seconds } : {}),
     ...(pauseSeconds !== undefined && maxWaitSeconds !== undefined && maxWaitSeconds <= pauseSeconds
-      ? { maxWaitSeconds: MAX_WAIT_ERROR }
+      ? { maxWaitSeconds: text.maxWait }
       : {}),
-    ...(maxMessages === undefined ? { maxMessages: WHOLE_NUMBER_ERROR } : {}),
+    ...(maxMessages === undefined ? { maxMessages: text.wholeNumber } : {}),
   };
   if (pauseSeconds === undefined || maxWaitSeconds === undefined || maxMessages === undefined) {
     return { valid: false, errors };

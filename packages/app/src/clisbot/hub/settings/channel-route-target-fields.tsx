@@ -1,7 +1,9 @@
 import { AutomationInputDraftContext } from "./automation-input-draft";
 import { useContext } from "react";
 import { AutomationReplyNavigationContext } from "./automation-reply-navigation";
+import type { TFunction } from "i18next";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ChoiceRow } from "./channel-route-behavior-rows";
 import { Text, View } from "react-native";
 import { Alert } from "@/components/ui/alert";
@@ -19,15 +21,16 @@ import {
 import { workspaceConfigurationFromTarget } from "../workspace-configuration";
 import { selectedOptionDisplay } from "./channel-identity-form-parts";
 import { type HubAutomation, type RecordValue, type RouteTarget } from "./channel-settings-types";
-import { MANAGED_BY_ORGANIZATION, routeTargetSummary } from "./channel-settings-records";
+import { routeTargetSummary } from "./channel-settings-records";
 import { parseOptionalObject } from "./channel-route-form-state";
 
-const ROUTE_TARGET_LABELS = {
-  bot: "Start or continue a Bot",
-  agent: "Start or continue an Agent",
-  automation: "Run an Automation",
-};
-const EXPERIMENTAL_ROUTE_TARGET_NOTE = "Experimental";
+function routeTargetLabels(t: TFunction) {
+  return {
+    bot: t("hub.routes.target.choices.bot"),
+    agent: t("hub.routes.target.choices.agent"),
+    automation: t("hub.routes.target.choices.automation"),
+  };
+}
 /**
  * What a Connection Admin sees for the target: the Route keeps the Agent or
  * Automation it has, since the shared resource file that defines it is the
@@ -47,32 +50,36 @@ export function ChannelRouteAdminTarget({
   onChange(index: string | null): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const options = useMemo<SelectFieldOption<string>[]>(
     () =>
       routes.map((route, index) => ({
         id: String(index),
         value: String(index),
-        label: `Same as Route ${String(index + 1)} · ${routeTargetSummary(route)}`,
+        label: t("hub.routes.target.sameAsRoute", {
+          number: index + 1,
+          target: routeTargetSummary(route),
+        }),
       })),
-    [routes],
+    [routes, t],
   );
   if (editedRoute !== undefined)
     return (
-      <Field label="Target" hint={MANAGED_BY_ORGANIZATION}>
+      <Field label={t("hub.routes.target.label")} hint={t("hub.routes.target.managed")}>
         <Text style={settingsStyles.rowTitle}>{routeTargetSummary(editedRoute)}</Text>
       </Field>
     );
   return (
     <SelectField
-      label="Target"
-      hint={`${MANAGED_BY_ORGANIZATION}. Pick the target of a Route this account already runs.`}
+      label={t("hub.routes.target.label")}
+      hint={t("hub.routes.target.managedPick")}
       value={selectedIndex}
       selectedDisplay={selectedOptionDisplay(options, selectedIndex)}
       options={options}
       onChange={onChange}
-      placeholder="Choose a target"
-      emptyText="This account has no Route to copy a target from."
-      title="Target"
+      placeholder={t("hub.routes.target.choose")}
+      emptyText={t("hub.routes.target.noRouteToCopy")}
+      title={t("hub.routes.target.label")}
       disabled={disabled}
     />
   );
@@ -85,6 +92,7 @@ export function AutomationReplyAuthority({
   automation: HubAutomation | undefined;
   channel: string | undefined;
 }) {
+  const { t } = useTranslation();
   const configureReplies = useContext(AutomationReplyNavigationContext);
   const inputDraft = useContext(AutomationInputDraftContext);
   if (inputDraft || automation === undefined || channel === undefined) return null;
@@ -94,24 +102,27 @@ export function AutomationReplyAuthority({
       <View>
         <Alert
           variant="warning"
-          title="This Automation has no Channel reply output"
+          title={t("hub.routes.target.noReplyOutputTitle")}
           description={
             configureReplies
-              ? "The run can start, but it cannot reply to this conversation. Configure a reply output, then save the Automation."
-              : `Open ${automation.name} in Automations, choose Configuration, enable ${channel} replies on the step that responds, then save.`
+              ? t("hub.routes.target.configureDescription")
+              : t("hub.routes.target.openDescription", { automation: automation.name, channel })
           }
         />
         {configureReplies ? (
           <Button size="sm" variant="outline" onPress={configureReplies}>
-            Configure reply output
+            {t("hub.routes.target.configureReplyOutput")}
           </Button>
         ) : null}
       </View>
     );
   return (
-    <Text
-      style={settingsStyles.rowHint}
-    >{`Output target: source conversation. Automation allows ${grant.max ?? "unlimited"} ${channel} replies per run, subject to this Route’s reply policy.`}</Text>
+    <Text style={settingsStyles.rowHint}>
+      {t("hub.routes.target.outputTarget", {
+        max: String(grant.max ?? t("hub.routes.target.unlimited")),
+        channel,
+      })}
+    </Text>
   );
 }
 
@@ -168,14 +179,15 @@ export function RouteTargetFields({
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <ChoiceRow
-        label="What should happen"
+        label={t("hub.routes.target.whatShouldHappen")}
         values={targetValues}
         selected={target}
-        labels={ROUTE_TARGET_LABELS}
-        note={target === "automation" ? EXPERIMENTAL_ROUTE_TARGET_NOTE : undefined}
+        labels={routeTargetLabels(t)}
+        note={target === "automation" ? t("hub.routes.target.experimental") : undefined}
         onChange={changeTarget}
         disabled={pending}
       />
@@ -235,18 +247,19 @@ function AutomationTargetFields({
   automationCreateError: string | null;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <SelectField
-        label="Automation"
+        label={t("hub.routes.target.automation")}
         value={automationName}
         selectedDisplay={automationDisplay}
         options={automationOptions}
         onChange={setAutomationName}
-        placeholder="Choose an Automation"
-        emptyText="No Automation is available yet."
+        placeholder={t("hub.routes.target.chooseAutomation")}
+        emptyText={t("hub.routes.target.noAutomation")}
         searchable={automationOptions.length > 6}
-        title="Automation"
+        title={t("hub.routes.target.automation")}
         disabled={pending || automationCreatePending}
       />
       <Button
@@ -255,11 +268,9 @@ function AutomationTargetFields({
         disabled={pending || automationCreatePending || showAutomationCreator}
         onPress={showAutomationForm}
       >
-        Create Automation
+        {t("hub.routes.target.createAutomation")}
       </Button>
-      <Text style={settingsStyles.rowHint}>
-        The new Automation is selected here without clearing this Route draft.
-      </Text>
+      <Text style={settingsStyles.rowHint}>{t("hub.routes.target.createHint")}</Text>
       {automationCreateError ? <Alert variant="error" title={automationCreateError} /> : null}
     </>
   );
@@ -296,6 +307,7 @@ function AgentTargetFields({
   setAgentConfiguration(value: ManagedAgentConfigurationValue): void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const workspaceField = useMemo(
     () => ({ value: workspace, onChange: setWorkspace }),
     [setWorkspace, workspace],
@@ -303,15 +315,15 @@ function AgentTargetFields({
   return (
     <>
       <SelectField
-        label="Host"
+        label={t("hub.routes.target.host")}
         value={daemonId}
         selectedDisplay={daemonDisplay}
         options={daemonOptions}
         onChange={changeDaemon}
-        placeholder="Choose a Host"
-        emptyText="Enroll a Daemon first."
+        placeholder={t("hub.routes.target.chooseHost")}
+        emptyText={t("hub.routes.target.enrollDaemon")}
         searchable={daemonOptions.length > 6}
-        title="Host"
+        title={t("hub.routes.target.host")}
         disabled={pending}
       />
       <DaemonProjectField
@@ -354,9 +366,10 @@ export function AgentAdvancedFields({
   setProviderOptions(value: string): void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const providerOptionsError = parsedProviderOptions.valid
     ? null
-    : 'Enter a JSON object, for example {"setting": true}.';
+    : t("hub.routes.target.providerOptionsError");
   return (
     <>
       <ManagedAgentFastModeSwitch
@@ -366,8 +379,8 @@ export function AgentAdvancedFields({
         disabled={pending}
       />
       <Field
-        label="Provider options"
-        hint="Optional JSON object for provider-specific settings."
+        label={t("hub.routes.target.providerOptions")}
+        hint={t("hub.routes.target.providerOptionsHint")}
         error={providerOptionsError}
       >
         <FormTextInput

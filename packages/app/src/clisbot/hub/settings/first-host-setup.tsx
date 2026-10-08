@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { AddHostModal } from "@/components/add-host-modal";
@@ -14,6 +15,7 @@ import { buildHubSettingsRoute } from "../navigation";
 
 /** Account is the post-sign-in destination when no Host can be opened yet. */
 export function FirstHostSetup() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const inventory = useHostInventory();
   const router = useRouter();
@@ -35,21 +37,21 @@ export function FirstHostSetup() {
   if (inventory.hosts.length > 0 || (inventory.daemons.data?.daemons.length ?? 0) > 0) return null;
   if (inventory.status === "loading") {
     return (
-      <SettingsSection title="Your Hosts">
-        <Text style={settingsStyles.rowHint}>Checking your Hosts…</Text>
+      <SettingsSection title={t("hub.settings.firstHostSetup.yourHosts")}>
+        <Text style={settingsStyles.rowHint}>{t("hub.settings.firstHostSetup.checking")}</Text>
       </SettingsSection>
     );
   }
   if (inventory.status === "error") {
     return (
-      <SettingsSection title="Your Hosts">
+      <SettingsSection title={t("hub.settings.firstHostSetup.yourHosts")}>
         <Alert
           variant="error"
-          title="Could not load your Hosts"
+          title={t("hub.settings.firstHostSetup.loadFailed")}
           description={inventory.error ?? undefined}
         >
           <Button size="sm" variant="outline" onPress={inventory.retry}>
-            Retry
+            {t("hub.settings.firstHostSetup.retry")}
           </Button>
         </Alert>
       </SettingsSection>
@@ -58,36 +60,40 @@ export function FirstHostSetup() {
   const canManage = hub.signedIn.capabilities.manageResources;
   return (
     <>
-      <SettingsSection title="Add your first Host">
-        <Text style={settingsStyles.rowHint}>
-          A Host is a computer running Clisbot and your AI agents. Choose how to connect it to start
-          working.
-        </Text>
+      <SettingsSection title={t("hub.settings.firstHostSetup.title")}>
+        <Text style={settingsStyles.rowHint}>{t("hub.settings.firstHostSetup.intro")}</Text>
         <View style={settingsStyles.card}>
           <View style={styles.option}>
-            <Text style={settingsStyles.rowTitle}>Managed Host</Text>
+            <Text style={settingsStyles.rowTitle}>
+              {t("hub.settings.firstHostSetup.managedTitle")}
+            </Text>
             <Text style={settingsStyles.rowHint}>
               {canManage
-                ? `Add a computer to ${hub.signedIn.organization.name}. Manage who can use its Projects and agents through Hub.`
-                : "Use a Host shared by your organization. Ask an owner or admin to add one or grant you access."}
+                ? t("hub.settings.firstHostSetup.managedCanManage", {
+                    organization: hub.signedIn.organization.name,
+                  })
+                : t("hub.settings.firstHostSetup.managedShared")}
             </Text>
             <View style={styles.actions}>
               <Button onPress={openManaged}>
-                {canManage ? "Add via Hub" : "View shared Hosts"}
+                {canManage
+                  ? t("hub.settings.firstHostSetup.addViaHub")
+                  : t("hub.settings.firstHostSetup.viewShared")}
               </Button>
             </View>
           </View>
         </View>
         <View style={settingsStyles.card}>
           <View style={styles.option}>
-            <Text style={settingsStyles.rowTitle}>Direct Host</Text>
+            <Text style={settingsStyles.rowTitle}>
+              {t("hub.settings.firstHostSetup.directTitle")}
+            </Text>
             <Text style={settingsStyles.rowHint}>
-              Connect to a computer by address and save it on this device. Have its address and
-              daemon password ready, if required.
+              {t("hub.settings.firstHostSetup.directDescription")}
             </Text>
             <View style={styles.actions}>
               <Button variant="outline" onPress={openDirect}>
-                Connect directly
+                {t("hub.settings.firstHostSetup.connectDirectly")}
               </Button>
             </View>
           </View>

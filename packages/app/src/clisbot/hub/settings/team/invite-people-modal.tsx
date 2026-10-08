@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
@@ -19,7 +21,6 @@ import {
 import { useCreateTeamChoice } from "./use-create-team-choice";
 import type { TeamActions } from "./use-team-actions";
 
-const HEADER: SheetHeader = { title: "Invite people" };
 const NO_TEAMS: HubTeam[] = [];
 
 /**
@@ -41,6 +42,8 @@ export function InvitePeopleModal({
   close(): void;
   onDone(result: string): void;
 }) {
+  const { t } = useTranslation();
+  const header = useMemo<SheetHeader>(() => ({ title: t("hub.team.invite.title") }), [t]);
   const draftState = useInviteDraft(request);
   const invitations = hub.signedIn?.team?.invitations;
   const { plan, unknown, ready } = useInvitePlan(
@@ -67,20 +70,20 @@ export function InvitePeopleModal({
     () => (
       <View style={styles.footer}>
         <Button variant="secondary" disabled={actions.pending} onPress={close}>
-          Cancel
+          {t("common.actions.cancel")}
         </Button>
         <Button variant="default" disabled={!ready} loading={actions.pending} onPress={submit}>
           {submitLabel(plan)}
         </Button>
       </View>
     ),
-    [actions.pending, close, plan, ready, submit],
+    [actions.pending, close, plan, ready, submit, t],
   );
   const preview = invitePreview(plan, teams);
   const notes = pendingInvitationNotes(plan, draftState.draft.role);
   return (
     <AdaptiveModalSheet
-      header={HEADER}
+      header={header}
       visible
       onClose={close}
       footer={footer}
@@ -99,10 +102,14 @@ export function InvitePeopleModal({
         {preview.length === 0 ? null : <Alert variant="info" title={preview} />}
         <InviteAccessNote resources={resources} teamIds={plan.teamIds} />
         {notes.length === 0 ? null : (
-          <Alert variant="warning" title="Already invited" description={notes.join("\n")} />
+          <Alert
+            variant="warning"
+            title={t("hub.team.invite.alreadyInvited")}
+            description={notes.join("\n")}
+          />
         )}
         {plan.members.length > 0 && plan.teamIds.length === 0 ? (
-          <Text style={settingsStyles.rowHint}>Choose at least one Team for existing Members.</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.team.invite.chooseTeam")}</Text>
         ) : null}
         {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
       </View>
@@ -113,9 +120,16 @@ export function InvitePeopleModal({
 function submitLabel(plan: TeamAdditionPlan): string {
   const adds = plan.teamIds.length > 0 ? plan.members.length : 0;
   const invites = plan.invitees.length;
-  if (adds > 0 && invites > 0) return `Add ${String(adds)} and invite ${String(invites)}`;
-  if (invites > 0) return invites > 1 ? `Send ${String(invites)} invitations` : "Send invitation";
-  return adds > 1 ? `Add ${String(adds)} Members` : "Add to Teams";
+  if (adds > 0 && invites > 0)
+    return i18n.t("hub.team.invite.submit.addAndInvite", { adds, invites });
+  if (invites > 0) {
+    return invites > 1
+      ? i18n.t("hub.team.invite.submit.send", { count: invites })
+      : i18n.t("hub.team.invite.submit.sendOne");
+  }
+  return adds > 1
+    ? i18n.t("hub.team.invite.submit.addMembers", { count: adds })
+    : i18n.t("hub.team.invite.submit.addToTeams");
 }
 
 const styles = StyleSheet.create((theme) => ({

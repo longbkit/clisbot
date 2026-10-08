@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react-native";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ComposioKeyRow } from "./composio-key-row";
@@ -25,6 +26,7 @@ export function ConnectorsMaster({
   screen: ReturnType<typeof useConnectorsScreen>;
   onAddServer(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.master}>
       {hosts.length > 1 ? (
@@ -33,17 +35,19 @@ export function ConnectorsMaster({
       {screen.settings.error ? (
         <Alert
           variant="error"
-          title="Connectors are unavailable"
+          title={t("connectors.screen.master.unavailable")}
           description={screen.settings.error.message}
         />
       ) : null}
       {screen.accounts.error ? (
         <Alert
           variant="warning"
-          title="Connected accounts could not be read"
+          title={t("connectors.screen.master.accountsUnreadable")}
           description={
             screen.accounts.data
-              ? `Showing the accounts read last. ${screen.accounts.error.message}`
+              ? t("connectors.screen.master.accountsStale", {
+                  message: screen.accounts.error.message,
+                })
               : screen.accounts.error.message
           }
         />
@@ -51,7 +55,7 @@ export function ConnectorsMaster({
       {screen.catalog.error ? (
         <Alert
           variant="warning"
-          title="The app catalog could not be read"
+          title={t("connectors.screen.master.catalogUnreadable")}
           description={screen.catalog.error.message}
         />
       ) : null}
@@ -76,7 +80,7 @@ export function ConnectorsMaster({
             onPress={onAddServer}
             testID="connectors-add-mcp"
           >
-            Add MCP server
+            {t("connectors.screen.common.addMcpServer")}
           </Button>
         </View>
       ) : null}

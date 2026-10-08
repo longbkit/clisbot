@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { create } from "zustand";
 import { router } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import { useSessionStore } from "@/stores/session-store";
 import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { botsSessionScope } from "../data/session-scope";
@@ -34,6 +35,7 @@ export function BackToChatAction({
   serverId: string;
   workspaceId: string;
 }) {
+  const { t } = useTranslation();
   const origin = useCoworkOrigin((state) => state.origin);
   const snapshot = useHostRuntimeSnapshot(serverId);
   const goBack = useCallback(() => {
@@ -48,5 +50,12 @@ export function BackToChatAction({
     origin.scope !== botsSessionScope(snapshot)
   )
     return null;
-  return <ChatHeaderAction label="Back to chat" text="Chat" icon={ArrowLeft} onPress={goBack} />;
+  return (
+    <ChatHeaderAction
+      label={t("bots.chat.cowork.backToChat")}
+      text={t("bots.chat.common.chat")}
+      icon={ArrowLeft}
+      onPress={goBack}
+    />
+  );
 }

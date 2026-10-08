@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type {
   ConnectorAccount,
   ConnectorAppState,
@@ -41,6 +42,7 @@ export function ConnectorAppDetail({
   accountsError: Error | null;
   uses: ConnectorUse[];
 }) {
+  const { t } = useTranslation();
   const accounts = app?.accounts ?? [];
   const connect = useConnectAccount(serverId, item.slug);
   const tools = useConnectorTools(
@@ -50,8 +52,8 @@ export function ConnectorAppDetail({
   const needsName = accounts.length > 0;
   const subtitle = [
     item.description,
-    item.toolsCount ? `${item.toolsCount} tools` : null,
-    "via Composio",
+    item.toolsCount ? t("connectors.screen.common.toolCount", { count: item.toolsCount }) : null,
+    t("connectors.screen.appDetail.viaComposio"),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -63,7 +65,9 @@ export function ConnectorAppDetail({
       onPress={needsName ? connect.askName : connect.start}
       testID="connectors-connect"
     >
-      {needsName ? "Connect another account" : "Connect"}
+      {needsName
+        ? t("connectors.screen.appDetail.connectAnother")
+        : t("connectors.screen.common.connect")}
     </Button>
   );
   return (
@@ -97,8 +101,8 @@ export function ConnectorAppDetail({
         uses={uses}
         empty={
           appState(accounts) === "connected"
-            ? `Nothing uses ${item.name} yet. Add it in a Bot's or Project's settings → Connectors.`
-            : `Connect an account, then add ${item.name} to a Bot or Project.`
+            ? t("connectors.screen.common.usedByEmpty", { name: item.name })
+            : t("connectors.screen.appDetail.usedByEmptyNotConnected", { name: item.name })
         }
       />
       <ToolsSection
@@ -126,6 +130,7 @@ function ConnectFeedback({
   /** An account still waits for its sign-in; once none does, the link is no longer needed. */
   waiting: boolean;
 }) {
+  const { t } = useTranslation();
   if (connect.error) {
     return (
       <Text accessibilityRole="alert" style={[settingsStyles.rowError, styles.feedback]}>
@@ -138,10 +143,8 @@ function ConnectFeedback({
     <View style={[settingsStyles.card, styles.feedback]}>
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>Finish signing in in your browser</Text>
-          <Text style={settingsStyles.rowHint}>
-            The page did not open, or you closed it? Open it again; the link works for ten minutes.
-          </Text>
+          <Text style={settingsStyles.rowTitle}>{t("connectors.screen.common.finishSignIn")}</Text>
+          <Text style={settingsStyles.rowHint}>{t("connectors.screen.appDetail.reopenHint")}</Text>
         </View>
         <Button
           size="sm"
@@ -149,7 +152,7 @@ function ConnectFeedback({
           onPress={connect.reopen}
           testID="connectors-reopen-sign-in"
         >
-          Open sign-in
+          {t("connectors.screen.appDetail.openSignIn")}
         </Button>
       </View>
     </View>
@@ -167,18 +170,19 @@ function AccountsSection({
   error: Error | null;
   onRetry(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <SettingsSection
-      title="Accounts"
-      info="Up to five accounts per app. Bots and Projects use the accounts you connect here."
+      title={t("connectors.screen.common.accounts")}
+      info={t("connectors.screen.appDetail.accountsInfo")}
     >
       <View style={settingsStyles.card}>
         {accounts.length === 0 ? (
           <View style={settingsStyles.row}>
             <Text style={error ? settingsStyles.rowError : settingsStyles.rowHint}>
               {error
-                ? `Accounts could not be read from Composio: ${error.message}`
-                : "No account connected. Connect opens the sign-in in your browser."}
+                ? t("connectors.screen.appDetail.accountsUnreadable", { message: error.message })
+                : t("connectors.screen.appDetail.noAccount")}
             </Text>
           </View>
         ) : (
@@ -208,6 +212,7 @@ function AccountRow({
   bordered: boolean;
   onRetry(): void;
 }) {
+  const { t } = useTranslation();
   const state = accountState(account);
   const [error, setError] = useState<string | null>(null);
   const check = useCallback(
@@ -216,9 +221,9 @@ function AccountRow({
   );
   const disconnect = useCallback(async () => {
     const confirmed = await confirmDialog({
-      title: `Disconnect ${accountLabel(account)}?`,
-      message: "Agents lose access to this account at once. Composio revokes the sign-in.",
-      confirmLabel: "Disconnect",
+      title: t("connectors.screen.appDetail.disconnectTitle", { account: accountLabel(account) }),
+      message: t("connectors.screen.appDetail.disconnectMessage"),
+      confirmLabel: t("connectors.screen.appDetail.disconnect"),
       destructive: true,
     });
     if (!confirmed) return;
@@ -226,7 +231,7 @@ function AccountRow({
     await removeAccount(serverId, account.id).catch((cause: unknown) =>
       setError(toErrorMessage(cause)),
     );
-  }, [account, serverId]);
+  }, [account, serverId, t]);
   const disconnectPress = useCallback(() => void disconnect(), [disconnect]);
   return (
     <View
@@ -246,16 +251,16 @@ function AccountRow({
         <StatusBadge label={ACCOUNT_STATUS_LABELS[state]} variant={APP_STATE_VARIANTS[state]} />
         {state === "pending" ? (
           <Button size="xs" variant="outline" onPress={check}>
-            Check status
+            {t("connectors.screen.appDetail.checkStatus")}
           </Button>
         ) : null}
         {state === "attention" ? (
           <Button size="xs" variant="outline" onPress={onRetry}>
-            Sign in again
+            {t("connectors.screen.common.signInAgain")}
           </Button>
         ) : null}
         <Button size="xs" variant="ghost" onPress={disconnectPress}>
-          Disconnect
+          {t("connectors.screen.appDetail.disconnect")}
         </Button>
       </View>
     </View>

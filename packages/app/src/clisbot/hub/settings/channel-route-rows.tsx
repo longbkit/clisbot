@@ -1,7 +1,9 @@
 import { useChannelRouteWarnings } from "./channel-settings-hooks";
 import { routeAudienceDraft, type InheritedConditions } from "./channel-route-audience";
 import { ruleSummary, type AudienceNames } from "./channel-route-rule-summary";
+import type { TFunction } from "i18next";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { hostConnectionPresentation } from "@/clisbot/hub/channel-host-connection";
 import { useRouteHost } from "./route-host-context";
@@ -62,6 +64,7 @@ export function ChannelAccountRouteList({
   /** Offered on the empty row: a Connection's first Route. */
   addRoute?: () => void;
 }) {
+  const { t } = useTranslation();
   const inherited = useMemo(
     () =>
       inheritedRuleConditions([
@@ -80,7 +83,7 @@ export function ChannelAccountRouteList({
     return (
       <View style={settingsStyles.rowBorder}>
         {addRoute === undefined ? (
-          <EmptyRow message={NO_ROUTES_MESSAGE} />
+          <EmptyRow message={t("hub.routes.rows.noRoutes")} />
         ) : (
           <NoRoutesRow pending={pending} addRoute={addRoute} />
         )}
@@ -150,6 +153,7 @@ function ChannelRouteRow({
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const names = useAudienceNames(metadata);
   const [showWarnings, setShowWarnings] = useState(false);
@@ -171,14 +175,17 @@ function ChannelRouteRow({
     stringField(account, "accountId"),
     routeIndex,
   );
-  const ordinal = routeCount > 1 ? `Route ${String(routeIndex + 1)} · ` : "";
   const rowStyle = [settingsStyles.row, settingsStyles.rowBorder, styles.routeRow];
   // A Route is where messages go: named by its destination, its Rules under it.
   const body = (
     <>
       <View style={[channelRowStyles.row, compact && channelRowStyles.stackedRow]}>
         <View style={settingsStyles.rowContent}>
-          <RouteDestinationLine prefix={ordinal} route={route} resource={resource} />
+          <RouteDestinationLine
+            number={routeCount > 1 ? routeIndex + 1 : null}
+            route={route}
+            resource={resource}
+          />
           {routeRuleLines(route, names, inherited).map(({ id, line }) => (
             <Text key={id} style={styles.routeRule} numberOfLines={compact ? 2 : 1}>
               {line}
@@ -195,11 +202,11 @@ function ChannelRouteRow({
                 onPressIn={keepPressInControl}
                 onPress={toggleWarnings}
               >
-                {warningCount(warnings.length)}
+                {t("hub.routes.rows.warnings", { count: warnings.length })}
               </Button>
             )}
             <ChannelActionsMenu
-              label={`Actions for Route ${String(routeIndex + 1)}`}
+              label={t("hub.routes.rows.actions", { number: routeIndex + 1 })}
               disabled={pending}
               actions={menu.actions}
               remove={menu.remove}
@@ -211,7 +218,7 @@ function ChannelRouteRow({
       {showWarnings ? (
         <Alert
           variant="warning"
-          title={warningCount(warnings.length)}
+          title={t("hub.routes.rows.warnings", { count: warnings.length })}
           description={warnings.join("\n")}
         />
       ) : null}
@@ -220,7 +227,11 @@ function ChannelRouteRow({
   if (!canManage) return <View style={rowStyle}>{body}</View>;
   return (
     <DrillRow
-      label={automationScoped ? "Edit input and replies" : `Edit Route ${String(routeIndex + 1)}`}
+      label={
+        automationScoped
+          ? t("hub.routes.rows.editInput")
+          : t("hub.routes.editor.editRoute", { number: routeIndex + 1 })
+      }
       style={rowStyle}
       disabled={pending}
       onPress={edit}
@@ -228,10 +239,6 @@ function ChannelRouteRow({
       {body}
     </DrillRow>
   );
-}
-
-function warningCount(count: number): string {
-  return `${String(count)} warning${count === 1 ? "" : "s"}`;
 }
 
 /** Reordering lives in the Route's menu, offered only where there is an order. */
@@ -250,6 +257,7 @@ function useRouteMenu({
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
+  const { t } = useTranslation();
   return useMemo(() => {
     const reorder = !automationScoped && routeCount > 1;
     return {
@@ -257,7 +265,7 @@ function useRouteMenu({
         ...(reorder && routeIndex > 0
           ? [
               {
-                label: "Move up",
+                label: t("hub.routes.rows.moveUp"),
                 icon: ArrowUp,
                 onSelect: () => void moveRoute(account, routeIndex, routeIndex - 1),
               },
@@ -266,7 +274,7 @@ function useRouteMenu({
         ...(reorder && routeIndex < routeCount - 1
           ? [
               {
-                label: "Move down",
+                label: t("hub.routes.rows.moveDown"),
                 icon: ArrowDown,
                 onSelect: () => void moveRoute(account, routeIndex, routeIndex + 1),
               },
@@ -275,7 +283,7 @@ function useRouteMenu({
       ],
       remove: () => void removeRoute(account, routeIndex),
     };
-  }, [account, automationScoped, moveRoute, removeRoute, routeCount, routeIndex]);
+  }, [account, automationScoped, moveRoute, removeRoute, routeCount, routeIndex, t]);
 }
 
 /**
@@ -288,21 +296,25 @@ function useRouteMenu({
  * runs on. A Host the Hub cannot reach is the one fact that gets a badge.
  */
 function RouteDestinationLine({
-  prefix,
+  number,
   route,
   resource,
 }: {
-  prefix: string;
+  /** Shown only when the Connection has more than one Route. */
+  number: number | null;
   route: RecordValue;
   resource: RecordValue;
 }) {
+  const { t } = useTranslation();
   const host = useRouteHost(route);
   const offline = host !== null && !host.connected;
-  const where = host === null || offline ? "" : ` · on ${host.label}`;
+  const target = routeTargetLabel(t, route, resource);
+  const destination =
+    host === null || offline ? target : t("hub.routes.rows.onHost", { target, host: host.label });
   return (
     <View style={styles.routeDetail}>
       <Text style={[styles.routeTitle, styles.routeDetailText]} numberOfLines={2}>
-        {`${prefix}${routeTargetLabel(route, resource)}${where}`}
+        {number === null ? destination : t("hub.routes.rows.numbered", { number, destination })}
       </Text>
       {offline ? <StatusBadge {...hostConnectionPresentation(host)} /> : null}
     </View>
@@ -311,12 +323,15 @@ function RouteDestinationLine({
 
 /** How the Route replies and asks: the Reply method, the permission choice, and limits once set. */
 function RouteDetailLine({ route }: { route: RecordValue }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const { behavior } = routeBehaviorDraft(route);
   const facts = [
-    behavior.outboundPathInherited === true ? null : ROUTE_REPLY_SHORT[behavior.outboundPath],
+    behavior.outboundPathInherited === true ? null : routeReplyShort(t, behavior.outboundPath),
     routeToolRequestSummary(route),
-    Object.keys(objectField(route, "limits") ?? {}).length > 0 ? "Custom limits" : null,
+    Object.keys(objectField(route, "limits") ?? {}).length > 0
+      ? t("hub.routes.rows.customLimits")
+      : null,
   ].filter((fact): fact is string => fact !== null);
   if (facts.length === 0) return null;
   return (
@@ -326,38 +341,38 @@ function RouteDetailLine({ route }: { route: RecordValue }) {
   );
 }
 
-const ROUTE_REPLY_SHORT: Record<ChannelRouteBehavior["outboundPath"], string> = {
-  hybrid: "Hybrid replies",
-  relay: "Text forward",
-  tool: "Channel tool only",
-};
+function routeReplyShort(t: TFunction, outboundPath: ChannelRouteBehavior["outboundPath"]): string {
+  if (outboundPath === "hybrid") return t("hub.routes.rows.replyShort.hybrid");
+  if (outboundPath === "relay") return t("hub.routes.rows.replyShort.relay");
+  return t("hub.routes.rows.replyShort.tool");
+}
 
 /**
  * The Agent a Route starts, by the name a reader knows: a shared Agent by its
  * name; one the form created for this Route alone (`channel-<account>`) by its
  * provider and model, since that generated name says nothing.
  */
-function routeTargetLabel(route: RecordValue, resource: RecordValue): string {
+function routeTargetLabel(t: TFunction, route: RecordValue, resource: RecordValue): string {
   const workflow = stringField(route, "workflow");
-  if (workflow !== null) return `Automation ${workflow}`;
+  if (workflow !== null) return t("hub.routes.rows.automationTarget", { name: workflow });
   const agent = stringField(route, "agent");
-  if (agent === null) return "Unavailable target";
+  if (agent === null) return t("hub.routes.rows.unavailableTarget");
   const record = objectField(objectField(resource, "agents") ?? EMPTY_RECORD, agent);
   const provider = stringField(record ?? EMPTY_RECORD, "provider");
-  if (!agent.startsWith("channel-") || provider === null) return `Agent ${agent}`;
+  if (!agent.startsWith("channel-") || provider === null)
+    return t("hub.routes.rows.agentTarget", { name: agent });
   const model = stringField(record ?? EMPTY_RECORD, "model");
   return model === null ? channelLabel(provider) : `${channelLabel(provider)} ${model}`;
 }
 
-const NO_ROUTES_MESSAGE = "No Routes yet: nobody can talk to this bot.";
-
 /** A Connection's empty Routes, with the one thing to do next beside it. */
 export function NoRoutesRow({ pending, addRoute }: { pending: boolean; addRoute(): void }) {
+  const { t } = useTranslation();
   return (
     <View style={settingsStyles.row}>
-      <Text style={[settingsStyles.rowHint, styles.shrink]}>{NO_ROUTES_MESSAGE}</Text>
+      <Text style={[settingsStyles.rowHint, styles.shrink]}>{t("hub.routes.rows.noRoutes")}</Text>
       <Button size="sm" variant="ghost" leftIcon={Plus} disabled={pending} onPress={addRoute}>
-        Add Route
+        {t("hub.routes.editor.addRoute")}
       </Button>
     </View>
   );

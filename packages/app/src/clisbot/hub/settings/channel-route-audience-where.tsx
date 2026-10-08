@@ -2,7 +2,9 @@
 // chats, which ones. One kind of place per Rule, so each Rule reads as one
 // way in (docs/audits/2026-10-05-routes-and-rules.md).
 
+import type { TFunction } from "i18next";
 import React, { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text } from "react-native";
 import { settingsStyles } from "@/styles/settings";
 import { Alert } from "@/components/ui/alert";
@@ -30,7 +32,9 @@ export interface AudienceWherePlace {
 type Update = (change: (rule: AudienceRuleDraft) => AudienceRuleDraft) => void;
 
 const PLACES: RulePlace[] = ["dm", "groups"];
-const PLACE_LABELS: Record<RulePlace, string> = { dm: "Direct messages", groups: "Group chats" };
+function placeLabels(t: TFunction): Record<RulePlace, string> {
+  return { dm: t("hub.routes.where.places.dm"), groups: t("hub.routes.where.places.groups") };
+}
 
 export function RuleWhereFields({
   rule,
@@ -48,6 +52,7 @@ export function RuleWhereFields({
   /** Why the Where cannot save yet, shown under the chats. */
   problem: string | null;
 }) {
+  const { t } = useTranslation();
   const changePlace = useCallback(
     (value: string) => update((current) => withPlace(current, value as RulePlace)),
     [update],
@@ -55,10 +60,10 @@ export function RuleWhereFields({
   return (
     <>
       <ChoiceRow
-        label="Where"
+        label={t("hub.routes.where.label")}
         values={PLACES}
         selected={rule.place}
-        labels={PLACE_LABELS}
+        labels={placeLabels(t)}
         onChange={changePlace}
         disabled={disabled}
       />
@@ -76,12 +81,14 @@ export function RuleWhereFields({
   );
 }
 
-const SCOPE_LABELS: Record<Exclude<AudienceGroupScope, "off">, string> = {
-  specific: "Chats I pick",
-  all: "Every chat the bot is in",
-  public: "Every public chat",
-  private: "Every private chat",
-};
+function scopeLabels(t: TFunction): Record<Exclude<AudienceGroupScope, "off">, string> {
+  return {
+    specific: t("hub.routes.groupScopes.specific"),
+    all: t("hub.routes.groupScopes.all"),
+    public: t("hub.routes.groupScopes.public"),
+    private: t("hub.routes.groupScopes.private"),
+  };
+}
 
 function GroupChatFields({
   rule,
@@ -96,6 +103,7 @@ function GroupChatFields({
   disabled: boolean;
   update: Update;
 }) {
+  const { t } = useTranslation();
   const { where } = rule;
   // A stored public/private filter stays selectable where it matches nothing.
   const filtered = where.groups === "public" || where.groups === "private";
@@ -104,8 +112,8 @@ function GroupChatFields({
       (place.reportsVisibility || filtered
         ? (["specific", "all", "public", "private"] as const)
         : (["specific", "all"] as const)
-      ).map((value) => ({ value, label: SCOPE_LABELS[value] })),
-    [filtered, place.reportsVisibility],
+      ).map((value) => ({ value, label: scopeLabels(t)[value] })),
+    [filtered, place.reportsVisibility, t],
   );
   const changeScope = useCallback(
     (groups: Exclude<AudienceGroupScope, "off">) =>
@@ -129,7 +137,7 @@ function GroupChatFields({
   return (
     <>
       <RadioList
-        label="Which chats?"
+        label={t("hub.routes.where.whichChats")}
         options={scopes}
         selected={where.groups === "off" ? "specific" : where.groups}
         onChange={changeScope}
@@ -144,22 +152,26 @@ function GroupChatFields({
           value={where.conversations}
           onChange={changeConversations}
           disabled={disabled}
-          hint="Rooms, groups, threads or topics. A thread or topic narrows to it."
+          hint={t("hub.routes.where.chatsHint")}
           placeholder="C0123, C0456"
         />
       ) : null}
       {visibilityFilterMatchesNothing(where, place.reportsVisibility) ? (
         <Alert
           variant="warning"
-          title={`${place.channelName} does not report whether a chat is public or private`}
-          description="This choice matches nothing here. Choose Every chat the bot is in, or pick chats."
+          title={t("hub.routes.where.noVisibilityTitle", { channel: place.channelName })}
+          description={t("hub.routes.where.noVisibilityDescription")}
         />
       ) : null}
       {extra.length > 0 ? (
         <Alert
           variant="info"
-          title={`Also saved: ${extra.map((id) => names.conversationLabel(id)).join(", ")}`}
-          description="Saved by an earlier editor. Choosing an option above replaces them."
+          title={t("hub.routes.where.alsoSavedTitle", {
+            chats: extra
+              .map((id) => names.conversationLabel(id))
+              .join(t("hub.routes.common.listSeparator")),
+          })}
+          description={t("hub.routes.where.alsoSavedDescription")}
         />
       ) : null}
     </>

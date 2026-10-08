@@ -1,16 +1,16 @@
+import { i18n } from "@/i18n/i18next";
+
 /** Safe display errors shared by password and Google owner setup entry. */
 export class HubAccountRequestError extends Error {
   constructor(
     readonly code: string,
     status: number,
   ) {
-    let message = `Hub account request failed (${status}).`;
+    let message = i18n.t("hub.connection.errors.accountRequestFailed", { status });
     if (code === "owner_setup_approval_required")
-      message =
-        "Owner setup approval is unavailable. It may have expired or already been used. Ask the Hub operator for a new setup QR or link.";
+      message = i18n.t("hub.connection.errors.ownerApprovalUnavailable");
     if (code === "setup_unavailable" || code === "owner_setup_unavailable")
-      message =
-        "Owner setup is no longer available. If an owner was created, sign in with an approved account; otherwise ask the Hub operator to recover setup locally.";
+      message = i18n.t("hub.connection.errors.ownerSetupUnavailable");
     super(message);
   }
 }

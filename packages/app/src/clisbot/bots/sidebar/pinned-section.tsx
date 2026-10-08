@@ -2,6 +2,7 @@ import type { Rect } from "@/components/ui/menu/menu-anchor";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useState, useMemo, useCallback } from "react";
 import { usePathname, useRouter } from "expo-router";
 import { Bot, Folder, Hash, Pin, MessageSquare } from "lucide-react-native";
@@ -23,6 +24,7 @@ const Icons = {
 
 export function FusionPinnedSection({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
   const { rows, error } = usePinnedRows(onBeforeNavigate);
+  const { t } = useTranslation();
   const { visibleItems, expanded, canToggle, toggleExpanded } = useLimitedSidebarGroup(rows);
   const [menu, setMenu] = useState<(PinRow & { anchor: Rect }) | null>(null);
   const pathname = usePathname();
@@ -36,7 +38,8 @@ export function FusionPinnedSection({ onBeforeNavigate }: { onBeforeNavigate?: (
   return (
     <>
       <BotsSectionHeader
-        label="Pinned"
+        label={t("bots.workspace.sidebar.pinned")}
+        icon="Pinned"
         testID="sidebar-unified-pinned"
         collapsed={collapsed}
         onToggle={toggleCollapsed}
@@ -67,7 +70,7 @@ export function FusionPinnedSection({ onBeforeNavigate }: { onBeforeNavigate?: (
       <PinOptionsMenu
         anchor={menu?.anchor}
         visible={menu !== null}
-        title={menu?.title ?? "Pinned item"}
+        title={menu?.title ?? t("bots.workspace.sidebar.pinnedItem")}
         actions={UNPIN_ACTIONS}
         onSelect={removePin}
         onClose={closeMenu}
@@ -91,6 +94,7 @@ function PinnedRow({
   onOpenMenu: (row: PinRow & { anchor: Rect }) => void;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const Icon = Icons[row.kind];
   const leading = useMemo(() => <Icon size={16} uniProps={pinColor} />, [Icon]);
   const open = useCallback(() => {
@@ -109,7 +113,7 @@ function PinnedRow({
       leading={leading}
       onPress={open}
       onOpenMenu={menu}
-      menuLabel="Pinned item options"
+      menuLabel={t("bots.workspace.sidebar.pinnedItemOptions")}
     />
   );
 }

@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import { useCallback, useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import type { SelectFieldOption } from "@/components/ui/select-field";
 import {
   channelBotNames,
@@ -120,6 +122,7 @@ export function useLinkRealms({
   chosenRealmKey: string | null;
   requestedConnectionId: string | null;
 }) {
+  const { t } = useTranslation();
   // Only Channel Connections carry a realm; provider Connections (GitHub, Linear) never do.
   const realmConnections = useMemo(
     () => (connections ?? []).filter(({ identityRealm }) => typeof identityRealm === "string"),
@@ -139,7 +142,7 @@ export function useLinkRealms({
   );
   const isLinked = useCallback((key: string) => linkedKeys.has(key), [linkedKeys]);
   const unlinked = useMemo(() => realms.filter(({ key }) => !isLinked(key)), [realms, isLinked]);
-  const options = useMemo(() => unlinked.map(realmOption), [unlinked]);
+  const options = useMemo(() => unlinked.map((realm) => realmOption(realm, t)), [unlinked, t]);
   const requestedKey = requestedRealmKey(realmConnections, requestedConnectionId);
   const requested = realms.find(({ key }) => key === requestedKey);
   // With one place left to link, there is nothing to choose.
@@ -154,19 +157,19 @@ export function useLinkRealms({
     allLinked: realms.length > 0 && unlinked.length === 0,
     emptyText:
       realms.length > 0
-        ? "You are linked everywhere this organization's bots run."
-        : "This organization has no chat bots yet.",
+        ? t("hub.channels.linkRealms.allLinked")
+        : t("hub.channels.linkRealms.noBots"),
   };
 }
 
-function realmOption(realm: LinkRealm): SelectFieldOption<string> {
+function realmOption(realm: LinkRealm, t: TFunction): SelectFieldOption<string> {
   return {
     id: realm.key,
     value: realm.key,
     label: realm.label,
     description:
       realm.scope === "bot"
-        ? "Links this bot only"
-        : `One link covers every bot here: ${realm.botNames.join(", ")}`,
+        ? t("hub.channels.linkRealms.thisBotOnly")
+        : t("hub.channels.linkRealms.coversEvery", { bots: realm.botNames.join(", ") }),
   };
 }

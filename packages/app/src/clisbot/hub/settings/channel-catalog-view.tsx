@@ -1,11 +1,13 @@
 import { RefreshCw } from "lucide-react-native";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { createChannelConnection } from "../channel-api";
 import { addQrChannelAccount } from "../channel-qr-account";
@@ -28,6 +30,7 @@ import { BackLink } from "./back-link";
  * list, then the chosen channel on its own screen with a way back.
  */
 export function ChannelCatalogView() {
+  const { t } = useTranslation();
   const { rows, catalog, refresh, fetching, statusError } = useChannelCatalogQueries();
   const compact = useIsCompactFormFactor();
   const [chosenChannel, setSelectedChannel] = useState<string | null>(null);
@@ -52,18 +55,18 @@ export function ChannelCatalogView() {
   // Both columns open on a text label, so their cards start level; a button in
   // this header would make it taller than the detail's.
   const list = (
-    <SettingsSection title="All channels">
+    <SettingsSection title={t("hub.channels.catalogView.allChannels")}>
       {catalog.availability === "available" || catalog.message === null ? null : (
         <Alert
           variant={catalog.availability === "loading" ? "info" : "warning"}
-          title={CATALOG_STATE_TITLES[catalog.availability]}
+          title={catalogStateTitle(catalog.availability)}
           description={catalog.message}
         />
       )}
       {statusError === null ? null : (
         <Alert
           variant="warning"
-          title="Channel runtime status is unavailable"
+          title={t("hub.channels.catalogView.statusUnavailable")}
           description={statusError.message}
         />
       )}
@@ -77,7 +80,7 @@ export function ChannelCatalogView() {
           disabled={fetching}
           onPress={refresh}
         >
-          Refresh health
+          {t("hub.channels.catalogView.refreshHealth")}
         </Button>
       </View>
     </SettingsSection>
@@ -98,7 +101,7 @@ export function ChannelCatalogView() {
       list
     ) : (
       <View style={styles.view}>
-        <BackLink to="Channel Integrations" onPress={back} />
+        <BackLink to={t("hub.channels.catalogView.backTo")} onPress={back} />
         {detail}
       </View>
     );
@@ -110,11 +113,12 @@ export function ChannelCatalogView() {
   );
 }
 
-const CATALOG_STATE_TITLES: Readonly<Record<string, string>> = {
-  loading: "Loading channels",
-  unavailable: "Catalog not available on this Hub",
-  error: "The channel catalog could not be read",
-};
+function catalogStateTitle(availability: string): string | undefined {
+  if (availability === "loading") return i18n.t("hub.channels.catalogView.loading");
+  if (availability === "unavailable") return i18n.t("hub.channels.catalogView.unavailable");
+  if (availability === "error") return i18n.t("hub.channels.catalogView.error");
+  return undefined;
+}
 
 function ChannelSelection({
   row,

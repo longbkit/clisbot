@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
 import { FormTextInput } from "@/components/ui/form-field";
@@ -18,11 +19,13 @@ import { toErrorMessage } from "@/utils/error-messages";
  */
 
 export const COMPOSIO_LINKS = [
-  { label: "What is Composio", url: "https://composio.dev" },
-  { label: "Quickstart", url: "https://docs.composio.dev/docs/quickstart" },
-  { label: "Security", url: "https://docs.composio.dev/docs/security/overview" },
-  { label: "Privacy", url: "https://composio.dev/privacy" },
+  { id: "whatIs", url: "https://composio.dev" },
+  { id: "quickstart", url: "https://docs.composio.dev/docs/quickstart" },
+  { id: "security", url: "https://docs.composio.dev/docs/security/overview" },
+  { id: "privacy", url: "https://composio.dev/privacy" },
 ] as const;
+
+type ComposioLinkId = (typeof COMPOSIO_LINKS)[number]["id"];
 
 /**
  * The dashboard opens in the person's own project; its API keys page sits under that project's
@@ -30,12 +33,10 @@ export const COMPOSIO_LINKS = [
  */
 const COMPOSIO_DASHBOARD = "https://dashboard.composio.dev";
 
-export const COMPOSIO_SECTION_INFO =
-  "Each Host has its own Composio key, and the app accounts you connect belong to that Host. Free plan: 100,000 tool calls a month.";
-
 export function ComposioSetup({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
   return (
-    <SettingsSection title="Composio" info={COMPOSIO_SECTION_INFO}>
+    <SettingsSection title="Composio" info={t("connectors.screen.composio.sectionInfo")}>
       <View style={settingsStyles.card}>
         <ComposioIntro />
         <View style={[styles.block, settingsStyles.rowBorder]}>
@@ -48,14 +49,11 @@ export function ComposioSetup({ serverId }: { serverId: string }) {
 
 /** Who Composio is and what leaves the Host, in two lines, with their own pages. */
 export function ComposioIntro() {
+  const { t } = useTranslation();
   return (
     <View style={styles.block}>
-      <Text style={settingsStyles.rowTitle}>Connect 1,000+ apps through Composio</Text>
-      <Text style={styles.body}>
-        Composio keeps your app sign-ins (Gmail, GitHub, Slack, Notion…) and runs their actions for
-        your agents. Those requests pass through its cloud; your code and files stay here. For
-        nothing to leave this Host, add an MCP server instead.
-      </Text>
+      <Text style={settingsStyles.rowTitle}>{t("connectors.screen.composio.introTitle")}</Text>
+      <Text style={styles.body}>{t("connectors.screen.composio.introBody")}</Text>
       <ComposioLinks />
     </View>
   );
@@ -65,17 +63,24 @@ function ComposioLinks() {
   return (
     <View style={styles.links}>
       {COMPOSIO_LINKS.map((link) => (
-        <ComposioLink key={link.url} label={link.label} url={link.url} />
+        <ComposioLink key={link.url} id={link.id} url={link.url} />
       ))}
     </View>
   );
 }
 
-function ComposioLink({ label, url }: { label: string; url: string }) {
+function ComposioLink({ id, url }: { id: ComposioLinkId; url: string }) {
+  const { t } = useTranslation();
   const open = useCallback(() => void openExternalUrl(url), [url]);
+  const labels: Record<ComposioLinkId, string> = {
+    whatIs: t("connectors.screen.composio.whatIs"),
+    quickstart: t("connectors.screen.composio.quickstart"),
+    security: t("connectors.screen.composio.security"),
+    privacy: t("connectors.screen.composio.privacy"),
+  };
   return (
     <Button size="xs" variant="ghost" leftIcon={ExternalLink} onPress={open}>
-      {label}
+      {labels[id]}
     </Button>
   );
 }
@@ -92,6 +97,7 @@ export function ComposioKeyForm({
   onSaved?(): void;
   onCancel?(): void;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
@@ -114,16 +120,16 @@ export function ComposioKeyForm({
     <View style={styles.form}>
       <View style={styles.keyHelp}>
         <Text style={[settingsStyles.rowHint, styles.keyHelpText]}>
-          In Composio: API Keys → Create, then paste it here. Agents never see it.
+          {t("connectors.screen.composio.keyHelp")}
         </Text>
         <Button size="sm" variant="outline" leftIcon={ExternalLink} onPress={openDashboard}>
-          Get a key
+          {t("connectors.screen.composio.getKey")}
         </Button>
       </View>
       <View style={styles.keyRow}>
         <View style={styles.keyInput}>
           <FormTextInput
-            accessibilityLabel="Composio API key"
+            accessibilityLabel={t("connectors.screen.composio.keyLabel")}
             placeholder="ak_…"
             secureTextEntry
             autoCapitalize="none"
@@ -141,11 +147,11 @@ export function ComposioKeyForm({
           disabled={!key.trim() || saving}
           onPress={save}
         >
-          Save key
+          {t("connectors.screen.composio.saveKey")}
         </Button>
         {onCancel ? (
           <Button variant="ghost" size={compact ? "md" : "sm"} onPress={onCancel}>
-            Cancel
+            {t("connectors.screen.common.cancel")}
           </Button>
         ) : null}
       </View>

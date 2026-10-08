@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { Alert } from "@/components/ui/alert";
@@ -16,6 +17,7 @@ import { SettingsSection } from "@/components/settings/headings/settings-section
 import { settingsStyles } from "@/styles/settings";
 import type { HostProfile } from "@/types/host-connection";
 import { confirmDialog } from "@/utils/confirm-dialog";
+import { i18n } from "@/i18n/i18next";
 import { useSessionStore } from "@/stores/session-store";
 import { useHubAccount } from "../account-provider";
 import { hasIndependentHostCredential } from "./independent-host-credential";
@@ -26,6 +28,7 @@ import {
 
 /** Clisbot-owned mount for the daemon policy; the generic Host page stays transport-agnostic. */
 export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const [pairLinkVisible, setPairLinkVisible] = useState(false);
   const devicePairing = useSessionStore(
@@ -100,11 +103,13 @@ export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
   if (!managedByCurrentHub) return null;
 
   return (
-    <SettingsSection title="Managed access">
+    <SettingsSection title={t("hub.settings.managedAccess.title")}>
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>Require Hub access externally</Text>
+            <Text style={settingsStyles.rowTitle}>
+              {t("hub.settings.managedAccess.requireTitle")}
+            </Text>
             <Text style={settingsStyles.rowHint}>
               {managedAccessDescription(external, devicePairing)}
             </Text>
@@ -113,7 +118,7 @@ export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
             value={external}
             onValueChange={changeExternalMode}
             disabled={!isOwner || switching || isLoading || config === null}
-            accessibilityLabel="Require Hub access for external connections"
+            accessibilityLabel={t("hub.settings.managedAccess.switchLabel")}
           />
         </View>
       </View>
@@ -123,22 +128,15 @@ export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
         onPair={openPairLink}
       />
       <PairLinkModal visible={pairLinkVisible} onClose={closePairLink} onSaved={savePairLink} />
-      {!isOwner ? (
-        <Alert
-          variant="info"
-          title="Only an organization owner can change this security boundary."
-        />
-      ) : null}
+      {!isOwner ? <Alert variant="info" title={t("hub.settings.managedAccess.ownerOnly")} /> : null}
     </SettingsSection>
   );
 }
 
 function managedAccessDescription(external: boolean, devicePairing: boolean): string {
-  if (external)
-    return "External sessions must use a short-lived Hub ticket and receive only their granted resources.";
-  if (devicePairing)
-    return "This Host requires its own paired device credential. Hub login does not grant access.";
-  return "Upstream-compatible trusted access is active for this Host.";
+  if (external) return i18n.t("hub.settings.managedAccess.descriptionExternal");
+  if (devicePairing) return i18n.t("hub.settings.managedAccess.descriptionDevicePairing");
+  return i18n.t("hub.settings.managedAccess.descriptionTrusted");
 }
 
 function ManagedAccessNotice({
@@ -150,15 +148,16 @@ function ManagedAccessNotice({
   devicePairing: boolean;
   onPair: () => void;
 }) {
+  const { t } = useTranslation();
   if (transition.status === "pairing-required") {
     return (
       <Alert
         variant="info"
-        title="Managed access is off · Pair this device"
-        description="Hub sign-in no longer grants access to this Host. Ask the Host owner for a fresh Host pairing link or QR, then paste its link to connect this device. Your Hub connection stays available."
+        title={t("hub.settings.managedAccess.pairingRequiredTitle")}
+        description={t("hub.settings.managedAccess.pairingRequiredDescription")}
       >
         <Button variant="outline" onPress={onPair}>
-          Pair this device
+          {t("hub.settings.managedAccess.pairThisDevice")}
         </Button>
       </Alert>
     );
@@ -169,8 +168,8 @@ function ManagedAccessNotice({
         variant="info"
         title={
           transition.target === "external"
-            ? "Turning on managed access…"
-            : "Turning off managed access…"
+            ? t("hub.settings.managedAccess.turningOn")
+            : t("hub.settings.managedAccess.turningOff")
         }
         description={managedAccessNoticeDescription("switching", transition.target, devicePairing)}
       />
@@ -180,7 +179,11 @@ function ManagedAccessNotice({
     return (
       <Alert
         variant="success"
-        title={transition.mode === "external" ? "Managed access is on" : "Managed access is off"}
+        title={
+          transition.mode === "external"
+            ? t("hub.settings.managedAccess.isOn")
+            : t("hub.settings.managedAccess.isOff")
+        }
         description={managedAccessNoticeDescription("done", transition.mode, devicePairing)}
       />
     );
@@ -192,13 +195,13 @@ function ManagedAccessNotice({
         title={transition.message}
         description={
           devicePairing && transition.mode === "off"
-            ? "This Host requires its own device credential. If this device's credential was revoked, pair it again with a fresh link from the Host owner."
+            ? t("hub.settings.managedAccess.failedDevicePairing")
             : undefined
         }
       >
         {devicePairing && transition.mode === "off" ? (
           <Button variant="outline" onPress={onPair}>
-            Pair this device
+            {t("hub.settings.managedAccess.pairThisDevice")}
           </Button>
         ) : null}
       </Alert>
@@ -213,32 +216,30 @@ function managedAccessNoticeDescription(
   devicePairing: boolean,
 ): string {
   if (status === "switching") {
-    if (mode === "external")
-      return "The Host closes sessions without a Hub ticket, including this one. Clisbot reconnects with a ticket from Hub.";
-    if (devicePairing)
-      return "This device reconnects using its own Host credential. If it has not paired with the Host, a new pairing link is required.";
-    return "Clisbot reconnects to the Host.";
+    if (mode === "external") return i18n.t("hub.settings.managedAccess.switchingExternal");
+    if (devicePairing) return i18n.t("hub.settings.managedAccess.switchingDevicePairing");
+    return i18n.t("hub.settings.managedAccess.switchingTrusted");
   }
-  if (mode === "external")
-    return "This device reconnected with a Hub ticket. Other external clients need a Hub sign-in and an access grant.";
-  if (devicePairing)
-    return "This device connected with its own Host credential. Other devices must pair with this Host; Hub sign-in does not grant access.";
-  return "External clients use ordinary trusted access again.";
+  if (mode === "external") return i18n.t("hub.settings.managedAccess.doneExternal");
+  if (devicePairing) return i18n.t("hub.settings.managedAccess.doneDevicePairing");
+  return i18n.t("hub.settings.managedAccess.doneTrusted");
 }
 
 function modeChangeMessage(enabled: boolean, devicePairing: boolean): string {
-  if (enabled)
-    return "External TCP, relay, LAN, Tailscale, and tunnel connections will need a current Hub sign-in and access grant. Sessions without a Hub ticket close, including this one; Clisbot reconnects it with a ticket.";
-  if (devicePairing)
-    return "Hub sign-in and access grants will no longer authorize connections to this Host. Each device needs its own Host pairing credential. Devices using only a Hub ticket disconnect and must pair with the Host; your Hub connection stays available.";
-  return "External clients will regain the ordinary trusted-operator access used by upstream Clisbot.";
+  if (enabled) return i18n.t("hub.settings.managedAccess.confirmEnableMessage");
+  if (devicePairing) return i18n.t("hub.settings.managedAccess.confirmDisableDevicePairingMessage");
+  return i18n.t("hub.settings.managedAccess.confirmDisableTrustedMessage");
 }
 
 function confirmModeChange(enabled: boolean, devicePairing: boolean): Promise<boolean> {
   return confirmDialog({
-    title: enabled ? "Require Hub access?" : "Turn off managed access?",
+    title: enabled
+      ? i18n.t("hub.settings.managedAccess.confirmEnableTitle")
+      : i18n.t("hub.settings.managedAccess.confirmDisableTitle"),
     message: modeChangeMessage(enabled, devicePairing),
-    confirmLabel: enabled ? "Require Hub access" : "Turn off",
+    confirmLabel: enabled
+      ? i18n.t("hub.settings.managedAccess.confirmEnableLabel")
+      : i18n.t("hub.settings.managedAccess.confirmDisableLabel"),
     destructive: !enabled,
   });
 }

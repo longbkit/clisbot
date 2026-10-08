@@ -4,6 +4,7 @@ import * as WebBrowser from "expo-web-browser";
 import { getDesktopHost } from "@/desktop/host";
 import { Buffer } from "buffer";
 import { HubConnectionSchema, type HubConnection } from "@clisbot/protocol/device-pairing-offer";
+import { i18n } from "@/i18n/i18next";
 
 const AUTH_PAGE = "https://app.clisbot.com/hub-google-auth.html";
 export function requiresOfficialGoogleWeb(): boolean {
@@ -25,7 +26,7 @@ export function officialHubConnectionUrl(connection: HubConnection): string {
 }
 export function parsePublicHubConnection(encoded: string): HubConnection {
   if (encoded.length > 16_384 || !/^[A-Za-z0-9_-]+$/.test(encoded))
-    throw new Error("Invalid Hub connection link");
+    throw new Error(i18n.t("hub.connection.errors.invalidLink"));
   const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
   return HubConnectionSchema.parse(JSON.parse(Buffer.from(base64, "base64").toString("utf8")));
 }
@@ -42,7 +43,7 @@ export interface GoogleTokenInput {
 export function prepareGooglePopup(): Window | undefined {
   if (Platform.OS !== "web" || getDesktopHost()) return undefined;
   const popup = window.open("about:blank", "clisbot-google-sign-in", "popup,width=520,height=680");
-  if (!popup) throw new Error("Allow popups to continue with Google");
+  if (!popup) throw new Error(i18n.t("hub.connection.errors.allowPopups"));
   return popup;
 }
 export async function acquireGoogleIdToken(
@@ -53,7 +54,7 @@ export async function acquireGoogleIdToken(
   if (desktop?.google?.signIn) {
     const result = await desktop.google.signIn(input);
     if (result.transactionId !== input.transactionId || !result.idToken)
-      throw new Error("Google sign-in handoff did not match this request");
+      throw new Error(i18n.t("hub.connection.errors.googleMismatch"));
     return result.idToken;
   }
   const auth = new URL(AUTH_PAGE);
@@ -65,7 +66,7 @@ export async function acquireGoogleIdToken(
     const popup =
       preparedPopup ??
       window.open(auth.href, "clisbot-google-sign-in", "popup,width=520,height=680");
-    if (!popup) throw new Error("Allow popups to continue with Google");
+    if (!popup) throw new Error(i18n.t("hub.connection.errors.allowPopups"));
     if (preparedPopup) preparedPopup.location.href = auth.href;
     return await new Promise<string>((resolve, reject) => {
       const finish = (token?: string, error?: string) => {
@@ -74,7 +75,7 @@ export async function acquireGoogleIdToken(
         window.removeEventListener("message", message);
         popup.close();
         if (token) resolve(token);
-        else reject(new Error(error ?? "Google sign-in cancelled"));
+        else reject(new Error(error ?? i18n.t("hub.connection.errors.googleCancelled")));
       };
       const message = (event: MessageEvent) => {
         if (
@@ -90,7 +91,7 @@ export async function acquireGoogleIdToken(
         );
       };
       const timeout = setTimeout(
-        () => finish(undefined, "Google sign-in expired; try again"),
+        () => finish(undefined, i18n.t("hub.connection.errors.googleExpired")),
         5 * 60_000,
       );
       const closed = setInterval(() => {
@@ -104,7 +105,7 @@ export async function acquireGoogleIdToken(
   parameters.set("redirectUri", redirectUri);
   auth.hash = parameters.toString();
   const result = await WebBrowser.openAuthSessionAsync(auth.href, redirectUri);
-  if (result.type !== "success") throw new Error("Google sign-in cancelled");
+  if (result.type !== "success") throw new Error(i18n.t("hub.connection.errors.googleCancelled"));
   const callback = new URL(result.url);
   const expected = new URL(redirectUri);
   if (
@@ -112,9 +113,9 @@ export async function acquireGoogleIdToken(
     callback.host !== expected.host ||
     callback.pathname !== expected.pathname
   )
-    throw new Error("Google sign-in returned to an unexpected app route");
+    throw new Error(i18n.t("hub.connection.errors.googleRoute"));
   const response = new URLSearchParams(callback.hash.slice(1));
   if (response.get("transactionId") !== input.transactionId || !response.get("idToken"))
-    throw new Error("Google sign-in handoff did not match this request");
+    throw new Error(i18n.t("hub.connection.errors.googleMismatch"));
   return response.get("idToken")!;
 }

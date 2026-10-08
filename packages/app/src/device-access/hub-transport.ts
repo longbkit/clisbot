@@ -19,6 +19,7 @@ import {
 } from "./google-sign-in";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "./hub-account-error";
 import { suggestedDeviceLabel } from "./device-label";
+import { i18n } from "@/i18n/i18next";
 import { createAppWebSocketFactory } from "@/runtime/websocket-factory";
 import {
   prepareDevicePairing,
@@ -36,9 +37,11 @@ import {
 
 export class PairedHubTransport implements HubTransport {
   readonly signInKind = "password" as const;
-  readonly googleSignInLabel = requiresOfficialGoogleWeb()
-    ? "Continue with Google in Clisbot web"
-    : "Continue with Google";
+  get googleSignInLabel(): string {
+    return requiresOfficialGoogleWeb()
+      ? i18n.t("hub.connection.google.continueWeb")
+      : i18n.t("hub.connection.google.continue");
+  }
   private connection: Promise<HubDeviceTransport> | undefined;
   private closed = false;
   private loginChallenge?: { id: string; expiresAt: number };
@@ -141,7 +144,7 @@ export class PairedHubTransport implements HubTransport {
         credentialId?: string;
       };
       if (value.backendId !== this.profile.hubId || typeof value.credentialId !== "string")
-        throw new Error("Hub login credential identity mismatch");
+        throw new Error(i18n.t("hub.connection.errors.loginCredentialMismatch"));
       await saveDeviceCredential(this.profile.hubId, value.credentialId);
       this.loginChallenge = undefined;
       this.accountLogin = false;
@@ -166,8 +169,8 @@ export class PairedHubTransport implements HubTransport {
     if (!response.ok)
       throw new Error(
         response.status === 403
-          ? "This Hub requires an approved pairing link before access or owner setup"
-          : "Hub sign-in could not be started",
+          ? i18n.t("hub.connection.errors.needsApprovedLink")
+          : i18n.t("hub.connection.errors.signInNotStarted"),
       );
     const value = (await response.json()) as {
       hubId?: string;
@@ -179,13 +182,13 @@ export class PairedHubTransport implements HubTransport {
       typeof value.challengeId !== "string" ||
       typeof value.expiresAt !== "number"
     )
-      throw new Error("Hub sign-in challenge identity mismatch");
+      throw new Error(i18n.t("hub.connection.errors.challengeMismatch"));
     this.loginChallenge = { id: value.challengeId, expiresAt: value.expiresAt };
     return `login:${value.challengeId}`;
   }
 
   async signIn(input?: { email: string; password: string }): Promise<void> {
-    if (!input) throw new Error("Email and password are required");
+    if (!input) throw new Error(i18n.t("hub.connection.errors.credentialsRequired"));
     await this.prepareAccountLogin();
     try {
       const response = await this.request("/api/auth/sign-in/email", {
@@ -193,7 +196,7 @@ export class PairedHubTransport implements HubTransport {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(input),
       });
-      if (!response.ok) throw new Error("Hub sign-in failed; check your email and password");
+      if (!response.ok) throw new Error(i18n.t("hub.connection.errors.signInFailed"));
       await this.request("/api/auth/clisbot/state");
     } finally {
       this.accountLogin = false;
@@ -210,12 +213,13 @@ export class PairedHubTransport implements HubTransport {
 
   private async prepareAccountLogin(): Promise<void> {
     const response = await this.identity();
-    if (!response.ok) throw new Error("Hub identity could not be verified");
+    if (!response.ok) throw new Error(i18n.t("hub.connection.errors.identityNotVerified"));
     const identity = (await response.json()) as {
       hubId?: string;
       entry?: string;
     };
-    if (identity.hubId !== this.profile.hubId) throw new Error("Hub login identity mismatch");
+    if (identity.hubId !== this.profile.hubId)
+      throw new Error(i18n.t("hub.connection.errors.loginMismatch"));
     // A prior successful request may have consumed its challenge even when its
     // response was lost. A new explicit attempt must obtain a fresh challenge.
     this.loginChallenge = undefined;
@@ -231,7 +235,7 @@ export class PairedHubTransport implements HubTransport {
         headers: { "content-type": "application/json" },
         body: "{}",
       });
-      if (!response.ok) throw new Error("Hub sign-out failed");
+      if (!response.ok) throw new Error(i18n.t("hub.connection.errors.signOutFailed"));
     } finally {
       await writeSecret(cookieKey(this.profile.hubId), "{}");
     }
@@ -240,9 +244,7 @@ export class PairedHubTransport implements HubTransport {
   async signInWithGoogle(context: GoogleSignInContext = {}): Promise<void> {
     if (requiresOfficialGoogleWeb()) {
       if (context.claimInstance)
-        throw new Error(
-          "Complete owner setup with the approved pairing link in Clisbot web, mobile or Desktop. Setup approvals are not sent to another website automatically.",
-        );
+        throw new Error(i18n.t("hub.connection.errors.ownerSetupElsewhere"));
       openOfficialHubGoogle(this.profile);
       return;
     }
@@ -254,14 +256,15 @@ export class PairedHubTransport implements HubTransport {
         headers: { "content-type": "application/json" },
         body: "{}",
       });
-      if (!challenge.ok) throw new Error("Google sign-in is unavailable on this Hub");
+      if (!challenge.ok) throw new Error(i18n.t("hub.connection.errors.googleUnavailable"));
       const transaction = (await challenge.json()) as {
         transactionId: string;
         nonce: string;
         clientId: string;
         expiresAt: number;
       };
-      if (transaction.expiresAt <= Date.now()) throw new Error("Google sign-in challenge expired");
+      if (transaction.expiresAt <= Date.now())
+        throw new Error(i18n.t("hub.connection.errors.googleChallengeExpired"));
       const idToken = await acquireGoogleIdToken(transaction, popup);
       const setup = context.claimInstance ? await readSecret(setupKey(this.profile.hubId)) : null;
       const response = await this.request("/api/auth/clisbot/device/google/sign-in", {
@@ -284,9 +287,7 @@ export class PairedHubTransport implements HubTransport {
           response.status,
         );
         if (needsOwnerSetupRecovery(error)) throw error;
-        throw new Error(
-          "Google account could not sign in to this Hub. Check its invitation and account policy.",
-        );
+        throw new Error(i18n.t("hub.connection.errors.googleAccountRefused"));
       }
       if (context.claimInstance) await writeSecret(setupKey(this.profile.hubId), "");
     } finally {
@@ -299,7 +300,7 @@ export class PairedHubTransport implements HubTransport {
     const credential = await readDeviceCredential(this.profile.hubId);
     if (!credential?.invitationToken) {
       if (credential?.credentialId) return;
-      throw new Error("Pairing invitation unavailable");
+      throw new Error(i18n.t("hub.connection.errors.invitationUnavailable"));
     }
     const connection = await this.connect();
     const proof = signDeviceProof({
@@ -324,15 +325,13 @@ export class PairedHubTransport implements HubTransport {
       }),
     });
     if (!response.ok)
-      throw new Error(
-        `Hub pairing failed (${response.status}); issue a fresh invitation on the host`,
-      );
+      throw new Error(i18n.t("hub.connection.errors.pairingFailed", { status: response.status }));
     const value = (await response.json()) as {
       hubId?: string;
       credentialId?: string;
     };
     if (value.hubId !== this.profile.hubId || typeof value.credentialId !== "string")
-      throw new Error("Hub pairing identity mismatch");
+      throw new Error(i18n.t("hub.connection.errors.hubPairingMismatch"));
     await saveDeviceCredential(this.profile.hubId, value.credentialId);
   }
 
@@ -401,7 +400,7 @@ async function connectHub(
       connection.close();
     }
   }
-  throw failure ?? new Error("Hub has no reachable endpoint");
+  throw failure ?? new Error(i18n.t("hub.connection.errors.noReachableEndpoint"));
 }
 
 export async function pairHub(
@@ -413,7 +412,7 @@ export async function pairHub(
   validateHubRoutes(profile);
   if (offer.pairing) {
     if (offer.pairing.expiresAt <= Date.now())
-      throw new Error("Hub invitation expired; create a fresh QR on the host");
+      throw new Error(i18n.t("hub.connection.errors.invitationExpired"));
     await prepareDevicePairing(offer.hubId, offer.pairing.token);
   }
   const transport = new PairedHubTransport(profile);
@@ -425,12 +424,12 @@ export async function pairHub(
         entry?: string;
       };
       if (!response.ok || identity.hubId !== offer.hubId)
-        throw new Error("Hub identity could not be verified");
+        throw new Error(i18n.t("hub.connection.errors.identityNotVerified"));
       if (identity.entry !== "account" && !(await readDeviceCredential(offer.hubId))?.credentialId)
         throw new Error(
           identity.entry === "owner-setup"
-            ? "This Hub needs an approved owner-setup pairing link"
-            : "This Hub needs an approved pairing link",
+            ? i18n.t("hub.connection.errors.needsOwnerSetupLink")
+            : i18n.t("hub.connection.errors.needsPairingLink"),
         );
       if (identity.entry === "account") {
         await saveHubProfile(offer);
@@ -442,7 +441,7 @@ export async function pairHub(
     const capabilities = await transport.request("/api/auth/clisbot/device/capabilities");
     const capability = await capabilities.json();
     if (!capabilities.ok || capability.hubId !== offer.hubId)
-      throw new Error("Hub identity could not be verified");
+      throw new Error(i18n.t("hub.connection.errors.identityNotVerified"));
     let entry: "owner-setup" | "account" | "pairing" = "pairing";
     if (offer.ownerSetupToken) entry = "owner-setup";
     else if (capability.loginRequired) entry = "account";

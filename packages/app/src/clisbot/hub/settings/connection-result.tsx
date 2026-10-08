@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useHubAccount } from "../account-provider";
@@ -8,6 +9,7 @@ import { hubResourceQueryKey } from "../query-keys";
 import { hubConnectionResult } from "../connection-result";
 
 export function HubConnectionResultNotice() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id;
   const accountId = hub.signedIn?.account.id ?? null;
@@ -52,21 +54,25 @@ export function HubConnectionResultNotice() {
     <>
       <Alert variant={result.variant} title={result.title} description={result.description}>
         <Button size="sm" variant="ghost" onPress={dismiss}>
-          Dismiss
+          {t("hub.settings.connectionResult.dismiss")}
         </Button>
       </Alert>
       {refreshFailed || pending ? (
         <Alert
           variant={pending ? "info" : "warning"}
-          title={pending ? "Refreshing Connection status" : "Connection status could not refresh"}
+          title={
+            pending
+              ? t("hub.settings.connectionResult.refreshingTitle")
+              : t("hub.settings.connectionResult.refreshFailedTitle")
+          }
           description={
             pending
-              ? "Loading current provider status from Hub."
-              : "Check your connection and retry to load the current provider status."
+              ? t("hub.settings.connectionResult.refreshingDescription")
+              : t("hub.settings.connectionResult.refreshFailedDescription")
           }
         >
           <Button size="sm" variant="outline" loading={pending} onPress={retry}>
-            Retry refresh
+            {t("hub.settings.connectionResult.retryRefresh")}
           </Button>
         </Alert>
       ) : null}

@@ -1,5 +1,6 @@
 import { MoreHorizontal, Trash2, type LucideIcon } from "lucide-react-native";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { GestureResponderEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -62,6 +63,7 @@ export function ChannelActionsMenu({
   actions?: readonly ChannelMenuAction[];
   remove?: () => void;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   return (
     <DropdownMenu compactMode="sheet">
@@ -85,7 +87,12 @@ export function ChannelActionsMenu({
           />
         ))}
         {remove === undefined ? null : (
-          <ChannelMenuItem label="Remove" icon={Trash2} onSelect={remove} disabled={disabled} />
+          <ChannelMenuItem
+            label={t("hub.channels.menu.remove")}
+            icon={Trash2}
+            onSelect={remove}
+            disabled={disabled}
+          />
         )}
       </DropdownMenuContent>
     </DropdownMenu>

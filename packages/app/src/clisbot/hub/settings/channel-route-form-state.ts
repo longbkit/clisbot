@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import {
   newAudienceRule,
   routeAudienceDraft,
@@ -262,18 +263,23 @@ export function routeSaveBlocker(input: {
   provider: string;
   providerOptionsValid: boolean;
 }): string | null {
-  if (input.effectiveAccountId.length === 0) return "Give the Connection a name.";
+  if (input.effectiveAccountId.length === 0)
+    return i18n.t("hub.routes.saveBlockers.nameConnection");
   if (input.configurationKind === "route" && input.selectedAccount === undefined)
-    return "Choose a Connection.";
+    return i18n.t("hub.routes.saveBlockers.chooseConnection");
   if (input.configurationKind === "account" && input.selectedConnection === undefined)
-    return "Choose a Connection.";
+    return i18n.t("hub.routes.saveBlockers.chooseConnection");
   if (!input.parsedRouteLimits.valid) return input.parsedRouteLimits.error;
-  if (!input.audienceComplete) return "Finish the Rules above.";
-  if (!input.conversationValid || !input.toolActivityValid) return "Fix the fields marked above.";
+  if (!input.audienceComplete) return i18n.t("hub.routes.saveBlockers.finishRules");
+  if (!input.conversationValid || !input.toolActivityValid)
+    return i18n.t("hub.routes.saveBlockers.fixFields");
   if (input.existingTarget !== null) return null;
   if (input.target === "automation")
-    return input.automationName === null ? "Choose an Automation." : null;
-  if (input.target === "bot") return input.bot === null ? "Choose a Bot." : null;
+    return input.automationName === null
+      ? i18n.t("hub.routes.saveBlockers.chooseAutomation")
+      : null;
+  if (input.target === "bot")
+    return input.bot === null ? i18n.t("hub.routes.saveBlockers.chooseBot") : null;
   return agentTargetBlocker(input);
 }
 
@@ -286,12 +292,12 @@ function agentTargetBlocker(input: {
   provider: string;
   providerOptionsValid: boolean;
 }): string | null {
-  if (input.daemonId === null) return "Choose a Host.";
-  if (input.projectId === null) return "Choose a Project.";
-  if (input.cwd.trim().length === 0) return "Choose a folder for the Agent.";
-  if (!input.workspaceValid) return "Fix the workspace settings.";
-  if (input.provider.trim().length === 0) return "Choose a Provider and Model.";
-  return input.providerOptionsValid ? null : "Fix the provider options.";
+  if (input.daemonId === null) return i18n.t("hub.routes.saveBlockers.chooseHost");
+  if (input.projectId === null) return i18n.t("hub.routes.saveBlockers.chooseProject");
+  if (input.cwd.trim().length === 0) return i18n.t("hub.routes.saveBlockers.chooseFolder");
+  if (!input.workspaceValid) return i18n.t("hub.routes.saveBlockers.fixWorkspace");
+  if (input.provider.trim().length === 0) return i18n.t("hub.routes.saveBlockers.chooseProvider");
+  return input.providerOptionsValid ? null : i18n.t("hub.routes.saveBlockers.fixProviderOptions");
 }
 
 /** The Route keeps its target when the form was not allowed to rebuild one. */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { i18n } from "@/i18n/i18next";
 import { useTranscriptStore } from "../data/transcript-store";
 export function useChatRecord(
   client: DaemonClient | null,
@@ -25,7 +26,9 @@ export function useChatRecord(
           } else {
             setChat(r.chats.find((c) => c.id === chatId) ?? null);
             if (!r.chats.some((c) => c.id === chatId)) useTranscriptStore.getState().clear(key);
-            setError(r.chats.some((c) => c.id === chatId) ? null : "Chat is no longer available");
+            setError(
+              r.chats.some((c) => c.id === chatId) ? null : i18n.t("bots.chat.record.unavailable"),
+            );
           }
           return undefined;
         })

@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { formatTimeAgo } from "@/utils/time";
 import { invitationTeams } from "../../contracts";
 import { matchesSearch } from "../search-text";
@@ -19,17 +20,29 @@ export function invitationState(expiresAt: string, now = Date.now()): Invitation
 }
 
 export function invitationStateLabel(state: InvitationState): string {
-  return { active: "Pending", expiringSoon: "Expiring soon", expired: "Expired" }[state];
+  switch (state) {
+    case "active":
+      return i18n.t("hub.team.invitations.states.active");
+    case "expiringSoon":
+      return i18n.t("hub.team.invitations.states.expiringSoon");
+    case "expired":
+      return i18n.t("hub.team.invitations.states.expired");
+  }
 }
 
 /** "Expires in 3 h", "Expiring soon · 40 min", or "Expired". */
 export function invitationExpiryLabel(expiresAt: string, now = Date.now()): string {
   const state = invitationState(expiresAt, now);
-  if (state === "expired") return "Expired";
+  if (state === "expired") return i18n.t("hub.team.invitations.states.expired");
   const remaining = Date.parse(expiresAt) - now;
   const hours = Math.floor(remaining / HOUR_MS);
-  const clock = hours >= 1 ? `${String(hours)} h` : `${String(Math.floor(remaining / 60_000))} min`;
-  return state === "expiringSoon" ? `Expiring soon · ${clock}` : `Expires in ${clock}`;
+  const time =
+    hours >= 1
+      ? i18n.t("hub.team.invitations.hours", { value: hours })
+      : i18n.t("hub.team.invitations.minutes", { value: Math.floor(remaining / 60_000) });
+  return state === "expiringSoon"
+    ? i18n.t("hub.team.invitations.expiringSoonIn", { time })
+    : i18n.t("hub.team.invitations.expiresIn", { time });
 }
 
 /**
@@ -44,8 +57,10 @@ export function invitationSentLabel(
     invitation.createdAt === undefined
       ? Date.parse(invitation.expiresAt) - INVITATION_LIFETIME_MS
       : Date.parse(invitation.createdAt);
-  if (Number.isNaN(sentAt)) return "Sent";
-  return `Sent ${formatTimeAgo(new Date(sentAt), new Date(now))}`;
+  if (Number.isNaN(sentAt)) return i18n.t("hub.team.invitations.sent");
+  return i18n.t("hub.team.invitations.sentAgo", {
+    time: formatTimeAgo(new Date(sentAt), new Date(now)),
+  });
 }
 
 export function filterInvitations(

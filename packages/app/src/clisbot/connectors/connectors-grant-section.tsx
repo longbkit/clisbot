@@ -2,7 +2,9 @@ import { Plus } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
+import { i18n } from "@/i18n/i18next";
 import type { ConnectorGrant, ConnectorToolSelection } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
@@ -52,18 +54,21 @@ export interface ConnectorsGrantSectionProps {
   provider?: string;
 }
 
-const SUBJECT_TEXT = {
-  bot: {
-    info: "Apps and MCP servers this Bot may use. A new app starts read-only. Only Connectors set up on this Host are offered.",
-    empty: "This Bot uses no Connectors yet",
-  },
-  project: {
-    info: "Apps and MCP servers every agent session in this Project may use, Bots included. A new app starts read-only. Only Connectors set up on this Host are offered.",
-    empty: "Agents in this Project use no Connectors yet",
-  },
-} as const;
+/** The section's wording for a Bot's grant or a Project's. */
+function subjectText(subject: "bot" | "project"): { info: string; empty: string } {
+  return subject === "bot"
+    ? {
+        info: i18n.t("connectors.screen.grantSection.botInfo"),
+        empty: i18n.t("connectors.screen.grantSection.botEmpty"),
+      }
+    : {
+        info: i18n.t("connectors.screen.grantSection.projectInfo"),
+        empty: i18n.t("connectors.screen.grantSection.projectEmpty"),
+      };
+}
 
 export function ConnectorsGrantSection(props: ConnectorsGrantSectionProps) {
+  const { t } = useTranslation();
   const enabled = useHostConnectorsFeature(props.serverId);
   const saved = useProjectGrant(props.serverId, props.projectId, enabled);
   if (!enabled) return null;
@@ -71,9 +76,9 @@ export function ConnectorsGrantSection(props: ConnectorsGrantSectionProps) {
   if (isAccessDenied(saved.error)) return null;
   if (!saved.loaded) {
     return (
-      <SettingsSection title="Connectors">
+      <SettingsSection title={t("connectors.screen.common.connectors")}>
         <Text style={settingsStyles.rowHint}>
-          {saved.error ? saved.error.message : "Loading Connectors…"}
+          {saved.error ? saved.error.message : t("connectors.screen.grantSection.loading")}
         </Text>
       </SettingsSection>
     );
@@ -102,12 +107,14 @@ function GrantEditor({
   defaults: AgentToolDefaults | undefined;
   onSave(edit: GrantEdit): Promise<ConnectorGrant | null>;
 }) {
+  const { t } = useTranslation();
   const editor = useGrantEditor(saved, onSave);
   const lookup = useConnectorLookup(serverId);
   const sheets = useSheets(editor.apply, serverId, defaults);
   const apps = Object.entries(editor.grant?.apps ?? {});
   const servers = Object.entries(editor.grant?.mcpServers ?? {});
   const total = apps.length + servers.length;
+  const text = subjectText(subject);
   const choices = useMemo(
     () => lookup.choices.filter((choice) => !isGranted(editor.grant, choice)),
     [editor.grant, lookup.choices],
@@ -120,7 +127,7 @@ function GrantEditor({
         apply={editor.apply}
         onPickGroup={sheets.openAgentTools}
       />
-      <SettingsSection title="Connectors" info={SUBJECT_TEXT[subject].info}>
+      <SettingsSection title={t("connectors.screen.common.connectors")} info={text.info}>
         <View style={settingsStyles.card}>
           {apps.map(([slug, app], index) => (
             <AppGrantRow
@@ -146,7 +153,7 @@ function GrantEditor({
           ))}
           <AddRow
             bordered={total > 0}
-            empty={total === 0 ? SUBJECT_TEXT[subject].empty : null}
+            empty={total === 0 ? text.empty : null}
             onAdd={sheets.openAdd}
           />
         </View>
@@ -185,6 +192,7 @@ function AddRow({
   empty: string | null;
   onAdd(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={bordered ? [settingsStyles.row, settingsStyles.rowBorder] : settingsStyles.row}>
       <Text style={[settingsStyles.rowHint, settingsStyles.rowContent]}>{empty ?? ""}</Text>
@@ -195,7 +203,7 @@ function AddRow({
         onPress={onAdd}
         testID="bot-connectors-add"
       >
-        Add connector
+        {t("connectors.screen.common.addConnector")}
       </Button>
     </View>
   );
@@ -300,6 +308,7 @@ function PickerSheet({
   onClose(): void;
   onSave(tools: ConnectorToolSelection): void;
 }) {
+  const { t } = useTranslation();
   const query = useMemo(
     () => (target.kind === "app" ? { app: target.slug } : { mcpServer: target.name }),
     [target],
@@ -312,7 +321,7 @@ function PickerSheet({
     <ToolPickerSheet
       serverId={serverId}
       target={query}
-      title={`${name} tools`}
+      title={t("connectors.screen.grantSection.pickerTitle", { name })}
       initial={current ?? "all"}
       onClose={onClose}
       onSave={onSave}

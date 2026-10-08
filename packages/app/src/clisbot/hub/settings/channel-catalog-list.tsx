@@ -1,12 +1,13 @@
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { tableStyles } from "./table-styles";
 import { channelPrerequisiteSummary } from "../channel-catalog";
 import {
-  CHANNEL_STATUS_LABELS,
   channelSeverityVariant,
+  channelStatusLabel,
   type ChannelCatalogRow,
 } from "../channel-account-health";
 import type { ChannelIngressSeverity } from "../channel-ingress-operations";
@@ -73,23 +74,25 @@ function ChannelCatalogListRow({
 
 function prerequisites(row: ChannelCatalogRow): string {
   return row.entry === undefined
-    ? "This Hub runs this channel but does not publish a catalog entry for it."
-    : `Needs: ${channelPrerequisiteSummary(row.entry)}`;
+    ? i18n.t("hub.channels.catalogList.noEntry")
+    : i18n.t("hub.channels.catalogDetail.needs", { items: channelPrerequisiteSummary(row.entry) });
 }
 
 function accountSummary(row: ChannelCatalogRow): string {
-  if (row.accounts.length === 0) return "No accounts configured";
+  if (row.accounts.length === 0) return i18n.t("hub.channels.catalogList.noAccounts");
   const running = row.accounts.filter((account) => account.transport === "started").length;
-  return `${String(row.accounts.length)} ${row.accounts.length === 1 ? "account" : "accounts"} · ${String(running)} running`;
+  return i18n.t("hub.channels.catalogList.accounts", { count: row.accounts.length, running });
 }
 
 function statusLabel(row: ChannelCatalogRow): string {
-  if (row.status !== "in-repo") return CHANNEL_STATUS_LABELS[row.status];
-  if (row.accounts.length === 0) return "Ready to connect";
-  if (row.accounts.some((account) => account.severity === "error")) return "Attention";
+  if (row.status !== "in-repo") return channelStatusLabel(row.status);
+  if (row.accounts.length === 0) return i18n.t("hub.channels.catalogList.ready");
+  if (row.accounts.some((account) => account.severity === "error")) {
+    return i18n.t("hub.channels.catalogList.attention");
+  }
   // A warning names itself ("Needs login", "Stopped") rather than reading "Connected".
   const warning = row.accounts.find((account) => account.severity === "warning");
-  return warning?.transportLabel ?? "Connected";
+  return warning?.transportLabel ?? i18n.t("hub.channels.catalogList.connected");
 }
 
 function statusVariant(row: ChannelCatalogRow): "success" | "warning" | "error" | "muted" {

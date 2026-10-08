@@ -1,4 +1,5 @@
 import { useCallback, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -40,6 +41,7 @@ export function SessionSwitchRow({
   onNote?(): void;
   testID?: string;
 }) {
+  const { t } = useTranslation();
   const change = useCallback((next: boolean) => void onToggle?.(id, next), [id, onToggle]);
   return (
     <View style={bordered ? [styles.row, settingsStyles.rowBorder] : styles.row}>
@@ -50,7 +52,7 @@ export function SessionSwitchRow({
             <Text style={styles.noteText}>{note}</Text>
             {onNote ? (
               <Pressable accessibilityRole="link" onPress={onNote} hitSlop={6}>
-                <Text style={styles.noteLink}>Change</Text>
+                <Text style={styles.noteLink}>{t("connectors.tools.switchRow.change")}</Text>
               </Pressable>
             ) : null}
           </View>

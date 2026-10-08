@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { mergeAccessConstraints } from "./access-assignment-edit";
 import { assignmentSubjectName } from "./access-grant-rows";
@@ -59,7 +60,9 @@ export async function submitAccessAssignment(input: {
       );
   const addsHostConnect = daemonId !== null && !holdsHostConnect(existingDaemon);
   const confirmed = await confirmDialog({
-    title: input.editing ? "Save this access?" : "Grant this access?",
+    title: input.editing
+      ? i18n.t("hub.access.review.saveTitle")
+      : i18n.t("hub.access.review.grantTitle"),
     message: grantReviewMessage({
       subjectName: assignmentSubjectName(
         selection.subject,
@@ -77,10 +80,12 @@ export async function submitAccessAssignment(input: {
       addsHostConnect,
       hostConnectKnown: hostShareable,
       replacedNames: replaced.map(({ name }) => name),
-      guestScope: guestScope(selection.subject.kind, selection.resource.kind),
+      guestLine: guestLine(selection.subject.kind, selection.resource.kind),
       assignmentCount: written.length + (addsHostConnect ? 1 : 0),
     }),
-    confirmLabel: input.editing ? "Save access" : "Grant access",
+    confirmLabel: input.editing
+      ? i18n.t("hub.access.form.saveAccess")
+      : i18n.t("hub.access.form.grantAccess"),
   });
   if (!confirmed || !input.isCurrent()) return;
   await persistAccessAssignment(
@@ -217,12 +222,15 @@ async function persistAccessAssignment(
   );
 }
 
-/** What a Guest grant reaches, or null when the subject is not Guest. */
-function guestScope(subjectKind: SubjectKind, resourceKind: AccessResource["kind"]): string | null {
+/**
+ * What a Guest grant reaches, or null when the subject is not Guest. "Guest" reads
+ * like one person; it is everyone on a channel who never linked.
+ */
+function guestLine(subjectKind: SubjectKind, resourceKind: AccessResource["kind"]): string | null {
   if (subjectKind !== "guest") return null;
   return resourceKind === "daemon"
-    ? "every Project on this Host, including Projects added later"
-    : "the selected resources";
+    ? i18n.t("hub.access.review.guestOnHost")
+    : i18n.t("hub.access.review.guestOnSelected");
 }
 
 function grantReviewMessage(input: {
@@ -235,28 +243,25 @@ function grantReviewMessage(input: {
   /** False when the viewer cannot see the grantee's Host row. */
   hostConnectKnown: boolean;
   replacedNames: readonly string[];
-  guestScope: string | null;
+  guestLine: string | null;
   assignmentCount: number;
 }): string {
   return [
     `${input.subjectName} → ${input.resourceName}`,
-    // "Guest" reads like one person; it is everyone on a channel who never linked.
-    input.guestScope === null
-      ? null
-      : `Guest is every channel sender without a linked Member. All of them get this access on ${input.guestScope}.`,
-    `Access level: ${input.accessLevel}`,
-    effectLines("Allows", input.summary.allows),
-    effectLines("Not included", input.summary.withholds),
-    effectLines("Before you grant", input.summary.cautions),
+    input.guestLine,
+    i18n.t("hub.access.review.accessLevel", { level: input.accessLevel }),
+    effectLines(i18n.t("hub.access.summary.allows"), input.summary.allows),
+    effectLines(i18n.t("hub.access.summary.notIncluded"), input.summary.withholds),
+    effectLines(i18n.t("hub.access.summary.beforeYouGrant"), input.summary.cautions),
     hostConnectLine(input.addsHostConnect, input.hostConnectKnown),
     input.replacedNames.length > 0
-      ? `Replaces existing access, including its Agent choices, on: ${input.replacedNames.join(", ")}`
+      ? i18n.t("hub.access.review.replaces", { names: input.replacedNames.join(", ") })
       : null,
     input.configurationCount > 0
-      ? `Agent configurations: ${String(input.configurationCount)}`
+      ? i18n.t("hub.access.review.agentConfigurations", { number: input.configurationCount })
       : null,
     input.assignmentCount > 1
-      ? `Written as ${String(input.assignmentCount)} assignments in one action.`
+      ? i18n.t("hub.access.review.assignments", { count: input.assignmentCount })
       : null,
   ]
     .filter((line): line is string => line !== null)
@@ -266,6 +271,6 @@ function grantReviewMessage(input: {
 function hostConnectLine(addsHostConnect: boolean, known: boolean): string | null {
   if (!addsHostConnect) return null;
   return known
-    ? "Also grants: Connect to the parent Host"
-    : "Also grants: Connect to the parent Host, unless they already reach it";
+    ? i18n.t("hub.access.review.hostConnect")
+    : i18n.t("hub.access.review.hostConnectUnknown");
 }

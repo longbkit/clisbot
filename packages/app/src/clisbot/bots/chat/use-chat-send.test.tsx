@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
-import { expect, it, vi } from "vitest";
+import { beforeAll, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useChatSend } from "./use-chat-send";
@@ -10,6 +11,8 @@ vi.mock("@/utils/encode-images", () => ({
     images.length ? [{ data: "AA==", mimeType: "image/png" }] : undefined,
 }));
 vi.mock("../data/runtime", () => ({ refreshBotsAndChats: vi.fn() }));
+// The copy under test is the English UI text.
+beforeAll(() => i18n.changeLanguage("en"));
 const initial = { id: "chat-a", participants: [] } as unknown as ChatPayload;
 function mount(client: DaemonClient, attachmentsSupported = true) {
   return renderHook(() => {

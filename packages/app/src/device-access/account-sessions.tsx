@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { HubText as Text } from "./hub-text";
 import { z } from "zod";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { useHubProfiles } from "./hub-profiles";
 import { PairedHubTransport } from "./hub-transport";
@@ -51,6 +53,7 @@ function AccountSessionsScope({
   hub: ReturnType<typeof useHubAccount>;
   profile: HubProfile | undefined;
 }) {
+  const { t } = useTranslation();
   const generation = useRef(0);
   const transport = useMemo(() => {
     if (profile) return new PairedHubTransport(profile);
@@ -65,11 +68,10 @@ function AccountSessionsScope({
     const requestedGeneration = generation.current;
     const response = await transport.request("/api/auth/clisbot/device/account/sessions");
     if (requestedGeneration !== generation.current) return;
-    if (!response.ok)
-      throw new Error("Account sessions are unavailable. This Hub may need an update.");
+    if (!response.ok) throw new Error(t("hub.connection.sessions.unavailable"));
     const next = SessionsSchema.parse(await response.json()).sessions;
     if (requestedGeneration === generation.current) setSessions(next);
-  }, [transport]);
+  }, [transport, t]);
   useEffect(() => {
     const lifetime = generation;
     const requestedGeneration = generation.current;
@@ -85,13 +87,10 @@ function AccountSessionsScope({
     async (session: z.infer<typeof SessionSchema>) => {
       const requestedGeneration = generation.current;
       const confirmed = await confirmDialog({
-        title: session.isCurrent
-          ? "Sign out on this device?"
-          : `Sign out ${session.label ?? "this session"}?`,
-        message:
-          "This ends the sign-in session for this Hub. It does not stop agents or revoke paired devices. A permitted account can sign in again.",
-        confirmLabel: "Sign out",
-        cancelLabel: "Cancel",
+        title: signOutTitle(t, session),
+        message: t("hub.connection.sessions.confirmMessage"),
+        confirmLabel: t("hub.connection.sessions.signOut"),
+        cancelLabel: t("hub.connection.common.cancel"),
         destructive: true,
       });
       if (!confirmed || !transport || requestedGeneration !== generation.current) return;
@@ -107,19 +106,19 @@ function AccountSessionsScope({
           { method: "DELETE" },
         );
         if (requestedGeneration !== generation.current) return;
-        if (!response.ok) throw new Error("Session sign-out failed");
+        if (!response.ok) throw new Error(t("hub.connection.sessions.failed"));
         await refresh();
       } catch (caught) {
         if (requestedGeneration === generation.current)
-          setError(caught instanceof Error ? caught.message : "Session sign-out failed");
+          setError(caught instanceof Error ? caught.message : t("hub.connection.sessions.failed"));
       } finally {
         if (requestedGeneration === generation.current) setPending(false);
       }
     },
-    [transport, hub, refresh],
+    [transport, hub, refresh, t],
   );
   return (
-    <SettingsSection title="Sessions">
+    <SettingsSection title={t("hub.connection.sessions.title")}>
       <View style={settingsStyles.card}>
         {sessions.map((session, index) => (
           <AccountSessionRow
@@ -131,13 +130,17 @@ function AccountSessionsScope({
           />
         ))}
       </View>
-      <HubContextNote>
-        These are sign-in sessions for your account on this Hub. Signing out a session does not
-        revoke Host pairing or stop agents.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.sessions.note")}</HubContextNote>
       {error ? <Text accessibilityRole="alert">{error}</Text> : null}
     </SettingsSection>
   );
+}
+
+function signOutTitle(t: TFunction, session: z.infer<typeof SessionSchema>): string {
+  if (session.isCurrent) return t("hub.connection.sessions.confirmThisDevice");
+  return session.label == null
+    ? t("hub.connection.sessions.confirmSession")
+    : t("hub.connection.sessions.confirmOther", { label: session.label });
 }
 
 function AccountSessionRow({
@@ -151,6 +154,7 @@ function AccountSessionRow({
   signOut(session: z.infer<typeof SessionSchema>): Promise<void>;
   bordered: boolean;
 }) {
+  const { t } = useTranslation();
   const end = useCallback(() => {
     void signOut(session);
   }, [session, signOut]);
@@ -160,19 +164,27 @@ function AccountSessionRow({
       <View style={styles.copy}>
         <View style={styles.heading}>
           <Text style={styles.title}>
-            {session.label ?? "Device"}
-            {session.isCurrent ? " · This device" : ""}
+            {session.label ?? t("hub.connection.sessions.device")}
+            {session.isCurrent ? t("hub.connection.common.thisDeviceSuffix") : ""}
           </Text>
-          {session.isCurrent ? <HubStatusBadge label="Current" tone="success" /> : null}
+          {session.isCurrent ? (
+            <HubStatusBadge label={t("hub.connection.sessions.current")} tone="success" />
+          ) : null}
         </View>
-        <Text style={styles.hint}>Signed in {new Date(session.createdAt).toLocaleString()}</Text>
         <Text style={styles.hint}>
-          Last active {new Date(session.lastActiveAt ?? session.updatedAt).toLocaleString()}
+          {t("hub.connection.sessions.signedIn", {
+            date: new Date(session.createdAt).toLocaleString(),
+          })}
+        </Text>
+        <Text style={styles.hint}>
+          {t("hub.connection.common.lastActive", {
+            date: new Date(session.lastActiveAt ?? session.updatedAt).toLocaleString(),
+          })}
         </Text>
       </View>
       {!session.isCurrent ? (
         <Button size="sm" variant="outline" disabled={pending} onPress={end}>
-          Sign out
+          {t("hub.connection.sessions.signOut")}
         </Button>
       ) : null}
     </View>

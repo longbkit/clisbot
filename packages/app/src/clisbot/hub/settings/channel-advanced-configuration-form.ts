@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import {
   parseChannelConfigurationYaml,
   type ChannelConfigurationCandidate,
@@ -16,6 +17,17 @@ interface ChannelYamlState {
   validation: "idle" | "pending" | "valid" | "error";
   message: string;
   saving: boolean;
+}
+
+/** The error's own message, or the line for the step that failed. */
+function failureMessage(
+  error: unknown,
+  step: "invalid" | "validationFailed" | "activationFailed",
+): string {
+  if (error instanceof Error) return error.message;
+  if (step === "invalid") return i18n.t("hub.channels.yaml.invalid");
+  if (step === "validationFailed") return i18n.t("hub.channels.yaml.validationFailed");
+  return i18n.t("hub.channels.yaml.activationFailed");
 }
 
 export function openChannelYamlForm(initial: ChannelYamlSnapshot) {
@@ -54,7 +66,7 @@ export function openChannelYamlForm(initial: ChannelYamlSnapshot) {
     } catch (error) {
       publish({
         validation: "error",
-        message: error instanceof Error ? error.message : "Configuration is invalid.",
+        message: failureMessage(error, "invalid"),
       });
       return null;
     }
@@ -94,13 +106,13 @@ export function openChannelYamlForm(initial: ChannelYamlSnapshot) {
         if (request === generation)
           publish({
             validation: "valid",
-            message: "Configuration is valid. Nothing was activated.",
+            message: i18n.t("hub.channels.yaml.valid"),
           });
       } catch (error) {
         if (request === generation)
           publish({
             validation: "error",
-            message: error instanceof Error ? error.message : "Validation failed.",
+            message: failureMessage(error, "validationFailed"),
           });
       }
     },
@@ -113,12 +125,12 @@ export function openChannelYamlForm(initial: ChannelYamlSnapshot) {
       try {
         if (await save(candidate)) {
           baseline = { source: state.source, revisionId: latest.revisionId };
-          publish({ message: "Configuration activated." });
+          publish({ message: i18n.t("hub.channels.yaml.activated") });
         }
       } catch (error) {
         publish({
           validation: "error",
-          message: error instanceof Error ? error.message : "Activation failed.",
+          message: failureMessage(error, "activationFailed"),
         });
       } finally {
         publish({ saving: false });

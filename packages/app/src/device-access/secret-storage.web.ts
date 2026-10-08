@@ -1,4 +1,5 @@
 import { getDesktopHost } from "@/desktop/host";
+import { i18n } from "@/i18n/i18next";
 interface EncryptedSecret {
   key: CryptoKey;
   iv: Uint8Array<ArrayBuffer>;
@@ -34,8 +35,7 @@ async function readEncrypted(key: string): Promise<EncryptedSecret | undefined> 
 export async function readSecret(key: string): Promise<string | null> {
   const desktop = getDesktopHost();
   if (desktop) {
-    if (!desktop.deviceSecrets)
-      throw new Error("Update the desktop app to support secure device storage");
+    if (!desktop.deviceSecrets) throw new Error(i18n.t("hub.connection.errors.updateDesktop"));
     return desktop.deviceSecrets.read(key);
   }
   const stored = await readEncrypted(key);
@@ -51,8 +51,7 @@ export async function readSecret(key: string): Promise<string | null> {
 export async function writeSecret(key: string, value: string): Promise<void> {
   const desktop = getDesktopHost();
   if (desktop) {
-    if (!desktop.deviceSecrets)
-      throw new Error("Update the desktop app to support secure device storage");
+    if (!desktop.deviceSecrets) throw new Error(i18n.t("hub.connection.errors.updateDesktop"));
     return desktop.deviceSecrets.write(key, value);
   }
   const encryptionKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
@@ -71,8 +70,7 @@ export async function writeSecret(key: string, value: string): Promise<void> {
 export async function deleteSecret(key: string): Promise<void> {
   const desktop = getDesktopHost();
   if (desktop) {
-    if (!desktop.deviceSecrets)
-      throw new Error("Update the desktop app to support secure device storage");
+    if (!desktop.deviceSecrets) throw new Error(i18n.t("hub.connection.errors.updateDesktop"));
     return desktop.deviceSecrets.delete(key);
   }
   await mutateSecret(key);
@@ -91,7 +89,6 @@ async function mutateSecret(key: string, value?: EncryptedSecret): Promise<void>
 }
 
 export async function lockSecret<T>(key: string, action: () => Promise<T>): Promise<T> {
-  if (!navigator.locks)
-    throw new Error("Device pairing requires a secure browser with Web Locks support");
+  if (!navigator.locks) throw new Error(i18n.t("hub.connection.errors.needsWebLocks"));
   return navigator.locks.request(`clisbot-device:${key}`, action);
 }

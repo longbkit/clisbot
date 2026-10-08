@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorMcpServer, ConnectorMcpTransport } from "@clisbot/protocol/connectors/types";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { useMcpServerForm, type McpServerForm } from "./use-mcp-server-form";
 
@@ -14,11 +16,6 @@ import { useMcpServerForm, type McpServerForm } from "./use-mcp-server-form";
  * values are typed here once and never shown again: an edit with the field left empty
  * keeps what the Host stores. The caller remounts the sheet per server it edits.
  */
-
-const TRANSPORTS = [
-  { value: "http" as const, label: "Remote URL" },
-  { value: "stdio" as const, label: "Local command" },
-];
 
 export function McpServerSheet({
   serverId,
@@ -33,16 +30,28 @@ export function McpServerSheet({
   onClose(): void;
   onSaved(name: string): void;
 }) {
+  const { t } = useTranslation();
   const form = useMcpServerForm(serverId, editing, onSaved);
+  const transports = useMemo(
+    () => [
+      { value: "http" as const, label: t("connectors.screen.mcp.remoteUrl") },
+      { value: "stdio" as const, label: t("connectors.screen.common.localCommand") },
+    ],
+    [t],
+  );
   const header = useMemo(
-    () => ({ title: editing ? `Edit ${editing.name}` : "Add MCP server" }),
-    [editing],
+    () => ({
+      title: editing
+        ? t("connectors.screen.mcp.editTitle", { name: editing.name })
+        : t("connectors.screen.common.addMcpServer"),
+    }),
+    [editing, t],
   );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <Button variant="ghost" onPress={onClose}>
-          Cancel
+          {t("connectors.screen.common.cancel")}
         </Button>
         <Button
           variant="default"
@@ -51,11 +60,11 @@ export function McpServerSheet({
           onPress={form.save}
           testID="connectors-mcp-save"
         >
-          {editing ? "Save server" : "Add server"}
+          {editing ? t("connectors.screen.mcp.saveServer") : t("connectors.screen.mcp.addServer")}
         </Button>
       </View>
     ),
-    [editing, form.save, form.saving, onClose],
+    [editing, form.save, form.saving, onClose, t],
   );
   return (
     <AdaptiveModalSheet
@@ -66,12 +75,9 @@ export function McpServerSheet({
       desktopMaxWidth={560}
     >
       <View style={styles.body}>
-        <Field
-          label="Name"
-          hint="Lowercase letters, digits, - and _. Agents see its tools under this name."
-        >
+        <Field label={t("connectors.screen.mcp.name")} hint={t("connectors.screen.mcp.nameHint")}>
           <FormTextInput
-            accessibilityLabel="Name"
+            accessibilityLabel={t("connectors.screen.mcp.name")}
             initialValue={editing?.name ?? ""}
             placeholder="linear"
             autoCapitalize="none"
@@ -79,9 +85,9 @@ export function McpServerSheet({
             testID="connectors-mcp-name"
           />
         </Field>
-        <Field label="Runs as">
+        <Field label={t("connectors.screen.mcp.runsAs")}>
           <SegmentedControl<ConnectorMcpTransport>
-            options={TRANSPORTS}
+            options={transports}
             value={form.transport}
             onValueChange={form.setTransport}
             size="sm"
@@ -103,7 +109,9 @@ export function McpServerSheet({
 }
 
 function storedHint(names: string[] | undefined, fallback: string): string {
-  return names?.length ? `Stored: ${names.join(", ")}. Leave empty to keep them.` : fallback;
+  return names?.length
+    ? i18n.t("connectors.screen.mcp.stored", { names: names.join(", ") })
+    : fallback;
 }
 
 function RemoteFields({
@@ -113,11 +121,12 @@ function RemoteFields({
   editing: ConnectorMcpServer | null;
   form: McpServerForm;
 }) {
+  const { t } = useTranslation();
   return (
     <>
-      <Field label="URL">
+      <Field label={t("connectors.screen.mcp.url")}>
         <FormTextInput
-          accessibilityLabel="URL"
+          accessibilityLabel={t("connectors.screen.mcp.url")}
           initialValue={editing?.url ?? ""}
           placeholder="https://mcp.example.com/mcp"
           autoCapitalize="none"
@@ -127,14 +136,11 @@ function RemoteFields({
         />
       </Field>
       <Field
-        label="Headers"
-        hint={storedHint(
-          editing?.headerKeys,
-          "One per line, Name: value. Stored on this Host only; agents never see them.",
-        )}
+        label={t("connectors.screen.mcp.headers")}
+        hint={storedHint(editing?.headerKeys, t("connectors.screen.mcp.headersHint"))}
       >
         <FormTextInput
-          accessibilityLabel="Headers"
+          accessibilityLabel={t("connectors.screen.mcp.headers")}
           placeholder="Authorization: Bearer …"
           autoCapitalize="none"
           multiline
@@ -153,14 +159,15 @@ function LocalFields({
   editing: ConnectorMcpServer | null;
   form: McpServerForm;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <Field
-        label="Command"
-        hint="Runs on this Host in the agent's folder, for example npx -y @modelcontextprotocol/server-filesystem ~/notes"
+        label={t("connectors.screen.mcp.command")}
+        hint={t("connectors.screen.mcp.commandHint")}
       >
         <FormTextInput
-          accessibilityLabel="Command"
+          accessibilityLabel={t("connectors.screen.mcp.command")}
           initialValue={form.command}
           placeholder="npx -y my-mcp-server"
           autoCapitalize="none"
@@ -169,14 +176,11 @@ function LocalFields({
         />
       </Field>
       <Field
-        label="Environment"
-        hint={storedHint(
-          editing?.envKeys,
-          "One per line, NAME=value. The server starts inside each granted agent with these.",
-        )}
+        label={t("connectors.screen.mcp.environment")}
+        hint={storedHint(editing?.envKeys, t("connectors.screen.mcp.envHint"))}
       >
         <FormTextInput
-          accessibilityLabel="Environment"
+          accessibilityLabel={t("connectors.screen.mcp.environment")}
           placeholder="API_TOKEN=…"
           autoCapitalize="none"
           multiline

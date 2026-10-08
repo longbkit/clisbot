@@ -11,7 +11,8 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react-native";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { AgentToolGroup } from "@clisbot/protocol/connectors/agent-tools";
@@ -21,6 +22,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Switch } from "@/components/ui/switch";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE } from "@/styles/theme";
+import { agentToolGroupDescription, agentToolGroupLabel } from "./agent-tool-copy";
 import {
   TOOL_GROUPS,
   groupSummary,
@@ -40,12 +42,6 @@ import type { GrantEdit } from "./use-grant-editor";
  * tools"): whether they get the Clisbot tools at all (Host default, On, Off), then one row per
  * group, the browser first, with a switch and its tool list behind the chevron (§12).
  */
-
-const CHOICES: { value: ToolsChoice; label: string }[] = [
-  { value: "host", label: "Host" },
-  { value: "on", label: "On" },
-  { value: "off", label: "Off" },
-];
 
 const themed = (icon: LucideIcon) =>
   withUnistyles(icon, (theme) => ({ color: theme.colors.foregroundMuted }));
@@ -95,6 +91,7 @@ export function AgentToolsSections({
   apply(edit: GrantEdit): void;
   onPickGroup(group: AgentToolGroup): void;
 }) {
+  const { t } = useTranslation();
   const clisbotOn = toolsOn(grant?.agentTools?.enabled, defaults?.agentTools);
   const setClisbot = useCallback(
     (choice: ToolsChoice) => apply((current) => setClisbotToolsChoice(current, choice)),
@@ -102,8 +99,8 @@ export function AgentToolsSections({
   );
   return (
     <SettingsSection
-      title="Clisbot tools"
-      info="Clisbot's own tools for this Project's agents: the built-in browser, other agents, workspaces, terminals and Automations. On or off applies from a session's next start; a tool turned off applies at its next call. The browser also has its own Host default."
+      title={t("connectors.tools.common.clisbotTools")}
+      info={t("connectors.tools.agentTools.info")}
     >
       <View style={settingsStyles.card}>
         <ChoiceRow
@@ -138,15 +135,26 @@ function ChoiceRow({
   value: ToolsChoice;
   onChange(value: ToolsChoice): void;
 }) {
+  const { t } = useTranslation();
+  const choices = useMemo<{ value: ToolsChoice; label: string }[]>(
+    () => [
+      { value: "host", label: t("connectors.tools.agentTools.choiceHost") },
+      { value: "on", label: t("connectors.tools.agentTools.choiceOn") },
+      { value: "off", label: t("connectors.tools.agentTools.choiceOff") },
+    ],
+    [t],
+  );
   return (
     <View style={styles.row}>
       <AgentToolGroupIcon group={null} />
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>Agents get these tools</Text>
+        <Text style={settingsStyles.rowTitle}>
+          {t("connectors.tools.agentTools.agentsGetTools")}
+        </Text>
         <Text style={settingsStyles.rowHint}>{hint}</Text>
       </View>
       <SegmentedControl<ToolsChoice>
-        options={CHOICES}
+        options={choices}
         value={value}
         onValueChange={onChange}
         size="sm"
@@ -169,8 +177,10 @@ function GroupRow({
   apply(edit: GrantEdit): void;
   onOpen(group: AgentToolGroup): void;
 }) {
+  const { t } = useTranslation();
   const on = projectGroupTools(grant, group, defaults).length > 0;
   const summary = groupSummary(grant, group, defaults);
+  const label = agentToolGroupLabel(group);
   const toggle = useCallback(
     (value: boolean) => apply((current) => setGroupOn(current, group, value, defaults)),
     [apply, defaults, group],
@@ -179,19 +189,23 @@ function GroupRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${group.label}, ${summary}`}
+      accessibilityLabel={`${label}, ${summary}`}
       onPress={open}
       style={groupRowStyle}
       testID={`agent-tools-group-${group.id}`}
     >
       <AgentToolGroupIcon group={group.id} dimmed={!on} />
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{group.label}</Text>
+        <Text style={settingsStyles.rowTitle}>{label}</Text>
         <Text style={settingsStyles.rowHint} numberOfLines={1}>
-          {`${summary} · ${group.description}`}
+          {`${summary} · ${agentToolGroupDescription(group)}`}
         </Text>
       </View>
-      <Switch value={on} onValueChange={toggle} accessibilityLabel={`${group.label} tools`} />
+      <Switch
+        value={on}
+        onValueChange={toggle}
+        accessibilityLabel={t("connectors.tools.agentTools.groupTools", { group: label })}
+      />
       <ThemedChevron size={ICON_SIZE.sm} />
     </Pressable>
   );

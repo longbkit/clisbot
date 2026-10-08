@@ -1,5 +1,6 @@
 import { useFormLifetime } from "./use-form-lifetime";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import type { AggregatedBot } from "../data/use-bots";
 import { refreshBotsAndChats } from "../data/runtime";
@@ -16,6 +17,7 @@ export interface GroupChatFormProps {
 }
 export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps) {
   const isCurrent = useFormLifetime();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(() => openGroupChatDraft(hosts.map((host) => host.serverId)));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,20 +43,21 @@ export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps)
     setError(null);
     try {
       if (!hosts.some((host) => host.serverId === draft.serverId))
-        throw new Error("Host is disconnected");
+        throw new Error(t("bots.workspace.errors.hostDisconnected"));
       const client = getHostRuntimeStore().getClient(draft.serverId);
       if (
         !client ||
         getHostRuntimeStore().getSnapshot(draft.serverId)?.connectionStatus !== "online"
       )
-        throw new Error("Host is disconnected");
+        throw new Error(t("bots.workspace.errors.hostDisconnected"));
       const result = await client.createChat(
         groupChatRequest(
           draft,
           bots.filter((bot) => bot.serverId === draft.serverId).map((bot) => bot.id),
         ),
       );
-      if (result.error || !result.chat) throw new Error(result.error ?? "Could not create chat");
+      if (result.error || !result.chat)
+        throw new Error(result.error ?? t("bots.workspace.errors.createChatFailed"));
       refreshBotsAndChats();
       if (isCurrent()) onCreated(draft.serverId, result.chat.id);
     } catch (cause) {
@@ -62,7 +65,7 @@ export function useGroupChatForm({ bots, hosts, onCreated }: GroupChatFormProps)
     } finally {
       if (isCurrent()) setBusy(false);
     }
-  }, [bots, draft, hosts, onCreated, isCurrent]);
+  }, [bots, draft, hosts, onCreated, isCurrent, t]);
   return {
     draft,
     members,

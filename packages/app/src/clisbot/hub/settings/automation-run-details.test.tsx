@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutomationActivity, AutomationRunDetails } from "./automation-run-details";
+// Real English copy: the assertions below read the rendered text.
+import { i18n as testI18n } from "@/i18n/i18next";
+
+void testI18n;
 
 const fixture = vi.hoisted(() => ({ get: vi.fn(), accountId: "owner", close: vi.fn() }));
 vi.mock("../account-provider", () => ({

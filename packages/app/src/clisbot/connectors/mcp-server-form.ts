@@ -1,3 +1,5 @@
+import { i18n } from "@/i18n/i18next";
+
 /**
  * Text parsing behind the MCP server form. Kept apart from the component so it is tested
  * without a renderer.
@@ -22,8 +24,8 @@ export function parseSecretLines(
     if (at <= 0) {
       throw new Error(
         separator === ":"
-          ? `"${line}" is not a header. Write it as Name: value.`
-          : `"${line}" is not a variable. Write it as NAME=value.`,
+          ? i18n.t("connectors.screen.errors.notAHeader", { line })
+          : i18n.t("connectors.screen.errors.notAVariable", { line }),
       );
     }
     values[line.slice(0, at).trim()] = line.slice(at + 1).trim();

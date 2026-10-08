@@ -14,6 +14,7 @@ import {
   useState,
 } from "react";
 import { useFetchQuery } from "@/data/query";
+import { i18n } from "@/i18n/i18next";
 import { HubApiClient } from "./api-client";
 import { getHubConfiguration, type HubConfiguration } from "./config";
 import {
@@ -93,6 +94,11 @@ interface HubAccountContextValue {
   api(): HubApiClient;
 }
 
+/** Every account action of a build without Hub support. */
+function notIncluded(): Promise<never> {
+  return Promise.reject(new Error(i18n.t("hub.account.errors.notIncluded")));
+}
+
 const disabledValue: HubAccountContextValue = {
   enabled: false,
   origin: null,
@@ -101,32 +107,30 @@ const disabledValue: HubAccountContextValue = {
   signedIn: null,
   loading: false,
   error: null,
-  signIn: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  signUp: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  startRegistration: () => Promise.reject(new Error("Hub support is not included in this build.")),
+  signIn: notIncluded,
+  signUp: notIncluded,
+  startRegistration: notIncluded,
   registrationToken: null,
-  inspectRegistration: () =>
-    Promise.reject(new Error("Hub support is not included in this build.")),
-  completeRegistration: () =>
-    Promise.reject(new Error("Hub support is not included in this build.")),
+  inspectRegistration: notIncluded,
+  completeRegistration: notIncluded,
   dismissRegistration: () => undefined,
-  updateProfile: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  renameOrganization: () => Promise.reject(new Error("Hub support is not included in this build.")),
+  updateProfile: notIncluded,
+  renameOrganization: notIncluded,
   signInWithGoogle: undefined,
-  claimInstance: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  completeAppSetup: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  changePassword: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  acceptInvitation: () => Promise.reject(new Error("Hub support is not included in this build.")),
+  claimInstance: notIncluded,
+  completeAppSetup: notIncluded,
+  changePassword: notIncluded,
+  acceptInvitation: notIncluded,
   signOut: () => Promise.resolve(),
-  selectOrganization: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  createOrganization: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  inviteMember: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  cancelInvitation: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  changeMemberRole: () => Promise.reject(new Error("Hub support is not included in this build.")),
-  removeMember: () => Promise.reject(new Error("Hub support is not included in this build.")),
+  selectOrganization: notIncluded,
+  createOrganization: notIncluded,
+  inviteMember: notIncluded,
+  cancelInvitation: notIncluded,
+  changeMemberRole: notIncluded,
+  removeMember: notIncluded,
   refresh: () => Promise.resolve(),
   api: () => {
-    throw new Error("Hub support is not included in this build.");
+    throw new Error(i18n.t("hub.account.errors.notIncluded"));
   },
 };
 
@@ -135,7 +139,7 @@ const unconfiguredHub = { origin: "hub://unconfigured" };
 const disabledTransport: HubTransport = {
   signInKind: "password",
   request: async () => {
-    throw new Error("Pair a Hub first.");
+    throw new Error(i18n.t("hub.account.errors.pairFirst"));
   },
   signIn: disabledValue.signIn,
   signOut: disabledValue.signOut,
@@ -259,7 +263,8 @@ function EnabledHubAccountController({
         await operation();
         await refresh();
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Hub request failed.";
+        const message =
+          error instanceof Error ? error.message : i18n.t("hub.account.errors.requestFailed");
         setMutationError(message);
         throw error;
       }
@@ -465,7 +470,7 @@ function EnabledHubAccountController({
   const signedIn =
     state?.status === "active" || state?.status === "appSetupRequired" ? state : null;
   const api = useCallback(() => {
-    if (signedIn === null) throw new Error("Sign in to Hub first.");
+    if (signedIn === null) throw new Error(i18n.t("hub.account.errors.signInFirst"));
     return new HubApiClient(transport, signedIn.organization.id);
   }, [signedIn, transport]);
   const accountError = accountErrorMessage(account.error, account.isError);
@@ -556,7 +561,7 @@ function EnabledHubAccountController({
 
 function accountErrorMessage(error: unknown, isError: boolean): string | null {
   if (error instanceof Error) return error.message;
-  return isError ? "Hub is unavailable." : null;
+  return isError ? i18n.t("hub.account.errors.unavailable") : null;
 }
 
 export function useHubAccount(): HubAccountContextValue {
@@ -630,7 +635,9 @@ async function registrationLinkRequest(
     body: JSON.stringify(body),
   });
   const parsed = HubRegistrationLinkSchema.safeParse(await response.json().catch(() => null));
-  if (!parsed.success) throw new Error(`Hub registration request failed (${response.status}).`);
+  if (!parsed.success) {
+    throw new Error(i18n.t("hub.account.errors.registrationFailed", { status: response.status }));
+  }
   return parsed.data;
 }
 
@@ -643,13 +650,16 @@ function queryParameter(value: string | null, name: string): string | null {
   }
 }
 
-const UPDATE_ERRORS: Record<string, string> = {
-  invalid_profile_name: "Enter a name of up to 100 characters.",
-  invalid_profile_image:
-    "Use an https image link from a host this Hub trusts, such as a Google or Gravatar photo.",
-  invalid_organization_name: "Enter an organization name of up to 100 characters.",
-  organization_owner_required: "Only an organization owner can rename the organization.",
-};
+/** The readable message for a Better Auth update refusal code. */
+function updateErrorMessage(code: string): string | undefined {
+  const messages: Record<string, string> = {
+    invalid_profile_name: i18n.t("hub.account.errors.invalidProfileName"),
+    invalid_profile_image: i18n.t("hub.account.errors.invalidProfileImage"),
+    invalid_organization_name: i18n.t("hub.account.errors.invalidOrganizationName"),
+    organization_owner_required: i18n.t("hub.account.errors.organizationOwnerRequired"),
+  };
+  return messages[code];
+}
 
 function updateProfileRequest(
   transport: HubTransport,
@@ -672,8 +682,8 @@ async function hubUpdateRequest(
   if (response.ok) return;
   const code: unknown = Reflect.get(Object(await response.json().catch(() => ({}))), "code");
   throw new Error(
-    (typeof code === "string" ? UPDATE_ERRORS[code] : undefined) ??
-      `Hub couldn't save the change (${response.status}).`,
+    (typeof code === "string" ? updateErrorMessage(code) : undefined) ??
+      i18n.t("hub.account.errors.saveFailed", { status: response.status }),
   );
 }
 
@@ -696,28 +706,27 @@ async function startRegistrationRequest(
   return "unavailable";
 }
 
-/** Messages for the `?error=` code a refused Google sign-in returns with. */
-const GOOGLE_SIGN_IN_ERRORS: Record<string, string> = {
-  registration_closed:
-    "This Google account isn't admitted to this Hub. Use an invited address or an allowed company domain.",
-  google_email_unverified: "Google hasn't verified this email address, so Hub can't use it.",
-  account_already_linked_to_different_user:
-    "This Google account is linked to a different Hub account. Ask the Hub operator to recover it.",
-  google_profile_unavailable:
-    "Google didn't return the profile Hub needs. Try signing in with Google again.",
-  instance_unavailable:
-    "This Hub was already set up by someone else. Sign in with your account instead.",
-  unable_to_link_account:
-    "Hub doesn't link Google to this account automatically. Sign in with your password.",
-  account_not_linked:
-    "An account with this email exists, but Google couldn't prove the address. Sign in with your password.",
-};
+/** The message for the `?error=` code a refused Google sign-in returns with. */
+function googleSignInErrorMessage(code: string): string | undefined {
+  const messages: Record<string, string> = {
+    registration_closed: i18n.t("hub.account.googleSignIn.registrationClosed"),
+    google_email_unverified: i18n.t("hub.account.googleSignIn.emailUnverified"),
+    account_already_linked_to_different_user: i18n.t(
+      "hub.account.googleSignIn.linkedToDifferentAccount",
+    ),
+    google_profile_unavailable: i18n.t("hub.account.googleSignIn.profileUnavailable"),
+    instance_unavailable: i18n.t("hub.account.googleSignIn.instanceUnavailable"),
+    unable_to_link_account: i18n.t("hub.account.googleSignIn.unableToLink"),
+    account_not_linked: i18n.t("hub.account.googleSignIn.accountNotLinked"),
+  };
+  return messages[code];
+}
 
 function signInRedirectError(value: string | null): string | null {
   if (value === null) return null;
   try {
     const code = new URL(value).searchParams.get("error");
-    return code === null ? null : (GOOGLE_SIGN_IN_ERRORS[code] ?? null);
+    return code === null ? null : (googleSignInErrorMessage(code) ?? null);
   } catch {
     return null;
   }

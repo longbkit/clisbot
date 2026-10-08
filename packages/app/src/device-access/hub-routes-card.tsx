@@ -45,6 +45,7 @@ export function HubRoutesCard({ profile, onUpdated }: { profile: HubProfile; onU
 }
 
 function useHubTailscale(profile: HubProfile, onUpdated?: () => void) {
+  const { t } = useTranslation();
   const host = useHubHost(profile.hubId);
   const localServerId = useLocalDaemonServerId();
   const hostTailscale = useHostTailscale(host.serverId);
@@ -52,7 +53,7 @@ function useHubTailscale(profile: HubProfile, onUpdated?: () => void) {
   const canStart = host.serverId ? canStartHubOnHost(host.serverId, localServerId) : false;
   const setUp = useMutation({
     mutationFn: () => {
-      if (!host.serverId) throw new Error("Connect the Host that runs this Hub first");
+      if (!host.serverId) throw new Error(t("hub.connection.errors.connectHubHost"));
       return setUpHubTailscale({ profile, serverId: host.serverId, localServerId });
     },
     onSuccess: (result) => {

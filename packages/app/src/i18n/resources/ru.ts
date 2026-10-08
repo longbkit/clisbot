@@ -1,5 +1,9 @@
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
+import { bots } from "./bots";
+import { heartbeats } from "./heartbeats";
+import { connectors } from "./connectors";
+import { hub } from "./hub";
 
 export const ru: TranslationResources = {
   paneFind: {
@@ -1267,6 +1271,7 @@ export const ru: TranslationResources = {
         copyPath: "Копировать путь",
         copyBranchName: "Скопировать имя ветки",
         rename: "Переименовать рабочее пространство",
+        renameSession: "Переименовать сессию",
         pin: "Закрепить вверху",
         unpin: "Открепить",
         archive: "Архивировать",
@@ -2209,6 +2214,7 @@ export const ru: TranslationResources = {
           ko: "한국어",
           ptBR: "Português brasileiro",
           ru: "Русский",
+          vi: "вьетнамский",
           zhCN: "简体中文",
         },
       },
@@ -2860,4 +2866,8 @@ export const ru: TranslationResources = {
       },
     },
   },
+  hub: hub.ru,
+  connectors: connectors.ru,
+  bots: bots.ru,
+  heartbeats: heartbeats.ru,
 };

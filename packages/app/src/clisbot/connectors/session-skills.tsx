@@ -1,9 +1,11 @@
 import { ChevronRight } from "lucide-react-native";
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { skillOffKey, skillsInOffList } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
+import { i18n } from "@/i18n/i18next";
 import { useAgentCommandsQuery, type AgentSlashCommand } from "@/hooks/use-agent-commands-query";
 import { useSessionStore } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
@@ -75,12 +77,13 @@ export function useSessionSkills(
 }
 
 function skillsSummary({ skills, loading }: SessionSkills, off: ReadonlySet<string>): string {
-  if (skills === null) return "Listed once the session starts";
-  if (loading) return "Loading…";
-  if (skills.length === 0) return "None found";
-  const count = skills.length === 1 ? "1 skill" : `${skills.length} skills`;
+  if (skills === null) return i18n.t("connectors.tools.skills.listedOnStart");
+  if (loading) return i18n.t("connectors.tools.skills.loading");
+  if (skills.length === 0) return i18n.t("connectors.tools.skills.noneFound");
+  const count = i18n.t("connectors.tools.skills.count", { count: skills.length });
   const offCount = skills.filter((skill) => off.has(skillOffKey(skill.name))).length;
-  return offCount > 0 ? `${count} · ${offCount} off here` : count;
+  if (offCount === 0) return count;
+  return `${count} · ${i18n.t("connectors.tools.common.offHere", { count: offCount })}`;
 }
 
 /** One row for the session's skills; it opens their list. */
@@ -93,15 +96,16 @@ export function SkillsSection({
   off: ReadonlySet<string>;
   onOpen(page: string): void;
 }) {
+  const { t } = useTranslation();
   const listed = (skills.skills?.length ?? 0) > 0;
   const open = useCallback(() => onOpen(SKILLS_PAGE), [onOpen]);
   const summary = skillsSummary(skills, off);
   return (
-    <SettingsSection title="Skills">
+    <SettingsSection title={t("connectors.tools.skills.title")}>
       <View style={settingsStyles.card}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Skills, ${summary}`}
+          accessibilityLabel={t("connectors.tools.skills.accessibilityLabel", { summary })}
           disabled={!listed}
           onPress={open}
           style={rowStyle}
@@ -109,7 +113,7 @@ export function SkillsSection({
         >
           <AgentToolGroupIcon group={SKILLS_PAGE} dimmed={!listed} />
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>Skills</Text>
+            <Text style={settingsStyles.rowTitle}>{t("connectors.tools.skills.title")}</Text>
             <Text style={settingsStyles.rowHint}>{summary}</Text>
           </View>
           {listed ? <ThemedChevron size={ICON_SIZE.sm} /> : null}
@@ -135,13 +139,18 @@ export function SkillsPage({
   off: ReadonlySet<string>;
   apply(edit: SessionOffEdit): void;
 }) {
+  const { t } = useTranslation();
   const shown = useMemo(() => matchingSkills(skills.skills ?? [], query), [query, skills.skills]);
   const toggle = useCallback(
     (name: string) => apply((current) => toggled(current, skillOffKey(name))),
     [apply],
   );
   if (shown.length === 0) {
-    return <Text style={[settingsStyles.rowHint, styles.empty]}>No skill matches.</Text>;
+    return (
+      <Text style={[settingsStyles.rowHint, styles.empty]}>
+        {t("connectors.tools.skills.noMatch")}
+      </Text>
+    );
   }
   return (
     <View style={settingsStyles.card}>
@@ -176,17 +185,18 @@ function matchingSkills(skills: readonly AgentSlashCommand[], query: string) {
   );
 }
 
-export const SKILLS_PAGE_HEADER = {
-  title: "Skills",
-  subtitle: "What this agent can load when a task needs it",
-};
+export function skillsPageHeader(): { title: string; subtitle: string } {
+  return {
+    title: i18n.t("connectors.tools.skills.title"),
+    subtitle: i18n.t("connectors.tools.skills.pageSubtitle"),
+  };
+}
 
 export function skillsInfo(switchable: boolean): string {
-  const source =
-    "Skills come from the agent's own folders on the Host, such as ~/.claude/skills or the project's .claude/skills.";
+  const source = i18n.t("connectors.tools.skills.infoSource");
   return switchable
-    ? `${source} A skill turned off here cannot be loaded from the agent's next step, and other sessions keep it.`
-    : `${source} This agent's provider cannot turn single skills off for one session.`;
+    ? i18n.t("connectors.tools.skills.infoSwitchable", { source })
+    : i18n.t("connectors.tools.skills.infoFixed", { source });
 }
 
 const styles = StyleSheet.create((theme) => ({

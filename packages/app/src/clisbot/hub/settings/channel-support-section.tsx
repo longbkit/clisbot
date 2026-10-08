@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -11,12 +12,13 @@ import type { ChannelCatalogEntry } from "../channel-catalog";
  * status.
  */
 export function ChannelSupportSection({ entry }: { entry: ChannelCatalogEntry }) {
+  const { t } = useTranslation();
   const support = channelSupport(entry);
   const tools = entry.extraTools.map(agentToolLabel);
   return (
     <SettingsSection
-      title="What it supports"
-      info={`What Clisbot's ${entry.label} integration can do in a conversation. It is the same for every ${entry.label} Connection.`}
+      title={t("hub.channels.support.title")}
+      info={t("hub.channels.support.info", { label: entry.label })}
     >
       <View style={[settingsStyles.card, styles.card]}>
         <View style={styles.chips}>
@@ -28,16 +30,20 @@ export function ChannelSupportSection({ entry }: { entry: ChannelCatalogEntry })
         </View>
         {support.limited.map(({ label, limit }) => (
           <View key={label}>
-            <Text style={settingsStyles.rowTitle}>{`${label}, with a limit`}</Text>
+            <Text style={settingsStyles.rowTitle}>
+              {t("hub.channels.support.withLimit", { label })}
+            </Text>
             <Text style={settingsStyles.rowHint}>{limit}</Text>
           </View>
         ))}
         {tools.length === 0 ? null : (
-          <Text style={settingsStyles.rowHint}>{`Extra Agent tools: ${tools.join(", ")}`}</Text>
+          <Text style={settingsStyles.rowHint}>
+            {t("hub.channels.support.extraTools", { tools: tools.join(", ") })}
+          </Text>
         )}
         {support.unsupported.length === 0 ? null : (
           <Text style={settingsStyles.rowHint}>
-            {`Not supported: ${support.unsupported.join(", ")}`}
+            {t("hub.channels.support.notSupported", { items: support.unsupported.join(", ") })}
           </Text>
         )}
       </View>

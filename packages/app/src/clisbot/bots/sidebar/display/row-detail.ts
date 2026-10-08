@@ -1,6 +1,7 @@
 // The second line of a bot or group chat row in the sidebar, from the items the user shows. Pure.
 import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
+import { i18n } from "@/i18n/i18next";
 import type { BotRowItem, ChatRowItem } from "./preferences";
 
 export interface BotLaunch {
@@ -74,7 +75,7 @@ export function chatRowDetail(
   return joinShown(
     {
       host: chat.hostName,
-      memberCount: `${count} ${count === 1 ? "bot" : "bots"}`,
+      memberCount: i18n.t("bots.workspace.sidebar.botCount", { count }),
       members: chat.memberNames.join(", "),
     },
     items,

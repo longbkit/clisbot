@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import type { HubObservedChannelConversation } from "./contracts";
 
 export type ConversationKind = HubObservedChannelConversation["kind"];
@@ -43,36 +44,61 @@ export function observedConversationOptions(
   }
   return [...conversations.values()]
     .filter((conversation) => kind === undefined || conversation.kind === kind)
-    .map((conversation) => {
-      const nested = conversation.threadId !== null;
-      const kindLabel = conversationKindLabel(conversation.kind);
-      if (nested && (roots.get(`${conversation.kind}:${conversation.id}`)?.size ?? 0) > 1) {
-        return {
-          id: `${conversation.kind}:${conversation.id}`,
-          conversationId: conversation.id,
-          label: `${kindLabel} ${conversation.id}`,
-          description: "This ID appears in multiple parent conversations.",
-        };
-      }
-      let visibility: string | null = null;
-      if (conversation.visibility === "public") visibility = "Public";
-      if (conversation.visibility === "private") visibility = "Private";
-      const parent = conversation.label ?? conversation.rootConversationId;
-      return {
-        id: `${conversation.kind}:${conversation.id}`,
-        conversationId: conversation.id,
-        label: nested
-          ? `${parent} · ${kindLabel} ${conversation.id}`
-          : (conversation.label ?? conversation.id),
-        description: [
-          kindLabel,
-          nested ? `Root ${conversation.rootConversationId}` : conversation.id,
-          visibility,
-        ]
-          .filter((part): part is string => part !== null)
-          .join(" · "),
-      };
-    });
+    .map((conversation) =>
+      conversationOption(
+        conversation,
+        (roots.get(`${conversation.kind}:${conversation.id}`)?.size ?? 0) > 1,
+      ),
+    );
+}
+
+function conversationOption(
+  conversation: ConversationMetadata,
+  inSeveralParents: boolean,
+): ConversationOption {
+  const nested = conversation.threadId !== null;
+  const kindLabel = conversationKindLabel(conversation.kind);
+  const id = `${conversation.kind}:${conversation.id}`;
+  if (nested && inSeveralParents) {
+    return {
+      id,
+      conversationId: conversation.id,
+      label: i18n.t("hub.channels.conversationPicker.kindId", {
+        kind: kindLabel,
+        id: conversation.id,
+      }),
+      description: i18n.t("hub.channels.conversationPicker.ambiguous"),
+    };
+  }
+  const parent = conversation.label ?? conversation.rootConversationId;
+  return {
+    id,
+    conversationId: conversation.id,
+    label: nested
+      ? i18n.t("hub.channels.conversationPicker.nestedLabel", {
+          parent,
+          kind: kindLabel,
+          id: conversation.id,
+        })
+      : (conversation.label ?? conversation.id),
+    description: [
+      kindLabel,
+      nested
+        ? i18n.t("hub.channels.conversationPicker.root", { id: conversation.rootConversationId })
+        : conversation.id,
+      conversationVisibilityLabel(conversation.visibility),
+    ]
+      .filter((part): part is string => part !== null)
+      .join(" · "),
+  };
+}
+
+function conversationVisibilityLabel(
+  visibility: ConversationMetadata["visibility"],
+): string | null {
+  if (visibility === "public") return i18n.t("hub.channels.conversationPicker.public");
+  if (visibility === "private") return i18n.t("hub.channels.conversationPicker.private");
+  return null;
 }
 
 export function parseChannelAccountResourceId(
@@ -90,12 +116,12 @@ export function parseChannelAccountResourceId(
   }
 }
 
-function conversationKindLabel(kind: ConversationKind): string {
+export function conversationKindLabel(kind: ConversationKind): string {
   return {
-    dm: "Direct message",
-    channel: "Channel",
-    thread: "Thread",
-    group: "Group",
-    topic: "Topic",
-  }[kind];
+    dm: () => i18n.t("hub.channels.conversationPicker.kind.dm"),
+    channel: () => i18n.t("hub.channels.conversationPicker.kind.channel"),
+    thread: () => i18n.t("hub.channels.conversationPicker.kind.thread"),
+    group: () => i18n.t("hub.channels.conversationPicker.kind.group"),
+    topic: () => i18n.t("hub.channels.conversationPicker.kind.topic"),
+  }[kind]();
 }

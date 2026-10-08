@@ -3,6 +3,7 @@
 
 import { useCallback, useState } from "react";
 import { useFetchQuery } from "@/data/query";
+import { i18n } from "@/i18n/i18next";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useHubAccount } from "../account-provider";
 import { HubApiError } from "../api-client";
@@ -83,7 +84,10 @@ export function useManagedAccessQueries() {
 
 function describeMutationError(error: unknown): MutationError {
   if (error instanceof HubApiError) return { code: error.code, message: error.message };
-  return { code: null, message: error instanceof Error ? error.message : "Hub request failed." };
+  return {
+    code: null,
+    message: error instanceof Error ? error.message : i18n.t("hub.access.page.requestFailed"),
+  };
 }
 
 /**
@@ -127,6 +131,16 @@ export function useAccessMutation(reload: () => Promise<unknown>, onDone: () => 
   return { pending, mutationError, runMutation, post };
 }
 
+/** Asks before a grant is removed; both the Access page and a grant sheet ask the same. */
+export function confirmRemoveAccess(): Promise<boolean> {
+  return confirmDialog({
+    title: i18n.t("hub.access.remove.title"),
+    message: i18n.t("hub.access.remove.message"),
+    confirmLabel: i18n.t("hub.access.remove.confirm"),
+    destructive: true,
+  });
+}
+
 /**
  * Removes one grant after a confirmation, then reloads the page's own copy of the grants. `run`
  * is the page's mutation runner, so a refusal shows where that page shows its errors.
@@ -138,12 +152,7 @@ export function useRemoveGrant(
   const hub = useHubAccount();
   return useCallback(
     async (assignmentId: string) => {
-      const confirmed = await confirmDialog({
-        title: "Remove access?",
-        message: "The Member or Team will lose this explicit resource access.",
-        confirmLabel: "Remove access",
-        destructive: true,
-      });
+      const confirmed = await confirmRemoveAccess();
       if (!confirmed) return;
       await run(async () => {
         await hub.api().delete(`access-assignments/${encodeURIComponent(assignmentId)}`);

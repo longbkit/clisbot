@@ -10,6 +10,7 @@
  * Secret values never leave this module. `getState()` publishes `filled`, not the
  * value; only `requestBody()` reads them, and only to build the request.
  */
+import { i18n } from "@/i18n/i18next";
 import {
   isConnectableChannel,
   supportedTransports,
@@ -38,11 +39,12 @@ interface ChannelConnectionFieldSpec {
   readonly key: string;
   /** The catalog credential that supplies the label and help, when there is one. */
   readonly catalogKey?: string;
-  readonly label?: string;
+  /** Resolved when the form state is built, so it follows the language. */
+  readonly label?: () => string;
   readonly help?: string;
   readonly kind: ChannelConnectionFieldKind;
   /** The first choice is the default. */
-  readonly choices?: readonly ChannelConnectionChoice[];
+  readonly choices?: () => readonly ChannelConnectionChoice[];
   readonly required?: boolean;
   /** Required only while one of these transports is selected. */
   readonly requiredForTransports?: readonly string[];
@@ -119,20 +121,20 @@ const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
       },
       {
         key: "domain",
-        label: "Domain",
+        label: () => i18n.t("hub.channels.connectionForm.domain"),
         kind: "choice",
         // The app exists on one platform only; the wrong one refuses the
         // long connection with "Incorrect domain name".
-        choices: [
+        choices: () => [
           {
             value: "lark",
             label: "Lark",
-            description: "larksuite.com — for apps made in the international Lark console.",
+            description: i18n.t("hub.channels.connectionForm.larkDomain"),
           },
           {
             value: "feishu",
             label: "Feishu",
-            description: "feishu.cn — for apps made in the mainland China Feishu console.",
+            description: i18n.t("hub.channels.connectionForm.feishuDomain"),
           },
         ],
         required: true,
@@ -272,7 +274,7 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
   const values = new Map<string, string>();
   const touched = new Set<string>();
   for (const spec of specs) {
-    if (spec.kind === "choice") values.set(spec.key, spec.choices?.[0]?.value ?? "");
+    if (spec.kind === "choice") values.set(spec.key, spec.choices?.()[0]?.value ?? "");
   }
   let accountId = "";
   let accountTouched = false;
@@ -407,10 +409,10 @@ function fieldState(
   const value = values.get(spec.key) ?? "";
   return {
     key: spec.key,
-    label: spec.label ?? credential?.label ?? spec.key,
+    label: spec.label?.() ?? credential?.label ?? spec.key,
     help: spec.help ?? credential?.help ?? null,
     kind: spec.kind,
-    choices: spec.choices ?? null,
+    choices: spec.choices?.() ?? null,
     required: isRequired,
     placeholder: spec.placeholder ?? null,
     value: spec.kind === "secret" ? null : value,
@@ -421,8 +423,8 @@ function fieldState(
 
 function accountIdIssue(value: string): string | null {
   const trimmed = value.trim();
-  if (trimmed.length === 0) return "Enter an account name.";
-  if (trimmed.length > 128) return "Use 128 characters or fewer.";
+  if (trimmed.length === 0) return i18n.t("hub.channels.connectionForm.accountNameRequired");
+  if (trimmed.length > 128) return i18n.t("hub.channels.connectionForm.maxLength", { max: 128 });
   return null;
 }
 
@@ -433,15 +435,15 @@ function fieldIssue(
   isRequired: boolean,
 ): string | null {
   const value = raw.trim();
-  if (value.length === 0) return isRequired ? "This is required." : null;
+  if (value.length === 0) return isRequired ? i18n.t("hub.channels.connectionForm.required") : null;
   if (spec.prefix !== undefined && !value.startsWith(spec.prefix)) {
-    return `This must start with ${spec.prefix}.`;
+    return i18n.t("hub.channels.connectionForm.prefix", { prefix: spec.prefix });
   }
   if (spec.minLength !== undefined && value.length < spec.minLength) {
-    return `Use at least ${String(spec.minLength)} characters.`;
+    return i18n.t("hub.channels.connectionForm.minLength", { min: spec.minLength });
   }
   if (spec.maxLength !== undefined && value.length > spec.maxLength) {
-    return `Use ${String(spec.maxLength)} characters or fewer.`;
+    return i18n.t("hub.channels.connectionForm.maxLength", { max: spec.maxLength });
   }
   if (spec.key === "serviceAccount") return serviceAccountIssue(value);
   return null;
@@ -458,12 +460,12 @@ function serviceAccountIssue(value: string): string | null {
   try {
     parsed = JSON.parse(value);
   } catch {
-    return "This is not valid JSON.";
+    return i18n.t("hub.channels.connectionForm.invalidJson");
   }
   if (parsed === null || typeof parsed !== "object")
-    return "This is not a service-account document.";
+    return i18n.t("hub.channels.connectionForm.notServiceAccount");
   const type: unknown = Reflect.get(parsed, "type");
-  if (type !== "service_account") return 'The document\'s "type" must be "service_account".';
+  if (type !== "service_account") return i18n.t("hub.channels.connectionForm.serviceAccountType");
   return null;
 }
 
@@ -485,57 +487,57 @@ export function channelConnectionProblem(
   entry: ChannelCatalogEntry | undefined,
   input: { status: number; code: string; message: string },
 ): ChannelConnectionProblem {
-  const label = entry?.label ?? "This channel";
+  const label = entry?.label ?? i18n.t("hub.channels.problem.thisChannel");
   if (input.status === 404) {
     return {
-      title: `${label} connections are not available on this Hub`,
+      title: i18n.t("hub.channels.problem.notAvailableTitle", { label }),
       detail: input.message,
-      hint: "Update the Hub to a build that ships this channel.",
+      hint: i18n.t("hub.channels.problem.notAvailableHint"),
       retryable: false,
     };
   }
   if (input.status === 422) {
     return {
-      title: "The provider rejected this credential",
+      title: i18n.t("hub.channels.problem.rejectedTitle"),
       detail: input.message,
-      hint: "Check the credential in the provider console, then paste it again.",
+      hint: i18n.t("hub.channels.problem.rejectedHint"),
       retryable: false,
     };
   }
   if (input.status === 502) {
     return {
-      title: `${label} could not be reached`,
+      title: i18n.t("hub.channels.problem.unreachableTitle", { label }),
       detail: input.message,
-      hint: "The credential may be fine. Try again.",
+      hint: i18n.t("hub.channels.problem.unreachableHint"),
       retryable: true,
     };
   }
   if (input.status === 503) {
     return {
-      title: "The Hub cannot verify this credential right now",
+      title: i18n.t("hub.channels.problem.cannotVerifyTitle"),
       detail: input.message,
-      hint: "Provider Applications are unavailable on this Hub.",
+      hint: i18n.t("hub.channels.problem.cannotVerifyHint"),
       retryable: true,
     };
   }
   if (input.status === 409 && input.code === "connection_duplicate") {
     return {
-      title: "This bot is already connected",
+      title: i18n.t("hub.channels.problem.duplicateTitle"),
       detail: input.message,
-      hint: "Use that Connection: add a Route to it from the Connections page.",
+      hint: i18n.t("hub.channels.problem.duplicateHint"),
       retryable: false,
     };
   }
   if (input.status === 403) {
     return {
-      title: "You cannot add Connections in this organization",
+      title: i18n.t("hub.channels.problem.forbiddenTitle"),
       detail: input.message,
-      hint: "Ask an owner for the Hub configuration privilege.",
+      hint: i18n.t("hub.channels.problem.forbiddenHint"),
       retryable: false,
     };
   }
   return {
-    title: "The Hub refused this request",
+    title: i18n.t("hub.channels.problem.refusedTitle"),
     detail: input.message,
     hint: null,
     retryable: input.status >= 500,

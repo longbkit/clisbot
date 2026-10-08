@@ -1,4 +1,5 @@
 import { parseDocument, stringify } from "yaml";
+import { i18n } from "@/i18n/i18next";
 
 type ObjectValue = Record<string, unknown>;
 export function record(value: unknown): ObjectValue {
@@ -13,10 +14,9 @@ export function expandAutomationWorkflow(source: string, preserveShorthand = fal
   const value = record(document.toJS());
   if (!value.run) return source;
   const run = record(value.run);
-  const outputs = Object.entries(record(run.outputs)).map(([type, grant]) => ({
-    type,
-    ...record(grant),
-  }));
+  const outputs = Object.entries(record(run.outputs)).map(([type, grant]) =>
+    Object.assign({ type }, record(grant)),
+  );
   const eventProviders = Object.keys(record(value.on)).map((event) => event.split(".")[0]);
   const implicitReplies = new Set(
     eventProviders.filter(
@@ -29,9 +29,7 @@ export function expandAutomationWorkflow(source: string, preserveShorthand = fal
     !preserveShorthand &&
     [...implicitReplies].some((provider) => eventProviders.some((other) => other !== provider))
   ) {
-    throw new Error(
-      "These inputs have different native reply permissions. Set explicit reply limits before adding steps so conversion does not broaden access.",
-    );
+    throw new Error(i18n.t("hub.automations.model.differentReplyPermissions"));
   }
   for (const event of Object.keys(record(value.on))) {
     const provider = event.split(".")[0];
@@ -154,14 +152,14 @@ export function openAutomationWorkflow(source: string) {
       else document.setIn(path, document.createNode(value));
       publish();
     },
-    replaceYaml(source: string) {
-      const input = parseDocument(source);
+    replaceYaml(yaml: string) {
+      const input = parseDocument(yaml);
       if (input.errors.length) throw input.errors[0];
       const candidateShorthand = Boolean(record(input.toJS()).run);
-      const candidate = parseDocument(expandAutomationWorkflow(source, true));
+      const candidate = parseDocument(expandAutomationWorkflow(yaml, true));
       if (candidate.errors.length) throw candidate.errors[0];
       if (!Array.isArray(record(candidate.toJS()).steps))
-        throw new Error("Workflow needs a steps list.");
+        throw new Error(i18n.t("hub.automations.model.needsStepsList"));
       document = candidate;
       shorthand = candidateShorthand;
       stepKeys = (record(candidate.toJS()).steps as unknown[]).map(() => nextKey++);
@@ -194,16 +192,14 @@ export function openAutomationWorkflow(source: string) {
       publish();
     },
     removeStep(index: number) {
-      if (state.steps.length === 1) throw new Error("A Workflow needs at least one step.");
+      if (state.steps.length === 1) throw new Error(i18n.t("hub.automations.model.needsOneStep"));
       const id = String(state.steps[index]?.id);
       const rest = {
         ...state.value,
         steps: state.steps.filter((_, position) => position !== index),
       };
       if (stringify(rest).includes(`steps.${id}.`) || stringify(rest).includes(`steps.${id}\n`))
-        throw new Error(
-          `Other steps or values reference ${id}. Update those references before removing it.`,
-        );
+        throw new Error(i18n.t("hub.automations.model.stepReferenced", { id }));
       document.deleteIn(["steps", index]);
       for (const key of errors.keys())
         if (key.startsWith(`${stepKeys[index]}:`)) errors.delete(key);
@@ -222,3 +218,5 @@ export function openAutomationWorkflow(source: string) {
     },
   };
 }
+export type AutomationWorkflowModel = ReturnType<typeof openAutomationWorkflow>;
+export type AutomationWorkflowState = ReturnType<AutomationWorkflowModel["getState"]>;

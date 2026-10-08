@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
+import { i18n } from "@/i18n/i18next";
 import { PairedHubTransport } from "./hub-transport";
 import type { HubProfile } from "./hub-profiles";
 import { readHubDeviceCapabilities, type HubDeviceCapabilities } from "./hub-capabilities";
@@ -40,7 +41,10 @@ export function useHubDeviceCapabilities(profile: HubProfile | undefined) {
             setState({
               scope: transport,
               capabilities: null,
-              error: caught instanceof Error ? caught : new Error("Hub connection failed"),
+              error:
+                caught instanceof Error
+                  ? caught
+                  : new Error(i18n.t("hub.connection.errors.connectionFailed")),
             });
         });
     return () => {

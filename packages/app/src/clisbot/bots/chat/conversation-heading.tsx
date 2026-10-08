@@ -1,6 +1,8 @@
 import { useCallback, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
 import { useChatOptionsState } from "./chat-options-context";
 
 export function conversationHeaderSummary(
@@ -10,8 +12,8 @@ export function conversationHeaderSummary(
   tabs: number,
 ) {
   return {
-    context: group ? `${members} ${members === 1 ? "member" : "members"}` : hostName,
-    tabs: `${tabs} ${tabs === 1 ? "tab" : "tabs"}`,
+    context: group ? i18n.t("bots.chat.header.members", { count: members }) : hostName,
+    tabs: i18n.t("bots.chat.header.tabs", { count: tabs }),
   };
 }
 
@@ -31,6 +33,7 @@ export function ConversationHeading({
   hostName: string;
   tabCount: number;
 }) {
+  const { t } = useTranslation();
   const { visible, setVisible } = useChatOptionsState();
   const open = useCallback(() => setVisible(true), [setVisible]);
   const summary = conversationHeaderSummary(group, memberCount, hostName, tabCount);
@@ -39,7 +42,7 @@ export function ConversationHeading({
       onPress={open}
       style={styles.heading}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${summary.context} · ${summary.tabs}. Open chat options`}
+      accessibilityLabel={t("bots.chat.header.accessibilityLabel", { title, ...summary })}
       aria-expanded={visible}
       testID="conversation-header-details"
     >

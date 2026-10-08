@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useSyncExternalStore } from "react";
 import { HubDeviceOfferSchema, type HubDeviceOffer } from "@clisbot/protocol/device-pairing-offer";
 import { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 import { isHubSwitchLocked } from "./hub-edit-lock";
 
 const ProfileSchema = HubDeviceOfferSchema.omit({
@@ -55,10 +56,10 @@ export function currentHubProfile(): HubProfile | null {
 export async function assertHubIdentity(offer: HubDeviceOffer): Promise<void> {
   await loadHubProfiles();
   if (isHubSwitchLocked() && snapshot.activeId !== offer.hubId)
-    throw new Error("Save or cancel your changes before switching Hub");
+    throw new Error(i18n.t("hub.connection.errors.saveOrCancel"));
   const existing = snapshot.profiles.find((profile) => profile.hubId === offer.hubId);
   if (existing && existing.publicKey !== offer.publicKey)
-    throw new Error("Hub identity key changed; verify it on the host before pairing again");
+    throw new Error(i18n.t("hub.connection.errors.keyChangedPairing"));
 }
 
 function defaultHubLabel(offer: HubDeviceOffer): string {
@@ -76,10 +77,10 @@ export async function saveHubProfile(
 ): Promise<void> {
   await mutate(() => {
     if (isHubSwitchLocked() && snapshot.activeId !== offer.hubId)
-      throw new Error("Save or cancel your changes before switching Hub");
+      throw new Error(i18n.t("hub.connection.errors.saveOrCancel"));
     const existing = snapshot.profiles.find((profile) => profile.hubId === offer.hubId);
     if (existing && existing.publicKey !== offer.publicKey)
-      throw new Error("Hub identity key changed; verify it on the host before pairing again");
+      throw new Error(i18n.t("hub.connection.errors.keyChangedPairing"));
     const { pairing: _pairing, ownerSetupToken: _setup, ...connection } = offer;
     const profile = ProfileSchema.parse({
       ...existing,
@@ -97,8 +98,9 @@ export async function saveHubProfile(
 export function selectHubProfile(id: string): Promise<void> {
   return mutate(() => {
     if (isHubSwitchLocked() && snapshot.activeId !== id)
-      throw new Error("Save or cancel your changes before switching Hub");
-    if (!snapshot.profiles.some((profile) => profile.hubId === id)) throw new Error("Unknown Hub");
+      throw new Error(i18n.t("hub.connection.errors.saveOrCancel"));
+    if (!snapshot.profiles.some((profile) => profile.hubId === id))
+      throw new Error(i18n.t("hub.connection.errors.unknownHub"));
     return { ...snapshot, activeId: id };
   });
 }
@@ -107,10 +109,10 @@ export function selectHubProfile(id: string): Promise<void> {
 export function saveDiscoveredHub(profile: HubProfile): Promise<void> {
   return mutate(() => {
     if (isHubSwitchLocked() && snapshot.activeId !== profile.hubId)
-      throw new Error("Save or cancel your changes before switching Hub");
+      throw new Error(i18n.t("hub.connection.errors.saveOrCancel"));
     const existing = snapshot.profiles.find((value) => value.hubId === profile.hubId);
     if (existing && existing.publicKey !== profile.publicKey)
-      throw new Error("Hub identity key changed; verify it on the Host before connecting");
+      throw new Error(i18n.t("hub.connection.errors.keyChangedConnect"));
     const next = ProfileSchema.parse({
       ...existing,
       ...profile,
@@ -157,7 +159,7 @@ function mutate(action: () => typeof snapshot): Promise<void> {
 }
 
 export function validateHubRoutes(offer: HubDeviceOffer): void {
-  if (!offer.origin && !offer.relay) throw new Error("Hub has no connection route");
+  if (!offer.origin && !offer.relay) throw new Error(i18n.t("hub.connection.errors.noRoute"));
   if (offer.relay)
     parseHubRelayUrl(`${offer.relay.useTls === false ? "ws" : "wss"}://${offer.relay.endpoint}`);
   if (!offer.origin) return;
@@ -171,7 +173,7 @@ export function validateHubRoutes(offer: HubDeviceOffer): void {
     url.search ||
     url.hash
   )
-    throw new Error("Use a public or Tailscale HTTPS Hub origin");
+    throw new Error(i18n.t("hub.connection.errors.originRule"));
 }
 
 export function parseHubRelayUrl(input: string): HubDeviceOffer["relay"] | null {
@@ -185,7 +187,7 @@ export function parseHubRelayUrl(input: string): HubDeviceOffer["relay"] | null 
     url.search ||
     url.hash
   )
-    throw new Error("Use a ws:// or wss:// relay origin without a path or credentials");
+    throw new Error(i18n.t("hub.connection.errors.relayRule"));
   return { endpoint: url.host, useTls: url.protocol === "wss:" };
 }
 

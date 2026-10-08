@@ -25,7 +25,6 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({ replace: env.replace, push: env.push }),
   useLocalSearchParams: () => env.params,
 }));
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("./account-provider", () => ({ useHubAccount: () => env.hub }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => env.hosts,

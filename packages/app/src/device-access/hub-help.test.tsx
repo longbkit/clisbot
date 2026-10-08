@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { WhatIsHub } from "./hub-help";
+
+// The assertions read the English copy.
+beforeEach(() => i18n.changeLanguage("en"));
 const storage = vi.hoisted(() => ({ value: null as string | null, set: vi.fn() }));
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {

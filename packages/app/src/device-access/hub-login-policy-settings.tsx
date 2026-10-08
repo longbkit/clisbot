@@ -3,6 +3,8 @@ import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { z } from "zod";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { SettingsSection, SettingsCard, SettingsRow } from "@/components/settings";
 import { Alert } from "@/components/ui/alert";
@@ -29,6 +31,7 @@ export function HubLoginPolicySummary() {
 }
 
 export function HubLoginPolicySettings() {
+  const { t } = useTranslation();
   const registry = useHubProfiles();
   const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
   const account = useHubAccount();
@@ -38,30 +41,30 @@ export function HubLoginPolicySettings() {
   if (!profile || !transport)
     return (
       <Alert
-        title="Connect a Hub first"
-        description="Select a connected Hub from Hubs to manage its account sign-in."
+        title={t("hub.connection.policy.connectFirstTitle")}
+        description={t("hub.connection.policy.connectFirstBody")}
       />
     );
   if (error)
     return <PolicyConnectionError error={error} profile={profile} signIn={signIn} retry={retry} />;
-  if (!capabilities) return <Text>Loading account sign-in settings…</Text>;
+  if (!capabilities) return <Text>{t("hub.connection.policy.loading")}</Text>;
   if (capabilities.loginRequired && !account.signedIn)
     return (
       <Alert
         variant="info"
-        title="Account sign-in is required"
-        description="Sign in to this Hub to continue. Your account determines your access."
+        title={t("hub.connection.policy.requiredTitle")}
+        description={t("hub.connection.policy.requiredBody")}
       >
         <Button variant="outline" size="sm" onPress={signIn}>
-          Sign in to this Hub
+          {t("hub.connection.common.signInToHub")}
         </Button>
       </Alert>
     );
   if (!capabilities.canConfigureLogin)
     return (
       <Alert
-        title="Only the Hub operator can change account sign-in"
-        description="Ask the person who runs this Hub to update this setting."
+        title={t("hub.connection.policy.operatorOnlyTitle")}
+        description={t("hub.connection.policy.operatorOnlyBody")}
       />
     );
   return (
@@ -85,6 +88,7 @@ function PolicyConnectionError({
   signIn(): void;
   retry(): void;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const pairAgain = useCallback(
     () =>
@@ -99,11 +103,11 @@ function PolicyConnectionError({
     return (
       <Alert
         variant="warning"
-        title="Hub is unavailable"
-        description="Check the connection and try again."
+        title={t("hub.connection.common.hubUnavailable")}
+        description={t("hub.connection.policy.unavailableBody")}
       >
         <Button variant="outline" onPress={retry}>
-          Retry connection
+          {t("hub.connection.common.retryConnection")}
         </Button>
       </Alert>
     );
@@ -111,22 +115,22 @@ function PolicyConnectionError({
     return (
       <Alert
         variant="info"
-        title="Sign in to this Hub"
-        description="Use your Hub account to restore access."
+        title={t("hub.connection.common.signInToHub")}
+        description={t("hub.connection.policy.signInBody")}
       >
         <Button variant="outline" size="sm" onPress={signIn}>
-          Sign in to this Hub
+          {t("hub.connection.common.signInToHub")}
         </Button>
       </Alert>
     );
   return (
     <Alert
       variant="warning"
-      title="This device needs to pair again"
-      description="Ask the Hub operator for a new pairing QR or link."
+      title={t("hub.connection.common.pairAgainTitle")}
+      description={t("hub.connection.policy.pairAgainBody")}
     >
       <Button variant="outline" onPress={pairAgain}>
-        Pair again
+        {t("hub.connection.common.pairAgain")}
       </Button>
     </Alert>
   );
@@ -141,6 +145,7 @@ function HubLoginPolicy({
   capabilities: HubDeviceCapabilities;
   reload(): void;
 }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const begin = useCallback(() => setEditing(true), []);
   const cancel = useCallback(() => {
@@ -149,19 +154,25 @@ function HubLoginPolicy({
   }, [reload]);
   useHubEditLock(editing);
   return (
-    <SettingsSection title="Account sign-in">
+    <SettingsSection title={t("hub.connection.common.accountSignIn")}>
       <SettingsCard>
         <SettingsRow
-          label={capabilities.loginRequired ? "Required" : "Not required"}
+          label={
+            capabilities.loginRequired
+              ? t("hub.connection.common.required")
+              : t("hub.connection.common.notRequired")
+          }
           hint={
             capabilities.loginRequired
-              ? "Account roles determine access to this Hub."
-              : "Pairing is usually enough for your own devices. Enable sign-in when sharing this Hub, so each person has their own account and permissions."
+              ? t("hub.connection.policy.rolesHint")
+              : t("hub.connection.policy.pairingHint")
           }
         >
           {!editing ? (
             <Button size="sm" variant="outline" onPress={begin}>
-              {capabilities.loginRequired ? "Turn off account sign-in" : "Require account sign-in"}
+              {capabilities.loginRequired
+                ? t("hub.connection.policy.turnOff")
+                : t("hub.connection.policy.require")}
             </Button>
           ) : null}
         </SettingsRow>
@@ -189,6 +200,7 @@ function HubLoginPolicyEditor({
   cancel(): void;
   reload(): void;
 }) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [ownerReady, setOwnerReady] = useState(capabilities.ownerLoginConfigured === true);
@@ -198,7 +210,7 @@ function HubLoginPolicyEditor({
     capabilities.loginRequired,
     async () => {
       if (!ownerReady) {
-        await configureOwnerLogin(transport, email.trim(), password);
+        await configureOwnerLogin(transport, email.trim(), password, t);
         setOwnerReady(true);
         setPassword("");
       }
@@ -217,8 +229,8 @@ function HubLoginPolicyEditor({
       password.length <= 1024);
   const useExisting = useCallback(() => setOwnerReady(true), []);
   const saveLabel = capabilities.loginRequired
-    ? "Turn off account sign-in"
-    : "Enable account sign-in";
+    ? t("hub.connection.policy.turnOff")
+    : t("hub.connection.policy.enable");
   return (
     <View style={styles.card}>
       <PolicyChangeExplanation required={capabilities.loginRequired} needsOwner={needsOwner} />
@@ -233,18 +245,22 @@ function HubLoginPolicyEditor({
       ) : null}
       {needsOwner && capabilities.ownerLoginConfigured === undefined ? (
         <Button variant="outline" disabled={pending} onPress={useExisting}>
-          Use existing owner sign-in
+          {t("hub.connection.policy.useExisting")}
         </Button>
       ) : null}
       {error ? (
-        <Alert variant="error" title="Account sign-in was not changed" description={error} />
+        <Alert
+          variant="error"
+          title={t("hub.connection.policy.notChangedTitle")}
+          description={error}
+        />
       ) : null}
       <View style={styles.actions}>
         <Button variant="outline" disabled={pending} onPress={cancel}>
-          Cancel
+          {t("hub.connection.common.cancel")}
         </Button>
         <Button variant="default" disabled={pending || !valid} loading={pending} onPress={save}>
-          {pending ? "Saving..." : saveLabel}
+          {pending ? t("hub.connection.common.saving") : saveLabel}
         </Button>
       </View>
     </View>
@@ -258,25 +274,25 @@ function PolicyChangeExplanation({
   required: boolean;
   needsOwner: boolean;
 }) {
+  const { t } = useTranslation();
   if (required)
     return (
       <Alert
         variant="warning"
-        title="Paired devices will have personal owner access"
-        description="Account roles will no longer limit Hub access. Only turn this off for a personal Hub. Host managed access is unchanged."
+        title={t("hub.connection.policy.warnTitle")}
+        description={t("hub.connection.policy.warnBody")}
       />
     );
   return (
     <>
-      <Text>{needsOwner ? "Set up the owner's sign-in" : "Use the owner's existing sign-in"}</Text>
-      <Text style={styles.hint}>
-        Everyone will need to sign in after enabling. Account roles determine Hub access; Host
-        managed access is unchanged.
+      <Text>
+        {needsOwner
+          ? t("hub.connection.policy.setUpOwner")
+          : t("hub.connection.policy.useOwnerExisting")}
       </Text>
+      <Text style={styles.hint}>{t("hub.connection.policy.everyoneHint")}</Text>
       {!needsOwner ? (
-        <Text style={styles.hint}>
-          {"Sign in with the owner's existing account to continue after enabling."}
-        </Text>
+        <Text style={styles.hint}>{t("hub.connection.policy.ownerExistingHint")}</Text>
       ) : null}
     </>
   );
@@ -295,13 +311,14 @@ function OwnerLoginFields({
   setPassword(value: string): void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
-      <Field label="Owner email">
+      <Field label={t("hub.connection.policy.ownerEmail")}>
         <FormTextInput
           initialValue={email}
           onChangeText={setEmail}
-          accessibilityLabel="Owner email"
+          accessibilityLabel={t("hub.connection.policy.ownerEmail")}
           placeholder="you@example.com"
           autoCapitalize="none"
           autoComplete="email"
@@ -310,14 +327,14 @@ function OwnerLoginFields({
         />
       </Field>
       <Field
-        label="Owner password"
-        hint="At least 12 characters. Keep it somewhere safe before continuing."
+        label={t("hub.connection.policy.ownerPassword")}
+        hint={t("hub.connection.policy.passwordHint")}
       >
         <FormTextInput
           initialValue={password}
           onChangeText={setPassword}
-          accessibilityLabel="Owner password"
-          placeholder="Choose a password"
+          accessibilityLabel={t("hub.connection.policy.ownerPassword")}
+          placeholder={t("hub.connection.policy.passwordPlaceholder")}
           autoComplete="new-password"
           secureTextEntry
           editable={!pending}
@@ -333,6 +350,7 @@ function usePolicyChange(
   prepare: () => Promise<void>,
   complete: () => Promise<void>,
 ) {
+  const { t } = useTranslation();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = useCallback(async () => {
@@ -348,22 +366,25 @@ function usePolicyChange(
       if (!response.ok)
         throw new Error(
           response.status === 409
-            ? "This Hub needs a configured personal owner to make this change. Review the owner's sign-in and try again."
-            : "The Hub could not change this setting. Check your access and try again.",
+            ? t("hub.connection.policy.needsOwner")
+            : t("hub.connection.policy.couldNotChange"),
         );
       await complete();
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "The setting could not be changed. Try again.",
-      );
+      setError(caught instanceof Error ? caught.message : t("hub.connection.policy.changeFailed"));
     } finally {
       setPending(false);
     }
-  }, [transport, required, prepare, complete]);
+  }, [transport, required, prepare, complete, t]);
   return { pending, error, save };
 }
 
-async function configureOwnerLogin(transport: PairedHubTransport, email: string, password: string) {
+async function configureOwnerLogin(
+  transport: PairedHubTransport,
+  email: string,
+  password: string,
+  t: TFunction,
+) {
   const response = await transport.request("/api/auth/clisbot/device/owner-login", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -372,8 +393,8 @@ async function configureOwnerLogin(transport: PairedHubTransport, email: string,
   if (!response.ok)
     throw new Error(
       response.status === 409
-        ? "The owner may already have a sign-in method, or this email is in use. Cancel to reload the setting before trying again."
-        : "The owner's sign-in could not be saved. Check the email, password and your Hub access.",
+        ? t("hub.connection.policy.ownerConflict")
+        : t("hub.connection.policy.ownerSaveFailed"),
     );
 }
 

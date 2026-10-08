@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 import { routeAudienceDraft } from "./channel-route-audience";
 import { ID_NAMES, rulePlaceLabel } from "./channel-route-rule-summary";
 
@@ -35,7 +36,10 @@ export function publicAccessRoutes(accounts: Record<string, unknown>[]) {
           account: `${account.data.channel} · ${account.data.accountId}`,
           enabled: account.data.enabled !== false && route.data.enabled !== false,
           conversations: open.map((rule) => rulePlaceLabel(rule, ID_NAMES)).join("; "),
-          target: route.data.workflow ?? route.data.agent ?? "Target unavailable",
+          target:
+            route.data.workflow ??
+            route.data.agent ??
+            i18n.t("hub.access.publicRoutes.targetUnavailable"),
         },
       ];
     });

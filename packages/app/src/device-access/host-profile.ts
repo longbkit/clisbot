@@ -2,6 +2,7 @@ import type { DevicePairingOffer } from "@clisbot/protocol/device-pairing-offer"
 import type { HostProfile, HostConnection } from "@/types/host-connection";
 import { normalizeHostPort } from "@clisbot/protocol/daemon-endpoints";
 import { defaultHostAppearance } from "@/hosts/appearance";
+import { i18n } from "@/i18n/i18next";
 
 export function devicePairedHost(input: {
   offer: DevicePairingOffer;
@@ -13,10 +14,9 @@ export function devicePairedHost(input: {
     existing?.devicePairing?.daemonPublicKeyB64 ??
     existing?.connections.find((c) => c.type === "relay")?.daemonPublicKeyB64;
   if (pinnedKey && pinnedKey !== offer.daemonPublicKeyB64)
-    throw new Error(
-      "This pairing link changes the Host identity; remove the old Host before pairing a replacement",
-    );
-  if (offer.pairing.backendId !== offer.serverId) throw new Error("Pairing identity mismatch");
+    throw new Error(i18n.t("hub.connection.errors.hostIdentityChanged"));
+  if (offer.pairing.backendId !== offer.serverId)
+    throw new Error(i18n.t("hub.connection.errors.pairingMismatch"));
   const connections = offerConnections(offer);
   const now = new Date().toISOString();
   const { password: _password, ...previous } = existing ?? {};
@@ -45,7 +45,7 @@ export function offerConnections(
     const endpoint = normalizeHostPort(offer.direct.endpoint);
     const useTls = offer.direct.useTls ?? true;
     if (!useTls && !/^(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(endpoint))
-      throw new Error("Remote pairing requires HTTPS; use Tailscale Serve");
+      throw new Error(i18n.t("hub.connection.errors.remoteNeedsHttps"));
     connections.push({
       id: `direct:${useTls ? "wss" : "ws"}:${endpoint}`,
       type: "directTcp",
@@ -61,6 +61,6 @@ export function offerConnections(
       useTls: offer.relay.useTls ?? true,
       daemonPublicKeyB64: offer.daemonPublicKeyB64,
     });
-  if (!connections.length) throw new Error("Pairing link has no connection route");
+  if (!connections.length) throw new Error(i18n.t("hub.connection.errors.linkNoRoute"));
   return connections;
 }

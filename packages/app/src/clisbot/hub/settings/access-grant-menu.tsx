@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,31 +31,32 @@ export function GrantAccessMenu<T extends GrantChoice>({
   disabled: boolean;
   grantTo(choice: T): void;
 }) {
+  const { t } = useTranslation();
   return (
     <DropdownMenu compactMode="sheet">
       <DropdownTrigger
         accessibilityRole="button"
-        accessibilityLabel="Grant access…"
+        accessibilityLabel={t("hub.access.form.grantAccessEllipsis")}
         disabled={disabled}
       >
-        Grant access…
+        {t("hub.access.form.grantAccessEllipsis")}
       </DropdownTrigger>
-      <DropdownMenuContent align="end" width={300} sheetTitle="Grant access">
-        <DropdownMenuLabel>Recommended: grant to a Team</DropdownMenuLabel>
+      <DropdownMenuContent align="end" width={300} sheetTitle={t("hub.access.form.grantAccess")}>
+        <DropdownMenuLabel>{t("hub.access.grantMenu.recommended")}</DropdownMenuLabel>
         {teams.map((team) => (
           <GrantItem
             key={team.key}
             entry={team}
-            label={`Team ${team.title}`}
-            description="Everyone in the Team gets it, including people added later."
+            label={t("hub.access.rows.viaTeam", { name: team.title })}
+            description={t("hub.access.grantMenu.teamDescription")}
             grantTo={grantTo}
           />
         ))}
         <DropdownMenuSeparator />
         <GrantItem
           entry={member}
-          label={`Only ${member.title}`}
-          description="A direct grant, kept even if they leave their Teams."
+          label={t("hub.access.grantMenu.only", { name: member.title })}
+          description={t("hub.access.grantMenu.onlyDescription")}
           grantTo={grantTo}
         />
       </DropdownMenuContent>

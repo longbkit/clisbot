@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -20,28 +21,29 @@ export function ChannelRevisionHistory({
   activeRevisionId: string | undefined;
   close(): void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
   const trailing = useMemo(
     () => (
       <Button size="xs" variant="ghost" onPress={close}>
-        Hide
+        {t("hub.channels.connectionSettings.hide")}
       </Button>
     ),
-    [close],
+    [close, t],
   );
   if (revisions === undefined || revisions.length === 0)
     return (
-      <SettingsSection title="Revision history" trailing={trailing}>
+      <SettingsSection title={t("hub.channels.accounts.revisionHistory")} trailing={trailing}>
         <View style={settingsStyles.card}>
-          <EmptyRow message="Nothing saved yet." />
+          <EmptyRow message={t("hub.channels.revisions.empty")} />
         </View>
       </SettingsSection>
     );
   const active = revisions.find((revision) => revision.id === activeRevisionId) ?? revisions[0]!;
   const older = revisions.filter((revision) => revision.id !== active.id);
   return (
-    <SettingsSection title="Revision history" trailing={trailing}>
+    <SettingsSection title={t("hub.channels.accounts.revisionHistory")} trailing={trailing}>
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
@@ -49,7 +51,9 @@ export function ChannelRevisionHistory({
           </View>
           {older.length === 0 ? null : (
             <Button size="xs" variant="ghost" onPress={toggle}>
-              {expanded ? "Hide earlier" : `${String(older.length)} earlier`}
+              {expanded
+                ? t("hub.channels.revisions.hideEarlier")
+                : t("hub.channels.revisions.earlier", { count: older.length })}
             </Button>
           )}
         </View>
@@ -68,10 +72,13 @@ export function ChannelRevisionHistory({
 }
 
 function ChannelRevisionLine({ revision, active }: { revision: HubRevision; active: boolean }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.revisionLine}>
       <Text style={settingsStyles.rowTitle}>
-        {`Revision ${String(revision.version)}${active ? " · Active" : ""}`}
+        {active
+          ? t("hub.channels.revisions.activeRevision", { version: revision.version })
+          : t("hub.channels.revisions.revision", { version: revision.version })}
       </Text>
       <Text style={styles.revisionTime}>{new Date(revision.createdAt).toLocaleString()}</Text>
     </View>

@@ -1,6 +1,7 @@
 import { FileDiff, FileText, MessageSquare } from "lucide-react-native";
 import { useCallback, useContext, useMemo, useState } from "react";
 import { View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { DropdownMenuHint, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { MenuTextField } from "@/components/ui/menu";
@@ -21,6 +22,7 @@ type TabOption = ReturnType<typeof buildConversationTabOptions>[number];
 
 /** The chat options menu's sub-pages: Switch tab and Start a fresh session. */
 export function useChatOptionsPages(group: boolean) {
+  const { t } = useTranslation();
   const tabs = useConversationTabsContext();
   const labels = useContext(ConversationSourceLabelsContext);
   const draft = useConversationDraftContext();
@@ -32,7 +34,7 @@ export function useChatOptionsPages(group: boolean) {
     () => [
       {
         id: "tabs",
-        title: "Switch tab",
+        title: t("bots.chat.options.switchTab"),
         hoverIntent: false,
         content: (
           <ChatTabsPage options={tabOptions} activeId={tabs?.activeId} onSelect={tabs?.selectTab} />
@@ -40,21 +42,19 @@ export function useChatOptionsPages(group: boolean) {
       },
       {
         id: "fresh",
-        title: "Start a fresh session",
+        title: t("bots.chat.options.freshSession"),
         hoverIntent: false,
         content: (
           <>
-            <DropdownMenuHint>
-              Send /new in Messages to reset bot context. This chat’s history stays here.
-            </DropdownMenuHint>
+            <DropdownMenuHint>{t("bots.chat.options.freshHint")}</DropdownMenuHint>
             <DropdownMenuItem disabled={!draft} onSelect={draft?.focusMessages}>
-              Go to Messages
+              {t("bots.chat.options.goToMessages")}
             </DropdownMenuItem>
           </>
         ),
       },
     ],
-    [tabOptions, tabs, draft],
+    [tabOptions, tabs, draft, t],
   );
   return { pages, tabCount: tabOptions.length };
 }
@@ -68,17 +68,20 @@ function ChatTabsPage({
   activeId?: string;
   onSelect?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const matches = filterConversationTabs(options, query);
   return (
     <>
       <View style={styles.tabSearch}>
-        <MenuTextField placeholder="Search tabs" onChangeText={setQuery} />
+        <MenuTextField placeholder={t("bots.chat.options.searchTabs")} onChangeText={setQuery} />
       </View>
       {matches.map((tab) => (
         <ChatTabItem key={tab.id} tab={tab} selected={tab.id === activeId} onSelect={onSelect} />
       ))}
-      {!matches.length ? <DropdownMenuHint>No matching tabs</DropdownMenuHint> : null}
+      {!matches.length ? (
+        <DropdownMenuHint>{t("bots.chat.options.noMatchingTabs")}</DropdownMenuHint>
+      ) : null}
     </>
   );
 }

@@ -1,7 +1,15 @@
 import { mutedIconColorMapping } from "@/components/ui/icon-color";
 import { HubEnrollmentRequestSchema } from "@clisbot/protocol/messages";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, Text, View } from "react-native";
 import { Home, Settings } from "lucide-react-native";
 import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
@@ -57,6 +65,7 @@ const CliAuthorizationDecisionSchema = z.object({
 });
 
 export function HubCliLoginScreen() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const router = useRouter();
   const home = useCallback(() => router.push(buildOpenProjectRoute()), [router]);
@@ -70,21 +79,21 @@ export function HubCliLoginScreen() {
       <View style={styles.navigation}>
         <HeaderToggleButton
           onPress={home}
-          tooltipLabel="Home"
+          tooltipLabel={t("hub.account.cliLogin.home")}
           tooltipKeys={NO_SHORTCUTS}
           tooltipSide="bottom"
           accessibilityRole="button"
-          accessibilityLabel="Home"
+          accessibilityLabel={t("hub.account.cliLogin.home")}
         >
           <ThemedHome size={iconButtonChromeGlyphSize("large")} uniProps={mutedIconColorMapping} />
         </HeaderToggleButton>
         <HeaderToggleButton
           onPress={settings}
-          tooltipLabel="Settings"
+          tooltipLabel={t("hub.account.cliLogin.settings")}
           tooltipKeys={NO_SHORTCUTS}
           tooltipSide="bottom"
           accessibilityRole="button"
-          accessibilityLabel="Settings"
+          accessibilityLabel={t("hub.account.cliLogin.settings")}
         >
           <ThemedSettings
             size={iconButtonChromeGlyphSize("large")}
@@ -238,9 +247,7 @@ function CliLoginForm({ code }: { code: string }) {
   }
   if (submittedCode.length === 0) return <CliCodeEntry model={model} state={state} />;
   return (
-    <SettingsSection
-      title={authorization.data?.enrollment ? "Connect Host" : "Advanced CLI access"}
-    >
+    <CliReviewSection enrollment={Boolean(authorization.data?.enrollment)}>
       <CliAuthorizationReview
         authorization={authorization}
         account={approver}
@@ -252,6 +259,21 @@ function CliLoginForm({ code }: { code: string }) {
         retry={retryInspection}
         openAccount={openHosts}
       />
+    </CliReviewSection>
+  );
+}
+
+function CliReviewSection({ enrollment, children }: { enrollment: boolean; children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <SettingsSection
+      title={
+        enrollment
+          ? t("hub.account.cliLogin.connectHost")
+          : t("hub.account.cliLogin.advancedAccess")
+      }
+    >
+      {children}
     </SettingsSection>
   );
 }
@@ -259,10 +281,14 @@ function CliLoginForm({ code }: { code: string }) {
 type CliLoginFormModel = ReturnType<typeof openCliLoginForm>;
 
 function CliCodeEntry({ model, state }: { model: CliLoginFormModel; state: CliLoginFormState }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   return (
-    <SettingsSection title="Approve a terminal request">
-      <Field label="Verification code" hint="Only approve a code you requested yourself.">
+    <SettingsSection title={t("hub.account.cliLogin.approveRequest")}>
+      <Field
+        label={t("hub.account.cliLogin.verificationCode")}
+        hint={t("hub.account.cliLogin.verificationHint")}
+      >
         <FormTextInput
           initialValue={state.enteredCode}
           onChangeText={model.setCode}
@@ -273,7 +299,7 @@ function CliCodeEntry({ model, state }: { model: CliLoginFormModel; state: CliLo
         />
       </Field>
       <Button disabled={state.enteredCode.trim().length === 0} onPress={model.inspect}>
-        Continue
+        {t("hub.account.cliLogin.continue")}
       </Button>
     </SettingsSection>
   );
@@ -292,49 +318,54 @@ function CliHostDiscovery({
   retry(): void;
   openHosts(): void;
 }) {
+  const { t } = useTranslation();
   if (host !== undefined) {
     return (
-      <SettingsSection title="Connect host">
+      <SettingsSection title={t("hub.account.cliLogin.connectHostTitle")}>
         <Alert
           variant="success"
-          title={`${host.label} was added to Clisbot`}
+          title={t("hub.account.cliLogin.hostAdded", { label: host.label })}
           description={
             connected
-              ? "The Host is online. Choose what to do next, or continue to the app."
-              : "The Host was added and Clisbot is connecting to it."
+              ? t("hub.account.cliLogin.hostOnline")
+              : t("hub.account.cliLogin.hostConnecting")
           }
         />
         <ConnectedHostActions serverId={host.serverId} connected={connected} />
         {!connected ? (
           <Button variant="outline" onPress={openHosts}>
-            Open Hosts
+            {t("hub.account.cliLogin.openHosts")}
           </Button>
         ) : null}
       </SettingsSection>
     );
   }
   return (
-    <SettingsSection title="Connect host">
+    <SettingsSection title={t("hub.account.cliLogin.connectHostTitle")}>
       <Alert
         variant={failed ? "warning" : "success"}
-        title={failed ? "Connection approved; Host not detected" : "Host connection approved"}
+        title={
+          failed
+            ? t("hub.account.cliLogin.hostNotDetected")
+            : t("hub.account.cliLogin.connectionApproved")
+        }
         description={
           failed
-            ? "Open Hosts to check the connection. If it is missing, check the daemon logs, then retry discovery."
-            : "Clisbot is connecting the approved Host automatically. Let the terminal command finish; this page follows the connection."
+            ? t("hub.account.cliLogin.hostNotDetectedDescription")
+            : t("hub.account.cliLogin.connectionApprovedDescription")
         }
       >
         {failed ? (
           <Button size="sm" variant="outline" onPress={retry}>
-            Retry
+            {t("hub.account.cliLogin.retry")}
           </Button>
         ) : null}
       </Alert>
       {!failed ? (
-        <Text style={settingsStyles.rowHint}>Waiting for the enrolled host...</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.account.cliLogin.waitingForHost")}</Text>
       ) : null}
       <Button variant="outline" onPress={openHosts}>
-        Open Hosts
+        {t("hub.account.cliLogin.openHosts")}
       </Button>
     </SettingsSection>
   );
@@ -365,20 +396,21 @@ function CliAuthorizationReview({
   retry(): void;
   openAccount(): void;
 }) {
+  const { t } = useTranslation();
   if (authorization.isPending)
-    return <Text style={settingsStyles.rowHint}>Checking the request...</Text>;
+    return <Text style={settingsStyles.rowHint}>{t("hub.account.cliLogin.checking")}</Text>;
   if (authorization.error) {
     return (
       <Alert
         variant="error"
-        title="Request unavailable"
-        description="Check the code and Hub connection, or run the terminal command again from the terminal if the request expired."
+        title={t("hub.account.cliLogin.requestUnavailable")}
+        description={t("hub.account.cliLogin.requestUnavailableDescription")}
       >
         <Button size="sm" variant="outline" onPress={retry}>
-          Retry
+          {t("hub.account.cliLogin.retry")}
         </Button>
         <Button size="sm" variant="outline" onPress={model.editCode}>
-          Enter another code
+          {t("hub.account.cliLogin.enterAnotherCode")}
         </Button>
       </Alert>
     );
@@ -399,30 +431,32 @@ function CliAuthorizationReview({
           {state.error ? (
             <Alert
               variant="error"
-              title="Could not record the decision"
+              title={t("hub.account.cliLogin.decisionFailed")}
               description={state.error}
             />
           ) : null}
           <View style={styles.actions}>
             <Button variant="outline" disabled={state.pending} onPress={model.editCode}>
-              Enter another code
+              {t("hub.account.cliLogin.enterAnotherCode")}
             </Button>
             <Button variant="outline" disabled={state.pending} onPress={deny}>
-              Deny
+              {t("hub.account.cliLogin.deny")}
             </Button>
             <Button loading={state.pending} disabled={state.pending} onPress={approve}>
-              {`Approve for ${authorization.data.organization.name}`}
+              {t("hub.account.cliLogin.approveFor", {
+                organization: authorization.data.organization.name,
+              })}
             </Button>
           </View>
         </>
       ) : (
         <Alert
           variant="info"
-          title="Owner or admin approval required"
-          description="An organization owner or admin must approve this request. Sign in with an account that can manage this organization."
+          title={t("hub.account.cliLogin.approvalRequired")}
+          description={t("hub.account.cliLogin.approvalRequiredDescription")}
         >
           <Button size="sm" variant="outline" onPress={openAccount}>
-            Open account
+            {t("hub.account.cliLogin.openAccount")}
           </Button>
         </Alert>
       )}
@@ -432,11 +466,12 @@ function CliAuthorizationReview({
 
 /** The signed-in account that will approve, shown next to the organization it approves for. */
 function useApprover(hub: ReturnType<typeof useHubAccount>) {
+  const { t } = useTranslation();
   const email = hub.signedIn?.account.email;
   const role = hub.signedIn?.membership.role;
   return useMemo(
-    () => (email && role ? { email, roleLabel: roleLabel(role) } : null),
-    [email, role],
+    () => (email && role ? { email, roleLabel: roleLabel(role, t) } : null),
+    [email, role, t],
   );
 }
 
@@ -488,23 +523,24 @@ function CliAuthorizationResult({
   decision: "approved" | "denied";
   enrollment: boolean;
 }) {
+  const { t } = useTranslation();
   if (decision === "denied")
     return (
-      <SettingsSection title="Request denied">
+      <SettingsSection title={t("hub.account.cliLogin.denied")}>
         <Alert
           variant="warning"
-          title="Request denied"
-          description="You can close this window and return to the terminal."
+          title={t("hub.account.cliLogin.denied")}
+          description={t("hub.account.cliLogin.deniedDescription")}
         />
       </SettingsSection>
     );
   if (!enrollment)
     return (
-      <SettingsSection title="Advanced CLI access">
+      <SettingsSection title={t("hub.account.cliLogin.advancedAccess")}>
         <Alert
           variant="success"
-          title="CLI login approved"
-          description="Return to the terminal. This grants organization API access; it does not add a Host. Use hub connect to add a Host."
+          title={t("hub.account.cliLogin.loginApproved")}
+          description={t("hub.account.cliLogin.loginApprovedDescription")}
         />
       </SettingsSection>
     );

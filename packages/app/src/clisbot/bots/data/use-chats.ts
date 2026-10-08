@@ -2,9 +2,8 @@ import { useMemo } from "react";
 import type { BotsClient, BotsHostInput, BotsRuntime } from "./client";
 import type { ChatPayload } from "./contracts";
 import { chatsQueryKey } from "./query-keys";
+import { useTranslation } from "react-i18next";
 import { useAggregatedQuery, type AggregatedQueryResult } from "./use-aggregated-query";
-
-export const ALL_CHAT_HOSTS_FAILED_MESSAGE = "No connected hosts could load chats";
 
 export type AggregatedChat = ChatPayload & { serverId: string; serverName: string };
 
@@ -22,12 +21,13 @@ export function useChatsQuery(input: {
   hosts: readonly BotsHostInput[];
   runtime: BotsRuntime;
 }): AggregatedQueryResult<ChatPayload> {
+  const { t } = useTranslation();
   const result = useAggregatedQuery({
     hosts: input.hosts,
     runtime: input.runtime,
     queryKey: chatsQueryKey(input.hosts.map((host) => host.serverId)),
     load: loadChats,
-    allHostsFailedMessage: ALL_CHAT_HOSTS_FAILED_MESSAGE,
+    allHostsFailedMessage: t("bots.workspace.errors.noHostLoadedChats"),
     enabled: input.hosts.length > 0,
   });
   const loadState = useMemo<AggregatedQueryResult<ChatPayload>["loadState"]>(

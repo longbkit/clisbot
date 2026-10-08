@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -7,7 +8,7 @@ import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
-import { OWNER_ACCESS_HINT } from "./access-catalog";
+import { ownerAccessHint } from "./access-catalog";
 import { DetailRow, OrganizationTitle } from "../organization-identity";
 
 type HubAccount = ReturnType<typeof useHubAccount>;
@@ -34,25 +35,26 @@ export function OrganizationHeader({
   pending: boolean;
   run: HubRun;
 }) {
+  const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
   const startRenaming = useCallback(() => setRenaming(true), []);
   const stopRenaming = useCallback(() => setRenaming(false), []);
   return (
-    <SettingsSection title="Organization">
+    <SettingsSection title={t("hub.settings.organization.title")}>
       <View style={[settingsStyles.card, styles.card]}>
         <View style={styles.titleRow}>
           <OrganizationTitle name={organizationName} />
           {isOwner && !renaming ? (
             <Button size="sm" variant="outline" disabled={pending} onPress={startRenaming}>
-              Rename
+              {t("hub.settings.organization.rename")}
             </Button>
           ) : null}
         </View>
-        <DetailRow label="Organization ID" value={organizationSlug} />
+        <DetailRow label={t("hub.settings.organization.organizationId")} value={organizationSlug} />
         <DetailRow
-          label="Your role"
+          label={t("hub.settings.organization.yourRole")}
           value={roleLabel}
-          hint={isOwner ? OWNER_ACCESS_HINT : undefined}
+          hint={isOwner ? ownerAccessHint() : undefined}
         />
         {renaming ? (
           <RenameOrganization
@@ -81,6 +83,7 @@ function RenameOrganization({
   run: HubRun;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const [name, setName] = useState(currentName);
   const save = useCallback(
@@ -94,7 +97,10 @@ function RenameOrganization({
   const unchanged = name.trim() === currentName || name.trim().length === 0;
   return (
     <View style={styles.form}>
-      <Field label="Organization name" hint="Shown to everyone in this organization.">
+      <Field
+        label={t("hub.settings.organization.nameLabel")}
+        hint={t("hub.settings.organization.nameHint")}
+      >
         <FormTextInput
           size={compact ? "md" : "sm"}
           initialValue={name}
@@ -104,10 +110,10 @@ function RenameOrganization({
       </Field>
       <View style={styles.actions}>
         <Button disabled={pending || unchanged} loading={pending} onPress={save}>
-          Save name
+          {t("hub.settings.organization.saveName")}
         </Button>
         <Button variant="ghost" disabled={pending} onPress={onDone}>
-          Cancel
+          {t("hub.settings.organization.cancel")}
         </Button>
       </View>
     </View>

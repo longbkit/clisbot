@@ -1,6 +1,7 @@
 import type { AgentToolGroup } from "@clisbot/protocol/connectors/agent-tools";
 import { agentToolGroupOffKey, agentToolOffKey } from "@clisbot/protocol/connectors/agent-tools";
 import type { ConnectorGrant } from "@clisbot/protocol/connectors/types";
+import { i18n } from "@/i18n/i18next";
 import type { AgentToolDefaults } from "./agent-tools-model";
 import { sessionKeptTools, type SessionToolSet } from "./session-connectors";
 import { sessionTools, type SessionConnector } from "./session-tools";
@@ -75,8 +76,9 @@ export function roomTools(bots: readonly RoomBot[], defaults: AgentToolDefaults 
 
 /** "test", "test and writer", "3 Bots". */
 export function botsLabel(names: readonly string[]): string {
-  if (names.length <= 2) return names.join(" and ");
-  return `${names.length} Bots`;
+  if (names.length > 2) return i18n.t("connectors.tools.room.manyBots", { count: names.length });
+  const [first = "", second] = names;
+  return second === undefined ? first : i18n.t("connectors.tools.room.twoBots", { first, second });
 }
 
 /** How many groups and Connectors the room keeps on, for the chip. */

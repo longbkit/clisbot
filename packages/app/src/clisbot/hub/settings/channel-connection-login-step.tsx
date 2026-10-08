@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export function ConnectionLoginStep({
   target: ConnectionLoginTarget;
   done(): void;
 }) {
+  const { t } = useTranslation();
   const verbs = useChannelQrVerbs(target);
   const [phase, setPhase] = useState<ChannelQrPhase>("idle");
   useCancelWaitingCodeOnLeave(phase, verbs);
@@ -83,11 +85,11 @@ export function ConnectionLoginStep({
       <View style={styles.actions}>
         {phase === "linked" ? (
           <Button size="sm" variant="default" onPress={finish}>
-            Continue to the Route
+            {t("hub.channels.loginStep.continue")}
           </Button>
         ) : (
           <Button size="sm" variant="outline" onPress={finish}>
-            Log in later
+            {t("hub.channels.loginStep.later")}
           </Button>
         )}
       </View>

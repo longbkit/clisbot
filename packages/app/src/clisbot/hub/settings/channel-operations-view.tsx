@@ -1,14 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { useConfirmation } from "@/components/confirmation-provider";
 import { useHubAccount } from "../account-provider";
 import type { HubApiClient } from "../api-client";
+import type { HubChannelIngressCounts } from "../contracts";
 import {
   isChannelOperationUnavailable,
   pruneChannelIngress,
@@ -40,6 +43,7 @@ export function ChannelOperationsView({
 }: {
   adminAccounts?: readonly ChannelAccountRef[] | null;
 }) {
+  const { t } = useTranslation();
   const queries = useChannelIngressQueries(adminAccounts);
   const readOnly = adminAccounts !== null;
   // Labels only. An unavailable catalog leaves the rows keyed by channel id.
@@ -66,10 +70,10 @@ export function ChannelOperationsView({
         disabled={queries.fetching}
         onPress={refresh}
       >
-        Refresh
+        {t("hub.channels.operations.refresh")}
       </Button>
     ),
-    [queries.fetching, refresh],
+    [queries.fetching, refresh, t],
   );
   const deadLetterActions = useMemo(
     () =>
@@ -80,38 +84,37 @@ export function ChannelOperationsView({
   );
   return (
     <View style={styles.view}>
-      <SettingsSection title="Ingress queue" trailing={refreshAction}>
+      <SettingsSection title={t("hub.channels.operations.queueTitle")} trailing={refreshAction}>
         {unavailable ? (
           <Alert
             variant="info"
-            title="Not available on this Hub"
-            description="This Hub does not serve the channel ingress operations."
+            title={t("hub.channels.operations.unavailableTitle")}
+            description={t("hub.channels.operations.unavailableBody")}
           />
         ) : null}
         {queries.statusError === null || unavailable ? null : (
           <Alert
             variant="warning"
-            title="Queue status is unavailable"
+            title={t("hub.channels.operations.statusUnavailable")}
             description={queries.statusError.message}
           />
         )}
         {notice === null ? null : <Alert variant="success" description={notice} />}
-        {queries.status === undefined ? null : (
-          <Text style={settingsStyles.rowHint}>
-            {`${String(channelIngressDepth(queries.status.totals))} waiting · ${channelIngressSummary(queries.status.totals)}`}
-          </Text>
-        )}
+        {queries.status === undefined ? null : <QueueTotals totals={queries.status.totals} />}
         {queries.status === undefined ? null : (
           <QueueAccountList
             rows={channelIngressAccountRows(queries.status.accounts, catalog.entries)}
           />
         )}
       </SettingsSection>
-      <SettingsSection title="Dead letters" trailing={deadLetterActions}>
+      <SettingsSection
+        title={t("hub.channels.operations.deadLetters")}
+        trailing={deadLetterActions}
+      >
         {queries.eventsError === null || unavailable ? null : (
           <Alert
             variant="warning"
-            title="Dead letters are unavailable"
+            title={t("hub.channels.operations.deadLettersUnavailable")}
             description={queries.eventsError.message}
           />
         )}
@@ -123,11 +126,23 @@ export function ChannelOperationsView({
         />
         {queries.hasMore ? (
           <Text style={settingsStyles.rowHint}>
-            {`Showing the first ${String(CHANNEL_DEAD_LETTER_PAGE)}; more remain.`}
+            {t("hub.channels.operations.showingFirst", { count: CHANNEL_DEAD_LETTER_PAGE })}
           </Text>
         ) : null}
       </SettingsSection>
     </View>
+  );
+}
+
+function QueueTotals({ totals }: { totals: HubChannelIngressCounts }) {
+  const { t } = useTranslation();
+  return (
+    <Text style={settingsStyles.rowHint}>
+      {t("hub.channels.operations.totals", {
+        count: channelIngressDepth(totals),
+        summary: channelIngressSummary(totals),
+      })}
+    </Text>
   );
 }
 
@@ -144,6 +159,7 @@ function DeadLetterActions({
   run: IngressAction;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const resubmit = useCallback(() => run("resubmit", ids), [ids, run]);
   const prune = useCallback(() => run("prune", []), [run]);
   return (
@@ -154,21 +170,24 @@ function DeadLetterActions({
         disabled={pending || disabled || ids.length === 0}
         onPress={resubmit}
       >
-        {`Resubmit${ids.length === 0 ? "" : ` (${String(ids.length)})`}`}
+        {ids.length === 0
+          ? t("hub.channels.ingress.resubmit")
+          : t("hub.channels.operations.resubmitCount", { count: ids.length })}
       </Button>
       <Button size="sm" variant="outline" disabled={pending || disabled} onPress={prune}>
-        Prune
+        {t("hub.channels.ingress.prune")}
       </Button>
     </View>
   );
 }
 
 function QueueAccountList({ rows }: { rows: readonly ChannelIngressAccountRow[] }) {
+  const { t } = useTranslation();
   if (rows.length === 0) {
     return (
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
-          <Text style={settingsStyles.rowHint}>No account has queued work.</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.channels.operations.noQueued")}</Text>
         </View>
       </View>
     );
@@ -184,11 +203,13 @@ function QueueAccountList({ rows }: { rows: readonly ChannelIngressAccountRow[] 
             <Text style={settingsStyles.rowTitle}>{`${row.channelLabel} · ${row.accountId}`}</Text>
             <Text style={settingsStyles.rowHint}>{row.summary}</Text>
             {row.oldestPending === null ? null : (
-              <Text style={settingsStyles.rowHint}>{`Oldest pending ${row.oldestPending}`}</Text>
+              <Text style={settingsStyles.rowHint}>
+                {t("hub.channels.operations.oldestPending", { age: row.oldestPending })}
+              </Text>
             )}
           </View>
           <StatusBadge
-            label={`${String(row.depth)} waiting`}
+            label={t("hub.channels.operations.waiting", { count: row.depth })}
             variant={channelSeverityVariant(row.severity)}
           />
         </View>
@@ -234,10 +255,10 @@ async function runIngressAction(
 ): Promise<string> {
   if (action === "resubmit") {
     const { resubmitted } = await resubmitChannelIngress(api, ids);
-    return `${String(resubmitted.length)} events resubmitted.`;
+    return i18n.t("hub.channels.operations.resubmitted", { count: resubmitted.length });
   }
   const { deleted } = await pruneChannelIngress(api);
-  return `${String(deleted)} rows pruned.`;
+  return i18n.t("hub.channels.operations.pruned", { count: deleted });
 }
 
 const styles = StyleSheet.create((theme) => ({

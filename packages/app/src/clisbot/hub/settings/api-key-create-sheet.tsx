@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
 import { settingsStyles } from "@/styles/settings";
-import { API_KEY_SCOPES, SCOPE_DETAILS, type ApiKeyScope } from "./api-key-scopes";
+import { API_KEY_SCOPES, scopeDetails, type ApiKeyScope } from "./api-key-scopes";
 
 /** New API key: a name and the operations it may run, in a sheet so the list stays a list. */
 export function ApiKeyCreateSheet({
@@ -20,6 +21,7 @@ export function ApiKeyCreateSheet({
   onCreate(name: string, scopes: ApiKeyScope[]): Promise<boolean>;
   onClose(): void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<Set<ApiKeyScope>>(new Set());
   const toggle = useCallback((scope: ApiKeyScope, enabled: boolean) => {
@@ -38,20 +40,20 @@ export function ApiKeyCreateSheet({
       return true;
     });
   }, [name, onCreate, scopes]);
-  const header = useMemo(() => ({ title: "New API key" }), []);
+  const header = useMemo(() => ({ title: t("hub.settings.apiKeys.create.title") }), [t]);
   const disabled = pending || name.trim().length === 0 || scopes.size === 0;
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <Button variant="secondary" size="sm" onPress={onClose}>
-          Cancel
+          {t("hub.settings.apiKeys.create.cancel")}
         </Button>
         <Button variant="default" size="sm" disabled={disabled} loading={pending} onPress={create}>
-          Create key
+          {t("hub.settings.apiKeys.create.submit")}
         </Button>
       </View>
     ),
-    [create, disabled, onClose, pending],
+    [create, disabled, onClose, pending, t],
   );
   return (
     <AdaptiveModalSheet
@@ -62,15 +64,21 @@ export function ApiKeyCreateSheet({
       desktopMaxWidth={520}
     >
       <View style={styles.form}>
-        <Field label="Name" hint="The machine or script that will hold it.">
+        <Field
+          label={t("hub.settings.apiKeys.create.nameLabel")}
+          hint={t("hub.settings.apiKeys.create.nameHint")}
+        >
           <FormTextInput
             initialValue=""
             onChangeText={setName}
-            placeholder="CI deployment"
+            placeholder={t("hub.settings.apiKeys.create.namePlaceholder")}
             editable={!pending}
           />
         </Field>
-        <Field label="Allowed operations" hint="Grant only what it needs.">
+        <Field
+          label={t("hub.settings.apiKeys.create.operationsLabel")}
+          hint={t("hub.settings.apiKeys.create.operationsHint")}
+        >
           <View style={styles.scopes}>
             {API_KEY_SCOPES.map((scope) => (
               <ScopeToggle
@@ -100,7 +108,7 @@ function ScopeToggle({
   toggle(scope: ApiKeyScope, enabled: boolean): void;
 }) {
   const change = useCallback((enabled: boolean) => toggle(scope, enabled), [scope, toggle]);
-  const detail = SCOPE_DETAILS[scope];
+  const detail = scopeDetails(scope);
   return (
     <View style={styles.scope}>
       <View style={settingsStyles.rowContent}>

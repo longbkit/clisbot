@@ -9,6 +9,7 @@ import {
   type ChannelConfigurationRecord,
   type ChannelLimits,
 } from "../channel-configuration";
+import { i18n } from "@/i18n/i18next";
 import { splitConversationIds } from "../conversation-picker";
 import { HUB_AUDIENCE_ROLES, type HubAudienceRole, type HubAudienceRule } from "../contracts";
 import {
@@ -89,18 +90,18 @@ export type AudienceDmScope = "off" | "all" | "specific";
 export type AudienceGroupScope = AudienceGroups | "specific";
 
 /** In a sentence and a summary: "Members may talk in …". */
-export const AUDIENCE_ROLE_LABELS: Record<HubAudienceRole, string> = {
-  owner: "Owners",
-  admin: "Owners and admins",
-  member: "Everyone on the Hub",
-};
+export function audienceRoleLabel(role: HubAudienceRole): string {
+  if (role === "owner") return i18n.t("hub.routes.roles.owner");
+  if (role === "admin") return i18n.t("hub.routes.roles.admin");
+  return i18n.t("hub.routes.roles.member");
+}
 
-export const WHO_CHOICE_LABELS: Record<Exclude<WhoChoice, "anyone">, string> = {
-  owners: "Only owners",
-  admins: "Owners and admins",
-  everyone: "Everyone on the Hub",
-  pick: "Only people I pick",
-};
+export function whoChoiceLabel(choice: Exclude<WhoChoice, "anyone">): string {
+  if (choice === "owners") return i18n.t("hub.routes.whoChoices.owners");
+  if (choice === "admins") return i18n.t("hub.routes.whoChoices.admins");
+  if (choice === "everyone") return i18n.t("hub.routes.whoChoices.everyone");
+  return i18n.t("hub.routes.whoChoices.pick");
+}
 
 const EMPTY_STORED: ChannelConfigurationRecord = {};
 
@@ -428,12 +429,15 @@ function whoOrWhereProblem(
 ): { part: RuleProblemPart; message: string } | null {
   const { who, where } = rule;
   if (rule.place === "groups") {
-    if (where.groups === "off") return { part: "where", message: "Choose which chats." };
+    if (where.groups === "off")
+      return { part: "where", message: i18n.t("hub.routes.ruleProblems.chooseChats") };
     if (where.groups === "specific" && splitConversationIds(where.conversations).length === 0) {
-      return { part: "where", message: "Pick a chat, or choose Every chat the bot is in." };
+      return { part: "where", message: i18n.t("hub.routes.ruleProblems.pickChat") };
     }
   }
-  return hasWhoPart(who) ? null : { part: "who", message: "Pick at least one person." };
+  return hasWhoPart(who)
+    ? null
+    : { part: "who", message: i18n.t("hub.routes.ruleProblems.pickPerson") };
 }
 
 function conditionsProblem(rule: AudienceRuleDraft, inherited: InheritedConditions): string | null {
@@ -446,10 +450,10 @@ function conditionsProblem(rule: AudienceRuleDraft, inherited: InheritedConditio
     conditions.ttlMinutes !== undefined &&
     parseTtlMinutes(conditions.ttlMinutes) === null
   ) {
-    return "Use a whole number of minutes.";
+    return i18n.t("hub.routes.ruleProblems.wholeMinutes");
   }
   if (conditions.contains !== undefined && conditions.contains.trim().length === 0) {
-    return "Type the text a message must contain.";
+    return i18n.t("hub.routes.ruleProblems.typeText");
   }
   const limits = parseChannelLimitsDraft(rule.limits, RULE_LIMIT_NAMES);
   return limits.valid ? null : limits.error;
@@ -461,10 +465,10 @@ function legacyDmProblem({ who, where }: AudienceRuleDraft): string | null {
   const dmPeople = where.dmMembers.length + where.dmTeams.length;
   const whoNamesMembers = who.roles.length > 0 || who.teams.length > 0 || who.members.length > 0;
   if (dmPeople > 0 && !whoNamesMembers) {
-    return "This older Rule limits DMs to Members its Who does not name. Pick the people again.";
+    return i18n.t("hub.routes.ruleProblems.legacyDmMembers");
   }
   if (splitConversationIds(where.dmIdentities).length > 0 && who.identities.trim().length === 0) {
-    return "This older Rule limits DMs to Guests its Who does not name. Pick the people again.";
+    return i18n.t("hub.routes.ruleProblems.legacyDmGuests");
   }
   return null;
 }

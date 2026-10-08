@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { Blocks } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { useConnectorsFeatureHosts } from "./feature";
 
@@ -16,6 +17,7 @@ export function ConnectorsSidebarItem({
   onBeforeNavigate?: () => void;
   groupStyle?: StyleProp<ViewStyle>;
 }) {
+  const { t } = useTranslation();
   const hosts = useConnectorsFeatureHosts();
   const router = useRouter();
   const pathname = usePathname();
@@ -27,7 +29,7 @@ export function ConnectorsSidebarItem({
   const row = (
     <SidebarHeaderRow
       icon={Blocks}
-      label="Connectors"
+      label={t("connectors.screen.common.connectors")}
       onPress={open}
       isActive={pathname === "/connectors"}
       testID="sidebar-connectors"

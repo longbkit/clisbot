@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { i18n } from "@/i18n/i18next";
 import { channelCatalogLabel } from "../channel-catalog";
 import { useChannelCatalog } from "./channel-catalog-queries";
 import { type RecordValue } from "./channel-settings-types";
@@ -26,12 +27,14 @@ export function channelAccountLabel(
   account: RecordValue | undefined,
   channelName: (channel: string) => string,
 ): string {
-  if (account === undefined) return "Connection unavailable";
+  if (account === undefined) return i18n.t("hub.channels.identityDirectory.connectionUnavailable");
   return `${channelName(stringField(account, "channel") ?? "channel")} · ${stringField(account, "accountId") ?? "account"}`;
 }
 
 /** What a Connection Admin sees where the Connection would be named. */
-export const MANAGED_BY_ORGANIZATION = "Managed by Organization Admins";
+export function managedByOrganization(): string {
+  return i18n.t("hub.channels.records.managedByOrganization");
+}
 
 export function arrayField(record: RecordValue, key: string): unknown[] {
   const value = record[key];
@@ -53,9 +56,11 @@ export function objectField(record: RecordValue, key: string): RecordValue | nul
 
 export function routeTargetSummary(route: RecordValue): string {
   const workflow = stringField(route, "workflow");
-  if (workflow !== null) return `Automation · ${workflow}`;
+  if (workflow !== null) return i18n.t("hub.channels.records.automationTarget", { name: workflow });
   const agent = stringField(route, "agent");
-  return agent === null ? "Unavailable target" : `Agent · ${agent}`;
+  return agent === null
+    ? i18n.t("hub.channels.records.unavailableTarget")
+    : i18n.t("hub.channels.records.agentTarget", { name: agent });
 }
 
 export function channelLabel(value: string): string {

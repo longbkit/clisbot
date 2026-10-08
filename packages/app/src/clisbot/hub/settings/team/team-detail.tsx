@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -14,7 +16,6 @@ import type { TeamActions } from "./use-team-actions";
 import { AdaptiveRenameModal } from "@/components/rename-modal";
 import { BackLink } from "../back-link";
 import { DetailHeader } from "../detail-header";
-import { countLabel } from "../labels";
 import { ViewTabs, type ViewTab } from "../view-tabs";
 
 type TeamView = "members" | "access";
@@ -23,9 +24,11 @@ type TeamView = "members" | "access";
  * Members for everyone; Access for Organization Admins and this Team's Team Admins (read-only
  * for the latter). Renaming and deleting are the header's … menu, for Organization Admins.
  */
-function teamViews(canManage: boolean) {
-  const views: ViewTab<TeamView>[] = [{ value: "members", label: "Members" }];
-  if (canManage) views.push({ value: "access", label: "Access" });
+function teamViews(canManage: boolean, t: TFunction) {
+  const views: ViewTab<TeamView>[] = [
+    { value: "members", label: t("hub.team.teamDetail.members") },
+  ];
+  if (canManage) views.push({ value: "access", label: t("hub.team.teamDetail.access") });
   return views;
 }
 
@@ -46,12 +49,13 @@ export function SelectedTeamDetail({
   manageAccess(): void;
   addPeople(team: HubTeam): void;
 }) {
+  const { t } = useTranslation();
   const [view, setView] = useState<TeamView>("members");
   const { pending, mutationError } = actions;
   const organizationAdmin = resources.canManageResources;
   const canManage = canManageTeamMembership(resources.authority, team.id);
   const canInvite = canInvitePeople(resources.authority, team.id);
-  const views = useMemo(() => teamViews(canManage), [canManage]);
+  const views = useMemo(() => teamViews(canManage, t), [canManage, t]);
   const teamAdmin = useTeamAdminAction(hub, resources, actions.run);
   const removeMember = useCallback(
     (userId: string) => actions.removeTeamMember(team.id, userId),
@@ -63,20 +67,22 @@ export function SelectedTeamDetail({
       <>
         {canInvite ? (
           <Button size="sm" variant="outline" disabled={pending} onPress={invite}>
-            Add people
+            {t("hub.team.teamDetail.addPeople")}
           </Button>
         ) : null}
         {organizationAdmin ? <TeamMenu team={team} actions={actions} onDeleted={back} /> : null}
       </>
     ),
-    [actions, back, canInvite, invite, organizationAdmin, pending, team],
+    [actions, back, canInvite, invite, organizationAdmin, pending, t, team],
   );
   return (
     <View>
-      <BackLink to="People & access" onPress={back} disabled={pending} />
+      <BackLink to={t("hub.team.people.title")} onPress={back} disabled={pending} />
       <DetailHeader
         title={team.name}
-        subtitle={`Team · ${countLabel(team.userIds.length, "Member")}`}
+        subtitle={t("hub.team.teamDetail.subtitle", {
+          members: t("hub.team.counts.members", { count: team.userIds.length }),
+        })}
         actions={headerActions}
       />
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
@@ -86,7 +92,7 @@ export function SelectedTeamDetail({
         </View>
       ) : null}
       {view === "members" ? (
-        <SettingsSection title="Members">
+        <SettingsSection title={t("hub.team.teamDetail.members")}>
           <TeamMemberRows
             team={team}
             resources={resources}
@@ -119,6 +125,7 @@ function TeamMenu({
   actions: TeamActions;
   onDeleted(): void;
 }) {
+  const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
   const close = useCallback(() => setRenaming(false), []);
   const rename = useCallback(
@@ -130,26 +137,34 @@ function TeamMenu({
   }, [actions, onDeleted, team.id, team.name]);
   const items = useMemo(
     () => [
-      { label: "Rename Team", disabled: actions.pending, onSelect: () => setRenaming(true) },
       {
-        label: "Delete Team",
+        label: t("hub.team.teamDetail.rename"),
+        disabled: actions.pending,
+        onSelect: () => setRenaming(true),
+      },
+      {
+        label: t("hub.team.teamDetail.delete"),
         destructive: true,
         disabled: actions.pending,
         onSelect: () => void remove(),
       },
     ],
-    [actions.pending, remove],
+    [actions.pending, remove, t],
   );
   return (
     <>
-      <RowActionsMenu label={`Actions for ${team.name}`} actions={items} disabled={false} />
+      <RowActionsMenu
+        label={t("hub.team.actions.actionsFor", { name: team.name })}
+        actions={items}
+        disabled={false}
+      />
       {renaming ? (
         <AdaptiveRenameModal
           visible
-          title="Rename Team"
+          title={t("hub.team.teamDetail.rename")}
           initialValue={team.name}
-          placeholder="Team name"
-          submitLabel="Rename Team"
+          placeholder={t("hub.team.teams.namePlaceholder")}
+          submitLabel={t("hub.team.teamDetail.rename")}
           maxLength={100}
           onSubmit={rename}
           onClose={close}

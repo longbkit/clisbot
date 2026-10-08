@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Image, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { channelApiProblem } from "../channel-api";
 import {
-  CHANNEL_QR_ACTION_LABELS,
+  channelQrActionLabel,
   channelQrFailure,
   channelQrLoginGuide,
   openChannelQrLinking,
@@ -63,6 +65,7 @@ export function ChannelQrLinkPanel({
   /** Told every phase the login reaches (the login step's Continue and its cleanup). */
   onPhase?: (phase: ChannelQrPhase) => void;
 }) {
+  const { t } = useTranslation();
   const [model] = useState(() => openChannelQrLinking({ available }));
   useEffect(() => () => model.close(), [model]);
   const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
@@ -81,7 +84,7 @@ export function ChannelQrLinkPanel({
   );
   if (!framed) return row;
   return (
-    <SettingsSection title="Login">
+    <SettingsSection title={t("hub.channels.qrPanel.login")}>
       <View style={settingsStyles.card}>{row}</View>
     </SettingsSection>
   );
@@ -116,26 +119,34 @@ function QrLoginRow({
 }
 
 function qrLoginTitle(state: ChannelQrState, guide: ChannelQrLoginGuide): string {
-  if (state.phase === "pending") return `Scan with ${guide.app}`;
+  if (state.phase === "pending") return i18n.t("hub.channels.qrPanel.scanWith", { app: guide.app });
   if (state.phase === "linked" && state.user !== null) {
-    return `Logged in as ${state.user.displayName ?? state.user.userId}`;
+    return i18n.t("hub.channels.qrPanel.loggedInAs", {
+      name: state.user.displayName ?? state.user.userId,
+    });
   }
-  if (state.phase === "linked") return `Logged in to ${guide.app}`;
-  return `Log in to ${guide.app}`;
+  if (state.phase === "linked")
+    return i18n.t("hub.channels.qrPanel.loggedInTo", { app: guide.app });
+  return i18n.t("hub.channels.qrPanel.logInTo", { app: guide.app });
 }
 
 /** The one line under the title: what happens next, a countdown, or what failed. */
 function QrLoginStatus({ state, guide }: { state: ChannelQrState; guide: ChannelQrLoginGuide }) {
+  const { t } = useTranslation();
   if (state.phase === "starting") {
     return (
       <View style={styles.inline}>
         <MutedSpinner uniProps={mutedSpinnerColor} />
-        <Text style={settingsStyles.rowHint}>Preparing a QR code...</Text>
+        <Text style={settingsStyles.rowHint}>{t("hub.channels.qrPanel.preparing")}</Text>
       </View>
     );
   }
   if (state.phase === "failed") {
-    return <Text style={settingsStyles.rowError}>{state.message ?? "The login failed"}</Text>;
+    return (
+      <Text style={settingsStyles.rowError}>
+        {state.message ?? t("hub.channels.qrPanel.loginFailed")}
+      </Text>
+    );
   }
   const hint = qrLoginHint(state, guide);
   return hint === null ? null : <Text style={settingsStyles.rowHint}>{hint}</Text>;
@@ -144,17 +155,19 @@ function QrLoginStatus({ state, guide }: { state: ChannelQrState; guide: Channel
 function qrLoginHint(state: ChannelQrState, guide: ChannelQrLoginGuide): string | null {
   switch (state.phase) {
     case "idle":
-      return `Scan a QR code with ${guide.app} on the phone this bot answers as. The bot starts once you are logged in.`;
+      return i18n.t("hub.channels.qrPanel.idleHint", { app: guide.app });
     case "pending":
       return state.remainingMs === null
         ? null
-        : `The code expires in ${String(Math.ceil(state.remainingMs / 1_000))}s`;
+        : i18n.t("hub.channels.qrPanel.expiresIn", {
+            seconds: Math.ceil(state.remainingMs / 1_000),
+          });
     case "expired":
-      return "The code expired before it was scanned";
+      return i18n.t("hub.channels.qrPanel.expiredHint");
     case "linked":
-      return "Confirm this is the account the bot should use. It starts in a few seconds.";
+      return i18n.t("hub.channels.qrPanel.linkedHint");
     case "unavailable":
-      return state.message ?? "This Hub does not serve QR login";
+      return state.message ?? i18n.t("hub.channels.qrPanel.unavailableHint");
     default:
       return null;
   }
@@ -167,6 +180,7 @@ function QrLoginActions({
   state: ChannelQrState;
   run(action: ChannelQrAction): void;
 }) {
+  const { t } = useTranslation();
   if (state.actions.length === 0) return null;
   return (
     <View style={styles.actions}>
@@ -176,8 +190,8 @@ function QrLoginActions({
           action={action}
           label={
             action === "start" && state.phase !== "idle"
-              ? "Try again"
-              : CHANNEL_QR_ACTION_LABELS[action]
+              ? t("hub.channels.qrPanel.tryAgain")
+              : channelQrActionLabel(action)
           }
           disabled={state.busy}
           run={run}
@@ -199,10 +213,15 @@ function ScanSteps({ steps }: { steps: readonly string[] }) {
 
 /** A QR code needs a light quiet zone around it to scan, whatever the theme. */
 function QrCodeFrame({ uri }: { uri: string }) {
+  const { t } = useTranslation();
   const source = useMemo(() => ({ uri }), [uri]);
   return (
     <View style={styles.codeFrame}>
-      <Image accessibilityLabel="Login QR code" source={source} style={styles.code} />
+      <Image
+        accessibilityLabel={t("hub.channels.qrPanel.codeLabel")}
+        source={source}
+        style={styles.code}
+      />
     </View>
   );
 }
@@ -299,20 +318,25 @@ function useChannelQrPolling(
 }
 
 /** Ending a working login means scanning again: asked before it happens. */
-const CONFIRM_ENDING: Partial<
-  Record<ChannelQrAction, { title: string; message: string; label: string }>
-> = {
-  logout: {
-    title: "Log out?",
-    message: "The bot stops answering on this account until someone scans a new QR code.",
-    label: "Log out",
-  },
-  relink: {
-    title: "Log in with a different account?",
-    message: "The current login ends first. The bot stays offline until the new code is scanned.",
-    label: "Continue",
-  },
-};
+function confirmEnding(
+  action: ChannelQrAction,
+): { title: string; message: string; label: string } | undefined {
+  if (action === "logout") {
+    return {
+      title: i18n.t("hub.channels.qrPanel.logoutTitle"),
+      message: i18n.t("hub.channels.qrPanel.logoutMessage"),
+      label: i18n.t("hub.channels.qr.action.logout"),
+    };
+  }
+  if (action === "relink") {
+    return {
+      title: i18n.t("hub.channels.qrPanel.relinkTitle"),
+      message: i18n.t("hub.channels.qrPanel.relinkMessage"),
+      label: i18n.t("hub.channels.qrPanel.continue"),
+    };
+  }
+  return undefined;
+}
 
 function useQrAction(
   model: ChannelQrModel,
@@ -320,7 +344,7 @@ function useQrAction(
 ): (action: ChannelQrAction) => void {
   return useCallback(
     (action: ChannelQrAction) => {
-      const ending = CONFIRM_ENDING[action];
+      const ending = confirmEnding(action);
       const run = () => runQrAction(model, verbs, action);
       if (ending === undefined) {
         run();

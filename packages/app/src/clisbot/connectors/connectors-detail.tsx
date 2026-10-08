@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorMcpServer } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
@@ -146,28 +147,29 @@ function SetupDetail({
   appName?: string;
   onAddServer(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View>
       {appName ? (
         <Text style={[settingsStyles.rowHint, styles.lead]}>
-          To connect {appName}, save a Composio key first.
+          {t("connectors.screen.detail.connectFirst", { app: appName })}
         </Text>
       ) : null}
       <ComposioSetup serverId={serverId} />
       <SettingsSection
-        title="MCP servers"
-        info="A server you run or trust. Nothing leaves this Host unless the server itself sends it."
+        title={t("connectors.screen.common.mcpServers")}
+        info={t("connectors.screen.detail.serverInfo")}
       >
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
             <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>Keep everything on this Host</Text>
+              <Text style={settingsStyles.rowTitle}>{t("connectors.screen.detail.keepLocal")}</Text>
               <Text style={settingsStyles.rowHint}>
-                Add a remote URL or a local command, in the format Claude Code uses.
+                {t("connectors.screen.detail.keepLocalHint")}
               </Text>
             </View>
             <Button variant="outline" size="sm" onPress={onAddServer}>
-              Add MCP server
+              {t("connectors.screen.common.addMcpServer")}
             </Button>
           </View>
         </View>

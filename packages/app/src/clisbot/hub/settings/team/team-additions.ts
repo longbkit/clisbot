@@ -1,6 +1,7 @@
+import { i18n } from "@/i18n/i18next";
 import { invitationTeams } from "../../contracts";
 import { invitationFailureMessage, parseInvitationEmails } from "../invitation-emails";
-import { capitalizeLabel, countLabel } from "../labels";
+import { roleLabel } from "./member-role";
 import type { HubManagedInvitation, HubMember, HubTeam, InvitationRole } from "./types";
 
 /**
@@ -106,7 +107,8 @@ export async function applyTeamAdditions(
     try {
       for (const teamId of missingTeamIds) await ports.addTeamMember(teamId, member.userId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Hub request failed";
+      const message =
+        error instanceof Error ? error.message : i18n.t("hub.team.errors.requestFailedBare");
       failures.push({ key: member.userId, kind: "member", label: member.email, message });
     }
   }
@@ -173,27 +175,38 @@ export function invitePreview(plan: TeamAdditionPlan, teams: readonly HubTeam[])
   const newCount = plan.invitees.length - pendingCount;
   const parts: string[] = [];
   if (plan.members.length > 0 && teamNames.length > 0) {
-    const verb = plan.members.length === 1 ? "joins" : "join";
-    parts.push(`${countLabel(plan.members.length, "Member")} ${verb} ${teamNames.join(", ")} now`);
+    parts.push(
+      i18n.t("hub.team.invite.preview.membersJoin", {
+        count: plan.members.length,
+        teams: teamNames.join(", "),
+      }),
+    );
   }
-  if (newCount > 0) parts.push(`${countLabel(newCount, "invitation")} will be sent`);
-  if (pendingCount > 0) {
-    const effect = pendingInvitationEffect(pendingCount, teamNames.length > 0);
-    parts.push(`${countLabel(pendingCount, "pending invitation")} ${effect}`);
+  if (newCount > 0) {
+    parts.push(i18n.t("hub.team.invite.preview.invitationsSent", { count: newCount }));
   }
+  if (pendingCount > 0) parts.push(pendingInvitationEffect(pendingCount, teamNames.length > 0));
   return parts.join(" · ");
 }
 
 /** "gains Teams" when Teams are chosen, otherwise only the lifetime restarts. */
 function pendingInvitationEffect(count: number, joinsTeams: boolean): string {
-  if (joinsTeams) return count === 1 ? "gains Teams" : "gain Teams";
-  return count === 1 ? "is renewed" : "are renewed";
+  return joinsTeams
+    ? i18n.t("hub.team.invite.preview.pendingGainTeams", { count })
+    : i18n.t("hub.team.invite.preview.pendingRenewed", { count });
 }
 
 /** Notes for invitees who already have a pending invitation: its Teams stay, its role and expiry are renewed. */
 export function pendingInvitationNotes(plan: TeamAdditionPlan, role: InvitationRole): string[] {
+  const t = i18n.getFixedT(null, "translation");
   return Object.entries(plan.pending).map(([email, { teamNames }]) => {
-    const kept = teamNames.length === 0 ? "" : `, keeps ${teamNames.join(", ")}`;
-    return `${email} already has a pending invitation${kept}; it is renewed as ${capitalizeLabel(role)}.`;
+    if (teamNames.length === 0) {
+      return i18n.t("hub.team.invite.pendingNote", { email, role: roleLabel(role, t) });
+    }
+    return i18n.t("hub.team.invite.pendingNoteKeeps", {
+      email,
+      teams: teamNames.join(", "),
+      role: roleLabel(role, t),
+    });
   });
 }

@@ -3,6 +3,10 @@ import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutomationSidebarItem } from "./automation-sidebar-item";
+// Real English copy: the assertions below read the rendered text.
+import { i18n as testI18n } from "@/i18n/i18next";
+
+void testI18n;
 
 const account = vi.hoisted(() => ({
   enabled: false,
@@ -29,7 +33,7 @@ vi.mock("@/components/sidebar/sidebar-header-row", () => ({
     onPress(): void;
     isActive: boolean;
   }) => (
-    <button aria-current={isActive ? "page" : undefined} onClick={onPress}>
+    <button type="button" aria-current={isActive ? "page" : undefined} onClick={onPress}>
       {label}
     </button>
   ),

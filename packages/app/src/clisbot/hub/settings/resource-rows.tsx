@@ -1,5 +1,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -14,8 +15,9 @@ export function ResourceFeedback({ query }: { query: ResourceQuery }) {
 
 /** One loading line or the first error across several Hub resource queries. */
 export function ResourceFeedbackGroup({ queries }: { queries: ResourceQuery[] }) {
+  const { t } = useTranslation();
   if (queries.some(({ isPending }) => isPending)) {
-    return <Text style={settingsStyles.rowHint}>Loading…</Text>;
+    return <Text style={settingsStyles.rowHint}>{t("hub.settings.resourceRows.loading")}</Text>;
   }
   const error = queries.find((query) => query.error)?.error;
   return error ? <Alert variant="error" title={error.message} /> : null;

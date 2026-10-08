@@ -1,4 +1,6 @@
+import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   TOOL_DETAIL_VALUES,
   WHEN_THROTTLED_VALUES,
@@ -20,20 +22,26 @@ import {
 // The Replies section's Show tool activity switch and the options it carries
 // (docs/features/channels/conversation-flow.md, "Configuration").
 
-const TOOL_DETAIL_LABELS: Record<ChannelRouteToolDetail, string> = {
-  name: "Tool name only",
-  short: "Tool and short command",
-  full: "Tool and full command",
-};
-const TOOL_DETAIL_DESCRIPTIONS: Record<ChannelRouteToolDetail, string> = {
-  name: "Without the command or path",
-  short: "Plus the command or path on one line, cut when long",
-  full: "Plus the whole command or path",
-};
-const WHEN_THROTTLED_LABELS: Record<ChannelRouteWhenThrottled, string> = {
-  update: "Update the last line",
-  skip: "Skip it",
-};
+function toolDetailLabels(t: TFunction): Record<ChannelRouteToolDetail, string> {
+  return {
+    name: t("hub.routes.toolActivity.details.name"),
+    short: t("hub.routes.toolActivity.details.short"),
+    full: t("hub.routes.toolActivity.details.full"),
+  };
+}
+function toolDetailDescriptions(t: TFunction): Record<ChannelRouteToolDetail, string> {
+  return {
+    name: t("hub.routes.toolActivity.detailDescriptions.name"),
+    short: t("hub.routes.toolActivity.detailDescriptions.short"),
+    full: t("hub.routes.toolActivity.detailDescriptions.full"),
+  };
+}
+function whenThrottledLabels(t: TFunction): Record<ChannelRouteWhenThrottled, string> {
+  return {
+    update: t("hub.routes.toolActivity.whenThrottledOptions.update"),
+    skip: t("hub.routes.toolActivity.whenThrottledOptions.skip"),
+  };
+}
 
 export interface RouteToolActivityCommands {
   changeOn(on: boolean): void;
@@ -97,11 +105,12 @@ export function RouteToolActivityFields({
   commands,
   pending,
 }: RouteToolActivityForm & { pending: boolean }) {
+  const { t } = useTranslation();
   const shown = routeToolActivityDisplay(draft);
   return (
     <>
       <RouteBehaviorSwitch
-        label="Show tool activity"
+        label={t("hub.routes.toolActivity.show")}
         value={shown.on}
         onChange={commands.changeOn}
         disabled={pending}
@@ -124,20 +133,21 @@ function ToolActivityOptions({
   commands: RouteToolActivityCommands;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <ChoiceRow
-        label="Tool detail"
+        label={t("hub.routes.toolActivity.detail")}
         values={TOOL_DETAIL_VALUES}
         selected={shown.fields.detail}
-        labels={TOOL_DETAIL_LABELS}
-        descriptions={TOOL_DETAIL_DESCRIPTIONS}
+        labels={toolDetailLabels(t)}
+        descriptions={toolDetailDescriptions(t)}
         onChange={commands.changeDetail}
         disabled={pending}
       />
       <RouteNumberRow
-        label="At most one line every"
-        unit="seconds"
+        label={t("hub.routes.toolActivity.throttle")}
+        unit={t("hub.routes.common.secondsUnit")}
         value={shown.fields.throttleSeconds}
         {...(parsed.valid ? {} : { error: parsed.error })}
         onChange={commands.changeThrottleSeconds}
@@ -145,10 +155,10 @@ function ToolActivityOptions({
       />
       {shown.throttled ? (
         <ChoiceRow
-          label="When throttled"
+          label={t("hub.routes.toolActivity.whenThrottled")}
           values={WHEN_THROTTLED_VALUES}
           selected={shown.fields.whenThrottled}
-          labels={WHEN_THROTTLED_LABELS}
+          labels={whenThrottledLabels(t)}
           onChange={commands.changeWhenThrottled}
           disabled={pending}
         />

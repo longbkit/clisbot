@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export function MemberRow({
   bordered: boolean;
   handlers: MemberRowHandlers;
 }) {
+  const { t } = useTranslation();
   const { member, teams, chat } = row;
   const view = useCallback(
     () => handlers.select({ kind: "member", id: member.id }),
@@ -52,10 +54,15 @@ export function MemberRow({
   const removeLocked = memberRemoveLockReason(member, members, capabilities) !== null;
   const actions = useMemo(
     () => [
-      { label: "View", onSelect: view },
-      { label: "Remove", onSelect: remove, destructive: true, disabled: removeLocked },
+      { label: t("hub.team.actions.view"), onSelect: view },
+      {
+        label: t("hub.team.actions.remove"),
+        onSelect: remove,
+        destructive: true,
+        disabled: removeLocked,
+      },
     ],
-    [remove, removeLocked, view],
+    [remove, removeLocked, t, view],
   );
   const canManageMembers = capabilities?.manageMembers === true;
   const compact = useIsCompactFormFactor();
@@ -64,7 +71,7 @@ export function MemberRow({
       <Text style={tableStyles.cellText}>{memberTeamNames(member, teams)}</Text>
       {canEditTeams && (teams.length > 0 || needsTeam(member, teams)) ? (
         <Button size="xs" variant="ghost" disabled={pending} onPress={editTeams}>
-          {teams.length === 0 ? "Add to a Team" : "Edit Teams"}
+          {teams.length === 0 ? t("hub.team.actions.addToTeam") : t("hub.team.actions.editTeams")}
         </Button>
       ) : null}
     </View>
@@ -84,7 +91,11 @@ export function MemberRow({
           setRole={handlers.setRole}
         />
       ) : null}
-      <RowActionsMenu label={`Actions for ${member.name}`} actions={actions} disabled={pending} />
+      <RowActionsMenu
+        label={t("hub.team.actions.actionsFor", { name: member.name })}
+        actions={actions}
+        disabled={pending}
+      />
     </View>
   );
   const identity = <MemberIdentity member={member} open={view} />;
@@ -94,8 +105,10 @@ export function MemberRow({
     return (
       <View style={[settingsStyles.row, border, tableStyles.body, styles.stackedRow]}>
         <View>{identity}</View>
-        <LabelledCell label="Teams">{teamsCell}</LabelledCell>
-        {chatCell === null ? null : <LabelledCell label="Chat">{chatCell}</LabelledCell>}
+        <LabelledCell label={t("hub.team.members.columns.teams")}>{teamsCell}</LabelledCell>
+        {chatCell === null ? null : (
+          <LabelledCell label={t("hub.team.members.columns.chat")}>{chatCell}</LabelledCell>
+        )}
         {trailing}
       </View>
     );
@@ -114,14 +127,27 @@ export function MemberRow({
  * column styles, so the headings sit over their values.
  */
 export function MemberTableHeader({ chat, role }: { chat: boolean; role: boolean }) {
+  const { t } = useTranslation();
   if (useIsCompactFormFactor()) return null;
   return (
     <View style={[settingsStyles.row, styles.tableRow, tableStyles.header]}>
-      <Text style={[tableStyles.headerCell, styles.memberColumn]}>Member</Text>
-      <Text style={[tableStyles.headerCell, styles.teamsColumn]}>Teams</Text>
-      {chat ? <Text style={[tableStyles.headerCell, styles.chatColumn]}>Chat</Text> : null}
+      <Text style={[tableStyles.headerCell, styles.memberColumn]}>
+        {t("hub.team.members.columns.member")}
+      </Text>
+      <Text style={[tableStyles.headerCell, styles.teamsColumn]}>
+        {t("hub.team.members.columns.teams")}
+      </Text>
+      {chat ? (
+        <Text style={[tableStyles.headerCell, styles.chatColumn]}>
+          {t("hub.team.members.columns.chat")}
+        </Text>
+      ) : null}
       <View style={styles.trailing}>
-        {role ? <Text style={[tableStyles.headerCell, styles.roleHeading]}>Role</Text> : null}
+        {role ? (
+          <Text style={[tableStyles.headerCell, styles.roleHeading]}>
+            {t("hub.team.members.columns.role")}
+          </Text>
+        ) : null}
         <View style={styles.menuSpace} />
       </View>
     </View>
@@ -130,11 +156,12 @@ export function MemberTableHeader({ chat, role }: { chat: boolean; role: boolean
 
 /** The name opens the Member, the way a directory row does everywhere; hover underlines it. */
 function MemberIdentity({ member, open }: { member: HubMember; open(): void }) {
+  const { t } = useTranslation();
   return (
     <View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open ${member.name}`}
+        accessibilityLabel={t("hub.team.members.open", { name: member.name })}
         onPress={open}
       >
         {renderMemberName(member.name)}

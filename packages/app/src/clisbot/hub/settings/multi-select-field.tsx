@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { StyleSheet } from "react-native-unistyles";
 import {
   Pressable,
@@ -136,7 +138,7 @@ export function MultiSelectField({
     [value],
   );
   // The chosen values are listed under the trigger, so the trigger only counts them.
-  const summary = triggerLabel(value, allLabel);
+  const { summary, emptyText } = useSelectionText(value, allLabel);
   const display = useMemo(() => (summary === null ? null : { label: summary }), [summary]);
   const removeOne = useCallback(
     (optionId: string) => onChange(toggleSelection(value, optionId)),
@@ -171,7 +173,7 @@ export function MultiSelectField({
         onSelect={select}
         searchable
         searchPlaceholder={searchPlaceholder}
-        emptyText="Nothing matches this search."
+        emptyText={emptyText}
         title={label}
         open={open}
         onOpenChange={setOpen}
@@ -205,10 +207,25 @@ export function MultiSelectField({
   );
 }
 
-function triggerLabel(value: MultiSelection | null, allLabel: string | undefined): string | null {
+/** The trigger's summary and the empty-search line, in the app language. */
+function useSelectionText(value: MultiSelection | null, allLabel: string | undefined) {
+  const { t } = useTranslation();
+  return {
+    summary: triggerLabel(value, allLabel, t),
+    emptyText: t("hub.settings.multiSelect.noMatches"),
+  };
+}
+
+function triggerLabel(
+  value: MultiSelection | null,
+  allLabel: string | undefined,
+  t: TFunction,
+): string | null {
   if (value === null) return null;
   if (value === "*") return allLabel ?? null;
-  return value.length === 0 ? null : `${String(value.length)} selected`;
+  return value.length === 0
+    ? null
+    : t("hub.settings.multiSelect.selected", { count: value.length });
 }
 
 /** One chosen value, readable at a glance, with its group and a way to drop it. */
@@ -223,6 +240,7 @@ function SelectedOptionRow({
   disabled: boolean;
   remove(id: string): void;
 }) {
+  const { t } = useTranslation();
   const press = useCallback(() => remove(id), [id, remove]);
   const label = option?.label ?? id;
   const meta = option?.description ?? option?.group;
@@ -236,7 +254,7 @@ function SelectedOptionRow({
         size="sm"
         variant="ghost"
         leftIcon={X}
-        accessibilityLabel={`Remove ${label}`}
+        accessibilityLabel={t("hub.settings.multiSelect.remove", { label })}
         disabled={disabled}
         onPress={press}
       />

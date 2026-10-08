@@ -1,6 +1,7 @@
 import { Building2 } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import type { Theme } from "@/styles/theme";
 
@@ -19,8 +20,12 @@ export function OrganizationTitle({ name }: { name: string }) {
   );
 }
 
-/** An organization role as shown to people: `owner` → `Owner`. */
-export function roleLabel(role: string): string {
+/** An organization role as shown to people: `owner` → `Owner`. A role this app does not know yet
+ * is shown capitalized. Pass a component's `t` so the label follows a language change. */
+export function roleLabel(role: string, t: (key: string) => string = (key) => i18n.t(key)): string {
+  if (role === "owner") return t("hub.account.roles.owner");
+  if (role === "admin") return t("hub.account.roles.admin");
+  if (role === "member") return t("hub.account.roles.member");
   return role.length === 0 ? role : `${role[0]?.toUpperCase() ?? ""}${role.slice(1)}`;
 }
 

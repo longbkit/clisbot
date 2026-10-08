@@ -4,6 +4,7 @@ import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { botsSessionScope } from "../data/session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { View, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { PanelsTopLeft } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { ChatParticipantPayload } from "@clisbot/protocol/chats/types";
@@ -25,6 +26,7 @@ export function ParticipantActions({
   workspaceByBotId?: ReadonlyMap<string, string>;
   group?: boolean;
 }) {
+  const { t } = useTranslation();
   const project = useConversationProjectContext();
   const snapshot = useHostRuntimeSnapshot(serverId);
   const scope = botsSessionScope(snapshot);
@@ -46,7 +48,7 @@ export function ParticipantActions({
   );
   const [visible, setVisible] = useState(false);
   const close = useCallback(() => setVisible(false), []);
-  const header = useMemo(() => ({ title: "Open in cowork" }), []);
+  const header = useMemo(() => ({ title: t("bots.chat.common.openInCowork") }), [t]);
   const open = useCallback(() => {
     const direct = project?.botId
       ? participants.find((p) => p.botId === project.botId)
@@ -58,7 +60,12 @@ export function ParticipantActions({
   }, [group, participants, serverId, remember, project?.botId]);
   return (
     <>
-      <ChatHeaderAction label="Open in cowork" text="Cowork" icon={PanelsTopLeft} onPress={open} />
+      <ChatHeaderAction
+        label={t("bots.chat.common.openInCowork")}
+        text={t("bots.chat.cowork.text")}
+        icon={PanelsTopLeft}
+        onPress={open}
+      />
       <AdaptiveModalSheet visible={visible} onClose={close} header={header}>
         <View style={styles.body}>
           {participants.map((participant) => (
@@ -86,6 +93,7 @@ function CoworkParticipant({
   onOpen: () => void;
   onRemember: (agentId: string) => void;
 }) {
+  const { t } = useTranslation();
   const open = useCallback(() => {
     if (!participant.agentId) return;
     onRemember(participant.agentId);
@@ -98,7 +106,7 @@ function CoworkParticipant({
         {participant.displayName}
       </Button>
       {!participant.agentId ? (
-        <Text style={styles.hint}>Send a message to start this bot’s session.</Text>
+        <Text style={styles.hint}>{t("bots.chat.cowork.startSession")}</Text>
       ) : null}
     </View>
   );

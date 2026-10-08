@@ -6,6 +6,7 @@
  * app side by naming the fields a row may render, so a future contract addition
  * cannot leak a message body into the list by accident.
  */
+import { i18n } from "@/i18n/i18next";
 import { channelCatalogLabel, type ChannelCatalogEntry } from "./channel-catalog";
 import type { HubChannelIngressCounts, HubChannelIngressEvent } from "./contracts";
 
@@ -29,24 +30,35 @@ export function channelIngressSeverity(counts: HubChannelIngressCounts): Channel
 /** "3 pending · 1 retrying · 2 dead-lettered", dropping every empty bucket. */
 export function channelIngressSummary(counts: HubChannelIngressCounts): string {
   const parts = [
-    counts.pending > 0 ? `${String(counts.pending)} pending` : null,
-    counts.claimed > 0 ? `${String(counts.claimed)} in flight` : null,
-    counts.retrying > 0 ? `${String(counts.retrying)} retrying` : null,
-    counts.deadLettered > 0 ? `${String(counts.deadLettered)} dead-lettered` : null,
-    counts.lanesBlocked > 0 ? `${String(counts.lanesBlocked)} lanes blocked` : null,
+    counts.pending > 0 ? i18n.t("hub.channels.ingress.pending", { count: counts.pending }) : null,
+    counts.claimed > 0 ? i18n.t("hub.channels.ingress.inFlight", { count: counts.claimed }) : null,
+    counts.retrying > 0
+      ? i18n.t("hub.channels.ingress.retrying", { count: counts.retrying })
+      : null,
+    counts.deadLettered > 0
+      ? i18n.t("hub.channels.ingress.deadLettered", { count: counts.deadLettered })
+      : null,
+    counts.lanesBlocked > 0
+      ? i18n.t("hub.channels.ingress.lanesBlocked", { count: counts.lanesBlocked })
+      : null,
   ].filter((part): part is string => part !== null);
-  return parts.length === 0 ? "Queue empty" : parts.join(" · ");
+  return parts.length === 0 ? i18n.t("hub.channels.ingress.queueEmpty") : parts.join(" · ");
 }
 
 /** Coarse on purpose: this is a backlog age, not a stopwatch. */
 export function formatChannelQueueAge(ms: number | null): string | null {
   if (ms === null) return null;
-  if (ms < 60_000) return "under a minute";
+  if (ms < 60_000) return i18n.t("hub.channels.ingress.age.underMinute");
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `${String(minutes)}m`;
+  if (minutes < 60) return i18n.t("hub.channels.ingress.age.minutes", { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${String(hours)}h ${String(minutes % 60)}m`;
-  return `${String(Math.floor(hours / 24))}d ${String(hours % 24)}h`;
+  if (hours < 24) {
+    return i18n.t("hub.channels.ingress.age.hours", { hours, minutes: minutes % 60 });
+  }
+  return i18n.t("hub.channels.ingress.age.days", {
+    days: Math.floor(hours / 24),
+    hours: hours % 24,
+  });
 }
 
 export interface ChannelIngressAccountRow {
@@ -98,14 +110,19 @@ export function channelDeadLetterRow(
   event: HubChannelIngressEvent,
   catalog: readonly ChannelCatalogEntry[],
 ): ChannelDeadLetterRow {
-  const thread = event.externalThreadId === null ? "" : ` · thread ${event.externalThreadId}`;
   return {
     id: event.id,
     title: `${channelCatalogLabel(catalog, event.channel)} · ${event.accountId}`,
-    conversation: `${event.externalConversationId}${thread}`,
-    attempts: `${String(event.attempts)} ${event.attempts === 1 ? "attempt" : "attempts"}`,
+    conversation:
+      event.externalThreadId === null
+        ? event.externalConversationId
+        : i18n.t("hub.channels.ingress.conversationThread", {
+            conversation: event.externalConversationId,
+            thread: event.externalThreadId,
+          }),
+    attempts: i18n.t("hub.channels.ingress.attempts", { count: event.attempts }),
     failedAt: event.failedAt ?? event.lastAttemptAt,
-    reason: event.failedReason ?? event.lastError ?? "No failure reason was recorded.",
+    reason: event.failedReason ?? event.lastError ?? i18n.t("hub.channels.ingress.noReason"),
   };
 }
 
@@ -138,11 +155,10 @@ export function channelIngressResubmitConfirmation(count: number): {
   message: string;
   confirmLabel: string;
 } {
-  const noun = count === 1 ? "event" : "events";
   return {
-    title: `Resubmit ${String(count)} ${noun}?`,
-    message: `They go back on the queue as pending and run again in their conversation's lane. Anything that failed for a reason that has not changed will fail again.`,
-    confirmLabel: "Resubmit",
+    title: i18n.t("hub.channels.ingress.resubmitTitle", { count }),
+    message: i18n.t("hub.channels.ingress.resubmitMessage"),
+    confirmLabel: i18n.t("hub.channels.ingress.resubmit"),
   };
 }
 
@@ -152,21 +168,20 @@ export function channelIngressPruneConfirmation(): {
   confirmLabel: string;
 } {
   return {
-    title: "Prune the queue now?",
-    message:
-      "Completed and dead-lettered rows past the Hub's retention window are deleted. Pending and in-flight work is untouched. This cannot be undone.",
-    confirmLabel: "Prune",
+    title: i18n.t("hub.channels.ingress.pruneTitle"),
+    message: i18n.t("hub.channels.ingress.pruneMessage"),
+    confirmLabel: i18n.t("hub.channels.ingress.prune"),
   };
 }
 
-export const CHANNEL_INGRESS_STATUS_LABELS: Readonly<Record<string, string>> = {
-  pending: "Pending",
-  claimed: "In flight",
-  completed: "Completed",
-  failed: "Failed",
-  dead_letter: "Dead-lettered",
+const CHANNEL_INGRESS_STATUS_LABELS: Readonly<Record<string, () => string>> = {
+  pending: () => i18n.t("hub.channels.ingress.status.pending"),
+  claimed: () => i18n.t("hub.channels.ingress.status.claimed"),
+  completed: () => i18n.t("hub.channels.ingress.status.completed"),
+  failed: () => i18n.t("hub.channels.ingress.status.failed"),
+  dead_letter: () => i18n.t("hub.channels.ingress.status.deadLetter"),
 };
 
 export function channelIngressStatusLabel(status: string): string {
-  return CHANNEL_INGRESS_STATUS_LABELS[status] ?? status;
+  return CHANNEL_INGRESS_STATUS_LABELS[status]?.() ?? status;
 }

@@ -2,6 +2,7 @@
 // row menu and the open chat's options menu list the same ones in the same order with the
 // same labels. Actions that belong to the open page (tabs, Project actions, a fresh session)
 // stay in the chat options menu. Pure.
+import { i18n } from "@/i18n/i18next";
 
 export type ChatResourceActionId =
   | "pin"
@@ -35,18 +36,20 @@ export interface ChatResourceActionsInput {
 export function chatResourceActions(input: ChatResourceActionsInput): ChatResourceAction[] {
   const actions: ChatResourceAction[] = [];
   if (input.target !== "group" && input.canConfigureBot)
-    actions.push({ id: "bot-settings", label: "Bot settings" });
+    actions.push({ id: "bot-settings", label: i18n.t("bots.chat.actions.botSettings") });
   if (input.target === "group") {
-    actions.push({ id: "group-settings", label: "Group settings" });
-    actions.push({ id: "members", label: "Members" });
+    actions.push({ id: "group-settings", label: i18n.t("bots.chat.common.groupSettings") });
+    actions.push({ id: "members", label: i18n.t("bots.chat.common.members") });
   }
   if (input.target !== "group" && input.canConnectChannel)
-    actions.push({ id: "connect-channel", label: "Connect to a channel…" });
+    actions.push({ id: "connect-channel", label: i18n.t("bots.chat.actions.connectChannel") });
   actions.push(pinAction(input.pinned));
-  if (input.target !== "bot") actions.push({ id: "archive", label: "Archive chat…" });
+  if (input.target !== "bot")
+    actions.push({ id: "archive", label: i18n.t("bots.chat.actions.archive") });
   return actions;
 }
 
 export function pinAction(pinned: boolean): ChatResourceAction {
-  return { id: "pin", label: pinned ? "Unpin" : "Pin to sidebar", pinned };
+  const label = pinned ? i18n.t("bots.chat.actions.unpin") : i18n.t("bots.chat.actions.pin");
+  return { id: "pin", label, pinned };
 }

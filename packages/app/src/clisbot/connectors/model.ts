@@ -1,4 +1,5 @@
 import { connectorAccessOf, connectorAppTitle } from "@clisbot/protocol/connectors/types";
+import { i18n } from "@/i18n/i18next";
 import type {
   ConnectorGrant,
   ProjectConnectorGrant,
@@ -12,6 +13,7 @@ import type {
 /**
  * Pure rules behind the Connectors screen and the grant editor
  * (docs/features/connectors/README.md). No React, no client: everything here is unit-tested.
+ * Labels resolve through `i18n` when they are read, so they follow the app's language.
  */
 
 export type ConnectorFilter = "all" | "connected" | "mcp";
@@ -38,9 +40,15 @@ export function appState(accounts: readonly ConnectorAccount[] | undefined): App
 }
 
 export const APP_STATE_LABELS: Record<AppConnectionState, string> = {
-  connected: "Connected",
-  pending: "Waiting for sign-in",
-  attention: "Sign in again",
+  get connected() {
+    return i18n.t("connectors.screen.common.connected");
+  },
+  get pending() {
+    return i18n.t("connectors.screen.common.waitingForSignIn");
+  },
+  get attention() {
+    return i18n.t("connectors.screen.common.signInAgain");
+  },
   none: "",
 };
 
@@ -55,15 +63,30 @@ export const APP_STATE_VARIANTS: Record<
 };
 
 export function accountLabel(account: ConnectorAccount): string {
-  return account.alias ?? "Default account";
+  return account.alias ?? i18n.t("connectors.screen.model.defaultAccount");
 }
 
 export const ACCOUNT_STATUS_LABELS: Record<AppConnectionState, string> = {
-  connected: "Connected",
-  pending: "Waiting for sign-in",
-  attention: "Expired",
-  none: "Unknown",
+  get connected() {
+    return i18n.t("connectors.screen.common.connected");
+  },
+  get pending() {
+    return i18n.t("connectors.screen.common.waitingForSignIn");
+  },
+  get attention() {
+    return i18n.t("connectors.screen.model.expired");
+  },
+  get none() {
+    return i18n.t("connectors.screen.model.unknown");
+  },
 };
+
+/** "Read only" or "Read and write". */
+export function accessLabel(access: ConnectorAccess): string {
+  return access === "write"
+    ? i18n.t("connectors.screen.common.readWrite")
+    : i18n.t("connectors.screen.common.readOnly");
+}
 
 /** True while any account waits for its sign-in to finish, so the screen keeps polling. */
 export function hasPendingAccount(apps: readonly ConnectorAppState[]): boolean {
@@ -106,12 +129,15 @@ export function matchesSearch(item: { name: string; slug?: string }, search: str
 
 /** "All 38 tools", "6 of 412 tools", "No tools". */
 export function toolSelectionLabel(selection: ConnectorToolSelection, total?: number): string {
-  if (selection === "all") return total === undefined ? "All tools" : `All ${total} tools`;
-  if (selection.length === 0) return "No tools";
-  const noun = selection.length === 1 && total === undefined ? "tool" : "tools";
+  if (selection === "all") {
+    return total === undefined
+      ? i18n.t("connectors.screen.model.allTools")
+      : i18n.t("connectors.screen.model.allToolsCount", { count: total });
+  }
+  if (selection.length === 0) return i18n.t("connectors.screen.model.noTools");
   return total === undefined
-    ? `${selection.length} ${noun}`
-    : `${selection.length} of ${total} tools`;
+    ? i18n.t("connectors.screen.model.selectedTools", { count: selection.length })
+    : i18n.t("connectors.screen.model.selectedOf", { count: total, selected: selection.length });
 }
 
 /**
@@ -167,7 +193,7 @@ export function connectorUses(
     const owner = owners.get(projectId);
     uses.push({
       projectId,
-      name: owner?.name ?? "A Project not on this list",
+      name: owner?.name ?? i18n.t("connectors.screen.model.unknownProject"),
       ...(owner?.botId ? { botId: owner.botId } : {}),
       enabled: entry.enabled !== false,
       ...(app ? { access: connectorAccessOf(app.access) } : {}),
@@ -263,13 +289,15 @@ export function accountSelectionLabel(
   selection: "all" | string[] | undefined,
   accounts: readonly ConnectorAccount[],
 ): string {
-  if (selection === undefined || selection === "all") return "All accounts";
-  if (selection.length === 0) return "No account";
-  if (selection.length === 1) {
-    const account = accounts.find((candidate) => candidate.id === selection[0]);
-    return account ? accountLabel(account) : "1 account";
+  if (selection === undefined || selection === "all") {
+    return i18n.t("connectors.screen.model.allAccounts");
   }
-  return `${selection.length} accounts`;
+  if (selection.length === 0) return i18n.t("connectors.screen.model.noAccount");
+  const only =
+    selection.length === 1 ? accounts.find((candidate) => candidate.id === selection[0]) : null;
+  return only
+    ? accountLabel(only)
+    : i18n.t("connectors.screen.model.accountCount", { count: selection.length });
 }
 
 /** Limit an app to some accounts, or `all`; an app keeps its access and tools. */
@@ -324,9 +352,10 @@ export function mcpServerSummary(server: {
     try {
       return new URL(server.url ?? "").host;
     } catch {
-      return server.url ?? "Remote server";
+      return server.url ?? i18n.t("connectors.screen.model.remoteServer");
     }
   }
   const program = (server.command ?? "").split(/[\\/]/).pop();
-  return program ? `Local command · ${program}` : "Local command";
+  const local = i18n.t("connectors.screen.common.localCommand");
+  return program ? `${local} · ${program}` : local;
 }

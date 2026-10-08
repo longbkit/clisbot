@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export function BackLink({
   onPress(): void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.row}>
       <Button
@@ -26,7 +28,7 @@ export function BackLink({
         leftIcon={ArrowLeft}
         disabled={disabled}
         onPress={onPress}
-        accessibilityLabel={`Back to ${to}`}
+        accessibilityLabel={t("hub.settings.backLink.accessibilityLabel", { to })}
       >
         {to}
       </Button>

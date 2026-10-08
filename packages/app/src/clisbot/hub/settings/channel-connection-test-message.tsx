@@ -1,5 +1,6 @@
 import { routeAudienceDraft } from "./channel-route-audience";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ConnectionTestMessagePanel } from "./channel-connection-settings";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -66,32 +67,34 @@ export function ChannelTestPreview({
 }: {
   preview: z.infer<typeof HubChannelTestPreviewSchema>;
 }) {
-  let destination = "New message in this conversation.";
+  const { t } = useTranslation();
+  let destination = t("hub.channels.testPreview.newMessage");
   if (preview.threadId !== null)
-    destination = `In thread: ${preview.threadLabel ? `${preview.threadLabel} (${preview.threadId})` : preview.threadId}.`;
+    destination = t("hub.channels.testPreview.inThread", {
+      thread: preview.threadLabel
+        ? `${preview.threadLabel} (${preview.threadId})`
+        : preview.threadId,
+    });
   else if (preview.channel === "telegram" && preview.requestedThreadId === "1")
-    destination = "In the General topic.";
+    destination = t("hub.channels.testPreview.generalTopic");
   return (
     <View style={styles.testPreview}>
       <View>
-        <Text style={settingsStyles.rowTitle}>Send to</Text>
+        <Text style={settingsStyles.rowTitle}>{t("hub.channels.testPreview.sendTo")}</Text>
         <Text selectable style={settingsStyles.rowHint}>
           {preview.label ? `${preview.label} (${preview.conversationId})` : preview.conversationId}
         </Text>
         <Text style={settingsStyles.rowHint}>{destination}</Text>
       </View>
       <View style={styles.testMessageSection}>
-        <Text style={settingsStyles.rowTitle}>Message to send</Text>
+        <Text style={settingsStyles.rowTitle}>{t("hub.channels.testPreview.messageToSend")}</Text>
         <View testID="channel-test-message" style={[settingsStyles.card, styles.testMessage]}>
           <Text selectable style={settingsStyles.rowTitle}>
             {preview.text}
           </Text>
         </View>
       </View>
-      <Text style={settingsStyles.rowHint}>
-        No attachments. This checks outbound delivery only; it does not start an Agent or
-        Automation.
-      </Text>
+      <Text style={settingsStyles.rowHint}>{t("hub.channels.testPreview.footer")}</Text>
     </View>
   );
 }

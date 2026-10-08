@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import type { z } from "zod";
 import { useFetchQuery } from "@/data/query";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "./account-provider";
 import { hubResourceQueryKey } from "./query-keys";
 import { channelCatalogLabel, type ChannelCatalogEntry } from "./channel-catalog";
@@ -167,7 +168,7 @@ export function channelConnectionLabel(
   connections: readonly ChannelConnectionNaming[],
 ): string {
   const first = connections[0];
-  if (first === undefined) return "Connection unavailable";
+  if (first === undefined) return i18n.t("hub.channels.identityDirectory.connectionUnavailable");
   return `${channelCatalogLabel(catalog, first.provider)} · ${channelBotNames(connections).join(", ")}`;
 }
 
@@ -232,7 +233,7 @@ export function identityRealmLabel(
   connections: readonly ChannelConnectionNaming[],
 ): string {
   const first = connections[0];
-  if (first === undefined) return "Bot unavailable";
+  if (first === undefined) return i18n.t("hub.channels.identityDirectory.botUnavailable");
   const channel = channelCatalogLabel(catalog, first.provider);
   const scope = identityRealmScopeOf(connections);
   if (scope === "channel") return channel;
@@ -248,9 +249,12 @@ export function channelIdentityLine(
   connections: readonly ChannelConnectionNaming[],
 ): string {
   const realm = identityRealmConnections(identity, connections);
-  if (realm.length === 0) return "No bot left to recognize this identity";
+  if (realm.length === 0) return i18n.t("hub.channels.identityDirectory.noBotLeft");
   const label = identityRealmLabel(catalog, realm);
   return identityRealmScopeOf(realm) === "bot"
     ? label
-    : `${label} · works with ${channelBotNames(realm).join(", ")}`;
+    : i18n.t("hub.channels.identityDirectory.worksWith", {
+        label,
+        bots: channelBotNames(realm).join(", "),
+      });
 }

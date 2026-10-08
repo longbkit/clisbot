@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { BotsSection, type BotsSidebarBot } from "./bots-section";
 
 const env = vi.hoisted(() => ({ compact: false }));
@@ -90,6 +91,8 @@ vi.mock("@/hooks/use-compact-time-ago", () => ({ useCompactTimeAgo: () => "2m" }
 function bot(id: string, overrides: Partial<BotsSidebarBot> = {}): BotsSidebarBot {
   return { key: `host-a:${id}`, serverId: "host-a", botId: id, name: `Bot ${id}`, ...overrides };
 }
+
+beforeAll(() => i18n.changeLanguage("en"));
 
 beforeEach(() => {
   vi.stubGlobal("React", React);

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { ChevronDown, ChevronRight } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,7 @@ function AgentConfigurationGrantFields({
   onChange(value: AgentConfigurationDraft): void;
   onRemove(): void;
 }) {
+  const { t } = useTranslation();
   // A finished row reads as one line; only an unfinished one needs the controls.
   const [expanded, setExpanded] = useState(() => !isCompleteAgentConfiguration(value));
   const toggleExpanded = useCallback(() => setExpanded((current) => !current), []);
@@ -176,67 +178,102 @@ function AgentConfigurationGrantFields({
     [onChange, value],
   );
   const summary = [
-    provider?.label ?? `Agent configuration ${String(index + 1)}`,
-    selectionLabel(value.modelIds, modelOptions, "All Models"),
-    selectionLabel(value.thinkingOptionIds, thinkingOptions, "All Thinking"),
+    provider?.label ?? t("hub.access.agentConfiguration.fallbackTitle", { number: index + 1 }),
+    selectionLabel(value.modelIds, modelOptions, t("hub.access.agentConfiguration.allModels")),
+    selectionLabel(
+      value.thinkingOptionIds,
+      thinkingOptions,
+      t("hub.access.agentConfiguration.allThinking"),
+    ),
   ]
     .filter(Boolean)
     .join(" · ");
   return (
     <View style={styles.configurationCard}>
-      <View style={styles.configurationHeader}>
-        <Button
-          size="xs"
-          variant="ghost"
-          leftIcon={expanded ? ChevronDown : ChevronRight}
-          onPress={toggleExpanded}
-          accessibilityLabel={expanded ? "Collapse" : "Expand"}
-        />
-        <Text style={[settingsStyles.rowTitle, styles.configurationSummary]} numberOfLines={1}>
-          {summary}
-        </Text>
-        {canRemove ? (
-          <Button size="xs" variant="ghost" disabled={disabled} onPress={onRemove}>
-            Remove
-          </Button>
-        ) : null}
-      </View>
+      <ConfigurationHeader
+        summary={summary}
+        expanded={expanded}
+        onToggle={toggleExpanded}
+        onRemove={canRemove ? onRemove : null}
+        disabled={disabled}
+      />
       {expanded ? (
         <>
           <SelectField
-            label="Provider"
+            label={t("hub.access.agentConfiguration.provider")}
             value={value.providerId}
             selectedDisplay={providerDisplay}
             options={providerOptions}
             onChange={changeProvider}
-            placeholder="Choose a Provider"
-            emptyText="No enabled Providers were published by this Host."
+            placeholder={t("hub.access.agentConfiguration.providerPlaceholder")}
+            emptyText={t("hub.access.agentConfiguration.providerEmpty")}
             searchable={providerOptions.length > 6}
-            title="Provider"
+            title={t("hub.access.agentConfiguration.provider")}
             disabled={disabled}
           />
           <MultiSelectField
-            label="Models"
+            label={t("hub.access.agentConfiguration.models")}
             options={modelOptions}
             value={value.modelIds}
             onChange={changeModels}
             disabled={disabled || provider === undefined}
-            allLabel="All available Models"
-            placeholder="Choose Models"
-            searchPlaceholder="Search Models"
+            allLabel={t("hub.access.agentConfiguration.allAvailableModels")}
+            placeholder={t("hub.access.agentConfiguration.modelsPlaceholder")}
+            searchPlaceholder={t("hub.access.agentConfiguration.searchModels")}
           />
           <MultiSelectField
-            label="Thinking"
+            label={t("hub.access.agentConfiguration.thinking")}
             options={thinkingOptions}
             value={value.thinkingOptionIds}
             onChange={changeThinking}
             disabled={disabled || !isCompleteSelection(value.modelIds)}
-            allLabel="All available Thinking"
-            placeholder="Choose Thinking"
-            searchPlaceholder="Search Thinking options"
+            allLabel={t("hub.access.agentConfiguration.allAvailableThinking")}
+            placeholder={t("hub.access.agentConfiguration.thinkingPlaceholder")}
+            searchPlaceholder={t("hub.access.agentConfiguration.searchThinking")}
           />
         </>
       ) : null}
+    </View>
+  );
+}
+
+/** One line for the row: expand or collapse it, what it allows, and Remove when there are others. */
+function ConfigurationHeader({
+  summary,
+  expanded,
+  onToggle,
+  onRemove,
+  disabled,
+}: {
+  summary: string;
+  expanded: boolean;
+  onToggle(): void;
+  /** Null when this is the only row, which cannot be removed. */
+  onRemove: (() => void) | null;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.configurationHeader}>
+      <Button
+        size="xs"
+        variant="ghost"
+        leftIcon={expanded ? ChevronDown : ChevronRight}
+        onPress={onToggle}
+        accessibilityLabel={
+          expanded
+            ? t("hub.access.agentConfiguration.collapse")
+            : t("hub.access.agentConfiguration.expand")
+        }
+      />
+      <Text style={[settingsStyles.rowTitle, styles.configurationSummary]} numberOfLines={1}>
+        {summary}
+      </Text>
+      {onRemove === null ? null : (
+        <Button size="xs" variant="ghost" disabled={disabled} onPress={onRemove}>
+          {t("hub.access.agentConfiguration.remove")}
+        </Button>
+      )}
     </View>
   );
 }

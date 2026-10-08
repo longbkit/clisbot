@@ -1,4 +1,5 @@
 import { parse, stringify } from "yaml";
+import { i18n } from "@/i18n/i18next";
 import {
   withChannelRouteConversation,
   type ChannelRouteConversation,
@@ -177,26 +178,26 @@ export function formatChannelConfigurationYaml(candidate: ChannelConfigurationCa
 export function parseChannelConfigurationYaml(source: string): ChannelConfigurationCandidate {
   const value: unknown = parse(source);
   if (!isRecord(value)) {
-    throw new Error("Advanced YAML must be a mapping.");
+    throw new Error(i18n.t("hub.channels.yaml.notMapping"));
   }
   const keys = Object.keys(value);
   if (keys.some((key) => key !== "resource" && key !== "policy" && key !== "accounts")) {
-    throw new Error("Advanced YAML accepts only resource, policy, and accounts.");
+    throw new Error(i18n.t("hub.channels.yaml.onlyKnownKeys"));
   }
   if (!isRecord(value["policy"])) {
-    throw new Error("policy must be a mapping.");
+    throw new Error(i18n.t("hub.channels.yaml.policyNotMapping"));
   }
   if (!Array.isArray(value["accounts"])) {
-    throw new Error("accounts must be a list.");
+    throw new Error(i18n.t("hub.channels.yaml.accountsNotList"));
   }
   const accounts = value["accounts"].map((account, index) => {
     if (!isRecord(account)) {
-      throw new Error("accounts[" + String(index) + "] must be a mapping.");
+      throw new Error(i18n.t("hub.channels.yaml.accountNotMapping", { index }));
     }
     return account;
   });
   if (!isRecord(value["resource"])) {
-    throw new Error("resource must be a mapping.");
+    throw new Error(i18n.t("hub.channels.yaml.resourceNotMapping"));
   }
   return { policy: value["policy"], accounts, resource: value["resource"] };
 }

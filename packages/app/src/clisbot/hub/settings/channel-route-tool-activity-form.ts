@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import {
   authorsToolActivityOptions,
   readChannelRouteToolActivity,
@@ -37,8 +38,6 @@ export interface RouteToolActivityDraft {
 export type ParsedRouteToolActivity =
   | { valid: true; value: ChannelRouteToolActivity | undefined }
   | { valid: false; error: string };
-
-const THROTTLE_ERROR = "Use a whole number of seconds, 0 or more.";
 
 /** Opens the draft from the stored Route and what it inherits. */
 export function openRouteToolActivityDraft(
@@ -96,7 +95,8 @@ export function parseRouteToolActivityDraft(
   if (fields === undefined) return { valid: true, value: true };
   const typed = fields.throttleSeconds;
   const seconds = typed === undefined ? undefined : parseThrottleSeconds(typed);
-  if (typed !== undefined && seconds === undefined) return { valid: false, error: THROTTLE_ERROR };
+  if (typed !== undefined && seconds === undefined)
+    return { valid: false, error: i18n.t("hub.routes.toolActivity.throttleError") };
   return {
     valid: true,
     value: {

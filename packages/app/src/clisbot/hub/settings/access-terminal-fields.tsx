@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +37,7 @@ export function TerminalAccessFields({
   setProfiles(value: MultiSelection): void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const options = useMemo(
     () =>
       shareableTerminalProfiles(resource.terminalProfileCatalog, holdings).map(({ id, name }) => ({
@@ -48,35 +50,35 @@ export function TerminalAccessFields({
   return (
     <>
       {terminal ? (
-        <Field label="Terminal profiles">
-          <Text style={settingsStyles.rowHint}>All profiles, included with Terminal</Text>
+        <Field label={t("hub.access.terminal.profilesLabel")}>
+          <Text style={settingsStyles.rowHint}>{t("hub.access.terminal.allIncluded")}</Text>
         </Field>
       ) : (
         <MultiSelectField
-          label="Terminal profiles"
-          hint="Each opens an agent CLI directly, with no shell. Exiting closes the terminal."
+          label={t("hub.access.terminal.profilesLabel")}
+          hint={t("hub.access.terminal.profilesHint")}
           options={options}
           value={profiles}
           onChange={setProfiles}
           disabled={pending}
-          {...(sharesEveryTerminalProfile(holdings) ? { allLabel: "All profiles" } : {})}
-          placeholder="Choose Terminal profiles"
-          searchPlaceholder="Search Terminal profiles"
+          {...(sharesEveryTerminalProfile(holdings)
+            ? { allLabel: t("hub.access.terminal.allProfiles") }
+            : {})}
+          placeholder={t("hub.access.terminal.profilesPlaceholder")}
+          searchPlaceholder={t("hub.access.terminal.searchProfiles")}
         />
       )}
       {terminalSwitch ? (
         <View style={styles.switchRow}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>Terminal (shell)</Text>
-            <Text style={settingsStyles.rowHint}>
-              Runs any command. Reads every file the daemon can, secrets included.
-            </Text>
+            <Text style={settingsStyles.rowTitle}>{t("hub.access.terminal.shellLabel")}</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.access.terminal.shellHint")}</Text>
           </View>
           <Switch
             value={terminal}
             onValueChange={setTerminal}
             disabled={pending}
-            accessibilityLabel="Terminal (shell)"
+            accessibilityLabel={t("hub.access.terminal.shellLabel")}
           />
         </View>
       ) : null}
@@ -99,6 +101,7 @@ export function ProjectFolderFields({
   holdings: ViewerHoldings;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   // A narrowed grantor passes their narrowing on, so it cannot be switched off.
   const mustNarrow = holdings.projectFolders !== undefined;
   const narrowed = value !== null;
@@ -118,21 +121,19 @@ export function ProjectFolderFields({
     <>
       <View style={styles.switchRow}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>Narrow Project folders</Text>
-          <Text style={settingsStyles.rowHint}>
-            Creates Projects wherever the Host folder policy allows, unless narrowed here.
-          </Text>
+          <Text style={settingsStyles.rowTitle}>{t("hub.access.terminal.narrowFolders")}</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.access.terminal.narrowFoldersHint")}</Text>
         </View>
         <Switch
           value={narrowed}
           onValueChange={toggle}
           disabled={pending || mustNarrow}
-          accessibilityLabel="Narrow Project folders"
+          accessibilityLabel={t("hub.access.terminal.narrowFolders")}
         />
       </View>
       {narrowed ? (
         <>
-          <Field label="Allow" hint="Folders, comma-separated. * is one level, ** any depth.">
+          <Field label={t("hub.access.terminal.allow")} hint={t("hub.access.terminal.allowHint")}>
             <FormTextInput
               initialValue={value.allow.join(", ")}
               onChangeText={setAllow}
@@ -142,7 +143,7 @@ export function ProjectFolderFields({
               editable={!pending}
             />
           </Field>
-          <Field label="Deny" hint="Wins over Allow.">
+          <Field label={t("hub.access.terminal.deny")} hint={t("hub.access.terminal.denyHint")}>
             <FormTextInput
               initialValue={value.deny.join(", ")}
               onChangeText={setDeny}

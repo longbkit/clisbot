@@ -3,6 +3,7 @@
 // set shows what it inherits and writes nothing until it is changed.
 
 import React, { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import {
   effectiveConditions,
@@ -24,6 +25,7 @@ export function RuleConditionFields({
   disabled: boolean;
   update: Update;
 }) {
+  const { t } = useTranslation();
   const effective = effectiveConditions(rule.conditions, inherited);
   const setConditions = useCallback(
     (patch: Partial<AudienceRuleDraft["conditions"]>) =>
@@ -45,14 +47,14 @@ export function RuleConditionFields({
   return (
     <>
       <RouteBehaviorSwitch
-        label="Require a mention"
+        label={t("hub.routes.conditions.requireMention")}
         value={effective.requireMention}
         onChange={changeMention}
         disabled={disabled}
       />
       {effective.requireMention ? (
         <RouteBehaviorSwitch
-          label="Continue without a mention"
+          label={t("hub.routes.conditions.continueWithoutMention")}
           value={effective.followUpMode === "auto"}
           onChange={changeContinue}
           disabled={disabled}
@@ -60,8 +62,8 @@ export function RuleConditionFields({
       ) : null}
       {effective.requireMention && effective.followUpMode === "auto" ? (
         <RouteNumberRow
-          label="For this many minutes after the bot's last reply"
-          unit="minutes"
+          label={t("hub.routes.conditions.followUpMinutes")}
+          unit={t("hub.routes.common.minutesUnit")}
           value={rule.conditions.ttlMinutes ?? String(effective.ttlMinutes)}
           onChange={changeMinutes}
           disabled={disabled}
@@ -81,6 +83,7 @@ function RuleTextFilter({
   disabled: boolean;
   setConditions(patch: Partial<AudienceRuleDraft["conditions"]>): void;
 }) {
+  const { t } = useTranslation();
   const filtered = rule.conditions.contains !== undefined;
   const toggle = useCallback(
     (on: boolean) => setConditions({ contains: on ? "" : undefined }),
@@ -90,16 +93,13 @@ function RuleTextFilter({
   return (
     <>
       <RouteBehaviorSwitch
-        label="Only messages containing text"
+        label={t("hub.routes.conditions.onlyContaining")}
         value={filtered}
         onChange={toggle}
         disabled={disabled}
       />
       {filtered ? (
-        <Field
-          label="Text"
-          hint="Case-sensitive. It decides only whether a new conversation comes in this way; the whole message reaches the Agent."
-        >
+        <Field label={t("hub.routes.conditions.text")} hint={t("hub.routes.conditions.textHint")}>
           <FormTextInput
             initialValue={rule.conditions.contains ?? ""}
             onChangeText={type}

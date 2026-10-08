@@ -3,9 +3,11 @@
 // hundreds of Members: the list is filtered by kind and search, and only one
 // entry's grants are ever on screen. docs/features/access/access-screen.md.
 
+import { i18n } from "@/i18n/i18next";
 import {
   resourceKey,
   resourceKindLabel,
+  resourceKindPluralLabels,
   subjectKey,
   type AccessResource,
   type AccessResourceKind,
@@ -17,7 +19,6 @@ import {
   type GrantGrouping,
   type GrantRow,
 } from "./access-grant-rows";
-import { countLabel } from "./labels";
 
 export interface AccessEntry {
   /** `member:<id>`, `daemon:<id>`: the same key as its grant group. */
@@ -54,18 +55,16 @@ const RESOURCE_KINDS: readonly AccessResourceKind[] = [
   "channel_account",
   "automation",
 ];
-const SUBJECT_FILTER_LABELS: Record<SubjectKind, string> = {
-  team: "Teams",
-  member: "Members",
-  guest: "Guest",
-};
-const RESOURCE_FILTER_LABELS: Partial<Record<AccessResourceKind, string>> = {
-  daemon: "Hosts",
-  project: "Projects",
-  channel_account: "Connections",
-  team: "Teams",
-  automation: "Automations",
-};
+/** The kinds the Resources view lists; an Organization is never a grant target here. */
+const LISTED_RESOURCE_KINDS: ReadonlySet<AccessResourceKind> = new Set(RESOURCE_KINDS);
+
+function subjectFilterLabels(): Record<SubjectKind, string> {
+  return {
+    team: i18n.t("hub.access.kindsPlural.team"),
+    member: i18n.t("hub.access.kindsPlural.member"),
+    guest: i18n.t("hub.access.kinds.guest"),
+  };
+}
 
 /** Every entry of one view: the ones with grants, then the ones without. */
 export function accessEntries(
@@ -126,10 +125,12 @@ export function hasAccess(entry: AccessEntry): boolean {
 
 /** The list row's one-word state: the role that gives access, else the grant count. */
 export function entryStatus(entry: AccessEntry): string {
-  if (entry.role === "owner") return "Owner, full access";
+  if (entry.role === "owner") return i18n.t("hub.access.browser.ownerStatus");
   const grants = entry.rows.length;
-  if (grants > 0) return countLabel(grants, "grant");
-  return entry.role === "admin" ? "Admin role" : "No access";
+  if (grants > 0) return i18n.t("hub.access.browser.grants", { count: grants });
+  return entry.role === "admin"
+    ? i18n.t("hub.access.browser.adminRole")
+    : i18n.t("hub.access.browser.noAccess");
 }
 
 function targetOf(key: string, grouping: GrantGrouping): AccessEntry["target"] {
@@ -152,17 +153,25 @@ function entryWithout(
 
 function subjectsWithout(directory: GrantDirectory): AccessEntry[] {
   return [
-    ...directory.teams.map((team) => entryWithout("team", team.id, team.name, "Team", "subject")),
+    ...directory.teams.map((team) =>
+      entryWithout("team", team.id, team.name, i18n.t("hub.access.kinds.team"), "subject"),
+    ),
     ...directory.members.map((member) =>
       entryWithout("member", member.id, member.name, member.email, "subject"),
     ),
-    entryWithout("guest", "guest", "Guest", "Channel senders without a linked Member", "subject"),
+    entryWithout(
+      "guest",
+      "guest",
+      i18n.t("hub.access.kinds.guest"),
+      i18n.t("hub.access.guestDescription"),
+      "subject",
+    ),
   ];
 }
 
 function resourcesWithout(resources: readonly AccessResource[]): AccessEntry[] {
   return resources
-    .filter((resource) => RESOURCE_FILTER_LABELS[resource.kind] !== undefined)
+    .filter((resource) => LISTED_RESOURCE_KINDS.has(resource.kind))
     .map((resource) =>
       entryWithout(
         resource.kind,
@@ -183,16 +192,20 @@ export function entryFilterChips(
   const kinds: readonly AccessEntry["kind"][] =
     grouping === "subject" ? SUBJECT_KINDS : RESOURCE_KINDS;
   const labels: Partial<Record<string, string>> =
-    grouping === "subject" ? SUBJECT_FILTER_LABELS : RESOURCE_FILTER_LABELS;
+    grouping === "subject" ? subjectFilterLabels() : resourceKindPluralLabels();
   const byKind = kinds.flatMap((kind) => {
     const count = entries.filter((entry) => entry.kind === kind).length;
     return count === 0 ? [] : [{ value: kind, label: labels[kind] ?? kind, count }];
   });
   return [
-    { value: "all", label: "All", count: entries.length },
+    { value: "all", label: i18n.t("hub.access.browser.all"), count: entries.length },
     ...byKind,
-    { value: "with", label: "With access", count: withAccess.length },
-    { value: "none", label: "No access", count: entries.length - withAccess.length },
+    { value: "with", label: i18n.t("hub.access.browser.withAccess"), count: withAccess.length },
+    {
+      value: "none",
+      label: i18n.t("hub.access.browser.noAccess"),
+      count: entries.length - withAccess.length,
+    },
   ];
 }
 

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
@@ -35,23 +36,24 @@ export function TeamAccessSection({
   pending: boolean;
   manageAccess(): void;
 }) {
+  const { t } = useTranslation();
   const members = resources.members.data?.members ?? NO_MEMBERS;
   const teams = useMemo(() => [team], [team]);
   const manage = useMemo(
     () => (
       <Button size="sm" variant="outline" disabled={pending} onPress={manageAccess}>
-        Manage access
+        {t("hub.team.teamDetail.manageAccess")}
       </Button>
     ),
-    [manageAccess, pending],
+    [manageAccess, pending, t],
   );
   if (!resources.canManageResources) {
     return <TeamAdminAccess team={team} teams={teams} members={members} />;
   }
   return (
     <SettingsSection
-      title="Access"
-      info="What every Member of this Team can use. A change here reaches all of them."
+      title={t("hub.team.teamDetail.access")}
+      info={t("hub.team.teamDetail.accessInfo")}
       trailing={manage}
     >
       <SubjectGrantsTable
@@ -62,7 +64,7 @@ export function TeamAccessSection({
         accessLevels={resources.catalog.data?.accessLevels ?? NO_LEVELS}
         members={members}
         teams={teams}
-        empty="No access yet. Grant some with Manage access."
+        empty={t("hub.team.teamDetail.accessEmpty")}
       />
     </SettingsSection>
   );
@@ -77,9 +79,10 @@ function TeamAdminAccess({
   teams: readonly HubTeam[];
   members: readonly HubMember[];
 }) {
+  const { t } = useTranslation();
   const access = useTeamAccess(team.id);
   return (
-    <SettingsSection title="Access">
+    <SettingsSection title={t("hub.team.teamDetail.access")}>
       <ResourceFeedbackGroup queries={[access]} />
       {access.data === undefined ? null : (
         <SubjectGrantsTable
@@ -90,12 +93,10 @@ function TeamAdminAccess({
           accessLevels={access.data.accessLevels}
           members={members}
           teams={teams}
-          empty="No resource access granted"
+          empty={t("hub.team.teamDetail.accessEmptyReadOnly")}
         />
       )}
-      <Text style={settingsStyles.rowHint}>
-        Team Admins manage who is in the Team. An Organization Admin changes what the Team can use.
-      </Text>
+      <Text style={settingsStyles.rowHint}>{t("hub.team.teamDetail.teamAdminNote")}</Text>
     </SettingsSection>
   );
 }

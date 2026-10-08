@@ -4,6 +4,7 @@
  * only refusal this needs to word is `access_exceeds_grantor`.
  */
 import type { z } from "zod";
+import { i18n } from "@/i18n/i18next";
 import { HubApiError, type HubApiClient } from "../api-client";
 import { HubAccessAssignmentSchema, type HubAccessAssignmentsSchema } from "../contracts";
 import type { HubAutomationScope } from "./automation-access";
@@ -56,7 +57,7 @@ export function removeAutomationAccess(api: HubApiClient, assignmentId: string):
 
 export function grantErrorMessage(error: unknown): string {
   if (error instanceof HubApiError && error.code === "access_exceeds_grantor") {
-    return "You can grant only what you hold on this Automation.";
+    return i18n.t("hub.automations.access.exceedsGrantor");
   }
-  return error instanceof Error ? error.message : "Hub request failed.";
+  return error instanceof Error ? error.message : i18n.t("hub.automations.hubRequestFailed");
 }

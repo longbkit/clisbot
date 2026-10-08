@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { SettingsCard, SettingsSection } from "@/components/settings";
 import { SettingsLinkRow } from "@/clisbot/hub/settings/settings-link-row";
 import { Alert } from "@/components/ui/alert";
@@ -14,6 +15,7 @@ export function HubReadyNotice({
   capabilities: HubDeviceCapabilities;
   started: boolean;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const openChannels = useCallback(() => router.push("/settings/hub/channels"), [router]);
   const signIn = useCallback(() => router.push("/settings/hub/account"), [router]);
@@ -23,21 +25,21 @@ export function HubReadyNotice({
   return (
     <Alert
       variant="success"
-      title="Hub started successfully"
+      title={t("hub.connection.summary.startedTitle")}
       description={
         needsSignIn
-          ? "Sign in to this Hub to continue."
-          : "This device is connected and ready to use."
+          ? t("hub.connection.summary.signInToContinue")
+          : t("hub.connection.summary.ready")
       }
     >
       {needsSignIn ? (
         <Button variant="outline" size="sm" onPress={signIn}>
-          Sign in to this Hub
+          {t("hub.connection.common.signInToHub")}
         </Button>
       ) : null}
       {!needsSignIn && capabilities.canManageDevices ? (
         <Button variant="outline" size="sm" onPress={openChannels}>
-          Set up a channel
+          {t("hub.connection.summary.setUpChannel")}
         </Button>
       ) : null}
     </Alert>
@@ -59,21 +61,26 @@ export function HubOverviewSummary({
   signIn(): void;
   openPolicy(): void;
 }) {
+  const { t } = useTranslation();
   const needsSignIn =
     capabilities.loginRequired && capabilities.accountAuthentication !== "signedIn";
   return (
-    <SettingsSection title="Hub settings">
+    <SettingsSection title={t("hub.connection.summary.settingsTitle")}>
       <SettingsCard>
         <SettingsLinkRow
-          label="Connection"
-          hint={profile.origin ?? "Encrypted relay"}
-          value={needsSignIn ? "Sign-in required" : "Connected"}
+          label={t("hub.connection.summary.connection")}
+          hint={profile.origin ?? t("hub.connection.common.encryptedRelay")}
+          value={
+            needsSignIn
+              ? t("hub.connection.summary.signInRequired")
+              : t("hub.connection.status.connected")
+          }
           tone={needsSignIn ? "warning" : "success"}
           onPress={reviewConnection}
         />
         <HubAccountSignInRow capabilities={capabilities} signIn={signIn} openPolicy={openPolicy} />
         {capabilities.canManageDevices ? (
-          <SettingsLinkRow label="Paired devices" onPress={openDevices} />
+          <SettingsLinkRow label={t("hub.connection.devices.title")} onPress={openDevices} />
         ) : null}
       </SettingsCard>
     </SettingsSection>
@@ -89,8 +96,9 @@ export function HubAccountSignInSummary({
   signIn(): void;
   openPolicy(): void;
 }) {
+  const { t } = useTranslation();
   return (
-    <SettingsSection title="Sign-in">
+    <SettingsSection title={t("hub.connection.summary.signInSection")}>
       <SettingsCard>
         <HubAccountSignInRow capabilities={capabilities} signIn={signIn} openPolicy={openPolicy} />
       </SettingsCard>
@@ -107,27 +115,32 @@ function HubAccountSignInRow({
   signIn(): void;
   openPolicy(): void;
 }) {
+  const { t } = useTranslation();
   const needsSignIn =
     capabilities.loginRequired && capabilities.accountAuthentication !== "signedIn";
   if (needsSignIn)
     return (
       <SettingsLinkRow
-        label="Account sign-in"
-        hint="Sign in to use this Hub"
-        value="Not signed in"
+        label={t("hub.connection.common.accountSignIn")}
+        hint={t("hub.connection.summary.signInToUse")}
+        value={t("hub.connection.summary.notSignedIn")}
         tone="warning"
         onPress={signIn}
       />
     );
   return (
     <SettingsLinkRow
-      label="Account sign-in"
+      label={t("hub.connection.common.accountSignIn")}
       hint={
         capabilities.loginRequired
-          ? "Account roles determine access"
-          : "Access through device pairing"
+          ? t("hub.connection.summary.rolesDetermine")
+          : t("hub.connection.summary.viaPairing")
       }
-      value={capabilities.loginRequired ? "Required" : "Not required"}
+      value={
+        capabilities.loginRequired
+          ? t("hub.connection.common.required")
+          : t("hub.connection.common.notRequired")
+      }
       onPress={capabilities.canConfigureLogin ? openPolicy : undefined}
     />
   );

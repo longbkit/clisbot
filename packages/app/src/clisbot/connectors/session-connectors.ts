@@ -4,6 +4,7 @@ import {
   formatConnectorsOff,
   readConnectorsOff,
 } from "@clisbot/protocol/connectors/types";
+import { i18n } from "@/i18n/i18next";
 import { useSessionStore } from "@/stores/session-store";
 
 /**
@@ -153,7 +154,7 @@ export function useHostedOffList(input: {
   const writes = useRef({ chain: Promise.resolve(), generation: 0 });
   const update = useCallback(
     async (edit: SessionOffEdit) => {
-      if (!owner) throw new Error("This Host is not connected.");
+      if (!owner) throw new Error(i18n.t("connectors.tools.common.hostNotConnected"));
       const next = edit(latest.current);
       latest.current = next;
       setShown({ owner, off: next });
@@ -188,7 +189,7 @@ function useRunningOff(serverId: string, agentId: string | null) {
   const write = useCallback(
     async (next: ReadonlySet<string>) => {
       const client = useSessionStore.getState().sessions[serverId]?.client;
-      if (!agentId || !client) throw new Error("This Host is not connected.");
+      if (!agentId || !client) throw new Error(i18n.t("connectors.tools.common.hostNotConnected"));
       await client.updateAgent(agentId, {
         labels: { [CONNECTORS_OFF_LABEL]: formatConnectorsOff(next) },
       });

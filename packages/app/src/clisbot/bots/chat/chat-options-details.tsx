@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
@@ -11,11 +13,12 @@ import { GroupChatSettings } from "./group-chat-settings";
 
 export type ChatOptionsDetail = "group-settings" | "members" | "project" | null;
 
-const DETAIL_TITLES = {
-  "group-settings": "Group settings",
-  members: "Members",
-  project: "Project",
-};
+function detailTitle(t: TFunction, detail: ChatOptionsDetail): string {
+  if (detail === "group-settings") return t("bots.chat.common.groupSettings");
+  if (detail === "members") return t("bots.chat.common.members");
+  if (detail === "project") return t("bots.chat.common.project");
+  return t("bots.chat.common.chat");
+}
 
 /** The sheet the chat options menu opens: Group settings, Members, Project actions, or an error. */
 export function ChatOptionsDetailsSheet({
@@ -42,8 +45,9 @@ export function ChatOptionsDetailsSheet({
   toggleParticipant: (botId: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const project = useConversationProjectContext();
-  const header = useMemo(() => ({ title: detail ? DETAIL_TITLES[detail] : "Chat" }), [detail]);
+  const header = useMemo(() => ({ title: detailTitle(t, detail) }), [detail, t]);
   return (
     <AdaptiveModalSheet
       visible={active && (detail !== null || error !== null)}

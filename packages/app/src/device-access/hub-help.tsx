@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { Pressable, Text, View } from "react-native";
 import { ChevronDown, ChevronRight, Info } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 
 import { hubMutedIconProps } from "./hub-ui";
 const ThemedInfo = withUnistyles(Info);
@@ -18,6 +19,7 @@ function emit() {
   for (const listener of listeners) listener();
 }
 export function WhatIsHub() {
+  const { t } = useTranslation();
   const open = useSyncExternalStore(
     (listener) => {
       listeners.add(listener);
@@ -52,11 +54,11 @@ export function WhatIsHub() {
         accessibilityRole="button"
         accessibilityState={disclosure}
         aria-expanded={open}
-        accessibilityLabel="What is a Hub?"
+        accessibilityLabel={t("hub.connection.help.title")}
         style={styles.heading}
       >
         <ThemedInfo size={14} uniProps={hubMutedIconProps} />
-        <Text style={styles.label}>What is a Hub?</Text>
+        <Text style={styles.label}>{t("hub.connection.help.title")}</Text>
         <View style={styles.chevron}>
           {open ? (
             <ThemedChevronDown size={14} uniProps={hubMutedIconProps} />
@@ -67,27 +69,32 @@ export function WhatIsHub() {
       </Pressable>
       {open ? (
         <View style={styles.body}>
-          <Text style={styles.copy}>
-            A Hub manages channels, automations and shared Host access.
-          </Text>
+          <Text style={styles.copy}>{t("hub.connection.help.intro")}</Text>
           <View style={styles.bullets}>
-            <Text style={styles.copy}>
-              • <Text style={styles.strong}>Agents only:</Text> connect a Host. No Hub needed.
-            </Text>
-            <Text style={styles.copy}>
-              • <Text style={styles.strong}>Slack, Telegram or automations:</Text> run your own Hub
-              on a Host, or use an existing Hub.
-            </Text>
-            <Text style={styles.copy}>
-              • <Text style={styles.strong}>Team access:</Text> connect the Hub your team provides.
-            </Text>
+            <HelpBullet
+              label={t("hub.connection.help.agentsOnlyLabel")}
+              body={t("hub.connection.help.agentsOnly")}
+            />
+            <HelpBullet
+              label={t("hub.connection.help.channelsLabel")}
+              body={t("hub.connection.help.channels")}
+            />
+            <HelpBullet
+              label={t("hub.connection.help.teamLabel")}
+              body={t("hub.connection.help.team")}
+            />
           </View>
         </View>
       ) : null}
-      {error ? (
-        <Text style={styles.copy}>Your help preference could not be saved on this device.</Text>
-      ) : null}
+      {error ? <Text style={styles.copy}>{t("hub.connection.help.saveFailed")}</Text> : null}
     </View>
+  );
+}
+function HelpBullet({ label, body }: { label: string; body: string }) {
+  return (
+    <Text style={styles.copy}>
+      • <Text style={styles.strong}>{label}</Text> {body}
+    </Text>
   );
 }
 const styles = StyleSheet.create((theme) => ({

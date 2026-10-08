@@ -11,6 +11,7 @@
  * limit with a stated fix — and never an empty catalog, which would read as "no
  * channels exist".
  */
+import { i18n } from "@/i18n/i18next";
 import { HubApiError } from "./api-client";
 import type { HubChannelCatalogEntry } from "./contracts";
 
@@ -32,18 +33,21 @@ export interface ChannelCatalogState {
   message: string | null;
 }
 
-const LOADING: ChannelCatalogState = {
-  entries: [],
-  availability: "loading",
-  message: "Loading the channel catalog…",
-};
+function loadingState(): ChannelCatalogState {
+  return {
+    entries: [],
+    availability: "loading",
+    message: i18n.t("hub.channels.catalog.loading"),
+  };
+}
 
-const UNAVAILABLE: ChannelCatalogState = {
-  entries: [],
-  availability: "unavailable",
-  message:
-    "The channel catalog is not available on this Hub. Update the Hub to a build that publishes it, then set channels up from here.",
-};
+function unavailableState(): ChannelCatalogState {
+  return {
+    entries: [],
+    availability: "unavailable",
+    message: i18n.t("hub.channels.catalog.unavailable"),
+  };
+}
 
 /** The query's three outcomes as one state the renderers switch on. */
 export function channelCatalogState(input: {
@@ -51,17 +55,17 @@ export function channelCatalogState(input: {
   error: unknown;
 }): ChannelCatalogState {
   if (input.error !== null && input.error !== undefined) {
-    if (input.error instanceof HubApiError && input.error.status === 404) return UNAVAILABLE;
+    if (input.error instanceof HubApiError && input.error.status === 404) return unavailableState();
     return {
       entries: [],
       availability: "error",
       message:
         input.error instanceof Error
           ? input.error.message
-          : "The channel catalog could not be read.",
+          : i18n.t("hub.channels.catalog.readFailed"),
     };
   }
-  if (input.entries === undefined) return LOADING;
+  if (input.entries === undefined) return loadingState();
   return { entries: input.entries, availability: "available", message: null };
 }
 
@@ -117,7 +121,7 @@ export function supportedTransports(entry: ChannelCatalogEntry): ChannelTranspor
  * secret is not listed as something to fetch.
  */
 export function channelPrerequisiteSummary(entry: ChannelCatalogEntry): string {
-  if (entry.auth === "qr") return "QR scan from the provider's own app";
+  if (entry.auth === "qr") return i18n.t("hub.channels.catalog.qrPrerequisite");
   const used = new Set(supportedTransports(entry).flatMap(({ requiredConfig }) => requiredConfig));
   const required = entry.credentials.filter(
     (credential) => credential.required && (used.size === 0 || used.has(credential.key)),

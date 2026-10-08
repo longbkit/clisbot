@@ -10,6 +10,10 @@ import {
   parseSingleAgentAutomationYaml,
 } from "../automation-configuration";
 import { AutomationSettings, SingleAgentAutomationForm } from "./automation-settings";
+// Real English copy: the assertions below read the rendered text.
+import { i18n as testI18n } from "@/i18n/i18next";
+
+void testI18n;
 
 const page = vi.hoisted(() => ({
   enabled: false,

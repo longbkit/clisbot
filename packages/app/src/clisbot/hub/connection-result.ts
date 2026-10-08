@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { HUB_PROVIDER_APPLICATION_PROVIDERS } from "./provider-application-form";
 
 interface HubConnectionResult {
@@ -6,36 +7,36 @@ interface HubConnectionResult {
   description: string;
 }
 
-const CONNECTION_RESULTS: Readonly<Record<string, HubConnectionResult>> = {
-  github_approval_required: {
-    variant: "warning",
-    title: "GitHub owner approval required",
-    description:
-      "Ask a GitHub organization owner to approve this installation, then connect again.",
-  },
-  slack_bot_failed: {
-    variant: "error",
-    title: "Slack permissions are incomplete",
-    description:
-      "Apply the setup guide's manifest in Slack, then install again. Hub did not save this Connection.",
-  },
-  provider_not_configured: {
-    variant: "warning",
-    title: "Provider application required",
-    description: "Verify and save the Provider Application before connecting an account.",
-  },
-  connection_invalid: {
-    variant: "error",
-    title: "Connection link unavailable",
-    description: "This setup link expired or was already used. Start Connect account again below.",
-  },
-  connection_conflict: {
-    variant: "error",
-    title: "Account connected elsewhere",
-    description:
-      "Disconnect the provider account from its other organization, or choose a different account.",
-  },
-};
+/** Results the Hub returns by code; read when the callback is shown so it follows the language. */
+function connectionResults(): Readonly<Record<string, HubConnectionResult>> {
+  return {
+    github_approval_required: {
+      variant: "warning",
+      title: i18n.t("hub.account.connectionResults.githubApprovalRequired.title"),
+      description: i18n.t("hub.account.connectionResults.githubApprovalRequired.description"),
+    },
+    slack_bot_failed: {
+      variant: "error",
+      title: i18n.t("hub.account.connectionResults.slackBotFailed.title"),
+      description: i18n.t("hub.account.connectionResults.slackBotFailed.description"),
+    },
+    provider_not_configured: {
+      variant: "warning",
+      title: i18n.t("hub.account.connectionResults.providerNotConfigured.title"),
+      description: i18n.t("hub.account.connectionResults.providerNotConfigured.description"),
+    },
+    connection_invalid: {
+      variant: "error",
+      title: i18n.t("hub.account.connectionResults.connectionInvalid.title"),
+      description: i18n.t("hub.account.connectionResults.connectionInvalid.description"),
+    },
+    connection_conflict: {
+      variant: "error",
+      title: i18n.t("hub.account.connectionResults.connectionConflict.title"),
+      description: i18n.t("hub.account.connectionResults.connectionConflict.description"),
+    },
+  };
+}
 const PROVIDER_LABELS = { github: "GitHub", slack: "Slack", discord: "Discord", linear: "Linear" };
 
 /** Callback copy is informational; the authenticated inventories own actual Connection status. */
@@ -57,25 +58,23 @@ export function hubConnectionResult(input: {
   );
   if (input.app !== undefined && resultProvider !== undefined && input.app !== resultProvider)
     return null;
-  const known = Object.hasOwn(CONNECTION_RESULTS, resultCode)
-    ? CONNECTION_RESULTS[resultCode]
-    : undefined;
+  const results = connectionResults();
+  const known = Object.hasOwn(results, resultCode) ? results[resultCode] : undefined;
   if (known !== undefined) return known;
   if (resultProvider === undefined) return null;
   const label = PROVIDER_LABELS[resultProvider];
   if (resultCode === `${resultProvider}_connected`) {
     return {
       variant: "success",
-      title: `${label} setup completed`,
-      description:
-        "The provider returned from setup. The refreshed list below shows the current Connection status.",
+      title: i18n.t("hub.account.connectionResults.completed.title", { provider: label }),
+      description: i18n.t("hub.account.connectionResults.completed.description"),
     };
   }
   if (resultCode === `${resultProvider}_cancelled`) {
     return {
       variant: "info",
-      title: `${label} setup cancelled`,
-      description: "Start Connect account again when you are ready.",
+      title: i18n.t("hub.account.connectionResults.cancelled.title", { provider: label }),
+      description: i18n.t("hub.account.connectionResults.cancelled.description"),
     };
   }
   return null;

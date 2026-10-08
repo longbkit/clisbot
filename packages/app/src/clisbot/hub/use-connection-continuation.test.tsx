@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { useHubConnectionContinuation } from "./use-connection-continuation";
 
 const { openURL } = vi.hoisted(() => ({ openURL: vi.fn() }));
@@ -18,6 +19,7 @@ describe("provider connection continuation", () => {
     await act(() => result.current.open(url));
     expect(result.current.url).toBe(url);
     expect(result.current.error).toContain("Continue setup");
+    expect(result.current.error).toBe(i18n.t("hub.account.continuation.openFailed"));
     expect(result.current.pending).toBe(false);
 
     openURL.mockResolvedValueOnce(undefined);

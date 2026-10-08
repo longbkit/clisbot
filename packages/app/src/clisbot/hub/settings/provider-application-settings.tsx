@@ -1,6 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
@@ -17,6 +19,7 @@ import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
+import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { HubConnectionContinuationNotice } from "./connection-continuation";
 import { hubResourceQueryKey } from "../query-keys";
@@ -58,17 +61,18 @@ const PROVIDER_OPTIONS: SelectFieldOption<HubProviderApplicationProvider>[] =
 // Webhooks ("Let Slack send events to a public Hub HTTPS address") come back
 // once the webhook transports are run end to end; the channel catalog labels
 // them "Not supported yet" until then. One option leaves nothing to choose.
-const SLACK_DELIVERY_OPTIONS: SelectFieldOption<"socket" | "webhook">[] = [
+const slackDeliveryOptions = (): SelectFieldOption<"socket" | "webhook">[] => [
   {
     id: "socket",
     value: "socket",
     label: "Socket Mode",
-    description: "Connect from Hub to Slack. No public HTTPS address needed.",
+    description: i18n.t("hub.settings.providerApplications.socketModeDescription"),
   },
 ];
 const NOOP = () => undefined;
 
 export function ProviderApplicationSettings() {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const queryClient = useQueryClient();
   const continuation = useHubConnectionContinuation();
@@ -113,12 +117,12 @@ export function ProviderApplicationSettings() {
           );
         await openContinuation(result.url);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Unable to connect provider account.");
+        setError(messageOr(cause, t("hub.settings.providerApplications.connectFailed")));
       } finally {
         setPendingApplicationId(null);
       }
     },
-    [hub, openContinuation],
+    [hub, openContinuation, t],
   );
   const retryDelivery = useCallback(
     async (application: ProviderApplication) => {
@@ -136,12 +140,12 @@ export function ProviderApplicationSettings() {
           );
         await applications.refetch();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Unable to retry provider delivery.");
+        setError(messageOr(cause, t("hub.settings.providerApplications.retryFailed")));
       } finally {
         setPendingApplicationId(null);
       }
     },
-    [applications, hub],
+    [applications, hub, t],
   );
   const replaceCredentials = useCallback(
     (application: ProviderApplication, applicationId: string) => {
@@ -168,9 +172,9 @@ export function ProviderApplicationSettings() {
         ),
       ]);
     } catch {
-      setError("Provider details could not refresh. Use Refresh to try again.");
+      setError(t("hub.settings.providerApplications.refreshFailed"));
     }
-  }, [accountId, applications, hub.origin, organizationId, queryClient]);
+  }, [accountId, applications, hub.origin, organizationId, queryClient, t]);
   const save = useCallback(
     async (input: HubProviderApplicationSubmission) => {
       if (input.provider === "slack" && input.transport === "socket") {
@@ -206,35 +210,33 @@ export function ProviderApplicationSettings() {
     },
     [openContinuation, refresh],
   );
-  const closeDraft = useCallback(() => {
-    setDraft(null);
-  }, []);
+  const closeDraft = useCallback(() => setDraft(null), []);
 
   const loaded = applications.data !== undefined;
   const headerActions = useMemo(
     () => (
       <View style={styles.headerActions}>
         <Button size="xs" variant="ghost" disabled={applications.isFetching} onPress={refresh}>
-          Refresh
+          {t("hub.settings.providerApplications.refresh")}
         </Button>
         <Button
           size="sm"
           disabled={!loaded || pendingApplicationId !== null}
           onPress={addApplication}
         >
-          Add…
+          {t("hub.settings.providerApplications.add")}
         </Button>
       </View>
     ),
-    [addApplication, applications.isFetching, loaded, pendingApplicationId, refresh],
+    [addApplication, applications.isFetching, loaded, pendingApplicationId, refresh, t],
   );
 
   if (!operator) return null;
 
   return (
     <SettingsSection
-      title="Provider applications"
-      info={PROVIDER_APPLICATIONS_INFO}
+      title={t("hub.settings.providerApplications.title")}
+      info={t("hub.settings.providerApplications.info")}
       trailing={headerActions}
     >
       <ProviderApplicationLoadState pending={applications.isPending} error={applications.error} />
@@ -243,9 +245,7 @@ export function ProviderApplicationSettings() {
       {applications.data === undefined ? null : (
         <View style={settingsStyles.card}>
           {visible.length === 0 ? (
-            <View style={settingsStyles.row}>
-              <Text style={settingsStyles.rowHint}>{PROVIDER_APPLICATIONS_EMPTY}</Text>
-            </View>
+            <ProviderApplicationsEmpty />
           ) : (
             visible.map((application, index) => (
               <ProviderApplicationRow
@@ -275,6 +275,15 @@ export function ProviderApplicationSettings() {
   );
 }
 
+function ProviderApplicationsEmpty() {
+  const { t } = useTranslation();
+  return (
+    <View style={settingsStyles.row}>
+      <Text style={settingsStyles.rowHint}>{t("hub.settings.providerApplications.empty")}</Text>
+    </View>
+  );
+}
+
 function ProviderApplicationLoadState({
   pending,
   error,
@@ -282,7 +291,12 @@ function ProviderApplicationLoadState({
   pending: boolean;
   error: Error | null;
 }) {
-  if (pending) return <Text style={settingsStyles.rowHint}>Loading…</Text>;
+  const { t } = useTranslation();
+  if (pending) {
+    return (
+      <Text style={settingsStyles.rowHint}>{t("hub.settings.providerApplications.loading")}</Text>
+    );
+  }
   if (error !== null) return <Alert variant="error" title={error.message} />;
   return null;
 }
@@ -302,6 +316,7 @@ function ProviderApplicationRow({
   retryDelivery(application: ProviderApplication): Promise<void>;
   replaceCredentials(application: ProviderApplication, applicationId: string): void;
 }) {
+  const { t } = useTranslation();
   const identity = application.identity;
   const applicationId = identity?.id ?? `${application.provider}:environment`;
   const connectAccount = useCallback(() => {
@@ -321,13 +336,32 @@ function ProviderApplicationRow({
   const connectionCount = application.connections.length;
   const actions = useMemo(
     () => [
-      ...(canConnectAccount ? [{ label: "Connect account", onSelect: connectAccount }] : []),
-      ...(canRetry ? [{ label: "Retry delivery", onSelect: retry }] : []),
+      ...(canConnectAccount
+        ? [
+            {
+              label: t("hub.settings.providerApplications.connectAccount"),
+              onSelect: connectAccount,
+            },
+          ]
+        : []),
+      ...(canRetry
+        ? [{ label: t("hub.settings.providerApplications.retryDelivery"), onSelect: retry }]
+        : []),
       ...(application.managedByEnvironment
         ? []
-        : [{ label: "Replace credentials", onSelect: replace }]),
+        : [
+            { label: t("hub.settings.providerApplications.replaceCredentials"), onSelect: replace },
+          ]),
     ],
-    [application.managedByEnvironment, canConnectAccount, canRetry, connectAccount, replace, retry],
+    [
+      application.managedByEnvironment,
+      canConnectAccount,
+      canRetry,
+      connectAccount,
+      replace,
+      retry,
+      t,
+    ],
   );
 
   return (
@@ -341,7 +375,7 @@ function ProviderApplicationRow({
       <View style={styles.applicationContent}>
         <View style={styles.titleRow}>
           <Text style={settingsStyles.rowTitle}>
-            {`${providerLabel(application.provider)} · ${identity?.name ?? "Application"}`}
+            {`${providerLabel(application.provider)} · ${identity?.name ?? t("hub.settings.providerApplications.application")}`}
           </Text>
           <StatusBadge
             label={statusLabel(application.status)}
@@ -350,13 +384,15 @@ function ProviderApplicationRow({
         </View>
         <Text style={settingsStyles.rowHint}>
           {connectionCount === 0
-            ? "No Connections"
-            : `${String(connectionCount)} Connection${connectionCount === 1 ? "" : "s"}`}
+            ? t("hub.settings.providerApplications.noConnections")
+            : t("hub.settings.providerApplications.connections", { count: connectionCount })}
         </Text>
       </View>
       {actions.length === 0 ? null : (
         <RowActionsMenu
-          label={`Actions for ${providerLabel(application.provider)}`}
+          label={t("hub.settings.providerApplications.actionsFor", {
+            provider: providerLabel(application.provider),
+          })}
           actions={actions}
           disabled={pendingApplicationId !== null}
         />
@@ -378,6 +414,7 @@ function ProviderApplicationSheet({
   onSaved(continuationUrl: string | null): Promise<void>;
   onClose(): void;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const size: FieldControlSize = compact ? "md" : "sm";
   const [form] = useState(() => openHubProviderApplicationForm(snapshot));
@@ -388,10 +425,8 @@ function ProviderApplicationSheet({
   );
   useEffect(() => () => form.close(), [form]);
   const header = useMemo<SheetHeader>(
-    () => ({
-      title: state.mode === "replace" ? "Replace provider application" : "Add provider application",
-    }),
-    [state.mode],
+    () => ({ title: sheetTitle(state.mode, t) }),
+    [state.mode, t],
   );
   const submit = useCallback(async () => {
     if (state.submission === null) return;
@@ -400,12 +435,10 @@ function ProviderApplicationSheet({
       const result = await save(state.submission);
       await onSaved(result);
     } catch (cause) {
-      form.setError(
-        cause instanceof Error ? cause.message : "Unable to save Provider Application.",
-      );
+      form.setError(messageOr(cause, t("hub.settings.providerApplications.saveFailed")));
       form.setSubmitting(false);
     }
-  }, [form, onSaved, save, state.submission]);
+  }, [form, onSaved, save, state.submission, t]);
   const submitForm = useCallback(() => {
     void submit();
   }, [submit]);
@@ -422,7 +455,7 @@ function ProviderApplicationSheet({
     () => (
       <View style={styles.footer}>
         <Button variant="secondary" size="md" disabled={state.submitting} onPress={onClose}>
-          Cancel
+          {t("hub.settings.providerApplications.cancel")}
         </Button>
         <Button
           variant="default"
@@ -431,11 +464,11 @@ function ProviderApplicationSheet({
           loading={state.submitting}
           onPress={submitForm}
         >
-          Verify and save
+          {t("hub.settings.providerApplications.verifyAndSave")}
         </Button>
       </View>
     ),
-    [guide?.unavailable, onClose, state.canSubmit, state.submitting, submitForm],
+    [guide?.unavailable, onClose, state.canSubmit, state.submitting, submitForm, t],
   );
 
   return (
@@ -450,36 +483,36 @@ function ProviderApplicationSheet({
       <View style={styles.form}>
         {state.mode === "create" ? (
           <SelectField
-            label="Provider"
+            label={t("hub.settings.providerApplications.provider")}
             value={state.provider}
             selectedDisplay={providerDisplay}
             options={PROVIDER_OPTIONS}
             onChange={form.setProvider}
-            title="Provider"
-            placeholder="Choose a Provider"
-            emptyText="No Providers available"
+            title={t("hub.settings.providerApplications.provider")}
+            placeholder={t("hub.settings.providerApplications.chooseProvider")}
+            emptyText={t("hub.settings.providerApplications.noProviders")}
             disabled={state.submitting}
             size={size}
           />
         ) : null}
         {state.provider === "slack" &&
         state.mode === "create" &&
-        SLACK_DELIVERY_OPTIONS.length > 1 ? (
+        slackDeliveryOptions().length > 1 ? (
           <SelectField
-            label="Delivery"
+            label={t("hub.settings.providerApplications.delivery")}
             value={state.transport ?? "socket"}
             selectedDisplay={deliveryDisplay}
-            options={SLACK_DELIVERY_OPTIONS}
+            options={slackDeliveryOptions()}
             onChange={form.setSlackTransport}
-            title="Slack delivery"
-            placeholder="Choose delivery"
-            emptyText="No Slack delivery methods available"
+            title={t("hub.settings.providerApplications.slackDelivery")}
+            placeholder={t("hub.settings.providerApplications.chooseDelivery")}
+            emptyText={t("hub.settings.providerApplications.noDeliveryMethods")}
             disabled={state.submitting}
             size={size}
           />
         ) : null}
         {guide === undefined ? (
-          <Alert variant="error" title="Provider setup is unavailable." />
+          <Alert variant="error" title={t("hub.settings.providerApplications.setupUnavailable")} />
         ) : (
           <>
             <ProviderSetupGuide guide={guide} />
@@ -534,6 +567,7 @@ function ProviderField({
   size: FieldControlSize;
   setField: ReturnType<typeof openHubProviderApplicationForm>["setField"];
 }) {
+  const { t } = useTranslation();
   const name = isHubProviderApplicationField(field.name) ? field.name : null;
   const changeText = useCallback(
     (value: string) => {
@@ -544,7 +578,11 @@ function ProviderField({
   if (name === null) return null;
   return (
     <Field
-      label={`${field.label}${field.optional === true ? " (optional)" : ""}`}
+      label={
+        field.optional === true
+          ? t("hub.settings.providerApplications.optionalField", { label: field.label })
+          : field.label
+      }
       hint={field.description}
     >
       <FormTextInput
@@ -562,6 +600,7 @@ function ProviderField({
 }
 
 function ProviderSetupGuide({ guide }: { guide: ProviderApplicationSetupGuide }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState<string | null>(null);
   const copy = useCallback((key: string, value: string) => {
     void copyToClipboard(value).then(() => setCopied(key));
@@ -576,7 +615,11 @@ function ProviderSetupGuide({ guide }: { guide: ProviderApplicationSetupGuide })
         <ExternalLink href={guide.portal.href} label={guide.portal.label} />
       </View>
       {guide.unavailable === undefined ? null : (
-        <Alert variant="warning" title="HTTPS required" description={guide.unavailable} />
+        <Alert
+          variant="warning"
+          title={t("hub.settings.providerApplications.httpsRequired")}
+          description={guide.unavailable}
+        />
       )}
       {guide.groups.map((group) => (
         <View key={group.id} style={styles.guideGroup}>
@@ -589,7 +632,7 @@ function ProviderSetupGuide({ guide }: { guide: ProviderApplicationSetupGuide })
           {group.unavailable === undefined ? null : (
             <Alert
               variant="warning"
-              title="Unavailable from this Hub URL"
+              title={t("hub.settings.providerApplications.unavailableFromUrl")}
               description={group.unavailable}
             />
           )}
@@ -636,9 +679,11 @@ function ProviderSetupGuide({ guide }: { guide: ProviderApplicationSetupGuide })
                     </View>
                   )}
                   {step.events === undefined ? null : (
-                    <Text
-                      style={settingsStyles.rowHint}
-                    >{`Events: ${step.events.join(", ")}`}</Text>
+                    <Text style={settingsStyles.rowHint}>
+                      {t("hub.settings.providerApplications.events", {
+                        events: step.events.join(", "),
+                      })}
+                    </Text>
                   )}
                 </View>
               </View>
@@ -681,6 +726,7 @@ function ProviderGuideCopyRow({
   copied: string | null;
   copy(key: string, value: string): void;
 }) {
+  const { t } = useTranslation();
   const copyValue = useCallback(() => {
     copy(copyKey, value);
   }, [copy, copyKey, value]);
@@ -693,7 +739,9 @@ function ProviderGuideCopyRow({
         </Text>
       </View>
       <Button size="xs" variant="outline" onPress={copyValue}>
-        {copied === copyKey ? "Copied" : "Copy"}
+        {copied === copyKey
+          ? t("hub.settings.providerApplications.copied")
+          : t("hub.settings.providerApplications.copy")}
       </Button>
     </View>
   );
@@ -710,15 +758,18 @@ function ProviderGuideManifest({
   copied: string | null;
   copy(key: string, value: string): void;
 }) {
+  const { t } = useTranslation();
   const copyManifest = useCallback(() => {
     copy(copyKey, manifest);
   }, [copy, copyKey, manifest]);
   return (
     <View style={styles.manifest}>
       <View style={styles.copyRow}>
-        <Text style={styles.copyLabel}>Manifest</Text>
+        <Text style={styles.copyLabel}>{t("hub.settings.providerApplications.manifest")}</Text>
         <Button size="xs" variant="outline" onPress={copyManifest}>
-          {copied === copyKey ? "Copied" : "Copy"}
+          {copied === copyKey
+            ? t("hub.settings.providerApplications.copied")
+            : t("hub.settings.providerApplications.copy")}
         </Button>
       </View>
       <Text selectable style={styles.manifestText}>
@@ -780,10 +831,26 @@ function providerLabel(provider: HubProviderApplicationProvider): string {
 }
 
 function statusLabel(status: ProviderApplication["status"]): string {
-  if (status === "notConfigured") return "Not configured";
-  if (status === "actionNeeded") return "Action needed";
-  if (status === "managedByEnvironment") return "Managed by environment";
-  return status === "connected" ? "Connected" : "Verified";
+  if (status === "notConfigured")
+    return i18n.t("hub.settings.providerApplications.status.notConfigured");
+  if (status === "actionNeeded")
+    return i18n.t("hub.settings.providerApplications.status.actionNeeded");
+  if (status === "managedByEnvironment") {
+    return i18n.t("hub.settings.providerApplications.status.managedByEnvironment");
+  }
+  return status === "connected"
+    ? i18n.t("hub.settings.providerApplications.status.connected")
+    : i18n.t("hub.settings.providerApplications.status.verified");
+}
+
+function sheetTitle(mode: HubProviderApplicationFormState["mode"], t: TFunction): string {
+  return mode === "replace"
+    ? t("hub.settings.providerApplications.replaceTitle")
+    : t("hub.settings.providerApplications.addTitle");
+}
+
+function messageOr(cause: unknown, fallback: string): string {
+  return cause instanceof Error ? cause.message : fallback;
 }
 
 function statusVariant(status: ProviderApplication["status"]): StatusBadgeVariant {
@@ -884,8 +951,3 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
   },
 }));
-
-const PROVIDER_APPLICATIONS_INFO =
-  "Your own GitHub, Slack, Discord or Linear app, registered once for this whole Hub. Organizations then connect their account through it, so Automations can react to its events. Slack and Telegram chat bots in Channels do not need one.";
-const PROVIDER_APPLICATIONS_EMPTY =
-  "None yet. Add one only if Automations should react to GitHub, Slack, Discord or Linear events.";

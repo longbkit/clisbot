@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import type { PairedHubTransport } from "./hub-transport";
 
 export type HubDeviceAction =
@@ -22,9 +23,10 @@ export async function requestHubDevices(transport: PairedHubTransport, action: H
         },
   );
   if (!response.ok)
-    throw new Error(`Hub device management requires operator access (${response.status})`);
+    throw new Error(i18n.t("hub.connection.errors.needsOperator", { status: response.status }));
   const list =
     action.kind === "list" ? response : await transport.request("/api/auth/clisbot/device/devices");
-  if (!list.ok) throw new Error(`Hub device management requires operator access (${list.status})`);
+  if (!list.ok)
+    throw new Error(i18n.t("hub.connection.errors.needsOperator", { status: list.status }));
   return await list.json();
 }

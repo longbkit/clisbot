@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
 import { connectorToolKindOf } from "@clisbot/protocol/connectors/types";
 import type { ConnectorTool, ConnectorToolKind } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
@@ -16,7 +18,7 @@ import { settingsStyles } from "@/styles/settings";
 import { buildProjectSettingsRoute } from "@/utils/host-routes";
 import { buildHostBotRoute } from "../bots/routes";
 import { ConnectorLogo } from "./connector-logo";
-import { toolSelectionLabel, toolTitle, type ConnectorUse } from "./model";
+import { accessLabel, toolSelectionLabel, toolTitle, type ConnectorUse } from "./model";
 
 /** Pieces both detail pages share: the header, Used by, and Tools. */
 
@@ -58,10 +60,11 @@ export function UsedBySection({
   uses: ConnectorUse[];
   empty: string;
 }) {
+  const { t } = useTranslation();
   return (
     <SettingsSection
-      title="Used by"
-      info="Bots and Projects whose agents may use this, and how. Change it in their settings."
+      title={t("connectors.screen.parts.usedBy")}
+      info={t("connectors.screen.parts.usedByInfo")}
     >
       <View style={settingsStyles.card}>
         {uses.length === 0 ? (
@@ -87,6 +90,7 @@ function UsedByRow({
   use: ConnectorUse;
   bordered: boolean;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const open = useCallback(
     () =>
@@ -97,15 +101,15 @@ function UsedByRow({
       ),
     [router, serverId, use.botId, use.projectId],
   );
-  const access = use.access === undefined ? null : ACCESS_LABELS[use.access];
+  const access = use.access === undefined ? null : accessLabel(use.access);
   return (
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{use.name}</Text>
         <Text style={settingsStyles.rowHint}>
           {[
-            use.botId ? "Bot" : "Project",
-            use.enabled ? null : "Paused",
+            use.botId ? t("connectors.screen.common.bot") : t("connectors.screen.common.project"),
+            use.enabled ? null : t("connectors.screen.common.paused"),
             access,
             toolSelectionLabel(use.tools),
           ]
@@ -114,18 +118,23 @@ function UsedByRow({
         </Text>
       </View>
       <Button size="xs" variant="ghost" onPress={open}>
-        Edit
+        {t("connectors.screen.common.edit")}
       </Button>
     </View>
   );
 }
 
-const ACCESS_LABELS = { read: "Read only", write: "Read and write" } as const;
-
+/** Each label resolves when read, so it follows the app's language. */
 export const TOOL_KIND_LABELS: Record<ConnectorToolKind, string> = {
-  read: "Reads",
-  write: "Changes data",
-  send: "Sends",
+  get read() {
+    return i18n.t("connectors.screen.parts.kinds.read");
+  },
+  get write() {
+    return i18n.t("connectors.screen.parts.kinds.write");
+  },
+  get send() {
+    return i18n.t("connectors.screen.parts.kinds.send");
+  },
 };
 
 export function ToolsSection({
@@ -140,10 +149,12 @@ export function ToolsSection({
   loading: boolean;
   error: Error | null;
 }) {
+  const { t } = useTranslation();
+  const title = t("connectors.screen.common.tools");
   return (
     <SettingsSection
-      title={tools ? `Tools · ${tools.length}` : "Tools"}
-      info="Reads run without asking. Tools that change data need Read and write. Tools that send ask first unless sends are allowed."
+      title={tools ? `${title} · ${tools.length}` : title}
+      info={t("connectors.screen.parts.toolsInfo")}
     >
       <View style={settingsStyles.card}>
         <ToolsBody tools={tools} toolkit={toolkit} loading={loading} error={error} />

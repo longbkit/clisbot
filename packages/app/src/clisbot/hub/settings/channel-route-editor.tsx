@@ -1,9 +1,11 @@
 import { useHubEditLock } from "@/device-access/hub-edit-lock";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { i18n } from "@/i18n/i18next";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { routeBotKey, type RouteBotRequest } from "../channel-route-bot";
 import { AddChannelConnection } from "./channel-connection-add";
@@ -31,7 +33,7 @@ import { ChannelAccountForm } from "./channel-route-form";
 
 function ChannelRouteEditorHeader({
   title,
-  backTo = "Connections",
+  backTo,
   pending,
   error,
   back,
@@ -42,10 +44,15 @@ function ChannelRouteEditorHeader({
   back(): void;
   backTo?: string;
 }) {
+  const { t } = useTranslation();
   // The way back, then the page's own title, as every Hub detail page reads.
   return (
     <>
-      <BackLink to={backTo} onPress={back} disabled={pending} />
+      <BackLink
+        to={backTo ?? t("hub.routes.editor.connections")}
+        onPress={back}
+        disabled={pending}
+      />
       <DetailHeader title={title} />
       {error ? <Alert variant="error" title={error} /> : null}
     </>
@@ -87,7 +94,7 @@ export function ChannelManagementSection(props: ChannelManagementSectionProps) {
   const accountKey = editor.kind === "add" ? editor.accountKey : null;
   const fixedAccount = editor.kind === "edit" || editor.fixed;
   const title = channelEditorTitle(editor, step);
-  const backTo = automationName ? "Automation inputs" : undefined;
+  const backTo = automationName ? i18n.t("hub.routes.editor.automationInputs") : undefined;
   if (
     channels === undefined ||
     connections === undefined ||
@@ -226,6 +233,7 @@ function ChannelEditorUnavailable({
   retry(): void;
   back(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View>
       <ChannelRouteEditorHeader
@@ -235,10 +243,10 @@ function ChannelEditorUnavailable({
         error={error}
         back={back}
       />
-      <SettingsSection title="Channel setup">
+      <SettingsSection title={t("hub.routes.editor.channelSetup")}>
         <QueryFeedback queries={queries} />
         <Button size="sm" variant="outline" onPress={retry}>
-          Retry Channel setup
+          {t("hub.routes.editor.retry")}
         </Button>
       </SettingsSection>
     </View>
@@ -259,6 +267,7 @@ function AddConnectionPanel({
   create(body: Record<string, unknown>): Promise<void>;
   close(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View>
       <AddChannelConnection
@@ -268,10 +277,10 @@ function AddConnectionPanel({
       />
       {connectFirst ? (
         <Button size="sm" variant="ghost" disabled={pending} onPress={close}>
-          Use an existing Connection
+          {t("hub.routes.editor.useExisting")}
         </Button>
       ) : (
-        <BackLink to="the Route" onPress={close} disabled={pending} />
+        <BackLink to={t("hub.routes.editor.theRoute")} onPress={close} disabled={pending} />
       )}
     </View>
   );
@@ -286,9 +295,12 @@ function requestedBot(editor: ChannelEditor): RouteBotRequest | null {
 }
 
 function channelEditorTitle(editor: ChannelEditor, step: EditorStep): string {
-  if (editor.kind === "edit") return `Edit Route ${String(editor.route.routeIndex + 1)}`;
+  if (editor.kind === "edit")
+    return i18n.t("hub.routes.editor.editRoute", { number: editor.route.routeIndex + 1 });
   // Logging in is the last part of adding the Connection; its section says Login.
-  return step === "route" ? "Add Route" : "Add Connection";
+  return step === "route"
+    ? i18n.t("hub.routes.editor.addRoute")
+    : i18n.t("hub.routes.editor.addConnection");
 }
 
 export function channelFormKey(editor: ChannelEditor): string {

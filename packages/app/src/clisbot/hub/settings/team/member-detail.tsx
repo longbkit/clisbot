@@ -1,13 +1,13 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { settingsStyles } from "@/styles/settings";
-import { OWNER_ACCESS_HINT } from "../access-catalog";
-import { capitalizeLabel } from "../labels";
+import { ownerAccessHint } from "../access-catalog";
 import { MemberAccessSection } from "./member-access-section";
 import { MemberChatAccounts } from "./member-chat-accounts";
-import { memberRemoveLockReason, type OrganizationRole } from "./member-role";
+import { memberRemoveLockReason, roleLabel, type OrganizationRole } from "./member-role";
 import { MemberRoleSelect } from "./member-role-select";
 import { MemberTeamsSection } from "./member-teams-section";
 import type { HubAccount, HubMember, HubTeam, TeamResources } from "./types";
@@ -37,6 +37,7 @@ export function SelectedMemberDetail({
   manageAccess(): void;
   setRole(member: HubMember, role: OrganizationRole): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const { pending } = actions;
   const capabilities = hub.signedIn?.capabilities;
   const canManageMembers = capabilities?.manageMembers === true;
@@ -52,16 +53,16 @@ export function SelectedMemberDetail({
   );
   return (
     <View>
-      <BackLink to="People & access" onPress={back} disabled={pending} />
+      <BackLink to={t("hub.team.people.title")} onPress={back} disabled={pending} />
       <DetailHeader
         title={member.name}
         subtitle={visibleEmail(member.email) ?? undefined}
         actions={menu}
       />
       {actions.mutationError ? <Alert variant="error" title={actions.mutationError} /> : null}
-      <SettingsSection title="Details">
+      <SettingsSection title={t("hub.team.memberDetail.details")}>
         <View style={settingsStyles.card}>
-          <LabeledRow label="Role">
+          <LabeledRow label={t("hub.team.memberDetail.role")}>
             {canManageMembers ? (
               <MemberRoleSelect
                 member={member}
@@ -71,14 +72,14 @@ export function SelectedMemberDetail({
                 setRole={setRole}
               />
             ) : (
-              <Text style={settingsStyles.rowTitle}>{capitalizeLabel(member.role)}</Text>
+              <Text style={settingsStyles.rowTitle}>{roleLabel(member.role, t)}</Text>
             )}
             {member.role === "owner" ? (
-              <Text style={settingsStyles.rowHint}>{OWNER_ACCESS_HINT}</Text>
+              <Text style={settingsStyles.rowHint}>{ownerAccessHint()}</Text>
             ) : null}
           </LabeledRow>
-          <LabeledRow label="Status" bordered>
-            <Text style={settingsStyles.rowTitle}>Active</Text>
+          <LabeledRow label={t("hub.team.memberDetail.status")} bordered>
+            <Text style={settingsStyles.rowTitle}>{t("hub.team.memberDetail.active")}</Text>
             {canManageMembers && lock !== null ? (
               <Text style={settingsStyles.rowHint}>{lock}</Text>
             ) : null}
@@ -122,19 +123,26 @@ function MemberMenu({
   actions: TeamActions;
   back(): void;
 }) {
+  const { t } = useTranslation();
   const remove = useCallback(async () => {
     if (await actions.removeMember(member.id, member.name)) back();
   }, [actions, back, member.id, member.name]);
   const items = useMemo(
     () => [
       {
-        label: "Remove Member",
+        label: t("hub.team.memberDetail.removeMember"),
         destructive: true,
         disabled: actions.pending || lock !== null,
         onSelect: () => void remove(),
       },
     ],
-    [actions.pending, lock, remove],
+    [actions.pending, lock, remove, t],
   );
-  return <RowActionsMenu label={`Actions for ${member.name}`} actions={items} disabled={false} />;
+  return (
+    <RowActionsMenu
+      label={t("hub.team.actions.actionsFor", { name: member.name })}
+      actions={items}
+      disabled={false}
+    />
+  );
 }

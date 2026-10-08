@@ -1,6 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import type { z } from "zod";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -22,16 +23,17 @@ export function AutomationActivity({
   automationId: string;
   activity: UseQueryResult<Activity, Error>;
 }) {
+  const { t } = useTranslation();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const closeDetails = useCallback(() => setSelectedRunId(null), []);
   const refresh = useCallback(() => void activity.refetch(), [activity]);
   const refreshAction = useMemo(
     () => (
       <Button size="sm" variant="ghost" loading={activity.isFetching} onPress={refresh}>
-        Refresh
+        {t("hub.automations.activity.refresh")}
       </Button>
     ),
-    [activity.isFetching, refresh],
+    [activity.isFetching, refresh, t],
   );
   if (selectedRunId !== null) {
     return (
@@ -44,19 +46,25 @@ export function AutomationActivity({
     );
   }
   return (
-    <SettingsSection title="Activity" trailing={refreshAction}>
-      {activity.isPending ? <Text style={settingsStyles.rowHint}>Loading activity...</Text> : null}
+    <SettingsSection title={t("hub.automations.activity.title")} trailing={refreshAction}>
+      {activity.isPending ? (
+        <Text style={settingsStyles.rowHint}>{t("hub.automations.activity.loading")}</Text>
+      ) : null}
       {activity.error ? (
-        <Alert variant="error" title="Activity unavailable" description={activity.error.message}>
+        <Alert
+          variant="error"
+          title={t("hub.automations.activity.unavailable")}
+          description={activity.error.message}
+        >
           <Button size="sm" variant="outline" onPress={refresh}>
-            Retry
+            {t("common.actions.retry")}
           </Button>
         </Alert>
       ) : null}
       {activity.data ? (
         <View style={settingsStyles.card}>
           {activity.data.activity.length === 0 ? (
-            <Text style={settingsStyles.rowHint}>No runs yet.</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.automations.activity.noRuns")}</Text>
           ) : null}
           {activity.data.activity.map((run, index) => (
             <AutomationActivityRow
@@ -81,18 +89,22 @@ function AutomationActivityRow({
   bordered: boolean;
   select(runId: string): void;
 }) {
+  const { t } = useTranslation();
   const open = useCallback(() => select(run.id), [run.id, select]);
   return (
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
-        <Text
-          style={settingsStyles.rowTitle}
-        >{`${run.status.replaceAll("_", " ")} · ${run.provider}`}</Text>
+        <Text style={settingsStyles.rowTitle}>
+          {t("hub.automations.activity.rowTitle", {
+            status: t(`hub.automations.status.${run.status}`),
+            provider: run.provider,
+          })}
+        </Text>
         <Text style={settingsStyles.rowHint}>{new Date(run.createdAt).toLocaleString()}</Text>
         {run.error ? <Text style={settingsStyles.rowHint}>{run.error}</Text> : null}
       </View>
       <Button size="sm" variant="ghost" onPress={open}>
-        View details
+        {t("hub.automations.activity.viewDetails")}
       </Button>
     </View>
   );
@@ -107,6 +119,7 @@ export function AutomationRunDetails({
   runId: string;
   close(): void;
 }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const accountId = hub.signedIn?.account.id ?? null;
   const organizationId = hub.signedIn?.organization.id ?? null;
@@ -134,26 +147,26 @@ export function AutomationRunDetails({
   const refreshAction = useMemo(
     () => (
       <Button size="sm" variant="ghost" loading={details.isFetching} onPress={refresh}>
-        Refresh
+        {t("hub.automations.activity.refresh")}
       </Button>
     ),
-    [details.isFetching, refresh],
+    [details.isFetching, refresh, t],
   );
   return (
     <>
-      <BackLink to="Activity" onPress={close} />
-      <SettingsSection title="Run details" trailing={refreshAction}>
+      <BackLink to={t("hub.automations.activity.title")} onPress={close} />
+      <SettingsSection title={t("hub.automations.runDetails.title")} trailing={refreshAction}>
         {details.isPending ? (
-          <Text style={settingsStyles.rowHint}>Loading run details...</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.automations.runDetails.loading")}</Text>
         ) : null}
         {details.error ? (
           <Alert
             variant="error"
-            title="Run details unavailable"
+            title={t("hub.automations.runDetails.unavailable")}
             description={details.error.message}
           >
             <Button size="sm" variant="outline" onPress={refresh}>
-              Retry
+              {t("common.actions.retry")}
             </Button>
           </Alert>
         ) : null}
@@ -164,30 +177,31 @@ export function AutomationRunDetails({
 }
 
 function RunSummary({ details }: { details: RunDetails }) {
+  const { t } = useTranslation();
   return (
     <View>
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{details.status.replaceAll("_", " ")}</Text>
-            <Text
-              style={settingsStyles.rowHint}
-            >{`Started ${new Date(details.createdAt).toLocaleString()}`}</Text>
-            {details.completedAt ? (
-              <Text
-                style={settingsStyles.rowHint}
-              >{`Completed ${new Date(details.completedAt).toLocaleString()}`}</Text>
-            ) : null}
+            <Text style={settingsStyles.rowTitle}>
+              {t(`hub.automations.status.${details.status}`)}
+            </Text>
+            <RunTime kind="started" at={details.createdAt} />
+            <RunTime kind="completed" at={details.completedAt} />
           </View>
         </View>
       </View>
       {details.error ? (
-        <Alert variant="error" title="Run error" description={details.error} />
+        <Alert
+          variant="error"
+          title={t("hub.automations.runDetails.error")}
+          description={details.error}
+        />
       ) : null}
-      <SettingsSection title="Steps">
+      <SettingsSection title={t("hub.automations.runDetails.steps")}>
         <View style={settingsStyles.card}>
           {details.steps.length === 0 ? (
-            <Text style={settingsStyles.rowHint}>No steps were started for this run.</Text>
+            <Text style={settingsStyles.rowHint}>{t("hub.automations.runDetails.noSteps")}</Text>
           ) : null}
           {details.steps.map((step, index) => (
             <RunStep key={step.id} step={step} bordered={index > 0} />
@@ -199,26 +213,22 @@ function RunSummary({ details }: { details: RunDetails }) {
 }
 
 function RunStep({ step, bordered }: { step: RunDetails["steps"][number]; bordered: boolean }) {
+  const { t } = useTranslation();
   const outputs = Object.entries(step.outputs);
   return (
     <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
       <View style={settingsStyles.rowContent}>
-        <Text
-          style={settingsStyles.rowTitle}
-        >{`${step.name} · ${step.status.replaceAll("_", " ")}`}</Text>
-        {step.startedAt ? (
-          <Text
-            style={settingsStyles.rowHint}
-          >{`Started ${new Date(step.startedAt).toLocaleString()}`}</Text>
-        ) : null}
-        {step.completedAt ? (
-          <Text
-            style={settingsStyles.rowHint}
-          >{`Completed ${new Date(step.completedAt).toLocaleString()}`}</Text>
-        ) : null}
+        <Text style={settingsStyles.rowTitle}>
+          {t("hub.automations.runDetails.stepTitle", {
+            name: step.name,
+            status: t(`hub.automations.status.${step.status}`),
+          })}
+        </Text>
+        <RunTime kind="started" at={step.startedAt} />
+        <RunTime kind="completed" at={step.completedAt} />
         {step.error ? <Text style={settingsStyles.rowHint}>{step.error}</Text> : null}
         {outputs.length === 0 ? (
-          <Text style={settingsStyles.rowHint}>No outputs recorded.</Text>
+          <Text style={settingsStyles.rowHint}>{t("hub.automations.runDetails.noOutputs")}</Text>
         ) : (
           outputs.map(([name, count]) => (
             <Text
@@ -229,5 +239,19 @@ function RunStep({ step, bordered }: { step: RunDetails["steps"][number]; border
         )}
       </View>
     </View>
+  );
+}
+
+/** "Started …" / "Completed …" under a run or step; nothing when the time is unknown. */
+function RunTime({ kind, at }: { kind: "started" | "completed"; at: string | null }) {
+  const { t } = useTranslation();
+  if (!at) return null;
+  const time = new Date(at).toLocaleString();
+  return (
+    <Text style={settingsStyles.rowHint}>
+      {kind === "started"
+        ? t("hub.automations.runDetails.started", { time })
+        : t("hub.automations.runDetails.completed", { time })}
+    </Text>
   );
 }

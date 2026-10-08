@@ -1,16 +1,20 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   connectorToolKindOf,
   type ConnectorGrant,
   type ConnectorTool,
+  type ConnectorToolKind,
 } from "@clisbot/protocol/connectors/types";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { toErrorMessage } from "@/utils/error-messages";
 import type { AgentToolDefaults } from "./agent-tools-model";
+import { agentToolDescription } from "./agent-tool-copy";
 import { TOOL_KIND_LABELS, ToolLabel } from "./connector-detail-parts";
 import { useConnectorTools } from "./data";
 import { toolTitle } from "./model";
@@ -50,8 +54,8 @@ export interface ProjectEdits {
   onError(message: string): void;
   /** The tools this session may use beyond the Project, by their off-list key. */
   allows: ReadonlySet<string>;
-  /** What the sheet calls the session's owner ("Project", "Bot") and the session ("session", "chat"). */
-  words: { owner: string; here: string };
+  /** Whose settings the session follows: its Project's, or, in a Chat, the Bot's. */
+  owner: "project" | "bot";
   /** Changes them; null in a draft, which has no session yet and changes the Project instead. */
   editAllows: ((edit: (allow: ReadonlySet<string>) => ReadonlySet<string>) => Promise<void>) | null;
 }
@@ -60,29 +64,40 @@ export interface ProjectEdits {
 function noteOf(
   allowed: boolean,
   refusal: ProjectToolRefusal | null,
-  words: ProjectEdits["words"],
+  owner: ProjectEdits["owner"],
 ): string | undefined {
-  if (allowed) return `On for this ${words.here} only`;
-  if (refusal === "not-picked") return `Off in this ${words.owner}`;
-  if (refusal === "reads-only") return `${words.owner} only reads this app`;
+  const bot = owner === "bot";
+  if (allowed)
+    return i18n.t(bot ? "connectors.tools.pages.onForChat" : "connectors.tools.pages.onForSession");
+  if (refusal === "not-picked") return offInOwner(owner);
+  if (refusal === "reads-only") {
+    return i18n.t(
+      bot ? "connectors.tools.pages.botReadsOnly" : "connectors.tools.pages.projectReadsOnly",
+    );
+  }
   return undefined;
+}
+
+/** "Off in this Project", or "Off in this Bot" for a Bot's session in a Chat. */
+export function offInOwner(owner: ProjectEdits["owner"]): string {
+  return owner === "bot"
+    ? i18n.t("connectors.tools.pages.offInBot")
+    : i18n.t("connectors.tools.pages.offInProject");
 }
 
 const ThemedSpinner = withUnistyles(LoadingSpinner, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 
-export const KIND_BADGES = Object.fromEntries(
-  Object.entries(TOOL_KIND_LABELS).map(([kind, label]) => [
-    kind,
-    { label, variant: kind === "send" ? "warning" : "muted" },
-  ]),
-) as Record<keyof typeof TOOL_KIND_LABELS, SessionRowBadge>;
+/** A tool's kind as a row badge; the label is read when the row renders, in the current language. */
+export function kindBadge(kind: ConnectorToolKind): SessionRowBadge {
+  return { label: TOOL_KIND_LABELS[kind], variant: kind === "send" ? "warning" : "muted" };
+}
 
 function confirmMessage(refusal: ProjectToolRefusal): string {
   return refusal === "reads-only"
-    ? "It changes data, and this Project only reads from this app. Turning it on lets every session of the Project use this one tool."
-    : "It is off in this Project. Turning it on here turns it on for every session of the Project.";
+    ? i18n.t("connectors.tools.pages.confirmReadsOnly")
+    : i18n.t("connectors.tools.pages.confirmNotPicked");
 }
 
 /**
@@ -106,9 +121,9 @@ async function turnOnPastProject(input: {
       await project.editAllows((current) => new Set([...current, key]));
     } else {
       const confirmed = await confirmDialog({
-        title: `Turn on ${title}?`,
+        title: i18n.t("connectors.tools.common.turnOnTitle", { name: title }),
         message: confirmMessage(refusal),
-        confirmLabel: "Turn on for Project",
+        confirmLabel: i18n.t("connectors.tools.common.turnOnForProject"),
       });
       if (!confirmed) return;
       await project.save(allow);
@@ -193,7 +208,10 @@ export function GroupPage({
     [entry.set.given],
   );
   const titleOf = useCallback(
-    (tool: string) => group.tools.find((candidate) => candidate.name === tool)?.description ?? tool,
+    (tool: string) => {
+      const info = group.tools.find((candidate) => candidate.name === tool);
+      return info ? agentToolDescription(info) : tool;
+    },
     [group.tools],
   );
   const allow = useCallback(
@@ -214,12 +232,12 @@ export function GroupPage({
             id={tool.name}
             value={kept.includes(tool.name)}
             onToggle={toggle}
-            label={tool.description}
-            note={noteOf(project.allows.has(set.keyOf(tool.name)), refusal, project.words)}
+            label={agentToolDescription(tool)}
+            note={noteOf(project.allows.has(set.keyOf(tool.name)), refusal, project.owner)}
             onNote={refusal ? project.manage : undefined}
             testID={`session-tool-${tool.name}`}
           >
-            <Text style={settingsStyles.rowTitle}>{tool.description}</Text>
+            <Text style={settingsStyles.rowTitle}>{agentToolDescription(tool)}</Text>
             <Text style={styles.name}>{tool.name}</Text>
           </SessionSwitchRow>
         );
@@ -305,8 +323,7 @@ export function ConnectorPage({
   const shown = useMemo(() => matchingTools(list, query, toolkit), [list, query, toolkit]);
   if (tools.isLoading) return <ThemedSpinner />;
   if (tools.error) return <Text style={settingsStyles.rowError}>{tools.error.message}</Text>;
-  if (shown.length === 0)
-    return <Text style={[settingsStyles.rowHint, styles.empty]}>No tool matches.</Text>;
+  if (shown.length === 0) return <NoToolMatches />;
   return (
     <View style={settingsStyles.card}>
       {shown.map((tool, index) => {
@@ -316,11 +333,11 @@ export function ConnectorPage({
             key={tool.name}
             id={tool.name}
             bordered={index > 0}
-            badge={KIND_BADGES[connectorToolKindOf(tool.kind)]}
+            badge={kindBadge(connectorToolKindOf(tool.kind))}
             value={kept.includes(tool.name)}
             onToggle={toggle}
             label={toolTitle(tool, toolkit)}
-            note={noteOf(project.allows.has(set.keyOf(tool.name)), refusal, project.words)}
+            note={noteOf(project.allows.has(set.keyOf(tool.name)), refusal, project.owner)}
             onNote={refusal ? project.manage : undefined}
             testID={`session-connector-tool-${tool.name}`}
           >
@@ -329,6 +346,15 @@ export function ConnectorPage({
         );
       })}
     </View>
+  );
+}
+
+function NoToolMatches() {
+  const { t } = useTranslation();
+  return (
+    <Text style={[settingsStyles.rowHint, styles.empty]}>
+      {t("connectors.tools.pages.noMatch")}
+    </Text>
   );
 }
 

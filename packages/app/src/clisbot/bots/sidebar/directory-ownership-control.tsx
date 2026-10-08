@@ -1,11 +1,7 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { SelectField } from "@/components/ui/select-field";
 import type { DirectoryOwnership } from "./directory-model";
-const options = [
-  { id: "all", value: "all" as const, label: "All bots" },
-  { id: "mine", value: "mine" as const, label: "Mine" },
-  { id: "shared", value: "shared" as const, label: "Shared" },
-];
 export function DirectoryOwnershipControl({
   value,
   onChange,
@@ -15,25 +11,30 @@ export function DirectoryOwnershipControl({
   onChange: (value: DirectoryOwnership) => void;
   unknown: boolean;
 }) {
+  const { t } = useTranslation();
+  const options = useMemo(
+    () => [
+      { id: "all", value: "all" as const, label: t("bots.workspace.directory.allBots") },
+      { id: "mine", value: "mine" as const, label: t("bots.workspace.directory.mine") },
+      { id: "shared", value: "shared" as const, label: t("bots.workspace.directory.shared") },
+    ],
+    [t],
+  );
   const display = useMemo(
     () => ({ label: options.find((option) => option.value === value)!.label }),
-    [value],
+    [options, value],
   );
   return (
     <SelectField
-      label="Show"
+      label={t("bots.workspace.directory.show")}
       value={value}
       onChange={onChange}
       selectedDisplay={display}
       options={options}
-      placeholder="All bots"
-      emptyText="No options"
+      placeholder={t("bots.workspace.directory.allBots")}
+      emptyText={t("bots.workspace.directory.noOptions")}
       size="md"
-      hint={
-        unknown
-          ? "Some Hosts do not report ownership yet. Those bots appear only in All bots."
-          : undefined
-      }
+      hint={unknown ? t("bots.workspace.directory.ownershipHint") : undefined}
     />
   );
 }

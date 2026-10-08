@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import {
   isOpenAudienceDraft,
   type AudienceRuleDraft,
@@ -311,7 +312,7 @@ export function useRouteAutomationCreator({
   const [automationCreateError, setAutomationCreateError] = useState<string | null>(null);
   const showAutomationForm = useCallback(() => {
     if (selectedConnection === undefined) {
-      setAutomationCreateError("Choose a Connection before creating its Automation.");
+      setAutomationCreateError(i18n.t("hub.routes.automationCreator.chooseConnectionFirst"));
       return;
     }
     setAutomationCreateError(null);
@@ -332,7 +333,7 @@ export function useRouteAutomationCreator({
         setShowAutomationCreator(false);
       } catch (error) {
         setAutomationCreateError(
-          error instanceof Error ? error.message : "Automation could not be created.",
+          error instanceof Error ? error.message : i18n.t("hub.routes.automationCreator.failed"),
         );
       } finally {
         setAutomationCreatePending(false);

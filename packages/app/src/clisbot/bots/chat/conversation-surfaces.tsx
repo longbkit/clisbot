@@ -1,6 +1,7 @@
 import { useState, useMemo, type ComponentProps, type ReactNode } from "react";
 import { View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { useTranslation } from "react-i18next";
 import { SplitContainer } from "@/components/split-container";
 import {
   CompactExplorerSidebar,
@@ -74,6 +75,7 @@ function ConversationSwitcher({
   state,
   actions,
 }: Pick<SurfaceProps, "serverId" | "state" | "actions">) {
+  const { t } = useTranslation();
   const { mainTabs, active } = state;
   const closeActions = useMemo(
     () => ({
@@ -103,8 +105,8 @@ function ConversationSwitcher({
       activeTab={active}
       tabByKey={new Map(mainTabs.map((tab) => [tab.key, tab]))}
       tabSwitcherOptions={mainTabs.map((tab) => {
-        let label = "Changes";
-        if (tab.kind === "conversation") label = "Messages";
+        let label = t("bots.chat.common.changes");
+        if (tab.kind === "conversation") label = t("bots.chat.common.messages");
         if (tab.target.kind === "file") label = tab.target.path;
         return { id: tab.key, label };
       })}

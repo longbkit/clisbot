@@ -11,6 +11,7 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react-native";
+import { i18n } from "@/i18n/i18next";
 import type { HubSectionSlug } from "../navigation";
 
 export interface HubSettingsNavigationItem {
@@ -19,58 +20,64 @@ export interface HubSettingsNavigationItem {
   icon: ComponentType<{ size: number; color: string }>;
 }
 
-const HUBS_ITEM: HubSettingsNavigationItem = { section: "hubs", label: "Hubs", icon: Network };
-const OVERVIEW_ITEM: HubSettingsNavigationItem = {
+// Labels resolve when the list is built, so a language change shows on the next render.
+const HUBS_ITEM = (): HubSettingsNavigationItem => ({
+  section: "hubs",
+  label: i18n.t("hub.settings.navigation.hubs"),
+  icon: Network,
+});
+const OVERVIEW_ITEM = (): HubSettingsNavigationItem => ({
   section: "overview",
-  label: "Overview",
+  label: i18n.t("hub.settings.navigation.overview"),
   icon: Info,
-};
-
-const SIGN_IN_ITEM: HubSettingsNavigationItem = {
+});
+const SIGN_IN_ITEM = (): HubSettingsNavigationItem => ({
   section: "sign-in",
-  label: "Account sign-in",
+  label: i18n.t("hub.settings.navigation.accountSignIn"),
   icon: KeyRound,
-};
-
-const ACCOUNT_ITEM: HubSettingsNavigationItem = {
+});
+const ACCOUNT_ITEM = (): HubSettingsNavigationItem => ({
   section: "account",
-  label: "Account",
+  label: i18n.t("hub.settings.navigation.account"),
   icon: UserRound,
-};
-
-const CHANNELS_ITEM: HubSettingsNavigationItem = {
+});
+const CHANNELS_ITEM = (): HubSettingsNavigationItem => ({
   section: "channels",
-  label: "Channels",
+  label: i18n.t("hub.settings.navigation.channels"),
   icon: MessageSquare,
-};
-const AUTOMATIONS_ITEM: HubSettingsNavigationItem = {
+});
+const AUTOMATIONS_ITEM = (): HubSettingsNavigationItem => ({
   section: "automations",
-  label: "Automations",
+  label: i18n.t("hub.settings.navigation.automations"),
   icon: Workflow,
-};
-const PEOPLE_ITEM: HubSettingsNavigationItem = {
+});
+const PEOPLE_ITEM = (): HubSettingsNavigationItem => ({
   section: "team",
-  label: "People & access",
+  label: i18n.t("hub.settings.navigation.peopleAndAccess"),
   icon: UsersRound,
-};
-const HOSTS_ITEM: HubSettingsNavigationItem = { section: "hosts", label: "Hosts", icon: Server };
-const INTEGRATIONS_ITEM: HubSettingsNavigationItem = {
+});
+const HOSTS_ITEM = (): HubSettingsNavigationItem => ({
+  section: "hosts",
+  label: i18n.t("hub.settings.navigation.hosts"),
+  icon: Server,
+});
+const INTEGRATIONS_ITEM = (): HubSettingsNavigationItem => ({
   section: "integrations",
-  label: "Integrations",
+  label: i18n.t("hub.settings.navigation.integrations"),
   icon: Blocks,
-};
-const INSTANCE_ITEM: HubSettingsNavigationItem = {
+});
+const INSTANCE_ITEM = (): HubSettingsNavigationItem => ({
   section: "instance",
-  label: "Instance settings",
+  label: i18n.t("hub.settings.navigation.instanceSettings"),
   icon: ServerCog,
-};
+});
 
 /** People holds Access as a tab: managing people and what they may use is one job. */
-const SIGNED_IN_ITEMS: readonly HubSettingsNavigationItem[] = [
-  CHANNELS_ITEM,
-  AUTOMATIONS_ITEM,
-  PEOPLE_ITEM,
-  INTEGRATIONS_ITEM,
+const SIGNED_IN_ITEMS = (): readonly HubSettingsNavigationItem[] => [
+  CHANNELS_ITEM(),
+  AUTOMATIONS_ITEM(),
+  PEOPLE_ITEM(),
+  INTEGRATIONS_ITEM(),
 ];
 
 /** One effective grant of the viewer, enough to decide which destinations they can use. */
@@ -94,37 +101,43 @@ export function hubSettingsNavigationItems(input: {
 }): readonly HubSettingsNavigationItem[] {
   if (!input.signedIn) {
     return input.deviceAccess
-      ? [OVERVIEW_ITEM, { section: "account", label: "Account", icon: KeyRound }]
-      : [{ section: "account", label: "Sign in to Hub", icon: KeyRound }];
+      ? [OVERVIEW_ITEM(), { ...ACCOUNT_ITEM(), icon: KeyRound }]
+      : [
+          {
+            section: "account",
+            label: i18n.t("hub.settings.navigation.signInToHub"),
+            icon: KeyRound,
+          },
+        ];
   }
-  const overview = input.deviceAccess ? [OVERVIEW_ITEM] : [];
-  const instance = input.isInstanceOperator ? [INSTANCE_ITEM] : [];
-  if (input.canManage) return [...overview, ACCOUNT_ITEM, ...SIGNED_IN_ITEMS, ...instance];
+  const overview = input.deviceAccess ? [OVERVIEW_ITEM()] : [];
+  const instance = input.isInstanceOperator ? [INSTANCE_ITEM()] : [];
+  if (input.canManage) return [...overview, ACCOUNT_ITEM(), ...SIGNED_IN_ITEMS(), ...instance];
   const holds = (kind: string, privilege: string) =>
     input.grants?.some(
       (grant) => grant.resourceKind === kind && grant.privileges.includes(privilege),
     ) === true;
   const destinations = [
-    ...(holds("channel_account", "channel.manage") ? [CHANNELS_ITEM] : []),
+    ...(holds("channel_account", "channel.manage") ? [CHANNELS_ITEM()] : []),
     ...(holds("automation", "automation.run") ||
     holds("project", "project.use") ||
     holds("daemon", "project.use")
-      ? [AUTOMATIONS_ITEM]
+      ? [AUTOMATIONS_ITEM()]
       : []),
-    PEOPLE_ITEM,
+    PEOPLE_ITEM(),
   ];
-  return [...overview, ACCOUNT_ITEM, ...destinations, ...instance];
+  return [...overview, ACCOUNT_ITEM(), ...destinations, ...instance];
 }
 
 export function hubSettingsSection(section: HubSectionSlug): HubSettingsNavigationItem {
   const item = [
-    HUBS_ITEM,
-    OVERVIEW_ITEM,
-    ACCOUNT_ITEM,
-    SIGN_IN_ITEM,
-    ...SIGNED_IN_ITEMS,
-    HOSTS_ITEM,
-    INSTANCE_ITEM,
+    HUBS_ITEM(),
+    OVERVIEW_ITEM(),
+    ACCOUNT_ITEM(),
+    SIGN_IN_ITEM(),
+    ...SIGNED_IN_ITEMS(),
+    HOSTS_ITEM(),
+    INSTANCE_ITEM(),
   ].find((candidate) => candidate.section === section);
-  return item ?? ACCOUNT_ITEM;
+  return item ?? ACCOUNT_ITEM();
 }

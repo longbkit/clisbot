@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
@@ -35,6 +36,7 @@ export function ChannelIdentityLinkForm({
   pending: boolean;
   link(body: ChannelIdentityLinkBody): Promise<boolean>;
 }) {
+  const { t } = useTranslation();
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [user, setUser] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -71,32 +73,29 @@ export function ChannelIdentityLinkForm({
   return (
     <View style={[settingsStyles.card, styles.form]}>
       <SelectField
-        label="Where they chat"
+        label={t("hub.channels.idLink.where")}
         value={connectionId}
         selectedDisplay={selectedOptionDisplay(options, connectionId)}
         options={options}
         onChange={setConnectionId}
-        placeholder="Choose a bot or workspace"
-        emptyText="Add a chat bot Connection first."
+        placeholder={t("hub.channels.idLink.wherePlaceholder")}
+        emptyText={t("hub.channels.idLink.whereEmpty")}
         searchable={options.length > 6}
-        title="Where they chat"
+        title={t("hub.channels.idLink.where")}
         disabled={pending}
       />
-      <Field
-        label="User"
-        hint="The person's id on that bot: Slack U0123, or a Telegram numeric user id."
-      >
+      <Field label={t("hub.channels.idLink.user")} hint={t("hub.channels.idLink.userHint")}>
         <FormTextInput
           initialValue=""
           resetKey={resetKey}
           onChangeText={setUser}
-          placeholder="U0123 or 123456789"
+          placeholder={t("hub.channels.idLink.userPlaceholder")}
           autoCapitalize="none"
           autoCorrect={false}
           editable={!pending}
         />
       </Field>
-      <Field label="Display name" hint="Optional; only to make this link recognizable.">
+      <Field label={t("hub.channels.idLink.name")} hint={t("hub.channels.idLink.nameHint")}>
         <FormTextInput
           initialValue=""
           resetKey={resetKey}
@@ -109,14 +108,14 @@ export function ChannelIdentityLinkForm({
       </Field>
       <Alert
         variant="warning"
-        title="Instance operator override"
-        description="Use this only after verifying the chat account out of band. The Hub records who linked it and when."
+        title={t("hub.channels.idLink.overrideTitle")}
+        description={t("hub.channels.idLink.overrideBody")}
       />
       <Button
         disabled={pending || connectionId === null || user.trim().length === 0}
         onPress={submit}
       >
-        Link chat account
+        {t("hub.channels.idLink.submit")}
       </Button>
     </View>
   );

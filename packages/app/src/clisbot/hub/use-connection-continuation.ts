@@ -1,5 +1,6 @@
 import * as Linking from "expo-linking";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type ContinuationState =
   | { status: "idle" }
@@ -7,6 +8,7 @@ type ContinuationState =
 
 /** Retains an existing provider attempt when opening its browser page fails. */
 export function useHubConnectionContinuation() {
+  const { t } = useTranslation();
   const [state, setState] = useState<ContinuationState>({ status: "idle" });
   const open = useCallback(async (url: string) => {
     setState({ status: "opening", url });
@@ -28,10 +30,7 @@ export function useHubConnectionContinuation() {
   return {
     url,
     pending: state.status === "opening",
-    error:
-      state.status === "failed"
-        ? "The provider page could not open. Use Continue setup to try again."
-        : null,
+    error: state.status === "failed" ? t("hub.account.continuation.openFailed") : null,
     open,
     retry,
     dismiss,

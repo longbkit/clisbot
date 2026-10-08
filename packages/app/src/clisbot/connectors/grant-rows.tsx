@@ -2,7 +2,9 @@ import { ChevronRight } from "lucide-react-native";
 import { useCallback } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { connectorAccessOf } from "@clisbot/protocol/connectors/types";
+import { i18n } from "@/i18n/i18next";
 import type { ConnectorToolSelection } from "@clisbot/protocol/connectors/types";
 import { Switch } from "@/components/ui/switch";
 import { settingsStyles } from "@/styles/settings";
@@ -10,6 +12,7 @@ import { ICON_SIZE } from "@/styles/theme";
 import type { ConnectorLookup } from "./connector-lookup";
 import { ConnectorLogo, serverLogoKey } from "./connector-logo";
 import {
+  accessLabel,
   accountSelectionLabel,
   setAppEnabled,
   setMcpServerEnabled,
@@ -39,13 +42,14 @@ export interface AppGrantEntry {
 
 /** "Read only · All tools", "No sign-in needed", or what keeps it from working. */
 export function appGrantSummary(slug: string, app: AppGrantEntry, lookup: ConnectorLookup) {
-  if (app.enabled === false) return { text: "Paused", warning: false };
-  if (!lookup.connected(slug)) return { text: "Not connected on this Host", warning: true };
-  const parts = [
-    connectorAccessOf(app.access) === "write" ? "Read and write" : "Read only",
-    toolSelectionLabel(app.tools),
-  ];
-  if (lookup.noAuth(slug)) parts.push("No sign-in needed");
+  if (app.enabled === false) {
+    return { text: i18n.t("connectors.screen.common.paused"), warning: false };
+  }
+  if (!lookup.connected(slug)) {
+    return { text: i18n.t("connectors.screen.grantRows.notConnected"), warning: true };
+  }
+  const parts = [accessLabel(connectorAccessOf(app.access)), toolSelectionLabel(app.tools)];
+  if (lookup.noAuth(slug)) parts.push(i18n.t("connectors.screen.common.noSignIn"));
   else if (app.accounts !== undefined && app.accounts !== "all") {
     parts.push(accountSelectionLabel(app.accounts, lookup.accounts(slug)));
   }
@@ -105,6 +109,7 @@ export function ServerGrantRow({
   apply(edit: GrantEdit): void;
   onOpen(target: GrantTarget): void;
 }) {
+  const { t } = useTranslation();
   const setOn = useCallback(
     (value: boolean) => apply((grant) => setMcpServerEnabled(grant, name, value)),
     [apply, name],
@@ -113,7 +118,11 @@ export function ServerGrantRow({
   return (
     <GrantRow
       name={name}
-      summary={enabled ? `MCP server · ${toolSelectionLabel(tools)}` : "Paused"}
+      summary={
+        enabled
+          ? `${t("connectors.screen.common.mcpServer")} · ${toolSelectionLabel(tools)}`
+          : t("connectors.screen.common.paused")
+      }
       warning={false}
       on={enabled}
       bordered={bordered}
@@ -147,6 +156,7 @@ function GrantRow({
   testID: string;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       accessibilityRole="button"
@@ -167,7 +177,11 @@ function GrantRow({
         </Text>
       </View>
       {/* The Switch stops its press, so toggling never opens the sheet. */}
-      <Switch value={on} onValueChange={onToggle} accessibilityLabel={`Use ${name}`} />
+      <Switch
+        value={on}
+        onValueChange={onToggle}
+        accessibilityLabel={t("connectors.screen.grantRows.useSwitch", { name })}
+      />
       <ThemedChevron size={ICON_SIZE.sm} />
     </Pressable>
   );

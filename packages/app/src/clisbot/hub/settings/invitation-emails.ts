@@ -1,3 +1,5 @@
+import { i18n } from "@/i18n/i18next";
+
 const EMAIL_SEPARATORS = /[\s,;]+/;
 // Same shape Hub accepts; Hub still validates each address.
 const EMAIL_PATTERN = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
@@ -30,7 +32,7 @@ export function parseInvitationEmails(text: string): InvitationEmailList {
 export function invitationFailureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   // Hub answers 409 both for an existing Member and for a full seat plan.
-  if (message.includes("(409)")) return "already a Member, or no free seat";
-  if (message.includes("(403)")) return "you can't invite Members";
-  return message.length > 0 ? message : "Hub request failed";
+  if (message.includes("(409)")) return i18n.t("hub.settings.invitationFailure.conflict");
+  if (message.includes("(403)")) return i18n.t("hub.settings.invitationFailure.forbidden");
+  return message.length > 0 ? message : i18n.t("hub.settings.invitationFailure.requestFailed");
 }

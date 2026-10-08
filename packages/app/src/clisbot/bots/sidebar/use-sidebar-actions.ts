@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { refreshBotsAndChats } from "../data/runtime";
 import { buildHostChatRoute } from "../routes";
@@ -12,6 +13,7 @@ export function useBotSidebarActions(
   chatsLoaded = true,
 ) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const opening = useRef(false);
   const navigate = useCallback(
@@ -25,7 +27,7 @@ export function useBotSidebarActions(
     async (serverId: string, botId: string) => {
       if (opening.current) return;
       if (!chatsLoaded) {
-        setError("Your chats are still loading. Try again in a moment.");
+        setError(t("bots.workspace.errors.chatsLoading"));
         return;
       }
       opening.current = true;
@@ -37,7 +39,7 @@ export function useBotSidebarActions(
           return;
         }
         const client = getHostRuntimeStore().getClient(serverId);
-        if (!client) throw new Error("Host is disconnected");
+        if (!client) throw new Error(t("bots.workspace.errors.hostDisconnected"));
         const latest = await client.listChats();
         if (latest.error) throw new Error(latest.error);
         const direct = latest.chats.find(
@@ -50,7 +52,8 @@ export function useBotSidebarActions(
           return;
         }
         const result = await client.createChat({ botIds: [botId], kind: "direct" });
-        if (result.error || !result.chat) throw new Error(result.error ?? "Could not open chat");
+        if (result.error || !result.chat)
+          throw new Error(result.error ?? t("bots.workspace.errors.openChatFailed"));
         refreshBotsAndChats();
         navigate(serverId, result.chat.id);
       } catch (e) {
@@ -59,7 +62,7 @@ export function useBotSidebarActions(
         opening.current = false;
       }
     },
-    [chatRows, navigate, chatsLoaded],
+    [chatRows, navigate, chatsLoaded, t],
   );
   return { openBot, navigate, error };
 }

@@ -2,14 +2,17 @@
 // it covers (docs/audits/2026-10-05-routes-and-rules.md). Roles nest on the
 // Hub, so they are rungs of one ladder; anything else is "Only people I pick".
 
+import type { TFunction } from "i18next";
 import React, { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import {
-  WHO_CHOICE_LABELS,
+  whoChoiceLabel,
   whoChoiceOf,
   whoForChoice,
   type AudienceRuleDraft,
@@ -27,11 +30,13 @@ import {
 } from "./channel-route-rule-people";
 import { ruleWhoLabel, type AudienceNames } from "./channel-route-rule-summary";
 
-export const OPEN_AUDIENCE_WARNING = {
-  title: "Anyone in the matching conversations can use this Route",
-  description:
-    "They can talk to the Agent this Route runs, with the settings below. This does not give them Clisbot, Host or Project access. They meet the limits under this rule, which start from safe defaults.",
-};
+/** The warning an open Rule carries, in the reader's language. */
+export function openAudienceWarning(): { title: string; description: string } {
+  return {
+    title: i18n.t("hub.routes.who.openTitle"),
+    description: i18n.t("hub.routes.who.openDescription"),
+  };
+}
 
 const SHOWN_NAMES = 3;
 
@@ -53,6 +58,7 @@ export function RuleWhoFields({
   /** Why the Who cannot save yet, shown under the people picker. */
   problem: string | null;
 }) {
+  const { t } = useTranslation();
   const choice = whoChoiceOf(rule);
   const options = useWhoOptions(rule, people, place);
   const choose = useCallback(
@@ -83,9 +89,7 @@ export function RuleWhoFields({
     <>
       <RadioList
         label={
-          rule.place === "dm"
-            ? "Who can message the bot privately?"
-            : "Who can talk to the bot there?"
+          rule.place === "dm" ? t("hub.routes.who.dmQuestion") : t("hub.routes.who.groupQuestion")
         }
         options={options}
         selected={choice}
@@ -105,13 +109,7 @@ export function RuleWhoFields({
         />
       ) : null}
       {problem === null ? null : <Text style={settingsStyles.rowError}>{problem}</Text>}
-      {choice === "anyone" ? (
-        <Alert
-          variant="warning"
-          title={OPEN_AUDIENCE_WARNING.title}
-          description={OPEN_AUDIENCE_WARNING.description}
-        />
-      ) : null}
+      {choice === "anyone" ? <Alert variant="warning" {...openAudienceWarning()} /> : null}
       <SelfLinkPrompt rule={rule} people={people} channelName={place.channelName} />
     </>
   );
@@ -132,6 +130,7 @@ function NarrowedDmNote({
   update(change: (rule: AudienceRuleDraft) => AudienceRuleDraft): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const edit = useCallback(
     () =>
       update((current) => ({
@@ -146,12 +145,12 @@ function NarrowedDmNote({
     <View style={styles.note}>
       <Alert
         variant="info"
-        title={`Only ${ruleWhoLabel(rule, names)}`}
-        description="Saved by an older version, which let them in only if they also matched the people chosen before. It is kept as it is until you edit it."
+        title={t("hub.routes.who.narrowedTitle", { who: ruleWhoLabel(rule, names) })}
+        description={t("hub.routes.who.narrowedDescription")}
       />
       <View style={styles.action}>
         <Button size="sm" variant="outline" disabled={disabled} onPress={edit}>
-          Edit these people
+          {t("hub.routes.who.editPeople")}
         </Button>
       </View>
     </View>
@@ -189,54 +188,68 @@ function useWhoOptions(
   people: RulePeople,
   place: PeoplePickerPlace,
 ): RadioOption<WhoChoice>[] {
+  const { t } = useTranslation();
   return useMemo(() => {
     const everyone = people.people;
-    const linked = everyone.filter((person) => person.linked === true).length;
-    const known = everyone.some((person) => person.linked !== undefined);
+    const channel = place.channelName;
+    const outsideHub = t("hub.routes.who.outsideHub");
     return [
       {
         value: "owners",
-        label: WHO_CHOICE_LABELS.owners,
-        description: namesLine(peopleWithRole(everyone, "owner"), place.channelName),
+        label: whoChoiceLabel("owners"),
+        description: namesLine(t, peopleWithRole(everyone, "owner"), channel),
       },
       {
         value: "admins",
-        label: WHO_CHOICE_LABELS.admins,
-        description: namesLine(peopleWithRole(everyone, "admin"), place.channelName),
+        label: whoChoiceLabel("admins"),
+        description: namesLine(t, peopleWithRole(everyone, "admin"), channel),
       },
       {
         value: "everyone",
-        label: WHO_CHOICE_LABELS.everyone,
-        description: `${String(everyone.length)} ${everyone.length === 1 ? "person" : "people"}${
-          known ? ` · ${String(linked)} linked on ${place.channelName}` : ""
-        }`,
+        label: whoChoiceLabel("everyone"),
+        description: everyoneLine(t, everyone, channel),
       },
-      { value: "pick", label: WHO_CHOICE_LABELS.pick },
+      { value: "pick", label: whoChoiceLabel("pick") },
       rule.place === "dm"
         ? {
             value: "anyone",
-            label: `Anyone on ${place.channelName}`,
-            description: "Including people outside your Hub",
+            label: t("hub.routes.who.anyoneOn", { channel }),
+            description: outsideHub,
           }
-        : {
-            value: "anyone",
-            label: "Anyone in the chat",
-            description: "Including people outside your Hub",
-          },
+        : { value: "anyone", label: t("hub.routes.summary.anyoneInChat"), description: outsideHub },
     ];
-  }, [people.people, place.channelName, rule.place]);
+  }, [people.people, place.channelName, rule.place, t]);
+}
+
+/** "12 people · 9 linked on Slack", the link count once this viewer can see it. */
+function everyoneLine(t: TFunction, everyone: readonly RulePerson[], channel: string): string {
+  const count = everyone.length;
+  if (!everyone.some((person) => person.linked !== undefined))
+    return t("hub.routes.who.people", { count });
+  const linked = String(everyone.filter((person) => person.linked === true).length);
+  return t("hub.routes.who.peopleLinked", { count, linked, channel });
 }
 
 /** "Long Luong, An Nguyễn (not linked on Slack) and 2 others". */
-function namesLine(people: readonly RulePerson[], channelName: string): string | undefined {
+function namesLine(
+  t: TFunction,
+  people: readonly RulePerson[],
+  channelName: string,
+): string | undefined {
   if (people.length === 0) return undefined;
   const named = people
     .slice(0, SHOWN_NAMES)
     .map((person) =>
-      person.linked === false ? `${person.name} (not linked on ${channelName})` : person.name,
+      person.linked === false
+        ? t("hub.routes.who.notLinkedName", { name: person.name, channel: channelName })
+        : person.name,
     );
   const others = people.length - named.length;
-  return others > 0 ? `${named.join(", ")} and ${String(others)} others` : named.join(", ");
+  if (others > 0) {
+    const names = named.join(t("hub.routes.common.listSeparator"));
+    return t("hub.routes.who.namesAndOthers", { names, count: others });
+  }
+  return named.join(t("hub.routes.common.listSeparator"));
 }
 
 /**
@@ -252,16 +265,17 @@ function SelfLinkPrompt({
   people: RulePeople;
   channelName: string;
 }) {
+  const { t } = useTranslation();
   const self = unlinkedSelf(people);
   if (self === undefined || people.connection === undefined || !ruleLetsIn(rule, self)) return null;
-  const why = `The bot can't recognize you on ${channelName} yet, so this rule does not let you in.`;
+  const why = t("hub.routes.who.selfUnlinked", { channel: channelName });
   if (!people.listening) {
     // A `/link` sent now would reach no running bot and nothing would answer it.
     return (
       <Alert
         variant="info"
         title={why}
-        description={`The bot starts on ${channelName} when you save this Route. Then link your account from the Connection's card on the Connections page.`}
+        description={t("hub.routes.who.linkAfterSave", { channel: channelName })}
       />
     );
   }

@@ -2,12 +2,10 @@ import { useEffect, useRef } from "react";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useToast } from "@/contexts/toast-context";
+import { i18n } from "@/i18n/i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 import { pairedHubSettingsRoute } from "./pairing-target";
-
-const pairingFailureMessage =
-  "Could not connect this device. Check the network connection, then scan a fresh QR code or connection link from your Host or Hub. Tailscale should be connected on both devices; relay works without Tailscale.";
 
 // Keep this listener outside the keyed Hub account scope: pairing a first Hub
 // changes that scope before importConnectionLink returns its navigation target.
@@ -43,7 +41,7 @@ export function OfferLinkListener() {
           current.current.router.replace(pairedHubSettingsRoute(url));
       } catch {
         if (!cancelled) {
-          const id = current.current.toast.show(pairingFailureMessage, {
+          const id = current.current.toast.show(i18n.t("hub.connection.errors.pairingLinkFailed"), {
             variant: "error",
             durationMs: null,
             testID: "pairing-link-error",

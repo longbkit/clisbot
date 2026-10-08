@@ -1,5 +1,7 @@
 import { suggestedDeviceLabel } from "./device-label";
 import { z } from "zod";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   useHosts,
@@ -72,6 +74,7 @@ function usePublicHubTarget(
   setBusy: (busy: boolean) => void,
   setError: (error: string | null) => void,
 ) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     const connectPublicTarget = () => {
@@ -83,7 +86,7 @@ function usePublicHubTarget(
         window.location.pathname + window.location.search,
       );
       if (encoded.length > 16_384) {
-        setError("Hub connection link is too large");
+        setError(t("hub.connection.errors.linkTooLarge"));
         return;
       }
       setBusy(true);
@@ -94,7 +97,7 @@ function usePublicHubTarget(
         .then(() => router.replace("/settings/hub/account"))
         .catch((caught) =>
           setError(
-            caught instanceof Error ? caught.message : "Hub connection could not be verified",
+            caught instanceof Error ? caught.message : t("hub.connection.errors.notVerified"),
           ),
         )
         .finally(() => setBusy(false));
@@ -102,10 +105,11 @@ function usePublicHubTarget(
     connectPublicTarget();
     window.addEventListener("hashchange", connectPublicTarget);
     return () => window.removeEventListener("hashchange", connectPublicTarget);
-  }, [router, setBusy, setError]);
+  }, [router, setBusy, setError, t]);
 }
 
 export function HubConnectionSettings() {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const params = useLocalSearchParams<{ hubIntent?: string }>();
   const registry = useHubProfiles();
@@ -176,12 +180,9 @@ export function HubConnectionSettings() {
           return;
         }
         const configuration = parseHubConfiguration({ origin: input.trim() });
-        if (!configuration) throw new Error("Paste a Hub HTTPS URL or its pairing link");
+        if (!configuration) throw new Error(t("hub.connection.errors.pasteUrl"));
         const result = IdentitySchema.safeParse(await fetchPublicHubIdentity(configuration.origin));
-        if (!result.success)
-          throw new Error(
-            "This address did not return a valid Hub response. Check the URL and try again.",
-          );
+        if (!result.success) throw new Error(t("hub.connection.errors.invalidResponse"));
         const identity = result.data;
         const notice = hubEntryNotice(identity);
         if (notice) {
@@ -201,36 +202,35 @@ export function HubConnectionSettings() {
         setIntent(null);
         setLink("");
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Hub connection failed");
+        setError(
+          caught instanceof Error ? caught.message : t("hub.connection.errors.connectionFailed"),
+        );
       } finally {
         setBusy(false);
       }
     },
-    [label, router],
+    [label, router, t],
   );
   const start = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
       const selected = hosts.find((host) => host.serverId === (hostId || hosts[0]?.serverId));
-      if (!selected) throw new Error("Connect a Host before starting a Hub");
-      if (!canStartHub) throw new Error("This Host cannot start a Hub from this connection");
+      if (!selected) throw new Error(t("hub.connection.errors.connectHostFirst"));
+      if (!canStartHub) throw new Error(t("hub.connection.errors.hostCannotStart"));
       const value = await startHubOnHost({
         serverId: selected.serverId,
         localServerId,
         label,
       });
-      if (!value?.url)
-        throw new Error(
-          "This Host does not support starting a Hub yet. Update its CLI and restart it when convenient.",
-        );
+      if (!value?.url) throw new Error(t("hub.connection.errors.hostUnsupported"));
       await connectInput(value.url, { relay: value.transport === "relay" });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Hub could not start");
+      setError(caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotStart"));
     } finally {
       setBusy(false);
     }
-  }, [hosts, hostId, label, connectInput, localServerId, canStartHub]);
+  }, [hosts, hostId, label, connectInput, localServerId, canStartHub, t]);
   const addHub = useCallback(() => {
     setIntent("add");
     router.setParams({ hubIntent: "add" });
@@ -264,30 +264,31 @@ export function HubConnectionSettings() {
         await selectHubProfile(id);
         router.push("/settings/hub/overview");
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Hub could not be selected");
+        setError(
+          caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotSelect"),
+        );
       }
     },
-    [router],
+    [router, t],
   );
   const connectDetected = useCallback(
     async (hub: DetectedHub) => {
       setBusy(true);
       setError(null);
       try {
-        if (!hub.connection)
-          throw new Error(
-            "Ask this Host’s operator for the Hub connection link. Its internal address is not a client access route.",
-          );
+        if (!hub.connection) throw new Error(t("hub.connection.errors.askOperatorLink"));
         await pairHub(hub.connection, label);
         router.push("/settings/hub/account");
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Hub could not connect");
+        setError(
+          caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotConnect"),
+        );
         setIntent("connect");
       } finally {
         setBusy(false);
       }
     },
-    [router, label],
+    [router, label, t],
   );
   const formOptions = useMemo(
     () => (
@@ -315,7 +316,7 @@ export function HubConnectionSettings() {
       {intent === null && registry.profiles.length ? (
         <>
           <View style={hubStyles.toolbar}>
-            <Text style={hubStyles.sectionLabel}>Saved Hubs</Text>
+            <Text style={hubStyles.sectionLabel}>{t("hub.connection.list.savedHubs")}</Text>
             <Button
               size={compact ? "md" : "sm"}
               variant="outline"
@@ -323,7 +324,7 @@ export function HubConnectionSettings() {
               disabled={locked}
               onPress={addHub}
             >
-              Add Hub
+              {t("hub.connection.list.addHub")}
             </Button>
           </View>
           <View style={hubStyles.collection}>
@@ -332,7 +333,7 @@ export function HubConnectionSettings() {
                 key={profile.hubId}
                 profile={profile}
                 selected={registry.activeId === profile.hubId}
-                status={hubListingStatus(profile.hubId === registry.activeId, account)}
+                status={hubListingStatus(t, profile.hubId === registry.activeId, account)}
                 hostLabel={
                   detected.find(
                     (hub) =>
@@ -354,7 +355,7 @@ export function HubConnectionSettings() {
             (profile) => profile.hubId === hub.connection?.hubId || profile.origin === hub.origin,
           ),
       ).length ? (
-        <SettingsSection title="Available Hubs">
+        <SettingsSection title={t("hub.connection.list.availableHubs")}>
           {detected
             .filter(
               (hub) =>
@@ -390,11 +391,9 @@ export function HubConnectionSettings() {
       ) : (
         <>
           {noHubs && intent === null ? (
-            <Text style={hubStyles.intro}>
-              No Hubs are connected. Add one when you need these features.
-            </Text>
+            <Text style={hubStyles.intro}>{t("hub.connection.list.noHubs")}</Text>
           ) : null}
-          <SettingsSection title="Add a Hub">
+          <SettingsSection title={t("hub.connection.list.addAHub")}>
             <HubAddForm
               intent={intent}
               noHubs={noHubs}
@@ -419,10 +418,14 @@ export function HubConnectionSettings() {
         </>
       )}
       {error && intent !== "connect" && intent !== "start" ? (
-        <Alert variant="error" title="Hub connection could not finish" description={error} />
+        <Alert
+          variant="error"
+          title={t("hub.connection.list.finishFailedTitle")}
+          description={error}
+        />
       ) : null}
       {!registry.profiles.length && intent === null && discovery === "ready" ? (
-        <HubContextNote>Just controlling agents? You only need a Host.</HubContextNote>
+        <HubContextNote>{t("hub.connection.list.onlyHostNote")}</HubContextNote>
       ) : null}
     </View>
   );
@@ -441,26 +444,27 @@ function HubDiscoveryStatus({
   retry(): void;
   connect(): void;
 }) {
+  const { t } = useTranslation();
   if (!visible) return null;
   if (state === "loading")
     return (
-      <SettingsSection title="Checking your Hosts">
-        <Text style={hubStyles.hint}>Looking for Hubs linked to your connected Hosts…</Text>
+      <SettingsSection title={t("hub.connection.list.checkingTitle")}>
+        <Text style={hubStyles.hint}>{t("hub.connection.list.checkingBody")}</Text>
       </SettingsSection>
     );
   if (state === "error")
     return (
       <Alert
         variant="warning"
-        title="Some Hosts could not be checked"
-        description="Saved Hubs are still available. Retry discovery, or add a Hub using its URL or approved connection link."
+        title={t("hub.connection.list.discoveryFailedTitle")}
+        description={t("hub.connection.list.discoveryFailedBody")}
       >
         <View style={hubStyles.actions}>
           <Button variant="outline" onPress={retry} disabled={busy}>
-            Retry discovery
+            {t("hub.connection.list.retryDiscovery")}
           </Button>
           <Button variant="outline" onPress={connect} disabled={busy}>
-            Connect a Hub manually
+            {t("hub.connection.list.connectManually")}
           </Button>
         </View>
       </Alert>
@@ -485,34 +489,35 @@ function hubEntryNotice(identity: z.infer<typeof IdentitySchema>): HubEntryNotic
   return null;
 }
 function HubUrlEntryNotice({ notice, scan }: { notice: HubEntryNotice; scan(): void }) {
+  const { t } = useTranslation();
   if (notice === "blocked")
     return (
       <Alert
         variant="warning"
-        title="Hub setup needs operator recovery"
-        description="This Hub cannot safely offer first-owner creation. Ask the person operating it to repair setup from its local computer. A URL or ordinary pairing cannot reopen owner setup."
+        title={t("hub.connection.entry.blockedTitle")}
+        description={t("hub.connection.entry.blockedBody")}
       />
     );
   if (notice === "owner-required")
     return (
       <Alert
         variant="warning"
-        title="Owner setup is not complete"
-        description="Ask the Hub operator for an approved owner setup QR or link. Pairing connects this device and approves creation of the first owner account; a Hub URL alone cannot do that."
+        title={t("hub.connection.entry.ownerTitle")}
+        description={t("hub.connection.entry.ownerBody")}
       >
         <Button variant="outline" onPress={scan}>
-          Scan approved setup QR
+          {t("hub.connection.entry.scanSetup")}
         </Button>
       </Alert>
     );
   return (
     <Alert
       variant="info"
-      title="Pairing is required for this Hub"
-      description="This Hub does not require account sign-in. Use a pairing QR or connection link from its operator to connect securely."
+      title={t("hub.connection.entry.pairingTitle")}
+      description={t("hub.connection.entry.pairingBody")}
     >
       <Button variant="outline" onPress={scan}>
-        Scan pairing QR
+        {t("hub.connection.entry.scanPairing")}
       </Button>
     </Alert>
   );
@@ -529,13 +534,11 @@ function HubListingContext({
   locked: boolean;
   addHub(): void;
 }) {
+  const { t } = useTranslation();
   if (saved + detected === 0) return null;
   return (
     <>
-      <HubContextNote>
-        Open a Hub to manage its settings. Switching leaves other connections and Host sessions
-        unchanged.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.list.switchNote")}</HubContextNote>
       {saved === 0 && detected > 0 ? (
         <Button
           variant="ghost"
@@ -544,7 +547,7 @@ function HubListingContext({
           onPress={addHub}
           style={hubStyles.startAligned}
         >
-          Add another Hub
+          {t("hub.connection.list.addAnother")}
         </Button>
       ) : null}
     </>
@@ -588,6 +591,7 @@ function HubAddOptions({
   chooseStart(): void;
   chooseConnect(): void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={compact ? MOBILE_OPTION_STYLE : OPTION_STYLE}>
       <View
@@ -597,18 +601,15 @@ function HubAddOptions({
           hubStyles.optionCard,
         ]}
       >
-        <Text style={hubStyles.rowTitle}>Run your own Hub</Text>
-        <Text style={hubStyles.hint}>
-          For your channels and automations. It runs on a connected Host you choose; no account is
-          required by default.
-        </Text>
+        <Text style={hubStyles.rowTitle}>{t("hub.connection.add.runOwnTitle")}</Text>
+        <Text style={hubStyles.hint}>{t("hub.connection.add.runOwnBody")}</Text>
         <Button variant="outline" leftIcon={Server} onPress={chooseStart}>
-          Start a Hub
+          {t("hub.connection.add.startHub")}
         </Button>
       </View>
       <View style={compact ? MOBILE_OR_STYLE : OR_STYLE}>
         <View style={compact ? MOBILE_OR_LINE : OR_LINE} />
-        <Text>OR</Text>
+        <Text>{t("hub.connection.add.or")}</Text>
         <View style={compact ? MOBILE_OR_LINE : OR_LINE} />
       </View>
       <View
@@ -618,13 +619,10 @@ function HubAddOptions({
           hubStyles.optionCard,
         ]}
       >
-        <Text style={hubStyles.rowTitle}>Use an existing Hub</Text>
-        <Text style={hubStyles.hint}>
-          For a Hub you already run or one provided by your team. Have its URL or connection link
-          ready.
-        </Text>
+        <Text style={hubStyles.rowTitle}>{t("hub.connection.add.useExistingTitle")}</Text>
+        <Text style={hubStyles.hint}>{t("hub.connection.add.useExistingBody")}</Text>
         <Button variant="outline" leftIcon={Link} onPress={chooseConnect}>
-          Connect existing Hub
+          {t("hub.connection.add.connectExisting")}
         </Button>
       </View>
     </View>
@@ -642,6 +640,7 @@ function HubStartHostPicker({
   onSelect(id: string): void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const anchor = useRef<View | null>(null);
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
@@ -657,17 +656,18 @@ function HubStartHostPicker({
       onOpenChange={setOpen}
       anchorRef={anchor}
       searchable
-      title="Run Hub on Host"
+      title={t("hub.connection.add.runOnHost")}
     >
       <ComboboxTrigger
         ref={anchor}
         onPress={show}
         disabled={disabled}
-        accessibilityLabel="Run Hub on Host"
+        accessibilityLabel={t("hub.connection.add.runOnHost")}
         style={hubStyles.startHostTrigger}
       >
         <Text>
-          {hosts.find((host) => host.serverId === value)?.label ?? "Choose a connected Host"}
+          {hosts.find((host) => host.serverId === value)?.label ??
+            t("hub.connection.add.chooseHost")}
         </Text>
       </ComboboxTrigger>
     </SharedHostPicker>
@@ -680,6 +680,7 @@ export function HubOverviewSettings() {
     hubPanel?: string;
     startedHub?: string;
   }>();
+  const { t } = useTranslation();
   const registry = useHubProfiles();
   const router = useRouter();
   const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
@@ -700,7 +701,7 @@ export function HubOverviewSettings() {
     <>
       {params.hubPanel === "devices" ? (
         <Button variant="ghost" onPress={closeDevices} style={hubStyles.startAligned}>
-          Back to Overview
+          {t("hub.connection.overview.backToOverview")}
         </Button>
       ) : null}
       {!editing ? (
@@ -717,16 +718,16 @@ export function HubOverviewSettings() {
       {params.transport === "relay" && !editing && !isTailscaleOrigin(profile.origin) ? (
         <Alert
           variant="info"
-          title="Hub is running on encrypted relay"
-          description="For a direct connection and best speed, set up Tailscale on the computer running this Hub."
+          title={t("hub.connection.overview.relayTitle")}
+          description={t("hub.connection.overview.relayBody")}
         >
           <Button variant="outline" size="sm" onPress={openEditor}>
-            Set up Tailscale
+            {t("hub.connection.overview.setUpTailscale")}
           </Button>
         </Alert>
       ) : null}
       {editing ? (
-        <SettingsSection title="Edit connection">
+        <SettingsSection title={t("hub.connection.overview.editConnection")}>
           <HubConnectionEditor profile={profile} close={closeEditor} />
         </SettingsSection>
       ) : null}
@@ -735,6 +736,7 @@ export function HubOverviewSettings() {
 }
 
 function HubConnectionEditor({ profile, close }: { profile: HubProfile; close(): void }) {
+  const { t } = useTranslation();
   useHubEditLock();
   const [label, setLabel] = useState(profile.label);
   const [origin, setOrigin] = useState(profile.origin ?? "");
@@ -756,35 +758,35 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
       });
       close();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Hub connection could not be saved");
+      setError(caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotSave"));
     } finally {
       setBusy(false);
     }
-  }, [profile, label, origin, relay, close]);
+  }, [profile, label, origin, relay, close, t]);
   const savePress = useCallback(() => {
     void save();
   }, [save]);
   return (
     <>
-      <HubContextNote>
-        Save or cancel to switch Hubs. These changes apply only on this device.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.editor.switchNote")}</HubContextNote>
       <HubRoutesCard profile={profile} onUpdated={close} />
       <View style={[settingsStyles.card, hubStyles.form]}>
         <Field
-          label="Name on this device"
-          hint="This changes the saved name here, not the Hub's identity."
+          label={t("hub.connection.editor.nameLabel")}
+          hint={t("hub.connection.editor.nameHint")}
         >
           <FormTextInput
             initialValue={label}
             onChangeText={setLabel}
-            accessibilityLabel="Hub name"
+            accessibilityLabel={t("hub.connection.editor.nameA11y")}
             editable={!busy}
           />
         </Field>
         <View style={hubStyles.verified}>
-          <Text style={hubStyles.hint}>Hub ID: {profile.hubId}</Text>
-          <HubStatusBadge label="Verified" tone="success" />
+          <Text style={hubStyles.hint}>
+            {t("hub.connection.editor.hubId", { id: profile.hubId })}
+          </Text>
+          <HubStatusBadge label={t("hub.connection.editor.verified")} tone="success" />
         </View>
         <CustomAddressFields
           initiallyOpen={Boolean(profile.origin) && !isTailscaleOrigin(profile.origin)}
@@ -796,7 +798,7 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
         />
         <View style={hubStyles.actions}>
           <Button variant="outline" disabled={busy} onPress={close}>
-            Cancel
+            {t("hub.connection.common.cancel")}
           </Button>
           <Button
             variant="default"
@@ -804,14 +806,12 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
             loading={busy}
             onPress={savePress}
           >
-            {busy ? "Saving..." : "Save connection"}
+            {busy ? t("hub.connection.common.saving") : t("hub.connection.editor.save")}
           </Button>
         </View>
         {error ? <Text accessibilityRole="alert">{error}</Text> : null}
       </View>
-      <HubContextNote>
-        The new endpoint must prove it is the same Hub before a saved credential is used.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.editor.proveNote")}</HubContextNote>
     </>
   );
 }
@@ -825,6 +825,7 @@ function CustomAddressFields(props: {
   setRelay(value: string): void;
   busy: boolean;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(props.initiallyOpen);
   const toggle = useCallback(() => setOpen((value) => !value), []);
   return (
@@ -836,26 +837,26 @@ function CustomAddressFields(props: {
         onPress={toggle}
         style={hubStyles.startAligned}
       >
-        Custom address
+        {t("hub.connection.editor.customAddress")}
       </Button>
       {open ? (
         <>
-          <Field label="HTTPS address">
+          <Field label={t("hub.connection.editor.httpsLabel")}>
             <FormTextInput
               initialValue={props.origin}
               onChangeText={props.setOrigin}
-              accessibilityLabel="Hub HTTPS URL"
+              accessibilityLabel={t("hub.connection.editor.httpsA11y")}
               editable={!props.busy}
             />
           </Field>
           <Field
-            label="Relay address"
-            hint="Keep the saved relay route to connect when direct access is unavailable."
+            label={t("hub.connection.editor.relayLabel")}
+            hint={t("hub.connection.editor.relayHint")}
           >
             <FormTextInput
               initialValue={props.relay}
               onChangeText={props.setRelay}
-              accessibilityLabel="Hub relay URL"
+              accessibilityLabel={t("hub.connection.editor.relayA11y")}
               editable={!props.busy}
             />
           </Field>
@@ -911,6 +912,7 @@ function HubDeviceSettings({
   openDevices(): void;
   reviewConnection(): void;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { transport, capabilities, error, retry } = useHubDeviceCapabilities(profile);
   const accessError = hubAccessErrorReason(error, profile);
@@ -940,10 +942,10 @@ function HubDeviceSettings({
   const closePairing = useCallback(() => setPairing(false), []);
   const request = useCallback(
     (action: HubDeviceAction) => {
-      if (!transport) throw new Error("Hub is not connected");
+      if (!transport) throw new Error(t("hub.connection.errors.notConnected"));
       return requestHubDevices(transport, action);
     },
-    [transport],
+    [transport, t],
   );
   if (accessError)
     return (
@@ -967,7 +969,8 @@ function HubDeviceSettings({
         {pairing ? <HubPairDevicePanel profile={profile} onClose={closePairing} /> : null}
       </PairedDeviceList>
     );
-  if (!capabilities) return <HubContextNote>Checking Hub connection…</HubContextNote>;
+  if (!capabilities)
+    return <HubContextNote>{t("hub.connection.overview.checking")}</HubContextNote>;
   return (
     <>
       <HubReadyNotice capabilities={capabilities} started={started} />
@@ -1009,29 +1012,30 @@ function HubAccessRecovery({
   profile: HubProfile;
   reviewConnection(): void;
 }) {
+  const { t } = useTranslation();
   const networkFallback = useMemo(
     () => (
       <Alert
         variant="warning"
-        title="Hub is unavailable"
-        description="Check the connection on your Host and this device. Your saved Hub connection is kept."
+        title={t("hub.connection.common.hubUnavailable")}
+        description={t("hub.connection.recovery.unavailableBody")}
       >
         <Button variant="outline" onPress={retry}>
-          Retry connection
+          {t("hub.connection.common.retryConnection")}
         </Button>
       </Alert>
     ),
-    [retry],
+    [retry, t],
   );
   if (reason === "pairing")
     return (
       <Alert
         variant="warning"
-        title="This device needs to pair again"
-        description="Its Hub pairing is missing or has been revoked. Ask the Hub operator for a new pairing QR or link. Host credentials and running agents are separate."
+        title={t("hub.connection.common.pairAgainTitle")}
+        description={t("hub.connection.recovery.pairAgainBody")}
       >
         <Button variant="outline" onPress={pairAgain}>
-          Pair again
+          {t("hub.connection.common.pairAgain")}
         </Button>
       </Alert>
     );
@@ -1039,11 +1043,11 @@ function HubAccessRecovery({
     return (
       <Alert
         variant="info"
-        title="Sign in to this Hub"
-        description="This Hub requires an authorized account. Use your account to restore access."
+        title={t("hub.connection.common.signInToHub")}
+        description={t("hub.connection.recovery.signInBody")}
       >
         <Button variant="outline" size="sm" onPress={signIn}>
-          Sign in to this Hub
+          {t("hub.connection.common.signInToHub")}
         </Button>
       </Alert>
     );
@@ -1078,30 +1082,31 @@ function SavedHubRow({
   disabled: boolean;
   open(id: string): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const select = useCallback(() => {
     void open(profile.hubId);
   }, [open, profile.hubId]);
-  let access = "Open to check access";
-  let badge = "Saved";
+  let access = t("hub.connection.row.openToCheck");
+  let badge = t("hub.connection.status.saved");
   let tone: "success" | "warning" | "muted" = "muted";
   if (account?.signedIn) {
-    badge = "Connected";
+    badge = t("hub.connection.status.connected");
     tone = "success";
     access =
       account.connection?.accountAuthentication === "personal"
-        ? "No account sign-in required"
-        : `Signed in as ${account.signedIn.account.email}`;
+        ? t("hub.connection.common.noAccountSignIn")
+        : t("hub.connection.row.signedInAs", { email: account.signedIn.account.email });
   } else if (selected) {
     badge = status;
     tone = account?.error ? "warning" : "muted";
-    if (profile.entry === "account") access = "Account sign-in required";
-    else if (profile.entry === "owner-setup") access = "Owner setup required";
-    else access = "Pairing required";
+    if (profile.entry === "account") access = t("hub.connection.row.accountSignInRequired");
+    else if (profile.entry === "owner-setup") access = t("hub.connection.row.ownerSetupRequired");
+    else access = t("hub.connection.row.pairingRequired");
   }
   let host = hostLabel;
   if (!host && profile.origin) host = new URL(profile.origin).hostname;
-  if (!host) host = "Available through encrypted relay";
+  if (!host) host = t("hub.connection.row.viaRelay");
   return (
     <View style={[settingsStyles.card, hubStyles.rowCard]}>
       <View style={hubStyles.rowHeading}>
@@ -1109,13 +1114,13 @@ function SavedHubRow({
         <Text style={hubStyles.rowTitle}>{profile.label}</Text>
         {selected ? (
           <View style={hubStyles.selected}>
-            <Text style={hubStyles.selectedText}>Selected</Text>
+            <Text style={hubStyles.selectedText}>{t("hub.connection.row.selected")}</Text>
           </View>
         ) : null}
       </View>
       <View style={hubStyles.metadata}>
-        <HubMetadataRow label="Host">{host}</HubMetadataRow>
-        <HubMetadataRow label="Access">{access}</HubMetadataRow>
+        <HubMetadataRow label={t("hub.connection.common.host")}>{host}</HubMetadataRow>
+        <HubMetadataRow label={t("hub.connection.common.access")}>{access}</HubMetadataRow>
       </View>
       <View style={hubStyles.rowFooter}>
         <HubStatusBadge label={badge} tone={tone} />
@@ -1126,7 +1131,7 @@ function SavedHubRow({
           onPress={select}
           style={hubStyles.openAction}
         >
-          Open Hub
+          {t("hub.connection.row.openHub")}
         </Button>
       </View>
     </View>
@@ -1141,6 +1146,7 @@ function DetectedHubRow({
   disabled: boolean;
   connect(hub: DetectedHub): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const open = useCallback(() => {
     void connect(hub);
@@ -1149,14 +1155,18 @@ function DetectedHubRow({
     <View style={[settingsStyles.card, hubStyles.rowCard]}>
       <View style={hubStyles.rowHeading}>
         <HubNetworkIcon size={18} uniProps={hubMutedIconProps} />
-        <Text style={hubStyles.rowTitle}>Hub on {hub.hostLabel}</Text>
+        <Text style={hubStyles.rowTitle}>
+          {t("hub.connection.row.hubOnHost", { host: hub.hostLabel })}
+        </Text>
       </View>
       <View style={hubStyles.metadata}>
-        <HubMetadataRow label="Host">{hub.hostLabel}</HubMetadataRow>
-        <HubMetadataRow label="Access">Checked when you connect</HubMetadataRow>
+        <HubMetadataRow label={t("hub.connection.common.host")}>{hub.hostLabel}</HubMetadataRow>
+        <HubMetadataRow label={t("hub.connection.common.access")}>
+          {t("hub.connection.row.checkedOnConnect")}
+        </HubMetadataRow>
       </View>
       <View style={hubStyles.rowFooter}>
-        <HubStatusBadge label="Detected" />
+        <HubStatusBadge label={t("hub.connection.row.detected")} />
         <Button
           size={compact ? "md" : "sm"}
           variant="outline"
@@ -1165,18 +1175,22 @@ function DetectedHubRow({
           onPress={open}
           style={hubStyles.openAction}
         >
-          Connect
+          {t("hub.connection.common.connect")}
         </Button>
       </View>
     </View>
   );
 }
-function hubListingStatus(selected: boolean, account: ReturnType<typeof useHubAccount>): string {
-  if (!selected) return "Saved";
-  if (account.signedIn) return "Connected";
-  if (account.loading) return "Connecting…";
-  if (account.error) return "Unavailable";
-  return "Sign in required";
+function hubListingStatus(
+  t: TFunction,
+  selected: boolean,
+  account: ReturnType<typeof useHubAccount>,
+): string {
+  if (!selected) return t("hub.connection.status.saved");
+  if (account.signedIn) return t("hub.connection.status.connected");
+  if (account.loading) return t("hub.connection.status.connecting");
+  if (account.error) return t("hub.connection.status.unavailable");
+  return t("hub.connection.status.signInRequired");
 }
 const hubStyles = StyleSheet.create((theme) => ({
   toolbar: {

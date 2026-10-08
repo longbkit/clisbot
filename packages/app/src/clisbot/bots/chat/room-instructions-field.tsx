@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { CHAT_ROOM_INSTRUCTIONS_MAX_CHARS } from "@clisbot/protocol/chats/rpc-schemas";
 import { DEFAULT_ROOM_INSTRUCTIONS } from "@clisbot/protocol/chats/room";
 import { FormTextInput } from "@/components/ui/form-field";
@@ -18,22 +19,20 @@ export function RoomInstructionsField({
   onChangeText: (value: string) => void;
   editable: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>Room instructions · optional</Text>
+      <Text style={styles.label}>{t("bots.chat.room.label")}</Text>
       <FormTextInput
         initialValue={initialValue}
         onChangeText={onChangeText}
         multiline
         maxLength={CHAT_ROOM_INSTRUCTIONS_MAX_CHARS}
         editable={editable}
-        accessibilityLabel="Room instructions"
+        accessibilityLabel={t("bots.chat.room.name")}
         placeholder={DEFAULT_ROOM_INSTRUCTIONS}
       />
-      <Text style={styles.hint}>
-        Every bot in this group reads these with the member list and the room rules. Leave empty to
-        use the default shown above.
-      </Text>
+      <Text style={styles.hint}>{t("bots.chat.room.hint")}</Text>
     </View>
   );
 }

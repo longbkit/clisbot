@@ -2,6 +2,7 @@
 // set to a number, or turned off. One model serves the Bot, each Conversation,
 // a Route and a Rule (docs/audits/2026-10-05-routes-and-rules.md#limits).
 
+import { i18n } from "@/i18n/i18next";
 import {
   CHANNEL_LIMIT_NAMES,
   DEFAULT_OPEN_AUDIENCE_ROUTE_LIMITS,
@@ -17,24 +18,30 @@ export interface LimitDraft {
 export type ChannelLimitsDraft = Record<ChannelLimitName, LimitDraft>;
 export type ChannelLimitDefaults = Partial<Record<ChannelLimitName, number>>;
 
-export const LIMIT_LABELS: Record<ChannelLimitName, string> = {
-  maxInputCharacters: "Message length",
-  messagesPerMinutePerSender: "Messages handled per minute, per person",
-  messagesPerMinute: "Messages handled per minute",
-  messagesSentPerMinute: "Bot messages per minute",
-  maxConcurrentRuns: "Concurrent runs",
-  maxRuntimeSeconds: "Run time",
+const LIMIT_LABELS: Record<ChannelLimitName, () => string> = {
+  maxInputCharacters: () => i18n.t("hub.channels.limits.label.maxInputCharacters"),
+  messagesPerMinutePerSender: () => i18n.t("hub.channels.limits.label.messagesPerMinutePerSender"),
+  messagesPerMinute: () => i18n.t("hub.channels.limits.label.messagesPerMinute"),
+  messagesSentPerMinute: () => i18n.t("hub.channels.limits.label.messagesSentPerMinute"),
+  maxConcurrentRuns: () => i18n.t("hub.channels.limits.label.maxConcurrentRuns"),
+  maxRuntimeSeconds: () => i18n.t("hub.channels.limits.label.maxRuntimeSeconds"),
 };
+
+export function limitLabel(name: ChannelLimitName): string {
+  return LIMIT_LABELS[name]();
+}
 
 /** Said after the number, so the label stays short. */
-export const LIMIT_UNITS: Partial<Record<ChannelLimitName, string>> = {
-  maxInputCharacters: "characters",
-  maxRuntimeSeconds: "seconds",
-};
+export function limitUnit(name: ChannelLimitName): string {
+  if (name === "maxInputCharacters") return i18n.t("hub.channels.limits.unit.characters");
+  if (name === "maxRuntimeSeconds") return i18n.t("hub.channels.limits.unit.seconds");
+  return "";
+}
 
 /** The one line that says how every limit behaves, over its fields. */
-export const LIMITS_NOTE =
-  "Empty uses the default. Handled messages start or continue work. Over a limit, messages and runs wait their turn; a longer message is refused, a longer run stopped.";
+export function limitsNote(): string {
+  return i18n.t("hub.channels.limits.note");
+}
 
 /** A Rule's limits: everything about who comes in. Posts belong to no sender. */
 export const RULE_LIMIT_NAMES: readonly ChannelLimitName[] = CHANNEL_LIMIT_NAMES.filter(
@@ -76,7 +83,10 @@ export function parseChannelLimitsDraft(
     if (mode !== "custom") continue;
     const parsed = Number(text.trim());
     if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-      return { valid: false, error: `${LIMIT_LABELS[name]}: use a positive whole number.` };
+      return {
+        valid: false,
+        error: i18n.t("hub.channels.limits.positiveWhole", { label: limitLabel(name) }),
+      };
     }
     value[name] = parsed;
   }
@@ -96,15 +106,21 @@ export function channelLimitsSummary(
   limits: unknown,
   names: readonly ChannelLimitName[] = CHANNEL_LIMIT_NAMES,
   /** What a scope with nothing set says: a scope with no defaults has "No limits". */
-  empty = "Default limits",
+  empty?: string,
 ): string {
   const draft = channelLimitsDraft(limits);
   const set = names.flatMap((name) => {
     const { mode, value } = draft[name];
     if (mode === "default") return [];
-    return [`${LIMIT_LABELS[name]}: ${mode === "off" ? "off" : value}`];
+    return [
+      mode === "off"
+        ? i18n.t("hub.channels.limits.summaryOff", { label: limitLabel(name) })
+        : i18n.t("hub.channels.limits.summaryValue", { label: limitLabel(name), value }),
+    ];
   });
-  return set.length === 0 ? empty : set.join(" · ");
+  return set.length === 0
+    ? (empty ?? i18n.t("hub.channels.limits.defaultLimits"))
+    : set.join(" · ");
 }
 
 /**

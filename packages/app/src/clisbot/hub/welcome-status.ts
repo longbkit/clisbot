@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import {
   hubHostOfferHint,
   hubHostStatusPresentation,
@@ -47,7 +48,7 @@ export function resolveHubWelcomeCard(input: HubWelcomeCardInput): HubWelcomeCar
       kind: "status",
       view: {
         tone: "warning",
-        badge: "Action needed",
+        badge: i18n.t("hub.account.welcome.badges.actionNeeded"),
         message: accountStepMessage(input.status),
         actions: ["account"],
         primaryAction: "account",
@@ -58,10 +59,12 @@ export function resolveHubWelcomeCard(input: HubWelcomeCardInput): HubWelcomeCar
 }
 
 function accountStepMessage(status: string): string {
-  if (status === "organizationRequired") return "Choose an organization to continue.";
-  if (status === "appSetupRequired") return "Finish setting up this app to continue.";
-  if (status === "passwordChangeRequired") return "Change your password to continue.";
-  return "Open Account to finish signing in.";
+  if (status === "organizationRequired")
+    return i18n.t("hub.account.welcome.steps.organizationRequired");
+  if (status === "appSetupRequired") return i18n.t("hub.account.welcome.steps.appSetupRequired");
+  if (status === "passwordChangeRequired")
+    return i18n.t("hub.account.welcome.steps.passwordChangeRequired");
+  return i18n.t("hub.account.welcome.steps.finishSigningIn");
 }
 
 /**
@@ -75,8 +78,11 @@ function signedInHostView(input: HubWelcomeCardInput): HubWelcomeStatusView {
   if (failure) {
     return {
       tone: "error",
-      badge: "Error",
-      message: `Couldn't connect ${failure.label}: ${failure.message}`,
+      badge: i18n.t("hub.account.welcome.badges.error"),
+      message: i18n.t("hub.account.welcome.connectFailed", {
+        label: failure.label,
+        message: failure.message,
+      }),
       actions: ["retrySynchronization", "account"],
       primaryAction: "retrySynchronization",
     };
@@ -84,8 +90,8 @@ function signedInHostView(input: HubWelcomeCardInput): HubWelcomeStatusView {
   if (input.hostsFailed) {
     return {
       tone: "error",
-      badge: "Error",
-      message: "Clisbot could not load the Hosts your organization shares.",
+      badge: i18n.t("hub.account.welcome.badges.error"),
+      message: i18n.t("hub.account.welcome.hostsFailed"),
       actions: ["refreshHosts", "account"],
       primaryAction: "refreshHosts",
     };
@@ -99,8 +105,8 @@ function signedInHostView(input: HubWelcomeCardInput): HubWelcomeStatusView {
 function loadingView(): HubWelcomeStatusView {
   return {
     tone: "muted",
-    badge: "Loading",
-    message: "Loading the Hosts your organization shares…",
+    badge: i18n.t("hub.account.welcome.badges.loading"),
+    message: i18n.t("hub.account.welcome.loadingHosts"),
     actions: [],
     primaryAction: null,
   };
@@ -109,10 +115,10 @@ function loadingView(): HubWelcomeStatusView {
 function noHostView(canAddHost: boolean): HubWelcomeStatusView {
   return {
     tone: "warning",
-    badge: "No Host",
+    badge: i18n.t("hub.account.welcome.badges.noHost"),
     message: canAddHost
-      ? "No Host shared with you yet. Run `clisbot hub connect` on the computer you want to use, or connect one of your own below."
-      : "No Host shared with you yet. Ask an organization owner or admin for access, or connect one of your own below.",
+      ? i18n.t("hub.account.welcome.noHostCanAdd")
+      : i18n.t("hub.account.welcome.noHostAskAccess"),
     actions: ["refreshHosts", "account"],
     primaryAction: null,
   };
@@ -123,7 +129,7 @@ function onlineView(item: HubHostOnboardingItem): HubWelcomeStatusView {
   return {
     tone: "success",
     badge: hubHostStatusPresentation("online").label,
-    message: `${item.label} is connected.`,
+    message: i18n.t("hub.account.welcome.hostConnected", { label: item.label }),
     actions: ["account"],
     primaryAction: null,
   };
@@ -139,7 +145,7 @@ function hostProgressView(items: readonly HubHostOnboardingItem[]): HubWelcomeSt
     return {
       tone: presentation.variant,
       badge: presentation.label,
-      message: `Connecting to ${arriving.label}…`,
+      message: i18n.t("hub.account.welcome.connectingTo", { label: arriving.label }),
       actions: ["account"],
       primaryAction: null,
     };
@@ -160,8 +166,11 @@ function stalledView(items: readonly HubHostOnboardingItem[]): HubWelcomeStatusV
     badge: presentation.label,
     message:
       item.serverId === null
-        ? `${item.label}: ${hubHostOfferHint(item.status)}`
-        : `Clisbot can't reach ${item.label}.`,
+        ? i18n.t("hub.account.welcome.hostHint", {
+            label: item.label,
+            hint: hubHostOfferHint(item.status),
+          })
+        : i18n.t("hub.account.welcome.cannotReach", { label: item.label }),
     actions: ["refreshHosts", "account"],
     primaryAction: null,
   };

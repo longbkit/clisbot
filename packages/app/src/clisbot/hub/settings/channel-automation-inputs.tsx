@@ -1,6 +1,7 @@
 import { AutomationInputDraftContext } from "./automation-input-draft";
 import { useContext } from "react";
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export function AutomationChannelInputs({
   moveRoute(account: RecordValue, from: number, to: number): Promise<void>;
   removeRoute(account: RecordValue, routeIndex: number): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const inputDraft = useContext(AutomationInputDraftContext);
   const choosing = Boolean(inputDraft) || choosingInput;
   const accounts = configuration?.accounts as RecordValue[] | undefined;
@@ -66,10 +68,12 @@ export function AutomationChannelInputs({
     () =>
       embedded || inputDraft ? undefined : (
         <Button size="sm" variant="outline" onPress={toggleChoosingInput}>
-          {choosingInput ? "Cancel" : "Add input"}
+          {choosingInput
+            ? t("hub.channels.automationInputs.cancel")
+            : t("hub.channels.automationInputs.add")}
         </Button>
       ),
-    [choosingInput, embedded, inputDraft, toggleChoosingInput],
+    [choosingInput, embedded, inputDraft, t, toggleChoosingInput],
   );
   const empty =
     !choosing &&
@@ -80,7 +84,9 @@ export function AutomationChannelInputs({
       <QueryFeedback queries={queries} />
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
       {testResult ? <Alert variant="success" title={testResult} /> : null}
-      {empty ? <Text style={settingsStyles.rowHint}>No Channel inputs configured.</Text> : null}
+      {empty ? (
+        <Text style={settingsStyles.rowHint}>{t("hub.channels.automationInputs.empty")}</Text>
+      ) : null}
       {inputAccounts.map((account) => (
         <AutomationChannelAccount
           key={channelAccountKey(account)}
@@ -102,7 +108,7 @@ export function AutomationChannelInputs({
           disabled={pending || accounts === undefined}
           onPress={addRoute}
         >
-          Use another Connection
+          {t("hub.channels.automationInputs.useAnother")}
         </Button>
       ) : null}
     </AutomationInputSection>
@@ -137,6 +143,7 @@ function AutomationChannelAccount({
   addRouteTo(accountKey: string): void;
   removeRoute(account: RecordValue, index: number): Promise<void>;
 }) {
+  const { t } = useTranslation();
   const add = useCallback(() => addRouteTo(channelAccountKey(account)), [account, addRouteTo]);
   const channelName = useChannelName();
   const routes = arrayField(account, "routes") as RecordValue[];
@@ -146,7 +153,7 @@ function AutomationChannelAccount({
         <Text style={settingsStyles.rowTitle}>{channelAccountLabel(account, channelName)}</Text>
         {choosing ? (
           <Button size="sm" variant="outline" disabled={pending} onPress={add}>
-            Add input here
+            {t("hub.channels.automationInputs.addHere")}
           </Button>
         ) : null}
       </View>
@@ -176,10 +183,11 @@ function AutomationInputSection({
   children: React.ReactNode;
   trailing?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return embedded ? (
     <View>{children}</View>
   ) : (
-    <SettingsSection title="Inputs" trailing={trailing}>
+    <SettingsSection title={t("hub.channels.automationInputs.title")} trailing={trailing}>
       {children}
     </SettingsSection>
   );

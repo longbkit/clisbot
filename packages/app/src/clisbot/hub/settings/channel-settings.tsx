@@ -10,12 +10,15 @@ import {
 import { useChannelYamlForm } from "./channel-advanced-configuration";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { RouteHostProvider } from "./route-host-context";
 import { Text, View } from "react-native";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { i18n } from "@/i18n/i18next";
 import { settingsStyles } from "@/styles/settings";
 import { ConfirmationProvider, useConfirmation } from "@/components/confirmation-provider";
 import { useHubAccount } from "../account-provider";
@@ -72,32 +75,33 @@ export function ChannelSettings({
   /** Called once the Add Route form opened on `connectBot`, to clear the request. */
   onConnectBotOpened?: () => void;
 } = {}) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const router = useRouter();
   const adminScope = useChannelRouteAdminScope();
   const automationInput = useContext(AutomationInputDraftContext) !== null;
   const openAccount = useCallback(() => router.push(buildHubSettingsRoute("account")), [router]);
   if (hub.loading || adminScope.status === "loading")
-    return <Text style={settingsStyles.rowHint}>Loading Channels...</Text>;
+    return <Text style={settingsStyles.rowHint}>{t("hub.channels.settings.loading")}</Text>;
   if (adminScope.status === "none" && automationInput)
     // A Channel input is a Route on a bot, so adding one is Connection Admin work.
     return (
       <Alert
         variant="info"
-        title="Channel inputs need Connection Admin"
-        description="A Channel input adds a Route to a Channel bot. Ask an Organization Admin to make you Connection Admin of that bot, or to add this input for you."
+        title={t("hub.channels.settings.inputsNeedAdminTitle")}
+        description={t("hub.channels.settings.inputsNeedAdminBody")}
       />
     );
   if (adminScope.status === "none")
     return (
-      <SettingsSection title="Channels">
+      <SettingsSection title={t("hub.channels.settings.title")}>
         <Alert
           variant="info"
-          title="Ask an owner or administrator to configure Channels"
-          description="Link your Channel identity in Account settings to use the conversations shared with you."
+          title={t("hub.channels.settings.askOwnerTitle")}
+          description={t("hub.channels.settings.askOwnerBody")}
         />
         <Button size="sm" variant="outline" onPress={openAccount}>
-          Open Account settings
+          {t("hub.channels.settings.openAccount")}
         </Button>
       </SettingsSection>
     );
@@ -121,12 +125,31 @@ export function ChannelSettings({
  * admission. The `accounts`/`catalog` values stay as the stored view ids. */
 type ChannelView = "accounts" | "catalog" | "operations" | "activity";
 
-const CHANNEL_VIEWS: ViewTab<ChannelView>[] = [
-  { value: "accounts", label: "Connections" },
-  { value: "catalog", label: "Channel Integrations" },
-  { value: "operations", label: "Operations" },
-  { value: "activity", label: "Activity" },
-];
+function channelViews(t: TFunction): ViewTab<ChannelView>[] {
+  return [
+    { value: "accounts", label: t("hub.channels.settings.views.accounts") },
+    { value: "catalog", label: t("hub.channels.settings.views.catalog") },
+    { value: "operations", label: t("hub.channels.settings.views.operations") },
+    { value: "activity", label: t("hub.channels.settings.views.activity") },
+  ];
+}
+
+/** The page heading and its view tabs. */
+function ChannelViewNavigation({
+  value,
+  onChange,
+}: {
+  value: ChannelView;
+  onChange(view: ChannelView): void;
+}) {
+  const { t } = useTranslation();
+  const tabs = useMemo(() => channelViews(t), [t]);
+  return (
+    <SettingsSection title={t("hub.channels.settings.title")}>
+      <ViewTabs tabs={tabs} value={value} onChange={onChange} />
+    </SettingsSection>
+  );
+}
 
 /** The views that render on their own, with no state from the accounts editor. */
 const CHANNEL_SECONDARY_VIEWS: Partial<
@@ -352,11 +375,7 @@ function ChannelSettingsContent({
       />
     );
   }
-  const navigation = (
-    <SettingsSection title="Channels">
-      <ViewTabs tabs={CHANNEL_VIEWS} value={channelView} onChange={setChannelView} />
-    </SettingsSection>
-  );
+  const navigation = <ChannelViewNavigation value={channelView} onChange={setChannelView} />;
   const SecondaryView = CHANNEL_SECONDARY_VIEWS[channelView];
   if (SecondaryView !== undefined)
     return (
@@ -506,15 +525,17 @@ function useConnectBotEditor({
     opened.current = key;
     onOpened?.();
     void (async () => {
-      if (editing && !(await confirm(DISCARD_ROUTE_DRAFT))) return;
+      if (editing && !(await confirm(discardRouteDraft()))) return;
       beginEdit({ kind: "add", accountKey: null, fixed: false, bot: connectBot });
     })();
   }, [allowed, beginEdit, confirm, connectBot, editing, onOpened, ready]);
 }
 
-const DISCARD_ROUTE_DRAFT = {
-  title: "Discard this Route?",
-  message: "Connect to a channel… opens a new Route. The Route you are editing is not saved.",
-  confirmLabel: "Discard",
-  destructive: true,
-};
+function discardRouteDraft() {
+  return {
+    title: i18n.t("hub.channels.settings.discardTitle"),
+    message: i18n.t("hub.channels.settings.discardMessage"),
+    confirmLabel: i18n.t("hub.channels.settings.discard"),
+    destructive: true,
+  };
+}

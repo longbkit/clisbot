@@ -1,6 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import type { ViewTab } from "../view-tabs";
+import { canSeeInvitations, managesPeople } from "./team-membership";
+import type { PeopleAuthority } from "./types";
 
 export type PeopleView = "members" | "teams" | "invitations" | "access";
 
@@ -11,14 +15,17 @@ export type PeopleView = "members" | "teams" | "invitations" | "access";
  */
 export function peopleViews(
   showInvitations: boolean,
-  managesPeople: boolean,
+  managesAnyone: boolean,
+  t: TFunction,
 ): ViewTab<PeopleView>[] {
-  const access = { value: "access" as const, label: "Access" };
-  if (!managesPeople) return [access];
+  const access = { value: "access" as const, label: t("hub.team.people.tabs.access") };
+  if (!managesAnyone) return [access];
   return [
-    { value: "members", label: "Members" },
-    { value: "teams", label: "Teams" },
-    ...(showInvitations ? [{ value: "invitations" as const, label: "Invitations" }] : []),
+    { value: "members", label: t("hub.team.people.tabs.members") },
+    { value: "teams", label: t("hub.team.people.tabs.teams") },
+    ...(showInvitations
+      ? [{ value: "invitations" as const, label: t("hub.team.people.tabs.invitations") }]
+      : []),
     access,
   ];
 }
@@ -35,4 +42,15 @@ export function usePeopleView(
   );
   const setView = useCallback((next: PeopleView) => router.setParams({ view: next }), [router]);
   return [view, setView];
+}
+
+/** The tabs this viewer gets and the open one; the labels follow the UI language. */
+export function usePeopleTabs(authority: PeopleAuthority) {
+  const { t } = useTranslation();
+  const views = useMemo(
+    () => peopleViews(canSeeInvitations(authority), managesPeople(authority), t),
+    [authority, t],
+  );
+  const [view, setView] = usePeopleView(views);
+  return { views, view, setView };
 }

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import type { ConnectorAccount } from "@clisbot/protocol/connectors/types";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export function AccountPickerSheet({
   onClose(): void;
   onSave(selection: "all" | string[]): void;
 }) {
+  const { t } = useTranslation();
   const [selection, setSelection] = useState(initial);
   const toggle = useCallback(
     (id: string) =>
@@ -36,24 +38,27 @@ export function AccountPickerSheet({
   );
   const every = useCallback(() => setSelection("all"), []);
   const save = useCallback(() => onSave(selection), [onSave, selection]);
-  const header = useMemo(() => ({ title: `${appName} accounts` }), [appName]);
+  const header = useMemo(
+    () => ({ title: t("connectors.screen.accountPicker.title", { app: appName }) }),
+    [appName, t],
+  );
   const footer = useMemo(
     () => (
       <View style={styles.footer}>
         <Button variant="ghost" size="sm" onPress={every}>
-          Every account
+          {t("connectors.screen.accountPicker.every")}
         </Button>
         <View style={styles.group}>
           <Button variant="ghost" onPress={onClose}>
-            Cancel
+            {t("connectors.screen.common.cancel")}
           </Button>
           <Button variant="default" onPress={save} testID="connectors-accounts-save">
-            Save
+            {t("connectors.screen.common.save")}
           </Button>
         </View>
       </View>
     ),
-    [every, onClose, save],
+    [every, onClose, save, t],
   );
   return (
     <AdaptiveModalSheet
@@ -76,8 +81,8 @@ export function AccountPickerSheet({
       </View>
       <Text style={[settingsStyles.rowHint, styles.note]}>
         {selection === "all"
-          ? "Every account, including ones connected later."
-          : "Only the checked accounts. The agent names the account on each call; with one, Clisbot names it."}
+          ? t("connectors.screen.accountPicker.noteAll")
+          : t("connectors.screen.accountPicker.noteSome")}
       </Text>
     </AdaptiveModalSheet>
   );

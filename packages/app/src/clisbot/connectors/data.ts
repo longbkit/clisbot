@@ -7,6 +7,7 @@ import type {
 } from "@clisbot/protocol/connectors/types";
 import { useFetchQuery } from "@/data/query";
 import { queryClient } from "@/data/query-client";
+import { i18n } from "@/i18n/i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { hasPendingAccount } from "./model";
 
@@ -39,7 +40,7 @@ export function isAccessDenied(error: unknown): boolean {
 
 export function connectorsClient(serverId: string) {
   const client = getHostRuntimeStore().getClient(serverId);
-  if (!client) throw new ConnectorsError("This Host is not connected.");
+  if (!client) throw new ConnectorsError(i18n.t("connectors.screen.errors.hostNotConnected"));
   return client;
 }
 
@@ -69,7 +70,8 @@ export function useConnectorSettings(serverId: string | null) {
     staleTimeMs: 30_000,
     queryFn: async () => {
       const payload = unwrap(await connectorsClient(serverId!).getConnectorSettings());
-      if (!payload.settings) throw new ConnectorsError("The Host returned no Connector settings.");
+      if (!payload.settings)
+        throw new ConnectorsError(i18n.t("connectors.screen.errors.noSettings"));
       return payload.settings;
     },
   });
@@ -225,7 +227,8 @@ export async function startAccountConnect(
     await connectorsClient(serverId).connectConnectorAccount({ slug, ...(alias ? { alias } : {}) }),
   );
   await queryClient.invalidateQueries({ queryKey: connectorKeys.accounts(serverId) });
-  if (!payload.redirectUrl) throw new ConnectorsError("The Host returned no sign-in link.");
+  if (!payload.redirectUrl)
+    throw new ConnectorsError(i18n.t("connectors.screen.errors.noSignInLink"));
   return payload.redirectUrl;
 }
 

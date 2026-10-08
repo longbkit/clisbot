@@ -12,6 +12,7 @@ import {
   CLISBOT_CLIENT_ID,
   tokenRequestBody,
 } from "./oauth";
+import { i18n } from "@/i18n/i18next";
 
 interface AccessCredential {
   accessToken: string;
@@ -66,7 +67,7 @@ class NativeHubTransport implements HubTransport {
       }),
       redirectUri,
     );
-    if (result.type !== "success") throw new Error("Hub sign-in was canceled.");
+    if (result.type !== "success") throw new Error(i18n.t("hub.account.signIn.canceled"));
     const code = authorizationCodeFromCallback({
       callbackUrl: result.url,
       state,
@@ -80,7 +81,8 @@ class NativeHubTransport implements HubTransport {
         verifier,
       }),
     );
-    if (token.refresh_token === undefined) throw new Error("Hub did not issue a refresh token.");
+    if (token.refresh_token === undefined)
+      throw new Error(i18n.t("hub.account.signIn.noRefreshToken"));
     await SecureStore.setItemAsync(this.refreshKey, token.refresh_token, {
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
@@ -134,7 +136,10 @@ class NativeHubTransport implements HubTransport {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body,
     });
-    if (!response.ok) throw new Error(`Hub credential exchange failed (${response.status}).`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("hub.account.signIn.credentialExchangeFailed", { status: response.status }),
+      );
     const token = OAuthTokenResponseSchema.parse(await response.json());
     this.access = {
       accessToken: token.access_token,

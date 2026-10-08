@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { MoreHorizontal, Pencil, QrCode, RefreshCw, Trash2 } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { HubText as Text } from "./hub-text";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,7 @@ export function PairedDeviceList({
   /** Shown above the list, e.g. the invitation just created. */
   children?: ReactNode;
 }) {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,13 +60,13 @@ export function PairedDeviceList({
         setDevices((await request(action)).devices);
         return true;
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Device operation failed");
+        setError(caught instanceof Error ? caught.message : t("hub.connection.devices.failed"));
         return false;
       } finally {
         setBusy(false);
       }
     },
-    [request],
+    [request, t],
   );
   const refresh = useCallback(() => {
     void run({ kind: "list" });
@@ -87,19 +90,19 @@ export function PairedDeviceList({
           </Button>
         ) : null}
         <Button variant="ghost" size="xs" leftIcon={RefreshCw} disabled={busy} onPress={refresh}>
-          Refresh
+          {t("hub.connection.devices.refresh")}
         </Button>
         {onPairDevice ? (
           <Button variant="ghost" size="xs" leftIcon={QrCode} onPress={onPairDevice}>
-            Pair a device
+            {t("hub.connection.devices.pair")}
           </Button>
         ) : null}
       </View>
     ),
-    [busy, refresh, revokeAll, onPairDevice],
+    [busy, refresh, revokeAll, onPairDevice, t],
   );
   return (
-    <SettingsSection title="Paired devices" trailing={headerActions}>
+    <SettingsSection title={t("hub.connection.devices.title")} trailing={headerActions}>
       {children}
       {error ? <Text accessibilityRole="alert">{error}</Text> : null}
       <View style={settingsStyles.card}>
@@ -115,10 +118,7 @@ export function PairedDeviceList({
           />
         ))}
       </View>
-      <HubContextNote>
-        Revoke pairing to remove a device&apos;s access to this service. Hub and Host pairings are
-        separate; running agents continue.
-      </HubContextNote>
+      <HubContextNote>{t("hub.connection.devices.note")}</HubContextNote>
     </SettingsSection>
   );
 }
@@ -135,40 +135,50 @@ function useRevokeAll(
   setError: (error: string | null) => void,
   setBusy: (busy: boolean) => void,
 ) {
+  const { t } = useTranslation();
   const targets = devices.filter((device) => !device.revokedAt && device.id !== currentDeviceId);
   const keepsCurrent = currentDeviceId !== undefined;
   const count = targets.length;
   const start = useCallback(() => {
     const ids = targets.map((device) => device.id);
     void confirmAndRevoke(ids, keepsCurrent, {
+      t,
       request,
       setDevices,
       setError,
       setBusy,
     });
     // targets is rebuilt each render; its ids are what the confirmation counts.
-  }, [targets, keepsCurrent, request, setDevices, setError, setBusy]);
-  return { count, start, label: keepsCurrent ? "Revoke others" : "Revoke all" };
+  }, [targets, keepsCurrent, request, setDevices, setError, setBusy, t]);
+  return {
+    count,
+    start,
+    label: keepsCurrent
+      ? t("hub.connection.devices.revokeOthers")
+      : t("hub.connection.devices.revokeAll"),
+  };
 }
 
 async function confirmAndRevoke(
   ids: string[],
   keepsCurrent: boolean,
   io: {
+    t: TFunction;
     request: (action: DeviceAction) => Promise<{ devices: Device[] }>;
     setDevices: (devices: Device[]) => void;
     setError: (error: string | null) => void;
     setBusy: (busy: boolean) => void;
   },
 ) {
+  const { t } = io;
   const confirmed = await confirmDialog({
     title: keepsCurrent
-      ? `Revoke ${ids.length} other devices?`
-      : `Revoke all ${ids.length} devices?`,
+      ? t("hub.connection.devices.confirmOthers", { count: ids.length })
+      : t("hub.connection.devices.confirmAll", { count: ids.length }),
     message: keepsCurrent
-      ? "Every other device loses access to this service and its connections close. This device stays paired. Running agents continue."
-      : "Every device loses access to this service and its connections close, including this one if it is in the list. Running agents continue.",
-    confirmLabel: "Revoke all",
+      ? t("hub.connection.devices.othersMessage")
+      : t("hub.connection.devices.allMessage"),
+    confirmLabel: t("hub.connection.devices.revokeAll"),
     destructive: true,
   });
   if (!confirmed) return;
@@ -178,7 +188,7 @@ async function confirmAndRevoke(
     for (const deviceId of ids)
       io.setDevices((await io.request({ kind: "revoke", deviceId })).devices);
   } catch (caught) {
-    io.setError(caught instanceof Error ? caught.message : "Device operation failed");
+    io.setError(caught instanceof Error ? caught.message : t("hub.connection.devices.failed"));
   } finally {
     io.setBusy(false);
   }
@@ -199,6 +209,7 @@ function PairedDeviceRow({
   current: boolean;
   bordered: boolean;
 }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(device.label);
   const [resetKey, setResetKey] = useState(0);
@@ -221,28 +232,16 @@ function PairedDeviceRow({
   }, [run, device.id, label]);
   const revoke = useCallback(() => {
     void confirmDialog({
-      title: `Revoke ${device.label}?`,
-      message:
-        "This removes this device's access to this backend and closes its active connections. A daemon and Hub have separate credentials; revoke each service when needed. Running agents continue.",
-      confirmLabel: "Revoke device",
+      title: t("hub.connection.devices.revokeTitle", { label: device.label }),
+      message: t("hub.connection.devices.revokeMessage"),
+      confirmLabel: t("hub.connection.devices.revokeDevice"),
       destructive: true,
     }).then((confirmed) => {
       if (confirmed) return run({ kind: "revoke", deviceId: device.id });
       return undefined;
     });
-  }, [run, device.id, device.label]);
-  let activity = "Not connected yet";
-  if (device.revokedAt) activity = "Pairing revoked";
-  else if (device.lastSeenAt)
-    activity = `Last active ${new Date(device.lastSeenAt).toLocaleString()}`;
-  const connections = device.sessions?.filter((session) => session.connected).length;
-  const meta = [
-    activity,
-    connections ? `${connections} connected` : null,
-    `Device ${device.id.slice(0, 8)}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  }, [run, device.id, device.label, t]);
+  const meta = deviceMeta(t, device);
   return (
     <View style={[styles.row, bordered && settingsStyles.rowBorder]}>
       <View style={styles.heading}>
@@ -250,7 +249,7 @@ function PairedDeviceRow({
         <View style={styles.copy}>
           <Text style={styles.title}>
             {device.label}
-            {current ? " · This device" : ""}
+            {current ? t("hub.connection.common.thisDeviceSuffix") : ""}
           </Text>
           <Text style={styles.hint}>{meta}</Text>
         </View>
@@ -266,20 +265,20 @@ function PairedDeviceRow({
       {editing ? (
         <View style={styles.editor}>
           <Field
-            label="Device label"
-            hint="A label is for recognition only; it does not change identity or permissions."
+            label={t("hub.connection.common.deviceLabel")}
+            hint={t("hub.connection.devices.labelHint")}
           >
             <FormTextInput
               initialValue={label}
               onChangeText={setLabel}
-              accessibilityLabel="Device label"
+              accessibilityLabel={t("hub.connection.common.deviceLabel")}
               resetKey={resetKey}
               editable={!busy}
             />
           </Field>
           <View style={styles.actions}>
             <Button size="sm" variant="secondary" disabled={busy} onPress={cancelLabel}>
-              Cancel
+              {t("hub.connection.common.cancel")}
             </Button>
             <Button
               size="sm"
@@ -287,13 +286,30 @@ function PairedDeviceRow({
               disabled={busy || !label.trim() || label.trim() === device.label}
               onPress={saveLabel}
             >
-              Save label
+              {t("hub.connection.devices.saveLabel")}
             </Button>
           </View>
         </View>
       ) : null}
     </View>
   );
+}
+
+function deviceMeta(t: TFunction, device: Device): string {
+  let activity = t("hub.connection.devices.notConnected");
+  if (device.revokedAt) activity = t("hub.connection.devices.revoked");
+  else if (device.lastSeenAt)
+    activity = t("hub.connection.common.lastActive", {
+      date: new Date(device.lastSeenAt).toLocaleString(),
+    });
+  const connections = device.sessions?.filter((session) => session.connected).length;
+  return [
+    activity,
+    connections ? t("hub.connection.devices.connectedCount", { count: connections }) : null,
+    t("hub.connection.devices.deviceId", { id: device.id.slice(0, 8) }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Row actions live in one menu, as on every settings list (docs/design.md, kebab menus). */
@@ -308,7 +324,8 @@ function DeviceMenu({
   onRename: () => void;
   onRevoke: () => void;
 }) {
-  const menuLabel = `${label} options`;
+  const { t } = useTranslation();
+  const menuLabel = t("hub.connection.devices.menuLabel", { label });
   // Every item carries an icon so the labels share one rail.
   const renameIcon = useMemo(() => <Pencil size={16} color={styles.menuIcon.color} />, []);
   const revokeIcon = useMemo(() => <Trash2 size={16} color={styles.dangerIcon.color} />, []);
@@ -325,10 +342,10 @@ function DeviceMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" width={200} sheetTitle={menuLabel}>
         <DropdownMenuItem leading={renameIcon} onSelect={onRename}>
-          Rename
+          {t("hub.connection.devices.rename")}
         </DropdownMenuItem>
         <DropdownMenuItem destructive leading={revokeIcon} onSelect={onRevoke}>
-          Revoke device
+          {t("hub.connection.devices.revokeDevice")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -336,6 +353,7 @@ function DeviceMenu({
 }
 
 export function DaemonPairedDevices({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const canManage = useSessionStore((state) => {
     const info = state.sessions[serverId]?.serverInfo;
@@ -345,10 +363,10 @@ export function DaemonPairedDevices({ serverId }: { serverId: string }) {
   });
   const request = useCallback(
     (action: DeviceAction) => {
-      if (!client) return Promise.reject(new Error("Connect to this Host first"));
+      if (!client) return Promise.reject(new Error(t("hub.connection.errors.connectToHostFirst")));
       return client.devices(action);
     },
-    [client],
+    [client, t],
   );
   if (!canManage) return null;
   return <PairedDeviceList request={request} />;

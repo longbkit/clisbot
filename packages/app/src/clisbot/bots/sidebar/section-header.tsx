@@ -47,6 +47,7 @@ export function useSectionCollapsed(key: string) {
 
 export function BotsSectionHeader({
   label,
+  icon,
   testID,
   createLabel,
   onCreate,
@@ -56,6 +57,8 @@ export function BotsSectionHeader({
   actions,
 }: {
   label: string;
+  /** Picks the leading icon; without it the English `label` does, for callers not yet translated. */
+  icon?: keyof typeof icons;
   testID: string;
   createLabel?: string;
   onCreate?: () => void;
@@ -78,7 +81,7 @@ export function BotsSectionHeader({
     ],
     [compact, disabled],
   );
-  const Icon = icons[label as keyof typeof icons] ?? Fallback;
+  const Icon = icons[icon ?? (label as keyof typeof icons)] ?? Fallback;
   return (
     <View
       style={styles.header}

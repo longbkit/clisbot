@@ -1,5 +1,6 @@
 import { useOpenConversationFile } from "./use-open-conversation-file";
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspacePaneContentModel } from "@/screens/workspace/workspace-pane-content";
 import { createWorkspaceFileTabTarget } from "@/workspace/file-open";
@@ -23,6 +24,7 @@ export function useConversationTabs(input: {
   selectBot: (id: string) => void;
 }) {
   const { serverId, bots, layoutKey, singlePanel, tabs, selectBot } = input;
+  const { t } = useTranslation();
   const open = useOpenConversationFile({ serverId, bots, layoutKey, singlePanel, selectBot });
   const closeTab = useCallback(
     async (tabId: string) => {
@@ -34,10 +36,10 @@ export function useConversationTabs(input: {
         !(await confirmPanelClose(
           { ...origin, tabId },
           {
-            title: "Unsaved changes",
-            message: "Close this tab without saving your changes?",
-            confirmLabel: "Close without saving",
-            cancelLabel: "Keep editing",
+            title: t("bots.chat.tabs.unsavedTitle"),
+            message: t("bots.chat.tabs.unsavedMessage"),
+            confirmLabel: t("bots.chat.tabs.closeWithoutSaving"),
+            cancelLabel: t("bots.chat.tabs.keepEditing"),
             destructive: true,
           },
         ))
@@ -45,7 +47,7 @@ export function useConversationTabs(input: {
         return;
       useWorkspaceLayoutStore.getState().closeTab(layoutKey, tabId);
     },
-    [layoutKey, tabs],
+    [layoutKey, tabs, t],
   );
   const buildContent = useCallback(
     ({ tab }: { tab: WorkspaceTabDescriptor; paneId: string }) =>

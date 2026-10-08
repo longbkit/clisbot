@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -9,32 +10,36 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount, type HubRegistrationStart } from "../account-provider";
 import type { HubRegistrationLink } from "../contracts";
+import { i18n } from "@/i18n/i18next";
 
 type HubAccount = ReturnType<typeof useHubAccount>;
 
 const PASSWORD_MIN_LENGTH = 12;
 
-const REGISTRATION_START_NOTICES: Record<
-  HubRegistrationStart,
-  { variant: "info" | "warning"; title: string }
-> = {
-  sent: {
-    variant: "info",
-    title: "If this address can register, a sign-up link is on its way. It expires in 30 minutes.",
-  },
-  domainNotAllowed: {
-    variant: "warning",
-    title: "This email's domain can't register here. Ask an organization owner to invite you.",
-  },
-  rateLimited: {
-    variant: "warning",
-    title: "A link was sent recently. Check your inbox, or try again in a minute.",
-  },
-  unavailable: {
-    variant: "warning",
-    title: "Hub couldn't send a sign-up link. Try again, or ask the Hub operator.",
-  },
-};
+function registrationStartNotice(result: HubRegistrationStart): {
+  variant: "info" | "warning";
+  title: string;
+} {
+  switch (result) {
+    case "sent":
+      return { variant: "info", title: i18n.t("hub.settings.emailRegistration.notices.sent") };
+    case "domainNotAllowed":
+      return {
+        variant: "warning",
+        title: i18n.t("hub.settings.emailRegistration.notices.domainNotAllowed"),
+      };
+    case "rateLimited":
+      return {
+        variant: "warning",
+        title: i18n.t("hub.settings.emailRegistration.notices.rateLimited"),
+      };
+    case "unavailable":
+      return {
+        variant: "warning",
+        title: i18n.t("hub.settings.emailRegistration.notices.unavailable"),
+      };
+  }
+}
 
 /** Email-first self-registration: the Hub mails a link, and the password is chosen on the page
  * that link opens, so this form only needs the address. */
@@ -49,6 +54,7 @@ export function EmailRegistrationButton({
   hub: HubAccount;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const [result, setResult] = useState<HubRegistrationStart | null>(null);
   const [sending, setSending] = useState(false);
   const request = useCallback(() => {
@@ -60,7 +66,7 @@ export function EmailRegistrationButton({
       .finally(() => setSending(false));
   }, [email, hub]);
   if (!visible) return null;
-  const notice = result === null ? null : REGISTRATION_START_NOTICES[result];
+  const notice = result === null ? null : registrationStartNotice(result);
   return (
     <>
       {notice === null ? null : <Alert variant={notice.variant} title={notice.title} />}
@@ -69,7 +75,7 @@ export function EmailRegistrationButton({
         disabled={pending || sending || email.trim().length === 0}
         onPress={request}
       >
-        Email me a sign-up link
+        {t("hub.settings.emailRegistration.emailMeLink")}
       </Button>
     </>
   );
@@ -82,22 +88,31 @@ type LinkView =
 
 type FinishedStatus = Exclude<LinkView["status"], "loading" | "valid">;
 
-const LINK_MESSAGES: Record<FinishedStatus, string> = {
-  registered: "Your account is ready.",
-  invalid: "This sign-up link isn't valid.",
-  expired: "This sign-up link has expired. Request a new one from the sign-in form.",
-  used: "This sign-up link was already used. Sign in, or request a new link.",
-  already_registered: "An account already uses this email. Sign in instead.",
-  registration_closed:
-    "This Hub no longer admits this email. Ask an organization owner to invite you.",
-  failed: "Hub couldn't finish creating your account. Try the link again.",
-};
+function linkMessage(status: FinishedStatus): string {
+  switch (status) {
+    case "registered":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.registered");
+    case "invalid":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.invalid");
+    case "expired":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.expired");
+    case "used":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.used");
+    case "already_registered":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.alreadyRegistered");
+    case "registration_closed":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.registrationClosed");
+    case "failed":
+      return i18n.t("hub.settings.emailRegistration.linkMessages.failed");
+  }
+}
 
 /**
  * The screen a Hub registration link opens: choose a name and password, then Hub creates, admits,
  * and signs in the account. Opening the link only inspects it; the account exists after submit.
  */
 export function EmailRegistrationCompletion({ hub }: { hub: HubAccount }) {
+  const { t } = useTranslation();
   const token = hub.registrationToken;
   const inspect = hub.inspectRegistration;
   const [view, setView] = useState<LinkView>({ status: "loading" });
@@ -110,19 +125,21 @@ export function EmailRegistrationCompletion({ hub }: { hub: HubAccount }) {
   }, [inspect, token]);
   if (token === null) return null;
   if (view.status === "loading") {
-    return <SettingsSection title="Create your Hub account">{null}</SettingsSection>;
+    return (
+      <SettingsSection title={t("hub.settings.emailRegistration.title")}>{null}</SettingsSection>
+    );
   }
   if (view.status === "valid") {
     return <ChoosePassword hub={hub} token={token} email={view.email} onFinished={setView} />;
   }
   return (
-    <SettingsSection title="Create your Hub account">
+    <SettingsSection title={t("hub.settings.emailRegistration.title")}>
       <Alert
         variant={view.status === "registered" ? "info" : "error"}
-        title={LINK_MESSAGES[view.status]}
+        title={linkMessage(view.status)}
       />
       <Button variant="outline" onPress={hub.dismissRegistration}>
-        Continue to sign in
+        {t("hub.settings.emailRegistration.continueToSignIn")}
       </Button>
     </SettingsSection>
   );
@@ -139,6 +156,7 @@ function ChoosePassword({
   email: string;
   onFinished: (view: LinkView) => void;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const fieldSize = compact ? "md" : "sm";
   const [name, setName] = useState("");
@@ -156,21 +174,24 @@ function ChoosePassword({
   }, [hub, name, onFinished, password, token]);
   const canSubmit = name.trim().length > 0 && password.length >= PASSWORD_MIN_LENGTH;
   return (
-    <SettingsSection title="Create your Hub account">
+    <SettingsSection title={t("hub.settings.emailRegistration.title")}>
       <View style={[settingsStyles.card, styles.form]}>
-        <Field label="Email">
+        <Field label={t("hub.settings.emailRegistration.email")}>
           <FormTextInput size={fieldSize} initialValue={email} editable={false} />
         </Field>
-        <Field label="Name">
+        <Field label={t("hub.settings.emailRegistration.name")}>
           <FormTextInput
             size={fieldSize}
             initialValue={name}
             onChangeText={setName}
-            placeholder="Your name"
+            placeholder={t("hub.settings.emailRegistration.namePlaceholder")}
             editable={!submitting}
           />
         </Field>
-        <Field label="Password" hint="Use at least 12 characters.">
+        <Field
+          label={t("hub.settings.emailRegistration.password")}
+          hint={t("hub.settings.emailRegistration.passwordHint")}
+        >
           <FormTextInput
             size={fieldSize}
             initialValue={password}
@@ -180,7 +201,7 @@ function ChoosePassword({
           />
         </Field>
         <Button disabled={submitting || !canSubmit} loading={submitting} onPress={submit}>
-          Create account
+          {t("hub.settings.emailRegistration.createAccount")}
         </Button>
       </View>
     </SettingsSection>

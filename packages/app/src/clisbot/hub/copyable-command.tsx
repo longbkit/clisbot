@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,8 @@ import { copyToClipboard } from "@/utils/copy-to-clipboard";
 type CopyState = { status: "idle" | "copying" | "copied" } | { status: "error"; message: string };
 
 /** A terminal command the user runs elsewhere: selectable monospace text with a copy action. */
-export function CopyableCommand({
-  command,
-  copyLabel = "Copy command",
-}: {
-  command: string;
-  copyLabel?: string;
-}) {
+export function CopyableCommand({ command, copyLabel }: { command: string; copyLabel?: string }) {
+  const { t } = useTranslation();
   const [copyState, setCopyState] = useState<CopyState>({ status: "idle" });
   const copy = useCallback(() => {
     setCopyState({ status: "copying" });
@@ -23,10 +19,10 @@ export function CopyableCommand({
       .catch((error: unknown) => {
         setCopyState({
           status: "error",
-          message: error instanceof Error ? error.message : "Unable to copy command.",
+          message: error instanceof Error ? error.message : t("hub.account.copyCommand.failed"),
         });
       });
-  }, [command]);
+  }, [command, t]);
   return (
     <View style={styles.command}>
       <View style={settingsStyles.rowContent}>
@@ -38,7 +34,9 @@ export function CopyableCommand({
         ) : null}
       </View>
       <Button size="sm" variant="ghost" loading={copyState.status === "copying"} onPress={copy}>
-        {copyState.status === "copied" ? "Copied" : copyLabel}
+        {copyState.status === "copied"
+          ? t("hub.account.copyCommand.copied")
+          : (copyLabel ?? t("hub.account.copyCommand.copy"))}
       </Button>
     </View>
   );

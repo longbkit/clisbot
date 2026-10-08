@@ -1,4 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { AgentProvider } from "@clisbot/protocol/agent-types";
@@ -12,6 +13,7 @@ import {
   type SelectFieldOption,
 } from "@/components/ui/select-field";
 import { Switch } from "@/components/ui/switch";
+import { i18n } from "@/i18n/i18next";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { buildSelectableProviderSelectorProviders } from "@/provider-selection/provider-selection";
 import { settingsStyles } from "@/styles/settings";
@@ -42,10 +44,23 @@ function configurationHint(input: {
   hasProfiles: boolean;
 }): string | undefined {
   if (input.hasServer && !input.hasProviders && !input.isLoading) {
-    return "Connect the Host and enable a Provider first.";
+    return i18n.t("hub.access.managedAgent.connectHost");
   }
-  if (input.hasProfiles) return "Choose directly or apply an Agent profile as a copy.";
+  if (input.hasProfiles) return i18n.t("hub.access.managedAgent.profilesHint");
   return undefined;
+}
+
+/** "Default" first, then the Provider's own Modes or Thinking options. */
+function withDefaultOption(
+  defaultLabel: string,
+  choices: readonly (Pick<SelectFieldOption<string>, "label" | "description"> & {
+    id: string;
+  })[] = [],
+): SelectFieldOption<string>[] {
+  return [
+    { id: "default", value: "", label: defaultLabel },
+    ...choices.map(({ id, label, description }) => ({ id, value: id, label, description })),
+  ];
 }
 
 /** Shared Agent controls for Channel and Automation authoring on every Clisbot platform. */
@@ -58,6 +73,7 @@ export function ManagedAgentConfigurationFields({
   allowFastMode = true,
   showFastMode = true,
 }: ManagedAgentConfigurationFieldsProps) {
+  const { t } = useTranslation();
   const snapshot = useProvidersSnapshot(serverId, { cwd: cwd.trim() || null });
   const { profiles, isSupported: profilesSupported } = useAgentProfiles(serverId);
   const providers = useMemo(
@@ -76,29 +92,13 @@ export function ManagedAgentConfigurationFields({
       null,
     [selectedEntry, value.model],
   );
-  const modeOptions = useMemo<SelectFieldOption<string>[]>(
-    () => [
-      { id: "default", value: "", label: "Default" },
-      ...(selectedEntry?.modes ?? []).map((mode) => ({
-        id: mode.id,
-        value: mode.id,
-        label: mode.label,
-        description: mode.description,
-      })),
-    ],
-    [selectedEntry?.modes],
+  const modeOptions = useMemo(
+    () => withDefaultOption(t("hub.access.managedAgent.default"), selectedEntry?.modes),
+    [selectedEntry?.modes, t],
   );
-  const thinkingOptions = useMemo<SelectFieldOption<string>[]>(
-    () => [
-      { id: "default", value: "", label: "Default" },
-      ...(selectedModel?.thinkingOptions ?? []).map((option) => ({
-        id: option.id,
-        value: option.id,
-        label: option.label,
-        description: option.description,
-      })),
-    ],
-    [selectedModel?.thinkingOptions],
+  const thinkingOptions = useMemo(
+    () => withDefaultOption(t("hub.access.managedAgent.default"), selectedModel?.thinkingOptions),
+    [selectedModel?.thinkingOptions, t],
   );
 
   const applyProfile = useCallback(
@@ -173,12 +173,16 @@ export function ManagedAgentConfigurationFields({
       <SelectFieldTrigger
         label={selectedModelLabel}
         isPlaceholder={!value.provider}
-        placeholder={serverId ? "Choose a Provider and Model" : "Choose a Host first"}
+        placeholder={
+          serverId
+            ? t("hub.access.managedAgent.chooseProviderModel")
+            : t("hub.access.managedAgent.chooseHostFirst")
+        }
         disabled={triggerDisabled}
         active={hovered || pressed || isOpen}
       />
     ),
-    [serverId, value.provider],
+    [serverId, t, value.provider],
   );
 
   const setThinkingOption = useCallback(
@@ -224,7 +228,7 @@ export function ManagedAgentConfigurationFields({
       {/* One line while the surface is wide enough; each selector wraps whole. */}
       <View style={styles.selectorRow}>
         <View style={styles.selector}>
-          <Field label="Provider and Model" hint={hint}>
+          <Field label={t("hub.access.managedAgent.providerAndModel")} hint={hint}>
             <CombinedModelSelector
               providers={providers}
               selectedProvider={value.provider}
@@ -245,30 +249,30 @@ export function ManagedAgentConfigurationFields({
         </View>
         <View style={styles.selector}>
           <SelectField
-            label="Thinking"
+            label={t("hub.access.managedAgent.thinking")}
             value={value.thinkingOptionId}
             selectedDisplay={thinkingDisplay}
             options={thinkingOptions}
             onChange={setThinkingOption}
-            placeholder="Default"
-            emptyText="No Thinking options are available."
+            placeholder={t("hub.access.managedAgent.default")}
+            emptyText={t("hub.access.managedAgent.noThinking")}
             searchable={thinkingOptions.length > 6}
-            title="Thinking"
+            title={t("hub.access.managedAgent.thinking")}
             disabled={disabled || serverId === null || thinkingOptions.length <= 1}
           />
         </View>
         {modeOptions.length > 1 || value.mode.length > 0 ? (
           <View style={styles.selector}>
             <SelectField
-              label="Mode"
+              label={t("hub.access.managedAgent.mode")}
               value={value.mode}
               selectedDisplay={modeDisplay}
               options={modeOptions}
               onChange={setMode}
-              placeholder="Default"
-              emptyText="No Modes are available."
+              placeholder={t("hub.access.managedAgent.default")}
+              emptyText={t("hub.access.managedAgent.noModes")}
               searchable={modeOptions.length > 6}
-              title="Mode"
+              title={t("hub.access.managedAgent.mode")}
               disabled={disabled || serverId === null || modeOptions.length <= 1}
             />
           </View>
@@ -301,6 +305,7 @@ export function ManagedAgentFastModeSwitch({
   disabled?: boolean;
   allowFastMode?: boolean;
 }) {
+  const { t } = useTranslation();
   const setFastMode = useCallback(
     (enabled: boolean) => {
       const featureValues = { ...value.featureValues };
@@ -313,18 +318,18 @@ export function ManagedAgentFastModeSwitch({
   return (
     <View style={settingsStyles.formRow}>
       <View style={settingsStyles.formRowContent}>
-        <Text style={settingsStyles.rowTitle}>Use Fast mode</Text>
+        <Text style={settingsStyles.rowTitle}>{t("hub.access.managedAgent.useFastMode")}</Text>
         <Text style={settingsStyles.rowHint}>
           {allowFastMode
-            ? "Uses the Provider's faster service tier when supported and may cost more."
-            : "Unavailable for Routes that external participants can invoke."}
+            ? t("hub.access.managedAgent.fastModeHint")
+            : t("hub.access.managedAgent.fastModeUnavailable")}
         </Text>
       </View>
       <Switch
         value={allowFastMode && value.featureValues["fast_mode"] === true}
         onValueChange={setFastMode}
         disabled={disabled || serverId === null || !allowFastMode}
-        accessibilityLabel="Use Fast mode"
+        accessibilityLabel={t("hub.access.managedAgent.useFastMode")}
       />
     </View>
   );

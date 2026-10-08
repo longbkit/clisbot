@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { MultiSelectCreate } from "../multi-select-field";
 import type { TeamActions } from "./use-team-actions";
 
@@ -12,19 +13,20 @@ export function useCreateTeamChoice(
   canCreate: boolean,
   choose: (teamId: string) => void,
 ): MultiSelectCreate | undefined {
+  const { t } = useTranslation();
   const { run, createTeam } = actions;
   return useMemo(
     () =>
       canCreate
         ? {
-            label: "Create Team",
-            description: "New Team, created now",
+            label: t("hub.team.teamPicker.createLabel"),
+            description: t("hub.team.teamPicker.createDescription"),
             onCreate: (name: string) =>
               void run(async () => {
                 choose((await createTeam(name)).id);
               }),
           }
         : undefined,
-    [canCreate, choose, createTeam, run],
+    [canCreate, choose, createTeam, run, t],
   );
 }
