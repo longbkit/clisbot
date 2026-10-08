@@ -31,6 +31,7 @@ import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { SettingsGroup } from "@/components/settings/headings/settings-group";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { ProjectPathLine } from "@/clisbot/projects/project-path-line";
 import { settingsStyles } from "@/styles/settings";
 import { useProjects } from "@/hooks/use-projects";
 import type { ProjectEditFormSnapshot } from "@/projects/edit-form";
@@ -290,6 +291,7 @@ function ProjectSettingsBody({
             <Pencil size={ICON_SIZE} color={styles.iconColor.color} />
           </Pressable>
         </View>
+        <ProjectPathLine path={selectedHost.repoRoot} />
       </View>
 
       <ProjectEditSheet

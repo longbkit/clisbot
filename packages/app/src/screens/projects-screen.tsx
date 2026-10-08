@@ -9,6 +9,7 @@ import { useProjects, type ProjectHostError } from "@/hooks/use-projects";
 import { useProjectIcons } from "@/projects/icons";
 import { createProjectIconTarget } from "@/projects/icon-target";
 import { settingsStyles } from "@/styles/settings";
+import { wrappablePath } from "@/utils/shorten-path";
 import { openProjectSettings } from "@/navigation/settings-navigation";
 import type { ProjectHostEntry, ProjectSummary } from "@/utils/projects";
 
@@ -142,9 +143,14 @@ function ProjectRow({ project, host, isFirst, iconDataUri }: ProjectRowProps) {
             projectViewKey={viewKey}
           />
         </View>
-        <Text style={settingsStyles.rowTitle} numberOfLines={1}>
-          {projectName}
-        </Text>
+        <View style={styles.rowText}>
+          <Text style={settingsStyles.rowTitle} numberOfLines={1}>
+            {projectName}
+          </Text>
+          {host.repoRoot ? (
+            <Text style={styles.rowPath}>{wrappablePath(host.repoRoot)}</Text>
+          ) : null}
+        </View>
       </View>
       <ChevronRight size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
     </Pressable>
@@ -204,6 +210,15 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[3],
+  },
+  rowText: {
+    flex: 1,
+    minWidth: 0,
+    gap: theme.spacing[0.5],
+  },
+  rowPath: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   rowHovered: {
     backgroundColor: theme.colors.surface2,
