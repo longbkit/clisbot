@@ -206,7 +206,7 @@ describe("openBotForm", () => {
     const model = openBotForm(createSnapshot());
     model.applyProviderSnapshot("host-a", { entries: ENTRIES });
     model.setProvider("mock");
-    model.setKind("team");
+    model.setTemplate("team");
     model.setFeature("fast", true);
     expect(toCreateRequest(model.getState())).toEqual({
       serverId: "host-a",
@@ -219,6 +219,50 @@ describe("openBotForm", () => {
         thinkingOptionId: undefined,
         featureValues: { fast: true },
       },
+    });
+  });
+
+  it("starts a new bot with Personal, which seeds its empty folder", () => {
+    const model = openBotForm(createSnapshot());
+    model.applyProviderSnapshot("host-a", { entries: ENTRIES });
+    model.setProvider("mock");
+    expect(model.getState().template.choice).toBe("personal");
+    expect(toCreateRequest(model.getState())).not.toHaveProperty("template");
+    model.setTemplate("none");
+    expect(toCreateRequest(model.getState()).template).toEqual({ seed: false });
+  });
+
+  it("starts a bot from a Project with no template, which writes no files", () => {
+    const project = { serverId: "host-b", projectId: "p9", name: "Repo", path: "/code/repo" };
+    const model = openBotForm(createSnapshot({ hosts: HOSTS, defaults: { project } }));
+    model.applyProviderSnapshot("host-b", { entries: ENTRIES });
+    model.setProvider("mock");
+    expect(model.getState().template.choice).toBe("none");
+    expect(toCreateRequest(model.getState()).template).toEqual({ seed: false });
+  });
+
+  it("makes a bot from a Project on its Host and replaces only the files picked", () => {
+    const project = { serverId: "host-b", projectId: "p9", name: "Repo", path: "/code/repo" };
+    const model = openBotForm(createSnapshot({ hosts: HOSTS, defaults: { project } }));
+    expect(model.getState()).toMatchObject({ selectedServerId: "host-b", showHostField: false });
+    model.applyProviderSnapshot("host-b", { entries: ENTRIES });
+    model.setProvider("mock");
+    model.setTemplate("personal");
+    model.applyTemplatePreview([
+      { name: "AGENTS.md", exists: true },
+      { name: "SOUL.md", exists: true },
+      { name: "USER.md", exists: false },
+    ]);
+    const keep = toCreateRequest(model.getState());
+    expect(keep).toMatchObject({ path: "/code/repo", kind: "personal" });
+    expect(keep).not.toHaveProperty("template");
+    model.setConflictPolicy("choose");
+    model.toggleReplace("AGENTS.md");
+    expect(toCreateRequest(model.getState()).template).toEqual({ overwrite: ["AGENTS.md"] });
+    // Use template replaces the files the preview listed, by name, never a blanket `true`.
+    model.setConflictPolicy("replace");
+    expect(toCreateRequest(model.getState()).template).toEqual({
+      overwrite: ["AGENTS.md", "SOUL.md"],
     });
   });
 

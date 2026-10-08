@@ -41,6 +41,11 @@ export const StoredBotSchema = z.object({
   workspaceId: z.string(),
   /** The exact home directory, never re-derived from `slug`. */
   cwd: z.string(),
+  /**
+   * The bot was made from a Project that already existed and shares it: the Project keeps its
+   * own name and stays listed with the other Projects.
+   */
+  sharesProject: z.boolean().optional(),
   launch: BotLaunchDefaultsSchema,
   template: BotTemplateStateSchema.nullable(),
   owner: SessionActorSchema,

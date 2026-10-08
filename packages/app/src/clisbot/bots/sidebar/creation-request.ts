@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { BotFromProject } from "../create/bot-form-model";
 
 /**
  * Asks the sidebar to open New bot or New group chat from elsewhere, such as the Command Center.
@@ -10,20 +11,23 @@ export type CreationRequest = "bot" | "group" | null;
 
 export const useCreationRequest = create<{
   request: CreationRequest;
+  /** New bot opened from a Project's menu: the bot is made from that Project. */
+  project: BotFromProject | null;
   /** Mounted sidebars that can open the sheets. */
   handlers: number;
-  ask: (request: Exclude<CreationRequest, null>) => void;
+  ask: (request: Exclude<CreationRequest, null>, options?: { project?: BotFromProject }) => void;
   take: () => void;
   register: () => () => void;
 }>((set, get) => ({
   request: null,
+  project: null,
   handlers: 0,
-  ask: (request) => {
-    if (get().handlers > 0) set({ request });
+  ask: (request, options) => {
+    if (get().handlers > 0) set({ request, project: options?.project ?? null });
   },
-  take: () => set({ request: null }),
+  take: () => set({ request: null, project: null }),
   register: () => {
     set((state) => ({ handlers: state.handlers + 1 }));
-    return () => set((state) => ({ handlers: state.handlers - 1, request: null }));
+    return () => set((state) => ({ handlers: state.handlers - 1, request: null, project: null }));
   },
 }));

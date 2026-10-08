@@ -25,7 +25,10 @@ export function useSidebarBotProjectKeys() {
     () =>
       new Set(
         query.loadState.status === "loaded"
-          ? query.loadState.data.map((bot) => `${bot.serverId}:${bot.projectId}`)
+          ? query.loadState.data
+              // A bot made from an existing Project shares it; that Project stays listed.
+              .filter((bot) => !bot.sharesProject)
+              .map((bot) => `${bot.serverId}:${bot.projectId}`)
           : [],
       ),
     [query.loadState],

@@ -9,6 +9,7 @@ import { useArchiveChat } from "../chat/use-archive-chat";
 import { buildGroupSettingsRoute, buildMembersRoute } from "../chat/chat-panel-param";
 import { useCreationRequest } from "./creation-request";
 import { useCanConnectBotToChannel, useOpenConnectBotToChannel } from "../chat/use-connect-channel";
+import type { BotFromProject } from "../create/bot-form-model";
 export function useSidebarPinMenu(onBeforeNavigate?: () => void, chats?: readonly PinChat[]) {
   const router = useRouter();
   const { pins, toggle: togglePin, isPinned } = useResourcePins(chats);
@@ -71,12 +72,17 @@ export function useCreationActions(
   navigate: (serverId: string, chatId: string) => void,
 ) {
   const [createName, setCreateName] = useState<string | null>(null);
+  const [createProject, setCreateProject] = useState<BotFromProject | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
-  const openCreate = useCallback(() => setCreateName(""), []);
+  const openCreateFrom = useCallback((project: BotFromProject | null) => {
+    setCreateProject(project);
+    setCreateName("");
+  }, []);
+  const openCreate = useCallback(() => openCreateFrom(null), [openCreateFrom]);
   const closeCreate = useCallback(() => setCreateName(null), []);
   const closeGroup = useCallback(() => setGroupOpen(false), []);
   const openGroup = useCallback(() => setGroupOpen(true), []);
-  useCreationRequestHandler(openCreate, openGroup);
+  useCreationRequestHandler(openCreateFrom, openGroup);
   const onBotCreated = useCallback(
     (serverId: string, botId: string) => {
       setCreateName(null);
@@ -99,6 +105,7 @@ export function useCreationActions(
   );
   return {
     createName,
+    createProject,
     groupOpen,
     openCreate,
     closeCreate,
@@ -111,15 +118,19 @@ export function useCreationActions(
 }
 
 /** Opens the sheet the Command Center asked for, then clears the request. */
-function useCreationRequestHandler(openCreate: () => void, openGroup: () => void) {
+function useCreationRequestHandler(
+  openCreate: (project: BotFromProject | null) => void,
+  openGroup: () => void,
+) {
   const request = useCreationRequest((state) => state.request);
+  const project = useCreationRequest((state) => state.project);
   const take = useCreationRequest((state) => state.take);
   const register = useCreationRequest((state) => state.register);
   useEffect(register, [register]);
   useEffect(() => {
     if (request === null) return;
     take();
-    if (request === "bot") openCreate();
+    if (request === "bot") openCreate(project);
     else openGroup();
-  }, [request, take, openCreate, openGroup]);
+  }, [request, project, take, openCreate, openGroup]);
 }

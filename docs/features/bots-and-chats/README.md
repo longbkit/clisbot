@@ -88,6 +88,18 @@ inside the Host folder policy's allow set.
 Project root = bot directory, one Workspace of kind `directory`. This is what gives per-bot sharing
 through Project grants and per-bot session storage. One shared "Bots" Project would lose both.
 
+**A bot from a Project** (decided 2026-10-08). **Create bot from project** in a Project's or a
+workspace's ⋯ menu opens New bot with that Project fixed: `bot.create` gets the Project root as
+`path`, and the daemon reuses the Project instead of making one (roots match as the registry
+matches them, `areEquivalentPaths`). The bot still gets its own Workspace there, so archiving the
+bot never archives the user's, and a failed creation never removes the Project. The record carries
+`sharesProject: true`; such a Project keeps its own name (neither creation nor a later rename sets
+`customName`) and stays with the ordinary Projects instead of moving under Bot projects. A
+restricted session needs `workspace.manage` on that Project, not the right to create one; the
+template preview asks the same. The item is hidden on a Project that already has an active bot,
+since a second `bot.create` at the same path returns it, and on Hosts without
+`features.botTemplatePreview`. A folder whose bot was archived can have a new one.
+
 Bot Projects have an always-present **Bot projects** subgroup inside **Projects**, initially collapsed.
 Its lighter caption and one 8px inset distinguish the group without adding a full tree level to
 every row. Collapsing Projects hides the whole subgroup while preserving its own expansion
@@ -230,6 +242,19 @@ Today the catalog lives in the CLI package (`packages/cli/src/commands/bot/templ
 CLI and daemon share a machine. The catalog and the seeding step become a Fusion-owned server
 module; `bot.create` seeds on the Host; `bot start` in the CLI calls the RPC. The seeding rules stay:
 existing files are kept, symlinks are never followed, never seed into the OS home root.
+
+Revised 2026-10-08: a bot from a Project starts with no template (`template.seed: false` writes
+nothing; the record's `template` is null), because the Project already holds what the bot reads. A
+new bot still starts with Personal: its folder is empty. Choosing Personal or Team on a bot from a Project first asks the Host what it
+would write (`bot.template.preview`), and the form lists the files the Project already has: keep
+them all (the default), use the template for all, or choose per file. `template.overwrite` takes
+`true` or a list of names, and the app always sends the names the preview listed, so a file nobody
+saw is never replaced. Each replaced file moves into a `.clisbot-template-backup-*` folder in the
+Project before the new one is installed, and moves back if the creation then fails. Only a regular
+file is offered for replacing; a link or folder by that name is kept. `CLAUDE.md -> AGENTS.md` is
+made only when AGENTS.md is a real file: many repos link the other way, and replacing CLAUDE.md
+there would make a loop that hides the instructions from every agent. A Host without the feature
+always seeds, so the form offers it only Personal and Team.
 
 A new bot's launch defaults come from the Agent profile or controls chosen at creation. There is no
 hidden default provider.

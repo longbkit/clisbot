@@ -27,6 +27,9 @@ export function allowsBotInbound(
       if (allowed) admittedProjectCreations.add(message.requestId);
       return allowed;
     }
+    // Reads which file names exist in a folder, so it asks what creating a bot there would.
+    case "bot.template.preview.request":
+      return authority.allowsDaemonPrivilege("workspace.manage");
     case "bot.list.request":
     case "bot.update.request":
     case "bot.archive.request":
@@ -56,7 +59,8 @@ export function allowsBotOutbound(
     case "bot.template.seed.response":
       return message.payload.bot === null || allowsProject(message.payload.bot.projectId);
     case "bot.archive.response":
-      // Carries only the id the requester sent; the handler refused before acting.
+    case "bot.template.preview.response":
+      // Carries only the id the requester sent, or file names the request was admitted for.
       return true;
     default:
       return undefined;

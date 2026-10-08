@@ -24,7 +24,17 @@ export const BotCreateRequestSchema = z.object({
   /** An explicit home directory; otherwise `<daemon.bots.root>/<slug>`. */
   path: z.string().optional(),
   launch: BotLaunchDefaultsSchema,
-  template: z.object({ overwrite: z.boolean().optional() }).optional(),
+  template: z
+    .object({
+      /** `false` writes no template files at all; absent seeds as before. */
+      seed: z.boolean().optional(),
+      /**
+       * `true` replaces every existing file; a list replaces only those names. A replaced file
+       * moves into a `.clisbot-template-backup-*` folder in the home first.
+       */
+      overwrite: z.union([z.boolean(), z.array(z.string())]).optional(),
+    })
+    .optional(),
 });
 
 export const BotCreateResponseSchema = z.object({
@@ -90,6 +100,36 @@ export const BotArchiveResponseSchema = z.object({
     requestId: z.string(),
     botId: z.string(),
     archivedAt: z.string().nullable(),
+    error: z.string().nullable(),
+    errorCode: z.string().optional(),
+  }),
+});
+
+/**
+ * What seeding a template into a directory would write, before anything is written: each file
+ * and whether one by that name is already there, so the form can ask which side wins.
+ */
+export const BotTemplatePreviewRequestSchema = z.object({
+  type: z.literal("bot.template.preview.request"),
+  requestId: z.string(),
+  path: z.string(),
+  kind: BotKindSchema.optional(),
+  /** Decides the discovery link (`CLAUDE.md`, `GEMINI.md`) the template adds. */
+  provider: z.string().optional(),
+});
+
+export const BotTemplatePreviewFileSchema = z.object({
+  name: z.string(),
+  exists: z.boolean(),
+  /** Only a regular file can be replaced; a link or a folder by that name is always kept. */
+  replaceable: z.boolean().optional(),
+});
+
+export const BotTemplatePreviewResponseSchema = z.object({
+  type: z.literal("bot.template.preview.response"),
+  payload: z.object({
+    requestId: z.string(),
+    files: z.array(BotTemplatePreviewFileSchema),
     error: z.string().nullable(),
     errorCode: z.string().optional(),
   }),

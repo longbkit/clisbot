@@ -18,9 +18,14 @@ import { botSlug } from "./bot-slug.js";
 import type { BotStore } from "./bot-store.js";
 import {
   botTemplateId,
+  previewBotTemplate,
+  restoreReplacedFiles,
   seedBotTemplate,
+  type BotTemplateOverwrite,
+  type BotTemplatePreviewFile,
   type BotTemplateSeedResult,
 } from "./bot-template-seeding.js";
+import { areEquivalentPaths } from "../../utils/path.js";
 
 /**
  * `bot.create` on the daemon (docs/features/bots-and-chats/plans/server-bot.md, §3):
@@ -44,7 +49,7 @@ export interface BotCreateInput {
   description?: string;
   path?: string;
   launch: BotLaunchDefaults;
-  template?: { overwrite?: boolean };
+  template?: { seed?: boolean; overwrite?: BotTemplateOverwrite };
 }
 
 export interface BotCreateContext {
@@ -53,6 +58,8 @@ export interface BotCreateContext {
   mayCreateAt?: (cwd: string) => Promise<boolean>;
   /** Reusing a home can seed files, so it requires management of that Project. */
   mayReuse?: (bot: StoredBot) => boolean;
+  /** A home at an existing Project's root shares that Project; it needs managing it. */
+  mayShareProject?: (projectId: string) => boolean;
 }
 
 export interface BotCreateResult {
@@ -84,7 +91,7 @@ export async function createBot(
 ): Promise<BotCreateResult> {
   const name = validateCreateInput(deps, input);
   const kind = input.kind ?? "personal";
-  const overwrite = input.template?.overwrite === true;
+  const overwrite = input.template?.overwrite ?? false;
   const bots = await deps.store.list();
   const home = await resolveBotHome({
     name,
@@ -97,6 +104,13 @@ export async function createBot(
     if (context.mayReuse && !context.mayReuse(existing)) {
       throw new BotRequestError("access_denied", "Your access does not allow reusing this bot.");
     }
+    if (input.template?.seed === false) {
+      return {
+        bot: existing,
+        reused: true,
+        template: { directory: existing.cwd, created: [], skipped: [] },
+      };
+    }
     const template = await seedBotTemplate(
       existing.cwd,
       existing.kind,
@@ -105,8 +119,39 @@ export async function createBot(
     );
     return { bot: await markSeeded(deps.store, existing.id), reused: true, template };
   }
+  const sharedProjectId = await assertHomeAllowed(deps, home.cwd, context);
+  return provisionBot(deps, {
+    name,
+    kind,
+    overwrite,
+    seed: input.template?.seed !== false,
+    sharedProjectId,
+    home,
+    input,
+    owner: context.owner,
+  });
+}
+
+/**
+ * What a template would write into the home `bot.create` would use for `path`, after the same
+ * checks: a folder the caller could not make a bot in is not one it may look into either.
+ */
+export async function previewTemplateAt(
+  deps: BotProvisioningDeps,
+  input: { path: string; kind: BotKind; provider?: string },
+  context: Omit<BotCreateContext, "owner" | "mayReuse">,
+): Promise<BotTemplatePreviewFile[]> {
+  const home = await resolveBotHome({
+    name: "preview",
+    path: input.path,
+    root: deps.root,
+    takenSlugs: new Set(),
+  }).catch((error: unknown) => {
+    if (error instanceof BotHomeError) throw new BotRequestError(error.code, error.message);
+    throw error;
+  });
   await assertHomeAllowed(deps, home.cwd, context);
-  return provisionBot(deps, { name, kind, overwrite, home, input, owner: context.owner });
+  return previewBotTemplate(home.cwd, input.kind, input.provider);
 }
 
 function validateCreateInput(deps: BotProvisioningDeps, input: BotCreateInput): string {
@@ -122,31 +167,46 @@ function validateCreateInput(deps: BotProvisioningDeps, input: BotCreateInput): 
   return name;
 }
 
-/** An explicit path names a bot by its home; a name names it by slug. Archived bots are not reused. */
+/**
+ * An explicit path names a bot by its home; a name names it by slug. Archived bots are not
+ * reused: a folder whose bot was archived can have a new one.
+ */
 function findReusableBot(bots: StoredBot[], home: BotHome, name: string): StoredBot | null {
+  const active = bots.filter((bot) => bot.archivedAt === null);
   const match = home.explicit
-    ? bots.find((bot) => bot.cwd === home.cwd)
-    : bots.find((bot) => bot.slug === botSlug(name) && bot.archivedAt === null);
-  if (!match) return null;
-  if (match.archivedAt !== null) {
-    throw new BotRequestError("bot_archived", `The bot at ${match.cwd} is archived.`);
-  }
-  return match;
+    ? active.find((bot) => areEquivalentPaths(bot.cwd, home.cwd))
+    : active.find((bot) => bot.slug === botSlug(name));
+  return match ?? null;
 }
 
+/** Refuses a home the caller may not use; returns the existing Project at it, if any. */
 async function assertHomeAllowed(
   deps: BotProvisioningDeps,
   cwd: string,
-  context: BotCreateContext,
-): Promise<void> {
-  const projectRoots = (await deps.projectRegistry.list())
-    .filter((project) => project.archivedAt === null)
-    .map((project) => project.rootPath);
+  context: Pick<BotCreateContext, "mayCreateAt" | "mayShareProject">,
+): Promise<string | null> {
+  const projects = (await deps.projectRegistry.list()).filter(
+    (project) => project.archivedAt === null,
+  );
   try {
-    await assertBotHomeAllowed(cwd, projectRoots);
+    await assertBotHomeAllowed(
+      cwd,
+      projects.map((project) => project.rootPath),
+    );
   } catch (error) {
     if (error instanceof BotHomeError) throw new BotRequestError(error.code, error.message);
     throw error;
+  }
+  const shared =
+    projects.find((project) => areEquivalentPaths(project.rootPath, cwd))?.projectId ?? null;
+  if (shared) {
+    if (context.mayShareProject && !context.mayShareProject(shared)) {
+      throw new BotRequestError(
+        "access_denied",
+        "Your access does not allow managing this Project.",
+      );
+    }
+    return shared;
   }
   if (context.mayCreateAt && !(await context.mayCreateAt(cwd))) {
     throw new BotRequestError(
@@ -154,12 +214,17 @@ async function assertHomeAllowed(
       `Your access does not allow creating a Project at ${cwd}.`,
     );
   }
+  return null;
 }
 
 interface ProvisionInput {
   name: string;
   kind: BotKind;
-  overwrite: boolean;
+  overwrite: BotTemplateOverwrite;
+  /** False writes no template files; the bot starts from what the folder already holds. */
+  seed: boolean;
+  /** The existing Project at the home, shared: it keeps its name and listing, and is never removed. */
+  sharedProjectId: string | null;
   home: BotHome;
   input: BotCreateInput;
   owner: SessionActor;
@@ -170,29 +235,28 @@ async function provisionBot(
   plan: ProvisionInput,
 ): Promise<BotCreateResult> {
   const { cwd } = plan.home;
-  const made = {
-    directory: false,
-    project: null as string | null,
-    workspace: null as string | null,
-  };
+  const made: Provisioned = { directory: false, project: null, workspace: null, template: null };
   try {
     made.directory = await ensureDirectory(cwd);
-    const projectExisted = await hasActiveProjectAt(deps.projectRegistry, cwd);
+    const projectExisted =
+      plan.sharedProjectId !== null || (await hasActiveProjectAt(deps.projectRegistry, cwd));
     const project = await deps.findOrCreateProjectForDirectory(cwd);
+    // Never record a Project that was already there: a rollback removes what it records.
     if (!projectExisted) made.project = project.projectId;
     const workspace = await deps.createWorkspaceForDirectory(cwd, plan.name, project.projectId);
     made.workspace = workspace.workspaceId;
-    const template = await seedBotTemplate(
-      cwd,
-      plan.kind,
-      plan.overwrite,
-      plan.input.launch.provider,
-    );
-    // The Hub Access picker shows `customName ?? displayName`; without this a shared bot is its slug.
-    await deps.projectRegistry.update(project.projectId, (record) => ({
-      ...record,
-      customName: plan.name,
-    }));
+    const template = plan.seed
+      ? await seedBotTemplate(cwd, plan.kind, plan.overwrite, plan.input.launch.provider)
+      : { directory: cwd, created: [], skipped: [] };
+    made.template = template;
+    // The Hub Access picker shows `customName ?? displayName`; without this a shared bot is its
+    // slug. A Project the bot was made from keeps the name it had.
+    if (plan.sharedProjectId === null) {
+      await deps.projectRegistry.update(project.projectId, (record) => ({
+        ...record,
+        customName: plan.name,
+      }));
+    }
     const bot = await deps.store.create(
       newBotRecord(plan, project.projectId, workspace.workspaceId),
     );
@@ -221,8 +285,9 @@ function newBotRecord(
     projectId,
     workspaceId,
     cwd: plan.home.cwd,
+    ...(plan.sharedProjectId !== null ? { sharesProject: true } : {}),
     launch: plan.input.launch,
-    template: { id: botTemplateId(plan.kind), seededAt: now },
+    template: plan.seed ? { id: botTemplateId(plan.kind), seededAt: now } : null,
     owner: plan.owner,
     createdAt: now,
     updatedAt: now,
@@ -255,16 +320,26 @@ async function ensureDirectory(cwd: string): Promise<boolean> {
 
 async function hasActiveProjectAt(registry: ProjectRegistry, cwd: string): Promise<boolean> {
   return (await registry.list()).some(
-    (project) => project.archivedAt === null && project.rootPath === cwd,
+    (project) => project.archivedAt === null && areEquivalentPaths(project.rootPath, cwd),
   );
+}
+
+/** What a creation made so far, so a failure can take back exactly that. */
+interface Provisioned {
+  directory: boolean;
+  project: string | null;
+  workspace: string | null;
+  template: BotTemplateSeedResult | null;
 }
 
 async function rollbackProvisioning(
   deps: BotProvisioningDeps,
   cwd: string,
-  made: { directory: boolean; project: string | null; workspace: string | null },
+  made: Provisioned,
 ): Promise<void> {
   try {
+    // A file the template replaced goes back before anything else is undone.
+    if (made.template && !made.directory) await restoreReplacedFiles(made.template);
     if (made.workspace) await deps.workspaceRegistry.remove(made.workspace);
     if (made.project) await deps.projectRegistry.remove(made.project);
     if (made.directory) await rm(cwd, { recursive: true, force: true });

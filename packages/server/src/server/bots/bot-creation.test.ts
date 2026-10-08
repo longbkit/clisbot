@@ -1,4 +1,15 @@
-import { lstat, mkdir, mkdtemp, readdir, readlink, rm, stat } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  readlink,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,6 +30,7 @@ let projectRegistry: FileBackedProjectRegistry;
 let workspaceRegistry: FileBackedWorkspaceRegistry;
 let archived: string[];
 let service: BotService;
+let provisioning: ReturnType<typeof createWorkspaceProvisioningService>;
 
 async function isDirectory(target: string): Promise<boolean> {
   return (await stat(target).catch(() => null))?.isDirectory() ?? false;
@@ -38,7 +50,7 @@ beforeEach(async () => {
   );
   await projectRegistry.initialize();
   await workspaceRegistry.initialize();
-  const provisioning = createWorkspaceProvisioningService({
+  provisioning = createWorkspaceProvisioningService({
     projectRegistry,
     workspaceRegistry,
     workspaceGitService: createNoopWorkspaceGitService(),
@@ -208,5 +220,115 @@ describe("createBotService", () => {
       { owner: OWNER },
     );
     expect(again.bot.slug).toBe("ops-bot-2");
+  });
+
+  it("a bot from an existing Project shares it: no new Project, same name, chosen files replaced", async () => {
+    const repo = path.join(home, "repo");
+    await mkdir(repo);
+    await writeFile(path.join(repo, "AGENTS.md"), "mine");
+    await writeFile(path.join(repo, "SOUL.md"), "kept");
+    const project = await provisioning.findOrCreateProjectForDirectory(repo);
+    await projectRegistry.update(project.projectId, (record) => ({
+      ...record,
+      customName: "Repo",
+    }));
+
+    const preview = await service.previewTemplate({ path: repo, kind: "personal" }, {});
+    expect(preview.filter((file) => file.exists)).toEqual([
+      { name: "AGENTS.md", exists: true, replaceable: true },
+      { name: "SOUL.md", exists: true, replaceable: true },
+    ]);
+    await expect(
+      service.previewTemplate({ path: repo, kind: "personal" }, { mayShareProject: () => false }),
+    ).rejects.toMatchObject({ code: "access_denied" });
+
+    const result = await service.create(
+      {
+        name: "Repo Bot",
+        path: repo,
+        launch: { provider: "codex" },
+        template: { overwrite: ["AGENTS.md"] },
+      },
+      { owner: OWNER },
+    );
+    expect(result.bot).toMatchObject({ projectId: project.projectId, sharesProject: true });
+    expect(result.template.overwritten).toEqual(["AGENTS.md"]);
+    expect(result.template.skipped).toContain("SOUL.md");
+    expect(await readFile(path.join(repo, "SOUL.md"), "utf8")).toBe("kept");
+    const backup = result.template.backupDirectory ?? "";
+    expect(await readFile(path.join(backup, "AGENTS.md"), "utf8")).toBe("mine");
+    expect(await projectRegistry.list()).toHaveLength(1);
+    expect(await projectRegistry.get(project.projectId)).toMatchObject({ customName: "Repo" });
+
+    await service.update(result.bot.id, { name: "Renamed Bot" });
+    expect(await projectRegistry.get(project.projectId)).toMatchObject({ customName: "Repo" });
+  });
+
+  it("writes no template when asked not to, and needs managing the Project it shares", async () => {
+    const repo = path.join(home, "plain");
+    await mkdir(repo);
+    const project = await provisioning.findOrCreateProjectForDirectory(repo);
+    await expect(
+      service.create(
+        { name: "Denied", path: repo, launch: { provider: "codex" }, template: { seed: false } },
+        { owner: OWNER, mayShareProject: () => false },
+      ),
+    ).rejects.toMatchObject({ code: "access_denied" });
+
+    const { bot, template } = await service.create(
+      { name: "Plain", path: repo, launch: { provider: "codex" }, template: { seed: false } },
+      { owner: OWNER, mayShareProject: (id) => id === project.projectId },
+    );
+    expect(bot.template).toBeNull();
+    expect(template.created).toEqual([]);
+    expect(await readdir(repo)).toEqual([]);
+  });
+
+  it("never links CLAUDE.md back at an AGENTS.md that is itself a link to it", async () => {
+    const repo = path.join(home, "linked");
+    await mkdir(repo);
+    await writeFile(path.join(repo, "CLAUDE.md"), "the real instructions");
+    await symlink("CLAUDE.md", path.join(repo, "AGENTS.md"));
+    await provisioning.findOrCreateProjectForDirectory(repo);
+
+    const preview = await service.previewTemplate(
+      { path: repo, kind: "personal", provider: "claude" },
+      {},
+    );
+    expect(preview.find((file) => file.name === "AGENTS.md")).toMatchObject({
+      exists: true,
+      replaceable: false,
+    });
+    expect(preview.some((file) => file.name === "CLAUDE.md")).toBe(false);
+
+    const { template } = await service.create(
+      {
+        name: "Linked",
+        path: repo,
+        launch: { provider: "claude" },
+        template: { overwrite: ["AGENTS.md", "CLAUDE.md"] },
+      },
+      { owner: OWNER },
+    );
+    expect(template.skipped).toEqual(expect.arrayContaining(["AGENTS.md", "CLAUDE.md"]));
+    expect(await readFile(path.join(repo, "AGENTS.md"), "utf8")).toBe("the real instructions");
+    expect(await readlink(path.join(repo, "AGENTS.md"))).toBe("CLAUDE.md");
+  });
+
+  it("a folder whose bot was archived can have a new one", async () => {
+    const repo = path.join(home, "again");
+    await mkdir(repo);
+    await provisioning.findOrCreateProjectForDirectory(repo);
+    const first = await service.create(
+      { name: "First", path: repo, launch: { provider: "codex" }, template: { seed: false } },
+      { owner: OWNER },
+    );
+    await service.archive(first.bot.id);
+    const second = await service.create(
+      { name: "Second", path: repo, launch: { provider: "codex" }, template: { seed: false } },
+      { owner: OWNER },
+    );
+    expect(second.reused).toBe(false);
+    expect(second.bot.id).not.toBe(first.bot.id);
   });
 });

@@ -4,6 +4,7 @@ import { useBotSidebarActions } from "./use-sidebar-actions";
 import { projectGroupSidebar, projectBotSidebar, selectedDirectBotKey } from "./sidebar-model";
 import { useMemo } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useGlobalSearchParams, usePathname } from "expo-router";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { useBotsFeatureHosts, useBotCreationHosts } from "../feature";
@@ -14,6 +15,7 @@ import { GroupChatForm } from "../create/group-chat-form";
 import { BotsSection } from "./bots-section";
 import { ChatsSection } from "./chats-section";
 import { filterByHost, useSidebarDisplayStore } from "./display/preferences";
+import type { BotFromProject } from "../create/bot-form-model";
 
 const BOT_CREATE_SNAP_POINTS = ["95%"];
 const BOT_CREATE_CONTENT_STYLE = { padding: 0 };
@@ -28,7 +30,8 @@ export function BotsAndChatsSidebarSections({
 }
 function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
   const { hosts, bots, chats, botRows, chatRows, directoryHosts } = useSidebarCatalog();
-  const directoryStatus = directoryLoadStatus(bots);
+  const { t } = useTranslation();
+  const directoryStatus = directoryLoadStatus(bots, t("bots.workspace.sidebar.partialFailure"));
   const creationHosts = useBotCreationHosts();
   const defaultServerId = useDefaultCreationServerId(creationHosts, chatRows);
   const { menu, pinned, onBotMenu, onChatMenu, closeMenu, actions, selectAction, ...menuState } =
@@ -80,7 +83,11 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
       <PinOptionsMenu
         anchor={menu?.anchor}
         visible={menu !== null}
-        title={menu?.kind === "bot" ? "Bot" : "Group chat"}
+        title={
+          menu?.kind === "bot"
+            ? t("bots.workspace.shared.bot")
+            : t("bots.workspace.sidebar.groupChat")
+        }
         actions={actions}
         onSelect={selectAction}
         onClose={closeMenu}
@@ -132,6 +139,7 @@ function useDefaultCreationServerId(
 
 function CreationSheets({
   createName,
+  createProject,
   groupOpen,
   closeCreate,
   closeGroup,
@@ -143,6 +151,7 @@ function CreationSheets({
   onGroupCreated,
 }: {
   createName: string | null;
+  createProject: BotFromProject | null;
   groupOpen: boolean;
   closeCreate: () => void;
   closeGroup: () => void;
@@ -153,8 +162,16 @@ function CreationSheets({
   onBotCreated: (serverId: string, botId: string) => void;
   onGroupCreated: (serverId: string, chatId: string) => void;
 }) {
-  const botHeader = useMemo(() => ({ title: "New bot" }), []);
-  const groupHeader = useMemo(() => ({ title: "New group chat" }), []);
+  const { t } = useTranslation();
+  const botHeader = useMemo(
+    () => ({
+      title: createProject
+        ? t("bots.workspace.botForm.fromProjectTitle", { name: createProject.name })
+        : t("bots.workspace.shared.newBot"),
+    }),
+    [createProject, t],
+  );
+  const groupHeader = useMemo(() => ({ title: t("bots.workspace.sidebar.newGroupChat") }), [t]);
   return (
     <>
       <AdaptiveModalSheet
@@ -167,8 +184,10 @@ function CreationSheets({
       >
         {createName !== null ? (
           <BotCreateForm
+            key={createProject?.projectId ?? "new"}
             name={createName}
             defaultServerId={defaultServerId}
+            {...(createProject ? { project: createProject } : {})}
             hosts={creationHosts}
             onCancel={closeCreate}
             onCreated={onBotCreated}
@@ -191,9 +210,10 @@ function CreationSheets({
   );
 }
 
-const partialFailureMessage = "Some Hosts could not load bots. Retry to refresh the complete list.";
-
-function directoryLoadStatus(bots: ReturnType<typeof useBotCatalog>["bots"]) {
+function directoryLoadStatus(
+  bots: ReturnType<typeof useBotCatalog>["bots"],
+  partialFailureMessage: string,
+) {
   return {
     loading: (bots.loadState.status !== "loaded" && !bots.error) || bots.isRefetching,
     error: bots.error?.message ?? (bots.hostErrors.length ? partialFailureMessage : null),

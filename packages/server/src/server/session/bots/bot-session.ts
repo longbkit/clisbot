@@ -19,7 +19,8 @@ type BotRequest = Extract<
       | "bot.list.request"
       | "bot.update.request"
       | "bot.archive.request"
-      | "bot.template.seed.request";
+      | "bot.template.seed.request"
+      | "bot.template.preview.request";
   }
 >;
 type BotRequestOf<T extends BotRequest["type"]> = Extract<BotRequest, { type: T }>;
@@ -90,6 +91,7 @@ export class BotSession {
         {
           owner: this.host.actor() ?? LOCAL_OWNER,
           mayReuse: (bot) => authority.allowsProject(bot.projectId, "workspace.manage"),
+          mayShareProject: (projectId) => authority.allowsProject(projectId, "workspace.manage"),
           mayCreateAt: authority.isRestricted()
             ? (cwd) => authority.mayCreateProjectAt(cwd)
             : undefined,
@@ -191,6 +193,37 @@ export class BotSession {
     }
   }
 
+  async handleTemplatePreview(
+    request: BotRequestOf<"bot.template.preview.request">,
+  ): Promise<void> {
+    const { requestId } = request;
+    try {
+      const authority = this.host.authority;
+      const files = await this.service.previewTemplate(
+        {
+          path: request.path,
+          kind: request.kind ?? "personal",
+          ...(request.provider ? { provider: request.provider } : {}),
+        },
+        {
+          mayShareProject: (projectId) => authority.allowsProject(projectId, "workspace.manage"),
+          mayCreateAt: authority.isRestricted()
+            ? (cwd) => authority.mayCreateProjectAt(cwd)
+            : undefined,
+        },
+      );
+      this.host.emit({
+        type: "bot.template.preview.response",
+        payload: { requestId, files, error: null },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "bot.template.preview.response",
+        payload: { requestId, files: [], ...errorPayload(error) },
+      });
+    }
+  }
+
   private project(bot: StoredBot) {
     return {
       ...bot,
@@ -259,6 +292,8 @@ export function dispatchBotMessage(
       return session ? session.handleArchive(msg) : emitBotsDisabled(msg, emit);
     case "bot.template.seed.request":
       return session ? session.handleTemplateSeed(msg) : emitBotsDisabled(msg, emit);
+    case "bot.template.preview.request":
+      return session ? session.handleTemplatePreview(msg) : emitBotsDisabled(msg, emit);
     default:
       return undefined;
   }

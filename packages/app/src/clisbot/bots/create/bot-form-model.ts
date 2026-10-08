@@ -19,6 +19,15 @@ import {
 } from "@/provider-selection/resolve-agent-form";
 import type { BotKind, BotLaunchDefaults, BotPayload } from "../data/contracts";
 import {
+  initialTemplateState,
+  templateRequest,
+  toggledReplace,
+  type BotTemplateChoice,
+  type BotTemplateConflictPolicy,
+  type BotTemplateFile,
+  type BotTemplateState,
+} from "./bot-template-choice";
+import {
   buildInitialState,
   entryFor,
   hostDisplay,
@@ -44,6 +53,14 @@ export interface BotFormHost {
   label: string;
 }
 
+/** An existing Project a new bot is made from: the bot works in it and shares it. */
+export interface BotFromProject {
+  serverId: string;
+  projectId: string;
+  name: string;
+  path: string;
+}
+
 export interface BotFormSnapshot {
   mode: "create" | "edit";
   bot?: BotPayload & { serverId?: string };
@@ -52,6 +69,7 @@ export interface BotFormSnapshot {
     serverId?: string | null;
     name?: string;
     preferences?: FormPreferences;
+    project?: BotFromProject;
   };
 }
 
@@ -70,6 +88,9 @@ export interface BotFormState {
   /** The directory name the daemon will derive (README D3); the record's slug in edit mode. */
   slugPreview: string;
   kind: BotKind;
+  /** The Project the bot is made from; its Host is the bot's Host. */
+  project: BotFromProject | null;
+  template: BotTemplateState;
   hosts: BotFormHost[];
   selectedServerId: string | null;
   selectedHostDisplay: BotFormDisplay | null;
@@ -97,7 +118,9 @@ export interface BotCreateRequest {
   name: string;
   kind: BotKind;
   description?: string;
+  path?: string;
   launch: BotLaunchDefaults;
+  template?: { seed: false } | { overwrite: boolean | string[] };
 }
 
 export interface BotUpdateRequest {
@@ -119,6 +142,10 @@ export interface BotFormModel {
   setName: (value: string) => void;
   setDescription: (value: string) => void;
   setKind: (value: BotKind) => void;
+  setTemplate: (choice: BotTemplateChoice) => void;
+  setConflictPolicy: (policy: BotTemplateConflictPolicy) => void;
+  toggleReplace: (fileName: string) => void;
+  applyTemplatePreview: (files: BotTemplateFile[]) => void;
   setHost: (serverId: string | null, display?: BotFormDisplay | null) => void;
   setProvider: (provider: AgentProvider) => void;
   setModel: (provider: AgentProvider, modelId: string) => void;
@@ -146,12 +173,15 @@ function launchOf(state: BotFormState): BotLaunchDefaults {
 
 export function toCreateRequest(state: BotFormState): BotCreateRequest {
   if (!state.selectedServerId) throw new Error("A Host is required");
+  const template = templateRequest(state.template);
   return {
     serverId: state.selectedServerId,
     name: state.name.trim(),
     kind: state.kind,
     ...(state.description.trim() ? { description: state.description.trim() } : {}),
+    ...(state.project ? { path: state.project.path } : {}),
     launch: launchOf(state),
+    ...(template ? { template } : {}),
   };
 }
 
@@ -313,6 +343,27 @@ function sourceMethods(
   };
 }
 
+/** The template a new bot starts from, and what it does to files the folder already has. */
+function templateMethods(
+  session: BotFormSession,
+): Pick<
+  BotFormModel,
+  "setTemplate" | "setConflictPolicy" | "toggleReplace" | "applyTemplatePreview"
+> {
+  const patchTemplate = (update: (template: BotTemplateState) => BotTemplateState) =>
+    publish(session, { ...session.state, template: update(session.state.template) });
+  return {
+    setTemplate(choice) {
+      const kind = choice === "none" ? session.state.kind : choice;
+      // Another template writes other files; its preview comes again.
+      publish(session, { ...session.state, kind, template: initialTemplateState(choice) });
+    },
+    setConflictPolicy: (policy) => patchTemplate((template) => ({ ...template, policy })),
+    toggleReplace: (fileName) => patchTemplate((template) => toggledReplace(template, fileName)),
+    applyTemplatePreview: (files) => patchTemplate((template) => ({ ...template, files })),
+  };
+}
+
 /** The bot's own fields: name, description, kind, Host, and the submit error. */
 function identityMethods(
   session: BotFormSession,
@@ -407,6 +458,7 @@ export function openBotForm(snapshot: BotFormSnapshot): BotFormModel {
     ...lifecycleMethods(session),
     ...sourceMethods(session),
     ...identityMethods(session),
+    ...templateMethods(session),
     ...launchMethods(session),
   };
 }

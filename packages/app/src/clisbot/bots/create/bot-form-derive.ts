@@ -19,8 +19,13 @@ import {
   type UserModifiedFields,
 } from "@/provider-selection/resolve-agent-form";
 import { buildProviderDefinitions } from "@/utils/provider-definitions";
-import { botsCopy } from "../copy";
+import { i18n } from "@/i18n/i18next";
 import type { BotFormDisplay, BotFormHost, BotFormSnapshot, BotFormState } from "./bot-form-model";
+import {
+  awaitingTemplatePreview,
+  initialTemplateState,
+  type BotTemplateChoice,
+} from "./bot-template-choice";
 
 /**
  * Pure state derivation for the bot form model: the initial state, the provider/model/mode
@@ -36,6 +41,7 @@ export function previewBotSlug(name: string): string {
 
 function resolveInitialServerId(snapshot: BotFormSnapshot): string | null {
   if (snapshot.mode === "edit") return snapshot.bot?.serverId ?? snapshot.defaults.serverId ?? null;
+  if (snapshot.defaults.project) return snapshot.defaults.project.serverId;
   if (snapshot.defaults.serverId !== undefined) return snapshot.defaults.serverId;
   return snapshot.hosts.length === 1 ? (snapshot.hosts[0]?.serverId ?? null) : null;
 }
@@ -90,7 +96,7 @@ function modelDisplay(
 
 function modeDisplay(modes: readonly AgentMode[], modeId: string): BotFormDisplay {
   const id = modeId.trim();
-  if (!id) return { label: botsCopy.form.defaultMode };
+  if (!id) return { label: i18n.t("bots.workspace.shared.form.defaultMode") };
   return { label: modes.find((mode) => mode.id === id)?.label ?? id };
 }
 
@@ -192,7 +198,10 @@ export function updateDerivedState(input: {
     hosts: [...input.hosts],
     selectedHostDisplay:
       state.selectedHostDisplay ?? hostDisplay(input.hosts, state.selectedServerId),
-    showHostField: input.hosts.length !== 1 || input.hosts[0]?.serverId !== state.selectedServerId,
+    // A bot from a Project runs on that Project's Host.
+    showHostField:
+      !state.project &&
+      (input.hosts.length !== 1 || input.hosts[0]?.serverId !== state.selectedServerId),
     selectedModelDisplay: modelDisplay(models, state.selectedModel),
     selectedModeDisplay: modeDisplay(modeOptions, state.selectedMode),
     selectedThinkingDisplay: thinkingDisplay(thinkingOptions, state.selectedThinkingOptionId),
@@ -202,8 +211,33 @@ export function updateDerivedState(input: {
       state.selectedServerId && resolution !== "complete"
         ? { serverId: state.selectedServerId }
         : null,
-    canSubmit: Boolean(state.name.trim() && state.selectedServerId && state.selectedProvider),
+    canSubmit: Boolean(
+      state.name.trim() &&
+      state.selectedServerId &&
+      state.selectedProvider &&
+      !awaitingTemplatePreview(state.template, state.project !== null),
+    ),
   };
+}
+
+/** The Project a new bot is made from, and no template unless an existing bot was seeded with one. */
+function initialProjectAndTemplate(
+  snapshot: BotFormSnapshot,
+): Pick<BotFormState, "project" | "template"> {
+  const project = snapshot.mode === "create" ? (snapshot.defaults.project ?? null) : null;
+  return { project, template: initialTemplateState(initialTemplateChoice(snapshot, project)) };
+}
+
+/**
+ * A bot from a Project starts from what the Project holds, so no template; a new bot gets an
+ * empty folder, so Personal, which writes the files it needs. An existing bot shows how it began.
+ */
+function initialTemplateChoice(
+  snapshot: BotFormSnapshot,
+  project: BotFormState["project"],
+): BotTemplateChoice {
+  if (snapshot.mode !== "create") return snapshot.bot?.template ? snapshot.bot.kind : "none";
+  return project ? "none" : "personal";
 }
 
 export function buildInitialState(snapshot: BotFormSnapshot): BotFormState {
@@ -218,6 +252,7 @@ export function buildInitialState(snapshot: BotFormSnapshot): BotFormState {
     description: snapshot.bot?.description ?? "",
     slugPreview: "",
     kind: snapshot.bot?.kind ?? "personal",
+    ...initialProjectAndTemplate(snapshot),
     hosts: [],
     selectedServerId,
     selectedHostDisplay: null,

@@ -1,10 +1,11 @@
 import { join } from "node:path";
 import type { Logger } from "pino";
-import type { BotLaunchDefaults, StoredBot } from "@clisbot/protocol/bots/types";
+import type { BotKind, BotLaunchDefaults, StoredBot } from "@clisbot/protocol/bots/types";
 import type { ProjectRegistry, WorkspaceRegistry } from "../workspace-registry.js";
 import {
   BotRequestError,
   createBot,
+  previewTemplateAt,
   type BotCreateContext,
   type BotCreateInput,
   type BotCreateResult,
@@ -15,6 +16,7 @@ import type { BotsConfig } from "./bots-config.js";
 import {
   botTemplateId,
   seedBotTemplate,
+  type BotTemplatePreviewFile,
   type BotTemplateSeedResult,
 } from "./bot-template-seeding.js";
 
@@ -56,6 +58,11 @@ export interface BotService {
     botId: string,
     overwrite: boolean,
   ): Promise<{ bot: StoredBot; template: BotTemplateSeedResult }>;
+  /** What a template would write at a bot home `path`, under the checks `create` applies. */
+  previewTemplate(
+    input: { path: string; kind: BotKind; provider?: string },
+    context: Omit<BotCreateContext, "owner" | "mayReuse">,
+  ): Promise<BotTemplatePreviewFile[]>;
   subscribe(listener: (event: BotChangeEvent) => void): () => void;
 }
 
@@ -89,6 +96,7 @@ export function createBotService(deps: BotServiceDeps): BotService {
     update: (botId, patch) => updateBot(store, deps.projectRegistry, botId, patch),
     archive: (botId) => archiveBot(store, (id) => deps.archiveWorkspace(id), botId),
     seedTemplate: (botId, overwrite) => seedTemplateForBot(store, botId, overwrite),
+    previewTemplate: (input, context) => previewTemplateAt(provisioning, input, context),
     subscribe: (listener) => store.subscribe(listener),
   };
 }
@@ -106,7 +114,7 @@ async function requireActive(store: BotStore, botId: string): Promise<StoredBot>
   return bot;
 }
 
-/** A rename also becomes the custom name of the bot's Project. */
+/** A rename also becomes the custom name of the bot's Project, unless it shares an older one. */
 async function updateBot(
   store: BotStore,
   projectRegistry: ProjectRegistry,
@@ -128,7 +136,7 @@ async function updateBot(
     updatedAt: new Date().toISOString(),
   }));
   if (!updated) throw botNotFound(botId);
-  if (name && name !== bot.name) {
+  if (name && name !== bot.name && !bot.sharesProject) {
     await projectRegistry.update(bot.projectId, (record) => ({ ...record, customName: name }));
   }
   return updated;
