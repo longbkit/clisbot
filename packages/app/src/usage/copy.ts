@@ -1,4 +1,4 @@
-import type { UsageProblem } from "@getpaseo/protocol/messages";
+import type { UsageProblem } from "@clisbot/protocol/messages";
 import { formatCompactTimeAgo, formatCompactTimeAgoAsProse } from "@/utils/time";
 
 // User-facing copy for the usage surfaces, kept in one file so localization is a

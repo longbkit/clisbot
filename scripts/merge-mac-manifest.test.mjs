@@ -6,7 +6,7 @@ import { test } from "vitest";
 import { mergeMacManifest } from "./merge-mac-manifest.mjs";
 
 test("preserves unknown fields while merging files by url", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "paseo-merge-mac-manifest-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "clisbot-merge-mac-manifest-"));
   try {
     const arm64Path = path.join(dir, "arm64.yml");
     const x64Path = path.join(dir, "x64.yml");

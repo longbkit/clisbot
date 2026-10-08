@@ -1,5 +1,5 @@
 {
-  "name": "@getpaseo/builtin-plugins",
+  "name": "@clisbot/builtin-plugins",
   "version": "0.11.1",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@getpaseo/plugin": "*",
+    "@clisbot/plugin": "*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

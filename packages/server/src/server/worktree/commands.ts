@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { getPaseoWorktreesRoot, isPaseoOwnedWorktreeCwd } from "../../utils/worktree.js";
+import { getClisbotWorktreesRoot, isClisbotOwnedWorktreeCwd } from "../../utils/worktree.js";
 import {
   archiveByScope,
   resolveWorkspaceIdAtPath,
@@ -8,24 +8,24 @@ import {
   type ArchiveScope,
 } from "../workspace-archive-service.js";
 import type {
-  CreatePaseoWorktreeInput,
-  CreatePaseoWorktreeResult,
-} from "../paseo-worktree-service.js";
+  CreateClisbotWorktreeInput,
+  CreateClisbotWorktreeResult,
+} from "../clisbot-worktree-service.js";
 import { toWorktreeWireError, type WorktreeWireError } from "../worktree-errors.js";
 import type { WorkspaceGitService, WorkspaceGitWorktreeInfo } from "../workspace-git-service.js";
 
-export interface ListPaseoWorktreesCommandDependencies {
+export interface ListClisbotWorktreesCommandDependencies {
   workspaceGitService: Pick<WorkspaceGitService, "listWorktrees">;
 }
 
-export interface ListPaseoWorktreesCommandInput {
+export interface ListClisbotWorktreesCommandInput {
   cwd: string;
   reason?: string;
 }
 
-export async function listPaseoWorktreesCommand(
-  dependencies: ListPaseoWorktreesCommandDependencies,
-  input: ListPaseoWorktreesCommandInput,
+export async function listClisbotWorktreesCommand(
+  dependencies: ListClisbotWorktreesCommandDependencies,
+  input: ListClisbotWorktreesCommandInput,
 ): Promise<WorkspaceGitWorktreeInfo[]> {
   if (input.reason) {
     return dependencies.workspaceGitService.listWorktrees(input.cwd, { reason: input.reason });
@@ -33,27 +33,27 @@ export async function listPaseoWorktreesCommand(
   return dependencies.workspaceGitService.listWorktrees(input.cwd);
 }
 
-type CreatePaseoWorktreeWorkflow<Result extends CreatePaseoWorktreeResult> = (
-  input: CreatePaseoWorktreeInput,
+type CreateClisbotWorktreeWorkflow<Result extends CreateClisbotWorktreeResult> = (
+  input: CreateClisbotWorktreeInput,
 ) => Promise<Result>;
 
-export interface CreatePaseoWorktreeCommandDependencies<
-  Result extends CreatePaseoWorktreeResult = CreatePaseoWorktreeResult,
+export interface CreateClisbotWorktreeCommandDependencies<
+  Result extends CreateClisbotWorktreeResult = CreateClisbotWorktreeResult,
 > {
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
-  createPaseoWorktreeWorkflow?: CreatePaseoWorktreeWorkflow<Result>;
+  createClisbotWorktreeWorkflow?: CreateClisbotWorktreeWorkflow<Result>;
 }
 
-export type CreatePaseoWorktreeCommandInput = Omit<
-  CreatePaseoWorktreeInput,
-  "paseoHome" | "runSetup"
+export type CreateClisbotWorktreeCommandInput = Omit<
+  CreateClisbotWorktreeInput,
+  "clisbotHome" | "runSetup"
 > & {
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
 };
 
-export type CreatePaseoWorktreeCommandResult<Result extends CreatePaseoWorktreeResult> =
+export type CreateClisbotWorktreeCommandResult<Result extends CreateClisbotWorktreeResult> =
   | {
       ok: true;
       createdWorktree: Result;
@@ -64,19 +64,19 @@ export type CreatePaseoWorktreeCommandResult<Result extends CreatePaseoWorktreeR
       cause: unknown;
     };
 
-export async function createPaseoWorktreeCommand<Result extends CreatePaseoWorktreeResult>(
-  dependencies: CreatePaseoWorktreeCommandDependencies<Result>,
-  input: CreatePaseoWorktreeCommandInput,
-): Promise<CreatePaseoWorktreeCommandResult<Result>> {
+export async function createClisbotWorktreeCommand<Result extends CreateClisbotWorktreeResult>(
+  dependencies: CreateClisbotWorktreeCommandDependencies<Result>,
+  input: CreateClisbotWorktreeCommandInput,
+): Promise<CreateClisbotWorktreeCommandResult<Result>> {
   try {
-    if (!dependencies.createPaseoWorktreeWorkflow) {
-      throw new Error("Paseo worktree service is not configured");
+    if (!dependencies.createClisbotWorktreeWorkflow) {
+      throw new Error("Clisbot worktree service is not configured");
     }
 
-    const createdWorktree = await dependencies.createPaseoWorktreeWorkflow({
+    const createdWorktree = await dependencies.createClisbotWorktreeWorkflow({
       ...input,
       runSetup: false,
-      paseoHome: input.paseoHome ?? dependencies.paseoHome,
+      clisbotHome: input.clisbotHome ?? dependencies.clisbotHome,
       worktreesRoot: input.worktreesRoot ?? dependencies.worktreesRoot,
     });
     return { ok: true, createdWorktree };
@@ -124,9 +124,9 @@ export async function archiveCommand(
 ): Promise<ArchiveCommandResult> {
   const targetPath = await resolveArchiveTarget(dependencies, input);
   const scope = input.scope ?? "workspace";
-  const ownership = await isPaseoOwnedWorktreeCwd(targetPath, {
-    paseoHome: dependencies.paseoHome,
-    worktreesRoot: dependencies.paseoWorktreesBaseRoot,
+  const ownership = await isClisbotOwnedWorktreeCwd(targetPath, {
+    clisbotHome: dependencies.clisbotHome,
+    worktreesRoot: dependencies.clisbotWorktreesBaseRoot,
   });
 
   if (scope === "worktree") {
@@ -134,7 +134,7 @@ export async function archiveCommand(
       return {
         ok: false,
         code: "NOT_ALLOWED",
-        message: "Worktree is not a Paseo-owned worktree",
+        message: "Worktree is not a Clisbot-owned worktree",
         removedAgents: [],
       };
     }
@@ -195,7 +195,7 @@ async function resolveArchiveTarget(
     const worktrees = await dependencies.workspaceGitService.listWorktrees(repoRoot);
     const match = worktrees.find((entry) => entry.branchName === input.branchName);
     if (!match) {
-      throw new Error(`Paseo worktree not found for branch ${input.branchName}`);
+      throw new Error(`Clisbot worktree not found for branch ${input.branchName}`);
     }
     return match.path;
   }
@@ -208,10 +208,10 @@ async function resolveWorktreeSlugPath(
   repoRoot: string,
   worktreeSlug: string,
 ): Promise<string> {
-  const worktreesRoot = await getPaseoWorktreesRoot(
+  const worktreesRoot = await getClisbotWorktreesRoot(
     repoRoot,
-    dependencies.paseoHome,
-    dependencies.paseoWorktreesBaseRoot,
+    dependencies.clisbotHome,
+    dependencies.clisbotWorktreesBaseRoot,
   );
   return join(worktreesRoot, worktreeSlug);
 }

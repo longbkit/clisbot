@@ -24,7 +24,7 @@ const workspaceSchema = z.object({
   isolation: z.literal("worktree"),
 });
 
-async function callPaseoTool(
+async function callClisbotTool(
   mcp: Client,
   name: string,
   args: Record<string, unknown>,
@@ -37,7 +37,7 @@ async function callPaseoTool(
 async function defaultCodexModel(mcp: Client): Promise<string> {
   const result = z
     .object({ models: z.array(z.object({ id: z.string(), isDefault: z.boolean() })) })
-    .parse(await callPaseoTool(mcp, "list_models", { provider: "codex" }));
+    .parse(await callClisbotTool(mcp, "list_models", { provider: "codex" }));
   const model = result.models.find((entry) => entry.isDefault);
   if (!model) throw new Error("Codex did not advertise a default model");
   return model.id;
@@ -84,7 +84,7 @@ async function createCodexRestoreJourney(page: Page, client: SeedDaemonClient, i
         ),
       );
       workspace = workspaceSchema.parse(
-        await callPaseoTool(mcp, "create_workspace", {
+        await callClisbotTool(mcp, "create_workspace", {
           isolation: "worktree",
           path: repo.path,
           baseBranch: "main",
@@ -92,7 +92,7 @@ async function createCodexRestoreJourney(page: Page, client: SeedDaemonClient, i
         }),
       );
       const agent = z.object({ agentId: z.string() }).parse(
-        await callPaseoTool(mcp, "create_agent", {
+        await callClisbotTool(mcp, "create_agent", {
           workspaceId: workspace.workspaceId,
           provider: `codex/${await defaultCodexModel(mcp)}`,
           settings: { modeId: "full-access", thinkingOptionId: "low" },
@@ -229,14 +229,14 @@ async function createCodexRestoreJourney(page: Page, client: SeedDaemonClient, i
           contentType: "application/json",
         });
         await info.attach("daemon-log", {
-          body: await readFile(path.join(process.env.E2E_PASEO_HOME!, "daemon.log")),
+          body: await readFile(path.join(process.env.E2E_CLISBOT_HOME!, "daemon.log")),
           contentType: "text/plain",
         });
       } catch (error) {
         errors.push(error);
       }
       const cleanup: Array<() => Promise<unknown>> = [() => mcp.close()];
-      if (!testFailed || process.env.E2E_KEEP_PASEO_HOME !== "1") {
+      if (!testFailed || process.env.E2E_KEEP_CLISBOT_HOME !== "1") {
         const projectId = workspace?.projectId;
         if (projectId) cleanup.push(() => client.removeProject(projectId));
         cleanup.push(() => repo.cleanup());

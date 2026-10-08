@@ -87,7 +87,7 @@ export async function ensurePathInShellRc(): Promise<{ shellUpdated: boolean }> 
     }
 
     await fs.mkdir(path.dirname(info.rcFile), { recursive: true });
-    await fs.appendFile(info.rcFile, `\n# Added by Paseo\n${info.exportLine}\n`);
+    await fs.appendFile(info.rcFile, `\n# Added by Clisbot\n${info.exportLine}\n`);
 
     return { shellUpdated: true };
   } catch (err) {

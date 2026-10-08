@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 import type {
   DaemonClient,
   FetchRecentProviderSessionEntry,
-} from "@getpaseo/client/internal/daemon-client";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+} from "@clisbot/client/internal/daemon-client";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
 import { ChevronDown, Inbox, Layers, RotateCw } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";

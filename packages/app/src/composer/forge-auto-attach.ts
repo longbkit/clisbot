@@ -12,7 +12,7 @@ import {
 import type { ComposerAttachment, UserComposerAttachment } from "@/attachments/types";
 import { buildForgeSearchQueryOptions, type ForgeSearchClient } from "@/git/use-forge-search-query";
 import { extractForgeRefs, type ForgeRef } from "@/git/forge-refs";
-import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
+import type { ForgeSearchItem } from "@clisbot/protocol/messages";
 import { isAttachmentSelectedForForgeItem, toggleForgeAttachment } from "./actions";
 
 const AUTO_ATTACH_DEBOUNCE_MS = 300;

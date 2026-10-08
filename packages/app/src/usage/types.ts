@@ -1,4 +1,4 @@
-import type { ProviderUsageTone, UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { ProviderUsageTone, UsageReportEntry } from "@clisbot/protocol/messages";
 
 export type { UsageReportEntry };
 export type UsageReport = UsageReportEntry["report"];

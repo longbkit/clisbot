@@ -29,8 +29,8 @@ export const Route = createFileRoute("/plugins/$owner")({
   },
   head: ({ params, loaderData }) =>
     pageMeta(
-      loaderData ? `${loaderData.author.name} – Paseo plugins` : "Author not found – Paseo",
-      loaderData ? `Paseo plugins published by ${loaderData.author.name}.` : "Author not found.",
+      loaderData ? `${loaderData.author.name} – Clisbot plugins` : "Author not found – Clisbot",
+      loaderData ? `Clisbot plugins published by ${loaderData.author.name}.` : "Author not found.",
       `/plugins/${params.owner}`,
     ),
   component: AuthorPage,

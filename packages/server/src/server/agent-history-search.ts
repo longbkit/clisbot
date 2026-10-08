@@ -1,5 +1,5 @@
-import type { AgentSnapshotPayload, ProjectPlacementPayload } from "@getpaseo/protocol/messages";
-import { scoreTextFields } from "@getpaseo/protocol/search/text-match";
+import type { AgentSnapshotPayload, ProjectPlacementPayload } from "@clisbot/protocol/messages";
+import { scoreTextFields } from "@clisbot/protocol/search/text-match";
 
 export interface AgentHistorySearchCandidate {
   agent: AgentSnapshotPayload;

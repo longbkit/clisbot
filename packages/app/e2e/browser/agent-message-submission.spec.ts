@@ -330,7 +330,7 @@ async function selectSendBehaviorInSettings(
   await page.getByRole("menuitem", { name: behaviorLabel, exact: true }).click();
   await expect
     .poll(async () => {
-      const raw = await page.evaluate(() => localStorage.getItem("@paseo:app-settings"));
+      const raw = await page.evaluate(() => localStorage.getItem("@clisbot:app-settings"));
       return raw ? (JSON.parse(raw) as { sendBehavior?: unknown }).sendBehavior : null;
     })
     .toBe(stored);

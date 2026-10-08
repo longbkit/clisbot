@@ -8,7 +8,7 @@ import { z } from "zod";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
-import type { PaseoToolCatalog } from "../../tools/types.js";
+import type { ClisbotToolCatalog } from "../../tools/types.js";
 import {
   OpenCodeBridge,
   loadOpenCodeBridgePluginArtifact,
@@ -25,7 +25,7 @@ afterEach(async () => {
   );
 });
 
-function createCatalog(): PaseoToolCatalog {
+function createCatalog(): ClisbotToolCatalog {
   const tool = {
     name: "echo_context",
     title: "Echo context",
@@ -64,7 +64,7 @@ function readPluginOptions(env: Record<string, string>): {
 
 describe("OpenCodeBridge", () => {
   test("loads packaged bundle bytes without invoking source compilation", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-opencode-artifact-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-artifact-"));
     temporaryDirectories.push(root);
     const moduleUrl = pathToFileURL(path.join(root, "bridge.js")).href;
     const bundle = Buffer.from("export default async () => ({})");
@@ -99,8 +99,8 @@ describe("OpenCodeBridge", () => {
   });
 
   test("serves authenticated session context and caller-scoped tools", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-bridge-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-bridge-"));
+    temporaryDirectories.push(clisbotHome);
     const catalog = createCatalog();
     const executedInputs: unknown[] = [];
     const executeTool = catalog.executeTool;
@@ -108,14 +108,14 @@ describe("OpenCodeBridge", () => {
       executedInputs.push(input);
       return await executeTool(name, input, context);
     };
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
     bridge.setManifestCatalog(catalog);
     const release = bridge.bindSession({
       sessionId: "ses_one",
       env: {
-        PASEO_AGENT_ID: "agent-one",
-        PASEO_AGENT_CWD: "/workspace/one",
+        CLISBOT_AGENT_ID: "agent-one",
+        CLISBOT_AGENT_CWD: "/workspace/one",
         CUSTOM_VALUE: "one",
       },
       tools: catalog,
@@ -136,8 +136,8 @@ describe("OpenCodeBridge", () => {
       });
       expect(await context.json()).toEqual({
         env: {
-          PASEO_AGENT_ID: "agent-one",
-          PASEO_AGENT_CWD: "/workspace/one",
+          CLISBOT_AGENT_ID: "agent-one",
+          CLISBOT_AGENT_CWD: "/workspace/one",
           CUSTOM_VALUE: "one",
         },
       });
@@ -181,18 +181,18 @@ describe("OpenCodeBridge", () => {
       );
       const asked: unknown[] = [];
       await expect(
-        hooks.tool.paseo_echo_context.execute(
+        hooks.tool.clisbot_echo_context.execute(
           { value: "through bundled plugin" },
           { sessionID: "ses_one", ask: async (request: unknown) => void asked.push(request) },
         ),
       ).resolves.toMatchObject({ output: "through bundled plugin" });
       expect(asked).toEqual([
-        { permission: "paseo_echo_context", patterns: ["*"], always: ["*"], metadata: {} },
+        { permission: "clisbot_echo_context", patterns: ["*"], always: ["*"], metadata: {} },
       ]);
 
       executedInputs.length = 0;
       await expect(
-        hooks.tool.paseo_echo_context.execute(
+        hooks.tool.clisbot_echo_context.execute(
           { value: "rejected" },
           {
             sessionID: "ses_one",
@@ -210,7 +210,7 @@ describe("OpenCodeBridge", () => {
         hooks["shell.env"]({ cwd: "/workspace/one", sessionID: "ses_one" }, { env: {} }),
       ).rejects.toThrow("not bound");
       expect(pluginError).toHaveBeenCalledWith(
-        "[paseo-opencode-plugin] shell.env failed",
+        "[clisbot-opencode-plugin] shell.env failed",
         expect.objectContaining({ sessionID: "ses_one", error: expect.stringContaining("bound") }),
       );
       pluginError.mockRestore();
@@ -226,10 +226,10 @@ describe("OpenCodeBridge", () => {
   });
 
   test("v2 plugin filters caller tools and inherits child session bindings", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-scope-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-scope-"));
+    temporaryDirectories.push(clisbotHome);
     const catalog = createCatalog();
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     bridge.setManifestCatalog(catalog);
     await bridge.start();
     const release = bridge.bindSession({ sessionId: "parent", env: {}, tools: catalog });
@@ -276,21 +276,23 @@ describe("OpenCodeBridge", () => {
       });
       const allowed: V2TestContext = {
         sessionID: "child",
-        tools: { paseo_echo_context: {}, native: {} },
+        tools: { clisbot_echo_context: {}, native: {} },
       };
       await filter(allowed);
-      expect(Object.keys(allowed.tools)).toEqual(["paseo_echo_context", "native"]);
+      expect(Object.keys(allowed.tools)).toEqual(["clisbot_echo_context", "native"]);
       const disabled: V2TestContext = {
         sessionID: "disabled",
-        tools: { paseo_echo_context: {}, native: {} },
+        tools: { clisbot_echo_context: {}, native: {} },
       };
       await filter(disabled);
       expect(Object.keys(disabled.tools)).toEqual(["native"]);
       await expect(
-        tools.get("paseo_echo_context")!.execute({ value: "child result" }, { sessionID: "child" }),
+        tools
+          .get("clisbot_echo_context")!
+          .execute({ value: "child result" }, { sessionID: "child" }),
       ).resolves.toMatchObject({ content: [{ type: "text", text: "child result" }] });
       await expect(
-        tools.get("paseo_echo_context")!.execute({ value: "blocked" }, { sessionID: "disabled" }),
+        tools.get("clisbot_echo_context")!.execute({ value: "blocked" }, { sessionID: "disabled" }),
       ).rejects.toThrow("HTTP 403");
       await dispose();
     } finally {
@@ -301,7 +303,7 @@ describe("OpenCodeBridge", () => {
   });
 
   test("v2 structured output validates values and clears its tool on ordinary turns", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-structured-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-structured-"));
     temporaryDirectories.push(root);
     const pluginUrl = await materializeOpenCodeV2Plugin(root);
     const module: {
@@ -319,7 +321,7 @@ describe("OpenCodeBridge", () => {
         type: "user",
         text: "answer",
         time: { created: 1 },
-        metadata: { paseoOutputSchema: schema },
+        metadata: { clisbotOutputSchema: schema },
       },
     ];
     const tools = new Map<string, V2TestTool>();
@@ -348,20 +350,20 @@ describe("OpenCodeBridge", () => {
     try {
       const context: V2TestContext = {
         sessionID: "session",
-        tools: { paseo_structured_output: {} },
+        tools: { clisbot_structured_output: {} },
         system: [],
       };
       await hook(context);
-      expect(context.tools.paseo_structured_output.input).toMatchObject({
+      expect(context.tools.clisbot_structured_output.input).toMatchObject({
         properties: { value: schema },
       });
-      const tool = tools.get("paseo_structured_output")!;
+      const tool = tools.get("clisbot_structured_output")!;
       await expect(
         tool.execute({ value: { answer: "wrong" } }, { sessionID: "session" }),
       ).rejects.toThrow("Invalid structured output");
       await expect(
         tool.execute({ value: { answer: 42 } }, { sessionID: "session" }),
-      ).resolves.toMatchObject({ metadata: { paseoStructuredOutput: { answer: 42 } } });
+      ).resolves.toMatchObject({ metadata: { clisbotStructuredOutput: { answer: 42 } } });
       history.push({ id: "next", type: "user", text: "ordinary", time: { created: 2 } });
       await hook(context);
       expect(context.tools).toEqual({});
@@ -374,14 +376,14 @@ describe("OpenCodeBridge", () => {
   });
 
   test("packages the v2 bridge as a directory with a server entry point", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-package-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-package-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
     try {
       expect(
-        (await readdir(path.join(paseoHome, "runtime", "opencode"))).filter((name) =>
-          name.startsWith("paseo-v2-"),
+        (await readdir(path.join(clisbotHome, "runtime", "opencode"))).filter((name) =>
+          name.startsWith("clisbot-v2-"),
         ),
       ).toEqual([]);
       const env = await bridge.decorateV2ServerEnv({
@@ -393,7 +395,7 @@ describe("OpenCodeBridge", () => {
       const directory = fileURLToPath(config.plugins[1].package);
       expect((await stat(directory)).isDirectory()).toBe(true);
       const entry = await readFile(path.join(directory, "server.js"), "utf8");
-      expect(entry).toContain('id: "paseo"');
+      expect(entry).toContain('id: "clisbot"');
       const manifest = JSON.parse(await readFile(path.join(directory, "package.json"), "utf8"));
       expect(manifest).toMatchObject({ type: "module", exports: { "./server": "./server.js" } });
     } finally {
@@ -402,9 +404,9 @@ describe("OpenCodeBridge", () => {
   });
 
   test("preserves user OpenCode config while installing one content-addressed plugin", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-bridge-config-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-bridge-config-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
 
     try {
@@ -423,7 +425,7 @@ describe("OpenCodeBridge", () => {
       expect(config.model).toBe("provider/model");
       expect(config.plugin[0]).toBe("user-plugin");
       expect(config.plugin).toHaveLength(2);
-      expect(config.plugin[1]?.[0]).toMatch(/paseo-[a-f0-9]{64}\.mjs$/);
+      expect(config.plugin[1]?.[0]).toMatch(/clisbot-[a-f0-9]{64}\.mjs$/);
     } finally {
       await bridge.close();
     }

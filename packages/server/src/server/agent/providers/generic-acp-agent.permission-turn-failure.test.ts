@@ -81,7 +81,7 @@ async function withFakeACPAgent(
   ending: "fail" | "cancel",
   run: (command: [string, ...string[]], cwd: string) => Promise<void>,
 ): Promise<void> {
-  const testDir = await mkdtemp(path.join(tmpdir(), "paseo-acp-permission-turn-failure-"));
+  const testDir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-permission-turn-failure-"));
   try {
     const scriptPath = path.join(testDir, "fake-acp-agent.cjs");
     await writeFile(scriptPath, fakeACPAgentScript, "utf8");

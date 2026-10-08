@@ -23,13 +23,13 @@ const queryFactory = vi.fn();
 const testTempDirs: string[] = [];
 
 function writeWorkflowOutput(): string {
-  const directory = mkdtempSync(path.join(tmpdir(), "paseo-workflow-output-"));
+  const directory = mkdtempSync(path.join(tmpdir(), "clisbot-workflow-output-"));
   testTempDirs.push(directory);
   const outputPath = path.join(directory, "workflow.output");
   writeFileSync(
     outputPath,
     JSON.stringify({
-      result: { report: "What Paseo is\nA local-first coding-agent environment." },
+      result: { report: "What Clisbot is\nA local-first coding-agent environment." },
       script: "SECRET WORKFLOW SOURCE",
       workflowProgress: [{ promptPreview: "SECRET CHILD PROMPT" }],
     }),
@@ -251,7 +251,7 @@ describe("background Claude subagents", () => {
           id: "toolu_workflow",
           item: {
             type: "assistant_message",
-            text: "What Paseo is\nA local-first coding-agent environment.",
+            text: "What Clisbot is\nA local-first coding-agent environment.",
           },
         },
       }),

@@ -8,19 +8,19 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { UserComposerAttachment } from "@/attachments/types";
 import type { ForgeSearchClient } from "@/git/use-forge-search-query";
-import type { ForgeSearchItem, ForgeSearchResponse } from "@getpaseo/protocol/messages";
+import type { ForgeSearchItem, ForgeSearchResponse } from "@clisbot/protocol/messages";
 import { useComposerForgeAutoAttach } from "./forge-auto-attach";
 
 type ForgeSearchPayload = ForgeSearchResponse["payload"];
 
-const remoteUrl = "git@github.com:acme/paseo.git";
+const remoteUrl = "git@github.com:acme/clisbot.git";
 const cwd = "/repo";
 
 const pr101: ForgeSearchItem = {
   kind: "change_request",
   number: 101,
   title: "Attach PR",
-  url: "https://github.com/acme/paseo/pull/101",
+  url: "https://github.com/acme/clisbot/pull/101",
   state: "open",
   body: null,
   labels: [],
@@ -32,7 +32,7 @@ const pr202: ForgeSearchItem = {
   ...pr101,
   number: 202,
   title: "Attach second PR",
-  url: "https://github.com/acme/paseo/pull/202",
+  url: "https://github.com/acme/clisbot/pull/202",
   headRefName: "feature-two",
 };
 
@@ -40,7 +40,7 @@ const issue202: ForgeSearchItem = {
   kind: "issue",
   number: 202,
   title: "Attach issue",
-  url: "https://github.com/acme/paseo/issues/202",
+  url: "https://github.com/acme/clisbot/issues/202",
   state: "open",
   body: null,
   labels: [],
@@ -53,11 +53,11 @@ const gitlabMr73: ForgeSearchItem = {
   kind: "change_request",
   number: 73,
   title: "Attach MR",
-  url: "https://gitlab.com/acme/paseo/-/merge_requests/73",
+  url: "https://gitlab.com/acme/clisbot/-/merge_requests/73",
   state: "opened",
   body: null,
   labels: [],
-  projectPath: "acme/paseo",
+  projectPath: "acme/clisbot",
   baseRefName: "main",
   headRefName: "feature",
 };
@@ -67,7 +67,7 @@ const giteaIssue27: ForgeSearchItem = {
   kind: "issue",
   number: 27,
   title: "Attach Gitea issue",
-  url: "https://gitea.example.com/acme/paseo/issues/27",
+  url: "https://gitea.example.com/acme/clisbot/issues/27",
   state: "open",
   body: null,
   labels: [],
@@ -178,7 +178,7 @@ describe("useComposerForgeAutoAttach", () => {
     });
 
     act(() => {
-      result.current.setText("Please review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Please review https://github.com/acme/clisbot/pull/101");
     });
     expect(result.current.isResolving).toBe(true);
     expect(onChangeRequestDetected).toHaveBeenCalledTimes(1);
@@ -200,13 +200,13 @@ describe("useComposerForgeAutoAttach", () => {
         useHarness(client, {
           onChangeRequestDetected,
           onChangeRequestAdded,
-          remote: "git@gitlab.com:acme/paseo.git",
+          remote: "git@gitlab.com:acme/clisbot.git",
         }),
       { wrapper: createWrapper() },
     );
 
     act(() => {
-      result.current.setText("Review https://gitlab.com/acme/paseo/-/merge_requests/73/diffs");
+      result.current.setText("Review https://gitlab.com/acme/clisbot/-/merge_requests/73/diffs");
     });
     await flushDebounce();
 
@@ -225,13 +225,13 @@ describe("useComposerForgeAutoAttach", () => {
     const { result } = renderHook(
       () =>
         useHarness(client, {
-          remote: "git@gitea.example.com:acme/paseo.git",
+          remote: "git@gitea.example.com:acme/clisbot.git",
         }),
       { wrapper: createWrapper() },
     );
 
     act(() => {
-      result.current.setText("See https://gitea.example.com/acme/paseo/issues/27");
+      result.current.setText("See https://gitea.example.com/acme/clisbot/issues/27");
     });
     await flushDebounce();
 
@@ -246,7 +246,7 @@ describe("useComposerForgeAutoAttach", () => {
     const { result } = renderHook(() => useHarness(client), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.setText("Other repo https://github.com/other/paseo/pull/101");
+      result.current.setText("Other repo https://github.com/other/clisbot/pull/101");
     });
     await flushDebounce();
 
@@ -264,7 +264,7 @@ describe("useComposerForgeAutoAttach", () => {
     });
 
     act(() => {
-      result.current.setText("Already here https://github.com/acme/paseo/pull/101");
+      result.current.setText("Already here https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
 
@@ -284,7 +284,7 @@ describe("useComposerForgeAutoAttach", () => {
     act(() => {
       result.current.markForgeAttachmentRemoved(initialAttachments[0]);
       result.current.setAttachments([]);
-      result.current.setText("Re-pasted https://github.com/acme/paseo/pull/101");
+      result.current.setText("Re-pasted https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
 
@@ -300,7 +300,7 @@ describe("useComposerForgeAutoAttach", () => {
 
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/issues/202",
+        "Refs https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/issues/202",
       );
     });
     await flushDebounce();
@@ -333,7 +333,7 @@ describe("useComposerForgeAutoAttach", () => {
 
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/pull/202",
+        "Refs https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/pull/202",
       );
     });
     await flushDebounce();
@@ -375,12 +375,12 @@ describe("useComposerForgeAutoAttach", () => {
     });
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
     act(() => {
       result.current.setText(
-        "Review https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/pull/202",
+        "Review https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/pull/202",
       );
     });
     expect(result.current.isResolving).toBe(true);
@@ -420,12 +420,12 @@ describe("useComposerForgeAutoAttach", () => {
 
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/pull/202",
+        "Refs https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/pull/202",
       );
     });
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/202 and https://github.com/acme/paseo/pull/101",
+        "Refs https://github.com/acme/clisbot/pull/202 and https://github.com/acme/clisbot/pull/101",
       );
     });
     await flushDebounce();
@@ -455,13 +455,13 @@ describe("useComposerForgeAutoAttach", () => {
 
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/pull/202",
+        "Refs https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/pull/202",
       );
     });
     await flushDebounce();
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/202 and https://github.com/acme/paseo/pull/101",
+        "Refs https://github.com/acme/clisbot/pull/202 and https://github.com/acme/clisbot/pull/101",
       );
     });
     await flushDebounce();
@@ -507,7 +507,7 @@ describe("useComposerForgeAutoAttach", () => {
 
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/pull/202",
+        "Refs https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/pull/202",
       );
     });
     await flushDebounce();
@@ -517,7 +517,7 @@ describe("useComposerForgeAutoAttach", () => {
       await Promise.resolve();
     });
     act(() => {
-      result.current.setText("Still https://github.com/acme/paseo/pull/101");
+      result.current.setText("Still https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
 
@@ -543,7 +543,7 @@ describe("useComposerForgeAutoAttach", () => {
     });
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
 
@@ -553,7 +553,7 @@ describe("useComposerForgeAutoAttach", () => {
     expect(result.current.isResolving).toBe(false);
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     expect(result.current.isResolving).toBe(true);
     await flushDebounce();
@@ -588,7 +588,7 @@ describe("useComposerForgeAutoAttach", () => {
 
     act(() => {
       result.current.setText(
-        "Refs https://github.com/acme/paseo/pull/101 and https://github.com/acme/paseo/pull/202",
+        "Refs https://github.com/acme/clisbot/pull/101 and https://github.com/acme/clisbot/pull/202",
       );
     });
     await flushDebounce();
@@ -601,7 +601,7 @@ describe("useComposerForgeAutoAttach", () => {
     expect(result.current.isResolving).toBe(true);
 
     act(() => {
-      result.current.setText("Still https://github.com/acme/paseo/pull/202");
+      result.current.setText("Still https://github.com/acme/clisbot/pull/202");
     });
     await flushDebounce();
 
@@ -626,13 +626,13 @@ describe("useComposerForgeAutoAttach", () => {
     const { result } = renderHook(() => useHarness(client), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
 
     act(() => {
       result.current.setAttachments([{ kind: "forge_issue", item: issue202 }]);
-      result.current.setText("Review https://github.com/acme/paseo/pull/101 please");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101 please");
     });
 
     expect(result.current.isResolving).toBe(true);
@@ -659,7 +659,7 @@ describe("useComposerForgeAutoAttach", () => {
     const { result } = renderHook(() => useHarness(client), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
     act(() => {
@@ -679,7 +679,7 @@ describe("useComposerForgeAutoAttach", () => {
     const { result } = renderHook(() => useHarness(client), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
 
@@ -707,7 +707,7 @@ describe("useComposerForgeAutoAttach", () => {
     const { result } = renderHook(() => useHarness(firstClient), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.setText("Review https://github.com/acme/paseo/pull/101");
+      result.current.setText("Review https://github.com/acme/clisbot/pull/101");
     });
     await flushDebounce();
     act(() => {

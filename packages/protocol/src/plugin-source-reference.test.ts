@@ -76,7 +76,7 @@ describe("plugin source references", () => {
 
 it("addresses default and private registries without treating explicit sources as registry IDs", () => {
   expect(parsePluginRegistryReference("omercnet/dracula")).toEqual({
-    url: "https://plugins.paseo.sh",
+    url: "https://plugins.clisbot.com",
     id: "omercnet/dracula",
   });
   expect(parsePluginRegistryReference("acme/plugin", "https://internal.example/registry/")).toEqual(

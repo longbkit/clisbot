@@ -763,7 +763,7 @@ export const ko: TranslationResources = {
       },
       routes: {
         public: "역방향 프록시",
-        paseo: "간편 주소",
+        clisbot: "간편 주소",
         direct: "직접",
       },
       states: {
@@ -877,7 +877,7 @@ export const ko: TranslationResources = {
             "이 브랜치가 이미 {{baseRef}}와 최신 상태이므로 업데이트를 사용할 수 없습니다",
           mergePrNoGithub: "GitHub가 연결되어 있지 않아 지금은 PR 병합을 사용할 수 없습니다",
           archiveNotWorktree:
-            "이 워크스페이스가 Paseo 워크트리로 생성되지 않아 여기서 보관을 사용할 수 없습니다",
+            "이 워크스페이스가 Clisbot 워크트리로 생성되지 않아 여기서 보관을 사용할 수 없습니다",
           mergePrNoForge:
             "{{brand}}가 연결되어 있지 않기 때문에 지금은 {{noun}} 병합을 사용할 수 없습니다.",
           mergePrMissing: "아직 풀 리퀘스트가 없어 PR 병합을 사용할 수 없습니다",
@@ -1225,7 +1225,7 @@ export const ko: TranslationResources = {
       discord: "Discord",
       github: "GitHub 이슈 만들기",
       whatsNew: "새로운 소식",
-      appName: "Paseo",
+      appName: "Clisbot",
     },
     sections: {
       sessions: "기록",
@@ -1372,7 +1372,7 @@ export const ko: TranslationResources = {
       close: "창 닫기",
     },
     quitting: {
-      title: "Paseo 종료 중...",
+      title: "Clisbot 종료 중...",
       detail: "로컬 데몬을 중지하는 중입니다.",
     },
     daemon: {
@@ -1387,19 +1387,20 @@ export const ko: TranslationResources = {
       },
       management: {
         title: "내장 데몬 관리",
-        hint: "Paseo가 내장 데몬을 시작하고 중지하도록 허용합니다",
+        hint: "Clisbot가 내장 데몬을 시작하고 중지하도록 허용합니다",
         pauseTitle: "내장 데몬 일시 중지",
         pauseMessage:
           "내장 데몬이 즉시 중지됩니다. 내장 데몬에 연결된 실행 중인 에이전트와 터미널이 중지됩니다.",
         pauseAndStop: "일시 중지 후 중지",
         registrationFailed:
-          "내장 데몬이 시작되었지만 Paseo가 localhost 연결을 저장하지 못했습니다. 데몬 관리를 껐다가 다시 켜거나 localhost를 수동으로 추가하세요.",
-        pausedStopFailed: "내장 데몬 관리가 일시 중지되었지만 Paseo가 데몬을 중지하지 못했습니다.",
+          "내장 데몬이 시작되었지만 Clisbot가 localhost 연결을 저장하지 못했습니다. 데몬 관리를 껐다가 다시 켜거나 localhost를 수동으로 추가하세요.",
+        pausedStopFailed:
+          "내장 데몬 관리가 일시 중지되었지만 Clisbot가 데몬을 중지하지 못했습니다.",
         updateFailed: "내장 데몬 관리를 업데이트할 수 없습니다.",
       },
       keepRunning: {
         title: "종료 후에도 데몬 계속 실행",
-        hint: "Paseo를 종료해도 데몬이 계속 실행됩니다",
+        hint: "Clisbot를 종료해도 데몬이 계속 실행됩니다",
       },
       logs: {
         title: "로그 파일",
@@ -1414,7 +1415,7 @@ export const ko: TranslationResources = {
       fullStatus: {
         title: "전체 상태",
         modalTitle: "데몬 상태",
-        hint: "`paseo daemon status`를 실행하고 출력을 표시합니다",
+        hint: "`clisbot daemon status`를 실행하고 출력을 표시합니다",
         view: "상태 보기",
         copied: "상태가 클립보드에 복사되었습니다.",
         fetchFailed: "데몬 상태를 가져오지 못했습니다: {{message}}",
@@ -1468,7 +1469,7 @@ export const ko: TranslationResources = {
     },
     rosetta: {
       title: "Apple Silicon 빌드 다운로드",
-      runningIntel: "Apple Silicon에서 Rosetta로 Paseo의 Intel 빌드를 실행하고 있습니다.",
+      runningIntel: "Apple Silicon에서 Rosetta로 Clisbot의 Intel 빌드를 실행하고 있습니다.",
       highCpu:
         "이로 인해 CPU 사용량이 높아집니다. 이를 해결하려면 Apple Silicon 빌드를 다운로드하세요.",
       download: "다운로드",
@@ -1511,7 +1512,7 @@ export const ko: TranslationResources = {
         microphone: "마이크 상태를 아직 확인하지 않았습니다.",
       },
       testNotification: {
-        title: "Paseo 알림 테스트",
+        title: "Clisbot 알림 테스트",
         body: "이 메시지가 보이면 데스크톱 알림이 작동하는 것입니다.",
         notDelivered: "알림이 전달되지 않았습니다. 시스템 설정 > 알림을 확인하세요.",
         failed: "알림을 보내지 못했습니다.",
@@ -1520,12 +1521,12 @@ export const ko: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "CLI 설치 상태를 확인할 수 없습니다.",
-        installFailed: "Paseo CLI를 설치할 수 없습니다.",
+        installFailed: "Clisbot CLI를 설치할 수 없습니다.",
       },
     },
   },
   rootError: {
-    title: "Paseo에 문제가 발생했습니다.",
+    title: "Clisbot에 문제가 발생했습니다.",
     body: "앱을 다시 로드해 보세요. 이런 일이 계속 발생하면 신고할 때 아래 세부정보를 포함하세요.",
     details: "세부",
   },
@@ -1622,7 +1623,7 @@ export const ko: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Paseo에 오신 것을 환영합니다",
+    title: "Clisbot에 오신 것을 환영합니다",
     subtitle: "시작하려면 컴퓨터를 연결하세요",
     actions: {
       settings: "설정",
@@ -1725,7 +1726,7 @@ export const ko: TranslationResources = {
     },
     direct: {
       title: "직접 연결",
-      helper: "Paseo 서버의 주소를 입력하세요.",
+      helper: "Clisbot 서버의 주소를 입력하세요.",
       fields: {
         host: "호스트",
         port: "포트",
@@ -1766,7 +1767,7 @@ export const ko: TranslationResources = {
     },
     remoteSsh: {
       title: "원격 SSH",
-      helper: "원격 호스트에서 실행 중인 Paseo 데몬에 연결합니다.",
+      helper: "원격 호스트에서 실행 중인 Clisbot 데몬에 연결합니다.",
       fields: {
         target: "SSH 호스트",
         password: "데몬 비밀번호",
@@ -1829,15 +1830,15 @@ export const ko: TranslationResources = {
       enableDescription:
         "릴레이를 사용하면 이 장치를 어디에서나 연결할 수 있습니다. 페어링 트래픽은 종단 간 암호화됩니다.",
       relayDocs: "릴레이 작동 방식",
-      relayDocsAccessibility: "Paseo 릴레이 작동 방식 읽기",
+      relayDocsAccessibility: "Clisbot 릴레이 작동 방식 읽기",
       enableRelay: "릴레이 활성화",
       enablingRelay: "활성화 중...",
       notNow: "지금은 아님",
       directConnectionHint:
         "릴레이 없이 TCP, Tailscale 또는 다른 VPN을 통해 직접 연결하세요. QR 코드가 생성되지 않습니다.",
-      updateRequired: "Paseo 데스크톱에서 릴레이를 활성화하려면 호스트를 업데이트하세요.",
+      updateRequired: "Clisbot 데스크톱에서 릴레이를 활성화하려면 호스트를 업데이트하세요.",
       unavailable: "페어링 정보를 사용할 수 없습니다.",
-      hint: "휴대폰의 Paseo로 이 QR 코드를 스캔하거나 아래 링크를 복사하세요.",
+      hint: "휴대폰의 Clisbot로 이 QR 코드를 스캔하거나 아래 링크를 복사하세요.",
       securityWarning:
         "이 페어링 링크는 비밀번호처럼 취급하세요. 링크를 가진 사람은 누구나 이 데몬에 접근할 수 있습니다.",
       qrUnavailable: "QR 코드를 사용할 수 없습니다.",
@@ -1872,7 +1873,7 @@ export const ko: TranslationResources = {
   serviceUrl: {
     title: "서비스 URL 열기",
     message: "{{url}}을(를) 열까요?",
-    inPaseo: "Paseo에서",
+    inClisbot: "Clisbot에서",
     externalBrowser: "외부 브라우저",
     dontAskAgain: "다시 묻지 않기",
   },
@@ -1991,9 +1992,9 @@ export const ko: TranslationResources = {
       one: "기타 도구 {{count}}개 사용함",
       other: "기타 도구 {{count}}개 사용함",
     },
-    paseoCalls: {
-      one: "Paseo를 {{count}}회 호출함",
-      other: "Paseo를 {{count}}회 호출함",
+    clisbotCalls: {
+      one: "Clisbot를 {{count}}회 호출함",
+      other: "Clisbot를 {{count}}회 호출함",
     },
     and: "그리고",
   },
@@ -2079,7 +2080,7 @@ export const ko: TranslationResources = {
       send: "보내기",
       sending: "보내는 중...",
       sentTitle: "테스트 알림을 보냈습니다",
-      sentDescription: "Paseo가 알림을 운영 체제에 전달했습니다.",
+      sentDescription: "Clisbot가 알림을 운영 체제에 전달했습니다.",
       sendFailedTitle: "테스트 알림을 보낼 수 없음",
     },
     hostSections: {
@@ -2102,10 +2103,10 @@ export const ko: TranslationResources = {
       selection: "모델 선택",
       automatic: "자동",
       preferred: "수동",
-      automaticHint: "Paseo가 사용 가능한 빠른 모델을 선택합니다",
-      preferredHint: "Paseo에서 사용할 모델을 선택하세요",
+      automaticHint: "Clisbot가 사용 가능한 빠른 모델을 선택합니다",
+      preferredHint: "Clisbot에서 사용할 모델을 선택하세요",
       model: "모델",
-      fallbackHint: "사용할 수 없으면 Paseo가 다른 사용 가능한 모델을 사용합니다",
+      fallbackHint: "사용할 수 없으면 Clisbot가 다른 사용 가능한 모델을 사용합니다",
       docs: "문서",
       saveError: "메타데이터 생성을 업데이트할 수 없습니다",
     },
@@ -2115,7 +2116,7 @@ export const ko: TranslationResources = {
       browserData: {
         title: "브라우저 데이터",
         siteData: "쿠키 및 사이트 데이터",
-        description: "브라우저 탭은 Paseo 전체에서 로그인 및 사이트 데이터를 공유합니다.",
+        description: "브라우저 탭은 Clisbot 전체에서 로그인 및 사이트 데이터를 공유합니다.",
         clear: "브라우저 데이터 지우기",
         clearing: "삭제 중...",
         confirmTitle: "브라우저 데이터를 삭제하시겠습니까?",
@@ -2142,7 +2143,7 @@ export const ko: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "물어보기",
-          inApp: "Paseo에서",
+          inApp: "Clisbot에서",
           external: "외부 브라우저",
         },
       },
@@ -2226,7 +2227,7 @@ export const ko: TranslationResources = {
         label: "앱 업데이트",
         readyToInstall: "설치 준비됨: {{version}}",
         installTitle: "데스크톱 업데이트 설치",
-        installMessage: "이 컴퓨터의 Paseo를 업데이트합니다",
+        installMessage: "이 컴퓨터의 Clisbot를 업데이트합니다",
         installConfirm: "업데이트 설치",
         update: "업데이트",
         updateTo: "{{version}}(으)로 업데이트",
@@ -2473,11 +2474,11 @@ export const ko: TranslationResources = {
         title: "오케스트레이션 스킬",
         description: "CLI를 통해 에이전트가 오케스트레이션하도록 가르칩니다",
         updateAvailable: "업데이트 사용 가능",
-        updateTitle: "Paseo 스킬을 업데이트할까요?",
+        updateTitle: "Clisbot 스킬을 업데이트할까요?",
         updateFallback: "번들된 스킬을 내 컴퓨터에 동기화합니다.",
-        uninstallTitle: "Paseo 스킬을 제거할까요?",
+        uninstallTitle: "Clisbot 스킬을 제거할까요?",
         uninstallMessage:
-          "~/.agents, ~/.claude, ~/.codex에서 모든 Paseo 오케스트레이션 스킬을 제거합니다.",
+          "~/.agents, ~/.claude, ~/.codex에서 모든 Clisbot 오케스트레이션 스킬을 제거합니다.",
         choose: "스킬 선택",
         chooseAll: "모든 스킬",
         chooseAllHint: "나중에 추가되는 항목을 포함하여 모든 번들 스킬을 설치된 상태로 유지합니다.",
@@ -2513,9 +2514,9 @@ export const ko: TranslationResources = {
         title: "오케스트레이션",
         unavailable: "오케스트레이션을 관리하려면 이 호스트에 연결하세요",
         enableTools: {
-          title: "Paseo 도구 활성화",
+          title: "Clisbot 도구 활성화",
           hint: "에이전트가 워크트리, 에이전트, 일정을 관리할 수 있습니다",
-          accessibilityLabel: "Paseo 도구 주입",
+          accessibilityLabel: "Clisbot 도구 주입",
         },
         systemPrompt: {
           title: "시스템 프롬프트",
@@ -2619,15 +2620,15 @@ export const ko: TranslationResources = {
             "이 호스트는 연결되어 있지 않습니다. 재시작하기 전에 온라인 상태가 될 때까지 기다리세요.",
           offlineTitle: "호스트 오프라인",
           offlineMessage:
-            "이 호스트는 오프라인입니다. Paseo가 자동으로 다시 연결하므로 다시 온라인이 될 때까지 기다린 후 재시작하세요.",
+            "이 호스트는 오프라인입니다. Clisbot가 자동으로 다시 연결하므로 다시 온라인이 될 때까지 기다린 후 재시작하세요.",
           requestFailedTitle: "오류",
           requestFailedMessage:
-            "재시작 요청을 보내지 못했습니다. Paseo가 자동으로 다시 연결하므로 호스트가 온라인으로 표시되면 다시 시도하세요.",
+            "재시작 요청을 보내지 못했습니다. Clisbot가 자동으로 다시 연결하므로 호스트가 온라인으로 표시되면 다시 시도하세요.",
           dialogFailedMessage: "재시작 확인 대화 상자를 열 수 없습니다.",
         },
         update: {
           desktopManagedHint:
-            "이 데몬은 Paseo Desktop에서 관리됩니다. 호스트에서 Paseo 데스크톱을 업데이트합니다.",
+            "이 데몬은 Clisbot Desktop에서 관리됩니다. 호스트에서 Clisbot 데스크톱을 업데이트합니다.",
           title: "데몬 업데이트",
           hint: "데몬을 최신 버전으로 업데이트하고 다시 시작하세요.",
           confirm: "업데이트",
@@ -2748,13 +2749,13 @@ export const ko: TranslationResources = {
         savedToast: "프로젝트가 업데이트되었습니다.",
       },
       readFailures: {
-        invalidTitle: "paseo.json을 파싱할 수 없습니다",
+        invalidTitle: "clisbot.json을 파싱할 수 없습니다",
         invalidDescription: "디스크의 파일을 수정한 후 다시 로드하세요.",
         missingTitle: "이 호스트에는 이 프로젝트가 없습니다",
         missingSingleHost: "선택한 호스트에 이 프로젝트의 기록이 없습니다.",
-        transportTitle: "paseo.json을 불러올 수 없습니다",
+        transportTitle: "clisbot.json을 불러올 수 없습니다",
         transportFallback: "호스트가 응답하지 않았습니다.",
-        failedTitle: "paseo.json을 불러올 수 없습니다",
+        failedTitle: "clisbot.json을 불러올 수 없습니다",
         failedDescription: "다시 로드하여 재시도하세요.",
       },
       worktree: {
@@ -2764,7 +2765,7 @@ export const ko: TranslationResources = {
         docsTooltip: "자세한 내용과 이 명령에 사용할 수 있는 환경 변수는 문서를 참조하세요",
         setup: "설정",
         setupAccessibility: "워크트리 설정 명령",
-        uncommittedTitle: "paseo.json 변경 사항을 커밋하세요",
+        uncommittedTitle: "clisbot.json 변경 사항을 커밋하세요",
         uncommittedDescription: "새 워크트리는 선택한 기본 브랜치의 설정 스크립트를 사용합니다.",
         teardown: "정리",
         teardownAccessibility: "워크트리 정리 명령",
@@ -2788,7 +2789,7 @@ export const ko: TranslationResources = {
         newScript: "새 스크립트",
         editScript: "{{name}} 편집",
         runAsService: "서비스로 실행",
-        serviceHint: "Paseo가 프로세스를 감독하고 $PASEO_PORT를 통해 포트를 할당합니다",
+        serviceHint: "Clisbot가 프로세스를 감독하고 $CLISBOT_PORT를 통해 포트를 할당합니다",
         actions: {
           add: "스크립트 추가",
           edit: "편집",
@@ -2797,7 +2798,7 @@ export const ko: TranslationResources = {
       },
       metadata: {
         title: "메타데이터 생성",
-        info: "Paseo가 메타데이터를 생성하는 데 사용하는 AI 프롬프트에 주입되는 프로젝트별 지침 - 브랜치 이름, 커밋 스타일, PR 형식 같은 팀 규칙을 적용하는 데 사용하세요",
+        info: "Clisbot가 메타데이터를 생성하는 데 사용하는 AI 프롬프트에 주입되는 프로젝트별 지침 - 브랜치 이름, 커밋 스타일, PR 형식 같은 팀 규칙을 적용하는 데 사용하세요",
         branchName: "브랜치 이름",
         branchNamePlaceholder:
           "브랜치에 feat/ 또는 fix/를 접두사로, 개인 브랜치에는 mb/를 붙이세요",
@@ -2808,8 +2809,8 @@ export const ko: TranslationResources = {
       },
       writeFailures: {
         staleTitle: "디스크에서 구성이 변경되었습니다",
-        staleDescription: "저장하기 전에 다시 로드하여 최신 paseo.json을 가져오세요.",
-        failedTitle: "paseo.json을 저장할 수 없습니다",
+        staleDescription: "저장하기 전에 다시 로드하여 최신 clisbot.json을 가져오세요.",
+        failedTitle: "clisbot.json을 저장할 수 없습니다",
         failedDescription: "다시 시도하거나 디스크에서 최신 버전을 다시 로드하세요.",
       },
       actions: {

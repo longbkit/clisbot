@@ -9,7 +9,7 @@ import "~/styles.css";
 export const Route = createFileRoute("/agents")({
   head: () =>
     pageMeta(
-      "Supported agents – Every coding agent Paseo runs",
+      "Supported agents – Every coding agent Clisbot runs",
       "Run Claude Code, Codex, OpenCode, Pi, OMP, Cursor, Muse Code, Antigravity, and dozens more coding agents from your phone. Self-hosted, your code stays on your machine.",
       "/agents",
     ),
@@ -23,7 +23,7 @@ function AgentsPage() {
     <SiteShell width="default">
       <h1 className="text-3xl font-medium tracking-tight mb-4">Supported agents</h1>
       <p className="text-lg text-white/70 leading-relaxed max-w-2xl">
-        Paseo supports many agents natively, it can run any{" "}
+        Clisbot supports many agents natively, it can run any{" "}
         <a href="/docs/custom-providers#acp-providers" className={LINK_CLASS}>
           ACP agent
         </a>{" "}

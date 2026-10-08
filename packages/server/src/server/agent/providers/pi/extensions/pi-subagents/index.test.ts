@@ -47,7 +47,7 @@ function hasCompletedChild(events: AgentStreamEvent[]) {
 
 describe("pi-subagents adapter", () => {
   test("follows async status and transcript without bg_wait", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "paseo-pi-async-"));
+    const dir = await mkdtemp(join(tmpdir(), "clisbot-pi-async-"));
     const file = join(dir, "child.jsonl");
     const received: AgentStreamEvent[] = [];
     const host = createPiExtensionHost();
@@ -88,7 +88,7 @@ describe("pi-subagents adapter", () => {
     }
   });
   test("settles an async run and reads its transcript from the completion notice on replay", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "paseo-pi-async-"));
+    const dir = await mkdtemp(join(tmpdir(), "clisbot-pi-async-"));
     const file = join(dir, "child.jsonl");
     try {
       await writeFile(
@@ -229,7 +229,7 @@ describe("pi-subagents adapter", () => {
     const client = new PiRpcAgentClient({ logger: pino({ level: "silent" }), runtime: pi });
     const session = await client.createSession({
       provider: "pi",
-      cwd: "/tmp/paseo-pi-child-close",
+      cwd: "/tmp/clisbot-pi-child-close",
     });
     const events: AgentStreamEvent[] = [];
     session.subscribe((event) => events.push(event));

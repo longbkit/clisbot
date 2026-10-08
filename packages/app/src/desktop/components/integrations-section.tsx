@@ -11,7 +11,7 @@ import { settingsStyles } from "@/styles/settings";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { shouldUseDesktopDaemon } from "@/desktop/daemon/desktop-daemon";
 
-const CLI_DOCS_URL = "https://paseo.sh/docs/cli";
+const CLI_DOCS_URL = "https://clisbot.com/docs/cli";
 
 export function IntegrationsSection() {
   const { t } = useTranslation();

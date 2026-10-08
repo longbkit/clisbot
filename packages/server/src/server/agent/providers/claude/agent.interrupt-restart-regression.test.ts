@@ -258,7 +258,7 @@ async function waitFor(
 }
 
 /**
- * Paseo interrupts Claude only while a main-session turn is in flight, which it learns from the
+ * Clisbot interrupts Claude only while a main-session turn is in flight, which it learns from the
  * init. The pump asks for its next frame only after routing the last one, so a second next() call
  * proves the init was read.
  */

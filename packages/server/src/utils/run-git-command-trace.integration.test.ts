@@ -16,10 +16,10 @@ describe("git command trace", () => {
   });
 
   it("writes one asynchronous settlement record for a real git process", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-git-trace-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-git-trace-"));
     tempDirectories.push(directory);
     const tracePath = path.join(directory, "git.jsonl");
-    vi.stubEnv("PASEO_GIT_TRACE_FILE", tracePath);
+    vi.stubEnv("CLISBOT_GIT_TRACE_FILE", tracePath);
 
     await runGitCommand(["--version"], { cwd: directory });
     await flushGitCommandTrace();

@@ -3,7 +3,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { openSettings } from "./app";
 import { clickSettingsBackToWorkspace, openSettingsSection } from "./settings";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 /** Persisted nav key -> the testID the app shell renders that item with. */
 const SHELL_ROW_TEST_IDS = {
@@ -292,7 +292,7 @@ export async function hoverFooterAddProject(page: Page): Promise<void> {
 }
 
 export async function footerScreenshot(page: Page, name: string): Promise<void> {
-  const directory = process.env.PASEO_QA_SCREENSHOT_DIR;
+  const directory = process.env.CLISBOT_QA_SCREENSHOT_DIR;
   if (!directory) return;
   await page.waitForTimeout(600);
   await page.addStyleTag({ content: ".__expo_fast_refresh { display: none !important; }" });

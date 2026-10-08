@@ -1,6 +1,6 @@
 ---
 title: Run parallel tasks
-description: Run coding agents in separate worktrees, review their diffs, and test each change with terminals and the built-in browser in Paseo.
+description: Run coding agents in separate worktrees, review their diffs, and test each change with terminals and the built-in browser in Clisbot.
 nav: Run parallel tasks
 order: 12
 category: Workspaces
@@ -8,7 +8,7 @@ category: Workspaces
 
 # Run parallel tasks
 
-Use Paseo's desktop app to give several coding agents independent tasks, review their changes, and run the results. Each task gets a workspace with its own git worktree and branch, with agents, files, diffs, terminals, and browser tabs together.
+Use Clisbot's desktop app to give several coding agents independent tasks, review their changes, and run the results. Each task gets a workspace with its own git worktree and branch, with agents, files, diffs, terminals, and browser tabs together.
 
 Start with the [desktop app](/docs#desktop-app-recommended), a local git repository, and at least one [coding agent installed and authenticated](/docs/supported-providers). The examples below use a repository with an `origin/main` branch.
 
@@ -33,7 +33,7 @@ Send corrections to that workspace's agent. To get another opinion, use **New ag
 
 In the selected workspace, use **New terminal** from the Command Center. Install dependencies and run your project's test or development command there.
 
-Each worktree has its own files, but processes still share the machine's network ports. Assign a different dev-server port to each running copy. For repeatable setup and service ports, configure [worktree setup and scripts](/docs/worktrees#paseojson).
+Each worktree has its own files, but processes still share the machine's network ports. Assign a different dev-server port to each running copy. For repeatable setup and service ports, configure [worktree setup and scripts](/docs/worktrees#clisbotjson).
 
 For a web app, use **New browser** and enter that workspace's dev-server URL. Exercise the changed flow, then switch workspaces to test the other implementation. Browser tabs run inside the desktop app.
 
@@ -49,4 +49,4 @@ For independent tasks, review and merge each branch. For competing implementatio
 
 ## Let an agent coordinate the tasks
 
-When you want an agent to create the workspaces, launch workers, and collect their results, use [orchestration](/docs/orchestration). The workers appear in Paseo so you can inspect their conversations and changes as they work.
+When you want an agent to create the workspaces, launch workers, and collect their results, use [orchestration](/docs/orchestration). The workers appear in Clisbot so you can inspect their conversations and changes as they work.

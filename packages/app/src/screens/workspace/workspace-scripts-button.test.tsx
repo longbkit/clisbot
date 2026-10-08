@@ -5,7 +5,7 @@ import { i18n as testI18n } from "@/i18n/i18next";
 import React, { type ReactElement } from "react";
 import { act, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { WorkspaceScriptPayload } from "@getpaseo/protocol/messages";
+import type { WorkspaceScriptPayload } from "@clisbot/protocol/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { WorkspaceScriptsButton } from "@/screens/workspace/workspace-scripts-button";
@@ -41,9 +41,9 @@ const {
     },
   };
 
-  const routePreferenceByServerId: Record<string, "public" | "paseo" | "direct"> = {};
+  const routePreferenceByServerId: Record<string, "public" | "clisbot" | "direct"> = {};
   const routePreferenceListeners = new Set<() => void>();
-  const setPreferredRoute = vi.fn((serverId: string, kind: "public" | "paseo" | "direct") => {
+  const setPreferredRoute = vi.fn((serverId: string, kind: "public" | "clisbot" | "direct") => {
     routePreferenceByServerId[serverId] = kind;
     for (const listener of routePreferenceListeners) listener();
   });
@@ -389,7 +389,7 @@ describe("WorkspaceScriptsButton", () => {
       script({
         scriptName: "web",
         type: "service",
-        hostname: "web.paseo.localhost",
+        hostname: "web.clisbot.localhost",
         lifecycle: "running",
         health: "healthy",
         port: 3000,
@@ -397,7 +397,7 @@ describe("WorkspaceScriptsButton", () => {
       script({
         scriptName: "api",
         type: "service",
-        hostname: "api.paseo.localhost",
+        hostname: "api.clisbot.localhost",
         lifecycle: "running",
         health: "unhealthy",
         port: 4000,
@@ -405,7 +405,7 @@ describe("WorkspaceScriptsButton", () => {
       script({
         scriptName: "worker",
         type: "service",
-        hostname: "worker.paseo.localhost",
+        hostname: "worker.clisbot.localhost",
         lifecycle: "running",
         health: null,
         port: 5000,
@@ -413,7 +413,7 @@ describe("WorkspaceScriptsButton", () => {
       script({
         scriptName: "old-service",
         type: "service",
-        hostname: "old-service.paseo.localhost",
+        hostname: "old-service.clisbot.localhost",
         lifecycle: "stopped",
         exitCode: 1,
       }),
@@ -457,14 +457,14 @@ describe("WorkspaceScriptsButton", () => {
         hostname: "dev--proj--repo.localhost",
         lifecycle: "running",
         port: 57483,
-        proxyUrl: "http://dev--proj--repo.localhost:6767",
+        proxyUrl: "http://dev--proj--repo.localhost:6868",
         terminalId: "terminal-script-1",
       }),
     ];
     current = renderScripts(scripts);
 
     const row = requireRow("dev");
-    expect(row.textContent).toContain("dev--proj--repo.localhost:6767");
+    expect(row.textContent).toContain("dev--proj--repo.localhost:6868");
 
     const routeButton = row.querySelector('[data-testid="workspace-scripts-route-dev"]');
     expect(routeButton).not.toBeNull();
@@ -492,7 +492,7 @@ describe("WorkspaceScriptsButton", () => {
         type: "service",
         lifecycle: "running",
         port: 57483,
-        localProxyUrl: "http://dev--proj--repo.localhost:6767",
+        localProxyUrl: "http://dev--proj--repo.localhost:6868",
         publicProxyUrl: "https://dev--proj--repo.services.example.com",
         proxyUrl: "https://dev--proj--repo.services.example.com",
         terminalId: "terminal-script-1",
@@ -564,7 +564,7 @@ describe("WorkspaceScriptsButton", () => {
         type: "service",
         lifecycle: "running",
         port: 3000,
-        proxyUrl: "http://dev--project.localhost:6767",
+        proxyUrl: "http://dev--project.localhost:6868",
         terminalId: "terminal-script-1",
       }),
     ]);

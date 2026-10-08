@@ -1,11 +1,11 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { ClisbotApi } from "@clisbot/client";
 import type { QueryClient } from "@tanstack/react-query";
-import type { PluginRequirements } from "@getpaseo/protocol/messages";
+import type { PluginRequirements } from "@clisbot/protocol/messages";
 import type {
   PluginAttachmentSourceContribution,
   PluginCleanup,
   PluginThemeContribution,
-} from "@getpaseo/plugin";
+} from "@clisbot/plugin";
 import type {
   PluginCommandCenterItemContribution,
   PluginClientSlashCommandContribution,
@@ -18,7 +18,7 @@ import type {
   PluginTimelineTransformerContribution,
   PluginPanelLocation,
   PluginWorkspacePanelContribution,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 
 export type PluginSidebarSection = "header" | "footer";
 
@@ -46,8 +46,8 @@ export interface EvaluatedPlugin {
 
 export interface InstalledPlugin extends EvaluatedPlugin {
   lifetime: AbortController;
-  /** The plugin's one Paseo client, `usePaseo()` in every surface; disposed at teardown. */
-  paseo: PaseoApi;
+  /** The plugin's one Clisbot client, `useClisbot()` in every surface; disposed at teardown. */
+  clisbot: ClisbotApi;
   /** Calls one of the plugin's server RPC methods on its host. */
   invoke(method: string, input: unknown): Promise<unknown>;
   serverId: string;

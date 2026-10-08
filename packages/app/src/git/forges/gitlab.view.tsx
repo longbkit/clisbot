@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { CircleCheck, ExternalLink } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import type { CheckoutPipelineJob, CheckoutPipelineStage } from "@getpaseo/protocol/messages";
+import type { CheckoutPipelineJob, CheckoutPipelineStage } from "@clisbot/protocol/messages";
 import { GitLabIcon } from "@/components/icons/gitlab-icon";
 import {
   definePaneContribution,

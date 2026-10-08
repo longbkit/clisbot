@@ -48,9 +48,9 @@ const COMPACT = { width: 390, height: 844 };
 
 type ScreenshotArea = { kind: "page" } | { kind: "footer" } | { kind: "element"; locator: Locator };
 
-/** Set PASEO_QA_SCREENSHOT_DIR to keep QA screenshots of each state. */
+/** Set CLISBOT_QA_SCREENSHOT_DIR to keep QA screenshots of each state. */
 async function qaScreenshot(page: Page, name: string, area: ScreenshotArea = { kind: "page" }) {
-  const directory = process.env.PASEO_QA_SCREENSHOT_DIR;
+  const directory = process.env.CLISBOT_QA_SCREENSHOT_DIR;
   if (!directory) return;
   // Let sheet and drawer animations settle so the image shows the final state.
   await page.waitForTimeout(600);

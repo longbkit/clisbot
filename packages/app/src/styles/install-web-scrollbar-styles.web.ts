@@ -5,7 +5,7 @@ import {
   WEB_SCROLLBAR_WIDTH,
 } from "@/styles/web-scrollbar";
 
-const STYLE_ID = "paseo-web-scrollbar-styles";
+const STYLE_ID = "clisbot-web-scrollbar-styles";
 
 export function installWebScrollbarStyles(): () => void {
   const existingStyle = document.getElementById(STYLE_ID);

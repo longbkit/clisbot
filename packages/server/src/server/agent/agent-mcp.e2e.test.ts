@@ -10,7 +10,7 @@ import pino from "pino";
 
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { hashDaemonPassword } from "../auth.js";
-import { createPaseoDaemon, type PaseoDaemonConfig } from "../bootstrap.js";
+import { createClisbotDaemon, type ClisbotDaemonConfig } from "../bootstrap.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
 import type {
   AgentClient,
@@ -95,24 +95,24 @@ interface OfflineMcpDaemon {
 }
 
 async function startOfflineMcpDaemon(): Promise<OfflineMcpDaemon> {
-  const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-  const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
+  const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+  const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
   const removeDirectories = async () => {
-    await rm(paseoHome, { recursive: true, force: true });
+    await rm(clisbotHome, { recursive: true, force: true });
     await rm(staticDir, { recursive: true, force: true });
   };
   const port = await getAvailablePort();
-  const daemon = await createPaseoDaemon(
+  const daemon = await createClisbotDaemon(
     {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     },
     pino({ level: "silent" }),
   ).catch(async (error: unknown) => {
@@ -174,7 +174,7 @@ class RecordingAgentClient implements AgentClient {
     this.capabilities = {
       ...inner.capabilities,
       supportsMcpServers: true,
-      supportsNativePaseoTools: false,
+      supportsNativeClisbotTools: false,
     };
   }
 
@@ -235,24 +235,24 @@ async function assertAgentNotRunning(options: {
 
 describe("agent MCP end-to-end (offline)", () => {
   test("create_agent runs initial prompt and affects filesystem", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-"));
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-"));
     const port = await getAvailablePort();
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
@@ -298,7 +298,7 @@ describe("agent MCP end-to-end (offline)", () => {
       }
       await client.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(agentCwd, { recursive: true, force: true });
     }
@@ -306,7 +306,7 @@ describe("agent MCP end-to-end (offline)", () => {
 
   test("create_workspace with local isolation adopts only an existing directory", async () => {
     const daemon = await startOfflineMcpDaemon();
-    const root = await mkdtemp(path.join(os.tmpdir(), "paseo-local-workspace-"));
+    const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-local-workspace-"));
     const missingPath = path.join(root, "does-not-exist");
     const filePath = path.join(root, "regular-file");
     await writeFile(filePath, "not a directory\n", "utf8");
@@ -326,25 +326,25 @@ describe("agent MCP end-to-end (offline)", () => {
   }, 30_000);
 
   test("password-protected daemon authorizes the agent MCP via the capability token", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-"));
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-"));
     const port = await getAvailablePort();
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
       auth: { password: hashDaemonPassword("daemon-secret") },
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const mcpUrl = `http://127.0.0.1:${port}/mcp/agents`;
@@ -389,44 +389,44 @@ describe("agent MCP end-to-end (offline)", () => {
       }
       await client?.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(agentCwd, { recursive: true, force: true });
     }
   }, 30_000);
 
-  test("create_agent auto-injects paseo MCP by default and can be disabled", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-"));
+  test("create_agent auto-injects clisbot MCP by default and can be disabled", async () => {
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-"));
     const port = await getAvailablePort();
     const recorder: LaunchRecorder = { recordedLaunches: [] };
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createMcpRecordingAgentClients(recorder),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
 
-    const disabledPaseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-disabled-"));
-    const disabledStaticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-disabled-"));
-    const disabledAgentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-disabled-"));
+    const disabledClisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-disabled-"));
+    const disabledStaticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-disabled-"));
+    const disabledAgentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-disabled-"));
     const disabledPort = await getAvailablePort();
     const disabledRecorder: LaunchRecorder = { recordedLaunches: [] };
-    const disabledDaemonConfig: PaseoDaemonConfig = {
+    const disabledDaemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${disabledPort}`,
-      paseoHome: disabledPaseoHome,
+      clisbotHome: disabledClisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
@@ -434,9 +434,12 @@ describe("agent MCP end-to-end (offline)", () => {
       staticDir: disabledStaticDir,
       mcpDebug: false,
       agentClients: createMcpRecordingAgentClients(disabledRecorder),
-      agentStoragePath: path.join(disabledPaseoHome, "agents"),
+      agentStoragePath: path.join(disabledClisbotHome, "agents"),
     };
-    const disabledDaemon = await createPaseoDaemon(disabledDaemonConfig, pino({ level: "silent" }));
+    const disabledDaemon = await createClisbotDaemon(
+      disabledDaemonConfig,
+      pino({ level: "silent" }),
+    );
     await disabledDaemon.start();
 
     const disabledClient = await createMcpClient(`http://127.0.0.1:${disabledPort}/mcp/agents`);
@@ -460,13 +463,13 @@ describe("agent MCP end-to-end (offline)", () => {
       expect(agentId).toBeTruthy();
 
       expect(recorder.recordedLaunches.at(-1)?.mcpServers).toMatchObject({
-        paseo: {
+        clisbot: {
           type: "http",
           url: `http://127.0.0.1:${port}/mcp/agents?callerAgentId=${agentId!}`,
         },
       });
       const injectedAgent = daemon.agentManager.getAgent(agentId!);
-      expect(injectedAgent?.config.mcpServers?.paseo).toBeUndefined();
+      expect(injectedAgent?.config.mcpServers?.clisbot).toBeUndefined();
 
       const disabledResult = await disabledClient.callTool({
         name: "create_agent",
@@ -484,9 +487,9 @@ describe("agent MCP end-to-end (offline)", () => {
         typeof disabledPayload?.agentId === "string" ? disabledPayload.agentId : null;
       expect(disabledAgentId).toBeTruthy();
 
-      expect(disabledRecorder.recordedLaunches.at(-1)?.mcpServers?.paseo).toBeUndefined();
+      expect(disabledRecorder.recordedLaunches.at(-1)?.mcpServers?.clisbot).toBeUndefined();
       const disabledAgent = disabledDaemon.agentManager.getAgent(disabledAgentId!);
-      expect(disabledAgent?.config.mcpServers?.paseo).toBeUndefined();
+      expect(disabledAgent?.config.mcpServers?.clisbot).toBeUndefined();
     } finally {
       if (agentId) {
         await client.callTool({ name: "kill_agent", args: { agentId } });
@@ -496,37 +499,37 @@ describe("agent MCP end-to-end (offline)", () => {
       }
       await disabledClient.close();
       await disabledDaemon.stop();
-      await rm(disabledPaseoHome, { recursive: true, force: true });
+      await rm(disabledClisbotHome, { recursive: true, force: true });
       await rm(disabledStaticDir, { recursive: true, force: true });
       await rm(disabledAgentCwd, { recursive: true, force: true });
       await client.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(agentCwd, { recursive: true, force: true });
     }
   }, 30_000);
 
   test("create_agent injects a loopback MCP URL when the daemon listens on all interfaces", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-"));
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-"));
     const port = await getAvailablePort();
     const recorder: LaunchRecorder = { recordedLaunches: [] };
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `0.0.0.0:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createMcpRecordingAgentClients(recorder),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
@@ -549,44 +552,44 @@ describe("agent MCP end-to-end (offline)", () => {
       expect(agentId).toBeTruthy();
 
       expect(recorder.recordedLaunches.at(-1)?.mcpServers).toMatchObject({
-        paseo: {
+        clisbot: {
           type: "http",
           url: `http://127.0.0.1:${port}/mcp/agents?callerAgentId=${agentId!}`,
         },
       });
       const injectedAgent = daemon.agentManager.getAgent(agentId!);
-      expect(injectedAgent?.config.mcpServers?.paseo).toBeUndefined();
+      expect(injectedAgent?.config.mcpServers?.clisbot).toBeUndefined();
     } finally {
       if (agentId) {
         await client.callTool({ name: "kill_agent", args: { agentId } });
       }
       await client.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(agentCwd, { recursive: true, force: true });
     }
   }, 30_000);
 
   test("create_agent with background initialPrompt reflects running state once the first turn starts", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-"));
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-"));
     const port = await getAvailablePort();
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
@@ -622,7 +625,7 @@ describe("agent MCP end-to-end (offline)", () => {
       }
       await client.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(agentCwd, { recursive: true, force: true });
     }
@@ -747,14 +750,14 @@ describe("agent MCP end-to-end (offline)", () => {
       }
     }
 
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-cwd-"));
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const agentCwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-cwd-"));
     const port = await getAvailablePort();
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
@@ -764,10 +767,10 @@ describe("agent MCP end-to-end (offline)", () => {
         ...createTestAgentClients(),
         codex: new StartTurnFailureClient(),
       },
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
@@ -807,31 +810,31 @@ describe("agent MCP end-to-end (offline)", () => {
       }
       await client.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(agentCwd, { recursive: true, force: true });
     }
   }, 30_000);
 
   test("create_agent with worktree is async and boots terminals only after setup success", async () => {
-    const paseoHome = await mkdtemp(path.join(os.tmpdir(), "paseo-home-"));
-    const staticDir = await mkdtemp(path.join(os.tmpdir(), "paseo-static-"));
-    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-worktree-repo-"));
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-"));
+    const staticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-"));
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-worktree-repo-"));
     const port = await getAvailablePort();
 
-    const daemonConfig: PaseoDaemonConfig = {
+    const daemonConfig: ClisbotDaemonConfig = {
       listen: `127.0.0.1:${port}`,
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: true,
       staticDir,
       mcpDebug: false,
       agentClients: createTestAgentClients(),
-      agentStoragePath: path.join(paseoHome, "agents"),
+      agentStoragePath: path.join(clisbotHome, "agents"),
     };
 
-    const daemon = await createPaseoDaemon(daemonConfig, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
     const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
@@ -847,9 +850,9 @@ describe("agent MCP end-to-end (offline)", () => {
       execSync("git -c commit.gpgsign=false commit -m 'initial'", { cwd: repoRoot, stdio: "pipe" });
 
       const setupCommand =
-        'while [ ! -f "$PASEO_WORKTREE_PATH/allow-setup" ]; do sleep 0.05; done; echo "done" > "$PASEO_WORKTREE_PATH/setup-done.txt"';
+        'while [ ! -f "$CLISBOT_WORKTREE_PATH/allow-setup" ]; do sleep 0.05; done; echo "done" > "$CLISBOT_WORKTREE_PATH/setup-done.txt"';
       await writeFile(
-        path.join(repoRoot, "paseo.json"),
+        path.join(repoRoot, "clisbot.json"),
         JSON.stringify({
           worktree: {
             setup: [setupCommand],
@@ -863,7 +866,7 @@ describe("agent MCP end-to-end (offline)", () => {
         }),
         "utf8",
       );
-      execSync("git add paseo.json", { cwd: repoRoot, stdio: "pipe" });
+      execSync("git add clisbot.json", { cwd: repoRoot, stdio: "pipe" });
       execSync("git -c commit.gpgsign=false commit -m 'add worktree config'", {
         cwd: repoRoot,
         stdio: "pipe",
@@ -911,7 +914,7 @@ describe("agent MCP end-to-end (offline)", () => {
       }
       await client.close();
       await daemon.stop();
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
       await rm(staticDir, { recursive: true, force: true });
       await rm(repoRoot, { recursive: true, force: true });
     }

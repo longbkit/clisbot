@@ -1,9 +1,9 @@
 import type { AudioEngine } from "@/audio";
 import { useMemo, useSyncExternalStore } from "react";
 import { QueryClient } from "@tanstack/react-query";
-import { createPaseoApi } from "@getpaseo/client";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
+import { createClisbotApi } from "@clisbot/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { assertPluginCompatibility } from "@clisbot/protocol/plugin-requirements";
 import { resolveAppVersion } from "@/utils/app-version";
 import { createPluginClientRuntime } from "./client-runtime";
 import { runPluginClientBundle } from "./evaluate";
@@ -55,7 +55,7 @@ export class PluginRegistry {
           plugin.id !== options.replacePluginId &&
           plugin.id === entry.id &&
           plugin.clientBundle === entry.clientBundle &&
-          plugin.requirements?.paseo === entry.requirements?.paseo,
+          plugin.requirements?.clisbot === entry.requirements?.clisbot,
       );
       return existing ? [existing] : [];
     });
@@ -81,7 +81,7 @@ export class PluginRegistry {
         const client = options.client;
         installation = {
           lifetime: new AbortController(),
-          paseo: createPaseoApi(client),
+          clisbot: createClisbotApi(client),
           invoke: (method, input) => client.invokePluginRpc(entry.id, method, input),
           id: entry.id,
           serverId,
@@ -106,9 +106,9 @@ export class PluginRegistry {
           this.publish(),
         );
         Object.assign(installation, evaluated);
-        const paseo = installation.paseo;
+        const clisbot = installation.clisbot;
         installation.cleanup = async () => {
-          const results = await Promise.allSettled([paseo.dispose(), evaluated.cleanup()]);
+          const results = await Promise.allSettled([clisbot.dispose(), evaluated.cleanup()]);
           const failures = results.filter((result) => result.status === "rejected");
           if (failures.length)
             throw new AggregateError(
@@ -120,7 +120,7 @@ export class PluginRegistry {
         return [installation];
       } catch (error) {
         installation?.lifetime.abort();
-        void installation?.paseo
+        void installation?.clisbot
           .dispose()
           .catch((failure) => console.warn(`[Plugins] API cleanup failed for ${key}`, failure));
         this.evaluationErrors.set(key, error instanceof Error ? error.message : String(error));

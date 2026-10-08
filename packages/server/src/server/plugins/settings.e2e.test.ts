@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, onTestFinished, test } from "vitest";
 import { z } from "zod";
-import { defineRpc, settingsRpc } from "@getpaseo/plugin";
+import { defineRpc, settingsRpc } from "@clisbot/plugin";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 test("server reads saved settings after daemon restart before any client connects", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "settings-restart-"));
@@ -15,10 +15,10 @@ test("server reads saved settings after daemon restart before any client connect
   const startupReport = path.join(root, "startup.json");
   await mkdir(path.join(directory, "server"), { recursive: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "settings-startup",
-      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+      requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
     }),
   );
   await writeFile(
@@ -31,7 +31,7 @@ export async function reportStartup(settings) {
   );
   await writeFile(
     path.join(directory, "index.server.ts"),
-    `import { defineSettings } from "@getpaseo/plugin";
+    `import { defineSettings } from "@clisbot/plugin";
 import { z } from "zod";
 import { reportStartup } from "./server/report";
 export default function(server) {
@@ -41,7 +41,7 @@ export default function(server) {
 }`,
   );
   const options = {
-    paseoHomeRoot: path.join(root, "daemon"),
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
     pluginsEnabled: true,
@@ -49,7 +49,7 @@ export default function(server) {
       "settings-startup": { source: "directory" as const, path: directory, enabled: true },
     },
   };
-  const first = await createTestPaseoDaemon(options);
+  const first = await createTestClisbotDaemon(options);
   onTestFinished(() => first.close());
   const rpc = settingsRpc("display");
   const readStartup = async () =>
@@ -75,7 +75,7 @@ export default function(server) {
   await first.close();
   await rm(startupReport);
 
-  const restarted = await createTestPaseoDaemon(options);
+  const restarted = await createTestClisbotDaemon(options);
   onTestFinished(() => restarted.close());
   // No client is created for this daemon: the report comes from server startup alone.
   await expect.poll(readStartup).toEqual(persisted);
@@ -83,7 +83,7 @@ export default function(server) {
 
 test("two clients share settings, observe changes, and preserve values through plugin lifecycle", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "settings-plugin-"));
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const first = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.7.2" });
   const second = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.7.2" });
   const rpc = settingsRpc("display");
@@ -102,15 +102,15 @@ test("two clients share settings, observe changes, and preserve values through p
   const changed: string[] = [];
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "settings-test",
-        requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+        requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
       }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
-      `import { defineRpc, defineSettings } from "@getpaseo/plugin";
+      `import { defineRpc, defineSettings } from "@clisbot/plugin";
 import { z } from "zod";
 const serverRead = defineRpc({ name: "settings-test.server-read", input: z.object({}), output: z.json() });
 const serverChanges = defineRpc({ name: "settings-test.server-changes", input: z.object({}), output: z.object({ count: z.number().int() }) });

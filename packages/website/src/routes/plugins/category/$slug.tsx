@@ -26,7 +26,9 @@ export const Route = createFileRoute("/plugins/category/$slug")({
   },
   head: ({ params, loaderData }) =>
     pageMeta(
-      loaderData ? `${loaderData.category.label} – Paseo plugins` : "Category not found – Paseo",
+      loaderData
+        ? `${loaderData.category.label} – Clisbot plugins`
+        : "Category not found – Clisbot",
       loaderData?.category.description ?? "Category not found.",
       `/plugins/category/${params.slug}`,
     ),

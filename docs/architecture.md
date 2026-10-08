@@ -1,8 +1,8 @@
 # Architecture
 
-Paseo is a client-server system for monitoring and controlling local AI coding agents. The daemon runs on your machine, manages agent processes, and streams their output in real time over WebSocket. Clients (mobile app, CLI, desktop app) connect to the daemon to observe and interact with agents.
+Clisbot is a client-server system for monitoring and controlling local AI coding agents. The daemon runs on your machine, manages agent processes, and streams their output in real time over WebSocket. Clients (mobile app, CLI, desktop app) connect to the daemon to observe and interact with agents.
 
-Your code never leaves your machine. Paseo is local-first.
+Your code never leaves your machine. Clisbot is local-first.
 
 ## System overview
 
@@ -43,7 +43,7 @@ Your code never leaves your machine. Paseo is local-first.
 
 ### `packages/server` — The daemon
 
-The heart of Paseo. A Node.js process that:
+The heart of Clisbot. A Node.js process that:
 
 - Listens for WebSocket connections from clients
 - Manages agent lifecycle (create, run, stop, resume, archive)
@@ -55,7 +55,7 @@ The heart of Paseo. A Node.js process that:
 All paths are under `packages/server/src/`.
 
 Desktop and CLI import server capabilities through explicit package subpaths such as
-`@getpaseo/server/daemon-control`, `/configuration`, and `/process`. The root export
+`@clisbot/server/daemon-control`, `/configuration`, and `/process`. The root export
 loads daemon bootstrap eagerly, even when a caller only uses a path or process helper.
 Keep process-management and configuration dependencies independent of bootstrap and
 WebSocket message schemas. Shared configuration schemas belong in protocol leaf modules;
@@ -81,9 +81,9 @@ not retain non-Git directories.
 | `server/directory-sync/`        | Daemon-global latest-state sequences for projects, workspaces, and agents      |
 | `server/workspace-labels/`      | Host-local label catalog, assignment mutations, and explicit subscriptions     |
 | `server/agent/agent-manager.ts` | Agent lifecycle state machine, timeline tracking, subscriber management        |
-| `server/agent/agent-storage.ts` | File-backed JSON persistence at `$PASEO_HOME/agents/`                          |
+| `server/agent/agent-storage.ts` | File-backed JSON persistence at `$CLISBOT_HOME/agents/`                        |
 | `server/agent/tools/`           | Transport-neutral catalog for workspaces, agents, permissions, and automation  |
-| `server/agent/mcp-server.ts`    | Thin MCP adapter that registers the Paseo tool catalog with the MCP SDK        |
+| `server/agent/mcp-server.ts`    | Thin MCP adapter that registers the Clisbot tool catalog with the MCP SDK      |
 | `server/agent/providers/`       | Provider adapters (see "Agent providers" below)                                |
 | `server/orchestration-skills/`  | Bundled catalog, host selection, convergence, and skill-directory transactions |
 | `server/relay-transport.ts`     | Outbound relay connection with E2E encryption                                  |
@@ -93,18 +93,18 @@ not retain non-Git directories.
 
 The source of truth for WebSocket messages, binary frame codecs, endpoint parsing,
 agent timeline types, provider config schemas, and other values shared by daemon
-and clients. Server, app, CLI, and `@getpaseo/client` all depend on this package;
+and clients. Server, app, CLI, and `@clisbot/client` all depend on this package;
 it does not depend on the server.
 
 ### `packages/client` — Daemon client library and SDK facade
 
-Owns the low-level daemon WebSocket driver plus the higher-level `PaseoClient`
+Owns the low-level daemon WebSocket driver plus the higher-level `ClisbotClient`
 facade. App and CLI may import the low-level driver from
-`@getpaseo/client/internal/daemon-client` during migration, while new SDK-shaped
-code imports from `@getpaseo/client`.
+`@clisbot/client/internal/daemon-client` during migration, while new SDK-shaped
+code imports from `@clisbot/client`.
 
-`PaseoApi` is the capability-only boundary over workspaces, agents, terminals, providers, and config.
-`PaseoClient` adds connection lifecycle. App plugin surfaces borrow an API over their selected
+`ClisbotApi` is the capability-only boundary over workspaces, agents, terminals, providers, and config.
+`ClisbotClient` adds connection lifecycle. App plugin surfaces borrow an API over their selected
 host's client; plugin subprocesses use the same facade over a host-owned IPC transport. Protocol capability ownership and subscription lifetimes follow
 [the client contract](protocol-compatibility.md#client-capability-ownership).
 
@@ -151,20 +151,20 @@ traffic. Workspace assignments stay on the workspace directory sequence.
 
 ### `packages/cli` — Command-line client
 
-Commander.js CLI with Docker-style commands. Common agent operations are also exposed at the top level (e.g. `paseo ls`, `paseo run`).
+Commander.js CLI with Docker-style commands. Common agent operations are also exposed at the top level (e.g. `clisbot ls`, `clisbot run`).
 
-- `paseo agent ls/run/import/attach/logs/stop/delete/send/inspect/wait/archive/reload/update/mode`
-- `paseo daemon start/run/stop/restart/status/reload/config/pair/set-password`
-- `paseo terminal ls/create/capture/send-keys/kill`
-- `paseo script ls/start/stop`
-- `paseo schedule create/ls/inspect/update/pause/resume/run-once/logs/delete`
-- `paseo heartbeat create/update/delete`
-- `paseo project create/ls/rename/delete`
-- `paseo workspace create/ls/rename/archive`
-- `paseo permit allow/deny/ls`
-- `paseo provider ls/models`
-- hidden legacy `paseo worktree create/ls/archive` compatibility alias
-- `paseo speech …`
+- `clisbot agent ls/run/import/attach/logs/stop/delete/send/inspect/wait/archive/reload/update/mode`
+- `clisbot daemon start/run/stop/restart/status/reload/config/pair/set-password`
+- `clisbot terminal ls/create/capture/send-keys/kill`
+- `clisbot script ls/start/stop`
+- `clisbot schedule create/ls/inspect/update/pause/resume/run-once/logs/delete`
+- `clisbot heartbeat create/update/delete`
+- `clisbot project create/ls/rename/delete`
+- `clisbot workspace create/ls/rename/archive`
+- `clisbot permit allow/deny/ls`
+- `clisbot provider ls/models`
+- hidden legacy `clisbot worktree create/ls/archive` compatibility alias
+- `clisbot speech …`
 
 Communicates with the daemon via the same WebSocket protocol as the app.
 
@@ -178,13 +178,13 @@ Enables remote access when the daemon is behind a firewall.
 - Pairing via QR code transfers the daemon's public key to the client
 - New homes keep relay disabled until pairing consent. `DaemonConfigStore` persists the desired state, while the relay runtime starts or stops the outbound transport live; pairing reads that current state instead of a startup snapshot.
 - Optional E2EE capability negotiation preserves application frame kind: text plaintext uses base64 ciphertext text frames, while binary plaintext uses raw ciphertext binary frames; mixed-version peers remain base64-only
-- Self-hosted relays opt into TLS with `daemon.relay.useTls` or `PASEO_RELAY_USE_TLS=true`; the public (client-facing) TLS setting can be overridden independently via `daemon.relay.publicUseTls` or `PASEO_RELAY_PUBLIC_USE_TLS`
+- Self-hosted relays opt into TLS with `daemon.relay.useTls` or `CLISBOT_RELAY_USE_TLS=true`; the public (client-facing) TLS setting can be overridden independently via `daemon.relay.publicUseTls` or `CLISBOT_RELAY_PUBLIC_USE_TLS`
 
 The production relay server lives in [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay). It is a distributed Elixir service. The Cloudflare relay implementation in this monorepo is retained as legacy code and is not deployed.
 
 See [SECURITY.md](../SECURITY.md) for the full threat model.
 
-### Paseo Hub
+### Clisbot Hub
 
 The optional Hub relationship is daemon-outbound and does not use the relay. Its connection,
 authorization, ownership, persistence, and lifecycle contract is documented in [hub.md](hub.md).
@@ -201,24 +201,24 @@ The desktop does not manage agent skills. It retains one compatibility reader fo
 `skill-selection.json`, imports that preference into its managed local daemon, then deletes the old
 file after the daemon confirms persistence.
 
-**Multi-window (hybrid land-on model).** `createWindow()` in `main.ts` is reusable: `⌘⇧N`/File→New Window, relaunching the app (`second-instance`), and the sidebar "Open in new window" action each open a fresh `BrowserWindow`. Every window shows the full sidebar — there is no per-window project ownership or filtering. "Land on a project" is delivered by a per-`webContents` `PendingOpenProjectStore`: each window pulls its own pending project path on mount (`paseo:get-pending-open-project`) and runs the normal open-project flow, identical to a CLI `paseo <path>` launch.
+**Multi-window (hybrid land-on model).** `createWindow()` in `main.ts` is reusable: `⌘⇧N`/File→New Window, relaunching the app (`second-instance`), and the sidebar "Open in new window" action each open a fresh `BrowserWindow`. Every window shows the full sidebar — there is no per-window project ownership or filtering. "Land on a project" is delivered by a per-`webContents` `PendingOpenProjectStore`: each window pulls its own pending project path on mount (`clisbot:get-pending-open-project`) and runs the normal open-project flow, identical to a CLI `clisbot <path>` launch.
 
 > **Window-state v1 limitation:** only the _first_ window of a session restores and persists saved geometry (size/position/maximized). Windows opened via ⌘⇧N / second-instance / "Open in new window" open at the default size, OS-cascaded, and do not persist — this avoids every window stacking on the same restored bounds and fighting over the single window-state store. Lifting this needs per-window state keys.
 >
 > **In-app browser profile.** Every browser guest uses one stable persistent Electron session, so cookies, authentication, cache, and site storage are shared across tabs, workspaces, and desktop windows and survive tab or app closure. Browser identity is independent of that storage partition: after every `did-attach`, the renderer explicitly registers its browser id, workspace id, and current guest `WebContents` id, and main accepts the registration only when that guest belongs to the calling renderer and the shared profile. Registration is intentionally repeated because reparenting a retained `<webview>` can replace its guest without replacing the DOM element. Settings > General > Clear browser data is the sole profile-deletion path; it clears the shared session and reloads live guests without deleting saved tabs or URLs.
 >
-> **In-app browser window opens.** Ordinary link opens, including Shift-clicked links, become Paseo workspace tabs. Script-created opens with popup features or a named window target and POST-backed opens remain secured Electron child windows in the shared browser profile, preserving `window.opener`, `postMessage`, named-window reuse, request bodies, and `window.close()` for OAuth, payment, and similar popup protocols. Unsupported URL schemes are denied before either path.
+> **In-app browser window opens.** Ordinary link opens, including Shift-clicked links, become Clisbot workspace tabs. Script-created opens with popup features or a named window target and POST-backed opens remain secured Electron child windows in the shared browser profile, preserving `window.opener`, `postMessage`, named-window reuse, request bodies, and `window.close()` for OAuth, payment, and similar popup protocols. Unsupported URL schemes are denied before either path.
 >
 > **In-app browser ownership.** Each registered guest records its owning host window. The active browser is keyed by `(host window, workspace)`, and application-menu Reload / Force Reload resolve only within the window Electron supplies to the menu callback. A non-null active update must name a browser owned by that host; a null update clears only that host/workspace. Browser automation continues to target explicit browser ids returned by `browser_new_tab` or `browser_list_tabs`.
 >
-> **Browser keyboard boundary.** Guest pages receive renderer-published shortcuts first. `Cmd/Ctrl+L` and `Cmd/Ctrl+R` are explicit guest-shell reservations; ordinary Paseo shortcuts run only after the page declines them. The sandboxed guest preload runs in every frame so focused iframes use the same boundary, while Node integration remains disabled. Human guest input disables Electron's menu fallback for plain keys. Agent-generated keys use guest `sendInputEvent` with `skipIfUnhandled`, so an unhandled Enter stops at the guest instead of reaching the host composer. Main selects the preload; it exposes no APIs to guest pages.
+> **Browser keyboard boundary.** Guest pages receive renderer-published shortcuts first. `Cmd/Ctrl+L` and `Cmd/Ctrl+R` are explicit guest-shell reservations; ordinary Clisbot shortcuts run only after the page declines them. The sandboxed guest preload runs in every frame so focused iframes use the same boundary, while Node integration remains disabled. Human guest input disables Electron's menu fallback for plain keys. Agent-generated keys use guest `sendInputEvent` with `skipIfUnhandled`, so an unhandled Enter stops at the guest instead of reaching the host composer. Main selects the preload; it exposes no APIs to guest pages.
 
 ```text
 Human key -> guest WebContents
   |-- Cmd/Ctrl+T/L/R ----------> reserved browser-shell action
   `-- page keydown
         |-- page prevents ------> page owns it
-        `-- published shortcut -> guest preload -> IPC(browserId) -> Paseo resolver
+        `-- published shortcut -> guest preload -> IPC(browserId) -> Clisbot resolver
 
 Agent browser_keypress -> guest sendInputEvent(skipIfUnhandled)
   |-- guest handles ------------> page owns it
@@ -227,7 +227,7 @@ Agent browser_keypress -> guest sendInputEvent(skipIfUnhandled)
 
 ### `packages/website` — Marketing site
 
-TanStack Router + Cloudflare Workers. Serves paseo.sh.
+TanStack Router + Cloudflare Workers. Serves clisbot.com.
 
 ## WebSocket protocol
 
@@ -385,7 +385,7 @@ initializing → idle ⇄ running
   client-side dedup; the default fetch page is 200 items.
 - Timeline row `timestamp` values are canonical daemon-owned timestamps. Providers may supply original replay timestamps, but clients must not guess timestamp trust or hide time UI based on local clock heuristics.
 - Events stream to connected clients in real time; correctness is backed by authoritative timeline fetches and paged-to-completion catch-up.
-- Agent state persists to `$PASEO_HOME/agents/{cwd-with-dashes}/{agent-id}.json`. Timeline rows are runtime memory; provider history is the durable transcript authority and resumed agents rebuild from it. That storage path is derived from `cwd`, not from workspace id.
+- Agent state persists to `$CLISBOT_HOME/agents/{cwd-with-dashes}/{agent-id}.json`. Timeline rows are runtime memory; provider history is the durable transcript authority and resumed agents rebuild from it. That storage path is derived from `cwd`, not from workspace id.
 
 ## Right-sidebar boundary: directory-backed vs workspace-owned
 
@@ -437,12 +437,12 @@ The built-in, user-facing providers are Claude Code, Codex, Copilot, OpenCode, P
 
 All providers:
 
-- Handle their own authentication (Paseo does not manage API keys)
+- Handle their own authentication (Clisbot does not manage API keys)
 - Support session resume via persistence handles
 - Map tool calls to a normalized `ToolCallDetail` type
 - Expose provider-specific modes (plan, default, full-access)
 
-Providers that can accept native tool definitions should set `supportsNativePaseoTools` and read `launchContext.paseoTools`. The daemon then passes the shared Paseo tool catalog directly and removes the internal Paseo MCP server from that provider launch config. Providers that only support MCP continue to receive the same tools through the MCP fallback at `/mcp/agents`.
+Providers that can accept native tool definitions should set `supportsNativeClisbotTools` and read `launchContext.clisbotTools`. The daemon then passes the shared Clisbot tool catalog directly and removes the internal Clisbot MCP server from that provider launch config. Providers that only support MCP continue to receive the same tools through the MCP fallback at `/mcp/agents`.
 
 ## Data flow: running an agent
 
@@ -456,10 +456,10 @@ Providers that can accept native tool definitions should set `supportsNativePase
 
 ## Storage
 
-`$PASEO_HOME` defaults to `~/.paseo`. The most important files:
+`$CLISBOT_HOME` defaults to `~/.clisbot`. The most important files:
 
 ```
-$PASEO_HOME/
+$CLISBOT_HOME/
 ├── agents/{cwd-with-dashes}/{agent-id}.json   # Agent record
 ├── projects/projects.json                      # Project registry
 ├── projects/workspaces.json                    # Workspace registry
@@ -468,16 +468,16 @@ $PASEO_HOME/
 ├── config.json                                 # Daemon config (mutable)
 ├── daemon-keypair.json                         # Daemon identity for relay/E2EE
 ├── push-tokens.json                            # Mobile push tokens
-├── paseo.pid                                   # Supervisor identity and published bound endpoint
+├── clisbot.pid                                   # Supervisor identity and published bound endpoint
 └── daemon.log                                  # Daemon trace logs (rotated)
 ```
 
-The supervisor alone publishes its ready worker's endpoint in `paseo.pid`, clears it before respawn, and fails if any worker exits before first readiness. CLI home selection trusts only that live record; config expresses desired state, never an endpoint fallback. POSIX home stop signals the captured supervisor without TCP. Windows graceful stop and ordinary RPCs trust the published endpoint. This metadata is not cryptographic listener ownership: edited endpoints, copied identities, PID reuse, and address takeover races remain outside that guarantee. A stale heartbeat never permits reclaiming a live lock.
+The supervisor alone publishes its ready worker's endpoint in `clisbot.pid`, clears it before respawn, and fails if any worker exits before first readiness. CLI home selection trusts only that live record; config expresses desired state, never an endpoint fallback. POSIX home stop signals the captured supervisor without TCP. Windows graceful stop and ordinary RPCs trust the published endpoint. This metadata is not cryptographic listener ownership: edited endpoints, copied identities, PID reuse, and address takeover races remain outside that guarantee. A stale heartbeat never permits reclaiming a live lock.
 
 Worker restart retains supervisor arguments/environment and rereads the configuration file. Updating a package and observing its new worker version do not refresh the running supervisor code; the launcher owns full-process replacement. See [CLI lifecycle contracts](../public-docs/cli.md#daemon-management).
 
 ## Deployment models
 
-1. **Local daemon** (default): `paseo daemon start` on `127.0.0.1:6767`
+1. **Local daemon** (default): `clisbot daemon start` on `127.0.0.1:6868`
 2. **Managed desktop**: Electron uses the server package’s local-instance lifecycle capability for sanitized launch, published readiness, and captured-PID stop. Only a matching `{pid, startedAt}` from a spawn in the current Desktop session authorizes automatic stop or binary replacement. Preexisting instances, including legacy `desktopManaged` records, are attach-only. Keep-running survivors attach in the next session. Explicit attached Stop requires a confirmation naming the captured home/PID. Ordinary Restart uses the worker RPC on every app platform.
 3. **Remote + relay**: Daemon behind firewall, relay bridges with E2E encryption

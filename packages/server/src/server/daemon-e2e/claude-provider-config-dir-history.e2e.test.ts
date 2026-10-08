@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { claudeProjectDirSync } from "../agent/providers/claude/project-dir.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 const PROVIDER_ID = "claude-secondary";
 const SESSION_ID = "provider-config-dir-session";
@@ -22,19 +22,19 @@ function timelineText(entries: ReadonlyArray<{ item: { type: string; text?: stri
 
 describe("daemon E2E - Claude history lives in the provider's CLAUDE_CONFIG_DIR", () => {
   let tempRoot: string;
-  let paseoHomeRoot: string;
+  let clisbotHomeRoot: string;
   let providerConfigDir: string;
   let cwd: string;
   let prevClaudeConfigDir: string | undefined;
-  let daemon: TestPaseoDaemon | undefined;
+  let daemon: TestClisbotDaemon | undefined;
   let client: DaemonClient | undefined;
 
   beforeEach(() => {
     tempRoot = mkdtempSync(path.join(tmpdir(), "claude-provider-config-dir-"));
-    paseoHomeRoot = path.join(tempRoot, "paseo-home");
+    clisbotHomeRoot = path.join(tempRoot, "clisbot-home");
     providerConfigDir = path.join(tempRoot, "custom-claude-dir");
     cwd = path.join(tempRoot, "repo");
-    mkdirSync(paseoHomeRoot, { recursive: true });
+    mkdirSync(clisbotHomeRoot, { recursive: true });
     mkdirSync(cwd, { recursive: true });
 
     const projectDir = claudeProjectDirSync(cwd, { configDir: providerConfigDir });
@@ -80,8 +80,8 @@ describe("daemon E2E - Claude history lives in the provider's CLAUDE_CONFIG_DIR"
   }, 60_000);
 
   async function startDaemon(): Promise<DaemonClient> {
-    daemon = await createTestPaseoDaemon({
-      paseoHomeRoot,
+    daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot,
       cleanup: false,
       providerOverrides: {
         [PROVIDER_ID]: {

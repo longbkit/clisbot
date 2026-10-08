@@ -146,7 +146,7 @@ function createSession(
   return new ACPAgentSession(
     {
       provider: "claude-acp",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
     },
     {
       provider: "claude-acp",
@@ -204,7 +204,7 @@ function createSessionWithConfig(
   return new ACPAgentSession(
     {
       provider: config.provider ?? "claude-acp",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
       modeId: config.modeId ?? undefined,
       model: config.model ?? undefined,
       featureValues: config.featureValues,
@@ -233,7 +233,7 @@ function createKiroSession(
   return new ACPAgentSession(
     {
       provider: "kiro",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
     },
     {
       provider: "kiro",
@@ -304,7 +304,7 @@ function createCopilotSessionWithConfig(
   return new ACPAgentSession(
     {
       provider: "copilot",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
       modeId: modeId ?? undefined,
       ...(featureValues ? { featureValues } : {}),
     },
@@ -685,7 +685,7 @@ describe("ACPAgentSession terminal tools", () => {
 
     const readLaunchIdentityArgs = [
       "-e",
-      "process.stdout.write(JSON.stringify({ id: process.env.PASEO_AGENT_ID ?? null, cwd: process.env.PASEO_AGENT_CWD ?? null, extra: process.env.PASEO_TEST_EXTRA ?? null }))",
+      "process.stdout.write(JSON.stringify({ id: process.env.CLISBOT_AGENT_ID ?? null, cwd: process.env.CLISBOT_AGENT_CWD ?? null, extra: process.env.CLISBOT_TEST_EXTRA ?? null }))",
     ];
 
     async function readLaunchIdentity(
@@ -711,13 +711,13 @@ describe("ACPAgentSession terminal tools", () => {
     }
 
     test("gives the terminal the agent's identity", async () => {
-      // The daemon itself does not run inside a Paseo agent.
-      vi.stubEnv("PASEO_AGENT_ID", undefined);
-      vi.stubEnv("PASEO_AGENT_CWD", undefined);
+      // The daemon itself does not run inside a Clisbot agent.
+      vi.stubEnv("CLISBOT_AGENT_ID", undefined);
+      vi.stubEnv("CLISBOT_AGENT_CWD", undefined);
       const session = createSession({
         launchEnv: {
-          PASEO_AGENT_ID: "agent-1",
-          PASEO_AGENT_CWD: "/repo",
+          CLISBOT_AGENT_ID: "agent-1",
+          CLISBOT_AGENT_CWD: "/repo",
         },
       });
 
@@ -728,13 +728,13 @@ describe("ACPAgentSession terminal tools", () => {
     });
 
     test("prefers the agent's identity over the daemon's own environment", async () => {
-      // A daemon started from inside another Paseo agent carries that agent's id.
-      vi.stubEnv("PASEO_AGENT_ID", "daemon-host-agent");
-      vi.stubEnv("PASEO_AGENT_CWD", "/elsewhere");
+      // A daemon started from inside another Clisbot agent carries that agent's id.
+      vi.stubEnv("CLISBOT_AGENT_ID", "daemon-host-agent");
+      vi.stubEnv("CLISBOT_AGENT_CWD", "/elsewhere");
       const session = createSession({
         launchEnv: {
-          PASEO_AGENT_ID: "agent-1",
-          PASEO_AGENT_CWD: "/repo",
+          CLISBOT_AGENT_ID: "agent-1",
+          CLISBOT_AGENT_CWD: "/repo",
         },
       });
 
@@ -747,14 +747,14 @@ describe("ACPAgentSession terminal tools", () => {
     test("lets the requested terminal environment win over the launch environment", async () => {
       const session = createSession({
         launchEnv: {
-          PASEO_AGENT_ID: "agent-1",
-          PASEO_TEST_EXTRA: "from-launch",
+          CLISBOT_AGENT_ID: "agent-1",
+          CLISBOT_TEST_EXTRA: "from-launch",
         },
       });
 
       await expect(
         readLaunchIdentity(session, {
-          env: [{ name: "PASEO_TEST_EXTRA", value: "from-request" }],
+          env: [{ name: "CLISBOT_TEST_EXTRA", value: "from-request" }],
         }),
       ).resolves.toMatchObject({ id: "agent-1", extra: "from-request" });
     });
@@ -762,11 +762,11 @@ describe("ACPAgentSession terminal tools", () => {
     test("carries the agent's identity into single-string shell commands", async () => {
       const child = createTerminalChildStub();
       const spawn = vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(child);
-      const session = createSession({ launchEnv: { PASEO_AGENT_ID: "agent-1" } });
+      const session = createSession({ launchEnv: { CLISBOT_AGENT_ID: "agent-1" } });
 
       await session.createTerminal({
         sessionId: "session-1",
-        command: "paseo heartbeat create --every 5m",
+        command: "clisbot heartbeat create --every 5m",
         cwd: "/repo",
       });
 
@@ -775,7 +775,7 @@ describe("ACPAgentSession terminal tools", () => {
         expect.any(Array),
         expect.objectContaining({
           envOverlay: expect.objectContaining({
-            PASEO_AGENT_ID: "agent-1",
+            CLISBOT_AGENT_ID: "agent-1",
             BASH_ENV: undefined,
           }),
         }),
@@ -813,7 +813,7 @@ describe("ACPAgentSession terminal tools", () => {
 });
 
 describe("mapACPUsage", () => {
-  test("maps ACP usage fields into Paseo usage", () => {
+  test("maps ACP usage fields into Clisbot usage", () => {
     expect(
       mapACPUsage({
         inputTokens: 11,
@@ -1357,7 +1357,7 @@ describe("ACPAgentSession Zed parity", () => {
             type: "content",
             content: {
               type: "text",
-              text: "Which path should Paseo take?",
+              text: "Which path should Clisbot take?",
             },
           },
         ],
@@ -1378,7 +1378,7 @@ describe("ACPAgentSession Zed parity", () => {
         detail: {
           type: "plain_text",
           label: "AskUserQuestion",
-          text: "Which path should Paseo take?",
+          text: "Which path should Clisbot take?",
         },
         actions: [
           { id: "q0_opt_0", label: "Narrow fix", behavior: "allow" },
@@ -2491,7 +2491,7 @@ describe("ACPAgentSession slash commands", () => {
     const session = new ACPAgentSession(
       {
         provider: "claude-acp",
-        cwd: "/tmp/paseo-acp-test",
+        cwd: "/tmp/clisbot-acp-test",
       },
       {
         provider: "claude-acp",
@@ -2517,7 +2517,7 @@ describe("ACPAgentSession slash commands", () => {
     const session = new ACPAgentSession(
       {
         provider: "claude-acp",
-        cwd: "/tmp/paseo-acp-test",
+        cwd: "/tmp/clisbot-acp-test",
       },
       {
         provider: "claude-acp",
@@ -2590,11 +2590,11 @@ describe("ACPAgentSession", () => {
     const session = new ACPAgentSession(
       {
         provider: "no-mcp-acp",
-        cwd: "/tmp/paseo-acp-test",
+        cwd: "/tmp/clisbot-acp-test",
         mcpServers: {
-          paseo: {
+          clisbot: {
             type: "http",
-            url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+            url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           },
         },
       },
@@ -3403,11 +3403,11 @@ describe("ACPAgentSession", () => {
     await connection.initialize({
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: {},
-      clientInfo: { name: "Paseo test", version: "dev" },
+      clientInfo: { name: "Clisbot test", version: "dev" },
     });
     expect(agentConnection.signal.aborted).toBe(false);
     const sessionResponse = await connection.newSession({
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
       mcpServers: [],
     });
     const turnFailed = new Promise<Extract<AgentStreamEvent, { type: "turn_failed" }>>(
@@ -3603,7 +3603,7 @@ describe("ACPAgentSession close() tree-kill", () => {
 
 describe("ACPAgentSession initialization cleanup", () => {
   test("rejects a resume whose working directory was deleted instead of crashing", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-acp-deleted-cwd-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-acp-deleted-cwd-"));
     const deletedCwd = path.join(root, "worktree");
     const terminator = new FakeTerminator();
     const session = new ACPAgentSession(
@@ -3647,7 +3647,7 @@ describe("ACPAgentSession initialization cleanup", () => {
     }
 
     const session = new FailingNewSession(
-      { provider: "copilot", cwd: "/tmp/paseo-acp-test" },
+      { provider: "copilot", cwd: "/tmp/clisbot-acp-test" },
       {
         provider: "copilot",
         logger: createTestLogger(),
@@ -3683,7 +3683,7 @@ describe("ACPAgentSession initialization cleanup", () => {
     }
 
     const session = new FailingLoadSession(
-      { provider: "cursor", cwd: "/tmp/paseo-acp-test" },
+      { provider: "cursor", cwd: "/tmp/clisbot-acp-test" },
       {
         provider: "cursor",
         logger: createTestLogger(),
@@ -4031,7 +4031,7 @@ describe("ACP session/load invariant — cwd and mcpServers always passed", () =
 
     // Pass handle through the typed constructor option (no private-field casts).
     const session = new TestSession(
-      { provider: "claude-acp", cwd: "/tmp/paseo-acp-test" },
+      { provider: "claude-acp", cwd: "/tmp/clisbot-acp-test" },
       {
         provider: "claude-acp",
         logger: createTestLogger(),
@@ -4063,7 +4063,7 @@ describe("ACP session/load invariant — cwd and mcpServers always passed", () =
 
     expect(loadSession).toHaveBeenCalledWith({
       sessionId: "session-1",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
       mcpServers: [],
     });
   });
@@ -4238,7 +4238,7 @@ describe("ACP session/load invariant — cwd and mcpServers always passed", () =
     // Even with supportsMcpServers=false, mcpServers: [] must still be passed
     expect(loadSession).toHaveBeenCalledWith({
       sessionId: "session-1",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
       mcpServers: [],
     });
   });
@@ -4253,7 +4253,7 @@ describe("ACP session/load invariant — cwd and mcpServers always passed", () =
 
     expect(unstableResumeSession).toHaveBeenCalledWith({
       sessionId: "session-1",
-      cwd: "/tmp/paseo-acp-test",
+      cwd: "/tmp/clisbot-acp-test",
       mcpServers: [],
     });
   });
@@ -4313,7 +4313,7 @@ interface SilentCloseProvider {
 }
 
 async function startSilentCloseProvider(): Promise<SilentCloseProvider> {
-  const dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-silent-close-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-silent-close-"));
   const agentScript = path.join(dir, "agent.mjs");
   const pidFile = path.join(dir, "agent.pid");
   await writeFile(agentScript, SILENT_CLOSE_ACP_AGENT);
@@ -4420,7 +4420,7 @@ describe("custom ACP provider with configured models", () => {
   let session: AgentSession | null = null;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-configured-models-"));
+    dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-configured-models-"));
     agentScript = path.join(dir, "agent.mjs");
     await writeFile(agentScript, PERMISSIVE_MODEL_ACP_AGENT);
   });

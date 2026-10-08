@@ -5,8 +5,8 @@ import { LRUCache } from "lru-cache";
 import { CheckoutDiffCache } from "./checkout-diff-cache.js";
 import pLimit from "p-limit";
 import type pino from "pino";
-import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
-import { parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
+import type { ProjectCheckoutLitePayload } from "@clisbot/protocol/messages";
+import { parseGitRemoteLocation } from "@clisbot/protocol/git-remote";
 import type { CheckoutContext } from "../utils/checkout-git.js";
 import {
   type BranchCheckoutResolution,
@@ -55,7 +55,7 @@ import {
   type RunGitCommand,
 } from "../utils/run-git-command.js";
 import { branchNameFromRef } from "../utils/worktree-metadata.js";
-import { listPaseoWorktrees, type PaseoWorktreeInfo } from "../utils/worktree.js";
+import { listClisbotWorktrees, type ClisbotWorktreeInfo } from "../utils/worktree.js";
 import { READ_ONLY_GIT_ENV } from "./checkout-git-utils.js";
 import { classifyGitMetadataPath, getPrunedGitMetadataPaths } from "./git-metadata-event-rules.js";
 import {
@@ -91,7 +91,7 @@ const DEGRADED_GIT_POLL_INTERVAL_MS = 5_000;
 // therefore burns a core forever on a workspace nobody has touched. Double the gap after every
 // tick that produced an identical snapshot, and drop back to the base interval as soon as one
 // does not. Explicit reads still force a refresh, so this only bounds background discovery of
-// changes made outside Paseo.
+// changes made outside Clisbot.
 const DEGRADED_GIT_POLL_MAX_INTERVAL_MS = 60_000;
 // A dependency install creates directories for minutes. Collapse the burst into
 // a couple of `git ls-files` runs rather than one per event.
@@ -161,7 +161,7 @@ export interface WorkspaceGitRuntimeSnapshot {
     mainRepoRoot: string | null;
     currentBranch: string | null;
     remoteUrl: string | null;
-    isPaseoOwnedWorktree: boolean;
+    isClisbotOwnedWorktree: boolean;
     isDirty: boolean | null;
     baseRef: string | null;
     aheadBehind: { ahead: number; behind: number } | null;
@@ -301,19 +301,19 @@ export interface WorkspaceGitBranchSuggestionsOptions {
 }
 
 export interface WorkspaceGitStashListOptions {
-  paseoOnly?: boolean;
+  clisbotOnly?: boolean;
 }
 
 export interface WorkspaceGitStashEntry {
   index: number;
   message: string;
   branch: string | null;
-  isPaseo: boolean;
+  isClisbot: boolean;
 }
 
 export type WorkspaceGitBranchValidationResult = BranchCheckoutResolution;
 export type WorkspaceGitBranchSuggestion = BranchSuggestion;
-export type WorkspaceGitWorktreeInfo = PaseoWorktreeInfo;
+export type WorkspaceGitWorktreeInfo = ClisbotWorktreeInfo;
 
 export type WorkspaceGitSnapshotOptions =
   | {
@@ -372,7 +372,7 @@ interface WorkspaceGitServiceDependencies {
   resolveBranchCheckout: typeof resolveBranchCheckout;
   resolveRepositoryDefaultBranch: typeof resolveRepositoryDefaultBranch;
   listBranchSuggestions: typeof listBranchSuggestions;
-  listPaseoWorktrees: typeof listPaseoWorktrees;
+  listClisbotWorktrees: typeof listClisbotWorktrees;
   /**
    * Adapter instances to bind by forge id instead of building from the registry
    * — the injection seam for the daemon's shared GitHub adapter and for test
@@ -394,7 +394,7 @@ interface WorkspaceGitServiceDependencies {
 
 interface WorkspaceGitServiceOptions {
   logger: pino.Logger;
-  paseoHome: string;
+  clisbotHome: string;
   worktreesRoot?: string;
   fileObserver?: FileObserver;
   deps?: Partial<WorkspaceGitServiceDependencies>;
@@ -565,7 +565,7 @@ function buildDefaultWorkspaceGitServiceDeps(
     resolveBranchCheckout,
     resolveRepositoryDefaultBranch,
     listBranchSuggestions,
-    listPaseoWorktrees,
+    listClisbotWorktrees,
     resolveAbsoluteGitDir,
     hasOriginRemote,
     runGitFetch: fetchWorkspaceGitRemote,
@@ -585,7 +585,7 @@ function resolveWorkspaceGitServiceDeps(
 
 export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   private readonly logger: pino.Logger;
-  private readonly paseoHome: string;
+  private readonly clisbotHome: string;
   private readonly worktreesRoot: string | undefined;
   private readonly fileObserver: FileObserver;
   private readonly deps: WorkspaceGitServiceDependencies;
@@ -636,7 +636,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   private watcherErrorCallbackCount = 0;
   constructor(options: WorkspaceGitServiceOptions) {
     this.logger = options.logger.child({ module: "workspace-git-service" });
-    this.paseoHome = options.paseoHome;
+    this.clisbotHome = options.clisbotHome;
     this.worktreesRoot = options.worktreesRoot;
     this.fileObserver = options.fileObserver ?? createFileObserver();
     this.deps = resolveWorkspaceGitServiceDeps(
@@ -760,7 +760,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     this.assertNotDisposed();
     const normalizedCwd = resolve(cwd);
     const status = await this.deps.getCheckoutStatus(normalizedCwd, {
-      paseoHome: this.paseoHome,
+      clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       logger: this.logger,
     });
@@ -770,7 +770,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         currentBranch: null,
         remoteUrl: null,
         repoRoot: null,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       });
     }
@@ -779,7 +779,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       currentBranch: status.currentBranch,
       remoteUrl: status.remoteUrl,
       repoRoot: status.repoRoot,
-      isPaseoOwnedWorktree: status.isPaseoOwnedWorktree,
+      isClisbotOwnedWorktree: status.isClisbotOwnedWorktree,
       mainRepoRoot: status.mainRepoRoot,
     });
   }
@@ -807,7 +807,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       ...readOptions,
       load: () =>
         this.deps.getCheckoutDiff(normalizedCwd, normalizedOptions, {
-          paseoHome: this.paseoHome,
+          clisbotHome: this.clisbotHome,
           worktreesRoot: this.worktreesRoot,
         }),
     });
@@ -880,14 +880,14 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   ): Promise<WorkspaceGitStashEntry[]> {
     this.assertNotDisposed();
     const normalizedCwd = resolve(cwd);
-    const paseoOnly = options?.paseoOnly !== false;
-    const key = JSON.stringify(["stashes", normalizedCwd, paseoOnly]);
+    const clisbotOnly = options?.clisbotOnly !== false;
+    const key = JSON.stringify(["stashes", normalizedCwd, clisbotOnly]);
     return this.readAuxiliaryCache(this.stashListCache, key, readOptions, async () => {
       const { stdout } = await this.deps.runGitCommand(["stash", "list", "--format=%gd%x00%s"], {
         cwd: normalizedCwd,
         envOverlay: READ_ONLY_GIT_ENV,
       });
-      return parseWorkspaceGitStashList(stdout, { paseoOnly });
+      return parseWorkspaceGitStashList(stdout, { clisbotOnly });
     });
   }
 
@@ -899,9 +899,9 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     const repoRoot = await this.resolveRepoRoot(cwdOrRepoRoot, options);
     const key = JSON.stringify(["worktrees", repoRoot]);
     return this.readAuxiliaryCache(this.worktreeListCache, key, options, () =>
-      this.deps.listPaseoWorktrees({
+      this.deps.listClisbotWorktrees({
         cwd: repoRoot,
-        paseoHome: this.paseoHome,
+        clisbotHome: this.clisbotHome,
         worktreesRoot: this.worktreesRoot,
       }),
     );
@@ -913,7 +913,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       throw new Error("Create worktree requires a git repository");
     }
 
-    return snapshot.git.isPaseoOwnedWorktree
+    return snapshot.git.isClisbotOwnedWorktree
       ? (snapshot.git.mainRepoRoot ?? snapshot.git.repoRoot ?? resolve(cwd))
       : (snapshot.git.repoRoot ?? resolve(cwd));
   }
@@ -1300,7 +1300,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return target.latestFacts;
     }
     return this.loadCheckoutFacts(target, {
-      paseoHome: this.paseoHome,
+      clisbotHome: this.clisbotHome,
       logger: this.logger,
     });
   }
@@ -2935,7 +2935,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       target.latestFacts?.isGit && target.latestFacts.currentBranch === git.currentBranch
         ? target.latestFacts.pullRequestLookupTarget
         : null;
-    if (target.latestFacts?.isGit && target.latestFacts.paseoWorktree.isPaseoOwnedWorktree) {
+    if (target.latestFacts?.isGit && target.latestFacts.clisbotWorktree.isClisbotOwnedWorktree) {
       return lookupTarget;
     }
     if (lookupTarget) {
@@ -3278,7 +3278,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       { aheadBehind: latestGit.aheadBehind, diffStat: latestGit.diffStat },
       movedRemoteRefs,
       {
-        paseoHome: this.paseoHome,
+        clisbotHome: this.clisbotHome,
         worktreesRoot: this.worktreesRoot,
         logger: this.logger,
         facts,
@@ -3310,7 +3310,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
 
     target.lastShellOutAtMs = this.deps.now().getTime();
     const context: CheckoutContext = {
-      paseoHome: this.paseoHome,
+      clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       logger: this.logger,
       facts,
@@ -3337,7 +3337,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     const cwd = target.cwd;
     const previousForgePrStatusPollKey = this.getForgePrStatusPollKey(target);
     const baseContext: CheckoutContext = {
-      paseoHome: this.paseoHome,
+      clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       logger: this.logger,
       runGitCommand: runRefreshGitCommand,
@@ -3369,7 +3369,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       mainRepoRoot: checkoutStatus.mainRepoRoot,
       currentBranch: checkoutStatus.currentBranch,
       remoteUrl: checkoutStatus.remoteUrl,
-      isPaseoOwnedWorktree: checkoutStatus.isPaseoOwnedWorktree,
+      isClisbotOwnedWorktree: checkoutStatus.isClisbotOwnedWorktree,
       isDirty: refreshWorktree
         ? checkoutStatus.isDirty
         : (target.latestGit?.isDirty ?? checkoutStatus.isDirty),
@@ -3843,7 +3843,7 @@ function buildForgeSnapshot(
 
 function parseWorkspaceGitStashList(
   stdout: string,
-  options: { paseoOnly: boolean },
+  options: { clisbotOnly: boolean },
 ): WorkspaceGitStashEntry[] {
   const entries: WorkspaceGitStashEntry[] = [];
   const lines = stdout.trim().split("\n").filter(Boolean);
@@ -3862,16 +3862,16 @@ function parseWorkspaceGitStashList(
     }
 
     const index = Number(indexMatch[1]);
-    const prefix = "paseo-auto-stash:";
+    const prefix = "clisbot-auto-stash:";
     const prefixIdx = subject.indexOf(prefix);
-    const isPaseo = prefixIdx >= 0;
-    const branch = isPaseo ? subject.slice(prefixIdx + prefix.length).trim() || null : null;
+    const isClisbot = prefixIdx >= 0;
+    const branch = isClisbot ? subject.slice(prefixIdx + prefix.length).trim() || null : null;
 
-    if (options.paseoOnly && !isPaseo) {
+    if (options.clisbotOnly && !isClisbot) {
       continue;
     }
 
-    entries.push({ index, message: subject, branch, isPaseo });
+    entries.push({ index, message: subject, branch, isClisbot });
   }
 
   return entries;
@@ -3886,7 +3886,7 @@ function buildNotGitSnapshot(cwd: string): WorkspaceGitRuntimeSnapshot {
       mainRepoRoot: null,
       currentBranch: null,
       remoteUrl: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: null,
       baseRef: null,
       aheadBehind: null,

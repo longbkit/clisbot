@@ -1,23 +1,23 @@
 import { chromium } from "playwright";
 import { writeFile } from "node:fs/promises";
 
-const baseUrl = process.env.PASEO_PROFILE_APP_URL ?? "http://localhost:19010";
-const digits = parseDigits(process.env.PASEO_PROFILE_WORKSPACE_DIGITS ?? "1234567");
-const lruSize = Number(process.env.PASEO_PROFILE_WORKSPACE_LRU_SIZE ?? 3);
-const retainedRepeatCount = Number(process.env.PASEO_PROFILE_RETAINED_REPEATS ?? 1);
-const warmQuietMs = Number(process.env.PASEO_PROFILE_WARM_QUIET_MS ?? 300);
-const finalWaitMs = Number(process.env.PASEO_PROFILE_FINAL_WAIT_MS ?? 1_000);
-const headless = process.env.PASEO_PROFILE_HEADLESS !== "0";
-const dumpCommits = process.env.PASEO_PROFILE_DUMP_COMMITS === "1";
-const cpuProfilePath = process.env.PASEO_PROFILE_CPU_PATH;
-const tracePath = process.env.PASEO_PROFILE_TRACE_PATH;
-const traceInvalidations = process.env.PASEO_PROFILE_TRACE_INVALIDATIONS === "1";
-const traceFocus = process.env.PASEO_PROFILE_TRACE_FOCUS === "1";
+const baseUrl = process.env.CLISBOT_PROFILE_APP_URL ?? "http://localhost:19010";
+const digits = parseDigits(process.env.CLISBOT_PROFILE_WORKSPACE_DIGITS ?? "1234567");
+const lruSize = Number(process.env.CLISBOT_PROFILE_WORKSPACE_LRU_SIZE ?? 3);
+const retainedRepeatCount = Number(process.env.CLISBOT_PROFILE_RETAINED_REPEATS ?? 1);
+const warmQuietMs = Number(process.env.CLISBOT_PROFILE_WARM_QUIET_MS ?? 300);
+const finalWaitMs = Number(process.env.CLISBOT_PROFILE_FINAL_WAIT_MS ?? 1_000);
+const headless = process.env.CLISBOT_PROFILE_HEADLESS !== "0";
+const dumpCommits = process.env.CLISBOT_PROFILE_DUMP_COMMITS === "1";
+const cpuProfilePath = process.env.CLISBOT_PROFILE_CPU_PATH;
+const tracePath = process.env.CLISBOT_PROFILE_TRACE_PATH;
+const traceInvalidations = process.env.CLISBOT_PROFILE_TRACE_INVALIDATIONS === "1";
+const traceFocus = process.env.CLISBOT_PROFILE_TRACE_FOCUS === "1";
 
 function parseDigits(value) {
   const parsed = [...value].filter((digit) => /^[1-9]$/.test(digit));
   if (parsed.length === 0 || new Set(parsed).size !== parsed.length) {
-    throw new Error("PASEO_PROFILE_WORKSPACE_DIGITS must contain unique digits from 1 through 9");
+    throw new Error("CLISBOT_PROFILE_WORKSPACE_DIGITS must contain unique digits from 1 through 9");
   }
   return parsed;
 }
@@ -30,7 +30,7 @@ async function installBenchmarkShortcutOverride(page) {
   await page.addInitScript(
     ({ profileFocus }) => {
       localStorage.setItem(
-        "@paseo:keyboard-shortcut-overrides",
+        "@clisbot:keyboard-shortcut-overrides",
         JSON.stringify({ "workspace-navigate-index-alt-digit-web": "Cmd+Digit" }),
       );
 
@@ -70,8 +70,8 @@ async function installBenchmarkShortcutOverride(page) {
             ? getComputedStyle(workspaceElement).display
             : null;
           const result = Reflect.apply(originalFocus, this, args);
-          globalThis.__PASEO_FOCUS_PROFILE__ ??= [];
-          globalThis.__PASEO_FOCUS_PROFILE__.push({
+          globalThis.__CLISBOT_FOCUS_PROFILE__ ??= [];
+          globalThis.__CLISBOT_FOCUS_PROFILE__.push({
             time: start,
             duration: performance.now() - start,
             tagName: this.tagName,
@@ -108,7 +108,7 @@ async function waitForProfilerIdle(page) {
   const deadline = Date.now() + 15_000;
 
   while (Date.now() < deadline) {
-    const count = await page.evaluate(() => globalThis.__PASEO_RENDER_PROFILE__?.length ?? 0);
+    const count = await page.evaluate(() => globalThis.__CLISBOT_RENDER_PROFILE__?.length ?? 0);
     if (count !== previousCount) {
       previousCount = count;
       unchangedSince = Date.now();
@@ -166,9 +166,9 @@ async function warmWorkspaces(page, warmDigits, targets) {
 
 async function beginBrowserMeasurements(page, scenarioName) {
   await page.evaluate((name) => {
-    globalThis.__PASEO_RESET_RENDER_PROFILE__?.();
-    globalThis.__PASEO_WORKSPACE_SWITCH_BENCHMARK_CLEANUP__?.();
-    globalThis.__PASEO_FOCUS_PROFILE__ = [];
+    globalThis.__CLISBOT_RESET_RENDER_PROFILE__?.();
+    globalThis.__CLISBOT_WORKSPACE_SWITCH_BENCHMARK_CLEANUP__?.();
+    globalThis.__CLISBOT_FOCUS_PROFILE__ = [];
 
     const getDeckEntries = () =>
       [...document.querySelectorAll('[data-testid^="workspace-deck-entry-"]')]
@@ -192,7 +192,7 @@ async function beginBrowserMeasurements(page, scenarioName) {
       performance.mark(label);
       console.timeStamp(label);
     };
-    markTrace(`paseo:${name}:capture-start`);
+    markTrace(`clisbot:${name}:capture-start`);
 
     const recordActivation = (records) => {
       const activeEntry = records
@@ -202,12 +202,12 @@ async function beginBrowserMeasurements(page, scenarioName) {
         );
       if (!activeEntry) return;
       lastActiveEntry = activeEntry;
-      markTrace(`paseo:${name}:activation:${activationSequence}:${activeEntry}`);
+      markTrace(`clisbot:${name}:activation:${activationSequence}:${activeEntry}`);
       activationSequence += 1;
       measurements.activations.push({ activeEntry, time: performance.now() });
     };
     const recordKeydown = (digit) => {
-      markTrace(`paseo:${name}:keydown:${keydownSequence}:Cmd+${digit}`);
+      markTrace(`clisbot:${name}:keydown:${keydownSequence}:Cmd+${digit}`);
       keydownSequence += 1;
       measurements.keydowns.push({
         digit,
@@ -222,9 +222,9 @@ async function beginBrowserMeasurements(page, scenarioName) {
       attributes: true,
       attributeFilter: ["class"],
     });
-    globalThis.__PASEO_WORKSPACE_SWITCH_BENCHMARK__ = measurements;
-    globalThis.__PASEO_RECORD_WORKSPACE_SWITCH_KEYDOWN__ = recordKeydown;
-    globalThis.__PASEO_WORKSPACE_SWITCH_BENCHMARK_CLEANUP__ = () => {
+    globalThis.__CLISBOT_WORKSPACE_SWITCH_BENCHMARK__ = measurements;
+    globalThis.__CLISBOT_RECORD_WORKSPACE_SWITCH_KEYDOWN__ = recordKeydown;
+    globalThis.__CLISBOT_WORKSPACE_SWITCH_BENCHMARK_CLEANUP__ = () => {
       observer.disconnect();
     };
   }, scenarioName);
@@ -334,7 +334,7 @@ async function runScenario(page, name, scenarioDigits, targets) {
   await page.keyboard.down("Meta");
   for (const digit of scenarioDigits) {
     await page.evaluate((nextDigit) => {
-      globalThis.__PASEO_RECORD_WORKSPACE_SWITCH_KEYDOWN__?.(nextDigit);
+      globalThis.__CLISBOT_RECORD_WORKSPACE_SWITCH_KEYDOWN__?.(nextDigit);
     }, digit);
     await page.keyboard.press(digit);
   }
@@ -352,18 +352,18 @@ async function runScenario(page, name, scenarioDigits, targets) {
   await page.waitForTimeout(finalWaitMs);
   await waitForProfilerIdle(page);
   await page.evaluate((scenarioName) => {
-    const label = `paseo:${scenarioName}:capture-end`;
+    const label = `clisbot:${scenarioName}:capture-end`;
     performance.mark(label);
     console.timeStamp(label);
   }, name);
 
   const result = await page.evaluate(() => ({
-    measurements: globalThis.__PASEO_WORKSPACE_SWITCH_BENCHMARK__,
-    samples: globalThis.__PASEO_RENDER_PROFILE__ ?? [],
-    reasons: globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {},
-    focusCalls: globalThis.__PASEO_FOCUS_PROFILE__ ?? [],
+    measurements: globalThis.__CLISBOT_WORKSPACE_SWITCH_BENCHMARK__,
+    samples: globalThis.__CLISBOT_RENDER_PROFILE__ ?? [],
+    reasons: globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {},
+    focusCalls: globalThis.__CLISBOT_FOCUS_PROFILE__ ?? [],
   }));
-  await page.evaluate(() => globalThis.__PASEO_WORKSPACE_SWITCH_BENCHMARK_CLEANUP__?.());
+  await page.evaluate(() => globalThis.__CLISBOT_WORKSPACE_SWITCH_BENCHMARK_CLEANUP__?.());
   return {
     ...buildScenarioReport(name, scenarioDigits, targets, result.measurements, result.samples),
     reasons: result.reasons,

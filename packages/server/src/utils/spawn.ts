@@ -1,6 +1,6 @@
 import type { ChildProcess, SpawnOptions } from "node:child_process";
-import { spawnProcess as spawnCli, execCommand as execCli } from "@getpaseo/plugin/server";
-import { createExternalCommandProcessEnv, type ProcessEnvRecord } from "../server/paseo-env.js";
+import { spawnProcess as spawnCli, execCommand as execCli } from "@clisbot/plugin/server";
+import { createExternalCommandProcessEnv, type ProcessEnvRecord } from "../server/clisbot-env.js";
 
 interface ExternalEnvOptions {
   baseEnv?: ProcessEnvRecord;

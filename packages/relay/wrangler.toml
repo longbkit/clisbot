@@ -1,15 +1,17 @@
-name = "paseo-relay"
-account_id = "10ed39a1dbf316e30abd0c409bed40d6"
+# Cloudflare Worker deployment option. The official relay currently uses Docker + Tunnel.
+name = "clisbot-relay-worker"
 main = "src/cloudflare-adapter.ts"
 compatibility_date = "2024-12-01"
 
-routes = [{ pattern = "relay.paseo.sh", custom_domain = true }]
+workers_dev = false
+preview_urls = false
 
 [observability]
 enabled = true
 
 [vars]
-PASEO_RELAY_UPSTREAM = "https://paseo-relay-next.fly.dev"
+# Set an HTTPS origin when the Worker should proxy to an upstream relay, such as Fly.
+CLISBOT_RELAY_UPSTREAM = ""
 
 [[durable_objects.bindings]]
 name = "RELAY"

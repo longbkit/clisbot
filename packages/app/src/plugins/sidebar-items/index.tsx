@@ -4,8 +4,8 @@ import type {
   PluginPopoverProps,
   PluginScreenLocation,
   PluginSidebarItemProps,
-} from "@getpaseo/plugin/client";
-import type { PluginTheme } from "@getpaseo/plugin";
+} from "@clisbot/plugin/client";
+import type { PluginTheme } from "@clisbot/plugin";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
 import { useCallback, useMemo, useState, type ComponentType, type RefObject } from "react";
 import { type View } from "react-native";

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Clisbot logo">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Clisbot</h1>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -12,45 +12,67 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/getpaseo/paseo/stargazers">
-    <img src="https://img.shields.io/github/stars/getpaseo/paseo?style=flat&logo=github" alt="GitHub stars">
+  <a href="https://github.com/longbkit/clisbot/stargazers">
+    <img src="https://img.shields.io/github/stars/longbkit/clisbot?style=flat&logo=github" alt="GitHub stars">
   </a>
-  <a href="https://github.com/getpaseo/paseo/releases">
-    <img src="https://img.shields.io/github/v/release/getpaseo/paseo?style=flat&logo=github" alt="GitHub release">
+  <a href="https://github.com/longbkit/clisbot/releases">
+    <img src="https://img.shields.io/github/v/release/longbkit/clisbot?style=flat&logo=github" alt="GitHub release">
   </a>
-  <a href="https://x.com/moboudra">
-    <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://discord.gg/jz8T2uahpH">
+  <a href="https://discord.gg/awGmcmFXC">
     <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
   </a>
-  <a href="https://www.reddit.com/r/PaseoAI/">
-    <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
-  </a>
 </p>
 
-<p align="center">One interface for Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code agents.</p>
+<p align="center">Your AI workspace and bot for work and personal life—all in one app.</p>
+
+<p align="center">Work and chat with AI natively in Clisbot and across your communication channels.</p>
 
 <p align="center">
-  <img src="https://paseo.sh/hero-mockup.png" alt="Paseo app screenshot" width="100%">
+  <img src="https://clisbot.com/hero-mockup.png" alt="Clisbot app screenshot" width="100%">
 </p>
 
 <p align="center">
-  <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo mobile app" width="100%">
+  <img src="https://clisbot.com/mobile-mockup.png" alt="Clisbot mobile app" width="100%">
 </p>
 
-Paseo is a desktop, mobile, web, and CLI app for coding agents. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.
+<!-- clisbot:intro:start -->
+
+**An alternative to Claude Cowork and AI desktop apps.** A desktop workspace for office work and software engineering. Research a topic, analyze data, write documents, or take software from planning through implementation, testing, and review—with conversations, files, and code in one place. Choose your agent provider and model. Bring your existing subscription or API key.
+
+**An alternative to OpenClaw and Hermes Agent.** Put agents to work on your own machines, with persistent context, reusable skills, and the tools they need to act. Delegate tasks, schedule recurring work, and automate workflows while keeping progress and results visible. Use it on your own or give your team managed access to projects, providers, and models.
+
+**An alternative to Grok Bot, Muse, or Dots.** Create your own bots for work and personal life. Shape each bot's role, persona, memory, tools, and behavior, and choose where it runs. Bring specialists—researchers, planners, engineers, and reviewers—into one group chat. Give them a shared goal and let them discuss ideas, coordinate tasks, and review one another's work to produce a more complete, polished result. Talk to bots natively in Clisbot and use AI through your communication channels—from your laptop or on the go.
+
+<!-- clisbot:intro:end -->
 
 - **Parallel agents:** Run many agents at once, each in its own worktree.
-- **Built-in orchestration:** Agents in Paseo can create worktrees, launch other agents, and talk to them, across providers.
+- **Built-in orchestration:** Agents in Clisbot can create worktrees, launch other agents, and talk to them, across providers.
 - **Full IDE:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
 - **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
-- **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code through the same interface. Pick the right model for each job.
+- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 38 ACP catalog presets including Grok. Pick the model for each task.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
 - **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
-- **Privacy-first:** Paseo doesn't have any telemetry, tracking, or forced log-ins.
+- **Privacy-first:** Clisbot doesn't have any telemetry, tracking, or forced log-ins.
 
-[Run parallel tasks in Paseo](https://paseo.sh/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
+[Run parallel tasks in Clisbot](https://clisbot.com/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
+
+## Concept
+
+Clisbot combines Paseo's cross-device agent workspace with OpenClaw's channel integrations and native channel capabilities. Paseo's freedom of choice lets you pick the agent harness—Claude Code, Codex, Copilot, OpenCode, or Pi—and model for each task. Switch providers as your work changes while keeping one workspace and app. This foundation brings together a desktop workspace for office work and software engineering, an agent platform for delegated tasks and automation, and bots for work and personal life. The goal is to make AI a native part of the app and available across every communication channel. Agents run on a Host, while people can follow and direct their work from the app or team conversations.
+
+Clisbot adds native bot creation and group collaboration. Quickly create specialists with distinct roles, instructions, and models, then bring them into one group to complete a task, brainstorm ideas, or review one another's work. You control the participants, shared instructions, reply rules, and discussion limits directly in the app, and can redirect or stop a discussion whenever needed. Native groups give you more direct control over bot collaboration than routing it through an external chat app's interface and bot restrictions.
+
+For professional and enterprise use, Clisbot adds Hub-managed Hosts and access control. Grants to Members and Teams decide which Hosts and Projects they can use, and which providers and models are available for their agents. Teams can share managed Hosts without giving everyone the same access.
+
+## Who am I & Why I Built This
+
+I’m Long Luong (Long), Co-founder & CTO of Vexere, Vietnam’s #1 transportation booking platform, where we also build SaaS and inventory distribution infrastructure for transportation operators. As we scale a 300-person company with a 100-member Engineering, Product, and Design team, I’ve been searching for the most practical way to roll out AI-native workflows across the organization.
+
+The challenge is not whether AI is useful. It is how to make it work at enterprise scale without creating a fragmented, expensive, or ungovernable stack. In practice, that means solving several hard problems at once: cost control, workflow truthfulness, team accessibility, governance, and the ability to bring frontier AI into the real tools and communication surfaces where work already happens.
+
+clisbot is the approach I landed on. Instead of building yet another isolated AI layer, it turns the coding CLIs we already trust into durable, chat-native agents that can work across Slack, Telegram, Zalo surfaces, and real team workflows.
+
+If clisbot helps your workflow, a GitHub star is a simple way to let me know it is useful and help more people discover it.
 
 ## Plugins
 
@@ -61,15 +83,15 @@ iOS, and Android. Write a plugin once and it is on your phone.
 - **Agent lifecycle:** change configuration, environment, and MCP servers, answer permissions, follow up when a turn ends.
 - **Providers:** add a coding agent as a provider.
 
-Install from the registry with `paseo plugin add owner/slug`, or from Git or a local directory.
+Install from the registry with `clisbot plugin add owner/slug`, or from Git or a local directory.
 
-**[Browse plugins](https://paseo.sh/plugins)** · **[Plugin docs](https://paseo.sh/docs/plugins)**
+**[Browse plugins](https://clisbot.com/plugins)** · **[Plugin docs](https://clisbot.com/docs/plugins)**
 
 Plugins run with access to your daemon machine and inside connected clients; install only code you trust.
 
 ## Getting Started
 
-Paseo runs a local server called the daemon that manages your coding agents. Clients like the desktop app, mobile app, web app, and CLI connect to it.
+Clisbot runs a local server called the daemon that manages your coding agents. Clients like the desktop app, mobile app, web app, and CLI connect to it.
 
 ### Prerequisites
 
@@ -80,12 +102,12 @@ You need at least one agent CLI installed and configured with your credentials:
 - [GitHub Copilot](https://github.com/features/copilot/cli/)
 - [OpenCode](https://github.com/anomalyco/opencode)
 - [Pi](https://pi.dev)
-- [Antigravity](https://paseo.sh/docs/supported-providers#antigravity)
-- [Muse Code](https://paseo.sh/docs/muse-code)
+- [Antigravity](https://clisbot.com/docs/supported-providers#antigravity)
+- [Muse Code](https://clisbot.com/docs/muse-code)
 
 ### Desktop app (recommended)
 
-Download it from [paseo.sh/download](https://paseo.sh/download) or the [GitHub releases page](https://github.com/getpaseo/paseo/releases). Open the app and the daemon starts automatically. Nothing else to install.
+Download it from [clisbot.com/download](https://clisbot.com/download) or the [GitHub releases page](https://github.com/longbkit/clisbot/releases). Open the app and the daemon starts automatically. Nothing else to install.
 
 To connect from your phone, open **Settings → your host → Pair Device**.
 
@@ -94,59 +116,59 @@ To connect from your phone, open **Settings → your host → Pair Device**.
 For a server, a VM, or any machine without the desktop app. Install the CLI and start the daemon:
 
 ```bash
-npm install -g @getpaseo/cli
-paseo
+npm install -g @clisbot/cli
+clisbot
 ```
 
-Paseo starts, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. The desktop, mobile, and web apps connect to this daemon like any other host.
+Clisbot starts, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. The desktop, mobile, and web apps connect to this daemon like any other host.
 
 For full setup and configuration, see:
 
-- [Docs](https://paseo.sh/docs)
-- [Connectivity guide](https://paseo.sh/docs/connectivity)
-- [Configuration reference](https://paseo.sh/docs/configuration)
+- [Docs](https://clisbot.com/docs)
+- [Connectivity guide](https://clisbot.com/docs/connectivity)
+- [Configuration reference](https://clisbot.com/docs/configuration)
 
 ### Docker
 
-Run the Paseo daemon and self-hosted web UI in Docker:
+Run the Clisbot daemon and self-hosted web UI in Docker:
 
 ```bash
-docker run -d --name paseo \
-  -p 6767:6767 \
-  -e PASEO_PASSWORD=change-me \
-  -v "$PWD/paseo-home:/home/paseo" \
+docker run -d --name clisbot \
+  -p 6868:6868 \
+  -e CLISBOT_PASSWORD=change-me \
+  -v "$PWD/clisbot-home:/home/clisbot" \
   -v "$PWD:/workspace" \
-  ghcr.io/getpaseo/paseo:latest
+  ghcr.io/longbkit/clisbot:latest
 ```
 
-Open `http://localhost:6767` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/paseo` volume. See the [Docker documentation](docs/docker.md) for full setup details.
+Open `http://localhost:6868` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/clisbot` volume. See the [Docker documentation](docs/docker.md) for full setup details.
 
 ## CLI
 
 Everything you can do in the app, you can do from the terminal.
 
 ```bash
-paseo run --provider claude/opus-4.6 "implement user authentication"
-paseo run --provider codex/gpt-5.5 --worktree feature-x "implement feature X"
+clisbot run --provider claude/opus-4.6 "implement user authentication"
+clisbot run --provider codex/gpt-5.5 --worktree feature-x "implement feature X"
 
-paseo ls                           # list running agents
-paseo attach abc123                # stream live output
-paseo send abc123 "also add tests" # follow-up task
+clisbot ls                           # list running agents
+clisbot attach abc123                # stream live output
+clisbot send abc123 "also add tests" # follow-up task
 
 # run on a remote daemon; --cwd is a path on that host
-paseo run --host workstation.local:6767 --cwd /workspace "run the full test suite"
+clisbot run --host workstation.local:6868 --cwd /workspace "run the full test suite"
 ```
 
-See the [full CLI reference](https://paseo.sh/docs/cli) for more.
+See the [full CLI reference](https://clisbot.com/docs/cli) for more.
 
 ## TypeScript SDK
 
-Build issue integrations, dashboards, and orchestration services with `@getpaseo/client`:
+Build issue integrations, dashboards, and orchestration services with `@clisbot/client`:
 
 ```ts
-import { createPaseoClient } from "@getpaseo/client";
+import { createClisbotClient } from "@clisbot/client";
 
-const client = createPaseoClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6868/ws" });
 await client.connect();
 
 const agent = await client.agents.create({
@@ -161,32 +183,32 @@ console.log(result.lastMessage);
 await client.close();
 ```
 
-See the [SDK quickstart](https://paseo.sh/docs/sdk/quickstart), [recipes](https://paseo.sh/docs/sdk/recipes), and [API reference](https://paseo.sh/docs/sdk/reference).
+See the [SDK quickstart](https://clisbot.com/docs/sdk/quickstart), [recipes](https://clisbot.com/docs/sdk/recipes), and [API reference](https://clisbot.com/docs/sdk/reference).
 
 ## Skills
 
-Skills teach your agent to use Paseo to orchestrate other agents.
+Skills teach your agent to use Clisbot to orchestrate other agents.
 
 ```bash
-npx skills add getpaseo/paseo
+npx skills add longbkit/clisbot
 ```
 
 Then use them in any agent conversation:
 
-- `/paseo-handoff` — hand off work between agents. I use this to plan with Claude and then handoff to Codex to implement.
-- `/paseo-advisor` — spin up a single agent as an advisor for a second opinion, without delegating the work itself.
-- `/paseo-committee` — form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
+- `/clisbot-handoff` — hand off work between agents. Plan with Claude, then hand off implementation to Codex.
+- `/clisbot-advisor` — spin up a single agent as an advisor for a second opinion, without delegating the work itself.
+- `/clisbot-committee` — form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
 
 ## Development
 
 Quick monorepo package map:
 
-- `packages/server`: Paseo daemon (agent process orchestration, WebSocket API, MCP server)
+- `packages/server`: Clisbot daemon (agent process orchestration, WebSocket API, MCP server)
 - `packages/app`: Expo client (iOS, Android, web)
-- `packages/cli`: `paseo` CLI for daemon and agent workflows
+- `packages/cli`: `clisbot` CLI for daemon and agent workflows
 - `packages/desktop`: Electron desktop app
 - `packages/relay`: Relay transport and encryption used by the daemon and clients
-- `packages/website`: Marketing site and documentation (`paseo.sh`)
+- `packages/website`: Marketing site and documentation (`clisbot.com`)
 
 Common commands:
 
@@ -209,15 +231,19 @@ npm run typecheck
 
 ## Sponsors
 
-Paseo is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown here and on the paseo.sh homepage.
+Sponsorship options for Clisbot are being set up. Check back here when they are ready.
 
 <!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
-## Related projects
+## Attribution
 
-- [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay) — official distributed relay, written in Elixir
-- [paseo-vscode](https://marketplace.visualstudio.com/items?itemName=hinnes.paseo-vscode) — VS Code extension
+- **Paseo** — [Paseo by Mohamed Boudra and contributors](https://github.com/getpaseo/paseo) is the source foundation for Clisbot's daemon, agent sessions, clients, and relay model. Its copyright and license notices remain in [LICENSE](LICENSE).
+- **OpenClaw** — [OpenClaw and its contributors](https://github.com/openclaw/openclaw) are credited for the channel code adapted in `packages/channels/`. The source baselines are recorded in that tree's `upstream-sync.json` files; bundled dependency notices are in [THIRD_PARTY_NOTICES](packages/hub/THIRD_PARTY_NOTICES).
 
 ## License
 
-Apache-2.0
+Clisbot is licensed under the [Apache License 2.0](LICENSE), except for components with their own licenses.
+
+Copyright (c) 2026-present Long Luong — Clisbot modifications and original additions.
+
+Original Paseo code: Copyright (c) 2025-present Mohamed Boudra. Upstream and third-party copyright and license notices are preserved in [LICENSE](LICENSE), individual component licenses, and [THIRD_PARTY_NOTICES](packages/hub/THIRD_PARTY_NOTICES).

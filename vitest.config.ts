@@ -31,11 +31,11 @@ export default defineConfig({
     ],
     alias: [
       {
-        find: /^@getpaseo\/relay\/e2ee$/,
+        find: /^@clisbot\/relay\/e2ee$/,
         replacement: path.resolve(__dirname, "packages/relay/src/e2ee.ts"),
       },
       {
-        find: /^@getpaseo\/relay$/,
+        find: /^@clisbot\/relay$/,
         replacement: path.resolve(__dirname, "packages/relay/src/index.ts"),
       },
       { find: "@", replacement: path.resolve(appDir, "src") },
@@ -59,7 +59,7 @@ export default defineConfig({
   test: {
     // Fake-timer suites freeze p-throttle's clock, so a real per-second cap deadlocks them.
     env: {
-      PASEO_GIT_MAX_PROCESSES_PER_SECOND: "10000",
+      CLISBOT_GIT_MAX_PROCESSES_PER_SECOND: "10000",
     },
     exclude: [...configDefaults.exclude, "**/.claude/**", "**/.dev/**"],
   },

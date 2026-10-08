@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import type { PluginServerContribution } from "@getpaseo/plugin/server";
+import type { PluginServerContribution } from "@clisbot/plugin/server";
 import { createPluginWorker, type PluginWorkerChannel } from "./plugin-process.js";
 import type { PluginProcessMessage, PluginProcessRequest } from "./plugin-process-protocol.js";
 

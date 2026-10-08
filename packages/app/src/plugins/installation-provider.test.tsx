@@ -1,6 +1,6 @@
-import { usePaseo, useRpc } from "@getpaseo/plugin/client";
-import { defineRpc } from "@getpaseo/plugin";
-import type { PaseoApi } from "@getpaseo/client";
+import { useClisbot, useRpc } from "@clisbot/plugin/client";
+import { defineRpc } from "@clisbot/plugin";
+import type { ClisbotApi } from "@clisbot/client";
 import { QueryClient } from "@tanstack/react-query";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,7 +21,7 @@ function installation(invoked: string[]): InstalledPlugin {
     serverId: "host",
     clientBundle: "",
     lifetime: new AbortController(),
-    paseo: { dispose: async () => undefined } as PaseoApi,
+    clisbot: { dispose: async () => undefined } as ClisbotApi,
     invoke: async (method) => {
       invoked.push(method);
       return { state: "green" };
@@ -45,10 +45,10 @@ function installation(invoked: string[]): InstalledPlugin {
 it("gives every surface the installation's client and RPCs on its first frame", async () => {
   const invoked: string[] = [];
   const plugin = installation(invoked);
-  const received: PaseoApi[] = [];
+  const received: ClisbotApi[] = [];
   let rpc: ((input: Record<string, never>) => Promise<unknown>) | null = null;
   function Surface({ name }: { name: string }) {
-    received.push(usePaseo());
+    received.push(useClisbot());
     rpc = useRpc(status);
     return <span>{name}</span>;
   }
@@ -64,8 +64,8 @@ it("gives every surface the installation's client and RPCs on its first frame", 
     .join("");
 
   expect(markup).toBe("<span>Screen</span><span>Sidebar item</span><span>Popover</span>");
-  expect(received).toEqual([plugin.paseo, plugin.paseo, plugin.paseo]);
-  expect(received.every((paseo) => paseo === plugin.paseo)).toBe(true);
+  expect(received).toEqual([plugin.clisbot, plugin.clisbot, plugin.clisbot]);
+  expect(received.every((clisbot) => clisbot === plugin.clisbot)).toBe(true);
   await expect(rpc!({})).resolves.toEqual({ state: "green" });
   expect(invoked).toEqual(["deploys.status"]);
 });

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useSessionStore } from "@/stores/session-store";
 import { supportsAgentProfiles } from "./capabilities";

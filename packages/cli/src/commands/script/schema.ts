@@ -1,4 +1,4 @@
-import type { WorkspaceScriptPayload } from "@getpaseo/protocol/messages";
+import type { WorkspaceScriptPayload } from "@clisbot/protocol/messages";
 import type { OutputSchema } from "../../output/index.js";
 
 export type WorkspaceScriptRow = WorkspaceScriptPayload;

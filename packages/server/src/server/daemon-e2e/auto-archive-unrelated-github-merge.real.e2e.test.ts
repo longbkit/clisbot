@@ -68,11 +68,11 @@ afterEach(async () => {
 githubTest(
   "shows but does not archive an already-merged PR checked out in another workspace",
   async () => {
-    const repository = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-github-merge-")));
+    const repository = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-github-merge-")));
     cleanupPaths.add(repository);
     run(repository, "git", ["init", "-b", "main"]);
-    run(repository, "git", ["config", "user.email", "paseo-test@example.com"]);
-    run(repository, "git", ["config", "user.name", "Paseo Test"]);
+    run(repository, "git", ["config", "user.email", "clisbot-test@example.com"]);
+    run(repository, "git", ["config", "user.name", "Clisbot Test"]);
     writeFileSync(path.join(repository, "README.md"), "producer repro\n");
     run(repository, "git", ["add", "README.md"]);
     run(repository, "git", ["-c", "commit.gpgsign=false", "commit", "-m", "initial"]);
@@ -107,14 +107,14 @@ githubTest(
       worktreeSlug: "merged-feature",
       source: { kind: "branch-off", baseBranch: "main", branchName: "merged-feature" },
       runSetup: false,
-      paseoHome: context.daemon.paseoHome,
+      clisbotHome: context.daemon.clisbotHome,
     });
     const unrelated = await createWorktree({
       cwd: repository,
       worktreeSlug: "never-pushed-unrelated",
       source: { kind: "branch-off", baseBranch: "main", branchName: "never-pushed-unrelated" },
       runSetup: false,
-      paseoHome: context.daemon.paseoHome,
+      clisbotHome: context.daemon.clisbotHome,
     });
     const mergedWorkspace = await context.client.createWorkspace({
       source: { kind: "directory", path: merged.worktreePath },

@@ -12,7 +12,7 @@ import {
   type ProviderInput,
   type ProviderLaunch,
   type ProviderPersistence,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { signalPlan } from "./internal/signals.js";
 import { createAntigravityProvider } from "./provider.js";
 
@@ -441,7 +441,7 @@ it("emits one full-access warning per open, none on respawn, and one again on re
       severity: "warning",
       title: "Antigravity is running with full access",
       description:
-        "Antigravity's CLI cannot ask for permission when another app drives it, so Paseo starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
+        "Antigravity's CLI cannot ask for permission when another app drives it, so Clisbot starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
     },
   };
   const opened = h.events.findIndex((event) => event.type === "session.opened");
@@ -615,7 +615,7 @@ describe("discovery", () => {
         colorTier: "dangerous",
         isUnattended: true,
         description:
-          "Antigravity cannot ask for permission when another app drives it. Paseo starts it with --dangerously-skip-permissions.",
+          "Antigravity cannot ask for permission when another app drives it. Clisbot starts it with --dangerously-skip-permissions.",
       },
     ]);
   });

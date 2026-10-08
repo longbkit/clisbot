@@ -31,7 +31,7 @@ afterEach(async () => {
 
 describe("managed process registry", () => {
   test("reaps a validated leftover helper process and deletes its record", async () => {
-    tempHome = await mkdtemp(path.join(tmpdir(), "paseo-managed-processes-"));
+    tempHome = await mkdtemp(path.join(tmpdir(), "clisbot-managed-processes-"));
     const processTable = new FakeProcessTable([
       {
         pid: 4101,
@@ -41,7 +41,7 @@ describe("managed process registry", () => {
     ]);
     const terminator = new FakeProcessTerminator();
     const registry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable,
       terminateProcess: terminator.terminate,
       logger: createTestLogger(),
@@ -55,7 +55,7 @@ describe("managed process registry", () => {
     });
 
     const restartedRegistry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable,
       terminateProcess: terminator.terminate,
       logger: createTestLogger(),
@@ -75,7 +75,7 @@ describe("managed process registry", () => {
   });
 
   test("deletes a dead helper process record without terminating a PID", async () => {
-    tempHome = await mkdtemp(path.join(tmpdir(), "paseo-managed-processes-"));
+    tempHome = await mkdtemp(path.join(tmpdir(), "clisbot-managed-processes-"));
     const processTable = new FakeProcessTable([
       {
         pid: 4102,
@@ -85,7 +85,7 @@ describe("managed process registry", () => {
     ]);
     const terminator = new FakeProcessTerminator();
     const registry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable,
       terminateProcess: terminator.terminate,
       logger: createTestLogger(),
@@ -99,7 +99,7 @@ describe("managed process registry", () => {
     });
 
     const restartedRegistry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([]),
       terminateProcess: terminator.terminate,
       logger: createTestLogger(),
@@ -119,10 +119,10 @@ describe("managed process registry", () => {
   });
 
   test("removes a reused PID record without terminating the new process", async () => {
-    tempHome = await mkdtemp(path.join(tmpdir(), "paseo-managed-processes-"));
+    tempHome = await mkdtemp(path.join(tmpdir(), "clisbot-managed-processes-"));
     const terminator = new FakeProcessTerminator();
     const registry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([
         {
           pid: 4103,
@@ -142,7 +142,7 @@ describe("managed process registry", () => {
     });
 
     const restartedRegistry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([
         {
           pid: 4103,
@@ -168,10 +168,10 @@ describe("managed process registry", () => {
   });
 
   test("keeps a helper record when inspection fails instead of orphaning a live process", async () => {
-    tempHome = await mkdtemp(path.join(tmpdir(), "paseo-managed-processes-"));
+    tempHome = await mkdtemp(path.join(tmpdir(), "clisbot-managed-processes-"));
     const terminator = new FakeProcessTerminator();
     const registry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([
         { pid: 4104, commandLine: "opencode serve --port 4104", startedAt: "process-start-token" },
       ]),
@@ -187,7 +187,7 @@ describe("managed process registry", () => {
     });
 
     const restartedRegistry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([], [4104]),
       terminateProcess: terminator.terminate,
       logger: createTestLogger(),
@@ -207,10 +207,10 @@ describe("managed process registry", () => {
   });
 
   test("does not terminate a reused PID whose command line only mentions the tokens", async () => {
-    tempHome = await mkdtemp(path.join(tmpdir(), "paseo-managed-processes-"));
+    tempHome = await mkdtemp(path.join(tmpdir(), "clisbot-managed-processes-"));
     const terminator = new FakeProcessTerminator();
     const registry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([], [4105]),
       terminateProcess: terminator.terminate,
       logger: createTestLogger(),
@@ -224,7 +224,7 @@ describe("managed process registry", () => {
     });
 
     const restartedRegistry = createManagedProcessRegistry({
-      paseoHome: tempHome,
+      clisbotHome: tempHome,
       processTable: new FakeProcessTable([
         {
           pid: 4105,

@@ -38,7 +38,7 @@ export function resolveCliShimPath(input: {
 }): string {
   if (!input.isPackaged) return input.resolveWorkspaceCli();
 
-  const filename = input.platform === "win32" ? "paseo.cmd" : "paseo";
+  const filename = input.platform === "win32" ? "clisbot.cmd" : "clisbot";
   if (input.platform === "darwin") {
     const bundle = input.executablePath.replace(/\/Contents\/MacOS\/.+$/, "");
     return path.join(bundle, "Contents", "Resources", "bin", filename);

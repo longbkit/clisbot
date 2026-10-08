@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import type { ProjectIconSource } from "@getpaseo/protocol/messages";
+import type { ProjectIconSource } from "@clisbot/protocol/messages";
 
 const MAX_ICON_BYTES = 512 * 1024;
 const MAX_HTML_BYTES = 512 * 1024;

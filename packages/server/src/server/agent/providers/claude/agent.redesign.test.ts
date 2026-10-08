@@ -379,11 +379,11 @@ test("does not keep a query started in a mode that Claude Code rejected", async 
 });
 
 test("logs redacted query summary and never leaks sentinel secrets", async () => {
-  const envSecret = "PASEO_ENV_SENTINEL_SECRET";
-  const runtimeSecret = "PASEO_RUNTIME_SENTINEL_SECRET";
-  const systemSecret = "PASEO_SYSTEM_PROMPT_SENTINEL_SECRET";
-  const previousEnv = process.env.PASEO_TEST_SENTINEL_SECRET;
-  process.env.PASEO_TEST_SENTINEL_SECRET = envSecret;
+  const envSecret = "CLISBOT_ENV_SENTINEL_SECRET";
+  const runtimeSecret = "CLISBOT_RUNTIME_SENTINEL_SECRET";
+  const systemSecret = "CLISBOT_SYSTEM_PROMPT_SENTINEL_SECRET";
+  const previousEnv = process.env.CLISBOT_TEST_SENTINEL_SECRET;
+  process.env.CLISBOT_TEST_SENTINEL_SECRET = envSecret;
 
   sdkQueryFactory.mockImplementation(() => {
     let step = 0;
@@ -435,7 +435,7 @@ test("logs redacted query summary and never leaks sentinel secrets", async () =>
     queryFactory: sdkQueryFactory,
     runtimeSettings: {
       env: {
-        PASEO_RUNTIME_SENTINEL_SECRET: runtimeSecret,
+        CLISBOT_RUNTIME_SENTINEL_SECRET: runtimeSecret,
       },
     },
     resolveBinary: async () => "/test/claude/bin",
@@ -468,9 +468,9 @@ test("logs redacted query summary and never leaks sentinel secrets", async () =>
   } finally {
     await session.close();
     if (previousEnv === undefined) {
-      delete process.env.PASEO_TEST_SENTINEL_SECRET;
+      delete process.env.CLISBOT_TEST_SENTINEL_SECRET;
     } else {
-      process.env.PASEO_TEST_SENTINEL_SECRET = previousEnv;
+      process.env.CLISBOT_TEST_SENTINEL_SECRET = previousEnv;
     }
   }
 });
@@ -1532,7 +1532,7 @@ function createInterruptibleQueryMock(): InterruptibleQueryMock {
   });
 }
 
-/** The uuid Paseo stamped on the first message it pushed into the SDK input. */
+/** The uuid Clisbot stamped on the first message it pushed into the SDK input. */
 async function readFirstPromptUuid(): Promise<string | null> {
   const input = sdkQueryFactory.mock.calls[0]?.[0] as { prompt: AsyncIterable<unknown> };
   return await createPromptUuidReader(input.prompt)();
@@ -1579,7 +1579,7 @@ test("an interrupt after Claude took the message but before it started stops it"
   const internal: InterruptInternals = asInternals(session);
 
   await session.startTurn("hello");
-  // No command_lifecycle "started" or init has reached Paseo yet.
+  // No command_lifecycle "started" or init has reached Clisbot yet.
   await session.interrupt();
 
   await vi.waitFor(() => expect(queryMock.interrupt).toHaveBeenCalledTimes(1));

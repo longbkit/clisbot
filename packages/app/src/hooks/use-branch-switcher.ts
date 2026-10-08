@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import type { ToastApi } from "@/components/toast-host";
 import { invalidateCheckoutGitQueriesForClient } from "@/git/query-keys";
@@ -94,7 +94,7 @@ export function useBranchSwitcher({
     async (branchId: string) => {
       if (!operations) return;
       try {
-        const stashPayload = await operations.listPaseoStashes();
+        const stashPayload = await operations.listClisbotStashes();
         const targetStash = stashPayload.entries.find((e) => e.branch === branchId);
         if (!targetStash) return;
         const shouldRestore = await confirmDialog({

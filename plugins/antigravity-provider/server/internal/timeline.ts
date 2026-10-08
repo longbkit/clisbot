@@ -1,7 +1,4 @@
-import type {
-  ProviderTimelineItem,
-  ProviderToolCallDetail,
-} from "@getpaseo/plugin/server/provider";
+import type { ProviderTimelineItem, ProviderToolCallDetail } from "@clisbot/plugin/server/provider";
 import type { Step } from "./wire.js";
 
 export function toolItem(

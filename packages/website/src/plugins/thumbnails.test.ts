@@ -5,8 +5,8 @@ import { handlePluginThumbnailRequest, pluginCardScreenshot } from "./thumbnails
 import { NewPluginCard, PluginCard } from "./plugin-card";
 import type { Plugin } from "./registry";
 
-const source = "https://cdn.jsdelivr.net/npm/paseo-example@1.2.3/preview.png";
-const video = "https://cdn.jsdelivr.net/npm/paseo-example@1.2.3/demo.mp4";
+const source = "https://cdn.jsdelivr.net/npm/clisbot-example@1.2.3/preview.png";
+const video = "https://cdn.jsdelivr.net/npm/clisbot-example@1.2.3/demo.mp4";
 const plugin: Plugin = {
   id: "acme/example",
   name: "Example",
@@ -16,7 +16,7 @@ const plugin: Plugin = {
   repository: { url: "https://github.com/acme/example" },
   artifact: {
     kind: "npm",
-    package: "paseo-example",
+    package: "clisbot-example",
     version: "1.2.3",
     resolved: "https://registry.npmjs.org/example.tgz",
     integrity: "sha512-YWJj",
@@ -79,7 +79,7 @@ function thumbnailRequest(
   accept = "image/avif,image/webp",
 ) {
   return new Request(
-    `https://paseo.sh/plugins/thumb/${width}/${encodeURIComponent(sourceUrl)}?plugin=${encodeURIComponent(id)}`,
+    `https://clisbot.com/plugins/thumb/${width}/${encodeURIComponent(sourceUrl)}?plugin=${encodeURIComponent(id)}`,
     { headers: { accept } },
   );
 }
@@ -183,13 +183,13 @@ describe("thumbnail route", () => {
     ["wrong plugin ID", thumbnailRequest(source, 592, "acme/other"), [plugin], 404],
     [
       "missing plugin ID",
-      new Request(`https://paseo.sh/plugins/thumb/592/${encodeURIComponent(source)}`),
+      new Request(`https://clisbot.com/plugins/thumb/592/${encodeURIComponent(source)}`),
       [plugin],
       404,
     ],
     ["removed plugin", thumbnailRequest(), [], 404],
     ["listed video", thumbnailRequest(video), [{ ...plugin, media: [video, source] }], 404],
-    ["malformed encoding", new Request("https://paseo.sh/plugins/thumb/592/%ZZ"), [plugin], 400],
+    ["malformed encoding", new Request("https://clisbot.com/plugins/thumb/592/%ZZ"), [plugin], 400],
     ["malformed URL", thumbnailRequest("not a URL"), [plugin], 400],
     ...[
       "https://example.com/preview.png",
@@ -240,7 +240,7 @@ describe("thumbnail route", () => {
     const screenshot = source + "?name=a&other=b#preview";
     const upstream = imageFetch(imageResponse("thumbnail"));
     const request = new Request(
-      "https://paseo.sh" + pluginCardScreenshot(plugin.id, screenshot).src,
+      "https://clisbot.com" + pluginCardScreenshot(plugin.id, screenshot).src,
     );
     const response = await handlePluginThumbnailRequest(
       request,

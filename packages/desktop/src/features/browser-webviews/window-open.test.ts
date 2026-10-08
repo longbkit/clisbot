@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { decideBrowserWindowOpenRequest, PendingBrowserWindowOpenRequests } from ".";
 
 describe("browser webview window-open requests", () => {
-  it("routes foreground tabs to a Paseo workspace tab", () => {
+  it("routes foreground tabs to a Clisbot workspace tab", () => {
     const result = decideBrowserWindowOpenRequest({
       url: "https://example.com/target",
       disposition: "foreground-tab",
@@ -40,7 +40,7 @@ describe("browser webview window-open requests", () => {
   });
 
   it.each(["noopener", "noreferrer"])(
-    "routes a named target with %s to a Paseo workspace tab",
+    "routes a named target with %s to a Clisbot workspace tab",
     (features) => {
       const result = decideBrowserWindowOpenRequest({
         url: "https://example.com/target",
@@ -54,7 +54,7 @@ describe("browser webview window-open requests", () => {
     },
   );
 
-  it("routes Shift-clicked links to a Paseo workspace tab", () => {
+  it("routes Shift-clicked links to a Clisbot workspace tab", () => {
     const result = decideBrowserWindowOpenRequest({
       url: "https://example.com/target",
       disposition: "new-window",
@@ -67,7 +67,7 @@ describe("browser webview window-open requests", () => {
   });
 
   it.each(["noopener", "noreferrer", "attributionsrc=https://example.com/register", "popup=false"])(
-    "routes non-popup feature %s to a Paseo workspace tab",
+    "routes non-popup feature %s to a Clisbot workspace tab",
     (features) => {
       const result = decideBrowserWindowOpenRequest({
         url: "https://example.com/target",
@@ -117,7 +117,7 @@ describe("browser webview window-open requests", () => {
     expect(result).toEqual({ kind: "popup" });
   });
 
-  it("routes an all-enabled browser-chrome request to a Paseo workspace tab", () => {
+  it("routes an all-enabled browser-chrome request to a Clisbot workspace tab", () => {
     const result = decideBrowserWindowOpenRequest({
       url: "https://example.com/target",
       disposition: "new-window",

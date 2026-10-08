@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import type { AgentStreamEventPayload, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { AgentStreamEventPayload, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { resolveVoiceUnavailableMessage } from "@/utils/server-info-capabilities";
 import type { DaemonServerInfo } from "@/stores/session-store";
 import type { AudioEngine } from "@/audio";
@@ -9,7 +9,7 @@ import {
 } from "@/utils/thinking-tone.native-pcm";
 
 const PCM_MIME_TYPE = "audio/pcm;rate=16000;bits=16";
-const KEEP_AWAKE_TAG = "paseo:voice";
+const KEEP_AWAKE_TAG = "clisbot:voice";
 const THINKING_TONE_REPEAT_GAP_MS = 350;
 /**
  * A reply is spoken as one TTS segment per sentence, and the daemon starts the next segment

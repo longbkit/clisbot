@@ -1,12 +1,12 @@
 # Native iOS text geometry regression
 
 Run on the Namespace Mac with a fresh simulator development build. Use the PID
-returned by `xcrun simctl launch <your-task-simulator-UDID> sh.paseo.debug`.
+returned by `xcrun simctl launch <your-task-simulator-UDID> sh.clisbot.debug`.
 Attach only to your task's app, while no device replay is running:
 
 ```sh
-PASEO_NATIVE_TEXT_REFLOW_PID=12345 \
-PASEO_NATIVE_TEXT_REFLOW_LOG=/Volumes/devbox/workspace/native-text-reflow.log \
+CLISBOT_NATIVE_TEXT_REFLOW_PID=12345 \
+CLISBOT_NATIVE_TEXT_REFLOW_LOG=/Volumes/devbox/workspace/native-text-reflow.log \
 bash packages/app/e2e/mobile/native-text-reflow/ios.sh
 ```
 

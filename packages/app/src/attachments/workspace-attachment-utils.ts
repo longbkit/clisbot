@@ -4,7 +4,7 @@ import type {
   UserComposerAttachment,
   WorkspaceComposerAttachment,
 } from "@/attachments/types";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 
 export function isPullRequestContextAttachment(
   attachment: ComposerAttachment | undefined,

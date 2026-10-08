@@ -1,6 +1,6 @@
 import { createPluginHosts } from "./hosts";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PaseoApi } from "@getpaseo/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { ClisbotApi } from "@clisbot/client";
 import { expect, test } from "vitest";
 import { PluginRegistry } from "./registry";
 
@@ -27,11 +27,11 @@ function observingClient() {
 }
 
 function registry() {
-  const setupClients = new Map<string, PaseoApi>();
+  const setupClients = new Map<string, ClisbotApi>();
   const plugins = new PluginRegistry({
     version: "0.8.0",
     createRuntime: (installation) => {
-      setupClients.set(installation.id, installation.paseo);
+      setupClients.set(installation.id, installation.clisbot);
       return {
         hosts: createPluginHosts(
           {
@@ -42,7 +42,7 @@ function registry() {
           },
           installation.lifetime.signal,
         ),
-        paseo: installation.paseo,
+        clisbot: installation.clisbot,
         rpc: async () => {
           throw new Error("Unexpected plugin RPC");
         },
@@ -63,17 +63,17 @@ function registry() {
 function catalog(id: string, body = "return function() {};") {
   return {
     id,
-    requirements: { paseo: ">=0.8.0" },
-    clientBundle: `(function() { return { default: function(plugin) { plugin.paseo.observeEvents(["${id}"]); ${body} } }; })`,
+    requirements: { clisbot: ">=0.8.0" },
+    clientBundle: `(function() { return { default: function(plugin) { plugin.clisbot.observeEvents(["${id}"]); ${body} } }; })`,
   };
 }
 
-test("setup and every surface share the installation's one Paseo client", () => {
+test("setup and every surface share the installation's one Clisbot client", () => {
   const h = registry();
   h.plugins.installCatalog("host", [catalog("deploys")], { client: h.client, audio });
 
   const [installation] = h.plugins.getSnapshot();
-  expect(h.setupClients.get("deploys")).toBe(installation.paseo);
+  expect(h.setupClients.get("deploys")).toBe(installation.clisbot);
   expect(h.open).toEqual(new Set(["deploys"]));
 });
 
@@ -106,9 +106,9 @@ test("reloading a plugin ends the old installation's subscriptions", async () =>
 
   const [second] = h.plugins.getSnapshot();
   expect(second).not.toBe(first);
-  expect(second.paseo).not.toBe(first.paseo);
-  await expect(first.paseo.dispose()).resolves.toBeUndefined();
-  expect(() => first.paseo.observeEvents(["project.update"])).toThrow("Paseo API is disposed");
+  expect(second.clisbot).not.toBe(first.clisbot);
+  await expect(first.clisbot.dispose()).resolves.toBeUndefined();
+  expect(() => first.clisbot.observeEvents(["project.update"])).toThrow("Clisbot API is disposed");
   expect(h.open).toEqual(new Set(["reloaded"]));
 });
 

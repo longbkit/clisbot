@@ -29,24 +29,24 @@ describe("resolveFilePreviewReadTarget", () => {
   it("uses the filesystem root for absolute paths outside the workspace", () => {
     expect(
       resolveFilePreviewReadTarget({
-        path: "/tmp/paseo-preview.txt",
+        path: "/tmp/clisbot-preview.txt",
         workspaceRoot: "/Users/test/project",
       }),
     ).toEqual({
       cwd: "/",
-      path: "/tmp/paseo-preview.txt",
+      path: "/tmp/clisbot-preview.txt",
     });
   });
 
   it("uses the home root for tilde paths", () => {
     expect(
       resolveFilePreviewReadTarget({
-        path: "~/.paseo/plans/file-preview.md",
+        path: "~/.clisbot/plans/file-preview.md",
         workspaceRoot: "/Users/test/project",
       }),
     ).toEqual({
       cwd: "~",
-      path: "~/.paseo/plans/file-preview.md",
+      path: "~/.clisbot/plans/file-preview.md",
     });
   });
 

@@ -251,7 +251,7 @@ describe("OpenCodeServerManager generations", () => {
   test("acquireExisting keeps a retired dedicated server alive until every reference releases", async () => {
     const { manager, runtime } = createTestManager([4475]);
 
-    const dedicatedAcquisition = await manager.acquireDedicated({ PASEO_AGENT_ID: "parent" });
+    const dedicatedAcquisition = await manager.acquireDedicated({ CLISBOT_AGENT_ID: "parent" });
     const existingAcquisition = manager.acquireExisting(dedicatedAcquisition.server.url);
 
     expect(existingAcquisition?.server.url).toBe("http://127.0.0.1:4475");
@@ -266,7 +266,7 @@ describe("OpenCodeServerManager generations", () => {
   test("acquireExisting returns null for unknown or dead server urls", async () => {
     const { manager, runtime } = createTestManager([4476]);
 
-    const acquisition = await manager.acquireDedicated({ PASEO_AGENT_ID: "parent" });
+    const acquisition = await manager.acquireDedicated({ CLISBOT_AGENT_ID: "parent" });
     const url = acquisition.server.url;
 
     expect(manager.acquireExisting("http://127.0.0.1:9999")).toBe(null);

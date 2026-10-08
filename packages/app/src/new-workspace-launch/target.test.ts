@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
 import {
   BLANK_TERMINAL_PROFILE_ID,
   CHAT_LAUNCH_TARGET,

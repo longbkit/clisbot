@@ -1,13 +1,13 @@
 import Ajv from "ajv";
 
-export const STRUCTURED_OUTPUT_TOOL = "paseo_structured_output";
+export const STRUCTURED_OUTPUT_TOOL = "clisbot_structured_output";
 
 export async function registerStructuredOutput(context) {
   const ajv = new Ajv({ strict: false, allErrors: true });
   async function schemaFor(sessionID) {
     const history = await context.session.context({ sessionID });
     const prompt = history.findLast((message) => message.type === "user");
-    return prompt?.metadata?.paseoOutputSchema;
+    return prompt?.metadata?.clisbotOutputSchema;
   }
   const tools = await context.tool.transform((editor) => {
     editor.add({
@@ -29,7 +29,7 @@ export async function registerStructuredOutput(context) {
         return {
           content:
             "Final structured answer accepted. End this turn without additional text or tool calls.",
-          metadata: { paseoStructuredOutput: input.value },
+          metadata: { clisbotStructuredOutput: input.value },
         };
       },
     });

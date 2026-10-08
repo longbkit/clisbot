@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/contexts/toast-context";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { RewindMode } from "./use-rewind-capabilities";
 import { useRewindComposerRestore } from "./composer-restore";
 import { useSessionStore } from "@/stores/session-store";

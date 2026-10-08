@@ -3,8 +3,8 @@ import type {
   ModalComponent,
   ModalContentProps,
   ModalProps,
-} from "@getpaseo/plugin/client/react-native";
-import { usePluginRuntimeContextBridge } from "@getpaseo/plugin/client/host";
+} from "@clisbot/plugin/client/react-native";
+import { usePluginRuntimeContextBridge } from "@clisbot/plugin/client/host";
 import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from "react";
 import { ToastApiProvider, useToast as useAppToast } from "@/contexts/toast-api-context";
 

@@ -1,6 +1,6 @@
 ---
 title: Custom providers
-description: Configure custom providers, alternative endpoints, profiles, custom binaries, and ACP agents in ~/.paseo/config.json.
+description: Configure custom providers, alternative endpoints, profiles, custom binaries, and ACP agents in ~/.clisbot/config.json.
 nav: Custom providers
 order: 22
 category: Providers
@@ -8,7 +8,7 @@ category: Providers
 
 # Custom providers
 
-Everything beyond the [supported providers](/docs/supported-providers) lives under `agents.providers` in `~/.paseo/config.json`. You can:
+Everything beyond the [supported providers](/docs/supported-providers) lives under `agents.providers` in `~/.clisbot/config.json`. You can:
 
 - **Extend** a first-class provider to point at a different API (Z.AI, Alibaba/Qwen, a proxy, a self-hosted endpoint).
 - **Add profiles**, multiple entries against the same underlying provider with different credentials or curated model lists.
@@ -16,13 +16,13 @@ Everything beyond the [supported providers](/docs/supported-providers) lives und
 - **Add ACP agents**, Gemini CLI, Hermes, or any agent speaking the Agent Client Protocol over stdio.
 - **Disable** a provider you don't use.
 
-Run `paseo reload` after editing the file. Provider changes apply to future launches without restarting the daemon.
+Run `clisbot reload` after editing the file. Provider changes apply to future launches without restarting the daemon.
 
 Provider IDs must be lowercase alphanumeric with hyphens (`/^[a-z][a-z0-9-]*$/`). A new custom provider needs `extends` (a first-class provider ID or `"acp"`) and a `label`.
 To override a bundled provider plugin, use its provider ID and omit `extends`. For
 [Muse Code](/docs/muse-code), set command or environment overrides under `agents.providers.muse`.
 
-The examples below are a quick tour. The full, up-to-date reference is on GitHub: [docs/custom-providers.md](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md).
+The examples below are a quick tour. The full, up-to-date reference is on GitHub: [docs/custom-providers.md](https://github.com/longbkit/clisbot/blob/main/docs/custom-providers.md).
 
 ## Provider options
 
@@ -156,7 +156,7 @@ Create as many entries as you want against the same first-class provider. Each o
 
 ## ACP providers
 
-Any agent that speaks [ACP](https://agentclientprotocol.com) over stdio can be added with `extends: "acp"` and a `command`. Paseo spawns the process, sends an `initialize` JSON-RPC request, and the agent reports its capabilities, modes, and models at runtime.
+Any agent that speaks [ACP](https://agentclientprotocol.com) over stdio can be added with `extends: "acp"` and a `command`. Clisbot spawns the process, sends an `initialize` JSON-RPC request, and the agent reports its capabilities, modes, and models at runtime.
 
 ```json
 {
@@ -213,4 +213,4 @@ Any agent that speaks [ACP](https://agentclientprotocol.com) over stdio can be a
 
 ## Full reference
 
-For the complete field reference (`extends`, `label`, `command`, `env`, `options`, `models`, `additionalModels`, `disallowedTools`, `paseoTools`, `enabled`, `order`), model and thinking-option schemas, and deeper examples for each plan, see [docs/custom-providers.md](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md) on GitHub. See [Limit Paseo tools by provider](/docs/mcp#limit-paseo-tools-by-provider) for `paseoTools` configuration.
+For the complete field reference (`extends`, `label`, `command`, `env`, `options`, `models`, `additionalModels`, `disallowedTools`, `clisbotTools`, `enabled`, `order`), model and thinking-option schemas, and deeper examples for each plan, see [docs/custom-providers.md](https://github.com/longbkit/clisbot/blob/main/docs/custom-providers.md) on GitHub. See [Limit Clisbot tools by provider](/docs/mcp#limit-clisbot-tools-by-provider) for `clisbotTools` configuration.

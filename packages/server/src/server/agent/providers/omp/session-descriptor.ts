@@ -107,7 +107,7 @@ export async function listOmpImportableSessions(
  *
  * `handle` is either an absolute path to the session `.jsonl` (what the
  * importable-sessions list hands back) or a bare OMP session id (what
- * `paseo import <id>` supplies). Ids are resolved against the configured
+ * `clisbot import <id>` supplies). Ids are resolved against the configured
  * sessions directory; an unresolvable handle yields `{}`.
  */
 export async function readOmpImportSessionConfig(

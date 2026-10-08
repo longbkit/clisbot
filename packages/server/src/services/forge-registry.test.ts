@@ -1,4 +1,4 @@
-import { FORGE_IDS } from "@getpaseo/protocol/forge-manifest";
+import { FORGE_IDS } from "@clisbot/protocol/forge-manifest";
 import { describe, expect, it, vi } from "vitest";
 
 import { createForgeService, defaultForgeRegistry, ForgeRegistry } from "./forge-registry.js";

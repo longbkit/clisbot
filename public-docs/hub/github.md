@@ -16,7 +16,7 @@ on: github.issue_comment
 max_runtime: 2h
 filters:
   repo: example/project
-  contains: "@paseo"
+  contains: "@clisbot"
   from_users: [maintainer]
 steps:
   - id: implement
@@ -34,7 +34,7 @@ steps:
       - text: |
           Implement the request, push a branch, and open a pull request with gh.
           Call hub.finish_execution when done.
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
 ```
 
 The agent can use `git` and `gh` within the declared repositories and permissions. See [agent continuation](/docs/hub/configuration/hub-yml#agent-continuation) for the token lifecycle when requests continue an agent.
@@ -70,7 +70,7 @@ Connection values for other integrations remain explicit step environment values
 
 ```yaml
 env:
-  SOME_TOKEN: "${{ paseo.connections.some-connection.token }}"
+  SOME_TOKEN: "${{ clisbot.connections.some-connection.token }}"
 ```
 
 Hub resolves the value when it prepares the agent's environment. See [Hub security](/docs/hub/security) for provider and host boundaries.

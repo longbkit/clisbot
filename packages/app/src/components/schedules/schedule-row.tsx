@@ -23,7 +23,7 @@ import {
   scheduleProductName,
 } from "@/utils/schedule-format";
 import { useTimeAgo } from "@/hooks/use-time-ago";
-import type { ScheduleSummary } from "@getpaseo/protocol/schedule/types";
+import type { ScheduleSummary } from "@clisbot/protocol/schedule/types";
 
 // Themed lucide wrappers — module-scope so only the icon re-renders on theme
 // change (never call useUnistyles in render). See docs/unistyles.md.

@@ -25,7 +25,7 @@ describe("plugin manifest", () => {
   });
 
   it("reads display metadata and ignores future top-level fields", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-manifest-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-manifest-"));
     directories.push(directory);
     const manifest = {
       id: "review",
@@ -34,7 +34,7 @@ describe("plugin manifest", () => {
       media: ["assets/screenshot.webp", "demo.mp4", "https://example.com/media?id=1"],
     };
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ ...manifest, futureField: { enabled: true } }),
     );
     await expect(readPluginManifest(directory)).resolves.toEqual(manifest);
@@ -67,39 +67,42 @@ describe("plugin manifest", () => {
     { media: ["assets/"] },
     { id: "INVALID" },
     { description: 42 },
-    { requirements: { paseoo: ">=0.11.0" } },
+    { requirements: { clisboto: ">=0.11.0" } },
   ])("rejects invalid known fields: %j", async (fields) => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-manifest-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-manifest-"));
     directories.push(directory);
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: "example", futureField: true, ...fields }),
     );
     await expect(readPluginManifest(directory)).rejects.toThrow();
   });
 
   it("accepts omitted metadata and empty media", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-manifest-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-manifest-"));
     directories.push(directory);
     for (const manifest of [{ id: "example" }, { id: "example", media: [] }]) {
-      await writeFile(path.join(directory, "paseo-plugin.json"), JSON.stringify(manifest));
+      await writeFile(path.join(directory, "clisbot-plugin.json"), JSON.stringify(manifest));
       await expect(readPluginManifest(directory)).resolves.toEqual(manifest);
     }
   });
 
   it("reads and validates requirements before any plugin code runs", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-manifest-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-manifest-"));
     directories.push(directory);
-    const manifest = path.join(directory, "paseo-plugin.json");
-    await writeFile(manifest, JSON.stringify({ id: "example", requirements: { paseo: "^0.8.0" } }));
+    const manifest = path.join(directory, "clisbot-plugin.json");
+    await writeFile(
+      manifest,
+      JSON.stringify({ id: "example", requirements: { clisbot: "^0.8.0" } }),
+    );
     await expect(readPluginManifest(directory)).resolves.toEqual({
       id: "example",
-      requirements: { paseo: "^0.8.0" },
+      requirements: { clisbot: "^0.8.0" },
     });
     for (const requirements of [
-      { paseo: "latest" },
-      { paseo: "" },
-      { paseo: 8 },
+      { clisbot: "latest" },
+      { clisbot: "" },
+      { clisbot: 8 },
       { node: ">=20" },
       "0.8.0",
     ]) {
@@ -109,10 +112,10 @@ describe("plugin manifest", () => {
   });
 
   it("reads an optional description", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-manifest-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-manifest-"));
     directories.push(directory);
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: "described", description: "Reviews changes before merge" }),
     );
 
@@ -122,16 +125,16 @@ describe("plugin manifest", () => {
     });
 
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: "described", description: "   " }),
     );
     await expect(readPluginManifest(directory)).rejects.toThrow();
   });
 
   it("accepts only non-empty argv arrays for build commands", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-manifest-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-manifest-"));
     directories.push(directory);
-    const manifest = path.join(directory, "paseo-plugin.json");
+    const manifest = path.join(directory, "clisbot-plugin.json");
 
     await writeFile(
       manifest,

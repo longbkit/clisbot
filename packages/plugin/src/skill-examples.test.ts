@@ -5,7 +5,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const skill = readFileSync(path.join(repository, "skills/paseo-plugin/SKILL.md"), "utf8");
+const skill = readFileSync(path.join(repository, "skills/clisbot-plugin/SKILL.md"), "utf8");
 
 function sectionCode(heading: string): string {
   const section = skill.slice(skill.indexOf(`\n## ${heading}\n`));
@@ -33,7 +33,7 @@ function typeErrors(code: string): string[] {
     .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
 }
 
-describe("paseo-plugin skill examples", () => {
+describe("clisbot-plugin skill examples", () => {
   it("composer pill example typechecks against the plugin SDK", () => {
     expect(typeErrors(sectionCode("Add a composer pill"))).toEqual([]);
   });

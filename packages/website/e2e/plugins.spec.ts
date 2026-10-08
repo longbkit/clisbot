@@ -41,14 +41,14 @@ test("browses from the directory into a category, a plugin, and its author", asy
   await page.getByRole("link", { name: /Fresh Worktrees/ }).click();
   await expect(page).toHaveURL(/\/plugins\/omercnet\/fresh-worktrees$/);
   await expect(page.getByRole("heading", { name: "Fresh Worktrees" })).toHaveCount(1);
-  await expect(page.getByText("paseo plugin add omercnet/fresh-worktrees")).toHaveCount(1);
+  await expect(page.getByText("clisbot plugin add omercnet/fresh-worktrees")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { level: 2, name: "Behavior", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __copied?: string }).__copied))
-    .toBe("paseo plugin add omercnet/fresh-worktrees");
+    .toBe("clisbot plugin add omercnet/fresh-worktrees");
   await expect(page.getByRole("link", { name: "Git", exact: true })).toHaveAttribute(
     "href",
     "/plugins/category/git",
@@ -227,45 +227,45 @@ test.describe("search engine visits without JavaScript", () => {
   }) => {
     await openPlugins(page);
     await expect(page.getByRole("link", { name: /Base2Tone/ }).first()).toBeVisible();
-    await expectPageMetadata(page, "Plugins – Extend Paseo with community plugins", "/plugins");
+    await expectPageMetadata(page, "Plugins – Extend Clisbot with community plugins", "/plugins");
 
     await page.goto("/plugins/category/git");
     await expect(page.getByRole("link", { name: /Fresh Worktrees/ })).toBeVisible();
-    await expectPageMetadata(page, "Git – Paseo plugins", "/plugins/category/git");
+    await expectPageMetadata(page, "Git – Clisbot plugins", "/plugins/category/git");
 
     await page.goto("/plugins/omercnet");
     await expect(page.getByRole("heading", { level: 1, name: "Omer Cohen" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Fresh Worktrees/ }).first()).toBeVisible();
-    await expectPageMetadata(page, "Omer Cohen – Paseo plugins", "/plugins/omercnet");
+    await expectPageMetadata(page, "Omer Cohen – Clisbot plugins", "/plugins/omercnet");
 
     const response = await page.goto("/plugins/omercnet/fresh-worktrees");
     expect(response?.status()).toBe(200);
     expect(response?.headers()["cache-control"]).toBe("private, no-store");
     expect(response?.headers()["x-robots-tag"]).toBeUndefined();
-    await expect(page.getByText("paseo plugin add omercnet/fresh-worktrees")).toBeVisible();
+    await expect(page.getByText("clisbot plugin add omercnet/fresh-worktrees")).toBeVisible();
     await expect(
       page.getByRole("heading", { level: 2, name: "Behavior", exact: true }),
     ).toBeVisible();
     await expectPageMetadata(
       page,
-      "Fresh Worktrees – Paseo plugin",
+      "Fresh Worktrees – Clisbot plugin",
       "/plugins/omercnet/fresh-worktrees",
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       "content",
-      "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
+      "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
     );
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
-      "Fast-forwards clean local base branches before Paseo creates branch-off worktrees",
+      "Fast-forwards clean local base branches before Clisbot creates branch-off worktrees",
     );
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
 
     await page.goto("/plugins/tomgrin10/graphite");
-    await expectPageMetadata(page, "Graphite – Paseo plugin", "/plugins/tomgrin10/graphite");
+    await expectPageMetadata(page, "Graphite – Clisbot plugin", "/plugins/tomgrin10/graphite");
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       "content",
-      "https://paseo.sh/og-image.png",
+      "https://clisbot.com/og-image.png",
     );
   });
 
@@ -293,15 +293,15 @@ test.describe("search engine visits without JavaScript", () => {
     const plugin = await page.goto("/plugins/acme/does-not-exist");
     expect(plugin?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Plugin not found" })).toBeVisible();
-    await expect(page).toHaveTitle("Plugin not found – Paseo");
+    await expect(page).toHaveTitle("Plugin not found – Clisbot");
     const author = await page.goto("/plugins/does-not-exist");
     expect(author?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Author not found" })).toBeVisible();
-    await expect(page).toHaveTitle("Author not found – Paseo");
+    await expect(page).toHaveTitle("Author not found – Clisbot");
     const category = await page.goto("/plugins/category/does-not-exist");
     expect(category?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Category not found" })).toBeVisible();
-    await expect(page).toHaveTitle("Category not found – Paseo");
+    await expect(page).toHaveTitle("Category not found – Clisbot");
   });
 
   test("redirects old category links permanently", async ({ request }) => {
@@ -319,17 +319,17 @@ test.describe("search engine visits without JavaScript", () => {
     request,
   }) => {
     const robots = await request.get("/robots.txt");
-    expect(await robots.text()).toContain("Sitemap: https://paseo.sh/sitemap-index.xml");
+    expect(await robots.text()).toContain("Sitemap: https://clisbot.com/sitemap-index.xml");
     const index = await request.get("/sitemap-index.xml");
-    expect(await index.text()).toContain("https://paseo.sh/sitemap-plugins.xml");
+    expect(await index.text()).toContain("https://clisbot.com/sitemap-plugins.xml");
     const plugins = await request.get("/sitemap-plugins.xml");
     expect(plugins.status()).toBe(200);
     expect(plugins.headers()["content-type"]).toContain("application/xml");
     const sitemap = await plugins.text();
-    expect(sitemap).toContain("<loc>https://paseo.sh/plugins/all</loc>");
-    expect(sitemap).toContain("<loc>https://paseo.sh/plugins/category/git</loc>");
-    expect(sitemap).toContain("<loc>https://paseo.sh/plugins/omercnet</loc>");
-    expect(sitemap).toContain("<loc>https://paseo.sh/plugins/omercnet/fresh-worktrees</loc>");
+    expect(sitemap).toContain("<loc>https://clisbot.com/plugins/all</loc>");
+    expect(sitemap).toContain("<loc>https://clisbot.com/plugins/category/git</loc>");
+    expect(sitemap).toContain("<loc>https://clisbot.com/plugins/omercnet</loc>");
+    expect(sitemap).toContain("<loc>https://clisbot.com/plugins/omercnet/fresh-worktrees</loc>");
   });
 });
 
@@ -368,12 +368,12 @@ async function expectPageMetadata(page: Page, title: string, path: string) {
   await expect(page).toHaveTitle(title);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     "href",
-    `https://paseo.sh${path}`,
+    `https://clisbot.com${path}`,
   );
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", title);
   await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
     "content",
-    `https://paseo.sh${path}`,
+    `https://clisbot.com${path}`,
   );
   await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "website");
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(

@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { openSettings } from "./app";
 import { openSettingsSection } from "./settings";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 function contentWidthInput(page: Page): Locator {
   return page.getByLabel("Content width in pixels", { exact: true });

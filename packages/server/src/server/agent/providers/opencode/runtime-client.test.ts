@@ -70,7 +70,7 @@ test("retries a rejected version probe after the configured binary changes", asy
   try {
     await writeFile(script, 'console.log("opencode v2.0.3")');
     await expect(client.fetchCatalog({ scope: "global", force: true })).rejects.toThrow(
-      "Update OpenCode to 2.0.10 or newer, then refresh the provider in Paseo",
+      "Update OpenCode to 2.0.10 or newer, then refresh the provider in Clisbot",
     );
     await writeFile(script, 'console.log("opencode v3.0.0")');
     await expect(client.fetchCatalog({ scope: "global", force: true })).rejects.toThrow(

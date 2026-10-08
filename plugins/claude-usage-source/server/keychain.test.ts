@@ -182,7 +182,7 @@ describe("Claude Keychain token usage", () => {
     ) as unknown as typeof fetch;
     const report = await fetchUsage({ route: { store: "keychain" } }, fetchApi, {
       platform: "darwin",
-      claudeHome: "/nonexistent-paseo-test-home",
+      claudeHome: "/nonexistent-clisbot-test-home",
       readKeychainCredentials: async () => credentials,
     });
     expect(report.status).toBe("unavailable");

@@ -1,6 +1,6 @@
 ---
 title: Browser automation
-description: Give agents a real browser inside Paseo to open pages, click, type, and verify their work.
+description: Give agents a real browser inside Clisbot to open pages, click, type, and verify their work.
 nav: Overview
 order: 35
 category: Browser
@@ -8,7 +8,7 @@ category: Browser
 
 # Browser automation
 
-Agents in Paseo can drive real browser tabs — the same tabs you see in the Paseo desktop app. An agent can open your dev server, read the page, click through a flow, fill a form, and take a screenshot, all without leaving your machine.
+Agents in Clisbot can drive real browser tabs — the same tabs you see in the Clisbot desktop app. An agent can open your dev server, read the page, click through a flow, fill a form, and take a screenshot, all without leaving your machine.
 
 This closes the loop on frontend work: instead of telling you "the change should work," an agent opens the page and checks.
 
@@ -26,7 +26,7 @@ Because you share the browser with the agent, you can watch it work — and step
 Browser tools are off by default. Turn them on per host:
 
 - **In the app:** open **Settings → your host → Agents** and turn on **Browser tools**.
-- **In `config.json`** (`~/.paseo/config.json`):
+- **In `config.json`** (`~/.clisbot/config.json`):
 
 ```json
 {
@@ -38,13 +38,13 @@ Browser tools are off by default. Turn them on per host:
 }
 ```
 
-The tools are part of the [Paseo MCP toolset](/docs/mcp), so **Enable Paseo tools** on the same page must also be on for agents to receive them. Existing agents may need a reload to pick up new tools.
+The tools are part of the [Clisbot MCP toolset](/docs/mcp), so **Enable Clisbot tools** on the same page must also be on for agents to receive them. Existing agents may need a reload to pick up new tools.
 
-> Browser tools let agents access and control Paseo browser tabs, including logged-in browser state. Only enable this for agents you trust.
+> Browser tools let agents access and control Clisbot browser tabs, including logged-in browser state. Only enable this for agents you trust.
 
 ## Desktop only, for now
 
-Browser tabs are hosted by the Paseo desktop app. The daemon itself doesn't run a browser — it routes tool calls to a connected desktop app, and returns an error when none is connected. The wire contract is host-neutral, so other hosts can carry the same tools later.
+Browser tabs are hosted by the Clisbot desktop app. The daemon itself doesn't run a browser — it routes tool calls to a connected desktop app, and returns an error when none is connected. The wire contract is host-neutral, so other hosts can carry the same tools later.
 
 ## How an agent sees a page
 
@@ -77,6 +77,6 @@ agent ──MCP──▶ daemon (broker) ──▶ browser host (desktop app) �
 
 - Navigation is restricted to `http(s)` URLs.
 - File uploads can only reference files inside the agent's workspace.
-- Tabs share the browser profile you use in Paseo, including cookies and logins — that's what makes logged-in testing work, and why the feature is opt-in per host.
+- Tabs share the browser profile you use in Clisbot, including cookies and logins — that's what makes logged-in testing work, and why the feature is opt-in per host.
 
 See the [tools reference](/docs/browser-tools) for the full tool list.

@@ -18,7 +18,7 @@ async function writeSession(root: string, relativePath: string, lines: unknown[]
 
 describe("OMP session descriptor", () => {
   test("cwd filtering continues past the global candidate overscan", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-omp-session-cwd-limit-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-omp-session-cwd-limit-"));
     const sessionsDir = path.join(root, "sessions");
     const requestedCwd = path.join(root, "requested");
     const otherCwd = path.join(root, "other");
@@ -54,14 +54,14 @@ describe("OMP session descriptor", () => {
   });
 
   test("reads title-first sessions and OMP combined model identifiers", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-omp-session-title-first-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-omp-session-title-first-"));
     const cwd = path.join(root, "repo");
     const sessionFile = await writeSession(root, "project/session.jsonl", [
       {
         type: "title",
         id: "title-1",
         timestamp: "2026-06-09T00:00:00.000Z",
-        title: "Deploy Paseo and verify",
+        title: "Deploy Clisbot and verify",
       },
       {
         type: "session",
@@ -90,7 +90,7 @@ describe("OMP session descriptor", () => {
       expect.objectContaining({
         providerHandleId: sessionFile,
         cwd,
-        title: "Deploy Paseo and verify",
+        title: "Deploy Clisbot and verify",
         firstPromptPreview: "import me",
       }),
     ]);
@@ -100,7 +100,7 @@ describe("OMP session descriptor", () => {
   });
 
   test("resolves a bare session id to its file and reads the same import config", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-omp-session-by-id-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-omp-session-by-id-"));
     const sessionDir = path.join(root, "sessions");
     const cwd = path.join(root, "repo");
     const sessionId = "01a03dc8-77bb-7000-b0a3-bb7d25477e81";
@@ -144,7 +144,7 @@ describe("OMP session descriptor", () => {
   });
 
   test("keeps recent nested OMP subagent sessions importable", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-omp-session-nested-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-omp-session-nested-"));
     const cwd = path.join(root, "repo");
     const parent = await writeSession(root, "project/parent.jsonl", [
       { type: "session", id: "parent", timestamp: "2026-06-10T00:00:00.000Z", cwd },
@@ -179,7 +179,7 @@ describe("OMP session descriptor", () => {
   });
 
   test("uses OMP's own default session directory", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-omp-session-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-omp-session-home-"));
     const cwd = path.join(home, "repo");
     const sessionFile = path.join(home, ".omp", "agent", "sessions", "project", "session.jsonl");
     await mkdir(path.dirname(sessionFile), { recursive: true });
@@ -195,7 +195,7 @@ describe("OMP session descriptor", () => {
   });
 
   test("uses a named OMP profile's session directory", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-omp-profile-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-omp-profile-home-"));
     const cwd = path.join(home, "repo");
     const sessionFile = path.join(
       home,
@@ -222,7 +222,7 @@ describe("OMP session descriptor", () => {
   test.skipIf(process.platform === "win32")(
     "uses a profile's XDG data directory after OMP has created it",
     async () => {
-      const home = await mkdtemp(path.join(tmpdir(), "paseo-omp-xdg-home-"));
+      const home = await mkdtemp(path.join(tmpdir(), "clisbot-omp-xdg-home-"));
       const cwd = path.join(home, "repo");
       const xdgDataHome = path.join(home, "xdg-data");
       const sessionFile = path.join(
@@ -249,7 +249,7 @@ describe("OMP session descriptor", () => {
   test.runIf(process.platform === "win32")(
     "ignores a profile's XDG data directory on Windows",
     async () => {
-      const home = await mkdtemp(path.join(tmpdir(), "paseo-omp-windows-xdg-home-"));
+      const home = await mkdtemp(path.join(tmpdir(), "clisbot-omp-windows-xdg-home-"));
       const cwd = path.join(home, "repo");
       const xdgDataHome = path.join(home, "xdg-data");
       const xdgSessionFile = path.join(

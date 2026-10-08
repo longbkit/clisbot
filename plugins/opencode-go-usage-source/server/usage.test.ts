@@ -34,7 +34,7 @@ const upstreamResponse = {
 };
 
 test("discovers and fetches the default key from read-only auth.json", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "paseo-go-usage-"));
+  const directory = await mkdtemp(join(tmpdir(), "clisbot-go-usage-"));
   const path = join(directory, "auth.json");
   const content = JSON.stringify({ "opencode-go": { type: "api", key: "fixture-key" } });
   try {
@@ -71,7 +71,7 @@ test("discovers and fetches the default key from read-only auth.json", async () 
 });
 
 test("omits default discovery when auth.json lacks an OpenCode Go API key", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "paseo-go-usage-"));
+  const directory = await mkdtemp(join(tmpdir(), "clisbot-go-usage-"));
   const path = join(directory, "auth.json");
   try {
     await writeFile(path, JSON.stringify({ openai: { type: "oauth", access: "other-token" } }));

@@ -7,7 +7,7 @@ import pino from "pino";
 import { beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 import { OpenCodeAgentClient } from "../agent/providers/opencode-agent.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { canRunRealProvider } from "./real-provider-test-config.js";
 
@@ -25,7 +25,7 @@ describe("daemon E2E (real opencode) - slow plugin readiness", () => {
   });
 
   test("a fresh dedicated generation starts while a global plugin initializes slowly", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "paseo-opencode-slow-plugin-"));
+    const root = mkdtempSync(path.join(tmpdir(), "clisbot-opencode-slow-plugin-"));
     const cwd = path.join(root, "worktree");
     const configHome = path.join(root, "config");
     const dataHome = path.join(root, "data");
@@ -60,7 +60,7 @@ describe("daemon E2E (real opencode) - slow plugin readiness", () => {
         OPENCODE_DISABLE_AUTO_UPDATE: "1",
       },
     });
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: { opencode: openCode },
       logger,
     });

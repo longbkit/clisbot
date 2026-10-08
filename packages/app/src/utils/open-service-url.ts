@@ -39,7 +39,7 @@ async function resolveBehavior(url: string): Promise<Exclude<ServiceUrlBehavior,
 
   const result = await askWithCheckbox(i18n.t("serviceUrl.message", { url }), {
     title: i18n.t("serviceUrl.title"),
-    okLabel: i18n.t("serviceUrl.inPaseo"),
+    okLabel: i18n.t("serviceUrl.inClisbot"),
     cancelLabel: i18n.t("serviceUrl.externalBrowser"),
     checkboxLabel: i18n.t("serviceUrl.dontAskAgain"),
   });

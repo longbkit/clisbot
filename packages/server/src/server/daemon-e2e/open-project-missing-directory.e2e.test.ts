@@ -4,16 +4,16 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { afterEach, beforeEach, expect, test } from "vitest";
 
 import { DaemonClient, type DaemonEvent } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 const cleanupPaths = new Set<string>();
-const cleanupDaemons = new Set<TestPaseoDaemon>();
+const cleanupDaemons = new Set<TestClisbotDaemon>();
 const cleanupClients = new Set<DaemonClient>();
 let previousSupervised: string | undefined;
 
 beforeEach(() => {
-  previousSupervised = process.env.PASEO_SUPERVISED;
-  process.env.PASEO_SUPERVISED = "0";
+  previousSupervised = process.env.CLISBOT_SUPERVISED;
+  process.env.CLISBOT_SUPERVISED = "0";
 });
 
 afterEach(async () => {
@@ -30,11 +30,11 @@ afterEach(async () => {
 
 function restoreSupervisedEnv(): void {
   if (previousSupervised === undefined) {
-    delete process.env.PASEO_SUPERVISED;
+    delete process.env.CLISBOT_SUPERVISED;
     return;
   }
 
-  process.env.PASEO_SUPERVISED = previousSupervised;
+  process.env.CLISBOT_SUPERVISED = previousSupervised;
 }
 
 // Repro for the "project flashes in the sidebar then disappears" report.
@@ -42,7 +42,7 @@ function restoreSupervisedEnv(): void {
 // receive a path that does not exist on the daemon's disk. The daemon must not
 // answer with a success + workspace upsert that it immediately retracts.
 test("openProject on a nonexistent directory does not broadcast an upsert that is immediately removed", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   cleanupDaemons.add(daemon);
 
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -59,7 +59,7 @@ test("openProject on a nonexistent directory does not broadcast an upsert that i
   });
   await client.fetchWorkspaces({ subscribe: {} });
 
-  const tempParent = await mkdtemp(path.join(os.tmpdir(), "paseo-open-project-"));
+  const tempParent = await mkdtemp(path.join(os.tmpdir(), "clisbot-open-project-"));
   cleanupPaths.add(tempParent);
   const missingPath = path.join(tempParent, "this-directory-does-not-exist");
   const response = await client.openProject(missingPath);
@@ -71,7 +71,7 @@ test("openProject on a nonexistent directory does not broadcast an upsert that i
 }, 30000);
 
 test("openProject expands tilde before creating the workspace", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   cleanupDaemons.add(daemon);
 
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -81,7 +81,7 @@ test("openProject expands tilde before creating the workspace", async () => {
   await client.fetchWorkspaces({ subscribe: {} });
 
   const home = process.env.HOME || os.homedir();
-  const workspacePath = await mkdtemp(path.join(home, ".paseo-open-project-"));
+  const workspacePath = await mkdtemp(path.join(home, ".clisbot-open-project-"));
   cleanupPaths.add(workspacePath);
   const queryPath = `~/${path.relative(home, workspacePath)}`;
 

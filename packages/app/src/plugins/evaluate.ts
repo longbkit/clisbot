@@ -2,20 +2,20 @@ import type { createPluginHosts } from "./hosts";
 import { openExternalUrl } from "@/utils/open-external-url";
 import * as pluginUiRuntime from "./react-native/ui";
 import { useSettings } from "./settings/use-settings";
-import * as pluginSharedRuntime from "@getpaseo/plugin";
-import * as pluginClientRuntime from "@getpaseo/plugin/client";
+import * as pluginSharedRuntime from "@clisbot/plugin";
+import * as pluginClientRuntime from "@clisbot/plugin/client";
 import * as React from "react";
 import * as ReactJsxRuntime from "react/jsx-runtime";
 // eslint-disable-next-line no-restricted-imports -- plugin client runtime injects host ReactNative.
 import * as ReactNative from "react-native";
-// eslint-disable-next-line no-restricted-imports -- plugin bundles receive TanStack's real runtime, not Paseo's query wrappers.
+// eslint-disable-next-line no-restricted-imports -- plugin bundles receive TanStack's real runtime, not Clisbot's query wrappers.
 import * as ReactQuery from "@tanstack/react-query";
 import * as Zod from "zod";
 import {
   type PluginAttachmentSourceContribution,
   type PluginCleanup,
   type PluginThemeContribution,
-} from "@getpaseo/plugin";
+} from "@clisbot/plugin";
 import {
   type PluginCommandCenterItemContribution,
   type PluginClientContext,
@@ -30,7 +30,7 @@ import {
   type PluginTimelineTransformerContribution,
   type PluginWorkspacePanelContribution,
   type PluginButtonRegistration,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import type { EvaluatedPlugin, PluginSidebarSection } from "./types";
 import type { ComponentType } from "react";
 import { resolvePluginIcon } from "./icons";
@@ -92,7 +92,7 @@ function requireScreenTitle(screenId: string, title: unknown): PluginScreenTitle
 export type PluginClientRuntime = Pick<
   PluginClientContext,
   | "playAudio"
-  | "paseo"
+  | "clisbot"
   | "rpc"
   | "openSettings"
   | "openScreen"
@@ -437,17 +437,17 @@ export function runPluginClientBundle(
     },
   };
   const runtimeRequire = (name: string): unknown => {
-    if (name === "@getpaseo/plugin/client/ui") return pluginUiRuntime;
+    if (name === "@clisbot/plugin/client/ui") return pluginUiRuntime;
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJsxRuntime;
     if (name === "react-native") return ReactNative;
-    if (name === "@getpaseo/plugin") return pluginSharedRuntime;
-    if (name === "@getpaseo/plugin/client")
+    if (name === "@clisbot/plugin") return pluginSharedRuntime;
+    if (name === "@clisbot/plugin/client")
       return {
         ...pluginClientRuntime,
         useSettings,
         openExternalUrl,
-        getPaseoClient: (serverId: string) => runtime.hosts.getPaseoClient(serverId),
+        getClisbotClient: (serverId: string) => runtime.hosts.getClisbotClient(serverId),
         useHosts: () =>
           React.useSyncExternalStore(
             runtime.hosts.subscribe,
@@ -455,7 +455,7 @@ export function runPluginClientBundle(
             runtime.hosts.getSnapshot,
           ),
       };
-    if (name === "@getpaseo/plugin/client/react-native") {
+    if (name === "@clisbot/plugin/client/react-native") {
       return pluginReactNativeRuntime;
     }
     if (name === "@tanstack/react-query") return ReactQuery;

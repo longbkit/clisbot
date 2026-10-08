@@ -32,41 +32,41 @@ jobs:
         run: |
           set -euo pipefail
 
-          export PASEO_HOME
-          PASEO_HOME="$(mktemp -d)"
-          export PASEO_LISTEN=127.0.0.1:6767
+          export CLISBOT_HOME
+          CLISBOT_HOME="$(mktemp -d)"
+          export CLISBOT_LISTEN=127.0.0.1:6868
 
-          WRAPPER_LOG="$PASEO_HOME/paseo-cli.log"
+          WRAPPER_LOG="$CLISBOT_HOME/clisbot-cli.log"
 
           cleanup() {
             if [[ -n "${DAEMON_PID:-}" ]] && kill -0 "$DAEMON_PID" 2>/dev/null; then
               kill "$DAEMON_PID"
               wait "$DAEMON_PID" || true
             fi
-            rm -rf "$PASEO_HOME"
+            rm -rf "$CLISBOT_HOME"
           }
           trap cleanup EXIT
 
-          PASEO_WEB_UI_ENABLED=true PASEO_RELAY_ENABLED=false ./result/bin/paseo daemon run >"$WRAPPER_LOG" 2>&1 &
+          CLISBOT_WEB_UI_ENABLED=true CLISBOT_RELAY_ENABLED=false ./result/bin/clisbot daemon run >"$WRAPPER_LOG" 2>&1 &
           DAEMON_PID=$!
 
           deadline=$((SECONDS + 30))
           while (( SECONDS < deadline )); do
-            if STATUS_JSON="$(./result/bin/paseo daemon status --json)" \
+            if STATUS_JSON="$(./result/bin/clisbot daemon status --json)" \
               && jq -e '.connectedDaemon == "reachable"' <<<"$STATUS_JSON" >/dev/null; then
               echo "$STATUS_JSON"
-              curl --fail --silent --show-error http://127.0.0.1:6767/ >"$PASEO_HOME/web-ui.html"
-              [[ -s "$PASEO_HOME/web-ui.html" ]]
-              if ! TERMINAL_JSON="$(./result/bin/paseo terminal create --cwd "$PASEO_HOME" --name nix-smoke --json)"; then
+              curl --fail --silent --show-error http://127.0.0.1:6868/ >"$CLISBOT_HOME/web-ui.html"
+              [[ -s "$CLISBOT_HOME/web-ui.html" ]]
+              if ! TERMINAL_JSON="$(./result/bin/clisbot terminal create --cwd "$CLISBOT_HOME" --name nix-smoke --json)"; then
                 break
               fi
               TERMINAL_ID="$(jq -er '.id' <<<"$TERMINAL_JSON")"
-              ./result/bin/paseo terminal send-keys "$TERMINAL_ID" 'PATH= "$PASEO_HOOK_CLI" --version && printf "nix-terminal-%s\n" ok' Enter
+              ./result/bin/clisbot terminal send-keys "$TERMINAL_ID" 'PATH= "$CLISBOT_HOOK_CLI" --version && printf "nix-terminal-%s\n" ok' Enter
               deadline=$((SECONDS + 15))
               while (( SECONDS < deadline )); do
-                if ./result/bin/paseo terminal capture "$TERMINAL_ID" --json \
+                if ./result/bin/clisbot terminal capture "$TERMINAL_ID" --json \
                   | jq -e '.lines | any(. == "nix-terminal-ok")' >/dev/null; then
-                  ./result/bin/paseo terminal kill "$TERMINAL_ID"
+                  ./result/bin/clisbot terminal kill "$TERMINAL_ID"
                   exit 0
                 fi
                 sleep 1
@@ -84,15 +84,15 @@ jobs:
           done
 
           echo "::group::daemon.log"
-          cat "$PASEO_HOME/daemon.log" 2>/dev/null || echo "<missing>"
+          cat "$CLISBOT_HOME/daemon.log" 2>/dev/null || echo "<missing>"
           echo "::endgroup::"
 
-          echo "::group::paseo daemon run stdout/stderr"
+          echo "::group::clisbot daemon run stdout/stderr"
           cat "$WRAPPER_LOG" 2>/dev/null || echo "<missing>"
           echo "::endgroup::"
 
-          echo "::group::paseo daemon status"
-          ./result/bin/paseo daemon status || true
+          echo "::group::clisbot daemon status"
+          ./result/bin/clisbot daemon status || true
           echo "::endgroup::"
 
           exit 1
@@ -116,8 +116,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          app="result-desktop/Applications/Paseo.app"
-          test -x "$app/Contents/MacOS/Paseo"
-          test -L result-desktop/bin/paseo-desktop
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "sh.paseo.desktop"
+          app="result-desktop/Applications/Clisbot.app"
+          test -x "$app/Contents/MacOS/Clisbot"
+          test -L result-desktop/bin/clisbot-desktop
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "sh.clisbot.desktop"
           find "$app" -name Info.plist -print0 | xargs -0 -n 1 plutil -lint

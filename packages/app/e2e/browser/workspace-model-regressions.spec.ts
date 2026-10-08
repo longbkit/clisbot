@@ -216,7 +216,7 @@ test.describe("Workspace model regressions", () => {
 
       await page.addInitScript(() => {
         localStorage.setItem(
-          "@paseo:create-agent-preferences",
+          "@clisbot:create-agent-preferences",
           JSON.stringify({
             provider: "mock",
             providerPreferences: {

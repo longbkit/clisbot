@@ -1,6 +1,6 @@
-import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
+import { DaemonConnectionError } from "@clisbot/client/internal/daemon-client";
 import { afterEach, describe, expect, test } from "vitest";
-import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
+import type { ProviderSubagentDescriptorPayload } from "@clisbot/protocol/messages";
 import {
   observeProviderSubagentTimeline,
   providerSubagentKey,

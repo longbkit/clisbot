@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "playwright/test";
 
-const APPLE_SILICON_DMG = /\/getpaseo\/paseo\/releases\/download\/v[^/]+\/Paseo-[^/]+-arm64\.dmg$/;
+const APPLE_SILICON_DMG =
+  /\/longbkit\/clisbot\/releases\/download\/v[^/]+\/Clisbot-[^/]+-arm64\.dmg$/;
 
 async function openDownloadPage(page: Page) {
   // Serve a stand-in file so the test never downloads a real release.
@@ -9,7 +10,7 @@ async function openDownloadPage(page: Page) {
       status: 200,
       headers: {
         "content-type": "application/octet-stream",
-        "content-disposition": "attachment; filename=Paseo.dmg",
+        "content-disposition": "attachment; filename=Clisbot.dmg",
       },
       body: "dmg",
     }),
@@ -29,7 +30,7 @@ test("a download button opens the thanks page and requests the file", async ({ p
 
   await fileRequest;
   await expect(page).toHaveURL(/\/download\/thanks\?file=/);
-  await expect(page.getByRole("heading", { name: "Thanks for downloading Paseo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Thanks for downloading Clisbot" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Try again" })).toHaveAttribute(
     "href",
     APPLE_SILICON_DMG,

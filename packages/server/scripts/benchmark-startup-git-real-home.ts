@@ -14,7 +14,7 @@ import { performance } from "node:perf_hooks";
 
 import { startGitCommandMetrics, stopGitCommandMetrics } from "../src/utils/run-git-command.js";
 import { DaemonClient } from "../src/server/test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../src/server/test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../src/server/test-utils/clisbot-daemon.js";
 
 type Scenario = "snapshotOnly" | "legacyPrFanout";
 
@@ -40,9 +40,9 @@ interface BenchmarkResult {
 }
 
 function parseArgs(): { sourceHome: string; frozenHomeRoot: string | null; scenario: Scenario } {
-  let sourceHome = process.env.PASEO_BENCHMARK_SOURCE_HOME ?? path.join(os.homedir(), ".paseo");
-  let frozenHomeRoot = process.env.PASEO_BENCHMARK_FROZEN_HOME_ROOT ?? null;
-  let scenario = (process.env.PASEO_BENCHMARK_SCENARIO ?? "snapshotOnly") as Scenario;
+  let sourceHome = process.env.CLISBOT_BENCHMARK_SOURCE_HOME ?? path.join(os.homedir(), ".clisbot");
+  let frozenHomeRoot = process.env.CLISBOT_BENCHMARK_FROZEN_HOME_ROOT ?? null;
+  let scenario = (process.env.CLISBOT_BENCHMARK_SCENARIO ?? "snapshotOnly") as Scenario;
 
   for (const arg of process.argv.slice(2)) {
     const [key, value] = arg.split("=", 2);
@@ -77,11 +77,11 @@ function copyJsonTree(sourceDir: string, targetDir: string): void {
 }
 
 async function freezeHome(sourceHome: string, requestedRoot: string | null): Promise<string> {
-  const frozenHomeRoot = requestedRoot ?? mkdtempSync(path.join(os.tmpdir(), "paseo-real-home-"));
-  if (process.env.PASEO_BENCHMARK_REUSE_FROZEN_HOME === "1") {
+  const frozenHomeRoot = requestedRoot ?? mkdtempSync(path.join(os.tmpdir(), "clisbot-real-home-"));
+  if (process.env.CLISBOT_BENCHMARK_REUSE_FROZEN_HOME === "1") {
     return frozenHomeRoot;
   }
-  const frozenHome = path.join(frozenHomeRoot, ".paseo");
+  const frozenHome = path.join(frozenHomeRoot, ".clisbot");
   rmSync(frozenHome, { recursive: true, force: true });
   mkdirSync(frozenHome, { recursive: true });
 
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
   const cpuBefore = process.cpuUsage();
   const memoryBefore = process.memoryUsage();
   const startedAt = performance.now();
-  const daemon = await createTestPaseoDaemon({ paseoHomeRoot: frozenHomeRoot, cleanup: false });
+  const daemon = await createTestClisbotDaemon({ clisbotHomeRoot: frozenHomeRoot, cleanup: false });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.90",

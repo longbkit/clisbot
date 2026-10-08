@@ -130,13 +130,13 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: Verify website mockups
-        run: npm run test:e2e --workspace=@getpaseo/website
+        run: npm run test:e2e --workspace=@clisbot/website
 
       - name: Verify public package contents
         run: |
-          npm pack --dry-run --ignore-scripts --workspace=@getpaseo/protocol
-          npm pack --dry-run --ignore-scripts --workspace=@getpaseo/client
-          npm pack --dry-run --ignore-scripts --workspace=@getpaseo/server
+          npm pack --dry-run --ignore-scripts --workspace=@clisbot/protocol
+          npm pack --dry-run --ignore-scripts --workspace=@clisbot/client
+          npm pack --dry-run --ignore-scripts --workspace=@clisbot/server
 
   server-tests-ubuntu:
     name: server-tests (ubuntu-latest)
@@ -169,7 +169,7 @@ jobs:
 
       - name: Run server tests
         if: ${{ needs.changes.outputs.full != 'false' || needs.changes.outputs.server != 'false' }}
-        run: npm run test --workspace=@getpaseo/server
+        run: npm run test --workspace=@clisbot/server
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -177,11 +177,11 @@ jobs:
 
       - name: Run built-in plugin tests
         if: ${{ needs.changes.outputs.full != 'false' || needs.changes.outputs.server != 'false' }}
-        run: npm run test --workspace=@getpaseo/builtin-plugins
+        run: npm run test --workspace=@clisbot/builtin-plugins
 
       - name: Run Hub CLI/daemon contract
         if: ${{ needs.changes.outputs.full == 'false' && needs.changes.outputs.server == 'false' && needs.changes.outputs.hub != 'false' }}
-        run: npm run test:hub-cli-contract --workspace=@getpaseo/server
+        run: npm run test:hub-cli-contract --workspace=@clisbot/server
 
   server-tests-windows:
     name: server-tests (windows-latest)
@@ -215,7 +215,7 @@ jobs:
 
       - name: Run file observation tests
         run: |
-          npm run test:unit --workspace=@getpaseo/server -- \
+          npm run test:unit --workspace=@clisbot/server -- \
             src/server/file-observer \
             src/server/workspace-git-service.observation.test.ts \
             src/server/workspace-git-service.observation.integration.test.ts \
@@ -244,7 +244,7 @@ jobs:
         run: npm run build:server
 
       - name: Run desktop tests
-        run: npm run test --workspace=@getpaseo/desktop
+        run: npm run test --workspace=@clisbot/desktop
 
       - name: Install virtual display
         if: ${{ runner.os == 'Linux' }}
@@ -260,9 +260,9 @@ jobs:
 
       - name: Run desktop lifecycle E2E (Linux)
         if: ${{ runner.os == 'Linux' }}
-        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run test:e2e:lifecycle --workspace=@getpaseo/desktop
+        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run test:e2e:lifecycle --workspace=@clisbot/desktop
         env:
-          PASEO_DESKTOP_LIFECYCLE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-lifecycle
+          CLISBOT_DESKTOP_LIFECYCLE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-lifecycle
 
       - name: Upload desktop lifecycle screenshots
         uses: actions/upload-artifact@v4
@@ -275,17 +275,17 @@ jobs:
 
       - name: Run desktop lifecycle E2E (Windows)
         if: ${{ runner.os == 'Windows' }}
-        run: npm run test:e2e:lifecycle --workspace=@getpaseo/desktop
+        run: npm run test:e2e:lifecycle --workspace=@clisbot/desktop
 
       - name: Run desktop renderer E2E
         if: ${{ runner.os == 'Linux' }}
-        run: npm run test:e2e:renderer --workspace=@getpaseo/desktop
+        run: npm run test:e2e:renderer --workspace=@clisbot/desktop
 
       - name: Run desktop browser E2E
         if: ${{ runner.os == 'Linux' }}
-        run: npm run test:e2e:browser-tabs --workspace=@getpaseo/desktop
+        run: npm run test:e2e:browser-tabs --workspace=@clisbot/desktop
         env:
-          PASEO_DESKTOP_BROWSER_E2E_ARTIFACT_DIR: ${{ runner.temp }}/desktop-browser-e2e
+          CLISBOT_DESKTOP_BROWSER_E2E_ARTIFACT_DIR: ${{ runner.temp }}/desktop-browser-e2e
 
       - name: Upload desktop browser diagnostics
         uses: actions/upload-artifact@v4
@@ -330,7 +330,7 @@ jobs:
         run: npm run build:app-deps
 
       - name: Run app unit tests
-        run: npm run test --workspace=@getpaseo/app
+        run: npm run test --workspace=@clisbot/app
 
   sdk-tests:
     name: sdk-tests
@@ -355,19 +355,19 @@ jobs:
         run: npm run build:plugin
 
       - name: Run plugin SDK tests
-        run: npm run test --workspace=@getpaseo/plugin
+        run: npm run test --workspace=@clisbot/plugin
 
       - name: Run protocol tests
-        run: npm run test --workspace=@getpaseo/protocol
+        run: npm run test --workspace=@clisbot/protocol
 
       - name: Run client tests
-        run: npm run test --workspace=@getpaseo/client
+        run: npm run test --workspace=@clisbot/client
 
       - name: Run highlight tests
-        run: npm run test --workspace=@getpaseo/highlight
+        run: npm run test --workspace=@clisbot/highlight
 
       - name: Typecheck client examples
-        run: npm run typecheck:examples --workspace=@getpaseo/client
+        run: npm run typecheck:examples --workspace=@clisbot/client
 
   playwright-1:
     name: playwright (shard 1/4)
@@ -396,13 +396,13 @@ jobs:
         run: npm run build:server
 
       - name: Build native app dependency
-        run: npm run build --workspace=@getpaseo/expo-two-way-audio
+        run: npm run build --workspace=@clisbot/expo-two-way-audio
 
       - name: Install agent CLIs for provider tests
         run: node scripts/npm-retry.mjs install -g @anthropic-ai/claude-code @openai/codex@0.105.0 opencode-ai
 
       - name: Run Playwright E2E tests
-        run: npm run test:e2e --workspace=@getpaseo/app -- --shard=${{ env.PLAYWRIGHT_SHARD }}
+        run: npm run test:e2e --workspace=@clisbot/app -- --shard=${{ env.PLAYWRIGHT_SHARD }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Weight file groups by observed duration; raw test counts overload
@@ -469,7 +469,7 @@ jobs:
         run: npm run build:relay
 
       - name: Run relay tests
-        run: npm run test --workspace=@getpaseo/relay
+        run: npm run test --workspace=@clisbot/relay
 
   cli-tests-1:
     name: cli-tests (shard 1/3)
@@ -477,11 +477,11 @@ jobs:
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.cli != 'false') }}
     runs-on: ubuntu-latest
     env:
-      PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
-      PASEO_DICTATION_ENABLED: "0"
-      PASEO_VOICE_MODE_ENABLED: "0"
-      PASEO_CLI_TEST_SHARD: "1"
-      PASEO_CLI_TEST_SHARD_TOTAL: "3"
+      CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
+      CLISBOT_DICTATION_ENABLED: "0"
+      CLISBOT_VOICE_MODE_ENABLED: "0"
+      CLISBOT_CLI_TEST_SHARD: "1"
+      CLISBOT_CLI_TEST_SHARD_TOTAL: "3"
     steps: &cli_test_steps
       - uses: actions/checkout@v4
 
@@ -498,13 +498,13 @@ jobs:
 
       # The local runner builds its dependencies and shards its own E2E files.
       - name: Run CLI E2E tests
-        run: npm run test:local --workspace=@getpaseo/cli
+        run: npm run test:local --workspace=@clisbot/cli
 
-      # Source tests do not read PASEO_CLI_TEST_SHARD. Run them once, on the
+      # Source tests do not read CLISBOT_CLI_TEST_SHARD. Run them once, on the
       # shortest E2E shard, after its runner has built the server stack.
       - name: Run CLI source tests
-        if: ${{ env.PASEO_CLI_TEST_SHARD == '3' }}
-        run: npm run test:unit --workspace=@getpaseo/cli
+        if: ${{ env.CLISBOT_CLI_TEST_SHARD == '3' }}
+        run: npm run test:unit --workspace=@clisbot/cli
 
   cli-tests-2:
     name: cli-tests (shard 2/3)
@@ -512,11 +512,11 @@ jobs:
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.cli != 'false') }}
     runs-on: ubuntu-latest
     env:
-      PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
-      PASEO_DICTATION_ENABLED: "0"
-      PASEO_VOICE_MODE_ENABLED: "0"
-      PASEO_CLI_TEST_SHARD: "2"
-      PASEO_CLI_TEST_SHARD_TOTAL: "3"
+      CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
+      CLISBOT_DICTATION_ENABLED: "0"
+      CLISBOT_VOICE_MODE_ENABLED: "0"
+      CLISBOT_CLI_TEST_SHARD: "2"
+      CLISBOT_CLI_TEST_SHARD_TOTAL: "3"
     steps: *cli_test_steps
 
   cli-tests-3:
@@ -525,9 +525,9 @@ jobs:
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.cli != 'false') }}
     runs-on: ubuntu-latest
     env:
-      PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
-      PASEO_DICTATION_ENABLED: "0"
-      PASEO_VOICE_MODE_ENABLED: "0"
-      PASEO_CLI_TEST_SHARD: "3"
-      PASEO_CLI_TEST_SHARD_TOTAL: "3"
+      CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
+      CLISBOT_DICTATION_ENABLED: "0"
+      CLISBOT_VOICE_MODE_ENABLED: "0"
+      CLISBOT_CLI_TEST_SHARD: "3"
+      CLISBOT_CLI_TEST_SHARD_TOTAL: "3"
     steps: *cli_test_steps

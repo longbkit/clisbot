@@ -5,7 +5,7 @@ import { pageMeta } from "~/meta";
 export const Route = createFileRoute("/")({
   head: () =>
     pageMeta(
-      "Paseo – Run Claude Code, Codex, Copilot, OpenCode from anywhere",
+      "Clisbot – Run Claude Code, Codex, Copilot, OpenCode from anywhere",
       "Open source app for Claude Code, Codex, OpenCode, Pi, and 30+ more coding agents. Run many agents in parallel on your machines. Editor, terminals, diffs, pull requests, and a browser in one window. One download on desktop. The full app on iOS and Android.",
       "/",
     ),

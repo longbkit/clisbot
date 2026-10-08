@@ -8,8 +8,8 @@ export function SiteHeader() {
   return (
     <header className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
       <a href="/" className="flex items-center gap-3">
-        <img src="/logo.svg" alt="Paseo" className="w-6 h-6" />
-        <span className="text-lg font-medium">Paseo</span>
+        <img src="/logo.svg" alt="Clisbot" className="w-6 h-6" />
+        <span className="text-lg font-medium">Clisbot</span>
       </a>
       <div className="flex flex-wrap items-center justify-center gap-4">
         {PLUGINS_LINKED && (
@@ -51,7 +51,7 @@ export function SiteHeader() {
           Sponsor
         </a>
         <a
-          href="https://discord.gg/jz8T2uahpH"
+          href="https://discord.gg/awGmcmFXC"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Discord"
@@ -60,7 +60,7 @@ export function SiteHeader() {
           <DiscordIcon width="18" height="18" />
         </a>
         <a
-          href="https://github.com/getpaseo/paseo"
+          href="https://github.com/longbkit/clisbot"
           target="_blank"
           rel="noopener noreferrer"
           aria-label={stars ? `GitHub, ${stars} stars` : "GitHub"}

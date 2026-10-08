@@ -1,7 +1,7 @@
 import type { z } from "zod";
-import { pluginOverviewUrl } from "@getpaseo/protocol/plugin-overview";
-import { pluginMediaKind, type PublishedPluginSchema } from "@getpaseo/protocol/plugin-registry";
-import { scoreTextFields } from "@getpaseo/protocol/search/text-match";
+import { pluginOverviewUrl } from "@clisbot/protocol/plugin-overview";
+import { pluginMediaKind, type PublishedPluginSchema } from "@clisbot/protocol/plugin-registry";
+import { scoreTextFields } from "@clisbot/protocol/search/text-match";
 import { CATEGORIES, type Category, type CategorySlug } from "./categories";
 import type { InstallCounts, InstallWindow } from "./installs";
 export { CATEGORIES, type Category, type CategorySlug };
@@ -41,7 +41,7 @@ export function getPluginsByAuthor(plugins: Plugin[], owner: string): Plugin[] {
   return plugins.filter((plugin) => pluginOwner(plugin) === owner);
 }
 export function installCommand(plugin: Plugin): string {
-  return `paseo plugin add ${plugin.id}`;
+  return `clisbot plugin add ${plugin.id}`;
 }
 export function pluginVersion(plugin: Plugin): string {
   return plugin.artifact.kind === "npm"

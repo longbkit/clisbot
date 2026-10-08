@@ -17,7 +17,7 @@ interface WebNotificationInstance {
   addEventListener: (type: "click", listener: (event: Event) => void) => void;
 }
 
-export const WEB_NOTIFICATION_CLICK_EVENT = "paseo:web-notification-click";
+export const WEB_NOTIFICATION_CLICK_EVENT = "clisbot:web-notification-click";
 
 let permissionRequest: Promise<boolean> | null = null;
 let notificationIconUrl: string | null | undefined;
@@ -108,7 +108,7 @@ function getWebNotificationIconUrl(): string | undefined {
   }
 
   try {
-    const asset = Asset.fromModule(require("../../assets/images/notification-icon.png"));
+    const asset = Asset.fromModule(require("../../assets/images/browser-notification-icon.png"));
     notificationIconUrl = asset.uri ?? null;
   } catch {
     notificationIconUrl = null;

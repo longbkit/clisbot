@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { discover, fetchUsage } from "./usage.js";
-import type { UsageReport } from "@getpaseo/plugin/server/usage";
+import type { UsageReport } from "@clisbot/plugin/server/usage";
 
 // node:sqlite has no @types/node@20 typings; require it with a narrow local type.
 const testRequire = createRequire(import.meta.url);

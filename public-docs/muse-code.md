@@ -1,6 +1,6 @@
 ---
 title: Muse Code
-description: Install and configure Muse Code for Paseo.
+description: Install and configure Muse Code for Clisbot.
 nav: Muse Code
 order: 25
 category: Providers
@@ -8,11 +8,11 @@ category: Providers
 
 # Muse Code
 
-Run Meta's terminal coding agent in Paseo with your existing Muse installation and credentials.
+Run Meta's terminal coding agent in Clisbot with your existing Muse installation and credentials.
 
 ## Getting started
 
-Install Muse Code on the machine running the Paseo daemon:
+Install Muse Code on the machine running the Clisbot daemon:
 
 ```bash
 curl -fsSL https://dev.meta.ai/install.sh | sh
@@ -23,13 +23,13 @@ Use Muse 1.3.0 or newer. This integration was verified with 1.4.1. For API acces
 `META_API_KEY` in the daemon's environment instead of logging in. See
 [provider environment overrides](/docs/custom-providers).
 
-In Paseo, select **Muse Code**, then choose a model, approval mode, and reasoning effort.
-Paseo runs `muse serve` and communicates over the Muse Session Protocol (MSP). Your Muse
+In Clisbot, select **Muse Code**, then choose a model, approval mode, and reasoning effort.
+Clisbot runs `muse serve` and communicates over the Muse Session Protocol (MSP). Your Muse
 configuration determines the available models.
 
 ## Provider options
 
-Paseo launches Muse with the sandbox disabled (`--disable-sandbox`) and workspace trust
+Clisbot launches Muse with the sandbox disabled (`--disable-sandbox`) and workspace trust
 on (`--trust-workspace`). Muse can install packages using your npm cache and load project
 rules, skills, and configuration.
 
@@ -71,8 +71,8 @@ the effective provider options. Skills appear in the slash-command menu, alongsi
 
 ## Limitations in Muse 1.4.1
 
-- **Paseo MCP tools are unavailable.** Muse drops the returned tool namespace before matching
-  an MCP call. This upstream issue must be fixed in Muse before its agents can use Paseo tools.
+- **Clisbot MCP tools are unavailable.** Muse drops the returned tool namespace before matching
+  an MCP call. This upstream issue must be fixed in Muse before its agents can use Clisbot tools.
 - **Compaction needs a model context limit.** If your endpoint does not report one, configure
   `context_compaction.provider_context_limit_tokens` in Muse for the selected model.
 - **Usage windows appear only when Muse reports them.** An empty `usage/read` response

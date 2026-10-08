@@ -354,7 +354,7 @@ function buildRuntimeElementExpression(metadata: BrowserRefMetadata): string {
 }
 
 function buildResolveExpression(metadata: BrowserRefMetadata): string {
-  return `window.__PASEO_BROWSER_AUTOMATION__?.resolve(${JSON.stringify(metadata.ref)}, ${JSON.stringify(metadata.fingerprint)}) ?? { ok: false, reason: 'stale_ref' }`;
+  return `window.__CLISBOT_BROWSER_AUTOMATION__?.resolve(${JSON.stringify(metadata.ref)}, ${JSON.stringify(metadata.fingerprint)}) ?? { ok: false, reason: 'stale_ref' }`;
 }
 
 function readString(value: unknown): string | null {

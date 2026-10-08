@@ -5,7 +5,7 @@ Run these against a connected task-owned tablet with the current development app
 Android Pixel Tablet API 36.1:
 
 ```sh
-agent-device replay packages/app/e2e/mobile/agent-device/native-terminal-wide-keybar.android.ad --platform android --device paseo-tablet-p1-api36
+agent-device replay packages/app/e2e/mobile/agent-device/native-terminal-wide-keybar.android.ad --platform android --device clisbot-tablet-p1-api36
 ```
 
 iPad Pro 11-inch (M5), iOS 26.5: from the Namespace Mac checkout, prefill the simulator clipboard with the command below, then run the Maestro compatibility flow. Its `runFlow.when.visible` presses **Allow Paste** only if the iOS sheet appears; every other action and output assertion remains strict. The clipboard payload contains `PASTE_OK`, while only executed PTY output contains `__AD_IOS_PASTE_OK__`.

@@ -1,4 +1,4 @@
-import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions } from "@clisbot/protocol/agent-types";
 import type { z } from "zod";
 
 export interface ProviderOptionIssue {

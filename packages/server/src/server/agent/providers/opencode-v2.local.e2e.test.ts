@@ -22,7 +22,7 @@ import {
 } from "./opencode/test-utils/v2-local-e2e-helpers.js";
 
 test("v2 shares a helper across agent identities and keeps the remaining session alive", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-shared-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-shared-"));
   const runtime = new V2Runtime({ logger: createTestLogger() });
   const clients = new Set<V2Api>();
   const client = new OpenCodeV2AgentClient({
@@ -42,7 +42,7 @@ test("v2 shares a helper across agent identities and keeps the remaining session
       sessions.push(
         await client.createSession(
           { provider: "opencode", cwd: root },
-          { agentId, env: { PASEO_AGENT_ID: agentId, PASEO_AGENT_CWD: root } },
+          { agentId, env: { CLISBOT_AGENT_ID: agentId, CLISBOT_AGENT_CWD: root } },
           { persistSession: false },
         ),
       );
@@ -59,7 +59,7 @@ test("v2 shares a helper across agent identities and keeps the remaining session
 }, 60_000);
 
 test("v2 structured output survives history and does not affect the next ordinary turn", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-schema-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-schema-"));
   const client = new OpenCodeV2AgentClient({ logger: createTestLogger() });
   let session: Awaited<ReturnType<typeof client.createSession>> | undefined;
   try {
@@ -100,7 +100,7 @@ test("v2 structured output survives history and does not affect the next ordinar
 }, 120_000);
 
 test("v2 preserves final text without duplicating streamed content", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-stream-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-stream-"));
   const client = new OpenCodeV2AgentClient({ logger: createTestLogger() });
   let session: Awaited<ReturnType<typeof client.createSession>> | undefined;
   try {
@@ -131,7 +131,7 @@ test("v2 preserves final text without duplicating streamed content", async () =>
 }, 120_000);
 
 test("v2 handles live tool approvals and questions", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-approvals-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-approvals-"));
   const client = new OpenCodeV2AgentClient({ logger: createTestLogger() });
   let session: Awaited<ReturnType<typeof client.createSession>> | undefined;
   try {
@@ -148,9 +148,9 @@ test("v2 handles live tool approvals and questions", async () => {
     session = active;
     const permissions = autoRespondToPermissions(active);
     const command = await active.run(
-      "Use the shell tool to run exactly: printf PASEO_APPROVED. Then report its output.",
+      "Use the shell tool to run exactly: printf CLISBOT_APPROVED. Then report its output.",
     );
-    expect(command.finalText).toContain("PASEO_APPROVED");
+    expect(command.finalText).toContain("CLISBOT_APPROVED");
     expect(permissions.kinds).toContain("tool");
     const question = await active.run(
       "Use the question tool to ask me to choose Red or Blue. Wait for my answer, then reply with exactly the color I selected.",
@@ -168,14 +168,14 @@ test("v2 handles live tool approvals and questions", async () => {
 }, 120_000);
 
 test("v2 invokes an injected MCP tool with exact preapproval", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-mcp-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-mcp-"));
   const fixture = path.join(root, "mcp.mjs");
   await writeFile(
     fixture,
     `import { McpServer } from ${JSON.stringify(import.meta.resolve("@modelcontextprotocol/sdk/server/mcp.js"))};
 import { StdioServerTransport } from ${JSON.stringify(import.meta.resolve("@modelcontextprotocol/sdk/server/stdio.js"))};
-const server = new McpServer({ name: "paseo-validation", version: "1.0.0" });
-server.registerTool("marker", { description: "Return the validation marker", inputSchema: {} }, async () => ({ content: [{ type: "text", text: "PASEO_MCP_OK" }] }));
+const server = new McpServer({ name: "clisbot-validation", version: "1.0.0" });
+server.registerTool("marker", { description: "Return the validation marker", inputSchema: {} }, async () => ({ content: [{ type: "text", text: "CLISBOT_MCP_OK" }] }));
 await server.connect(new StdioServerTransport());
 `,
   );
@@ -198,7 +198,7 @@ await server.connect(new StdioServerTransport());
     const result = await active.run(
       "Call the validation_marker MCP tool once and report its output. Do not use other tools.",
     );
-    expect(result.finalText).toContain("PASEO_MCP_OK");
+    expect(result.finalText).toContain("CLISBOT_MCP_OK");
     expect(result.timeline).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -218,7 +218,7 @@ await server.connect(new StdioServerTransport());
 }, 120_000);
 
 test("v2 stops a running tool before replacement work and imports the same session", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-stop-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-stop-"));
   const client = new OpenCodeV2AgentClient({ logger: createTestLogger() });
   let session: Awaited<ReturnType<typeof client.createSession>> | undefined;
   let imported: Awaited<ReturnType<typeof client.importSession>> | undefined;
@@ -265,7 +265,7 @@ test("v2 stops a running tool before replacement work and imports the same sessi
 }, 120_000);
 
 test("v2 rewinds conversation and files and reports autonomous subagents", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-rewind-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-rewind-"));
   await execCommand("git", ["init", root]);
   await writeFile(path.join(root, "marker.txt"), "before\n");
   await execCommand("git", ["add", "marker.txt"], { cwd: root });
@@ -273,7 +273,7 @@ test("v2 rewinds conversation and files and reports autonomous subagents", async
     "git",
     [
       "-c",
-      "user.name=Paseo Test",
+      "user.name=Clisbot Test",
       "-c",
       "user.email=test@example.invalid",
       "-c",
@@ -324,7 +324,7 @@ test("v2 rewinds conversation and files and reports autonomous subagents", async
 }, 180_000);
 
 test("v2 executes commands and retains context after compaction", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-commands-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-commands-"));
   const commandDir = path.join(root, ".opencode", "command");
   await mkdir(commandDir, { recursive: true });
   await writeFile(
@@ -365,7 +365,7 @@ test("v2 executes commands and retains context after compaction", async () => {
 }, 180_000);
 
 test("v2 executes discovered skills and accepts image attachments", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-attachments-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-attachments-"));
   const skillDir = path.join(root, ".opencode", "skills", "validation");
   await mkdir(skillDir, { recursive: true });
   await writeFile(

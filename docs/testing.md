@@ -109,7 +109,7 @@ The packaged desktop smoke is an external observer of the production launch path
 
 The harness launches the packaged app with isolated user data and daemon state, connects to the real renderer over Chromium's debugging protocol, and requires all of these outcomes:
 
-- the `paseo://app/` renderer mounts into `#root`;
+- the `clisbot://app/` renderer mounts into `#root`;
 - the sandboxed preload exposes the desktop bridge;
 - the renderer starts a fresh desktop-managed daemon through the normal startup bootstrap;
 - the bundled CLI can query that daemon and run a terminal command.
@@ -123,8 +123,8 @@ Smoke jobs upload renderer screenshots and desktop/daemon diagnostics, including
 To exercise the smoke locally on Linux:
 
 ```bash
-PASEO_DESKTOP_SMOKE=1 \
-PASEO_DESKTOP_SMOKE_ARTIFACT_DIR=/tmp/paseo-desktop-smoke \
+CLISBOT_DESKTOP_SMOKE=1 \
+CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR=/tmp/clisbot-desktop-smoke \
 npm run build:desktop -- --publish never --linux --x64 --dir
 ```
 
@@ -134,7 +134,7 @@ electron-builder packs `node_modules` by walking declared production `dependenci
 
 The packaged smoke catches it after merge. PRs need the fast dependency-closure test below because packaging runs on main.
 
-`packages/highlight/src/__tests__/dependency-closure.test.ts` replicates the packer's traversal statically and runs with the normal unit tests. It is scoped to `@getpaseo/highlight` on purpose: that tree is small and pure, so the check is exact. Running the same walk over `@getpaseo/server` produces dozens of false positives from optional dependencies loaded behind `try`/`catch`.
+`packages/highlight/src/__tests__/dependency-closure.test.ts` replicates the packer's traversal statically and runs with the normal unit tests. It is scoped to `@clisbot/highlight` on purpose: that tree is small and pure, so the check is exact. Running the same walk over `@clisbot/server` produces dozens of false positives from optional dependencies loaded behind `try`/`catch`.
 
 Prefer a `@lezer/*` grammar. When a language only ships inside an editor extension, vendor the grammar into `packages/highlight/src/<lang>/` — see `svelte/`, `nix/`, and `csharp/`.
 
@@ -145,7 +145,7 @@ The desktop browser E2E launches an isolated real daemon, Metro, and Electron ap
 Run it locally with the same command owned by the Ubuntu `desktop-tests` required check:
 
 ```bash
-npm run test:e2e:browser-tabs --workspace=@getpaseo/desktop
+npm run test:e2e:browser-tabs --workspace=@clisbot/desktop
 ```
 
 ## Test organization
@@ -168,7 +168,7 @@ Vitest picks up tests by suffix. The suffix tells the runner which category it b
 | `*.real.e2e.test.ts`  | E2E that hits a real provider (Claude/Codex/Copilot/OpenCode/Pi) — needs creds in `packages/server/.env.test` | `npm run test:integration:real` / `test:e2e:real`                                    |
 | `*.local.e2e.test.ts` | E2E that needs a local-only resource                                                                          | `npm run test:integration:local` / `test:e2e:local`                                  |
 
-Browser Playwright specs live in `packages/app/e2e/browser/`. Desktop Playwright and real-Electron E2E live in `packages/desktop/e2e/`. Harness code shared by both suites lives in `packages/app/e2e/support/`; neither suite may place specs there. App Playwright specs that hit real providers use `*.real.spec.ts` and run through `npm run test:e2e:real --workspace=@getpaseo/app`; the default browser project ignores that suffix so CI does not need provider credentials.
+Browser Playwright specs live in `packages/app/e2e/browser/`. Desktop Playwright and real-Electron E2E live in `packages/desktop/e2e/`. Harness code shared by both suites lives in `packages/app/e2e/support/`; neither suite may place specs there. App Playwright specs that hit real providers use `*.real.spec.ts` and run through `npm run test:e2e:real --workspace=@clisbot/app`; the default browser project ignores that suffix so CI does not need provider credentials.
 
 Live provider smoke tests belong in `*.real.e2e.test.ts`, not `*.test.ts`, even when guarded by environment variables. Default unit suites must use deterministic provider adapters/fakes so missing credits, auth outages, and upstream model drift do not block normal CI.
 
@@ -176,7 +176,7 @@ Codex MultiAgentV2 real tests use local Codex authentication rather than the Ope
 
 ### Test setup
 
-- Server: `packages/server/src/test-utils/vitest-setup.ts` loads `.env.test`, sets `PASEO_SUPERVISED=0`, and disables Git/SSH prompts. Add new global env shims here, not in individual tests.
+- Server: `packages/server/src/test-utils/vitest-setup.ts` loads `.env.test`, sets `CLISBOT_SUPERVISED=0`, and disables Git/SSH prompts. Add new global env shims here, not in individual tests.
 - App: `packages/app/vitest.setup.ts` provides `expo`/`__DEV__` shims and stubs a few native-only modules (`react-native-unistyles`, `react-native-svg`, `expo-linking`, `@xterm/addon-ligatures`). Stubbing here is for modules that have no meaningful Node behavior — not a license to mock app code.
 
 ## Running tests locally
@@ -189,7 +189,7 @@ Test suites in this repo are heavy. Running them in bulk freezes the machine, es
 - Never re-run a suite another agent already reported green.
 - For full-suite confidence, push to CI and check GitHub Actions.
 - Never run the full Playwright E2E suite locally — defer whole-suite verification to CI. Targeted Playwright specs are allowed when you changed or need to prove that specific flow.
-- App Playwright shares one warmed Metro server per run and gives every Playwright worker its own isolated daemon and `PASEO_HOME`. Spec files run concurrently without exposing one file's projects, agents, terminals, history, or provider configuration to another worker; tests within a file remain together so file-level setup is not repeated.
+- App Playwright shares one warmed Metro server per run and gives every Playwright worker its own isolated daemon and `CLISBOT_HOME`. Spec files run concurrently without exposing one file's projects, agents, terminals, history, or provider configuration to another worker; tests within a file remain together so file-level setup is not repeated.
 - Playwright specs that exercise only the daemon import `daemonTest` from the shared fixtures so they do not create a browser context or page.
 - Helpers that create projects or workspaces own those records until cleanup. Their clients remove the daemon project on close, and an automatic fixture fails any test that still leaks a project record. Deleting only the temporary directory is not cleanup. Agent helpers pass the intended `workspaceId` through to agent creation; they never infer ownership from `cwd`.
 - Tests whose subject is daemon-global state, such as an empty history or daemon restart, start a dedicated host explicitly. Filenames and directories describe product behavior, never execution order or isolation mechanics.

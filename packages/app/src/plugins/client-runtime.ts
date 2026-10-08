@@ -1,7 +1,7 @@
 import { createPlayAudio, type AudioEngine } from "@/audio";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { createPluginHosts } from "./hosts";
-import type { PluginClientOpenPanelOptions } from "@getpaseo/plugin/client";
+import type { PluginClientOpenPanelOptions } from "@clisbot/plugin/client";
 import {
   createPluginAgentActionContext,
   createPluginCapabilities,

@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     ...devices["Desktop Chrome"],
-    baseURL: process.env.PASEO_PROFILE_APP_URL ?? "http://127.0.0.1:8081",
+    baseURL: process.env.CLISBOT_PROFILE_APP_URL ?? "http://127.0.0.1:8081",
     viewport: { width: 1440, height: 900 },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

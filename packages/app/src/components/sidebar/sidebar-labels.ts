@@ -1,4 +1,4 @@
-import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
+import { workspaceLabelKey } from "@clisbot/protocol/workspace-labels";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import { SIDEBAR_UNLABELLED_LABEL_KEY, type SidebarLabelFilter } from "@/stores/sidebar-view-store";
 import type { StatusBucket, StatusGroup } from "@/hooks/sidebar-status-view-model";

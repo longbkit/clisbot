@@ -335,7 +335,7 @@ function buildAnnotationMarkerScript(markers: readonly BrowserAnnotationMarker[]
   return `
     (function() {
       var markers = ${payload};
-      if (window.__paseoAnnotationMarkers) { window.__paseoAnnotationMarkers.update(markers); return true; }
+      if (window.__clisbotAnnotationMarkers) { window.__clisbotAnnotationMarkers.update(markers); return true; }
       var host = document.createElement('div');
       host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483646;pointer-events:none;';
       (document.body || document.documentElement).appendChild(host);
@@ -371,14 +371,14 @@ function buildAnnotationMarkerScript(markers: readonly BrowserAnnotationMarker[]
       }
       window.addEventListener('scroll', schedule, true);
       window.addEventListener('resize', schedule, true);
-      window.__paseoAnnotationMarkers = {
+      window.__clisbotAnnotationMarkers = {
         update: function(next) { current = next; schedule(); },
         destroy: function() {
           window.removeEventListener('scroll', schedule, true);
           window.removeEventListener('resize', schedule, true);
           clearBadges();
           if (host.parentNode) host.parentNode.removeChild(host);
-          window.__paseoAnnotationMarkers = null;
+          window.__clisbotAnnotationMarkers = null;
         }
       };
       reposition();
@@ -399,7 +399,7 @@ function applyAnnotationMarkers(
 function clearAnnotationMarkers(webview: ElectronWebview): void {
   void executeWebviewJavaScript(
     webview,
-    "if(window.__paseoAnnotationMarkers) window.__paseoAnnotationMarkers.destroy();",
+    "if(window.__clisbotAnnotationMarkers) window.__clisbotAnnotationMarkers.destroy();",
   ).catch(ignoreWebviewJavaScriptError);
 }
 

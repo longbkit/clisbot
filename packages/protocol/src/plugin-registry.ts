@@ -71,7 +71,7 @@ export type PluginRegistries = z.infer<typeof PluginRegistriesSchema>;
 
 export function parsePluginRegistryReference(
   source: string,
-  defaultUrl = "https://plugins.paseo.sh",
+  defaultUrl = "https://plugins.clisbot.com",
 ): PluginRegistryIdentity | null {
   const segments = source.split("/");
   if (segments.length === 2 && PluginRegistryIdSchema.safeParse(source).success)

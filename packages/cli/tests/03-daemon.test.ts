@@ -3,7 +3,7 @@
 /**
  * Phase 2: Daemon Command Tests
  *
- * Tests daemon commands with an isolated PASEO_HOME.
+ * Tests daemon commands with an isolated CLISBOT_HOME.
  *
  * Tests:
  * - daemon --help shows subcommands
@@ -24,17 +24,17 @@ import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import YAML from "yaml";
-import { runLocalPaseo } from "./helpers/local-cli.ts";
+import { runLocalClisbot } from "./helpers/local-cli.ts";
 
 console.log("=== Daemon Commands ===\n");
 
-// Keep restart off default 6767 to avoid collisions with any existing daemon.
+// Keep restart off default 6868 to avoid collisions with any existing daemon.
 const port = 10000 + Math.floor(Math.random() * 50000);
-const paseoHome = await mkdtemp(join(tmpdir(), "paseo-test-home-"));
+const clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-test-home-"));
 const require = createRequire(import.meta.url);
 
 function daemonCommand(args: string[]) {
-  return runLocalPaseo(["daemon", ...args], { PASEO_HOME: paseoHome });
+  return runLocalClisbot(["daemon", ...args], { CLISBOT_HOME: clisbotHome });
 }
 
 async function stopChildProcess(child: ChildProcess): Promise<void> {
@@ -51,13 +51,13 @@ async function stopChildProcess(child: ChildProcess): Promise<void> {
 }
 
 function resolveDaemonWorkerEntry(): string {
-  let currentDir = dirname(require.resolve("@getpaseo/server"));
+  let currentDir = dirname(require.resolve("@clisbot/server"));
 
   while (true) {
     const packageJsonPath = join(currentDir, "package.json");
     if (existsSync(packageJsonPath)) {
       const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-      if (packageJson.name === "@getpaseo/server") {
+      if (packageJson.name === "@clisbot/server") {
         const candidates = [
           join(currentDir, "dist", "server", "server", "daemon-worker.js"),
           join(currentDir, "src", "server", "daemon-worker.ts"),
@@ -73,12 +73,12 @@ function resolveDaemonWorkerEntry(): string {
     currentDir = parentDir;
   }
 
-  throw new Error("Unable to resolve @getpaseo/server package root");
+  throw new Error("Unable to resolve @clisbot/server package root");
 }
 
 async function tailDaemonLog(): Promise<string> {
   try {
-    const log = await readFile(join(paseoHome, "daemon.log"), "utf-8");
+    const log = await readFile(join(clisbotHome, "daemon.log"), "utf-8");
     return log.split("\n").slice(-30).join("\n");
   } catch {
     return "<daemon log unavailable>";
@@ -111,7 +111,7 @@ try {
   // Test 1: daemon --help shows subcommands
   {
     console.log("Test 1: daemon --help shows subcommands");
-    const result = await runLocalPaseo(["daemon", "--help"]);
+    const result = await runLocalClisbot(["daemon", "--help"]);
     assert.strictEqual(result.exitCode, 0, "daemon --help should exit 0");
     assert(result.stdout.includes("start"), "help should mention start");
     assert(result.stdout.includes("status"), "help should mention status");
@@ -166,7 +166,7 @@ try {
     const status = JSON.parse(result.stdout);
     assert.strictEqual(status.serverId, undefined, "stopped observation must not invent identity");
     assert.strictEqual(status.localDaemon, "stopped", "json status should report stopped");
-    assert.strictEqual(status.home, paseoHome, "json status should reflect the isolated home");
+    assert.strictEqual(status.home, clisbotHome, "json status should reflect the isolated home");
     assert.strictEqual(
       status.hostname,
       null,
@@ -176,8 +176,8 @@ try {
   }
 
   {
-    const result = await runLocalPaseo(["--host", "127.0.0.1:1", "daemon", "status", "--json"], {
-      PASEO_HOME: paseoHome,
+    const result = await runLocalClisbot(["--host", "127.0.0.1:1", "daemon", "status", "--json"], {
+      CLISBOT_HOME: clisbotHome,
     });
     assert.strictEqual(result.exitCode, 1, "an explicit endpoint must not report local status");
     assert.match(result.stderr, /127.0.0.1:1/);
@@ -210,9 +210,9 @@ try {
     console.log("Test 8: daemon status probes live relay state over local IPC");
     const listen =
       process.platform === "win32"
-        ? `\\\\.\\pipe\\paseo-status-${process.pid}-${Date.now()}`
-        : join(paseoHome, "status.sock");
-    const configPath = join(paseoHome, "config.json");
+        ? `\\\\.\\pipe\\clisbot-status-${process.pid}-${Date.now()}`
+        : join(clisbotHome, "status.sock");
+    const configPath = join(clisbotHome, "config.json");
     const config = JSON.parse(await readFile(configPath, "utf-8"));
     config.daemon = {
       ...config.daemon,
@@ -220,7 +220,7 @@ try {
       relay: { ...config.daemon?.relay, enabled: false },
     };
     await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
-    // A supervised daemon owns and heartbeats paseo.pid. Launch the worker
+    // A supervised daemon owns and heartbeats clisbot.pid. Launch the worker
     // directly so this fixture naturally has a reachable daemon without a PID file.
     const workerEntry = resolveDaemonWorkerEntry();
     const workerArgs = workerEntry.endsWith(".ts")
@@ -230,11 +230,11 @@ try {
       cwd: join(import.meta.dirname, ".."),
       env: {
         ...process.env,
-        PASEO_HOME: paseoHome,
-        PASEO_LISTEN: listen,
-        PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
-        PASEO_DICTATION_ENABLED: "0",
-        PASEO_VOICE_MODE_ENABLED: "0",
+        CLISBOT_HOME: clisbotHome,
+        CLISBOT_LISTEN: listen,
+        CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
+        CLISBOT_DICTATION_ENABLED: "0",
+        CLISBOT_VOICE_MODE_ENABLED: "0",
         CI: "true",
       },
       stdio: "ignore",
@@ -291,7 +291,7 @@ try {
       const nestedReload = await daemonCommand(["reload", "--host", listen, "--json"]);
       assert.strictEqual(nestedReload.exitCode, 0, nestedReload.stderr);
       assert.deepStrictEqual(JSON.parse(nestedReload.stdout), {
-        restartCommand: `paseo daemon restart --host ${JSON.stringify(listen)}`,
+        restartCommand: `clisbot daemon restart --host ${JSON.stringify(listen)}`,
         appliedPaths: ["daemon.browserTools.enabled"],
         restartRequiredPaths: [],
         overrideControlledPaths: ["daemon.listen"],
@@ -299,12 +299,12 @@ try {
 
       reloadConfig.daemon.browserTools.enabled = false;
       await writeFile(configPath, `${JSON.stringify(reloadConfig, null, 2)}\n`, "utf-8");
-      const aliasReload = await runLocalPaseo(["reload", "--host", listen, "--json"], {
-        PASEO_HOME: paseoHome,
+      const aliasReload = await runLocalClisbot(["reload", "--host", listen, "--json"], {
+        CLISBOT_HOME: clisbotHome,
       });
       assert.strictEqual(aliasReload.exitCode, 0, aliasReload.stderr);
       assert.deepStrictEqual(JSON.parse(aliasReload.stdout), {
-        restartCommand: `paseo daemon restart --host ${JSON.stringify(listen)}`,
+        restartCommand: `clisbot daemon restart --host ${JSON.stringify(listen)}`,
         appliedPaths: ["daemon.browserTools.enabled"],
         restartRequiredPaths: [],
         overrideControlledPaths: [],
@@ -313,7 +313,7 @@ try {
       const yamlReload = await daemonCommand(["reload", "--host", listen, "--format", "yaml"]);
       assert.strictEqual(yamlReload.exitCode, 0, yamlReload.stderr);
       assert.deepStrictEqual(YAML.parse(yamlReload.stdout), {
-        restartCommand: `paseo daemon restart --host ${JSON.stringify(listen)}`,
+        restartCommand: `clisbot daemon restart --host ${JSON.stringify(listen)}`,
         appliedPaths: [],
         restartRequiredPaths: [],
         overrideControlledPaths: [],
@@ -322,16 +322,16 @@ try {
       const humanReload = await daemonCommand(["reload", "--host", listen]);
       assert.match(humanReload.stdout, /Configuration reloaded\./);
 
-      const foreignHome = await mkdtemp(join(tmpdir(), "paseo-test-foreign-home-"));
+      const foreignHome = await mkdtemp(join(tmpdir(), "clisbot-test-foreign-home-"));
       try {
         await writeFile(
           join(foreignHome, "config.json"),
           `${JSON.stringify({ daemon: { listen, relay: { enabled: false } } }, null, 2)}\n`,
           "utf-8",
         );
-        const foreignPairing = await runLocalPaseo(
+        const foreignPairing = await runLocalClisbot(
           ["daemon", "pair", "--home", foreignHome, "--json"],
-          { PASEO_HOME: foreignHome },
+          { CLISBOT_HOME: foreignHome },
         );
         assert.strictEqual(foreignPairing.exitCode, 1);
         assert.match(foreignPairing.stderr, /RELAY_DISABLED/);
@@ -348,7 +348,7 @@ try {
   // Test 9: explicit offline relay consent persists for subsequent pairing
   {
     console.log("Test 9: daemon pair --relay persists offline relay consent");
-    const configPath = join(paseoHome, "config.json");
+    const configPath = join(clisbotHome, "config.json");
     const config = JSON.parse(await readFile(configPath, "utf-8"));
     config.daemon = {
       ...config.daemon,
@@ -378,7 +378,7 @@ try {
   // Best-effort daemon cleanup in case assertions fail before explicit stop.
   await daemonCommand(["stop", "--force"]);
   // Clean up temp directory
-  await rm(paseoHome, { recursive: true, force: true });
+  await rm(clisbotHome, { recursive: true, force: true });
 }
 
 console.log("=== All daemon tests passed ===");

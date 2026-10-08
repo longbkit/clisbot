@@ -17,7 +17,7 @@ const loaderEnv = resolveSherpaLoaderEnv();
 test.runIf(loaderKey && loaderEnv)(
   "daemon worker environment does not carry the local speech library directory",
   async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-supervisor-env-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-supervisor-env-"));
     const reportPath = path.join(root, "worker-env.json");
     const preloadPath = path.join(root, "report-worker-env.mjs");
     await writeFile(
@@ -31,7 +31,7 @@ test.runIf(loaderKey && loaderEnv)(
     `,
     );
     const env = Object.fromEntries(
-      Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_")),
+      Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
     );
     // Start from a parent environment that does not already list the speech library directory.
     const envLoaderKey =
@@ -50,7 +50,7 @@ test.runIf(loaderKey && loaderEnv)(
           ...env,
           HOME: root,
           USERPROFILE: root,
-          PASEO_HOME: path.join(root, "home"),
+          CLISBOT_HOME: path.join(root, "home"),
           NODE_OPTIONS: `--import=${pathToFileURL(preloadPath).href}`,
         },
         stdio: ["ignore", "pipe", "pipe"],

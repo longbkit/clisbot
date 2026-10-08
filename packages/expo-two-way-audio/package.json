@@ -1,5 +1,5 @@
 {
-  "name": "@getpaseo/expo-two-way-audio",
+  "name": "@clisbot/expo-two-way-audio",
   "version": "0.11.1",
   "description": "Native module for two way audio streaming",
   "keywords": [

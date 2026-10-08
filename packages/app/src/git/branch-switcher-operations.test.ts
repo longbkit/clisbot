@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { createBranchSwitcherOperations } from "./branch-switcher-operations";
 
 function createRecordingClient() {
@@ -37,7 +37,7 @@ describe("createBranchSwitcherOperations", () => {
 
     const operations = createBranchSwitcherOperations(client, workspaceDirectory);
     await operations.getBranchSuggestions(200);
-    await operations.listPaseoStashes();
+    await operations.listClisbotStashes();
     await operations.saveStash("main");
     await operations.popStash(0);
     await operations.switchBranch("feature");

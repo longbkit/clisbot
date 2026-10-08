@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 // are editor extensions published as if they were bare parsers.
 //
 // This replicates the packer's traversal statically: build the closure of
-// declared dependencies reachable from @getpaseo/highlight, walk each package's
+// declared dependencies reachable from @clisbot/highlight, walk each package's
 // real entry points, and assert every bare specifier they reach lands inside
 // the closure.
 

@@ -1,5 +1,5 @@
 {
-  description = "Paseo - self-hosted daemon for AI coding agents";
+  description = "Clisbot - self-hosted daemon for AI coding agents";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -25,8 +25,8 @@
         system:
         let
           pkgs = pkgsFor system;
-          paseo = pkgs.callPackage ./nix/package.nix { };
-          versionParts = pkgs.lib.splitString "." paseo.version;
+          clisbot = pkgs.callPackage ./nix/package.nix { };
+          versionParts = pkgs.lib.splitString "." clisbot.version;
           sourceRevision = if self ? revCount && self.revCount != null then self.revCount else 0;
           buildRevision = sourceRevision - (sourceRevision / 10000) * 10000;
           desktopBuildVersion = pkgs.lib.concatStringsSep "." [
@@ -36,21 +36,21 @@
           ];
         in
         {
-          default = paseo;
-          paseo = paseo;
+          default = clisbot;
+          clisbot = clisbot;
           desktop = pkgs.callPackage ./nix/desktop-package.nix {
-            inherit paseo;
+            inherit clisbot;
             buildVersion = desktopBuildVersion;
           };
         }
       );
 
-      nixosModules.default = self.nixosModules.paseo;
-      nixosModules.paseo =
+      nixosModules.default = self.nixosModules.clisbot;
+      nixosModules.clisbot =
         { pkgs, lib, ... }:
         {
           imports = [ ./nix/module.nix ];
-          services.paseo.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          services.clisbot.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         };
 
       devShells = forAllSystems (

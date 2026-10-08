@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z, type ZodType } from "zod";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 
 export interface UsageWindow {
   id: string;

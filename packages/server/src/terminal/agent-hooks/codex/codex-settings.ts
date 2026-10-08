@@ -40,7 +40,7 @@ export const codexHooksFormat: AgentHookConfigFormat<CodexHooksFile> = {
     const install = provider.install;
     const hooks = normalizeHooks(config.hooks);
     for (const event of provider.events) {
-      const userEntries = removePaseoHooks(hooks[event.event], install.hookMarker);
+      const userEntries = removeClisbotHooks(hooks[event.event], install.hookMarker);
       hooks[event.event] = [
         ...userEntries,
         {
@@ -62,7 +62,7 @@ export const codexHooksFormat: AgentHookConfigFormat<CodexHooksFile> = {
     const install = provider.install;
     const hooks = normalizeHooks(config.hooks);
     for (const event of provider.events) {
-      const entries = removePaseoHooks(hooks[event.event], install.hookMarker);
+      const entries = removeClisbotHooks(hooks[event.event], install.hookMarker);
       if (entries.length > 0) {
         hooks[event.event] = entries;
       } else {
@@ -77,7 +77,7 @@ export const codexHooksFormat: AgentHookConfigFormat<CodexHooksFile> = {
     return provider.events.every((event) =>
       normalizeMatchers(hooks[event.event]).some((entry) =>
         normalizeCommandHooks(entry.hooks).some((hook) =>
-          hasPaseoCommands(hook, install.hookMarker),
+          hasClisbotCommands(hook, install.hookMarker),
         ),
       ),
     );
@@ -102,7 +102,7 @@ function normalizeCommandHooks(value: unknown): CodexCommandHook[] {
   return value.filter(isRecord);
 }
 
-function removePaseoHooks(value: unknown, marker: string): CodexMatcherGroup[] {
+function removeClisbotHooks(value: unknown, marker: string): CodexMatcherGroup[] {
   const entries: CodexMatcherGroup[] = [];
   for (const entry of normalizeMatchers(value)) {
     const hooks = normalizeCommandHooks(entry.hooks).filter(
@@ -115,7 +115,7 @@ function removePaseoHooks(value: unknown, marker: string): CodexMatcherGroup[] {
   return entries;
 }
 
-function hasPaseoCommands(hook: CodexCommandHook, marker: string): boolean {
+function hasClisbotCommands(hook: CodexCommandHook, marker: string): boolean {
   return (
     commandFieldContainsMarker(hook.command, marker) && windowsCommandContainsMarker(hook, marker)
   );

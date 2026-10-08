@@ -49,7 +49,7 @@ import type {
   AgentCapabilityFlags,
   AgentPermissionAction,
   AgentPermissionResponse,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import type { AgentScreenAgent } from "@/hooks/use-agent-screen-state-machine";
 import { useSessionStore } from "@/stores/session-store";
 import { useRevealedText } from "@/hooks/use-revealed-text";
@@ -58,7 +58,7 @@ import { useLoadOlderAgentHistory } from "@/hooks/use-load-older-agent-history";
 import { resolveContentMaxWidth, useSettings } from "@/hooks/use-settings";
 import type { ToastApi } from "@/components/toast-host";
 import { returnToTimelineTail } from "./timeline-tail-navigation";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { ToolCallDetailsContent } from "@/components/tool-call-details";
 import { QuestionFormCard } from "@/components/question-form-card";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";

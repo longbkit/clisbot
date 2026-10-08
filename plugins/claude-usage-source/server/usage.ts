@@ -16,7 +16,7 @@ import {
   type UsageReport,
   type UsageWindow,
   type UsageDetail,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 
 const ApiNumberSchema = z.coerce.number().finite();
 

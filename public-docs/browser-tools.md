@@ -1,6 +1,6 @@
 ---
 title: Browser tools
-description: The browser_* MCP tools agents use to drive Paseo browser tabs.
+description: The browser_* MCP tools agents use to drive Clisbot browser tabs.
 nav: Tools reference
 order: 37
 category: Browser
@@ -8,7 +8,7 @@ category: Browser
 
 # Browser tools
 
-The `browser_*` tools are injected into agents alongside the other [Paseo MCP tools](/docs/mcp) when [browser automation](/docs/browser) is enabled.
+The `browser_*` tools are injected into agents alongside the other [Clisbot MCP tools](/docs/mcp) when [browser automation](/docs/browser) is enabled.
 
 Shared concepts:
 

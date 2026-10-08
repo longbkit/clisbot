@@ -15,9 +15,9 @@ import { createTempDirectory, createTempGitRepo } from "../support/helpers/works
 
 const SCREENSHOT_DIRECTORY = path.join(
   process.env.HOME ?? tmpdir(),
-  ".paseo/plans/import-session-ux",
+  ".clisbot/plans/import-session-ux",
 );
-const claudeConfigDirectory = mkdtempSync(path.join(tmpdir(), "paseo-import-flow-claude-"));
+const claudeConfigDirectory = mkdtempSync(path.join(tmpdir(), "clisbot-import-flow-claude-"));
 const brokenProvider = "broken-acp";
 
 test.use({
@@ -62,7 +62,7 @@ test.setTimeout(120_000);
 test.beforeAll(async () => {
   await mkdir(SCREENSHOT_DIRECTORY, { recursive: true });
   const repo = await createTempGitRepo("isf-", {
-    originUrl: "https://github.com/paseo-e2e/import-session-fixture.git",
+    originUrl: "https://github.com/clisbot-e2e/import-session-fixture.git",
   });
   const unrelated = await createTempDirectory("isf-other-");
   const worktreeDirectory = path.join(repo.path, "worktrees", "review-fix");

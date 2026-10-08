@@ -138,7 +138,7 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
           <p className="text-extra-muted-foreground">Community</p>
           <div className="space-y-2">
             <a
-              href="https://discord.gg/jz8T2uahpH"
+              href="https://discord.gg/awGmcmFXC"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"
@@ -146,15 +146,7 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
               Discord
             </a>
             <a
-              href="https://www.reddit.com/r/PaseoAI/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Reddit
-            </a>
-            <a
-              href="https://github.com/getpaseo/paseo"
+              href="https://github.com/longbkit/clisbot"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"
@@ -183,7 +175,7 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
               Google Play
             </a>
             <a
-              href="https://github.com/getpaseo/paseo/releases"
+              href="https://github.com/longbkit/clisbot/releases"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-muted-foreground hover:text-foreground transition-colors"

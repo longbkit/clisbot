@@ -246,11 +246,13 @@ describe("OMP tool call mapper", () => {
   });
 
   test("maps web search and URL reads to search and fetch", () => {
-    expect(mapOmpToolDetail(parseToolArgs("web_search", { query: "Paseo" }), null)).toMatchObject({
-      type: "search",
-      query: "Paseo",
-      toolName: "web_search",
-    });
+    expect(mapOmpToolDetail(parseToolArgs("web_search", { query: "Clisbot" }), null)).toMatchObject(
+      {
+        type: "search",
+        query: "Clisbot",
+        toolName: "web_search",
+      },
+    );
     expect(
       mapOmpToolDetail(parseToolArgs("read", { path: "https://example.com/" }), null),
     ).toMatchObject({ type: "fetch", url: "https://example.com/" });

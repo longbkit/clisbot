@@ -10,7 +10,7 @@ import { OpenAITTS } from "./speech/providers/openai/tts.js";
 import { OpenAISTT } from "./speech/providers/openai/stt.js";
 import { STTManager } from "./agent/stt-manager.js";
 import { withTimeout } from "../utils/promise-timeout.js";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 
 type SessionMessage<T extends SessionOutboundMessage["type"]> = Extract<
   SessionOutboundMessage,
@@ -88,7 +88,7 @@ function makeActivityErrorHandler(reject: (error: Error) => void) {
 }
 
 const openaiApiKey = process.env.OPENAI_API_KEY ?? null;
-const shouldRun = process.env.PASEO_VOICE_ROUNDTRIP_E2E === "1" && Boolean(openaiApiKey);
+const shouldRun = process.env.CLISBOT_VOICE_ROUNDTRIP_E2E === "1" && Boolean(openaiApiKey);
 const speechTest = shouldRun ? test : test.skip;
 
 type VoiceRoundtripProvider = string;

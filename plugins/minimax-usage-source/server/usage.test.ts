@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { discover, fetchUsage } from "./usage.js";
-import type { UsageReport } from "@getpaseo/plugin/server/usage";
+import type { UsageReport } from "@clisbot/plugin/server/usage";
 
 function writeMiniMaxConfig(dir: string, payload: Record<string, unknown>): void {
   mkdirSync(join(dir, ".mmx"), { recursive: true });

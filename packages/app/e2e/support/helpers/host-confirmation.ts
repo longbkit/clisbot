@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-const EXTRA_HOSTS_KEY = "@paseo:e2e-extra-hosts";
+const EXTRA_HOSTS_KEY = "@clisbot:e2e-extra-hosts";
 
 export interface LinkedHost {
   serverId: string;

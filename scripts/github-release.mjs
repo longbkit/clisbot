@@ -21,7 +21,7 @@ export function getGitHubRelease(repo, tag, execFileSync = nodeExecFileSync) {
     if (!isNotFoundError(error)) {
       throw error;
     }
-    const expectedName = `Paseo ${tag}`;
+    const expectedName = `Clisbot ${tag}`;
     const output = execFileSync(
       "gh",
       [
@@ -81,7 +81,7 @@ if (isMainModule(import.meta.url)) {
     process.exitCode = 1;
   } else {
     if (cleanupDuplicates && release.draft === true) {
-      const expectedName = `Paseo ${tag}`;
+      const expectedName = `Clisbot ${tag}`;
       const duplicateIds = nodeExecFileSync(
         "gh",
         [

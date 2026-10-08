@@ -1,9 +1,9 @@
 {
-  "name": "@getpaseo/desktop",
+  "name": "@clisbot/desktop",
   "version": "0.11.1",
   "private": true,
-  "description": "Paseo desktop app (Electron wrapper)",
-  "homepage": "https://paseo.sh",
+  "description": "Clisbot desktop app (Electron wrapper)",
+  "homepage": "https://clisbot.com",
   "license": "Apache-2.0",
   "author": {
     "name": "Mohamed Boudra",
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/getpaseo/paseo.git"
+    "url": "https://github.com/longbkit/clisbot.git"
   },
   "main": "dist/main.js",
   "scripts": {
@@ -28,8 +28,8 @@
     "test:e2e:lifecycle": "npm run build:main && node ./e2e/daemon-lifecycle.e2e.mjs"
   },
   "dependencies": {
-    "@getpaseo/cli": "*",
-    "@getpaseo/server": "*",
+    "@clisbot/cli": "*",
+    "@clisbot/server": "*",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.6.2",
     "ws": "^8.14.2",
@@ -46,5 +46,5 @@
     "vitest": "^4.1.6",
     "wait-on": "8.0.5"
   },
-  "desktopName": "Paseo.desktop"
+  "desktopName": "Clisbot.desktop"
 }

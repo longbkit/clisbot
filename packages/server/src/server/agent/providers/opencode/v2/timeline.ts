@@ -63,11 +63,11 @@ export class V2Timeline {
     state: TimelineState,
     push: (item: AgentTimelineItem) => void,
   ) {
-    state.structured = message.metadata?.paseoOutputSchema !== undefined;
+    state.structured = message.metadata?.clisbotOutputSchema !== undefined;
     state.accepted = false;
     if (this.content.has(message.id)) return;
     this.content.set(message.id, message.text);
-    const clientMessageId = message.metadata?.paseoClientMessageId;
+    const clientMessageId = message.metadata?.clisbotClientMessageId;
     push({
       type: "user_message",
       text: message.text,
@@ -111,7 +111,7 @@ export class V2Timeline {
     push: (item: AgentTimelineItem) => void,
   ) {
     if (!state.structured || state.accepted || part.state.status !== "completed") return;
-    const value = part.state.metadata?.paseoStructuredOutput;
+    const value = part.state.metadata?.clisbotStructuredOutput;
     if (value === undefined) return;
     state.accepted = true;
     const key = `${messageID}:${partIndex}`;

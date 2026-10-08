@@ -2,7 +2,7 @@ import type {
   AgentAttachment,
   ForgeSearchItem,
   UploadedFileAttachment,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { PluginResourceComposerAttachment } from "@/plugins/attachments";
 
 export type AttachmentStorageType = "web-indexeddb" | "desktop-file" | "native-file";

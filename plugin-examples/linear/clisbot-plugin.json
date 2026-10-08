@@ -1,0 +1,6 @@
+{
+  "id": "linear",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

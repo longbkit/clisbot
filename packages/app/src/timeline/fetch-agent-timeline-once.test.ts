@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { fetchAgentTimelineOnce } from "./fetch-agent-timeline-once";
 
 type TimelinePage = Awaited<ReturnType<DaemonClient["fetchAgentTimeline"]>>;

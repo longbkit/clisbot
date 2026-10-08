@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { createProjectIconTarget } from "./icon-target";
 import { ProjectIconCache, type ProjectIconCacheStorage } from "./icon-cache";
 

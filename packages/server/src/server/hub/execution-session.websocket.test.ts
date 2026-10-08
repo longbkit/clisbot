@@ -399,7 +399,7 @@ test("Hub creates and archives distinct local workspaces for classifier and work
   expect(await hub.archivedWorkspaceAt(workerWorkspaceId!)).toEqual(expect.any(String));
 });
 
-test("Hub archives a running execution's Paseo-created worktree", async () => {
+test("Hub archives a running execution's Clisbot-created worktree", async () => {
   const hub = await launchRelationship();
   hub.beginOwnedCreate("worktree-create", "execution-worktree", {
     worktree: { mode: "branch-off", newBranch: "hub-created-worktree", base: "main" },

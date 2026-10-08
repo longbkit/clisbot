@@ -1,17 +1,17 @@
 import { execFileSync } from "node:child_process";
 import type { z } from "zod";
 import { WebSocket } from "ws";
-import { SessionInboundMessageSchema, WSOutboundMessageSchema } from "@getpaseo/protocol/messages";
+import { SessionInboundMessageSchema, WSOutboundMessageSchema } from "@clisbot/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import pino from "pino";
-import type { CreationSnapshot, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { CreationSnapshot, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -29,7 +29,7 @@ test("creation progresses before agent readiness and continues after the disconn
   const directory = await mkdtemp(join(tmpdir(), "creation-wire-"));
   let agents = 0;
   let prompts = 0;
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     logger: pino(
       { level: "trace" },
       {
@@ -170,7 +170,7 @@ test.each([false, true])(
   "workspace identity does not depend on subscribing (first subscribe=%s)",
   async (subscribe) => {
     const directory = await mkdtemp(join(tmpdir(), "creation-identity-"));
-    const daemon = await createTestPaseoDaemon();
+    const daemon = await createTestClisbotDaemon();
     const peer = await connectCreationPeer(daemon.port);
     try {
       const request = {
@@ -199,7 +199,7 @@ test.each(["create_agent_request", "agent.create.request"] as const)(
   async (type) => {
     const directory = await mkdtemp(join(tmpdir(), "creation-agent-identity-"));
     let creations = 0;
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createTestAgentClients({
         beforeCreateSession: async () => {
           creations++;
@@ -264,7 +264,7 @@ test("legacy keyed creation preserves checkout error codes", async () => {
     ],
     { cwd: directory, stdio: "pipe" },
   );
-  const daemon = await createTestPaseoDaemon({ agentClients: createTestAgentClients() });
+  const daemon = await createTestClisbotDaemon({ agentClients: createTestAgentClients() });
   const peer = await connectCreationPeer(daemon.port);
   try {
     const result = await peer.request({

@@ -2,7 +2,7 @@ import type {
   DaemonClient,
   FetchAgentHistoryOptions,
   FetchAgentHistoryPageInfo,
-} from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/internal/daemon-client";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";

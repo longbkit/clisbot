@@ -506,7 +506,7 @@ test.describe("Worktree restore", () => {
 });
 
 async function captureBranchlessRestoreStep(page: Page, filename: string): Promise<void> {
-  const screenshotDirectory = path.join(tmpdir(), "paseo-branchless-restore-evidence");
+  const screenshotDirectory = path.join(tmpdir(), "clisbot-branchless-restore-evidence");
   mkdirSync(screenshotDirectory, { recursive: true });
   await page.screenshot({ path: path.join(screenshotDirectory, filename), fullPage: true });
 }

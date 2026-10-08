@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatPairingInstructions } from "./pairing.js";
 
 const QR = "\u001b[47m\u001b[30m      \n ████ \n      \u001b[0m";
-const URL = "https://app.paseo.sh/#offer=pairing-offer";
+const URL = "https://app.clisbot.com/#offer=pairing-offer";
 
 describe("formatPairingInstructions", () => {
   it("prints the QR and an unmodified pairing-link line when the terminal is wide enough", () => {
@@ -35,11 +35,11 @@ describe("formatPairingInstructions", () => {
     const output = formatPairingInstructions({
       qr: null,
       url: URL,
-      connectionUri: "relay://relay.paseo.sh:443/srv_test?key=public&password=private-value",
+      connectionUri: "relay://relay.clisbot.com:443/srv_test?key=public&password=private-value",
     });
 
     expect(output).toContain(
-      "relay://relay.paseo.sh:443/srv_test?key=public&password=%5Bredacted%5D",
+      "relay://relay.clisbot.com:443/srv_test?key=public&password=%5Bredacted%5D",
     );
     expect(output).not.toContain("private-value");
   });

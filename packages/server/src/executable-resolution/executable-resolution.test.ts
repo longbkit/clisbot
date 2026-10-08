@@ -14,7 +14,7 @@ const originalEnv = {
 const tempDirs: string[] = [];
 
 function makeTempDir(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "paseo-executable-test-"));
+  const dir = mkdtempSync(path.join(os.tmpdir(), "clisbot-executable-test-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -159,7 +159,7 @@ describe("findExecutable", () => {
     const dir = makeTempDir();
     prependPath(dir);
 
-    await expect(findExecutable("paseo-definitely-missing-command")).resolves.toBeNull();
+    await expect(findExecutable("clisbot-definitely-missing-command")).resolves.toBeNull();
   });
 
   test("Windows resolution skips literal path candidates that do not exist", async () => {

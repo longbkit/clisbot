@@ -46,7 +46,7 @@ test.describe("Workspace setup streaming", () => {
   test("does not seed the setup tab while workspace setup is running", async ({ page }) => {
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-open-", {
-      paseoConfig: {
+      clisbotConfig: {
         worktree: {
           setup: [
             "sh -c 'echo starting setup; for i in $(seq 1 30); do echo tick $i; sleep 1; done; echo setup complete'",
@@ -74,7 +74,7 @@ test.describe("Workspace setup streaming", () => {
   test("runs setup through the sidebar and leaves the workspace usable", async ({ page }) => {
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-ui-flow-", {
-      paseoConfig: {
+      clisbotConfig: {
         worktree: {
           setup: [
             "sh -c 'echo starting setup; sleep 1; echo loading dependencies; sleep 1; echo setup complete'",
@@ -119,7 +119,7 @@ test.describe("Workspace setup streaming", () => {
   daemonTest("streams running and completed setup snapshots for a successful setup", async () => {
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-success-", {
-      paseoConfig: {
+      clisbotConfig: {
         worktree: {
           setup: ["sh -c 'echo starting setup; sleep 2; echo setup complete'"],
         },
@@ -164,7 +164,7 @@ test.describe("Workspace setup streaming", () => {
   test("seeds a failed setup tab once in the main pane", async ({ page }) => {
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-failure-", {
-      paseoConfig: {
+      clisbotConfig: {
         worktree: {
           setup: ["sh -c 'echo starting setup; sleep 2; echo setup failed 1>&2; exit 1'"],
         },
@@ -206,7 +206,7 @@ test.describe("Workspace setup streaming", () => {
   test("keeps a workspace usable when its setup config cannot be parsed", async ({ page }) => {
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-invalid-config-", {
-      files: [{ path: "paseo.json", content: "{ invalid json\n" }],
+      files: [{ path: "clisbot.json", content: "{ invalid json\n" }],
     });
 
     try {
@@ -220,18 +220,18 @@ test.describe("Workspace setup streaming", () => {
         worktreeSlug: "workspace-setup-invalid-config",
       });
       const failedPayload = await failed;
-      expect(failedPayload.error).toContain("Failed to parse paseo.json");
+      expect(failedPayload.error).toContain("Failed to parse clisbot.json");
       expect(failedPayload.detail.commands).toEqual([]);
 
       await openHomeWithProject(page, repo.path);
       await navigateToWorkspaceViaSidebar(page, workspace.id);
       await expectFailedSetupTabSeededInMainPane(page, workspace.id);
-      await expect(page.getByText(/Failed to parse paseo\.json at/)).toBeVisible();
+      await expect(page.getByText(/Failed to parse clisbot\.json at/)).toBeVisible();
       await closeSetupTab(page, workspace.id);
       await clickNewChat(page);
       await expectComposerVisible(page);
       await openFileExplorer(page);
-      await expectExplorerEntryVisible(page, "paseo.json");
+      await expectExplorerEntryVisible(page, "clisbot.json");
     } finally {
       await client.close();
       await repo.cleanup();
@@ -271,7 +271,7 @@ test.describe("Workspace setup streaming", () => {
     test.setTimeout(90_000);
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-svc-ui-", {
-      paseoConfig: {
+      clisbotConfig: {
         worktree: {
           setup: ["sh -c 'echo bootstrapping; sleep 1; echo setup complete'"],
         },
@@ -320,7 +320,7 @@ test.describe("Workspace setup streaming", () => {
   daemonTest("launches workspace scripts through an explicit daemon request", async () => {
     const client = await connectWorkspaceSetupClient();
     const repo = await createTempGitRepo("setup-scripts-", {
-      paseoConfig: {
+      clisbotConfig: {
         worktree: {
           setup: ["sh -c 'echo bootstrapping; sleep 1; echo setup complete'"],
         },
@@ -340,7 +340,7 @@ test.describe("Workspace setup streaming", () => {
           payload.status === "completed" && payload.detail.log.includes("setup complete"),
       );
 
-      const result = await client.createPaseoWorktree({
+      const result = await client.createClisbotWorktree({
         cwd: repo.path,
         worktreeSlug: "workspace-setup-scripts",
       });

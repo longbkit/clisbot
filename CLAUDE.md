@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Paseo is a mobile app for monitoring and controlling your local AI coding agents from anywhere. Your dev environment, in your pocket. Connects directly to your actual development environment — your code stays on your machine.
+Clisbot is a mobile app for monitoring and controlling your local AI coding agents from anywhere. Your dev environment, in your pocket. Connects directly to your actual development environment — your code stays on your machine.
 
 **Supported agents:** Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, and Muse Code.
 
@@ -10,10 +10,10 @@ This is an npm workspace monorepo:
 
 - `packages/server` — Daemon: agent lifecycle, WebSocket API, MCP server
 - `packages/app` — Mobile + web client (Expo)
-- `packages/cli` — Docker-style CLI (`paseo run/ls/logs/wait`)
+- `packages/cli` — Docker-style CLI (`clisbot run/ls/logs/wait`)
 - `packages/relay` — E2E encrypted relay for remote access
 - `packages/desktop` — Electron desktop wrapper
-- `packages/website` — Marketing site (paseo.sh)
+- `packages/website` — Marketing site (clisbot.com)
 
 ## Docs
 
@@ -23,7 +23,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 
 | Doc                                                                  | What's in it                                                                                                                   |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| [docs/product.md](docs/product.md)                                   | What Paseo is, who it's for, where it's going                                                                                  |
+| [docs/product.md](docs/product.md)                                   | What Clisbot is, who it's for, where it's going                                                                                |
 | [docs/architecture.md](docs/architecture.md)                         | System design, package layering, WebSocket protocol, agent lifecycle, data flow                                                |
 | [docs/agent-lifecycle.md](docs/agent-lifecycle.md)                   | Agent states, parent/child relationships, archive semantics, tabs vs archive, subagents track                                  |
 | [docs/data-model.md](docs/data-model.md)                             | File-based JSON persistence, Zod schemas, atomic writes, no migrations                                                         |
@@ -102,7 +102,7 @@ npm run format                       # Auto-format with Biome
 npm run format:check                 # Check formatting without writing
 ```
 
-Repo dev commands use checkout-local state by default. In this checkout, `PASEO_HOME` resolves to `.dev/paseo-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.paseo` on port `6767`.
+Repo dev commands use checkout-local state by default. In this checkout, `CLISBOT_HOME` resolves to `.dev/clisbot-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.clisbot` on port `6767`.
 
 See [docs/development.md](docs/development.md) for full setup, build sync requirements, and debugging.
 
@@ -115,7 +115,7 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
 
 ## Critical rules
 
-- **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
+- **NEVER restart the main Clisbot daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
 - **NEVER assume a timeout means the service needs restarting** — timeouts can be transient.
 - **NEVER add auth checks to tests** — agent providers handle their own auth.
 - **Before changing app routes, startup routing, remembered workspace restore, or active workspace selection, read [docs/expo-router.md](docs/expo-router.md).**
@@ -175,7 +175,7 @@ The app runs on iOS, Android, web (browser), and web (Electron desktop). Code is
     use-audio-recorder.native.ts ← uses expo-audio
   ```
   Import as `@/hooks/use-audio-recorder` — Metro picks the right file automatically.
-- **Use `.electron.ts` / `.electron.tsx` for Electron-only web modules.** Electron is still the Metro `web` platform, but desktop dev/build sets `PASEO_WEB_PLATFORM=electron`, so Metro first looks for `.electron.*` files and falls back to normal `.web.*` files. Use this when the implementation depends on Electron-only behavior such as `webviewTag`, desktop preload APIs, or the Electron bridge. Keep plain browser web in `.web.*`, and keep native fallbacks in the base file or `.native.*`.
+- **Use `.electron.ts` / `.electron.tsx` for Electron-only web modules.** Electron is still the Metro `web` platform, but desktop dev/build sets `CLISBOT_WEB_PLATFORM=electron`, so Metro first looks for `.electron.*` files and falls back to normal `.web.*` files. Use this when the implementation depends on Electron-only behavior such as `webviewTag`, desktop preload APIs, or the Electron bridge. Keep plain browser web in `.web.*`, and keep native fallbacks in the base file or `.native.*`.
   ```
   desktop/browser/pane/
     index.electron.tsx ← Electron <webview> implementation
@@ -191,4 +191,4 @@ The app runs on iOS, Android, web (browser), and web (Electron desktop). Code is
 
 ## Debugging
 
-Find the complete daemon logs and traces in the $PASEO_HOME/daemon.log
+Find the complete daemon logs and traces in the $CLISBOT_HOME/daemon.log

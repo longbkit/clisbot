@@ -1,6 +1,6 @@
 import type { ListUsageReportsOptions } from "../../plugins/usage-sources/index.js";
 import type pino from "pino";
-import type { ProviderUsage, UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { ProviderUsage, UsageReportEntry } from "@clisbot/protocol/messages";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 
 export interface UsageSessionOptions {

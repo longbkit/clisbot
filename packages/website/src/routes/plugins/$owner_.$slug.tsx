@@ -33,7 +33,9 @@ export const Route = createFileRoute("/plugins/$owner_/$slug")({
   },
   head: ({ params, loaderData }) =>
     pageMeta(
-      loaderData?.plugin ? `${loaderData.plugin.name} – Paseo plugin` : "Plugin not found – Paseo",
+      loaderData?.plugin
+        ? `${loaderData.plugin.name} – Clisbot plugin`
+        : "Plugin not found – Clisbot",
       loaderData?.plugin?.description ?? "Plugin not found.",
       `/plugins/${params.owner}/${params.slug}`,
       loaderData?.plugin && firstMediaImage(loaderData.plugin),

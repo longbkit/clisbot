@@ -1,5 +1,5 @@
-import type { ProviderLaunch } from "@getpaseo/plugin/server/provider";
-import { spawnProcess, terminateProcess } from "@getpaseo/plugin/server";
+import type { ProviderLaunch } from "@clisbot/plugin/server/provider";
+import { spawnProcess, terminateProcess } from "@clisbot/plugin/server";
 import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
@@ -88,7 +88,7 @@ export class MspConnection {
     const response = await this.request(
       "initialize",
       {
-        clientInfo: { name: "paseo", version: "1" },
+        clientInfo: { name: "clisbot", version: "1" },
         capabilities: {
           experimentalApi: true,
           requestedCapabilities: ["sessionMcp", "sessionListStream"],

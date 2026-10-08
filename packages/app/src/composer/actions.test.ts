@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AgentAttachment, ForgeSearchItem } from "@getpaseo/protocol/messages";
+import type { AgentAttachment, ForgeSearchItem } from "@clisbot/protocol/messages";
 import type {
   AttachmentMetadata,
   ComposerAttachment,
@@ -53,7 +53,7 @@ const issueItem: ForgeSearchItem = {
   kind: "issue",
   number: 101,
   title: "Fix composer attachments",
-  url: "https://github.com/acme/paseo/issues/101",
+  url: "https://github.com/acme/clisbot/issues/101",
   state: "open",
   body: "Issue body",
   labels: ["composer"],
@@ -65,7 +65,7 @@ const prItem: ForgeSearchItem = {
   kind: "change_request",
   number: 202,
   title: "Refactor composer attachments",
-  url: "https://github.com/acme/paseo/pull/202",
+  url: "https://github.com/acme/clisbot/pull/202",
   state: "open",
   body: "PR body",
   labels: ["composer"],
@@ -82,7 +82,7 @@ function reviewWorkspaceAttachment(
 ): Extract<WorkspaceComposerAttachment, { kind: "review" }> {
   const attachment: Extract<AgentAttachment, { type: "review" }> = {
     type: "review",
-    mimeType: "application/paseo-review",
+    mimeType: "application/clisbot-review",
     cwd: "/repo",
     mode: "uncommitted",
     baseRef: null,
@@ -570,11 +570,11 @@ describe("dispatchComposerAgentMessage", () => {
     expect(call.options.attachments).toEqual([
       {
         type: "forge_change_request",
-        mimeType: "application/paseo-forge-change-request",
+        mimeType: "application/clisbot-forge-change-request",
         forge: "github",
         number: 202,
         title: "Refactor composer attachments",
-        url: "https://github.com/acme/paseo/pull/202",
+        url: "https://github.com/acme/clisbot/pull/202",
         body: "PR body",
         baseRefName: "main",
         headRefName: "composer-attachments",
@@ -614,7 +614,7 @@ describe("dispatchComposerAgentMessage", () => {
         mimeType: "application/github-pr",
         number: 202,
         title: "Refactor composer attachments",
-        url: "https://github.com/acme/paseo/pull/202",
+        url: "https://github.com/acme/clisbot/pull/202",
         body: "PR body",
         baseRefName: "main",
         headRefName: "composer-attachments",

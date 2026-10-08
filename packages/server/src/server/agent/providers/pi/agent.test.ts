@@ -82,7 +82,7 @@ function rewindCapabilities(capabilities: PiRpcAgentSession["capabilities"]) {
 function createConfig(overrides: Partial<AgentSessionConfig> = {}): AgentSessionConfig {
   return {
     provider: "pi",
-    cwd: "/tmp/paseo-pi-rpc-test",
+    cwd: "/tmp/clisbot-pi-rpc-test",
     ...overrides,
   };
 }
@@ -120,7 +120,7 @@ function readUtf8File(pathname: string): string {
   }
 }
 
-type PaseoExtensionListener = (event: unknown, context?: unknown) => unknown;
+type ClisbotExtensionListener = (event: unknown, context?: unknown) => unknown;
 
 interface PiSessionEntry {
   type: "message";
@@ -153,19 +153,19 @@ function piBranchTo(entries: PiSessionEntry[], leafId: string): PiSessionEntry[]
 }
 
 function parseEntryCapture(notification: string): unknown {
-  const prefix = "PASEO_ENTRY_CAPTURE ";
+  const prefix = "CLISBOT_ENTRY_CAPTURE ";
   expect(notification.startsWith(prefix)).toBe(true);
   return JSON.parse(notification.slice(prefix.length));
 }
 
-async function loadPaseoExtensionListeners(
+async function loadClisbotExtensionListeners(
   extensionPath: string,
   registerMcpServer: (name: string, config: unknown) => void = () => undefined,
-): Promise<Map<string, PaseoExtensionListener>> {
-  const listeners = new Map<string, PaseoExtensionListener>();
+): Promise<Map<string, ClisbotExtensionListener>> {
+  const listeners = new Map<string, ClisbotExtensionListener>();
   const extension = (await import(pathToFileURL(extensionPath).href)) as {
     default: (piApi: {
-      on: (event: string, listener: PaseoExtensionListener) => void;
+      on: (event: string, listener: ClisbotExtensionListener) => void;
       events: { on: () => void };
       registerCommand: () => void;
       registerMcpServer: (name: string, config: unknown) => void;
@@ -182,17 +182,17 @@ async function loadPaseoExtensionListeners(
 
 async function readRegisteredMcpServers(extensionPath: string): Promise<Record<string, unknown>> {
   const servers: Record<string, unknown> = {};
-  await loadPaseoExtensionListeners(extensionPath, (name, config) => {
+  await loadClisbotExtensionListeners(extensionPath, (name, config) => {
     servers[name] = config;
   });
   return servers;
 }
 
-async function applyPaseoExtensionSystemPrompt(
+async function applyClisbotExtensionSystemPrompt(
   extensionPath: string,
   systemPrompt: string,
 ): Promise<string | undefined> {
-  const listeners = await loadPaseoExtensionListeners(extensionPath);
+  const listeners = await loadClisbotExtensionListeners(extensionPath);
   const result = await listeners.get("before_agent_start")?.({ systemPrompt });
   return (result as { systemPrompt?: string } | undefined)?.systemPrompt;
 }
@@ -1710,7 +1710,7 @@ describe("PiRpcAgentSession", () => {
     const session = await client.createSession(createConfig());
     const extensionPath = pi.recordedLaunches[0]?.extensionPaths[0];
     expect(extensionPath).toBeDefined();
-    const listeners = await loadPaseoExtensionListeners(extensionPath!);
+    const listeners = await loadClisbotExtensionListeners(extensionPath!);
     const submittedMessage = { role: "user", content: "new prompt" };
     const entries: Array<{
       type: string;
@@ -1744,7 +1744,7 @@ describe("PiRpcAgentSession", () => {
     );
 
     expect(notifications).toEqual([
-      'PASEO_SUBMITTED_USER_ENTRY {"entry":{"id":"entry-new","parentId":"entry-old-assistant","text":"new prompt"}}',
+      'CLISBOT_SUBMITTED_USER_ENTRY {"entry":{"id":"entry-new","parentId":"entry-old-assistant","text":"new prompt"}}',
     ]);
 
     await session.close();
@@ -1754,7 +1754,9 @@ describe("PiRpcAgentSession", () => {
     const pi = new FakePi();
     const session = await createClient(pi).createSession(createConfig());
     onTestFinished(() => session.close());
-    const listeners = await loadPaseoExtensionListeners(pi.recordedLaunches[0]!.extensionPaths[0]!);
+    const listeners = await loadClisbotExtensionListeners(
+      pi.recordedLaunches[0]!.extensionPaths[0]!,
+    );
     // "abandoned" was rewound; "two" was sent from the same parent afterwards.
     const entries = [
       piUserEntry({ id: "one", parentId: null, text: "first" }),
@@ -1804,7 +1806,7 @@ describe("PiRpcAgentSession", () => {
 
     const actualLaunch = pi.recordedLaunches[0]!;
     expect(actualLaunch).toMatchObject({
-      cwd: "/tmp/paseo-pi-rpc-test",
+      cwd: "/tmp/clisbot-pi-rpc-test",
     });
     expect(actualLaunch.extensionPaths).toHaveLength(1);
     expect(actualLaunch.argv).toEqual([
@@ -1816,7 +1818,7 @@ describe("PiRpcAgentSession", () => {
     ]);
 
     await expect(
-      applyPaseoExtensionSystemPrompt(actualLaunch.extensionPaths[0]!, "Pi project prompt"),
+      applyClisbotExtensionSystemPrompt(actualLaunch.extensionPaths[0]!, "Pi project prompt"),
     ).resolves.toBe("Pi project prompt\n\nAgent prompt\n\nDaemon prompt");
 
     await session.close();
@@ -1862,7 +1864,7 @@ describe("PiRpcAgentSession", () => {
       actualLaunch.extensionPaths[0],
     ]);
     await expect(
-      applyPaseoExtensionSystemPrompt(actualLaunch.extensionPaths[0]!, "Pi project prompt"),
+      applyClisbotExtensionSystemPrompt(actualLaunch.extensionPaths[0]!, "Pi project prompt"),
     ).resolves.toBe("Pi project prompt\n\nAgent prompt\n\nDaemon prompt");
   });
 
@@ -1923,7 +1925,7 @@ describe("PiRpcAgentSession", () => {
 
     expect(fakeSession.setModelRequests).toEqual([{ provider: "kimi-coding", modelId: "kimi-k3" }]);
     expect(session.describePersistence()?.metadata).toEqual({
-      cwd: "/tmp/paseo-pi-rpc-test",
+      cwd: "/tmp/clisbot-pi-rpc-test",
       model: "kimi-coding/kimi-k3",
       thinkingOptionId: "high",
     });
@@ -1989,7 +1991,7 @@ describe("PiRpcAgentSession", () => {
       imagePath = prompt.message.match(/\[Image available at: (.+)\]/)?.[1];
       expect(imagePath).toBeTypeOf("string");
       expect(imagePath).toMatch(
-        /paseo-attachments(?:-[^\\/]+)?[\\/](?:[^\\/]+[\\/])?[0-9a-f]{64}\.png$/,
+        /clisbot-attachments(?:-[^\\/]+)?[\\/](?:[^\\/]+[\\/])?[0-9a-f]{64}\.png$/,
       );
       expect(existsSync(imagePath!)).toBe(true);
     } finally {
@@ -2563,7 +2565,7 @@ describe("PiRpcAgentSession steering", () => {
 
 describe("PiRpcAgentClient", () => {
   test("lists JSONL persisted sessions from configured provider params", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "paseo-pi-sessions-"));
+    const root = mkdtempSync(path.join(tmpdir(), "clisbot-pi-sessions-"));
     const cwd = path.join(root, "workspace");
     const otherCwd = path.join(root, "other");
     const sessionsDir = path.join(root, "sessions");
@@ -2625,7 +2627,7 @@ describe("PiRpcAgentClient", () => {
   });
 
   test("lists JSONL persisted sessions from Pi's configured agent directory", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "paseo-pi-default-sessions-"));
+    const root = mkdtempSync(path.join(tmpdir(), "clisbot-pi-default-sessions-"));
     const cwd = path.join(root, "workspace");
     const agentDir = path.join(root, ".pi", "agent");
     const sessionsDir = path.join(agentDir, "sessions");
@@ -2674,7 +2676,7 @@ describe("PiRpcAgentClient", () => {
   });
 
   test("imports JSONL sessions with the recorded model and thinking level", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "paseo-pi-import-config-"));
+    const root = mkdtempSync(path.join(tmpdir(), "clisbot-pi-import-config-"));
     const cwd = path.join(root, "workspace");
     const sessionsDir = path.join(root, "sessions");
     mkdirSync(sessionsDir, { recursive: true });
@@ -2926,7 +2928,7 @@ describe("PiRpcAgentClient", () => {
     expect(pi.recordedLaunches).toHaveLength(0);
   });
 
-  test("maps extension, prompt, and skill commands to Paseo slash commands", async () => {
+  test("maps extension, prompt, and skill commands to Clisbot slash commands", async () => {
     const { pi, session } = await createSession();
     pi.latestSession().commands = [
       { name: "review", description: "Review changes", source: "extension" },
@@ -3177,7 +3179,7 @@ describe("PiRpcAgentClient", () => {
   });
 
   test("injects MCP servers without replacing the Pi global MCP config", async () => {
-    const agentDir = mkdtempSync(path.join(tmpdir(), "paseo-pi-agent-"));
+    const agentDir = mkdtempSync(path.join(tmpdir(), "clisbot-pi-agent-"));
     onTestFinished(() => rmSync(agentDir, { recursive: true, force: true }));
     writeFileSync(
       path.join(agentDir, "mcp.json"),
@@ -3205,9 +3207,9 @@ describe("PiRpcAgentClient", () => {
     const session = await client.createSession(
       createConfig({
         mcpServers: {
-          paseo: {
+          clisbot: {
             type: "http",
-            url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+            url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           },
           localSecret: {
             type: "stdio",
@@ -3222,7 +3224,7 @@ describe("PiRpcAgentClient", () => {
 
     expect(pi.recordedLaunches).toHaveLength(2);
     expect(pi.recordedLaunches[0]).toMatchObject({
-      cwd: "/tmp/paseo-pi-rpc-test",
+      cwd: "/tmp/clisbot-pi-rpc-test",
       argv: ["pi", "--mode", "rpc"],
     });
     const actualLaunch = pi.recordedLaunches[1]!;
@@ -3250,8 +3252,8 @@ describe("PiRpcAgentClient", () => {
           url: "https://example.com/mcp/brave",
           directTools: ["brave_llm_context"],
         },
-        paseo: {
-          url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+        clisbot: {
+          url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           auth: false,
           oauth: false,
         },
@@ -3268,7 +3270,7 @@ describe("PiRpcAgentClient", () => {
   });
 
   test("reports the path of a malformed Pi global MCP config", async () => {
-    const agentDir = mkdtempSync(path.join(tmpdir(), "paseo-pi-agent-"));
+    const agentDir = mkdtempSync(path.join(tmpdir(), "clisbot-pi-agent-"));
     onTestFinished(() => rmSync(agentDir, { recursive: true, force: true }));
     const configPath = path.join(agentDir, "mcp.json");
     writeFileSync(configPath, "{ invalid");
@@ -3280,7 +3282,7 @@ describe("PiRpcAgentClient", () => {
       client.createSession(
         createConfig({
           mcpServers: {
-            paseo: { type: "http", url: "http://127.0.0.1:6767/mcp/agents" },
+            clisbot: { type: "http", url: "http://127.0.0.1:6868/mcp/agents" },
           },
         }),
         { env: { PI_CODING_AGENT_DIR: agentDir } },
@@ -3300,9 +3302,9 @@ describe("PiRpcAgentClient", () => {
     const session = await createClient(pi).createSession(
       createConfig({
         mcpServers: {
-          paseo: {
+          clisbot: {
             type: "http",
-            url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+            url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
             headers: { Authorization: "Bearer token" },
           },
           local: { type: "stdio", command: "node", args: ["server.js"], env: { KEY: "`${x}`" } },
@@ -3315,8 +3317,8 @@ describe("PiRpcAgentClient", () => {
     expect(actualLaunch.argv).not.toContain("--mcp-config");
     const extensionPath = actualLaunch.extensionPaths[0]!;
     expect(await readRegisteredMcpServers(extensionPath)).toEqual({
-      paseo: {
-        url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+      clisbot: {
+        url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
         headers: { Authorization: "Bearer token" },
       },
       local: { command: "node", args: ["server.js"], env: { KEY: "`${x}`" } },
@@ -3336,7 +3338,7 @@ describe("PiRpcAgentClient", () => {
     pi.queueCommands([{ name: "mcp", source: "extension", sourceInfo: { path: "builtin:mcp" } }]);
     const session = await client.resumeSession(persistence, {
       mcpServers: {
-        paseo: { type: "http", url: "http://127.0.0.1:7777/mcp/agents?callerAgentId=agent-2" },
+        clisbot: { type: "http", url: "http://127.0.0.1:7777/mcp/agents?callerAgentId=agent-2" },
       },
     });
     onTestFinished(() => session.close());
@@ -3346,12 +3348,12 @@ describe("PiRpcAgentClient", () => {
     expect(actualLaunch.session).toBe(persistence.nativeHandle);
     expect(actualLaunch.argv).not.toContain("--mcp-config");
     expect(await readRegisteredMcpServers(actualLaunch.extensionPaths[0]!)).toEqual({
-      paseo: { url: "http://127.0.0.1:7777/mcp/agents?callerAgentId=agent-2" },
+      clisbot: { url: "http://127.0.0.1:7777/mcp/agents?callerAgentId=agent-2" },
     });
   });
 
   test("uses pi-mcp-adapter when it replaces Pi's built-in MCP", async () => {
-    const agentDir = mkdtempSync(path.join(tmpdir(), "paseo-pi-agent-"));
+    const agentDir = mkdtempSync(path.join(tmpdir(), "clisbot-pi-agent-"));
     onTestFinished(() => rmSync(agentDir, { recursive: true, force: true }));
     const pi = new FakePi();
     pi.queueCommands([
@@ -3360,7 +3362,7 @@ describe("PiRpcAgentClient", () => {
     ]);
     const session = await createClient(pi).createSession(
       createConfig({
-        mcpServers: { paseo: { type: "http", url: "http://127.0.0.1:6767/mcp/agents" } },
+        mcpServers: { clisbot: { type: "http", url: "http://127.0.0.1:6868/mcp/agents" } },
       }),
       { env: { PI_CODING_AGENT_DIR: agentDir } },
     );
@@ -3392,9 +3394,9 @@ describe("PiRpcAgentClient", () => {
     const session = await client.createSession(
       createConfig({
         mcpServers: {
-          paseo: {
+          clisbot: {
             type: "http",
-            url: "http://127.0.0.1:6767/mcp/agents?callerAgentId=agent-1",
+            url: "http://127.0.0.1:6868/mcp/agents?callerAgentId=agent-1",
           },
         },
       }),

@@ -524,7 +524,7 @@ describe("joinSubtitleParts", () => {
   });
 
   it("drops empty strings (Boolean parity — agents subtitle refactor guard)", () => {
-    expect(joinSubtitleParts(["", "paseo", "master"])).toBe("paseo · master");
+    expect(joinSubtitleParts(["", "clisbot", "master"])).toBe("clisbot · master");
   });
 
   it("returns an empty string when every part is null or empty", () => {
@@ -532,15 +532,15 @@ describe("joinSubtitleParts", () => {
   });
 
   it("returns a single part unchanged, with no separator", () => {
-    expect(joinSubtitleParts([null, "paseo", null])).toBe("paseo");
+    expect(joinSubtitleParts([null, "clisbot", null])).toBe("clisbot");
   });
 
   it("builds the workspace subtitle in host · project · branch order", () => {
     // Single-host: host gated away, project leads.
-    expect(joinSubtitleParts([null, "paseo", "master"])).toBe("paseo · master");
+    expect(joinSubtitleParts([null, "clisbot", "master"])).toBe("clisbot · master");
     // Multi-host: host first, then project, then branch.
-    expect(joinSubtitleParts(["host", "paseo", "master"])).toBe("host · paseo · master");
+    expect(joinSubtitleParts(["host", "clisbot", "master"])).toBe("host · clisbot · master");
     // No branch: degrades to project (or host · project).
-    expect(joinSubtitleParts([null, "paseo", null])).toBe("paseo");
+    expect(joinSubtitleParts([null, "clisbot", null])).toBe("clisbot");
   });
 });

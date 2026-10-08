@@ -9,7 +9,7 @@ import type { AgentStreamEvent } from "../../agent-sdk-types.js";
 import { collectSessionTurnEvents } from "../test-utils/session-stream-adapter.js";
 import { ClaudeAgentClient } from "./agent.js";
 
-const ROOT_PROMPT = `You are ROOT_OWNER. Use Claude Code's native Agent tool exactly once, never Paseo tools.
+const ROOT_PROMPT = `You are ROOT_OWNER. Use Claude Code's native Agent tool exactly once, never Clisbot tools.
 Name the agent direct_owner and give it this complete task:
 
 You are DIRECT_OWNER. Use Claude Code's native Agent tool exactly once. Name that agent nested_owner and give it this complete task:
@@ -19,7 +19,7 @@ Wait for nested_owner to finish, then reply exactly DIRECT_DONE.
 Wait for direct_owner to finish, then reply exactly ROOT_DONE.`;
 
 test("attributes a nested Claude child and its background notification to their direct owners", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-claude-nested-ownership-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-claude-nested-ownership-"));
   const client = new ClaudeAgentClient({ logger: pino({ level: "trace" }) });
   const session = await client.createSession({
     provider: "claude",

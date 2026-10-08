@@ -42,7 +42,7 @@ describe("Claude workflow replay", () => {
           runId: RUN_ID,
           timestamp: "2026-08-06T08:04:46.347Z",
           summary: "Runs one deterministic child and returns its structured result",
-          workflowName: "paseo-workflow-one-child",
+          workflowName: "clisbot-workflow-one-child",
           status: "completed",
           startTime: 1786003484150,
           defaultModel: "claude-sonnet-5",
@@ -54,7 +54,7 @@ describe("Claude workflow replay", () => {
       runId: RUN_ID,
       timestamp: "2026-08-06T08:04:46.347Z",
       summary: "Runs one deterministic child and returns its structured result",
-      workflowName: "paseo-workflow-one-child",
+      workflowName: "clisbot-workflow-one-child",
       status: "completed",
       startTime: 1786003484150,
       defaultModel: "claude-sonnet-5",
@@ -118,9 +118,9 @@ describe("Claude workflow replay", () => {
     const workflow = parseClaudeWorkflowRun(
       JSON.stringify({
         runId: RUN_ID,
-        summary: "Inspect Paseo",
+        summary: "Inspect Clisbot",
         status: "completed",
-        result: { report: "What Paseo is\nA local-first coding-agent environment." },
+        result: { report: "What Clisbot is\nA local-first coding-agent environment." },
         script: "SECRET WORKFLOW SOURCE",
         workflowProgress: [{ promptPreview: "SECRET CHILD PROMPT" }],
       }),
@@ -138,7 +138,7 @@ describe("Claude workflow replay", () => {
       id: TOOL_CALL_ID,
       item: {
         type: "assistant_message",
-        text: "What Paseo is\nA local-first coding-agent environment.",
+        text: "What Clisbot is\nA local-first coding-agent environment.",
       },
     });
     expect(JSON.stringify(observations)).not.toContain("SECRET WORKFLOW SOURCE");
@@ -146,10 +146,10 @@ describe("Claude workflow replay", () => {
   });
 
   it("does not duplicate a result already present in the child transcript", () => {
-    const report = "What Paseo is\nA local-first coding-agent environment.";
+    const report = "What Clisbot is\nA local-first coding-agent environment.";
     const observations = observeReplayWorkflows({
       workflows: [
-        { runId: RUN_ID, summary: "Inspect Paseo", status: "completed", result: { report } },
+        { runId: RUN_ID, summary: "Inspect Clisbot", status: "completed", result: { report } },
       ],
       parentEntries: parentEntries(),
       entriesByRunId: new Map([[RUN_ID, [{} as never]]]),

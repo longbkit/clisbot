@@ -1,7 +1,7 @@
 # Fresh English app at Welcome, local relay host with PASSWORD, see README.md.
 # Run on phones and tablets: the confirmation lives at the root, outside the pairing sheet.
 context platform=ios timeout=180000 retries=0
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 
 open "${APP_ID}"
 wait "id=\"welcome-paste-pairing-link\"" 20000

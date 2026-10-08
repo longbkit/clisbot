@@ -3,21 +3,21 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { createPaseoClient, type PaseoClient } from "@getpaseo/client";
+import { createClisbotClient, type ClisbotClient } from "@clisbot/client";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
-let daemon: TestPaseoDaemon;
+let daemon: TestClisbotDaemon;
 let client: DaemonClient;
 let cwd: string;
-let sdk: PaseoClient;
+let sdk: ClisbotClient;
 
 beforeEach(async () => {
   cwd = await mkdtemp(path.join(tmpdir(), "terminal-workspace-sdk-"));
-  daemon = await createTestPaseoDaemon();
+  daemon = await createTestClisbotDaemon();
   client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   await client.connect();
-  sdk = createPaseoClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  sdk = createClisbotClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   await sdk.connect();
 });
 
@@ -109,21 +109,21 @@ test("terminal creation rejects unknown and archived owners, including explicit 
   expect((await client.fetchWorkspaces()).entries).toEqual([]);
 });
 
-test("plugin handlers operate terminals through their host-owned Paseo API", async () => {
+test("plugin handlers operate terminals through their host-owned Clisbot API", async () => {
   const workspaceId = await createWorkspace("Plugin workspace");
   const pluginDirectory = path.join(cwd, "plugin");
   await mkdir(pluginDirectory);
   await writeFile(
-    path.join(pluginDirectory, "paseo-plugin.json"),
+    path.join(pluginDirectory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "terminal-sdk",
-      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+      requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
     }),
   );
   await writeFile(
     path.join(pluginDirectory, "index.server.ts"),
     `
-import { defineRpc } from "@getpaseo/plugin";
+import { defineRpc } from "@clisbot/plugin";
 import { z } from "zod";
 const operate = defineRpc({ name: "operate", input: z.object({ workspaceId: z.string(), command: z.string() }), output: z.object({ workspaceIds: z.array(z.string()), lines: z.array(z.string()), remaining: z.number() }) });
 async function waitForTerminalOutput(terminal, text) {
@@ -136,8 +136,8 @@ async function waitForTerminalOutput(terminal, text) {
   throw new Error("Timed out waiting for plugin terminal output: " + text);
 }
 export default function contribute(server) {
-  server.handle(operate, async ({ workspaceId, command }, { paseo }) => {
-    const workspace = paseo.workspaces.ref(workspaceId);
+  server.handle(operate, async ({ workspaceId, command }, { clisbot }) => {
+    const workspace = clisbot.workspaces.ref(workspaceId);
     const terminal = await workspace.terminals.create({ command, args: ["-e", "process.stdin.setRawMode(true); process.stdin.resume(); console.log('PLUGIN READY'); let hex = ''; process.stdin.on('data', data => { hex += data.toString('hex'); console.log('PLUGIN:' + hex); });"] });
     try {
       await waitForTerminalOutput(terminal, "PLUGIN READY");
@@ -146,7 +146,7 @@ export default function contribute(server) {
       terminal.sendKeys(["Enter"]);
       const lines = await waitForTerminalOutput(terminal, "PLUGIN:456e7465720d");
       const listed = await workspace.terminals.list();
-      await paseo.terminals.ref(terminal.id).kill();
+      await clisbot.terminals.ref(terminal.id).kill();
       return { workspaceIds: listed.entries.map(entry => entry.workspaceId), lines, remaining: (await workspace.terminals.list()).entries.length };
     } finally {
       await terminal.kill();
@@ -195,7 +195,7 @@ test("listing by workspace ID keeps terminals in a shared directory separate", a
 
 test("script status started and stopped by one client reaches every subscribed client", async () => {
   await writeFile(
-    path.join(cwd, "paseo.json"),
+    path.join(cwd, "clisbot.json"),
     JSON.stringify({
       scripts: { sleeper: { type: "script", command: 'node -e "setInterval(() => {}, 60000)"' } },
     }),

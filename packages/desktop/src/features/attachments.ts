@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { resolvePaseoHome } from "@getpaseo/server/daemon-control";
+import { resolveClisbotHome } from "@clisbot/server/daemon-control";
 
 const ATTACHMENTS_DIRNAME = "desktop-attachments";
 const ATTACHMENT_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -12,7 +12,7 @@ interface AttachmentFileResult {
 }
 
 function attachmentsDirPath(): string {
-  return path.join(resolvePaseoHome(process.env), ATTACHMENTS_DIRNAME);
+  return path.join(resolveClisbotHome(process.env), ATTACHMENTS_DIRNAME);
 }
 
 async function ensureAttachmentsDir(): Promise<string> {

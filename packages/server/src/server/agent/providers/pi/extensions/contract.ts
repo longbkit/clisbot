@@ -75,7 +75,7 @@ export interface PiExtensionSession {
 export interface PiExtension {
   id: string;
   /**
-   * JavaScript statements run inside Paseo's Pi integration extension, with `pi` in scope. Reports
+   * JavaScript statements run inside Clisbot's Pi integration extension, with `pi` in scope. Reports
    * state that Pi's RPC stream omits through `ctx.ui.notify`, which reaches `mapRuntimeNotification`.
    */
   runtimeBridge?: string;

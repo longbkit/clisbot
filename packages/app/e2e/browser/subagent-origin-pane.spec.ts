@@ -6,7 +6,7 @@ import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { openSubagentsTrack, seedParentWithSubagent } from "../support/helpers/subagents";
 
-const SETTINGS_KEY = "@paseo:app-settings";
+const SETTINGS_KEY = "@clisbot:app-settings";
 
 async function openParentInRightPane(page: Page, parentId: string, workspaceId: string) {
   await page.setViewportSize({ width: 1400, height: 900 });

@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 async function compileInlineSchema(sourceSchema: string): Promise<GeneratedSchema> {
   const scratchRoot = resolve(protocolRoot, "../../.tmp");
   await mkdir(scratchRoot, { recursive: true });
-  const tempDir = await mkdtemp(join(scratchRoot, "paseo-zod-aot-"));
+  const tempDir = await mkdtemp(join(scratchRoot, "clisbot-zod-aot-"));
 
   try {
     const sourcePath = join(tempDir, "schema.source.js");

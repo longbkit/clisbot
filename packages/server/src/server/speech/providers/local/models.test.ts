@@ -32,7 +32,7 @@ function writeCompleteModel(modelDir: string): void {
 }
 
 function setupModelsDirWithArchive(): { modelsDir: string; modelDir: string; archive: string } {
-  const root = mkdtempSync(path.join(tmpdir(), "paseo-local-models-"));
+  const root = mkdtempSync(path.join(tmpdir(), "clisbot-local-models-"));
   onTestFinished(() => rmSync(root, { recursive: true, force: true }));
   const sourceRoot = path.join(root, "source");
   writeCompleteModel(path.join(sourceRoot, spec.extractedDir));

@@ -1,8 +1,8 @@
 import type {
   CreateAgentRequestOptions,
   CreateWorkspaceRequestOptions,
-} from "@getpaseo/client/internal/daemon-client";
-import type { AgentSnapshotPayload, CreationSnapshot } from "@getpaseo/protocol/messages";
+} from "@clisbot/client/internal/daemon-client";
+import type { AgentSnapshotPayload, CreationSnapshot } from "@clisbot/protocol/messages";
 import { encodeImages } from "@/utils/encode-images";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
@@ -40,8 +40,8 @@ import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
+import { resolveTerminalProfiles } from "@clisbot/protocol/terminal-profiles";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
 import { LaunchControl } from "@/new-workspace-launch/launch-control";
 import { resolveLaunchTarget, type LaunchTarget } from "@/new-workspace-launch/target";
 import { useTerminalComposerState } from "@/new-workspace-launch/composer-state";
@@ -91,9 +91,9 @@ import type { ComposerAttachment } from "@/attachments/types";
 import { useDraftWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
 import type { MessagePayload } from "@/composer/types";
 import type { UserComposerAttachment } from "@/attachments/types";
-import type { AgentAttachment, ForgeSearchItem } from "@getpaseo/protocol/messages";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+import type { AgentAttachment, ForgeSearchItem } from "@clisbot/protocol/messages";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { isEmptyWorkspaceSubmission, runCreateEmptyWorkspace } from "./new-workspace-empty";
 import {

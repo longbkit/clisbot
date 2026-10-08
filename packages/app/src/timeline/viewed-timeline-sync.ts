@@ -11,7 +11,7 @@ import {
   type AgentTimelineState,
 } from "@/stores/session-store";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { getSendingClientMessageIds } from "@/composer/submission/model";
 import {
   getInitDeferred,

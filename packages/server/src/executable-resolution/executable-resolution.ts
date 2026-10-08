@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
-import type { ProcessEnvRecord } from "../server/paseo-env.js";
+import type { ProcessEnvRecord } from "../server/clisbot-env.js";
 import { execCommand } from "../utils/spawn.js";
 import { windowsExecutableResolution } from "./windows.js";
 

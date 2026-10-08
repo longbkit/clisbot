@@ -87,7 +87,7 @@ it("accepts terminalId and token reports through the route into the tracker", as
   temporaryDirs.push(cwd);
   const envPath = join(cwd, "activity-env.json");
   manager = createTerminalManager({
-    getTerminalActivityUrl: () => "http://127.0.0.1:6767/api/terminal-activity",
+    getTerminalActivityUrl: () => "http://127.0.0.1:6868/api/terminal-activity",
   });
 
   const session = await manager.createTerminal({
@@ -95,7 +95,7 @@ it("accepts terminalId and token reports through the route into the tracker", as
     command: process.execPath,
     args: [
       "-e",
-      `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ terminalId: process.env.PASEO_TERMINAL_ID, token: process.env.PASEO_ACTIVITY_TOKEN, url: process.env.PASEO_TERMINAL_ACTIVITY_URL })); setInterval(() => {}, 1000);`,
+      `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ terminalId: process.env.CLISBOT_TERMINAL_ID, token: process.env.CLISBOT_ACTIVITY_TOKEN, url: process.env.CLISBOT_TERMINAL_ACTIVITY_URL })); setInterval(() => {}, 1000);`,
     ],
   });
   await waitForCondition(() => existsSync(envPath), 10000);
@@ -114,7 +114,7 @@ it("accepts terminalId and token reports through the route into the tracker", as
   );
 
   expect(env.terminalId).toBe(session.id);
-  expect(env.url).toBe("http://127.0.0.1:6767/api/terminal-activity");
+  expect(env.url).toBe("http://127.0.0.1:6868/api/terminal-activity");
   expect(response.statusCode).toBe(204);
   expect(session.getActivity()?.state).toBe("working");
 });

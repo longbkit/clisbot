@@ -75,7 +75,7 @@ describe("shared Markdown links", () => {
   it("renders accent text and underlines it while hovered", () => {
     const onPress = vi.fn();
     const children = colorMarkdownLinkChildren(
-      createElement(Text, { style: { color: "white" } }, "Paseo"),
+      createElement(Text, { style: { color: "white" } }, "Clisbot"),
       "rgb(0, 122, 255)",
     );
     const view = render(
@@ -84,7 +84,7 @@ describe("shared Markdown links", () => {
     const link = view.getByRole("link");
     const linkText = link.firstElementChild as HTMLElement;
 
-    expect((view.getByText("Paseo") as HTMLElement).style.color).toBe("rgb(0, 122, 255)");
+    expect((view.getByText("Clisbot") as HTMLElement).style.color).toBe("rgb(0, 122, 255)");
     expect(linkText.style.textDecorationLine).toBe("");
 
     fireEvent.mouseEnter(link);

@@ -1,4 +1,4 @@
-import type { SidebarIcon, SidebarRowProps } from "@getpaseo/plugin/client/ui";
+import type { SidebarIcon, SidebarRowProps } from "@clisbot/plugin/client/ui";
 import { useCallback, useEffect, useRef } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

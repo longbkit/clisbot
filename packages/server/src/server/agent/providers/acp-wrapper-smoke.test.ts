@@ -606,7 +606,7 @@ for (const config of wrappers) {
       }
     }, 120_000);
 
-    test("(e) real assistant tool call becomes a Paseo tool snapshot and observes permission flow when emitted", async () => {
+    test("(e) real assistant tool call becomes a Clisbot tool snapshot and observes permission flow when emitted", async () => {
       const trace = createTrace(config);
       installWireCapture(trace);
       let session: ACPAgentSession | null = null;
@@ -627,7 +627,7 @@ for (const config of wrappers) {
         trace.criteria.toolSnapshot = {
           outcome: "PASS",
           detail:
-            "Read-file prompt produced ACP tool_call/tool_call_update notifications and Paseo tool snapshots.",
+            "Read-file prompt produced ACP tool_call/tool_call_update notifications and Clisbot tool snapshots.",
         };
 
         if (result.permissionCount === 0) {

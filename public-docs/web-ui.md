@@ -1,6 +1,6 @@
 ---
 title: Self-hosting the web UI
-description: Serve the Paseo web app from your own daemon and reach it over your own LAN, VPN, reverse proxy, or tunnel.
+description: Serve the Clisbot web app from your own daemon and reach it over your own LAN, VPN, reverse proxy, or tunnel.
 nav: Web UI
 order: 6
 category: Getting started
@@ -8,7 +8,7 @@ category: Getting started
 
 # Self-hosting the web UI
 
-Paseo's daemon can serve the browser web app itself, from the same address it already uses for the API. You don't need the hosted app at [app.paseo.sh](https://app.paseo.sh): point a browser at your own daemon and you get the full UI, connected to your own agents, on infrastructure you control.
+Clisbot's daemon can serve the browser web app itself, from the same address it already uses for the API. You don't need the hosted app at [app.clisbot.com](https://app.clisbot.com): point a browser at your own daemon and you get the full UI, connected to your own agents, on infrastructure you control.
 
 This is useful when you want to:
 
@@ -23,14 +23,14 @@ The web app ships inside the daemon package, so the UI you serve always matches 
 The bundled web UI is off by default. Save the setting, then start the daemon:
 
 ```bash
-paseo daemon config set features.webUi.enabled true
-paseo daemon start
+clisbot daemon config set features.webUi.enabled true
+clisbot daemon start
 ```
 
 Or run a foreground deployment with an environment variable:
 
 ```bash
-PASEO_WEB_UI_ENABLED=true paseo daemon run
+CLISBOT_WEB_UI_ENABLED=true clisbot daemon run
 ```
 
 Or persist it in `config.json` so it survives restarts:
@@ -48,14 +48,14 @@ Or persist it in `config.json` so it survives restarts:
 Then open the daemon's address in a browser:
 
 ```
-http://localhost:6767/
+http://localhost:6868/
 ```
 
 If your daemon doesn't recognize `--web-ui`, update it, the flag was added with the bundled web UI.
 
 ## How the connection works
 
-The page is served from the same origin as the daemon's API and WebSocket. When you open it, the app automatically connects back to that same origin, so you usually skip the "Add Host" step entirely, open `http://localhost:6767/` and you're looking at your agents.
+The page is served from the same origin as the daemon's API and WebSocket. When you open it, the app automatically connects back to that same origin, so you usually skip the "Add Host" step entirely, open `http://localhost:6868/` and you're looking at your agents.
 
 The same HTTP server keeps serving the API (`/api/*`), MCP (`/mcp/*`), service-proxy routes, and the WebSocket upgrade. Only the static files are new. To point the served UI at a _different_ daemon, add that daemon as a host from the UI as usual.
 
@@ -63,7 +63,7 @@ The same HTTP server keeps serving the API (`/api/*`), MCP (`/mcp/*`), service-p
 
 Three common ways to run it, in order of exposure:
 
-- **Same machine.** Daemon and browser on one box. Open `http://localhost:6767/`. Nothing else to configure.
+- **Same machine.** Daemon and browser on one box. Open `http://localhost:6868/`. Nothing else to configure.
 - **Private network (LAN or VPN).** Reach the daemon from other devices on a network you trust, a home LAN or a [Tailscale](https://tailscale.com) tailnet. Follow the [Connectivity guide](/docs/connectivity#tailscale) for the complete direct setup.
 - **Public reverse proxy or tunnel.** Expose the UI on a domain over HTTPS, terminating TLS at a reverse proxy or a tunnel. This is the full self-hosted setup.
 
@@ -71,11 +71,11 @@ The rest of this page builds from local to public. **Verify a direct connection 
 
 ## Exposing beyond localhost
 
-By default the daemon listens on `127.0.0.1:6767`, reachable only from the same machine. To reach it from other devices, bind it to a network interface:
+By default the daemon listens on `127.0.0.1:6868`, reachable only from the same machine. To reach it from other devices, bind it to a network interface:
 
 ```bash
-paseo daemon config set daemon.listen 0.0.0.0:6767
-paseo daemon start
+clisbot daemon config set daemon.listen 0.0.0.0:6868
+clisbot daemon start
 ```
 
 > **Anyone who can reach the listening address can use your agents.** Before you bind beyond localhost, set a password and review your host allowlist. The relay pairing path avoids this entirely by keeping the daemon bound to localhost, see [Security](/docs/security).
@@ -85,7 +85,7 @@ Two things to configure when you expose the daemon directly:
 1. **Set a password** so only authorized clients can connect:
 
    ```bash
-   paseo daemon set-password
+   clisbot daemon set-password
    ```
 
    See [password authentication](/docs/configuration#password-authentication) for the persistent setup. Password auth controls access; it does not encrypt traffic, put TLS in front of it (below) on any untrusted network.
@@ -93,7 +93,7 @@ Two things to configure when you expose the daemon directly:
 2. **Allow your hostname** so the daemon's DNS-rebinding protection accepts requests for your domain:
 
    ```bash
-   paseo daemon config set daemon.hostnames '[".example.com"]'
+   clisbot daemon config set daemon.hostnames '[".example.com"]'
    ```
 
    See [DNS rebinding protection](/docs/security#dns-rebinding-protection) for how the host allowlist works.
@@ -122,15 +122,15 @@ map $http_upgrade $connection_upgrade {
 
 server {
   listen 443 ssl;
-  server_name paseo.example.com;
+  server_name clisbot.example.com;
 
-  ssl_certificate     /etc/letsencrypt/live/paseo.example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/paseo.example.com/privkey.pem;
+  ssl_certificate     /etc/letsencrypt/live/clisbot.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/clisbot.example.com/privkey.pem;
 
   client_max_body_size 100m;
 
   location / {
-    proxy_pass http://127.0.0.1:6767;
+    proxy_pass http://127.0.0.1:6868;
     proxy_http_version 1.1;
 
     # WebSocket upgrade
@@ -155,8 +155,8 @@ server {
 Caddy handles TLS, the WebSocket upgrade, header forwarding, and streaming for you:
 
 ```caddy
-paseo.example.com {
-  reverse_proxy 127.0.0.1:6767
+clisbot.example.com {
+  reverse_proxy 127.0.0.1:6868
 }
 ```
 
@@ -166,7 +166,7 @@ That's the whole config. Caddy provisions a certificate automatically and preser
 
 Terminate TLS at the proxy (or tunnel) and forward to the daemon over plain HTTP on localhost, that's what the configs above do. When the page is served over HTTPS and the proxy passes `X-Forwarded-Proto: https`, the app automatically connects back over `wss://`. You don't configure the scheme anywhere; it follows the edge.
 
-The daemon trusts forwarded headers from loopback proxies by default, which is what all the setups above do, the proxy or tunnel forwards to `127.0.0.1:6767`.
+The daemon trusts forwarded headers from loopback proxies by default, which is what all the setups above do, the proxy or tunnel forwards to `127.0.0.1:6868`.
 
 If your proxy reaches the daemon from another address, as in some Docker, LAN, or load-balancer setups, configure the trusted proxy ranges:
 
@@ -178,17 +178,17 @@ If your proxy reaches the daemon from another address, as in some Docker, LAN, o
 }
 ```
 
-`PASEO_TRUSTED_PROXIES` accepts the same comma-separated values:
+`CLISBOT_TRUSTED_PROXIES` accepts the same comma-separated values:
 
 ```bash
-PASEO_TRUSTED_PROXIES=loopback,172.16.0.0/12 PASEO_WEB_UI_ENABLED=true paseo daemon run
+CLISBOT_TRUSTED_PROXIES=loopback,172.16.0.0/12 CLISBOT_WEB_UI_ENABLED=true clisbot daemon run
 ```
 
 Only use `trustedProxies: true` when your final trusted proxy overwrites client-supplied `X-Forwarded-*` headers. Otherwise a client could spoof forwarded header values.
 
 If you serve the UI over HTTPS but the app tries to connect over `ws://` (and the browser blocks it as mixed content), your proxy isn't forwarding `X-Forwarded-Proto` or the daemon doesn't trust the proxy address. Fix whichever applies.
 
-For the remote/relay path (driving a daemon through the Paseo relay rather than a reverse proxy), the relay has its own public-vs-internal TLS settings, see [Security](/docs/security).
+For the remote/relay path (driving a daemon through the Clisbot relay rather than a reverse proxy), the relay has its own public-vs-internal TLS settings, see [Security](/docs/security).
 
 ## Tunnels
 
@@ -197,7 +197,7 @@ If you don't want to manage a reverse proxy or open ports, a tunnel gives you an
 - **Tailscale Serve** keeps it inside your tailnet, no public exposure, TLS handled for you:
 
   ```bash
-  tailscale serve --bg http://127.0.0.1:6767
+  tailscale serve --bg http://127.0.0.1:6868
   ```
 
   Reach it at `https://<your-machine>.<tailnet>.ts.net/`. Only devices on your tailnet can connect.
@@ -205,7 +205,7 @@ If you don't want to manage a reverse proxy or open ports, a tunnel gives you an
 - **Cloudflare Tunnel** exposes it on a public hostname with TLS and WebSocket support:
 
   ```bash
-  cloudflared tunnel --url http://localhost:6767
+  cloudflared tunnel --url http://localhost:6868
   ```
 
   Cloudflare terminates TLS and sets `X-Forwarded-Proto: https`, so auto-connect works. Because the URL is public, **set a daemon password.**
@@ -219,11 +219,11 @@ Self-hosting the web UI puts you in charge of who can reach the daemon. The esse
 - **Keep the daemon on localhost when you can** and let a reverse proxy or tunnel be the only exposed surface.
 - **Review your host allowlist** when serving on a custom domain.
 
-For the full threat model, relay encryption, and DNS-rebinding details, see [Security](/docs/security) and [SECURITY.md](https://github.com/getpaseo/paseo/blob/main/SECURITY.md).
+For the full threat model, relay encryption, and DNS-rebinding details, see [Security](/docs/security) and [SECURITY.md](https://github.com/longbkit/clisbot/blob/main/SECURITY.md).
 
 ## Troubleshooting
 
-- **Blank page or 404 at `/`.** The web UI isn't enabled. Start the daemon with `--web-ui` and confirm with `paseo daemon status` that it's the daemon you're hitting.
+- **Blank page or 404 at `/`.** The web UI isn't enabled. Start the daemon with `--web-ui` and confirm with `clisbot daemon status` that it's the daemon you're hitting.
 - **Page loads but never connects.** The proxy isn't forwarding the WebSocket upgrade, or it's stripping the `Host` header. Check the upgrade headers in your proxy config.
 - **Connects, then output freezes.** Response buffering is on, or read timeouts are too short. Disable buffering and raise the timeouts.
 - **"Mixed content" / connection blocked over HTTPS.** The app fell back to `ws://`. Either the proxy isn't sending `X-Forwarded-Proto: https`, or the daemon doesn't trust the proxy address. Forward the header and configure `daemon.trustedProxies` if the proxy is not loopback.
@@ -234,5 +234,5 @@ For the full threat model, relay encryption, and DNS-rebinding details, see [Sec
 
 - [Security](/docs/security), connection methods, relay encryption, password auth, host allowlist.
 - [Configuration](/docs/configuration), `config.json`, environment variables, and CLI overrides.
-- [CLI](/docs/cli), the `paseo daemon` commands.
+- [CLI](/docs/cli), the `clisbot daemon` commands.
 - [Community projects](/docs/community), community-built self-hosting tooling.

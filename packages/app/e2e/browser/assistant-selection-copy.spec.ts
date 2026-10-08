@@ -45,7 +45,7 @@ const ASSISTANT_MARKDOWN = [
   "",
   '[docs](https://docs.example.com "Reference") and <https://autolink.example.com>.',
   "",
-  "[workspace file](file:///tmp/paseo%20notes.md#L4)",
+  "[workspace file](file:///tmp/clisbot%20notes.md#L4)",
   "",
   "`https://example.com/generated` stays code, not a generated link.",
   "",
@@ -173,7 +173,7 @@ async function dragFromBelowImageTo(page: Page, text: string): Promise<void> {
   const blocks = assistantMessageBlocks(page);
   const target = blocks.getByText(text);
   await target.scrollIntoViewIfNeeded();
-  const frame = await blocks.locator('[data-paseo-markdown-tag="img"]').boundingBox();
+  const frame = await blocks.locator('[data-clisbot-markdown-tag="img"]').boundingBox();
   const end = await target.evaluate((element, selectedText) => {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
@@ -210,13 +210,13 @@ async function selectAssistantListItemFromMarker(
 ): Promise<void> {
   const assistantMessage = assistantMessageBlocks(page);
   const item = assistantMessage
-    .locator(`[data-paseo-markdown-tag="${listTag}"]`)
+    .locator(`[data-clisbot-markdown-tag="${listTag}"]`)
     .filter({ hasText: itemText })
-    .locator(':scope > [data-paseo-markdown-tag="li"]')
+    .locator(':scope > [data-clisbot-markdown-tag="li"]')
     .filter({ hasText: itemText });
 
   await item.evaluate((element, selectedEndText) => {
-    const marker = element.querySelector(':scope > [data-paseo-markdown-list-marker="true"]');
+    const marker = element.querySelector(':scope > [data-clisbot-markdown-list-marker="true"]');
     const markerText = marker?.firstChild;
     if (!(markerText instanceof Text)) {
       throw new Error("Expected rendered list marker text");
@@ -254,7 +254,7 @@ async function doubleClickAssistantMarkdownText(
 ): Promise<void> {
   const assistantMessage = assistantMessageBlocks(page);
   await assistantMessage
-    .locator(`[data-paseo-markdown-tag="${tag}"]`)
+    .locator(`[data-clisbot-markdown-tag="${tag}"]`)
     .filter({ hasText: text })
     .dblclick({ position: { x: 5, y: 5 } });
 }
@@ -404,7 +404,7 @@ test("copying an assistant selection preserves Markdown structure and links", as
   page,
 }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ uiFontFamily: "serif" }));
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ uiFontFamily: "serif" }));
   });
   const agent = await seedMockAgentWorkspace({
     repoPrefix: "assistant-selection-copy-",
@@ -429,13 +429,13 @@ test("copying an assistant selection preserves Markdown structure and links", as
       ["s", "struck prose"],
     ]) {
       const formattedProse = assistantMessage
-        .locator(`[data-paseo-markdown-tag="${tag}"]`)
+        .locator(`[data-clisbot-markdown-tag="${tag}"]`)
         .filter({ hasText: text });
       await expect(formattedProse).toHaveCSS("font-family", "serif");
       await expect(formattedProse).not.toHaveAttribute("data-pmono");
     }
     const inlineCode = assistantMessage
-      .locator('[data-paseo-markdown-tag="code"]')
+      .locator('[data-clisbot-markdown-tag="code"]')
       .filter({ hasText: "apply_patch" });
     await expect(inlineCode).toHaveAttribute("data-pmono", "");
 
@@ -463,7 +463,7 @@ test("copying an assistant selection preserves Markdown structure and links", as
       '<a href="https://autolink.example.com/">https://autolink.example.com</a>',
     );
     expect(clipboard.html).toContain(
-      '<a href="file:///tmp/paseo%20notes.md#L4">workspace file</a>',
+      '<a href="file:///tmp/clisbot%20notes.md#L4">workspace file</a>',
     );
     expect(clipboard.html).toContain("<code>https://example.com/generated</code>");
     expect(clipboard.html).not.toContain(
@@ -636,7 +636,7 @@ test("copying an assistant selection preserves Markdown structure and links", as
     // contains every character in the block.
     await selectAssistantElement(
       page,
-      '[data-paseo-markdown-language="typescript"] [data-paseo-markdown-tag="code"]',
+      '[data-clisbot-markdown-language="typescript"] [data-clisbot-markdown-tag="code"]',
     );
     await copySelection(page);
 
@@ -648,7 +648,7 @@ test("copying an assistant selection preserves Markdown structure and links", as
     await selectAssistantElementFromEndOf(
       page,
       "not a generated link.",
-      '[data-paseo-markdown-language="typescript"] [data-paseo-markdown-tag="code"]',
+      '[data-clisbot-markdown-language="typescript"] [data-clisbot-markdown-tag="code"]',
     );
     await copySelection(page);
 
@@ -674,18 +674,20 @@ test("copying an assistant selection preserves Markdown structure and links", as
 
     // The block's own Copy button had the same hazard: a Markdown fence body ends in
     // a newline, and the button copied it raw.
-    const typescriptFence = assistantMessage.locator('[data-paseo-markdown-language="typescript"]');
+    const typescriptFence = assistantMessage.locator(
+      '[data-clisbot-markdown-language="typescript"]',
+    );
     // The button is opacity 0 / pointerEvents none until the fence is hovered.
     await typescriptFence.hover();
-    await typescriptFence.locator("[data-paseo-markdown-ignore]").click();
+    await typescriptFence.locator("[data-clisbot-markdown-ignore]").click();
 
     expect(await readPlainClipboard(page)).toBe('const answer = "yes";\n  return answer;');
 
     // A blank line before the closing fence leaves the body ending in two newlines,
     // so stripping only the terminal one still hands the terminal an executable line.
-    const bashFence = assistantMessage.locator('[data-paseo-markdown-language="bash"]');
+    const bashFence = assistantMessage.locator('[data-clisbot-markdown-language="bash"]');
     await bashFence.hover();
-    await bashFence.locator("[data-paseo-markdown-ignore]").click();
+    await bashFence.locator("[data-clisbot-markdown-ignore]").click();
 
     expect(await readPlainClipboard(page)).toBe("echo trailing");
   } finally {

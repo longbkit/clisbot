@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { OwnedSubscriptions } from "./owned.js";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 
 interface Snapshot {
   subscriptionId: string;

@@ -3,17 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { WebSocket, type RawData } from "ws";
-import {
-  decodeFileTransferFrame,
-  FileTransferOpcode,
-} from "@getpaseo/protocol/binary-frames/index";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/index.js";
+import { decodeFileTransferFrame, FileTransferOpcode } from "@clisbot/protocol/binary-frames/index";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/index.js";
 import { WSOutboundMessageSchema, type WSOutboundMessage } from "./messages.js";
 
 const TEST_TIMEOUT_MS = 30_000;
 const FILE_SIZE = 8 * 1024 * 1024 + 123;
 
-let daemon: TestPaseoDaemon | undefined;
+let daemon: TestClisbotDaemon | undefined;
 const temporaryDirectories: string[] = [];
 const sockets: WebSocket[] = [];
 
@@ -29,13 +26,13 @@ afterEach(async () => {
 test(
   "a large file stays ordered, source-scoped, and does not block another socket",
   async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "paseo-large-file-transfer-"));
+    const cwd = mkdtempSync(join(tmpdir(), "clisbot-large-file-transfer-"));
     temporaryDirectories.push(cwd);
     const expected = Buffer.alloc(FILE_SIZE);
     for (let index = 0; index < expected.length; index += 1) expected[index] = index % 251;
     writeFileSync(join(cwd, "large.bin"), expected);
 
-    daemon = await createTestPaseoDaemon();
+    daemon = await createTestClisbotDaemon();
     const source = await connectSocket(daemon.port, "shared-file-client");
     const unrelated = await connectSocket(daemon.port, "shared-file-client");
     sockets.push(source, unrelated);

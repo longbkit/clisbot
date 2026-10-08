@@ -87,8 +87,8 @@ export const Route = createFileRoute("/plugins/")({
   },
   head: () =>
     pageMeta(
-      "Plugins – Extend Paseo with community plugins",
-      "Themes, providers, panels, and automations built by the Paseo community. Install any of them with one command.",
+      "Plugins – Extend Clisbot with community plugins",
+      "Themes, providers, panels, and automations built by the Clisbot community. Install any of them with one command.",
       "/plugins",
     ),
   loader: () => getRegistry(),

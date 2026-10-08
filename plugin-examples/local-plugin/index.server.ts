@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { increment } from "./server/increment";
 import { incrementRpc } from "./shared/increment";
 

@@ -20,7 +20,7 @@ import {
 
 // Someone who wants a terminal agent instead of a chat: they pick a profile
 // from the meta-row control, type a prompt, and the daemon actually spawns the
-// resolved command with their prompt substituted in — no mocking Paseo's own
+// resolved command with their prompt substituted in — no mocking Clisbot's own
 // code, the "profile" here is a real, harmless binary the daemon really runs.
 //
 // The sentinel becomes `$0` (a positional shell parameter, not string

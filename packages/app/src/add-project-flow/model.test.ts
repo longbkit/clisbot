@@ -89,8 +89,8 @@ describe("Add Project navigation", () => {
   it("restores the GitHub destination query and active parent when reopening a repository", () => {
     const repository = {
       id: "repo-1",
-      nameWithOwner: "getpaseo/paseo",
-      cloneUrl: "git@github.com:getpaseo/paseo.git",
+      nameWithOwner: "longbkit/clisbot",
+      cloneUrl: "git@github.com:longbkit/clisbot.git",
       description: null,
       visibility: "public",
       updatedAt: null,
@@ -149,39 +149,39 @@ describe("Add Project options", () => {
   });
 
   it("offers manual URL and protocol-specific owner/repo clone choices", () => {
-    expect(buildManualGithubRepositoryChoices("git@github.com:getpaseo/paseo.git")).toEqual([
+    expect(buildManualGithubRepositoryChoices("git@github.com:longbkit/clisbot.git")).toEqual([
       expect.objectContaining({
-        id: "manual:git@github.com:getpaseo/paseo.git",
-        nameWithOwner: "getpaseo/paseo",
-        cloneUrl: "git@github.com:getpaseo/paseo.git",
+        id: "manual:git@github.com:longbkit/clisbot.git",
+        nameWithOwner: "longbkit/clisbot",
+        cloneUrl: "git@github.com:longbkit/clisbot.git",
       }),
     ]);
-    expect(buildManualGithubRepositoryChoices("getpaseo/paseo")).toEqual([
-      expect.objectContaining({ cloneProtocol: "https", cloneUrl: "getpaseo/paseo" }),
-      expect.objectContaining({ cloneProtocol: "ssh", cloneUrl: "getpaseo/paseo" }),
+    expect(buildManualGithubRepositoryChoices("longbkit/clisbot")).toEqual([
+      expect.objectContaining({ cloneProtocol: "https", cloneUrl: "longbkit/clisbot" }),
+      expect.objectContaining({ cloneProtocol: "ssh", cloneUrl: "longbkit/clisbot" }),
     ]);
-    expect(buildManualGithubRepositoryChoices("paseo")).toEqual([]);
+    expect(buildManualGithubRepositoryChoices("clisbot")).toEqual([]);
   });
 
   it("shows final clone paths while retaining parent paths as values", () => {
     expect(
       buildCloneLocationOptions({
         parents: ["~/dev", "~/workspace"],
-        repositoryName: "paseo",
-        existingPaths: ["~/workspace/paseo"],
+        repositoryName: "clisbot",
+        existingPaths: ["~/workspace/clisbot"],
       }),
     ).toEqual([
       {
         id: "~/dev",
         path: "~/dev",
-        displayPath: "~/dev/paseo",
+        displayPath: "~/dev/clisbot",
         secondaryText: "Parent directory: ~/dev",
         disabled: false,
       },
       {
         id: "~/workspace",
         path: "~/workspace",
-        displayPath: "~/workspace/paseo",
+        displayPath: "~/workspace/clisbot",
         secondaryText: "Already exists",
         disabled: true,
       },

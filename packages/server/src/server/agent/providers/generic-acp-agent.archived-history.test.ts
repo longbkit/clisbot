@@ -90,7 +90,7 @@ async function withFakeACPAgent(
     loadRequestsPath: string;
   }) => Promise<void>,
 ): Promise<void> {
-  const testDir = await mkdtemp(path.join(tmpdir(), "paseo-acp-archived-history-"));
+  const testDir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-archived-history-"));
   try {
     const scriptPath = path.join(testDir, "fake-acp-agent.cjs");
     const loadRequestsPath = path.join(testDir, "load-requests.json");

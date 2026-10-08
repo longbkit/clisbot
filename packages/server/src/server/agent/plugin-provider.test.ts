@@ -5,7 +5,7 @@ import type {
   ProviderEvent,
   ProviderInput,
   ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
 import { createTestLogger } from "../../test-utils/test-logger.js";
@@ -13,7 +13,7 @@ import type { AgentClient, AgentStreamEvent } from "./agent-sdk-types.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import { AgentManager } from "./agent-manager.js";
 import { buildProviderRegistry } from "./provider-registry.js";
-import { ProviderOverrideSchema } from "@getpaseo/protocol/provider-config";
+import { ProviderOverrideSchema } from "@clisbot/protocol/provider-config";
 import { PluginAgentClientRegistry } from "./plugin-provider.js";
 import {
   isStaleProviderSessionError,
@@ -986,7 +986,7 @@ describe("plugin provider launch and status", () => {
     registry.replace([registration]);
     try {
       const definition = registry.definitions()[registration.id]!;
-      const client = definition.createClient(logger, { env: { PATH: "/paseo-nonexistent-bin" } });
+      const client = definition.createClient(logger, { env: { PATH: "/clisbot-nonexistent-bin" } });
       expect(await client.isAvailable()).toBe(false);
       expect(await client.getDiagnostic!()).toEqual({ diagnostic: "node not found on PATH" });
     } finally {
@@ -1005,19 +1005,19 @@ describe("plugin provider launch and status", () => {
         {
           env: {
             SESSION_TOKEN: "session",
-            PASEO_AGENT_ID: "agent",
+            CLISBOT_AGENT_ID: "agent",
             CLAUDECODE: "parent",
-            PASEO_NODE_ENV: "development",
+            CLISBOT_NODE_ENV: "development",
           },
         },
       );
       const input = harness.inputs.find((value) => value.type === "session.open");
       expect(input).toMatchObject({
-        config: { env: { SESSION_TOKEN: "session", PASEO_AGENT_ID: "agent" } },
+        config: { env: { SESSION_TOKEN: "session", CLISBOT_AGENT_ID: "agent" } },
       });
       if (input?.type !== "session.open") throw new Error("Expected session.open");
       expect(input.config.env).not.toHaveProperty("CLAUDECODE");
-      expect(input.config.env).not.toHaveProperty("PASEO_NODE_ENV");
+      expect(input.config.env).not.toHaveProperty("CLISBOT_NODE_ENV");
     } finally {
       await registry.shutdown();
     }
@@ -1048,7 +1048,7 @@ describe("plugin provider launch and status", () => {
     const harness = createProviderHarness();
     const registration: ProviderRegistration = {
       ...harness.registration,
-      command: ["paseo-nonexistent-provider-executable"],
+      command: ["clisbot-nonexistent-provider-executable"],
     };
     const registry = new PluginAgentClientRegistry(createTestLogger());
     registry.replace([registration]);
@@ -1056,7 +1056,7 @@ describe("plugin provider launch and status", () => {
       const client = registry.clients()[registration.id]!;
       expect(await client.isAvailable()).toBe(false);
       expect(await client.getDiagnostic!()).toEqual({
-        diagnostic: "paseo-nonexistent-provider-executable not found on PATH",
+        diagnostic: "clisbot-nonexistent-provider-executable not found on PATH",
       });
       expect(harness.inputs).toEqual([]);
     } finally {
@@ -1111,7 +1111,7 @@ describe("plugin provider launch and status", () => {
             env: { PLUGIN_SETTING: "custom" },
           });
           expect(launch!.env).not.toHaveProperty("CLAUDECODE");
-          expect(launch!.env).not.toHaveProperty("PASEO_NODE_ENV");
+          expect(launch!.env).not.toHaveProperty("CLISBOT_NODE_ENV");
         }
         expect(launches[0]).toEqual(launches[1]);
         expect(launches[1]).toEqual(launches[2]);

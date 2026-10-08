@@ -1,4 +1,4 @@
-import type { PluginScreenParams } from "@getpaseo/plugin/client";
+import type { PluginScreenParams } from "@clisbot/plugin/client";
 import type { PluginSurfaceContributionIdentity } from "./surface-contribution";
 
 type PluginSurfaceRoute<Kind extends PluginSurfaceContributionIdentity["kind"]> =

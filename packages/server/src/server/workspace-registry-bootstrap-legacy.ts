@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 
-import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
+import type { ProjectCheckoutLitePayload } from "@clisbot/protocol/messages";
 
 import { parseGitRevParsePath } from "../utils/git-rev-parse-path.js";
 import { createRealpathAwarePathMatcher, getRealpathAwareRelativePath } from "../utils/path.js";

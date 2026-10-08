@@ -770,7 +770,7 @@ export const fr: TranslationResources = {
       },
       routes: {
         public: "Proxy inverse",
-        paseo: "Mémorable",
+        clisbot: "Mémorable",
         direct: "Directe",
       },
       states: {
@@ -892,7 +892,7 @@ export const fr: TranslationResources = {
           mergePrNoGithub:
             "Impossible de fusionner la PR pour l’instant : GitHub n’est pas connecté",
           archiveNotWorktree:
-            "Archivage indisponible : cet espace de travail n’a pas été créé comme worktree Paseo",
+            "Archivage indisponible : cet espace de travail n’a pas été créé comme worktree Clisbot",
           mergePrNoForge:
             "Impossible de fusionner la {{noun}} pour l’instant : {{brand}} n’est pas connecté",
           mergePrMissing: "Impossible de fusionner la PR : il n’y a pas encore de pull request",
@@ -1246,7 +1246,7 @@ export const fr: TranslationResources = {
       discord: "Discord",
       github: "Créer un ticket GitHub",
       whatsNew: "Nouveautés",
-      appName: "Paseo",
+      appName: "Clisbot",
     },
     sections: {
       sessions: "Historique",
@@ -1393,7 +1393,7 @@ export const fr: TranslationResources = {
       close: "Fermer la fenêtre",
     },
     quitting: {
-      title: "Fermeture de Paseo…",
+      title: "Fermeture de Clisbot…",
       detail: "Arrêt du daemon local.",
     },
     daemon: {
@@ -1408,20 +1408,20 @@ export const fr: TranslationResources = {
       },
       management: {
         title: "Gérer le daemon intégré",
-        hint: "Laisser Paseo démarrer et arrêter le daemon intégré",
+        hint: "Laisser Clisbot démarrer et arrêter le daemon intégré",
         pauseTitle: "Suspendre le daemon intégré",
         pauseMessage:
           "Le daemon intégré sera arrêté immédiatement. Les agents en cours et les terminaux connectés au daemon intégré seront arrêtés.",
         pauseAndStop: "Suspendre et arrêter",
         registrationFailed:
-          "Le daemon intégré a démarré, mais Paseo n’a pas pu enregistrer la connexion localhost. Désactivez puis réactivez la gestion du daemon, ou ajoutez localhost manuellement.",
+          "Le daemon intégré a démarré, mais Clisbot n’a pas pu enregistrer la connexion localhost. Désactivez puis réactivez la gestion du daemon, ou ajoutez localhost manuellement.",
         pausedStopFailed:
-          "La gestion du daemon intégré a été suspendue, mais Paseo n’a pas pu arrêter le daemon.",
+          "La gestion du daemon intégré a été suspendue, mais Clisbot n’a pas pu arrêter le daemon.",
         updateFailed: "Impossible de mettre à jour la gestion du daemon intégré.",
       },
       keepRunning: {
         title: "Laisser le daemon tourner après la fermeture",
-        hint: "Le daemon continue de tourner quand vous quittez Paseo",
+        hint: "Le daemon continue de tourner quand vous quittez Clisbot",
       },
       logs: {
         title: "Fichier journal",
@@ -1436,7 +1436,7 @@ export const fr: TranslationResources = {
       fullStatus: {
         title: "Statut complet",
         modalTitle: "Statut du daemon",
-        hint: "Exécute `paseo daemon status` et affiche la sortie",
+        hint: "Exécute `clisbot daemon status` et affiche la sortie",
         view: "Afficher le statut",
         copied: "Statut copié dans le presse-papiers.",
         fetchFailed: "Impossible de récupérer le statut du daemon : {{message}}",
@@ -1491,7 +1491,7 @@ export const fr: TranslationResources = {
     },
     rosetta: {
       title: "Téléchargez la version Apple Silicon",
-      runningIntel: "Vous utilisez la version Intel de Paseo via Rosetta sur Apple Silicon.",
+      runningIntel: "Vous utilisez la version Intel de Clisbot via Rosetta sur Apple Silicon.",
       highCpu:
         "Cela entraîne une forte utilisation du processeur. Téléchargez la version Apple Silicon pour corriger le problème.",
       download: "Télécharger",
@@ -1540,7 +1540,7 @@ export const fr: TranslationResources = {
         microphone: "L’état du microphone n’a pas encore été vérifié.",
       },
       testNotification: {
-        title: "Test de notification Paseo",
+        title: "Test de notification Clisbot",
         body: "Si vous voyez ceci, les notifications de bureau fonctionnent.",
         notDelivered:
           "La notification n’a pas été délivrée. Vérifiez Réglages système > Notifications.",
@@ -1550,12 +1550,12 @@ export const fr: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "Impossible de vérifier l’installation de la CLI.",
-        installFailed: "Impossible d’installer la CLI Paseo.",
+        installFailed: "Impossible d’installer la CLI Clisbot.",
       },
     },
   },
   rootError: {
-    title: "Paseo a rencontré un problème.",
+    title: "Clisbot a rencontré un problème.",
     body: "Réessayez pour recharger l’application. Si le problème persiste, joignez les détails ci-dessous à votre signalement.",
     details: "Détails",
   },
@@ -1654,7 +1654,7 @@ export const fr: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Bienvenue dans Paseo",
+    title: "Bienvenue dans Clisbot",
     subtitle: "Connectez votre ordinateur pour commencer",
     actions: {
       settings: "Paramètres",
@@ -1757,7 +1757,7 @@ export const fr: TranslationResources = {
     },
     direct: {
       title: "Connexion directe",
-      helper: "Saisissez l’adresse d’un serveur Paseo.",
+      helper: "Saisissez l’adresse d’un serveur Clisbot.",
       fields: {
         host: "Hôte",
         port: "Port",
@@ -1800,7 +1800,7 @@ export const fr: TranslationResources = {
     },
     remoteSsh: {
       title: "SSH distant",
-      helper: "Connectez-vous à un daemon Paseo qui tourne sur l’hôte distant.",
+      helper: "Connectez-vous à un daemon Clisbot qui tourne sur l’hôte distant.",
       fields: {
         target: "Hôte SSH",
         password: "Mot de passe du daemon",
@@ -1863,15 +1863,15 @@ export const fr: TranslationResources = {
       enableDescription:
         "Le relais permet à cet appareil de se connecter depuis n’importe où. Le trafic d’association est chiffré de bout en bout.",
       relayDocs: "Fonctionnement du relais",
-      relayDocsAccessibility: "Découvrir le fonctionnement du relais Paseo",
+      relayDocsAccessibility: "Découvrir le fonctionnement du relais Clisbot",
       enableRelay: "Activer le relais",
       enablingRelay: "Activation…",
       notNow: "Pas maintenant",
       directConnectionHint:
         "Sans relais, connectez-vous directement via TCP, Tailscale ou un autre VPN. Aucun code QR n’est créé.",
-      updateRequired: "Mettez à jour l’hôte pour activer le relais depuis Paseo Desktop.",
+      updateRequired: "Mettez à jour l’hôte pour activer le relais depuis Clisbot Desktop.",
       unavailable: "Offre d’association indisponible.",
-      hint: "Scannez ce code QR avec Paseo sur votre téléphone, ou copiez le lien ci-dessous.",
+      hint: "Scannez ce code QR avec Clisbot sur votre téléphone, ou copiez le lien ci-dessous.",
       securityWarning:
         "Traitez ce lien d’association comme un mot de passe. Toute personne qui le possède peut accéder à ce daemon.",
       qrUnavailable: "Code QR indisponible.",
@@ -1906,7 +1906,7 @@ export const fr: TranslationResources = {
   serviceUrl: {
     title: "Ouvrir l’URL du service",
     message: "Ouvrir {{url}} ?",
-    inPaseo: "Dans Paseo",
+    inClisbot: "Dans Clisbot",
     externalBrowser: "Navigateur externe",
     dontAskAgain: "Ne plus demander",
   },
@@ -2026,9 +2026,9 @@ export const fr: TranslationResources = {
       one: "{{count}} autre outil utilisé",
       other: "{{count}} autres outils utilisés",
     },
-    paseoCalls: {
-      one: "{{count}} appel à Paseo",
-      other: "{{count}} appels à Paseo",
+    clisbotCalls: {
+      one: "{{count}} appel à Clisbot",
+      other: "{{count}} appels à Clisbot",
     },
     and: "et",
   },
@@ -2114,7 +2114,7 @@ export const fr: TranslationResources = {
       send: "Envoyer",
       sending: "Envoi…",
       sentTitle: "Notification de test envoyée",
-      sentDescription: "Paseo a transmis la notification au système d’exploitation.",
+      sentDescription: "Clisbot a transmis la notification au système d’exploitation.",
       sendFailedTitle: "Impossible d’envoyer la notification de test",
     },
     hostSections: {
@@ -2133,14 +2133,14 @@ export const fr: TranslationResources = {
     metadataGeneration: {
       title: "Génération de métadonnées",
       description:
-        "Choisissez le modèle utilisé par Paseo pour les titres d’espaces de travail, les noms de branches, les messages de commit et les brouillons de pull request",
+        "Choisissez le modèle utilisé par Clisbot pour les titres d’espaces de travail, les noms de branches, les messages de commit et les brouillons de pull request",
       selection: "Sélection du modèle",
       automatic: "Automatique",
       preferred: "Manuel",
-      automaticHint: "Paseo choisit un modèle rapide disponible",
-      preferredHint: "Choisissez le modèle utilisé par Paseo",
+      automaticHint: "Clisbot choisit un modèle rapide disponible",
+      preferredHint: "Choisissez le modèle utilisé par Clisbot",
       model: "Modèle",
-      fallbackHint: "S’il est indisponible, Paseo utilise un autre modèle disponible",
+      fallbackHint: "S’il est indisponible, Clisbot utilise un autre modèle disponible",
       docs: "Documentation",
       saveError: "Impossible de mettre à jour la génération de métadonnées",
     },
@@ -2151,7 +2151,7 @@ export const fr: TranslationResources = {
         title: "Données du navigateur",
         siteData: "Cookies et données des sites",
         description:
-          "Les onglets du navigateur partagent les connexions et les données des sites dans Paseo.",
+          "Les onglets du navigateur partagent les connexions et les données des sites dans Clisbot.",
         clear: "Effacer les données du navigateur",
         clearing: "Effacement…",
         confirmTitle: "Effacer les données du navigateur ?",
@@ -2178,7 +2178,7 @@ export const fr: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "Demander",
-          inApp: "Dans Paseo",
+          inApp: "Dans Clisbot",
           external: "Navigateur externe",
         },
       },
@@ -2264,7 +2264,7 @@ export const fr: TranslationResources = {
         label: "Mises à jour de l’application",
         readyToInstall: "Prête à installer : {{version}}",
         installTitle: "Installer la mise à jour de l’app de bureau",
-        installMessage: "Paseo sera mis à jour sur cet ordinateur",
+        installMessage: "Clisbot sera mis à jour sur cet ordinateur",
         installConfirm: "Installer la mise à jour",
         update: "Mettre à jour",
         updateTo: "Mettre à jour vers {{version}}",
@@ -2517,11 +2517,11 @@ export const fr: TranslationResources = {
         title: "Skills d’orchestration",
         description: "Apprenez à vos agents à orchestrer via la CLI",
         updateAvailable: "Mise à jour disponible",
-        updateTitle: "Mettre à jour les skills Paseo ?",
+        updateTitle: "Mettre à jour les skills Clisbot ?",
         updateFallback: "Synchronisez les skills fournis sur cet hôte.",
-        uninstallTitle: "Désinstaller les skills Paseo ?",
+        uninstallTitle: "Désinstaller les skills Clisbot ?",
         uninstallMessage:
-          "Supprime tous les skills d’orchestration Paseo de ~/.agents, ~/.claude et ~/.codex sur cet hôte.",
+          "Supprime tous les skills d’orchestration Clisbot de ~/.agents, ~/.claude et ~/.codex sur cet hôte.",
         choose: "Choisir les skills",
         chooseAll: "Tous les skills",
         chooseAllHint:
@@ -2558,9 +2558,9 @@ export const fr: TranslationResources = {
         title: "Orchestration",
         unavailable: "Connectez-vous à cet hôte pour gérer l’orchestration",
         enableTools: {
-          title: "Activer les outils Paseo",
+          title: "Activer les outils Clisbot",
           hint: "Les agents pourront gérer les worktrees, les agents et les planifications",
-          accessibilityLabel: "Injecter les outils Paseo",
+          accessibilityLabel: "Injecter les outils Clisbot",
         },
         systemPrompt: {
           title: "Prompt système",
@@ -2666,16 +2666,16 @@ export const fr: TranslationResources = {
             "Cet hôte n’est pas connecté. Attendez qu’il soit en ligne avant de redémarrer.",
           offlineTitle: "Hôte hors ligne",
           offlineMessage:
-            "Cet hôte est hors ligne. Paseo se reconnecte automatiquement : attendez qu’il soit de nouveau en ligne avant de redémarrer.",
+            "Cet hôte est hors ligne. Clisbot se reconnecte automatiquement : attendez qu’il soit de nouveau en ligne avant de redémarrer.",
           requestFailedTitle: "Erreur",
           requestFailedMessage:
-            "Impossible d’envoyer la demande de redémarrage. Paseo se reconnecte automatiquement : réessayez quand l’hôte apparaît en ligne.",
+            "Impossible d’envoyer la demande de redémarrage. Clisbot se reconnecte automatiquement : réessayez quand l’hôte apparaît en ligne.",
           dialogFailedMessage:
             "Impossible d’ouvrir la boîte de dialogue de confirmation du redémarrage.",
         },
         update: {
           desktopManagedHint:
-            "Ce daemon est géré par Paseo Desktop. Mettez à jour Paseo Desktop sur l’hôte.",
+            "Ce daemon est géré par Clisbot Desktop. Mettez à jour Clisbot Desktop sur l’hôte.",
           title: "Mettre à jour le daemon",
           hint: "Met à jour le daemon vers la dernière version puis le redémarre",
           confirm: "Mettre à jour",
@@ -2797,13 +2797,13 @@ export const fr: TranslationResources = {
         savedToast: "Projet mis à jour",
       },
       readFailures: {
-        invalidTitle: "Impossible d’analyser paseo.json",
+        invalidTitle: "Impossible d’analyser clisbot.json",
         invalidDescription: "Corrigez le fichier sur le disque, puis rechargez.",
         missingTitle: "Ce projet n’existe pas sur cet hôte",
         missingSingleHost: "L’hôte sélectionné n’a aucune trace de ce projet.",
-        transportTitle: "Impossible de charger paseo.json",
+        transportTitle: "Impossible de charger clisbot.json",
         transportFallback: "L’hôte n’a pas répondu.",
-        failedTitle: "Impossible de charger paseo.json",
+        failedTitle: "Impossible de charger clisbot.json",
         failedDescription: "Rechargez pour réessayer.",
       },
       worktree: {
@@ -2814,7 +2814,7 @@ export const fr: TranslationResources = {
           "Consultez la documentation pour plus de détails et la liste des variables d’environnement disponibles pour ces commandes",
         setup: "Configuration",
         setupAccessibility: "Commandes de configuration du worktree",
-        uncommittedTitle: "Commitez les modifications de paseo.json",
+        uncommittedTitle: "Commitez les modifications de clisbot.json",
         uncommittedDescription:
           "Les nouveaux worktrees utilisent le script de configuration de la branche de base sélectionnée.",
         teardown: "Démontage",
@@ -2839,7 +2839,7 @@ export const fr: TranslationResources = {
         newScript: "Nouveau script",
         editScript: "Modifier {{name}}",
         runAsService: "Exécuter comme service",
-        serviceHint: "Paseo supervise le processus et lui attribue un port via $PASEO_PORT",
+        serviceHint: "Clisbot supervise le processus et lui attribue un port via $CLISBOT_PORT",
         actions: {
           add: "Ajouter un script",
           edit: "Modifier",
@@ -2848,7 +2848,7 @@ export const fr: TranslationResources = {
       },
       metadata: {
         title: "Génération des métadonnées",
-        info: "Instructions propres au projet, injectées dans les prompts IA que Paseo utilise pour générer les métadonnées : servez-vous-en pour imposer les conventions de votre équipe (nommage des branches, style de commit, format des PR).",
+        info: "Instructions propres au projet, injectées dans les prompts IA que Clisbot utilise pour générer les métadonnées : servez-vous-en pour imposer les conventions de votre équipe (nommage des branches, style de commit, format des PR).",
         branchName: "Noms de branches",
         branchNamePlaceholder:
           "Préfixez les branches par feat/ ou fix/, et par mb/ pour les branches personnelles",
@@ -2861,8 +2861,8 @@ export const fr: TranslationResources = {
       writeFailures: {
         staleTitle: "Configuration modifiée sur le disque",
         staleDescription:
-          "Rechargez pour récupérer la dernière version de paseo.json avant d’enregistrer.",
-        failedTitle: "Impossible d’enregistrer paseo.json",
+          "Rechargez pour récupérer la dernière version de clisbot.json avant d’enregistrer.",
+        failedTitle: "Impossible d’enregistrer clisbot.json",
         failedDescription: "Réessayez ou rechargez la dernière version depuis le disque.",
       },
       actions: {

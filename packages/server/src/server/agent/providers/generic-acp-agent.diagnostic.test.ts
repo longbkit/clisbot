@@ -306,7 +306,7 @@ describe("GenericACPAgentClient diagnostics", () => {
   });
 
   test("reports a missing launcher without dropping the rest of the diagnostic", async () => {
-    await withTempDir("paseo-missing-acp-agent-", async (testDir) => {
+    await withTempDir("clisbot-missing-acp-agent-", async (testDir) => {
       const missingCommand = path.join(testDir, "missing-acp-agent");
       const client = new GenericACPAgentClient({
         logger: createTestLogger(),
@@ -340,7 +340,7 @@ async function withFakeACPAgent(
     | "history-load-failures",
   run: (scriptPath: string, mode: string, testDir: string) => Promise<void>,
 ): Promise<void> {
-  await withTempDir("paseo-acp-diagnostic-", async (testDir) => {
+  await withTempDir("clisbot-acp-diagnostic-", async (testDir) => {
     const scriptPath = path.join(testDir, "fake-acp-agent.cjs");
     await writeFile(scriptPath, fakeACPAgentScript, "utf8");
     await run(scriptPath, mode, testDir);

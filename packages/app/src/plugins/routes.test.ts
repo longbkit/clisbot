@@ -64,7 +64,7 @@ describe("parsePluginSurfaceRoute", () => {
 describe("pluginScreenParamsFromRoute", () => {
   function searchParams(route: string): Record<string, string | string[]> {
     // Expo Router's search params: the route's segments merged with its query.
-    const url = new URL(route, "http://paseo.test");
+    const url = new URL(route, "http://clisbot.test");
     return {
       serverId: "local",
       pluginId: "bots",

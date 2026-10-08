@@ -1,4 +1,4 @@
-import type { TerminalInputModeState } from "@getpaseo/protocol/terminal-input-mode";
+import type { TerminalInputModeState } from "@clisbot/protocol/terminal-input-mode";
 import { describe, expect, it } from "vitest";
 import {
   createTerminalKeyInput,

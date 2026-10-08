@@ -1,7 +1,7 @@
 {
-  "name": "@getpaseo/protocol",
+  "name": "@clisbot/protocol",
   "version": "0.11.1",
-  "description": "Paseo shared protocol schemas and wire types",
+  "description": "Clisbot shared protocol schemas and wire types",
   "files": [
     "dist",
     "!dist/**/*.map",

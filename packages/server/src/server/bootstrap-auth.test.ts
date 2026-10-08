@@ -4,8 +4,8 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createTestPaseoDaemon } from "./test-utils/paseo-daemon.js";
-import { DaemonAuthenticationError, DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
+import { DaemonAuthenticationError, DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { readLocalCredentialForTarget } from "./local-credential.js";
 
 const originalEnv = { ...process.env };
@@ -50,11 +50,11 @@ describe("daemon bearer auth", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    process.env = { ...originalEnv, PASEO_SUPERVISED: "0" };
+    process.env = { ...originalEnv, CLISBOT_SUPERVISED: "0" };
   });
 
   test("leaves HTTP and WebSocket open when no password is configured", async () => {
-    const daemonHandle = await createTestPaseoDaemon();
+    const daemonHandle = await createTestClisbotDaemon();
     try {
       const response = await fetch(`http://127.0.0.1:${daemonHandle.port}/api/status`);
       expect(response.status).toBe(200);
@@ -68,7 +68,7 @@ describe("daemon bearer auth", () => {
   });
 
   test("requires Authorization bearer on protected HTTP routes when password is configured", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: CORRECT_PASSWORD_HASH },
     });
     try {
@@ -86,7 +86,7 @@ describe("daemon bearer auth", () => {
       expect(correct.status).toBe(200);
 
       const localToken = (
-        await readFile(join(daemonHandle.paseoHome, "local-credential"), "utf8")
+        await readFile(join(daemonHandle.clisbotHome, "local-credential"), "utf8")
       ).trim();
       const local = await fetch(`http://127.0.0.1:${daemonHandle.port}/api/status`, {
         headers: { Authorization: `Bearer ${localToken}` },
@@ -98,7 +98,7 @@ describe("daemon bearer auth", () => {
   });
 
   test("allows file downloads with only a capability token when password is configured", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: CORRECT_PASSWORD_HASH },
     });
     try {
@@ -119,13 +119,13 @@ describe("daemon bearer auth", () => {
   });
 
   test("bypasses bearer auth for preflight and liveness endpoints", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: CORRECT_PASSWORD_HASH },
     });
     try {
       const preflight = await fetch(`http://127.0.0.1:${daemonHandle.port}/api/files/download`, {
         method: "OPTIONS",
-        headers: { Origin: "https://app.paseo.sh" },
+        headers: { Origin: "https://app.clisbot.com" },
       });
       expect(preflight.status).toBe(204);
 
@@ -140,7 +140,7 @@ describe("daemon bearer auth", () => {
   });
 
   test("closes WebSocket connections with readable auth failures when password is configured", async () => {
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: CORRECT_PASSWORD_HASH },
     });
     try {
@@ -152,16 +152,16 @@ describe("daemon bearer auth", () => {
       });
       await expectWebSocketCloses({
         port: daemonHandle.port,
-        protocol: "paseo.bearer.wrong-password",
+        protocol: "clisbot.bearer.wrong-password",
         code: 4401,
         reason: "Incorrect password",
       });
 
       const { ws, protocol } = await connectWebSocket({
         port: daemonHandle.port,
-        protocol: "paseo.bearer.correct-password",
+        protocol: "clisbot.bearer.correct-password",
       });
-      expect(protocol).toBe("paseo.bearer.correct-password");
+      expect(protocol).toBe("clisbot.bearer.correct-password");
       const serverInfo = new Promise<unknown>((resolve) => {
         ws.once("message", (data) => resolve(JSON.parse(data.toString())));
       });
@@ -184,13 +184,15 @@ describe("daemon bearer auth", () => {
   });
 
   test("accepts hello password and local credential and reports the negotiated protocol", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     try {
       const token = (
-        await readFile(join(daemonHandle.paseoHome, "local-credential"), "utf8")
+        await readFile(join(daemonHandle.clisbotHome, "local-credential"), "utf8")
       ).trim();
       if (process.platform !== "win32") {
-        expect((await stat(join(daemonHandle.paseoHome, "local-credential"))).mode & 0o777).toBe(
+        expect((await stat(join(daemonHandle.clisbotHome, "local-credential"))).mode & 0o777).toBe(
           0o600,
         );
       }
@@ -224,14 +226,16 @@ describe("daemon bearer auth", () => {
       await daemonHandle.close();
     }
     await expect(
-      readFile(join(daemonHandle.paseoHome, "local-credential"), "utf8"),
+      readFile(join(daemonHandle.clisbotHome, "local-credential"), "utf8"),
     ).rejects.toThrow();
   });
 
   test("uses the per-run credential in memory after the file changes", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     try {
-      const path = join(daemonHandle.paseoHome, "local-credential");
+      const path = join(daemonHandle.clisbotHome, "local-credential");
       const token = (await readFile(path, "utf8")).trim();
       await writeFile(path, "stale-on-disk\n");
       const { ws } = await connectWebSocket({ port: daemonHandle.port });
@@ -258,15 +262,20 @@ describe("daemon bearer auth", () => {
   });
 
   test("a desktop-style client connects to its password-protected local daemon without a saved password", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     const target = `127.0.0.1:${daemonHandle.port}`;
-    await writeFile(join(daemonHandle.paseoHome, "paseo.pid"), JSON.stringify({ listen: target }));
+    await writeFile(
+      join(daemonHandle.clisbotHome, "clisbot.pid"),
+      JSON.stringify({ listen: target }),
+    );
     const client = new DaemonClient({
       url: `ws://${target}/ws`,
       clientId: "desktop-managed-test",
       clientType: "browser",
       localCredential: async () =>
-        readLocalCredentialForTarget(daemonHandle.paseoHome, target) ?? undefined,
+        readLocalCredentialForTarget(daemonHandle.clisbotHome, target) ?? undefined,
       webSocketFactory: (url, options) =>
         new WebSocket(url, options?.protocols, { headers: options?.headers }),
       reconnect: { enabled: false },
@@ -281,7 +290,9 @@ describe("daemon bearer auth", () => {
   });
 
   test("rejects a wrong hello password with a protocol frame before close", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     try {
       const { ws } = await connectWebSocket({ port: daemonHandle.port });
       const frames: unknown[] = [];
@@ -308,7 +319,9 @@ describe("daemon bearer auth", () => {
   });
 
   test("surfaces a typed auth reason from a real client with the wrong password", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     const client = new DaemonClient({
       url: `ws://127.0.0.1:${daemonHandle.port}/ws`,
       clientId: "typed-wrong-password",
@@ -331,7 +344,7 @@ describe("daemon bearer auth", () => {
 
   test("authenticates a real browser client when its password is invalid as a WebSocket subprotocol", async () => {
     const password = "two words";
-    const daemonHandle = await createTestPaseoDaemon({
+    const daemonHandle = await createTestClisbotDaemon({
       auth: { password: await hash(password, 4) },
     });
     const client = new DaemonClient({
@@ -353,7 +366,9 @@ describe("daemon bearer auth", () => {
   });
 
   test("ignores a proxy Basic header and admits the hello password", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     try {
       const ws = new WebSocket(`ws://127.0.0.1:${daemonHandle.port}/ws`, undefined, {
         headers: { Authorization: "Basic proxy-credential" },
@@ -385,7 +400,9 @@ describe("daemon bearer auth", () => {
   });
 
   test("sends password_required to a capable client without a credential", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     try {
       const { ws } = await connectWebSocket({ port: daemonHandle.port });
       const frames: unknown[] = [];
@@ -412,7 +429,9 @@ describe("daemon bearer auth", () => {
   });
 
   test("closes a pre-hello ping without sending server data", async () => {
-    const daemonHandle = await createTestPaseoDaemon({ auth: { password: CORRECT_PASSWORD_HASH } });
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: CORRECT_PASSWORD_HASH },
+    });
     try {
       const { ws } = await connectWebSocket({ port: daemonHandle.port });
       const frames: unknown[] = [];
