@@ -53,6 +53,8 @@ Managed Access. Separate device trust, account authentication, authority and net
 - Daemon, Hub and web serving have independent process ownership. Hub HTTP traffic must not
   use the daemon as its default tunnel. A gateway is an optional serving boundary, not an
   authority. Reuse existing services; never restart a live daemon to enable Hub or web.
+  The gateway runs only for a Tailscale or public HTTPS route, or for a web UI the person
+  turned on ([decision 2026-10-08](#decision-2026-10-08-the-web-ui-stays-opt-in)).
 - Hubs explains the service before offering setup: Hosts run agents; a Hub provides channels,
   automations and shared administration. Direct personal Host use does not require a Hub.
   Prefer saved/detected Hubs; do not infer setup intent from opening this page. With no Hub,
@@ -217,6 +219,45 @@ callback; Electron uses a random, one-use loopback callback and the system brows
 with Google requires its approved device/setup grant in the client performing setup; email/password
 setup remains available on self-hosted web.
 
+## Decision 2026-10-08: the web UI stays opt-in
+
+**Context.** [Self-hosting the web UI](../../../public-docs/web-ui.md) says the bundled web UI
+is off by default; people use `app.clisbot.com` or a native app. Personal composition
+(`clisbot onboard`, `hub start --personal`, Start Hub in the app) always started the gateway,
+and the gateway always served the web UI. With a Tailscale route the pairing link pointed at
+that self-hosted web (`https://<host>.ts.net:8443/#offer=…`). On relay the gateway still ran on
+loopback, serving a web UI nobody had asked for. Found in the
+[personal onboarding QA](../../audits/2026-10-08-personal-onboarding-qa.md).
+
+**Options.** Keep same-origin self-hosted web on Tailscale (the earlier "Serving contexts"
+row), or keep the gateway as a router only and send every pairing link to the official app.
+
+**Decision.**
+
+1. Start the gateway only for a Tailscale or public HTTPS route, or when the web UI is on
+   (the self-hosted web needs the gateway to reach Hub). On relay or `local` without it, no
+   gateway runs; the app reaches Hub on Hub's own loopback port. A gateway already running
+   from an earlier start is left alone: it keeps running with the web files it started with,
+   so an upgrade does not restart it and drop the sockets it carries.
+2. The gateway forwards the fixed daemon and Hub namespaces. It serves the web UI only when
+   `features.webUi.enabled` (or `CLISBOT_WEB_UI_ENABLED`) is on, as the public doc says.
+3. Every pairing link starts with `https://app.clisbot.com/#offer=…`, as upstream links start
+   with its hosted app. The `direct` route stays in the offer, so native apps and
+   `app.clisbot.com` still try Tailscale before relay. Upstream offers carry relay only and
+   create no link without relay; Clisbot's `local` link carries a `ws://127.0.0.1` route, which
+   a browser on `https://app.clisbot.com` may block or prompt for (verify per browser).
+
+**Why.** One Tailscale Serve mapping must front the daemon and the Hub, so the routing part
+of the gateway is needed. Serving the web UI is a separate choice the person makes. Links
+issued before the change keep working: the offer is in the hash, whichever host it lands on.
+
+The same QR pass settled the Tailscale port. The home's saved port or `8443` is preferred.
+A Serve mapping there that already proxies to this home's gateway is adopted. Any other
+mapping is left alone and the next free port up to nine above is used. An explicit
+`--https-port` is never replaced; it fails with the reason instead. When Serve still fails,
+relay takes over and the guidance carries Tailscale's own error, which the app shows under
+the start result.
+
 ## Implemented topology
 
 The CLI is a launcher. Each backend has its own supervisor; the daemon is not the parent
@@ -228,8 +269,8 @@ starting Hub from the app preserves the existing web address and other homes' Se
 ```mermaid
 flowchart TB
   App[Mobile / desktop / browser] -->|HTTPS + encrypted WebSocket| TS[Tailscale Serve or public reverse proxy]
-  TS --> Gateway[Web + gateway process · loopback 6880]
-  Gateway -->|static files| Web[Bundled web UI]
+  TS --> Gateway[Gateway process · loopback 6880 · only with a public route or web UI on]
+  Gateway -.->|static files, when the web UI is on| Web[Bundled web UI]
   Gateway -->|fixed Hub namespaces / device socket| Hub[Hub API process · loopback 6870]
   Gateway -->|daemon HTTP namespaces / ws| Daemon[Daemon process · loopback 6868]
   App -->|encrypted daemon connection| Relay[Relay WSS]
@@ -238,8 +279,8 @@ flowchart TB
   Daemon -->|private enrollment and outbound relationship| Hub
 ```
 
-Web and gateway are **one Node.js process**: Express serves the existing built Expo web
-assets and fixed HTTP/WS proxies. The implementation lives in
+Web and gateway are **one Node.js process**: Express serves fixed HTTP/WS proxies and, when
+the web UI is on, the existing built Expo web assets. The implementation lives in
 `packages/cli/src/commands/serve`; forwarding/static adapters reuse `@clisbot/server` and
 namespace contracts from `@clisbot/protocol`. No new gateway framework/package is required.
 Hub retains its own HTTP server, embedded database option and encrypted ingress. The new
@@ -313,17 +354,17 @@ invitation; it does not promise that an expired/consumed QR will keep working.
 
 ## Serving contexts and browser origins
 
-| Context                                       | Entry point and Hub route                                                   | Pairing / browser behavior                                                                                                                                                                        |
-| --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local computer only                           | Gateway loopback; relative Hub paths and `/ws`                              | Self-host web QR, no account by default. A phone cannot reach another computer's `127.0.0.1`.                                                                                                     |
-| Tailscale                                     | Serve HTTPS on the machine's `*.ts.net:8443`, pointing to gateway           | Install/sign in to Tailscale on host and phone. Same-origin web; direct route preferred, relay fallback when configured.                                                                          |
-| Public HTTPS / Cloudflare tunnel              | User-managed TLS proxy/tunnel points to gateway                             | Supply its HTTPS origin via `--public-url`; support WS upgrades and preserve Host/Origin. Tunnel access policy is separate from Clisbot device authority.                                         |
-| Official Clisbot web                          | `https://app.clisbot.com` connects to configured Hub/daemon                 | New paired Hub transport uses encrypted WSS request/response; server checks WS Origin. Direct HTTPS requires a reachable endpoint and browser network permission. Relay uses its own WSS ingress. |
-| Relay only                                    | Official web/native app to separate daemon and Hub relay targets            | One QR; no Hub HTTP URL to `fetch`. Hub traffic never tunnels through daemon.                                                                                                                     |
-| Hub and multiple daemons on separate machines | Each daemon enrolls outbound to reachable Hub; app keeps stable Hub profile | Discovery describes a Hub, not permission to pair it. Pair Hub with an approved Hub invitation. External Hosts use Hub grants/tickets; off Hosts need their own daemon credential.                |
+| Context                                       | Entry point and Hub route                                                       | Pairing / browser behavior                                                                                                                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local computer only                           | Daemon and Hub on their own loopback ports; gateway only with the web UI on     | Official-app QR, no account by default. A phone cannot reach another computer's `127.0.0.1`.                                                                                                      |
+| Tailscale                                     | Serve HTTPS on the machine's `*.ts.net:8443` (or the next free port) to gateway | Install/sign in to Tailscale on host and phone. Official-app QR whose `direct` route is the `*.ts.net` origin; relay fallback when configured.                                                    |
+| Public HTTPS / Cloudflare tunnel              | User-managed TLS proxy/tunnel points to gateway                                 | Supply its HTTPS origin via `--public-url`; support WS upgrades and preserve Host/Origin. Tunnel access policy is separate from Clisbot device authority.                                         |
+| Official Clisbot web                          | `https://app.clisbot.com` connects to configured Hub/daemon                     | New paired Hub transport uses encrypted WSS request/response; server checks WS Origin. Direct HTTPS requires a reachable endpoint and browser network permission. Relay uses its own WSS ingress. |
+| Relay only                                    | Official web/native app to separate daemon and Hub relay targets                | One QR; no Hub HTTP URL to `fetch`. Hub traffic never tunnels through daemon.                                                                                                                     |
+| Hub and multiple daemons on separate machines | Each daemon enrolls outbound to reachable Hub; app keeps stable Hub profile     | Discovery describes a Hub, not permission to pair it. Pair Hub with an approved Hub invitation. External Hosts use Hub grants/tickets; off Hosts need their own daemon credential.                |
 
-Self-host web fetches and WebSockets use the gateway origin, so its normal HTTP calls are
-same-origin. An official web page calling a user's backend is cross-origin even if that
+A self-hosted web UI (when turned on) fetches and opens WebSockets on the gateway origin, so
+its normal HTTP calls are same-origin. An official web page calling a user's backend is cross-origin even if that
 backend has one gateway. The paired Hub implementation handles this through its encrypted
 WebSocket adapter, not cross-origin cookie fetch. WS does not use CORS preflight; enforce
 its Origin policy. Legacy cookie browser transport keeps its same-origin contract. Any future

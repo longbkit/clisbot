@@ -8,17 +8,18 @@ import { resolveLocalPairingOffer } from "../daemon/pair.js";
 import { prepareHub } from "./hub-launch.js";
 import { configureServingAdmission } from "./network-admission.js";
 import { localHubPairingOffer } from "../hub/device-pairing.js";
-import { launchGateway } from "./gateway-launch.js";
-import { configureTailscaleServe, readTailscaleServePort } from "./tailscale.js";
+import { launchGateway, stopGateway } from "./gateway-launch.js";
+import {
+  configureTailscaleServe,
+  readTailscaleServePort,
+  selectTailscaleServePort,
+} from "./tailscale.js";
 import { selectLocalPort } from "../hub/local-port.js";
 import { connectToDaemon } from "../../utils/client.js";
 import { enrollPersonalDaemon } from "./enrollment.js";
 import { withServiceLaunchLock } from "../../utils/service-launch-lock.js";
-import {
-  detectTailscale,
-  renderPairingQr,
-  tailscaleApprovalUrl,
-} from "@clisbot/server/gateway-adapters";
+import { detectTailscale, tailscaleApprovalUrl } from "@clisbot/server/gateway-adapters";
+import { isProcessRunning, resolveLocalHubState } from "../hub/local-hub.js";
 
 export interface PersonalServingOptions {
   home?: string;
@@ -55,30 +56,26 @@ export async function startPersonalDaemon(
     const relay = !options.preserveRelay && network.transport !== "local";
     const daemon = await prepareDaemon(home, relay);
     if (relay) await configureDaemonRelay(home, true);
-    const { gateway, origin, directEndpoint } = await exposeServices(
+    const exposed = await exposeServices(
       options,
       home,
       network,
       daemon.origin,
       existingGatewayHub(home),
     );
-    await configureServingAdmission(home, [origin, gateway.origin]);
+    await configureServingAdmission(home, servingOrigins(exposed));
     const pairing = await resolveLocalPairingOffer({
       clisbotHome: home,
       devicePairing: true,
       enableRelay: relay,
-      direct: { endpoint: directEndpoint, useTls: origin.startsWith("https:") },
+      direct: exposed.direct,
       ...(options.label ? { label: options.label } : {}),
     });
-    if (network.transport !== "relay" && pairing.url) {
-      pairing.url = `${origin}/${new URL(pairing.url).hash}`;
-      pairing.qr = await renderPairingQr(pairing.url);
-    }
     return {
       home,
       daemon: daemon.origin,
-      gateway: gateway.origin,
-      origin,
+      gateway: exposed.gateway,
+      origin: exposed.origin ?? daemon.origin,
       transport: network.transport,
       tailscaleState: network.tailscaleState,
       networkGuidance: network.networkGuidance,
@@ -119,7 +116,9 @@ function existingGatewayHub(home: string): string | null {
 export interface PersonalDaemonResult {
   home: string;
   daemon: string;
-  gateway: string;
+  /** Loopback gateway, or null when no Tailscale or public HTTPS route needs one. */
+  gateway: string | null;
+  /** The public route, or the loopback service the app reaches without one. */
   origin: string;
   transport: string;
   url: string | null;
@@ -141,37 +140,29 @@ async function launchServices(
   home: string,
   network: Awaited<ReturnType<typeof servingNetwork>>,
 ): Promise<PersonalServingResult> {
-  const daemon = await prepareDaemon(home, network.transport !== "local");
-  await configureDaemonRelay(home, network.transport !== "local");
-  let hub = await prepareHub(
-    home,
-    network.origin ?? `http://127.0.0.1:${options.webPort ?? "6880"}`,
-    network.transport !== "local",
-    options.port,
-  );
-  const { gateway, origin, directEndpoint } = await exposeServices(
-    options,
-    home,
-    network,
-    daemon.origin,
-    hub,
-  );
-  if (network.tailscaleState === "unavailable") {
-    // Serve failed after Hub was prepared. Reconfigure only Hub's browser origin;
-    // gateway policy/target changes are applied without closing daemon sockets.
-    hub = await prepareHub(home, origin, true, options.port);
-    await launchGateway(
-      home,
-      {
-        daemonOrigin: daemon.origin,
-        hubOrigin: hub,
-        webDirectory: loadConfig(home, { env: { CLISBOT_HOME: home } }).webUi?.distDir ?? null,
-        origins: [],
-      },
-      Number(new URL(gateway.origin).port),
-    );
+  const relay = network.transport !== "local";
+  const daemon = await prepareDaemon(home, relay);
+  await configureDaemonRelay(home, relay);
+  const plan = await hubLaunchPlan(options, home, network);
+  const hubAppOrigin = plan.appOrigin;
+  let hub = await prepareHub(home, hubAppOrigin, relay, plan.hubPort);
+  // The gateway takes the port the plan reserved, so its origin is the one Hub was given.
+  const serving = plan.gatewayPort ? { ...options, webPort: plan.gatewayPort } : options;
+  const exposed = await exposeServices(serving, home, network, daemon.origin, hub);
+  // Without a public route the app reaches Hub on its own loopback port.
+  const origin = exposed.origin ?? hub;
+  if (origin !== hubAppOrigin) {
+    // The public route changed or failed after Hub was prepared. Reconfigure only Hub's
+    // browser origin; gateway targets change without closing daemon sockets.
+    hub = await prepareHub(home, origin, relay, new URL(hub).port);
+    if (exposed.gateway)
+      await launchGateway(
+        home,
+        gatewayConfig(home, daemon.origin, hub, exposed.origin ? [exposed.origin] : []),
+        Number(new URL(exposed.gateway).port),
+      );
   }
-  await configureServingAdmission(home, [origin, gateway.origin]);
+  await configureServingAdmission(home, servingOrigins(exposed));
   const enrollment = await enrollPersonalDaemon(home, hub);
   const hubOffer = await localHubPairingOffer({
     home,
@@ -181,21 +172,17 @@ async function launchServices(
   const pairing = await resolveLocalPairingOffer({
     clisbotHome: home,
     devicePairing: true,
-    enableRelay: network.transport !== "local",
-    direct: { endpoint: directEndpoint, useTls: origin.startsWith("https:") },
+    enableRelay: relay,
+    direct: exposed.direct,
     hub: hubOffer,
     ...(options.label ? { label: options.label } : {}),
   });
-  if (network.transport !== "relay" && pairing.url) {
-    pairing.url = `${origin}/${new URL(pairing.url).hash}`;
-    pairing.qr = await renderPairingQr(pairing.url);
-  }
   return {
     home,
     daemon: daemon.origin,
     hub,
     hubOffer,
-    gateway: gateway.origin,
+    gateway: exposed.gateway,
     origin,
     transport: network.transport,
     tailscaleState: network.tailscaleState,
@@ -203,6 +190,75 @@ async function launchServices(
     enrollment,
     ...pairing,
   };
+}
+
+/** Hub's own address when no gateway fronts it: the running or saved port, else a free one. */
+async function hubLoopbackOrigin(home: string, hubPort?: string): Promise<string> {
+  const saved = resolveLocalHubState({ home }).state?.port;
+  const selected = hubPort ? Number(hubPort) : (saved ?? (await selectLocalPort(6870, true)));
+  return `http://127.0.0.1:${selected}`;
+}
+
+/**
+ * Where the app will reach Hub, decided before Hub starts: the public route, the gateway that
+ * serves the web UI, or Hub's own loopback port. Only the last one picks Hub's port.
+ */
+async function hubLaunchPlan(
+  options: PersonalServingOptions,
+  home: string,
+  network: Awaited<ReturnType<typeof servingNetwork>>,
+): Promise<{ appOrigin: string; hubPort: string | undefined; gatewayPort?: string }> {
+  if (network.origin) return { appOrigin: network.origin, hubPort: options.port };
+  if (enabledWebDirectory(home)) {
+    const running = runningGateway(home)?.origin;
+    if (running) return { appOrigin: running, hubPort: options.port };
+    const gatewayPort = String(await selectLocalPort(port(options.webPort ?? "6880"), true));
+    return { appOrigin: `http://127.0.0.1:${gatewayPort}`, hubPort: options.port, gatewayPort };
+  }
+  const appOrigin = await hubLoopbackOrigin(home, options.port);
+  return { appOrigin, hubPort: new URL(appOrigin).port };
+}
+
+/** The gateway this home is running, if any; a repeat start reuses its port and web files. */
+function runningGateway(home: string): { origin: string; webDirectory: string | null } | null {
+  try {
+    const state = JSON.parse(readFileSync(path.join(home, "gateway-local.json"), "utf8")) as {
+      pid?: number;
+      config?: { port?: number; webDirectory?: string | null };
+    };
+    if (!state.pid || !state.config?.port || !isProcessRunning(state.pid)) return null;
+    return {
+      origin: `http://127.0.0.1:${state.config.port}`,
+      webDirectory: state.config.webDirectory ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function servingOrigins(exposed: { gateway: string | null; origin: string | null }): string[] {
+  return [exposed.origin, exposed.gateway].filter((origin): origin is string => Boolean(origin));
+}
+
+/** The web UI directory when the person turned the web UI on (config or `CLISBOT_WEB_UI_ENABLED`). */
+function enabledWebDirectory(home: string): string | null {
+  const webUi = loadConfig(home, { env: { ...process.env, CLISBOT_HOME: home } }).webUi;
+  return webUi?.enabled ? (webUi.distDir ?? null) : null;
+}
+
+/**
+ * The gateway forwards daemon and Hub routes; it serves the web UI only when that is on. A
+ * gateway already running keeps the web files it started with, so an upgrade does not restart
+ * it and drop the sockets it carries; the rule applies from its next start.
+ */
+function gatewayConfig(
+  home: string,
+  daemonOrigin: string,
+  hubOrigin: string | null,
+  origins: string[],
+) {
+  const webDirectory = enabledWebDirectory(home) ?? runningGateway(home)?.webDirectory ?? null;
+  return { daemonOrigin, hubOrigin, webDirectory, origins };
 }
 
 async function configureDaemonRelay(home: string, enabled: boolean): Promise<void> {
@@ -231,7 +287,7 @@ export function outputPersonalServices(
       ? `Hub API: ${result.transport === "relay" ? "encrypted relay (separate Hub ingress)" : `${result.origin}/api/management`}\n`
       : "";
   console.log(
-    `Daemon: ${result.daemon}\n${hub}Web: ${result.origin}\n\n${result.qr ?? ""}\n${result.url}\n\nInvitation expires in 5 minutes. Prefer Tailscale on your phone for a direct connection.`,
+    `Daemon: ${result.daemon}\n${hub}${result.gateway ? `Address: ${result.origin}\n` : ""}\n${result.qr ?? ""}\n${result.url}\n\nInvitation expires in 5 minutes. Prefer Tailscale on your phone for a direct connection.`,
   );
   if (!("hub" in result))
     console.log(
@@ -344,62 +400,119 @@ function port(value: string): number {
   return number;
 }
 
+interface ExposedServices {
+  gateway: string | null;
+  /** Tailscale or public HTTPS origin; null when the app connects by relay or loopback. */
+  origin: string | null;
+  direct: { endpoint: string; useTls: boolean };
+}
+
 async function exposeServices(
   options: PersonalServingOptions,
   home: string,
   network: Awaited<ReturnType<typeof servingNetwork>>,
   daemonOrigin: string,
   hub: string | null,
-) {
-  const config = loadConfig(home, { env: { CLISBOT_HOME: home } });
-  const gateway = await launchGateway(
+): Promise<ExposedServices> {
+  const loopback = { endpoint: new URL(daemonOrigin).host, useTls: false };
+  // A gateway fronts a public route, or the self-hosted web UI the person turned on.
+  const webUi = enabledWebDirectory(home) !== null;
+  if (!network.origin && !webUi) return persistDirect(options, home, network, null, null, loopback);
+  let gateway = await launchGateway(
     home,
-    {
-      daemonOrigin,
-      hubOrigin: hub,
-      webDirectory: config.webUi?.distDir ?? null,
-      origins: network.origin ? [network.origin] : [],
-    },
+    gatewayConfig(home, daemonOrigin, hub, network.origin ? [network.origin] : []),
     port(options.webPort ?? "6880"),
   );
-  let origin = network.origin ?? gateway.origin;
   if (network.tailscale) {
     try {
-      origin = await configureTailscaleServe({
+      network.origin = await mapTailscale(options, home, network.tailscale, gateway.origin);
+      gateway = await launchGateway(
         home,
-        dnsName: network.tailscale.dnsName,
-        port: network.tailscale.port,
-        target: gateway.origin,
-      });
-    } catch (error) {
-      if (process.stdin.isTTY && !options.json) throw error;
-      network.transport = "relay";
-      network.tailscaleState = "unavailable";
-      network.tailscaleActionUrl = tailscaleApprovalUrl(error);
-      network.networkGuidance = `Tailscale Serve could not expose this Host.${options.preserveRelay ? "" : " Clisbot is using encrypted relay."} ${network.tailscaleActionUrl ? "Enable Serve on your tailnet, then retry." : "Check HTTPS/Serve permissions (an Admin terminal on Windows), then retry."} Existing Serve mappings were preserved.`;
-      delete network.tailscale;
-      delete network.origin;
-      console.error(network.networkGuidance);
-      await launchGateway(
-        home,
-        {
-          daemonOrigin,
-          hubOrigin: hub,
-          webDirectory: config.webUi?.distDir ?? null,
-          origins: [],
-        },
+        gatewayConfig(home, daemonOrigin, hub, [network.origin]),
         Number(new URL(gateway.origin).port),
       );
-      origin = gateway.origin;
+    } catch (error) {
+      if (process.stdin.isTTY && !options.json) throw error;
+      fallBackToRelay(options, network, error);
+      if (!gateway.reused && !webUi) {
+        await stopGateway(home);
+        return persistDirect(options, home, network, null, null, loopback);
+      }
+      await launchGateway(
+        home,
+        gatewayConfig(home, daemonOrigin, hub, []),
+        Number(new URL(gateway.origin).port),
+      );
     }
   }
-  const directEndpoint = `${new URL(origin).hostname}:${new URL(origin).port || (origin.startsWith("https:") ? "443" : "80")}`;
+  const origin = network.origin ?? (webUi ? gateway.origin : null);
+  if (!origin) return persistDirect(options, home, network, gateway.origin, null, loopback);
+  const url = new URL(origin);
+  const direct = {
+    endpoint: `${url.hostname}:${url.port || (url.protocol === "https:" ? "443" : "80")}`,
+    useTls: url.protocol === "https:",
+  };
+  return persistDirect(options, home, network, gateway.origin, origin, direct);
+}
+
+/** Maps the preferred HTTPS port, or the next free one unless the person chose the port. */
+async function mapTailscale(
+  options: PersonalServingOptions,
+  home: string,
+  tailscale: { dnsName: string; port: number },
+  target: string,
+): Promise<string> {
+  tailscale.port = await selectTailscaleServePort({
+    home,
+    dnsName: tailscale.dnsName,
+    preferred: tailscale.port,
+    fixed: options.httpsPort !== undefined,
+    target,
+  });
+  return configureTailscaleServe({
+    home,
+    dnsName: tailscale.dnsName,
+    port: tailscale.port,
+    target,
+  });
+}
+
+function fallBackToRelay(
+  options: PersonalServingOptions,
+  network: Awaited<ReturnType<typeof servingNetwork>>,
+  error: unknown,
+): void {
+  network.transport = "relay";
+  network.tailscaleState = "unavailable";
+  network.tailscaleActionUrl = tailscaleApprovalUrl(error);
+  const reason = tailscaleFailureReason(error);
+  network.networkGuidance = `Tailscale Serve could not expose this Host (${reason}).${options.preserveRelay ? "" : " Clisbot is using encrypted relay."} ${network.tailscaleActionUrl ? "Enable Serve on your tailnet, then retry." : "Fix this, then retry (on Windows, Serve needs an Admin terminal)."}`;
+  delete network.tailscale;
+  delete network.origin;
+  console.error(network.networkGuidance);
+}
+
+/** Tailscale's own words (its stderr) rather than the whole failed command line. */
+function tailscaleFailureReason(error: unknown): string {
+  const stderr = (error as { stderr?: unknown }).stderr;
+  if (typeof stderr === "string" && stderr.trim()) return stderr.trim();
+  return error instanceof Error ? error.message : String(error);
+}
+
+function persistDirect(
+  options: PersonalServingOptions,
+  home: string,
+  network: Awaited<ReturnType<typeof servingNetwork>>,
+  gateway: string | null,
+  origin: string | null,
+  direct: { endpoint: string; useTls: boolean },
+): ExposedServices {
   // The app's Set up Tailscale must not swap the saved route for a loopback one when Serve
-  // fails; `onboard` keeps its fallback to this machine's gateway.
+  // fails; `onboard` keeps its fallback to this machine's daemon.
   if (options.preserveRelay && network.tailscaleState === "unavailable")
-    return { gateway, origin, directEndpoint };
-  editPersistedConfig(home, "daemon.direct.endpoint", { value: directEndpoint });
-  editPersistedConfig(home, "daemon.direct.useTls", { value: origin.startsWith("https:") });
+    return { gateway, origin, direct };
+  editPersistedConfig(home, "daemon.direct.endpoint", { value: direct.endpoint });
+  editPersistedConfig(home, "daemon.direct.useTls", { value: direct.useTls });
   editPersistedConfig(home, "features.personalServing", { value: true });
-  return { gateway, origin, directEndpoint };
+  return { gateway, origin, direct };
 }

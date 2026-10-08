@@ -6,6 +6,7 @@ import {
   configureTailscaleServe,
   removeTailscaleServe,
   readTailscaleServePort,
+  selectTailscaleServePort,
 } from "./tailscale.js";
 
 const homes: string[] = [];
@@ -131,4 +132,44 @@ test("ignores saved ports for another Tailscale host and invalid records", async
   }
   await writeFile(path.join(home, "tailscale-serve.json"), "invalid JSON");
   expect(readTailscaleServePort(home, "host.tail123.ts.net")).toBeUndefined();
+});
+
+test("adopts a mapping that already reaches this home's gateway", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-tailscale-adopt-"));
+  homes.push(home);
+  const dnsName = "host.tail123.ts.net";
+  const target = "http://127.0.0.1:6880";
+  const run = vi.fn(async (args: string[]) =>
+    args[1] === "status"
+      ? JSON.stringify({
+          Web: { [`${dnsName}:8443`]: { Handlers: { "/": { Proxy: target } } } },
+        })
+      : "",
+  );
+  expect(await configureTailscaleServe({ home, dnsName, port: 8443, target }, run)).toBe(
+    `https://${dnsName}:8443`,
+  );
+  expect(readTailscaleServePort(home, dnsName)).toBe(8443);
+});
+
+test("selects the next free HTTPS port unless the person chose one", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-tailscale-select-"));
+  homes.push(home);
+  const dnsName = "host.tail123.ts.net";
+  const target = "http://127.0.0.1:6880";
+  const run = vi.fn(async () =>
+    JSON.stringify({
+      TCP: { "8444": { TCPForward: "127.0.0.1:9230" } },
+      Web: {
+        [`${dnsName}:8443`]: { Handlers: { "/": { Proxy: "http://127.0.0.1:9999" } } },
+        [`${dnsName}:8445`]: { Handlers: { "/": { Proxy: target } } },
+      },
+    }),
+  );
+  const select = (fixed: boolean, preferred = 8443) =>
+    selectTailscaleServePort({ home, dnsName, preferred, fixed, target }, run);
+
+  expect(await select(false)).toBe(8445);
+  expect(await select(false, 8446)).toBe(8446);
+  await expect(select(true)).rejects.toThrow("Choose another --https-port");
 });

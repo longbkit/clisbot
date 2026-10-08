@@ -7,17 +7,67 @@ import {
 } from "@clisbot/server/gateway-adapters";
 import { writeServiceFile } from "../../utils/service-files.js";
 
+interface ServeRecord {
+  authority: string;
+  target: string;
+}
+
+function readServeRecord(home: string): ServeRecord | undefined {
+  const recordPath = path.join(home, "tailscale-serve.json");
+  return existsSync(recordPath)
+    ? (JSON.parse(readFileSync(recordPath, "utf8")) as ServeRecord)
+    : undefined;
+}
+
+/** A mapping Clisbot may (re)write: this home's record, or one that already reaches `target`. */
+function isOwnHandler(
+  authority: string,
+  proxy: string | undefined,
+  target: string,
+  record: ServeRecord | undefined,
+): boolean {
+  return proxy === target || (record?.authority === authority && proxy === record.target);
+}
+
+const AUTOMATIC_PORT_CANDIDATES = 10;
+
+/**
+ * The HTTPS port to map: the preferred one when it is free or already reaches this home's
+ * gateway, otherwise the next free port. An explicit `--https-port` is never replaced.
+ */
+export async function selectTailscaleServePort(
+  options: { home: string; dnsName: string; preferred: number; fixed: boolean; target: string },
+  run: TailscaleRunner = runTailscale,
+): Promise<number> {
+  const status = JSON.parse(await run(["serve", "status", "--json"])) as {
+    TCP?: Record<string, unknown>;
+    Web?: Record<string, { Handlers?: Record<string, { Proxy?: string }> }>;
+  };
+  const record = readServeRecord(options.home);
+  const count = options.fixed ? 1 : AUTOMATIC_PORT_CANDIDATES;
+  const last = Math.min(options.preferred + count - 1, 65535);
+  for (let port = options.preferred; port <= last; port += 1) {
+    const authority = `${options.dnsName}:${port}`;
+    const web = status.Web?.[authority];
+    if (!web && status.TCP?.[String(port)] === undefined) return port;
+    if (web && isOwnHandler(authority, web.Handlers?.["/"]?.Proxy, options.target, record))
+      return port;
+  }
+  const ports = last === options.preferred ? `${last}` : `${options.preferred}–${last}`;
+  throw new Error(
+    `Tailscale Serve already uses HTTPS port ${ports} on ${options.dnsName}. Choose another --https-port; existing mappings were preserved.`,
+  );
+}
+
 export async function configureTailscaleServe(
   options: { home: string; dnsName: string; port: number; target: string },
   run: TailscaleRunner = runTailscale,
 ): Promise<string> {
   const recordPath = path.join(options.home, "tailscale-serve.json");
-  const record = existsSync(recordPath)
-    ? (JSON.parse(readFileSync(recordPath, "utf8")) as { authority: string; target: string })
-    : undefined;
+  const record = readServeRecord(options.home);
   const authority = `${options.dnsName}:${options.port}`;
   const current = await readTailscaleServeHandler(authority, run);
-  if (current && (current.proxy !== record?.target || record?.authority !== authority)) {
+  if (current && !isOwnHandler(authority, current.proxy, options.target, record)) {
     throw new Error(
       `Tailscale Serve already owns https://${authority}/. Choose another --https-port; its mapping was preserved.`,
     );

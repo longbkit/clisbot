@@ -36,6 +36,8 @@ Object.assign(env, {
   CLISBOT_USAGE_REPORTING: "0",
   CLISBOT_DICTATION_ENABLED: "false",
   CLISBOT_VOICE_MODE_ENABLED: "false",
+  // This test drives the self-hosted web UI, which personal serving starts only when it is on.
+  CLISBOT_WEB_UI_ENABLED: "true",
 });
 const cli = async (args, overrides = {}) => {
   const child = spawn(process.execPath, ["packages/cli/dist/index.js", ...args], {
@@ -338,7 +340,8 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
         failures.push(error.message);
         console.log("Page error:", error.message.replace(/#offer=[^\s]+/g, "#offer=[private]"));
       });
-      await page.goto(repeated.url);
+      // Pairing links open the official app; this test loads the self-hosted copy instead.
+      await page.goto(`${repeated.origin}/${new URL(repeated.url).hash}`);
       await page
         .getByText("Personal Hub access; no account login required", {
           exact: true,
@@ -641,7 +644,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
       const emptyContext = await browser.newContext();
       try {
         const emptyPage = await emptyContext.newPage();
-        await emptyPage.goto(new URL("/settings/hub/hubs", repeated.url).href);
+        await emptyPage.goto(new URL("/settings/hub/hubs", repeated.origin).href);
         await emptyPage.getByRole("button", { name: "What is a Hub?", exact: true }).waitFor();
         await emptyPage.screenshot({
           path: ".debug/scratch/device-pairing/final-v11-empty-hubs.png",
@@ -703,7 +706,8 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   );
   assert.equal(published.gateway, result.gateway);
   const publicOffer = parseDevicePairingOfferFromUrl(published.url);
-  assert.equal(new URL(published.url).origin, "https://personal.example.test");
+  assert.equal(new URL(published.url).origin, "https://app.clisbot.com");
+  assert.deepEqual(publicOffer.direct, { endpoint: "personal.example.test:443", useTls: true });
   assert.equal(publicOffer.hub.hubId, offer.hub.hubId);
   const forwarded = new DaemonClient({
     url: `${published.gateway.replace(/^http/, "ws")}/ws`,

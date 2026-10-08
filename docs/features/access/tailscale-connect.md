@@ -39,7 +39,12 @@ Nothing in the app could turn Tailscale on, so people landed in the Direct conne
   the Hub's own relay is configured and restart it differently, so it stays out of scope.
 - **No Turn off for Tailscale in the app.** One Serve mapping fronts both the daemon and a personal
   Hub on that Host. Removing it is `clisbot hub stop --tailscale`, which checks ownership first.
-- **The QR says which routes it holds:** "Contains: Tailscale · Relay · Hub".
+- **The QR says which routes it holds:** "Contains: Tailscale · Relay · Hub". The link itself
+  opens `https://app.clisbot.com`; the `*.ts.net` address travels in the offer as its `direct`
+  route ([decision 2026-10-08](device-pairing.md#decision-2026-10-08-the-web-ui-stays-opt-in)).
+- **A busy HTTPS port is not a dead end.** Set up takes the next free Serve port, or adopts a
+  mapping that already reaches this Host's gateway. When it still falls back to relay, the
+  app shows Tailscale's own error next to the start result.
 - **A pasted link with `#offer=` always pairs**, whichever field it lands in. Direct connection
   hands it to Paste pairing link, which already knows Host, Hub-only and managed links.
 - **The Hub reuses Start Hub.** Set up Tailscale for a Hub re-runs `hub.local.start` with
