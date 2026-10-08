@@ -98,6 +98,7 @@ export function SidebarProjectEmptyState({
 const styles = StyleSheet.create((theme) => ({
   card: {
     marginTop: theme.spacing[3],
+    marginHorizontal: theme.spacing[2],
     padding: theme.spacing[4],
     alignItems: "center",
   },

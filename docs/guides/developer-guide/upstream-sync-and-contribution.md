@@ -163,7 +163,13 @@ below apply to official Clisbot `main`.
 4. Rerun the transformation and old-name scan on the merged tree. Reconcile
    dependency manifests and lockfile; run the build, typecheck, focused tests,
    and required live/release gates. Commit the merge only after review.
-5. Delete the disposable sync branch name and create the verified sync tag.
+5. Run `scripts/upstream-sync/clisbot-change-survival.py --since <previous
+merge> --pre <main before> --post <merged>` and review every missing line.
+   It catches what the normalized base cannot: a line where Clisbot kept
+   upstream's raw text (a temporary `paseo` endpoint) is taken from the renamed
+   upstream without a conflict. Compare failing tests against the pre-merge
+   commit before calling them regressions.
+6. Delete the disposable sync branch name and create the verified sync tag.
    The merge commit keeps the transformed snapshot and raw upstream history;
    no old `sync/rebranded-*` branch names need to remain.
 

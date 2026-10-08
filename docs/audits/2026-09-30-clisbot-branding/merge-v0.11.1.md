@@ -138,12 +138,69 @@ more. Each is a Clisbot feature using an API upstream changed:
   is not installed and the test daemon's `PATH` lacked `~/.local/bin` (`agy`). The
   provider-plugin code is byte-identical to upstream.
 
+## Change-survival review (2026-10-09)
+
+After the merge, every Clisbot commit since the v0.10.2 merge was checked with
+[`scripts/upstream-sync/clisbot-change-survival.py`](../../../scripts/upstream-sync/clisbot-change-survival.py):
+68 commits (`48676c64a..b30acfb7c`, excluding the retired clisbot v1 history
+joined at the cutover). For each commit it takes the lines the commit added that
+were still present before the merge and reports those missing after it.
+
+- 54 commits survived line for line. No Clisbot file was lost, no file Clisbot
+  had deleted came back, and every binary asset (icons, images) is unchanged.
+- 14 commits had 134 lines that no longer appear verbatim. All but two groups
+  are the adaptations listed above (sidebar footer, pairing, provider icons,
+  moved modules, version pins, `bottomTitle` renamed to "Bottom bar").
+- **Two losses, fixed in `5209c0b18`:**
+  - The temporary hosted Hub origin `hub.paseo.sh` became `hub.clisbot.com`
+    (no such host) in the CLI default, the website plans URL and the Hub docs;
+    two CLI tests failed. Clisbot kept upstream's raw text on those lines, so Git
+    saw that side as unchanged and took the renamed upstream line without a
+    conflict. The normalized-base comparison cannot see this case; the
+    survival check does.
+  - The sidebar empty states lost the lifted settings card from `35ab81200`.
+    Upstream's new actions stay; the card, centring and inset are restored. [Empty state](images/merge-v0.11.1-empty-light.png).
+
+Behaviour of the Clisbot areas was checked with their own tests:
+
+| Area                                                                                               | Result                           |
+| -------------------------------------------------------------------------------------------------- | -------------------------------- |
+| App `src/clisbot`, device access, sidebar nav, hosts, contexts, i18n                               | 1341 of 1342 tests; 4 files fail |
+| Server connectors, chats, managed access, device access, network, bots, schedules, session storage | 1256 of 1259; 3 fail             |
+| Hub daemons (PostgreSQL in Docker)                                                                 | 84 of 97; 13 fail                |
+| Hub channel loader and vertical contract                                                           | pass (9 contract cases)          |
+| Channel plane against simulated Slack and Telegram                                                 | 11 of 11                         |
+| CLI Hub commands                                                                                   | 22 of 22 after the origin fix    |
+
+Every remaining failure fails identically on `b30acfb7c` before the merge
+(checked in a separate worktree with the same dependencies and Docker), so none
+is a merge regression. They are existing Clisbot issues worth their own fixes:
+the app's `chat-options-activity` sheet case and three suites that do not load
+in the unit/browser runner; the server's worktree auto-archive and Project
+worktree e2e cases; `bot.template.preview.request` having no managed-access
+target (a `workspace.manage` RPC left unscoped); and 13 Hub daemon enrollment
+and fan-out cases.
+
 ## Not verified / follow-ups
 
-- **Plugin registry endpoint.** The rename turned upstream's default registry
-  into `https://plugins.clisbot.com`, which does not resolve. `clisbot plugin add
-owner/slug` fails until Clisbot hosts a registry or points at upstream's
-  (`getpaseo/plugins`). Needs a product decision.
+- **Plugin registry install (open, accepted for now).** `clisbot plugin add
+owner/slug` is new in v0.11.1 and fails. Built-in plugins and `npm:`/`git:`/
+  directory sources that ship `clisbot-plugin.json` still install. Two causes,
+  both must be fixed:
+  - The rename made the default registry `https://plugins.clisbot.com`
+    (`packages/protocol/src/plugin-registry.ts`), which has no DNS yet. The
+    host is the website Worker (`packages/website/wrangler.toml`,
+    `src/plugins/published.ts`, deployed by `deploy-website.yml`), which
+    proxies upstream's data at `getpaseo.github.io/plugins`. The next website
+    deploy may bring the domain up.
+  - Pointing at `plugins.paseo.sh` instead still fails: the registry lookup
+    and clone succeed (the bare host 301s, but `/plugins/<id>.json` answers
+    200), then install stops with `Plugin manifest is missing:
+…/clisbot-plugin.json`. Third-party plugins ship `paseo-plugin.json`, and
+    the daemon has read only `clisbot-plugin.json` since the earlier rebrand.
+    Accepting both names reopens the
+    [no-Paseo-interop decision](../2026-09-29-clisbot-rebrand-upstream-sync-decision.md#wire-contracts-follow-the-rename).
+    Checked live 2026-10-09 with `3ae3ae/agy-provider`.
 - New upstream copy (README bullets, plugin directory pages, Orca/registry
   links) has not had the [publication review](publication-review.md).
 - No live Slack/Telegram round trip: channel and Hub code are unchanged apart
