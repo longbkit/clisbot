@@ -29,6 +29,7 @@ RUN --mount=type=cache,target=/root/.npm set -eux; \
     npm pack --workspace=@clisbot/highlight --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/relay --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/protocol --pack-destination /tmp/clisbot-packs; \
+    npm pack --workspace=@clisbot/device-access --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/client --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/plugin --pack-destination /tmp/clisbot-packs; \
     npm pack --workspace=@clisbot/server --pack-destination /tmp/clisbot-packs; \

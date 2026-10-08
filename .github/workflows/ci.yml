@@ -117,6 +117,10 @@ jobs:
       - name: Build server stack
         run: npm run build:server
 
+      # The Hub and the channel packages typecheck against the channel packages' built output.
+      - name: Build channel packages
+        run: npm run build:channels
+
       - name: Verify built-in plugins from built output
         run: node --test scripts/builtin-plugins-dist.test.mjs
 

@@ -47,7 +47,10 @@ Hub's `dependencies`; the desktop `afterPack` refuses an `app.asar` without each
 pinned entry and plugin; and `clisbot-hub-smoke.mjs` loads every in-repo channel
 through the real loader, in the Docker image and, from the desktop's `afterSign`
 on a macOS build for the host's architecture, inside `app.asar`.
-`docker/pack-channels.mjs` reads the pins, so it needs no edit.
+The Hub compiles and typechecks against the channel packages' built output, so
+they build first: `npm run build:channels` (run by `build:hub` and the CI
+typecheck) and the Docker pack both take their build order from
+`scripts/channel-packages.mjs`, which reads the pins, so neither needs an edit.
 
 Published or bundled supply (when enabled for a channel) is installed once per
 Hub under the managed project rooted at `CLISBOT_HOME/plugins/channels/`:

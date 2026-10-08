@@ -19,6 +19,7 @@ export default defineConfig(({ command, isPreview }) => {
     ssr: {
       external: [
         "@clisbot/relay",
+        "@clisbot/device-access",
         "@clisbot/protocol",
         "@clisbot/channels-core",
         "@clisbot/channels-shared",

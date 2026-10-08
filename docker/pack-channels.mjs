@@ -1,24 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import { channelPackageDirs } from "../scripts/channel-packages.mjs";
 
 // Run only in the disposable Docker build context. Pack compiled private
 // workspaces locally so the image never fetches their names from npm.
-// The contract packages build first; the verticals are the Hub's in-repo channel pins, so a
-// channel added there is packed here without a second list to keep in step.
-const contractPackages = ["markdown-core", "core", "shared"];
-const pins = JSON.parse(readFileSync("packages/hub/channel-pins.json", "utf8"));
-const verticals = Object.values(pins.channels)
-  .filter((pin) => pin.loadMode === "in-repo")
-  .map((pin) => pin.inRepoPackage.replace(/^@clisbot\/channels-/u, ""));
-const channels = [...contractPackages, ...verticals];
+const workspaces = channelPackageDirs();
 const versions = new Map(
-  channels.map((channel) => {
-    const pkg = JSON.parse(readFileSync(`packages/channels/${channel}/package.json`, "utf8"));
+  workspaces.map((workspace) => {
+    const pkg = JSON.parse(readFileSync(`${workspace}/package.json`, "utf8"));
     return [pkg.name, pkg.version];
   }),
 );
-for (const channel of channels) {
-  const workspace = `packages/channels/${channel}`;
+for (const workspace of workspaces) {
   execFileSync("npm", ["run", "build", "--workspace", workspace], { stdio: "inherit" });
   const path = `${workspace}/package.json`;
   const pkg = JSON.parse(readFileSync(path, "utf8"));
