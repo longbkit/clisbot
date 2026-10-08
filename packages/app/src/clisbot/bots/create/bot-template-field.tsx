@@ -134,7 +134,7 @@ function TemplateOption({
 }
 
 // A template card steps up as a segment of `<SegmentedControl variant="track">` does: the track
-// fill at rest, lighter on hover, and the raised card of a selected sidebar row with a
+// fill at rest, lighter on hover, and the softly raised selected surface with a
 // medium-weight name when chosen (docs/design.md, sizes).
 const styles = StyleSheet.create((theme) => ({
   stack: { gap: theme.spacing[2] },
@@ -151,7 +151,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surfaceSegmentedTrack,
   },
   hovered: { backgroundColor: theme.colors.surfaceSegmentedHover },
-  selected: { backgroundColor: theme.colors.surfaceSegmentedSelected, ...theme.shadow.raised },
+  selected: { backgroundColor: theme.colors.surfaceSegmentedSelected, ...theme.shadow.segmented },
   faded: { opacity: theme.opacity[50] },
   title: {
     color: theme.colors.foregroundMuted,

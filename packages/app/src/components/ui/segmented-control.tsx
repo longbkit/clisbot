@@ -24,9 +24,9 @@ export interface SegmentedControlOption<T extends string> {
 
 /**
  * `plain` — segments on whatever is behind them, the selected one filled `surface3`.
- * `track` — the segments sit in one bordered rail and the selected one is the raised card a
- * selected sidebar row is (`surfaceSidebarSelected` + `shadow.raised`). For a switcher that has to
- * read as one control among rows of similar text, such as the sidebar's grouping tabs.
+ * `track` — the segments sit in one quiet rail, with `surfaceSegmentedSelected` and the softer
+ * `shadow.segmented` on the selected choice. For a switcher that has to read as one control
+ * among rows of similar text, such as the sidebar's grouping tabs.
  */
 export type SegmentedControlVariant = "plain" | "track";
 
@@ -274,7 +274,7 @@ const styles = StyleSheet.create((theme) => {
     },
     segmentRaised: {
       backgroundColor: theme.colors.surfaceSegmentedSelected,
-      ...theme.shadow.raised,
+      ...theme.shadow.segmented,
     },
     segmentHover: {
       backgroundColor: theme.colors.surface2,

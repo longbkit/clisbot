@@ -292,9 +292,9 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceSettings: tint.surfaceSettings ?? tint.surface0,
     borderComposer: tint.border,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
-    // A tracked segmented control steps up from its rail: hover is lighter, the selected segment
-    // is the white raised card a selected sidebar row is (docs/design.md).
-    surfaceSegmentedTrack: "rgba(0, 0, 0, 0.06)",
+    // A quiet rail groups the choices; white selection and a softer segmented shadow
+    // keep the control distinct without the weight of a selected sidebar row.
+    surfaceSegmentedTrack: "rgba(0, 0, 0, 0.025)",
     surfaceSegmentedHover: tint.surfaceSidebarHover ?? tint.surface1,
     surfaceSegmentedSelected: tint.surface0,
 
@@ -728,6 +728,12 @@ const commonTheme: CommonTheme = {
 
 const darkShadow = {
   // Dark surfaces separate by lightness; a shadow does not read on them.
+  segmented: {
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
+    elevation: 0,
+  },
   raised: {
     shadowColor: "transparent",
     shadowOffset: { width: 0, height: 0 },
@@ -814,6 +820,13 @@ const pureBlackDarkColors = buildDarkSemanticColors({
 export const darkPureBlackTheme = buildDarkTheme(pureBlackDarkColors);
 
 const lightShadow = {
+  // A selected segment needs less lift than a selected sidebar row.
+  segmented: {
+    shadowColor: "rgba(0, 0, 0, 0.04)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
+  },
   // A white card sitting on the gray sidebar: the selected row.
   raised: {
     shadowColor: "rgba(0, 0, 0, 0.08)",
