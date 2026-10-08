@@ -32,7 +32,7 @@
 // /tmp/openclaw-scout).
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -41,6 +41,7 @@ import { loadChannelPins } from "../install/pins.js";
 import { createHostRuntime, recordingInboundHandler } from "./host.js";
 import { loadChannelVertical, type LoadedChannelVertical } from "./load-channel.js";
 import { clearAllChannelRuntimes, getChannelRuntime } from "./runtime-store.js";
+import { resolveInRepoPackageDir } from "../install/in-repo-packages.js";
 
 const SCOUT = process.env["OPENCLAW_SCOUT"] ?? "/tmp/openclaw-scout";
 const PINS_PATH = fileURLToPath(new URL("../../../channel-pins.json", import.meta.url));
@@ -50,11 +51,8 @@ const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url));
 const MAIN_DIR = join(SCOUT, "main", "package");
 const SLACK_DIR = join(SCOUT, "slack", "package");
 
-/** The in-repo workspace package dir (the workspace symlink's REALPATH — the
- * same resolution the installer's `resolveInRepoPackageDir` lands on). */
-function inRepoPackageDir(packageName: string): string {
-  return realpathSync(join(REPO_ROOT, "node_modules", packageName));
-}
+/** The in-repo package dir, resolved the way the installer resolves it. */
+const inRepoPackageDir = resolveInRepoPackageDir;
 
 const SLACK_IN_REPO = inRepoPackageDir("@clisbot/channels-slack");
 const TELEGRAM_IN_REPO = inRepoPackageDir("@clisbot/channels-telegram");

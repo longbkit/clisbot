@@ -22,11 +22,11 @@ import type { ResolveConversationFn } from "@clisbot/channels-shared";
 // import keep resolving to this channel's main dir (§4.8 D5); `dispose()` forgets
 // it.
 
-import { existsSync, realpathSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runtimeFile } from "../../runtime-files.js";
+import { channelNodeModulesDir, resolveInRepoPackageDir } from "../install/in-repo-packages.js";
 import { assertChannelsEnabled } from "./channel-gate.js";
 import type { HostRuntime } from "./host.js";
 import {
@@ -118,69 +118,55 @@ export class LoadTraceError extends ChannelLoaderError {
   }
 }
 
-/** Allowlist roots for a channel's load-trace: its own package install dir (dist
- * + bundled node_modules), for published channels the pinned main package dir
- * (the allowlisted pure subpaths resolve into it), and the in-repo host module
- * dir (the bound seam's own code — Hub-owned, not channel supply). For a bundled
- * channel the two install dirs are the same. The synthetic seam URL sits under
- * the channel dir, so it is admitted by the channel-root check.
+/** What a channel's load-trace admits. `packageRoots` are admitted whole: its own
+ * package install dir (dist + bundled node_modules), for published channels the
+ * pinned main package dir (the allowlisted pure subpaths resolve into it), the
+ * in-repo host module dir (the bound seam's own code — Hub-owned, not channel
+ * supply) and, for an `in-repo` channel (blueprint §6.5), the contract packages.
+ * For a bundled channel the two install dirs are the same. The synthetic seam URL
+ * sits under the channel dir, so it is admitted by the channel-root check.
  *
- * An `in-repo` channel (blueprint §6.5) adds three explicit roots: its own
- * workspace package dir (already the channel root above), the shared in-repo
- * contract package (`@clisbot/channels-shared`, workspace-linked — its module
- * URLs are the symlink's REALPATH, which resolves OUTSIDE the channel install
- * dir), and the hoisted npm deps under the repo's root node_modules (the
- * vertical's pinned third-party deps — grammy, @slack/* — hoist to the root). */
-function allowlistRoots(options: LoadChannelVerticalOptions): string[] {
+ * `dependencyRoots` hold an `in-repo` vertical's hoisted third-party deps
+ * (grammy, @slack/*). In a packaged Hub that is the node_modules every Clisbot
+ * package is installed into, so its `@clisbot/*` scope is admitted only through
+ * `packageRoots`: a vertical may not reach the Hub, the daemon or a sibling. */
+export interface LoadTraceAllowlist {
+  packageRoots: string[];
+  dependencyRoots: string[];
+}
+
+function loadTraceAllowlist(options: LoadChannelVerticalOptions): LoadTraceAllowlist {
   const channel = pathToFileURL(options.channelInstallDir).toString();
-  const roots = [channel, pathToFileURL(options.hostBaseDir ?? defaultHostBaseDir()).toString()];
+  const packageRoots = [
+    channel,
+    pathToFileURL(options.hostBaseDir ?? defaultHostBaseDir()).toString(),
+  ];
   if (options.loadMode === "published") {
     const main = pathToFileURL(options.mainInstallDir).toString();
-    if (main !== channel) roots.push(main);
+    if (main !== channel) packageRoots.push(main);
   }
-  if (options.loadMode === "in-repo") {
-    for (const root of inRepoDependencyRoots()) {
-      const url = pathToFileURL(root).toString();
-      if (!roots.includes(url)) roots.push(url);
-    }
+  if (options.loadMode !== "in-repo") return { packageRoots, dependencyRoots: [] };
+  for (const name of IN_REPO_CONTRACT_PACKAGES) {
+    const url = pathToFileURL(resolveInRepoPackageDir(name)).toString();
+    if (!packageRoots.includes(url)) packageRoots.push(url);
   }
-  return roots;
+  // A missing contract package throws above: the vertical cannot be admitted to an
+  // unknown supply tree (fail closed at load, like every other load-trace miss).
+  const dependencyRoot = channelNodeModulesDir(IN_REPO_CONTRACT_PACKAGES[0]);
+  return { packageRoots, dependencyRoots: [pathToFileURL(dependencyRoot).toString()] };
 }
 
 /** The workspace packages every in-repo vertical is allowed to import: the drive
  * contract (`shared`), the ported OpenClaw core the verticals compile against
- * (`core`) and its markdown tree (`markdown-core`). They are workspace-linked, so
- * their module URLs are the symlink's REALPATH — outside both the channel install
- * dir and the repo's root `node_modules`. This list is closed on purpose: a
+ * (`core`) and its markdown tree (`markdown-core`). In the repo they are
+ * workspace-linked, so their module URLs are the symlink's REALPATH, outside the
+ * node_modules that holds the hoisted deps. This list is closed on purpose: a
  * vertical may not reach a sibling channel's package. */
 const IN_REPO_CONTRACT_PACKAGES = [
   "@clisbot/channels-shared",
   "@clisbot/channels-core",
   "@clisbot/channels-markdown-core",
 ] as const;
-
-/** The in-repo dependency roots:
- * (a) each in-repo contract package's dir — `require.resolve` from this hub file
- * resolves the workspace link; `realpathSync` normalizes it to the real package
- * dir, where those modules' URLs actually land;
- * (b) the repo's root `node_modules` — the hoisted npm deps (grammy, @slack/*,
- * discord-api-types, ws) live there, OUTSIDE the channel package dir.
- * Both are derived from this file's own location: this file sits at
- * `<root>/packages/hub/{src,dist}/channels/loader/`, so six `dirname` calls
- * on its URL path land on the repo root — the layout math holds in source/dev
- * runs (tsx, vitest) and in the compiled `dist/` run alike. A missing contract
- * package throws — the vertical cannot be admitted to an unknown supply tree
- * (fail closed at load, like every other load-trace miss). */
-function inRepoDependencyRoots(): string[] {
-  const require = createRequire(import.meta.url);
-  const packageDirs = IN_REPO_CONTRACT_PACKAGES.map((name) =>
-    realpathSync(dirname(require.resolve(`${name}/package.json`))),
-  );
-  const repoRoot = dirname(
-    dirname(dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))))),
-  );
-  return [...packageDirs, join(repoRoot, "node_modules")];
-}
 
 /** Node builtins are trusted stdlib, not third-party supply: a channel may import
  * `buffer`, `crypto`, `node:fs/promises`, `net`, … freely. They resolve to
@@ -189,17 +175,21 @@ function isBuiltinUrl(url: string): boolean {
   return url === "node:" || url.startsWith("node:");
 }
 
-function isAdmitted(url: string, roots: string[]): boolean {
+function isUnder(url: string, root: string): boolean {
+  return url === root || url.startsWith(`${root}/`);
+}
+
+export function isAdmitted(url: string, allowlist: LoadTraceAllowlist): boolean {
   if (isBuiltinUrl(url)) return true;
-  for (const root of roots) {
-    if (url === root || url.startsWith(`${root}/`)) return true;
-  }
-  return false;
+  if (allowlist.packageRoots.some((root) => isUnder(url, root))) return true;
+  return allowlist.dependencyRoots.some(
+    (root) => isUnder(url, root) && !isUnder(url, `${root}/@clisbot`),
+  );
 }
 
 function assertLoadTrace(loaded: Set<string>, options: LoadChannelVerticalOptions): string[] {
-  const roots = allowlistRoots(options);
-  const unexpected = [...loaded].filter((url) => !isAdmitted(url, roots));
+  const allowlist = loadTraceAllowlist(options);
+  const unexpected = [...loaded].filter((url) => !isAdmitted(url, allowlist));
   if (unexpected.length > 0) {
     throw new LoadTraceError(
       `load-trace miss for channel ${options.channel}: loaded ${unexpected.length} module(s) outside its allowlist (own dist + main pkg): ${unexpected.join(", ")}`,

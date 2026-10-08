@@ -1,12 +1,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { listPackage } = require("@electron/asar");
+const { extractFile, listPackage } = require("@electron/asar");
 
 /** Check actual package contents on every build target before shipping an app. */
 function verifyPersonalBackends(resourcesDirectory) {
-  const entries = new Set(
-    listPackage(path.join(resourcesDirectory, "app.asar")).map((entry) => entry.replace(/^\//, "")),
-  );
+  const archive = path.join(resourcesDirectory, "app.asar");
+  const entries = new Set(listPackage(archive).map((entry) => entry.replace(/^\//, "")));
   const required = [
     "node_modules/@clisbot/hub/bin/clisbot-hub.js",
     "node_modules/@clisbot/hub/dist/index.js",
@@ -18,6 +17,7 @@ function verifyPersonalBackends(resourcesDirectory) {
     "node_modules/@clisbot/cli/dist/commands/serve/service-supervisor-entry.js",
     "node_modules/@clisbot/device-access/dist/authority.js",
     "node_modules/@clisbot/device-access/dist/proof.js",
+    ...inRepoChannelFiles(archive),
   ];
   const missing = required.filter((entry) => !entries.has(entry));
   if (!fs.existsSync(path.join(resourcesDirectory, "app-dist", "index.html")))
@@ -36,6 +36,27 @@ function verifyPersonalBackends(resourcesDirectory) {
     missing.push("app.asar.unpacked/dist/daemon/node-entrypoint-runner.js");
   if (missing.length)
     throw new Error(`Desktop is missing personal serving assets: ${missing.join(", ")}`);
+}
+
+/**
+ * Every channel the shipped Hub loads from its own packages, read from the shipped
+ * `channel-pins.json`: a channel missing here fails only when a user connects it.
+ */
+function inRepoChannelFiles(archive) {
+  const pinsPath = "node_modules/@clisbot/hub/channel-pins.json";
+  let pins;
+  try {
+    pins = JSON.parse(extractFile(archive, pinsPath).toString("utf8"));
+  } catch {
+    return [pinsPath];
+  }
+  return Object.values(pins.channels)
+    .filter((pin) => pin.loadMode === "in-repo")
+    .flatMap((pin) =>
+      [pin.entry, pin.plugin.specifier].map((file) =>
+        path.posix.join("node_modules", pin.inRepoPackage, file),
+      ),
+    );
 }
 
 module.exports = { verifyPersonalBackends };

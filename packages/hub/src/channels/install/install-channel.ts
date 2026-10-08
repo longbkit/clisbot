@@ -5,14 +5,13 @@
 // CLISBOT_HOME. Integrity is verified before extraction. In-repo channels keep
 // loading their workspace package directly and write no installation metadata.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { sha512Integrity } from "./integrity.js";
 import type { ChannelPinEntry, ChannelPins, LoadMode, MainPin } from "./pins.js";
 import { fetchTarball, resolveTarballUrl } from "./registry.js";
 import { extractNpmTarball } from "./tarball.js";
+import { resolveInRepoPackageDir } from "./in-repo-packages.js";
 import { assertNoticesPresent } from "./notices.js";
 import { isProvisioned, provisionMainDependencies } from "./provision-main.js";
 
@@ -258,36 +257,6 @@ function writeManagedProject(root: string, sources: readonly TarballSource[]): v
   writeFileSync(join(root, "package-lock.json"), `${JSON.stringify(lock, null, 2)}\n`, {
     mode: 0o600,
   });
-}
-
-/**
- * Resolve the in-repo channel's workspace package dir from the Hub's own
- * node_modules (blueprint §6.5: the vertical is workspace-linked into the root
- * node_modules, so `createRequire` from this hub file resolves the symlink;
- * `realpath` follows it to the package dir). Falls back to the repo's
- * `node_modules/<pkg>` when the require resolution misses (a hub installed
- * without its workspace links).
- */
-function resolveInRepoPackageDir(packageName: string): string {
-  const require = createRequire(import.meta.url);
-  try {
-    // `dirname` of the resolved `<pkg>/package.json` IS the package dir;
-    // `realpath` follows the workspace symlink out of node_modules.
-    return realpathSync(dirname(require.resolve(`${packageName}/package.json`)));
-  } catch {
-    return realpathSync(
-      join(
-        dirname(fileURLToPath(import.meta.url)),
-        "..",
-        "..",
-        "..",
-        "..",
-        "..",
-        "node_modules",
-        packageName,
-      ),
-    );
-  }
 }
 
 /**

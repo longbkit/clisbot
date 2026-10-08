@@ -36,6 +36,19 @@ directory and do not create `install-<channel>.lock` files. A missing built
 entry fails closed; the workspace package manifest and the repository lockfile
 remain the source of truth.
 
+Every in-repo vertical and contract package is a `dependencies` entry of
+`@clisbot/hub`. Packaged Hubs (npm, Docker, the desktop's `app.asar`) install
+only `dependencies`, so a vertical left in `devDependencies` works in the repo
+and is missing from the release; that shipped twice. The loader finds packages
+with `require.resolve` from the Hub (`channels/install/in-repo-packages.ts`),
+never from its own file location, because the compiled and bundled Hub sit at
+different depths. Three checks hold this: `in-repo-packages.test.ts` compares the pins with the
+Hub's `dependencies`; the desktop `afterPack` refuses an `app.asar` without each
+pinned entry and plugin; and `clisbot-hub-smoke.mjs` loads every in-repo channel
+through the real loader, in the Docker image and, from the desktop's `afterSign`
+on a macOS build for the host's architecture, inside `app.asar`.
+`docker/pack-channels.mjs` reads the pins, so it needs no edit.
+
 Published or bundled supply (when enabled for a channel) is installed once per
 Hub under the managed project rooted at `CLISBOT_HOME/plugins/channels/`:
 
@@ -242,7 +255,7 @@ Ordered, and each step names the file. Derived from how Zalo and Feishu were wir
 **In the Hub:**
 
 6. `packages/hub/src/channels/catalog.ts` — the entry, and its name in `SUPPORTED_CHANNEL_NAMES`. Claim a capability only when a test on the production path proves it.
-7. `packages/hub/channel-pins.json` — `loadMode: "in-repo"`, `inRepoPackage`, `entry`, `plugin.{specifier,exportName}`.
+7. `packages/hub/channel-pins.json` — `loadMode: "in-repo"`, `inRepoPackage`, `entry`, `plugin.{specifier,exportName}`; and the package in `packages/hub/package.json` `dependencies` (not `devDependencies`), then refresh the lockfile.
 8. `channels/loader/vertical-contract.native.ts:67` — add to `LATER_IN_REPO_CHANNELS`.
 9. `channels/config/compile-support.ts` — a transport schema, the one drivable mode, and the account's drive-path config keys.
 10. `channels/config/schema.ts` — only if the account needs new authored leaves.

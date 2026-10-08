@@ -29,7 +29,6 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
-  realpathSync,
   rmSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -47,6 +46,7 @@ import type { Database } from "../../db/types.js";
 import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../../test-utils/project-configuration.js";
 import { createChannelSupervisor } from "./index.js";
 import type { ChannelSupervisor, ChannelSupervisorOptions } from "./types.js";
+import { resolveInRepoPackageDir } from "../install/in-repo-packages.js";
 
 // --- Fixed dev state (e2e-dev.sh): never ~/.clisbot, never .dev/clisbot-home -----
 
@@ -61,13 +61,8 @@ const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url));
 const HUB_DIST_LOADER = join(REPO_ROOT, "packages", "hub", "dist", "channels", "loader");
 const PINS_PATH = join(REPO_ROOT, "packages", "hub", "channel-pins.json");
 
-/** The in-repo workspace package dirs (blueprint §6.5): the workspace
- * symlinks under the repo root node_modules, real-pathed to the package
- * dirs — the same resolution the installer's `resolveInRepoPackageDir`
- * lands on. */
-function inRepoPackageDir(packageName: string): string {
-  return realpathSync(join(REPO_ROOT, "node_modules", packageName));
-}
+/** The in-repo package dir, resolved the way the installer resolves it. */
+const inRepoPackageDir = resolveInRepoPackageDir;
 const SLACK_IN_REPO = inRepoPackageDir("@clisbot/channels-slack");
 const TELEGRAM_IN_REPO = inRepoPackageDir("@clisbot/channels-telegram");
 const DISCORD_IN_REPO = inRepoPackageDir("@clisbot/channels-discord");

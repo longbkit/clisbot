@@ -3,18 +3,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 // Run only in the disposable Docker build context. Pack compiled private
 // workspaces locally so the image never fetches their names from npm.
-const channels = [
-  "markdown-core",
-  "core",
-  "shared",
-  "discord",
-  "feishu",
-  "googlechat",
-  "slack",
-  "telegram",
-  "zalo",
-  "zalouser",
-];
+// The contract packages build first; the verticals are the Hub's in-repo channel pins, so a
+// channel added there is packed here without a second list to keep in step.
+const contractPackages = ["markdown-core", "core", "shared"];
+const pins = JSON.parse(readFileSync("packages/hub/channel-pins.json", "utf8"));
+const verticals = Object.values(pins.channels)
+  .filter((pin) => pin.loadMode === "in-repo")
+  .map((pin) => pin.inRepoPackage.replace(/^@clisbot\/channels-/u, ""));
+const channels = [...contractPackages, ...verticals];
 const versions = new Map(
   channels.map((channel) => {
     const pkg = JSON.parse(readFileSync(`packages/channels/${channel}/package.json`, "utf8"));
