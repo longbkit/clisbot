@@ -1,105 +1,89 @@
-import { router } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useCallback } from "react";
-import { Pressable, Text, type PressableStateCallbackType } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useIsCompactFormFactor } from "@/constants/layout";
-import { usePanelStore } from "@/stores/panel-store";
+import { buildSettingsSectionRoute } from "@/utils/host-routes";
 import { useHubAccount } from "./account-provider";
 import { buildHubSettingsRoute } from "./navigation";
 import {
   resolveHubSidebarAccountPresentation,
   type HubSidebarAccountPresentation,
 } from "./sidebar-account-presentation";
+import { SidebarTopRow } from "./sidebar-top-row";
 
-function triggerStyle({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) {
-  return [styles.trigger, Boolean(hovered || pressed) && styles.triggerHovered];
-}
-
-export function HubSidebarAccountButton() {
+/**
+ * The sidebar's top row on a managed Hub: one button with the Clisbot mark and, once signed in,
+ * the account avatar. It opens the Hub account page, which is also where signing in starts.
+ * Without Hub support the row opens About.
+ */
+export function HubSidebarTopRow({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
+  const router = useRouter();
+  const pathname = usePathname();
   const presentation = resolveHubSidebarAccountPresentation({
     enabled: hub.enabled,
     account: hub.signedIn?.account ?? null,
     ...(hub.signedIn ? { organizationName: hub.signedIn.organization.name } : {}),
   });
-  if (!hub.enabled) return null;
-
-  return <SignedInHubSidebarAccountButton presentation={presentation ?? signedOutPresentation} />;
-}
-
-function SignedInHubSidebarAccountButton({
-  presentation,
-}: {
-  presentation: HubSidebarAccountPresentation;
-}) {
-  const isCompact = useIsCompactFormFactor();
-  const closeMobileSidebar = usePanelStore((state) => state.showMobileAgent);
-  const handlePress = useCallback(() => {
-    if (isCompact) closeMobileSidebar();
-    router.push(buildHubSettingsRoute("account"));
-  }, [closeMobileSidebar, isCompact]);
-
-  const accountTriggerStyle = useCallback(
-    (state: PressableStateCallbackType & { hovered?: boolean }) => [
-      triggerStyle(state),
-      !presentation.initials && styles.signInTrigger,
-    ],
-    [presentation.initials],
+  const route = hub.enabled ? buildHubSettingsRoute("account") : buildSettingsSectionRoute("about");
+  const open = useCallback(() => {
+    onBeforeNavigate?.();
+    router.push(route);
+  }, [onBeforeNavigate, route, router]);
+  const accessibilityLabel =
+    presentation?.accessibilityLabel ??
+    (hub.enabled
+      ? t("hub.account.sidebar.signInToAccount")
+      : `Clisbot · ${t("settings.sections.about")}`);
+  const row = (
+    <SidebarTopRow
+      label="Clisbot"
+      isActive={pathname === route}
+      onPress={open}
+      accessibilityLabel={accessibilityLabel}
+      testID="sidebar-hub-account"
+    >
+      <AccountMark presentation={presentation} hubEnabled={hub.enabled} />
+    </SidebarTopRow>
   );
+  if (presentation === null) return row;
   return (
     <Tooltip delayDuration={300}>
-      <TooltipTrigger asChild>
-        <Pressable
-          accessibilityLabel={presentation.accessibilityLabel}
-          accessibilityRole="button"
-          nativeID="sidebar-hub-account"
-          onPress={handlePress}
-          style={accountTriggerStyle}
-          testID="sidebar-hub-account"
-        >
-          {presentation.initials ? (
-            <Text
-              numberOfLines={1}
-              style={[styles.avatar, { backgroundColor: presentation.color }]}
-            >
-              {presentation.initials}
-            </Text>
-          ) : (
-            <Text style={styles.signInLabel}>Sign in</Text>
-          )}
-        </Pressable>
-      </TooltipTrigger>
-      <TooltipContent side="top" align="center" offset={8}>
+      <TooltipTrigger asChild>{row}</TooltipTrigger>
+      <TooltipContent side="bottom" align="end" offset={8}>
         <Text style={styles.tooltipText}>{presentation.tooltip}</Text>
       </TooltipContent>
     </Tooltip>
   );
 }
 
+function AccountMark({
+  presentation,
+  hubEnabled,
+}: {
+  presentation: HubSidebarAccountPresentation | null;
+  hubEnabled: boolean;
+}) {
+  const { t } = useTranslation();
+  if (presentation !== null) {
+    return (
+      <Text numberOfLines={1} style={[styles.avatar, { backgroundColor: presentation.color }]}>
+        {presentation.initials}
+      </Text>
+    );
+  }
+  if (!hubEnabled) return null;
+  return <Text style={styles.signInLabel}>{t("hub.account.sidebar.signIn")}</Text>;
+}
+
 const styles = StyleSheet.create((theme) => ({
-  trigger: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: theme.borderRadius.full,
-  },
-  signInTrigger: {
-    flex: 1,
-    width: "auto",
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    paddingHorizontal: theme.spacing[1],
-    borderRadius: theme.borderRadius.md,
-  },
   signInLabel: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
-  },
-  triggerHovered: {
-    backgroundColor: theme.colors.surfaceSidebarHover,
   },
   avatar: {
     width: 22,
@@ -110,16 +94,10 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     lineHeight: 22,
     textAlign: "center",
+    overflow: "hidden",
   },
   tooltipText: {
     color: theme.colors.popoverForeground,
     fontSize: theme.fontSize.base,
   },
 }));
-
-const signedOutPresentation = {
-  accessibilityLabel: "Sign in to your account",
-  color: "transparent",
-  initials: "",
-  tooltip: "Sign in to your account",
-};

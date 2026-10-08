@@ -1,5 +1,6 @@
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
 import { nameInitials } from "@/utils/name-initials";
+import { i18n } from "@/i18n/i18next";
 
 export interface HubSidebarAccountPresentation {
   accessibilityLabel: string;
@@ -19,13 +20,13 @@ export function resolveHubSidebarAccountPresentation(input: {
   const name = account.name.trim();
   const email = account.email.trim();
   const initials = nameInitials(name, email.at(0));
-  const accountLabel = name || email || "Hub account";
+  const accountLabel = name || email || i18n.t("hub.account.sidebar.hubAccount");
   const tooltip = input.organizationName
     ? `${accountLabel} · ${input.organizationName}`
     : accountLabel;
 
   return {
-    accessibilityLabel: `Hub account: ${tooltip}`,
+    accessibilityLabel: i18n.t("hub.account.sidebar.accountLabel", { label: tooltip }),
     color: identityColor(deriveIdentityColorName(account.id || email || name)),
     initials,
     tooltip,

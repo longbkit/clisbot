@@ -1,27 +1,18 @@
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useCallback } from "react";
 import { usePathname, useRouter } from "expo-router";
-import { useTranslation } from "react-i18next";
 import type { StyleProp, ViewStyle } from "react-native";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { ClisbotBrand } from "@/components/clisbot-brand";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { buildSettingsSectionRoute } from "@/utils/host-routes";
 import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
-import { HubSidebarAccountButton } from "./sidebar-account";
-import { OrganizationSidebarItem } from "./organization-sidebar-item";
+import { HubSidebarTopRow } from "./sidebar-account";
 import { useHubAccount } from "./account-provider";
 import { PersonalHubSwitcher } from "./personal-hub-switcher";
 
 const PERSONAL_HUB_ROUTE = "/settings/hub/overview";
 
-function brandButtonStyle({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) {
-  return [styles.brandButton, (hovered || pressed) && styles.brandButtonHovered];
-}
-
-/** Branding, account and organization share the top area; navigation follows below. */
+/** One top row (Clisbot mark, account avatar) opens the account; navigation follows below. */
 export function SidebarNavGroup({
   style,
   onBeforeNavigate,
@@ -30,57 +21,24 @@ export function SidebarNavGroup({
   onBeforeNavigate?: () => void;
 }) {
   const compact = useIsCompactFormFactor();
-  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const hub = useHubAccount();
-  const openAbout = useCallback(() => {
-    onBeforeNavigate?.();
-    router.push(buildSettingsSectionRoute("about"));
-  }, [onBeforeNavigate, router]);
   const openPersonalHub = useCallback(() => {
     onBeforeNavigate?.();
     router.push(PERSONAL_HUB_ROUTE);
   }, [onBeforeNavigate, router]);
   const personal = hub.enabled && hub.connection?.accountAuthentication === "personal";
-  const brandLabel = `Clisbot · ${t("settings.sections.about")}`;
   return (
     <View style={style}>
-      <View style={[styles.accountRow, compact && styles.accountRowCompact]}>
+      <View style={[styles.topRow, compact && styles.topRowCompact]}>
         {personal ? (
           <PersonalHubSwitcher
             isActive={pathname === PERSONAL_HUB_ROUTE}
             onPress={openPersonalHub}
           />
         ) : (
-          <>
-            <Tooltip delayDuration={300}>
-              <TooltipTrigger asChild>
-                <Pressable
-                  onPress={openAbout}
-                  accessibilityRole="button"
-                  accessibilityLabel={brandLabel}
-                  testID="sidebar-clisbot-brand"
-                  style={brandButtonStyle}
-                >
-                  <ClisbotBrand iconOnly />
-                </Pressable>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" offset={8}>
-                <Text style={styles.tooltipText}>{brandLabel}</Text>
-              </TooltipContent>
-            </Tooltip>
-            {hub.enabled && (
-              <>
-                {hub.signedIn && (
-                  <View style={styles.organization}>
-                    <OrganizationSidebarItem onBeforeNavigate={onBeforeNavigate} />
-                  </View>
-                )}
-                <HubSidebarAccountButton />
-              </>
-            )}
-          </>
+          <HubSidebarTopRow onBeforeNavigate={onBeforeNavigate} />
         )}
       </View>
       <SidebarNavRows onBeforeNavigate={onBeforeNavigate} />
@@ -89,25 +47,10 @@ export function SidebarNavGroup({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  accountRow: {
+  topRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[1],
     paddingHorizontal: theme.spacing[2],
   },
-  accountRowCompact: { paddingRight: MIN_TOUCH_TARGET_SIZE + theme.spacing[1] },
-  organization: { flex: 1, minWidth: 0 },
-  brandButton: {
-    width: MIN_TOUCH_TARGET_SIZE,
-    height: MIN_TOUCH_TARGET_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    borderRadius: theme.borderRadius.xl,
-  },
-  brandButtonHovered: { backgroundColor: theme.colors.surfaceSidebarHover },
-  tooltipText: {
-    color: theme.colors.popoverForeground,
-    fontSize: theme.fontSize.base,
-  },
+  topRowCompact: { paddingRight: MIN_TOUCH_TARGET_SIZE + theme.spacing[1] },
 }));
