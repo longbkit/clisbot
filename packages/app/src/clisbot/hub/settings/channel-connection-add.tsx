@@ -8,6 +8,7 @@ import { channelApiProblem } from "../channel-api";
 import {
   channelConnectionProblem,
   connectableChannelEntries,
+  connectionNamesFor,
   type ChannelConnectionProblem,
 } from "../channel-connection-form";
 import type { ChannelCatalogEntry, ChannelCatalogState } from "../channel-catalog";
@@ -27,12 +28,15 @@ import { ChannelConnectionSetup } from "./channel-connection-setup";
  */
 export function AddChannelConnection({
   allowProviderApplications,
+  connections,
   disabled = false,
   create,
   onCancel,
 }: {
   /** Slack Socket Mode is created from a Provider Application; operators only. */
   allowProviderApplications: boolean;
+  /** The Hub's Connections, so a new one is named past the names they use. */
+  connections: readonly { provider: string; name: string }[];
   disabled?: boolean;
   create(body: Record<string, unknown>): Promise<void>;
   onCancel?: (() => void) | undefined;
@@ -55,6 +59,7 @@ export function AddChannelConnection({
       <ChannelConnectionSetup
         key={selected.id}
         entry={selected}
+        takenNames={connectionNamesFor(selected.id, connections)}
         save={save}
         {...(onCancel === undefined || disabled ? {} : { onCancel })}
       />

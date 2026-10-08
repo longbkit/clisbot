@@ -15,6 +15,8 @@ import {
 
 export interface ChannelCatalogQueries {
   rows: ChannelCatalogRow[];
+  /** The Hub's Connections, so a new one is named past the names they use. */
+  connections: readonly { provider: string; name: string }[];
   catalog: ChannelCatalogState;
   refresh(): void;
   fetching: boolean;
@@ -23,6 +25,7 @@ export interface ChannelCatalogQueries {
 }
 
 const CATALOG_RESOURCE = "channel-catalog";
+const NO_CONNECTIONS: readonly { provider: string; name: string }[] = [];
 
 /**
  * The Hub's catalog, on its own. Every channel surface reads it through this
@@ -124,6 +127,7 @@ export function useChannelCatalogQueries(): ChannelCatalogQueries {
   }, [catalogRefresh, channels, connections, runtime]);
   return {
     rows,
+    connections: connections.data?.connections ?? NO_CONNECTIONS,
     catalog,
     refresh,
     fetching: fetchingAny([channels, connections, runtime]),

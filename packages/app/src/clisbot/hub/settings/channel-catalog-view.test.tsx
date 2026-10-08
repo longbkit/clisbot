@@ -23,6 +23,7 @@ vi.mock("./channel-catalog-queries", () => ({
         entry: { id: "whatsapp", auth: "qr" },
       },
     ],
+    connections: [],
     catalog: { availability: "available", message: null },
     refresh: vi.fn(),
     fetching: false,

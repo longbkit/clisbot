@@ -3,6 +3,8 @@ import { catalogFixtureEntry } from "./channel-catalog.fixture";
 import {
   channelConnectionProblem,
   connectableChannelEntries,
+  connectionNamesFor,
+  defaultConnectionName,
   openChannelConnectionForm,
 } from "./channel-connection-form";
 import { CHANNEL_CATALOG_FIXTURE } from "./channel-catalog.fixture";
@@ -18,10 +20,10 @@ function fieldKeys(channel: string): string[] {
 }
 
 describe("field shape per channel", () => {
-  it("asks a token channel for one secret and an account name", () => {
+  it("asks a token channel for one secret and a Connection name", () => {
     const model = openForm("telegram");
     expect(fieldKeys("telegram")).toEqual(["botToken"]);
-    expect(model.getState().accountId).toBe("");
+    expect(model.getState().accountId).toBe("telegram");
     expect(model.getState().fields[0]).toMatchObject({
       label: "Bot token",
       kind: "secret",
@@ -58,6 +60,44 @@ describe("field shape per channel", () => {
     const model = openForm("slack");
     expect(model.getState().accountId).toBeNull();
     expect(fieldKeys("slack")).toEqual(["appToken", "botToken"]);
+  });
+});
+
+describe("suggested Connection name", () => {
+  it("is the channel's id, numbered past the names its Connections use", () => {
+    expect(defaultConnectionName("telegram", [])).toBe("telegram");
+    expect(defaultConnectionName("telegram", ["telegram", "telegram-2"])).toBe("telegram-3");
+  });
+
+  it("moves past a name the list brings in later, until the person edits it", () => {
+    const model = openChannelConnectionForm(catalogFixtureEntry("telegram"));
+    expect(model.getState().accountId).toBe("telegram");
+    model.setTakenNames(["telegram"]);
+    expect(model.getState()).toMatchObject({
+      accountId: "telegram-2",
+      accountIdSuggestion: "telegram-2",
+    });
+    model.setAccountId("support");
+    model.setTakenNames(["telegram", "telegram-2"]);
+    expect(model.getState().accountId).toBe("support");
+  });
+
+  it("refuses a taken name, which would replace that Connection's token", () => {
+    const model = openChannelConnectionForm(catalogFixtureEntry("telegram"), ["support"]);
+    model.setField("botToken", "123:ABC");
+    model.setAccountId("support");
+    expect(model.getState().accountIdError).toBe(
+      "Another Telegram Connection already uses this name.",
+    );
+    expect(model.requestBody()).toBeNull();
+  });
+
+  it("counts only the same channel's Connections", () => {
+    const connections = [
+      { provider: "telegram", name: "telegram" },
+      { provider: "discord", name: "discord" },
+    ];
+    expect(connectionNamesFor("telegram", connections)).toEqual(["telegram"]);
   });
 });
 
@@ -112,10 +152,10 @@ describe("validation", () => {
     );
   });
 
-  it("requires an account name of at most 128 characters", () => {
+  it("requires a Connection name of at most 128 characters", () => {
     const model = openForm("telegram");
     model.setAccountId("   ");
-    expect(model.getState().accountIdError).toBe("Enter an account name.");
+    expect(model.getState().accountIdError).toBe("Enter a Connection name.");
     model.setAccountId("a".repeat(129));
     expect(model.getState().accountIdError).toBe("Use 128 characters or fewer.");
   });
@@ -125,6 +165,7 @@ describe("submission", () => {
   it("adds a Zalo Personal Connection by name alone: the QR scan comes later", () => {
     const model = openForm("zalouser");
     expect(model.getState()).toMatchObject({ setup: "qr", fields: [] });
+    model.setAccountId("");
     expect(model.requestBody()).toBeNull();
     model.setAccountId("main");
     expect(model.requestBody()).toEqual({
@@ -134,28 +175,29 @@ describe("submission", () => {
     });
   });
 
-  it("adds a WhatsApp Connection by name, with an optional account label", () => {
+  it("adds a WhatsApp Connection by its name alone, which the Hub also uses as its label", () => {
     const model = openForm("whatsapp");
-    expect(model.getState()).toMatchObject({ setup: "qr" });
-    expect(model.getState().fields.map((field) => [field.key, field.label])).toEqual([
-      ["name", "Account label"],
-    ]);
+    expect(model.getState()).toMatchObject({ setup: "qr", fields: [] });
     model.setAccountId("support");
     expect(model.requestBody()).toEqual({
       provider: "whatsapp",
       accountId: "support",
       credentials: {},
     });
-    model.setField("name", "Support line");
+  });
+
+  it("can be submitted with its suggested name", () => {
+    const model = openChannelConnectionForm(catalogFixtureEntry("zalouser"), ["zalouser"]);
     expect(model.requestBody()).toEqual({
-      provider: "whatsapp",
-      accountId: "support",
-      credentials: { name: "Support line" },
+      provider: "zalouser",
+      accountId: "zalouser-2",
+      credentials: {},
     });
   });
 
   it("refuses a body until the form is complete", () => {
     const model = openForm("telegram");
+    model.setAccountId("");
     expect(model.requestBody()).toBeNull();
     model.setAccountId("support");
     expect(model.requestBody()).toBeNull();

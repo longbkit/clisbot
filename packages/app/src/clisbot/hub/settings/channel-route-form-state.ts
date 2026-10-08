@@ -242,10 +242,30 @@ function managedAgentConfiguration(agent: RecordValue | null): ManagedAgentConfi
 }
 
 /** What keeps the Route form from saving, said as the next step; null when it can. */
+/**
+ * A Connection's first Route also names its account, unless the connect step in this form
+ * named it already; and a Connection added here is picked before the list holds it.
+ */
+export function routeConnectionStep(input: {
+  configurationKind: ConfigurationKind;
+  connectionId: string | null;
+  selectedConnection: { id: string } | undefined;
+  namedConnectionId: string | null;
+}): { namesAccount: boolean; connectionLoading: boolean } {
+  const firstRoute = input.configurationKind === "account";
+  return {
+    namesAccount: firstRoute && input.connectionId !== input.namedConnectionId,
+    connectionLoading:
+      firstRoute && input.connectionId !== null && input.selectedConnection === undefined,
+  };
+}
+
 export function routeSaveBlocker(input: {
   conversationValid: boolean;
   toolActivityValid: boolean;
   selectedConnection: { id: string } | undefined;
+  /** A Connection is picked but not in the list yet: one just added in this form. */
+  connectionLoading: boolean;
   effectiveAccountId: string;
   configurationKind: ConfigurationKind;
   selectedAccount: RecordValue | undefined;
@@ -263,6 +283,7 @@ export function routeSaveBlocker(input: {
   provider: string;
   providerOptionsValid: boolean;
 }): string | null {
+  if (input.connectionLoading) return i18n.t("hub.routes.saveBlockers.loadingConnection");
   if (input.effectiveAccountId.length === 0)
     return i18n.t("hub.routes.saveBlockers.nameConnection");
   if (input.configurationKind === "route" && input.selectedAccount === undefined)

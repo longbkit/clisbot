@@ -11,7 +11,7 @@ import { i18n } from "@/i18n/i18next";
 import { useHubAccount } from "../account-provider";
 import { createChannelConnection } from "../channel-api";
 import { addQrChannelAccount } from "../channel-qr-account";
-import type { ChannelConnectionProblem } from "../channel-connection-form";
+import { connectionNamesFor, type ChannelConnectionProblem } from "../channel-connection-form";
 import type { ChannelCatalogRow } from "../channel-account-health";
 import type { ChannelCatalogEntry } from "../channel-catalog";
 import { useChannelConnectionSave } from "./channel-connection-add";
@@ -31,7 +31,7 @@ import { BackLink } from "./back-link";
  */
 export function ChannelCatalogView() {
   const { t } = useTranslation();
-  const { rows, catalog, refresh, fetching, statusError } = useChannelCatalogQueries();
+  const { rows, connections, catalog, refresh, fetching, statusError } = useChannelCatalogQueries();
   const compact = useIsCompactFormFactor();
   const [chosenChannel, setSelectedChannel] = useState<string | null>(null);
   const selectedChannel = chosenChannel ?? (compact ? null : (rows[0]?.channel ?? null));
@@ -89,6 +89,7 @@ export function ChannelCatalogView() {
     selected === null ? null : (
       <ChannelSelection
         row={selected}
+        takenNames={connectionNamesFor(selected.channel, connections)}
         justConnected={justConnected}
         connecting={connecting}
         onConnect={connect}
@@ -122,6 +123,7 @@ function catalogStateTitle(availability: string): string | undefined {
 
 function ChannelSelection({
   row,
+  takenNames,
   justConnected,
   connecting,
   onConnect,
@@ -129,6 +131,7 @@ function ChannelSelection({
   save,
 }: {
   row: ChannelCatalogRow;
+  takenNames: readonly string[];
   /** The account whose Connection was just added here: its login code shows without a click. */
   justConnected: string | null;
   connecting: boolean;
@@ -146,7 +149,13 @@ function ChannelSelection({
     <View style={styles.view}>
       <ChannelCatalogDetail row={row} onConnect={connecting ? undefined : onConnect} />
       {entry !== undefined && connecting && row.connectable ? (
-        <ChannelConnectionSetup key={row.channel} entry={entry} save={save} onCancel={onCancel} />
+        <ChannelConnectionSetup
+          key={row.channel}
+          entry={entry}
+          takenNames={takenNames}
+          save={save}
+          onCancel={onCancel}
+        />
       ) : null}
       {/* QR login runs on a real account; before one exists, Connect creates it. */}
       {entry?.auth === "qr" && account !== null ? (

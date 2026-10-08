@@ -343,6 +343,7 @@ const en = {
   },
   saveBlockers: {
     nameConnection: "Give the Connection a name.",
+    loadingConnection: "Loading the new Connection…",
     chooseConnection: "Choose a Connection.",
     finishRules: "Finish the Rules above.",
     fixFields: "Fix the fields marked above.",
@@ -764,6 +765,7 @@ const es = {
   },
   saveBlockers: {
     nameConnection: "Ponle un nombre a la Conexión.",
+    loadingConnection: "Cargando la nueva Conexión…",
     chooseConnection: "Elige una Conexión.",
     finishRules: "Completa las Reglas de arriba.",
     fixFields: "Corrige los campos marcados arriba.",
@@ -1184,6 +1186,7 @@ const fr = {
   },
   saveBlockers: {
     nameConnection: "Donnez un nom à la Connexion.",
+    loadingConnection: "Chargement de la nouvelle Connexion…",
     chooseConnection: "Choisissez une Connexion.",
     finishRules: "Terminez les Règles ci-dessus.",
     fixFields: "Corrigez les champs signalés ci-dessus.",
@@ -1604,6 +1607,7 @@ const ptBR = {
   },
   saveBlockers: {
     nameConnection: "Dê um nome à Conexão.",
+    loadingConnection: "Carregando a nova Conexão…",
     chooseConnection: "Escolha uma Conexão.",
     finishRules: "Conclua as Regras acima.",
     fixFields: "Corrija os campos marcados acima.",
@@ -2021,6 +2025,7 @@ const ru = {
   },
   saveBlockers: {
     nameConnection: "Дайте Подключению название.",
+    loadingConnection: "Загружается новое Подключение…",
     chooseConnection: "Выберите Подключение.",
     finishRules: "Заполните Правила выше.",
     fixFields: "Исправьте отмеченные выше поля.",
@@ -2438,6 +2443,7 @@ const ar = {
   },
   saveBlockers: {
     nameConnection: "أعطِ الاتصال اسمًا.",
+    loadingConnection: "جارٍ تحميل الاتصال الجديد…",
     chooseConnection: "اختر اتصالًا.",
     finishRules: "أكمل القواعد أعلاه.",
     fixFields: "صحّح الحقول المحددة أعلاه.",
@@ -2856,6 +2862,7 @@ const ja = {
   },
   saveBlockers: {
     nameConnection: "接続に名前を付けてください。",
+    loadingConnection: "新しい接続を読み込んでいます…",
     chooseConnection: "接続を選んでください。",
     finishRules: "上のルールを完成させてください。",
     fixFields: "上でマークされた項目を修正してください。",
@@ -3272,6 +3279,7 @@ const ko = {
   },
   saveBlockers: {
     nameConnection: "연결 이름을 정하세요.",
+    loadingConnection: "새 연결을 불러오는 중…",
     chooseConnection: "연결을 선택하세요.",
     finishRules: "위의 규칙을 완성하세요.",
     fixFields: "위에 표시된 항목을 고치세요.",
@@ -3690,6 +3698,7 @@ const vi = {
   },
   saveBlockers: {
     nameConnection: "Hãy đặt tên cho kết nối.",
+    loadingConnection: "Đang tải kết nối mới…",
     chooseConnection: "Hãy chọn một kết nối.",
     finishRules: "Hãy hoàn thành các quy tắc ở trên.",
     fixFields: "Hãy sửa các trường được đánh dấu ở trên.",
@@ -4102,6 +4111,7 @@ const zhCN = {
   },
   saveBlockers: {
     nameConnection: "请为连接命名。",
+    loadingConnection: "正在加载新的连接…",
     chooseConnection: "请选择连接。",
     finishRules: "请完成上方的规则。",
     fixFields: "请修正上方标出的字段。",

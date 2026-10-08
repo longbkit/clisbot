@@ -143,6 +143,7 @@ export function ChannelManagementSection(props: ChannelManagementSectionProps) {
           initialBot={requestedBot(editor)}
           fixedAccount={fixedAccount}
           createdConnectionId={adding.createdConnectionId}
+          namedConnectionId={adding.namedConnectionId}
           pending={pending}
           adminScoped={adminScoped}
           saveError={error}
@@ -154,6 +155,7 @@ export function ChannelManagementSection(props: ChannelManagementSectionProps) {
       {adding.addingConnection ? (
         <AddConnectionPanel
           allowProviderApplications={props.isInstanceOperator}
+          connections={props.channelConnections}
           pending={adding.connectionPending}
           connectFirst={adding.connectFirst}
           create={adding.submitConnection}
@@ -176,6 +178,9 @@ function useAddConnectionStep(
   const [createdConnectionId, setCreatedConnectionId] = useState(() =>
     preselectedConnectionId(editor),
   );
+  // The Connection named in the connect step: its first Route takes that name
+  // instead of asking for one again.
+  const [namedConnectionId, setNamedConnectionId] = useState<string | null>(null);
   // Add Connection opens on the connect step. Its way out to the form is the
   // one way to give a Connection that has no Route yet its first Route.
   const connectFirst = editor.kind === "add" && editor.connect === true;
@@ -194,6 +199,7 @@ function useAddConnectionStep(
       try {
         const created = await saveConnection(body);
         setCreatedConnectionId(created.id);
+        setNamedConnectionId(typeof body["accountId"] === "string" ? created.id : null);
         setAddingConnection(false);
         connectionCreated(created);
       } finally {
@@ -204,6 +210,7 @@ function useAddConnectionStep(
   );
   return {
     createdConnectionId,
+    namedConnectionId,
     connectFirst,
     addingConnection,
     connectionPending,
@@ -256,12 +263,14 @@ function ChannelEditorUnavailable({
 /** Add Connection's connect step, and its way back to the Route form. */
 function AddConnectionPanel({
   allowProviderApplications,
+  connections,
   pending,
   connectFirst,
   create,
   close,
 }: {
   allowProviderApplications: boolean;
+  connections: readonly { provider: string; name: string }[];
   pending: boolean;
   connectFirst: boolean;
   create(body: Record<string, unknown>): Promise<void>;
@@ -272,6 +281,7 @@ function AddConnectionPanel({
     <View>
       <AddChannelConnection
         allowProviderApplications={allowProviderApplications}
+        connections={connections}
         disabled={pending}
         create={create}
       />

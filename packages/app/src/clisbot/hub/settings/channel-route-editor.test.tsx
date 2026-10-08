@@ -1451,7 +1451,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
     // The Add-connection form is catalog-driven, so it mounts once the Hub's
     // catalog read lands and the first connectable channel is chosen.
-    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+    fireEvent.change(await screen.findByRole("textbox", { name: "Connection name" }), {
       target: { value: "new-bot" },
     });
     fireEvent.change(screen.getByLabelText("Bot token"), {
@@ -1461,12 +1461,12 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull(),
     );
-    // The new Connection is picked, and its first Route names it after the Connection.
+    // The new Connection is picked; it was named in the connect step, so its
+    // first Route takes that name without asking again.
     expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe(
       "connection:new-connection",
     );
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("new-bot");
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "new-account" } });
+    expect(screen.queryByLabelText("Name")).toBeNull();
     expect((screen.getByLabelText("Automation") as HTMLSelectElement).value).toBe("support");
     // A new Route starts on the Hub's Owners and Admins in DMs, so it activates as it stands.
     fireEvent.click(screen.getByRole("button", { name: "Activate Route" }));
@@ -1474,10 +1474,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull(),
     );
-    expect(screen.getByText("Telegram · new-account")).toBeTruthy();
+    expect(screen.getByText("Telegram · new-bot")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Verify and add Connection" })).toBeNull();
     // The saved Route closed the form: the new Connection is on the page with its Route.
-    expect(screen.getByRole("button", { name: "Actions for new-account" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Actions for new-bot" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
     fireEvent.click(screen.getByRole("button", { name: "Use an existing Connection" }));
     expect((screen.getByLabelText("Connection") as HTMLSelectElement).value).toBe("");
@@ -1536,9 +1536,10 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     renderChannels();
     await screen.findByRole("button", { name: /^Edit Route/ });
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
-      target: { value: "new-bot" },
-    });
+    const connectionName = await screen.findByRole("textbox", { name: "Connection name" });
+    // The connect step suggests a name, so a first Connection needs no typing.
+    expect((connectionName as HTMLInputElement).value).toMatch(/^telegram(-\d+)?$/u);
+    fireEvent.change(connectionName, { target: { value: "new-bot" } });
     fireEvent.change(screen.getByLabelText("Bot token"), { target: { value: "bot-token" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify and add Connection" }));
     await waitFor(() =>
@@ -1615,7 +1616,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     renderChannels();
     await screen.findByRole("button", { name: /^Edit Route/ });
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+    fireEvent.change(await screen.findByRole("textbox", { name: "Connection name" }), {
       target: { value: "new-bot" },
     });
     fireEvent.change(screen.getByLabelText("Bot token"), { target: { value: "bot-token" } });
@@ -1668,7 +1669,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
     // WhatsApp is one of the popular channels offered as a segment.
     fireEvent.click(await screen.findByRole("button", { name: "WhatsApp" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+    fireEvent.change(await screen.findByRole("textbox", { name: "Connection name" }), {
       target: { value: "support-wa" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
@@ -1787,7 +1788,7 @@ describe("Connection focused editing", { timeout: 20_000 }, () => {
     renderChannels();
     await screen.findByRole("button", { name: /^Edit Route/ });
     fireEvent.click(screen.getByRole("button", { name: "Add Connection" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
+    fireEvent.change(await screen.findByRole("textbox", { name: "Connection name" }), {
       target: { value: "bot" },
     });
     fireEvent.change(screen.getByLabelText("Bot token"), {

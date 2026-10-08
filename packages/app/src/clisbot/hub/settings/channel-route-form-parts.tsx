@@ -36,6 +36,7 @@ export function RouteConnectionSection({
   namesAccount,
   connectionId,
   accountId,
+  suggestedAccountId,
   setAccountId,
   duplicateAccount,
   pending,
@@ -53,6 +54,8 @@ export function RouteConnectionSection({
   namesAccount: boolean;
   connectionId: string | null;
   accountId: string;
+  /** Derived from the Connection's name; arrives once a just-connected Connection loads. */
+  suggestedAccountId: string;
   setAccountId(value: string): void;
   duplicateAccount: boolean;
   pending: boolean;
@@ -105,7 +108,9 @@ export function RouteConnectionSection({
           error={duplicateAccount ? t("hub.routes.connection.duplicateName") : null}
         >
           <FormTextInput
-            key={connectionId ?? ""}
+            // The suggestion is in the key: a Connection just connected is not in the list yet,
+            // so its name arrives after the field first renders, and the field must take it.
+            key={`${connectionId ?? ""}:${suggestedAccountId}`}
             initialValue={accountId}
             onChangeText={setAccountId}
             placeholder="customer-support"

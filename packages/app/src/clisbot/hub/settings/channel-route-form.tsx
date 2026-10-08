@@ -89,6 +89,7 @@ import {
   nextConfiguration,
   parseOptionalObject,
   routeLimitFields,
+  routeConnectionStep,
   routeSaveBlocker,
 } from "./channel-route-form-state";
 import {
@@ -126,6 +127,8 @@ interface ChannelAccountFormProps {
   /** The Connection is shown, not picked: an edit, or Add Route inside a Connection. */
   fixedAccount: boolean;
   createdConnectionId: string | null;
+  /** A Connection named in the connect step: its first Route keeps that name. */
+  namedConnectionId: string | null;
   pending: boolean;
   /** A Connection Admin: the target is shown, not edited, and saved as it is. */
   adminScoped: boolean;
@@ -153,6 +156,7 @@ export function ChannelAccountForm({
   initialBot,
   fixedAccount,
   createdConnectionId,
+  namedConnectionId,
   pending,
   adminScoped,
   saveError,
@@ -175,12 +179,11 @@ export function ChannelAccountForm({
   );
   const { configurationKind, existingAccountKey, connectionId, destinationValue } =
     routeDestinationState(isEditing, initial.accountKey, destination);
-  const accountId =
-    accountIdDraft ??
-    suggestedChannelAccountId(
-      existingAccounts,
-      connections.find(({ id }) => id === connectionId),
-    );
+  const suggestedAccountId = suggestedChannelAccountId(
+    existingAccounts,
+    connections.find(({ id }) => id === connectionId),
+  );
+  const accountId = accountIdDraft ?? suggestedAccountId;
   const audience = useRouteAudienceState(initial);
   const { audienceRules, setAudienceRules, open, replyPlaces } = audience;
   const { behavior, setBehavior, approvalChoice, setApprovalChoice } = audience;
@@ -284,10 +287,17 @@ export function ChannelAccountForm({
     existingTargetIndex,
   );
   const hubPredatesRules = editedRoute !== undefined && routeCarriesRuleConditions(editedRoute);
+  const connectionStep = routeConnectionStep({
+    configurationKind,
+    connectionId,
+    selectedConnection,
+    namedConnectionId,
+  });
   const saveBlocker = routeSaveBlocker({
     conversationValid: conversation.parsed.valid,
     toolActivityValid: toolActivity.parsed.valid,
     selectedConnection,
+    connectionLoading: connectionStep.connectionLoading,
     effectiveAccountId,
     configurationKind,
     selectedAccount,
@@ -615,9 +625,10 @@ export function ChannelAccountForm({
         destinationOptions={options.destinationOptions}
         changeDestination={changeDestination}
         connectChannelAccount={connectChannelAccount}
-        namesAccount={configurationKind === "account"}
+        namesAccount={connectionStep.namesAccount}
         connectionId={connectionId}
         accountId={accountId}
+        suggestedAccountId={suggestedAccountId}
         setAccountId={setAccountId}
         duplicateAccount={duplicateAccount}
         pending={pending}

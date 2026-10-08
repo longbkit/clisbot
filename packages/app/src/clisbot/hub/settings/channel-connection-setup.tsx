@@ -34,17 +34,21 @@ function sourceOptions(t: TFunction): SegmentedControlOption<ServiceAccountSourc
  */
 export function ChannelConnectionSetup({
   entry,
+  takenNames,
   save,
   onCancel,
 }: {
   entry: ChannelCatalogEntry;
+  /** Names this channel's Connections already use; the suggested name avoids them. */
+  takenNames: readonly string[];
   save(body: Record<string, unknown>): Promise<ChannelConnectionProblem | null>;
   onCancel?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const options = useMemo(() => sourceOptions(t), [t]);
-  const [model] = useState(() => openChannelConnectionForm(entry));
+  const [model] = useState(() => openChannelConnectionForm(entry, takenNames));
   useEffect(() => () => model.close(), [model]);
+  useEffect(() => model.setTakenNames(takenNames), [model, takenNames]);
   const state = useSyncExternalStore(model.subscribe, model.getState, model.getState);
   const submit = useSubmit(model, save);
   return (
@@ -67,12 +71,14 @@ export function ChannelConnectionSetup({
         ) : null}
         {state.accountId === null ? null : (
           <Field
-            label={t("hub.channels.setup.accountName")}
-            hint={t("hub.channels.setup.accountNameHint")}
+            label={t("hub.channels.setup.connectionName")}
+            hint={t("hub.channels.setup.connectionNameHint")}
             error={state.accountIdError}
           >
             <FormTextInput
-              initialValue=""
+              // The suggestion changes when the Connection list loads, before the name is edited.
+              key={state.accountIdSuggestion}
+              initialValue={state.accountId}
               onChangeText={model.setAccountId}
               placeholder="support"
               autoCapitalize="none"

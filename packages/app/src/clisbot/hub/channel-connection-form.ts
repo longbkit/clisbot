@@ -74,10 +74,11 @@ const CONNECTION_SHAPES: Readonly<Record<string, ChannelConnectionShape>> = {
     setup: "qr",
     fields: [],
   },
-  // WhatsApp is QR-linked too; its one optional field is the account label.
+  // WhatsApp is QR-linked too. Its optional label defaults to the Connection
+  // name, so the form asks for one name only.
   whatsapp: {
     setup: "qr",
-    fields: [{ key: "name", catalogKey: "name", kind: "text" }],
+    fields: [],
   },
   telegram: {
     setup: "token",
@@ -241,8 +242,10 @@ export interface ChannelConnectionFormState {
   channel: string;
   label: string;
   setup: ChannelSetupKind;
-  /** Account name; Slack Socket Mode names its Connection from the app itself. */
+  /** Connection name; Slack Socket Mode names its Connection from the app itself. */
   accountId: string | null;
+  /** The name the form suggested last; it follows the list until the person edits the name. */
+  accountIdSuggestion: string;
   accountIdError: string | null;
   transports: readonly { id: string; label: string }[];
   transportId: string | null;
@@ -258,6 +261,8 @@ export interface ChannelConnectionFormModel {
   subscribe(listener: () => void): () => void;
   close(): void;
   setAccountId(value: string): void;
+  /** The channel's Connection names, once they load: a new name must differ from each. */
+  setTakenNames(names: readonly string[]): void;
   setTransport(id: string): void;
   setServiceAccountSource(source: ServiceAccountSource): void;
   setField(key: string, value: string): void;
@@ -267,7 +272,29 @@ export interface ChannelConnectionFormModel {
   requestBody(): Record<string, unknown> | null;
 }
 
-export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelConnectionFormModel {
+/**
+ * The Connection name the form starts with: the channel's id, numbered past the
+ * names its Connections already use (`telegram`, `telegram-2`, …).
+ */
+export function defaultConnectionName(channel: string, taken: readonly string[]): string {
+  const used = new Set(taken);
+  let name = channel;
+  for (let suffix = 2; used.has(name); suffix += 1) name = `${channel}-${String(suffix)}`;
+  return name;
+}
+
+/** The names a channel's Connections use: a new Connection's name must differ. */
+export function connectionNamesFor(
+  channel: string,
+  connections: readonly { provider: string; name: string }[],
+): string[] {
+  return connections.filter(({ provider }) => provider === channel).map(({ name }) => name);
+}
+
+export function openChannelConnectionForm(
+  entry: ChannelCatalogEntry,
+  takenNames: readonly string[] = [],
+): ChannelConnectionFormModel {
   const channel = entry.id;
   const setup = channelSetupKind(entry);
   const specs = CONNECTION_SHAPES[channel]?.fields ?? [];
@@ -276,7 +303,9 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
   for (const spec of specs) {
     if (spec.kind === "choice") values.set(spec.key, spec.choices?.()[0]?.value ?? "");
   }
-  let accountId = "";
+  let taken = takenNames;
+  let accountIdSuggestion = setup === "slackApp" ? "" : defaultConnectionName(channel, taken);
+  let accountId = accountIdSuggestion;
   let accountTouched = false;
   // Only the transports a Connection can use today are offered.
   const transports = supportedTransports(entry).map(({ id, label }) => ({ id, label }));
@@ -315,13 +344,16 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
     const fields = specs
       .filter(visible)
       .map((spec) => fieldState(spec, entry, values, touched, required(spec)));
-    const accountIdError =
-      setup === "slackApp" || !accountTouched ? null : accountIdIssue(accountId);
+    // Adding under a taken name replaces that Connection's credential on the Hub, so a taken
+    // name is an error from the start, typed or not.
+    const issue = setup === "slackApp" ? null : accountIdIssue(accountId, taken, entry.label);
+    const accountIdError = accountTouched || isTaken(accountId, taken) ? issue : null;
     return {
       channel,
       label: entry.label,
       setup,
       accountId: setup === "slackApp" ? null : accountId,
+      accountIdSuggestion,
       accountIdError,
       transports,
       transportId,
@@ -333,7 +365,7 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
         specs
           .filter(visible)
           .every((spec) => fieldIssue(spec, values.get(spec.key) ?? "", required(spec)) === null) &&
-        (setup === "slackApp" || accountIdIssue(accountId) === null),
+        issue === null,
       problem,
     };
   }
@@ -357,6 +389,16 @@ export function openChannelConnectionForm(entry: ChannelCatalogEntry): ChannelCo
       accountId = value;
       accountTouched = true;
       problem = null;
+      publish();
+    },
+    setTakenNames(names) {
+      if (names.length === taken.length && names.every((name, index) => name === taken[index]))
+        return;
+      taken = names;
+      if (!accountTouched && setup !== "slackApp") {
+        accountIdSuggestion = defaultConnectionName(channel, taken);
+        accountId = accountIdSuggestion;
+      }
       publish();
     },
     setTransport(id) {
@@ -421,9 +463,15 @@ function fieldState(
   };
 }
 
-function accountIdIssue(value: string): string | null {
+function isTaken(value: string, taken: readonly string[]): boolean {
+  return taken.includes(value.trim());
+}
+
+function accountIdIssue(value: string, taken: readonly string[], label: string): string | null {
   const trimmed = value.trim();
-  if (trimmed.length === 0) return i18n.t("hub.channels.connectionForm.accountNameRequired");
+  if (trimmed.length === 0) return i18n.t("hub.channels.connectionForm.connectionNameRequired");
+  if (isTaken(trimmed, taken))
+    return i18n.t("hub.channels.connectionForm.connectionNameTaken", { label });
   if (trimmed.length > 128) return i18n.t("hub.channels.connectionForm.maxLength", { max: 128 });
   return null;
 }
