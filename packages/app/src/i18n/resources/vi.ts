@@ -2238,7 +2238,7 @@ export const vi: TranslationResources = {
         label: "Ngôn ngữ",
         description: "Ngôn ngữ của ứng dụng",
         options: {
-          system: "Theo hệ thống",
+          system: "Hệ thống",
           ar: "Tiếng Ả Rập",
           en: "Tiếng Anh",
           es: "Tiếng Tây Ban Nha",

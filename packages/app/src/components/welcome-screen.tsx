@@ -23,6 +23,7 @@ import { isNative } from "@/constants/platform";
 import { HubWelcomeSignIn, WelcomeOwnComputerLabel } from "@/clisbot/hub/welcome-sign-in";
 import { HostConnectionMethods, type HostConnectionMethod } from "./host-connection-methods";
 import { ProductAnalyticsWelcomeNotice } from "@/clisbot/analytics/welcome-notice";
+import { WelcomeLanguageDropdown, WelcomeLanguageList } from "@/clisbot/language/language-surfaces";
 
 const ACTION_TEST_IDS: Record<HostConnectionMethod, string> = {
   scanQr: "welcome-scan-qr",
@@ -224,6 +225,8 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
   return (
     <View style={styles.root}>
       <View style={headerStyle}>
+        {/* Clisbot: the language is the first thing someone may need to change. */}
+        <WelcomeLanguageDropdown />
         <Pressable
           onPress={handleOpenSettings}
           style={styles.headerButton}
@@ -276,6 +279,7 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
 
           {/* COMPAT(clisbot-welcome-hub-sign-in): managed Hosts beside adding a Host directly. */}
           <HubWelcomeSignIn />
+          <WelcomeLanguageList />
         </View>
         <ProductAnalyticsWelcomeNotice />
         <Text style={styles.versionLabel}>{appVersionText}</Text>

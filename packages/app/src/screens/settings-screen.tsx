@@ -45,7 +45,6 @@ import {
   MessageSquare,
   ChevronRight,
 } from "lucide-react-native";
-import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { HostPicker as SharedHostPicker } from "@/components/hosts/host-picker";
@@ -94,7 +93,6 @@ import { Switch } from "@/components/ui/switch";
 import { CommunityLinks } from "@/components/community-links";
 import { ClisbotBrand } from "@/components/clisbot-brand";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissions-section";
 import { DesktopNotificationsSection } from "@/desktop/components/desktop-notifications-section";
 import { BrowserDataSection } from "@/desktop/browser/settings/browser-data-section";
@@ -108,13 +106,8 @@ import { useAppDiagnosticStore } from "@/diagnostics/store";
 import { settingsStyles } from "@/styles/settings";
 import { THINKING_TONE_NATIVE_PCM_BASE64 } from "@/utils/thinking-tone.native-pcm";
 import { useVoiceAudioEngineOptional } from "@/contexts/voice-context";
-import {
-  LANGUAGE_OPTIONS,
-  formatLanguageOptionLabel,
-  parseAppLanguage,
-  type AppLanguage,
-  type SupportedLocale,
-} from "@/i18n/locales";
+import type { AppLanguage } from "@/i18n/locales";
+import { LanguageSettingsCard } from "@/clisbot/language/language-surfaces";
 import {
   HostConnectionsPage,
   HostPairDevicePage,
@@ -308,11 +301,6 @@ function selectedSidebarItemStyle({ hovered }: PressableStateCallbackType & { ho
   ];
 }
 
-function getActiveLocale(language: string | undefined): SupportedLocale {
-  const parsed = parseAppLanguage(language);
-  return parsed && parsed !== "system" ? parsed : "en";
-}
-
 // ---------------------------------------------------------------------------
 // Section components
 // ---------------------------------------------------------------------------
@@ -322,69 +310,12 @@ interface GeneralSectionProps {
   handleLanguageChange: (language: AppLanguage) => void;
 }
 
-interface LanguageMenuItemProps {
-  value: AppLanguage;
-  activeLocale: SupportedLocale;
-  selected: boolean;
-  onChange: (value: AppLanguage) => void;
-}
-
-function LanguageMenuItem({ value, activeLocale, selected, onChange }: LanguageMenuItemProps) {
-  const { t } = useTranslation();
-  const handleSelect = useCallback(() => {
-    onChange(value);
-  }, [onChange, value]);
-  const option = LANGUAGE_OPTIONS.find((entry) => entry.value === value);
-  const label = option
-    ? formatLanguageOptionLabel(option, activeLocale, t(option.labelKey))
-    : value;
-
-  return (
-    <DropdownMenuItem selected={selected} onSelect={handleSelect}>
-      {label}
-    </DropdownMenuItem>
-  );
-}
-
 function GeneralSection({ settings, handleLanguageChange }: GeneralSectionProps) {
-  const { t, i18n } = useTranslation();
-  const activeLocale = getActiveLocale(i18n.language);
-  const selectedLanguageOption = LANGUAGE_OPTIONS.find(
-    (option) => option.value === settings.language,
-  );
-  const selectedLanguageLabel = selectedLanguageOption
-    ? formatLanguageOptionLabel(
-        selectedLanguageOption,
-        activeLocale,
-        t(selectedLanguageOption.labelKey),
-      )
-    : settings.language;
+  const { t } = useTranslation();
   return (
     <SettingsSection title={t("settings.general.title")}>
-      <View style={settingsStyles.card}>
-        <View style={settingsStyles.row}>
-          <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.general.language.label")}</Text>
-            <Text style={settingsStyles.rowHint}>{t("settings.general.language.description")}</Text>
-          </View>
-          <DropdownMenu>
-            <DropdownTrigger accessibilityRole="button" accessibilityLabel={selectedLanguageLabel}>
-              {selectedLanguageLabel}
-            </DropdownTrigger>
-            <DropdownMenuContent side="bottom" align="end" width={300}>
-              {LANGUAGE_OPTIONS.map((option) => (
-                <LanguageMenuItem
-                  key={option.value}
-                  value={option.value}
-                  activeLocale={activeLocale}
-                  selected={settings.language === option.value}
-                  onChange={handleLanguageChange}
-                />
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </View>
-      </View>
+      {/* Clisbot: a globe dropdown that names the language, and every language one tap away. */}
+      <LanguageSettingsCard language={settings.language} onChange={handleLanguageChange} />
     </SettingsSection>
   );
 }

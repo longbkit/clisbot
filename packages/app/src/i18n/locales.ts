@@ -45,7 +45,7 @@ const SUPPORTED_LANGUAGES = new Set<AppLanguage>([
   "vi",
   "zh-CN",
 ]);
-const LANGUAGE_NATIVE_NAMES: Record<SupportedLocale, string> = {
+export const LANGUAGE_NATIVE_NAMES: Record<SupportedLocale, string> = {
   ar: "العربية",
   en: "English",
   es: "Español",
