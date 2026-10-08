@@ -157,7 +157,10 @@ were still present before the merge and reports those missing after it.
     two CLI tests failed. Clisbot kept upstream's raw text on those lines, so Git
     saw that side as unchanged and took the renamed upstream line without a
     conflict. The normalized-base comparison cannot see this case; the
-    survival check does.
+    survival check does. Follow-up the same day: Clisbot does not use
+    upstream's hosted Hub, so the default was removed instead (see the
+    [playbook row](../../guides/developer-guide/upstream-sync-and-contribution.md)
+    for `hub.paseo.sh`).
   - The sidebar empty states lost the lifted settings card from `35ab81200`.
     Upstream's new actions stay; the card, centring and inset are restored. [Empty state](images/merge-v0.11.1-empty-light.png).
 

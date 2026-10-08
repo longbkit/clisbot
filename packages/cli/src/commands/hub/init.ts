@@ -20,7 +20,7 @@ import { link, lstat, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { Command } from "commander";
-import { DEFAULT_HUB_ORIGIN, resolveHubCredential } from "./authority.js";
+import { resolveHubCredential } from "./authority.js";
 import type { HubCredentialStore } from "./credentials.js";
 import type { HubDaemonConnection } from "./daemon-client.js";
 import { withHubDaemon } from "./daemon-client.js";
@@ -252,33 +252,18 @@ async function ensureLogin(
   activeOrigin: string | undefined,
   environment: HubGuidedSetupEnvironment,
 ): Promise<string> {
-  const endpoint = await requiredSelect(environment, {
-    message: "Hub endpoint",
-    initialValue:
-      activeOrigin === undefined || activeOrigin === DEFAULT_HUB_ORIGIN ? "hosted" : "custom",
-    options: [
-      { value: "hosted", label: "hub.paseo.sh" },
-      { value: "custom", label: "Custom endpoint…" },
-    ],
+  const origin = await requiredText(environment, {
+    message: "Hub URL",
+    initialValue: activeOrigin ?? environment.env.CLISBOT_HUB_URL,
+    validate(value) {
+      try {
+        normalizeHubOrigin(value ?? "");
+      } catch {
+        return "Enter a valid Hub URL";
+      }
+      return undefined;
+    },
   });
-  const origin =
-    endpoint === "hosted"
-      ? DEFAULT_HUB_ORIGIN
-      : await requiredText(environment, {
-          message: "Custom Hub URL",
-          initialValue:
-            activeOrigin === undefined || activeOrigin === DEFAULT_HUB_ORIGIN
-              ? environment.env.CLISBOT_HUB_URL
-              : activeOrigin,
-          validate(value) {
-            try {
-              normalizeHubOrigin(value ?? "");
-            } catch {
-              return "Enter a valid Hub URL";
-            }
-            return undefined;
-          },
-        });
   const normalizedOrigin = normalizeHubOrigin(origin);
   if (environment.credentials.get(normalizedOrigin) !== null) {
     log.success(`Logged in to ${normalizedOrigin}`);

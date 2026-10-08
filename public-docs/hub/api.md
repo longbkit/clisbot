@@ -14,14 +14,14 @@ organization. Set the Hub origin in `CLISBOT_HUB_URL` below, for example
 
 ## API reference
 
-- [Interactive API reference](https://hub.paseo.sh/api/reference)
-- [OpenAPI 3.1 document](https://hub.paseo.sh/api/openapi.json)
+Every Hub serves its own reference on its origin:
 
-These are the canonical reference endpoints for the hosted Clisbot Hub. A self-hosted Hub exposes the same `/api/reference` and `/api/openapi.json` paths on its own origin.
+- Interactive API reference: `<hub-origin>/api/reference`
+- OpenAPI 3.1 document: `<hub-origin>/api/openapi.json`
 
 ## Authentication
 
-**Host onboarding uses `clisbot hub connect <origin>` and does not require CLI login.** Use `clisbot hub login [origin]` only for deliberate CLI API administration after understanding its authority. After browser approval, Clisbot stores a durable, revocable organization credential under `CLISBOT_HOME` for that exact origin. Without an explicit origin, the CLI uses `CLISBOT_HUB_URL`, then the active stored login, then `https://hub.paseo.sh`.
+**Host onboarding uses `clisbot hub connect <origin>` and does not require CLI login.** Use `clisbot hub login [origin]` only for deliberate CLI API administration after understanding its authority. After browser approval, Clisbot stores a durable, revocable organization credential under `CLISBOT_HOME` for that exact origin. Without an explicit origin, the CLI uses `CLISBOT_HUB_URL`, then the active stored login; with neither it stops and asks for a Hub URL.
 
 For automation, create an organization API key from the Hub dashboard under **API keys**. Both credential types are bearer tokens:
 

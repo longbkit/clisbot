@@ -15,6 +15,7 @@ import { SiteShell } from "~/components/site-shell";
 import {
   formatPlanPrice,
   getHubPlans,
+  HOSTED_HUB_URL,
   planPriceQualifier,
   type HubPlanOffer,
   type HubPlans,
@@ -38,8 +39,6 @@ export const Route = createFileRoute("/hub")({
   component: Hub,
 });
 
-const HOSTED_HUB_URL = "https://hub.paseo.sh";
-
 const LINK_CLASS = "underline hover:text-white/80";
 
 function Hub() {
@@ -50,7 +49,9 @@ function Hub() {
       <p className="text-lg text-white/70 leading-relaxed max-w-2xl">
         An optional service that sits above your daemons and gives them extra capabilities.
       </p>
-      <p className="text-white/40 text-sm mt-3">Run it yourself or use the hosted service.</p>
+      <p className="text-white/40 text-sm mt-3">
+        You run it yourself, on your own machine or server.
+      </p>
 
       <div className="space-y-20 mt-16">
         <Triggers />
@@ -87,7 +88,7 @@ const SELF_HOSTED_FEATURES: readonly PlanFeature[] = [
   },
 ];
 function Pricing({ plans }: { plans: HubPlans | null }) {
-  if (plans === null) {
+  if (plans === null || HOSTED_HUB_URL === undefined) {
     return (
       <section className="space-y-6" aria-labelledby="pricing-heading">
         <div className="space-y-2">
@@ -95,7 +96,9 @@ function Pricing({ plans }: { plans: HubPlans | null }) {
             Choose how to run Hub
           </h2>
           <p className="max-w-2xl leading-relaxed text-white/70">
-            The plan comparison is temporarily unavailable.
+            {HOSTED_HUB_URL === undefined
+              ? "Clisbot does not run a hosted Hub. Hub is free and open source; you operate it."
+              : "The plan comparison is temporarily unavailable."}
           </p>
         </div>
         <a
@@ -584,7 +587,8 @@ function FaqSection() {
           you want.
         </FAQItem>
         <FAQItem question="Is there a hosted version?">
-          Yes. The hosted service runs the same Hub software you can self-host.
+          No. Clisbot does not run a hosted Hub; you run the Hub software on your own machine or
+          server.
         </FAQItem>
         <FAQItem question="What else is planned?">
           <p>Not built yet, listed so you know where this is going.</p>
@@ -608,12 +612,11 @@ function FaqSection() {
           triggers, and it&apos;s why access to the beta stays small and trusted.
         </FAQItem>
         <FAQItem question="How do I get access?">
-          You can self-host today or{" "}
-          <a href={HOSTED_HUB_URL} className={LINK_CLASS}>
-            sign in to Hosted Hub
-          </a>{" "}
-          for a free account. When you want more agent runs or more seats, upgrade from Billing
-          inside Hub.
+          Run it yourself: <code>npx @clisbot/hub</code>, then follow the{" "}
+          <a href="/docs/hub/quickstart" className={LINK_CLASS}>
+            quickstart
+          </a>
+          .
         </FAQItem>
       </div>
     </section>

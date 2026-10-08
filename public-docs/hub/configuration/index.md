@@ -102,7 +102,8 @@ Origin precedence:
 1. `--hub`
 2. `CLISBOT_HUB_URL`
 3. Active stored login
-4. `https://hub.paseo.sh`
+
+With none of these, the command stops and asks for a Hub URL.
 
 Credential precedence:
 

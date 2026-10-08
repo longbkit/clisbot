@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "vitest";
-import { DEFAULT_HUB_ORIGIN, resolveHubCredential, resolveHubOrigin } from "./authority.js";
+import { resolveHubCredential, resolveHubOrigin } from "./authority.js";
 import { PrivateHubCredentialStore, type HubCredentialStore } from "./credentials.js";
 
 const temporaryDirectories: string[] = [];
@@ -81,7 +81,7 @@ describe("Hub CLI credentials", () => {
     assert.equal(statSync(credentialPath).mode & 0o777, 0o600);
   });
 
-  it("resolves origin from explicit, environment, active login, then hosted default", () => {
+  it("resolves origin from explicit, environment, then active login, and has no hosted default", () => {
     const store = new PrivateHubCredentialStore({ CLISBOT_HOME: temporaryHome() });
     store.save({ origin: "https://stored.example.com", credential: "stored-secret" });
 
@@ -105,13 +105,14 @@ describe("Hub CLI credentials", () => {
       resolveHubOrigin({ options: {}, env: {}, credentials: store }),
       "https://stored.example.com",
     );
-    assert.equal(
-      resolveHubOrigin({
-        options: {},
-        env: {},
-        credentials: new PrivateHubCredentialStore({ CLISBOT_HOME: temporaryHome() }),
-      }),
-      DEFAULT_HUB_ORIGIN,
+    assert.throws(
+      () =>
+        resolveHubOrigin({
+          options: {},
+          env: {},
+          credentials: new PrivateHubCredentialStore({ CLISBOT_HOME: temporaryHome() }),
+        }),
+      { code: "HUB_ORIGIN_REQUIRED" },
     );
   });
 

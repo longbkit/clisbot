@@ -61,7 +61,7 @@ For unattended setup, inject an organization API key restricted to `daemons:enro
 CLISBOT_HUB_URL=https://hub.example.com CLISBOT_HUB_API_KEY=clisbot_pk_... clisbot hub connect
 ```
 
-Origin precedence is explicit `[origin]`, `CLISBOT_HUB_URL`, active stored login, then `https://hub.paseo.sh`. An explicit `--api-key <secret>` takes precedence over `CLISBOT_HUB_API_KEY`. Stored CLI credentials are not used for connection.
+Origin precedence is explicit `[origin]`, `CLISBOT_HUB_URL`, then active stored login; with none of these it stops and asks for a Hub URL. An explicit `--api-key <secret>` takes precedence over `CLISBOT_HUB_API_KEY`. Stored CLI credentials are not used for connection.
 
 Check and undo:
 

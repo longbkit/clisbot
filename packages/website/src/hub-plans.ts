@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const HUB_PLANS_URL =
-  import.meta.env.VITE_HUB_PLANS_URL ?? "https://hub.paseo.sh/api/billing/plans";
+// Clisbot runs no hosted Hub. A deployment that offers one sets VITE_HUB_PLANS_URL; its origin is
+// also where the hosted plan cards link.
+const HUB_PLANS_URL: string | undefined = import.meta.env.VITE_HUB_PLANS_URL;
+
+export const HOSTED_HUB_URL =
+  HUB_PLANS_URL === undefined ? undefined : new URL(HUB_PLANS_URL).origin;
 
 /** The two catalog slugs the page renders. `hosted` is displayed as whatever `name` says. */
 const FREE_SLUG = "free";
@@ -47,6 +51,7 @@ export function parseHubPlansResponse(value: unknown): HubPlans {
 }
 
 export const getHubPlans = createServerFn({ method: "GET" }).handler(async () => {
+  if (HUB_PLANS_URL === undefined) return null;
   const response = await fetch(HUB_PLANS_URL, {
     headers: { accept: "application/json" },
     signal: AbortSignal.timeout(5_000),

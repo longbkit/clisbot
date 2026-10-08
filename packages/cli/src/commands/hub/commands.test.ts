@@ -59,7 +59,7 @@ describe("Hub commands", () => {
       },
     });
     connect?.outputHelp();
-    assert.match(help, /active stored login.*https:\/\/hub\.paseo\.sh/u);
+    assert.match(help, /active stored login; with none of these the command stops/u);
   });
 
   it("login stores the durable credential and marks its normalized origin active", async () => {
@@ -105,37 +105,30 @@ describe("Hub commands", () => {
     assert.equal(JSON.stringify(result).includes("durable-secret"), false);
   });
 
-  it("login without an origin uses the hosted default and reports it before authorization", async () => {
-    const credentials = new MemoryCredentials();
+  it("login without an origin, environment or stored login asks for a Hub URL", async () => {
     const events: string[] = [];
 
-    const result = await runHubLogin(
-      undefined,
-      {},
-      {
-        env: {},
-        credentials,
-        flow: {
-          authorize: async (origin) => {
-            events.push(`authorize:${origin}`);
-            return "clisbot_cli_prefix_durable-secret";
+    await assert.rejects(
+      runHubLogin(
+        undefined,
+        {},
+        {
+          env: {},
+          credentials: new MemoryCredentials(),
+          flow: {
+            authorize: async (origin) => {
+              events.push(`authorize:${origin}`);
+              return "clisbot_cli_prefix_durable-secret";
+            },
           },
+          hub: { describeCredential: unknownIdentity },
+          reporter: { progress: (message) => events.push(`progress:${message}`) },
         },
-        hub: { describeCredential: unknownIdentity },
-        reporter: { progress: (message) => events.push(`progress:${message}`) },
-      },
+      ),
+      { code: "HUB_ORIGIN_REQUIRED" },
     );
 
-    assert.deepEqual(
-      events.filter((event) => !event.startsWith("progress:Advanced CLI access:")),
-      [
-        "progress:Logging in to https://hub.paseo.sh",
-        "authorize:https://hub.paseo.sh",
-        "progress:Logged in",
-        "progress:Hub https://hub.paseo.sh did not report which organization this credential belongs to.",
-      ],
-    );
-    assert.equal(result.data.origin, "https://hub.paseo.sh");
+    assert.deepEqual(events, []);
   });
 
   it("interactive login creates only explicit CLI access and does not enroll a Host", async () => {
@@ -182,7 +175,7 @@ describe("Hub commands", () => {
     ] as const) {
       const credentials = new MemoryCredentials();
       let continuationCount = 0;
-      await runHubLogin(undefined, options, {
+      await runHubLogin("https://hub.test", options, {
         env: {},
         credentials,
         flow: { authorize: async () => "clisbot_cli_prefix_durable-secret" },
@@ -422,10 +415,9 @@ describe("Hub commands", () => {
     assert.deepEqual(requests, ["https://active.test:active-secret"]);
   });
 
-  it("connect without authority reports the hosted destination and contacts nothing", async () => {
+  it("connect without a Hub URL contacts nothing", async () => {
     const progress: string[] = [];
-    const credentials = new MemoryCredentials();
-    const daemon = new FakeDaemonConnection(new FakeDaemon("https://hub.paseo.sh"));
+    const daemon = new FakeDaemonConnection(new FakeDaemon("https://hub.example.com"));
     let hubRequests = 0;
 
     await assert.rejects(
@@ -434,7 +426,7 @@ describe("Hub commands", () => {
         {},
         {
           env: { CLISBOT_ONBOARDING_ENABLED: "0" },
-          credentials,
+          credentials: new MemoryCredentials(),
           hub: {
             describeCredential: unknownIdentity,
             issueEnrollmentToken: async () => {
@@ -446,14 +438,10 @@ describe("Hub commands", () => {
           reporter: { progress: (message) => progress.push(message) },
         },
       ),
-      {
-        code: "HUB_API_KEY_REQUIRED",
-        message:
-          "No stored Hub login matches https://hub.paseo.sh. Run `clisbot hub login https://hub.paseo.sh`, pass --api-key <secret>, or set CLISBOT_HUB_API_KEY.",
-      },
+      { code: "HUB_ORIGIN_REQUIRED" },
     );
 
-    assert.deepEqual(progress, ["Connecting this daemon to https://hub.paseo.sh"]);
+    assert.deepEqual(progress, []);
     assert.equal(hubRequests, 0);
     assert.equal(daemon.connectionCount, 0);
   });

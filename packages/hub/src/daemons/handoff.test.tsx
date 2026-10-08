@@ -48,12 +48,10 @@ describe("the daemon login command", () => {
     );
   });
 
-  it("omits the argument only on the Hub the CLI already defaults to", () => {
-    assert.equal(daemonLoginCommand("https://hub.paseo.sh"), "clisbot hub login");
-    // A look-alike is still somebody else's Hub and has to be named.
+  it("never omits the origin, because the CLI has no default Hub", () => {
     assert.equal(
-      daemonLoginCommand("https://hub.paseo.sh.example.com"),
-      "clisbot hub login https://hub.paseo.sh.example.com",
+      daemonLoginCommand("https://hub.example.com"),
+      "clisbot hub login https://hub.example.com",
     );
   });
 });

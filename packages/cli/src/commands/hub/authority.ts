@@ -13,12 +13,16 @@ interface ResolveHubInput {
   credentials: HubCredentialStore;
 }
 
-export const DEFAULT_HUB_ORIGIN = "https://hub.paseo.sh";
-
+// Clisbot has no hosted Hub, so an unresolved origin is an error rather than a fallback host.
 export function resolveHubOrigin(input: ResolveHubInput): string {
   const configuredOrigin = input.options.origin ?? input.env.CLISBOT_HUB_URL;
-  const selectedOrigin =
-    configuredOrigin ?? input.credentials.active()?.origin ?? DEFAULT_HUB_ORIGIN;
+  const selectedOrigin = configuredOrigin ?? input.credentials.active()?.origin;
+  if (selectedOrigin === undefined) {
+    throw new HubCommandError(
+      "HUB_ORIGIN_REQUIRED",
+      "No Hub selected. Pass the Hub URL (for example `clisbot hub login https://hub.example.com`) or set CLISBOT_HUB_URL.",
+    );
+  }
   return normalizeHubOrigin(selectedOrigin);
 }
 
