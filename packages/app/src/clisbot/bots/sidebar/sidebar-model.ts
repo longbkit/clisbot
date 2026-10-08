@@ -73,6 +73,10 @@ export function projectGroupSidebar(
       memberNames: chat.participants.flatMap((participant) =>
         participant.displayName ? [participant.displayName] : [],
       ),
+      members: chat.participants.map((participant) => ({
+        botId: participant.botId,
+        name: participant.displayName ?? "",
+      })),
     }));
 }
 

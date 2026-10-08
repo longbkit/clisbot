@@ -163,6 +163,14 @@ function RowKebab({
 
 const TITLE_LINE_HEIGHT = 20;
 
+/**
+ * The Bot/Chat mark beside a row: as tall as the title and subtitle together when the row has
+ * both, the small icon size when the row is a single line.
+ */
+export function sidebarMarkSize(hasSubtitle: boolean): number {
+  return hasSubtitle ? 32 : 20;
+}
+
 const styles = StyleSheet.create((theme) => ({
   container: {
     position: "relative",
@@ -186,9 +194,10 @@ const styles = StyleSheet.create((theme) => ({
   rowHovered: { backgroundColor: theme.colors.surfaceSidebarHover },
   rowSelected: { backgroundColor: theme.colors.surfaceSidebarSelected, ...theme.shadow.raised },
   rowPressed: { backgroundColor: theme.colors.surface2 },
+  // Sized by its content: an icon keeps the icon box, a Bot/Chat mark fills the two-line row.
   leadingSlot: {
-    width: theme.iconSize.md,
-    height: theme.iconSize.md,
+    minWidth: theme.iconSize.md,
+    minHeight: theme.iconSize.md,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,

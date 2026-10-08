@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { ChatsSection, type ChatsSidebarChat } from "./chats-section";
 
 const env = vi.hoisted(() => ({
@@ -81,6 +82,7 @@ vi.mock("lucide-react-native", () => ({
   ChevronDown: () => <i />,
   ChevronRight: () => <i />,
   Bot: () => <i />,
+  UsersRound: () => <i />,
   Folder: () => <i />,
   Layers: () => <i />,
   LayoutGrid: () => <i />,
@@ -111,6 +113,8 @@ function chat(index: number, overrides: Partial<ChatsSidebarChat> = {}): ChatsSi
     ...overrides,
   };
 }
+
+beforeAll(() => i18n.changeLanguage("en"));
 
 beforeEach(() => {
   vi.stubGlobal("React", React);

@@ -105,3 +105,22 @@ function hashIdentityKey(key: string): number {
 export function deriveIdentityColorName(key: string): IdentityColorName {
   return IDENTITY_COLOR_NAMES[hashIdentityKey(key) % IDENTITY_COLOR_NAMES.length];
 }
+
+/**
+ * Two stops around the fill for a glossy mark: lit from the top-left, shaded to the bottom-right.
+ * The shift is small on purpose — the white letter sits mid-mark, where the fill is still the
+ * band's own hex, so the contrast band above still holds.
+ */
+export function identityGradient(name: IdentityColorName): readonly [string, string] {
+  const base = IDENTITY_COLORS[name];
+  return [mixHex(base, "#ffffff", 0.16), mixHex(base, "#000000", 0.14)];
+}
+
+function mixHex(from: string, to: string, amount: number): string {
+  const channel = (hex: string, index: number) =>
+    Number.parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16);
+  const mixed = [0, 1, 2].map((index) =>
+    Math.round(channel(from, index) + (channel(to, index) - channel(from, index)) * amount),
+  );
+  return `#${mixed.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
