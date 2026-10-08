@@ -8,6 +8,7 @@ import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list"
 import { useSidebarWorkspaceSessions, useWorkspaceShownAgents } from "./model";
 import type { WorkspaceSessionItem } from "./select-sessions";
 import { useProjectAbove } from "./project-above";
+import { SessionRenameModal } from "./session-rename-modal";
 import type { SessionLineActionsInput } from "./session-line-trailing";
 import {
   WorkspaceSessionRow,
@@ -69,6 +70,10 @@ export const StatusSessionLine = memo(function StatusSessionLine({
   if (shown.selectedAgentId === agentId) state = "selected";
   else if (shown.visibleAgentIds.has(agentId)) state = "visible";
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  // A session line renames its session as well as its workspace (rename stays the workspace's).
+  const [renaming, setRenaming] = useState(false);
+  const renameSession = useCallback(() => setRenaming(true), []);
+  const closeRename = useCallback(() => setRenaming(false), []);
   const badgeNumber = showShortcutBadge ? shortcutNumber : null;
   const renderActions = useCallback(
     ({ menuOpen, onMenuOpenChange }: SessionLineActionsInput) => (
@@ -76,16 +81,17 @@ export const StatusSessionLine = memo(function StatusSessionLine({
         open={menuOpen}
         onOpenChange={onMenuOpenChange}
         {...menuActions}
+        onRenameSession={renameSession}
         workspaceKey={workspace.workspaceKey}
         serverId={workspace.serverId}
         workspaceId={workspace.workspaceId}
         workspaceLabels={workspace.labels}
       />
     ),
-    [workspace, menuActions],
+    [workspace, menuActions, renameSession],
   );
 
-  return (
+  const line = (
     <SidebarWorkspaceContextMenu
       contextOnly
       accessible={false}
@@ -94,6 +100,7 @@ export const StatusSessionLine = memo(function StatusSessionLine({
       workspace={workspace}
       workspaceKey={workspace.workspaceKey}
       {...menuActions}
+      onRenameSession={renameSession}
       openInFileManagerPath={workspace.workspaceDirectory}
       disabled={menuDisabled}
       highlightStyle={undefined}
@@ -113,5 +120,12 @@ export const StatusSessionLine = memo(function StatusSessionLine({
         onPress={onPress}
       />
     </SidebarWorkspaceContextMenu>
+  );
+  if (!renaming) return line;
+  return (
+    <>
+      {line}
+      <SessionRenameModal serverId={serverId} agentId={agentId} visible onClose={closeRename} />
+    </>
   );
 });

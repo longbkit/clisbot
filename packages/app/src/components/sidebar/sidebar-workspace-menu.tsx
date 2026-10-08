@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Shortcut } from "@/components/ui/shortcut";
 import { OpenInFileManagerMenuItem } from "@/workspace/open-in-file-manager/menu-item";
+import { CreateBotFromProjectMenuItem } from "@/clisbot/bots/sidebar/create-bot-from-project-item";
 import { resolveSidebarWorkspaceAccessibilityLabel } from "@/components/sidebar/sidebar-workspace-title";
 import {
   workspaceServiceLabelKey,
@@ -96,6 +97,8 @@ export interface SidebarWorkspaceMenuProps {
   archiveShortcutKeys?: ShortcutKey[][] | null;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  /** Clisbot: a session line's menu also renames that session. */
+  onRenameSession?: () => void;
   openInFileManagerPath?: string | null;
   /**
    * Lifted so the row that reveals the kebab can keep it mounted while its menu is up. See
@@ -144,6 +147,7 @@ function SidebarWorkspaceMenuItems({
   archiveShortcutKeys,
   isPinned,
   onTogglePin,
+  onRenameSession,
   openInFileManagerPath,
 }: SidebarWorkspaceMenuItemsProps & { surface: MenuSurface }): ReactNode {
   const { t } = useTranslation();
@@ -176,6 +180,16 @@ function SidebarWorkspaceMenuItems({
           onSelect={onCopyBranchName}
         >
           {t("sidebar.workspace.actions.copyBranchName")}
+        </WorkspaceMenuItem>
+      ) : null}
+      {onRenameSession ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-workspace-menu-rename-session-${workspaceKey}`}
+          leading={renameLeadingIcon}
+          onSelect={onRenameSession}
+        >
+          {t("sidebar.workspace.actions.renameSession")}
         </WorkspaceMenuItem>
       ) : null}
       {onRename ? (
@@ -232,6 +246,13 @@ function SidebarWorkspaceMenuItems({
         path={openInFileManagerPath}
         testID={`sidebar-workspace-menu-open-folder-${workspaceKey}`}
       />
+      {/* Clisbot Bots: a bot that works in this workspace's Project and shares it. */}
+      <CreateBotFromProjectMenuItem
+        surface={surface}
+        serverId={serverId}
+        workspaceId={workspaceId}
+        testID={`sidebar-workspace-menu-create-bot-${workspaceKey}`}
+      />
       {onArchive ? (
         <WorkspaceMenuItem
           surface={surface}
@@ -266,6 +287,7 @@ export function SidebarWorkspaceMenu({
   archiveShortcutKeys,
   isPinned,
   onTogglePin,
+  onRenameSession,
   openInFileManagerPath,
   open,
   onOpenChange,
@@ -312,6 +334,7 @@ export function SidebarWorkspaceMenu({
           archiveShortcutKeys={archiveShortcutKeys}
           isPinned={isPinned}
           onTogglePin={onTogglePin}
+          onRenameSession={onRenameSession}
           openInFileManagerPath={openInFileManagerPath}
         />
       </DropdownMenuContent>
@@ -345,6 +368,7 @@ export function SidebarWorkspaceContextMenu({
   archiveShortcutKeys,
   isPinned,
   onTogglePin,
+  onRenameSession,
   openInFileManagerPath,
   accessibilityLabel,
   highlightStyle,
@@ -425,6 +449,7 @@ export function SidebarWorkspaceContextMenu({
           archiveShortcutKeys={archiveShortcutKeys}
           isPinned={isPinned}
           onTogglePin={onTogglePin}
+          onRenameSession={onRenameSession}
           openInFileManagerPath={openInFileManagerPath}
         />
       </ContextMenuContent>

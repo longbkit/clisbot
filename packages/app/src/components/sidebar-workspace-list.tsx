@@ -46,7 +46,15 @@ import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop
 import { type GestureType } from "react-native-gesture-handler";
 import { WorkspaceRenameModal } from "@/components/workspace-rename-modal";
 import { useWorkspaceClipboardActions } from "@/hooks/use-workspace-clipboard-actions";
-import { ExternalLink, Settings, MoreVertical, Plus, Trash2 } from "lucide-react-native";
+import {
+  ExternalLink,
+  Settings,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Plus,
+  Trash2,
+} from "lucide-react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import { DraggableList, type DraggableRenderItemInfo } from "./draggable-list";
 import type { DraggableListDragHandleProps } from "./draggable-list.types";
@@ -156,6 +164,7 @@ import {
 } from "@/constants/platform";
 import { getDesktopHost } from "@/desktop/host";
 import { OpenInFileManagerMenuItem } from "@/workspace/open-in-file-manager/menu-item";
+import { CreateBotFromProjectMenuItem } from "@/clisbot/bots/sidebar/create-bot-from-project-item";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import type { HostBadgeModel } from "@/hosts/appearance";
 import { useHostBadges } from "@/hosts/use-host-badges";
@@ -468,6 +477,10 @@ function ProjectRowTrailingActions({
 }
 
 const trash2LeadingIcon = <ThemedTrash2 size={14} uniProps={foregroundMutedColorMapping} />;
+const ThemedPin = withUnistyles(Pin);
+const ThemedPinOff = withUnistyles(PinOff);
+const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
+const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
 const settingsLeadingIcon = <ThemedSettings size={14} uniProps={foregroundMutedColorMapping} />;
 const openInNewWindowLeadingIcon = (
   <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
@@ -536,6 +549,27 @@ function ProjectMenuItem({
   return <DropdownMenuItem {...props}>{children}</DropdownMenuItem>;
 }
 
+/** Clisbot: pin a Project to the sidebar's Pinned section. */
+function ProjectPinItem({
+  surface,
+  pinned,
+  onSelect,
+}: {
+  surface: ProjectMenuSurface;
+  pinned: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <ProjectMenuItem
+      surface={surface}
+      leading={pinned ? unpinLeadingIcon : pinLeadingIcon}
+      onSelect={onSelect}
+    >
+      {pinned ? "Unpin project" : "Pin project"}
+    </ProjectMenuItem>
+  );
+}
+
 function ProjectMenuItems({
   surface,
   projectViewKey,
@@ -588,9 +622,11 @@ function ProjectMenuItems({
   return (
     <>
       {fusion && projectPin ? (
-        <ProjectMenuItem surface={surface} onSelect={onToggleProjectPin}>
-          {pins.some((pin) => pinKey(pin) === pinKey(projectPin)) ? "Unpin project" : "Pin project"}
-        </ProjectMenuItem>
+        <ProjectPinItem
+          surface={surface}
+          pinned={pins.some((pin) => pinKey(pin) === pinKey(projectPin))}
+          onSelect={onToggleProjectPin}
+        />
       ) : null}
       {settingsTarget ? (
         <ProjectMenuItem
@@ -616,6 +652,13 @@ function ProjectMenuItems({
         surface={surface}
         path={projectPath}
         testID={`sidebar-project-menu-open-folder-${projectViewKey}`}
+      />
+      {/* Clisbot Bots: a bot that works in this Project and shares it. */}
+      <CreateBotFromProjectMenuItem
+        surface={surface}
+        serverId={settingsTarget?.serverId}
+        projectId={settingsTarget?.projectId}
+        testID={`sidebar-project-menu-create-bot-${projectViewKey}`}
       />
       <ProjectMenuItem
         surface={surface}
