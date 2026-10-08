@@ -1,5 +1,6 @@
 import { Plug } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AgentControlTrigger } from "@/composer/agent-controls/control";
 import { useSessionStore } from "@/stores/session-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
@@ -61,6 +62,7 @@ function ChipForProject({
   projectId,
   chat,
 }: ConnectorsComposerChipProps & { projectId: string; chat: ChatTools | null }) {
+  const { t } = useTranslation();
   const { grant, defaults, save } = useProjectGrant(serverId, projectId);
   // In a Chat the composer acts for the Bot picked in the header: its session in this Chat.
   const conversation = useConversationProjectContext();
@@ -69,11 +71,11 @@ function ChipForProject({
       conversation?.botId
         ? {
             botId: conversation.botId,
-            botName: conversation.botName ?? "this Bot",
+            botName: conversation.botName ?? t("connectors.tools.composerChip.thisBot"),
             group: conversation.group,
           }
         : null,
-    [conversation?.botId, conversation?.botName, conversation?.group],
+    [conversation?.botId, conversation?.botName, conversation?.group, t],
   );
   const tools = useMemo(() => sessionTools(grant, defaults), [defaults, grant]);
   // A Chat's allows outlast `/new`; outside a Chat they are the running session's.
@@ -89,10 +91,14 @@ function ChipForProject({
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
   const hide = useCallback(() => setOpen(false), []);
-  if (tools.groups.length + tools.connectors.length === 0) return null;
+  // Shown even with nothing on: the sheet lists the session's skills and links to where tools
+  // are turned on, so an empty Project is where the chip matters most.
   // A count, not names: the chip reads the grant only, which holds slugs, not app names.
   const on = sessionOnCount(tools, off, allows);
-  const label = on === 0 ? "Tools off" : `Tools · ${on}`;
+  const label =
+    on === 0
+      ? t("connectors.tools.composerChip.off")
+      : t("connectors.tools.composerChip.count", { on });
   return (
     <>
       <AgentControlTrigger
@@ -102,7 +108,7 @@ function ChipForProject({
         value={label}
         open={open}
         onPress={show}
-        accessibilityLabel={`Tools: ${label}`}
+        accessibilityLabel={t("connectors.tools.composerChip.accessibilityLabel", { label })}
         testID="composer-connectors-chip"
       />
       {open ? (

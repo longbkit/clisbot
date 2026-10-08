@@ -146,7 +146,8 @@ the card show its title, description and two plain actions (`connector-connect.t
 
 ## Per session
 
-The composer shows a **Tools** chip when the session's Project gives it any tools. Its sheet lists
+The composer always shows a **Tools** chip for a session in a Project, reading **Tools off** when
+the Project gives it nothing, since that is where someone looks to turn tools on. Its sheet lists
 the Clisbot tool groups, then the apps and servers on, then the session's skills. Each group and
 Connector has a switch for this session and opens a page with every one of its tools and a switch
 per tool, as Project settings lists them. A tool the Project leaves off says why ("Off in this
