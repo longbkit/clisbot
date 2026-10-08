@@ -23,10 +23,12 @@ Object.assign(process.env, {
   CLISBOT_HUB_CREDENTIAL_MASTER_KEY: randomBytes(32).toString("base64"),
 });
 
+// The image builds for a second architecture under QEMU, where loading every channel takes
+// 60-90 s against ~7 s natively; 90 s timed out on an otherwise passing build.
 const timeout = setTimeout(() => {
   console.error("Packaged Hub runtime smoke timed out");
   process.exit(1);
-}, 90_000);
+}, 240_000);
 let build;
 try {
   const { configureRuntimeRoot } = await import(
