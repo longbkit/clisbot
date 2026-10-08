@@ -29,7 +29,7 @@ OpenCode Desktop is the desktop app for OpenCode. OpenCode is available as a ter
 
 OpenCode is a multi-model coding agent. It can connect to many LLM providers through its own provider system, including OpenCode Zen, local models, and API providers.
 
-Clisbot is multi-provider at the agent harness layer. It runs OpenCode, Claude Code, Codex, and Pi natively, plus 30+ more agents through the in-app catalog including GitHub Copilot, Cursor, Gemini CLI, and Amp. Clisbot speaks the [Agent Client Protocol](https://agentclientprotocol.com), so any ACP agent works. Custom providers run any CLI agent. See [all supported providers](/agents).
+Clisbot is multi-provider at the agent harness layer. It runs OpenCode, Claude Code, Codex, Pi, Antigravity, and Muse Code natively, plus 30+ more agents through the in-app catalog including GitHub Copilot, Cursor, Gemini CLI, and Amp. Clisbot speaks the [Agent Client Protocol](https://agentclientprotocol.com), so any ACP agent works. Custom providers run any CLI agent. See [all supported providers](/agents).
 
 ## Application plugins
 
@@ -43,7 +43,7 @@ Clisbot ships on macOS, Linux, and Windows. OpenCode provides beta desktop build
 
 ## Mobile
 
-Clisbot ships native iOS and Android apps with the same agent workflow as the desktop app.
+The mobile app is the full app, native on iOS and Android, with full feature parity with desktop.
 
 OpenCode Desktop is a desktop app. OpenCode also has web and share-link workflows, but not a native mobile app.
 
@@ -78,7 +78,7 @@ clisbot schedule create --cron "0 9 * * 1" "audit the codebase"
 
 ## Worktrees and services
 
-Clisbot runs each agent in its own Git worktree. Each worktree gets its own dev server URL like `web.fix-auth.my-app.localhost`, so parallel agents don't fight for ports.
+Clisbot runs each agent in its own Git worktree. Each worktree gets its own dev server URL like `web--fix-auth--my-app.localhost`, so parallel agents don't fight for ports.
 
 OpenCode supports multi-session work on the same project. If you want worktree isolation around OpenCode sessions, Clisbot can provide that by launching OpenCode inside Clisbot workspaces.
 
@@ -94,23 +94,31 @@ Clisbot supports dictation and realtime voice mode. Speech-to-text and text-to-s
 
 ## Comparison
 
-|                              | Clisbot                                                         | OpenCode Desktop                |
-| ---------------------------- | --------------------------------------------------------------- | ------------------------------- |
-| License                      | Open source (Apache-2.0)                                        | Open source (MIT)               |
-| Desktop platforms            | macOS, Linux, Windows                                           | macOS, Linux, Windows           |
-| Native mobile                | iOS, Android                                                    | No                              |
-| Agent harnesses              | Claude Code, Codex, OpenCode, Pi + 30+ via ACP catalog + custom | OpenCode                        |
-| Multi-model support          | Through supported agent harnesses                               | Through OpenCode providers      |
-| Git worktrees                | Yes                                                             | No built-in worktree manager    |
-| Per-worktree dev server URLs | Yes                                                             | No                              |
-| Split panes and tabs         | Yes                                                             | Desktop sessions                |
-| In-app terminal              | Yes                                                             | OpenCode terminal workflow      |
-| In-app browser               | Yes                                                             | No                              |
-| GitHub workflow in app       | Commit, push, PR, checks, reviews, merge                        | GitHub integration              |
-| CLI                          | Run, `--host`, ls, send, schedule, loop                         | OpenCode CLI                    |
-| MCP server for orchestration | Yes                                                             | MCP support inside OpenCode     |
-| Application plugins          | Server code and native client components                        | No                              |
-| Local voice                  | Yes                                                             | No                              |
-| Self-hosted daemon           | Yes                                                             | OpenCode server / local runtime |
+|                              | Clisbot                                                                                            | OpenCode Desktop                                |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| License                      | Open source (Apache-2.0)                                                                           | Open source (MIT)                               |
+| Account required             | No                                                                                                 | -                                               |
+| Desktop app                  | Yes (one click install, daemon bundled)                                                            | Yes (beta, macOS, Linux, Windows)               |
+| Mobile app                   | Yes (native, full parity with desktop)                                                             | No                                              |
+| CLI                          | Yes (everything the app does)                                                                      | Yes (OpenCode CLI)                              |
+| Remote machines              | Yes (install the daemon anywhere)                                                                  | OpenCode server                                 |
+| Built-in relay               | Yes (opt-in, end-to-end encrypted, no account)                                                     | -                                               |
+| Direct network access        | Yes (LAN, Tailscale, VPN)                                                                          | -                                               |
+| SSH access                   | Yes                                                                                                | -                                               |
+| Providers                    | Claude Code, Codex, OpenCode, Pi, Antigravity, Muse Code, 30+ more                                 | OpenCode (many model providers)                 |
+| Parallel agents              | Yes (isolated worktrees, across machines)                                                          | Multiple sessions, no built-in worktree manager |
+| Terminal agents              | Yes (run any agent in a terminal, get notified when it finishes)                                   | -                                               |
+| Agent orchestration          | Yes (agents create worktrees and launch other agents, across providers)                            | MCP support inside OpenCode                     |
+| Editor                       | Yes                                                                                                | -                                               |
+| Terminals                    | Yes                                                                                                | OpenCode terminal workflow                      |
+| Diff review                  | Yes (comments go to the agent)                                                                     | -                                               |
+| Pull requests in app         | GitHub, GitLab, Gitea, Forgejo, Codeberg                                                           | GitHub, GitLab integrations                     |
+| In-app browser               | Yes (element picker, agent browser tools)                                                          | No                                              |
+| Per-worktree dev server URLs | Yes (`web--fix-auth--my-app.localhost`)                                                            | No                                              |
+| Schedules and heartbeats     | Yes                                                                                                | -                                               |
+| Plan usage                   | Yes                                                                                                | -                                               |
+| Plugins                      | Yes (new screens, panels, agent hooks, and providers, one plugin runs on desktop, web, and mobile) | No                                              |
+| Voice                        | Yes (local dictation, realtime voice)                                                              | No                                              |
+| Telemetry                    | None                                                                                               | -                                               |
 
 See also: [Clisbot vs Codex App](/alternatives/codex-app), [Clisbot vs Claude Desktop](/alternatives/claude-desktop), [Clisbot vs OpenChamber](/alternatives/openchamber).

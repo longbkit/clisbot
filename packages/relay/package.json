@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/relay",
-  "version": "0.10.2",
+  "version": "0.11.1",
   "description": "Clisbot relay for bridging daemon and client connections",
   "files": [
     "dist",
@@ -11,20 +11,14 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "node": "./dist/index.js",
-      "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./e2ee": {
       "types": "./dist/e2ee.d.ts",
-      "node": "./dist/e2ee.js",
-      "import": "./dist/e2ee.js",
       "default": "./dist/e2ee.js"
     },
     "./cloudflare": {
       "types": "./dist/cloudflare-adapter.d.ts",
-      "node": "./dist/cloudflare-adapter.js",
-      "import": "./dist/cloudflare-adapter.js",
       "default": "./dist/cloudflare-adapter.js"
     },
     "./node-transport": {

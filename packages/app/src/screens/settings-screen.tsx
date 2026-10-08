@@ -81,10 +81,10 @@ import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { WindowChromeRegion, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { BackHeader } from "@/components/headers/back-header";
-import { ScreenHeader } from "@/components/headers/screen-header";
 import { AddHostMethodModal } from "@/components/add-host-method-modal";
 import { AddHostModal } from "@/components/add-host-modal";
 import { AddRemoteSshHostModal } from "@/components/add-remote-ssh-host-modal";
+import { ScreenHeader } from "@/components/headers/screen-header";
 import { PairLinkModal } from "@/components/pair-link-modal";
 import { KeyboardShortcutsSection } from "@/screens/settings/keyboard-shortcuts-section";
 import { EditorSection } from "@/screens/settings/editor-section";
@@ -923,6 +923,8 @@ function renderSettingsDetailByKind(
         serverId={view.serverId}
         pluginId={view.pluginId}
         screenId={view.screenId}
+        onBackToPlugins={handlers.onBackToProjects}
+        showBackToPlugins={handlers.showBackToProjects}
       />
     );
   if (view.kind === "host") return renderHostSettingsContent(view, handlers.onHostRemoved);

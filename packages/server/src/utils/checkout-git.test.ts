@@ -1003,9 +1003,9 @@ const x = 1;
   });
 
   it("does not report local-only no-track worktree commits as ahead of origin", async () => {
-    setupRemoteTrackingMain(repoDir, tempDir);
-    commitFile(repoDir, "second.txt", "second\n", "second commit");
-    execFileSync("git", ["push"], { cwd: repoDir });
+    // This case needs a remote base ref, not a second clone or extra base history.
+    execFileSync("git", ["remote", "add", "origin", repoDir], { cwd: repoDir });
+    execFileSync("git", ["fetch", "origin", "main:refs/remotes/origin/main"], { cwd: repoDir });
 
     const worktree = await createLegacyWorktreeForTest({
       branchName: "fresh-feature",
@@ -1019,6 +1019,7 @@ const x = 1;
     const status = await getCheckoutStatus(worktree.worktreePath, { clisbotHome });
     expect(status).toMatchObject({
       isGit: true,
+      hasRemote: true,
       isClisbotOwnedWorktree: true,
       baseRef: "main",
       aheadBehind: { ahead: 1, behind: 0 },

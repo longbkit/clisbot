@@ -29,6 +29,7 @@ export interface OpenCodeEventConsumerTiming {
 export interface OpenCodeEventConsumerOptions {
   serverUrl: string;
   processExit: Promise<Error>;
+  listening?: Promise<void>;
   logger: Pick<Logger, "debug" | "warn">;
   createClient?: (baseUrl: string) => OpencodeClient;
   timing?: OpenCodeEventConsumerTiming;
@@ -160,7 +161,7 @@ export class OpenCodeEventConsumer implements OpenCodeEventSource {
       this.rejectReady = reject;
     });
     void this.readyPromise.catch(() => undefined);
-    this.connectionTask = this.consume(options.processExit);
+    this.connectionTask = this.consume(options.processExit, options.listening);
     void this.connectionTask.catch(() => undefined);
   }
 
@@ -193,8 +194,23 @@ export class OpenCodeEventConsumer implements OpenCodeEventSource {
     await this.connectionTask.catch(() => undefined);
   }
 
-  private async consume(processExit: Promise<Error>): Promise<void> {
+  private async consume(processExit: Promise<Error>, listening?: Promise<void>): Promise<void> {
     void processExit.then((error) => this.exit(error));
+    if (listening) {
+      const signal = this.connectionAbort.signal;
+      let stopWaiting!: () => void;
+      const stopped = new Promise<void>((resolve) => {
+        stopWaiting = resolve;
+      });
+      signal.addEventListener("abort", stopWaiting, { once: true });
+      try {
+        await Promise.race([listening, stopped]);
+      } catch {
+        return;
+      } finally {
+        signal.removeEventListener("abort", stopWaiting);
+      }
+    }
     let reconnectAttempt = 0;
     while (!this.closed) {
       this.attempt += 1;
@@ -400,5 +416,5 @@ function containsPluginError(error: unknown): boolean {
 }
 
 export type OpenCodeEventConsumerFactory = (
-  options: Pick<OpenCodeEventConsumerOptions, "serverUrl" | "processExit" | "logger">,
+  options: Pick<OpenCodeEventConsumerOptions, "serverUrl" | "processExit" | "logger" | "listening">,
 ) => OpenCodeEventConsumer;

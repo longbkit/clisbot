@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
 import { useSessionStore } from "@/stores/session-store";
@@ -320,6 +321,7 @@ function useDisplayGroups(input: {
   activeOnly: boolean;
 }): StatusDisplayGroup[] {
   const { groups, sessionsShown, byStatus, activeOnly } = input;
+  const { t } = useTranslation();
   const keepAgentIds = useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly);
   const serverIds = useMemo(
     () => (sessionsShown ? [...new Set(groups.flatMap((g) => g.rows.map((r) => r.serverId)))] : []),
@@ -339,7 +341,7 @@ function useDisplayGroups(input: {
       const messageSubmissions = submissionMaps[index];
       if (agents && messageSubmissions) sources.set(serverId, { agents, messageSubmissions });
     });
-    return sessionDisplayGroups({ groups, sources, activeOnly, keepAgentIds, byStatus });
+    return sessionDisplayGroups({ groups, sources, activeOnly, keepAgentIds, byStatus, t });
   }, [
     sessionsShown,
     byStatus,
@@ -349,6 +351,7 @@ function useDisplayGroups(input: {
     serverIds,
     agentMaps,
     submissionMaps,
+    t,
   ]);
 }
 

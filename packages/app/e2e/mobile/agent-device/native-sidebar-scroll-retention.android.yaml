@@ -1,0 +1,4 @@
+appId: sh.clisbot.debug
+---
+- launchApp
+- runFlow: ../../../maestro/sidebar-scroll-retention.yaml

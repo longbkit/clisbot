@@ -7,8 +7,9 @@ import type {
   SidebarShortcutModel,
   SidebarShortcutWorkspaceTarget,
 } from "@/utils/sidebar-shortcuts";
+import type { TFunction } from "i18next";
 import {
-  STATUS_BUCKET_LABELS,
+  getStatusBucketLabel,
   STATUS_BUCKET_ORDER,
   type StatusBucket,
 } from "@/hooks/sidebar-status-view-model";
@@ -66,6 +67,7 @@ export function sessionDisplayGroups(input: {
   /** Sessions a pane shows, kept by Active sessions only. */
   keepAgentIds?: ReadonlySet<string>;
   byStatus: boolean;
+  t: TFunction;
 }): StatusDisplayGroup[] {
   let order = 0;
   const rank = (group: SidebarWorkspaceGroup): RankedItem[] =>
@@ -87,7 +89,9 @@ export function sessionDisplayGroups(input: {
     const ranked = buckets.get(bucket);
     if (!ranked) return [];
     const leading = { kind: "status", bucket } as const;
-    return [displayGroup({ key: bucket, label: STATUS_BUCKET_LABELS[bucket], leading }, ranked)];
+    return [
+      displayGroup({ key: bucket, label: getStatusBucketLabel(bucket, input.t), leading }, ranked),
+    ];
   });
 }
 

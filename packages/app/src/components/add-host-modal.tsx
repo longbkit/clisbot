@@ -304,11 +304,30 @@ export function AddHostModal({
   onSaved,
   onPasteLink,
 }: AddHostModalProps) {
+  return (
+    <AddHostModalContent
+      key={String(visible)}
+      visible={visible}
+      onClose={onClose}
+      onCancel={onCancel}
+      onSaved={onSaved}
+      onPasteLink={onPasteLink}
+    />
+  );
+}
+
+function AddHostModalContent({
+  visible,
+  onClose,
+  onCancel,
+  onSaved,
+  onPasteLink,
+}: AddHostModalProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const daemons = useHosts();
-  const { probeAndUpsertDirectConnection, probeAndUpsertConnectionFromOfferUrl } =
-    useHostMutations();
+  const { probeAndUpsertDirectConnection, beginLinkPairing } = useHostMutations();
+  const [linkPairing] = useState(() => beginLinkPairing());
   const isMobile = useIsCompactFormFactor();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -322,18 +341,6 @@ export function AddHostModal({
   const [advancedUri, setAdvancedUri] = useState("");
   const [inputResetKey, bumpInputResetKey] = useReducer((key: number) => key + 1, 0);
   const advancedTarget = useRef(new PairingTargetTracker("", true));
-
-  const clearInput = useCallback(() => {
-    setHost("");
-    setPort("6868");
-    setUseTls(false);
-    setPassword("");
-    setIsPasswordVisible(false);
-    setIsAdvancedOpen(false);
-    setAdvancedUri("");
-    advancedTarget.current = new PairingTargetTracker("", true);
-    bumpInputResetKey();
-  }, []);
 
   const connectIcon = useMemo(
     () => <Link2 size={16} color={theme.colors.accentForeground} />,
@@ -374,29 +381,25 @@ export function AddHostModal({
     if (/\.ts\.net\.?$/i.test(value.trim())) setUseTls(true);
   }, []);
 
+  // Each open mounts a fresh form (see AddHostModal), so closing needs no reset.
   const handleClose = useCallback(() => {
     if (isSaving) return;
-    clearInput();
-    setErrorMessage("");
     onClose();
-  }, [isSaving, clearInput, onClose]);
+  }, [isSaving, onClose]);
 
   const handleCancel = useCallback(() => {
     if (isSaving) return;
-    clearInput();
-    setErrorMessage("");
     (onCancel ?? onClose)();
-  }, [isSaving, clearInput, onCancel, onClose]);
+  }, [isSaving, onCancel, onClose]);
 
   const handleSaveRelay = useCallback(
     async (relayUri: string) => {
       try {
         setIsSaving(true);
         setErrorMessage("");
-        const { profile, serverId, hostname } = await probeAndUpsertConnectionFromOfferUrl(
-          relayUri,
-          password || undefined,
-        );
+        const result = await linkPairing.submit(relayUri, password || undefined);
+        if (result.status === "cancelled") return;
+        const { profile, serverId, hostname } = result;
         const isNewHost = !daemons.some((daemon) => daemon.serverId === serverId);
         onSaved?.({ profile, serverId, hostname, isNewHost });
         handleClose();
@@ -412,9 +415,9 @@ export function AddHostModal({
       daemons,
       directConnectionLabels.invalidConnection,
       handleClose,
+      linkPairing,
       onSaved,
       password,
-      probeAndUpsertConnectionFromOfferUrl,
     ],
   );
 
@@ -425,7 +428,6 @@ export function AddHostModal({
     // A pairing link pasted into any field pairs, whichever field it landed in.
     const pairingLink = [host.trim(), relayUri].find((value) => value.includes("#offer="));
     if (pairingLink && onPasteLink) {
-      clearInput();
       onPasteLink(pairingLink);
       return;
     }
@@ -503,7 +505,6 @@ export function AddHostModal({
     t,
     handleSaveRelay,
     useTls,
-    clearInput,
     onPasteLink,
   ]);
 

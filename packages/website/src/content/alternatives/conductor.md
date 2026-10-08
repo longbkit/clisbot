@@ -27,7 +27,7 @@ Conductor runs local workspaces through its macOS app and cloud workspaces in ma
 
 ## Providers
 
-Clisbot runs Claude Code, Codex, OpenCode, and Pi natively, plus 30+ more agents through the in-app catalog including GitHub Copilot, Cursor, Gemini CLI, and Amp. Clisbot speaks the [Agent Client Protocol](https://agentclientprotocol.com), so any ACP agent works. Custom providers run any CLI agent. See [all supported providers](/agents).
+Clisbot runs Claude Code, Codex, OpenCode, Pi, Antigravity, and Muse Code natively, plus 30+ more agents through the in-app catalog including GitHub Copilot, Cursor, Gemini CLI, and Amp. Clisbot speaks the [Agent Client Protocol](https://agentclientprotocol.com), so any ACP agent works. Custom providers run any CLI agent. See [all supported providers](/agents).
 
 Conductor supports Claude Code, Codex, Cursor, and OpenCode.
 
@@ -67,11 +67,11 @@ Conductor lists its API as a Pro feature but does not document a user-facing CLI
 
 Both tools isolate parallel agents in git worktrees.
 
-Clisbot also gives each worktree its own dev server URL. Two agents running their dev servers at the same time get `web.fix-auth.my-app.localhost` and `web.add-search.my-app.localhost` instead of port collisions.
+Clisbot also gives each worktree its own dev server URL. Two agents running their dev servers at the same time get `web--fix-auth--my-app.localhost` and `web--add-search--my-app.localhost` instead of port collisions.
 
 ## Mobile
 
-Clisbot ships native iOS and Android apps today. Conductor lists its mobile app as coming soon under the Pro plan.
+The mobile app is the full app, native on iOS and Android, with full feature parity with desktop. Conductor lists its mobile app as coming soon under the Pro plan.
 
 ## Voice
 
@@ -79,21 +79,31 @@ Clisbot supports local speech-to-text and text-to-speech. Conductor does not cur
 
 ## Comparison
 
-|                              | Clisbot                                                         | Conductor                            |
-| ---------------------------- | --------------------------------------------------------------- | ------------------------------------ |
-| License                      | Open source (Apache-2.0)                                        | Closed source                        |
-| Platforms                    | macOS, Linux, Windows                                           | macOS only                           |
-| Native mobile                | iOS, Android                                                    | Coming soon under Pro                |
-| Providers                    | Claude Code, Codex, OpenCode, Pi + 30+ via ACP catalog + custom | Claude Code, Codex, Cursor, OpenCode |
-| Git worktrees                | Yes                                                             | Yes                                  |
-| Per-worktree dev server URLs | Yes                                                             | —                                    |
-| Split panes and tabs         | Yes                                                             | —                                    |
-| In-app terminal              | Yes                                                             | Yes                                  |
-| In-app browser               | Yes                                                             | —                                    |
-| GitHub workflow in app       | Commit, push, PR, checks, reviews, merge                        | Yes                                  |
-| CLI                          | Run, `--host`, ls, send, schedule, loop                         | —                                    |
-| Application plugins          | Server code and native client components                        | No                                   |
-| Local voice                  | Yes                                                             | Not documented                       |
-| Self-hosted daemon           | Yes                                                             | —                                    |
+|                              | Clisbot                                                                                            | Conductor                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| License                      | Open source (Apache-2.0)                                                                           | Closed source                           |
+| Account required             | No                                                                                                 | Yes                                     |
+| Desktop app                  | Yes (one click install, daemon bundled)                                                            | Yes (macOS only)                        |
+| Mobile app                   | Yes (native, full parity with desktop)                                                             | Coming soon under Pro                   |
+| CLI                          | Yes (everything the app does)                                                                      | API under Pro                           |
+| Remote machines              | Yes (install the daemon anywhere)                                                                  | No (managed cloud workspaces under Pro) |
+| Built-in relay               | Yes (opt-in, end-to-end encrypted, no account)                                                     | -                                       |
+| Direct network access        | Yes (LAN, Tailscale, VPN)                                                                          | No                                      |
+| SSH access                   | Yes                                                                                                | No                                      |
+| Providers                    | Claude Code, Codex, OpenCode, Pi, Antigravity, Muse Code, 30+ more                                 | Claude Code, Codex, Cursor, OpenCode    |
+| Parallel agents              | Yes (isolated worktrees, across machines)                                                          | Yes (Git worktrees)                     |
+| Terminal agents              | Yes (run any agent in a terminal, get notified when it finishes)                                   | -                                       |
+| Agent orchestration          | Yes (agents create worktrees and launch other agents, across providers)                            | -                                       |
+| Editor                       | Yes                                                                                                | -                                       |
+| Terminals                    | Yes                                                                                                | Yes                                     |
+| Diff review                  | Yes (comments go to the agent)                                                                     | -                                       |
+| Pull requests in app         | GitHub, GitLab, Gitea, Forgejo, Codeberg                                                           | GitHub                                  |
+| In-app browser               | Yes (element picker, agent browser tools)                                                          | -                                       |
+| Per-worktree dev server URLs | Yes (`web--fix-auth--my-app.localhost`)                                                            | -                                       |
+| Schedules and heartbeats     | Yes                                                                                                | -                                       |
+| Plan usage                   | Yes                                                                                                | -                                       |
+| Plugins                      | Yes (new screens, panels, agent hooks, and providers, one plugin runs on desktop, web, and mobile) | No                                      |
+| Voice                        | Yes (local dictation, realtime voice)                                                              | -                                       |
+| Telemetry                    | None                                                                                               | -                                       |
 
 See also: [Clisbot vs Superset](/alternatives/superset), [Clisbot vs OpenChamber](/alternatives/openchamber), [Clisbot vs Happy Coder](/alternatives/happy-coder).

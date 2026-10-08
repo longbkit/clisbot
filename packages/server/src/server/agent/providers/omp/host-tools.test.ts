@@ -8,10 +8,9 @@ import type {
   ClisbotToolResult,
 } from "../../tools/types.js";
 import {
-  clearOmpHostToolState,
   handleOmpHostToolRuntimeEvent,
+  OmpHostToolRouter,
   serializeOmpHostTools,
-  waitForOmpHostToolsIdle,
 } from "./host-tools.js";
 import type { OmpRpcHostToolResult } from "./rpc-types.js";
 import { FakeOmp } from "./test-utils/fake-omp.js";
@@ -37,11 +36,14 @@ class OmpHostToolHarness {
   private readonly controlledStart = new Promise<void>((resolve) => {
     this.resolveControlledStart = resolve;
   });
+  private readonly router: OmpHostToolRouter;
 
   private constructor(
     private readonly catalog: ClisbotToolCatalog,
     private readonly runtimeSession: Awaited<ReturnType<FakeOmp["startSession"]>>,
-  ) {}
+  ) {
+    this.router = new OmpHostToolRouter({ runtimeSession, catalog, logger: this.logger });
+  }
 
   static async withTools(tools: ClisbotToolDefinition[]): Promise<OmpHostToolHarness> {
     const omp = new FakeOmp();
@@ -73,7 +75,12 @@ class OmpHostToolHarness {
     arguments: Record<string, unknown>;
   }): Promise<OmpRpcHostToolResult> {
     const result = this.runtimeSession.nextHostToolResult();
-    handleOmpHostToolRuntimeEvent({ type: "host_tool_call", ...input }, this.routerInput());
+    handleOmpHostToolRuntimeEvent(
+      { type: "host_tool_call", ...input },
+      this.router,
+      this.runtimeSession,
+      this.logger,
+    );
     return await result;
   }
 
@@ -86,7 +93,9 @@ class OmpHostToolHarness {
         toolName: "wait_for_agent",
         arguments: { agentId: "child-1" },
       },
-      this.routerInput(),
+      this.router,
+      this.runtimeSession,
+      this.logger,
     );
   }
 
@@ -97,7 +106,9 @@ class OmpHostToolHarness {
   cancelControlledCall(): void {
     handleOmpHostToolRuntimeEvent(
       { type: "host_tool_cancel", id: "cancel-1", targetId: "host-cancel" },
-      this.routerInput(),
+      this.router,
+      this.runtimeSession,
+      this.logger,
     );
   }
 
@@ -107,7 +118,7 @@ class OmpHostToolHarness {
   }
 
   async waitForIdle(): Promise<void> {
-    await waitForOmpHostToolsIdle(this.runtimeSession);
+    await this.router.waitForIdle();
   }
 
   wasControlledCallAborted(): boolean {
@@ -123,11 +134,7 @@ class OmpHostToolHarness {
   }
 
   close(): void {
-    clearOmpHostToolState(this.runtimeSession);
-  }
-
-  private routerInput() {
-    return { runtimeSession: this.runtimeSession, clisbotTools: this.catalog, logger: this.logger };
+    this.router.clear();
   }
 }
 

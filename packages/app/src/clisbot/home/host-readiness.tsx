@@ -16,7 +16,7 @@ import {
   type HostRuntimeConnectionStatus,
 } from "@/runtime/host-runtime";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
-import { getProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
 import { useSessionStore } from "@/stores/session-store";
 import { buildSettingsHostRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { settingsStyles } from "@/styles/settings";
@@ -224,7 +224,7 @@ interface GlyphProps {
 }
 
 function ProviderIconGlyph({ provider, serverId, size, color }: GlyphProps) {
-  const Icon = getProviderIcon(provider, serverId);
+  const Icon = useProviderIcon(provider, serverId);
   return <Icon size={size} color={color} />;
 }
 

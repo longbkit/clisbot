@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { Import, Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -5,7 +6,28 @@ import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { useSidebarModel } from "./sidebar-model";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
-import { settingsStyles } from "@/styles/settings";
+
+function SidebarEmptyStateCard({
+  testID,
+  title,
+  description,
+  children,
+}: {
+  testID: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.card} testID={testID}>
+      <View style={styles.copy}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.description}>{description}</Text>
+      </View>
+      <View style={styles.actions}>{children}</View>
+    </View>
+  );
+}
 
 /**
  * The two things the sidebar's workspace list says when it has no rows.
@@ -20,13 +42,15 @@ export function SidebarFilterEmptyState() {
   const clearAllFilters = useSidebarViewStore((state) => state.clearAllFilters);
 
   return (
-    <View style={[settingsStyles.card, styles.container]} testID="sidebar-filter-empty-state">
-      <Text style={styles.title}>{t("sidebar.filterEmpty.title")}</Text>
-      <Text style={styles.description}>{t("sidebar.filterEmpty.description")}</Text>
-      <Button variant="ghost" size="sm" onPress={clearAllFilters}>
+    <SidebarEmptyStateCard
+      testID="sidebar-filter-empty-state"
+      title={t("sidebar.filterEmpty.title")}
+      description={t("sidebar.filterEmpty.description")}
+    >
+      <Button variant="secondary" size="xs" onPress={clearAllFilters}>
         {t("sidebar.filterEmpty.clear")}
       </Button>
-    </View>
+    </SidebarEmptyStateCard>
   );
 }
 
@@ -54,38 +78,44 @@ export function SidebarProjectEmptyState({
   const { t } = useTranslation();
 
   return (
-    <View style={[settingsStyles.card, styles.container]} testID="sidebar-project-empty-state">
-      <Text style={styles.title}>{t("sidebar.project.empty.title")}</Text>
-      <Text style={styles.description}>{t("sidebar.project.empty.description")}</Text>
-      <Button variant="ghost" size="sm" leftIcon={Plus} onPress={onAddProject}>
+    <SidebarEmptyStateCard
+      testID="sidebar-project-empty-state"
+      title={t("sidebar.project.empty.title")}
+      description={t("sidebar.project.empty.description")}
+    >
+      <Button variant="secondary" size="xs" leftIcon={Plus} onPress={onAddProject}>
         {t("sidebar.actions.addProject")}
       </Button>
-      <Button variant="ghost" size="sm" leftIcon={Import} onPress={onImportSession}>
+      <Button variant="outline" size="xs" leftIcon={Import} onPress={onImportSession}>
         {t("importSession.title")}
       </Button>
-    </View>
+    </SidebarEmptyStateCard>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: {
-    marginHorizontal: theme.spacing[2],
+  card: {
+    marginTop: theme.spacing[3],
+    padding: theme.spacing[4],
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+  },
+  copy: {
+    gap: theme.spacing[1],
+  },
+  actions: {
+    flexDirection: "row",
+    gap: theme.spacing[2],
     marginTop: theme.spacing[4],
-    paddingTop: theme.spacing[6],
-    paddingBottom: theme.spacing[4],
-    paddingHorizontal: theme.spacing[4],
-    alignItems: "center",
-    gap: theme.spacing[3],
   },
   title: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-    textAlign: "center",
+    fontWeight: theme.fontWeight.normal,
   },
   description: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
-    textAlign: "center",
   },
 }));

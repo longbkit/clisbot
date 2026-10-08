@@ -75,11 +75,11 @@ describe("syncSkills", () => {
       "utf-8",
     );
     expect(claudeContent).toBe("new clisbot content");
-    const codexContent = await fs.readFile(
-      path.join(sandbox.codexDir, "clisbot", "SKILL.md"),
-      "utf-8",
+    await expect(fs.stat(path.join(sandbox.codexDir, "clisbot", "SKILL.md"))).rejects.toMatchObject(
+      {
+        code: "ENOENT",
+      },
     );
-    expect(codexContent).toBe("new clisbot content");
   });
 
   it("installs new bundled skills, including references/, when not present on disk", async () => {
@@ -105,12 +105,9 @@ describe("syncSkills", () => {
         "utf-8",
       ),
     ).toBe("roles content");
-    expect(
-      await fs.readFile(
-        path.join(sandbox.codexDir, "clisbot-committee", "references", "roles.md"),
-        "utf-8",
-      ),
-    ).toBe("roles content");
+    await expect(fs.stat(path.join(sandbox.codexDir, "clisbot-committee"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
 
     const claudeSkillDir = path.join(sandbox.claudeDir, "clisbot-committee");
     expect((await fs.lstat(claudeSkillDir)).isDirectory()).toBe(true);

@@ -143,6 +143,52 @@ describe("assistant selection copy ranges", () => {
     expect(copiedMarkdown(selectRange(blocks[0]!, 6, blocks[1]!, 6))).toBe("paragraph.\n\nSecond");
   });
 
+  // Chrome anchors a drag that starts in the gap below an image at the start of the
+  // image's rendered internals: the background-image layer, ahead of the hidden `img`.
+  // Only the text after it is highlighted.
+  it("leaves out an image when the selection starts in the gap below it", () => {
+    const transcript = mountTranscript([
+      {
+        messageId: "message-1",
+        blocks: [
+          "Before the image.",
+          '<div data-clisbot-markdown-tag="img" data-clisbot-markdown-src="https://example.test/chart.png" data-clisbot-markdown-alt="chart"><div><div style="background-image: url(blob:https://example.test/preview)"></div><img src="blob:https://example.test/preview" alt=""></div></div>',
+          "After the image.",
+        ],
+      },
+    ]);
+    const frame = fixtureElement(transcript, '[data-clisbot-markdown-tag="img"]');
+    const range = document.createRange();
+    range.setStart(frame.firstElementChild!.firstElementChild!, 0);
+    range.setEnd(textNode(fixtureElement(transcript, '[data-clisbot-markdown-tag="p"]', 2)), 9);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    expect(copiedMarkdown(selection)).toBe("After the");
+  });
+
+  it("keeps a failed image when the selection starts in its error text", () => {
+    const transcript = mountTranscript([
+      {
+        messageId: "message-1",
+        blocks: [
+          '<div data-clisbot-markdown-tag="img" data-clisbot-markdown-src="https://example.test/chart.png" data-clisbot-markdown-alt="chart"><div>Image failed to load</div></div>',
+          "After the image.",
+        ],
+      },
+    ]);
+    const frame = fixtureElement(transcript, '[data-clisbot-markdown-tag="img"]');
+    const selection = selectRange(
+      frame.firstElementChild!,
+      6,
+      fixtureElement(transcript, '[data-clisbot-markdown-tag="p"]', 1),
+      9,
+    );
+
+    expect(copiedMarkdown(selection)).toBe("![chart](https://example.test/chart.png)\n\nAfter the");
+  });
+
   it("does not replace the browser clipboard for a selection reaching a second message", () => {
     const transcript = mountTranscript([
       { messageId: "message-1", blocks: ["First paragraph.", "Second paragraph."] },
@@ -322,6 +368,32 @@ describe("assistant selection copy ranges", () => {
     ).toBe("6. Second bullet text");
   });
 
+  it("keeps the next number when a drag crosses a code block nested in an item", () => {
+    const message = mountFixture();
+    const list = fixtureElement(message, '[data-clisbot-markdown-tag="ul"]');
+    list.outerHTML = [
+      '<div data-clisbot-markdown-tag="ol" data-clisbot-markdown-list-start="1">',
+      '<div data-clisbot-markdown-tag="li">',
+      '<div data-clisbot-markdown-ignore="true" data-clisbot-markdown-list-marker="true">1.</div>',
+      "<div><div><span>Install it:</span></div>",
+      '<div data-clisbot-markdown-tag="pre" data-clisbot-markdown-language="sh">',
+      '<div data-clisbot-markdown-tag="code"><span>brew install foo</span></div>',
+      '<button data-clisbot-markdown-ignore="true">Copy</button>',
+      "</div></div>",
+      "</div>",
+      '<div data-clisbot-markdown-tag="li">',
+      '<div data-clisbot-markdown-ignore="true" data-clisbot-markdown-list-marker="true">2.</div>',
+      "<div><div><span>Done.</span></div></div>",
+      "</div>",
+      "</div>",
+    ].join("");
+
+    const content = copyAcross(message, "Install it:", "Done.");
+
+    expect(content?.plainText).toBe("Install it:\n\n```sh\nbrew install foo\n```\n\n2. Done.");
+    expect(content?.html).toContain("<div>2. Done.</div>");
+  });
+
   it("retains nested markers when a drag includes the complete outer item", () => {
     const message = mountFixture();
     const firstItem = fixtureElement(message, '[data-clisbot-markdown-tag="li"]');
@@ -387,6 +459,20 @@ describe("assistant selection copy ranges", () => {
     expect(content?.html).not.toContain("<pre>");
   });
 
+  it("copies an image as its Markdown when the selection stays inside the rendered image", () => {
+    const message = mountFixture();
+    const frame = document.createElement("div");
+    frame.setAttribute("data-clisbot-markdown-tag", "img");
+    frame.setAttribute("data-clisbot-markdown-src", "https://example.test/chart.png");
+    frame.setAttribute("data-clisbot-markdown-alt", "chart");
+    frame.innerHTML = '<div><div><img src="blob:https://example.test/preview" alt=""></div></div>';
+    message.prepend(frame);
+
+    expect(copiedMarkdown(selectNodeContents(fixtureElement(frame, "img").parentElement!))).toBe(
+      "![chart](https://example.test/chart.png)",
+    );
+  });
+
   it("copies code without a fence when every character is selected inside the block", () => {
     const message = mountFixture();
     const blockCode = fixtureElement(
@@ -407,10 +493,19 @@ describe("assistant selection copy ranges", () => {
  * Turndown, so those cases need a fixture shaped like the real thing.
  */
 function highlightedFixture(language: string | null): string {
+  return [
+    '<div data-testid="assistant-message">',
+    '<div data-clisbot-markdown-tag="p"><span>Before the block.</span></div>',
+    highlightedCodeBlock(language),
+    '<div data-clisbot-markdown-tag="p"><span>After the block.</span></div>',
+    "</div>",
+  ].join("");
+}
+
+function highlightedCodeBlock(language: string | null): string {
   const languageAttribute =
     language === null ? "" : ` data-clisbot-markdown-language="${escapeAttribute(language)}"`;
   return [
-    '<div data-testid="assistant-message">',
     `<div data-clisbot-markdown-tag="pre"${languageAttribute}>`,
     '<span data-clisbot-markdown-tag="code">',
     "<span>const</span><span> answer</span><span> = 1;</span>",
@@ -420,8 +515,6 @@ function highlightedFixture(language: string | null): string {
     "<span>    doThing();</span>",
     "</span>",
     '<div data-clisbot-markdown-ignore="true"><span>Copy</span></div>',
-    "</div>",
-    '<div data-clisbot-markdown-tag="p"><span>After the block.</span></div>',
     "</div>",
   ].join("");
 }
@@ -597,6 +690,65 @@ describe("assistant selection copy inside highlighted code", () => {
 
     expect(copiedMarkdown(selectNodeContents(blockCode))).toBe(
       "const answer = 1;\n  if (answer) {\n    doThing();",
+    );
+  });
+
+  // A drag that starts or ends in the gap beside a block anchors the selection at the
+  // edge of the neighbouring block. Nothing outside the code is highlighted or selected.
+  it("copies code without a fence when the selection only touches the end of the block before it", () => {
+    const message = mountHighlighted();
+    const before = tokenText(message, "Before the block.");
+
+    const content = copyBetween(
+      [before, before.length],
+      [tokenText(message, "    doThing();"), 14],
+    );
+
+    expect(content?.plainText).toBe("const answer = 1;\n  if (answer) {\n    doThing();");
+  });
+
+  it("copies code without a fence when the selection only touches the start of the block after it", () => {
+    const message = mountHighlighted();
+
+    const content = copyBetween(
+      [tokenText(message, "const"), 0],
+      [tokenText(message, "After the block."), 0],
+    );
+
+    expect(content?.plainText).toBe("const answer = 1;\n  if (answer) {\n    doThing();");
+  });
+
+  it("copies code without a fence when the selection only touches the row before the block", () => {
+    const transcript = mountTranscript([{ messageId: "message-1", blocks: ["Run this:", "code"] }]);
+    const codeRow = transcript.querySelectorAll('[data-testid="assistant-message"]')[1]!;
+    codeRow.innerHTML = highlightedCodeBlock("typescript");
+    const before = tokenText(transcript, "Run this:");
+
+    const content = copyBetween(
+      [before, before.length],
+      [tokenText(transcript, "    doThing();"), 14],
+    );
+
+    expect(content?.plainText).toBe("const answer = 1;\n  if (answer) {\n    doThing();");
+  });
+
+  it("keeps an image selected beside the code in the copy", () => {
+    const message = mountHighlighted();
+    const image = document.createElement("div");
+    image.setAttribute("data-clisbot-markdown-tag", "p");
+    // The rendered `img` shows a preview URL with no alt text; the frame carries the Markdown.
+    image.innerHTML =
+      '<div data-clisbot-markdown-tag="img" data-clisbot-markdown-src="https://example.test/chart.png" data-clisbot-markdown-alt="chart"><img src="blob:https://example.test/preview" alt=""></div>';
+    message.querySelector('[data-clisbot-markdown-tag="pre"]')!.before(image);
+    const before = tokenText(message, "Before the block.");
+
+    const content = copyBetween(
+      [before, before.length],
+      [tokenText(message, "    doThing();"), 14],
+    );
+
+    expect(content?.plainText).toBe(
+      "![chart](https://example.test/chart.png)\n\n```typescript\nconst answer = 1;\n  if (answer) {\n    doThing();\n```",
     );
   });
 

@@ -8,7 +8,9 @@ category: Providers
 
 # Providers
 
-Clisbot doesn't ship its own coding agent. It launches and supervises **existing CLIs you've already installed and authenticated**, Claude Code, Codex, OpenCode, Cursor, Gemini, and the rest. Your subscriptions, your config, your skills, your MCP servers all stay intact. Clisbot just gives you a UI, a CLI, a relay, and orchestration on top.
+Clisbot runs **existing coding agents you've installed and authenticated** in workspaces with an editor, terminals, diffs, and, on desktop, a browser. Run several agents in parallel, choose a provider for each task, and review their work in the same app. Your subscriptions, config, skills, and MCP servers stay intact.
+
+To try the workflow, [run parallel tasks in separate worktrees](/docs/parallel-development).
 
 ## Mental model
 
@@ -16,7 +18,7 @@ A provider is the contract between Clisbot and one external agent CLI: how to la
 
 ## Two tiers
 
-- **Native support**, Clisbot ships a bundled adapter for the major agents (Claude Code, Codex, OpenCode, pi). Auto-discovered when the underlying CLI is installed, with mode metadata and voice support where applicable.
+- **Native support**, Clisbot ships a bundled adapter for the major agents (Claude Code, Codex, OpenCode, Pi, [Antigravity](/docs/supported-providers#antigravity), [Muse Code](/docs/muse-code)). Auto-discovered when the underlying CLI is installed, with mode metadata and voice support where applicable.
 - **ACP catalog**, any agent speaking the [Agent Client Protocol](https://agentclientprotocol.com) is supported through a generic adapter. Clisbot ships a curated catalog of one-click installs (Cursor, Gemini, GitHub Copilot, Hermes, Kimi, Qwen Code, and 25+ more), and you can add any other ACP agent yourself.
 
 Either way, **you install the underlying CLI**. Clisbot runs it.

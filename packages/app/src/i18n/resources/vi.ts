@@ -78,6 +78,7 @@ export const vi: TranslationResources = {
       error: "Lỗi",
       idle: "Rảnh",
     },
+    bottomSheetBackdrop: "Nền mờ của bảng dưới",
   },
   shell: {
     menu: {
@@ -398,6 +399,9 @@ export const vi: TranslationResources = {
       withTokens: "Đã nén ngữ cảnh ({{tokens}}K token)",
       completed: "Đã nén ngữ cảnh",
     },
+    turnFooter: {
+      workedFor: "Đã làm việc trong {{duration}}",
+    },
   },
   importSession: {
     title: "Nhập phiên",
@@ -622,6 +626,17 @@ export const vi: TranslationResources = {
         archiveFailed: "Lưu trữ workspace thất bại",
       },
     },
+    footer: {
+      usage: "Mức sử dụng",
+    },
+    statusBucket: {
+      needsInput: "Cần phản hồi",
+      failed: "Thất bại",
+      readyToReview: "Sẵn sàng để xem lại",
+      working: "Đang làm",
+      done: "Xong",
+    },
+    statusGroupAccessibility: "Nhóm {{label}}",
   },
   desktop: {
     windowControls: {
@@ -840,6 +855,8 @@ export const vi: TranslationResources = {
     noFiles: "Không tìm thấy file hoặc thư mục",
     noCommands: "Không tìm thấy lệnh",
     failedToLoad: "Tải thất bại",
+    chooseModelForCommands: "Chọn một mô hình để xem lệnh",
+    chooseProjectForCommands: "Chọn một dự án để xem lệnh",
   },
   loadOlderHistory: {
     failed: "Không thể tải lịch sử cũ hơn",
@@ -1001,6 +1018,8 @@ export const vi: TranslationResources = {
       helper: "Kết nối tới daemon Clisbot đang chạy trên host từ xa.",
       fields: {
         target: "Host SSH",
+        optional: "Không bắt buộc",
+        password: "Mật khẩu daemon",
       },
       actions: {
         cancel: "Hủy",
@@ -1011,6 +1030,10 @@ export const vi: TranslationResources = {
         targetRequired: "Cần nhập host SSH",
         invalidTarget: "Nhập host ssh:// hợp lệ",
         failedToConnect: "Không thể kết nối qua SSH. {{detail}}",
+      },
+      passwordVisibility: {
+        show: "Hiện mật khẩu",
+        hide: "Ẩn mật khẩu",
       },
     },
     link: {
@@ -1108,6 +1131,17 @@ export const vi: TranslationResources = {
       copy: "Sao chép",
       copied: "Đã sao chép",
     },
+    hostConfirmation: {
+      title: "Kết nối tới host này?",
+      description:
+        "Host này sẽ có thể chạy mã trong ứng dụng và truy cập các host khác bạn đã kết nối. Chỉ kết nối nếu bạn nhận ra nó.",
+      descriptionChanged:
+        "Liên kết này thay đổi cách bạn kết nối tới host. Host sẽ có thể chạy mã trong ứng dụng và truy cập các host khác bạn đã kết nối. Chỉ kết nối nếu bạn nhận ra nó.",
+      hostLabel: "Host",
+      fingerprintLabel: "Dấu vân tay khóa",
+      relayLabel: "Relay",
+      connect: "Kết nối",
+    },
   },
   realtimeVoice: {
     actions: {
@@ -1159,6 +1193,8 @@ export const vi: TranslationResources = {
     tokens: "{{used}} / {{max}} token",
     sessionCost: "Chi phí phiên {{cost}}",
     accessibility: "Cửa sổ ngữ cảnh đã dùng {{percentage}}%",
+    accessibilityNoData: "Cửa sổ ngữ cảnh: chưa có dữ liệu ngữ cảnh",
+    noData: "Chưa có dữ liệu ngữ cảnh",
   },
 
   workspace: {
@@ -1183,6 +1219,8 @@ export const vi: TranslationResources = {
         restoringAction: "Đang khôi phục...",
         unavailableTitle: "Workspace không khả dụng",
         checkFailedTitle: "Không thể kiểm tra workspace",
+        restoreWithoutBranchDescription:
+          "Khôi phục {{workspaceName}} để quay lại các agent của nó. Một nhánh mới sẽ bắt đầu từ base đã lưu hoặc nhánh mặc định của kho mã.",
       },
     },
     hoverCard: {
@@ -1701,6 +1739,9 @@ export const vi: TranslationResources = {
         actions: {
           viewPullRequest: "Xem",
           openOn: "Mở trên {{brand}}",
+          addingToChat: "Đang thêm...",
+          addAllToChat: "Thêm tất cả vào chat",
+          addToChat: "Thêm vào chat",
         },
         checksSummary: {
           passedLabel: "đạt",
@@ -1714,12 +1755,14 @@ export const vi: TranslationResources = {
           checks: "Check",
           pipeline: "Pipeline",
           reviews: "Review",
+          activity: "Hoạt động",
         },
         empty: {
           noJobs: "Không có job",
           loadingPipeline: "Đang tải pipeline…",
           pipelineJobsLoadFailed: "Không thể tải job của pipeline",
           allowedToFail: "được phép lỗi",
+          noActivity: "Chưa có hoạt động",
         },
         approvals: "{{given}}/{{required}} phê duyệt",
         accessibility: {
@@ -1735,6 +1778,8 @@ export const vi: TranslationResources = {
             skipped: "Bỏ qua",
             cancelled: "Đã hủy",
           },
+          threadActions: "Thao tác với luồng",
+          commentActions: "Thao tác với bình luận",
         },
         states: {
           draft: "Bản nháp",
@@ -1753,10 +1798,50 @@ export const vi: TranslationResources = {
         },
         thread: {
           discussion: "Thread thảo luận",
+          outdated: "Đã cũ",
+          resolved: "Đã giải quyết",
         },
         errors: {
           statusLoadFailed: "Không thể tải trạng thái pull request",
           activityLoadFailed: "Không thể tải hoạt động của pull request",
+        },
+        checksOverview: {
+          headline: {
+            actionRequired: "Một số kiểm tra cần bạn xử lý",
+            failure: "Một số kiểm tra không thành công",
+            pending: "Một số kiểm tra chưa hoàn tất",
+            success: "Tất cả kiểm tra đã đạt",
+            none: "Không có kiểm tra",
+          },
+          count: {
+            actionRequired: "{{count}} cần xử lý",
+            warning: "{{count}} cảnh báo",
+            failure: "{{count}} thất bại",
+            pending: "{{count}} đang chạy",
+            manual: "{{count}} thủ công",
+            success: "{{count}} thành công",
+            ignored: "{{count}} bỏ qua",
+          },
+          detailOne: "{{parts}} kiểm tra",
+          detailMany: "{{parts}} kiểm tra",
+          groupOne: {
+            actionRequired: "{{count}} kiểm tra cần xử lý",
+            warning: "{{count}} kiểm tra cảnh báo",
+            failure: "{{count}} kiểm tra thất bại",
+            pending: "{{count}} kiểm tra đang chạy",
+            manual: "{{count}} kiểm tra thủ công",
+            success: "{{count}} kiểm tra thành công",
+            ignored: "{{count}} kiểm tra bị bỏ qua",
+          },
+          groupMany: {
+            actionRequired: "{{count}} kiểm tra cần xử lý",
+            warning: "{{count}} kiểm tra cảnh báo",
+            failure: "{{count}} kiểm tra thất bại",
+            pending: "{{count}} kiểm tra đang chạy",
+            manual: "{{count}} kiểm tra thủ công",
+            success: "{{count}} kiểm tra thành công",
+            ignored: "{{count}} kiểm tra bị bỏ qua",
+          },
         },
       },
       forgeSetup: {
@@ -2332,13 +2417,19 @@ export const vi: TranslationResources = {
         description: "Hiện mục lục để nhảy nhanh giữa các prompt",
       },
       sidebar: {
-        bottomTitle: "Phía dưới",
+        bottomTitle: "Thanh dưới",
         bottomDescription:
           "Chọn các thao tác phía dưới và thứ tự của chúng. Mới, Thêm dự án và Tìm kiếm luôn ở bên trái; Chọn Host và Nhập phiên luôn ở bên phải. Trợ giúp và Cài đặt luôn hiện ở vị trí cố định.",
-        title: "Thanh bên",
-        description: "Chọn mục nào hiện ở đầu thanh bên và theo thứ tự nào",
         moveUp: "Lên trên",
         moveDown: "Xuống dưới",
+        footer: {
+          title: "Phần cuối",
+          description: "Chọn các hàng hiển thị ở cuối thanh bên và thứ tự của chúng",
+        },
+        header: {
+          title: "Phần đầu",
+          description: "Chọn các mục hiển thị ở đầu thanh bên và thứ tự của chúng",
+        },
       },
       fonts: {
         title: "Phông chữ",
@@ -2368,6 +2459,14 @@ export const vi: TranslationResources = {
         highlightThemeAccessibility: "Chủ đề tô sáng: {{value}}",
         previewAccessibility: "Xem trước trực tiếp kiểu chữ nội dung, chủ đề cú pháp và phông code",
         previewContent: "Xem trước nội dung và code dễ đọc",
+      },
+      layout: {
+        title: "Bố cục",
+        contentWidth: "Độ rộng nội dung",
+        contentWidthHint: "Độ rộng tối đa của chat và tệp Markdown trên màn hình rộng",
+        contentWidthAccessibility: "Độ rộng nội dung tính bằng pixel",
+        reset: "Đặt lại",
+        resetAccessibility: "Đặt lại độ rộng nội dung về mặc định",
       },
     },
     shortcuts: {

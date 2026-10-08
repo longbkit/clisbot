@@ -6,7 +6,7 @@ import { SidebarWorkspaceShortcutBadge } from "@/components/sidebar/sidebar-work
 import { SCRIM_WIDTH, TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
-import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
+import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import { type Agent, useSessionStore } from "@/stores/session-store";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 

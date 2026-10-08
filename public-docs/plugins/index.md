@@ -9,7 +9,7 @@ category: Plugins
 # Plugin quickstart
 
 A plugin is a TypeScript project installed into one Clisbot daemon. It can add
-[surfaces and sidebar items](/docs/plugins/reference#surfaces-and-sidebar-items),
+[screens and sidebar items](/docs/plugins/reference#screens-and-sidebar-items),
 [workspace panels](/docs/plugins/reference#workspace-panels),
 [Command Center items](/docs/plugins/reference#command-center-items),
 [slash commands](/docs/plugins/reference#slash-commands),
@@ -20,6 +20,16 @@ A plugin is a TypeScript project installed into one Clisbot daemon. It can add
 [daemon-side RPCs](/docs/plugins/reference#add-plugin-specific-backend-behavior). It can also
 [connect a coding agent as a provider](/docs/plugins/providers). Client
 contributions run on every Clisbot client connected to that daemon, including mobile.
+
+Browse [published plugins](https://clisbot.com/plugins), then install one on your daemon:
+
+```bash
+clisbot plugin add owner/slug
+```
+
+Or paste `owner/slug` into **Settings → Plugins → Plugin source** and select **Install plugin**.
+Clisbot installs the registry's reviewed artifact. Use `git:owner/repository` or a full Git URL
+when you want to install directly from a Git repository.
 
 This guide scaffolds a plugin, runs it, and adds a workspace panel to it.
 
@@ -37,7 +47,7 @@ npm install
 development dependencies for typechecking and tests only; Clisbot supplies the plugin SDK, React,
 React Native, TanStack Query, and Zod at runtime.
 
-The scaffold is a working plugin: a sidebar surface with a button that asks the daemon for a
+The scaffold is a working plugin: a screen, opened from the sidebar, with a button that asks the daemon for a
 greeting through an RPC.
 
 ```text
@@ -45,7 +55,7 @@ workspace-plugin/
   clisbot-plugin.json      # plugin ID and supported Clisbot versions
   index.client.tsx       # runs in the Clisbot app
   index.server.ts        # runs in a daemon subprocess
-  client/greeting.tsx    # the surface component
+  client/greeting.tsx    # the screen component
   client/web.ts          # the only file allowed to touch browser APIs
   server/greeting.ts     # the RPC handler
   shared/greeting.ts     # the RPC contract, imported by both
@@ -54,20 +64,26 @@ workspace-plugin/
 ```
 
 Each entry default-exports one function that registers contributions and returns a cleanup
-function. `index.client.tsx` registers the surface and the sidebar item that opens it:
+function. `index.client.tsx` registers the screen and the sidebar item that opens it:
 
 ```tsx
-import type { PluginClientContext } from "@clisbot/plugin/client";
-import { GreetingSurface } from "./client/greeting";
+import type { PluginClientContext, PluginSidebarItemProps } from "@clisbot/plugin/client";
+import { SidebarRow } from "@clisbot/plugin/client/ui";
+import { GreetingScreen } from "./client/greeting";
+
+function GreetingItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
+  return (
+    <SidebarRow
+      icon="MessageCircle"
+      active={currentScreen?.screenId === "greeting"}
+      onPress={() => openScreen({ screenId: "greeting" })}
+    />
+  );
+}
 
 export default function contribute(client: PluginClientContext) {
-  client.addSurface("greeting", GreetingSurface);
-  client.addSidebarItem({
-    id: "greeting",
-    title: "Greeting",
-    icon: "MessageCircle",
-    surface: "greeting",
-  });
+  client.addScreen({ id: "greeting", title: "Greeting", Component: GreetingScreen });
+  client.addSidebarHeaderItem({ id: "greeting", title: "Greeting", Component: GreetingItem });
   return () => {};
 }
 ```
@@ -240,13 +256,13 @@ reload use the installed files.
 See [plugin sources](/docs/plugins/reference#plugin-sources) for identifier syntax. To share your own plugin, follow
 [Publish a plugin](/docs/plugins/publishing).
 
-Plugins published in a Git repository install by shorthand or URL:
+Plugins published in a Git repository install by explicit Git shorthand or URL:
 
 ```bash
-clisbot plugin add owner/repository
+clisbot plugin add git:owner/repository
 clisbot plugin add https://gitlab.com/group/repository.git
-clisbot plugin add owner/monorepo:plugins/workspace
-clisbot plugin add owner/repository --ref main
+clisbot plugin add git:owner/monorepo:plugins/workspace
+clisbot plugin add git:owner/repository --ref main
 ```
 
 Append `:relative/path` when the plugin lives below the repository root. `--ref` selects the initial

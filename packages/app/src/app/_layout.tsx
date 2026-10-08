@@ -4,6 +4,7 @@ import { ProductAnalyticsHost } from "@/clisbot/analytics/host";
 import { ConfirmationProvider } from "@/components/confirmation-provider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PortalProvider } from "@gorhom/portal";
+import { LucideProvider } from "lucide-react-native";
 import * as Notifications from "expo-notifications";
 import { Stack, useNavigationContainerRef, usePathname, useRouter } from "expo-router";
 import {
@@ -47,6 +48,7 @@ import { WorkspaceSetupDialog } from "@/components/workspace-setup-dialog";
 import { WorkspaceShortcutTargetsSubscriber } from "@/components/workspace-shortcut-targets-subscriber";
 import { FloatingPanelPortalHost } from "@/components/ui/floating-panel-portal";
 import { HostChooserModal, useHostChooser } from "@/hosts/host-chooser";
+import { HostConfirmationSheet } from "@/hosts/host-confirmation-sheet";
 import {
   getIsElectronRuntime,
   HEADER_INNER_HEIGHT,
@@ -114,7 +116,7 @@ import {
 import { getDaemonStartService } from "@/runtime/daemon-start-service";
 import { usePanelStore } from "@/stores/panel-store";
 import { flushDraftPersistStorage } from "@/stores/draft-store";
-import { getNextThemePreference } from "@/styles/theme";
+import { getNextThemePreference, ICON_STROKE_WIDTH } from "@/styles/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { installWebScrollbarStyles } from "@/styles/install-web-scrollbar-styles";
 import type { HostProfile } from "@/types/host-connection";
@@ -612,6 +614,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
         <CommandCenter />
         <AddProjectFlowHost />
         <HostChooserModal />
+        <HostConfirmationSheet />
         <ProviderSettingsHost />
         <WorkspaceSetupDialog />
         <KeyboardShortcutsDialog />
@@ -953,22 +956,33 @@ function RootProviders({ children }: { children: ReactNode }) {
   );
 }
 
+/** Clisbot: the Hub account scope and pairing listener above the upstream providers. */
+function ClisbotHubScope({ children }: { children: ReactNode }) {
+  return (
+    <ToastProvider>
+      {/* Pairing can change the active Hub and remount its account scope. */}
+      <OfferLinkListener />
+      <HubAccountProvider>
+        <HubHostSynchronization />
+        {children}
+      </HubAccountProvider>
+    </ToastProvider>
+  );
+}
+
 function RootAppTree() {
   return (
     <GestureHandlerRootView style={flexStyle}>
       <View style={layoutStyles.surfaceFill}>
-        <ToastProvider>
-          {/* Pairing can change the active Hub and remount its account scope. */}
-          <OfferLinkListener />
-          <HubAccountProvider>
-            <HubHostSynchronization />
+        <LucideProvider strokeWidth={ICON_STROKE_WIDTH}>
+          <ClisbotHubScope>
             <RootProviders>
               <RuntimeProviders>
                 <AppShell />
               </RuntimeProviders>
             </RootProviders>
-          </HubAccountProvider>
-        </ToastProvider>
+          </ClisbotHubScope>
+        </LucideProvider>
       </View>
     </GestureHandlerRootView>
   );

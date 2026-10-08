@@ -635,6 +635,8 @@ export function resolveConfigFromPersisted(
     skillSelection: persisted.agents?.skills?.selection,
     pluginsEnabled: persisted.pluginsEnabled ?? false,
     plugins: persisted.plugins,
+    pluginRegistries: persisted.pluginRegistries,
+    pluginRegistryUrl: env.CLISBOT_PLUGIN_REGISTRY,
     mcpDebug: env.MCP_DEBUG === "1",
     isDev: resolveClisbotNodeEnv(env) === "development",
     agentStoragePath: path.join(clisbotHome, "agents"),

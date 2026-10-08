@@ -1,4 +1,4 @@
-import type { Rect } from "@/components/ui/menu/menu-anchor";
+import type { Rect } from "@/components/ui/anchor";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { Text } from "react-native";

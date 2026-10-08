@@ -8,7 +8,6 @@ import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
 import { FlatList, View, type ListRenderItemInfo } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { MAX_CONTENT_WIDTH } from "@/constants/layout";
 import { ChatLiveRow } from "./chat-live-row";
 import {
   botIdentity,
@@ -156,7 +155,7 @@ const styles = StyleSheet.create((theme) => ({
   // Match the agent stream's item wrapper, including its inner reading gutter.
   row: {
     width: "100%",
-    maxWidth: MAX_CONTENT_WIDTH,
+    maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: theme.spacing[2],
   },

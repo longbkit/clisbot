@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   matchesSessionMetadata,
   sessionMetadataRecoveryNotice,
@@ -61,6 +62,7 @@ export function SidebarModelProvider({
   active?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const list = useSidebarWorkspacesList({ enabled: active });
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
@@ -165,6 +167,7 @@ export function SidebarModelProvider({
       pinnedCollapsed,
       collapsedProjectKeys,
       collapsedWorkspaceGroupKeys,
+      t,
     }),
     [
       collapsedProjectKeys,
@@ -176,6 +179,7 @@ export function SidebarModelProvider({
       pinnedKeys,
       pinnedWorkspaceOrder,
       filteredWorkspaceEntriesByKey,
+      t,
     ],
   );
   const projection = useMemo(() => buildSidebarProjection(projectionInput), [projectionInput]);

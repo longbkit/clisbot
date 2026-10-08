@@ -10,7 +10,6 @@ import type { BotPayload } from "@clisbot/protocol/bots/types";
 import { WithConnectorsTab } from "@/clisbot/connectors/connectors-tab";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { SettingsCard, SettingsSection, SettingsAction } from "@/components/settings";
-import { MAX_CONTENT_WIDTH } from "@/constants/layout";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { MenuHeader } from "@/components/headers/menu-header";
 import {
@@ -243,7 +242,7 @@ const styles = StyleSheet.create((theme) => ({
   screen: { flex: 1, backgroundColor: theme.colors.surface0 },
   content: {
     width: "100%",
-    maxWidth: MAX_CONTENT_WIDTH,
+    maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
     padding: theme.spacing[4],
     gap: theme.spacing[3],

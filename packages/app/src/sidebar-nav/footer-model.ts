@@ -4,6 +4,7 @@ const FOOTER_ITEMS = [
   { key: "new", group: "actions", visible: true, labelKey: "sidebar.actions.new" },
   { key: "add-project", group: "actions", visible: false, labelKey: "sidebar.actions.addProject" },
   { key: "search", group: "actions", visible: true, labelKey: "sidebar.sections.search" },
+  { key: "usage-icon", group: "controls", visible: true, labelKey: "sidebar.footer.usage" },
   { key: "hosts", group: "controls", visible: true, labelKey: "sidebar.actions.hosts" },
   { key: "import-session", group: "controls", visible: false, labelKey: "importSession.title" },
   { key: "help", group: "fixed", visible: true, labelKey: "sidebar.help.trigger" },
@@ -47,15 +48,28 @@ export function canMoveSidebarFooterItem(
   return Boolean(item && neighbor && item.group !== "fixed" && item.group === neighbor.group);
 }
 
+/**
+ * `sidebarFooterItems` also holds the upstream footer rows (Usage and plugin rows, see
+ * `resolveSidebarNavItems({ section: "footer" })`). Their entries ride along untouched.
+ */
+function withOtherFooterPreferences(
+  bar: SidebarNavPreference[],
+  previous: readonly SidebarNavPreference[],
+): SidebarNavPreference[] {
+  const barKeys = new Set<string>(FOOTER_ITEMS.map((item) => item.key));
+  return [...bar, ...previous.filter((preference) => !barKeys.has(preference.key))];
+}
+
 export function setSidebarFooterItemVisible(
   preferences: readonly SidebarNavPreference[],
   key: string,
   visible: boolean,
 ): SidebarNavPreference[] {
-  return resolveSidebarFooterItems(preferences).map((item) => ({
+  const bar = resolveSidebarFooterItems(preferences).map((item) => ({
     key: item.key,
     visible: item.key === key && item.group !== "fixed" ? visible : item.visible,
   }));
+  return withOtherFooterPreferences(bar, preferences);
 }
 
 export function moveSidebarFooterItem(
@@ -69,7 +83,10 @@ export function moveSidebarFooterItem(
     const to = from + (direction === "up" ? -1 : 1);
     [items[from], items[to]] = [items[to], items[from]];
   }
-  return items.map((item) => ({ key: item.key, visible: item.visible }));
+  return withOtherFooterPreferences(
+    items.map((item) => ({ key: item.key, visible: item.visible })),
+    preferences,
+  );
 }
 
 export function sidebarFooterShortcutAction(key: SidebarFooterId): string | null {

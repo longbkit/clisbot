@@ -1,6 +1,6 @@
 {
   "name": "clisbot",
-  "version": "0.10.2",
+  "version": "0.11.1",
   "private": true,
   "description": "Clisbot: voice-controlled development environment for local AI coding agents",
   "keywords": [
@@ -21,6 +21,7 @@
     "url": "https://github.com/longbkit/clisbot.git"
   },
   "workspaces": [
+    "plugins",
     "packages/expo-two-way-audio",
     "packages/highlight",
     "packages/plugin",
@@ -85,7 +86,7 @@
     "branding:apply": "node scripts/branding/apply.mjs --apply",
     "branding:check": "node scripts/branding/verify.mjs && node scripts/branding/apply.mjs --check",
     "branding:pack": "node scripts/branding/pack.mjs",
-    "typecheck:server": "npm run typecheck --workspace=@clisbot/relay && npm run typecheck --workspace=@clisbot/protocol && npm run typecheck --workspace=@clisbot/client && npm run typecheck --workspace=@clisbot/server && npm run typecheck --workspace=@clisbot/cli",
+    "typecheck:server": "npm run typecheck --workspace=@clisbot/relay && npm run typecheck --workspace=@clisbot/protocol && npm run typecheck --workspace=@clisbot/client && npm run typecheck --workspace=@clisbot/builtin-plugins && npm run typecheck --workspace=@clisbot/server && npm run typecheck --workspace=@clisbot/cli",
     "test": "npm run test --workspaces --if-present",
     "format": "oxfmt .",
     "format:files": "oxfmt",

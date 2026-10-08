@@ -1,7 +1,6 @@
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import type { AgentCapabilityFlags } from "../agent-sdk-types.js";
 import { checkProviderLaunchAvailable, resolveProviderLaunch } from "../provider-launch-config.js";
 import {
   ACPAgentClient,
@@ -19,25 +18,11 @@ import {
   toDiagnosticErrorMessage,
 } from "./diagnostic-utils.js";
 
-export const GenericACPProviderParamsSchema = z
-  .object({
-    supportsMcpServers: z.boolean().optional(),
-    clientCapabilities: z
-      .object({
-        fs: z
-          .object({
-            readTextFile: z.boolean().optional(),
-            writeTextFile: z.boolean().optional(),
-          })
-          .optional(),
-        terminal: z.boolean().optional(),
-      })
-      .optional(),
-    exactMcpPreapproval: ACPExactMcpPreapprovalSchema.optional(),
-  })
+// Clisbot: the one provider option the ACP session cannot read from `providerOptions`, because
+// the provider contract (`acpProviderContract`) decides it before any session exists.
+const GenericACPPreapprovalParamsSchema = z
+  .object({ exactMcpPreapproval: ACPExactMcpPreapprovalSchema.optional() })
   .passthrough();
-
-type GenericACPProviderParams = z.infer<typeof GenericACPProviderParamsSchema>;
 
 interface GenericACPAgentClientOptions {
   logger: Logger;
@@ -45,6 +30,7 @@ interface GenericACPAgentClientOptions {
   env?: Record<string, string>;
   providerId?: string;
   label?: string;
+  /** The configured provider options; only `exactMcpPreapproval` is read here. */
   providerParams?: unknown;
   waitForInitialCommands?: boolean;
   initialCommandsWaitTimeoutMs?: number;
@@ -63,7 +49,9 @@ export class GenericACPAgentClient extends ACPAgentClient {
   private readonly diagnosticPhaseTimeoutMs?: number;
 
   constructor(options: GenericACPAgentClientOptions) {
-    const providerParams = parseGenericACPProviderParams(options.providerParams);
+    const { exactMcpPreapproval } = GenericACPPreapprovalParamsSchema.parse(
+      options.providerParams ?? {},
+    );
     super({
       provider: "acp",
       // Every custom ACP provider shares the "acp" id; the configured id tells their log lines apart.
@@ -74,16 +62,15 @@ export class GenericACPAgentClient extends ACPAgentClient {
         env: options.env,
       },
       defaultCommand: options.command,
-      capabilities: buildGenericACPCapabilities(providerParams),
+      capabilities: DEFAULT_ACP_CAPABILITIES,
       // ACP agents advertise slash commands with available_commands_update after
       // session/new, so the first listCommands() waits for that batch.
       waitForInitialCommands: options.waitForInitialCommands ?? true,
       initialCommandsWaitTimeoutMs: options.initialCommandsWaitTimeoutMs,
-      clientCapabilities: providerParams.clientCapabilities,
       clientCapabilityMeta: options.clientCapabilityMeta,
       configFeatureOptions: options.configFeatureOptions,
       extensionCommandsParser: options.extensionCommandsParser,
-      exactMcpPreapproval: providerParams.exactMcpPreapproval,
+      exactMcpPreapproval,
       catalogModelResolver: options.catalogModelResolver,
       now: options.now,
     });
@@ -169,17 +156,6 @@ export class GenericACPAgentClient extends ACPAgentClient {
       ];
     }
   }
-}
-
-function buildGenericACPCapabilities(params: GenericACPProviderParams): AgentCapabilityFlags {
-  return {
-    ...DEFAULT_ACP_CAPABILITIES,
-    supportsMcpServers: params.supportsMcpServers ?? DEFAULT_ACP_CAPABILITIES.supportsMcpServers,
-  };
-}
-
-function parseGenericACPProviderParams(params: unknown): GenericACPProviderParams {
-  return GenericACPProviderParamsSchema.parse(params ?? {});
 }
 
 export interface CommandInvocation {

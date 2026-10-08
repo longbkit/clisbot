@@ -94,7 +94,7 @@ vi.mock("lucide-react-native", () => ({
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
 vi.mock("@/constants/platform", () => ({ isNative: false, isWeb: true }));
-vi.mock("@/hooks/use-compact-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
+vi.mock("@/hooks/use-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
 vi.mock("@/components/sidebar/sidebar-group-toggle-row", () => ({
   SidebarGroupToggleRow: ({ expanded, onPress }: { expanded: boolean; onPress: () => void }) => (
     <button type="button" onClick={onPress}>

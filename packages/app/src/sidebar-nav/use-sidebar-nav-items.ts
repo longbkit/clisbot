@@ -1,17 +1,20 @@
 import { useCallback, useMemo } from "react";
 import { useAppSettings } from "@/hooks/use-settings";
+import type { AppSettings } from "@/hooks/use-settings/storage";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { useInstalledPlugins } from "@/plugins/registry";
-import { groupPluginSidebarContributions } from "@/plugins/sidebar-groups";
+import { groupPluginSidebarItems } from "@/plugins/sidebar-groups";
 import {
   moveSidebarNavItem,
   resolveSidebarNavItems,
   setSidebarNavItemVisible,
+  type BuiltinSidebarItemId,
   type SidebarNavItem,
-  type BuiltinSidebarNavId,
+  type SidebarSection,
 } from "./model";
 
-const FUSION_BUILTIN_ORDER: readonly BuiltinSidebarNavId[] = [
+/** Header order on Hosts with Bots and Chats: Search sits beside New and Add project. */
+const FUSION_HEADER_ORDER: readonly BuiltinSidebarItemId<"header">[] = [
   "new-workspace",
   "add-project",
   "search",
@@ -19,73 +22,70 @@ const FUSION_BUILTIN_ORDER: readonly BuiltinSidebarNavId[] = [
   "schedules",
 ];
 
-export interface UseSidebarNavItemsReturn {
-  /** Every top-level item in display order, hidden ones included. */
-  items: SidebarNavItem[];
+const PREFERENCE_FIELDS = {
+  header: "sidebarNavItems",
+  footer: "sidebarFooterItems",
+} as const satisfies Record<SidebarSection, keyof AppSettings>;
+
+export interface UseSidebarNavItemsReturn<Section extends SidebarSection> {
+  /** Every item in the section in display order, hidden ones included. */
+  items: SidebarNavItem<Section>[];
   setVisible: (key: string, visible: boolean) => void;
   move: (key: string, direction: "up" | "down") => void;
 }
 
-export function useSidebarNavItems(): UseSidebarNavItemsReturn {
+export function useSidebarNavItems<Section extends SidebarSection>(
+  section: Section,
+): UseSidebarNavItemsReturn<Section> {
   const plugins = useInstalledPlugins();
   const { settings, updateSettings } = useAppSettings();
-  const preferences = settings.sidebarNavItems;
+  const field = PREFERENCE_FIELDS[section];
+  const preferences = settings[field];
   const fusion = useBotsFeatureHosts().length > 0;
-  const builtinOrder = fusion ? FUSION_BUILTIN_ORDER : undefined;
-  const pluginGroups = useMemo(() => groupPluginSidebarContributions(plugins), [plugins]);
+  const builtinOrder = (fusion && section === "header" ? FUSION_HEADER_ORDER : undefined) as
+    | readonly BuiltinSidebarItemId<Section>[]
+    | undefined;
+  const pluginGroups = useMemo(() => groupPluginSidebarItems(plugins, section), [plugins, section]);
 
   const items = useMemo(
-    () =>
-      resolveSidebarNavItems({
-        pluginGroups,
-        preferences,
-        builtinOrder,
-      }),
-    [pluginGroups, preferences, builtinOrder],
+    () => resolveSidebarNavItems({ section, pluginGroups, preferences, builtinOrder }),
+    [builtinOrder, pluginGroups, preferences, section],
   );
 
   const setVisible = useCallback(
     (key: string, visible: boolean) => {
       void updateSettings((current) => {
-        const previous = current.sidebarNavItems;
+        const previous = current[field];
         const currentItems = resolveSidebarNavItems({
+          section,
           pluginGroups,
           preferences: previous,
           builtinOrder,
         });
         return {
-          sidebarNavItems: setSidebarNavItemVisible({
-            items: currentItems,
-            key,
-            visible,
-            previous,
-          }),
+          [field]: setSidebarNavItemVisible({ items: currentItems, key, visible, previous }),
         };
       });
     },
-    [pluginGroups, updateSettings, builtinOrder],
+    [builtinOrder, field, pluginGroups, section, updateSettings],
   );
 
   const move = useCallback(
     (key: string, direction: "up" | "down") => {
       void updateSettings((current) => {
-        const previous = current.sidebarNavItems;
+        const previous = current[field];
         const currentItems = resolveSidebarNavItems({
+          section,
           pluginGroups,
           preferences: previous,
           builtinOrder,
         });
         return {
-          sidebarNavItems: moveSidebarNavItem({
-            items: currentItems,
-            key,
-            direction,
-            previous,
-          }),
+          [field]: moveSidebarNavItem({ items: currentItems, key, direction, previous }),
         };
       });
     },
-    [pluginGroups, updateSettings, builtinOrder],
+    [builtinOrder, field, pluginGroups, section, updateSettings],
   );
 
   return { items, setVisible, move };

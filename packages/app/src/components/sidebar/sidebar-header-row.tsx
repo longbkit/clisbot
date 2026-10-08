@@ -1,10 +1,19 @@
-import { useIsCompactFormFactor } from "@/constants/layout";
-import { isNative } from "@/constants/platform";
-import { useCallback, useMemo } from "react";
-import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type Ref,
+} from "react";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import type { LucideIcon } from "lucide-react-native";
-import { HEADER_INNER_HEIGHT, HEADER_INNER_HEIGHT_MOBILE } from "@/constants/layout";
+import {
+  HEADER_INNER_HEIGHT,
+  HEADER_INNER_HEIGHT_MOBILE,
+  useIsCompactFormFactor,
+} from "@/constants/layout";
+import { isNative } from "@/constants/platform";
 import { ICON_SIZE } from "@/styles/theme";
 import type { Theme } from "@/styles/theme";
 import { Shortcut } from "@/components/ui/shortcut";
@@ -13,10 +22,12 @@ import type { ShortcutKey } from "@/utils/format-shortcut";
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
-type SidebarHeaderRowVariant = "header" | "compact";
+type SidebarHeaderRowVariant = "header" | "compact" | "inline";
+
+export type SidebarRowIcon = ComponentType<{ size: number; color: string }>;
 
 interface SidebarHeaderRowProps {
-  icon: LucideIcon;
+  icon: SidebarRowIcon | null;
   label: string;
   onPress: () => void;
   isActive?: boolean;
@@ -28,9 +39,18 @@ interface SidebarHeaderRowProps {
    * the lone header at the top of a sidebar (settings "Back to workspace").
    * "compact": a row with no separator, for entries that
    * sit in a header group whose wrapper owns the single divider.
+   * "inline": a full-width row with no inset, for a row inside a padded container such as the
+   * sidebar footer.
    */
   variant?: SidebarHeaderRowVariant;
+  /** Shown in the right slot while the row is hovered, when `trailing` is not set. */
   shortcutKeys?: ShortcutKey[][] | null;
+  /**
+   * The right slot. A sibling of the row's button, never inside it (web cannot nest buttons). A
+   * press on the slot presses the row; a button inside it presses on its own.
+   */
+  trailing?: ReactNode;
+  rowRef?: Ref<View>;
 }
 
 export function SidebarHeaderRow({
@@ -43,83 +63,81 @@ export function SidebarHeaderRow({
   accessibilityLabel,
   variant = "header",
   shortcutKeys = null,
+  trailing,
+  rowRef,
 }: SidebarHeaderRowProps) {
   const touch = useIsCompactFormFactor() || isNative;
-  const ThemedIcon = useMemo(() => withUnistyles(Icon), [Icon]);
+  const [isHovered, setIsHovered] = useState(false);
+  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
+  const ThemedIcon = useMemo(() => (Icon ? withUnistyles(Icon) : null), [Icon]);
+  const isHighlighted = isHovered || isActive;
+  const iconSize = variant === "header" ? ICON_SIZE.md : ICON_SIZE.sm;
 
-  const containerStyle = useMemo(
-    () => (variant === "compact" ? styles.containerCompact : styles.container),
-    [variant],
-  );
-
-  const buttonStyle = useCallback(
-    ({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.button,
-      touch && styles.buttonTouch,
-      (Boolean(hovered) || isActive) && styles.buttonHovered,
-      isActive && styles.buttonSelected,
-    ],
-    [isActive, touch],
-  );
-
-  const renderChildren = useCallback(
-    (state: PressableStateCallbackType & { hovered?: boolean }) => {
-      const isHighlighted = Boolean(state.hovered) || isActive;
-      return (
-        <>
-          <ThemedIcon
-            size={variant === "compact" ? ICON_SIZE.sm : ICON_SIZE.md}
-            uniProps={isHighlighted ? foregroundColorMapping : foregroundMutedColorMapping}
-          />
-          <SidebarHeaderRowLabel
-            label={label}
-            isHighlighted={isHighlighted}
-            isSelected={isActive}
-          />
-          {shortcutKeys && Boolean(state.hovered) ? (
-            <Shortcut chord={shortcutKeys} style={styles.shortcut} />
-          ) : null}
-        </>
-      );
-    },
-    [ThemedIcon, isActive, label, shortcutKeys, variant],
-  );
+  let right = trailing ?? null;
+  if (right === null && shortcutKeys && isHovered) {
+    right = <Shortcut chord={shortcutKeys} />;
+  }
 
   return (
-    <View style={containerStyle}>
-      <Pressable
-        onPress={onPress}
-        testID={testID}
-        nativeID={nativeID}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? label}
-        style={buttonStyle}
+    <View ref={rowRef} collapsable={false} style={getContainerStyle(variant)}>
+      <View
+        style={rowStyle({ touch, highlighted: isHighlighted, selected: isActive })}
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}
       >
-        {renderChildren}
-      </Pressable>
+        <Pressable
+          onPress={onPress}
+          testID={testID}
+          nativeID={nativeID}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityState={isActive ? SELECTED_STATE : undefined}
+          aria-selected={isActive}
+          style={[styles.button, touch && styles.rowTouch]}
+        >
+          {ThemedIcon ? (
+            <ThemedIcon
+              size={iconSize}
+              uniProps={isHighlighted ? foregroundColorMapping : foregroundMutedColorMapping}
+            />
+          ) : (
+            <View style={variant === "header" ? styles.iconSpacer : styles.iconSpacerCompact} />
+          )}
+          <Text style={labelStyle({ highlighted: isHighlighted, selected: isActive })}>
+            {label}
+          </Text>
+        </Pressable>
+        {right === null ? null : (
+          <Pressable onPress={onPress} accessible={false} focusable={false} style={styles.trailing}>
+            {right}
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
 
-function SidebarHeaderRowLabel({
-  label,
-  isHighlighted,
-  isSelected,
-}: {
-  label: string;
-  isHighlighted: boolean;
-  isSelected: boolean;
-}) {
-  const labelStyle = useMemo(
-    () => [
-      styles.label,
-      isHighlighted && styles.labelHighlighted,
-      isSelected && styles.labelSelected,
-    ],
-    [isHighlighted, isSelected],
-  );
-  return <Text style={labelStyle}>{label}</Text>;
+const SELECTED_STATE = { selected: true } as const;
+
+interface RowState {
+  highlighted: boolean;
+  selected: boolean;
+}
+
+// Clisbot: touch-height rows and a raised selected row (design.md, sidebar selection).
+function rowStyle({ touch, highlighted, selected }: RowState & { touch: boolean }) {
+  return [
+    styles.row,
+    touch && styles.rowTouch,
+    highlighted && styles.rowHighlighted,
+    selected && styles.rowSelected,
+  ];
+}
+
+function labelStyle({ highlighted, selected }: RowState) {
+  return [styles.label, highlighted && styles.labelHighlighted, selected && styles.labelSelected];
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -139,28 +157,43 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     userSelect: "none",
   },
+  containerInline: {
+    width: "100%",
+    justifyContent: "center",
+    userSelect: "none",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    // Same row geometry as the settings sidebar items. Shorter than the header
+    // strip so the hover highlight clears the strip's bottom separator.
+    minHeight: 28,
+    borderRadius: theme.borderRadius.lg,
+  },
+  rowTouch: { minHeight: 44 },
+  rowHighlighted: {
+    backgroundColor: theme.colors.surfaceSidebarHover,
+  },
+  rowSelected: {
+    backgroundColor: theme.colors.surfaceSidebarSelected,
+    ...theme.shadow.raised,
+  },
   button: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    // Same row geometry as the settings sidebar items. Shorter than the header
-    // strip so the hover highlight clears the strip's bottom separator.
     minHeight: 28,
     paddingVertical: theme.spacing[1],
     // Match the project rows' inner padding so the icons align on one vertical
     // edge with the list below.
     paddingHorizontal: theme.spacing[2],
-    borderRadius: theme.borderRadius.lg,
   },
-  buttonTouch: { minHeight: 44 },
-  buttonHovered: {
-    backgroundColor: theme.colors.surfaceSidebarHover,
-  },
-  buttonSelected: {
-    backgroundColor: theme.colors.surfaceSidebarSelected,
-    ...theme.shadow.raised,
-  },
+  iconSpacer: { width: ICON_SIZE.md, height: ICON_SIZE.md },
+  iconSpacerCompact: { width: ICON_SIZE.sm, height: ICON_SIZE.sm },
   label: {
+    flexShrink: 1,
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.normal,
     color: theme.colors.foregroundMuted,
@@ -172,7 +205,21 @@ const styles = StyleSheet.create((theme) => ({
   labelSelected: {
     fontWeight: theme.fontWeight.medium,
   },
-  shortcut: {
-    marginLeft: "auto",
+  trailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+    paddingRight: theme.spacing[2],
   },
 }));
+
+function getContainerStyle(variant: SidebarHeaderRowVariant) {
+  switch (variant) {
+    case "header":
+      return styles.container;
+    case "compact":
+      return styles.containerCompact;
+    case "inline":
+      return styles.containerInline;
+  }
+}

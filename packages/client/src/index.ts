@@ -24,7 +24,6 @@ import type {
   ProjectPlacementPayload,
   WorkspaceProjectDescriptorPayload,
   RefreshProvidersSnapshotResponseMessage,
-  SendAgentMessageRequest,
   SessionOutboundMessage,
   WorkspaceDescriptorPayload,
   WorkspaceCreateRequest,
@@ -55,6 +54,7 @@ import type {
   FetchAgentTimelineDirection,
   FetchAgentTimelinePayload,
   FetchAgentTimelineProjection,
+  SendMessageOptions,
   WaitForFinishResult,
 } from "./daemon-client.js";
 
@@ -276,11 +276,7 @@ export interface ClisbotAgentTimelineRefetchOptions {
   requestId?: string;
 }
 
-export interface ClisbotAgentSendOptions {
-  messageId?: string;
-  images?: Array<{ data: string; mimeType: string }>;
-  attachments?: SendAgentMessageRequest["attachments"];
-}
+export type ClisbotAgentSendOptions = SendMessageOptions;
 
 export interface ClisbotAgentRunOptions extends ClisbotAgentSendOptions {
   timeoutMs?: number;

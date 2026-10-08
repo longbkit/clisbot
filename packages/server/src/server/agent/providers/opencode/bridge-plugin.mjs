@@ -35,6 +35,13 @@ export default async function clisbotPlugin(input, options) {
       description: definition.description,
       args: jsonSchemaObjectToZodShape(definition.inputSchema),
       execute: async (args, context) => {
+        // OpenCode leaves permission checks to plugin tools, so ask it the way it asks for MCP tools.
+        await context.ask({
+          permission: `clisbot_${definition.name}`,
+          patterns: ["*"],
+          always: ["*"],
+          metadata: {},
+        });
         let result;
         try {
           result = await request(

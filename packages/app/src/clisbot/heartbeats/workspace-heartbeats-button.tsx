@@ -1,6 +1,6 @@
 import { useCallback, useMemo, type ReactElement } from "react";
 import { StyleSheet } from "react-native-unistyles";
-import { getProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
 import { useTranslation } from "react-i18next";
 import { useSessionStore } from "@/stores/session-store";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
@@ -70,7 +70,7 @@ export function WorkspaceHeartbeatsButton({
 }
 
 function ProviderIcon({ provider, serverId }: { provider: string; serverId: string }) {
-  const Icon = getProviderIcon(provider, serverId);
+  const Icon = useProviderIcon(provider, serverId);
   return <Icon size={14} color={styles.icon.color} />;
 }
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Animated, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { MAX_CONTENT_WIDTH } from "@/constants/layout";
 import {
   ACTOR_AVATAR_SIZE,
   ACTOR_CONTENT_INSET,
@@ -145,7 +144,7 @@ const styles = StyleSheet.create((theme) => ({
   // its own centring a no-op and simply lands on the gutter's right edge.
   gutterInset: {
     width: "100%",
-    maxWidth: MAX_CONTENT_WIDTH,
+    maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
     paddingLeft: ACTOR_CONTENT_INSET,
   },

@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { describe, expect, it } from "vitest";
 import type { MessageSubmissionRecord } from "@/composer/submission/model";
 import type { Agent } from "@/stores/session-store";
@@ -264,7 +265,7 @@ describe("sessionDisplayGroups by status", () => {
     makeWorkspace("ws-2", "done"),
     makeWorkspace("terminal-only", "done"),
   ];
-  const groups = statusWorkspaceGroups(buildStatusGroups(workspaces, new Map()));
+  const groups = statusWorkspaceGroups(buildStatusGroups(workspaces, new Map(), i18n.t));
   const source = sourceOf([
     makeAgent({ id: "older-idle", createdAt: new Date("2026-09-01") }),
     makeAgent({
@@ -283,6 +284,7 @@ describe("sessionDisplayGroups by status", () => {
   function summarizeGroups(activeOnly: boolean) {
     return describeGroups(
       sessionDisplayGroups({
+        t: i18n.t,
         groups,
         sources: new Map([["srv", source]]),
         activeOnly,
@@ -307,6 +309,7 @@ describe("sessionDisplayGroups by status", () => {
 
   it("keeps a workspace row while its host's sessions are not loaded", () => {
     const loading = sessionDisplayGroups({
+      t: i18n.t,
       groups,
       sources: new Map(),
       activeOnly: false,
@@ -320,6 +323,7 @@ describe("sessionDisplayGroups by status", () => {
 
   it("numbers pinned rows first, then each open header's lines, and a session opens itself", () => {
     const displayGroups = sessionDisplayGroups({
+      t: i18n.t,
       groups,
       sources: new Map([["srv", source]]),
       activeOnly: false,
@@ -383,7 +387,13 @@ describe("Clisbot groupings", () => {
       projects,
       workspaceEntriesByKey: entries,
     });
-    const display = sessionDisplayGroups({ groups, sources, activeOnly: false, byStatus: false });
+    const display = sessionDisplayGroups({
+      t: i18n.t,
+      groups,
+      sources,
+      activeOnly: false,
+      byStatus: false,
+    });
     expect(describeGroups(display)).toEqual([
       ["project:app", ["messaged", "older", "workspace:terminal-only"]],
       ["project:docs", ["docs-session"]],
@@ -396,7 +406,13 @@ describe("Clisbot groupings", () => {
       projects,
       workspaceEntriesByKey: entries,
     });
-    const display = sessionDisplayGroups({ groups, sources, activeOnly: false, byStatus: false });
+    const display = sessionDisplayGroups({
+      t: i18n.t,
+      groups,
+      sources,
+      activeOnly: false,
+      byStatus: false,
+    });
     expect(describeGroups(display)).toEqual([
       ["all", ["messaged", "docs-session", "older", "workspace:terminal-only"]],
     ]);

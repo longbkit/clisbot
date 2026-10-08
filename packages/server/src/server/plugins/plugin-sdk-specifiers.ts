@@ -8,6 +8,7 @@ export const PLUGIN_CLIENT_ONLY_SDK_SPECIFIERS = [
 const PLUGIN_SERVER_ONLY_SDK_SPECIFIERS = [
   "@clisbot/plugin/server",
   "@clisbot/plugin/server/provider",
+  "@clisbot/plugin/server/usage",
   "@clisbot/plugin/server/acp",
 ] as const;
 

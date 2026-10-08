@@ -24,7 +24,7 @@ import { HostPickerOption } from "@/components/hosts/host-picker";
 import { createControlGeometry, type FieldControlSize } from "@/components/ui/control-geometry";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
-import { getProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
 // Clisbot: every N minutes or hours, daily, weekly or cron, with quick picks, in place of the
 // upstream preset-plus-cron editor (same props).
 import { CadencePicker as CadenceEditor } from "@/clisbot/schedules/cadence-picker";
@@ -1307,10 +1307,10 @@ function ProviderGlyph({
   provider: string | null;
   serverId: string | null;
 }): ReactElement | null {
+  const Icon = useProviderIcon(provider ?? "", serverId);
   if (!provider) {
     return null;
   }
-  const Icon = getProviderIcon(provider, serverId);
   return <Icon size={16} color={styles.providerIcon.color} />;
 }
 

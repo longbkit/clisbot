@@ -7,7 +7,7 @@ import { useRetainedPanelActive } from "@/components/retained-panel";
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import { useSubagentTimelineHistory } from "@/subagents/use-subagent-timeline-history";
 import { AgentStreamView } from "@/agent-stream/view";
-import { getProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
 import {
   resolveComposerTrackControlClearance,
   resolveComposerTrackTailClearance,
@@ -99,7 +99,7 @@ function useProviderSubagentDescriptor(
       subagentType && subagentType !== label ? `${subagentType} · ${providerLabel}` : providerLabel,
     tooltip: label,
     titleState: descriptor ? "ready" : "loading",
-    icon: getProviderIcon(provider, context.serverId),
+    icon: useProviderIcon(provider, context.serverId),
     statusBucket: descriptor
       ? deriveSidebarStateBucket({
           status: providerSubagentLifecycleStatus(descriptor.status),

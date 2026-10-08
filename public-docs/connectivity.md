@@ -45,7 +45,9 @@ clisbot --host 'ssh://user@host?daemonPort=7777' ls -a
 
 Put `--host` before the command. `clisbot daemon status` observes the default local home; use `clisbot --host ssh://user@host daemon status` to query a remote daemon. `clisbot --host ssh://user@host run --cwd /path/on/remote ...` requires a working directory that exists on the remote host.
 
-In Clisbot Desktop, open **Settings → Add host → Remote SSH** and enter the same `ssh://` destination.
+In Clisbot Desktop, open **Settings → Add host → Remote SSH** and enter the same `ssh://` destination, including `:port` or `?daemonPort=` when those differ from the defaults.
+
+If the remote daemon has a password, enter it in **Daemon password**; it is stored with the host and sent on every connection, the same as a direct connection's password. SSH login itself stays key-based — Clisbot never prompts for an SSH password.
 
 ## Clisbot relay
 
@@ -135,6 +137,7 @@ If the host was already paired through the relay, Clisbot adds the direct connec
 
 - **SSH authentication failed:** Run `ssh user@host` in a terminal and fix the key, agent, host key, or `~/.ssh/config` entry there. Clisbot does not prompt for SSH passwords.
 - **SSH connects but Clisbot is refused:** Run `clisbot daemon status` on the remote host. SSH transport does not start the daemon.
+- **SSH connects but Clisbot reports "Password required":** The remote daemon is password-protected. Remove the SSH connection from the host and add it again, this time entering the daemon password in **Daemon password**.
 - **Connection timed out:** Check that Tailscale is connected on both devices and that you used the daemon machine's Tailscale IP.
 - **Connection refused:** Run `clisbot daemon status` and confirm the daemon is running on the configured IP and port.
 - **Config change has no effect:** Run `clisbot reload`. `daemon.listen` is a startup setting, so restart when the command reports it.

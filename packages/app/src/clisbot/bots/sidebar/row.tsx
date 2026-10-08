@@ -1,4 +1,4 @@
-import type { Rect } from "@/components/ui/menu/menu-anchor";
+import type { Rect } from "@/components/ui/anchor";
 import { memo, useRef, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";

@@ -11,13 +11,14 @@ describe("sidebar bottom preferences", () => {
       resolveSidebarFooterItems([])
         .filter((item) => item.visible)
         .map((item) => item.key),
-    ).toEqual(["new", "search", "hosts", "help", "settings"]);
+    ).toEqual(["new", "search", "usage-icon", "hosts", "help", "settings"]);
   });
 
   it("restores toggles and order while keeping actions on the left and controls on the right", () => {
     let preferences = setSidebarFooterItemVisible([], "add-project", true);
     preferences = setSidebarFooterItemVisible(preferences, "import-session", true);
     preferences = setSidebarFooterItemVisible(preferences, "new", false);
+    preferences = moveSidebarFooterItem(preferences, "import-session", "up");
     preferences = moveSidebarFooterItem(preferences, "import-session", "up");
     preferences = moveSidebarFooterItem(preferences, "search", "up");
     expect(resolveSidebarFooterItems(JSON.parse(JSON.stringify(preferences)))).toEqual([
@@ -30,6 +31,7 @@ describe("sidebar bottom preferences", () => {
         labelKey: "sidebar.actions.addProject",
       },
       { key: "import-session", group: "controls", visible: true, labelKey: "importSession.title" },
+      { key: "usage-icon", group: "controls", visible: true, labelKey: "sidebar.footer.usage" },
       { key: "hosts", group: "controls", visible: true, labelKey: "sidebar.actions.hosts" },
       { key: "help", group: "fixed", visible: true, labelKey: "sidebar.help.trigger" },
       { key: "settings", group: "fixed", visible: true, labelKey: "sidebar.actions.settings" },
@@ -53,14 +55,27 @@ describe("sidebar bottom preferences", () => {
       { key: "new", visible: true },
       { key: "add-project", visible: false },
       { key: "search", visible: true },
+      // Stored controls keep their place; Usage, added after this storage was written, follows.
       { key: "hosts", visible: false },
+      { key: "usage-icon", visible: true },
       { key: "import-session", visible: false },
       { key: "help", visible: true },
       { key: "settings", visible: true },
     ]);
-    expect(setSidebarFooterItemVisible(edited, "help", false)).toEqual(normalized);
-    expect(setSidebarFooterItemVisible(edited, "settings", false)).toEqual(normalized);
-    expect(moveSidebarFooterItem(edited, "help", "up")).toEqual(normalized);
-    expect(moveSidebarFooterItem(edited, "settings", "up")).toEqual(normalized);
+    const stored = [...normalized, { key: "unknown", visible: true }];
+    expect(setSidebarFooterItemVisible(edited, "help", false)).toEqual(stored);
+    expect(setSidebarFooterItemVisible(edited, "settings", false)).toEqual(stored);
+    expect(moveSidebarFooterItem(edited, "help", "up")).toEqual(stored);
+    expect(moveSidebarFooterItem(edited, "settings", "up")).toEqual(stored);
+  });
+
+  it("keeps the footer rows' entries that share the stored list", () => {
+    const rows = [
+      { key: "usage", visible: true },
+      { key: "plugin:acme:status", visible: false },
+    ];
+    const toggled = setSidebarFooterItemVisible([...rows], "import-session", true);
+    expect(toggled.slice(-2)).toEqual(rows);
+    expect(moveSidebarFooterItem(toggled, "hosts", "up").slice(-2)).toEqual(rows);
   });
 });

@@ -1,4 +1,3 @@
-import { toSessionServerInfo } from "./session-server-info";
 import { useRef, ReactNode, useCallback, useEffect } from "react";
 import { Buffer } from "buffer";
 import { AppState } from "react-native";
@@ -30,9 +29,10 @@ import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { AgentPermissionResponse } from "@clisbot/protocol/agent-types";
 import { getHostRuntimeStore, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useVoiceAudioEngineOptional, useVoiceRuntimeOptional } from "@/contexts/voice-context";
-import type { AudioPlaybackSource } from "@/voice/audio-engine-types";
+import type { AudioPlaybackSource } from "@/audio";
 import {
   selectAgentTimelineState,
+  toDaemonServerInfo,
   useSessionStore,
   type SessionState,
 } from "@/stores/session-store";
@@ -50,7 +50,7 @@ import { useToast } from "@/contexts/toast-context";
 import { toErrorMessage } from "@/utils/error-messages";
 import { showProviderNoticeToast } from "@/utils/provider-notice-toast";
 import { applyCheckoutStatusUpdateFromEvent } from "@/git/checkout-status-cache";
-import { useProviderSubagentStore } from "@/subagents/provider-store";
+import { resyncProviderSubagents, useProviderSubagentStore } from "@/subagents/provider-store";
 
 // Re-export types from session-store and draft-store for backward compatibility
 export type { DraftInput } from "@/stores/draft-store";
@@ -320,15 +320,6 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
   );
 
   useEffect(() => {
-    const serverInfo = client.getLastServerInfoMessage();
-    if (!serverInfo) {
-      return;
-    }
-
-    updateSessionServerInfo(serverId, toSessionServerInfo(serverInfo));
-  }, [client, serverId, updateSessionServerInfo]);
-
-  useEffect(() => {
     const unregister = voiceRuntime?.registerSession({
       serverId,
       setVoiceMode: async (enabled, agentId) => {
@@ -551,9 +542,14 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
       }
     });
 
-    const unsubProviderSubagentUpdate = onFeed("agent.provider_subagents.update", (message) => {
-      if (message.type !== "agent.provider_subagents.update") return;
-      useProviderSubagentStore.getState().applyUpdate(serverId, message.payload);
+    const unsubProviderSubagentUpdate = feeds.subscribe({
+      snapshot: () => {
+        void resyncProviderSubagents(client, serverId);
+      },
+      update: (message) => {
+        if (message.type !== "agent.provider_subagents.update") return;
+        useProviderSubagentStore.getState().applyUpdate(serverId, message.payload);
+      },
     });
 
     const unsubCheckoutStatusUpdate = onFeed("checkout_status_update", (message) => {
@@ -570,7 +566,7 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
       if (message.type !== "status") return;
       const serverInfo = parseServerInfoStatusPayload(message.payload);
       if (serverInfo) {
-        updateSessionServerInfo(serverId, toSessionServerInfo(serverInfo));
+        updateSessionServerInfo(serverId, toDaemonServerInfo(serverInfo));
         return;
       }
     });

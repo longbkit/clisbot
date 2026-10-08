@@ -45,11 +45,16 @@
 
 <!-- clisbot:intro:end -->
 
+- **Parallel agents:** Run many agents at once, each in its own worktree.
+- **Built-in orchestration:** Agents in Clisbot can create worktrees, launch other agents, and talk to them, across providers.
+- **Full IDE:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
 - **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
-- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, and Pi are built in; explore 38 ACP catalog presets including Grok, or add Antigravity as a custom ACP provider. Pick the model for each task.
+- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 38 ACP catalog presets including Grok. Pick the model for each task.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
 - **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
 - **Privacy-first:** Clisbot doesn't have any telemetry, tracking, or forced log-ins.
+
+[Run parallel tasks in Clisbot](https://clisbot.com/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
 
 ## Concept
 
@@ -71,11 +76,18 @@ If clisbot helps your workflow, a GitHub star is a simple way to let me know it 
 
 ## Plugins
 
-Add themes, workspace panels, commands, settings screens, and coding-agent providers with trusted
-TypeScript plugins. Install from npm, Git, or a local directory with `clisbot plugin install <source>`.
+Plugins run on the daemon and show up in every client you connect, with the same UI on desktop, web,
+iOS, and Android. Write a plugin once and it is on your phone.
 
-Start with the [plugin quickstart](https://clisbot.com/docs/plugins). Plugins run with access to your daemon
-machine and inside connected clients; install only code you trust.
+- **UI:** screens, sidebar items, workspace panels, Command Center items, slash commands, composer pills, attachment sources, timeline items, themes.
+- **Agent lifecycle:** change configuration, environment, and MCP servers, answer permissions, follow up when a turn ends.
+- **Providers:** add a coding agent as a provider.
+
+Install from the registry with `clisbot plugin add owner/slug`, or from Git or a local directory.
+
+**[Browse plugins](https://clisbot.com/plugins)** · **[Plugin docs](https://clisbot.com/docs/plugins)**
+
+Plugins run with access to your daemon machine and inside connected clients; install only code you trust.
 
 ## Getting Started
 
@@ -90,6 +102,8 @@ You need at least one agent CLI installed and configured with your credentials:
 - [GitHub Copilot](https://github.com/features/copilot/cli/)
 - [OpenCode](https://github.com/anomalyco/opencode)
 - [Pi](https://pi.dev)
+- [Antigravity](https://clisbot.com/docs/supported-providers#antigravity)
+- [Muse Code](https://clisbot.com/docs/muse-code)
 
 ### Desktop app (recommended)
 
@@ -97,16 +111,16 @@ Download it from [clisbot.com/download](https://clisbot.com/download) or the [Gi
 
 To connect from your phone, open **Settings → your host → Pair Device**.
 
-### CLI / headless
+### Server
 
-Install the CLI and start Clisbot:
+For a server, a VM, or any machine without the desktop app. Install the CLI and start the daemon:
 
 ```bash
 npm install -g @clisbot/cli
 clisbot
 ```
 
-Clisbot starts locally, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. This path is useful for servers and remote machines.
+Clisbot starts, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. The desktop, mobile, and web apps connect to this daemon like any other host.
 
 For full setup and configuration, see:
 

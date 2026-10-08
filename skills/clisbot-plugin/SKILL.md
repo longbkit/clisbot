@@ -1,6 +1,6 @@
 ---
 name: clisbot-plugin
-description: Build and manage trusted local Clisbot plugins. Use when the user asks to create, edit, install, reload, enable, disable, remove, or troubleshoot a Clisbot plugin; add lifecycle hooks; transform agent configuration, environment, MCP servers, or workspace creation; automate permissions or turn follow-ups; add a native surface, sidebar item, or workspace panel; add Command Center items or slash commands; add composer pills or attachment sources; transform, render, or append agent timeline items; contribute a theme; use Clisbot from plugin code; or add plugin RPCs.
+description: Build and manage trusted local Clisbot plugins. Use when the user asks to create, edit, install, reload, enable, disable, remove, or troubleshoot a Clisbot plugin; add lifecycle hooks; transform agent configuration, environment, MCP servers, or workspace creation; automate permissions or turn follow-ups; add a screen, sidebar header or footer item, or workspace panel; add Command Center items or slash commands; add composer pills or attachment sources; transform, render, or append agent timeline items; contribute a theme; use Clisbot from plugin code; or add plugin RPCs.
 ---
 
 # Clisbot plugins
@@ -27,21 +27,21 @@ public docs; this skill indexes the references and examples.
 
 Pick the contribution that matches the request. Each row names the registration, when it fits, and where the full contract lives. Most plugins combine several: a slash command that calls an RPC, which appends a timeline row, which a renderer draws.
 
-| Contribution              | Registration                                     | Use it when                                                                                                   | Reference                                                                                          |
-| ------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Sidebar surface           | `addSurface` + `addSidebarItem`                  | A full screen of plugin UI reachable from the sidebar                                                         | reference.md → Surfaces and sidebar items; `plugin-examples/local-plugin`                          |
-| Workspace panel           | `addWorkspacePanel`                              | UI that lives as a tab beside agents, terminals, files, and diffs; `locations: ["explorer"]` for the Explorer | reference.md → Workspace panels                                                                    |
-| Command Center item       | `addCommandCenterItem`                           | A global, workspace, or agent action reachable from ⌘K                                                        | reference.md → Command Center items                                                                |
-| Client slash command      | `addSlashCommand`                                | A `/command args` in the composer that runs plugin code instead of prompting the agent                        | reference.md → Client slash commands                                                               |
-| Composer pill             | `addComposerPill`                                | A per-agent button in the composer track bar next to Tasks and Subagents                                      | reference.md → Composer pills                                                                      |
-| Timeline transformer      | `addTimelineTransformer` + `addTimelineRenderer` | Replace, explode, or hide a built-in timeline item, including while it streams                                | reference.md → Timeline items; `plugin-examples/timeline-items`, `plugin-examples/inline-thinking` |
-| Timeline row              | `clisbot.agents.ref(id).timeline.append(...)`    | Push a plugin-owned row into an agent timeline from a server handler and update it later                      | reference.md → Append a timeline row from the daemon                                               |
-| Attachment source         | `client.addAttachmentSource` + `server.handle`   | Let the user attach a searchable external resource, such as an issue, to a prompt                             | reference.md → Add a composer attachment source; `plugin-examples/linear`                          |
-| Theme                     | `addTheme`                                       | A light or dark palette under Settings → Appearance                                                           | reference.md → Contribute a theme; `plugin-examples/catppuccin`                                    |
-| Plugin RPC                | `defineRpc` + `server.handle` + `useRpc`         | Daemon-side work that is not a normal Clisbot operation: vendor APIs, credentials, local files                | reference.md → Add plugin-specific backend behavior                                                |
-| Lifecycle events          | `server.on`                                      | Observe agent/workspace lifecycle, inspect ended turns, and answer permission requests                        | [Lifecycle hooks](https://clisbot.com/docs/plugins/reference.md#lifecycle-hooks)                   |
-| Creation and launch hooks | `server.before`                                  | Change agent config, provider options, MCP servers, environment, or workspace isolation before the operation  | [Before hooks](https://clisbot.com/docs/plugins/reference.md#before-hooks)                         |
-| Clisbot SDK               | `useClisbot()` / handler `{ clisbot }`           | Normal Clisbot operations: workspaces, agents, providers, config                                              | reference.md → Use the Clisbot SDK                                                                 |
+| Contribution              | Registration                                                | Use it when                                                                                                   | Reference                                                                                          |
+| ------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Screen and sidebar item   | `addScreen` + `addSidebarHeaderItem`/`addSidebarFooterItem` | A full screen of plugin UI, or sidebar header or footer rows that open a screen or popover                    | reference.md → Screens and sidebar items                                                           |
+| Workspace panel           | `addWorkspacePanel`                                         | UI that lives as a tab beside agents, terminals, files, and diffs; `locations: ["explorer"]` for the Explorer | reference.md → Workspace panels                                                                    |
+| Command Center item       | `addCommandCenterItem`                                      | A global, workspace, or agent action reachable from ⌘K                                                        | reference.md → Command Center items                                                                |
+| Client slash command      | `addSlashCommand`                                           | A `/command args` in the composer that runs plugin code instead of prompting the agent                        | reference.md → Slash commands                                                                      |
+| Composer pill             | `addComposerPill`                                           | A per-agent button in the composer track bar next to Tasks and Subagents                                      | reference.md → Composer pills                                                                      |
+| Timeline transformer      | `addTimelineTransformer` + `addTimelineRenderer`            | Replace, explode, or hide a built-in timeline item, including while it streams                                | reference.md → Timeline items; `plugin-examples/timeline-items`, `plugin-examples/inline-thinking` |
+| Timeline row              | `clisbot.agents.ref(id).timeline.append(...)`               | Push a plugin-owned row into an agent timeline from a server handler and update it later                      | reference.md → Append a timeline row from the daemon                                               |
+| Attachment source         | `client.addAttachmentSource` + `server.handle`              | Let the user attach a searchable external resource, such as an issue, to a prompt                             | reference.md → Add a composer attachment source; `plugin-examples/linear`                          |
+| Theme                     | `addTheme`                                                  | A light or dark palette under Settings → Appearance                                                           | reference.md → Contribute a theme; `plugin-examples/catppuccin`                                    |
+| Plugin RPC                | `defineRpc` + `server.handle` + `useRpc`                    | Daemon-side work that is not a normal Clisbot operation: vendor APIs, credentials, local files                | reference.md → Add plugin-specific backend behavior                                                |
+| Lifecycle events          | `server.on`                                                 | Observe agent/workspace lifecycle, inspect ended turns, and answer permission requests                        | [Lifecycle hooks](https://clisbot.com/docs/plugins/reference.md#lifecycle-hooks)                   |
+| Creation and launch hooks | `server.before`                                             | Change agent config, provider options, MCP servers, environment, or workspace isolation before the operation  | [Before hooks](https://clisbot.com/docs/plugins/reference.md#before-hooks)                         |
+| Clisbot SDK               | `useClisbot()` / handler `{ clisbot }`                      | Normal Clisbot operations: workspaces, agents, providers, config                                              | reference.md → Use the Clisbot SDK                                                                 |
 
 | Lifecycle task                                                      | Example                                                                                                  |
 | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -64,6 +64,7 @@ The generated project contains:
 ```text
 my-plugin/
   clisbot-plugin.json
+  OVERVIEW.md
   package.json
   tsconfig.json
   index.client.tsx
@@ -189,18 +190,24 @@ export default function contribute(client: PluginClientContext) {
 Use `useWorkspace(id, selector)` and `useAgent(id, selector)`. Selectors are required
 and their results use shallow equality. Never select the whole snapshot or add an RPC to discover
 the active workspace or agent. Command callbacks receive the selected host's `clisbot`, typed
-`rpc(contract, input)`, `openSurface(id)`, and contextual `openPanel(id)` capabilities.
+`rpc(contract, input)`, `openScreen({ screenId, params? })`, and contextual `openPanel(id)`
+capabilities.
 
-## Add a sidebar surface
+## Add a screen and a sidebar item
 
-Plugin surfaces use React Native primitives and work across desktop, browser, iOS, and Android. Register the surface before its sidebar item. Color text from `theme.colors` and pad from `layout.compact`.
+Plugin screens use React Native primitives and work across desktop, browser, iOS, and Android. A sidebar item, in the header or the footer, is a component: render one or more `SidebarRow`s from `@clisbot/plugin/client/ui`, with `SidebarSeparator` between groups, and call `openScreen` or `openPopover` from them. A screen's `title` is a string or a function of its `params`; its component receives the `params` it was opened with. Color text from `theme.colors` and pad from `layout.compact`.
 
 ```tsx
-import type { PluginClientContext, PluginSurfaceProps } from "@clisbot/plugin/client";
+import type {
+  PluginClientContext,
+  PluginScreenProps,
+  PluginSidebarItemProps,
+} from "@clisbot/plugin/client";
+import { SidebarRow } from "@clisbot/plugin/client/ui";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-function Counter({ theme, layout }: PluginSurfaceProps) {
+function Counter({ theme, layout }: PluginScreenProps) {
   const [count, setCount] = useState(0);
   const styles = useMemo(
     () => ({
@@ -231,19 +238,24 @@ function Counter({ theme, layout }: PluginSurfaceProps) {
   );
 }
 
+function CounterItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
+  return (
+    <SidebarRow
+      icon="ListPlus"
+      active={currentScreen?.screenId === "main"}
+      onPress={() => openScreen({ screenId: "main" })}
+    />
+  );
+}
+
 export default function contribute(client: PluginClientContext) {
-  client.addSurface("main", Counter);
-  client.addSidebarItem({
-    id: "main",
-    title: "Counter",
-    icon: "ListPlus",
-    surface: "main",
-  });
+  client.addScreen({ id: "main", title: "Counter", Component: Counter });
+  client.addSidebarHeaderItem({ id: "main", title: "Counter", Component: CounterItem });
   return () => {};
 }
 ```
 
-Icons are Lucide icon names. `theme` is a typed `PluginTheme` on every surface and panel. Primary text uses `theme.colors.foreground`; labels use `theme.colors.foregroundMuted`; the root view uses `theme.colors.surface0`. `layout.compact` is true on mobile and narrow windows. Clisbot owns the route, header, host picker, close action, error boundary, and per-installation query client.
+Icons are Lucide icon names. `theme` is a typed `PluginTheme` on every screen and panel. Primary text uses `theme.colors.foreground`; labels use `theme.colors.foregroundMuted`; the root view uses `theme.colors.surface0`. `layout.compact` is true on mobile and narrow windows. Clisbot owns the route, header, host picker, close action, error boundary, and per-installation query client.
 
 Before writing imports, classify each module as shared, client, or server. Follow the
 [SDK import boundaries](https://clisbot.com/docs/plugins/reference.md#runtime-modules), including
@@ -278,7 +290,7 @@ Use the existing Clisbot SDK for normal Clisbot operations. Use plugin RPC only 
 
 ### Call Clisbot from a surface
 
-`useClisbot()` borrows the selected host's current connection. Never create another client inside a surface.
+`useClisbot()` borrows the selected host's current connection. Never create another client inside a surface. It is the plugin's one client in every surface: release your subscriptions in your cleanup; plugin teardown ends the rest.
 
 ```tsx
 import { useClisbot } from "@clisbot/plugin/client";
@@ -468,34 +480,70 @@ The callback receives the same context as the matching Command Center item plus 
 A pill is a per-agent button in the composer track bar next to Tasks and Subagents. Add and remove pills from the client entry lifecycle. `addComposerPill` exists on `PluginClientContext`.
 
 ```tsx
+import type { PluginButtonRegistration, PluginClientContext } from "@clisbot/plugin/client";
+
 export function contributeClient(client: PluginClientContext) {
-  const pills = new Map<string, () => void>();
-  const unsubscribe = client.clisbot.agents.subscribe((update) => {
-    if (update.kind !== "upsert" || !update.agent.workspaceId) return;
-    const { id: agentId, workspaceId } = update.agent;
-    pills.get(agentId)?.();
+  const pills = new Map<string, PluginButtonRegistration>();
+  const lifetime = new AbortController();
+  const register = (agent: { id: string; workspaceId?: string | null }) => {
+    if (lifetime.signal.aborted || !agent.workspaceId) return;
+    const agentId = agent.id;
+    const workspaceId = agent.workspaceId;
+    pills.get(agentId)?.remove();
     pills.set(
       agentId,
       client.addComposerPill({
         id: "review",
-        title: "Open review",
         workspaceId,
         agentId,
-        Component: ReviewPill,
-        async onPress() {
-          client.openPanel("review", { workspaceId, agentId });
+        button: {
+          title: "Open review",
+          icon: "Scan",
+          label: "Review",
+          behavior: {
+            kind: "action",
+            onPress() {
+              client.openPanel("review", { workspaceId, agentId });
+            },
+          },
         },
       }),
     );
-  });
+  };
+  const removeAll = () => {
+    for (const pill of pills.values()) pill.remove();
+    pills.clear();
+  };
+  // An owned list subscription delivers existing agents, then updates, and a fresh snapshot after a reconnect.
+  void client.clisbot.agents
+    .list({ subscribe: {}, signal: lifetime.signal })
+    .then(({ subscription }) => {
+      subscription.subscribe({
+        snapshot: ({ entries }) => {
+          removeAll();
+          for (const { agent } of entries) register(agent);
+        },
+        update: (message) => {
+          if (message.type !== "agent_update") return;
+          const update = message.payload;
+          if (update.kind === "upsert") return register(update.agent);
+          pills.get(update.agentId)?.remove();
+          pills.delete(update.agentId);
+        },
+      });
+      return undefined;
+    })
+    .catch((error) => {
+      if (!lifetime.signal.aborted) console.error("Agent observation failed", error);
+    });
   return () => {
-    unsubscribe();
-    for (const remove of pills.values()) remove();
+    lifetime.abort();
+    removeAll();
   };
 }
 ```
 
-Call `contributeClient(client)` from `index.client.tsx`, or move its body into that entry. The component owns its icon and text; Clisbot owns the pressable, chrome, pending state, error reporting, and placement. Removal functions are idempotent, and Clisbot removes every pill when the plugin, client entrypoint, or host connection is torn down.
+Call `contributeClient(client)` from `index.client.tsx`, or move its body into that entry. The `button` descriptor sets the icon, label, and behavior; Clisbot owns the pressable, chrome, pending state, error reporting, and placement. `addComposerPill` returns a registration with `update()` and `remove()`. `remove()` is idempotent, and Clisbot removes every pill when the plugin, client entrypoint, or host connection is torn down.
 
 ## Transform and render timeline items
 
@@ -589,7 +637,48 @@ If the user asks to disable the global switch, set `pluginsEnabled` to `false`, 
 
 Do not edit a local config when the target is a remote daemon. Perform the edit on the daemon machine, or ask the user to use **Settings → Plugins → Enable plugins**. `clisbot reload --host <url>` reloads the remote daemon's own file but does not edit it.
 
-When the same sidebar contribution exists on several connected hosts, Clisbot shows it once with a host picker. The selected host owns the bundle, SDK calls, RPCs, and query cache. An offline selected host does not fall through to another host. Attachment sources stay scoped to the composer's host.
+When the same screen or sidebar item exists on several connected hosts, Clisbot shows it once. The screen header has a host picker; a sidebar item uses the host of the screen on display, else the host last picked in one of the plugin's screens. The selected host owns the bundle, SDK calls, RPCs, and query cache. An offline selected host does not fall through to another host. Attachment sources stay scoped to the composer's host.
+
+## Publishing a listing
+
+Write `OVERVIEW.md` beside `clisbot-plugin.json` for the plugin page inside Clisbot.
+It helps someone decide whether to install your plugin; the install command is already at
+the top of that page. A README assumes a GitHub audience and carries installation
+instructions, technical details, and badges. Long, AI-generated READMEs make people read
+past that material to understand what a plugin does.
+
+`OVERVIEW.md` is required to list your plugin in the registry. Commit it beside
+`clisbot-plugin.json` in the source repository at the pinned commit. The registry resolves it
+relative to the manifest, under `pluginPath` for monorepos. Include it in the published npm
+package too; the scaffold's `files` list includes it. Replace the scaffold's guidance comment
+with useful facts before publishing.
+
+The repository overview takes precedence over a registry import stopgap. Online validation
+fails when the pinned commit has no `OVERVIEW.md`, except for unchanged imported records
+that already carry `plugins/<owner>/<slug>.md` in the registry repository. Every version bump
+requires a repository overview and removes the stopgap in the same PR. A bump without the
+repository overview fails validation. README files do not supply the overview.
+
+Author overviews and registry stopgaps follow the same content contract, in this order.
+Choose headings only when they help; length follows complexity. A theme needs one paragraph.
+
+1. Explain what the plugin is and does in plain terms first.
+2. Explain how it works only when that is not obvious.
+3. Explain setup when needed: settings, accounts, tokens, providers, external tools, or other
+   plugins. Include applicable daemon version and operating system requirements. Setup
+   guidance is allowed; installation instructions are not.
+4. Explain capabilities and settings worth understanding, what each option does, what the
+   plugin reads or sends and where, permissions, and known limits.
+
+Use sentence case and plain factual language, with no em dashes. Omit installation commands,
+badges, changelog, contributing or license sections, marketing, and unsupported claims.
+Avoid implementation filler such as empty cleanup functions, catalogs of theme-token fields,
+or lists of absent features. Keep only what helps someone choose the plugin.
+
+If your plugin is an unchanged imported record, you can propose an author-written overview
+to replace the registry stopgap. Do not add import credit to your own `OVERVIEW.md`.
+
+See [Your listing page](https://clisbot.com/docs/plugins/publishing.md#your-listing-page).
 
 ## Typecheck and manage
 
@@ -635,7 +724,7 @@ After a change:
 
 Common failures:
 
-- Missing sidebar item: wrong host, plugin not `running`, invalid Lucide icon, or sidebar item points to a missing surface.
+- Missing sidebar item: wrong host, plugin not `running`, the item is hidden in Settings > Sidebar, or its component throws (an invalid Lucide icon name throws).
 - Unavailable client module: client bundles can use only the host-provided modules listed above.
 - RPC rejection: input or output failed its Zod schema, or the handler threw. Inspect `clisbot plugin logs <id>` for handler output.
 - Plugin exits or reload fails: inspect `clisbot plugin ls` for status and `clisbot plugin logs <id>` for initialization, cleanup, or crash output.

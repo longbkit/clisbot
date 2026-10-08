@@ -1,4 +1,4 @@
-import type { Rect } from "@/components/ui/menu/menu-anchor";
+import type { Rect } from "@/components/ui/anchor";
 import { ChatAvatar } from "../chat/chat-avatar";
 import type { GroupMarkMember } from "../chat/group-mark";
 import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
@@ -8,7 +8,7 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
-import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
+import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import { buildHostChatRoute, parseChatRouteFromPathname } from "../routes";
 import { BotsSidebarRow, sidebarMarkSize } from "./row";
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";

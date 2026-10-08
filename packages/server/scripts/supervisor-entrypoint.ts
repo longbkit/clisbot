@@ -14,7 +14,6 @@ import { PRIVATE_FILE_MODE } from "../src/server/private-files.js";
 import { loadPersistedConfig } from "../src/server/persisted-config.js";
 import { runSupervisor } from "./supervisor.js";
 import { resolveSupervisorLogFile } from "./supervisor-log-config.js";
-import { applySherpaLoaderEnv } from "../src/server/speech/providers/local/sherpa/sherpa-runtime-env.js";
 import { applyDaemonThreadpoolEnv } from "../src/server/agent/session-storage/session-storage-io.js";
 
 process.title = "Clisbot Supervisor";
@@ -109,7 +108,6 @@ async function main(): Promise<void> {
       ? resolvePackagedNodeEntrypointRunnerPath(fileURLToPath(import.meta.url))
       : null;
 
-  applySherpaLoaderEnv(workerEnv);
   applyDaemonThreadpoolEnv(workerEnv);
 
   const clisbotHome = resolveClisbotHome(workerEnv);

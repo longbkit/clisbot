@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/floating-panel-portal";
 import { useConversationProjectContext } from "./conversation-project-context";
 import { useOpenConversationTarget } from "./conversation-file-context";
-import { withConversationSource } from "./conversation-layout";
 const KINDS = ["files", "changes_tree", "working_diff", "commit_diff", "pull_request"] as const;
 /** The same provider chain as WorkspaceScreen, with a document-only conversation launcher. */
 export function ConversationPanelProviders({
@@ -28,14 +27,6 @@ export function ConversationPanelProviders({
       terminalDisabled: true,
       workspaceDirectory: project?.cwd,
       supportedKinds: KINDS,
-      scopeTarget: (target) =>
-        project?.workspaceId
-          ? withConversationSource(
-              target,
-              { serverId: project.serverId, workspaceId: project.workspaceId },
-              layoutKey,
-            )
-          : target,
       launch: (selection) => {
         if (selection.kind === "target" && project?.workspaceId)
           open?.(
@@ -44,7 +35,7 @@ export function ConversationPanelProviders({
           );
       },
     }),
-    [layoutKey, open, project],
+    [open, project],
   );
   return (
     <WorkspaceFocusProvider workspaceKey={layoutKey}>

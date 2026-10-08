@@ -167,6 +167,10 @@ below apply to official Clisbot `main`.
    The merge commit keeps the transformed snapshot and raw upstream history;
    no old `sync/rebranded-*` branch names need to remain.
 
+Last promotion: Paseo `v0.11.1` on 2026-10-08 —
+[merge audit](../../audits/2026-09-30-clisbot-branding/merge-v0.11.1.md) (318 conflicting
+files, the integration fixes the merge needed, and open follow-ups).
+
 ### File completeness and publication gate
 
 Read the [2026-10-01 lesson](../../lessons/2026-10-01-rebrand-file-completeness.md)
@@ -475,6 +479,15 @@ four metadata/doc files; the 2026-09-06 comparison from `74a377ff6` to Paseo
   Every `placeholderTextColor` reads `colors.placeholder` (a theme token the
   fork adds) instead of `foregroundMuted`: one-line edits in about 19 app files.
   An upstream input added later needs the same edit.
+- The sidebar footer (since v0.11.1): upstream's footer rows (Usage, plugin
+  rows) and Clisbot's bottom bar share `sidebarFooterItems`;
+  `sidebar-nav/footer-model.ts` and `sidebar-nav/model.ts` each keep the other's
+  keys. `left-sidebar.tsx` and `settings/sidebar/sidebar-nav-section.tsx` render both.
+- Pairing (`runtime/host-runtime.ts`, `pair-link-modal.tsx`, `hosts/pair-scan-model.ts`):
+  Clisbot device and Hub links run before upstream's host confirmation.
+- `stores/session-store.ts` `toDaemonServerInfo` carries Clisbot's
+  `botCreationAllowed` and `permissions`; an upstream rewrite that drops them
+  breaks Bot creation and managed access after a reconnect.
 
 `getpaseo/hub` has its own overlap, from the channel plane driving a Host over
 the connection that Host holds to the Hub

@@ -32,7 +32,7 @@ export {
 } from "./host-picker-constants";
 
 type RenderHostOption = NonNullable<ComboboxProps["renderOption"]>;
-interface HostPickerHost {
+export interface HostPickerHost {
   serverId: string;
   label: string;
 }

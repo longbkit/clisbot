@@ -121,6 +121,8 @@ import {
 } from "./new-workspace-initial-context";
 import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-icon-targets";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
+import { ImportSessionButton } from "./new-workspace/import-session-button";
+import { useImportSession } from "@/hooks/use-import-session";
 import {
   buildTerminalsQueryKey,
   type ListTerminalsPayload,
@@ -2385,6 +2387,7 @@ export function NewWorkspaceScreen({
   });
 
   const screenHeaderLeft = useMemo(() => <SidebarMenuToggle />, []);
+  const importSession = useImportSession({ serverId: selectedServerId });
 
   const composer = isTerminalLaunch ? (
     <Composer
@@ -2440,7 +2443,7 @@ export function NewWorkspaceScreen({
       clearDraft={handleClearDraft}
       autoFocus
       autoFocusKey={launchFocusKey}
-      commandDraftConfig={composerState?.commandDraftConfig}
+      commandDraft={composerState?.commandDraft}
       agentControls={agentControlsWithDisabled}
     />
   );
@@ -2453,11 +2456,13 @@ export function NewWorkspaceScreen({
           isCompact={isCompact}
           title={t("newWorkspace.title")}
           formStack={formStack}
+          onImportSession={importSession.open}
         >
           {composer}
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         </NewWorkspaceLayout>
       </View>
+      {importSession.sheet}
     </FileDropZone>
   );
 }
@@ -2466,15 +2471,20 @@ function NewWorkspaceLayout({
   isCompact,
   title,
   formStack,
+  onImportSession,
   children,
 }: {
   isCompact: boolean;
   title: string;
   formStack: ReactNode;
+  onImportSession: () => void;
   children: ReactNode;
 }) {
+  // At the top of the screen on compact layouts, under the composer otherwise.
+  const importSessionButton = <ImportSessionButton compact={isCompact} onPress={onImportSession} />;
   const setupFields = (
     <>
+      {isCompact ? <View style={styles.compactTopActions}>{importSessionButton}</View> : null}
       <View style={styles.composerTitleContainer} pointerEvents="none">
         <Text style={styles.composerTitle}>{title}</Text>
       </View>
@@ -2484,7 +2494,10 @@ function NewWorkspaceLayout({
   return (
     <ComposerDock centered={!isCompact}>
       {setupFields}
-      {children}
+      <>
+        {children}
+        {isCompact ? null : importSessionButton}
+      </>
     </ComposerDock>
   );
 }
@@ -2498,6 +2511,12 @@ const styles = StyleSheet.create((theme) => ({
   content: {
     position: "relative",
     flex: 1,
+  },
+  // Takes the free space above the setup fields, so its button sits at the top of the screen.
+  // The inset puts the ghost button's icon on the setup rows' icon rail.
+  compactTopActions: {
+    flex: 1,
+    paddingHorizontal: theme.spacing[3],
   },
   composerTitleContainer: {
     marginBottom: theme.spacing[8],
@@ -2521,7 +2540,8 @@ const styles = StyleSheet.create((theme) => ({
   formStackDesktop: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: theme.spacing[8],
+    // Matches the gap between the composer and the Import session pill below it.
+    marginBottom: theme.spacing[4],
     // The badge adds its own left padding; offset it so the project icon's left
     // edge lands exactly on the "New workspace" title's left edge. The trailing
     // inset mirrors it so the launch chip stops on the composer's inner content

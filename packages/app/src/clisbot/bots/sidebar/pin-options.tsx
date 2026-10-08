@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useMenuContext } from "@/components/ui/menu";
-import type { Rect } from "@/components/ui/menu/menu-anchor";
+import type { Rect } from "@/components/ui/anchor";
 import type { ChatResourceAction, ChatResourceActionId } from "../chat/chat-resource-actions";
 import { resourceActionIcon } from "../chat/chat-resource-icons";
 

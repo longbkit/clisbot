@@ -13,7 +13,7 @@ interface ResolveHubInput {
   credentials: HubCredentialStore;
 }
 
-export const DEFAULT_HUB_ORIGIN = "https://hub.paseo.sh";
+export const DEFAULT_HUB_ORIGIN = "https://hub.clisbot.com";
 
 export function resolveHubOrigin(input: ResolveHubInput): string {
   const configuredOrigin = input.options.origin ?? input.env.CLISBOT_HUB_URL;

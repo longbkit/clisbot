@@ -1,4 +1,4 @@
-import type { Rect } from "@/components/ui/menu/menu-anchor";
+import type { Rect } from "@/components/ui/anchor";
 import { DirectoryControls } from "./directory-controls";
 import {
   filterDirectoryBots,
@@ -19,7 +19,7 @@ import { Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { BotFace } from "../chat/bot-face";
 import { settingsStyles } from "@/styles/settings";
-import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
+import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import { BotsSidebarRow, sidebarMarkSize } from "./row";
 import type { BotLaunch } from "./display/row-detail";
 import { useBotRowDetail } from "./display/use-row-detail";

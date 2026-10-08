@@ -3,7 +3,16 @@ import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { router } from "expo-router";
-import { FolderPlus, GitBranch, Import, Search, Server, Settings, X } from "lucide-react-native";
+import {
+  CircleGauge,
+  FolderPlus,
+  GitBranch,
+  Import,
+  Search,
+  Server,
+  Settings,
+  X,
+} from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
@@ -31,6 +40,7 @@ import {
 } from "@/components/hosts/host-picker";
 import { SidebarActiveFilters } from "@/components/sidebar/display-preferences/active-filters";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
+import { SidebarSeparator } from "@/components/sidebar/sidebar-separator";
 import { SidebarHelpMenu } from "@/components/sidebar/sidebar-help-menu";
 import { SidebarNewMenu } from "@/components/sidebar/sidebar-new-menu";
 import { SidebarResizeHandle } from "@/components/sidebar-resize-handle";
@@ -56,12 +66,21 @@ import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model
 import { type SidebarGroupMode, useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
+import { PluginSidebarItem } from "@/plugins/sidebar-items";
+import { builtinSidebarNavLabelKey } from "@/sidebar-nav/model";
+import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
 import { buildSettingsAddHostRoute, buildSettingsRoute } from "@/utils/host-routes";
 import { openHostOverview } from "@/navigation/settings-navigation";
+import {
+  UsageSidebarItem,
+  UsageSidebarRoot,
+  useHasUsageSummary,
+  useOpenSidebarUsage,
+} from "@/usage";
 import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
 import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarMetadataNotice } from "./sidebar/empty-states";
@@ -104,6 +123,7 @@ interface SidebarLabels {
   importSession: string;
   settings: string;
   searchHosts: string;
+  usage: string;
   closeSidebar: string;
 }
 
@@ -211,6 +231,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
       importSession: t("importSession.title"),
       settings: t("sidebar.actions.settings"),
       searchHosts: t("sidebar.host.searchPlaceholder"),
+      usage: t(builtinSidebarNavLabelKey("usage")),
       closeSidebar: t("sidebar.actions.closeSidebar"),
     }),
     [t],
@@ -287,7 +308,7 @@ function FooterIconButton({
   testID,
   label,
   icon: Icon,
-  iconSize,
+  iconSizeAdjustment = 0,
   shortcutKeys,
   theme,
   indicator,
@@ -297,7 +318,8 @@ function FooterIconButton({
   testID: string;
   label: string;
   icon: typeof FolderPlus;
-  iconSize?: number;
+  /** Only for a glyph that reads larger than the others at the same size. */
+  iconSizeAdjustment?: number;
   shortcutKeys?: ReturnType<typeof useShortcutKeys>;
   theme: SidebarTheme;
   buttonRef?: RefObject<View | null>;
@@ -306,13 +328,15 @@ function FooterIconButton({
 }) {
   const compact = useIsCompactFormFactor();
   const finePointer = useHasFinePointer();
+  const iconSize = compact ? theme.iconSize.lg : theme.iconSize.md;
+
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>
         <Pressable
           ref={buttonRef}
           style={[
-            styles.footerIconButton,
+            styles.footerIconButton(compact),
             compact || !finePointer ? styles.footerTouchIconButton : null,
           ]}
           testID={testID}
@@ -326,7 +350,7 @@ function FooterIconButton({
           {({ hovered }) => (
             <View style={styles.footerIconGlyph}>
               <Icon
-                size={iconSize ?? theme.iconSize.md}
+                size={iconSize + iconSizeAdjustment}
                 color={hovered ? theme.colors.foreground : theme.colors.foregroundMuted}
               />
               {indicator ? (
@@ -341,7 +365,7 @@ function FooterIconButton({
           )}
         </Pressable>
       </TooltipTrigger>
-      <TooltipContent side="top" align="center" offset={8}>
+      <TooltipContent side="top" align="center" offset={8} testID={`${testID}-tooltip`}>
         <IconTooltipContent label={label} shortcutKeys={shortcutKeys} />
       </TooltipContent>
     </Tooltip>
@@ -445,7 +469,8 @@ function SidebarHostPicker({
         testID="sidebar-hosts-trigger"
         label={triggerLabel}
         icon={Server}
-        iconSize={theme.iconSize.sm}
+        // Server's two boxes fill more of the square than the other glyphs.
+        iconSizeAdjustment={-1}
         theme={theme}
         indicator={hasActiveHostFilter}
         indicatorTestID="sidebar-hosts-filter-indicator"
@@ -477,6 +502,7 @@ function SidebarFooter({
   labels,
   handleAddHost,
   handleOpenHostSettings,
+  onBeforeNavigate,
 }: {
   theme: SidebarTheme;
   handleOpenProject: () => void;
@@ -488,9 +514,11 @@ function SidebarFooter({
     importSession: string;
     settings: string;
     searchHosts: string;
+    usage: string;
   };
   handleAddHost: () => void;
   handleOpenHostSettings: (serverId: string) => void;
+  onBeforeNavigate?: () => void;
 }) {
   const newAgentKeys = useShortcutKeys("new-agent");
   const settingsKeys = useShortcutKeys("toggle-settings");
@@ -508,70 +536,128 @@ function SidebarFooter({
     actions.reduce((width, item) => width + actionWidths[item.key], 0) +
     Math.max(0, actions.length - 1) * theme.spacing[touchTarget ? 2 : 1];
 
+  // Footer rows (Usage, plugins) above the bottom bar: actions left, controls, Help and Settings right.
   return (
-    <View style={styles.sidebarFooter} testID="sidebar-footer">
-      <View style={styles.footerActions(actionMinWidth, touchTarget)}>
-        {actions.map((item) => {
-          if (item.key === "new") {
-            return (
-              <SidebarNewMenu
-                key={item.key}
-                onAddProject={handleOpenProject}
-                onImportSession={handleImportSession}
-              />
-            );
-          }
-          if (item.key === "search") {
-            return <FooterSearchField key={item.key} theme={theme} />;
-          }
-          return (
+    <UsageSidebarRoot>
+      <View style={styles.footerContainer} testID="sidebar-footer">
+        <SidebarFooterRows onBeforeNavigate={onBeforeNavigate} />
+        <View style={styles.sidebarFooter} testID="sidebar-footer-bottom-line">
+          <View style={styles.footerActions(actionMinWidth, touchTarget)}>
+            {actions.map((item) => {
+              if (item.key === "new") {
+                return (
+                  <SidebarNewMenu
+                    key={item.key}
+                    onAddProject={handleOpenProject}
+                    onImportSession={handleImportSession}
+                  />
+                );
+              }
+              if (item.key === "search") {
+                return <FooterSearchField key={item.key} theme={theme} />;
+              }
+              return (
+                <FooterIconButton
+                  key={item.key}
+                  onPress={handleOpenProject}
+                  label={labels.addProject}
+                  shortcutKeys={newAgentKeys}
+                  icon={FolderPlus}
+                  testID="sidebar-add-project"
+                  theme={theme}
+                />
+              );
+            })}
+          </View>
+          <View style={styles.footerIconRow}>
+            {items
+              .filter((item) => item.visible && item.group === "controls")
+              .map((item) => {
+                if (item.key === "hosts") {
+                  return (
+                    <SidebarHostPicker
+                      key={item.key}
+                      theme={theme}
+                      label={labels.hosts}
+                      onAddHost={handleAddHost}
+                      onOpenHostSettings={handleOpenHostSettings}
+                    />
+                  );
+                }
+                if (item.key === "usage-icon") {
+                  return <SidebarUsageIcon key={item.key} label={labels.usage} theme={theme} />;
+                }
+                return (
+                  <FooterIconButton
+                    key={item.key}
+                    onPress={handleImportSession}
+                    testID="sidebar-import-session"
+                    label={labels.importSession}
+                    icon={Import}
+                    theme={theme}
+                  />
+                );
+              })}
+            <SidebarHelpMenu />
             <FooterIconButton
-              key={item.key}
-              onPress={handleOpenProject}
-              label={labels.addProject}
-              shortcutKeys={newAgentKeys}
-              icon={FolderPlus}
-              testID="sidebar-add-project"
+              onPress={handleSettings}
+              testID="sidebar-settings"
+              label={labels.settings}
+              icon={Settings}
+              shortcutKeys={settingsKeys}
               theme={theme}
             />
-          );
-        })}
+          </View>
+        </View>
       </View>
-      <View style={styles.footerIconRow}>
-        {items
-          .filter((item) => item.visible && item.group === "controls")
-          .map((item) =>
-            item.key === "hosts" ? (
-              <SidebarHostPicker
-                key={item.key}
-                theme={theme}
-                label={labels.hosts}
-                onAddHost={handleAddHost}
-                onOpenHostSettings={handleOpenHostSettings}
-              />
-            ) : (
-              <FooterIconButton
-                key={item.key}
-                onPress={handleImportSession}
-                testID="sidebar-import-session"
-                label={labels.importSession}
-                icon={Import}
-                theme={theme}
-              />
-            ),
-          )}
-        <SidebarHelpMenu />
+    </UsageSidebarRoot>
+  );
+}
 
-        <FooterIconButton
-          onPress={handleSettings}
-          testID="sidebar-settings"
-          label={labels.settings}
-          icon={Settings}
-          shortcutKeys={settingsKeys}
-          theme={theme}
-        />
+function SidebarUsageIcon({ label, theme }: { label: string; theme: SidebarTheme }) {
+  const openUsage = useOpenSidebarUsage();
+  return (
+    <FooterIconButton
+      onPress={openUsage}
+      testID="sidebar-usage-icon"
+      label={label}
+      icon={CircleGauge}
+      theme={theme}
+    />
+  );
+}
+
+/**
+ * The footer rows in the user's `sidebarFooterItems` order: the Usage item and plugin rows. The
+ * Usage item is left out while it has no summary to show.
+ */
+function SidebarFooterRows({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
+  const { items } = useSidebarNavItems("footer");
+  const hasUsageSummary = useHasUsageSummary();
+  const rowsRef = useRef<View | null>(null);
+  const visibleItems = items.filter(
+    (item) => item.visible && (item.kind === "plugin" || hasUsageSummary),
+  );
+  if (visibleItems.length === 0) return null;
+  return (
+    <>
+      <View ref={rowsRef} collapsable={false} style={styles.footerRows}>
+        {visibleItems.map((item) =>
+          item.kind === "plugin" ? (
+            <PluginSidebarItem
+              key={item.key}
+              group={item.group}
+              section="footer"
+              fallbackAnchorRef={rowsRef}
+              onBeforeNavigate={onBeforeNavigate}
+            />
+          ) : (
+            <UsageSidebarItem key={item.key} />
+          ),
+        )}
       </View>
-    </View>
+      <SidebarSeparator testID="sidebar-footer-separator" />
+    </>
   );
 }
 
@@ -692,6 +778,7 @@ function MobileSidebar({
           labels={labels}
           handleAddHost={handleAddHost}
           handleOpenHostSettings={handleOpenHostSettings}
+          onBeforeNavigate={closeSidebar}
         />
       </View>
     </MobilePanelOverlay>
@@ -996,7 +1083,6 @@ const styles = StyleSheet.create((theme) => ({
     right: 0,
     zIndex: 2,
     alignItems: "flex-end",
-    pointerEvents: "box-none",
   },
   mobileCloseButton: {
     // The 16px X paints farther inside its 32px hit target than the 14px Settings2 glyph.
@@ -1044,6 +1130,10 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
   },
+  footerContainer: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
   sidebarFooter: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1051,8 +1141,6 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
   },
   footerIconRow: {
     flexDirection: "row",
@@ -1087,18 +1175,24 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.normal,
     color: theme.colors.foregroundMuted,
   },
+  // Usage and plugin rows sit above the footer's icon line, spaced like the header nav rows.
+  footerRows: {
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1.5],
+    gap: 2,
+  },
   footerTouchSearchField: {
     height: MIN_TOUCH_TARGET_SIZE,
     paddingHorizontal: theme.spacing[2],
   },
-  footerIconButton: {
-    width: 28,
-    height: 28,
+  footerIconButton: (isCompact: boolean) => ({
+    width: isCompact ? buttonControlHeight.md : buttonControlHeight.xs,
+    height: isCompact ? buttonControlHeight.md : buttonControlHeight.xs,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: theme.spacing[1],
     paddingHorizontal: theme.spacing[1],
-  },
+  }),
   footerIconGlyph: {
     position: "relative",
     alignItems: "center",

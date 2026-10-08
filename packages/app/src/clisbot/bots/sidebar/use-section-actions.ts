@@ -1,5 +1,5 @@
 import type { PinChat } from "./pin-identity";
-import type { Rect } from "@/components/ui/menu/menu-anchor";
+import type { Rect } from "@/components/ui/anchor";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { buildHostBotRoute } from "../routes";

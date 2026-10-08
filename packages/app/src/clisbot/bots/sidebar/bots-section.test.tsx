@@ -87,7 +87,7 @@ vi.mock("@/stores/session-store", () => ({
   useSessionStore: () => false,
   selectAgentTurnPresentation: () => ({ isActive: false }),
 }));
-vi.mock("@/hooks/use-compact-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
+vi.mock("@/hooks/use-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
 function bot(id: string, overrides: Partial<BotsSidebarBot> = {}): BotsSidebarBot {
   return { key: `host-a:${id}`, serverId: "host-a", botId: id, name: `Bot ${id}`, ...overrides };
 }

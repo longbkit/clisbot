@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SessionMetadataLine } from "@/clisbot/session-storage/workspace-metadata-row";
-import { getProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
 import { isWeb } from "@/constants/platform";
 import type { WorkspaceTabPresentation } from "@/screens/workspace/workspace-tab-presentation";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
@@ -296,6 +296,7 @@ function SessionMark({
   wide: boolean;
 }): ReactElement {
   const { provider, id } = session.agent;
+  const icon = useProviderIcon(provider, serverId);
   const presentation = useMemo<WorkspaceTabPresentation>(
     () => ({
       key: id,
@@ -305,10 +306,12 @@ function SessionMark({
       tooltip: session.title ?? "",
       modified: false,
       titleState: "ready",
-      icon: getProviderIcon(provider, serverId),
+      // A sidebar line has no close control; only the tab bar offers one.
+      showCloseButton: false,
+      icon,
       statusBucket: session.statusBucket,
     }),
-    [id, provider, serverId, session.title, session.statusBucket],
+    [icon, id, session.title, session.statusBucket],
   );
   return (
     <View style={[styles.markSlot, wide && styles.markSlotWide]}>

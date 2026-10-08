@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/client",
-  "version": "0.10.2",
+  "version": "0.11.1",
   "description": "Clisbot client SDK package",
   "files": [
     "dist",
@@ -35,7 +35,7 @@
   },
   "scripts": {
     "clean": "node ../../scripts/clean-package-dist.mjs",
-    "build": "npm run build --workspace=@clisbot/protocol && tsc -p tsconfig.json --incremental false",
+    "build": "npm run build --workspace=@clisbot/protocol && npm run build --workspace=@clisbot/relay && tsc -p tsconfig.json --incremental false",
     "build:clean": "npm run clean && npm run build",
     "prepack": "npm run build:clean",
     "typecheck": "tsgo --noEmit",
@@ -43,9 +43,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@clisbot/device-access": "0.10.2",
-    "@clisbot/protocol": "0.10.2",
-    "@clisbot/relay": "0.10.2",
+    "@clisbot/device-access": "0.11.1",
+    "@clisbot/protocol": "0.11.1",
+    "@clisbot/relay": "0.11.1",
     "base64-js": "^1.5.1",
     "zod": "^4.4.3"
   },

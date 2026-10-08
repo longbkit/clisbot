@@ -157,6 +157,9 @@ buildNpmPackage {
         cp -a "$path" "$out/share/clisbot-desktop/$path"
       done < desktop-files.txt
 
+      # Shell hooks invoke the retained CLI bin directly, without a system Node.
+      patchShebangs --build "$out/share/clisbot-desktop"
+
       # Keep the same unpackaged monorepo layout expected by main.js.
       cp package.json $out/share/clisbot-desktop/
       mkdir -p $out/share/clisbot-desktop/packages/app

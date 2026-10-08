@@ -5,9 +5,11 @@ import type { TFunction } from "i18next";
 import {
   ArrowDown,
   ArrowUp,
+  Blocks,
   CalendarClock,
   CircleHelp,
   FolderPlus,
+  Gauge,
   History,
   Import,
   Plus,
@@ -21,14 +23,15 @@ import { Button } from "@/components/ui/button";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Switch } from "@/components/ui/switch";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
-import { resolvePluginIcon } from "@/plugins/icons";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import {
   builtinSidebarNavLabelKey,
   builtinSidebarNavShortcutAction,
-  type BuiltinSidebarNavId,
+  type BuiltinSidebarItemId,
   type SidebarNavItem,
+  type SidebarSection,
 } from "@/sidebar-nav/model";
+import { resolvePluginIcon } from "@/plugins/icons";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import {
   canMoveSidebarFooterItem,
@@ -47,23 +50,27 @@ const ThemedArrowDown = withUnistyles(ArrowDown);
 const moveUpIcon = <ThemedArrowUp size={ICON_SIZE.sm} uniProps={mutedColorMapping} />;
 const moveDownIcon = <ThemedArrowDown size={ICON_SIZE.sm} uniProps={mutedColorMapping} />;
 
-const BUILTIN_ICONS: Record<BuiltinSidebarNavId, LucideIcon> = {
+const BUILTIN_ICONS: Record<BuiltinSidebarItemId, LucideIcon> = {
   "new-workspace": Plus,
   "add-project": FolderPlus,
   history: History,
   search: Search,
   schedules: CalendarClock,
+  usage: Gauge,
 };
 
 const FOOTER_ICONS: Record<SidebarFooterId, LucideIcon> = {
   new: Plus,
   "add-project": FolderPlus,
   search: Search,
+  "usage-icon": Gauge,
   hosts: Server,
   "import-session": Import,
   help: CircleHelp,
   settings: Settings,
 };
+/** Plugin items register no icon, so they share this one; a legacy `addSidebarItem` keeps its own. */
+const PLUGIN_ICON = Blocks;
 
 function NavIcon({ Icon, color = "" }: { Icon: LucideIcon; color?: string }) {
   return <Icon size={ICON_SIZE.md} color={color} />;
@@ -72,7 +79,8 @@ function NavIcon({ Icon, color = "" }: { Icon: LucideIcon; color?: string }) {
 const ThemedNavIcon = withUnistyles(NavIcon);
 
 function navItemIcon(item: SidebarNavItem): LucideIcon {
-  return item.kind === "builtin" ? BUILTIN_ICONS[item.id] : resolvePluginIcon(item.group.icon);
+  if (item.kind === "builtin") return BUILTIN_ICONS[item.id];
+  return item.group.kind === "legacy" ? resolvePluginIcon(item.group.icon) : PLUGIN_ICON;
 }
 
 function navItemLabel(t: TFunction, item: SidebarNavItem): string {
@@ -168,62 +176,89 @@ function SidebarNavRow({
   );
 }
 
-export function SidebarNavSection(): ReactElement {
+const SECTION_COPY = {
+  header: {
+    title: "settings.appearance.sidebar.header.title",
+    info: "settings.appearance.sidebar.header.description",
+  },
+  footer: {
+    title: "settings.appearance.sidebar.footer.title",
+    info: "settings.appearance.sidebar.footer.description",
+  },
+} as const satisfies Record<SidebarSection, { title: string; info: string }>;
+
+function SidebarItemsCard({ section }: { section: SidebarSection }): ReactElement {
   const { t } = useTranslation();
-  const { items, setVisible, move } = useSidebarNavItems();
-  const footer = useSidebarFooterItems();
+  const { items, setVisible, move } = useSidebarNavItems(section);
 
   return (
+    <SettingsSection
+      title={t(SECTION_COPY[section].title)}
+      info={t(SECTION_COPY[section].info)}
+      testID={`sidebar-nav-section-${section}`}
+    >
+      <View style={settingsStyles.card}>
+        {items.map((item, index) => (
+          <SidebarNavRow
+            key={item.key}
+            item={item}
+            label={navItemLabel(t, item)}
+            Icon={navItemIcon(item)}
+            shortcutAction={
+              item.kind === "builtin" ? builtinSidebarNavShortcutAction(item.id) : null
+            }
+            testIDPrefix={section === "header" ? "sidebar-nav" : "sidebar-nav-footer"}
+            isFirst={index === 0}
+            isLast={index === items.length - 1}
+            onMove={move}
+            onSetVisible={setVisible}
+          />
+        ))}
+      </View>
+    </SettingsSection>
+  );
+}
+
+/** Clisbot's bottom bar: actions on the left, controls on the right, Help and Settings fixed. */
+function SidebarBottomBarCard(): ReactElement {
+  const { t } = useTranslation();
+  const footer = useSidebarFooterItems();
+  return (
+    <SettingsSection
+      title={t("settings.appearance.sidebar.bottomTitle")}
+      info={t("settings.appearance.sidebar.bottomDescription")}
+      testID="sidebar-footer-section"
+    >
+      <View style={settingsStyles.card}>
+        {footer.items.map((item, index) => (
+          <SidebarNavRow
+            key={item.key}
+            item={item}
+            label={t(item.labelKey)}
+            Icon={FOOTER_ICONS[item.key]}
+            shortcutAction={sidebarFooterShortcutAction(item.key)}
+            testIDPrefix="sidebar-footer"
+            isFirst={index === 0}
+            isLast={index === footer.items.length - 1}
+            canMoveUp={canMoveSidebarFooterItem(footer.items, item.key, "up")}
+            canMoveDown={canMoveSidebarFooterItem(footer.items, item.key, "down")}
+            locked={item.group === "fixed"}
+            onMove={footer.move}
+            onSetVisible={footer.setVisible}
+          />
+        ))}
+      </View>
+    </SettingsSection>
+  );
+}
+
+/** Settings > Sidebar: the header and footer row cards, then Clisbot's bottom bar. */
+export function SidebarNavSection(): ReactElement {
+  return (
     <>
-      <SettingsSection
-        title={t("settings.appearance.sidebar.title")}
-        info={t("settings.appearance.sidebar.description")}
-        testID="sidebar-nav-section"
-      >
-        <View style={settingsStyles.card}>
-          {items.map((item, index) => (
-            <SidebarNavRow
-              key={item.key}
-              item={item}
-              label={navItemLabel(t, item)}
-              Icon={navItemIcon(item)}
-              shortcutAction={
-                item.kind === "builtin" ? builtinSidebarNavShortcutAction(item.id) : null
-              }
-              testIDPrefix="sidebar-nav"
-              isFirst={index === 0}
-              isLast={index === items.length - 1}
-              onMove={move}
-              onSetVisible={setVisible}
-            />
-          ))}
-        </View>
-      </SettingsSection>
-      <SettingsSection
-        title={t("settings.appearance.sidebar.bottomTitle")}
-        info={t("settings.appearance.sidebar.bottomDescription")}
-        testID="sidebar-footer-section"
-      >
-        <View style={settingsStyles.card}>
-          {footer.items.map((item, index) => (
-            <SidebarNavRow
-              key={item.key}
-              item={item}
-              label={t(item.labelKey)}
-              Icon={FOOTER_ICONS[item.key]}
-              shortcutAction={sidebarFooterShortcutAction(item.key)}
-              testIDPrefix="sidebar-footer"
-              isFirst={index === 0}
-              isLast={index === footer.items.length - 1}
-              canMoveUp={canMoveSidebarFooterItem(footer.items, item.key, "up")}
-              canMoveDown={canMoveSidebarFooterItem(footer.items, item.key, "down")}
-              locked={item.group === "fixed"}
-              onMove={footer.move}
-              onSetVisible={footer.setVisible}
-            />
-          ))}
-        </View>
-      </SettingsSection>
+      <SidebarItemsCard section="header" />
+      <SidebarItemsCard section="footer" />
+      <SidebarBottomBarCard />
     </>
   );
 }

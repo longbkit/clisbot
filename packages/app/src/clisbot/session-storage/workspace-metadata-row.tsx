@@ -4,7 +4,7 @@ import { StyleSheet } from "react-native-unistyles";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useSidebarRowItems } from "@/components/sidebar/display-preferences/model";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCompactTimeAgo } from "@/hooks/use-compact-time-ago";
+import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import {
   type SessionAuthorship,
   type SessionChannelReference,

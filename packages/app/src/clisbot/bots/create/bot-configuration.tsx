@@ -7,7 +7,7 @@ import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Field } from "@/components/ui/form-field";
 import { SelectField } from "@/components/ui/select-field";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
-import { getProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
 import type { BotFormModel, BotFormState } from "./bot-form-model";
 import type { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
 import { SetupCard, SetupRowView } from "./bot-setup-card";
@@ -168,7 +168,7 @@ function ThinkingRow({ state, model }: Pick<Props, "state" | "model">) {
 }
 
 function ProviderIcon({ provider, serverId }: { provider: string; serverId: string | null }) {
-  const Icon = getProviderIcon(provider, serverId);
+  const Icon = useProviderIcon(provider, serverId);
   return <Icon size={16} color={styles.icon.color} />;
 }
 

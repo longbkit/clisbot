@@ -42,7 +42,7 @@ export const ScheduleTargetSchema = z.discriminatedUnion("type", [
       // isolation is ignored and the workspace is never archived by a run.
       workspaceId: z.string().trim().min(1).optional(),
       title: z.string().trim().min(1).nullable().optional(),
-      providerOptions: z.record(z.string(), z.json()).optional(),
+      providerOptions: z.record(z.string(), z.unknown()).optional(),
       featureValues: z.record(z.string(), z.unknown()).optional(),
       systemPrompt: z.string().optional(),
       mcpServers: z.record(z.string(), z.unknown()).optional(),

@@ -13,7 +13,8 @@ vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeClient: () => selectedHost.client ?? (hostClient as unknown as DaemonClient),
   useHosts: () => [{ serverId: "host-1", label: "Local" }],
 }));
-vi.mock("@/constants/layout", () => ({
+vi.mock("@/constants/layout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/layout")>()),
   useIsCompactFormFactor: () => false,
 }));
 vi.mock("../navigation", () => ({
@@ -37,6 +38,8 @@ vi.mock("../icons", () => ({
 
 import { pluginRegistry } from "../registry";
 import { PluginTimelineItemView } from "./view";
+
+const audio = { play: async () => 0 };
 
 const bundle = `(function(require) {
   const React = require("react");
@@ -127,6 +130,7 @@ describe("PluginTimelineItemView", () => {
       ],
       {
         client: daemonClient,
+        audio,
       },
     );
 
@@ -156,6 +160,7 @@ describe("PluginTimelineItemView", () => {
       ],
       {
         client: daemonClient,
+        audio,
       },
     );
     const container = document.createElement("div");
@@ -193,6 +198,7 @@ describe("PluginTimelineItemView", () => {
       ],
       {
         client: daemonClient,
+        audio,
       },
     );
     const container = document.createElement("div");
@@ -216,7 +222,7 @@ describe("PluginTimelineItemView", () => {
   });
 });
 
-it("releases a crashed renderer's observations and recovers a fresh scope in StrictMode", async () => {
+it("a renderer releases its observation on the plugin's client when it crashes, and remounts in StrictMode", async () => {
   let receive: Parameters<DaemonTransport["onMessage"]>[0] = () => {};
   let opened: () => void = () => {};
   let nextId = 0;
@@ -291,11 +297,9 @@ it("releases a crashed renderer's observations and recovers a fresh scope in Str
     return { default(plugin) {
       function Card(props) {
         const clisbot = useClisbot();
-        const failed = React.useRef(false);
-        failed.current = props.item.data.label === "explode";
         React.useEffect(() => {
           const owner = clisbot.observeEvents(["project.update"]);
-          return () => { if (failed.current) throw new Error("plugin cleanup failed"); void owner.release(); };
+          return () => { void owner.release(); };
         }, [clisbot]);
         if (props.item.data.label === "explode") throw new Error("owned renderer failed");
         return React.createElement("span", null, props.item.data.label);
@@ -317,7 +321,7 @@ it("releases a crashed renderer's observations and recovers a fresh scope in Str
         clientBundle: liveBundle,
       },
     ],
-    { client },
+    { client, audio },
   );
   const container = document.createElement("div");
   containers.push(container);

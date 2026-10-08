@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { resolveCliInstallSourcePath } from "./path";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { resolveCliInstallSourcePath, resolveCliShimPath } from "./path";
 
 describe("cli-install-path", () => {
   it("uses the bundled shim for packaged macOS installs", () => {
@@ -54,5 +56,40 @@ describe("cli-install-path", () => {
         shimPath: "/opt/Clisbot/resources/bin/clisbot",
       }),
     ).toBe("/opt/Clisbot/resources/bin/clisbot");
+  });
+});
+
+describe("CLI executable selection", () => {
+  const resolveWorkspaceCli = () =>
+    createRequire(import.meta.url).resolve("@clisbot/cli/bin/clisbot");
+
+  it("uses the workspace CLI for an unpackaged Electron launcher", () => {
+    expect(
+      resolveCliShimPath({
+        platform: "linux",
+        isPackaged: false,
+        executablePath: "/nix/store/electron/bin/electron",
+        resolveWorkspaceCli,
+      }),
+    ).toBe(resolveWorkspaceCli());
+  });
+
+  it("uses the application shim for a packaged launcher", () => {
+    expect(
+      resolveCliShimPath({
+        platform: "linux",
+        isPackaged: true,
+        executablePath: "/opt/Clisbot/clisbot",
+        resolveWorkspaceCli,
+      }),
+    ).toBe(path.join("/opt/Clisbot", "resources", "bin", "clisbot"));
+    expect(
+      resolveCliShimPath({
+        platform: "darwin",
+        isPackaged: true,
+        executablePath: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
+        resolveWorkspaceCli,
+      }),
+    ).toBe(path.join("/Applications/Clisbot.app", "Contents", "Resources", "bin", "clisbot"));
   });
 });

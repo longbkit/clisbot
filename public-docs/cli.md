@@ -334,6 +334,9 @@ clisbot hub init                 # Create and optionally deploy a starter trigge
 clisbot hub connect [url]        # Add this Host with one browser approval (no login)
 clisbot hub projects             # List legacy projects in the authenticated organization
 clisbot hub status               # Show the current Hub relationship
+clisbot hub permissions list     # Show what this Hub may do on this daemon
+clisbot hub permissions grant hub.execute    # Let Hub automations run agents here
+clisbot hub permissions revoke hub.execute   # Take it back
 clisbot hub disconnect           # End it
 clisbot hub deploy               # Validate and install .clisbot/triggers/*.yml
 clisbot hub deploy --dry-run     # Validate without installing
@@ -351,7 +354,7 @@ Pass `-p, --project <slug>` for an existing legacy bundle: `.clisbot/hub.yml`, d
 
 `init` requires a TTY. It signs in and connects the daemon as needed, then lists the organization's app connections that can back a starter trigger. One usable connection is selected automatically; with several, you choose a **Trigger connection**. If none is ready, setup sends you to **Hub → Apps** and stops before selecting an agent or writing files.
 
-Setup asks which agent provider, model, and mode to run. Providers must be enabled and expose both a selectable model and an execution mode. Suggested model and mode entries are the daemon's defaults; a mode is still selected explicitly when there is no default. Setup then asks for the identity allowed to trigger the bot: a GitHub username, Slack member ID, or Discord user ID. It validates the trigger, writes `.clisbot/triggers/<provider>-help.yml`, and asks whether to deploy. Replacing that file requires confirmation; existing legacy bundles and other trigger files are preserved. See the [generated starter trigger](/docs/hub/configuration#generated-starter-trigger).
+Setup asks which agent provider, model, and mode to run. Providers must be enabled and expose both a selectable model and an execution mode. Suggested model and mode entries are the daemon's defaults; a mode is still selected explicitly when there is no default. Hub validates the choice against the daemon before deploying, and accepts only Claude, Codex, and OpenCode for its unattended runs. `deploy` applies the same checks, so it needs the named daemon connected. Setup then asks for the identity allowed to trigger the bot: a GitHub username, Slack member ID, or Discord user ID. It validates the trigger, writes `.clisbot/triggers/<provider>-help.yml`, and asks whether to deploy. Replacing that file requires confirmation; existing legacy bundles and other trigger files are preserved. See the [generated starter trigger](/docs/hub/configuration#generated-starter-trigger).
 
 Interactive logout checks the same-origin daemon relationship and asks whether to disconnect before deleting the login. Declining removes only the login. JSON and noninteractive logout never prompt or disconnect implicitly; `--disconnect-daemon` is the explicit automation path, and `--force` applies to that daemon disconnection. If a requested disconnection fails, the login is preserved.
 

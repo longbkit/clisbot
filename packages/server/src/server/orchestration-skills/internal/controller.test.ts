@@ -211,7 +211,7 @@ async function blockAgentsDir(targets: SkillTargets): Promise<void> {
 }
 
 async function isInstalled(targets: SkillTargets, name: string): Promise<boolean> {
-  const dirs = [targets.agentsDir, targets.claudeDir, targets.codexDir];
+  const dirs = [targets.agentsDir, targets.claudeDir];
   const present = await Promise.all(
     dirs.map((dir) =>
       access(path.join(dir, name))
@@ -457,7 +457,7 @@ describe("skills controller", () => {
     expect(await installedEverywhere(readOnly.targets)).toEqual([
       ["clisbot", "clisbot-loop"],
       ["clisbot", "clisbot-loop"],
-      ["clisbot", "clisbot-loop"],
+      ["clisbot-loop"],
     ]);
     expect(await readUserFile(readOnly.targets, "clisbot-loop", "notes/mine.md")).toEqual([
       "hand written",
@@ -578,6 +578,7 @@ describe("skills controller", () => {
       };
       const next: SkillSelection = { mode: "custom", skills: ["clisbot"] };
       await harness.controller.save(previous);
+      await writeUserFile(harness.targets, "clisbot-loop", "SKILL.md", "clisbot-loop-v1");
       const livePaths = [
         harness.targets.agentsDir,
         harness.targets.claudeDir,
@@ -604,6 +605,7 @@ describe("skills controller", () => {
     };
     const next: SkillSelection = { mode: "custom", skills: ["clisbot"] };
     await harness.controller.save(previous);
+    await writeUserFile(harness.targets, "clisbot-loop", "SKILL.md", "clisbot-loop-v1");
 
     const transaction = await beginSkillsTransaction(harness.targets, previous, next, [
       { kind: "delete", name: "clisbot-loop" },
@@ -669,6 +671,7 @@ describe("skills controller", () => {
     };
     const next: SkillSelection = { mode: "custom", skills: ["clisbot"] };
     await harness.controller.save(previous);
+    await writeUserFile(harness.targets, "clisbot-loop", "SKILL.md", "clisbot-loop-v1");
     await writeUserFile(harness.targets, "clisbot-loop", "notes/mine.md", "staged notes");
 
     const transaction = await beginSkillsTransaction(harness.targets, previous, next, [
@@ -1118,7 +1121,7 @@ describe("skills controller", () => {
     expect(await installedEverywhere(harness.targets)).toEqual([
       ["clisbot", "clisbot-advisor", "clisbot-loop"],
       ["clisbot", "clisbot-advisor", "clisbot-loop"],
-      ["clisbot", "clisbot-advisor", "clisbot-loop"],
+      ["clisbot-advisor"],
     ]);
     expect(result.selection).toEqual({ mode: "custom", skills: ["clisbot", "clisbot-loop"] });
   });
@@ -1134,11 +1137,7 @@ describe("skills controller", () => {
 
     expect(result.confirmationRequired).toBeNull();
     expect(result.selection).toEqual({ mode: "custom", skills: ["clisbot"] });
-    expect(await installedEverywhere(harness.targets)).toEqual([
-      ["clisbot"],
-      ["clisbot"],
-      ["clisbot"],
-    ]);
+    expect(await installedEverywhere(harness.targets)).toEqual([["clisbot"], ["clisbot"], []]);
   });
 
   it("asks again when another directory appears before the retry", async () => {
@@ -1157,7 +1156,7 @@ describe("skills controller", () => {
     expect(await installedEverywhere(harness.targets)).toEqual([
       ["clisbot", "clisbot-advisor", "clisbot-chat", "clisbot-loop"],
       ["clisbot", "clisbot-advisor", "clisbot-chat", "clisbot-loop"],
-      ["clisbot", "clisbot-advisor", "clisbot-chat", "clisbot-loop"],
+      ["clisbot-chat"],
     ]);
   });
 
@@ -1186,11 +1185,7 @@ describe("skills controller", () => {
     const result = await harness.controller.save({ mode: "custom", skills: ["clisbot"] });
 
     expect(result.confirmationRequired).toBeNull();
-    expect(await installedEverywhere(harness.targets)).toEqual([
-      ["clisbot"],
-      ["clisbot"],
-      ["clisbot"],
-    ]);
+    expect(await installedEverywhere(harness.targets)).toEqual([["clisbot"], ["clisbot"], []]);
   });
 
   it("preserves a regular file at a skill path when save convergence fails", async () => {
@@ -1224,11 +1219,7 @@ describe("skills controller", () => {
     ]);
 
     expect(saved.selection).toEqual({ mode: "custom", skills: ["clisbot"] });
-    expect(await installedEverywhere(harness.targets)).toEqual([
-      ["clisbot"],
-      ["clisbot"],
-      ["clisbot"],
-    ]);
+    expect(await installedEverywhere(harness.targets)).toEqual([["clisbot"], ["clisbot"], []]);
     expect(await harness.controller.status()).toEqual({
       state: "up-to-date",
       ops: [],

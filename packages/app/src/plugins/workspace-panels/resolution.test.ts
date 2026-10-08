@@ -10,10 +10,13 @@ function installed(): InstalledPlugin {
     clientBundle: "bundle",
     lifetime: new AbortController(),
     queryClient: new QueryClient(),
+    clisbot: {} as InstalledPlugin["clisbot"],
+    invoke: async () => undefined,
     cleanup: () => {},
     settingsScreens: [],
     surfaces: [],
-    sidebarItems: [],
+    sidebarItems: { header: [], footer: [] },
+    legacySidebarItems: [],
     workspacePanels: [
       {
         id: "details",
