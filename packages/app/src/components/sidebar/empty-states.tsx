@@ -6,6 +6,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { useSidebarModel } from "./sidebar-model";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { settingsStyles } from "@/styles/settings";
 
 function SidebarEmptyStateCard({
   testID,
@@ -19,10 +20,11 @@ function SidebarEmptyStateCard({
   children: ReactNode;
 }) {
   return (
-    <View style={styles.card} testID={testID}>
+    // Clisbot: a lifted white card, like the sidebar's Bots empty state (design.md, cards).
+    <View style={[settingsStyles.card, styles.card]} testID={testID}>
       <View style={styles.copy}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+        <Text style={[styles.title, styles.centered]}>{title}</Text>
+        <Text style={[styles.description, styles.centered]}>{description}</Text>
       </View>
       <View style={styles.actions}>{children}</View>
     </View>
@@ -97,15 +99,18 @@ const styles = StyleSheet.create((theme) => ({
   card: {
     marginTop: theme.spacing[3],
     padding: theme.spacing[4],
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.lg,
+    alignItems: "center",
   },
   copy: {
+    alignItems: "center",
     gap: theme.spacing[1],
+  },
+  centered: {
+    textAlign: "center",
   },
   actions: {
     flexDirection: "row",
+    justifyContent: "center",
     gap: theme.spacing[2],
     marginTop: theme.spacing[4],
   },
