@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { HubText as Text } from "./hub-text";
-import { HubContextNote, HubStatusBadge } from "./hub-ui";
+import { HubContextNote } from "./hub-ui";
 
 interface HubAddFormProps {
   intent: "add" | "start" | "connect" | null;
@@ -55,7 +55,7 @@ function StartHubForm(props: HubAddFormProps) {
       <Text style={styles.title}>{t("hub.connection.add.startTitle")}</Text>
       <Text style={styles.hint}>{t("hub.connection.add.startBody")}</Text>
       <Field label={t("hub.connection.common.host")}>{props.hostPicker}</Field>
-      <HubStatusBadge label={t("hub.connection.add.personalBadge")} />
+      <Text style={styles.hint}>{t("hub.connection.add.personalBadge")}</Text>
       {props.hasHosts && !props.canStartHub ? (
         <Alert
           variant="info"

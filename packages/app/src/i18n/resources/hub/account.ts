@@ -265,6 +265,7 @@ const en = {
     hubAccount: "Hub account",
     accountLabel: "Hub account: {{label}}",
     signIn: "Sign in",
+    hubUnavailable: "Hub unavailable",
     signInToAccount: "Sign in to your account",
   },
 } as const;
@@ -528,6 +529,7 @@ const ar: Translation<HubAccountCopy> = {
     hubAccount: "حساب Hub",
     accountLabel: "حساب Hub: {{label}}",
     signIn: "تسجيل الدخول",
+    hubUnavailable: "الـ Hub غير متاح",
     signInToAccount: "سجّل الدخول إلى حسابك",
   },
 };
@@ -800,6 +802,7 @@ const es: Translation<HubAccountCopy> = {
     hubAccount: "Cuenta de Hub",
     accountLabel: "Cuenta de Hub: {{label}}",
     signIn: "Iniciar sesión",
+    hubUnavailable: "Hub no disponible",
     signInToAccount: "Inicia sesión en tu cuenta",
   },
 };
@@ -1074,6 +1077,7 @@ const fr: Translation<HubAccountCopy> = {
     hubAccount: "Compte Hub",
     accountLabel: "Compte Hub : {{label}}",
     signIn: "Se connecter",
+    hubUnavailable: "Hub indisponible",
     signInToAccount: "Connectez-vous à votre compte",
   },
 };
@@ -1345,6 +1349,7 @@ const ja: Translation<HubAccountCopy> = {
     hubAccount: "Hub アカウント",
     accountLabel: "Hub アカウント: {{label}}",
     signIn: "サインイン",
+    hubUnavailable: "Hub を利用できません",
     signInToAccount: "アカウントにサインイン",
   },
 };
@@ -1609,6 +1614,7 @@ const ko: Translation<HubAccountCopy> = {
     hubAccount: "Hub 계정",
     accountLabel: "Hub 계정: {{label}}",
     signIn: "로그인",
+    hubUnavailable: "Hub를 사용할 수 없음",
     signInToAccount: "계정에 로그인",
   },
 };
@@ -1877,6 +1883,7 @@ const ptBR: Translation<HubAccountCopy> = {
     hubAccount: "Conta do Hub",
     accountLabel: "Conta do Hub: {{label}}",
     signIn: "Entrar",
+    hubUnavailable: "Hub indisponível",
     signInToAccount: "Entre na sua conta",
   },
 };
@@ -2147,6 +2154,7 @@ const ru: Translation<HubAccountCopy> = {
     hubAccount: "Аккаунт Hub",
     accountLabel: "Аккаунт Hub: {{label}}",
     signIn: "Войти",
+    hubUnavailable: "Hub недоступен",
     signInToAccount: "Войдите в аккаунт",
   },
 };
@@ -2415,6 +2423,7 @@ const vi: Translation<HubAccountCopy> = {
     hubAccount: "Tài khoản Hub",
     accountLabel: "Tài khoản Hub: {{label}}",
     signIn: "Đăng nhập",
+    hubUnavailable: "Không truy cập được Hub",
     signInToAccount: "Đăng nhập vào tài khoản của bạn",
   },
 };
@@ -2668,6 +2677,7 @@ const zhCN: Translation<HubAccountCopy> = {
     hubAccount: "Hub 账号",
     accountLabel: "Hub 账号：{{label}}",
     signIn: "登录",
+    hubUnavailable: "Hub 不可用",
     signInToAccount: "登录你的账号",
   },
 };

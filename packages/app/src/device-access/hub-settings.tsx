@@ -52,8 +52,11 @@ import {
   saveDiscoveredHub,
   parseHubRelayUrl,
   type HubProfile,
+  removeHubProfile,
 } from "./hub-profiles";
 import { pairHub } from "./hub-transport";
+import { UnavailableHubCard, useSelectedUnavailableHub } from "./unavailable-hub-card";
+import { isStoppedHostHub, type DetectedHubRef } from "./unavailable-hub";
 import {
   canStartHubOnHost,
   isTailscaleOrigin,
@@ -158,7 +161,7 @@ export function HubConnectionSettings() {
     };
   }, [hosts, discoveryAttempt]);
   const connectInput = useCallback(
-    async (input: string, started?: { relay: boolean }) => {
+    async (input: string, started?: { relay: boolean; reason?: string }) => {
       setBusy(true);
       setError(null);
       setEntryNotice(null);
@@ -173,6 +176,10 @@ export function HubConnectionSettings() {
               hubSection: "overview",
               ...(started ? { startedHub: offer.hubId } : {}),
               ...(started?.relay ? { transport: "relay" } : {}),
+              // Tailscale's own words can be long; a route parameter carries only the start.
+              ...(started?.relay && started.reason
+                ? { relayReason: started.reason.slice(0, 300) }
+                : {}),
             },
           });
           setIntent(null);
@@ -224,7 +231,10 @@ export function HubConnectionSettings() {
         label,
       });
       if (!value?.url) throw new Error(t("hub.connection.errors.hostUnsupported"));
-      await connectInput(value.url, { relay: value.transport === "relay" });
+      await connectInput(value.url, {
+        relay: value.transport === "relay",
+        ...(value.networkGuidance ? { reason: value.networkGuidance } : {}),
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotStart"));
     } finally {
@@ -290,6 +300,29 @@ export function HubConnectionSettings() {
     },
     [router, label, t],
   );
+  const unavailableHub = useSelectedUnavailableHub({
+    account,
+    profile: registry.profiles.find((profile) => profile.hubId === registry.activeId),
+    hosts: allHosts,
+    connectedIds,
+    detected,
+    discoveryReady: discovery !== "loading",
+    localServerId,
+  });
+  const startOnHost = useCallback(
+    (serverId: string) => {
+      setHostId(serverId);
+      chooseStart();
+    },
+    [chooseStart],
+  );
+  const switchToDetected = useCallback(
+    (hub: DetectedHubRef) => {
+      const match = detected.find((value) => value.serverId === hub.serverId);
+      if (match) void connectDetected(match);
+    },
+    [connectDetected, detected],
+  );
   const formOptions = useMemo(
     () => (
       <HubAddOptions compact={compact} chooseStart={chooseStart} chooseConnect={chooseConnect} />
@@ -328,23 +361,34 @@ export function HubConnectionSettings() {
             </Button>
           </View>
           <View style={hubStyles.collection}>
-            {registry.profiles.map((profile) => (
-              <SavedHubRow
-                key={profile.hubId}
-                profile={profile}
-                selected={registry.activeId === profile.hubId}
-                status={hubListingStatus(t, profile.hubId === registry.activeId, account)}
-                hostLabel={
-                  detected.find(
+            {registry.profiles.map((profile) =>
+              profile.hubId === registry.activeId && unavailableHub ? (
+                <UnavailableHubCard
+                  key={profile.hubId}
+                  profile={profile}
+                  diagnosis={unavailableHub}
+                  disabled={locked || busy}
+                  startOn={startOnHost}
+                  switchToOther={switchToDetected}
+                  retry={account.refresh}
+                  remove={removeHubProfile}
+                />
+              ) : (
+                <SavedHubRow
+                  key={profile.hubId}
+                  profile={profile}
+                  selected={registry.activeId === profile.hubId}
+                  status={hubListingStatus(t, profile.hubId === registry.activeId, account)}
+                  runsOn={detected.find(
                     (hub) =>
                       hub.connection?.hubId === profile.hubId || hub.origin === profile.origin,
-                  )?.hostLabel
-                }
-                account={profile.hubId === registry.activeId ? account : null}
-                disabled={locked || busy}
-                open={openSaved}
-              />
-            ))}
+                  )}
+                  account={profile.hubId === registry.activeId ? account : null}
+                  disabled={locked || busy}
+                  open={openSaved}
+                />
+              ),
+            )}
           </View>
         </>
       ) : null}
@@ -370,6 +414,7 @@ export function HubConnectionSettings() {
                 hub={hub}
                 disabled={busy || locked}
                 connect={connectDetected}
+                startOn={startOnHost}
               />
             ))}
         </SettingsSection>
@@ -577,7 +622,10 @@ async function discoverHub(host: HostProfile): Promise<DetectedHub | null> {
   if (!status.hubOrigin) return null;
   return {
     origin: status.hubOrigin,
+    serverId: host.serverId,
     hostLabel: host.label,
+    // A stopped Hub on the Host is started again, not joined.
+    stopped: isStoppedHostHub(status),
     ...(connection ? { connection: HubConnectionSchema.parse(connection) } : {}),
   };
 }
@@ -677,6 +725,7 @@ function HubStartHostPicker({
 export function HubOverviewSettings() {
   const params = useLocalSearchParams<{
     transport?: string;
+    relayReason?: string;
     hubPanel?: string;
     startedHub?: string;
   }>();
@@ -712,20 +761,11 @@ export function HubOverviewSettings() {
           started={params.startedHub === profile.hubId}
           openDevices={openDevices}
           reviewConnection={openEditor}
+          onRelay={params.transport === "relay" && !isTailscaleOrigin(profile.origin)}
+          relayReason={params.relayReason}
         />
       ) : null}
       {!editing && params.hubPanel !== "devices" ? <WhatIsHub /> : null}
-      {params.transport === "relay" && !editing && !isTailscaleOrigin(profile.origin) ? (
-        <Alert
-          variant="info"
-          title={t("hub.connection.overview.relayTitle")}
-          description={t("hub.connection.overview.relayBody")}
-        >
-          <Button variant="outline" size="sm" onPress={openEditor}>
-            {t("hub.connection.overview.setUpTailscale")}
-          </Button>
-        </Alert>
-      ) : null}
       {editing ? (
         <SettingsSection title={t("hub.connection.overview.editConnection")}>
           <HubConnectionEditor profile={profile} close={closeEditor} />
@@ -899,18 +939,39 @@ const MOBILE_OR_LINE = {
   backgroundColor: "#d6d6d6",
 } as const;
 
+/** Started on relay: says so next to the start result, with Tailscale's own reason. */
+function HubRelayNotice({ reason, setUpTailscale }: { reason?: string; setUpTailscale(): void }) {
+  const { t } = useTranslation();
+  const body = t("hub.connection.overview.relayBody");
+  return (
+    <Alert
+      variant="info"
+      title={t("hub.connection.overview.relayTitle")}
+      description={reason ? `${body}\n\n${reason}` : body}
+    >
+      <Button variant="outline" size="sm" onPress={setUpTailscale}>
+        {t("hub.connection.overview.setUpTailscale")}
+      </Button>
+    </Alert>
+  );
+}
+
 function HubDeviceSettings({
   profile,
   devices,
   started,
   openDevices,
   reviewConnection,
+  onRelay,
+  relayReason,
 }: {
   profile: HubProfile;
   devices: boolean;
   started: boolean;
   openDevices(): void;
   reviewConnection(): void;
+  onRelay: boolean;
+  relayReason?: string;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -974,6 +1035,7 @@ function HubDeviceSettings({
   return (
     <>
       <HubReadyNotice capabilities={capabilities} started={started} />
+      {onRelay ? <HubRelayNotice reason={relayReason} setUpTailscale={reviewConnection} /> : null}
       <HubOverviewSummary
         profile={profile}
         capabilities={capabilities}
@@ -1062,14 +1124,17 @@ const PROFILE_STYLE = { gap: 16 } as const;
 
 interface DetectedHub {
   origin: string;
+  serverId: string;
   hostLabel: string;
+  /** A Hub on this Host that is not running: the row offers Start Hub, not Connect. */
+  stopped: boolean;
   connection?: z.infer<typeof HubConnectionSchema>;
 }
 function SavedHubRow({
   profile,
   selected,
   status,
-  hostLabel,
+  runsOn,
   account,
   disabled,
   open,
@@ -1077,7 +1142,8 @@ function SavedHubRow({
   profile: HubProfile;
   selected: boolean;
   status: string;
-  hostLabel?: string;
+  /** The connected Host this Hub runs on; its ID tells same-named Hosts apart. */
+  runsOn?: Pick<DetectedHub, "hostLabel" | "serverId">;
   account: ReturnType<typeof useHubAccount> | null;
   disabled: boolean;
   open(id: string): Promise<void>;
@@ -1104,7 +1170,7 @@ function SavedHubRow({
     else if (profile.entry === "owner-setup") access = t("hub.connection.row.ownerSetupRequired");
     else access = t("hub.connection.row.pairingRequired");
   }
-  let host = hostLabel;
+  let host = runsOn ? hostWithId(runsOn) : undefined;
   if (!host && profile.origin) host = new URL(profile.origin).hostname;
   if (!host) host = t("hub.connection.row.viaRelay");
   return (
@@ -1141,16 +1207,19 @@ function DetectedHubRow({
   hub,
   disabled,
   connect,
+  startOn,
 }: {
   hub: DetectedHub;
   disabled: boolean;
   connect(hub: DetectedHub): Promise<void>;
+  startOn(serverId: string): void;
 }) {
   const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const open = useCallback(() => {
-    void connect(hub);
-  }, [connect, hub]);
+    if (hub.stopped) startOn(hub.serverId);
+    else void connect(hub);
+  }, [connect, hub, startOn]);
   return (
     <View style={[settingsStyles.card, hubStyles.rowCard]}>
       <View style={hubStyles.rowHeading}>
@@ -1160,27 +1229,43 @@ function DetectedHubRow({
         </Text>
       </View>
       <View style={hubStyles.metadata}>
-        <HubMetadataRow label={t("hub.connection.common.host")}>{hub.hostLabel}</HubMetadataRow>
-        <HubMetadataRow label={t("hub.connection.common.access")}>
-          {t("hub.connection.row.checkedOnConnect")}
-        </HubMetadataRow>
+        <HubMetadataRow label={t("hub.connection.common.host")}>{hostWithId(hub)}</HubMetadataRow>
+        {hub.stopped ? null : (
+          <HubMetadataRow label={t("hub.connection.common.access")}>
+            {t("hub.connection.row.checkedOnConnect")}
+          </HubMetadataRow>
+        )}
       </View>
+      {hub.stopped ? (
+        <Text style={hubStyles.hint}>{t("hub.connection.unavailable.stopped")}</Text>
+      ) : null}
       <View style={hubStyles.rowFooter}>
-        <HubStatusBadge label={t("hub.connection.row.detected")} />
+        {hub.stopped ? (
+          <HubStatusBadge label={t("hub.connection.status.unavailable")} tone="warning" />
+        ) : (
+          <HubStatusBadge label={t("hub.connection.row.detected")} />
+        )}
         <Button
           size={compact ? "md" : "sm"}
           variant="outline"
-          leftIcon={Link}
+          leftIcon={hub.stopped ? Server : Link}
           disabled={disabled}
           onPress={open}
           style={hubStyles.openAction}
         >
-          {t("hub.connection.common.connect")}
+          {hub.stopped
+            ? t("hub.connection.unavailable.startAgain")
+            : t("hub.connection.common.connect")}
         </Button>
       </View>
     </View>
   );
 }
+/** A Host's name with its ID, so two Hosts with the same name can be told apart. */
+function hostWithId(host: Pick<DetectedHub, "hostLabel" | "serverId">): string {
+  return `${host.hostLabel} · ${host.serverId}`;
+}
+
 function hubListingStatus(
   t: TFunction,
   selected: boolean,

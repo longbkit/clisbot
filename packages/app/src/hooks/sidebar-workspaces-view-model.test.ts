@@ -659,6 +659,30 @@ describe("deriveSidebarLoadingState", () => {
     ).toEqual({ isLoading: false, isInitialLoad: false, isRevalidating: false });
   });
 
+  it("stops waiting for a Host that failed to connect", () => {
+    expect(
+      deriveSidebarLoadingState({
+        isActive: true,
+        serverIds: ["srv", "stale"],
+        hydratedServerIds: ["srv"],
+        unreachableServerIds: ["stale"],
+        hasProjects: false,
+      }),
+    ).toEqual({ isLoading: false, isInitialLoad: false, isRevalidating: false });
+  });
+
+  it("does not return to the initial skeleton once it has settled", () => {
+    expect(
+      deriveSidebarLoadingState({
+        isActive: true,
+        serverIds: ["srv", "retrying"],
+        hydratedServerIds: ["srv"],
+        hasProjects: false,
+        hasSettled: true,
+      }),
+    ).toEqual({ isLoading: true, isInitialLoad: false, isRevalidating: false });
+  });
+
   it("short-circuits to idle when inactive", () => {
     expect(
       deriveSidebarLoadingState({

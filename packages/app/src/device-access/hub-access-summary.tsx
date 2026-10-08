@@ -69,7 +69,7 @@ export function HubOverviewSummary({
       <SettingsCard>
         <SettingsLinkRow
           label={t("hub.connection.summary.connection")}
-          hint={profile.origin ?? t("hub.connection.common.encryptedRelay")}
+          hint={connectionRoutes(profile, t("hub.connection.common.encryptedRelay"))}
           value={
             needsSignIn
               ? t("hub.connection.summary.signInRequired")
@@ -85,6 +85,11 @@ export function HubOverviewSummary({
       </SettingsCard>
     </SettingsSection>
   );
+}
+
+/** Every route this device can use, so a loopback address does not read as the only one. */
+function connectionRoutes(profile: HubProfile, relayLabel: string): string {
+  return [profile.origin, profile.relay ? relayLabel : null].filter(Boolean).join(" · ");
 }
 
 export function HubAccountSignInSummary({

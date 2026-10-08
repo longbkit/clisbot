@@ -5,6 +5,7 @@ import { i18n } from "@/i18n/i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { updateHubProfile, validateHubRoutes, type HubProfile } from "./hub-profiles";
 import { PairedHubTransport } from "./hub-transport";
+import { isLoopbackOrigin } from "./loopback-origin";
 
 export function isTailscaleOrigin(origin: string | undefined): origin is string {
   if (!origin) return false;
@@ -124,12 +125,4 @@ export async function setUpHubTailscale(input: {
     state: result.tailscaleState ?? "unavailable",
     ...(result.networkGuidance ? { guidance: result.networkGuidance } : {}),
   };
-}
-
-function isLoopbackOrigin(origin: string): boolean {
-  try {
-    return ["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname);
-  } catch {
-    return false;
-  }
 }

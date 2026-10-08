@@ -53,3 +53,19 @@ it("projects transient Hub management for an existing manual Host", () => {
   expect(changes).toBe(2);
   unsubscribe();
 });
+
+it("asks a Hub Host without its Hub's sign-in for a login, unless this device has its own", async () => {
+  const management = {
+    kind: "hub" as const,
+    hubOrigin: "hub://hub-1",
+    organizationId: "organization-1",
+    daemonId: "daemon-1",
+  };
+  // The Hub is stopped or signed out, so no binding is registered for the Host.
+  await expect(resolveHostAccessTicket("server-hub-down", "client-1", management)).rejects.toThrow(
+    "Sign in to the Hub managing this Host to connect.",
+  );
+  await expect(
+    resolveHostAccessTicket("server-hub-down", "client-1", management, true),
+  ).resolves.toBeUndefined();
+});

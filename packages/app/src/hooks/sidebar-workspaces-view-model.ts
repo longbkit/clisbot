@@ -615,12 +615,17 @@ export function deriveSidebarLoadingState(input: {
   isActive: boolean;
   serverIds: string[];
   hydratedServerIds: string[];
+  /** Hosts that failed to connect: nothing will arrive from them, so they never hold loading. */
+  unreachableServerIds?: string[];
   hasProjects: boolean;
+  /** The sidebar left its first load once; a Host reconnecting later must not bring it back. */
+  hasSettled?: boolean;
 }): SidebarLoadingState {
   const hasRegisteredHosts = input.serverIds.length > 0;
+  const settled = new Set([...input.hydratedServerIds, ...(input.unreachableServerIds ?? [])]);
   const allHydrated =
-    input.serverIds.length > 0 && input.serverIds.length === input.hydratedServerIds.length;
+    input.serverIds.length > 0 && input.serverIds.every((serverId) => settled.has(serverId));
   const isLoading = input.isActive && hasRegisteredHosts && !allHydrated;
-  const isInitialLoad = isLoading && !input.hasProjects;
+  const isInitialLoad = isLoading && !input.hasProjects && !input.hasSettled;
   return { isLoading, isInitialLoad, isRevalidating: false };
 }

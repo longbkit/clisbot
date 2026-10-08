@@ -150,6 +150,10 @@ const en = {
     error: "Hosts unavailable. Try loading your Hosts again.",
     ready: "This Host is not available to your current account. Choose another Host.",
     retry: "Retry",
+    hubUnavailable:
+      "The Hub that lists this Host is unavailable. Retry, or remove the Host from this device.",
+    hostId: "ID {{id}}",
+    remove: "Remove from this device",
   },
   hostsCount: {
     full: "{{online}} active / {{total}} total",
@@ -642,6 +646,10 @@ export const hubSettings = {
       error: "المضيفون غير متاحين. حاول تحميل مضيفيك مرة أخرى.",
       ready: "هذا المضيف غير متاح لحسابك الحالي. اختر مضيفًا آخر.",
       retry: "إعادة المحاولة",
+      hubUnavailable:
+        "الـ Hub الذي يُدرج هذا المضيف غير متاح. أعد المحاولة، أو أزل المضيف من هذا الجهاز.",
+      hostId: "ID {{id}}",
+      remove: "إزالة من هذا الجهاز",
     },
     hostsCount: {
       full: "{{online}} نشط / {{total}} إجمالًا",
@@ -1129,6 +1137,10 @@ export const hubSettings = {
       error: "Hosts no disponibles. Vuelve a cargar tus Hosts.",
       ready: "Este Host no está disponible para tu cuenta actual. Elige otro Host.",
       retry: "Reintentar",
+      hubUnavailable:
+        "El Hub que lista este Host no está disponible. Reintenta o quita el Host de este dispositivo.",
+      hostId: "ID {{id}}",
+      remove: "Quitar de este dispositivo",
     },
     hostsCount: {
       full: "{{online}} activos / {{total}} en total",
@@ -1631,6 +1643,10 @@ export const hubSettings = {
       error: "Hôtes indisponibles. Rechargez vos hôtes.",
       ready: "Cet hôte n'est pas disponible pour votre compte actuel. Choisissez un autre hôte.",
       retry: "Réessayer",
+      hubUnavailable:
+        "Le Hub qui référence cet hôte est indisponible. Réessayez, ou retirez l'hôte de cet appareil.",
+      hostId: "ID {{id}}",
+      remove: "Retirer de cet appareil",
     },
     hostsCount: {
       full: "{{online}} actifs / {{total}} au total",
@@ -2134,6 +2150,10 @@ export const hubSettings = {
       error: "ホストを利用できません。ホストをもう一度読み込んでください。",
       ready: "このホストは現在のアカウントでは利用できません。別のホストを選んでください。",
       retry: "再試行",
+      hubUnavailable:
+        "このホストを管理する Hub を利用できません。再試行するか、このデバイスからホストを削除してください。",
+      hostId: "ID {{id}}",
+      remove: "このデバイスから削除",
     },
     hostsCount: {
       full: "稼働中 {{online}} / 全 {{total}}",
@@ -2626,6 +2646,10 @@ export const hubSettings = {
       error: "호스트를 사용할 수 없습니다. 호스트를 다시 불러오세요.",
       ready: "현재 계정에서는 이 호스트를 사용할 수 없습니다. 다른 호스트를 선택하세요.",
       retry: "다시 시도",
+      hubUnavailable:
+        "이 호스트를 관리하는 Hub를 사용할 수 없습니다. 다시 시도하거나 이 기기에서 호스트를 제거하세요.",
+      hostId: "ID {{id}}",
+      remove: "이 기기에서 제거",
     },
     hostsCount: {
       full: "활성 {{online}} / 전체 {{total}}",
@@ -3117,6 +3141,10 @@ export const hubSettings = {
       error: "Hosts indisponíveis. Tente carregar seus Hosts de novo.",
       ready: "Este Host não está disponível para sua conta atual. Escolha outro Host.",
       retry: "Tentar novamente",
+      hubUnavailable:
+        "O Hub que lista este Host está indisponível. Tente novamente ou remova o Host deste dispositivo.",
+      hostId: "ID {{id}}",
+      remove: "Remover deste dispositivo",
     },
     hostsCount: {
       full: "{{online}} ativos / {{total}} no total",
@@ -3617,6 +3645,10 @@ export const hubSettings = {
       error: "Хосты недоступны. Попробуйте загрузить их снова.",
       ready: "Этот хост недоступен для текущего аккаунта. Выберите другой хост.",
       retry: "Повторить",
+      hubUnavailable:
+        "Hub, в котором числится этот хост, недоступен. Повторите попытку или удалите хост с этого устройства.",
+      hostId: "ID {{id}}",
+      remove: "Удалить с этого устройства",
     },
     hostsCount: {
       full: "Активно: {{online}} / всего: {{total}}",
@@ -4113,6 +4145,10 @@ export const hubSettings = {
       error: "Không có Host. Hãy thử tải lại Host của bạn.",
       ready: "Tài khoản hiện tại của bạn không dùng được Host này. Hãy chọn Host khác.",
       retry: "Thử lại",
+      hubUnavailable:
+        "Hub quản lý Host này không truy cập được. Thử lại, hoặc gỡ Host khỏi thiết bị này.",
+      hostId: "ID {{id}}",
+      remove: "Gỡ khỏi thiết bị này",
     },
     hostsCount: {
       full: "{{online}} đang hoạt động / {{total}} tổng",
@@ -4600,6 +4636,9 @@ export const hubSettings = {
       error: "主机不可用。请重新加载你的主机。",
       ready: "此主机对你当前的账号不可用。请选择其他主机。",
       retry: "重试",
+      hubUnavailable: "列出此主机的 Hub 不可用。请重试，或从此设备移除该主机。",
+      hostId: "ID {{id}}",
+      remove: "从此设备移除",
     },
     hostsCount: {
       full: "活跃 {{online}} / 共 {{total}}",

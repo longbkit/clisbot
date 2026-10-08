@@ -12,6 +12,12 @@ import { homeCopy } from "./copy";
 const BotIcon = withUnistyles(Bot);
 const FolderIcon = withUnistyles(FolderOpen);
 // Neutral: accent is the one CTA on a surface (docs/design.md); these cards are choices.
+/** Say why the card is off: no Host can create bots, or the bot list is still loading. */
+function createBotDescription(hasCreationHost: boolean, sidebarReady: boolean): string {
+  if (!hasCreationHost) return homeCopy.actions.createBotUnavailable;
+  return sidebarReady ? homeCopy.actions.createBotDescription : homeCopy.actions.createBotLoading;
+}
+
 const iconColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 /**
@@ -31,11 +37,7 @@ export function HomeActions() {
       <ActionCard
         Icon={BotIcon}
         title={homeCopy.actions.createBot}
-        description={
-          canCreateBot
-            ? homeCopy.actions.createBotDescription
-            : homeCopy.actions.createBotUnavailable
-        }
+        description={createBotDescription(creationHosts.length > 0, sidebarCanCreate)}
         onPress={createBot}
         disabled={!canCreateBot}
         testID="home-create-bot"

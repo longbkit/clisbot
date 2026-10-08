@@ -30,6 +30,24 @@ const en = {
     unavailable: "Unavailable",
     signInRequired: "Sign in required",
   },
+  unavailable: {
+    ranOn: "Ran on {{host}} · {{id}}",
+    runsOn: "Runs on {{host}} · {{id}}",
+    hostGone:
+      "That Host isn't connected, so this Hub can't be reached. Its channels and automations stay with it.",
+    hostGoneNoStart: "Connect a Host to start a new Hub, or remove this one.",
+    stopped: "This Hub is stopped. Starting it again keeps its channels and automations.",
+    replaced: "{{host}} now runs a different Hub.",
+    unreachable: "This device can't reach this Hub. Check that it is running, then retry.",
+    startNew: "Start a new Hub on {{host}}",
+    startNewNote: "A new Hub starts empty; channels from this one are not moved.",
+    startAgain: "Start Hub",
+    useOther: "Use that Hub",
+    remove: "Remove from this device",
+    removeTitle: "Remove {{name}} from this device?",
+    removeMessage: "The Hub itself is not changed. You can add it again later.",
+    removeConfirm: "Remove",
+  },
   list: {
     savedHubs: "Saved Hubs",
     addHub: "Add Hub",
@@ -361,6 +379,8 @@ const en = {
     invitationExpired: "Hub invitation expired; create a fresh QR on the host",
     needsOwnerSetupLink: "This Hub needs an approved owner-setup pairing link",
     needsPairingLink: "This Hub needs an approved pairing link",
+    browserBlocksDirect:
+      "This browser blocks this page from connecting to your computer without encryption, and the link has no relay. Open the link in Chrome or the Clisbot desktop app, or turn on relay on the Host and pair again.",
     pairingLinkFailed:
       "Could not connect this device. Check the network connection, then scan a fresh QR code or connection link from your Host or Hub. Tailscale should be connected on both devices; relay works without Tailscale.",
     hostInvitationExpired: "Pairing invitation expired; print a new QR code",
@@ -406,6 +426,23 @@ const ar = {
     connecting: "جارٍ الاتصال…",
     unavailable: "غير متاح",
     signInRequired: "يلزم تسجيل الدخول",
+  },
+  unavailable: {
+    ranOn: "كان يعمل على {{host}} · {{id}}",
+    runsOn: "يعمل على {{host}} · {{id}}",
+    hostGone: "هذا المضيف غير متصل، لذا لا يمكن الوصول إلى هذا الـ Hub. تبقى قنواته وأتمتته معه.",
+    hostGoneNoStart: "صِل مضيفًا لبدء Hub جديد، أو أزل هذا.",
+    stopped: "هذا الـ Hub متوقف. تشغيله مجددًا يحتفظ بقنواته وأتمتته.",
+    replaced: "يشغّل {{host}} الآن Hub مختلفًا.",
+    unreachable: "لا يستطيع هذا الجهاز الوصول إلى هذا الـ Hub. تحقق من أنه يعمل، ثم أعد المحاولة.",
+    startNew: "بدء Hub جديد على {{host}}",
+    startNewNote: "يبدأ الـ Hub الجديد فارغًا؛ لا تُنقل قنوات هذا الـ Hub.",
+    startAgain: "تشغيل الـ Hub",
+    useOther: "استخدام ذلك الـ Hub",
+    remove: "إزالة من هذا الجهاز",
+    removeTitle: "إزالة {{name}} من هذا الجهاز؟",
+    removeMessage: "لا يتغير الـ Hub نفسه. يمكنك إضافته مرة أخرى لاحقًا.",
+    removeConfirm: "إزالة",
   },
   list: {
     savedHubs: "الـ Hubs المحفوظة",
@@ -733,6 +770,8 @@ const ar = {
     invitationExpired: "انتهت صلاحية دعوة الـ Hub؛ أنشئ رمز QR جديدًا على المضيف",
     needsOwnerSetupLink: "يحتاج هذا الـ Hub إلى رابط إقران معتمد لإعداد المالك",
     needsPairingLink: "يحتاج هذا الـ Hub إلى رابط إقران معتمد",
+    browserBlocksDirect:
+      "يمنع هذا المتصفح هذه الصفحة من الاتصال بجهازك دون تشفير، والرابط لا يتضمن ترحيلًا. افتح الرابط في Chrome أو تطبيق Clisbot لسطح المكتب، أو فعّل الترحيل على المضيف ثم أعد الاقتران.",
     pairingLinkFailed:
       "تعذّر توصيل هذا الجهاز. تحقق من اتصال الشبكة، ثم امسح رمز QR أو رابط اتصال جديدًا من المضيف أو الـ Hub. يجب أن يكون Tailscale متصلًا على الجهازين؛ ويعمل التتابع دون Tailscale.",
     hostInvitationExpired: "انتهت صلاحية دعوة الإقران؛ اعرض رمز QR جديدًا",
@@ -778,6 +817,25 @@ const es = {
     connecting: "Conectando…",
     unavailable: "No disponible",
     signInRequired: "Requiere iniciar sesión",
+  },
+  unavailable: {
+    ranOn: "Se ejecutaba en {{host}} · {{id}}",
+    runsOn: "Se ejecuta en {{host}} · {{id}}",
+    hostGone:
+      "Ese Host no está conectado, así que no se puede acceder a este Hub. Sus canales y automatizaciones siguen con él.",
+    hostGoneNoStart: "Conecta un Host para iniciar un Hub nuevo, o quita este.",
+    stopped: "Este Hub está detenido. Iniciarlo de nuevo conserva sus canales y automatizaciones.",
+    replaced: "{{host}} ahora ejecuta otro Hub.",
+    unreachable:
+      "Este dispositivo no puede acceder a este Hub. Comprueba que esté en ejecución y vuelve a intentarlo.",
+    startNew: "Iniciar un Hub nuevo en {{host}}",
+    startNewNote: "Un Hub nuevo empieza vacío; los canales de este no se mueven.",
+    startAgain: "Iniciar Hub",
+    useOther: "Usar ese Hub",
+    remove: "Quitar de este dispositivo",
+    removeTitle: "¿Quitar {{name}} de este dispositivo?",
+    removeMessage: "El Hub en sí no cambia. Puedes volver a añadirlo más tarde.",
+    removeConfirm: "Quitar",
   },
   list: {
     savedHubs: "Hubs guardados",
@@ -1125,6 +1183,8 @@ const es = {
     needsOwnerSetupLink:
       "Este Hub necesita un enlace de emparejamiento aprobado para configurar el propietario",
     needsPairingLink: "Este Hub necesita un enlace de emparejamiento aprobado",
+    browserBlocksDirect:
+      "Este navegador impide que esta página se conecte a tu computadora sin cifrado, y el enlace no tiene relay. Abre el enlace en Chrome o en la app de escritorio de Clisbot, o activa el relay en el Host y vuelve a emparejar.",
     pairingLinkFailed:
       "No se pudo conectar este dispositivo. Comprueba la conexión de red y escanea un QR o enlace de conexión nuevo de tu Host o Hub. Tailscale debe estar conectado en ambos dispositivos; la retransmisión funciona sin Tailscale.",
     hostInvitationExpired: "La invitación de emparejamiento caducó; genera un nuevo código QR",
@@ -1173,6 +1233,25 @@ const fr = {
     connecting: "Connexion…",
     unavailable: "Indisponible",
     signInRequired: "Connexion requise",
+  },
+  unavailable: {
+    ranOn: "Tournait sur {{host}} · {{id}}",
+    runsOn: "Tourne sur {{host}} · {{id}}",
+    hostGone:
+      "Cet hôte n'est pas connecté, ce Hub est donc injoignable. Ses canaux et automatisations restent avec lui.",
+    hostGoneNoStart: "Connectez un hôte pour démarrer un nouveau Hub, ou retirez celui-ci.",
+    stopped: "Ce Hub est arrêté. Le redémarrer conserve ses canaux et automatisations.",
+    replaced: "{{host}} fait maintenant tourner un autre Hub.",
+    unreachable: "Cet appareil ne peut pas joindre ce Hub. Vérifiez qu'il tourne, puis réessayez.",
+    startNew: "Démarrer un nouveau Hub sur {{host}}",
+    startNewNote: "Un nouveau Hub démarre vide ; les canaux de celui-ci ne sont pas déplacés.",
+    startAgain: "Démarrer le Hub",
+    useOther: "Utiliser ce Hub",
+    remove: "Retirer de cet appareil",
+    removeTitle: "Retirer {{name}} de cet appareil ?",
+    removeMessage:
+      "Le Hub lui-même n'est pas modifié. Vous pourrez l'ajouter de nouveau plus tard.",
+    removeConfirm: "Retirer",
   },
   list: {
     savedHubs: "Hubs enregistrés",
@@ -1517,6 +1596,8 @@ const fr = {
     needsOwnerSetupLink:
       "Ce Hub nécessite un lien d'association approuvé pour la configuration du propriétaire",
     needsPairingLink: "Ce Hub nécessite un lien d'association approuvé",
+    browserBlocksDirect:
+      "Ce navigateur empêche cette page de se connecter à votre ordinateur sans chiffrement, et le lien n'a pas de relais. Ouvrez le lien dans Chrome ou l'application de bureau Clisbot, ou activez le relais sur l'hôte puis associez à nouveau.",
     pairingLinkFailed:
       "Impossible de connecter cet appareil. Vérifiez la connexion réseau, puis scannez un nouveau code QR ou lien de connexion depuis votre hôte ou votre Hub. Tailscale doit être connecté sur les deux appareils ; le relais fonctionne sans Tailscale.",
     hostInvitationExpired: "L'invitation d'association a expiré ; générez un nouveau code QR",
@@ -1565,6 +1646,25 @@ const ja = {
     connecting: "接続中…",
     unavailable: "利用不可",
     signInRequired: "サインインが必要",
+  },
+  unavailable: {
+    ranOn: "実行していたホスト: {{host}} · {{id}}",
+    runsOn: "実行中のホスト: {{host}} · {{id}}",
+    hostGone:
+      "そのホストが接続されていないため、この Hub に接続できません。チャネルとオートメーションはそのホストに残ります。",
+    hostGoneNoStart: "ホストを接続して新しい Hub を開始するか、この Hub を削除してください。",
+    stopped: "この Hub は停止しています。再開してもチャネルとオートメーションはそのまま残ります。",
+    replaced: "{{host}} は現在別の Hub を実行しています。",
+    unreachable:
+      "このデバイスからこの Hub に接続できません。実行中か確認してから再試行してください。",
+    startNew: "{{host}} で新しい Hub を開始",
+    startNewNote: "新しい Hub は空の状態で始まります。この Hub のチャネルは移動しません。",
+    startAgain: "Hub を開始",
+    useOther: "その Hub を使う",
+    remove: "このデバイスから削除",
+    removeTitle: "{{name}} をこのデバイスから削除しますか？",
+    removeMessage: "Hub 自体は変更されません。後でもう一度追加できます。",
+    removeConfirm: "削除",
   },
   list: {
     savedHubs: "保存済みの Hub",
@@ -1907,6 +2007,8 @@ const ja = {
     invitationExpired: "Hub の招待の有効期限が切れました。ホストで新しい QR を作成してください",
     needsOwnerSetupLink: "この Hub には承認済みのオーナー設定用ペアリングリンクが必要です",
     needsPairingLink: "この Hub には承認済みのペアリングリンクが必要です",
+    browserBlocksDirect:
+      "このブラウザは、このページから暗号化なしでコンピュータに接続することをブロックしています。リンクにはリレーもありません。Chrome か Clisbot デスクトップアプリでリンクを開くか、ホストでリレーをオンにして再度ペアリングしてください。",
     pairingLinkFailed:
       "このデバイスを接続できませんでした。ネットワーク接続を確認してから、ホストまたは Hub の新しい QR コードか接続リンクをスキャンしてください。Tailscale は両方のデバイスで接続しておく必要があります。リレーは Tailscale なしで使えます。",
     hostInvitationExpired:
@@ -1954,6 +2056,24 @@ const ko = {
     connecting: "연결 중…",
     unavailable: "사용할 수 없음",
     signInRequired: "로그인 필요",
+  },
+  unavailable: {
+    ranOn: "실행되던 호스트: {{host}} · {{id}}",
+    runsOn: "실행 중인 호스트: {{host}} · {{id}}",
+    hostGone:
+      "해당 호스트가 연결되어 있지 않아 이 Hub에 연결할 수 없습니다. 채널과 자동화는 그 호스트에 남아 있습니다.",
+    hostGoneNoStart: "호스트를 연결해 새 Hub를 시작하거나 이 Hub를 제거하세요.",
+    stopped: "이 Hub는 중지되었습니다. 다시 시작해도 채널과 자동화는 유지됩니다.",
+    replaced: "{{host}}에서 이제 다른 Hub가 실행 중입니다.",
+    unreachable: "이 기기에서 이 Hub에 연결할 수 없습니다. 실행 중인지 확인한 뒤 다시 시도하세요.",
+    startNew: "{{host}}에서 새 Hub 시작",
+    startNewNote: "새 Hub는 비어 있는 상태로 시작하며, 이 Hub의 채널은 옮겨지지 않습니다.",
+    startAgain: "Hub 시작",
+    useOther: "그 Hub 사용",
+    remove: "이 기기에서 제거",
+    removeTitle: "{{name}}을(를) 이 기기에서 제거할까요?",
+    removeMessage: "Hub 자체는 변경되지 않습니다. 나중에 다시 추가할 수 있습니다.",
+    removeConfirm: "제거",
   },
   list: {
     savedHubs: "저장된 Hub",
@@ -2283,6 +2403,8 @@ const ko = {
     invitationExpired: "Hub 초대가 만료되었습니다. 호스트에서 새 QR을 만드세요",
     needsOwnerSetupLink: "이 Hub에는 승인된 소유자 설정 페어링 링크가 필요합니다",
     needsPairingLink: "이 Hub에는 승인된 페어링 링크가 필요합니다",
+    browserBlocksDirect:
+      "이 브라우저는 이 페이지가 암호화 없이 컴퓨터에 연결하는 것을 차단하며, 링크에 릴레이가 없습니다. Chrome이나 Clisbot 데스크톱 앱에서 링크를 열거나, 호스트에서 릴레이를 켠 뒤 다시 페어링하세요.",
     pairingLinkFailed:
       "이 기기를 연결하지 못했습니다. 네트워크 연결을 확인한 후 호스트나 Hub에서 새 QR 코드 또는 연결 링크를 스캔하세요. Tailscale은 두 기기 모두에서 연결되어 있어야 하며, 릴레이는 Tailscale 없이도 작동합니다.",
     hostInvitationExpired: "페어링 초대가 만료되었습니다. 새 QR 코드를 출력하세요",
@@ -2328,6 +2450,25 @@ const ptBR = {
     connecting: "Conectando…",
     unavailable: "Indisponível",
     signInRequired: "Login necessário",
+  },
+  unavailable: {
+    ranOn: "Executava em {{host}} · {{id}}",
+    runsOn: "Executa em {{host}} · {{id}}",
+    hostGone:
+      "Esse Host não está conectado, então este Hub não pode ser acessado. Os canais e automações continuam com ele.",
+    hostGoneNoStart: "Conecte um Host para iniciar um novo Hub, ou remova este.",
+    stopped: "Este Hub está parado. Iniciá-lo de novo mantém os canais e automações.",
+    replaced: "{{host}} agora executa outro Hub.",
+    unreachable:
+      "Este dispositivo não consegue acessar este Hub. Verifique se ele está em execução e tente de novo.",
+    startNew: "Iniciar um novo Hub em {{host}}",
+    startNewNote: "Um novo Hub começa vazio; os canais deste não são movidos.",
+    startAgain: "Iniciar Hub",
+    useOther: "Usar esse Hub",
+    remove: "Remover deste dispositivo",
+    removeTitle: "Remover {{name}} deste dispositivo?",
+    removeMessage: "O Hub em si não muda. Você pode adicioná-lo de novo depois.",
+    removeConfirm: "Remover",
   },
   list: {
     savedHubs: "Hubs salvos",
@@ -2669,6 +2810,8 @@ const ptBR = {
     needsOwnerSetupLink:
       "Este Hub precisa de um link de pareamento aprovado para configurar o proprietário",
     needsPairingLink: "Este Hub precisa de um link de pareamento aprovado",
+    browserBlocksDirect:
+      "Este navegador impede que esta página se conecte ao seu computador sem criptografia, e o link não tem relay. Abra o link no Chrome ou no app de desktop do Clisbot, ou ative o relay no Host e pareie de novo.",
     pairingLinkFailed:
       "Não foi possível conectar este dispositivo. Verifique a conexão de rede e escaneie um novo QR code ou link de conexão do seu Host ou Hub. O Tailscale deve estar conectado nos dois dispositivos; o relay funciona sem Tailscale.",
     hostInvitationExpired: "O convite de pareamento expirou; gere um novo QR code",
@@ -2715,6 +2858,25 @@ const ru = {
     connecting: "Подключение…",
     unavailable: "Недоступен",
     signInRequired: "Требуется вход",
+  },
+  unavailable: {
+    ranOn: "Работал на {{host}} · {{id}}",
+    runsOn: "Работает на {{host}} · {{id}}",
+    hostGone:
+      "Этот хост не подключён, поэтому Hub недоступен. Его каналы и автоматизации остаются на нём.",
+    hostGoneNoStart: "Подключите хост, чтобы запустить новый Hub, или удалите этот.",
+    stopped: "Этот Hub остановлен. При повторном запуске каналы и автоматизации сохранятся.",
+    replaced: "На {{host}} теперь работает другой Hub.",
+    unreachable:
+      "Это устройство не может подключиться к Hub. Убедитесь, что он запущен, и повторите попытку.",
+    startNew: "Запустить новый Hub на {{host}}",
+    startNewNote: "Новый Hub запускается пустым; каналы этого Hub не переносятся.",
+    startAgain: "Запустить Hub",
+    useOther: "Использовать тот Hub",
+    remove: "Удалить с этого устройства",
+    removeTitle: "Удалить {{name}} с этого устройства?",
+    removeMessage: "Сам Hub не изменится. Его можно добавить снова позже.",
+    removeConfirm: "Удалить",
   },
   list: {
     savedHubs: "Сохранённые Hub",
@@ -3057,6 +3219,8 @@ const ru = {
     invitationExpired: "Срок приглашения Hub истёк; создайте новый QR-код на хосте",
     needsOwnerSetupLink: "Этому Hub нужна одобренная ссылка для сопряжения с настройкой владельца",
     needsPairingLink: "Этому Hub нужна одобренная ссылка для сопряжения",
+    browserBlocksDirect:
+      "Этот браузер не позволяет странице подключиться к компьютеру без шифрования, а в ссылке нет ретранслятора. Откройте ссылку в Chrome или в приложении Clisbot для компьютера либо включите ретранслятор на хосте и выполните сопряжение снова.",
     pairingLinkFailed:
       "Не удалось подключить это устройство. Проверьте сетевое подключение, затем отсканируйте новый QR-код или ссылку для подключения с вашего хоста или Hub. Tailscale должен быть подключён на обоих устройствах; ретранслятор работает без Tailscale.",
     hostInvitationExpired: "Срок приглашения для сопряжения истёк; выведите новый QR-код",
@@ -3104,6 +3268,24 @@ const vi = {
     connecting: "Đang kết nối…",
     unavailable: "Không khả dụng",
     signInRequired: "Cần đăng nhập",
+  },
+  unavailable: {
+    ranOn: "Từng chạy trên {{host}} · {{id}}",
+    runsOn: "Chạy trên {{host}} · {{id}}",
+    hostGone:
+      "Host đó không kết nối nên không truy cập được Hub này. Channel và automation của Hub vẫn nằm trên Host đó.",
+    hostGoneNoStart: "Kết nối một Host để khởi động Hub mới, hoặc gỡ Hub này.",
+    stopped: "Hub này đang dừng. Khởi động lại vẫn giữ channel và automation.",
+    replaced: "{{host}} giờ đang chạy một Hub khác.",
+    unreachable: "Thiết bị này không truy cập được Hub. Kiểm tra Hub còn chạy rồi thử lại.",
+    startNew: "Khởi động Hub mới trên {{host}}",
+    startNewNote: "Hub mới bắt đầu trống; channel của Hub này không được chuyển sang.",
+    startAgain: "Khởi động Hub",
+    useOther: "Dùng Hub đó",
+    remove: "Gỡ khỏi thiết bị này",
+    removeTitle: "Gỡ {{name}} khỏi thiết bị này?",
+    removeMessage: "Bản thân Hub không bị thay đổi. Bạn có thể thêm lại sau.",
+    removeConfirm: "Gỡ",
   },
   list: {
     savedHubs: "Hub đã lưu",
@@ -3441,6 +3623,8 @@ const vi = {
     invitationExpired: "Lời mời Hub đã hết hạn; hãy tạo mã QR mới trên host",
     needsOwnerSetupLink: "Hub này cần link ghép nối thiết lập chủ sở hữu đã được phê duyệt",
     needsPairingLink: "Hub này cần link ghép nối đã được phê duyệt",
+    browserBlocksDirect:
+      "Trình duyệt này chặn trang kết nối tới máy tính của bạn khi không mã hoá, và link không có relay. Mở link bằng Chrome hoặc app Clisbot trên máy tính, hoặc bật relay trên Host rồi pair lại.",
     pairingLinkFailed:
       "Không thể kết nối thiết bị này. Hãy kiểm tra kết nối mạng, rồi quét mã QR hoặc link kết nối mới từ Host hoặc Hub. Tailscale cần được kết nối trên cả hai thiết bị; relay hoạt động mà không cần Tailscale.",
     hostInvitationExpired: "Lời mời ghép nối đã hết hạn; hãy tạo lại mã QR",
@@ -3486,6 +3670,23 @@ const zhCN = {
     connecting: "正在连接…",
     unavailable: "不可用",
     signInRequired: "需要登录",
+  },
+  unavailable: {
+    ranOn: "曾运行于 {{host}} · {{id}}",
+    runsOn: "运行于 {{host}} · {{id}}",
+    hostGone: "该主机未连接，因此无法访问此 Hub。它的频道和自动化仍保留在该主机上。",
+    hostGoneNoStart: "连接一台主机以启动新的 Hub，或移除此 Hub。",
+    stopped: "此 Hub 已停止。重新启动会保留它的频道和自动化。",
+    replaced: "{{host}} 现在运行着另一个 Hub。",
+    unreachable: "此设备无法访问此 Hub。请确认它正在运行后重试。",
+    startNew: "在 {{host}} 上启动新的 Hub",
+    startNewNote: "新的 Hub 从空白开始；此 Hub 的频道不会被迁移。",
+    startAgain: "启动 Hub",
+    useOther: "使用该 Hub",
+    remove: "从此设备移除",
+    removeTitle: "要从此设备移除 {{name}} 吗？",
+    removeMessage: "Hub 本身不会改变。你以后可以再次添加。",
+    removeConfirm: "移除",
   },
   list: {
     savedHubs: "已保存的 Hub",
@@ -3797,6 +3998,8 @@ const zhCN = {
     invitationExpired: "Hub 邀请已过期；请在主机上生成新的二维码",
     needsOwnerSetupLink: "此 Hub 需要已批准的所有者设置配对链接",
     needsPairingLink: "此 Hub 需要已批准的配对链接",
+    browserBlocksDirect:
+      "此浏览器阻止此页面以未加密方式连接到你的电脑，且该链接没有中继。请在 Chrome 或 Clisbot 桌面应用中打开链接，或在主机上开启中继后重新配对。",
     pairingLinkFailed:
       "无法连接此设备。请检查网络连接，然后扫描来自主机或 Hub 的新二维码或连接链接。两台设备都应连接 Tailscale；relay 无需 Tailscale 即可使用。",
     hostInvitationExpired: "配对邀请已过期；请生成新的二维码",

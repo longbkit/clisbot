@@ -1,7 +1,7 @@
 import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
 import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
 import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -14,6 +14,7 @@ import {
   useHostRuntimeConnectedServerIds,
   useHosts,
 } from "@/runtime/host-runtime";
+import { useHostRuntimeUnreachableServerIds } from "@/runtime/unreachable-hosts";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
@@ -111,6 +112,7 @@ export function useSidebarWorkspacesList(options?: {
   const hostRegistryLoaded = useHostRegistryLoaded();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
   const connectedServerIds = useHostRuntimeConnectedServerIds(allServerIds);
+  const unreachableServerIds = useHostRuntimeUnreachableServerIds(allServerIds);
 
   const storeHostFilters = useSidebarViewStore((state) => state.hostFilters);
   const hostFilters = options?.hostFilters ?? storeHostFilters;
@@ -198,12 +200,21 @@ export function useSidebarWorkspacesList(options?: {
     }
   }, [isActive, runtime, serverIds]);
 
+  const [hasSettled, setHasSettled] = useState(false);
   const loadingState = deriveSidebarLoadingState({
     isActive,
     serverIds,
     hydratedServerIds: directoryServerIds,
+    unreachableServerIds,
     hasProjects: projects.length > 0,
+    hasSettled,
   });
+  // A Host that retries its connection flips back to `connecting`; showing the skeleton again
+  // would unmount the sidebar sections (and any sheet they own, such as Create a bot).
+  const settledNow = isActive && serverIds.length > 0 && !loadingState.isLoading;
+  useEffect(() => {
+    if (settledNow) setHasSettled(true);
+  }, [settledNow]);
 
   return {
     workspacePlacements,

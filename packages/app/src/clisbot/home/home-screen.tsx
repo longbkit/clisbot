@@ -6,7 +6,6 @@ import { useHosts } from "@/runtime/host-runtime";
 import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
-import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { Button } from "@/components/ui/button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { usePanelStore } from "@/stores/panel-store";
@@ -29,9 +28,10 @@ export function ClisbotHomeScreen() {
   }, [isCompact, openDesktopAgentList]);
   return (
     <View style={styles.container}>
+      {/* The header is the window's drag region. A drag overlay inside the ScrollView would
+          swallow wheel events everywhere but on buttons, so the page would not scroll. */}
       <MenuHeader borderless transparent />
       <ScrollView contentContainerStyle={styles.content}>
-        <TitlebarDragRegion />
         <ClisbotLogo size={44} />
         {hosts.length ? <ReadyHome hosts={hosts} /> : <NoHost />}
       </ScrollView>

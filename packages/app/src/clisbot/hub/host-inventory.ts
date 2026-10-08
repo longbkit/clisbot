@@ -29,6 +29,36 @@ export function useHubDaemonsQuery() {
   });
 }
 
+type RegisteredHost = ReturnType<typeof useHosts>[number];
+
+/**
+ * Whether the current Hub account may see a saved Host. A Host with managed access off that
+ * belongs to the selected Hub is reached with this device's own daemon credential, so it stays
+ * visible while that Hub is unavailable. Every other managed Host needs the Hub to list it.
+ */
+export function isAccountHost(
+  host: Pick<RegisteredHost, "serverId" | "management">,
+  account: {
+    origin: string | null;
+    organizationId: string | null;
+    daemons: { id: string; connectionOffer?: { serverId?: string } | null }[] | undefined;
+  },
+): boolean {
+  const management = host.management;
+  if (management === undefined) return true;
+  if (management.managedAccessMode === "off" && management.hubOrigin === account.origin)
+    return true;
+  return (
+    account.organizationId !== null &&
+    management.hubOrigin === account.origin &&
+    management.organizationId === account.organizationId &&
+    account.daemons?.some(
+      (daemon) =>
+        daemon.id === management.daemonId && daemon.connectionOffer?.serverId === host.serverId,
+    ) === true
+  );
+}
+
 /** The UI inventory combines user-saved Hosts with the current account's Hub Hosts.
  * Connection transport (direct or relay) never determines visibility. Keep the runtime's
  * registry intact: it also owns saved connections and asynchronous Hub reconciliation.
@@ -41,20 +71,10 @@ export function useHostInventory() {
   const organizationId = hub.signedIn?.organization.id ?? null;
   const hosts = useMemo(() => {
     if (!hub.enabled) return registeredHosts;
-    return registeredHosts.filter((host) => {
-      const management = host.management;
-      if (management === undefined) return true;
-      return (
-        organizationId !== null &&
-        management.hubOrigin === hub.origin &&
-        management.organizationId === organizationId &&
-        !daemons.isPlaceholderData &&
-        daemons.data?.daemons.some(
-          (daemon) =>
-            daemon.id === management.daemonId && daemon.connectionOffer?.serverId === host.serverId,
-        ) === true
-      );
-    });
+    const listed = daemons.isPlaceholderData ? undefined : daemons.data?.daemons;
+    return registeredHosts.filter((host) =>
+      isAccountHost(host, { origin: hub.origin, organizationId, daemons: listed }),
+    );
   }, [
     registeredHosts,
     hub.enabled,

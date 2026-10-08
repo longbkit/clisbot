@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useToast } from "@/contexts/toast-context";
-import { i18n } from "@/i18n/i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
+import { pairingLinkFailureMessage } from "./pairing-link-failure";
 import { pairedHubSettingsRoute } from "./pairing-target";
 
 // Keep this listener outside the keyed Hub account scope: pairing a first Hub
@@ -41,7 +41,7 @@ export function OfferLinkListener() {
           current.current.router.replace(pairedHubSettingsRoute(url));
       } catch {
         if (!cancelled) {
-          const id = current.current.toast.show(i18n.t("hub.connection.errors.pairingLinkFailed"), {
+          const id = current.current.toast.show(pairingLinkFailureMessage(url), {
             variant: "error",
             durationMs: null,
             testID: "pairing-link-error",

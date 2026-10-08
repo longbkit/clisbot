@@ -29,7 +29,12 @@ import {
 import { devicePairedHost, offerConnections } from "@/device-access/host-profile";
 import { pairDaemon } from "@/device-access/pair-daemon";
 import { pairHub } from "@/device-access/hub-transport";
-import { daemonDeviceAccess } from "@/device-access/credentials";
+import { i18n } from "@/i18n/i18next";
+import {
+  deviceCredentialAccess,
+  resolveHostDeviceAccess,
+  usesDeviceCredential,
+} from "./device-credential-gate";
 import {
   buildDaemonWebSocketUrl,
   buildRelayWebSocketUrl,
@@ -589,10 +594,7 @@ function createDefaultDeps(
       const base = {
         ...(host.devicePairing
           ? {
-              resolveDeviceAccess: () =>
-                host.management?.managedAccessMode === "external"
-                  ? Promise.resolve(undefined)
-                  : daemonDeviceAccess(host.devicePairing!.backendId),
+              resolveDeviceAccess: () => resolveHostDeviceAccess(host, connection),
               e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
             }
           : {}),
@@ -607,7 +609,12 @@ function createDefaultDeps(
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
         resolveAccessTicket: async () => {
-          return resolveHostAccessTicket(host.serverId, clientId, host.management);
+          return resolveHostAccessTicket(
+            host.serverId,
+            clientId,
+            host.management,
+            usesDeviceCredential(host),
+          );
         },
         // Only a closed admission removes a Hub Host. A single operation denied for missing
         // permission (`access_denied`) is an ordinary authorization result, not revocation.
@@ -670,10 +677,7 @@ function createDefaultDeps(
       connectToDaemon(connection, {
         ...(host.devicePairing
           ? {
-              resolveDeviceAccess: () =>
-                host.management?.managedAccessMode === "external"
-                  ? Promise.resolve(undefined)
-                  : daemonDeviceAccess(host.devicePairing!.backendId),
+              resolveDeviceAccess: () => resolveHostDeviceAccess(host, connection),
               e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
             }
           : {}),
@@ -924,8 +928,21 @@ export class HostRuntimeController {
       return;
     }
 
+    let localConnectionId: string | null = null;
+    if (this.snapshot.connectionStatus !== "online" && usesDeviceCredential(this.host)) {
+      const access = await deviceCredentialAccess(this.host);
+      if (access.missing) {
+        // Pairing again is the only way forward. Retrying every tick would flip the Host
+        // through "connecting" and back; the next tick connects once a credential is saved.
+        if (this.isCurrentProbeRequest(requestVersion))
+          this.markStartupError(i18n.t("hub.connection.errors.credentialUnavailable"));
+        return;
+      }
+      localConnectionId = access.localConnectionId;
+    }
+
     if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
-      await this.runSessionAdmissionConnectionCycle(requestVersion);
+      await this.runSessionAdmissionConnectionCycle(requestVersion, localConnectionId);
       return;
     }
 
@@ -1190,7 +1207,10 @@ export class HostRuntimeController {
     });
   }
 
-  private async runSessionAdmissionConnectionCycle(requestVersion: number): Promise<void> {
+  private async runSessionAdmissionConnectionCycle(
+    requestVersion: number,
+    localConnectionId: string | null = null,
+  ): Promise<void> {
     if (!this.isCurrentProbeRequest(requestVersion)) return;
     const activeConnectionId = this.snapshot.activeConnectionId;
     const activeConnection = findConnectionById(this.host, activeConnectionId);
@@ -1205,7 +1225,11 @@ export class HostRuntimeController {
       }
       return;
     }
-    const preferred = findConnectionById(this.host, this.host.preferredConnectionId);
+    // Without a device credential only the desktop's local connection can admit this device.
+    const preferred = findConnectionById(
+      this.host,
+      localConnectionId ?? this.host.preferredConnectionId,
+    );
     const connection =
       preferred && !this.authRejectedConnectionIds.has(preferred.id)
         ? preferred

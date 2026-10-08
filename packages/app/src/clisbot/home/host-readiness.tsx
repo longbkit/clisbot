@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -6,6 +7,9 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
 import { ACP_PROVIDER_CATALOG } from "@/data/acp-provider-catalog";
+import { Button } from "@/components/ui/button";
+import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
+import { useConfirmRemoveHost } from "@/hosts/use-confirm-remove-host";
 import {
   useHostRuntimeConnectionStatus,
   useHostRuntimeLastError,
@@ -14,7 +18,7 @@ import {
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { getProviderIcon } from "@/components/provider-icons";
 import { useSessionStore } from "@/stores/session-store";
-import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { buildSettingsHostRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { settingsStyles } from "@/styles/settings";
 import { homeCopy } from "./copy";
 
@@ -61,8 +65,55 @@ export function HostReadinessCard({ serverId, label }: { serverId: string; label
             {lastError}
           </Text>
         ) : null}
+        {status === "offline" || status === "error" ? (
+          <HostRecovery serverId={serverId} label={label} />
+        ) : null}
       </View>
       {status === "online" ? <ProviderReadiness serverId={serverId} /> : null}
+    </View>
+  );
+}
+
+/**
+ * A Host that cannot connect: its ID tells two same-named Hosts apart, Details opens its
+ * settings, and Remove forgets it here. The desktop's own daemon is removed from its page,
+ * which also stops the daemon.
+ */
+function HostRecovery({ serverId, label }: { serverId: string; label: string }) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const isLocalDaemon = useIsLocalDaemon(serverId);
+  const { remove, removing } = useConfirmRemoveHost(serverId, label);
+  const openDetails = useCallback(
+    () => router.push(buildSettingsHostRoute(serverId)),
+    [router, serverId],
+  );
+  return (
+    <View style={styles.recovery}>
+      <Text style={styles.detail} selectable>
+        {homeCopy.host.id(serverId)}
+      </Text>
+      <View style={styles.recoveryActions}>
+        <Button
+          variant="outline"
+          size="sm"
+          onPress={openDetails}
+          testID={`home-host-details-${serverId}`}
+        >
+          {homeCopy.host.details}
+        </Button>
+        {isLocalDaemon ? null : (
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={remove}
+            disabled={removing}
+            testID={`home-host-remove-${serverId}`}
+          >
+            {t("settings.host.daemon.remove.title")}
+          </Button>
+        )}
+      </View>
     </View>
   );
 }
@@ -219,6 +270,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   muted: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   detail: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm, paddingLeft: 16 },
+  recovery: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  recoveryActions: { flexDirection: "row", gap: theme.spacing[2], marginLeft: "auto" },
   error: { color: theme.colors.destructive, fontSize: theme.fontSize.sm, paddingLeft: 16 },
   providerColumns: {
     flexDirection: { xs: "column", sm: "row" },

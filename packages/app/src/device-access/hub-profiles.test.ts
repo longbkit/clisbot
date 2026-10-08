@@ -92,3 +92,27 @@ test("new QR profiles have distinct route or identity labels without renaming sa
   });
   expect(registry.currentHubProfile()?.label).toBe("Hub · relay-hu");
 });
+
+test("removing the selected Hub selects another saved Hub, then none", async () => {
+  const registry = await import("./hub-profiles");
+  const hub = (id: string) => ({ hubId: id, publicKey: `key-${id}`, origin: "https://h.test" });
+  await registry.saveHubProfile(hub("old"));
+  await registry.saveHubProfile(hub("other"));
+  await registry.selectHubProfile("old");
+
+  await registry.removeHubProfile("old");
+  expect(registry.currentHubProfile()?.hubId).toBe("other");
+
+  await registry.removeHubProfile("other");
+  expect(registry.currentHubProfile()).toBeNull();
+});
+
+test("removing a Hub that is not selected keeps the selection", async () => {
+  const registry = await import("./hub-profiles");
+  const hub = (id: string) => ({ hubId: id, publicKey: `key-${id}`, origin: "https://h.test" });
+  await registry.saveHubProfile(hub("stale"));
+  await registry.saveHubProfile(hub("current"));
+
+  await registry.removeHubProfile("stale");
+  expect(registry.currentHubProfile()?.hubId).toBe("current");
+});

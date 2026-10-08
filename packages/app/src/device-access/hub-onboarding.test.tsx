@@ -36,6 +36,9 @@ const state = vi.hoisted(() => ({
     connection: null as Record<string, unknown> | null,
   },
 }));
+vi.mock("@/contexts/toast-api-context", () => ({
+  useToast: () => ({ show: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: state.push, setParams: state.setParams }),
   useLocalSearchParams: () => state.params,
@@ -47,6 +50,7 @@ vi.mock("./hub-profiles", () => ({
   }),
   selectHubProfile: state.select,
   saveDiscoveredHub: state.saveDiscovered,
+  removeHubProfile: vi.fn(),
 }));
 vi.mock("@/clisbot/hub/account-provider", () => ({
   useHubAccount: () => state.account,
@@ -223,6 +227,72 @@ test("failed Host discovery preserves saved Hubs and does not promote the empty 
   expect(screen.getByRole("button", { name: "Retry discovery" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Start a Hub" })).toBeNull();
   expect(screen.queryByText("private connection trace")).toBeNull();
+});
+
+test("an unreachable selected Hub says where it ran and offers a new Hub instead of Open Hub", async () => {
+  state.profiles = [
+    { hubId: "old", publicKey: "key", label: "Personal Hub", origin: "http://127.0.0.1:6880" },
+  ];
+  state.activeId = "old";
+  state.hosts = [{ serverId: "host", label: "My computer" }];
+  state.connected = ["host"];
+  Object.assign(state.account, { state: null, error: "Hub is not connected" });
+  try {
+    render(<HubConnectionSettings />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Start a new Hub on My computer" })).toBeTruthy(),
+    );
+    expect(
+      screen.getByText("A new Hub starts empty; channels from this one are not moved."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open Hub" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove from this device" })).toBeTruthy();
+  } finally {
+    Object.assign(state.account, { state: undefined, error: null });
+  }
+});
+
+test("a reachable selected Hub keeps the saved-Hub row", async () => {
+  selectPersonalHub();
+  state.hosts = [{ serverId: "host", label: "My computer" }];
+  state.connected = ["host"];
+  render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Open Hub" })).toBeTruthy());
+  expect(screen.queryByTestId("unavailable-hub-card")).toBeNull();
+});
+
+test("a saved Hub names the Host it runs on with that Host's ID", async () => {
+  selectPersonalHub();
+  state.hosts = [{ serverId: "srv_host", label: "My computer" }];
+  state.connected = ["srv_host"];
+  state.getHubStatus.mockResolvedValue({
+    status: {
+      hubOrigin: "https://home.example.test",
+      hubConnection: { hubId: "saved", publicKey: "key", origin: "https://home.example.test" },
+    },
+  });
+  render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByText("My computer · srv_host")).toBeTruthy());
+});
+
+test("a stopped Hub on a connected Host is started again, not joined", async () => {
+  state.hosts = [{ serverId: "srv_host", label: "My computer" }];
+  state.connected = ["srv_host"];
+  // After the Hub stops, its Host still names its loopback address but is not connected.
+  state.getHubStatus.mockResolvedValue({
+    status: {
+      state: "reconnecting",
+      hubOrigin: "http://127.0.0.1:6870",
+      lastError: "connect ECONNREFUSED 127.0.0.1:6870",
+    },
+  });
+  render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByText("Hub on My computer")).toBeTruthy());
+  expect(
+    screen.getByText("This Hub is stopped. Starting it again keeps its channels and automations."),
+  ).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Start Hub" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
 });
 
 test("a closed Hub popup still renders its borderless selector trigger", () => {
@@ -524,6 +594,7 @@ function prepareHubStart() {
   state.startLocalHub.mockResolvedValue({
     url: `https://home.example.test/#offer=${Buffer.from(JSON.stringify(offer)).toString("base64url")}`,
     transport: "relay",
+    networkGuidance: "Tailscale Serve could not expose this Host: port taken.",
   });
 }
 async function openOwnerSignIn() {
@@ -580,9 +651,29 @@ test("successful Hub start carries the paired Hub identity to its ready screen",
   await waitFor(() =>
     expect(state.push).toHaveBeenCalledWith({
       pathname: "/settings/hub/[hubSection]",
-      params: { hubSection: "overview", startedHub: "saved", transport: "relay" },
+      params: {
+        hubSection: "overview",
+        startedHub: "saved",
+        transport: "relay",
+        relayReason: "Tailscale Serve could not expose this Host: port taken.",
+      },
     }),
   );
+});
+
+test("a Hub started on relay says why, right under the start result", async () => {
+  selectPersonalHub();
+  state.params = { startedHub: "saved", transport: "relay", relayReason: "Port 8443 is taken." };
+  state.request.mockImplementation(async () => Response.json(personalCapabilities));
+  render(<HubOverviewSettings />);
+  const relay = await screen.findByText("Hub is running on encrypted relay");
+  const started = screen.getByText("Hub started successfully");
+  expect(screen.getByText(/Port 8443 is taken\./)).toBeTruthy();
+  expect(started.compareDocumentPosition(relay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(
+    relay.compareDocumentPosition(screen.getByText("Connection")) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });
 
 test("owner sign-in setup has visible labels, validates before sending, and keeps the Hub fixed while editing", async () => {

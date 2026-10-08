@@ -45,10 +45,16 @@ export function hostRequiresSessionAdmission(serverId: string): boolean {
   return registry().has(serverId);
 }
 
+/**
+ * The Hub ticket a hello presents. `ownCredential` says this device can sign in to the Host
+ * by itself (its device or desktop local credential, managed access off): a ticket then only
+ * adds Hub authority, so a stopped or signed-out Hub must not lock the device out.
+ */
 export async function resolveHostAccessTicket(
   serverId: string,
   clientId: string,
   management?: HubHostManagement,
+  ownCredential = false,
 ): Promise<string | undefined> {
   const binding = registry().get(serverId);
   // A persisted Hub offer is connection information, not a current login.
@@ -58,6 +64,7 @@ export async function resolveHostAccessTicket(
       binding?.management?.organizationId !== management.organizationId ||
       binding?.management?.daemonId !== management.daemonId)
   ) {
+    if (ownCredential) return undefined;
     throw new Error("Sign in to the Hub managing this Host to connect.");
   }
   return binding?.resolveAccessTicket(clientId);

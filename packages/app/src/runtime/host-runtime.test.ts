@@ -28,6 +28,13 @@ import {
   type HostRuntimeStorage,
 } from "./host-runtime";
 import type { ReplicaRow, ReplicaRowStore } from "./replica-cache/row-store";
+
+const deviceCredentials = vi.hoisted(() => ({ stored: new Set<string>() }));
+vi.mock("@/device-access/credentials", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/device-access/credentials")>()),
+  readDeviceCredential: async (backendId: string) =>
+    deviceCredentials.stored.has(backendId) ? { backendId } : null,
+}));
 import { registerHostAccessTicketResolver } from "./host-session-access";
 
 import { subscriptionFixture } from "./subscription-fixture";
@@ -626,6 +633,38 @@ class BrowserClientLifecycle {
 }
 
 describe("HostRuntimeController", () => {
+  it("does not retry a paired Host whose device credential is gone until one is saved", async () => {
+    const host: HostProfile = {
+      ...makeHost(),
+      devicePairing: { backendId: "srv_old", daemonPublicKeyB64: "pk_test" },
+    };
+    let connects = 0;
+    const controller = new HostRuntimeController({
+      host,
+      deps: {
+        createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
+        connectToDaemon: async () => {
+          connects += 1;
+          throw new Error("unreachable");
+        },
+        getClientId: async () => "cid_test_runtime",
+      },
+    });
+    const statuses: string[] = [];
+    controller.subscribe(() => statuses.push(controller.getSnapshot().connectionStatus));
+
+    await controller.runProbeCycleNow();
+    await controller.runProbeCycleNow();
+    expect(connects).toBe(0);
+    expect(controller.getSnapshot().connectionStatus).toBe("error");
+    expect(statuses).not.toContain("connecting");
+
+    deviceCredentials.stored.add("srv_old");
+    await controller.runProbeCycleNow();
+    expect(connects).toBeGreaterThan(0);
+    deviceCredentials.stored.clear();
+  });
+
   it("publishes an old host and mounts observations through the client interface", async () => {
     const host = makeHost();
     const client = new FakeDaemonClient();

@@ -105,6 +105,19 @@ export function selectHubProfile(id: string): Promise<void> {
   });
 }
 
+/**
+ * Forget a saved Hub on this device. The Hub itself is untouched; removing the selected Hub
+ * selects another saved one, or none, which leaves the app without a Hub.
+ */
+export function removeHubProfile(id: string): Promise<void> {
+  return mutate(() => {
+    if (isHubSwitchLocked()) throw new Error(i18n.t("hub.connection.errors.saveOrCancel"));
+    const profiles = snapshot.profiles.filter((profile) => profile.hubId !== id);
+    const activeId = snapshot.activeId === id ? (profiles[0]?.hubId ?? null) : snapshot.activeId;
+    return { profiles, activeId };
+  });
+}
+
 /** Save public discovery separately from pairing. A profile grants no access. */
 export function saveDiscoveredHub(profile: HubProfile): Promise<void> {
   return mutate(() => {

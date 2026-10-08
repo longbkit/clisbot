@@ -38,6 +38,9 @@ const adapters = vi.hoisted(() => ({
     };
   },
 }));
+vi.mock("@/contexts/toast-api-context", () => ({
+  useToast: () => ({ show: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("../account-provider", () => ({
   useHubAccount: () => ({
     enabled: adapters.hubEnabled,
@@ -59,6 +62,7 @@ vi.mock("../account-provider", () => ({
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => adapters.hosts,
+  useHostMutations: () => ({ removeHost: adapters.remove }),
   useHostRuntimeConnectionStatuses: () =>
     React.useSyncExternalStore(adapters.subscribeStatuses, () => adapters.statuses),
   getHostRuntimeStore: () => ({
@@ -278,10 +282,29 @@ it("retries a failed Host access check before mounting its settings", async () =
       </HostSettingsAccess>
     </QueryClientProvider>,
   );
-  await screen.findByText("Hosts unavailable. Try loading your Hosts again.");
+  await screen.findByText(
+    "The Hub that lists this Host is unavailable. Retry, or remove the Host from this device.",
+  );
+  expect(screen.getByText("ID server-1")).toBeDefined();
+  expect(screen.getByText("Remove from this device")).toBeDefined();
   expect(Detail).not.toHaveBeenCalled();
   fireEvent.click(screen.getByText("Retry"));
   await screen.findByText("Host settings");
+});
+
+it("forgets a hidden saved Host after confirming", async () => {
+  adapters.hosts = [managedHost];
+  adapters.get.mockRejectedValue(new Error("offline"));
+  adapters.confirm.mockResolvedValue(true);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostSettingsAccess serverId="server-1">
+        <div>Host settings</div>
+      </HostSettingsAccess>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByText("Remove from this device"));
+  await waitFor(() => expect(adapters.remove).toHaveBeenCalledWith("server-1"));
 });
 
 it("uses the same inventory for Host choices and the Hosts tab for a member without grants", async () => {

@@ -13,6 +13,8 @@ export const homeCopy = {
     offline: "Offline",
     error: "Connection error",
     version: (version: string) => `Clisbot ${version}`,
+    id: (serverId: string) => `ID ${serverId}`,
+    details: "Details",
   },
   providers: {
     title: "Providers",
@@ -30,6 +32,7 @@ export const homeCopy = {
     createBot: "Create a bot",
     createBotDescription: "A teammate with its own folder you can chat with",
     createBotUnavailable: "Needs a Host that supports bots",
+    createBotLoading: "Loading bots…",
     addProject: "Add a project",
     addProjectDescription: "Work in any folder on your Host: code, docs, research or data",
   },
