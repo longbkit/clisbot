@@ -104,11 +104,11 @@ function archivePost(input) {
 function removeUpstreamTestimonials(input) {
   if (!input.includes("SOCIAL_PROOF_TWEETS") && !input.includes("SocialProofWall")) return input;
   const withoutData = removeBlock(input, "const SOCIAL_PROOF_TWEETS = [", "function AgentBadge(");
-  const withoutWall = removeBlock(
-    withoutData,
-    "function SocialProofWall()",
+  // v0.11 moved the provider icon constant away; the wall now ends at the next section.
+  const withoutWall = removeBlock(withoutData, "function SocialProofWall()", [
     "const PROVIDER_ICON_CLASS",
-  );
+    "function MultiProviderSection(",
+  ]);
   return replaceKnown(withoutWall, "            <SocialProofWall />\n", "");
 }
 
@@ -145,9 +145,16 @@ function rebrandByline(input) {
   );
 }
 
-function removeBlock(input, start, end) {
+function removeBlock(input, start, ends) {
   const first = input.indexOf(start);
-  const last = input.indexOf(end, first + start.length);
+  const last =
+    first < 0
+      ? -1
+      : ([ends]
+          .flat()
+          .map((end) => input.indexOf(end, first + start.length))
+          .filter((index) => index >= 0)
+          .sort((a, b) => a - b)[0] ?? -1);
   if (first < 0 || last < 0) throw new Error(`Review upstream publication block: ${start}`);
   return input.slice(0, first) + input.slice(last);
 }

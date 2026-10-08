@@ -320,7 +320,7 @@ test("replaces upstream sponsorship with placeholders and uses the Clisbot commu
   assert.match(readme, /\*\*Freedom to choose:\*\*/);
   assert.match(readme, /40\+ agent options/);
   assert.match(readme, /38 ACP catalog presets including Grok/);
-  assert.match(readme, /Antigravity as a custom ACP provider/);
+  assert.match(readme, /Pi, Antigravity, and Muse Code are built in/);
   assert.match(readme, /Sponsorship options for Clisbot are being set up/);
   assert.match(readme, /## Concept\n/);
   assert.match(readme, /## Attribution\n/);

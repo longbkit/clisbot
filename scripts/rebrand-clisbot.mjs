@@ -50,14 +50,20 @@ const readmeSections = new Map([
         "Create your own AI bot for work and life—an alternative to Grok Bot, Muse, or Dots that you control and customize. Set its persona, memory, tools, agent provider, model, and where it runs. Reach Clisbot from your laptop, phone, or supported chat channels.",
       previousIntro:
         "Run agents in parallel on your own machines. Ship from your phone or your desk.",
+      upstreamIntro:
+        "Clisbot is a desktop, mobile, web, and CLI app for coding agents. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.",
       intermediateIntro:
         "Your AI coworker for projects and a personal bot for everyday life. Bring Clisbot into the chat apps and conversation channels you use, from your laptop or on the go.",
       previousProviderBullet:
         "- **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, and Pi through the same interface. Pick the right model for each job.",
       intermediateProviderBullet:
         "- **Freedom to choose:** Pick Claude Code, Codex, Copilot, OpenCode, or Pi for each task, along with the model. Switch agent providers as your work evolves.",
-      providerBullet:
+      olderProviderBullets: [
         "- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, and Pi are built in; explore 38 ACP catalog presets including Grok, or add Antigravity as a custom ACP provider. Pick the model for each task.",
+        "- **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code through the same interface. Pick the right model for each job.",
+      ],
+      providerBullet:
+        "- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 38 ACP catalog presets including Grok. Pick the model for each task.",
       sponsorHeading: "Sponsors",
       sponsorMessage:
         "Sponsorship options for Clisbot are being set up. Check back here when they are ready.",
@@ -88,8 +94,11 @@ const readmeSections = new Map([
         "- **多提供商：** 通过同一个界面使用 Claude Code、Codex、Copilot、OpenCode 和 Pi。为每个任务选择合适的模型。",
       intermediateProviderBullet:
         "- **自由选择 Agent：** 根据任务选择 Claude Code、Codex、Copilot、OpenCode 或 Pi，并选用合适的模型。工作方式变化时，也可以切换 Agent 提供商。",
-      providerBullet:
+      olderProviderBullets: [
         "- **自由选择 Agent：** 提供 40 多种 Agent 选项：内置 Claude Code、Codex、Copilot、OpenCode 和 Pi 的集成，ACP 目录另有 38 个预设（包括 Grok）；也可以通过自定义 ACP 配置接入 Antigravity。为每个任务选择合适的模型。",
+      ],
+      providerBullet:
+        "- **自由选择 Agent：** 提供 40 多种 Agent 选项：内置 Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity 和 Muse Code 的集成，ACP 目录另有 38 个预设（包括 Grok）。为每个任务选择合适的模型。",
       sponsorHeading: "赞助",
       sponsorMessage: "Clisbot 的赞助方式正在准备中。设置完成后，我们会在此更新。",
       relatedHeading: "相关项目",
@@ -121,8 +130,11 @@ const readmeSections = new Map([
         "- **マルチプロバイダー:** Claude Code、Codex、Copilot、OpenCode、Pi を同一のインターフェースで利用。タスクに合ったモデルを選べます。",
       intermediateProviderBullet:
         "- **エージェントを自由に選択:** タスクに合わせて Claude Code、Codex、Copilot、OpenCode、Pi とモデルを選べます。仕事の変化に応じてプロバイダーを切り替えられます。",
-      providerBullet:
+      olderProviderBullets: [
         "- **エージェントを自由に選択:** 40 種類以上の選択肢。Claude Code、Codex、Copilot、OpenCode、Pi の標準対応に加え、Grok を含む 38 件の ACP カタログプリセットを利用できます。Antigravity はカスタム ACP 設定で追加でき、タスクごとにモデルも選べます。",
+      ],
+      providerBullet:
+        "- **エージェントを自由に選択:** 40 種類以上の選択肢。Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity、Muse Code の標準対応に加え、Grok を含む 38 件の ACP カタログプリセットを利用できます。タスクごとにモデルも選べます。",
       sponsorHeading: "スポンサー",
       sponsorMessage:
         "Clisbot のスポンサー向け情報は準備中です。準備ができ次第、ここに掲載します。",
@@ -155,8 +167,11 @@ const readmeSections = new Map([
         "- **여러 제공자 지원:** Claude Code, Codex, Copilot, OpenCode, Pi를 하나의 인터페이스에서 사용할 수 있습니다. 작업마다 알맞은 모델을 고를 수 있습니다.",
       intermediateProviderBullet:
         "- **에이전트 선택의 자유:** 작업마다 Claude Code, Codex, Copilot, OpenCode, Pi와 적합한 모델을 선택할 수 있습니다. 필요에 따라 에이전트 제공자를 바꿀 수 있습니다.",
-      providerBullet:
+      olderProviderBullets: [
         "- **에이전트 선택의 자유:** 40개가 넘는 에이전트 옵션을 제공합니다. 기본 지원하는 Claude Code, Codex, Copilot, OpenCode, Pi에 더해 Grok을 포함한 ACP 카탈로그 프리셋 38개를 이용할 수 있습니다. Antigravity는 사용자 지정 ACP 설정으로 추가하고, 작업마다 모델을 선택하세요.",
+      ],
+      providerBullet:
+        "- **에이전트 선택의 자유:** 40개가 넘는 에이전트 옵션을 제공합니다. 기본 지원하는 Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, Muse Code에 더해 Grok을 포함한 ACP 카탈로그 프리셋 38개를 이용할 수 있습니다. 작업마다 모델을 선택하세요.",
       sponsorHeading: "스폰서",
       sponsorMessage:
         "Clisbot 후원 안내를 준비 중입니다. 준비가 완료되면 이곳에 업데이트하겠습니다.",
@@ -549,6 +564,7 @@ function replaceReadmeIntro(path, config, input) {
   const withProviderChoice = [
     config.previousProviderBullet,
     config.intermediateProviderBullet,
+    ...config.olderProviderBullets,
   ].reduce((body, previous) => body.replace(previous, config.providerBullet), withTagline);
   if (!withProviderChoice.includes(config.providerBullet)) {
     throw new Error(`Cannot find the provider choice bullet in ${path}`);
@@ -575,9 +591,12 @@ function replaceReadmeIntro(path, config, input) {
     `${config.previousWorkspaceIntro}\n\n${config.previousBotIntro}`,
     `${config.previousCoworkIntro}\n\n${config.previousBotIntro}`,
     config.previousIntro,
+    config.upstreamIntro,
     config.intermediateIntro,
     config.previousBotIntro,
-  ].find((previous) => withProviderChoice.includes(previous));
+  ]
+    .filter(Boolean)
+    .find((previous) => withProviderChoice.includes(previous));
   if (!previousIntro) {
     throw new Error(`Cannot find the introductory description in ${path}`);
   }
