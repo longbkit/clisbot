@@ -23,7 +23,7 @@ export type AgentRunController = Pick<
   | "steerOrReplaceActiveTurn"
   | "streamAgent"
 > &
-  Partial<Pick<AgentManager, "admitMessageSubmission">> & {
+  Partial<Pick<AgentManager, "admitMessageSubmission" | "reloadIfClisbotToolsSwitched">> & {
     reloadAgentSession(agentId: string): Promise<unknown>;
   };
 
@@ -133,6 +133,7 @@ async function startAdmittedAgentRun(
   if (await agentManager.tryRunOutOfBand(agentId, prompt, options?.runOptions)) {
     return { disposition: "out_of_band" };
   }
+  await applyClisbotToolsSwitch(agentManager, agentId, logger);
   try {
     return await startAgentRunInner(agentManager, agentId, prompt, logger, options);
   } catch (error) {
@@ -142,6 +143,23 @@ async function startAdmittedAgentRun(
     // fresh session on the current runtime while preserving history and labels.
     await agentManager.reloadAgentSession(agentId);
     return await startAgentRunInner(agentManager, agentId, prompt, logger, options);
+  }
+}
+
+/**
+ * A reload that fails before closing the old session is logged and the message goes to that
+ * session. One that fails after closing it leaves the agent closed, as a failed Reload agent
+ * does, so the send fails too and its submission stays pending.
+ */
+async function applyClisbotToolsSwitch(
+  agentManager: AgentRunController,
+  agentId: string,
+  logger: Logger,
+): Promise<void> {
+  try {
+    await agentManager.reloadIfClisbotToolsSwitched?.(agentId);
+  } catch (error) {
+    logger.warn({ agentId, err: error }, "Failed to reload the session for its Clisbot tools");
   }
 }
 

@@ -25,6 +25,16 @@ describe("Connector relay", () => {
 
   afterEach(() => h.close());
 
+  it("reads a Project's Clisbot tools choice", async () => {
+    expect(await h.runtime.clisbotToolsChoice(h.root)).toBeUndefined();
+    await h.setGrant({ agentTools: { enabled: true } });
+    expect(await h.runtime.clisbotToolsChoice(h.root)).toBe(true);
+    await h.setGrant({ agentTools: { enabled: false } });
+    expect(await h.runtime.clisbotToolsChoice(h.root)).toBe(false);
+    expect(await h.runtime.clisbotToolsChoice("/elsewhere")).toBeUndefined();
+    expect(await h.runtime.clisbotToolsChoice(undefined)).toBeUndefined();
+  });
+
   it("checks the key with Composio, lists the catalog and runs the connect flow", async () => {
     await expect(h.service.setComposioKey("not-a-key")).rejects.toMatchObject({
       code: "invalid_request",

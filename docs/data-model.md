@@ -333,7 +333,8 @@ Clisbot tools unless the session's Project turns them on; otherwise the provider
 Project can turn them on or off and narrow them per tool
 ([Agent tools](features/connectors/README.md#agent-tools)). Provider and global policy are resolved when a
 session is created, resumed, imported, or reloaded, so configuration changes affect the next
-session rather than an already-running one.
+session rather than an already-running one; the one exception is the Clisbot tools turning on or
+off, which reloads an idle session before its next message.
 
 `agents.metadataGeneration.providers` controls the preferred structured-generation fallback order for daemon-side metadata tasks such as commit messages, PR text, branch names, and generated agent titles. Entries are tried first in the configured order, then Clisbot falls through to dynamically discovered defaults and finally the current selection when available.
 

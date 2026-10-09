@@ -218,6 +218,21 @@ export class ConnectorRuntime {
     this.ticketKeys.delete(agentId);
   }
 
+  /** The Project's Clisbot tools choice, as a launch reads it, minting no token. */
+  async clisbotToolsChoice(cwd: string | undefined): Promise<boolean | undefined> {
+    return (await this.grantForCwd(cwd))?.grant?.agentTools?.enabled;
+  }
+
+  /** The Project running in `cwd` and its grant; null when no Project has a grant. */
+  private async grantForCwd(
+    cwd: string | undefined,
+  ): Promise<{ project: ConnectorProject | null; grant: ConnectorGrant | undefined } | null> {
+    const grants = await this.service.store.projectGrants();
+    if (!cwd || Object.keys(grants).length === 0) return null;
+    const project = await this.projects.projectForCwd(cwd);
+    return { project, grant: project ? grants[project.projectId] : undefined };
+  }
+
   /**
    * The MCP servers an agent session gets for its Project's grant; empty outside a Project with
    * Connectors. Servers follow the Project's grant, not the session's off list: the relay applies
@@ -226,10 +241,9 @@ export class ConnectorRuntime {
    * person's own MCP servers keep the agent's prompts.
    */
   async mcpServersForAgent(params: { agentId: string; cwd?: string }): Promise<RuntimeMcpServers> {
-    const grants = await this.service.store.projectGrants();
-    if (!params.cwd || Object.keys(grants).length === 0) return this.noConnectors(params.agentId);
-    const project = await this.projects.projectForCwd(params.cwd);
-    const grant = project ? grants[project.projectId] : undefined;
+    const found = await this.grantForCwd(params.cwd);
+    if (!found) return this.noConnectors(params.agentId);
+    const { project, grant } = found;
     const choice = grant?.agentTools?.enabled;
     const result: RuntimeMcpServers = {
       servers: {},

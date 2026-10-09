@@ -12,7 +12,9 @@ import {
   formatSystemNotificationPrompt,
   isSystemInjectedEnvelope,
   setupFinishNotification,
+  startAgentRun,
   waitForAgentRunStartWithTimeout,
+  type AgentRunController,
 } from "./agent-prompt.js";
 import type { AgentManagerEvent, ManagedAgent } from "./agent-manager.js";
 import type {
@@ -530,6 +532,43 @@ it("does not notify archived callers", async () => {
 
   expect(streamAgentSpy).not.toHaveBeenCalled();
   expect(replaceAgentRunSpy).not.toHaveBeenCalled();
+});
+
+function clisbotToolsRunController(reload: () => Promise<void>) {
+  const calls: string[] = [];
+  const controller: AgentRunController = {
+    getAgent: () => null,
+    tryRunOutOfBand: async () => false,
+    hasInFlightRun: () => false,
+    replaceAgentRun: vi.fn(),
+    steerOrReplaceActiveTurn: vi.fn(),
+    streamAgent: () => {
+      calls.push("stream");
+      return (async function* (): AsyncGenerator<AgentStreamEvent> {})();
+    },
+    reloadAgentSession: vi.fn(),
+    reloadIfClisbotToolsSwitched: async () => {
+      calls.push("reload");
+      return reload();
+    },
+  };
+  return { controller, calls };
+}
+
+test("a message applies a Clisbot tools switch before the turn starts", async () => {
+  const { controller, calls } = clisbotToolsRunController(async () => undefined);
+  await startAgentRun(controller, "agent-1", "hello", createTestLogger());
+  expect(calls).toEqual(["reload", "stream"]);
+});
+
+test("a failed Clisbot tools reload still sends the message", async () => {
+  const { controller, calls } = clisbotToolsRunController(async () => {
+    throw new Error("resume failed");
+  });
+  await expect(startAgentRun(controller, "agent-1", "hello", createTestLogger())).resolves.toEqual({
+    disposition: "turn_started",
+  });
+  expect(calls).toEqual(["reload", "stream"]);
 });
 
 // Deliberately independent literals rather than the production constants these tests

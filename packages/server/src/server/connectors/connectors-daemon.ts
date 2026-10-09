@@ -83,6 +83,7 @@ export function createConnectorsDaemon(params: {
   if (runtime) {
     runtime.setPermissionHost(params.agentManager);
     params.agentManager.setRuntimeMcpServers((input) => runtime.mcpServersForAgent(input));
+    params.agentManager.setClisbotToolsChoice((cwd) => runtime.clisbotToolsChoice(cwd));
   }
   // Skills follow the same off list as tools: the session's label and its Chat's.
   if (service) params.agentManager.setSessionOffSource((agentId) => projects.offList(agentId));

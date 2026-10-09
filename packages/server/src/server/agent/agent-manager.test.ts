@@ -12452,6 +12452,123 @@ test("a Project's choice of Clisbot tools wins over the Host's", async () => {
   rmSync(workdir, { recursive: true, force: true });
 });
 
+/** An agent launched without the Clisbot tools: the Host gives none and its Project has no say. */
+async function clisbotToolsSwitchHarness(client: McpCapableTestAgentClient) {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    mcpBaseUrl: "http://127.0.0.1:6868/mcp/agents",
+    idFactory: () => "00000000-0000-4000-8000-000000000320",
+  });
+  manager.setClisbotToolsEnabled(false);
+  const state: { choice: boolean | undefined; onChoiceRead: () => void } = {
+    choice: undefined,
+    onChoiceRead: () => undefined,
+  };
+  manager.setRuntimeMcpServers(async () => ({
+    servers: {},
+    preapproved: [],
+    ...(state.choice === undefined ? {} : { clisbotTools: state.choice }),
+  }));
+  manager.setClisbotToolsChoice(async () => {
+    state.onChoiceRead();
+    return state.choice;
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const close = async () => {
+    for (const listed of manager.listAgents()) await manager.closeAgent(listed.id);
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  };
+  return { manager, agent, state, close, reloads: () => client.resumeOverrides.length };
+}
+
+test("an idle session reloads when its Clisbot tools are switched after launch", async () => {
+  const client = new McpCapableTestAgentClient();
+  const { manager, agent, state, close, reloads } = await clisbotToolsSwitchHarness(client);
+  try {
+    expect(client.createdConfigs.at(-1)?.mcpServers ?? {}).not.toHaveProperty("clisbot");
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(0);
+
+    // The Bot's Tools sheet turns them on mid-chat.
+    state.choice = true;
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(1);
+    expect(client.resumeOverrides.at(-1)?.mcpServers).toHaveProperty("clisbot");
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(1);
+
+    // Following the Host again, which is off, takes them away.
+    state.choice = undefined;
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(2);
+    expect(client.resumeOverrides.at(-1)?.mcpServers ?? {}).not.toHaveProperty("clisbot");
+  } finally {
+    await close();
+  }
+});
+
+test("a Clisbot tools switch leaves a running turn alone", async () => {
+  const client = new McpCapableTestAgentClient();
+  const { manager, agent, state, close, reloads } = await clisbotToolsSwitchHarness(client);
+  try {
+    state.choice = true;
+    let running = true;
+    vi.spyOn(manager, "hasInFlightRun").mockImplementation(() => running);
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(0);
+
+    // A turn that starts while the lane reads the choice again is kept too.
+    running = false;
+    let reads = 0;
+    state.onChoiceRead = () => {
+      reads += 1;
+      if (reads === 2) running = true;
+    };
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(0);
+  } finally {
+    vi.restoreAllMocks();
+    await close();
+  }
+});
+
+/** A session with no provider thread to resume. */
+class UnresumableMcpTestAgentSession extends McpCapableTestAgentSession {
+  override describePersistence() {
+    return null;
+  }
+
+  override async getRuntimeInfo() {
+    return { ...(await super.getRuntimeInfo()), sessionId: null };
+  }
+}
+
+class UnresumableMcpTestAgentClient extends McpCapableTestAgentClient {
+  override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+    this.createdConfigs.push(config);
+    return new UnresumableMcpTestAgentSession(config);
+  }
+}
+
+test("a Clisbot tools switch does not reload a session it could not resume", async () => {
+  const client = new UnresumableMcpTestAgentClient();
+  const { manager, agent, state, close, reloads } = await clisbotToolsSwitchHarness(client);
+  try {
+    state.choice = true;
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(0);
+    expect(client.createdConfigs).toHaveLength(1);
+  } finally {
+    await close();
+  }
+});
+
 class SkillsTestSession extends TestAgentSession {
   readonly skillsOffCalls: string[][] = [];
 

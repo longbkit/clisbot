@@ -179,6 +179,9 @@ export type RuntimeMcpServersProvider = (params: {
   cwd: string | undefined;
 }) => Promise<RuntimeMcpServers>;
 
+/** The Project's choice for the Clisbot tools, read without the launch's side effects. */
+export type ClisbotToolsChoiceProvider = (cwd: string | undefined) => Promise<boolean | undefined>;
+
 /**
  * Adds runtime servers to a launch config. Their preapprovals join the stored ones here, after
  * validation: the stored config never names these servers, so it could not validate them.
@@ -892,6 +895,7 @@ export class AgentManager {
   private appendSystemPrompt: string;
   /** Runtime-only MCP servers per agent, e.g. a Project's Connectors (connectors/connector-runtime.ts). */
   private runtimeMcpServers: RuntimeMcpServersProvider | null = null;
+  private clisbotToolsChoice: ClisbotToolsChoiceProvider | null = null;
   private sessionOffSource: ((agentId: string) => Promise<Set<string>>) | null = null;
   /** The skills off list last handed to each live session, so an unchanged list is not resent. */
   private readonly appliedSkillsOff = new Map<string, string>();
@@ -1061,6 +1065,10 @@ export class AgentManager {
 
   setRuntimeMcpServers(provider: RuntimeMcpServersProvider | null): void {
     this.runtimeMcpServers = provider;
+  }
+
+  setClisbotToolsChoice(provider: ClisbotToolsChoiceProvider | null): void {
+    this.clisbotToolsChoice = provider;
   }
 
   /** Where a session's off list comes from when Connectors adds a Chat's to the label's. */
@@ -1970,6 +1978,36 @@ export class AgentManager {
         this.reloadAgentSessionInternal(agentId, overrides, options),
       ),
     );
+  }
+
+  /**
+   * Reloads an idle session whose Clisbot tools were switched on or off since launch, the only
+   * time the Clisbot MCP server is attached (docs/features/connectors/README.md, "Agent tools").
+   * Checked again inside the lifecycle lane, so a run started meanwhile is kept.
+   */
+  async reloadIfClisbotToolsSwitched(agentId: string): Promise<void> {
+    if (!(await this.clisbotToolsSwitched(agentId))) return;
+    await this.trackAgentRegistrationOperation(
+      this.runLifecycleMutation(agentId, async () => {
+        if (!(await this.clisbotToolsSwitched(agentId))) return;
+        this.logger.info({ agentId }, "Clisbot tools switched since launch; reloading the session");
+        await this.reloadAgentSessionInternal(agentId);
+      }),
+    );
+  }
+
+  /**
+   * Only a resumable, idle session counts: a fresh session would lose the conversation. Idle is
+   * read after the choice, since a run can start while it is read (`streamAgent` skips the lane).
+   */
+  private async clisbotToolsSwitched(agentId: string): Promise<boolean> {
+    const agent = this.agents.get(agentId);
+    if (!agent?.session || !agent.persistence) return false;
+    const choice = await this.clisbotToolsChoice?.(agent.config.cwd);
+    if (this.hasInFlightRun(agentId)) return false;
+    const launched = isClisbotToolPolicyEnabled(this.clisbotToolPolicies.get(agentId));
+    const current = this.launchClisbotToolPolicy(agent.provider, choice);
+    return launched !== isClisbotToolPolicyEnabled(current);
   }
 
   /**

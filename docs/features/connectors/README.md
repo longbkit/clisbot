@@ -230,7 +230,13 @@ Host, and switching it back to the Host's value follows the Host again.
   `mcp-server.test.ts` fails when the daemon registers a tool the table does not list, or the
   reverse. `speak` (voice chats) is always on and not listed.
 - **When it applies.** On or Off for the whole set is decided at launch
-  (`AgentManager.launchClisbotToolPolicy`): turning the tools on mid-session needs a new session.
+  (`AgentManager.launchClisbotToolPolicy`), because the Clisbot MCP server is attached only then.
+  When the choice flips after launch, the next message sent through `startAgentRun` (app, Chat,
+  channel, heartbeat) reloads an idle session first: the provider thread resumes, so the
+  conversation stays. Agent-response loops (`runAgent`) do not check. Upstream Paseo applies the
+  Host switch to new sessions only. If a launch could not read the Project's Connectors (a store
+  read failed), it fell back to the Host's choice, so each message reloads the session until the
+  read works again.
   The Project's tool list, its Browser choice and the session's switches are read on every request
   to `/mcp/agents` (`connector-agent-tools.ts`), so a tool turned off is gone from the next call.
   An agent that read the list earlier gets "Tool X disabled", not "not found", so it can say the
