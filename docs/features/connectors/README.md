@@ -234,9 +234,8 @@ Host, and switching it back to the Host's value follows the Host again.
   When the choice flips after launch, the next message sent through `startAgentRun` (app, Chat,
   channel, heartbeat) reloads an idle session first: the provider thread resumes, so the
   conversation stays. Agent-response loops (`runAgent`) do not check. Upstream Paseo applies the
-  Host switch to new sessions only. If a launch could not read the Project's Connectors (a store
-  read failed), it fell back to the Host's choice, so each message reloads the session until the
-  read works again.
+  Host switch to new sessions only. A launch whose Connectors fail (their secrets file, say)
+  still keeps the Project's choice, so the two reads agree.
   The Project's tool list, its Browser choice and the session's switches are read on every request
   to `/mcp/agents` (`connector-agent-tools.ts`), so a tool turned off is gone from the next call.
   An agent that read the list earlier gets "Tool X disabled", not "not found", so it can say the

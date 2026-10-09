@@ -6681,8 +6681,18 @@ export class AgentManager {
       return changes ? runtime : null;
     } catch (error) {
       this.logger.warn({ err: error, agentId }, "Failed to resolve runtime MCP servers");
-      return null;
+      return this.clisbotToolsOnly(cwd);
     }
+  }
+
+  /**
+   * A launch whose Connectors failed (their secrets file, say) keeps the Project's Clisbot tools
+   * choice: these are the daemon's own tools, and the switch check reads the same choice, so the
+   * two cannot disagree and reload the session on every message.
+   */
+  private async clisbotToolsOnly(cwd: string | undefined): Promise<RuntimeMcpServers | null> {
+    const choice = await this.clisbotToolsChoice?.(cwd).catch(() => undefined);
+    return choice === undefined ? null : { servers: {}, preapproved: [], clisbotTools: choice };
   }
 
   private applyDaemonAppendSystemPrompt(config: AgentSessionConfig): AgentSessionConfig {

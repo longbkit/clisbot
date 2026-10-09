@@ -12453,7 +12453,10 @@ test("a Project's choice of Clisbot tools wins over the Host's", async () => {
 });
 
 /** An agent launched without the Clisbot tools: the Host gives none and its Project has no say. */
-async function clisbotToolsSwitchHarness(client: McpCapableTestAgentClient) {
+async function clisbotToolsSwitchHarness(
+  client: McpCapableTestAgentClient,
+  initial: { choice?: boolean; connectorsFail?: boolean } = {},
+) {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const manager = new AgentManager({
     clients: { codex: client },
@@ -12464,14 +12467,17 @@ async function clisbotToolsSwitchHarness(client: McpCapableTestAgentClient) {
   });
   manager.setClisbotToolsEnabled(false);
   const state: { choice: boolean | undefined; onChoiceRead: () => void } = {
-    choice: undefined,
+    choice: initial.choice,
     onChoiceRead: () => undefined,
   };
-  manager.setRuntimeMcpServers(async () => ({
-    servers: {},
-    preapproved: [],
-    ...(state.choice === undefined ? {} : { clisbotTools: state.choice }),
-  }));
+  manager.setRuntimeMcpServers(async () => {
+    if (initial.connectorsFail) throw new Error("Invalid connectors secrets file");
+    return {
+      servers: {},
+      preapproved: [],
+      ...(state.choice === undefined ? {} : { clisbotTools: state.choice }),
+    };
+  });
   manager.setClisbotToolsChoice(async () => {
     state.onChoiceRead();
     return state.choice;
@@ -12534,6 +12540,21 @@ test("a Clisbot tools switch leaves a running turn alone", async () => {
     expect(reloads()).toBe(0);
   } finally {
     vi.restoreAllMocks();
+    await close();
+  }
+});
+
+test("a launch whose Connectors fail keeps the Project's Clisbot tools choice", async () => {
+  const client = new McpCapableTestAgentClient();
+  const { manager, agent, close, reloads } = await clisbotToolsSwitchHarness(client, {
+    choice: true,
+    connectorsFail: true,
+  });
+  try {
+    expect(client.createdConfigs.at(-1)?.mcpServers).toHaveProperty("clisbot");
+    await manager.reloadIfClisbotToolsSwitched(agent.id);
+    expect(reloads()).toBe(0);
+  } finally {
     await close();
   }
 });
