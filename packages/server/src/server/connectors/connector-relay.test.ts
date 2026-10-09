@@ -411,8 +411,14 @@ describe("Connector relay", () => {
       const read = await client.callTool({ name: "read_note", arguments: {} });
       const realHome = await realpath(h.home);
       expect(read.content).toEqual([
-        { type: "text", text: `read_note notes_secret none none ${realHome}` },
+        { type: "text", text: expect.stringMatching(/^read_note notes_secret none none /) },
       ]);
+      // Windows may report cwd using its short path alias; resolve the returned
+      // directory before checking identity while retaining the env-leak assertion.
+      const returned = (read.content as { text: string }[])[0]!.text;
+      expect(await realpath(returned.slice("read_note notes_secret none none ".length))).toBe(
+        realHome,
+      );
       expect((await client.callTool({ name: "delete_note", arguments: {} })).isError).toBe(true);
       await client.close();
     } finally {

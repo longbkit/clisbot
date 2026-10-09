@@ -93,6 +93,9 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
     ]),
   );
   assert(parseDevicePairingOfferFromUrl(onboarded.url)?.pairing);
+  // Managed daemon launches discard deployment environment overrides. Persist the
+  // web UI choice so Start Hub's CLI child uses the same gateway as onboarding.
+  await cli(["daemon", "config", "set", "features.webUi.enabled", "true", "--home", taskHome]);
   assert.equal(parseDevicePairingOfferFromUrl(onboarded.url).hub, undefined);
   await assert.rejects(readFile(resolvePath(taskHome, "hub-local.json")));
   const daemonOnlyInstance = await readDaemonInstance(taskHome);
@@ -146,6 +149,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
     origin: startedHub.origin,
     hub: initialHubState.url,
   };
+  assert.equal(result.origin, onboarded.gateway);
   assert.equal((await readDaemonInstance(taskHome)).pid, daemonOnlyInstance.pid);
   assert.equal(
     JSON.parse(await readFile(resolvePath(taskHome, "gateway-local.json"), "utf8")).pid,
@@ -264,6 +268,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   );
   const hubState = JSON.parse(await readFile(`${taskHome}/hub-local.json`));
   const gatewayState = JSON.parse(await readFile(`${taskHome}/gateway-local.json`));
+  assert.equal(gatewayState.config.hubOrigin, result.hub);
   const worker = async (pid) => {
     assert(Number.isSafeInteger(pid) && pid > 0);
     const { stdout } =

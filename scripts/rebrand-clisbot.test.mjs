@@ -63,6 +63,9 @@ test("keeps external catalog identities and real historical daemon fixtures", ()
   git(root, "init", "-q");
   const catalog = "packages/website/e2e/registry.fixture.json";
   const fixture = "packages/app/e2e/support/helpers/isolated-host-daemon.ts";
+  const adapter = "packages/app/e2e/support/helpers/historical-upstream-fixture.ts";
+  const normalization = '.replaceAll("PASEO", "CLISBOT").replaceAll("Paseo", "Clisbot")';
+  put(root, adapter, normalization);
   put(
     root,
     catalog,
@@ -79,7 +82,6 @@ test("keeps external catalog identities and real historical daemon fixtures", ()
     [
       "`@getpaseo/server@${options.publishedVersion}`",
       'path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")',
-      'spawnOptions.env[`PASEO_${name.slice("CLISBOT_".length)}`] = value;',
     ].join("\n"),
   );
   git(root, "add", "-A");
@@ -98,7 +100,7 @@ test("keeps external catalog identities and real historical daemon fixtures", ()
   const daemon = readFileSync(join(root, fixture), "utf8");
   assert.match(daemon, /@getpaseo\/server/);
   assert.match(daemon, /"@getpaseo", "server"/);
-  assert.match(daemon, /`PASEO_\$\{name\.slice\("CLISBOT_"\.length\)\}`/);
+  assert.equal(readFileSync(join(root, adapter), "utf8"), normalization);
   git(root, "add", "-A");
   const check = JSON.parse(
     execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }),

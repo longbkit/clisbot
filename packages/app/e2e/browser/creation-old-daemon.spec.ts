@@ -53,7 +53,7 @@ for (const version of ["0.2.5", "0.7.2", "0.8.0"]) {
       await project.cleanup();
     },
   });
-  test.describe(`published daemon ${version}`, () => {
+  test.describe(`normalized upstream daemon ${version}`, () => {
     test.beforeAll(async () => {
       test.setTimeout(120_000);
       daemon = await startIsolatedHostDaemon(`srv_creation_${randomUUID()}`, {
@@ -65,7 +65,7 @@ for (const version of ["0.2.5", "0.7.2", "0.8.0"]) {
     });
 
     for (const kind of ["workspace", "agent"] as const) {
-      test(`current client creates a keyed ${kind} and initial prompt on a published old daemon`, async ({
+      test(`current client creates a keyed ${kind} and initial prompt on a historical daemon`, async ({
         repo,
         client,
       }) => {

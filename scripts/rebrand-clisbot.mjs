@@ -314,6 +314,8 @@ function isProtectedPath(path) {
   return (
     path === "scripts/rebrand-clisbot.mjs" ||
     path === "scripts/rebrand-clisbot.test.mjs" ||
+    // This test adapter must retain the historical tokens it normalizes.
+    path === "packages/app/e2e/support/helpers/historical-upstream-fixture.ts" ||
     path.startsWith("scripts/branding/") ||
     path.startsWith("assets/branding/") ||
     // This deployment consumes an external Elixir release with upstream names.
@@ -409,10 +411,6 @@ function removeCollapsedAliases(path, input) {
       .replace(
         'path.join(publishedPackageRoot, "node_modules", "@clisbot", "server")',
         'path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")',
-      )
-      .replace(
-        '`CLISBOT_${name.slice("CLISBOT_".length)}`',
-        '`PASEO_${name.slice("CLISBOT_".length)}`',
       );
   }
   if (path === ".github/FUNDING.yml") {

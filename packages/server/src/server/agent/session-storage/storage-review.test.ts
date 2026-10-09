@@ -232,7 +232,11 @@ describe("process crash recovery", () => {
       );
       expect(stderr).toBe("");
       expect(stdout).toContain("acknowledged");
-      expect(result.signal).toBe("SIGKILL");
+      expect(result).toEqual(
+        process.platform === "win32"
+          ? { code: 1, signal: null }
+          : { code: null, signal: "SIGKILL" },
+      );
       expect(await new PagedJournal<string>(directory).read(1, 1)).toEqual([
         { seq: 1, value: "acknowledged" },
       ]);

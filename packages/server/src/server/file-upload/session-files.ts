@@ -80,7 +80,8 @@ async function copyDurable(source: string, destination: string): Promise<void> {
   const temporary = `${destination}.${randomUUID()}.tmp`;
   try {
     await fs.copyFile(source, temporary, fs.constants.COPYFILE_EXCL);
-    const handle = await fs.open(temporary, "r");
+    // Windows FlushFileBuffers requires a writable file handle.
+    const handle = await fs.open(temporary, "r+");
     try {
       await handle.sync();
     } finally {

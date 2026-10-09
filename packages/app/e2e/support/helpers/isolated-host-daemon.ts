@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { withDisabledE2ESpeechEnv } from "./speech-env";
 import { killProcessTree, spawnTsx } from "./spawn-node";
+import { normalizeHistoricalUpstreamFixture } from "./historical-upstream-fixture";
 
 export interface IsolatedHostDaemon {
   serverId: string;
@@ -118,11 +119,12 @@ export async function startIsolatedHostDaemon(
           "--no-audit",
           "--no-fund",
           "--no-package-lock",
-          // Historical compatibility fixtures are the real published upstream packages.
+          // Fetch the real historical upstream behavior, then normalize its wire names.
           `@getpaseo/server@${options.publishedVersion}`,
         ],
         { cwd: publishedPackageRoot, stdio: "ignore" },
       );
+      await normalizeHistoricalUpstreamFixture(publishedPackageRoot);
     } catch (error) {
       if (!options.preserveHome) {
         await rm(clisbotHome, { recursive: true, force: true });
@@ -171,13 +173,6 @@ export async function startIsolatedHostDaemon(
       stdio: ["ignore", "ignore", "pipe"],
       detached: false,
     };
-    if (publishedPackageRoot && spawnOptions.env) {
-      for (const [name, value] of Object.entries(spawnOptions.env)) {
-        if (name.startsWith("CLISBOT_")) {
-          spawnOptions.env[`PASEO_${name.slice("CLISBOT_".length)}`] = value;
-        }
-      }
-    }
     const child = publishedPackageRoot
       ? spawn(process.execPath, ["dist/scripts/supervisor-entrypoint.js"], spawnOptions)
       : spawnTsx("scripts/supervisor-entrypoint.ts", ["--dev"], spawnOptions);

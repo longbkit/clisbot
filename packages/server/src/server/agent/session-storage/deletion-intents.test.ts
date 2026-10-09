@@ -42,7 +42,9 @@ async function crashAt(directory: string, phase: string) {
     await storage.preparePermanentDelete('agent');
     if (process.argv[3] === 'partial') {
       await fs.rm(path.join(process.argv[1], 'events-000001.jsonl'));
-      const handle = await fs.open(process.argv[1], 'r'); await handle.sync(); await handle.close();
+      if (process.platform !== 'win32') {
+        const handle = await fs.open(process.argv[1], 'r'); await handle.sync(); await handle.close();
+      }
     }
     process.kill(process.pid, 'SIGKILL');
   `;
@@ -67,7 +69,9 @@ async function crashAt(directory: string, phase: string) {
     });
     child.on("error", reject);
     child.on("exit", (code, signal) => {
-      if (signal === "SIGKILL") resolve(signal);
+      // A self SIGKILL uses TerminateProcess on Windows and is reported as exit code 1.
+      if (signal === "SIGKILL" || (process.platform === "win32" && code === 1 && !stderr))
+        resolve(signal);
       else reject(new Error(`Child exited ${code}: ${stderr}`));
     });
   });
