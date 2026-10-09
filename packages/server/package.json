@@ -64,6 +64,7 @@
       "default": "./dist/server/server/agent/agent-response-loop.js"
     },
     "./gateway-adapters": {
+      "source": "./src/server/gateway-adapters.ts",
       "types": "./dist/server/server/gateway-adapters.d.ts",
       "default": "./dist/server/server/gateway-adapters.js"
     },

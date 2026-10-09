@@ -13,6 +13,8 @@ import {
 // This is the app's route/retained-pane contract, not identity admission proof.
 // The daemon fixture provides real history; the WebSocket boundary adds authorized
 // snapshot fields as a capable daemon would. No app stores/components are replaced.
+test.use({ e2eDaemonEnvironment: { CLISBOT_AGENT_SESSION_STORAGE: "1" } });
+
 const actor = {
   kind: "user",
   id: "slack:profile-review",
@@ -37,10 +39,6 @@ test("profile tab preserves chat draft and reading position in the workspace rou
   page,
 }) => {
   test.setTimeout(240_000);
-  expect(
-    process.env.CLISBOT_AGENT_SESSION_STORAGE,
-    "Run this contract with the actual durable backend enabled",
-  ).toBe("1");
   const session = await seedLongMockAgentTimeline({ turns: 30 });
   try {
     await page.routeWebSocket(daemonWsRoutePattern(), (socket) => {

@@ -337,7 +337,26 @@ function renameProductText(input) {
     /getpaseo(\\\/|%2[fF])(?:paseo|clisbot)(?=\\\/|%2[fF])/g,
     (_match, separator) => repoSlug.replaceAll("/", separator),
   );
-  const withExternalRepos = repositoryUrls.replace(
+  // External publication identities belong to their authors, including fixture assets.
+  const withExternalIdentities = repositoryUrls
+    .replace(
+      /https:\/\/(?:github\.com|raw\.githubusercontent\.com|registry\.npmjs\.org|cdn\.jsdelivr\.net)\/[^\s"'`<>]+/g,
+      (url) => {
+        if (
+          url.includes("getpaseo/") ||
+          url.includes("@getpaseo/") ||
+          url === "https://github.com/sponsors/boudra"
+        )
+          return url;
+        const index = retainedRepos.push(url) - 1;
+        return `__CLISBOT_UPSTREAM_REPO_${index}__`;
+      },
+    )
+    .replace(/@(?!getpaseo\/|clisbot\/)[\w.-]+\/paseo[\w.-]*/g, (name) => {
+      const index = retainedRepos.push(name) - 1;
+      return `__CLISBOT_UPSTREAM_REPO_${index}__`;
+    });
+  const withExternalRepos = withExternalIdentities.replace(
     /getpaseo(?:\/|\\\/|%2[fF])paseo-relay\b/g,
     (repo) => {
       const index = retainedRepos.push(repo) - 1;
@@ -381,6 +400,21 @@ function renameProductText(input) {
 // environment names. A full rename maps those two names to the same key. Remove
 // the resulting duplicate code; raw upstream snapshots simply lack these seams.
 function removeCollapsedAliases(path, input) {
+  if (path === "packages/app/e2e/support/helpers/isolated-host-daemon.ts") {
+    return input
+      .replace(
+        "`@clisbot/server@${options.publishedVersion}`",
+        "`@getpaseo/server@${options.publishedVersion}`",
+      )
+      .replace(
+        'path.join(publishedPackageRoot, "node_modules", "@clisbot", "server")',
+        'path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")',
+      )
+      .replace(
+        '`CLISBOT_${name.slice("CLISBOT_".length)}`',
+        '`PASEO_${name.slice("CLISBOT_".length)}`',
+      );
+  }
   if (path === ".github/FUNDING.yml") {
     return "# Add Clisbot funding options after sponsorship setup is ready.\n";
   }

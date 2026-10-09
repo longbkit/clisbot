@@ -84,4 +84,12 @@ test("checks actual packaged Hub, gateway, device proof and web assets before di
   expect(() => verifyPersonalBackends(resources)).toThrow(
     "@clisbot/hub/.output/server/start-server.js",
   );
+  writeFileSync(
+    path.join(source, "node_modules/@clisbot/hub/.output/server/start-server.js"),
+    "export {};\n",
+  );
+  rmSync(path.join(source, "node_modules/@clisbot/channels-slack/dist/plugin.js"));
+  await createPackage(source, path.join(resources, "app.asar"));
+  uncache(path.join(resources, "app.asar"));
+  expect(() => verifyPersonalBackends(resources)).toThrow("@clisbot/channels-slack/dist/plugin.js");
 });

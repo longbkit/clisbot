@@ -66,8 +66,8 @@ function versionFromTag(tag: string): string {
   return tag.replace(/^v/, "");
 }
 
-async function fetchGitHubReleases(): Promise<GitHubRelease[]> {
-  const response = await fetch(GITHUB_RELEASES_URL, {
+async function fetchGitHubReleases(releasesUrl = GITHUB_RELEASES_URL): Promise<GitHubRelease[]> {
+  const response = await fetch(releasesUrl, {
     headers: {
       Accept: "application/vnd.github+json",
       "User-Agent": "clisbot-website",
@@ -133,8 +133,8 @@ export function selectReleaseChannels(releases: GitHubRelease[]): ReleaseChannel
   return { stable, beta: beta && leadsStable(beta.version, stable.version) ? beta : null };
 }
 
-async function fetchReleaseChannels(): Promise<ReleaseChannels> {
-  return selectReleaseChannels(await fetchGitHubReleases());
+async function fetchReleaseChannels(releasesUrl: string): Promise<ReleaseChannels> {
+  return selectReleaseChannels(await fetchGitHubReleases(releasesUrl));
 }
 
 export function getLatestAndroidVersionFromReleases(releases: GitHubRelease[]): string {
@@ -188,12 +188,15 @@ function isReleaseChannels(value: unknown): value is ReleaseChannels {
   return isReleaseInfo(record.stable) && (record.beta === null || isReleaseInfo(record.beta));
 }
 
-export async function getReleaseChannels(context: WebsiteCacheContext): Promise<ReleaseChannels> {
+export async function getReleaseChannels(
+  context: WebsiteCacheContext,
+  releasesUrl = GITHUB_RELEASES_URL,
+): Promise<ReleaseChannels> {
   return getBlockingColdCache({
     context,
-    key: RELEASE_CACHE_KEY,
+    key: `${RELEASE_CACHE_KEY}:${releasesUrl}`,
     isValue: isReleaseChannels,
-    fetchFresh: fetchReleaseChannels,
+    fetchFresh: () => fetchReleaseChannels(releasesUrl),
   });
 }
 

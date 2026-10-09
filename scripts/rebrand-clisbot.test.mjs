@@ -58,6 +58,54 @@ test("defaults to official pairing and relay hosts and keeps a manual Worker dep
   assert.equal(check.changedFiles, 0);
 });
 
+test("keeps external catalog identities and real historical daemon fixtures", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-external-"));
+  git(root, "init", "-q");
+  const catalog = "packages/website/e2e/registry.fixture.json";
+  const fixture = "packages/app/e2e/support/helpers/isolated-host-daemon.ts";
+  put(
+    root,
+    catalog,
+    JSON.stringify({
+      name: "Paseo plugin",
+      package: "@example/paseo-theme",
+      media: "https://raw.githubusercontent.com/example/paseo-themes/main/paseo-theme/preview.png",
+      resolved: "https://registry.npmjs.org/@example/paseo-theme/-/paseo-theme-1.0.0.tgz",
+    }),
+  );
+  put(
+    root,
+    fixture,
+    [
+      "`@getpaseo/server@${options.publishedVersion}`",
+      'path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")',
+      'spawnOptions.env[`PASEO_${name.slice("CLISBOT_".length)}`] = value;',
+    ].join("\n"),
+  );
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--apply"]);
+  const output = JSON.parse(readFileSync(join(root, catalog), "utf8"));
+  assert.equal(output.name, "Clisbot plugin");
+  assert.equal(output.package, "@example/paseo-theme");
+  assert.equal(
+    output.media,
+    "https://raw.githubusercontent.com/example/paseo-themes/main/paseo-theme/preview.png",
+  );
+  assert.equal(
+    output.resolved,
+    "https://registry.npmjs.org/@example/paseo-theme/-/paseo-theme-1.0.0.tgz",
+  );
+  const daemon = readFileSync(join(root, fixture), "utf8");
+  assert.match(daemon, /@getpaseo\/server/);
+  assert.match(daemon, /"@getpaseo", "server"/);
+  assert.match(daemon, /`PASEO_\$\{name\.slice\("CLISBOT_"\.length\)\}`/);
+  git(root, "add", "-A");
+  const check = JSON.parse(
+    execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }),
+  );
+  assert.equal(check.changedFiles, 0);
+});
+
 test("renames escaped and encoded issue URLs, including previously renamed matchers", () => {
   const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-issue-url-"));
   git(root, "init", "-q");

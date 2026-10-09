@@ -72,7 +72,7 @@ try {
       "test-secret",
       "--json",
     ],
-    {},
+    { CLISBOT_ONBOARDING_ENABLED: "0" },
     cwd,
   );
   assert.equal(validate.exitCode, 0, validate.stderr);
@@ -85,7 +85,7 @@ try {
 
   const install = await runLocalClisbot(
     ["hub", "deploy", "-p", "studio", "--hub", origin, "--api-key", "test-secret", "--json"],
-    {},
+    { CLISBOT_ONBOARDING_ENABLED: "0" },
     cwd,
   );
   assert.equal(install.exitCode, 0, install.stderr);

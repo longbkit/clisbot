@@ -285,6 +285,11 @@ work left.
 | Upstream Discord invite and old X/Reddit badges                                                                                                                                                     | Rewrite the Discord invite to `https://discord.gg/awGmcmFXC`; remove the previous maintainer's X badge and the unclaimed Reddit badge.                                                                                                                                                                                                                                                      | Review new upstream community links individually; this rule covers the known old invite and badges, not every possible new URL.                                                                                                                                                      |
 | Four README introductions, concept, author, license, and attribution sections                                                                                                                       | Replace the centered tagline and subtitle, opening description, and provider-choice bullet in each locale. Insert localized Concept, author story, and Attribution sections; place the author story after Concept. Replace the known README License summary with the Clisbot summary. Remove the inherited Related projects lists; preserve the Chinese relay TLS guide as its own section. | The deliberate `Paseo` names and `getpaseo/paseo` links in Concept and Attribution identify the source project. Update the copy in the script and templates together when messaging changes.                                                                                         |
 
+External authors' repository, media and npm artifact identities stay verbatim.
+Historical daemon compatibility tests install the actual published `@getpaseo/server`
+versions and translate fixture environment variables to `PASEO_*`; those versions
+were never published under `@clisbot/server`. Preserve these boundaries on each sync.
+
 Repository URLs also match escaped slashes in regexes and `%2F` in encoded login
 return URLs. `docker/relay/` is protected because its pinned Elixir release keeps
 `PASEO_RELAY_*` names ([relay deployment](../../relay-deployment.md)).

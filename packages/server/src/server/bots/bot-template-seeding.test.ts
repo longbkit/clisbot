@@ -36,7 +36,7 @@ describe("bot templates", () => {
       const files = botTemplate(type);
       expect(Object.keys(files).sort()).toEqual(Object.keys(mainTemplateHashes[type]).sort());
       for (const [name, content] of Object.entries(files)) {
-        expect(createHash("sha256").update(content).digest("hex")).toBe(
+        expect(createHash("sha256").update(content.replaceAll("\r\n", "\n")).digest("hex")).toBe(
           mainTemplateHashes[type][name as keyof typeof mainTemplateHashes.personal],
         );
       }

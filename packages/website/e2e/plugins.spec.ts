@@ -253,7 +253,7 @@ test.describe("search engine visits without JavaScript", () => {
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       "content",
-      "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
+      "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
     );
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",

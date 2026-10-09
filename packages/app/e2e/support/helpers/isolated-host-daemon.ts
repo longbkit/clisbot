@@ -118,7 +118,8 @@ export async function startIsolatedHostDaemon(
           "--no-audit",
           "--no-fund",
           "--no-package-lock",
-          `@clisbot/server@${options.publishedVersion}`,
+          // Historical compatibility fixtures are the real published upstream packages.
+          `@getpaseo/server@${options.publishedVersion}`,
         ],
         { cwd: publishedPackageRoot, stdio: "ignore" },
       );
@@ -151,7 +152,7 @@ export async function startIsolatedHostDaemon(
     );
   }
   const serverDir = publishedPackageRoot
-    ? path.join(publishedPackageRoot, "node_modules", "@clisbot", "server")
+    ? path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")
     : path.resolve(__dirname, "../../../../server");
   const spawnDaemon = async (): Promise<ChildProcess> => {
     const spawnOptions: SpawnOptions = {
@@ -170,6 +171,13 @@ export async function startIsolatedHostDaemon(
       stdio: ["ignore", "ignore", "pipe"],
       detached: false,
     };
+    if (publishedPackageRoot && spawnOptions.env) {
+      for (const [name, value] of Object.entries(spawnOptions.env)) {
+        if (name.startsWith("CLISBOT_")) {
+          spawnOptions.env[`PASEO_${name.slice("CLISBOT_".length)}`] = value;
+        }
+      }
+    }
     const child = publishedPackageRoot
       ? spawn(process.execPath, ["dist/scripts/supervisor-entrypoint.js"], spawnOptions)
       : spawnTsx("scripts/supervisor-entrypoint.ts", ["--dev"], spawnOptions);
