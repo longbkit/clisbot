@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { Button } from "../components/ui/button.js";
+// Registers the stylesheet for this route tree.
+// oxlint-disable-next-line import/no-unassigned-import
 import "../styles.entry.js";
 
 export const Route = createRootRoute({

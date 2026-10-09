@@ -4212,11 +4212,12 @@ export class AgentManager {
           return;
         }
         finished = true;
+        const finishedStatus = currentStatus;
         cleanup();
         void this.getLastAssistantMessage(agentId)
           .then((lastMessage) => {
             resolvePromise({
-              status: currentStatus,
+              status: finishedStatus,
               permission,
               lastMessage,
             });
@@ -4239,6 +4240,7 @@ export class AgentManager {
       // This prevents race condition if callback fires synchronously with replayState: true
       unsubscribe = this.subscribe(
         (event) => {
+          if (finished) return;
           if (event.type === "agent_state") {
             currentStatus = event.agent.lifecycle;
             const pending = this.peekPendingPermission(event.agent);
@@ -4246,7 +4248,7 @@ export class AgentManager {
               finish(pending);
               return;
             }
-            if (isAgentBusy(event.agent.lifecycle)) {
+            if (isAgentBusy(event.agent.lifecycle) || this.hasInFlightRun(agentId)) {
               hasStarted = true;
               return;
             }
@@ -4279,6 +4281,8 @@ export class AgentManager {
         },
         { agentId, replayState: true },
       );
+      // A synchronous replay can finish before subscribe returns its disposer.
+      if (finished) cleanup();
     });
   }
 

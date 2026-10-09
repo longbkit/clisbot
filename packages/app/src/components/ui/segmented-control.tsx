@@ -58,7 +58,7 @@ export function segmentedSegmentStyle(input: {
   const { selected, hovered, pressed } = input;
   return [
     styles.segment,
-    SEGMENT_SIZE_STYLES[input.size],
+    styles[SEGMENT_SIZE_STYLE_KEYS[input.size]],
     selected && (input.variant === "track" ? styles.segmentRaised : styles.segmentSelected),
     hovered &&
       !selected &&
@@ -76,7 +76,7 @@ export function segmentedLabelStyle(input: {
 }): StyleProp<TextStyle> {
   return [
     styles.label,
-    LABEL_SIZE_STYLES[input.size],
+    styles[LABEL_SIZE_STYLE_KEYS[input.size]],
     input.selected && styles.labelSelected,
     input.selected && input.variant === "track" && styles.labelRaised,
   ];
@@ -115,7 +115,7 @@ export function SegmentedControl<T extends string>({
   }[size];
   const iconSize = segmentedIconSize[size];
 
-  const trackStyle = variant === "track" ? TRACK_SIZE_STYLES[size] : null;
+  const trackStyle = variant === "track" ? styles[TRACK_SIZE_STYLE_KEYS[size]] : null;
   const containerStyle = useMemo(
     () => [styles.container, containerSizeStyle, trackStyle && [styles.track, trackStyle], style],
     [containerSizeStyle, trackStyle, style],
@@ -311,20 +311,20 @@ const styles = StyleSheet.create((theme) => {
   };
 });
 
-const SEGMENT_SIZE_STYLES: Record<SegmentedControlSize, StyleProp<ViewStyle>> = {
-  xs: styles.segmentXs,
-  sm: styles.segmentSm,
-  md: styles.segmentMd,
-};
+const SEGMENT_SIZE_STYLE_KEYS = {
+  xs: "segmentXs",
+  sm: "segmentSm",
+  md: "segmentMd",
+} as const;
 
-const LABEL_SIZE_STYLES: Record<SegmentedControlSize, StyleProp<TextStyle>> = {
-  xs: styles.labelXs,
-  sm: styles.labelSm,
-  md: styles.labelMd,
-};
+const LABEL_SIZE_STYLE_KEYS = {
+  xs: "labelXs",
+  sm: "labelSm",
+  md: "labelMd",
+} as const;
 
-const TRACK_SIZE_STYLES: Record<SegmentedControlSize, StyleProp<ViewStyle>> = {
-  xs: styles.trackXs,
-  sm: styles.trackSm,
-  md: styles.trackMd,
-};
+const TRACK_SIZE_STYLE_KEYS = {
+  xs: "trackXs",
+  sm: "trackSm",
+  md: "trackMd",
+} as const;

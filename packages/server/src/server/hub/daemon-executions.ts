@@ -264,15 +264,12 @@ export class DaemonExecutions implements HubExecutionAgents {
       requireExecutionWorkspaceId(result.liveSnapshot);
       await this.requireProjectPlacement(result.liveSnapshot.workspaceId, input.projectId);
     } catch (error) {
+      if (createdAgentId && this.agentManager.getAgent(createdAgentId)) {
+        await this.closeFailedCreateAgent(createdAgentId);
+      }
       if (createdAgentId) await this.agentStorage.preparePermanentDelete(createdAgentId);
       try {
-        if (createdAgentId && this.agentManager.getAgent(createdAgentId)) {
-          try {
-            await this.agentManager.closeAgent(createdAgentId);
-          } finally {
-            await this.agentManager.deleteAgentState(createdAgentId);
-          }
-        }
+        if (createdAgentId) await this.agentManager.deleteAgentState(createdAgentId);
       } finally {
         try {
           await this.cleanupFailedCreate({
@@ -292,6 +289,17 @@ export class DaemonExecutions implements HubExecutionAgents {
       executionId: owner.executionId,
       agent: serializeAgentSnapshot(result.liveSnapshot),
     };
+  }
+
+  private async closeFailedCreateAgent(agentId: string): Promise<void> {
+    try {
+      await this.agentManager.closeAgent(agentId);
+    } catch (error) {
+      this.options.logger.warn({ err: error, agentId }, "Retrying failed Hub create closure");
+      // The manager retains the writer after a failed close. A second failure
+      // leaves its durable state and worktree intact for recovery.
+      await this.agentManager.closeAgent(agentId);
+    }
   }
 
   private async reuseAgent(

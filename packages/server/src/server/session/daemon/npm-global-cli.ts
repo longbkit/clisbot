@@ -3,7 +3,8 @@ import { getErrorMessage } from "@clisbot/protocol/error-utils";
 import { z } from "zod";
 import { execCommand } from "../../../utils/spawn.js";
 
-export const CLISBOT_CLI_PACKAGE = "@clisbot/cli";
+// The public entry owns updates; its pinned dependency supplies @clisbot/cli.
+export const CLISBOT_CLI_PACKAGE = "clisbot";
 
 const NPM_PROBE_TIMEOUT_MS = 10_000;
 const NPM_INSTALL_TIMEOUT_MS = 300_000;

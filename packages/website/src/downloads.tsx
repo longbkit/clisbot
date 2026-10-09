@@ -48,8 +48,8 @@ export function thanksPageHref(fileUrl: string): string {
   return `/download/thanks?${new URLSearchParams({ file: fileUrl })}`;
 }
 
-export const appStoreUrl = "https://apps.apple.com/app/clisbot-pocket-engineer/id6758887924";
-export const playStoreUrl = "https://play.google.com/store/apps/details?id=sh.clisbot";
+export const appStoreUrl = "https://apps.apple.com/app/clisbot/id6820985153";
+export const playStoreUrl = "https://play.google.com/store/apps/details?id=com.clisbot.app";
 export const webAppUrl = "https://app.clisbot.com";
 
 export interface PrimaryDownload {

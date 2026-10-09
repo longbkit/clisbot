@@ -649,7 +649,7 @@ describe("evaluatePluginClientBundle", () => {
     "@clisbot/plugin/react-native",
     "@clisbot/plugin/ui",
     "@clisbot/plugin/host",
-    "@clisbot/plugin",
+    "@paseo/plugin",
   ])("rejects %s in the client loader", (specifier) => {
     expect(() =>
       evaluatePluginClientBundle(

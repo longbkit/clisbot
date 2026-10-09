@@ -4,7 +4,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawnProcess } from "@clisbot/server";
+import { spawnProcess } from "@clisbot/server/process";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {

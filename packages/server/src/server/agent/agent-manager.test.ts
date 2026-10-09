@@ -6395,9 +6395,7 @@ test("waitForAgentEvent does not resolve idle until foreground turn is finalized
     }
   })();
 
-  // Wait for the turn to start
-  await new Promise<void>((resolve) => setTimeout(resolve, 20));
-
+  // Waiting immediately must cover a pending run before its provider starts.
   const waitPromise = manager.waitForAgentEvent(snapshot.id);
 
   // Should still be pending because turn_completed hasn't arrived

@@ -185,6 +185,13 @@ function DashboardContent({
 }) {
   const tenant = useOptionalRouteTenant() ?? undefined;
   const instance = useInstanceScope(account.isInstanceOperator);
+  const activeContent = (
+    <ActiveAccountProvider account={account}>
+      <div key={tenant?.project?.id ?? "organization"}>
+        <Outlet />
+      </div>
+    </ActiveAccountProvider>
+  );
   return (
     <>
       <AppSidebar
@@ -206,15 +213,7 @@ function DashboardContent({
           <div className="flex flex-1 flex-col p-4 md:p-8">
             <Page>
               <ErrorSummary message={error} />
-              {transitioning ? (
-                <AccountTransition />
-              ) : (
-                <ActiveAccountProvider account={account}>
-                  <div key={tenant?.project?.id ?? "organization"}>
-                    <Outlet />
-                  </div>
-                </ActiveAccountProvider>
-              )}
+              {transitioning ? <AccountTransition /> : activeContent}
             </Page>
           </div>
         </SidebarInset>

@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { startDaemonInstance, resolveClisbotHome } from "@clisbot/server/daemon-control";
 import { nodeEntrypointArguments } from "../../utils/node-entrypoint.js";
+import { prepareV1Upgrade } from "../legacy-v1/prepare-upgrade.js";
+import { registerLegacyWorkspaces } from "../legacy-v1/register-workspaces.js";
 const require = createRequire(import.meta.url);
 function resolveServerRunnerFromDir(currentDir: string): string | null {
   const packageJsonPath = path.join(currentDir, "package.json");
@@ -52,8 +54,9 @@ export async function launchLocalDaemon(options: {
   process.once("SIGINT", cancel);
   process.once("SIGTERM", cancel);
   try {
+    await prepareV1Upgrade(options.home);
     const entry = resolveDaemonRunnerEntry();
-    return await startDaemonInstance({
+    const result = await startDaemonInstance({
       home: resolveClisbotHome({ CLISBOT_HOME: options.home }),
       command: process.execPath,
       args: nodeEntrypointArguments(entry),
@@ -67,6 +70,8 @@ export async function launchLocalDaemon(options: {
             process.stdout.write(`Listening on ${instance.listen} (PID ${instance.pid})\n`)
         : undefined,
     });
+    if (!options.foreground) await registerLegacyWorkspaces(options.home);
+    return result;
   } finally {
     process.removeListener("SIGINT", cancel);
     process.removeListener("SIGTERM", cancel);

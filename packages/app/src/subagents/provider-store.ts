@@ -269,9 +269,9 @@ export const useProviderSubagentStore = create<ProviderSubagentState>((set) => (
       ) {
         return state;
       }
+      if (!subagentTimelineRetention.isVisible(key)) return state;
       const current = existing ?? EMPTY_TIMELINE;
       if (current.pagingMode === "source_ranges") {
-        if (!subagentTimelineRetention.isVisible(key)) return state;
         return applySourceRangeSubagentUpdate(serverId, key, current, payload);
       }
       if (payload.seq <= current.lastSeq) {

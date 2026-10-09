@@ -19,6 +19,7 @@ const DECIDED_ELSEWHERE = new Set([
   "bot.update.request",
   "bot.archive.request",
   "bot.template.seed.request",
+  "bot.template.preview.request", // Host privilege, decided by bot-access.ts
 ]);
 
 function message(type: string, fields: Record<string, unknown> = {}): SessionInboundMessage {

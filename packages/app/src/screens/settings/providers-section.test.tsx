@@ -16,6 +16,7 @@ const { theme, snapshotState, configState, patchConfigMock, openProviderSettings
       fontWeight: { normal: "400" },
       borderRadius: { lg: 8 },
       opacity: { 50: 0.5 },
+      shadow: { card: {} },
       colors: {
         surface1: "#111",
         surface2: "#222",

@@ -1,0 +1,29 @@
+{
+  "name": "clisbot",
+  "version": "0.11.1",
+  "description": "Clisbot — connect to and control your local AI agents",
+  "homepage": "https://clisbot.com",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/longbkit/clisbot.git"
+  },
+  "bin": {
+    "clis": "bin/clisbot",
+    "clisbot": "bin/clisbot"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@clisbot/cli": "0.11.1"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

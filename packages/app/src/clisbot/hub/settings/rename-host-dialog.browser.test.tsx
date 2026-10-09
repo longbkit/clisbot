@@ -1,15 +1,15 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import i18next from "i18next";
+import { use as registerI18nextPlugin } from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en } from "@/i18n/resources/en";
 import { RenameHostDialog } from "./rename-host-dialog";
 import { HubApiError } from "../api-client";
 
 beforeAll(async () => {
-  await i18next.use(initReactI18next).init({
+  await registerI18nextPlugin(initReactI18next).init({
     lng: "en",
     resources: { en: { translation: en } },
     interpolation: { escapeValue: false },
@@ -48,20 +48,19 @@ it("cancels without saving and retries a conflicting Host name in the app dialog
   function Harness() {
     const [saved, setSaved] = useState("sandbox");
     const [open, setOpen] = useState(true);
+    const openDialog = useCallback(() => setOpen(true), []);
+    const closeDialog = useCallback(() => setOpen(false), []);
+    const saveName = useCallback(async (value: string) => {
+      await save(value);
+      setSaved(value.toLowerCase().replaceAll(" ", "-"));
+    }, []);
     return (
       <>
         <div data-testid="saved-name">{saved}</div>
-        <button onClick={() => setOpen(true)}>Rename</button>
-        {open ? (
-          <RenameHostDialog
-            name={saved}
-            onClose={() => setOpen(false)}
-            onSave={async (value) => {
-              await save(value);
-              setSaved(value.toLowerCase().replaceAll(" ", "-"));
-            }}
-          />
-        ) : null}
+        <button type="button" onClick={openDialog}>
+          Rename
+        </button>
+        {open ? <RenameHostDialog name={saved} onClose={closeDialog} onSave={saveName} /> : null}
       </>
     );
   }

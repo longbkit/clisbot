@@ -16,7 +16,7 @@ describe("buildWorkingDirectorySuggestions", () => {
     const results = buildWorkingDirectorySuggestions({
       recommendedPaths: ["/Users/me/projects/clisbot-desktop", "/Users/me/documents"],
       serverPaths: ["/Users/me/projects/clisbot-plan", "/Users/me/projects/clisbot-desktop"],
-      query: "pso",
+      query: "csb",
     });
 
     expect(results).toEqual([
@@ -42,7 +42,7 @@ describe("buildWorkingDirectorySuggestions", () => {
         "/Users/me/projects/clisbot-desktop",
       ],
       serverPaths: [],
-      query: "projects/pso",
+      query: "projects/csb",
     });
 
     expect(results).toEqual([

@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
   expect,
@@ -8,7 +9,7 @@ import {
   type Page,
   type Request,
 } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder } from "@axe-core/playwright";
 import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { WebSocket, type RawData } from "ws";
@@ -119,13 +120,13 @@ const ORGANIZATION_DESTINATIONS = [
   "Settings",
 ] as const;
 /** Instance surfaces sit outside `/o/`, so the path is what says the sidebar is in instance scope. */
-const INSTANCE_ROUTES: readonly string[] = ["/apps", "/operator"];
-const ORGANIZATION_SETTINGS_SECTIONS: readonly OrganizationSettingsSection[] = [
+const INSTANCE_ROUTES = new Set(["/apps", "/operator"]);
+const ORGANIZATION_SETTINGS_SECTIONS = new Set<OrganizationSettingsSection>([
   "Team",
   "API keys",
   "Usage",
   "Billing",
-];
+]);
 
 interface TeamExpectation {
   membersPresent: string[];
@@ -4863,7 +4864,7 @@ class HubUser {
   private async openOrganizationSection(
     name: OrganizationSection | OrganizationSettingsSection,
   ): Promise<void> {
-    const settings = ORGANIZATION_SETTINGS_SECTIONS.includes(name as OrganizationSettingsSection);
+    const settings = ORGANIZATION_SETTINGS_SECTIONS.has(name as OrganizationSettingsSection);
     await this.returnToOrganizationScope();
     const mobile = await this.page
       .getByRole("button", { name: "Toggle Sidebar" })
@@ -4888,7 +4889,7 @@ class HubUser {
    */
   private async returnToOrganizationScope(): Promise<void> {
     const pathname = new URL(this.page.url()).pathname;
-    const instance = INSTANCE_ROUTES.includes(pathname);
+    const instance = INSTANCE_ROUTES.has(pathname);
     if (!instance && !/\/projects\/[^/]+\//u.test(pathname)) return;
     const mobileSidebar = this.page.getByRole("button", { name: "Toggle Sidebar" });
     if (await mobileSidebar.isVisible().catch(() => false)) await mobileSidebar.click();
@@ -5139,7 +5140,10 @@ class ContractDaemon {
   }
 }
 
-type ExecutionCapability = { url: string; headers: Record<string, string> };
+interface ExecutionCapability {
+  url: string;
+  headers: Record<string, string>;
+}
 
 interface HttpContract {
   name: string;
@@ -5572,7 +5576,7 @@ function readSocketData(data: RawData): string {
 }
 
 function plainLogs(value: string): string {
-  return value.replace(/\u001B\[[0-9;]*m/gu, "");
+  return stripVTControlCharacters(value);
 }
 
 async function retryUntil<T>(read: () => Promise<T>, done: (value: T) => boolean): Promise<T> {

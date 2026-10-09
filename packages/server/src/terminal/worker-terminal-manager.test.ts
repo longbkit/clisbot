@@ -501,16 +501,20 @@ it("starts the default shell through the worker and accepts quoted commands", as
   const cwd = mkdtempSync(join(tmpdir(), "worker-terminal-manager-shell-"));
   temporaryDirs.push(cwd);
   const markerPath = join(cwd, "shell quoted marker.txt");
-  const session = trackTerminal(await manager.createTerminal({ cwd, workspaceId: "ws-test" }));
+  // A developer's login rc can wait for input or change directory. Isolate it on macOS.
+  const env = process.platform === "darwin" ? { ZDOTDIR: cwd } : undefined;
+  const session = trackTerminal(await manager.createTerminal({ cwd, workspaceId: "ws-test", env }));
   const command = [
     "node",
     "-e",
-    `"require('node:fs').writeFileSync('shell quoted marker.txt','shell-ok')"`,
+    `"require('node:fs').writeFileSync(process.argv[1],'shell-ok')"`,
+    `"${markerPath}"`,
   ].join(" ");
 
   session.send({ type: "input", data: `${command}\r` });
 
-  await expect.poll(() => readFileSync(markerPath, "utf8"), { timeout: 10000 }).toBe("shell-ok");
+  await expect.poll(() => existsSync(markerPath), { timeout: 10000 }).toBe(true);
+  expect(readFileSync(markerPath, "utf8")).toBe("shell-ok");
 });
 
 it("lists subdirectory terminals when querying the workspace root", async () => {

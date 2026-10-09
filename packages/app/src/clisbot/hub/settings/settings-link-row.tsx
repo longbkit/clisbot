@@ -56,7 +56,7 @@ export function SettingsLinkRow({
       </View>
       {value ? (
         <View style={styles.value}>
-          {tone && tone !== "neutral" ? <View style={[styles.dot, DOT[tone]]} /> : null}
+          {tone && tone !== "neutral" ? <View style={[styles.dot, styles[tone]]} /> : null}
           <Text style={styles.valueText} numberOfLines={1}>
             {value}
           </Text>
@@ -77,5 +77,3 @@ const styles = StyleSheet.create((theme) => ({
   warning: { backgroundColor: theme.colors.statusDotWarning },
   danger: { backgroundColor: theme.colors.statusDotDanger },
 }));
-
-const DOT = { success: styles.success, warning: styles.warning, danger: styles.danger };

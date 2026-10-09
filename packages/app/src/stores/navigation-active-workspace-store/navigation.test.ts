@@ -194,7 +194,7 @@ describe("workspace navigation", () => {
       pathname: "/",
       params: {
         serverId: "server-1",
-        workspaceId: "b64_L3RtcC9wYXNlby1taXNzaW5nLXdvcmtzcGFjZQ",
+        workspaceId: "b64_L3RtcC9jbGlzYm90LW1pc3Npbmctd29ya3NwYWNl",
       },
     });
 

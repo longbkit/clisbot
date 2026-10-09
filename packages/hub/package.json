@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/getpaseo/hub.git"
+    "url": "git+https://github.com/longbkit/clisbot.git"
   },
   "bin": {
     "clisbot-hub": "bin/clisbot-hub.js"

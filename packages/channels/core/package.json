@@ -1,8 +1,14 @@
 {
   "name": "@clisbot/channels-core",
   "version": "0.7.3-beta.1",
-  "private": true,
   "description": "OpenClaw core source ported for the in-repo channel verticals; mirrors upstream src/<path> under src/<path> (docs/audits/2026-09-07-openclaw-channel-port-goal.md)",
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "SYNC.md",
+    "upstream-sync.json"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,10 +23,14 @@
       "default": "./dist/*.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsgo -p tsconfig.json",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "@clisbot/channels-markdown-core": "*",

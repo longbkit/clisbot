@@ -588,7 +588,7 @@ function ManualConfigurationResult({
   }
   return (
     <Alert variant="destructive" className="mb-5">
-      <AlertTitle>Configuration couldn't be activated</AlertTitle>
+      <AlertTitle>Configuration couldn&apos;t be activated</AlertTitle>
       <AlertDescription>
         <p>Correct the YAML and try again. The active revision was not changed.</p>
         <ul className="list-disc pl-5">

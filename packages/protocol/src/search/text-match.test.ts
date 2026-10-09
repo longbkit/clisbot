@@ -68,7 +68,7 @@ describe("scoreMatch", () => {
   it("keeps subsequences within a word, including names and later words", () => {
     expect(scoreMatch("trmnl", "Fix terminal resizing")).toEqual({ tier: 5, offset: 4, spread: 8 });
     expect(scoreMatch("abc", "AgentBrowserConfig")?.tier).toBe(5);
-    expect(scoreMatch("pasbab", "clisbot-babysit")?.tier).toBe(5);
+    expect(scoreMatch("clsbab", "clisbot-babysit")?.tier).toBe(5);
     expect(scoreMatch("confg", "check configuration")?.offset).toBe(6);
   });
 

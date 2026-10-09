@@ -615,7 +615,7 @@ export default function contribute(server: PluginServerContext) {
       );
       for (const args of [
         ["init", "-b", "main"],
-        ["add", "."],
+        ["add", "--force", "."],
         ["-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-m", "initial"],
         ["tag", "v1"],
       ])
@@ -678,7 +678,7 @@ export default function contribute(server: PluginServerContext) {
         await runGitCommand(["checkout", "-b", "new-default"], { cwd: repository });
         await writeFile(path.join(repository, pluginPath, "revision.txt"), "new default");
         for (const args of [
-          ["add", "."],
+          ["add", "--force", "."],
           ["-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-m", "update"],
         ])
           await runGitCommand(args, { cwd: repository });
@@ -967,7 +967,7 @@ export default function contribute(server: PluginServerContext) {
       const repository = await createPlugin("recovery", "export default () => () => {};\n");
       for (const args of [
         ["init", "-b", "main"],
-        ["add", "."],
+        ["add", "--force", "."],
         ["-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-m", "initial"],
       ])
         await runGitCommand(args, { cwd: repository });
@@ -1000,7 +1000,7 @@ export default function contribute(server: PluginServerContext) {
       const installed = await service.installSource({ source: pathToFileURL(repository).href });
       await writeFile(path.join(repository, "revision.txt"), "new");
       for (const args of [
-        ["add", "."],
+        ["add", "--force", "."],
         ["-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-m", "update"],
       ])
         await runGitCommand(args, { cwd: repository });
