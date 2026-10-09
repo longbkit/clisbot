@@ -2,6 +2,8 @@
 
 [User guide](../README.md) · [Xử lý lỗi](../help/faq.md#lỗi-onboarding-và-khởi-động) · [Mật khẩu và recovery](../account/password-and-recovery.md)
 
+Nếu đã dùng Clisbot 0.1.x, bắt đầu từ [nâng cấp v2](upgrade-v2.md) để dùng lại home và workspace.
+
 Bạn sẽ có bot personal dùng Codex, workspace đã seed template và dữ liệu lưu tại `~/.clisbot-dev-01`. Các lệnh dưới đây chạy trong Bash trên máy sẽ chạy bot.
 
 ## 1. Chuẩn bị

@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-discord",
-  "version": "0.7.3-beta.1",
+  "version": "2.0.0",
   "description": "In-repo Discord channel vertical (goal ledger slice 13). Ported from extensions/discord/src@5d8067a4483: the hand-rolled Discord REST/gateway client (src/internal), the send/action/component/markdown closure, and the Fusion boundary adapters. Third-party SDKs are upstream's: discord-api-types, ws, typebox, mdast-util-from-markdown.",
   "files": [
     "dist",
@@ -22,9 +22,9 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-markdown-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-markdown-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "discord-api-types": "0.38.54",
     "mdast-util-from-markdown": "2.0.3",
     "typebox": "1.3.18",

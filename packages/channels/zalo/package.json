@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-zalo",
-  "version": "0.7.3-beta.1",
+  "version": "2.0.0",
   "description": "In-repo Zalo Official Account (Bot API) channel vertical (goal ledger slice 16). Ported from extensions/zalo/src@5d8067a4483: the Bot API client, token/account resolution, the probe, the send path, the message-tool actions and the webhook request handler with its durable-admission spool parsing. Zalo ships no SDK; upstream hand-rolls the client over fetch and depends only on zod.",
   "files": [
     "dist",
@@ -22,8 +22,8 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "undici": "8.10.2",
     "zod": "4.4.3"
   },

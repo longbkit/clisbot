@@ -102,7 +102,7 @@ pointers. The npm invariant is:
 
 - A beta release moves only `beta`; `latest` remains on the newest stable.
 - A stable release moves both `latest` and `beta` to that stable version. This
-  keeps users who install `@clisbot/cli@beta` on the newest Clisbot release after
+  keeps users who install `clisbot@beta` on the newest Clisbot release after
   a beta is promoted or superseded by a direct stable release.
 
 ## Release version decision
@@ -123,10 +123,47 @@ version:
 The release agent selects patch or minor during preparation and presents the
 target version with the changelog for approval. Agents never select a major
 version autonomously. A major release requires an explicit user instruction and
-approval; Clisbot remains on major version zero until that deliberate decision.
+approval. The user selected `2.0.0` for the architectural replacement of legacy
+Clisbot `0.1.x`; subsequent Clisbot versions follow their own release track.
 
 Version bumps are never used to retry a failed build. Retry the existing version
 as described in **Fixing a failed release build**.
+
+### Clisbot 2 and the Paseo baseline
+
+`clisbot` remains the public npm entry for existing users. It is a small wrapper
+around `@clisbot/cli`; users install one package while npm installs its runtime
+dependencies. All public Clisbot runtime workspaces share the same exact version.
+`node scripts/npm-release.mjs list` lists the dependency-first publication graph.
+The wrapper publishes last so `clisbot@latest` never advertises missing internal
+packages. `expo-two-way-audio` is outside that graph and is built with the mobile
+app; do not publish it just because its workspace version changes.
+
+For the first major release, set the approved destination explicitly:
+
+```bash
+npm run version:all:set -- --version 2.0.0
+```
+
+Do not use `release:major` to select an arbitrary destination: it only increments
+the current major. Once the tree already contains `2.0.0`, use the manual flow
+below without another version bump. The stable publisher moves both `latest`
+and `beta` for every package in the graph; beta publication moves only `beta`.
+It skips an existing package version and resumes dependency-first publication.
+Never edit the contents of an already published version during a retry.
+
+`upstream-baseline.json` records the Paseo repository, tag and full source commit.
+This is provenance, not the Clisbot product version. After each upstream merge,
+update the baseline from the actual merged commit, keep Clisbot versions intact,
+and check exact internal runtime dependencies with the npm graph command. Mention
+the baseline in the Clisbot changelog. A Paseo version bump must not reset the
+Clisbot release version.
+
+The upgrade contract for legacy npm users is documented in
+[Upgrade to v2](guides/user-guide/getting-started/upgrade-v2.md). A successful
+fresh install of the real packed npm graph must exercise the legacy home,
+Project registration, pairing, shared app UI and local Hub backend using
+`node scripts/npm-installed-smoke.mjs` before publication.
 
 ## Standard release (stable)
 
@@ -144,19 +181,9 @@ npm run release:minor
 
 This bumps the version across all workspaces, runs checks, publishes to npm, and pushes the branch + tag. The tag push triggers `Desktop Release`, `Android APK Release`, `Docker`, and `Release Notes Sync` on GitHub Actions. The workflows create the GitHub Release as a draft while builds and release-note sync run. EAS picks up the same tag via the EAS GitHub app and starts the iOS + Android store builds in parallel (see "Mobile builds (EAS)" below) — there is no mobile-release workflow under `.github/workflows`.
 
-After the stable release succeeds, move npm's `beta` pointer to the new stable
-version for every published package. This changes dist-tags only; do not
-republish the packages:
-
-```bash
-CLISBOT_VERSION=$(node -p "require('./package.json').version")
-for package in highlight relay protocol client plugin server cli; do
-  npm dist-tag add "@clisbot/$package@$CLISBOT_VERSION" beta
-done
-```
-
-Verify both npm tags now resolve to `CLISBOT_VERSION` before considering the
-stable release complete.
+The stable publisher sets both npm dist-tags for every package in the release
+graph. Verify every package's `latest` and `beta` resolves to the release version
+before considering npm complete; the public entry is `clisbot`.
 
 The Docker workflow builds images from the checked-out source tree on pull requests and on `main` as non-publishing checks. Stable `vX.Y.Z` tag pushes publish `ghcr.io/longbkit/clisbot:X.Y.Z` and `ghcr.io/longbkit/clisbot:latest`; beta `vX.Y.Z-beta.N` tag pushes publish only `ghcr.io/longbkit/clisbot:X.Y.Z-beta.N` and never move `latest`.
 
@@ -169,12 +196,12 @@ The official production relay at `relay.clisbot.com` currently runs the Elixir s
 ```bash
 npm run typecheck            # Verify the exact commit you intend to release
 npm run release:check        # Typecheck, build, dry-run pack
-# Run exactly one approved version command:
-npm run version:all:patch
-npm run version:all:minor
+# Set or bump the approved destination once (skip if already set):
+npm run version:all:set -- --version 2.0.0
+# Future releases normally use version:all:patch or version:all:minor.
 npm run release:publish      # Publish to npm
 npm run release:push         # Push HEAD + tag (triggers CI workflows)
-# Then move npm's beta dist-tag to this stable version using the command above.
+# The stable publisher also moves beta for the entire package graph.
 ```
 
 ## Beta flow
@@ -188,7 +215,7 @@ npm run release:promote          # Promote X.Y.Z-beta.N to stable X.Y.Z
 ```
 
 - Beta tags are published GitHub prereleases like `v0.1.41-beta.1`
-- Betas publish npm packages with `--tag beta`, so `npm install @clisbot/cli@beta` opts in while plain `npm install @clisbot/cli` stays on `latest`
+- Betas publish npm packages with `--tag beta`, so `npm install -g clisbot@beta` opts in while plain `npm install -g clisbot` stays on `latest`
 - Betas publish desktop assets and APKs for testing. They also build iOS, upload it to TestFlight, add it to the `Clisbot Beta` external group, and submit it for Beta App Review. They do not submit mobile builds to the production stores.
 - `release:promote` creates a fresh stable tag like `v0.1.41`; the final release never reuses the beta tag
 - Desktop assets now come from the Electron package at `packages/desktop`

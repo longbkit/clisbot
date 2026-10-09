@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-feishu",
-  "version": "0.7.3-beta.1",
+  "version": "2.0.0",
   "description": "In-repo Feishu/Lark channel vertical (goal ledger slice 15). Ported from extensions/feishu/src@5d8067a4483: the Lark SDK client + tenant-token plumbing, the six feishu_* agent tool families, the WS long-connection / webhook transports, the send + card closure, and the Fusion boundary adapters. Third-party SDK is upstream's: @larksuiteoapi/node-sdk.",
   "files": [
     "dist",
@@ -22,9 +22,9 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-markdown-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-markdown-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "@larksuiteoapi/node-sdk": "1.73.0",
     "mdast-util-from-markdown": "2.0.3",
     "mdast-util-gfm-table": "2.0.0",

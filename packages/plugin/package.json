@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/plugin",
-  "version": "0.11.1",
+  "version": "2.0.0",
   "description": "Clisbot plugin SDK package",
   "files": [
     "dist",
@@ -70,8 +70,8 @@
     "use-sync-external-store": "^1.6.0"
   },
   "devDependencies": {
-    "@clisbot/client": "0.11.1",
-    "@clisbot/protocol": "0.11.1",
+    "@clisbot/client": "2.0.0",
+    "@clisbot/protocol": "2.0.0",
     "@types/node": "^20.9.0",
     "@types/react": "~19.2.0",
     "react": "19.1.0",
@@ -81,8 +81,8 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@clisbot/client": "0.11.1",
-    "@clisbot/protocol": "0.11.1",
+    "@clisbot/client": "2.0.0",
+    "@clisbot/protocol": "2.0.0",
     "react": "~19.1.0",
     "react-native": ">=0.81.5",
     "zod": "^4.4.3"

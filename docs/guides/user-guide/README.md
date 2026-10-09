@@ -4,6 +4,7 @@ Bắt đầu từ [onboarding](getting-started/onboarding.md), sau đó chọn h
 
 | Bạn muốn làm gì?                                      | Hướng dẫn                                                                  |
 | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| Nâng cấp Clisbot 0.1.x lên v2                         | [Nâng cấp v2](getting-started/upgrade-v2.md)                               |
 | Tạo bot Slack/Codex, seed workspace, chạy lại         | [Onboarding](getting-started/onboarding.md)                                |
 | Thiết lập Hub, đăng nhập Google, đăng ký              | [Thiết lập và đăng nhập](account/setup-and-sign-in.md)                     |
 | Đổi tên hiển thị, ảnh đại diện                        | [Hồ sơ](account/profile.md)                                                |

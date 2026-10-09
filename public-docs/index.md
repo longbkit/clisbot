@@ -42,7 +42,7 @@ Clisbot checks sandbox availability each time it launches. AppImage and extracte
 For headless machines, dev boxes, or any setup where you want the daemon running without the desktop UI:
 
 ```bash
-npm install -g @clisbot/cli
+npm install -g clisbot
 clisbot
 ```
 

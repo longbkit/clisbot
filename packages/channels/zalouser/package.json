@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-zalouser",
-  "version": "0.7.3-beta.1",
+  "version": "2.0.0",
   "description": "In-repo Zalo Personal (`zalouser`) channel vertical (goal ledger slice 17). Ported from extensions/zalouser/src@5d8067a4483: the zca-js client boundary, the QR login state machine, the credential/session closure, the markdown text-style compiler, the send path, the message-tool `react` action, the `zalouser` agent tool, the friend/group directory and the probe. Upstream's SDK is zca-js, pinned at upstream's version.",
   "files": [
     "dist",
@@ -22,8 +22,8 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "typebox": "1.3.18",
     "zca-js": "2.1.2",
     "zod": "4.4.3"

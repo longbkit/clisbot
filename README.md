@@ -116,7 +116,7 @@ To connect from your phone, open **Settings → your host → Pair Device**.
 For a server, a VM, or any machine without the desktop app. Install the CLI and start the daemon:
 
 ```bash
-npm install -g @clisbot/cli
+npm install -g clisbot
 clisbot
 ```
 

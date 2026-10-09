@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-slack",
-  "version": "0.7.3-beta.1",
+  "version": "2.0.0",
   "description": "In-repo Slack channel vertical. Ported from OpenClaw `extensions/slack/src` at 5d8067a4483 (see upstream-sync.json / SYNC.md); the SDK stack matches upstream (@slack/web-api, @slack/socket-mode, @slack/types).",
   "files": [
     "dist",
@@ -22,9 +22,9 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-markdown-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-markdown-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "@slack/bolt": "5.0.0",
     "@slack/socket-mode": "3.0.1",
     "@slack/types": "3.1.0",
