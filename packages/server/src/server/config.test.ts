@@ -89,6 +89,10 @@ describe("server config", () => {
   test("resolves reload state from the supplied validated snapshot", async () => {
     const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-snapshot-"));
     roots.push(clisbotHome);
+    await writeFile(
+      path.join(clisbotHome, "config.json"),
+      JSON.stringify({ version: 1, daemon: { browserTools: { enabled: false } } }),
+    );
     const snapshot = loadPersistedConfig(clisbotHome);
     await writeFile(
       path.join(clisbotHome, "config.json"),

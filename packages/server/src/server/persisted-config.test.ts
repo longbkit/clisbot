@@ -692,6 +692,29 @@ describe("loadPersistedConfig", () => {
     }
   });
 
+  test("materializes Clisbot tools on for a new Clisbot home", () => {
+    const home = createTempHome();
+    try {
+      const config = loadPersistedConfig(home);
+      expect(config.daemon?.mcp?.injectIntoAgents).toBe(true);
+      expect(config.daemon?.browserTools?.enabled).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("leaves Clisbot tools unset for an existing home that never set them", () => {
+    const home = createTempHome();
+    try {
+      writeFileSync(path.join(home, "config.json"), JSON.stringify({ version: 1, daemon: {} }));
+      const config = loadPersistedConfig(home);
+      expect(config.daemon?.mcp?.injectIntoAgents).toBeUndefined();
+      expect(config.daemon?.browserTools?.enabled).toBeUndefined();
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   test("accepts the documented config schema marker", () => {
     const home = createTempHome();
     const configPath = path.join(home, "config.json");

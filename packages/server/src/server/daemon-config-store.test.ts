@@ -219,6 +219,7 @@ describe("DaemonConfigStore", () => {
   test("rolls back live owners when a later transactional owner fails", () => {
     const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
     tempDirs.push(clisbotHome);
+    writeFileSync(path.join(clisbotHome, "config.json"), `${JSON.stringify({ version: 1 })}\n`);
     const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
@@ -921,6 +922,12 @@ describe("DaemonConfigStore reload", () => {
     for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
   });
 
+  // A new home materializes browser tools on; these tests turn them on.
+  const BROWSER_TOOLS_OFF: PersistedConfig = {
+    version: 1,
+    daemon: { browserTools: { enabled: false } },
+  };
+
   function createReloadableStore(
     options: {
       overrideControlledPaths?: string[];
@@ -960,7 +967,9 @@ describe("DaemonConfigStore reload", () => {
   }
 
   test("applies mutable edits and reports startup-only edits", () => {
-    const { clisbotHome, store, persisted } = createReloadableStore();
+    const { clisbotHome, store, persisted } = createReloadableStore({
+      initialPersisted: BROWSER_TOOLS_OFF,
+    });
     writeConfig(clisbotHome, {
       ...persisted,
       daemon: {
@@ -1100,7 +1109,9 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("invalid JSON and invalid schema apply nothing", () => {
-    const { clisbotHome, store } = createReloadableStore();
+    const { clisbotHome, store } = createReloadableStore({
+      initialPersisted: BROWSER_TOOLS_OFF,
+    });
     writeFileSync(path.join(clisbotHome, "config.json"), "{ nope\n");
     expect(() => store.reload()).toThrow("Invalid JSON");
     expect(store.get().browserTools.enabled).toBe(false);

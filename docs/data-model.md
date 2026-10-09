@@ -211,7 +211,8 @@ snapshot so a mixed edit can apply its live subset and still name the paths that
     listen: "127.0.0.1:6868",
     hostnames: true | string[],   // legacy alias `allowedHosts` is migrated on load
     trustedProxies: true | string[], // defaults to ["loopback"]; Express proxy names/CIDRs
-    mcp: { enabled: boolean, injectIntoAgents: boolean },
+    mcp: { enabled: boolean, injectIntoAgents: boolean }, // new homes materialize injectIntoAgents: true
+    browserTools: { enabled: boolean },  // new homes materialize enabled: true
     git: { maxProcessesPerSecond: number, maxProcessConcurrency: number },
     appendSystemPrompt: string,    // appended to supported provider system/developer prompts
     terminalProfiles: TerminalProfile[],  // named shell commands; omitted means DEFAULT_TERMINAL_PROFILES
@@ -325,7 +326,9 @@ Browser tools also require `daemon.browserTools.enabled` and a connected browser
 This policy controls the catalog presented to an agent. It is not an authorization boundary for
 agents that can access the host through a shell.
 
-`daemon.mcp.injectIntoAgents` is the Host default. When it is `false`, no provider receives
+`daemon.mcp.injectIntoAgents` is the Host default. A new home writes it and
+`daemon.browserTools.enabled` as `true` into its first `config.json`; a home whose file lacks them
+reads both as `false`, so an existing Host does not gain tools on upgrade. When it is `false`, no provider receives
 Clisbot tools unless the session's Project turns them on; otherwise the provider policy applies. A
 Project can turn them on or off and narrow them per tool
 ([Agent tools](features/connectors/README.md#agent-tools)). Provider and global policy are resolved when a
