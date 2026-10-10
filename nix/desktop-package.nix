@@ -82,6 +82,9 @@ buildNpmPackage {
   dontNpmBuild = true;
 
   env = {
+    # Match the macOS ARM desktop release build: Metro processes the generated
+    # outbound validator beyond Node's default 2 GiB heap.
+    NODE_OPTIONS = "--max-old-space-size=4096";
     EXPO_NO_TELEMETRY = "1";
     # Expo's web build pulls in some pre-bundled assets; ensure it doesn't try
     # to phone home during the build.
