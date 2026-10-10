@@ -160,6 +160,8 @@ The per-Agent record is process memory, reset when a turn ends. A Hub restart mi
 
 Replies leave through the outbound pacer (`plane/outbound-pacer.ts`) and the delivery ledger (`relay/index.ts`).
 
+A foreground turn id must remain unique when the same agent is restored after a daemon restart. Codex uses a UUID for each new turn; a process-local counter would reuse an earlier delivery key and silently suppress a new answer. Stream events for that turn retain the same id, so replay deduplication still works.
+
 - **Order is per destination thread.** Posts to one thread go one at a time, in order. Posts to different threads of one channel do not wait for each other.
 - **Rate is per scope.** `messagesSentPerMinute` still counts every thread of a conversation together in the Conversation scope, and the whole bot in the Bot scope. Ordering and counting are separate: a thread waits for its own previous post and for room in its scopes, never for another thread's post to finish.
 - **Every platform write has a timeout.** Each vertical's own write deadline is 30 s (Slack's write client carries it, 429 retries included; a 429 whose `Retry-After` would outlast it ends as `rate_limited`). The Hub gives up at 40 s, after the vertical, so a certain outcome reported at the vertical's deadline is not misread as a timeout. A write that times out fails like any other and releases its turn. Zalo Personal (zca-js) has no write timeout of its own and relies on the Hub's.

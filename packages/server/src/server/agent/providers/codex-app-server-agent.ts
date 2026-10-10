@@ -3464,7 +3464,6 @@ export class CodexAppServerAgentSession implements AgentSession {
   private client: CodexAppServerClient | null = null;
   private threadRollbackAvailable = true;
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
-  private nextTurnOrdinal = 0;
   private activeForegroundTurnId: string | null = null;
   private activeClientMessageId: string | null = null;
   private cachedRuntimeInfo: AgentRuntimeInfo | null = null;
@@ -5442,7 +5441,9 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private createTurnId(): string {
-    return `codex-turn-${this.nextTurnOrdinal++}`;
+    // A resumed provider session shares the agent's durable delivery ledger.
+    // Process-local ordinals would reuse a turn already delivered before restart.
+    return `codex-turn-${randomUUID()}`;
   }
 
   private handleNotification(method: string, params: unknown): void {
