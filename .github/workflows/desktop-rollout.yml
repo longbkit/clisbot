@@ -25,11 +25,11 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_TAG: ${{ inputs.tag }}
       ROLLOUT_HOURS: ${{ inputs.rollout_hours }}
-      RELEASE_SHA: 8207c65724e22051f6016f582c2741d95df86a2d
+      RELEASE_SHA: cb93946a0ff259fcfd3ebf492330848f0340c652
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 8207c65724e22051f6016f582c2741d95df86a2d
+          ref: cb93946a0ff259fcfd3ebf492330848f0340c652
           fetch-depth: 0
           sparse-checkout: scripts
       - uses: actions/setup-node@v4
@@ -44,7 +44,7 @@ jobs:
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import {execFileSync} from 'node:child_process';
-          for (const id of [38035035760, 38035035642]) {
+          for (const id of [38039128388, 38039130335]) {
             const run = JSON.parse(execFileSync('gh', ['api', `repos/longbkit/clisbot/actions/runs/${id}`]));
             assert.equal(run.head_sha, process.env.RELEASE_SHA);
             assert.equal(run.conclusion, 'success');
@@ -55,7 +55,7 @@ jobs:
           JS
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38035035642
+          run-id: 38039130335
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: desktop-*
           path: prebuilt
