@@ -58,6 +58,12 @@ status. Do not redirect to another online host just because the remembered host
 is still connecting or offline; the workspace screen owns that offline/loading
 state.
 
+After a workspace has rendered, a Host reconnect keeps its panes mounted and visible,
+preserving cached history and unsaved editor content. The panes own their connection and
+sync status as described in `timeline-sync.md`. Missing, archived, or unreachable workspaces
+dispose those panes; a workspace that has never become ready does not mount them while
+waiting for its Host.
+
 This split is deliberate. The host layout must mount first so native local
 dynamic params exist before any nested workspace leaf is selected.
 

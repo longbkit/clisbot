@@ -22,7 +22,7 @@ Use it to:
 ## Start a daemon
 
 ```bash
-npx @clisbot/cli
+npx clisbot
 ```
 
 It listens on `ws://127.0.0.1:6868/ws`.

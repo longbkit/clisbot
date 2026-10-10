@@ -21,6 +21,13 @@ vi.mock("@/contexts/toast-context", () => ({
   }),
 }));
 
+vi.mock("expo-crypto", () => ({ randomUUID: () => crypto.randomUUID() }));
+// These message/avatar fixtures never open an authentication browser.
+vi.mock("expo-web-browser", () => ({
+  maybeCompleteAuthSession: () => undefined,
+  openAuthSessionAsync: async () => ({ type: "cancel" }),
+}));
+
 const boundary = vi.hoisted(() => ({ hub: null as unknown }));
 vi.mock("@/clisbot/hub/account-provider", () => ({
   useHubAccount: () => boundary.hub,

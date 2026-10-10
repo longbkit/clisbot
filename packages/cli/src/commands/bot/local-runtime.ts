@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
-import { homeRequiresTickets, loadConfig } from "@clisbot/server";
+import { loadConfig } from "@clisbot/server/configuration";
+import { homeRequiresTickets } from "@clisbot/server/hub-membership";
 import { readDaemonInstance, daemonLogPath } from "@clisbot/server/daemon-control";
 import { resolveTcpHostFromListen } from "../daemon/local-daemon.js";
 import { resolveLocalHubState } from "../hub/local-hub.js";

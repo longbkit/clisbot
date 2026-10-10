@@ -153,7 +153,7 @@ function requiredEnvironment(name) {
 
 const output = Writable.toWeb(process.stdout);
 const input = Readable.toWeb(process.stdin);
-new sdk.AgentSideConnection(
+const _connection = new sdk.AgentSideConnection(
   (connection) => new PhaseFiveAgent(connection),
   sdk.ndJsonStream(output, input),
 );

@@ -14,7 +14,7 @@ and rebuilds the projection when an agent resumes.
 
 The invariants are:
 
-> A continuously subscribed client applies every committed row in order. Opening or resuming an
+> A visible, continuously subscribed chat applies every committed row in order. Opening or resuming an
 > agent establishes the daemon's current tail in one bounded request, with older history reachable
 > through backward pagination.
 
@@ -79,7 +79,10 @@ cannot be reconstructed from sequence metadata. Forking the current context rema
 ## Resume behavior
 
 Opening, reconnecting, and returning from app background establish the current timeline through
-bounded catch-up. Switching between continuously subscribed open chats needs no fetch.
+bounded catch-up. Switching between continuously subscribed open chats needs no fetch when no
+payloads were skipped while hidden. The owner does not retain hidden live payloads or advance their
+cursor; revealing such a chat performs the ordinary bounded resume, followed by one latest tail
+if more newer history remains.
 Focus alone does not mutate timeline state; the response is compared with the local
 authoritative range first.
 
@@ -152,7 +155,8 @@ catch-up. The owner requests `after endSeq`, and requests `before startSeq` when
 history. Code outside the owner does not distinguish cached and network timelines.
 
 The first resume request is bounded. If it reports more newer history, fetch one latest bounded tail
-instead of replaying every missed page. Live gap recovery still pages forward until current.
+instead of replaying every missed page. Replacing that tail also replaces its retained-page metadata;
+discarded rows must not remain certified as loaded. Live gap recovery still pages forward until current.
 
 If the canonical window exceeds the cache item limit, contains a discontiguous retained range, has a
 live head, or includes presentation data the cache cannot encode losslessly, persistence drops the
@@ -161,7 +165,8 @@ falsely certifies discarded source rows. A display-only row paints without grant
 authority, so the owner uses the ordinary bounded `tail` bootstrap.
 
 Live rows received between cache paint and catch-up stay in the separate live head and reconcile with
-the authoritative range through the existing forward-page path. The cache does not persist sync
+the authoritative range through the existing forward-page path. The memory budget pins these live
+rows until a page includes them, without advancing authoritative coverage. The cache does not persist sync
 generation or unreconciled local submissions.
 
 Every daemon-derived live item carries its timeline epoch and sequence position. Bootstrap
@@ -185,9 +190,10 @@ The app chooses one delivery policy from `server_info.features.selectiveAgentTim
   every one of those workspaces as just used (see
   [agent lifecycle](agent-lifecycle.md#workspace-activity)). Visible chats get the first catch-up
   attempt; the rest follow when those attempts settle, including failures, so a failed visible chat
-  does not starve background recovery. Split panes catch up together. Hidden chats update the
-  replica; on web their retained presentation stays suspended until revealed, on native it keeps
-  rendering. Revealing a chat reads the current store and preserves its local UI state.
+  does not starve background recovery. Split panes catch up together. Hidden chats retain their
+  last display window; skipped live payloads remain in durable history and trigger bounded catch-up
+  when revealed. On web their retained presentation stays suspended until revealed, on native it
+  keeps rendering. Revealing a chat preserves its local UI state while history catches up.
 - Legacy daemons keep globally streaming agent timelines. Visibility still triggers the existing
   authoritative catch-up, but the app does not issue selective-subscription RPCs.
 
@@ -201,7 +207,8 @@ rows already received live—for example, a tool call retained at its original d
 its completion advances `seqEnd`, followed by a merged assistant message. The app uses
 `sourceSeqRanges` to replace overlapping assistant and reasoning projections before applying the
 remaining page through the existing stream reducer. It must not append full projected text to a
-live prefix.
+live prefix. Explicitly different provider message IDs stay separate, even when their text is
+identical or one is a prefix of the other; text matching must never override known identity.
 
 Every path that sends a message to an agent — composer send, dictation accept-and-send, queued
 send-now, and the host runtime's automatic queue drain — goes through
@@ -220,6 +227,8 @@ prevents a later transport error from rolling back a prompt already observed.
 The daemon's accepted response waits for the correlated run start and guarantees that the canonical
 submitted row has been recorded. It publishes the accepted turn's liveness before that row, so the
 client applies authoritative activity before canonical acknowledgement retires optimistic activity.
+Provider output remains staged through the durable prompt lookup and write, so no response chunk can
+precede or straddle its canonical user row.
 Timeline render batching does not delay lifecycle application. Directory status never settles a
 submission. Overlapping sends settle independently rather than collapsing to one newest pending
 message.

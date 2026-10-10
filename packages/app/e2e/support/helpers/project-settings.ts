@@ -1,3 +1,4 @@
+import { answerAppConfirmation } from "./confirmation";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -238,8 +239,9 @@ export async function removeProjectScript(page: Page, scriptName: string): Promi
   // from the row's testID to avoid scoped locator unreliability.
   const id = (await row.getAttribute("data-testid"))!.replace("script-row-", "");
   await page.getByTestId(`script-row-menu-${id}`).click();
-  page.once("dialog", (dialog) => void dialog.accept());
+  const confirmation = answerAppConfirmation(page, "accept");
   await page.getByRole("menuitem", { name: "Remove" }).click();
+  await confirmation;
 }
 
 // --- File manipulation ---

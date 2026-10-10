@@ -46,7 +46,7 @@ it("checks current-folder authority and filters children before limiting", async
     ...input,
     browsePath: path.join(root, "workspace"),
     limit: 1,
-    filter: async (entries) => entries.filter((entry) => !entry.path.endsWith("/code")),
+    filter: async (entries) => entries.filter((entry) => path.basename(entry.path) !== "code"),
     canSelect: async () => false,
   });
   expect(result.entries.map((entry) => path.basename(entry.path))).toEqual(["research"]);

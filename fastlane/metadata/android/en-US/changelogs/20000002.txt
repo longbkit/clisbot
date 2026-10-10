@@ -1,0 +1,5 @@
+Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/desktop app and Hub architecture. Its Paseo baseline is v0.11.1 at ab10a6694ccf068959d1a6b67b6c915e21a9fe91; Clisbot now maintains an independent version series.
+
+Before upgrading: use Node.js 22.19 or newer. After publication, run npm install -g clisbot@2.0.0, then npx --yes clisbot@2.0.0 onboard. See the upgrade guide for a separate home, local access and rollback.
+
+Full notes: https://clisbot.com/changelog

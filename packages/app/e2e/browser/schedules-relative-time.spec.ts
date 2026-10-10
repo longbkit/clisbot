@@ -72,6 +72,8 @@ async function deleteSeededSchedule(workspace: SeededWorkspace, id: string): Pro
 async function openSchedulesAt(page: Page, time: number): Promise<void> {
   await page.clock.install({ time });
   await page.goto(buildSchedulesRoute());
+  // /schedules opens the Automations home; the list is its Schedules tab.
+  await page.getByRole("tab", { name: "Schedules" }).click();
 }
 
 async function letTimePass(page: Page, duration: string): Promise<void> {

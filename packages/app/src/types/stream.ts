@@ -552,6 +552,17 @@ function reconcileReplacementHeadAgainstTail(
   };
 }
 
+function hasDifferentAssistantMessageIds(
+  left: AssistantMessageItem,
+  right: AssistantMessageItem,
+): boolean {
+  return (
+    left.messageId !== undefined &&
+    right.messageId !== undefined &&
+    left.messageId !== right.messageId
+  );
+}
+
 function preserveReplacementHead(
   tail: StreamItem[],
   currentHead: StreamItem[],
@@ -589,7 +600,8 @@ function preserveReplacementHead(
   if (
     liveAssistant.kind !== "assistant_message" ||
     !tailAssistant ||
-    tailAssistant.kind !== "assistant_message"
+    tailAssistant.kind !== "assistant_message" ||
+    hasDifferentAssistantMessageIds(liveAssistant, tailAssistant)
   ) {
     return { tail: reconciledTail, head: unreconciledHead, acknowledgedClientMessageIds: [] };
   }

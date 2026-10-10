@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { WebSocket } from "ws";
 import { readDaemonInstance } from "@clisbot/server/daemon-control";
 import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { selectLocalPort } from "../../dist/commands/hub/local-port.js";
 import { HubDeviceTransport } from "@clisbot/client/internal/hub-device-transport";
 import {
   createDeviceKey,
@@ -93,6 +94,9 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
     ]),
   );
   assert(parseDevicePairingOfferFromUrl(onboarded.url)?.pairing);
+  // Managed daemon launches discard deployment environment overrides. Persist the
+  // web UI choice so Start Hub's CLI child uses the same gateway as onboarding.
+  await cli(["daemon", "config", "set", "features.webUi.enabled", "true", "--home", taskHome]);
   assert.equal(parseDevicePairingOfferFromUrl(onboarded.url).hub, undefined);
   await assert.rejects(readFile(resolvePath(taskHome, "hub-local.json")));
   const daemonOnlyInstance = await readDaemonInstance(taskHome);
@@ -146,6 +150,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
     origin: startedHub.origin,
     hub: initialHubState.url,
   };
+  assert.equal(result.origin, onboarded.gateway);
   assert.equal((await readDaemonInstance(taskHome)).pid, daemonOnlyInstance.pid);
   assert.equal(
     JSON.parse(await readFile(resolvePath(taskHome, "gateway-local.json"), "utf8")).pid,
@@ -264,6 +269,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   );
   const hubState = JSON.parse(await readFile(`${taskHome}/hub-local.json`));
   const gatewayState = JSON.parse(await readFile(`${taskHome}/gateway-local.json`));
+  assert.equal(gatewayState.config.hubOrigin, result.hub);
   const worker = async (pid) => {
     assert(Number.isSafeInteger(pid) && pid > 0);
     const { stdout } =
@@ -932,7 +938,8 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
       console.error("Cleanup:", error.message),
     );
   console.log("Owned services stopped.");
-  if (completed) await rm(taskHome, { recursive: true, force: true });
+  if (completed)
+    await rm(taskHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
 
 async function verifyRequiredLoginBootstrap() {
@@ -941,6 +948,16 @@ async function verifyRequiredLoginBootstrap() {
   let cookiesReceived = "";
   let verified = false;
   try {
+    // Managed service children read persisted config, not the fixture's voice env.
+    await writeFile(
+      resolvePath(requiredHome, "config.json"),
+      JSON.stringify({
+        version: 1,
+        daemon: { listen: `127.0.0.1:${await selectLocalPort(0, true)}` },
+        features: { dictation: { enabled: false }, voiceMode: { enabled: false } },
+      }),
+      { mode: 0o600 },
+    );
     const served = JSON.parse(
       await cli(
         ["hub", "start", "--personal", "--transport", "local", "--home", requiredHome, "--json"],
@@ -1048,6 +1065,7 @@ async function verifyRequiredLoginBootstrap() {
       await cli([...args, "--home", requiredHome]).catch((error) =>
         console.error("Login fixture cleanup:", error.message),
       );
-    if (verified) await rm(requiredHome, { recursive: true, force: true });
+    if (verified)
+      await rm(requiredHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }

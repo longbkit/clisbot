@@ -124,14 +124,14 @@ function SeatOverLimitBanner({ seats }: { seats: UsageMeasure }) {
   return (
     <Alert aria-label="Over limit" className="border-warning/40 bg-warning-surface">
       <TriangleAlert className="text-warning" />
-      <AlertTitle>You're over your seat limit</AlertTitle>
+      <AlertTitle>You&apos;re over your seat limit</AlertTitle>
       <AlertDescription>
         <p>
           You have {seats.used} seats in use, but your limit is {seats.limit}.
         </p>
         <p>
-          Your existing seats are kept — nothing was removed. You can't add more until you're within
-          the limit.
+          Your existing seats are kept — nothing was removed. You can&apos;t add more until
+          you&apos;re within the limit.
         </p>
       </AlertDescription>
     </Alert>

@@ -66,7 +66,7 @@ export function normalizeAgentPlanSteps(value: unknown): AgentPlanStep[] | undef
   });
 }
 
-const EMOJI_PREFIX_RE = /^\p{Extended_Pictographic}/u;
+const _EMOJI_PREFIX_RE = /^\p{Extended_Pictographic}/u;
 
 export type ChannelProgressDraftLineInput =
   | {

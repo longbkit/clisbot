@@ -924,8 +924,8 @@ const SERVER_INSTALL_TRIGGER = (
 
 const SERVER_INSTALL_FOOTNOTE = (
   <>
-    Requires Node.js 18+. Run <span className="font-mono text-white/40">clisbot</span> to start the
-    daemon.
+    Requires Node.js 22.19+. Run <span className="font-mono text-white/40">clisbot</span> to start
+    the daemon.
   </>
 );
 
@@ -935,7 +935,7 @@ function ServerInstallButton() {
       trigger={SERVER_INSTALL_TRIGGER}
       title="Run agents on a remote machine"
       description="For headless machines you want to connect to from the Clisbot apps. The desktop app already includes a built-in daemon"
-      command="npm install -g @clisbot/cli && clisbot"
+      command="npm install -g clisbot && clisbot"
       footnote={SERVER_INSTALL_FOOTNOTE}
     />
   );

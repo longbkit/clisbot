@@ -1,6 +1,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { test, expect, type Page } from "../support/fixtures";
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { gotoAppShell } from "../support/helpers/app";
 import {
   addProjectFlowInput,
@@ -42,13 +43,10 @@ async function removeProjectFromSidebar(page: Page, projectViewKey: string): Pro
   await expect(kebab).toBeVisible({ timeout: 10_000 });
   await kebab.click();
 
-  // Removing a project raises a browser confirm; accept it so the
-  // user-confirmed removal proceeds deterministically.
-  page.once("dialog", (dialog) => void dialog.accept());
-
   const removeItem = page.getByTestId(`sidebar-project-menu-remove-${projectViewKey}`);
   await expect(removeItem).toBeVisible({ timeout: 10_000 });
   await removeItem.click();
+  await answerAppConfirmation(page, "accept");
 }
 
 async function addProjectFromPicker(page: Page, projectPath: string): Promise<string> {
@@ -58,6 +56,7 @@ async function addProjectFromPicker(page: Page, projectPath: string): Promise<st
   const input = addProjectFlowInput(page);
   await input.fill(projectPath);
   await page.keyboard.press("Enter");
+  await page.getByTestId("host-directory-browser-select").click();
 
   const projectRow = page
     .locator('[data-testid^="sidebar-project-row-"]')
@@ -93,6 +92,7 @@ test.describe("Project picker search", () => {
     const suggestion = page.getByText(projectPickerFixture.projectName, { exact: false }).first();
     await expect(suggestion).toBeVisible({ timeout: 30_000 });
     await suggestion.click();
+    await page.getByTestId("host-directory-browser-select").click();
 
     const projectId = await expectOpenedProject(page, projectPickerFixture.projectName);
     projectPickerFixture.rememberProjectId(projectId);
@@ -126,17 +126,21 @@ test.describe("Project with no workspaces persists", () => {
       await gotoAppShell(page);
       await waitForSidebarProjectListReady(page);
 
-      projectId = await addProjectFromPicker(page, repo.path);
-      const projectRow = page.getByTestId(`sidebar-project-row-${projectId}`);
+      const projectViewKey = await addProjectFromPicker(page, repo.path);
+      projectId = new URL(page.url()).searchParams.get("projectId");
+      expect(projectId).not.toBeNull();
+      const projectRow = page.getByTestId(`sidebar-project-row-${projectViewKey}`);
       await expect(projectRow).toBeVisible({ timeout: 30_000 });
       await expect(projectRow).toContainText(path.basename(repo.path));
-      await expect(page.getByTestId(`sidebar-workspace-list-${projectId}`)).toHaveCount(0);
+      await expect(page.getByTestId(`sidebar-workspace-list-${projectViewKey}`)).toHaveCount(0);
 
-      const newWorkspaceRow = page.getByTestId(`sidebar-project-new-workspace-row-${projectId}`);
+      const newWorkspaceRow = page.getByTestId(
+        `sidebar-project-new-workspace-row-${projectViewKey}`,
+      );
       await expect(newWorkspaceRow).toBeVisible({ timeout: 30_000 });
       await expect(newWorkspaceRow).toContainText("New workspace");
 
-      const workspaces = await client.fetchWorkspaces({ filter: { projectId } });
+      const workspaces = await client.fetchWorkspaces({ filter: { projectId: projectId! } });
       expect(workspaces.entries).toEqual([]);
     } finally {
       if (projectId) {

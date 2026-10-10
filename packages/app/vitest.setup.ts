@@ -80,6 +80,34 @@ vi.mock("@xterm/addon-ligatures", () => ({
 // every vitest project through the resolve.alias in vitest.config.ts, same as
 // react-native-unistyles and lucide-react-native.
 
+// Node unit tests have no native bridge or browser localStorage. Keep storage
+// asynchronous and persistent within each test file, as the native API is.
+vi.mock("@react-native-async-storage/async-storage", () => {
+  const values = new Map<string, string>();
+  return {
+    default: {
+      getItem: vi.fn(async (key: string) => values.get(key) ?? null),
+      setItem: vi.fn(async (key: string, value: string) => {
+        values.set(key, value);
+      }),
+      removeItem: vi.fn(async (key: string) => {
+        values.delete(key);
+      }),
+      clear: vi.fn(async () => {
+        values.clear();
+      }),
+      getAllKeys: vi.fn(async () => [...values.keys()]),
+      multiGet: vi.fn(async (keys: string[]) => keys.map((key) => [key, values.get(key) ?? null])),
+      multiSet: vi.fn(async (entries: [string, string][]) => {
+        for (const [key, value] of entries) values.set(key, value);
+      }),
+      multiRemove: vi.fn(async (keys: string[]) => {
+        for (const key of keys) values.delete(key);
+      }),
+    },
+  };
+});
+
 const RouterPassthrough = ({ children }: { children?: React.ReactNode }) => children;
 
 vi.mock("expo-router", () => ({

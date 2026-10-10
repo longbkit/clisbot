@@ -37,9 +37,15 @@ function run(command, args, options) {
 
 async function exportBrowserWebApp() {
   console.log("Exporting browser web app...");
-  await run("npm", ["run", "build:web", "--workspace=@clisbot/app"], {
-    cwd: REPO_ROOT,
-  });
+  const npmCli = process.env.npm_execpath;
+  await run(
+    npmCli ? process.execPath : "npm",
+    [...(npmCli ? [npmCli] : []), "run", "build:web", "--workspace=@clisbot/app"],
+    {
+      cwd: REPO_ROOT,
+      shell: !npmCli && process.platform === "win32",
+    },
+  );
 }
 
 async function cleanTarget() {

@@ -429,7 +429,7 @@ export type Value = string;`,
   });
 
   it.each([
-    "@clisbot/plugin",
+    "@paseo/plugin",
     "@clisbot/plugin/react-native",
     "@clisbot/plugin/ui",
     "@clisbot/plugin/provider",

@@ -3918,6 +3918,7 @@ describe("OpenCode adapter startTurn error handling", () => {
       openCode.asSdkClient(),
       "ses_readiness_exit",
       createTestLogger(),
+      {},
       new Map(),
       {
         ready: () => Promise.reject(new Error("OpenCode server exited")),

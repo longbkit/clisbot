@@ -71,7 +71,7 @@ export function SessionLineTrailing({
           <View style={styles.fade} pointerEvents="none">
             <TrailingActionScrim backdrop={backdrop} />
           </View>
-          <View style={[styles.actions, BACKDROP_STYLES[backdrop]]}>{actions}</View>
+          <View style={[styles.actions, styles[backdrop]]}>{actions}</View>
         </View>
       ) : null}
     </View>
@@ -141,10 +141,3 @@ const styles = StyleSheet.create((theme) => ({
   surfaceSidebarSelected: { backgroundColor: theme.colors.surfaceSidebarSelected },
   surface2: { backgroundColor: theme.colors.surface2 },
 }));
-
-const BACKDROP_STYLES: Record<SidebarSurfaceBackdrop, object> = {
-  surfaceSidebar: styles.surfaceSidebar,
-  surfaceSidebarHover: styles.surfaceSidebarHover,
-  surfaceSidebarSelected: styles.surfaceSidebarSelected,
-  surface2: styles.surface2,
-};

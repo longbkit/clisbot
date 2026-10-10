@@ -171,7 +171,10 @@ async function addProjectFromSidebar(page: Page, projectPath: string): Promise<s
 
   const input = addProjectFlowInput(page);
   await input.fill(projectPath);
+  // Enter opens the folder in the folder browser; adding is its own action (fdd8c74e3).
   await page.keyboard.press("Enter");
+  await expect(page.getByTestId("host-directory-browser-input")).toHaveValue(`${projectPath}/`);
+  await page.getByTestId("host-directory-browser-select").click();
 
   const projectRow = page
     .locator('[data-testid^="sidebar-project-row-"]')

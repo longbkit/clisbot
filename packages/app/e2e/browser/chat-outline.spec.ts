@@ -48,19 +48,24 @@ test.describe("desktop chat outline", () => {
   test("keeps the prompt marked while reading split Markdown blocks and after completion", async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const prompt = "Explain in several paragraphs.";
     await withStreamingMarkdownOutline(async (agent) => {
       await agent.client.sendAgentMessage(agent.agentId, "Earlier prompt.");
-      await agent.client.waitForFinish(agent.agentId, 30_000);
+      await agent.client.waitForFinish(agent.agentId, 60_000);
       await page.setViewportSize(WIDE_VIEWPORT);
       await openAgentTimeline(page, agent);
+      // This case observes a live turn on a loaded transcript. Route settlement can
+      // precede the lazy timeline chunk and bootstrap history on a cold CI worker.
+      await expect(page.getByText("Paragraph 60.", { exact: true })).toBeVisible({
+        timeout: 30_000,
+      });
       await agent.client.sendAgentMessage(agent.agentId, prompt);
       await expectChatOutlinePrompts(page, 2);
 
       await expectReadingStreamedMarkdown(page, prompt);
       await expectActiveChatOutlinePrompt(page, 2);
-      await agent.client.waitForFinish(agent.agentId, 30_000);
+      await agent.client.waitForFinish(agent.agentId, 60_000);
       await expectActiveChatOutlinePrompt(page, 2);
 
       await page.reload({ waitUntil: "domcontentloaded" });

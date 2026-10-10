@@ -11,10 +11,14 @@ const nativeAnalytics =
   configured("GOOGLE_SERVICE_INFO_PLIST_PROD", ".secrets/GoogleService-Info.prod.plist");
 
 module.exports = {
-  dependencies: Object.fromEntries(
-    ["@react-native-firebase/app", "@react-native-firebase/analytics"].map((name) => [
-      name,
-      { platforms: nativeAnalytics ? {} : { android: null, ios: null } },
-    ]),
-  ),
+  // Expo replaces a library's platforms object with the project's override.
+  // Enabled Firebase must retain its shipped CMake paths and iOS script phases.
+  dependencies: nativeAnalytics
+    ? {}
+    : Object.fromEntries(
+        ["@react-native-firebase/app", "@react-native-firebase/analytics"].map((name) => [
+          name,
+          { platforms: { android: null, ios: null } },
+        ]),
+      ),
 };

@@ -1,20 +1,30 @@
 {
   "name": "@clisbot/channels-googlechat",
-  "version": "0.7.3-beta.1",
-  "private": true,
+  "version": "2.0.0",
   "description": "In-repo Google Chat channel vertical (goal ledger slice 14). Ported from extensions/googlechat/src@5d8067a4483: the Chat API REST client, the service-account auth + token cache, the markdown→Google Chat renderer, target/space resolution and the webhook request handler. Third-party SDKs are upstream's: google-auth-library.",
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "SYNC.md",
+    "upstream-sync.json"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsgo -p tsconfig.json",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-markdown-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-markdown-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "google-auth-library": "11.0.2",
     "undici": "8.10.2"
   },

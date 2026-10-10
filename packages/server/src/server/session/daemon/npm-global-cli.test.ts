@@ -33,7 +33,7 @@ describe("DefaultNpmGlobalClisbotCli", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "clisbot-npm-global-"));
     tempDirs.push(dir);
     const root = path.join(dir, "prefix", "lib");
-    const packagePath = path.join(root, "node_modules", "@clisbot", "cli");
+    const packagePath = path.join(root, "node_modules", "clisbot");
     const checkoutCli = path.join(dir, "checkout", "packages", "cli");
     if (options.linked) {
       mkdirSync(checkoutCli, { recursive: true });
@@ -46,11 +46,11 @@ describe("DefaultNpmGlobalClisbotCli", () => {
       name: "lib",
       path: root,
       dependencies: {
-        "@clisbot/cli": {
+        clisbot: {
           version: "0.1.15",
           resolved: options.linked
             ? `file:${path.relative(root, checkoutCli)}`
-            : "https://registry.npmjs.org/@clisbot/cli/-/cli-0.1.15.tgz",
+            : "https://registry.npmjs.org/clisbot/-/clisbot-0.1.15.tgz",
           path: packagePath,
         },
       },
@@ -91,7 +91,7 @@ describe("DefaultNpmGlobalClisbotCli", () => {
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["-g", "ls", "@clisbot/cli", "--json", "--depth=0", "--long"],
+        args: ["-g", "ls", "clisbot", "--json", "--depth=0", "--long"],
         timeout: 10_000,
         maxBuffer: 10 * 1024 * 1024,
       },
@@ -118,7 +118,7 @@ describe("DefaultNpmGlobalClisbotCli", () => {
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["install", "-g", "@clisbot/cli@latest"],
+        args: ["install", "-g", "clisbot@latest"],
         timeout: 300_000,
         maxBuffer: 10 * 1024 * 1024,
       },
@@ -143,7 +143,7 @@ describe("DefaultNpmGlobalClisbotCli", () => {
     }));
 
     await expect(cli.inspect()).rejects.toThrow(
-      "@clisbot/cli is not installed with npm -g on this host",
+      "clisbot is not installed with npm -g on this host",
     );
   });
 });

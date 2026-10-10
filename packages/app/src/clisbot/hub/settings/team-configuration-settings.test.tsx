@@ -79,6 +79,15 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
+// These native device-access surfaces have their own tests; this fixture
+// exercises organization/team settings and the chat-account linking flow.
+vi.mock("@/device-access/hub-settings", () => ({
+  HubConnectionSettings: () => null,
+  HubOverviewSettings: () => null,
+  HubLoginPolicySettings: () => null,
+}));
+vi.mock("@/device-access/account-sessions", () => ({ AccountSessions: () => null }));
+vi.mock("./instance-settings", () => ({ InstanceSettings: () => null }));
 vi.mock("./channel-settings", () => ({ ChannelSettings: () => null }));
 vi.mock("./channel-catalog-queries", () => ({
   useChannelCatalog: () => ({ entries: [], availability: "available", message: null }),

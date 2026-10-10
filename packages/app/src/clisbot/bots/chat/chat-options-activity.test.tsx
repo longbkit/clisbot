@@ -37,6 +37,8 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 vi.mock("@/components/ui/menu", () => ({ MenuTextField: () => null }));
 vi.mock("@/components/ui/icon-button-chrome", () => ({
   iconButtonChromeStyle: () => ({}),
+  iconButtonChromeGlyphSize: () => 20,
+  extraMutedIconColorMapping: {},
   mutedIconColorMapping: {},
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));

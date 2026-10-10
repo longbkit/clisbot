@@ -1,18 +1,18 @@
-# Thiết lập Hub, đăng nhập và đăng ký
+# Hub setup, sign-in and registration
 
-[User guide](../README.md) · [Hồ sơ](profile.md) · [Mật khẩu và recovery](password-and-recovery.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Profile](profile.md) · [Password and recovery](password-and-recovery.md) · [Q&A](../help/faq.md)
 
-Mở Hub trong Clisbot web app tại **Settings → Account**. App native và desktop mở cùng trang này trên trình duyệt để đăng nhập rồi quay lại app.
+Open the Hub in the Clisbot web app at **Settings → Account**. The native and desktop apps open this same page in a browser to sign in, then return to the app.
 
-Màn **Welcome** có hai nhóm nguồn Host: **Managed Hosts** (ô **Clisbot Hub**) và **Your own computer** (QR, pairing link, direct, Remote SSH trên desktop). Dùng được cả hai cùng lúc, nên nhóm dưới vẫn ở đó sau khi bạn đã đăng nhập Hub.
+The **Welcome** screen has two groups of Host sources: **Managed Hosts** (the **Clisbot Hub** tile) and **Your own computer** (QR, pairing link, direct, Remote SSH on desktop). You can use both at once, so the lower group stays after you sign in to the Hub.
 
-Đăng nhập ở Welcome xong, nếu tổ chức đã có Host bạn dùng được thì app vào thẳng workspace. Nếu chưa có Host, **Settings → Account** hiện **Add your first Host** ngay đầu trang: **Add via Hub** mở hướng dẫn `hub connect` và duyệt Host; **Connect directly** mở form địa chỉ/mật khẩu daemon, lưu Host trên thiết bị rồi mở Host đó. Member chưa được cấp Host thấy hướng dẫn xin quyền qua **View shared Hosts** và vẫn có lựa chọn direct. App chờ danh sách Host tải xong; lỗi tải có nút Retry. Host đã đăng ký, kể cả offline hoặc chưa có thông tin kết nối, không bị coi là chưa có Host. Các bước tài khoản còn thiếu (chọn tổ chức, đổi mật khẩu…) vẫn hoàn tất trước. Các lần vào Welcome sau đó ô **Clisbot Hub** hiện tài khoản đang đăng nhập và trạng thái Host: đang kết nối, tổ chức chưa chia sẻ Host nào, Host chưa công bố cách kết nối, hoặc lỗi lưu Host kèm nút **Retry**. Nút **Refresh Hosts** đọc lại danh sách Host từ Hub, giống nút cùng tên trong **Settings → Hosts**.
+After you sign in from Welcome, if the organization already has a Host you can use, the app goes straight to the workspace. With no Host yet, **Settings → Account** shows **Add your first Host** at the top: **Add via Hub** opens the `hub connect` instructions and Host approval; **Connect directly** opens the daemon address/password form, saves the Host on the device and opens it. A Member with no granted Host sees how to request access through **View shared Hosts** and still has the direct option. The app waits for the Host list to load; a load error shows a Retry button. A registered Host, even offline or without connection details, counts as a Host. Any missing account steps (choosing an organization, changing the password…) still come first. On later visits to Welcome, the **Clisbot Hub** tile shows the signed-in account and the Host status: connecting, the organization has shared no Host, the Host has not published how to connect, or a Host save error with a **Retry** button. **Refresh Hosts** reloads the Host list from the Hub, like the button of the same name in **Settings → Hosts**.
 
-Đóng Welcome bằng nút **✕** ở góc trên phải để về màn hình chính; từ đó tile **Add a Host** mở lại Welcome. Nút **⚙** cạnh nó mở Settings.
+Close Welcome with the **✕** button at the top right to go to the main screen; from there the **Add a Host** tile reopens Welcome. The **⚙** button next to it opens Settings.
 
-## Người vận hành: bật Google và chọn cách đăng ký
+## Operators: turn on Google and choose how people register
 
-Đặt các biến sau trong môi trường chạy Hub rồi restart Hub:
+Set these variables in the Hub's environment, then restart the Hub:
 
 ```dotenv
 CLISBOT_GOOGLE_AUTH_CLIENT_ID=...apps.googleusercontent.com
@@ -21,63 +21,63 @@ CLISBOT_REGISTRATION_MODE=invite_only
 CLISBOT_REGISTRATION_ALLOWED_DOMAINS=
 ```
 
-- **Google:** chỉ bật khi có đủ cả hai biến; thiếu một biến thì Hub không khởi động. Trong Google Cloud Console, thêm Authorized redirect URI đúng `<URL Hub>/api/auth/callback/google`, ví dụ `https://hub.example.com/api/auth/callback/google`.
-- **`invite_only`** (Hub cá nhân): chỉ người có lời mời mới tạo được tài khoản.
-- **`domain_self_registration`** (Hub công ty): người có email thuộc domain trong `CLISBOT_REGISTRATION_ALLOWED_DOMAINS` (ví dụ `acme.com`) tự đăng ký được. Lời mời vẫn dùng được cho người ngoài domain.
-  - Domain khớp chính xác; subdomain phải khai riêng.
-  - Không dùng được domain email công cộng như `gmail.com`.
-- **Đăng ký bằng email** (chỉ ở `domain_self_registration`): cần cấu hình gửi mail Resend. Domain gửi phải được xác minh trong Resend. Thiếu cấu hình thì chỉ đăng ký được bằng Google hoặc lời mời.
+- **Google:** turns on only when both variables are set; with only one, the Hub does not start. In Google Cloud Console, add the Authorized redirect URI `<Hub URL>/api/auth/callback/google` exactly, for example `https://hub.example.com/api/auth/callback/google`.
+- **`invite_only`** (personal Hub): only invited people can create an account.
+- **`domain_self_registration`** (company Hub): people with an email on a domain in `CLISBOT_REGISTRATION_ALLOWED_DOMAINS` (for example `acme.com`) can register themselves. Invitations still work for people outside the domain.
+  - Domains match exactly; list subdomains separately.
+  - Public email domains such as `gmail.com` are not allowed.
+- **Email registration** (only in `domain_self_registration`): needs Resend mail sending configured. The sending domain must be verified in Resend. Without it, people can register only with Google or an invitation.
 
 ```dotenv
 CLISBOT_RESEND_API_KEY=re_...
 CLISBOT_RESEND_FROM="Clisbot <accounts@acme.com>"
 ```
 
-Muốn tắt: bỏ hai biến Google, hoặc chuyển về `invite_only`. Tài khoản tạo bằng Google không có mật khẩu, nên sẽ không đăng nhập được cho tới khi bật lại Google.
+To turn it off: remove the two Google variables, or switch back to `invite_only`. Accounts created with Google have no password, so they cannot sign in until Google is turned on again.
 
-## Thiết lập Hub lần đầu
+## First-time Hub setup
 
-Hub mới chưa có tài khoản sẽ hiện **Set up Hub**. Người đầu tiên trở thành Owner và **operator** của Hub.
+A new Hub with no accounts shows **Set up Hub**. The first person becomes the Owner and the Hub **operator**.
 
-1. Chọn **Continue with Google** (khuyến nghị): Google đã xác minh email, tài khoản không cần mật khẩu.
-   - Ở `domain_self_registration`, nếu email thuộc domain được phép, tổ chức đầu tiên mang tên domain. Đồng nghiệp đăng ký sau sẽ vào đúng tổ chức này.
-2. Không dùng Google: chọn **Set up with email and password instead**, nhập email và mật khẩu từ 12 ký tự.
-   - Email này không được xác minh.
-   - Hub **không tự liên kết Google** vào tài khoản operator này; operator tiếp tục đăng nhập bằng mật khẩu. Lý do: nếu gõ nhầm email thành email của người khác, chủ email đó không thể dùng Google để vào tài khoản operator.
-3. Nếu có người thiết lập trước, app báo **This Hub was already set up by someone else**. Đăng nhập bằng tài khoản được mời hoặc tài khoản đã có.
+1. Choose **Continue with Google** (recommended): Google has verified the email and the account needs no password.
+   - In `domain_self_registration`, if the email is on an allowed domain, the first organization takes the domain's name. Colleagues who register later join this organization.
+2. Without Google: choose **Set up with email and password instead** and enter an email and a password of at least 12 characters.
+   - This email is not verified.
+   - The Hub **does not link Google to this operator account automatically**; the operator keeps signing in with the password. Reason: if you mistype the email as someone else's, that person cannot use Google to get into the operator account.
+3. If someone set it up first, the app shows **This Hub was already set up by someone else**. Sign in with an invited or existing account.
 
-## Đăng nhập
+## Sign in
 
-- **Continue with Google:** dùng được khi Hub đã bật Google.
-  - Lần đầu, nếu đã có tài khoản mật khẩu cùng email thì Google được liên kết vào tài khoản đó; quyền, tổ chức và dữ liệu giữ nguyên.
-  - Nếu tài khoản mật khẩu đó chưa từng xác minh email (ví dụ tạo từ lời mời), Hub đăng xuất các phiên cũ, thu hồi credential CLI và bỏ mật khẩu cũ. Từ đó chỉ đăng nhập bằng Google.
-- **Email và mật khẩu:** khi Hub bật Google, màn đăng nhập chỉ hiện **Continue with Google**; bấm **Use email and password instead** để mở form email, kể cả để tạo tài khoản hoặc nhận link đăng ký.
-- **Có nhiều tổ chức:** chọn tổ chức sau khi đăng nhập. CLI và Host dùng tổ chức đã chọn.
+- **Continue with Google:** available when the Hub has Google on.
+  - The first time, if a password account with the same email exists, Google is linked to it; permissions, organization and data are kept.
+  - If that password account never verified its email (for example, created from an invitation), the Hub signs out old sessions, revokes CLI credentials and drops the old password. From then on you sign in only with Google.
+- **Email and password:** when the Hub has Google on, the sign-in screen shows only **Continue with Google**; click **Use email and password instead** to open the email form, including to create an account or get a sign-up link.
+- **Several organizations:** choose the organization after signing in. The CLI and Hosts use the selected organization.
 
-## Đăng ký tài khoản mới
+## Register a new account
 
-| Trường hợp                       | Cách làm                                                                                                                                   |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Có lời mời                       | Mở liên kết mời, đăng nhập hoặc tạo tài khoản bằng đúng email được mời, rồi chấp nhận lời mời.                                             |
-| Email công ty, Hub bật Google    | **Continue with Google** bằng email công ty. Người đầu tiên của domain là Owner, người sau là Member.                                      |
-| Email công ty, không dùng Google | Chọn **Create an account**, nhập email, bấm **Email me a sign-up link**. Mở link trong mail, nhập tên và mật khẩu, bấm **Create account**. |
+| Case                             | How                                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| You have an invitation           | Open the invitation link, sign in or create an account with the invited email, then accept the invitation.                                                          |
+| Company email, Hub has Google on | **Continue with Google** with your company email. The first person on the domain is the Owner; later people are Members.                                            |
+| Company email, without Google    | Choose **Create an account**, enter your email, click **Email me a sign-up link**. Open the link in the email, enter a name and password, click **Create account**. |
 
-Về link đăng ký qua email:
+About email sign-up links:
 
-- Link sống 30 phút và chỉ dùng được một lần.
-- Tài khoản chỉ được tạo sau khi bạn đặt mật khẩu trên trang mở từ link. Người khác gõ email của bạn không tạo được tài khoản hay mật khẩu nào.
-- Mỗi email nhận tối đa 1 link mỗi phút và 5 link mỗi giờ.
-- App không cho biết email đã có tài khoản hay chưa. Nếu không nhận được mail, thử đăng nhập hoặc hỏi Owner.
+- A link lasts 30 minutes and works once.
+- The account is created only after you set a password on the page the link opens. Someone typing your email cannot create an account or password.
+- Each email gets at most 1 link per minute and 5 links per hour.
+- The app does not reveal whether an email already has an account. If no email arrives, try signing in or ask the Owner.
 
-## Lỗi thường gặp
+## Common errors
 
-| Thông báo                                                                        | Làm gì                                                                                                                 |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| This Google account isn't admitted to this Hub (`registration_closed`)           | Email không có lời mời và domain không được phép. Nhờ Owner mời, hoặc dùng email công ty đúng domain.                  |
-| Google hasn't verified this email address (`google_email_unverified`)            | Dùng tài khoản Google có email đã xác minh.                                                                            |
-| Linked to a different Hub account (`account_already_linked_to_different_user`)   | Tài khoản Google này đã gắn với một tài khoản Hub khác. Người vận hành xử lý thủ công; Hub không tự gộp hai tài khoản. |
-| Hub doesn't link Google to this account automatically (`unable_to_link_account`) | Tài khoản là operator tạo bằng mật khẩu. Đăng nhập bằng mật khẩu.                                                      |
-| This Hub was already set up by someone else (`instance_unavailable`)             | Hub đã có operator. Đăng nhập tài khoản của bạn hoặc xin lời mời.                                                      |
-| Sign-up link expired / already used                                              | Quay lại **Create an account** và gửi link mới. Link đã dùng rồi thì đăng nhập.                                        |
-| This Hub can't send email yet                                                    | Người vận hành chưa cấu hình Resend. Dùng Google hoặc lời mời.                                                         |
-| `redirect_uri_mismatch` trên trang Google                                        | Redirect URI trong Google Cloud chưa khớp `<URL Hub>/api/auth/callback/google`.                                        |
+| Message                                                                          | What to do                                                                                                                          |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| This Google account isn't admitted to this Hub (`registration_closed`)           | The email has no invitation and the domain is not allowed. Ask the Owner to invite you, or use a company email on the right domain. |
+| Google hasn't verified this email address (`google_email_unverified`)            | Use a Google account with a verified email.                                                                                         |
+| Linked to a different Hub account (`account_already_linked_to_different_user`)   | This Google account is already tied to another Hub account. The operator resolves it by hand; the Hub does not merge accounts.      |
+| Hub doesn't link Google to this account automatically (`unable_to_link_account`) | The account is an operator created with a password. Sign in with the password.                                                      |
+| This Hub was already set up by someone else (`instance_unavailable`)             | The Hub already has an operator. Sign in to your account or ask for an invitation.                                                  |
+| Sign-up link expired / already used                                              | Go back to **Create an account** and send a new link. If the link was used, sign in.                                                |
+| This Hub can't send email yet                                                    | The operator has not configured Resend. Use Google or an invitation.                                                                |
+| `redirect_uri_mismatch` on the Google page                                       | The redirect URI in Google Cloud does not match `<Hub URL>/api/auth/callback/google`.                                               |

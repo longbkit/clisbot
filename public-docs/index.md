@@ -8,13 +8,13 @@ category: Getting started
 
 # Getting started
 
-Clisbot runs your coding agents on your machine and gives you a mobile, desktop, web, and CLI client to drive them from anywhere. Three common ways to install.
+Clisbot runs your coding agents on your machine and gives you a mobile, desktop, web, and CLI client to drive them from anywhere. Install it with the desktop app, the CLI, or Docker.
 
 ## Desktop app (recommended)
 
 Download from [clisbot.com/download](https://clisbot.com/download) or the [GitHub releases page](https://github.com/longbkit/clisbot/releases). Open it and you're done.
 
-The desktop app bundles its own daemon and starts it automatically, no separate install required. On first launch you'll see a brief startup screen, then connect from your phone using **Settings → your host → Pair Device**.
+The desktop app bundles its own daemon and starts it automatically, no separate install required. On first launch you'll see a brief startup screen, then connect from your phone using **Settings → your host → Pair a device**.
 
 ### Linux
 
@@ -37,20 +37,44 @@ Alternatively, install `libfuse2t64` on Ubuntu 24.04 or newer (`sudo apt install
 
 Clisbot checks sandbox availability each time it launches. AppImage and extracted tar archives retain sandboxing when user namespaces work. On a restricted host without a usable installed helper, they launch with Chromium's sandbox disabled. Prefer the installed package if you require OS process isolation. **Settings → Diagnostics → App Diagnostics** reports the sandbox state and reason; the desktop log records the same decision. An explicit `--no-sandbox` argument overrides the automatic choice.
 
-## Server / CLI
+## CLI
 
-For headless machines, dev boxes, or any setup where you want the daemon running without the desktop UI:
+For headless machines, servers, or when you prefer the terminal. Requires Node.js 22.19 or newer.
 
 ```bash
-npm install -g @clisbot/cli
+npm install -g clisbot
 clisbot
 ```
 
-Clisbot starts the daemon locally, then asks whether to enable the end-to-end encrypted relay and print a pairing QR code. If you decline, enter the daemon address manually over TCP, Tailscale, or another VPN.
+`clisbot` asks whether to enable voice, then picks a connection:
 
-The daemon can also serve the browser web app itself, so you can use the full UI without the hosted app. See [Self-hosting the web UI](/docs/web-ui).
+- Signed in to Tailscale: it uses Tailscale. If Tailscale Serve cannot expose the daemon, it falls back to the encrypted relay.
+- No Tailscale: choose **Use encrypted relay** to connect from anywhere, or **Use this machine only**.
 
-Configuration and local state live under `CLISBOT_HOME` (defaults to `~/.clisbot`).
+It starts the daemon in the background and prints a QR code and a pairing link. Each link pairs one device and expires after 5 minutes.
+
+Run `clisbot` again whenever you need a new link or after a reboot. It reuses the running daemon, or starts it if it stopped. On a relay setup, run `clisbot --relay` so it does not ask for the connection again. For a first launch without prompts, use `clisbot --relay --voice disable`. Without an interactive terminal it skips prompts and keeps the saved voice setting (off on a fresh setup). Stop the daemon with `clisbot daemon stop`.
+
+The daemon can also serve the browser web app itself. See [Self-hosting the web UI](/docs/web-ui).
+
+Configuration and local state live under `CLISBOT_HOME` (defaults to `~/.clisbot`). Upgrading from Clisbot 0.1.x? See [Upgrade to v2](/docs/upgrade-v2).
+
+## Connect the web app or your phone
+
+- **Browser:** open the pairing link. It opens [app.clisbot.com](https://app.clisbot.com) and connects.
+- **Phone:** scan the QR code, or open the link in the phone's browser. The iOS and Android apps are not in the stores yet.
+- **From the desktop app:** **Settings → your host → Pair a device** shows a new QR code.
+
+## A daemon on another machine
+
+1. SSH into the machine, run `npm install -g clisbot`, then `clisbot`. Choose Tailscale or the relay.
+2. In the desktop app, choose **Add a Host → Paste pairing link** and paste the printed link. Or connect over [SSH](/docs/connectivity#ssh).
+3. For your phone, run `clisbot` on that machine again and scan the new QR code.
+
+## Join an existing Hub
+
+- **Member:** accept the email invitation, then sign in with the **Clisbot Hub** tile on the Welcome screen or **Settings → Account**. Hosts shared with you appear in **Settings → Hosts**.
+- **Add a machine to the Hub:** start the daemon on it, run `clisbot hub connect https://hub.example.com`, and open the printed URL. An Owner or Admin approves it. See [Hub daemons](/docs/hub/daemons).
 
 ## Docker
 

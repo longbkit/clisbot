@@ -99,7 +99,7 @@ export const feishuChannelActions: ChannelMessageActionAdapter = {
     if (enabledAccounts.length === 0) {
       return { actions: [], capabilities: enabled ? ["presentation"] : [] };
     }
-    const actions = new Set<ChannelMessageActionName>([...FEISHU_MESSAGE_ACTIONS]);
+    const actions = new Set<ChannelMessageActionName>(FEISHU_MESSAGE_ACTIONS);
     if (enabledAccounts.some((account) => isFeishuActionEnabled(account, "reactions"))) {
       actions.add("react");
       actions.add("reactions");

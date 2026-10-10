@@ -1,8 +1,9 @@
+import { answerAppConfirmation } from "./confirmation";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, type Dialog, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import type { DaemonClient as InternalDaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { AgentSkillSelection } from "@clisbot/protocol/messages";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
@@ -182,13 +183,8 @@ export async function toggleSkill(page: Page, name: string): Promise<void> {
 export function answerNextRemovalWarning(
   page: Page,
   answer: "accept" | "dismiss",
-): Promise<Dialog> {
-  return new Promise((resolve) => {
-    page.once("dialog", (dialog) => {
-      resolve(dialog);
-      void (answer === "accept" ? dialog.accept() : dialog.dismiss());
-    });
-  });
+): Promise<{ message(): string }> {
+  return answerAppConfirmation(page, answer);
 }
 
 export async function expectInstalledSkills(

@@ -218,6 +218,7 @@ try {
       ...config.daemon,
       listen,
       relay: { ...config.daemon?.relay, enabled: false },
+      browserTools: { enabled: false },
     };
     await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
     // A supervised daemon owns and heartbeats clisbot.pid. Launch the worker

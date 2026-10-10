@@ -30,7 +30,7 @@ import fs, {
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { spawnProcess } from "@clisbot/server";
+import { spawnProcess } from "@clisbot/server/process";
 
 const require = createRequire(import.meta.url);
 

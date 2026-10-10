@@ -235,7 +235,8 @@ export async function selectSidebarGrouping(
 }
 
 export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
-  await selectSidebarGrouping(page, "status");
+  // These contracts assert workspace rows; Status now lists individual sessions.
+  await selectSidebarGrouping(page, "statusWorkspace");
 }
 
 export async function openMobileAgentSidebar(page: Page): Promise<void> {

@@ -187,7 +187,8 @@ const MIN_TARGET_SIZE = 44;
 
 async function expectFingerSizedFooterTargets(page: Page): Promise<void> {
   const buttons = page.getByTestId("sidebar-footer-bottom-line").getByRole("button");
-  await expect(buttons).toHaveCount(5);
+  // Clisbot's default bar (footer-model.ts): New, Search, Usage, Hosts, Help and Settings.
+  await expect(buttons).toHaveCount(6);
   for (const button of await buttons.all()) {
     const bounds = await button.boundingBox();
     // Layout can report a 44pt box as 43.99999, so compare at a hundredth of a point.

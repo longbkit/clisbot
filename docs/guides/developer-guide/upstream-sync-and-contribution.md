@@ -285,6 +285,15 @@ work left.
 | Upstream Discord invite and old X/Reddit badges                                                                                                                                                     | Rewrite the Discord invite to `https://discord.gg/awGmcmFXC`; remove the previous maintainer's X badge and the unclaimed Reddit badge.                                                                                                                                                                                                                                                      | Review new upstream community links individually; this rule covers the known old invite and badges, not every possible new URL.                                                                                                                                                      |
 | Four README introductions, concept, author, license, and attribution sections                                                                                                                       | Replace the centered tagline and subtitle, opening description, and provider-choice bullet in each locale. Insert localized Concept, author story, and Attribution sections; place the author story after Concept. Replace the known README License summary with the Clisbot summary. Remove the inherited Related projects lists; preserve the Chinese relay TLS guide as its own section. | The deliberate `Paseo` names and `getpaseo/paseo` links in Concept and Attribution identify the source project. Update the copy in the script and templates together when messaging changes.                                                                                         |
 
+External authors' repository, media and npm artifact identities stay verbatim.
+Historical behavior tests install actual published `@getpaseo/server` versions,
+then normalize only those isolated upstream packages' product and wire names to
+Clisbot using `historical-upstream-fixture.ts`. They exercise old creation and
+pagination behavior, not interoperability with an unmodified Paseo daemon.
+Those versions were never published under `@clisbot/server`. The fixture adapter
+is protected from rebranding so its source tokens survive each sync; no production
+client or daemon gains aliases or translation.
+
 Repository URLs also match escaped slashes in regexes and `%2F` in encoded login
 return URLs. `docker/relay/` is protected because its pinned Elixir release keeps
 `PASEO_RELAY_*` names ([relay deployment](../../relay-deployment.md)).

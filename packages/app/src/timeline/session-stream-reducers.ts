@@ -827,6 +827,13 @@ function replaceLiveAssistantWithProjectedText(params: {
   if (!current || current.kind !== "assistant_message") {
     return null;
   }
+  if (
+    current.messageId !== undefined &&
+    event.item.messageId !== undefined &&
+    current.messageId !== event.item.messageId
+  ) {
+    return null;
+  }
   if (!event.item.text.startsWith(current.text)) {
     return null;
   }

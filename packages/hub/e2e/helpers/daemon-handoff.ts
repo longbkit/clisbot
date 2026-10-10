@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder } from "@axe-core/playwright";
 
 /**
  * The step between app setup and the dashboard: one command to run in a terminal, and a poll

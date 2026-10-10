@@ -1,23 +1,23 @@
-# Tên tổ chức
+# Organization name
 
-[User guide](../README.md) · [Thiết lập và đăng nhập](setup-and-sign-in.md) · [Hồ sơ](profile.md)
+[User guide](../README.md) · [Setup and sign-in](setup-and-sign-in.md) · [Profile](profile.md)
 
-Mọi thao tác trên Hub (Hosts, Channels, Automations, lời mời, quyền) đều thuộc **tổ chức đang chọn**. Tên tổ chức hiện ở ba chỗ:
+Everything you do on the Hub (Hosts, Channels, Automations, invitations, permissions) belongs to the **selected organization**. The organization name shows in three places:
 
-- **Đầu sidebar**, phía trên các mục điều hướng. Bấm vào để mở **Settings → Account**.
-- **Đầu màn Account**, kèm **Organization ID** (slug) và vai trò của bạn.
-- **Màn Approve CLI login**, kèm Organization ID, tài khoản duyệt và những gì CLI được làm trong tổ chức. Kiểm tra đúng tổ chức trước khi bấm **Approve for \<tên tổ chức\>**.
+- **Top of the sidebar**, above the navigation items. Click it to open **Settings → Account**.
+- **Top of the Account screen**, with the **Organization ID** (slug) and your role.
+- **The Approve CLI login screen**, with the Organization ID, the approving account and what the CLI may do in the organization. Check it is the right organization before you click **Approve for \<organization name\>**.
 
-## Đổi tên
+## Rename
 
-Chỉ **Owner** đổi được tên.
+Only the **Owner** can rename.
 
-1. Vào **Settings → Account**.
-2. Ở thẻ tổ chức đầu màn, bấm **Rename**.
-3. Nhập tên mới (1–100 ký tự), bấm **Save name**.
+1. Go to **Settings → Account**.
+2. On the organization card at the top of the screen, click **Rename**.
+3. Enter the new name (1–100 characters) and click **Save name**.
 
-Tên mới hiện cho mọi thành viên. Đổi tên không ảnh hưởng quyền, Host đã kết nối hay đăng nhập CLI: CLI và Host gắn với tổ chức theo mã định danh (slug) cố định, slug không đổi theo tên.
+The new name shows for every member. Renaming does not affect permissions, connected Hosts or CLI sign-ins: the CLI and Hosts attach to the organization by a fixed identifier (slug), and the slug does not follow the name.
 
-Admin và Member không thấy nút **Rename**. Nếu gọi API trực tiếp, Hub trả `organization_owner_required`.
+Admins and Members do not see the **Rename** button. If you call the API directly, the Hub returns `organization_owner_required`.
 
-Tổ chức tạo tự động theo domain (ví dụ `acme.com`) cũng đổi tên được. Người đăng ký sau bằng email domain đó vẫn vào đúng tổ chức này.
+Organizations created automatically from a domain (for example `acme.com`) can be renamed too. People who later register with an email on that domain still join this organization.

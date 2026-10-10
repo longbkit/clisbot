@@ -14,7 +14,9 @@ async function rebindCommandCenter(page: Page, combo: string): Promise<void> {
     [OVERRIDE_STORAGE_KEY, COMMAND_CENTER_BINDING, combo] as const,
   );
   await gotoAppShell(page);
-  await expect(page.getByTestId("sidebar-search")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("sidebar-footer-search").filter({ visible: true })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 async function expectCommandCenterOpen(page: Page): Promise<void> {

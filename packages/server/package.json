@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/server",
-  "version": "0.11.1",
+  "version": "2.0.0",
   "description": "Clisbot backend server",
   "files": [
     "dist/server",
@@ -64,12 +64,18 @@
       "default": "./dist/server/server/agent/agent-response-loop.js"
     },
     "./gateway-adapters": {
+      "source": "./src/server/gateway-adapters.ts",
       "types": "./dist/server/server/gateway-adapters.d.ts",
       "default": "./dist/server/server/gateway-adapters.js"
     },
     "./supervisor": {
       "types": "./dist/scripts/supervisor.d.ts",
       "default": "./dist/scripts/supervisor.js"
+    },
+    "./hub-membership": {
+      "types": "./dist/server/server/managed-access/hub-membership.d.ts",
+      "source": "./src/server/managed-access/hub-membership.ts",
+      "default": "./dist/server/server/managed-access/hub-membership.js"
     }
   },
   "publishConfig": {
@@ -115,12 +121,12 @@
     "@agentclientprotocol/sdk": "^0.17.1",
     "@anthropic-ai/claude-agent-sdk": "0.3.246",
     "@anthropic-ai/sdk": "^0.104.2",
-    "@clisbot/client": "0.11.1",
-    "@clisbot/device-access": "0.11.1",
-    "@clisbot/highlight": "0.11.1",
-    "@clisbot/plugin": "0.11.1",
-    "@clisbot/protocol": "0.11.1",
-    "@clisbot/relay": "0.11.1",
+    "@clisbot/client": "2.0.0",
+    "@clisbot/device-access": "2.0.0",
+    "@clisbot/highlight": "2.0.0",
+    "@clisbot/plugin": "2.0.0",
+    "@clisbot/protocol": "2.0.0",
+    "@clisbot/relay": "2.0.0",
     "@isaacs/ttlcache": "^2.1.4",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@opencode-ai/sdk": "1.14.46",

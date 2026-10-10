@@ -136,6 +136,10 @@ test("focused contracts stay inside existing required checks", () => {
   assert.match(desktop, /test:e2e:browser-tabs/);
   assert.match(desktop, /npm run test --workspace=@clisbot\/desktop/);
   assert.match(desktop, /npm run build:desktop-backends/);
+  assert.match(desktop, /npm run build:daemon-web-ui/);
+  assert.ok(
+    desktop.indexOf("npm run build:daemon-web-ui") < desktop.indexOf("test:e2e:packaged-serving"),
+  );
   assert.match(desktop, /test:e2e:personal-serving --workspace=@clisbot\/cli/);
   assert.match(desktop, /test:e2e:personal-serving --workspace=@clisbot\/desktop/);
   assert.ok(!jobs.has("desktop-browser-bridge"));

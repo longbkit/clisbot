@@ -1,18 +1,18 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { ConfirmationProvider } from "@/components/confirmation-provider";
 import { SelectField } from "@/components/ui/select-field";
 import { confirmDialog } from "@/utils/confirm-dialog";
-import i18next from "i18next";
+import { use as registerI18nextPlugin } from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en } from "@/i18n/resources/en";
 
 // Exercise actual web controls and modal with production theme tokens. The global
 // browser configuration only stubs native packages/icons; no picker/dialog mock.
 beforeAll(async () => {
-  await i18next.use(initReactI18next).init({
+  await registerI18nextPlugin(initReactI18next).init({
     lng: "en",
     resources: { en: { translation: en } },
     interpolation: { escapeValue: false },
@@ -54,6 +54,17 @@ const options = [
 function Harness({ scopeKey = "access" }: { scopeKey?: string }) {
   const [value, setValue] = useState<string | null>("team-69");
   const [result, setResult] = useState("Pending");
+  const openConfirmation = useCallback(async () => {
+    setResult(
+      String(
+        await confirmDialog({
+          title: "Grant this access?",
+          message: "AI Team → Longluongbrain\nAccess level: Office worker\nAgent configurations: 2",
+          confirmLabel: "Grant access",
+        }),
+      ),
+    );
+  }, []);
   return (
     <ConfirmationProvider webBackend scopeKey={scopeKey}>
       <SelectField
@@ -68,20 +79,7 @@ function Harness({ scopeKey = "access" }: { scopeKey?: string }) {
         maxOptionsPerGroup={50}
         searchPlaceholder="Search Teams, Members, or email"
       />
-      <button
-        onClick={async () =>
-          setResult(
-            String(
-              await confirmDialog({
-                title: "Grant this access?",
-                message:
-                  "AI Team → Longluongbrain\nAccess level: Office worker\nAgent configurations: 2",
-                confirmLabel: "Grant access",
-              }),
-            ),
-          )
-        }
-      >
+      <button type="button" onClick={openConfirmation}>
         Open confirmation
       </button>
       <div data-testid="result">{result}</div>

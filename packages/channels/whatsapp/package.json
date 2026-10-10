@@ -1,19 +1,29 @@
 {
   "name": "@clisbot/channels-whatsapp",
-  "version": "0.7.3-beta.1",
-  "private": true,
+  "version": "2.0.0",
   "description": "In-repo WhatsApp channel vertical (WhatsApp Web linked device). Ported from extensions/whatsapp/src@3928bad9bad (OpenClaw v2026.9.2): the Baileys socket and reconnect owner, the QR login state machine, the inbound normalizer/extractor/media download, the send path with outbound mentions, the react action and target normalization. Upstream's SDK is Baileys, pinned at upstream's version; the linked-device auth state is held in the Hub's encrypted keyed store (fusion/auth-fs.ts).",
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "SYNC.md",
+    "upstream-sync.json"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsgo -p tsconfig.json",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "*",
-    "@clisbot/channels-shared": "*",
+    "@clisbot/channels-core": "2.0.0",
+    "@clisbot/channels-shared": "2.0.0",
     "baileys": "7.0.0-rc14",
     "https-proxy-agent": "7.0.6",
     "sharp": "^0.34.5",

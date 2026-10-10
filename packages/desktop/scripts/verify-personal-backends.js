@@ -5,7 +5,9 @@ const { extractFile, listPackage } = require("@electron/asar");
 /** Check actual package contents on every build target before shipping an app. */
 function verifyPersonalBackends(resourcesDirectory) {
   const archive = path.join(resourcesDirectory, "app.asar");
-  const entries = new Set(listPackage(archive).map((entry) => entry.replace(/^\//, "")));
+  const entries = new Set(
+    listPackage(archive).map((entry) => entry.replaceAll("\\", "/").replace(/^\/+/, "")),
+  );
   const required = [
     "node_modules/@clisbot/hub/bin/clisbot-hub.js",
     "node_modules/@clisbot/hub/dist/index.js",
@@ -46,7 +48,7 @@ function inRepoChannelFiles(archive) {
   const pinsPath = "node_modules/@clisbot/hub/channel-pins.json";
   let pins;
   try {
-    pins = JSON.parse(extractFile(archive, pinsPath).toString("utf8"));
+    pins = JSON.parse(extractFile(archive, path.normalize(pinsPath)).toString("utf8"));
   } catch {
     return [pinsPath];
   }

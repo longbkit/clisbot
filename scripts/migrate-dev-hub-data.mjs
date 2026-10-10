@@ -108,7 +108,7 @@ export async function migrateDevHubData(selectedHome, { isRunning = processIsRun
     }
     await rename(staging, target);
   } catch (error) {
-    for (const entry of completed.reverse()) {
+    for (const entry of completed.toReversed()) {
       if (existsSync(join(staging, entry))) {
         await rename(join(staging, entry), join(home, entry));
       }

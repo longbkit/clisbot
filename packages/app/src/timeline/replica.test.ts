@@ -70,6 +70,38 @@ function createOwner(
   });
 }
 
+function retentionPage(start: number, end: number, hasOlder: boolean) {
+  return {
+    requestId: `retention-${start}-${end}`,
+    agentId: AGENT_ID,
+    agent: null,
+    direction: "tail" as const,
+    projection: "projected" as const,
+    reset: false,
+    staleCursor: false,
+    gap: false,
+    epoch: "epoch-1",
+    window: { minSeq: 1, maxSeq: end, nextSeq: end + 1 },
+    startCursor: { epoch: "epoch-1", seq: start },
+    endCursor: { epoch: "epoch-1", seq: end },
+    hasOlder,
+    hasNewer: false,
+    error: null,
+    entries: Array.from({ length: end - start + 1 }, (_, index) => {
+      const seq = start + index;
+      return {
+        provider: "mock" as const,
+        timestamp: "2026-08-26T10:00:00.000Z",
+        seqStart: seq,
+        seqEnd: seq,
+        sourceSeqRanges: [{ startSeq: seq, endSeq: seq }],
+        collapsed: [],
+        item: { type: "assistant_message" as const, text: `row ${seq}`, messageId: `row-${seq}` },
+      };
+    }),
+  };
+}
+
 function applySynced(agentId: string, seq: number): void {
   useSessionStore.getState().applyAgentTimelineResponseState(SERVER_ID, agentId, {
     items: [item(`network-${agentId}`, "network", seq)],
@@ -384,6 +416,58 @@ describe("viewed timeline persistence", () => {
 
     expect(commits.at(-1)?.items.at(-1)).toMatchObject({ text: "live" });
     expect(commits.at(-1)?.range?.endSeq).toBe(9);
+    owner.dispose();
+  });
+
+  it("keeps a pre-hydration live row after admitting the older baseline page", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    const owner = createOwner({
+      readTimeline: async () => ({ ...cachedTimeline(), range: null }),
+      commitTimeline: () => undefined,
+    });
+    owner.replaceVisibleAgentIds("test", [AGENT_ID]);
+    await expect
+      .poll(
+        () =>
+          selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID).status,
+      )
+      .toBe("painted");
+    owner.enqueueStreamEvent(AGENT_ID, {
+      epoch: "epoch-1",
+      seq: 5,
+      timestamp: new Date(),
+      event: {
+        type: "timeline",
+        provider: "mock",
+        item: { type: "user_message", text: "live before hydration", messageId: "live-user" },
+      },
+    });
+    owner.flushStreamAgent(AGENT_ID);
+    owner.applyTimelineResponse(retentionPage(1, 4, false));
+    const session = useSessionStore.getState().sessions[SERVER_ID];
+    expect([
+      ...(session.agentStreamTail.get(AGENT_ID) ?? []),
+      ...(session.agentStreamHead.get(AGENT_ID) ?? []),
+    ]).toContainEqual(expect.objectContaining({ text: "live before hydration" }));
+    expect(session.agentTimelineCursor.get(AGENT_ID)?.endSeq).toBe(4);
+    owner.dispose();
+  });
+
+  it("forgets discarded coverage when resume replaces the retained tail", () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    const owner = createOwner({
+      readTimeline: async () => undefined,
+      commitTimeline: () => undefined,
+    });
+    owner.applyTimelineResponse(retentionPage(1, 46, false));
+    owner.applyTimelineResponse({ ...retentionPage(15, 54, true), reset: true });
+    const session = useSessionStore.getState().sessions[SERVER_ID];
+    expect(session.agentTimelineCursor.get(AGENT_ID)).toEqual({
+      epoch: "epoch-1",
+      startSeq: 15,
+      endSeq: 54,
+    });
+    expect(session.agentTimelineHasOlder.get(AGENT_ID)).toBe(true);
     owner.dispose();
   });
 

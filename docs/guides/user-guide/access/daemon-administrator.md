@@ -1,41 +1,41 @@
-# Daemon Administrator làm được gì?
+# What can a Daemon Administrator do?
 
-[User guide](../README.md) · [Các mức quyền](permissions.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Permission levels](permissions.md) · [Q&A](../help/faq.md)
 
-**Daemon Administrator là quyền vận hành toàn bộ một daemon.** Nó bao gồm Connect, dùng mọi Project hiện tại và tương lai trên daemon đó, cùng quyền quản trị. Các bộ lọc Project/cấu hình Agent áp dụng cho Member thông thường không giới hạn session Administrator này.
+**Daemon Administrator is the right to operate a whole daemon.** It includes Connect, use of every current and future Project on that daemon, and administration rights. The Project and Agent configuration filters that apply to regular Members do not limit this Administrator session.
 
-## Phạm vi thao tác
+## Scope
 
-| Nhóm                    | Administrator có thể làm                                                                                                                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trạng thái và chẩn đoán | Xem trạng thái daemon, cấu hình, provider/model, usage và thông tin chẩn đoán                                                                                                                                     |
-| Vận hành daemon         | Restart, shutdown, update, reload/thay đổi cấu hình, quản lý provider, skills và plugins, gọi chức năng plugin                                                                                                    |
-| Project và Workspace    | Thêm thư mục/clone/tạo Project; tạo Workspace local và worktree; đổi tên, archive, xóa và quản lý vòng đời tài nguyên                                                                                             |
-| Agent                   | Xem lịch sử, tạo/import/điều khiển/archive/xóa session, gửi prompt, đổi model/thinking/mode và phản hồi yêu cầu phê duyệt                                                                                         |
-| File và Git             | Đọc/ghi/tạo/xóa/đổi tên/upload/download file; xem diff, commit, branch, stash, discard, pull/push/merge và thao tác PR được daemon hỗ trợ                                                                         |
-| Terminal và chạy mã     | Tạo terminal, nhập lệnh, xem output, đóng terminal, chạy scripts/services và mở editor                                                                                                                            |
-| Kết nối                 | Quản lý quan hệ Hub, relay/tunnel và endpoint theo các chức năng daemon hỗ trợ                                                                                                                                    |
-| Truy cập daemon         | Quản lý ghép nối và quyền truy cập daemon; thay đổi quyền của quan hệ dịch vụ Hub. Hợp đồng quyền gồm invitations, principals, credentials, grants và revocation; không phải mục nào cũng có form riêng trong app |
-| Tự động hóa local       | Quản lý lịch, heartbeat/loop trên daemon: tạo/sửa/xóa, dừng/chạy và xem logs theo API được hỗ trợ                                                                                                                 |
+| Area                       | Administrator can                                                                                                                                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status and diagnostics     | View daemon status, configuration, providers/models, usage, and diagnostics                                                                                                                                                       |
+| Daemon operations          | Restart, shut down, update, reload or change configuration, manage providers, skills, and plugins, call plugin functions                                                                                                          |
+| Projects and Workspaces    | Add a folder, clone, or create a Project; create local Workspaces and worktrees; rename, archive, delete, and manage resource lifecycle                                                                                           |
+| Agents                     | View history, create/import/control/archive/delete sessions, send prompts, change model/thinking/mode, and answer approval requests                                                                                               |
+| Files and Git              | Read/write/create/delete/rename/upload/download files; view diffs, commit, branch, stash, discard, pull/push/merge, and the PR actions the daemon supports                                                                        |
+| Terminals and running code | Create terminals, type commands, view output, close terminals, run scripts/services, and open an editor                                                                                                                           |
+| Connectivity               | Manage the Hub relationship, relay/tunnel, and endpoints, as far as the daemon supports them                                                                                                                                      |
+| Daemon access              | Manage pairing and daemon access; change the permissions of the Hub service relationship. The permission contract covers invitations, principals, credentials, grants, and revocation; not every item has its own form in the app |
+| Local automation           | Manage schedules and heartbeats/loops on the daemon: create, edit, delete, stop, run, and view logs through the supported API                                                                                                     |
 
-Về kỹ thuật, session này có `daemon.read`, `daemon.manage`, `tunnel.manage`, `access.manage`, `workspace.read`, `workspace.write`, `workspace.manage`, `automation.manage`. Xem [hợp đồng quyền](../../../permissions.md) khi cần đối chiếu API.
+Technically, this session holds `daemon.read`, `daemon.manage`, `tunnel.manage`, `access.manage`, `workspace.read`, `workspace.write`, `workspace.manage`, `automation.manage`. See the [permission contract](../../../permissions.md) when you need to check against the API.
 
-## Có đổi được Managed Access không?
+## Can they change Managed Access?
 
-Có quyền cấu hình ở backend: `daemon.manage` cho phép thay đổi cấu hình daemon, gồm Managed Access. App hiện chỉ mở công tắc này cho Organization Owner, nhưng Administrator vẫn có thẩm quyền backend và khả năng chạy mã trên máy daemon.
+Yes, at the backend: `daemon.manage` allows changing daemon configuration, including Managed Access. The app shows this switch only to the Organization Owner, but an Administrator still has the backend authority and can run code on the daemon machine.
 
-Vì vậy không cấp Administrator cho người mà bạn muốn buộc chỉ làm việc trong một Project. Dùng **Connect + Developer** cho nhu cầu tạo worktree.
+So do not grant Administrator to someone you want to keep inside one Project. Use **Connect + Developer** when they need to create worktrees.
 
-Cần làm trên **mọi Project** nhưng vẫn giới hạn provider/model: cấp **Developer trên Host** thay vì Administrator; cần thêm quyền tự tạo Project thì cấp **Full access trên Host**. Mức này không có quyền vận hành daemon, và vẫn áp giới hạn cấu hình Agent; xem [cấp cho mọi Project trên một Host](members-and-teams.md#cấp-cho-mọi-project-trên-một-host).
+If they need to work on **every Project** but stay limited to certain providers/models, grant **Developer on the Host** instead of Administrator; if they also need to create Projects, grant **Full access on the Host**. These levels cannot operate the daemon, and Agent configuration limits still apply; see [grant every Project on a Host](members-and-teams.md#grant-every-project-on-a-host).
 
-## Những quyền không tự đi kèm
+## What does not come with it
 
-- **Không thành Hub Organization Admin/Owner:** không tự được mời Members, sửa Teams/Access của tổ chức, cấu hình Channels/Hub Automations, API keys hay đổi tên Host dùng chung trên Hub.
-- **Không có quyền ở daemon khác:** phải cấp riêng từng daemon; không thành instance operator của máy chủ Hub.
-- **Không tự thành root hệ điều hành:** lệnh chạy theo tài khoản OS của daemon và quyền tài khoản đó có. Tuy nhiên có thể chạy mã và đọc/ghi ngoài thư mục Project nếu quyền OS cho phép.
-- **Không thay thế danh tính dịch vụ Hub:** `hub.execute` phục vụ vòng đời thực thi do Hub sở hữu, được cấp cho quan hệ dịch vụ Hub riêng. Session Administrator tương tác không tự mang quyền này; Administrator có quyền quản lý truy cập nên có thể thay đổi grant của quan hệ Hub.
-- **Quản lý lịch local không đồng nghĩa quản lý Hub Automation:** định nghĩa, audience và quyền Run trên Hub có cơ chế quản lý riêng.
+- **No Hub Organization Admin/Owner role:** they cannot invite Members, edit the organization's Teams/Access, configure Channels/Hub Automations or API keys, or rename the shared Host on the Hub.
+- **No rights on other daemons:** you grant each daemon separately. It does not make them an instance operator of the Hub server.
+- **Not OS root:** commands run as the daemon's OS account, with that account's permissions. They can still run code and read/write outside Project folders where the OS allows it.
+- **No Hub service identity:** `hub.execute` serves the Hub-owned execution lifecycle and is granted to the separate Hub service relationship. The interactive Administrator session does not carry it; because an Administrator manages access, they can change the Hub relationship's grants.
+- **Managing local schedules is not managing Hub Automations:** Hub definitions, audience, and Run permission are managed separately.
 
-## Cấp và kiểm tra
+## Grant and verify
 
-Trong **Access**, chọn Team/Member → Host cần quản trị → mức **Administrator** → xác nhận. Kiểm tra đúng Host trước khi lưu. Để thu hồi, xóa mọi assignment Administrator trực tiếp và qua Team; grant Connect/Project riêng vẫn có thể tiếp tục cho phép làm việc giới hạn.
+In **Access**, choose the Team/Member → the Host to administer → level **Administrator** → confirm. Check that it is the right Host before saving. To revoke, remove every Administrator assignment, direct and through Teams; separate Connect/Project grants can still allow limited work.

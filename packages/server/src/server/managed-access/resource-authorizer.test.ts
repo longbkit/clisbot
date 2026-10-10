@@ -1135,7 +1135,12 @@ describe("Project creation and Add project folder search", () => {
     const narrowed = createHarness(
       ["project.use"],
       {},
-      { ...hostCreator, projectFolders: [{ allow: ["/free/qc/**"], deny: [] }] },
+      {
+        ...hostCreator,
+        projectFolders: [
+          { allow: [`${path.resolve("/free/qc").replaceAll("\\", "/")}/**`], deny: [] },
+        ],
+      },
     );
     await expect(narrowed.allowsInbound(add("/free/qc/app"))).resolves.toBe(true);
     await expect(narrowed.allowsInbound(add("/free/app"))).resolves.toBe(false);

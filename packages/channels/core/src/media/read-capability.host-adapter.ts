@@ -16,7 +16,5 @@ export function resolveAgentScopedOutboundMediaAccess(params: {
   if (params.workspaceMediaAccess) {
     return params.workspaceMediaAccess;
   }
-  return {
-    ...(params.workspaceDir === undefined ? {} : { workspaceDir: params.workspaceDir }),
-  } as OutboundMediaAccess;
+  return (params.workspaceDir === undefined ? {} : { workspaceDir: params.workspaceDir }) as OutboundMediaAccess;
 }

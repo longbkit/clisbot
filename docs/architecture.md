@@ -496,6 +496,13 @@ The supervisor alone publishes its ready worker's endpoint in `clisbot.pid`, cle
 
 Worker restart retains supervisor arguments/environment and rereads the configuration file. Updating a package and observing its new worker version do not refresh the running supervisor code; the launcher owns full-process replacement. See [CLI lifecycle contracts](../public-docs/cli.md#daemon-management).
 
+The supported npm entry is `clisbot`, installed with `npm install -g clisbot`.
+It pins `@clisbot/cli` to the same release version. Daemon self-update probes
+and updates `clisbot@latest` in the running install's npm prefix, then uses the
+existing worker restart flow. It does not independently update `@clisbot/cli`
+or fall back to a directly installed scoped CLI. Desktop-managed daemons use
+the Desktop updater.
+
 ## Deployment models
 
 1. **Local daemon** (default): `clisbot daemon start` on `127.0.0.1:6868`

@@ -1,3 +1,4 @@
+import { answerAppConfirmation } from "./confirmation";
 import { expect, type Page } from "@playwright/test";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectDaemonClient } from "./daemon-client-loader";
@@ -18,8 +19,9 @@ export async function openDaemonOverview(page: Page, daemon: IsolatedHostDaemon)
 export async function restartDaemonInSettings(page: Page) {
   const button = page.getByRole("button", { name: "Restart", exact: true });
   await expect(button).toBeEnabled();
-  page.once("dialog", (dialog) => dialog.accept());
+  const confirmation = answerAppConfirmation(page, "accept");
   await button.click();
+  await confirmation;
   await expect(page.getByRole("button", { name: "Restarting...", exact: true })).toBeDisabled();
 }
 

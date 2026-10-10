@@ -409,6 +409,7 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
           ? readingAnchor.project(container.scrollTop, {
               id: String(measurement.key),
               top: measurement.start,
+              height: measurement.size,
             })
           : container?.scrollTop;
       let visibleRange = range;

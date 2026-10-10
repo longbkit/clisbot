@@ -1,3 +1,4 @@
+import { runInNewContext } from "node:vm";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
@@ -50,14 +51,14 @@ function fetchDaemonWebUi(options: {
   });
 }
 
-function readInjectedConnectionHint(html: string): InitialDaemonConnectionHint {
-  const match = html.match(
-    /window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__=(?<json>\{[^<;]+})(?:;|<\/script>)/,
-  );
-  if (!match?.groups?.json) {
-    throw new Error("Missing initial daemon connection hint");
-  }
-  return JSON.parse(match.groups.json) as InitialDaemonConnectionHint;
+function readInjectedConnectionHint(html: string, protocol = "http:"): InitialDaemonConnectionHint {
+  const script = html.match(
+    /<script>(window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__.*?)<\/script>/,
+  )?.[1];
+  if (!script) throw new Error("Missing initial daemon connection hint");
+  const window: Record<string, unknown> = { location: { protocol } };
+  runInNewContext(script, { window });
+  return window.__CLISBOT_INITIAL_DAEMON_CONNECTION__ as InitialDaemonConnectionHint;
 }
 
 describe("daemon web UI bootstrap", () => {
@@ -101,7 +102,7 @@ describe("daemon web UI bootstrap", () => {
     }
   });
 
-  test("injects a TLS initial connection hint only for HTTPS forwarded by a trusted proxy", async () => {
+  test("derives the initial TLS hint from the browser page protocol", async () => {
     const distDir = await createWebUiDist();
 
     daemonHandle = await createTestClisbotDaemon({
@@ -120,6 +121,7 @@ describe("daemon web UI bootstrap", () => {
         port: daemonHandle.port,
         headers: { "x-forwarded-proto": "https" },
       }),
+      "https:",
     );
 
     expect(httpHint).toEqual({

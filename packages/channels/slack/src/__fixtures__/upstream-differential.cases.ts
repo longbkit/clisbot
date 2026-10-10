@@ -111,7 +111,7 @@ const formattingCases: DifferentialCase[] = [
 /** Chunker inputs are generated, so the corpus stores the recipe, not 3 KB of x. */
 const CHUNK_INPUTS: ReadonlyArray<{ id: string; text: string; limit: number }> = [
   { id: "whitespace-at-section-boundary", text: `${"x".repeat(2_998)}  tail`, limit: 3_000 },
-  { id: "short-inline-code-spans", text: `${"a\`b\`".repeat(750)}x`, limit: 3_000 },
+  { id: "short-inline-code-spans", text: `${"a`b`".repeat(750)}x`, limit: 3_000 },
   { id: "long-inline-code-section", text: `\`${"x".repeat(3_100)}\``, limit: 3_000 },
   { id: "long-fenced-code-section", text: "```" + "x".repeat(3_100) + "```", limit: 3_000 },
   { id: "inline-wrapper-cannot-fit-1", text: "`x`", limit: 1 },

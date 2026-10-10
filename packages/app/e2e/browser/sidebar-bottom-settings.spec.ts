@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import {
@@ -7,6 +8,13 @@ import {
 } from "../support/helpers/sidebar-nav-settings";
 import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { getServerId } from "../support/helpers/server-id";
+
+/** With one ready Host, `useHostChooser` picks it: the sheet opens with no chooser between. */
+async function expectImportSheetForTheOnlyHost(page: Page): Promise<void> {
+  await expect(page.getByTestId("import-session-sheet")).toBeVisible();
+  await expect(page.getByTestId(`host-chooser-row-${getServerId()}`)).toHaveCount(0);
+  await expect(page.getByTestId("import-session-scope")).toContainText("localhost");
+}
 
 test("bottom actions persist, Help and Settings stay fixed, and New and Search open existing flows", async ({
   page,
@@ -85,9 +93,8 @@ test("bottom actions persist, Help and Settings stay fixed, and New and Search o
   await footer.getByTestId("sidebar-new").hover();
   await expect(menu).toBeVisible();
   await menu.getByTestId("sidebar-new-import-session").click();
-  await page.getByTestId(`host-chooser-row-${getServerId()}`).click();
+  await expectImportSheetForTheOnlyHost(page);
   const importSheet = page.getByTestId("import-session-sheet");
-  await expect(importSheet).toBeVisible();
   await importSheet.getByRole("button", { name: "Close", exact: true }).click();
 
   await footer.getByTestId("sidebar-new").hover();
@@ -103,7 +110,8 @@ test("bottom actions persist, Help and Settings stay fixed, and New and Search o
 
   await openSidebarNavSettings(page);
   const bottom = page.getByTestId("sidebar-footer-section");
-  await expect(bottom.getByText("Bottom", { exact: true })).toBeVisible();
+  // Titled "Bottom bar" since the v0.11.1 sync added upstream's Footer card (merge-v0.11.1.md).
+  await expect(bottom.getByText("Bottom bar", { exact: true })).toBeVisible();
   for (const key of ["help", "settings"]) {
     const row = bottom.getByTestId(`sidebar-footer-item-${key}`);
     await expect(row.getByRole("switch")).toBeDisabled();
@@ -216,9 +224,8 @@ test.describe("mobile bottom actions", () => {
     }
     await page.screenshot({ path: testInfo.outputPath("sidebar-new-mobile.png") });
     await page.getByTestId("sidebar-new-import-session").tap();
-    await page.getByTestId(`host-chooser-row-${getServerId()}`).tap();
+    await expectImportSheetForTheOnlyHost(page);
     const importSheet = page.getByTestId("import-session-sheet");
-    await expect(importSheet).toBeVisible();
     await importSheet.getByRole("button", { name: "Close", exact: true }).tap();
     await openMobileAgentSidebar(page);
     await trigger.tap();

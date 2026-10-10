@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { withDisabledE2ESpeechEnv } from "./speech-env";
 import { killProcessTree, spawnTsx } from "./spawn-node";
+import { normalizeHistoricalUpstreamFixture } from "./historical-upstream-fixture";
 
 export interface IsolatedHostDaemon {
   serverId: string;
@@ -118,10 +119,12 @@ export async function startIsolatedHostDaemon(
           "--no-audit",
           "--no-fund",
           "--no-package-lock",
-          `@clisbot/server@${options.publishedVersion}`,
+          // Fetch the real historical upstream behavior, then normalize its wire names.
+          `@getpaseo/server@${options.publishedVersion}`,
         ],
         { cwd: publishedPackageRoot, stdio: "ignore" },
       );
+      await normalizeHistoricalUpstreamFixture(publishedPackageRoot);
     } catch (error) {
       if (!options.preserveHome) {
         await rm(clisbotHome, { recursive: true, force: true });
@@ -151,7 +154,7 @@ export async function startIsolatedHostDaemon(
     );
   }
   const serverDir = publishedPackageRoot
-    ? path.join(publishedPackageRoot, "node_modules", "@clisbot", "server")
+    ? path.join(publishedPackageRoot, "node_modules", "@getpaseo", "server")
     : path.resolve(__dirname, "../../../../server");
   const spawnDaemon = async (): Promise<ChildProcess> => {
     const spawnOptions: SpawnOptions = {

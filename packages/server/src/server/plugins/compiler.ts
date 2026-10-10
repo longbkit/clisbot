@@ -319,8 +319,8 @@ function runtimeSpecifierError(
   else if (
     (specifier === "@clisbot/plugin" ||
       specifier.startsWith("@clisbot/plugin/") ||
-      specifier === "@clisbot/plugin" ||
-      specifier.startsWith("@clisbot/plugin/")) &&
+      specifier === "@paseo/plugin" ||
+      specifier.startsWith("@paseo/plugin/")) &&
     !(PLUGIN_SDK_SPECIFIERS as readonly string[]).includes(specifier)
   )
     kind = "Unknown SDK";

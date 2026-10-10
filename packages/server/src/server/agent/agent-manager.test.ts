@@ -6395,9 +6395,7 @@ test("waitForAgentEvent does not resolve idle until foreground turn is finalized
     }
   })();
 
-  // Wait for the turn to start
-  await new Promise<void>((resolve) => setTimeout(resolve, 20));
-
+  // Waiting immediately must cover a pending run before its provider starts.
   const waitPromise = manager.waitForAgentEvent(snapshot.id);
 
   // Should still be pending because turn_completed hasn't arrived
@@ -11462,6 +11460,81 @@ test("an agent reads and appends history again once an event overload has draine
     expect(manager.getAgent(agent.id)?.lastError).toContain("pending provider event count limit");
   } finally {
     release();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("foreground output waits for the canonical prompt's durable lookup", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-prompt-order-"));
+  const lookupEntered = deferred<void>();
+  const releaseLookup = deferred<void>();
+  let providerStarted = false;
+  class HeldLookupStore extends RecordingTimelineStore {
+    async getSubmittedUserMessage(): Promise<AgentTimelineRow | null> {
+      if (providerStarted) {
+        lookupEntered.resolve();
+        await releaseLookup.promise;
+      }
+      return null;
+    }
+  }
+  class HeldSession extends TestAgentSession {
+    override async startTurn(): Promise<{ turnId: string }> {
+      providerStarted = true;
+      return { turnId: "turn-1" };
+    }
+  }
+  const session = new HeldSession({ provider: "codex", cwd: workdir });
+  const client = new TestAgentClient();
+  client.createSession = async () => session;
+  const manager = new AgentManager({
+    clients: { codex: client },
+    durableTimelineStore: new HeldLookupStore(),
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const events: AgentStreamEvent[] = [];
+  const unsubscribe = manager.subscribe(
+    (event) => {
+      if (event.type === "agent_stream") events.push(event.event);
+    },
+    { agentId: agent.id, replayState: false },
+  );
+  const emitChunk = (text: string) =>
+    session.pushEvent({
+      type: "timeline",
+      provider: "codex",
+      turnId: "turn-1",
+      item: { type: "assistant_message", messageId: "answer", text },
+    });
+  try {
+    const stream = manager.streamAgent(agent.id, "Show the temperature.", {
+      clientMessageId: "prompt-1",
+    });
+    const started = stream.next();
+    await lookupEntered.promise;
+    emitChunk("- **Current tem");
+    // Let an incorrectly released provider event reach the timeline before releasing storage.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    releaseLookup.resolve();
+    await started;
+    emitChunk("perature**: 25°C.");
+    session.pushEvent({ type: "turn_completed", provider: "codex", turnId: "turn-1" });
+    await drainAsyncGenerator(stream);
+    await manager.flush();
+    expect(events.filter((event) => event.type === "timeline").map((event) => event.item)).toEqual([
+      expect.objectContaining({ type: "user_message", clientMessageId: "prompt-1" }),
+      expect.objectContaining({ type: "assistant_message", text: "- **Current tem" }),
+      expect.objectContaining({ type: "assistant_message", text: "perature**: 25°C." }),
+    ]);
+    expect(events[0]).toMatchObject({ type: "turn_started", turnId: "turn-1" });
+    expect(manager.hasInFlightRun(agent.id)).toBe(false);
+  } finally {
+    releaseLookup.resolve();
+    unsubscribe();
     await manager.closeAgent(agent.id);
     rmSync(workdir, { recursive: true, force: true });
   }

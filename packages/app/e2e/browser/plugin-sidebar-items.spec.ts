@@ -43,17 +43,21 @@ async function qaScreenshot(page: Page, name: string, area?: Locator) {
   else await page.screenshot({ path: file });
 }
 
-/** Footer rows sit above the fixed bottom line, spanning it from Add project to Settings. */
+/** Footer rows span the bottom line's first action through Settings. */
 async function expectFooterRow(page: Page, row: Locator) {
   // Polled: on compact the drawer is still sliding in when the row first shows.
   await expect
     .poll(async () => {
-      const addProject = (await visibleTestId(page, "sidebar-add-project").boundingBox())!;
+      const firstAction = (await visibleTestId(page, "sidebar-footer-bottom-line")
+        .getByRole("button")
+        .filter({ visible: true })
+        .first()
+        .boundingBox())!;
       const settings = (await visibleTestId(page, "sidebar-settings").boundingBox())!;
       const box = (await row.boundingBox())!;
       return {
-        aboveBottomLine: box.y + box.height <= addProject.y,
-        alignedLeft: Math.abs(box.x - addProject.x) < 1,
+        aboveBottomLine: box.y + box.height <= firstAction.y,
+        alignedLeft: Math.abs(box.x - firstAction.x) < 1,
         alignedRight: Math.abs(box.x + box.width - (settings.x + settings.width)) < 1,
       };
     })
@@ -87,14 +91,28 @@ async function expectBotScreen(page: Page, botId: string) {
   await expectRowActive(botRow(page, "status"), false);
 }
 
-/** The popover opens to the right of `row`, level with it, and away from `elsewhere`. */
-async function expectPopoverBeside(page: Page, text: string, row: Locator, elsewhere: Locator) {
+/**
+ * The popover opens to the right of `row`, level with it, and away from `elsewhere`. Returns the
+ * popover's offset below its row, so a later popover can be held to the same anchoring.
+ */
+async function expectPopoverBeside(
+  page: Page,
+  text: string,
+  row: Locator,
+  elsewhere: Locator,
+  anchorOffset?: number,
+): Promise<number> {
   const popover = await popoverBox(page, text);
   const rowBox = await boxOf(row);
   const otherBox = await boxOf(elsewhere);
+  const offset = popover.y - rowBox.y;
   expect(popover.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width);
-  expect(Math.abs(popover.y - rowBox.y)).toBeLessThan(40);
-  expect(Math.abs(popover.y - otherBox.y)).toBeGreaterThan(20);
+  expect(Math.abs(offset)).toBeLessThan(40);
+  expect(Math.abs(popover.y - otherBox.y)).toBeGreaterThan(Math.abs(offset));
+  // Adjacent rows sit one row pitch apart (37px for Bot 2 and the status row with Clisbot's
+  // spacing), so an equal offset pins the popover to `row` rather than to `elsewhere`.
+  if (anchorOffset !== undefined) expect(Math.abs(offset - anchorOffset)).toBeLessThan(1);
+  return offset;
 }
 
 /** Subscription ids the daemon confirms released, collected from the page's websocket. */
@@ -130,7 +148,7 @@ async function nextAlertsObservation(page: Page, previous: string | null): Promi
 }
 
 function sidebarFooter(page: Page): Locator {
-  return visibleTestId(page, "sidebar-add-project").locator("xpath=..");
+  return visibleTestId(page, "sidebar-footer");
 }
 
 test.describe("Plugin sidebar items", () => {
@@ -247,7 +265,9 @@ test.describe("Plugin sidebar items", () => {
     const newWorkspace = visibleTestId(page, "sidebar-global-new-workspace");
     await expect(newWorkspace).toBeVisible({ timeout: 30_000 });
     await newWorkspace.hover();
-    const hint = page.getByText("Ctrl+N", { exact: true }).locator("visible=true");
+    const hint = page
+      .getByText(process.platform === "darwin" ? "⌘N" : "Ctrl+N", { exact: true })
+      .locator("visible=true");
     await expect(hint).toBeVisible();
     await qaScreenshot(page, "phase7-header-row-hint", newWorkspace.locator("xpath=../.."));
     await hint.click();
@@ -328,7 +348,7 @@ test.describe("Plugin sidebar items", () => {
         .first();
       const footerIcon = page
         .getByTestId("sidebar-nav-section-footer")
-        .getByTestId(`sidebar-nav-item-plugin:${SHOWCASE_PLUGIN_ID}:sync`)
+        .getByTestId(`sidebar-nav-footer-item-plugin:${SHOWCASE_PLUGIN_ID}:sync`)
         .locator("svg")
         .first();
       const markup = await showcaseIcon.innerHTML();
@@ -357,6 +377,7 @@ test.describe("Plugin sidebar items", () => {
     const bot2 = botRow(page, "bot-2");
     const status = botRow(page, "status");
     await expect(bot1).toBeVisible({ timeout: 30_000 });
+    let statusPopoverOffset: number | undefined;
 
     await test.step("the rows and the separator render in order in the header", async () => {
       await expect(bot1).toHaveAccessibleName("Bot 1");
@@ -390,14 +411,14 @@ test.describe("Plugin sidebar items", () => {
 
     await test.step("a popover opened from a later row anchors to that row", async () => {
       await status.click();
-      await expectPopoverBeside(page, "Bot status details", status, bot1);
+      statusPopoverOffset = await expectPopoverBeside(page, "Bot status details", status, bot1);
       await page.getByRole("button", { name: "Close bot status", exact: true }).click();
       await expect(page.getByText("Bot status details", { exact: true })).toHaveCount(0);
     });
 
     await test.step("a trailing button's popover anchors to its own row, not the last pressed", async () => {
       await page.getByRole("button", { name: "More for Bot 2", exact: true }).click();
-      await expectPopoverBeside(page, "Bot 2 options", bot2, status);
+      await expectPopoverBeside(page, "Bot 2 options", bot2, status, statusPopoverOffset);
       await qaScreenshot(page, "phase6-desktop-popover-row");
       await page.getByRole("button", { name: "Close Bot 2 options", exact: true }).click();
       await expect(page.getByText("Bot 2 options", { exact: true })).toHaveCount(0);

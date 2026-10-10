@@ -1,8 +1,16 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-// Opens the command center / global search palette from the sidebar and returns its panel.
+// Search lives in the footer by default; a saved preference can also put it in navigation.
+export function commandCenterTrigger(page: Page): Locator {
+  return page
+    .getByTestId("sidebar-footer-search")
+    .or(page.getByTestId("sidebar-search"))
+    .filter({ visible: true })
+    .first();
+}
+
 export async function openCommandCenter(page: Page): Promise<Locator> {
-  await page.getByTestId("sidebar-search").click();
+  await commandCenterTrigger(page).click();
   const panel = page.getByTestId("command-center-panel");
   await expect(panel).toBeVisible({ timeout: 30_000 });
   return panel;

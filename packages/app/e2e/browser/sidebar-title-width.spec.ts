@@ -11,6 +11,9 @@ import {
   selectSidebarStatusGrouping,
 } from "../support/helpers/sidebar";
 
+// These foundation layout contracts exercise the documented Bots-disabled sidebar.
+test.use({ e2eDaemonEnvironment: { CLISBOT_BOTS_ENABLED: "0" } });
+
 const TITLE = "Linux desktop sandbox launch support";
 
 async function seedChangedWorkspace() {

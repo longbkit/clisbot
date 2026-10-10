@@ -94,7 +94,7 @@ Clisbot는 코딩 에이전트를 관리하는 로컬 서버인 데몬을 실행
 CLI를 설치하고 Clisbot를 시작하세요.
 
 ```bash
-npm install -g @clisbot/cli
+npm install -g clisbot
 clisbot
 ```
 

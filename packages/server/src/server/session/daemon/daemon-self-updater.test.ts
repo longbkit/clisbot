@@ -26,7 +26,7 @@ type RuntimeCall = "inspect" | "installLatest";
 
 const globalRoot = "/global/lib";
 const globalNodeModules = `${globalRoot}/node_modules`;
-const cliPackagePath = `${globalNodeModules}/@clisbot/cli`;
+const cliPackagePath = `${globalNodeModules}/clisbot`;
 const npmServerPackageRoot = `${cliPackagePath}/node_modules/@clisbot/server`;
 const sourceServerPackageRoot = "/repo/packages/server";
 
@@ -111,7 +111,7 @@ describe("DaemonSelfUpdater", () => {
     const prefix = mkdtempSync(path.join(tmpdir(), "custom npm prefix "));
     onTestFinished(() => rmSync(prefix, { recursive: true, force: true }));
     const root = process.platform === "win32" ? prefix : path.join(prefix, "lib");
-    const packagePath = path.join(root, "node_modules", "@clisbot", "cli");
+    const packagePath = path.join(root, "node_modules", "clisbot");
     mkdirSync(packagePath, { recursive: true });
     const commands: string[][] = [];
     let version = "0.1.15";
@@ -126,7 +126,7 @@ describe("DaemonSelfUpdater", () => {
         stderr: "",
         stdout: JSON.stringify({
           path: root,
-          dependencies: { "@clisbot/cli": { version, path: packagePath } },
+          dependencies: { clisbot: { version, path: packagePath } },
         }),
       };
     });
@@ -141,6 +141,7 @@ describe("DaemonSelfUpdater", () => {
     });
     expect(result).toEqual({ success: true, error: null, newVersion: "0.1.96" });
     expect(commands).toHaveLength(3);
+    expect(commands[1]?.slice(0, 3)).toEqual(["install", "-g", "clisbot@latest"]);
     expect(commands.map((args) => args.slice(-2))).toEqual([
       ["--prefix", prefix],
       ["--prefix", prefix],
@@ -185,13 +186,13 @@ describe("DaemonSelfUpdater", () => {
     const calls: RuntimeCall[] = [];
     const runtime = createRuntime({
       calls,
-      inspections: [new Error("@clisbot/cli is not installed with npm -g on this host")],
+      inspections: [new Error("clisbot is not installed with npm -g on this host")],
     });
 
     const { result, phases } = await runUpdate({ runtime });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("@clisbot/cli is not installed with npm -g on this host");
+    expect(result.error).toBe("clisbot is not installed with npm -g on this host");
     expect(phases).toEqual(["starting"]);
     expect(calls).toEqual(["inspect"]);
   });
@@ -208,7 +209,7 @@ describe("DaemonSelfUpdater", () => {
     expect(result).toEqual({
       success: false,
       error:
-        "This daemon is not running from the npm global @clisbot/cli install (global npm has 0.1.15, daemon is 0.1.96).",
+        "This daemon is not running from the npm global clisbot install (global npm has 0.1.15, daemon is 0.1.96).",
       newVersion: null,
     });
     expect(calls).toEqual(["inspect"]);
@@ -226,7 +227,7 @@ describe("DaemonSelfUpdater", () => {
 
     expect(result).toEqual({
       success: false,
-      error: "This daemon is not running from the npm global @clisbot/cli install.",
+      error: "This daemon is not running from the npm global clisbot install.",
       newVersion: null,
     });
     expect(calls).toEqual(["inspect"]);
@@ -242,7 +243,7 @@ describe("DaemonSelfUpdater", () => {
     expect(result).toEqual({
       success: false,
       error:
-        "The global @clisbot/cli install is linked; self-update only supports normal npm global installs.",
+        "The global clisbot install is linked; self-update only supports normal npm global installs.",
       newVersion: null,
     });
   });

@@ -4,7 +4,8 @@ import registry from "./registry.fixture.json" with { type: "json" };
 import { CATEGORIES } from "../src/plugins/categories";
 
 async function openPlugins(page: Page) {
-  await page.goto("/plugins");
+  // Image hosts must not gate testing the directory controls.
+  await page.goto("/plugins", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { level: 1, name: /^Plugins/ })).toBeVisible();
 }
 
@@ -253,7 +254,7 @@ test.describe("search engine visits without JavaScript", () => {
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       "content",
-      "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
+      "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
     );
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
@@ -343,7 +344,8 @@ async function holdScripts(page: Page): Promise<() => Promise<void>> {
   });
   return async () => {
     release();
-    await page.waitForLoadState("load");
+    // Callers assert hydrated controls/results; external thumbnails need not finish.
+    await page.waitForLoadState("domcontentloaded");
   };
 }
 

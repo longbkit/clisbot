@@ -15,7 +15,8 @@ export function writeServiceFile(file: string, value: unknown): void {
   const temporary = `${file}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temporary, JSON.stringify(value), { mode: 0o600, flag: "wx" });
-    const fd = openSync(temporary, "r");
+    // Windows FlushFileBuffers requires a writable file handle.
+    const fd = openSync(temporary, "r+");
     try {
       fsyncSync(fd);
     } finally {

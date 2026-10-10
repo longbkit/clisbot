@@ -21,7 +21,7 @@
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import WebSocket from "ws";
+import { WebSocket } from "ws";
 
 // The daemon's WS path is `/ws` (hub daemon discovery: `ws://<host>:<port>/ws`).
 const URL = process.env.TRUSTED_CLIENT_URL ?? "ws://127.0.0.1:6867/ws";
@@ -48,7 +48,7 @@ function arg(name) {
   return i >= 0 ? args[i + 1] : undefined;
 }
 const agentId = arg("--agent");
-const requestId = arg("--request");
+const permissionRequestId = arg("--request");
 const decision = arg("--decision") ?? "allow";
 const seconds = Number(arg("--seconds") ?? "120");
 
@@ -118,107 +118,128 @@ socket.on("open", () => {
   );
 });
 
-socket.on("message", (raw) => {
-  let frame;
+function readFrame(raw) {
   try {
-    frame = JSON.parse(raw.toString());
+    return JSON.parse(raw.toString());
   } catch {
+    return undefined;
+  }
+}
+
+function printAgent(entry) {
+  const agent = entry?.agent ?? entry;
+  if (!agent?.id) return;
+  const pending = agent.pendingPermissions ?? agent.state?.pendingPermissions;
+  console.log(
+    `${stamp()} agent ${agent.id} title=${JSON.stringify(agent.title ?? agent.name ?? "-")} status=${agent.status ?? agent.lifecycle ?? "-"} pending=${Array.isArray(pending) ? pending.length : "?"}`,
+  );
+}
+
+function handleAgentList(raw) {
+  const frame = readFrame(raw);
+  const message = frame?.type === "session" ? frame.message : frame;
+  const serverInfo = message?.type === "status" && message.payload?.status === "server_info";
+  if (!serverInfo && message?.type !== "fetch_agents_response" && message?.type !== "agent_created")
+    return;
+  if (message.type === "fetch_agents_response" || message.entries) {
+    const entries = Array.isArray(message.payload?.entries)
+      ? message.payload.entries
+      : (message.entries ?? []);
+    entries.forEach(printAgent);
+  }
+  done(0);
+}
+
+function sendPermissionResponse() {
+  const response =
+    decision === "allow"
+      ? { behavior: "allow" }
+      : { behavior: "deny", message: "denied by the scripted trusted client" };
+  console.log(
+    `${stamp()} sending agent_permission_response ${decision} request=${permissionRequestId}`,
+  );
+  socket.send(
+    JSON.stringify({
+      type: "session",
+      message: {
+        type: "agent_permission_response",
+        agentId,
+        requestId: permissionRequestId,
+        response,
+      },
+    }),
+  );
+}
+
+function handleServerInfo() {
+  console.log(`${stamp()} server_info (trusted session established)`);
+  if (mode === "list") {
+    call("fetch_agents_request", {}, 10000);
+    socket.on("message", handleAgentList);
     return;
   }
-  if (frame.type !== "session" || typeof frame.message !== "object") return;
-  const inner = frame.message;
-  const type = inner.type;
-  if (type === "status" && inner.payload?.status === "server_info") {
-    console.log(`${stamp()} server_info (trusted session established)`);
-    if (mode === "list") {
-      call("fetch_agents_request", {}, 10000);
-      socket.on("message", (raw2) => {
-        const f2 = JSON.parse(raw2.toString());
-        const m2 = f2.type === "session" ? f2.message : f2;
-        if (
-          m2?.type === "fetch_agents_response" ||
-          m2?.type === "agent_created" ||
-          (m2?.type === "status" && m2.payload?.status === "server_info")
-        ) {
-          if (m2.type === "fetch_agents_response" || m2.entries) {
-            const entries = Array.isArray(m2.payload?.entries)
-              ? m2.payload.entries
-              : (m2.entries ?? []);
-            for (const entry of entries) {
-              const a = entry?.agent ?? entry;
-              if (!a?.id) continue;
-              const pending =
-                a.pendingPermissions ??
-                (Array.isArray(a.state?.pendingPermissions)
-                  ? a.state.pendingPermissions
-                  : undefined);
-              console.log(
-                `${stamp()} agent ${a.id} title=${JSON.stringify(a.title ?? a.name ?? "-")} status=${a.status ?? a.lifecycle ?? "-"} pending=${Array.isArray(pending) ? pending.length : "?"}`,
-              );
-            }
-          }
-          done(0);
-        }
-      });
-      return;
-    }
-    call("agent.timeline.set_subscription.request", { agentIds: [agentId] }, 10000);
-    console.log(`${stamp()} timeline subscribed for ${agentId}`);
-    if (mode === "answer") {
-      const response =
-        decision === "allow"
-          ? { behavior: "allow" }
-          : { behavior: "deny", message: "denied by the scripted trusted client" };
-      console.log(`${stamp()} sending agent_permission_response ${decision} request=${requestId}`);
-      socket.send(
-        JSON.stringify({
-          type: "session",
-          message: { type: "agent_permission_response", agentId, requestId, response },
-        }),
-      );
-    }
-    return;
-  }
-  if (type === "agent_stream") {
-    const event = inner.payload?.event;
-    const eventType = event?.type;
-    if (eventType === "permission_requested") {
-      console.log(
-        `${stamp()} STREAM permission_requested id=${event.requestId ?? event.id} name=${event.name ?? event.toolName ?? "?"}`,
-      );
-    } else if (eventType === "permission_resolved") {
-      seen.permissionResolved += 1;
-      console.log(
-        `${stamp()} STREAM permission_resolved id=${event.requestId} resolution=${JSON.stringify(event.resolution ?? "-")}`,
-      );
-      if (mode === "answer" && seen.permissionResolved >= 1) done(0);
-    }
-    return;
-  }
-  if (type === "agent_permission_resolved") {
-    seen.agentPermissionResolved += 1;
+  call("agent.timeline.set_subscription.request", { agentIds: [agentId] }, 10000);
+  console.log(`${stamp()} timeline subscribed for ${agentId}`);
+  if (mode === "answer") sendPermissionResponse();
+}
+
+function handleAgentStream(inner) {
+  const event = inner.payload?.event;
+  if (event?.type === "permission_requested") {
     console.log(
-      `${stamp()} FANOUT agent_permission_resolved agent=${inner.payload?.agentId} request=${inner.payload?.requestId} resolution=${JSON.stringify(inner.payload?.resolution ?? "-")}`,
+      `${stamp()} STREAM permission_requested id=${event.requestId ?? event.id} name=${event.name ?? event.toolName ?? "?"}`,
+    );
+  } else if (event?.type === "permission_resolved") {
+    seen.permissionResolved += 1;
+    console.log(
+      `${stamp()} STREAM permission_resolved id=${event.requestId} resolution=${JSON.stringify(event.resolution ?? "-")}`,
     );
     if (mode === "answer" && seen.permissionResolved >= 1) done(0);
-    return;
   }
-  if (type === "rpc_error") {
-    seen.rpcErrors += 1;
-    console.log(
-      `${stamp()} RPC_ERROR ${JSON.stringify(inner.error ?? inner.payload ?? inner).slice(0, 300)}`,
-    );
-    return;
-  }
-  if (type === "agent_update" || type === "agent_attention_required") {
-    const state = inner.payload?.agent ?? inner.agent;
-    const pending = state?.pendingPermissions;
-    const attention =
-      type === "agent_attention_required" ? ` reason=${inner.payload?.reason ?? "-"}` : "";
-    console.log(
-      `${stamp()} ${type} agent=${state?.id ?? inner.payload?.agentId ?? "-"} lifecycle=${state?.lifecycle ?? state?.status ?? "-"} pending=${Array.isArray(pending) ? pending.length : "?"}${attention}`,
-    );
-    return;
+}
+
+function handlePermissionResolved(inner) {
+  seen.agentPermissionResolved += 1;
+  console.log(
+    `${stamp()} FANOUT agent_permission_resolved agent=${inner.payload?.agentId} request=${inner.payload?.requestId} resolution=${JSON.stringify(inner.payload?.resolution ?? "-")}`,
+  );
+  if (mode === "answer" && seen.permissionResolved >= 1) done(0);
+}
+
+function printAgentUpdate(inner) {
+  const state = inner.payload?.agent ?? inner.agent;
+  const pending = state?.pendingPermissions;
+  const attention =
+    inner.type === "agent_attention_required" ? ` reason=${inner.payload?.reason ?? "-"}` : "";
+  console.log(
+    `${stamp()} ${inner.type} agent=${state?.id ?? inner.payload?.agentId ?? "-"} lifecycle=${state?.lifecycle ?? state?.status ?? "-"} pending=${Array.isArray(pending) ? pending.length : "?"}${attention}`,
+  );
+}
+
+socket.on("message", (raw) => {
+  const frame = readFrame(raw);
+  if (frame?.type !== "session" || !frame.message || typeof frame.message !== "object") return;
+  const inner = frame.message;
+  switch (inner.type) {
+    case "status":
+      if (inner.payload?.status === "server_info") handleServerInfo();
+      break;
+    case "agent_stream":
+      handleAgentStream(inner);
+      break;
+    case "agent_permission_resolved":
+      handlePermissionResolved(inner);
+      break;
+    case "rpc_error":
+      seen.rpcErrors += 1;
+      console.log(
+        `${stamp()} RPC_ERROR ${JSON.stringify(inner.error ?? inner.payload ?? inner).slice(0, 300)}`,
+      );
+      break;
+    case "agent_update":
+    case "agent_attention_required":
+      printAgentUpdate(inner);
+      break;
   }
 });
 
