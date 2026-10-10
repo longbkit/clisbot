@@ -1,6 +1,7 @@
 name: Nix
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -26,7 +27,7 @@ jobs:
         run: ./scripts/update-nix.sh
 
       - name: Build Nix package
-        run: nix build .#default -o result
+        run: nix build --print-build-logs .#default -o result
 
       - name: Smoke Nix daemon
         run: |
@@ -97,8 +98,29 @@ jobs:
 
           exit 1
 
+      - name: Smoke Nix local Hub
+        run: |
+          set -euo pipefail
+          export CLISBOT_HOME
+          CLISBOT_HOME="$(mktemp -d)"
+          export CLISBOT_HUB_CHANNELS_ENABLED=0
+          cleanup() {
+            ./result/bin/clisbot hub stop || true
+            rm -rf "$CLISBOT_HOME"
+          }
+          trap cleanup EXIT
+          ./result/bin/clisbot hub start --port 6869 --init-master-key
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:6869/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$CLISBOT_HOME/hub.log"
+          exit 1
+
       - name: Build Nix desktop package
-        run: nix build .#desktop -o result-desktop
+        run: nix build --print-build-logs .#desktop -o result-desktop
 
   build-desktop-darwin:
     runs-on: macos-14
@@ -110,7 +132,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Build Nix desktop package
-        run: nix build .#desktop -o result-desktop
+        run: nix build --print-build-logs .#desktop -o result-desktop
 
       - name: Verify macOS application bundle
         run: |
