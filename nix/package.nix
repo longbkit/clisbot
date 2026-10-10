@@ -52,9 +52,8 @@ buildNpmPackage rec {
       # not necessarily documentation: skills/*/SKILL.md is a runtime file the
       # daemon's trace script copies into the output.
       && builtins.match "/[^/]+\\.md" relPath == null
-      # Exclude test fixtures and debug files
-      && !(lib.hasSuffix ".test.ts" baseName)
-      && !(lib.hasSuffix ".e2e.test.ts" baseName)
+      # Keep TypeScript inputs intact; workspace tsconfigs own build exclusions.
+      # Exclude local dependencies and debug files.
       && baseName != "node_modules"
       && baseName != ".git"
       && baseName != ".clisbot"
@@ -87,6 +86,9 @@ buildNpmPackage rec {
   # Don't use the default npm build hook — we need a custom build sequence
   dontNpmBuild = true;
 
+  # Match the desktop build budget for the bundled Hub and runtime trace.
+  env.NODE_OPTIONS = "--max-old-space-size=4096";
+
   buildPhase = ''
     runHook preBuild
 
@@ -95,8 +97,8 @@ buildNpmPackage rec {
     # daemon closure by scripts/trace-daemon.mjs.
     npm rebuild node-pty
 
-    # Build all server packages in dependency order (defined in package.json)
-    npm run build:server
+    # Build the CLI, daemon and local Hub, including its channel runtimes.
+    npm run build:desktop-backends
     npm run build:daemon-web-ui
 
     runHook postBuild
