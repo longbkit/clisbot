@@ -315,7 +315,11 @@ test("failed Hub creates release their lifecycle subscriptions", async () => {
   expect(hub.activeOwnedAgentIds()).toEqual([]);
   expect(await hub.durableOwnedAgentIds()).toEqual([]);
   expect(await hub.listedWorktrees()).toHaveLength(1);
-  expect(hub.agentSubscriptionCount()).toBe(subscriptionBaseline);
+  // Workspace auto-naming also owns temporary internal-agent subscriptions.
+  // Require cleanup after that background work settles, without masking a leak.
+  await expect
+    .poll(() => hub.agentSubscriptionCount(), { timeout: 5_000 })
+    .toBe(subscriptionBaseline);
 
   hub.failProviderPromptStart();
   hub.beginOwnedCreate("failed-prompt-create-2", "failed-prompt-execution-2");
@@ -328,7 +332,9 @@ test("failed Hub creates release their lifecycle subscriptions", async () => {
   expect(hub.activeOwnedAgentIds()).toEqual([]);
   expect(await hub.durableOwnedAgentIds()).toEqual([]);
   expect(await hub.listedWorktrees()).toHaveLength(1);
-  expect(hub.agentSubscriptionCount()).toBe(subscriptionBaseline);
+  await expect
+    .poll(() => hub.agentSubscriptionCount(), { timeout: 5_000 })
+    .toBe(subscriptionBaseline);
 });
 
 test("failed Hub create cleans durable state when provider close rejects", async () => {
