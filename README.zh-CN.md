@@ -100,7 +100,7 @@ Clisbot 会运行一个名为 daemon 的本地服务，用来管理你的 coding
 安装 CLI 并启动 Clisbot：
 
 ```bash
-npm install -g @clisbot/cli
+npm install -g clisbot
 clisbot
 ```
 

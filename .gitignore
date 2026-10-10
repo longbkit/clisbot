@@ -123,3 +123,7 @@ app.json
 !/packages/hub/examples/single-repo-team-bot/.clisbot/**
 !/packages/hub/src/config/fixtures/current-project/.clisbot/
 !/packages/hub/src/config/fixtures/current-project/.clisbot/**
+
+# Private release accounts, signing references and operation history.
+/.local/release-operations/
+/packages/app/credentials.json

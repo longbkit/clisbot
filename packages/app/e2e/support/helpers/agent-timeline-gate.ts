@@ -161,7 +161,10 @@ function recordRepeatedTimelineEntries(
   return repeats;
 }
 
-export async function holdDaemonHydration(page: Page): Promise<DaemonHydrationGate> {
+export async function holdDaemonHydration(
+  page: Page,
+  agentId: string,
+): Promise<DaemonHydrationGate> {
   let released = false;
   const delayedForwards: Array<() => void> = [];
 
@@ -169,7 +172,15 @@ export async function holdDaemonHydration(page: Page): Promise<DaemonHydrationGa
     const server = ws.connectToServer();
     ws.onMessage((message) => server.send(message));
     server.onMessage((message) => {
-      if (released) {
+      // A cold workspace needs the Host handshake before it can mount cached content.
+      // Delay authoritative history only; connection and directory setup stay live.
+      const sessionMessage = getSessionMessage(message);
+      const payload = sessionMessage ? getPayload(sessionMessage) : null;
+      if (
+        released ||
+        sessionMessage?.type !== "fetch_agent_timeline_response" ||
+        payload?.agentId !== agentId
+      ) {
         ws.send(message);
         return;
       }
@@ -364,12 +375,16 @@ export async function holdAgentOlderTimelinePages(
     daemonPort === undefined ? daemonWsRoutePattern() : wsRoutePatternForPort(String(daemonPort));
   await page.routeWebSocket(routePattern, (ws) => {
     const server = ws.connectToServer();
+    const speculativeForwards: Array<() => void> = [];
     ws.onMessage((message) => {
       const sessionMessage = getSessionMessage(message);
       if (
         sessionMessage?.type === "fetch_agent_timeline_request" &&
         sessionMessage.agentId === agentId &&
-        sessionMessage.direction === "before"
+        sessionMessage.direction === "before" &&
+        // Reading may speculatively prefetch one page. This gate holds the
+        // user-driven pagination request, matching the timeline owner's boundary.
+        !String(sessionMessage.requestId).startsWith("clisbot-prefetch:")
       ) {
         requestCount += 1;
         resolveRequestWaiters();
@@ -379,6 +394,12 @@ export async function holdAgentOlderTimelinePages(
     server.onMessage((message) => {
       const sessionMessage = getSessionMessage(message);
       const payload = sessionMessage ? getPayload(sessionMessage) : null;
+      if (String(payload?.requestId).startsWith("clisbot-prefetch:")) {
+        // Keep speculative cache expansion behind the page this test is holding.
+        // Deliver it after that page so the owner can discard the obsolete prefetch.
+        speculativeForwards.push(() => ws.send(message));
+        return;
+      }
       if (
         sessionMessage?.type === "fetch_agent_timeline_response" &&
         payload?.agentId === agentId &&
@@ -394,12 +415,16 @@ export async function holdAgentOlderTimelinePages(
         responseCount += 1;
         repeatedEntryCount += recordRepeatedTimelineEntries(payload, entryKeys);
         const pageNumber = responseCount;
-        if (releasedPages.has(pageNumber)) {
+        const forward = () => {
           ws.send(message);
+          for (const speculative of speculativeForwards.splice(0)) speculative();
+        };
+        if (releasedPages.has(pageNumber)) {
+          forward();
           return;
         }
         const forwards = delayedForwards.get(pageNumber) ?? [];
-        forwards.push(() => ws.send(message));
+        forwards.push(forward);
         delayedForwards.set(pageNumber, forwards);
         return;
       }

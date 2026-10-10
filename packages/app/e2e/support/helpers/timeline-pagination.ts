@@ -1,6 +1,7 @@
 import { expect, type TestInfo, type Page } from "@playwright/test";
 import { buildAgentRoute, seedMockAgentWorkspace, type MockAgentWorkspace } from "./mock-agent";
 import { readReplicaCache } from "./replica-cache-storage";
+import { loadSessionMessageReaders } from "./new-workspace";
 import {
   delayAgentBootstrapTailResponse,
   delayAgentOlderTimelineResponse,
@@ -67,6 +68,22 @@ interface OlderHistoryPages {
 
 function promptForTurn(index: number): string {
   return `${PROMPT_PREFIX}-${index}: emit 1 coalesced agent stream updates`;
+}
+
+export async function observeLiveAssistantText(page: Page, agentId: string): Promise<() => string> {
+  const frames = await loadSessionMessageReaders();
+  let text = "";
+  page.on("websocket", (socket) => {
+    socket.on("framereceived", ({ payload }) => {
+      const message = frames.server(payload);
+      if (message?.type !== "agent_stream" || message.payload.agentId !== agentId) return;
+      const event = message.payload.event;
+      if (event.type === "timeline" && event.item.type === "assistant_message") {
+        text += event.item.text;
+      }
+    });
+  });
+  return () => text;
 }
 
 export async function seedLongMockAgentTimeline(
@@ -503,11 +520,11 @@ async function returnTimelineToSettledHistoryStart(
 }
 
 export async function scrollTimelineToNewestLoadedEdge(page: Page): Promise<void> {
-  const scroll = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
-  await scroll.evaluate((element) => {
-    if (!(element instanceof HTMLElement)) {
-      throw new Error("Agent chat scroll element is not an HTMLElement");
-    }
+  await page.evaluate(() => {
+    const element = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+    ).find((candidate) => candidate.getClientRects().length > 0);
+    if (!element) throw new Error("Agent chat scroll container is not visible");
     element.scrollTop = element.scrollHeight;
     element.dispatchEvent(new Event("scroll", { bubbles: true }));
   });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SessionActorSchema } from "@clisbot/protocol/session-authorship";
 import type { SplitNode, WorkspaceLayout } from "./workspace-layout-actions";
 
 const WorkspaceDraftTabSetupStorageSchema = z.strictObject({
@@ -18,6 +19,11 @@ const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("conversation"),
     chatId: z.string(),
+    ...WorkspaceTabSourceStorageShape,
+  }),
+  z.strictObject({
+    kind: z.literal("user_profile"),
+    actor: SessionActorSchema,
     ...WorkspaceTabSourceStorageShape,
   }),
   z.strictObject({ ...WorkspaceTabSourceStorageShape, kind: z.literal("new_tab") }),

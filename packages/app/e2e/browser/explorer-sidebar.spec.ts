@@ -1,4 +1,5 @@
 import { expect, test } from "../support/fixtures";
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import {
   gotoWorkspace,
   pressNewTabShortcut,
@@ -112,12 +113,9 @@ async function closeOtherExplorerTabs(page: Parameters<typeof ensureExplorerSide
     exact: true,
   });
   await files.click({ button: "right", position: { x: 12, y: 13 } });
-  const confirmation = page.waitForEvent("dialog").then((dialog) => {
-    expect(dialog.message()).toContain("close 1 tab");
-    return dialog.accept();
-  });
   await page.getByRole("menuitem", { name: "Close other tabs", exact: true }).click();
-  await confirmation;
+  const confirmation = await answerAppConfirmation(page, "accept");
+  expect(confirmation.message()).toContain("close 1 tab");
 }
 
 test("Explorer keeps Files and Changes close actions in the context menu", async ({

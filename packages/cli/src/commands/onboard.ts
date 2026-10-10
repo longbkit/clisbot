@@ -19,6 +19,7 @@ import { formatPairingInstructions } from "../output/pairing.js";
 import { isPersonalServingHome } from "./serve/default-serving.js";
 import { outputPersonalServices, startPersonalDaemon } from "./serve/index.js";
 import { selectLocalPort } from "./hub/local-port.js";
+import { prepareV1Upgrade } from "./legacy-v1/prepare-upgrade.js";
 import {
   confirmRelayPairing,
   printDirectConnectionGuidance,
@@ -299,6 +300,7 @@ export async function runOnboard(options: OnboardOptions): Promise<void> {
 
   if (options.daemonTarget.kind !== "instance") throw new Error("Onboarding requires a local home");
   const clisbotHome = options.daemonTarget.home;
+  await prepareV1Upgrade(clisbotHome);
   const personal = isPersonalServingHome({ ...process.env, CLISBOT_HOME: clisbotHome });
   const alreadyRunning = await readDaemonInstance(clisbotHome);
   if (personal) await initializePersonalHome(clisbotHome);

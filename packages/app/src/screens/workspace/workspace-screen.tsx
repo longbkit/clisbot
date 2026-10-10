@@ -158,6 +158,7 @@ import {
   type WorkspaceRouteState,
 } from "@/screens/workspace/workspace-route-state";
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
+import { WorkspaceContentGate } from "@/screens/workspace/workspace-content-gate";
 import { useWorkspaceRecovery } from "@/workspace-recovery/use-workspace-recovery";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import {
@@ -1350,13 +1351,21 @@ function WorkspaceScreenGateFrame({ children }: { children: ReactNode }) {
 function WorkspaceContentProviders({
   children,
   workspaceKey,
+  kind,
+  gate,
 }: {
   children: ReactNode;
   workspaceKey: string | null;
+  kind: WorkspaceRouteState["kind"];
+  gate: ReactNode;
 }) {
   return (
     <WorkspaceFocusProvider workspaceKey={workspaceKey}>
-      <DiffDocumentWorkspaceCacheProvider>{children}</DiffDocumentWorkspaceCacheProvider>
+      <DiffDocumentWorkspaceCacheProvider>
+        <WorkspaceContentGate kind={kind} gate={gate}>
+          {children}
+        </WorkspaceContentGate>
+      </DiffDocumentWorkspaceCacheProvider>
     </WorkspaceFocusProvider>
   );
 }
@@ -4180,11 +4189,13 @@ function WorkspaceScreenContent({
     </RenderProfile>
   );
 
-  if (gatedWorkspaceScreen) {
-    return gatedWorkspaceScreen;
-  }
   return (
-    <WorkspaceContentProviders key={persistenceKey} workspaceKey={persistenceKey}>
+    <WorkspaceContentProviders
+      key={persistenceKey}
+      workspaceKey={persistenceKey}
+      kind={workspaceRouteState.kind}
+      gate={gatedWorkspaceScreen}
+    >
       {renderedWorkspaceScreen}
     </WorkspaceContentProviders>
   );

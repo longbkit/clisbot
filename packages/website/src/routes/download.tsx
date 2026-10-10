@@ -189,8 +189,8 @@ function Download() {
           <PlatformRow icon={TerminalIcon} label="npm">
             <CodeBlock size="sm">
               {onBeta
-                ? "npm install -g @clisbot/cli@beta && clisbot"
-                : "npm install -g @clisbot/cli && clisbot"}
+                ? "npm install -g clisbot@beta && clisbot"
+                : "npm install -g clisbot && clisbot"}
             </CodeBlock>
           </PlatformRow>
 

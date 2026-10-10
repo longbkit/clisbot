@@ -9,7 +9,7 @@ import { expect, test } from "vitest";
 const it = test.runIf(process.platform === "linux");
 
 const require = createRequire(import.meta.url);
-const afterPack = require("../../scripts/after-pack.js").default;
+const { installLinuxLauncher } = require("../../scripts/linux-sandbox");
 
 async function launch(
   options: {
@@ -45,8 +45,8 @@ async function launch(
     }
     writeFileSync(join(app, "chrome-sandbox"), "helper");
     chmodSync(join(app, "chrome-sandbox"), 0o755);
-    await afterPack({ appOutDir: app, electronPlatformName: "linux", arch: 1 });
-    if (options.rerun) await afterPack({ appOutDir: app, electronPlatformName: "linux", arch: 1 });
+    installLinuxLauncher(app);
+    if (options.rerun) installLinuxLauncher(app);
     const executablePath = options.symlink ? join(root, "clisbot") : join(app, "Clisbot");
     if (options.symlink) symlinkSync(join(app, "Clisbot"), executablePath);
     const args = options.args ?? ["path with spaces", "$(touch never)", "semi;colon", "*.txt"];

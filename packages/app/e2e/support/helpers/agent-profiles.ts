@@ -1,3 +1,4 @@
+import { answerAppConfirmation } from "./confirmation";
 import { expect, type Locator, type Page } from "@playwright/test";
 import type { AgentProfile } from "@clisbot/protocol/messages";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
@@ -205,18 +206,12 @@ export async function moveAgentProfileDown(page: Page, name: string): Promise<vo
 }
 
 /**
- * The remove confirmation is `window.confirm` on browser web, so the dialog is
- * consumed here — and its text is asserted, since naming the profile is the
- * whole point of confirming.
+ * The rendered confirmation names the profile before the user approves removal.
  */
 export async function removeAgentProfile(page: Page, name: string): Promise<void> {
-  const dialogMessage = page.waitForEvent("dialog").then(async (dialog) => {
-    const message = dialog.message();
-    await dialog.accept();
-    return message;
-  });
+  const confirmation = answerAppConfirmation(page, "accept");
   await agentProfileRow(page, name).getByRole("button", { name: "Remove", exact: true }).click();
-  expect(await dialogMessage).toContain(`Remove "${name}"?`);
+  expect((await confirmation).message()).toContain(`Remove "${name}"?`);
   await expect(agentProfileRow(page, name)).toHaveCount(0, { timeout: 30_000 });
 }
 

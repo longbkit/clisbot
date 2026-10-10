@@ -19,6 +19,7 @@ const DECIDED_ELSEWHERE = new Set([
   "bot.update.request",
   "bot.archive.request",
   "bot.template.seed.request",
+  "bot.template.preview.request", // Host privilege, decided by bot-access.ts
 ]);
 
 function message(type: string, fields: Record<string, unknown> = {}): SessionInboundMessage {
@@ -58,8 +59,9 @@ function authority(
     // `/work/a/wt` is an existing workspace folder inside Project A.
     isExistingProjectPlace: async (path) => ["/work/a", "/work/b", "/work/a/wt"].includes(path),
     mayCreateProjectAt: async (path) => {
-      input.checked?.push(path);
-      return path.startsWith("/free/");
+      const portable = path.replaceAll("\\", "/");
+      input.checked?.push(portable);
+      return portable.startsWith("/free/");
     },
   };
 }
@@ -149,7 +151,7 @@ describe("workspace.manage operations in a Project-restricted session", () => {
       message("project.add.request", { cwd: "~/new" }),
       authority({ host: true, checked }),
     );
-    expect(checked).toEqual([nodePath.join(os.homedir(), "new")]);
+    expect(checked).toEqual([nodePath.join(os.homedir(), "new").replaceAll("\\", "/")]);
   });
 
   test("managing one Project never reaches another the session can only use", async () => {

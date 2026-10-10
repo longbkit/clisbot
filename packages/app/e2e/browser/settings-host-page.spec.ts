@@ -1,3 +1,4 @@
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
 import { getE2EDaemonPort } from "../support/helpers/daemon-port";
@@ -81,9 +82,10 @@ test.describe("Settings host page", () => {
     await openSettingsHost(page, outdatedDaemon.serverId);
     await openHostSection(page, outdatedDaemon.serverId, "host");
 
-    page.once("dialog", (dialog) => dialog.accept());
+    const confirmation = answerAppConfirmation(page, "accept");
     const updateButton = page.getByTestId("host-page-update-button");
     await updateButton.click();
+    await confirmation;
 
     await expect(
       updateButton.filter({ hasText: /Preparing update|Downloading packages|Installing/ }),

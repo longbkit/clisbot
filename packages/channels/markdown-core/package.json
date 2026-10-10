@@ -1,8 +1,14 @@
 {
   "name": "@clisbot/channels-markdown-core",
-  "version": "0.7.3-beta.1",
-  "private": true,
+  "version": "2.0.0",
   "description": "OpenClaw markdown-core ported for the in-repo channel verticals; mirrors upstream packages/markdown-core/src under src (docs/audits/2026-09-07-openclaw-channel-port-goal.md). Manifest: upstream-sync.json",
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "SYNC.md",
+    "upstream-sync.json"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,10 +23,14 @@
       "default": "./dist/*.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsgo -p tsconfig.json",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "markdown-it": "15.0.1",

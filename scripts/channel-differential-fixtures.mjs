@@ -159,6 +159,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main(process.argv.slice(2)).then(
     (code) => {
       process.exitCode = code;
+      return code;
     },
     (error) => {
       process.stderr.write(`${error.stack ?? error.message}\n`);

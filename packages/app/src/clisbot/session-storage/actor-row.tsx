@@ -153,9 +153,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: ACTOR_NAME_ROW_OFFSET,
   },
   content: {
-    flexShrink: 1,
+    flex: 1,
     minWidth: 0,
-    alignItems: "flex-start",
+    alignItems: "stretch",
     maxWidth: "100%",
   },
   contentRight: { alignItems: "flex-end" },

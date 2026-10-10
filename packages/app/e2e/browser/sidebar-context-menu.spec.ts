@@ -14,6 +14,11 @@ import {
 } from "../support/helpers/sidebar";
 
 test.describe("Sidebar context menus", () => {
+  // Clisbot's sidebar puts the Bots section and more nav rows above Projects, so at the default
+  // 720px height a menu opened on the first project row no longer fits below the pointer and
+  // flips above it. Give it room so the pointer-anchored placement is what gets measured.
+  test.use({ viewport: { width: 1280, height: 1000 } });
+
   test("right-clicking workspace and project rows opens their actions at the pointer", async ({
     page,
   }) => {

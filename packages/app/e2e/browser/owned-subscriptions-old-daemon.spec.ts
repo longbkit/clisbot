@@ -18,7 +18,7 @@ import {
   scrollThroughOlderHistoryPages,
 } from "../support/helpers/timeline-pagination";
 
-test("does not repeat an assistant block when the current app paginates a published 0.2.5 daemon", async ({
+test("does not repeat an assistant block when the current app paginates a normalized upstream 0.2.5 daemon", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -45,7 +45,7 @@ test("does not repeat an assistant block when the current app paginates a publis
     provider: "mock",
     cwd: workspace.repoPath,
     workspaceId: workspace.workspaceId,
-    title: "Published daemon pagination regression",
+    title: "Historical daemon pagination regression",
     modeId: "load-test",
     model: "ten-second-stream",
   });

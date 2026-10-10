@@ -1,4 +1,5 @@
 import { ProviderSubagentPersistence } from "./persistence.js";
+import type { ProjectedTimelineFetchResult } from "../session-storage/projected-timeline.js";
 import type { AgentProvider, AgentTimelineItem } from "../agent-sdk-types.js";
 import { limitAgentTimelineItemContent } from "../agent-timeline-content.js";
 import { InMemoryAgentTimelineStore } from "../agent-timeline-store.js";
@@ -222,20 +223,25 @@ export class ProviderSubagentStore {
     options?: AgentTimelineFetchOptions,
   ): Promise<AgentTimelineFetchResult<AgentTimelineRow>> {
     await this.operations.get(parentAgentId);
-    return this.persistence
-      ? this.persistence.fetch(parentAgentId, subagentId, options)
-      : this.fetchTimeline(parentAgentId, subagentId, options);
+    if (this.persistence && !this.hasLiveReadOnlyTimeline(parentAgentId, subagentId))
+      return this.persistence.fetch(parentAgentId, subagentId, options);
+    return this.fetchTimeline(parentAgentId, subagentId, options);
   }
 
   async fetchProjectedCommittedTimeline(
     parentAgentId: string,
     subagentId: string,
     options?: AgentTimelineFetchOptions,
-  ) {
+  ): Promise<ProjectedTimelineFetchResult> {
     await this.operations.get(parentAgentId);
-    return this.persistence
-      ? this.persistence.fetchProjected(parentAgentId, subagentId, options)
-      : null;
+    if (this.persistence && !this.hasLiveReadOnlyTimeline(parentAgentId, subagentId))
+      return this.persistence.fetchProjected(parentAgentId, subagentId, options);
+    const page = this.fetchTimeline(parentAgentId, subagentId, options);
+    return { ...page, rows: [], entries: page.rows };
+  }
+
+  private hasLiveReadOnlyTimeline(parentAgentId: string, subagentId: string): boolean {
+    return !this.writable && this.timelines.has(storeKey(parentAgentId, subagentId));
   }
   async readPayload(
     parentAgentId: string,

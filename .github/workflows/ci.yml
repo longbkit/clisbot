@@ -227,7 +227,9 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.desktop != 'false') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Includes backend/UI builds, installed-artifact smoke, Electron lifecycle,
+    # renderer tests and browser tabs; keep their individual timeouts bounded.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps: &desktop_test_steps
@@ -243,6 +245,9 @@ jobs:
 
       - name: Build desktop backends
         run: npm run build:desktop-backends
+
+      - name: Build shared daemon web UI for packaged serving
+        run: npm run build:daemon-web-ui
 
       - name: Run desktop tests
         run: npm run test --workspace=@clisbot/desktop
@@ -423,11 +428,14 @@ jobs:
         run: node scripts/npm-retry.mjs install -g @anthropic-ai/claude-code @openai/codex@0.105.0 opencode-ai
 
       - name: Run Playwright E2E tests
-        run: npm run test:e2e --workspace=@clisbot/app -- --shard=${{ env.PLAYWRIGHT_SHARD }}
+        run: npm run test:e2e --workspace=@clisbot/app -- --shard=${{ env.PLAYWRIGHT_SHARD }} --reporter=list,github
         env:
           # Weight file groups by observed duration; raw test counts overload
           # early agent/Changes specs. Required check names remain unchanged.
           PWTEST_SHARD_WEIGHTS: "111:172:137:160"
+          # Stream rendering, Metro, and retry traces share each runner's CPU.
+          # Keep all four shards parallel, with one browser worker per runner.
+          E2E_WORKERS: "1"
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4

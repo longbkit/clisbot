@@ -107,6 +107,34 @@ describe("reading anchor", () => {
     expect(anchor.getRowId()).toBe("above");
   });
 
+  it("keeps text below a shrinking image in place after wheel input enters its lower edge", () => {
+    const anchor = createReadingAnchor();
+    const before = [
+      { id: "image", top: 0, height: 533 },
+      { id: "code", top: 533, height: 130 },
+      { id: "text", top: 663, height: 81 },
+    ];
+    anchor.reconcile(684, before);
+    anchor.scroll(524);
+    expect(anchor.getRowId()).toBe("image");
+    const after = [
+      { id: "image", top: 0, height: 215 },
+      { id: "code", top: 215, height: 130 },
+      { id: "text", top: 345, height: 81 },
+    ];
+    expect(anchor.project(524, after[0])).toBe(206);
+    expect(anchor.project(524, after[0])).toBe(206);
+    expect(anchor.reconcile(524, after)).toBe(206);
+    expect(anchor.reconcile(206, after)).toBe(206);
+    expect(after[2]!.top - 206).toBe(before[2]!.top - 524);
+  });
+
+  it("keeps the same offset when the reader still fits inside a shrinking row", () => {
+    const anchor = createReadingAnchor();
+    anchor.reconcile(100, [{ id: "image", top: 0, height: 533 }]);
+    expect(anchor.reconcile(100, [{ id: "image", top: 0, height: 215 }])).toBe(100);
+  });
+
   it("releases the old reading position for explicit navigation", () => {
     const anchor = createReadingAnchor();
     anchor.reconcile(600, rows);

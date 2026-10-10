@@ -189,7 +189,7 @@ export function ApiKeys() {
           description={`Machine access for ${account.organization.name}.`}
         />
         <Alert>
-          <AlertDescription>You don't have permission to manage API keys.</AlertDescription>
+          <AlertDescription>You don&apos;t have permission to manage API keys.</AlertDescription>
         </Alert>
       </>
     );
@@ -442,6 +442,9 @@ function ApiKeyDialog({
   useEffect(() => {
     if (!open) setSelectedScopes(0);
   }, [open]);
+  const scopeOptions = SCOPE_OPTIONS.map((option) => (
+    <ScopeOption key={option.value} option={option} onChange={updateScope} />
+  ));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -468,11 +471,7 @@ function ApiKeyDialog({
               <Field>
                 <fieldset className="grid gap-3">
                   <legend className="text-sm leading-snug">Scopes</legend>
-                  <div className="grid gap-3">
-                    {SCOPE_OPTIONS.map((option) => (
-                      <ScopeOption key={option.value} option={option} onChange={updateScope} />
-                    ))}
-                  </div>
+                  <div className="grid gap-3">{scopeOptions}</div>
                   <FieldDescription>Select at least one scope.</FieldDescription>
                 </fieldset>
               </Field>

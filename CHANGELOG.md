@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.0.0 - 2026-10-10
+
+Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/desktop app and Hub architecture. Its Paseo baseline is `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`; Clisbot now maintains an independent version series.
+
+**Before upgrading:** use Node.js 22.19 or newer. After publication, run `npm install -g clisbot@2.0.0`, then `npx --yes clisbot@2.0.0 onboard`. See [the upgrade guide](docs/guides/user-guide/getting-started/upgrade-v2.md) for a separate home, local access and rollback.
+
+### Added
+
+- Kept `clisbot` as the npm entry, installing the CLI, daemon, Hub and runtime channel packages together; both `clisbot` and `clis` commands select the v2 CLI.
+- Added a resumable legacy-home handover: snapshot v1 configuration and credentials before stopping verified v1 processes, preserve `clisbot.json`, prepare `config.json`, and register existing working directories as Projects.
+- Added supported legacy provider/name choices as launch profiles. Provider-native logins and workspace files remain in their existing locations.
+- Added a versioned npm publication graph and a fresh-install check using the real package artifacts, including onboarding, pairing, the shared app UI and local Hub backend.
+
+### Changed
+
+- Workspace versions and internal runtime dependencies now follow Clisbot `2.0.0`; Paseo provenance is tracked separately in `upstream-baseline.json`.
+- Channel Connections, Rules and sender permissions are managed in the Hub. Legacy channel tokens, owner/admin assignments, tmux sessions, queued prompts, loops and custom runner options need the manual setup described in the upgrade guide; they are not automatically converted.
+- Mobile store builds target the `com.clisbot.app` application identifier.
+
+### Fixed
+
+- Kept Project tools available when a Connector cannot be loaded, and made newly enabled tools available to running sessions.
+- Avoided loading the daemon implementation during CLI command registration.
+- Daemon updates now update the public `clisbot` npm package and its matching CLI dependency.
+- Preserved live messages and access to older history when reconnecting to a chat.
+- Kept reading position stable when images finish loading while scrolling through chat history.
+- Kept Welcome settings accessible beside desktop window controls.
+- Kept the Settings Host picker usable near the bottom of the window.
+- Fixed Android release builds with Firebase analytics configured.
+- Kept separate assistant replies with identical text from merging during history synchronization.
+- Updated Electron to 44.5.0 so hidden browser tabs stop rendering after a screenshot.
+
 ## 0.11.1 - 2026-10-07
 
 ### Added

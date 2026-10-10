@@ -8812,6 +8812,26 @@ export class Session {
     }
   }
 
+  private legacySubagentTimelineItem(item: AgentTimelineRow["item"], source?: object) {
+    return this.supportsSubagentTimelineItem(item, source)
+      ? item
+      : {
+          type: "assistant_message" as const,
+          text: "Please upgrade Clisbot to view this subagent conversation.",
+        };
+  }
+
+  private buildLegacySubagentTimelineRows(entries: TimelineProjectionEntry[], source?: object) {
+    return entries.map((entry) => ({
+      item: this.legacySubagentTimelineItem(entry.item, source),
+      timestamp: entry.timestamp,
+      seq: entry.seqEnd,
+      seqStart: entry.seqStart,
+      seqEnd: entry.seqEnd,
+      sourceSeqRanges: entry.sourceSeqRanges,
+    }));
+  }
+
   private async handleProviderSubagentTimelineRequest(
     msg: Extract<SessionInboundMessage, { type: "agent.provider_subagents.timeline.get.request" }>,
     source?: object,
@@ -8834,26 +8854,24 @@ export class Session {
       if (!descriptor) {
         throw new Error("Provider subagent not found");
       }
-      const projected = this.supportsSourceRangeTimeline(msg.pagingMode, source)
-        ? await this.agentManager.readProjectedProviderSubagentTimeline(
-            msg.parentAgentId,
-            msg.subagentId,
-            {
-              direction,
-              cursor: msg.cursor,
-              limit: msg.limit ?? 40,
-              pagingMode: "source_ranges",
-              allowDeferredPayloads: msg.allowDeferredPayloads,
-            },
-          )
-        : null;
-      const timeline =
-        projected ??
-        (await this.agentManager.readProviderSubagentTimeline(msg.parentAgentId, msg.subagentId, {
+      const sourceRanges = this.supportsSourceRangeTimeline(msg.pagingMode, source);
+      // COMPAT(projectedSubagentTimeline): legacy clients retain projected rows;
+      // the storage owner performs the same bounded projection for both wire shapes.
+      const projected = await this.agentManager.readProjectedProviderSubagentTimeline(
+        msg.parentAgentId,
+        msg.subagentId,
+        {
           direction,
           cursor: msg.cursor,
-          limit: msg.limit ?? (direction === "after" ? 0 : 200),
-        }));
+          limit: msg.limit ?? 40,
+          ...(sourceRanges ? { pagingMode: "source_ranges" as const } : {}),
+          ...(sourceRanges ? { allowDeferredPayloads: msg.allowDeferredPayloads } : {}),
+        },
+      );
+      const timeline = projected;
+      const projectedRows = sourceRanges
+        ? []
+        : this.buildLegacySubagentTimelineRows(projected.entries, source);
       this.emitForSource(
         {
           type: "agent.provider_subagents.timeline.get.response",
@@ -8870,7 +8888,8 @@ export class Session {
             window: timeline.window,
             hasOlder: timeline.hasOlder,
             hasNewer: timeline.hasNewer,
-            ...(projected
+            projection: "projected" as const,
+            ...(sourceRanges
               ? {
                   pagingMode: "source_ranges" as const,
                   startCursor:
@@ -8893,11 +8912,7 @@ export class Session {
                   ),
                 }
               : {}),
-            rows: (projected ? [] : timeline.rows).map((row) => ({
-              item: row.item,
-              timestamp: row.timestamp,
-              seq: row.seq,
-            })),
+            rows: projectedRows,
             error: null,
           },
         },

@@ -34,12 +34,27 @@ test("checks actual packaged Hub, gateway, device proof and web assets before di
     "node_modules/@clisbot/cli/dist/commands/serve/service-supervisor-entry.js",
     "node_modules/@clisbot/device-access/dist/authority.js",
     "node_modules/@clisbot/device-access/dist/proof.js",
+    "node_modules/@clisbot/channels-slack/dist/index.js",
+    "node_modules/@clisbot/channels-slack/dist/plugin.js",
   ];
   for (const file of files) {
     const target = path.join(source, file);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, "export {};\n");
   }
+  writeFileSync(
+    path.join(source, "node_modules/@clisbot/hub/channel-pins.json"),
+    JSON.stringify({
+      channels: {
+        slack: {
+          loadMode: "in-repo",
+          inRepoPackage: "@clisbot/channels-slack",
+          entry: "./dist/index.js",
+          plugin: { specifier: "./dist/plugin.js" },
+        },
+      },
+    }),
+  );
   mkdirSync(path.join(resources, "app-dist"), { recursive: true });
   await createPackage(source, path.join(resources, "app.asar"));
   expect(() => verifyPersonalBackends(resources)).toThrow("app-dist/index.html");
@@ -69,4 +84,12 @@ test("checks actual packaged Hub, gateway, device proof and web assets before di
   expect(() => verifyPersonalBackends(resources)).toThrow(
     "@clisbot/hub/.output/server/start-server.js",
   );
+  writeFileSync(
+    path.join(source, "node_modules/@clisbot/hub/.output/server/start-server.js"),
+    "export {};\n",
+  );
+  rmSync(path.join(source, "node_modules/@clisbot/channels-slack/dist/plugin.js"));
+  await createPackage(source, path.join(resources, "app.asar"));
+  uncache(path.join(resources, "app.asar"));
+  expect(() => verifyPersonalBackends(resources)).toThrow("@clisbot/channels-slack/dist/plugin.js");
 });

@@ -18,7 +18,7 @@ describe("deriveProjectKey", () => {
   });
 
   test("normalizes GitHub casing", () => {
-    expect(derive("git@github.com:GetClisbot/Clisbot.git")).toBe(
+    expect(derive("git@github.com:LongBKit/Clisbot.git")).toBe(
       "remote:github.com/longbkit/clisbot",
     );
   });

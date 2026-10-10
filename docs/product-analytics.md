@@ -61,6 +61,9 @@ lifecycle metrics may be collected while native analytics is enabled.
   fresh native build; Expo Go and an OTA-only update cannot add this SDK.
   Both inputs are stored as EAS secret files for production and preview on
   `@lbk-company/clisbot`; development builds do not use them.
+  When enabled, leave Firebase's React Native platform configuration intact:
+  Expo replaces a project's `platforms` override rather than merging the
+  library's CMake paths and iOS script phases into it.
 - Electron collector: `/api/analytics/desktop`, maximum 1 KB, exact field and
   screen allowlists, IP rate limit 120/minute per Cloudflare location. No event
   content is logged or persisted. CORS is an origin filter, not authentication;

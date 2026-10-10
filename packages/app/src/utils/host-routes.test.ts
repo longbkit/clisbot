@@ -49,7 +49,7 @@ describe("workspace route parsing", () => {
   });
 
   it("decodes non-canonical base64url workspace IDs used by older links", () => {
-    expect(decodeWorkspaceIdFromPathSegment("L2hvbWUvdXNlci9kZXYvcGFzZW8")).toBe(
+    expect(decodeWorkspaceIdFromPathSegment("L2hvbWUvdXNlci9kZXYvY2xpc2JvdA")).toBe(
       "/home/user/dev/clisbot",
     );
   });

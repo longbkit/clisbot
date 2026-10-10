@@ -28,8 +28,12 @@ const wsModuleMock = vi.hoisted(() => {
       return this;
     }
 
+    once(event: string, handler: (...args: unknown[]) => void) {
+      return this.on(event, handler);
+    }
+
     close() {
-      // no-op
+      this.handlers.get("close")?.();
     }
   }
 
@@ -111,6 +115,7 @@ function workspaceRecord(overrides?: Partial<PersistedWorkspaceRecord>): Persist
 function createWorkspaceRegistry(records: PersistedWorkspaceRecord[]): WorkspaceRegistry {
   return createStub<WorkspaceRegistry>({
     list: vi.fn(async () => records),
+    get: vi.fn(async (id) => records.find((record) => record.workspaceId === id) ?? null),
   });
 }
 
@@ -138,7 +143,7 @@ function createServer(terminalManager: TerminalManager, workspaceRegistry?: Work
   };
 
   const server = new VoiceAssistantWebSocketServer(
-    createStub<HTTPServer>({}),
+    createStub<HTTPServer>({ on: vi.fn(), off: vi.fn() }),
     createStub<pino.Logger>(createLogger()),
     "srv-test",
     createStub<AgentManager>(agentManager),

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "../fixtures";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { gotoAppShell } from "./app";
 import { scrollTimelineToOldestLoadedEdge } from "./timeline-pagination";
@@ -133,13 +134,36 @@ export async function verifyDelayedWorkspaceCreation(
           (item) => item.type === "uploaded_file",
         );
         if (!upload) throw new Error("The create request did not contain the submitted file");
-        expect(await readFile(upload.path)).toEqual(CONTEXT.buffer);
         const agents = await client.fetchAgents();
-        expect(
-          agents.entries.find((entry) => entry.agent.workspaceId === created.id)?.agent,
-        ).toMatchObject({
+        const agent = agents.entries.find((entry) => entry.agent.workspaceId === created.id)?.agent;
+        expect(agent).toMatchObject({
           cwd: created.workspaceDirectory,
         });
+        if (!agent) throw new Error("The created workspace has no agent");
+        const home = process.env.E2E_CLISBOT_HOME;
+        if (!home) throw new Error("The isolated daemon home is missing");
+        // Acceptance moves the temporary upload into its agent's session directory.
+        const agentsDirectory = path.join(home, "agents");
+        const acceptedFiles = await Promise.all(
+          (await readdir(agentsDirectory)).map(async (projectDirectory) => {
+            try {
+              return await readFile(
+                path.join(
+                  agentsDirectory,
+                  projectDirectory,
+                  agent.id,
+                  "uploads",
+                  upload.id,
+                  upload.fileName,
+                ),
+              );
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+              throw error;
+            }
+          }),
+        );
+        expect(acceptedFiles.filter((file) => file !== null)).toEqual([CONTEXT.buffer]);
         expect(delay.agentRequests[0]).toMatchObject({
           initialPrompt: PROMPT,
           config: {

@@ -168,7 +168,9 @@ test.describe("Command center workspace management", () => {
       await openWorkspace(page, workspace.workspaceId);
 
       await runCommand(page, "pin", "Pin to top");
-      await expect(page.getByTestId("sidebar-pinned-section")).toBeVisible({ timeout: 15_000 });
+      await expect(
+        page.getByTestId(`sidebar-pin-${getServerId()}:${workspace.workspaceId}`),
+      ).toBeVisible({ timeout: 15_000 });
 
       const panel = await openCommandCenter(page);
       await panel.getByTestId("command-center-input").fill("pin");

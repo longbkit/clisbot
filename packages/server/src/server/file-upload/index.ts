@@ -262,7 +262,8 @@ export class FileUploadStore {
       );
     }
     if (upload.durable) {
-      const handle = await open(upload.path, "r");
+      // Windows FlushFileBuffers requires a writable file handle.
+      const handle = await open(upload.path, "r+");
       try {
         await handle.sync();
       } finally {

@@ -91,7 +91,8 @@ test.describe("Sidebar project filter", () => {
       await closeSidebarDisplayPreferences(page);
 
       await pinWorkspaceFromSidebar(page, alpha.workspaceId);
-      await expect(alphaRow).toBeVisible();
+      await expect(page.getByTestId(`sidebar-pin-${serverId}:${alpha.workspaceId}`)).toBeVisible();
+      await expect(alphaRow).toHaveCount(0);
 
       // The way out of the filter is still on screen.
       await expect(page.getByTestId("sidebar-display-preferences-menu")).toBeVisible();

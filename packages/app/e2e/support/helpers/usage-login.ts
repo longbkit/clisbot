@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { UsageReport } from "@clisbot/protocol/messages";
 import { expect, type Page } from "@playwright/test";
-import { expectPinnedUsage, pinRow, usageItem } from "./usage-sidebar-item";
+import { expectPinnedUsage, pinRow, usageItem, usageModal } from "./usage-sidebar-item";
 import { connectNewWorkspaceDaemonClient } from "./new-workspace";
 import { pluginRequirements } from "./plugin-fixture";
 
@@ -122,7 +122,7 @@ export default function contribute(server) {
 export async function expectCodexReportedWindows(page: Page, shape: "seven-day-only" | "Spark") {
   await expectPinnedUsage(page, ["11% wk"]);
   await expect(pinRow(page.locator("body"), "Codex", "Weekly")).toBeChecked();
-  await expect(page.getByText("Session", { exact: true })).toHaveCount(0);
+  await expect(usageModal(page).getByText("Session", { exact: true })).toHaveCount(0);
   if (shape === "Spark") {
     const fiveHour = pinRow(page.locator("body"), "Codex", "GPT-5.3-Codex-Spark · 5-hour");
     const weekly = pinRow(page.locator("body"), "Codex", "GPT-5.3-Codex-Spark · Weekly");

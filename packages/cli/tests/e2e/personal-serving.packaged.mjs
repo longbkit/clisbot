@@ -33,6 +33,7 @@ Object.assign(env, {
   CLISBOT_USAGE_REPORTING: "0",
   CLISBOT_DICTATION_ENABLED: "false",
   CLISBOT_VOICE_MODE_ENABLED: "false",
+  CLISBOT_WEB_UI_ENABLED: "true",
 });
 async function run(command, args, options = {}) {
   const child = spawn(command, args, { env, stdio: ["ignore", "pipe", "pipe"], ...options });
@@ -138,6 +139,8 @@ console.log(JSON.stringify(names.map(name => require.resolve(name))));
   const onboard = JSON.parse(
     await cli(["onboard", "--transport", "local", "--voice", "disable", "--json"]),
   );
+  // Start Hub is delegated to a managed CLI child, which reads persisted config.
+  await cli(["daemon", "config", "set", "features.webUi.enabled", "true"]);
   const initial = await readDaemonInstance(home);
   const offer = parseDevicePairingOfferFromUrl(onboard.url);
   assert(offer?.pairing && !offer.hub);
@@ -158,6 +161,7 @@ console.log(JSON.stringify(names.map(name => require.resolve(name))));
   assert.equal(daemon.getLastServerInfoMessage().features.localHubStart, true);
   const started = await daemon.startLocalHub({ transport: "local", label: "Artifact phone" });
   assert(started.hub?.pairing);
+  assert.equal(started.origin, onboard.origin);
   assert.equal((await readDaemonInstance(home)).pid, initial.pid);
   assert.equal((await fetch(`${started.origin}/api/auth/clisbot/device/identity`)).status, 200);
   assert((await fetch(`${started.origin}/`)).ok);

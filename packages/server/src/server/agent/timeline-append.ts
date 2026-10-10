@@ -1,3 +1,4 @@
+import { SessionDeletedError } from "./session-storage/deletion-intents.js";
 import type { AgentManager } from "./agent-manager.js";
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
 
@@ -15,7 +16,7 @@ export async function appendTimelineItemIfAgentKnown(
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("Unknown agent")) {
+    if (error instanceof SessionDeletedError || message.includes("Unknown agent")) {
       return false;
     }
     throw error;
@@ -30,7 +31,7 @@ export async function emitLiveTimelineItemIfAgentKnown(
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("Unknown agent")) {
+    if (error instanceof SessionDeletedError || message.includes("Unknown agent")) {
       return false;
     }
     throw error;

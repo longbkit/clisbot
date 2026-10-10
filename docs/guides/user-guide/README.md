@@ -1,31 +1,35 @@
-# Hướng dẫn sử dụng Clisbot + Hub
+# Clisbot + Hub user guide
 
-Bắt đầu từ [onboarding](getting-started/onboarding.md), sau đó chọn hướng dẫn theo việc cần làm. Tên nút và menu giữ nguyên tiếng Anh để dễ tìm trong app.
+Vietnamese version: [vi/README.md](vi/README.md).
 
-| Bạn muốn làm gì?                                      | Hướng dẫn                                                                  |
-| ----------------------------------------------------- | -------------------------------------------------------------------------- |
-| Tạo bot Slack/Codex, seed workspace, chạy lại         | [Onboarding](getting-started/onboarding.md)                                |
-| Thiết lập Hub, đăng nhập Google, đăng ký              | [Thiết lập và đăng nhập](account/setup-and-sign-in.md)                     |
-| Đổi tên hiển thị, ảnh đại diện                        | [Hồ sơ](account/profile.md)                                                |
-| Xem và đổi tên tổ chức                                | [Tên tổ chức](account/organization.md)                                     |
-| Đổi/quên mật khẩu, cấu hình master password           | [Mật khẩu và recovery](account/password-and-recovery.md)                   |
-| Enroll, unenroll, đổi tên, quản lý nhiều Host         | [Quản lý Hosts](hosts/connect-and-manage.md)                               |
-| Chọn chế độ kết nối và bắt buộc phân quyền Hub        | [Managed Access: off và external](hosts/managed-access.md)                 |
-| Mời người, tạo Team, cấp và thu hồi quyền             | [Members, Teams và Access](access/members-and-teams.md)                    |
-| Cấp mọi Project trên Host, nhiều Project, nhiều model | [Cấp nhanh](access/members-and-teams.md#cấp-cho-mọi-project-trên-một-host) |
-| Cấp gì thì được gì: bảng quyền theo Host, Project...  | [Các mức quyền](access/permissions.md)                                     |
-| Hiểu đầy đủ quyền quản trị daemon                     | [Daemon Administrator](access/daemon-administrator.md)                     |
-| Tạo Project, Workspace, worktree và session           | [Làm việc trên Project](work/projects-and-workspaces.md)                   |
-| Kết nối Slack/Telegram, chạy Automation               | [Channels và Automations](automation/channels-and-automations.md)          |
-| Tìm nguyên nhân và xử lý lỗi                          | [Q&A và troubleshooting](help/faq.md)                                      |
+Start with the [quick start](getting-started/quick-start.md), then pick a guide by task.
 
-## Bốn khái niệm cần biết
+| What do you want to do?                                         | Guide                                                                     |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Install on your machine or another one, connect web/phone       | [Quick start](getting-started/quick-start.md)                             |
+| Upgrade Clisbot 0.1.x to v2                                     | [Upgrade to v2](getting-started/upgrade-v2.md)                            |
+| Create a Slack/Codex bot, seed a workspace, run it again        | [Onboarding](getting-started/onboarding.md)                               |
+| Set up the Hub, sign in with Google, register                   | [Setup and sign-in](account/setup-and-sign-in.md)                         |
+| Change your display name and profile image                      | [Profile](account/profile.md)                                             |
+| View and rename the organization                                | [Organization name](account/organization.md)                              |
+| Change or reset a password, configure the master password       | [Password and recovery](account/password-and-recovery.md)                 |
+| Enroll, unenroll, rename and manage several Hosts               | [Manage Hosts](hosts/connect-and-manage.md)                               |
+| Pick a connection mode and enforce Hub permissions              | [Managed Access: off and external](hosts/managed-access.md)               |
+| Invite people, create Teams, grant and revoke access            | [Members, Teams and Access](access/members-and-teams.md)                  |
+| Grant every Project on a Host, several Projects, several models | [Quick grants](access/members-and-teams.md#grant-every-project-on-a-host) |
+| What each grant allows: permissions by Host, Project...         | [Access levels](access/permissions.md)                                    |
+| Understand daemon administrator rights in full                  | [Daemon Administrator](access/daemon-administrator.md)                    |
+| Create Projects, Workspaces, worktrees and sessions             | [Working in a Project](work/projects-and-workspaces.md)                   |
+| Connect Slack/Telegram, run Automations                         | [Channels and Automations](automation/channels-and-automations.md)        |
+| Find the cause of a problem and fix it                          | [Q&A and troubleshooting](help/faq.md)                                    |
 
-- **Hub**: quản lý tổ chức, thành viên, quyền và cấu hình dùng chung.
-- **Host**: daemon đang chạy trên máy chứa mã nguồn và các công cụ AI.
-- **Project**: thư mục gốc được đăng ký trên một Host.
-- **Workspace**: nơi làm việc trong một Project; có thể dùng thư mục local hoặc Git worktree riêng. Một Workspace có thể chứa nhiều Agent session.
+## Four concepts to know
 
-Hướng dẫn phản ánh mã nguồn hiện tại. App/daemon cũ có thể chưa có Rename Host, thông báo quyền mới hoặc quyền tạo Workspace theo Project; xem [Q&A](help/faq.md) trước khi cập nhật grant đang dùng.
+- **Hub**: manages the organization, members, permissions and shared configuration.
+- **Host**: the daemon running on the machine that holds the source code and the AI tools.
+- **Project**: a root folder registered on a Host.
+- **Workspace**: where you work inside a Project; it uses the local folder or its own Git worktree. A Workspace can hold several Agent sessions.
 
-Tài liệu triển khai và kiến trúc nằm ngoài user guide: [phát triển/triển khai môi trường](../../development.md), [hợp đồng quyền](../../permissions.md), [developer guide](../developer-guide/upstream-sync-and-contribution.md).
+This guide follows the current source code. Older apps and daemons may lack Rename Host, the new permission notices, or per-Project Workspace creation rights; read the [Q&A](help/faq.md) before updating grants already in use.
+
+Deployment and architecture docs live outside the user guide: [development/deployment](../../development.md), [permissions contract](../../permissions.md), [developer guide](../developer-guide/upstream-sync-and-contribution.md).

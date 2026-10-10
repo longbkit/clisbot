@@ -100,7 +100,7 @@ Clisbot はコーディングエージェントを管理するローカルサー
 CLI をインストールして Clisbot を起動します。
 
 ```bash
-npm install -g @clisbot/cli
+npm install -g clisbot
 clisbot
 ```
 

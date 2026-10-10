@@ -43,12 +43,23 @@ vi.mock("../account-provider", () => ({
     };
   },
 }));
+// These native device-access surfaces have their own tests; this fixture
+// exercises organization/team settings and the chat-account linking flow.
+vi.mock("@/device-access/hub-settings", () => ({
+  HubConnectionSettings: () => null,
+  HubOverviewSettings: () => null,
+  HubLoginPolicySettings: () => null,
+}));
+vi.mock("@/device-access/account-sessions", () => ({ AccountSessions: () => null }));
+vi.mock("./instance-settings", () => ({ InstanceSettings: () => null }));
+vi.mock("./integrations-settings", () => ({ IntegrationsSettings: () => null }));
 vi.mock("./channel-settings", () => ({ ChannelSettings: () => null }));
 vi.mock("./automation-settings", () => ({ AutomationSettings: () => null }));
 vi.mock("./access-settings", () => ({ AccessSettings: () => null }));
 vi.mock("./api-key-settings", () => ({ ApiKeySettings: () => null }));
 vi.mock("./provider-application-settings", () => ({ ProviderApplicationSettings: () => null }));
 vi.mock("./hosts-settings", () => ({ HostsSettings: () => null }));
+vi.mock("./first-host-setup", () => ({ FirstHostSetup: () => null }));
 // People pulls the menu engine and the modal sheet, which this jsdom suite does not stub.
 vi.mock("./team/team-settings", () => ({ TeamSettings: () => null }));
 // Account's own chat-account list has its browser test; here only its entry to the flow matters.

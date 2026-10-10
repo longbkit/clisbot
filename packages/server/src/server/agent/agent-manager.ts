@@ -3216,7 +3216,6 @@ export class AgentManager {
           agent.pendingReplacement = false;
         }
         const turnStartedAt = new Date();
-        pendingRun.start = { status: "started", turnId };
         agent.activeForegroundTurnId = turnId;
         this.openActiveTurn(agent, turnId, turnStartedAt);
         turnStream = this.runs.createTurnStream(turnId, (event) =>
@@ -3256,6 +3255,9 @@ export class AgentManager {
             this.handleAcceptedPromptFailure(agent, pendingRun, turnId, error),
           );
         }
+        // Keep provider output staged while the durable prompt lookup/write yields.
+        // Otherwise an assistant chunk can precede (or straddle) its canonical user row.
+        pendingRun.start = { status: "started", turnId };
         for (const stagedEvent of pendingRun.stagedEvents.splice(0)) {
           const isAcceptedTurnStart =
             stagedEvent.type === "turn_started" &&
@@ -4212,11 +4214,12 @@ export class AgentManager {
           return;
         }
         finished = true;
+        const finishedStatus = currentStatus;
         cleanup();
         void this.getLastAssistantMessage(agentId)
           .then((lastMessage) => {
             resolvePromise({
-              status: currentStatus,
+              status: finishedStatus,
               permission,
               lastMessage,
             });
@@ -4239,6 +4242,7 @@ export class AgentManager {
       // This prevents race condition if callback fires synchronously with replayState: true
       unsubscribe = this.subscribe(
         (event) => {
+          if (finished) return;
           if (event.type === "agent_state") {
             currentStatus = event.agent.lifecycle;
             const pending = this.peekPendingPermission(event.agent);
@@ -4246,7 +4250,7 @@ export class AgentManager {
               finish(pending);
               return;
             }
-            if (isAgentBusy(event.agent.lifecycle)) {
+            if (isAgentBusy(event.agent.lifecycle) || this.hasInFlightRun(agentId)) {
               hasStarted = true;
               return;
             }
@@ -4279,6 +4283,8 @@ export class AgentManager {
         },
         { agentId, replayState: true },
       );
+      // A synchronous replay can finish before subscribe returns its disposer.
+      if (finished) cleanup();
     });
   }
 

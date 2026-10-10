@@ -59,6 +59,8 @@ So arrival sets a _target_ and the reveal rate is derived from the backlog inste
   stale. A new field on `StreamLayoutItem` must be added to `areLayoutItemsEquivalent`, or sharing
   silently stops.
 
+- **A shrinking reading row must not move the following text past the reader.** When wheel input enters the lower edge of an image placeholder and its intrinsic height arrives, preserve the distance to that edge if the old reading offset no longer fits. The virtualizer projects the same correction before layout commits; rows that still contain the reading offset keep it unchanged.
+
 ## Measuring
 
 - **Smoothness (user-perceived):** `packages/app/e2e/browser/agent-stream-smoothness.spec.ts`, gated behind `CLISBOT_AGENT_STREAM_PERF_E2E=1`. Drives the mock provider's `bursty-stream` model and reports coefficient of variation of characters painted per frame (smoothness) plus p95 gap between visible updates (stalls). Both numbers are needed: a stalled stream is perfectly smooth.

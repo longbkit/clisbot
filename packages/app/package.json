@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/app",
-  "version": "0.11.1",
+  "version": "2.0.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@clisbot/client": "*",
-    "@clisbot/device-access": "0.11.1",
+    "@clisbot/device-access": "*",
     "@clisbot/expo-two-way-audio": "*",
     "@clisbot/highlight": "*",
     "@clisbot/plugin": "*",

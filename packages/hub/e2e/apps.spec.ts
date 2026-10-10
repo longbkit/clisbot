@@ -606,13 +606,9 @@ test("every way a provider can send the operator back is answered in that sectio
     for (const outcome of returns) {
       await session.returnFromProvider(outcome.provider, outcome.result);
       const section = surface.section(
-        outcome.provider === "github"
-          ? "GitHub"
-          : outcome.provider === "slack"
-            ? "Slack"
-            : outcome.provider === "discord"
-              ? "Discord"
-              : "Linear",
+        ({ github: "GitHub", slack: "Slack", discord: "Discord", linear: "Linear" } as const)[
+          outcome.provider
+        ],
       );
       // The provider's own section opens, takes the keyboard, and says what happened there.
       await section.expectExpanded();

@@ -303,7 +303,9 @@ try {
   const normalizedConfiguration = {
     ...compiled,
     environments: compiled.environments.map((environment) =>
-      environment.kind === "daemon" ? { ...environment, daemonId: workflowDaemon.id } : environment,
+      environment.kind === "daemon"
+        ? Object.assign({}, environment, { daemonId: workflowDaemon.id })
+        : environment,
     ),
   };
   const existingWorkflow = (await database.listOrganizationTriggers(organizationId)).find(

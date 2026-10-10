@@ -65,14 +65,14 @@
       "description": "Base2Tone theme for Clisbot, ported from the Obsidian theme deathau/Base2Tone-For-Obsidian.md.",
       "artifact": {
         "kind": "npm",
-        "package": "@alhassanaraouf/clisbot-base2tone-theme",
+        "package": "@alhassanaraouf/paseo-base2tone-theme",
         "version": "0.1.2",
-        "resolved": "https://registry.npmjs.org/@alhassanaraouf/clisbot-base2tone-theme/-/clisbot-base2tone-theme-0.1.2.tgz",
+        "resolved": "https://registry.npmjs.org/@alhassanaraouf/paseo-base2tone-theme/-/paseo-base2tone-theme-0.1.2.tgz",
         "integrity": "sha512-baP+qh3MlPgwACvt72XjrULjbDHARofzHfxyGGVVl22iw6qVnMzyfBJXi4exgtplvD/yPqf/XlsqD8wTqHB+lg=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/alhassanaraouf/clisbot-themes/tree/HEAD/packages/clisbot-base2tone-theme"
+        "url": "https://github.com/alhassanaraouf/paseo-themes/tree/HEAD/packages/paseo-base2tone-theme"
       },
       "categories": ["themes"],
       "author": {
@@ -81,7 +81,7 @@
         "github": "alhassanaraouf"
       },
       "media": [
-        "https://raw.githubusercontent.com/alhassanaraouf/clisbot-themes/main/packages/clisbot-base2tone-theme/preview.png"
+        "https://raw.githubusercontent.com/alhassanaraouf/paseo-themes/main/packages/paseo-base2tone-theme/preview.png"
       ],
       "submittedAt": "2026-09-24T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -96,14 +96,14 @@
       "description": "A clisbot plugin for viewing and managing your Sayr tasks",
       "artifact": {
         "kind": "npm",
-        "package": "@sayrio/clisbot-plugin",
+        "package": "@sayrio/paseo-plugin",
         "version": "0.2.0",
-        "resolved": "https://registry.npmjs.org/@sayrio/clisbot-plugin/-/clisbot-plugin-0.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@sayrio/paseo-plugin/-/paseo-plugin-0.2.0.tgz",
         "integrity": "sha512-LPmVkEPWl8Km6US4zQAzhqSbGm7lBDwCjgNoysOhCsDiRy0jbtDKYRg1XVgwwUkoEwhF1EdZHCPwIuT8IizyWQ=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/dorasto/sayr/tree/HEAD/packages/clisbot-plugin",
+        "url": "https://github.com/dorasto/sayr/tree/HEAD/packages/paseo-plugin",
         "commit": "e70919b89df3cf9e95c18242939193a79c7593b1"
       },
       "categories": ["workspaces"],
@@ -113,8 +113,8 @@
         "github": "dorasto"
       },
       "media": [
-        "https://raw.githubusercontent.com/dorasto/sayr/main/packages/clisbot-plugin/assets/sayr-plguin-1.png",
-        "https://raw.githubusercontent.com/dorasto/sayr/main/packages/clisbot-plugin/assets/clisbot-plugin-2.png"
+        "https://raw.githubusercontent.com/dorasto/sayr/main/packages/paseo-plugin/assets/sayr-plguin-1.png",
+        "https://raw.githubusercontent.com/dorasto/sayr/main/packages/paseo-plugin/assets/paseo-plugin-2.png"
       ],
       "submittedAt": "2026-09-22T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -129,14 +129,14 @@
       "description": "Clisbot plugin: a GitHub sidebar board of your issues, draft and open pull requests, and discussions",
       "artifact": {
         "kind": "npm",
-        "package": "@gpambrozio/clisbot-github-board",
+        "package": "@gpambrozio/paseo-github-board",
         "version": "0.10.0",
-        "resolved": "https://registry.npmjs.org/@gpambrozio/clisbot-github-board/-/clisbot-github-board-0.10.0.tgz",
+        "resolved": "https://registry.npmjs.org/@gpambrozio/paseo-github-board/-/paseo-github-board-0.10.0.tgz",
         "integrity": "sha512-G6LxSsbt4Kt36yWEB2rXUxOwNLFsA4DbF20ViroVqaicMPjaw5H4JUWXjzEZAxWJT+0DlH12/TtqN4I0sNoQtg=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/gpambrozio/clisbot-plugins/tree/HEAD/github-board",
+        "url": "https://github.com/gpambrozio/paseo-plugins/tree/HEAD/github-board",
         "commit": "530a66c592e20915169b5e67a35de8793f71ec60"
       },
       "categories": ["git"],
@@ -146,8 +146,8 @@
         "github": "gpambrozio"
       },
       "media": [
-        "https://raw.githubusercontent.com/gpambrozio/clisbot-plugins/main/github-board/docs/screenshot.png",
-        "https://raw.githubusercontent.com/gpambrozio/clisbot-plugins/main/github-board/docs/detail-panel.png"
+        "https://raw.githubusercontent.com/gpambrozio/paseo-plugins/main/github-board/docs/screenshot.png",
+        "https://raw.githubusercontent.com/gpambrozio/paseo-plugins/main/github-board/docs/detail-panel.png"
       ],
       "submittedAt": "2026-09-19T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -162,14 +162,14 @@
       "description": "Clisbot plugin: speaks one sentence when an agent needs you, and lists everything waiting in a sidebar panel",
       "artifact": {
         "kind": "npm",
-        "package": "@gpambrozio/clisbot-herald",
+        "package": "@gpambrozio/paseo-herald",
         "version": "0.5.1",
-        "resolved": "https://registry.npmjs.org/@gpambrozio/clisbot-herald/-/clisbot-herald-0.5.1.tgz",
+        "resolved": "https://registry.npmjs.org/@gpambrozio/paseo-herald/-/paseo-herald-0.5.1.tgz",
         "integrity": "sha512-rXdlaxgRlYP3nmZrvbG29sQeluz5JC7TPuJDgKzyh9itDH1AvZYGjLgGp9XZGKxdBBhaGxgGAFhDh+VTL8h9dw=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/gpambrozio/clisbot-plugins/tree/HEAD/herald",
+        "url": "https://github.com/gpambrozio/paseo-plugins/tree/HEAD/herald",
         "commit": "b658d0ab58735959e46d12660ae179c002cdadda"
       },
       "categories": ["sidebar"],
@@ -179,8 +179,8 @@
         "github": "gpambrozio"
       },
       "media": [
-        "https://raw.githubusercontent.com/gpambrozio/clisbot-plugins/main/herald/docs/panel.png",
-        "https://raw.githubusercontent.com/gpambrozio/clisbot-plugins/main/herald/docs/timeline-card.png"
+        "https://raw.githubusercontent.com/gpambrozio/paseo-plugins/main/herald/docs/panel.png",
+        "https://raw.githubusercontent.com/gpambrozio/paseo-plugins/main/herald/docs/timeline-card.png"
       ],
       "submittedAt": "2026-09-19T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -195,14 +195,14 @@
       "description": "Clisbot plugin: schedule shell commands on your Mac through launchd, from a sidebar panel",
       "artifact": {
         "kind": "npm",
-        "package": "@gpambrozio/clisbot-launchd-jobs",
+        "package": "@gpambrozio/paseo-launchd-jobs",
         "version": "0.5.0",
-        "resolved": "https://registry.npmjs.org/@gpambrozio/clisbot-launchd-jobs/-/clisbot-launchd-jobs-0.5.0.tgz",
+        "resolved": "https://registry.npmjs.org/@gpambrozio/paseo-launchd-jobs/-/paseo-launchd-jobs-0.5.0.tgz",
         "integrity": "sha512-H6CQnalMdyQjW9ta9ZT40qEPJsREgNFSEAH8EC4sJXdz2Hz9tIsInSUmm2bDcgfY3D3HFffUrwf1mmeevi/wUA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/gpambrozio/clisbot-plugins/tree/HEAD/launchd-jobs",
+        "url": "https://github.com/gpambrozio/paseo-plugins/tree/HEAD/launchd-jobs",
         "commit": "08e75003b287208ef804f3d31b2fda2597f69dce"
       },
       "categories": ["daemon-management"],
@@ -227,14 +227,14 @@
       "description": "Clisbot plugin: a sidebar table of what every model costs, across Anthropic, OpenAI, Fireworks AI, Ollama Cloud and OpenRouter",
       "artifact": {
         "kind": "npm",
-        "package": "@gpambrozio/clisbot-model-pricing",
+        "package": "@gpambrozio/paseo-model-pricing",
         "version": "0.3.0",
-        "resolved": "https://registry.npmjs.org/@gpambrozio/clisbot-model-pricing/-/clisbot-model-pricing-0.3.0.tgz",
+        "resolved": "https://registry.npmjs.org/@gpambrozio/paseo-model-pricing/-/paseo-model-pricing-0.3.0.tgz",
         "integrity": "sha512-jLfC6iCLOwNACiili8nw3/qmBymoj6YHitMeGCa2RggiMdUhT6n+INRsSjoTs2kNzeYMftMfQ3MZJXeLLF1opA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/gpambrozio/clisbot-plugins/tree/HEAD/model-pricing",
+        "url": "https://github.com/gpambrozio/paseo-plugins/tree/HEAD/model-pricing",
         "commit": "08e75003b287208ef804f3d31b2fda2597f69dce"
       },
       "categories": ["sidebar"],
@@ -244,7 +244,7 @@
         "github": "gpambrozio"
       },
       "media": [
-        "https://raw.githubusercontent.com/gpambrozio/clisbot-plugins/main/model-pricing/docs/screenshot.png"
+        "https://raw.githubusercontent.com/gpambrozio/paseo-plugins/main/model-pricing/docs/screenshot.png"
       ],
       "submittedAt": "2026-09-19T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -259,14 +259,14 @@
       "description": "Clisbot plugin: lists the skills an agent can use, shows where each comes from, renders its SKILL.md, and invokes it",
       "artifact": {
         "kind": "npm",
-        "package": "@gpambrozio/clisbot-skills",
+        "package": "@gpambrozio/paseo-skills",
         "version": "0.4.0",
-        "resolved": "https://registry.npmjs.org/@gpambrozio/clisbot-skills/-/clisbot-skills-0.4.0.tgz",
+        "resolved": "https://registry.npmjs.org/@gpambrozio/paseo-skills/-/paseo-skills-0.4.0.tgz",
         "integrity": "sha512-zMgP2U/vrRsLkKhoQICkN52+YoDy2WkkYymEDmruduKxf4Dq99Ct8Pk3xqJyAzijq2oprMFYLbj/wT6XepBLeA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/gpambrozio/clisbot-plugins/tree/HEAD/skills",
+        "url": "https://github.com/gpambrozio/paseo-plugins/tree/HEAD/skills",
         "commit": "d04187ee60ca3702ca5843803567600427102d99"
       },
       "categories": ["utils"],
@@ -289,14 +289,14 @@
       "description": "PromptKit - rewrite and transform prompts directly from the Clisbot composer.",
       "artifact": {
         "kind": "npm",
-        "package": "clisbot-prompt-kit",
+        "package": "paseo-prompt-kit",
         "version": "0.6.0",
-        "resolved": "https://registry.npmjs.org/clisbot-prompt-kit/-/clisbot-prompt-kit-0.6.0.tgz",
+        "resolved": "https://registry.npmjs.org/paseo-prompt-kit/-/paseo-prompt-kit-0.6.0.tgz",
         "integrity": "sha512-eiagOY1OokDx2iihfe3Vjh2dgKKP6IsBKbJYbfhM+TXw3aU7duV/rs/TUnBSeeWAk0cEsVg2Jd+EkeaPM8IJdA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/hungcuong9125/clisbot-prompt-kit"
+        "url": "https://github.com/hungcuong9125/paseo-prompt-kit"
       },
       "categories": ["utils"],
       "author": {
@@ -305,8 +305,8 @@
         "github": "hungcuong9125"
       },
       "media": [
-        "https://raw.githubusercontent.com/hungcuong9125/clisbot-prompt-kit/main/docs/images/settings-provider-cli.png",
-        "https://raw.githubusercontent.com/hungcuong9125/clisbot-prompt-kit/main/docs/images/settings-direct-api.png"
+        "https://raw.githubusercontent.com/hungcuong9125/paseo-prompt-kit/main/docs/images/settings-provider-cli.png",
+        "https://raw.githubusercontent.com/hungcuong9125/paseo-prompt-kit/main/docs/images/settings-direct-api.png"
       ],
       "submittedAt": "2026-09-22T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -321,14 +321,14 @@
       "description": "A Clisbot plugin that provides a host-wide agent triage roster.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-agent-monitor",
+        "package": "@omercnet/paseo-agent-monitor",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-agent-monitor/-/clisbot-agent-monitor-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-agent-monitor/-/paseo-agent-monitor-1.2.0.tgz",
         "integrity": "sha512-dY7/3f49sPMVwb+Wr7iUsw4jCoQWRX2UF9Li+uU8yJdN0cj4BvTsz4GDiR3OsKk8zJ1/o01DSRi1e4uDRS3TmA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/agent-monitor",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/agent-monitor",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["orchestration"],
@@ -338,8 +338,8 @@
         "github": "omercnet"
       },
       "media": [
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/agent-monitor/docs/images/agent-monitor-roster.png",
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/agent-monitor/docs/images/agent-monitor-settings.png"
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/agent-monitor/docs/images/agent-monitor-roster.png",
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/agent-monitor/docs/images/agent-monitor-settings.png"
       ],
       "submittedAt": "2026-09-17T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -354,14 +354,14 @@
       "description": "A dependency-aware Beads work queue for each Clisbot workspace.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-beads",
+        "package": "@omercnet/paseo-beads",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-beads/-/clisbot-beads-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-beads/-/paseo-beads-1.2.0.tgz",
         "integrity": "sha512-UkI1SNP73RUrW0ap4qOx2Jv1GCxkrw4HIMrWOFCS3FDoPg2jw06DqHC8Jf34psaFglxXKWLAOkfL2wEZJhlUFw=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/clisbot-beads",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/paseo-beads",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["workspaces"],
@@ -371,8 +371,8 @@
         "github": "omercnet"
       },
       "media": [
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-beads/docs/images/clisbot-beads-wide.png",
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-beads/docs/images/clisbot-beads-compact.png"
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-beads/docs/images/paseo-beads-wide.png",
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-beads/docs/images/paseo-beads-compact.png"
       ],
       "submittedAt": "2026-09-17T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -387,14 +387,14 @@
       "description": "Dracula Classic and Alucard Classic themes for Clisbot.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-dracula",
+        "package": "@omercnet/paseo-dracula",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-dracula/-/clisbot-dracula-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-dracula/-/paseo-dracula-1.2.0.tgz",
         "integrity": "sha512-I3yUiFIvaIe3jdvuQ1tZyngsfgukaUJwEQza2XYkEaB8yIA0pplZehqJLvqqmA403cjNXdVtsdW7umPtmnycqw=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/clisbot-dracula",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/paseo-dracula",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["themes"],
@@ -404,9 +404,9 @@
         "github": "omercnet"
       },
       "media": [
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-dracula/screenshot.png",
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-dracula/screenshot.png",
         "https://raw.githubusercontent.com/web-platform-tests/wpt/master/media/movie_5.webm",
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-dracula/screenshot-alucard.png"
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-dracula/screenshot-alucard.png"
       ],
       "submittedAt": "2026-09-17T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -421,14 +421,14 @@
       "description": "Fast-forwards clean local base branches before Clisbot creates branch-off worktrees",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-fresh-worktrees",
+        "package": "@omercnet/paseo-fresh-worktrees",
         "version": "2.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-fresh-worktrees/-/clisbot-fresh-worktrees-2.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-fresh-worktrees/-/paseo-fresh-worktrees-2.2.0.tgz",
         "integrity": "sha512-WRarzdfTbrZ36JfzmvX9HfnIYh6Pp+GV9TkoeVwM7I6f1MAEZ4gzPEmT51lWuUyMGvwTs2HFB7LthCa+VYs7IA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/fresh-worktrees",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/fresh-worktrees",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["git"],
@@ -438,8 +438,8 @@
         "github": "omercnet"
       },
       "media": [
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-settings.png"
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-behind.png",
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/fresh-worktrees/docs/images/fresh-worktrees-settings.png"
       ],
       "submittedAt": "2026-09-18T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -454,14 +454,14 @@
       "description": "Clisbot integration for OMP, including its direct provider and workspace tooling.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-omp",
+        "package": "@omercnet/paseo-omp",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-omp/-/clisbot-omp-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-omp/-/paseo-omp-1.2.0.tgz",
         "integrity": "sha512-ueZede5D34hoNrdF4y6DBaomErA+hHcv+bcz0Sd6eArQKqF8L6ecKXdBe2tEZd3Ev8uQwxMHuiDQhMBx3q6gOw=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/clisbot-omp",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/paseo-omp",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["providers"],
@@ -471,8 +471,8 @@
         "github": "omercnet"
       },
       "media": [
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-omp/docs/images/plugin-manager.png",
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-omp/docs/images/workspace-settings.png"
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-omp/docs/images/plugin-manager.png",
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-omp/docs/images/workspace-settings.png"
       ],
       "submittedAt": "2026-09-17T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -487,14 +487,14 @@
       "description": "A viewer-aware delivery queue for pull requests linked to Clisbot workspaces.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-pr-radar",
+        "package": "@omercnet/paseo-pr-radar",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-pr-radar/-/clisbot-pr-radar-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-pr-radar/-/paseo-pr-radar-1.2.0.tgz",
         "integrity": "sha512-sk+zuzTGZ5Vmri2toic3z3uChm4d6kEShSr/UjkqfOTeILrsZVDHUc+XKX/CtZIQazT/vWvbgZ115+KUiAonCw=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/pr-radar",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/pr-radar",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["git"],
@@ -517,14 +517,14 @@
       "description": "One real Chromium session per Clisbot workspace, shared live across every connected client.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-shared-browser",
+        "package": "@omercnet/paseo-shared-browser",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-shared-browser/-/clisbot-shared-browser-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-shared-browser/-/paseo-shared-browser-1.2.0.tgz",
         "integrity": "sha512-ddvtkBSzHLFzyTRZFixO1y+QXOKW0of8Uo3PSkETRhW5xhd9ep0jqsJJF9JSfWLt1ouvVa5K8zFXic/EBzQ8lw=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/clisbot-shared-browser",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/paseo-shared-browser",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["workspaces"],
@@ -534,8 +534,8 @@
         "github": "omercnet"
       },
       "media": [
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-shared-browser/docs/images/shared-browser-wide.png",
-        "https://raw.githubusercontent.com/omercnet/clisbot-plugins/main/clisbot-shared-browser/docs/images/shared-browser-compact.png"
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-shared-browser/docs/images/shared-browser-wide.png",
+        "https://raw.githubusercontent.com/omercnet/paseo-plugins/main/paseo-shared-browser/docs/images/shared-browser-compact.png"
       ],
       "submittedAt": "2026-09-18T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -550,14 +550,14 @@
       "description": "Send messages to agents in other workspaces on the same Clisbot host.",
       "artifact": {
         "kind": "npm",
-        "package": "@omercnet/clisbot-tell-agent",
+        "package": "@omercnet/paseo-tell-agent",
         "version": "1.2.0",
-        "resolved": "https://registry.npmjs.org/@omercnet/clisbot-tell-agent/-/clisbot-tell-agent-1.2.0.tgz",
+        "resolved": "https://registry.npmjs.org/@omercnet/paseo-tell-agent/-/paseo-tell-agent-1.2.0.tgz",
         "integrity": "sha512-4XqL1RK1x3TQLoRRKTkZfDxytJbUCEnu2em5pbPDpsGQ5Gv6VN1h07mBci9iW8s2FbNINohNcIBdUaAMTXdOHA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/omercnet/clisbot-plugins/tree/HEAD/tell-agent",
+        "url": "https://github.com/omercnet/paseo-plugins/tree/HEAD/tell-agent",
         "commit": "d7b3e654f364b5be72edf6fd1d914a3750b53082"
       },
       "categories": ["orchestration"],
@@ -580,14 +580,14 @@
       "description": "Defer messages to Clisbot coding agents until a chosen time or usage-window reset.",
       "artifact": {
         "kind": "npm",
-        "package": "clisbot-defer",
+        "package": "paseo-defer",
         "version": "2.1.9",
-        "resolved": "https://registry.npmjs.org/clisbot-defer/-/clisbot-defer-2.1.9.tgz",
+        "resolved": "https://registry.npmjs.org/paseo-defer/-/paseo-defer-2.1.9.tgz",
         "integrity": "sha512-xBBf4TUC8zkTh9WMzQRRDt0alRAYPRCmUdBnBI1ZEkatUFC4i9MxFHgaTY939xij99dASM/261IWqctcKsQppQ=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/tomgrin10/clisbot-defer"
+        "url": "https://github.com/tomgrin10/paseo-defer"
       },
       "categories": ["utils"],
       "author": {
@@ -596,7 +596,7 @@
         "github": "tomgrin10"
       },
       "media": [
-        "https://raw.githubusercontent.com/tomgrin10/clisbot-defer/main/docs/defer-popover.png"
+        "https://raw.githubusercontent.com/tomgrin10/paseo-defer/main/docs/defer-popover.png"
       ],
       "submittedAt": "2026-09-22T00:00:00.000Z",
       "reviewedAt": "2026-10-03T00:00:00.000Z",
@@ -611,14 +611,14 @@
       "description": "Workspace-native Graphite stack status and PR action radar for Clisbot.",
       "artifact": {
         "kind": "npm",
-        "package": "clisbot-graphite",
+        "package": "paseo-graphite",
         "version": "0.2.4",
-        "resolved": "https://registry.npmjs.org/clisbot-graphite/-/clisbot-graphite-0.2.4.tgz",
+        "resolved": "https://registry.npmjs.org/paseo-graphite/-/paseo-graphite-0.2.4.tgz",
         "integrity": "sha512-aAFvh+118c5mmSQ3sTsDKO8Is7g1ZU8m2+0fisr8nFrgPMu0m2mokPJnM/LaIqQc3Zaaak1chB6M6k0dWOPeIA=="
       },
       "license": "MIT",
       "repository": {
-        "url": "https://github.com/tomgrin10/clisbot-graphite"
+        "url": "https://github.com/tomgrin10/paseo-graphite"
       },
       "categories": ["git"],
       "author": {

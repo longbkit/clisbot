@@ -4417,6 +4417,41 @@ describe("workspace-layout-store actions", () => {
   });
 });
 
+it("restores a selected user profile without discarding the workspace's chat tabs", async () => {
+  await AsyncStorage.removeItem("workspace-layout-state");
+  const source = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds());
+  await source.persist.rehydrate();
+  const workspaceKey = createWorkspaceKey();
+  const actor = {
+    kind: "user" as const,
+    id: "slack:profile-review",
+    memberId: "member-1",
+    displayName: "Profile review",
+  };
+  const chatTab = source.getState().openTab({
+    workspaceKey,
+    target: { kind: "agent", agentId: "chat-1" },
+    intent: "reveal",
+    pin: true,
+  });
+  const profileTab = source.getState().openTab({
+    workspaceKey,
+    target: { kind: "user_profile", actor },
+    intent: "reveal",
+    pin: true,
+  });
+  const restored = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds());
+  await restored.persist.rehydrate();
+  const layout = restored.getState().layoutByWorkspace[workspaceKey];
+  expect(collectAllTabs(layout.root)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ tabId: chatTab, target: { kind: "agent", agentId: "chat-1" } }),
+      expect.objectContaining({ tabId: profileTab, target: { kind: "user_profile", actor } }),
+    ]),
+  );
+  expect(findPaneById(layout.root, layout.focusedPaneId)?.focusedTabId).toBe(profileTab);
+});
+
 it("persists the once-only PR add after closing, and clears it when purging the workspace", async () => {
   await AsyncStorage.removeItem("workspace-layout-state");
   const source = createWorkspaceLayoutStore(workspaceLayoutIds);

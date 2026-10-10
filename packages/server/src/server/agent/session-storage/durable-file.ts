@@ -16,7 +16,8 @@ export async function syncDirectory(directory: string): Promise<void> {
 /** Persist every newly created directory entry, including the session's ancestors. */
 export async function createDurableDirectory(directory: string): Promise<void> {
   const created = await fs.mkdir(directory, { recursive: true });
-  if (!created) return;
+  // Directory fsync is unavailable on Windows; avoid comparing path aliases/casing there.
+  if (!created || process.platform === "win32") return;
   let current = path.resolve(directory);
   const first = path.resolve(created);
   while (true) {

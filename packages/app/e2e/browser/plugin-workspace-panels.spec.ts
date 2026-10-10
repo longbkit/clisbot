@@ -248,7 +248,7 @@ async function openRemoteAgentFromPlugin(
 
 async function openCompactSidebar(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Open menu", exact: true }).click();
-  await expect(page.getByTestId("sidebar-search")).toBeVisible();
+  await expect(page.getByTestId("sidebar-footer-search").filter({ visible: true })).toBeVisible();
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string): Promise<void> {

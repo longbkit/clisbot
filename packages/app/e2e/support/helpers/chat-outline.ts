@@ -16,7 +16,8 @@ export async function withStreamingMarkdownOutline(
         { length: 60 },
         (_, index) => `Paragraph ${index + 1}.`,
       ).join("\n\n"),
-      mockStreamingAssistantIntervalMs: 80,
+      // Leave time to inspect a live turn even on a busy browser worker.
+      mockStreamingAssistantIntervalMs: 160,
     },
   });
   try {
@@ -28,13 +29,20 @@ export async function withStreamingMarkdownOutline(
 
 export async function expectReadingStreamedMarkdown(page: Page, prompt: string): Promise<void> {
   await expect(page.getByText("Paragraph 30.", { exact: true }).last()).toBeVisible();
-  const timeline = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
-  const promptRow = timeline.getByTestId("user-message").filter({ hasText: prompt });
   await expect
-    .poll(async () => {
-      const [viewport, row] = await Promise.all([timeline.boundingBox(), promptRow.boundingBox()]);
-      return viewport && row ? row.y + row.height - viewport.y : Number.POSITIVE_INFINITY;
-    })
+    .poll(() =>
+      page.evaluate((expectedPrompt) => {
+        const timeline = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+        ).find((element) => element.getClientRects().length > 0);
+        const promptRow = Array.from(
+          timeline?.querySelectorAll<HTMLElement>('[data-testid="user-message"]') ?? [],
+        ).find((element) => element.textContent?.includes(expectedPrompt));
+        return timeline && promptRow
+          ? promptRow.getBoundingClientRect().bottom - timeline.getBoundingClientRect().top
+          : Number.POSITIVE_INFINITY;
+      }, prompt),
+    )
     .toBeLessThan(0);
   await expect(page.getByRole("button", { name: "Stop agent", exact: true })).toBeVisible();
 }
@@ -190,24 +198,31 @@ export async function expectLiveTurnPromptAboveFoldAndActive(
   prompt: string,
   position: number,
 ): Promise<void> {
-  const timeline = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
-  const promptRow = timeline.getByTestId("user-message").filter({ hasText: prompt });
-  const activeTick = chatOutlineRail(page).getByRole("tab", { selected: true });
   await expect
     .poll(
-      async () => {
-        const [timelineBox, promptBox, activeLabel] = await Promise.all([
-          timeline.boundingBox(),
-          promptRow.boundingBox(),
-          activeTick.getAttribute("aria-label"),
-        ]);
-        return Boolean(
-          timelineBox &&
-          promptBox &&
-          promptBox.y + promptBox.height < timelineBox.y &&
-          activeLabel?.startsWith(`${position} of `),
-        );
-      },
+      () =>
+        page.evaluate(
+          ({ prompt: expectedPrompt, position: expectedPosition }) => {
+            const timeline = Array.from(
+              document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+            ).find((element) => element.getClientRects().length > 0);
+            const promptRow = Array.from(
+              timeline?.querySelectorAll<HTMLElement>('[data-testid="user-message"]') ?? [],
+            ).find((element) => element.textContent?.includes(expectedPrompt));
+            const activeTick = document.querySelector(
+              '[data-testid="chat-outline-rail"] [role="tab"][aria-selected="true"]',
+            );
+            // Sample one rendered frame. Locator.boundingBox waits for a row that
+            // virtualization may already have unmounted, blocking the entire poll.
+            return Boolean(
+              timeline &&
+              promptRow &&
+              promptRow.getBoundingClientRect().bottom < timeline.getBoundingClientRect().top &&
+              activeTick?.getAttribute("aria-label")?.startsWith(`${expectedPosition} of `),
+            );
+          },
+          { prompt, position },
+        ),
       { timeout: 15_000 },
     )
     .toBe(true);

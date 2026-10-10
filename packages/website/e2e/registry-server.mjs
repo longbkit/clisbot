@@ -13,6 +13,24 @@ securityPlugin.readme +=
 // Serve the published registry contract so SSR and browser navigation use the same data.
 createServer((request, response) => {
   response.setHeader("Content-Type", "application/json");
+  if (request.url === "/releases") {
+    response.end(
+      JSON.stringify([
+        {
+          tag_name: "v2.0.0",
+          prerelease: false,
+          draft: false,
+          assets: [
+            { name: "Clisbot-2.0.0-arm64.dmg" },
+            { name: "Clisbot-x86_64.AppImage" },
+            { name: "Clisbot-Setup-2.0.0-x64.exe" },
+            { name: "clisbot-v2.0.0-android.apk" },
+          ],
+        },
+      ]),
+    );
+    return;
+  }
   if (request.url === "/index.json") {
     response.end(JSON.stringify(registry));
     return;

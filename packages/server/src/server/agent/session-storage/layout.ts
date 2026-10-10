@@ -57,7 +57,8 @@ export async function moveSessionRecord(source: string, destination: string): Pr
         cause: error,
       });
   }
-  const handle = await fs.open(destination, "r");
+  // Windows FlushFileBuffers requires a writable file handle.
+  const handle = await fs.open(destination, "r+");
   try {
     await handle.sync();
   } finally {

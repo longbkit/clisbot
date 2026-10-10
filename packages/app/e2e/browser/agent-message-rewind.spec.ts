@@ -20,11 +20,12 @@ async function completeSubmittedTurn(
   await submitMessage(page, prompt);
   const userMessage = page.getByTestId("user-message").filter({ hasText: prompt });
   await expect(userMessage).toBeVisible();
-
+  // Optimistic paint can precede the daemon receiving the submission. Waiting for
+  // idle before acknowledgement can return the previous turn's idle state.
+  await expect(userMessage).toHaveAttribute("aria-busy", "false");
   const finish = await agent.client.waitForFinish(agent.agentId, 30_000);
   expect(finish.status).toBe("idle");
   await expect(page.getByText("(end of synthetic stream)", { exact: true }).last()).toBeVisible();
-  await expect(userMessage).toHaveAttribute("aria-busy", "false");
   return userMessage;
 }
 
@@ -32,16 +33,6 @@ async function rewindConversation(page: Page, userMessage: Locator, prompt: stri
   await userMessage.getByText(prompt, { exact: true }).hover();
   await userMessage.getByRole("button", { name: "Rewind to this message", exact: true }).click();
   await page.getByRole("menuitem", { name: "Rewind conversation", exact: true }).click();
-}
-
-async function expectTurnCompletesNormally(
-  page: Page,
-  agent: Awaited<ReturnType<typeof seedMockAgentWorkspace>>,
-): Promise<void> {
-  const finish = await agent.client.waitForFinish(agent.agentId, 30_000);
-  expect(finish.status).toBe("idle");
-  await expect(page.getByText("(end of synthetic stream)", { exact: true }).last()).toBeVisible();
-  await expectAgentIdle(page);
 }
 
 test.describe("Agent message rewind", () => {
@@ -90,7 +81,8 @@ test.describe("Agent message rewind", () => {
 
   test("keeps a pre-acknowledgement turn running after rewind is rejected", async ({ page }) => {
     test.setTimeout(90_000);
-    const prompt = "Delay synthetic user message by 2000ms.";
+    // Keep the provider unacknowledged until the test interrupts it, even on a slow runner.
+    const prompt = "Withhold synthetic user message until interrupted.";
     const rewindError = "Cannot rewind before the provider acknowledges the submitted prompt";
     const agent = await seedMockAgentWorkspace({
       repoPrefix: "message-rewind-pre-echo-",
@@ -110,7 +102,10 @@ test.describe("Agent message rewind", () => {
 
       await expect(page.getByText(rewindError, { exact: true })).toBeVisible();
       await expectAgentReadyToInterrupt(page);
-      await expectTurnCompletesNormally(page, agent);
+      await cancelAgent(page);
+      const finish = await agent.client.waitForFinish(agent.agentId, 30_000);
+      expect(finish.status).toBe("idle");
+      await expectAgentIdle(page);
     } finally {
       await agent.cleanup();
     }
@@ -122,7 +117,8 @@ test.describe("Agent message rewind", () => {
     const agent = await seedMockAgentWorkspace({
       repoPrefix: "message-rewind-daemon-command-",
       title: "Message rewind daemon command",
-      model: "ten-second-stream",
+      // Outlast the test so cancellation cannot race normal stream completion.
+      model: "five-minute-stream",
     });
 
     try {

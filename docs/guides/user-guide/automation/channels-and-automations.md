@@ -1,68 +1,68 @@
-# Channels và Automations
+# Channels and Automations
 
-[User guide](../README.md) · [Cấp Access](../access/members-and-teams.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Grant Access](../access/members-and-teams.md) · [Q&A](../help/faq.md)
 
-|                  | Channel                                        | Automation                                                |
-| ---------------- | ---------------------------------------------- | --------------------------------------------------------- |
-| Mục đích         | Nhận/gửi hội thoại qua Slack, Telegram…        | Thực hiện một công việc hoặc Workflow nhiều bước          |
-| Cấu hình chính   | Connection, conversation, route và nơi trả lời | Các bước, Host/Project, cấu hình Agent, inputs và kết quả |
-| Cách dùng        | Gửi tin nhắn vào conversation được cấu hình    | Chạy trực tiếp, nhận event hoặc nhận tin nhắn qua Channel |
-| Quyền người dùng | Khớp một audience rule của Route (Who + Where) | `automation.run` khi chạy trực tiếp                       |
+|                    | Channel                                            | Automation                                                   |
+| ------------------ | -------------------------------------------------- | ------------------------------------------------------------ |
+| Purpose            | Receive/send conversations over Slack, Telegram…   | Run a job or a multi-step Workflow                           |
+| Main configuration | Connection, conversation, route and where to reply | Steps, Host/Project, Agent configuration, inputs and results |
+| How to use         | Send a message into the configured conversation    | Run directly, on an event, or on a message through a Channel |
+| User permission    | Match an audience rule of the Route (Who + Where)  | `automation.run` to run directly                             |
 
-Channel có thể chuyển vào một Automation, **Start or continue an Agent** hoặc **Start or continue a Bot** trực tiếp. Vì vậy không phải mọi tin nhắn Channel đều tạo Workflow run. Trong Automation, chọn tiếp tục cùng Agent vẫn tạo một Automation run mới cho mỗi yêu cầu.
+A Channel can hand off to an Automation, or directly to **Start or continue an Agent** or **Start or continue a Bot**. So not every Channel message creates a Workflow run. Inside an Automation, choosing to continue the same Agent still creates a new Automation run for each request.
 
-## Đưa một Bot ra Channel
+## Put a Bot on a Channel
 
-Owner/Admin thực hiện:
+Owner/Admin does this:
 
-1. Mở menu **…** của Bot trong sidebar, hoặc **Chat options** khi đang chat riêng với Bot, rồi chọn **Connect to a channel…**.
-2. Form **Add Route** mở với **Start or continue a Bot** và Bot đã chọn. Host, Project và cấu hình AI là của Bot, form chỉ hiển thị để xem.
-3. Chọn Connection có sẵn hoặc **Connect a new one**, đặt Rules (ai được nhắn, ở đâu) và cách trả lời, rồi **Activate Route**.
+1. Open the Bot's **…** menu in the sidebar, or **Chat options** while in a private chat with the Bot, and choose **Connect to a channel…**.
+2. The **Add Route** form opens with **Start or continue a Bot** and the Bot selected. Host, Project and AI configuration belong to the Bot; the form shows them read-only.
+3. Pick an existing Connection or **Connect a new one**, set Rules (who can message, and where) and how to reply, then **Activate Route**.
 
-Route dùng cấu hình AI của Bot tại thời điểm lưu. Khi đổi model của Bot, mở Route và lưu lại để Route dùng cấu hình mới.
+The Route uses the Bot's AI configuration as of when you save. After you change the Bot's model, open the Route and save it again so it picks up the new configuration.
 
-## Cấu hình một Automation nhận việc qua chat
+## Set up an Automation that takes work over chat
 
-Owner/Admin thực hiện:
+Owner/Admin does this:
 
-1. Mở **Channels**, tạo/cấu hình Connection của nhà cung cấp; nhập credential theo form và lưu. Kiểm tra Connection hoạt động.
-2. Mở **Automations**, tạo công việc/Workflow, chọn Host, Project và cấu hình Agent.
-3. Thêm/sửa các bước. Trong phần **Result**, cấu hình nội dung/kênh trả lời cần dùng.
-4. Chọn **Add input → Channel conversation**, chọn Connection và conversation nguồn. Kiểm tra route, điều kiện nhận tin và nơi trả lời.
-5. Chọn audience được dùng; mặc định riêng tư **Only you**, mở rộng khi đã sẵn sàng. Lưu Workflow và input.
-6. Trong **Access**, cấp quyền Channel cho Team/Member với đúng conversation; người dùng liên kết danh tính Slack/Telegram của mình trong **Account** nếu cần.
-7. Gửi một tin nhắn thật từ người được cấp quyền, kiểm tra run và phản hồi trong conversation.
+1. Open **Channels**, create/configure the provider's Connection; enter credentials as the form asks and save. Check that the Connection works.
+2. Open **Automations**, create a job/Workflow, and pick the Host, Project and Agent configuration.
+3. Add/edit steps. In **Result**, configure the reply content/channel you need.
+4. Choose **Add input → Channel conversation**, then pick the Connection and source conversation. Check the route, the receive conditions and where it replies.
+5. Pick the audience; the default is private, **Only you**; widen it when ready. Save the Workflow and the input.
+6. In **Access**, grant Channel access to Teams/Members for the right conversation; users link their Slack/Telegram identity in **Account** if needed.
+7. Send a real message as a granted user and check the run and the reply in the conversation.
 
-Connection và Workflow là các cấu hình lưu riêng. Nếu Workflow đã lưu nhưng input thất bại, sửa và lưu lại input trong cùng luồng; kiểm tra bản ghi hiện có trước khi tạo lại để tránh trùng. Không dựa vào draft chưa lưu sau khi reload.
+Connection and Workflow are saved separately. If the Workflow saved but the input failed, fix and save the input again in the same flow; check existing records before recreating to avoid duplicates. Do not rely on an unsaved draft after a reload.
 
-## Điều khiển bằng slash command
+## Control with slash commands
 
-Gõ `/help` để xem các lệnh dùng chung. [Hướng dẫn slash command](../../../features/slash-commands/user-guide.md)
-giải thích cách dùng; [bảng quyền và phạm vi](../../../features/slash-commands/README.md)
-là tài liệu tham chiếu đầy đủ.
+Type `/help` to see the shared commands. The [slash command guide](../../../features/slash-commands/user-guide.md)
+explains how to use them; the [permission and scope table](../../../features/slash-commands/README.md)
+is the full reference.
 
-- Route trực tiếp: `/new <nội dung>`, `/resume <id>`, `/stop`, `/steer`, `/queue`
-  điều khiển phiên Agent; `/agent`, `/provider`, `/model`, `/effort`, `/permission`
-  chỉnh cấu hình trong phạm vi được cấp.
-- `/fork [nội dung]` tiếp tục trong phiên mới có lịch sử; `/side <nội dung>` và
-  `/quick <nội dung>` trả lời riêng một lần mà không thay binding hiện tại.
-- Route Automation: `/status`, `/cowork`, `/stop`, `/me`, `/help` dùng được;
-  các lệnh chỉnh phiên/cấu hình trực tiếp trả lời rõ là không áp dụng.
-- `/cowork`, `/status`, `/me` và kết quả cấu hình gửi DM cho người gọi khi lệnh
-  xuất phát từ conversation công khai. Không gửi được DM thì không đăng thông
-  tin đó trở lại conversation.
+- Direct Route: `/new <text>`, `/resume <id>`, `/stop`, `/steer`, `/queue`
+  control the Agent session; `/agent`, `/provider`, `/model`, `/effort`, `/permission`
+  change configuration within the granted scope.
+- `/fork [text]` continues in a new session with history; `/side <text>` and
+  `/quick <text>` answer once on the side without changing the current binding.
+- Automation Route: `/status`, `/cowork`, `/stop`, `/me`, `/help` work;
+  direct session/configuration commands reply that they do not apply.
+- `/cowork`, `/status`, `/me` and configuration results go to the caller by DM
+  when the command comes from a public conversation. If the DM cannot be sent,
+  that information is not posted back to the conversation.
 
-Trong **Access**, có thể cấp quyền cho **Guest** để người chưa liên kết Hub
-Member dùng Channel. Guest mặc định không có quyền; Member đã liên kết dùng
-quyền của Member/Team và không tự nhận quyền Guest. Thay đổi provider được lưu
-chờ áp dụng bằng `/new` hoặc `/fork`; tin nhắn thường vẫn đi vào phiên hiện tại.
+In **Access**, you can grant **Guest** access so people not linked to a Hub
+Member can use the Channel. Guest has no access by default; a linked Member uses
+Member/Team access and does not pick up Guest access. A provider change is saved
+and waits for `/new` or `/fork` to apply; ordinary messages still go to the current session.
 
-## Chỉ dùng app hoặc chỉ dùng Channel
+## App only or Channel only
 
-- Muốn mở Project/terminal trong app: cấp **Connect + Project access**.
-- Muốn chạy trực tiếp một Automation: cấp quyền **Run** cho Automation đó.
-- Muốn gọi luồng cố định qua Channel: cấp **Channel access**, liên kết danh tính và cho vào audience phù hợp. Không cần cấp Connect/Project/Automation Run chỉ để gọi route đã cấu hình.
+- To open a Project/terminal in the app: grant **Connect + Project access**.
+- To run an Automation directly: grant **Run** on that Automation.
+- To call a fixed flow over a Channel: grant **Channel access**, link the identity and add the person to the right audience. Calling a configured route does not need Connect/Project/Automation Run.
 
-Quyền chạy công việc cố định không cho người gọi tự chọn mọi Project, model hoặc mở terminal. Cấu hình thực thi và quyền dịch vụ được kiểm tra riêng khi thiết lập. Với công việc do Hub thực thi, kiểm tra daemon đã enroll và quan hệ Hub có quyền `hub.execute` cần thiết.
+Permission to run a fixed job does not let the caller pick any Project or model, or open a terminal. Execution config and service permissions are checked separately at setup. For jobs the Hub executes, check that the daemon is enrolled and the Hub relationship has the `hub.execute` permission it needs.
 
-**Send test message** chỉ chứng minh gửi tin ra được. Để kiểm tra toàn bộ luồng phải gửi tin vào thật, xem hoạt động/run và kết quả trả về. Nếu không nhận phản hồi, xem [Q&A](../help/faq.md).
+**Send test message** only proves outbound sending works. To check the whole flow, send a real inbound message and check the activity/run and the reply. If no reply arrives, see [Q&A](../help/faq.md).

@@ -23,6 +23,7 @@ export default defineConfig({
           env: {
             CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
             PLUGINS_REGISTRY_URL: "http://127.0.0.1:8188",
+            GITHUB_RELEASES_URL: "http://127.0.0.1:8188/releases",
           },
         },
       ],

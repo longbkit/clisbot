@@ -2,7 +2,10 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { useAgentAutocomplete } from "./use-agent-autocomplete";
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("react-i18next", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-i18next")>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock("@tanstack/react-query", () => ({
   keepPreviousData: (data: unknown) => data,
   useQuery: () => ({ data: [], isLoading: false }),

@@ -177,7 +177,7 @@ function shellFooterRow(page: Page, key: string): Locator {
 function footerSettingsRows(page: Page): Locator {
   return page
     .getByTestId("sidebar-nav-section-footer")
-    .locator('[data-testid^="sidebar-nav-item-"]');
+    .locator('[data-testid^="sidebar-nav-footer-item-"]');
 }
 
 export async function expectFooterSettingsKeys(page: Page, keys: string[]): Promise<void> {
@@ -187,7 +187,7 @@ export async function expectFooterSettingsKeys(page: Page, keys: string[]): Prom
         await footerSettingsRows(page).evaluateAll((rows) =>
           rows.map((row) => row.getAttribute("data-testid")),
         )
-      ).map((testID) => testID?.replace("sidebar-nav-item-", "")),
+      ).map((testID) => testID?.replace("sidebar-nav-footer-item-", "")),
     )
     .toEqual(keys);
 }
@@ -195,12 +195,14 @@ export async function expectFooterSettingsKeys(page: Page, keys: string[]): Prom
 export async function moveFooterItemUp(page: Page, key: string): Promise<void> {
   await page
     .getByTestId("sidebar-nav-section-footer")
-    .getByTestId(`sidebar-nav-move-up-${key}`)
+    .getByTestId(`sidebar-nav-footer-move-up-${key}`)
     .click();
 }
 
 function footerItemSwitch(page: Page, key: string): Locator {
-  return page.getByTestId("sidebar-nav-section-footer").getByTestId(`sidebar-nav-toggle-${key}`);
+  return page
+    .getByTestId("sidebar-nav-section-footer")
+    .getByTestId(`sidebar-nav-footer-toggle-${key}`);
 }
 
 export async function setFooterItemVisible(
@@ -230,42 +232,78 @@ export async function expectFooterItemHidden(page: Page, key: string): Promise<v
   await expect(page.locator(`[data-testid="${shellFooterTestID(key)}"]:visible`)).toHaveCount(0);
 }
 
-const FOOTER_ICON_TEST_IDS = [
-  "sidebar-add-project",
+/**
+ * Clisbot's bottom bar (`src/sidebar-nav/footer-model.ts`): actions on the left (New, the
+ * opt-in Add project, Search), then the controls Usage and Hosts and the fixed Help and Settings
+ * as one group at the end. Upstream's bar was Add project, Usage, Hosts, a spacer, Help, Settings.
+ */
+const FOOTER_CONTROL_TEST_IDS = [
   "sidebar-usage-icon",
   "sidebar-hosts-trigger",
   "sidebar-help",
   "sidebar-settings",
 ];
+const FOOTER_ACTION_TEST_IDS = ["sidebar-new", "sidebar-add-project", "sidebar-footer-search"];
 
 // Browser layout boxes include floating-point rounding, even for whole-pixel styles.
 const FOOTER_GEOMETRY_TOLERANCE = 0.01;
 
 /**
- * One line of same-size icons: Add project, Usage and Hosts together on the left, Help and
- * Settings together at the end.
+ * The controls are one line of same-size icons, evenly spaced with separate hit regions, Help and
+ * Settings last and Settings at the bar's end. The actions sit before them: on the same line when
+ * the bar is wide enough, otherwise on the line above.
  */
-export async function expectFooterIconRow(page: Page): Promise<void> {
+export async function expectFooterIconRow(
+  page: Page,
+  options: { actions?: readonly string[] } = {},
+): Promise<void> {
+  const actions = options.actions ?? ["sidebar-new", "sidebar-footer-search"];
   // Read one browser-frame snapshot: the compact drawer can translate between separate RPCs.
-  const boxes = await page
-    .locator(FOOTER_ICON_TEST_IDS.map((testID) => `[data-testid="${testID}"]:visible`).join(","))
-    .evaluateAll((elements) =>
-      elements.map((element) => {
-        const { x, y, width, height } = element.getBoundingClientRect();
-        return { testID: element.getAttribute("data-testid"), x, y, width, height };
-      }),
+  const { bar, boxes } = await page
+    .locator('[data-testid="sidebar-footer-bottom-line"]:visible')
+    .evaluate(
+      (line, testIDs) => {
+        const box = (element: Element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { testID: element.getAttribute("data-testid"), x, y, width, height };
+        };
+        const present = testIDs
+          .map((testID) => line.querySelector(`[data-testid="${testID}"]`))
+          .filter((element): element is Element => element !== null)
+          .filter((element) => element.getClientRects().length > 0);
+        // Document order is the order the bar renders its items in.
+        present.sort((a, b) =>
+          a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+        );
+        const style = getComputedStyle(line);
+        const lineBox = box(line);
+        return {
+          bar: { right: lineBox.x + lineBox.width - Number.parseFloat(style.paddingRight) },
+          boxes: present.map(box),
+        };
+      },
+      [...FOOTER_ACTION_TEST_IDS, ...FOOTER_CONTROL_TEST_IDS],
     );
-  expect(boxes.map((box) => box.testID)).toEqual(FOOTER_ICON_TEST_IDS);
-  const [first] = boxes;
-  for (const box of boxes) {
+  expect(boxes.map((box) => box.testID)).toEqual([...actions, ...FOOTER_CONTROL_TEST_IDS]);
+  const controls = boxes.slice(actions.length);
+  const [first] = controls;
+  for (const box of controls) {
     expect(Math.abs(box.y + box.height / 2 - first!.y - first!.height / 2)).toBeLessThan(2);
     expect(Math.abs(box.width - first!.width)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
   }
-  const gaps = boxes.slice(1).map((box, index) => box.x - (boxes[index]!.x + boxes[index]!.width));
-  for (const index of [0, 1, 3]) {
-    expect(Math.abs(gaps[index]!)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
+  const gaps = controls
+    .slice(1)
+    .map((box, index) => box.x - (controls[index]!.x + controls[index]!.width));
+  for (const gap of gaps) {
+    expect(gap).toBeGreaterThan(0);
+    expect(Math.abs(gap - gaps[0]!)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
   }
-  expect(gaps[2]).toBeGreaterThan(first!.width);
+  const last = controls[controls.length - 1]!;
+  expect(Math.abs(last.x + last.width - bar.right)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
+  const lastAction = boxes[actions.length - 1]!;
+  const sameLine = lastAction.y + lastAction.height > first!.y;
+  if (sameLine) expect(lastAction.x + lastAction.width).toBeLessThan(first!.x);
+  else expect(lastAction.y + lastAction.height).toBeLessThanOrEqual(first!.y);
 }
 
 export async function expectFooterSeparator(page: Page, shown: boolean): Promise<void> {
@@ -290,7 +328,9 @@ export async function hoverFooterAddProject(page: Page): Promise<void> {
   await page.locator('[data-testid="sidebar-add-project"]:visible').hover();
   const tooltip = page.getByTestId("sidebar-add-project-tooltip");
   await expect(tooltip.getByText("Add project", { exact: true })).toBeVisible();
-  await expect(tooltip.getByText("Ctrl+O", { exact: true })).toBeVisible();
+  await expect(
+    tooltip.getByText(process.platform === "darwin" ? "⌘O" : "Ctrl+O", { exact: true }),
+  ).toBeVisible();
 }
 
 export async function footerScreenshot(page: Page, name: string): Promise<void> {

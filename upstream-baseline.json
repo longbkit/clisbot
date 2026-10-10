@@ -1,0 +1,7 @@
+{
+  "paseo": {
+    "repository": "https://github.com/getpaseo/paseo",
+    "tag": "v0.11.1",
+    "commit": "ab10a6694ccf068959d1a6b67b6c915e21a9fe91"
+  }
+}

@@ -123,7 +123,7 @@ export async function expectAssistantImageRendered(
   page: Page,
   image: AssistantImageFixture,
 ): Promise<void> {
-  const rendered = page.getByRole("img", { name: image.alt }).first();
+  const rendered = page.getByRole("img", { name: image.alt }).filter({ visible: true }).first();
   await expect(rendered).toBeVisible({ timeout: 30_000 });
   await expect
     .poll(async () =>

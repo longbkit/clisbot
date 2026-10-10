@@ -1,53 +1,53 @@
-# Managed Access: off hay external?
+# Managed Access: off or external?
 
-[User guide](../README.md) · [Các mức quyền](../access/permissions.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Permission levels](../access/permissions.md) · [Q&A](../help/faq.md)
 
-Managed Access là cấu hình **từng daemon**, quyết định daemon có buộc kết nối app đi qua kiểm tra quyền Hub hay không.
+Managed Access is a **per-daemon** setting. It decides whether the daemon forces app connections through Hub permission checks.
 
-Bản Clisbot để mặc định `external` từ lần chạy đầu, không cần biến môi trường hay flag. Daemon chỉ đòi vé khi đã thuộc một Hub: trước khi enroll chưa có Hub nào cấp vé, nên bạn vẫn kết nối, đăng nhập và chạy `clisbot hub connect` như bình thường. Enroll xong, daemon đóng các phiên không có vé và từ đó mọi kết nối cần vé. Mất Hub (bị thu hồi hoặc đang disconnect) vẫn giữ yêu cầu vé; chỉ khi Owner disconnect xong daemon mới hết đòi vé. Ghi `daemon.managedAccess.mode` trong `config.json` thì giá trị đó thắng mặc định.
+Clisbot defaults to `external` from the first run, with no environment variable or flag. The daemon asks for a ticket only once it belongs to a Hub: before enrollment no Hub issues tickets, so you connect, sign in, and run `clisbot hub connect` as usual. After enrollment, the daemon closes sessions without a ticket, and from then on every connection needs one. Losing the Hub (revoked, or in the middle of disconnecting) keeps the ticket requirement; the daemon stops asking for tickets only after the Owner finishes disconnecting. Setting `daemon.managedAccess.mode` in `config.json` overrides the default.
 
-|                                  | `off`                                             | `external`                                   |
-| -------------------------------- | ------------------------------------------------- | -------------------------------------------- |
-| Kết nối app                      | Luồng Clisbot tin cậy thông thường                | Cần vé truy cập do Hub cấp                   |
-| Hub Connect                      | Kiểm soát việc Hub đưa thông tin kết nối          | Cần có để xin vé kết nối daemon              |
-| Quyền trên daemon sau kết nối    | Session tin cậy có quyền owner của daemon         | Theo người đăng nhập, Team và các grant      |
-| Giới hạn Project trong Hub       | Không được daemon áp dụng cho session tin cậy này | Daemon kiểm tra Project và thao tác được cấp |
-| App upstream không hỗ trợ vé Hub | Có thể dùng luồng ghép nối thông thường           | Không kết nối ngoài được bằng luồng đó       |
+|                                         | `off`                                               | `external`                                           |
+| --------------------------------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| App connection                          | The ordinary trusted Clisbot flow                   | Needs an access ticket issued by the Hub             |
+| Hub Connect                             | Controls whether the Hub hands out connection info  | Required to request a daemon connection ticket       |
+| Daemon permissions after connecting     | The trusted session has the daemon's owner rights   | Follow the signed-in person, their Teams, and grants |
+| Project limits in the Hub               | Not enforced by the daemon for this trusted session | The daemon checks the granted Projects and actions   |
+| Upstream app without Hub ticket support | Can use the ordinary pairing flow                   | Cannot connect from outside through that flow        |
 
-## Off có phải ai cũng kết nối được?
+## Does off mean anyone can connect?
 
-Không phải cứ biết daemon là vào được: vẫn cần đường kết nối hợp lệ, thông tin ghép nối và điều kiện xác thực của endpoint nếu có. Nhưng người có pairing link/QR/thông tin kết nối hợp lệ có thể dùng app Clisbot tương thích mà không cần đăng nhập Hub.
+No. Knowing the daemon is not enough: you still need a valid connection path, pairing info, and whatever authentication the endpoint requires. But anyone with a valid pairing link/QR/connection info can use a compatible Clisbot app without signing in to the Hub.
 
-Với `off`, việc là Member hay chỉ được Connect trên Hub **không biến session daemon thành session giới hạn theo Project**. Đừng dùng chế độ này để chia quyền nhiều người theo Hub.
+With `off`, being a Member or having only Connect on the Hub **does not turn the daemon session into a Project-limited session**. Do not use this mode to split access among several people through the Hub.
 
-## Bật lại external
+## Turn external back on
 
-Chỉ cần khi Owner đã tắt trước đó.
+You need this only if the Owner turned it off earlier.
 
-1. Kiểm tra Owner kết nối được bằng app hỗ trợ Managed Access.
-2. Owner vào Settings → **Hosts → [Host] → Managed access**.
-3. Bật **Require Hub access externally**, xác nhận.
-4. App hiện **Turning on managed access…**: Host đóng mọi phiên không có vé Hub, kể cả phiên của thiết bị bạn. App tự xin vé từ Hub và kết nối lại, không cần làm gì.
-5. Khi thấy **Managed access is on** và badge **Managed access** là xong. Kiểm tra thêm bằng một Member chỉ được cấp một Project.
+1. Check that the Owner can connect with an app that supports Managed Access.
+2. The Owner goes to Settings → **Hosts → [Host] → Managed access**.
+3. Turn on **Require Hub access externally** and confirm.
+4. The app shows **Turning on managed access…**: the Host closes every session without a Hub ticket, including your device's. The app requests a ticket from the Hub and reconnects on its own; you do nothing.
+5. When you see **Managed access is on** and the **Managed access** badge, you are done. Also check with a Member granted only one Project.
 
-Sau 30 giây vẫn chưa kết nối lại thì app báo lỗi: bấm **Reconnect** ở **Settings → Hosts**, hoặc kiểm tra daemon bằng lệnh hiện trên card. Tab khác đang mở app từ trước cần reload để lấy vé.
+If it has not reconnected after 30 seconds, the app shows an error: click **Reconnect** in **Settings → Hosts**, or check the daemon with the command shown on the card. Other tabs that already had the app open need a reload to get a ticket.
 
-Thay đổi mode áp dụng ngay, **không cần restart daemon**. Kết nối ngoài không có vé bị đóng và phải kết nối lại qua Hub. Nếu vừa cập nhật mã nguồn/binary thì vẫn phải khởi động lại để nạp phiên bản mới; đó là việc khác với đổi mode.
+Mode changes apply immediately, **with no daemon restart**. Outside connections without a ticket are closed and must reconnect through the Hub. If you updated the source/binary, you still restart to load the new version; that is separate from changing the mode.
 
-`external` áp dụng cả TCP localhost, LAN, Tailscale, SSH tunnel và relay. Socket/pipe local của hệ điều hành là đường quản trị/khôi phục riêng; kết nối dịch vụ Hub có danh tính và quyền riêng.
+`external` covers localhost TCP, LAN, Tailscale, SSH tunnels, and relay. The OS local socket/pipe is a separate admin/recovery path; the Hub service connection has its own identity and permissions.
 
-## CLI trên Host ở chế độ external
+## CLI on a Host in external mode
 
-CLI đi cùng đường với app: khi daemon đòi vé, CLI dùng phiên `clisbot hub login` của bạn để xin vé từ Hub mà daemon đang kết nối, rồi kết nối lại. Vé mang quyền của tài khoản đã duyệt đăng nhập CLI, nên riêng vé kết nối Host không có nhiều quyền hơn người đó. **Credential `hub login` còn có các quyền Public API quản trị riêng, không giới hạn ở việc xin vé**; đọc [phạm vi và vòng đời](../../../hub.md#advanced-cli-login) trước khi dùng.
+The CLI follows the same path as the app: when the daemon asks for a ticket, the CLI uses your `clisbot hub login` session to request a ticket from the Hub the daemon is connected to, then reconnects. The ticket carries the rights of the account that approved the CLI sign-in, so the Host connection ticket alone gives no more than that person has. **The `hub login` credential also carries separate admin Public API permissions beyond requesting tickets**; read [scope and lifecycle](../../../hub.md#advanced-cli-login) before using it.
 
-**Đây là truy cập CLI vào một Host đã quản lý, không phải onboarding. Thêm Host mới chỉ dùng `hub connect <URL-Hub>`.** Nếu đang vận hành trên chính máy daemon, ưu tiên socket/pipe local khi phù hợp để không cần cấp credential quản trị CLI.
+**This is CLI access to a Host that is already managed, not onboarding. To add a new Host, use only `hub connect <Hub-URL>`.** If you operate on the daemon machine itself, prefer the local socket/pipe where it fits, so you do not need to grant a CLI admin credential.
 
-- Chưa đăng nhập Hub đó thì CLI báo: chạy `clisbot hub login` rồi thử lại.
-- `clisbot hub connect` chạy trước khi daemon thuộc Hub, lúc daemon chưa đòi vé. Daemon trả kết quả enroll xong mới đóng phiên đó.
-- Host enroll bằng `--api-key` mà máy không có phiên `clisbot hub login`: CLI không xin được vé (API key không đại diện cho người nào). Dùng `clisbot hub login`, hoặc đường socket/pipe local.
+- Not signed in to that Hub: the CLI tells you to run `clisbot hub login` and try again.
+- `clisbot hub connect` runs before the daemon belongs to a Hub, while the daemon does not ask for tickets yet. The daemon returns the enrollment result before closing that session.
+- A Host enrolled with `--api-key` on a machine without a `clisbot hub login` session: the CLI cannot get a ticket (an API key does not represent a person). Use `clisbot hub login`, or the local socket/pipe.
 
-## Tắt external
+## Turn external off
 
-Owner tắt cùng công tắc trên. Khi về `off`, các giới hạn Member/Project của Hub không còn bảo vệ session ghép nối thông thường. Thu hồi Access trên Hub không thay thế thu hồi các đường tin cậy cũ trong chế độ này.
+The Owner turns it off with the same switch. Back in `off`, the Hub's Member/Project limits no longer protect ordinary paired sessions. In this mode, revoking Access on the Hub does not replace revoking old trusted paths.
 
-App chỉ hiện quyền đổi công tắc cho Owner. Tuy nhiên **Daemon Administrator có quyền cấu hình daemon ở backend**, bao gồm Managed Access; việc ẩn công tắc không thu hẹp quyền quản trị đó. Xem [phạm vi Administrator](../access/daemon-administrator.md).
+The app shows the switch only to the Owner. But **a Daemon Administrator has backend authority over daemon configuration**, including Managed Access; hiding the switch does not narrow that authority. See [Administrator scope](../access/daemon-administrator.md).

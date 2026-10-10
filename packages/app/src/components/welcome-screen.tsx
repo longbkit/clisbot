@@ -20,6 +20,7 @@ import {
 import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { isNative } from "@/constants/platform";
+import { WindowChromeSafeArea } from "@/utils/desktop-window";
 import { HubWelcomeSignIn, WelcomeOwnComputerLabel } from "@/clisbot/hub/welcome-sign-in";
 import { HostConnectionMethods, type HostConnectionMethod } from "./host-connection-methods";
 import { ProductAnalyticsWelcomeNotice } from "@/clisbot/analytics/welcome-notice";
@@ -95,7 +96,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "flex-end",
     gap: theme.spacing[1],
-    paddingHorizontal: theme.spacing[2],
   },
   headerButton: {
     padding: theme.spacing[3],
@@ -224,7 +224,11 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
 
   return (
     <View style={styles.root}>
-      <View style={headerStyle}>
+      <WindowChromeSafeArea
+        placement="inline"
+        horizontalPadding={theme.spacing[2]}
+        style={headerStyle}
+      >
         {/* Clisbot: the language is the first thing someone may need to change. */}
         <WelcomeLanguageDropdown />
         <Pressable
@@ -245,7 +249,7 @@ export function WelcomeScreen({ onHostAdded }: WelcomeScreenProps) {
         >
           <X size={20} color={theme.colors.foregroundMuted} />
         </Pressable>
-      </View>
+      </WindowChromeSafeArea>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={scrollContentContainerStyle}

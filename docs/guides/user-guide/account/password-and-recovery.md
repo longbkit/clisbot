@@ -1,14 +1,14 @@
-# Mật khẩu owner và recovery
+# Owner password and recovery
 
-[User guide](../README.md) · [Thiết lập và đăng nhập](setup-and-sign-in.md) · [Onboarding](../getting-started/onboarding.md)
+[User guide](../README.md) · [Setup and sign-in](setup-and-sign-in.md) · [Onboarding](../getting-started/onboarding.md)
 
-Tài khoản tạo bằng Google không có mật khẩu: đăng nhập bằng Google, các lệnh dưới đây không áp dụng.
+Accounts created with Google have no password: sign in with Google; the commands below do not apply.
 
-Các lệnh dùng đúng `--home` đã onboarding. Nếu chạy từ repository, dùng hàm `clisbot` ở bước chuẩn bị của [onboarding](../getting-started/onboarding.md#1-chuẩn-bị).
+Use the same `--home` you onboarded with. If you run from the repository, use the `clisbot` function from the prepare step of [onboarding](../getting-started/onboarding.md#1-prepare).
 
-## Còn biết mật khẩu cũ
+## You still know the old password
 
-Nhập kín và export hai biến rồi đổi mật khẩu qua API:
+Enter both values hidden, export them, then change the password through the API:
 
 ```bash
 read -rsp 'Current password: ' CURRENT_OWNER_PASSWORD; printf '\n'
@@ -20,13 +20,13 @@ clisbot hub password change --home "$HOME/.clisbot-dev-01" \
   --new-password '${NEW_OWNER_PASSWORD}'
 ```
 
-Mật khẩu mới tối thiểu 12 ký tự. Các phiên khác bị đăng xuất. `--owner-password` lúc init chỉ tạo account ban đầu, **không reset account đã có**.
+The new password needs at least 12 characters. Other sessions are signed out. `--owner-password` at init only creates the initial account and **does not reset an existing account**.
 
-## Quên mật khẩu: recovery bằng master password
+## Forgot the password: recovery with the master password
 
-Recovery mặc định **tắt**. Người vận hành phải cấu hình `CLISBOT_MASTER_PASSWORD` trong môi trường chạy Hub; secret này có quyền reset **mọi password account trên Hub**. Dùng secret ngẫu nhiên 32–1024 ký tự ASCII không khoảng trắng, khác mật khẩu account; giữ trong password manager/file riêng ngoài workspace bot.
+Recovery is **off** by default. The operator must set `CLISBOT_MASTER_PASSWORD` in the Hub's environment; this secret can reset **every account password on the Hub**. Use a random secret of 32–1024 ASCII characters with no spaces, different from any account password; keep it in a password manager or a separate file outside the bot workspace.
 
-Nếu đã lưu trong `.env`, nạp lại file như bước onboarding. Nếu chưa cấu hình, nhập kín secret bạn đã tạo và lưu riêng:
+If it is in `.env`, load the file again as in onboarding. If not configured yet, enter the secret you created and stored separately, hidden:
 
 ```bash
 read -rsp 'Hub master password: ' CLISBOT_MASTER_PASSWORD; printf '\n'
@@ -35,9 +35,9 @@ clisbot hub stop --home "$HOME/.clisbot-dev-01"
 clisbot hub start --home "$HOME/.clisbot-dev-01"
 ```
 
-Chỉ Hub cần restart; daemon có thể giữ nguyên. Export chỉ tồn tại trong shell và tiến trình con; chạy Hub bằng service thì cấu hình biến trong service. Đổi/xóa master password cũng cần restart Hub; bỏ biến sẽ tắt recovery.
+Only the Hub needs a restart; the daemon can keep running. An export lives only in the shell and its child processes; if the Hub runs as a service, set the variable in the service. Changing or removing the master password also needs a Hub restart; removing the variable turns recovery off.
 
-Khi cần reset:
+To reset:
 
 ```bash
 read -rsp 'New account password: ' NEW_OWNER_PASSWORD; printf '\n'
@@ -48,19 +48,19 @@ clisbot hub password reset --home "$HOME/.clisbot-dev-01" \
   --new-password '${NEW_OWNER_PASSWORD}'
 ```
 
-Mật khẩu mới 12–128 ký tự, khác master password. Đăng nhập lại sau reset: các phiên account cũ bị thu hồi; bot, file, workspace, quyền, channel token và API key được giữ nguyên. Hiện có CLI/API, chưa có form “Quên mật khẩu” trên web hay recovery qua email.
+The new password is 12–128 characters and must differ from the master password. Sign in again after the reset: old account sessions are revoked; bots, files, workspaces, permissions, channel tokens and API keys are kept. Only CLI/API exist today; there is no "Forgot password" form on the web and no email recovery.
 
-| Kết quả                  | Làm gì tiếp?                                                          |
-| ------------------------ | --------------------------------------------------------------------- |
-| `401`                    | Kiểm tra master password đang dùng có khớp biến **Hub đã nạp** không. |
-| `404`                    | Kiểm tra bản Hub, recovery đã bật và email account đã tồn tại.        |
-| `429`                    | Đợi ít nhất 60 giây; giới hạn 5 lần thử/phút/tiến trình Hub.          |
-| Không nhận được xác nhận | Thử đăng nhập bằng mật khẩu mới để biết kết quả trước khi reset lại.  |
+| Result                   | What next?                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `401`                    | Check that the master password you use matches the variable **the Hub loaded**.  |
+| `404`                    | Check the Hub version, that recovery is on and that the account email exists.    |
+| `429`                    | Wait at least 60 seconds; the limit is 5 attempts per minute per Hub process.    |
+| No confirmation received | Try signing in with the new password to learn the result before resetting again. |
 
-CLI chỉ gửi secret qua HTTPS hoặc HTTP loopback; không theo redirect. Master password không được in trong kết quả hay tự truyền vào môi trường agent/terminal. **Bot đọc được `.env`, tiến trình hoặc database Hub vẫn có thể lấy quyền này**; không nhờ bot reset hộ. Đây không phải biện pháp cách ly quyền hệ điều hành.
+The CLI sends the secret only over HTTPS or loopback HTTP and does not follow redirects. The master password is never printed in output or passed into agent/terminal environments. **A bot that can read `.env`, the Hub process or the Hub database can still obtain this power**; do not ask a bot to reset for you. This is not OS-level privilege isolation.
 
-## Không còn mật khẩu hay master password
+## No password and no master password
 
-Nếu chưa đổi mật khẩu sau init, kiểm tra bản `INITIAL_OWNER_PASSWORD` bạn đã lưu. Nếu là Member, liên hệ người vận hành Hub; không gửi secret qua ticket/chat.
+If you have not changed the password since init, check the `INITIAL_OWNER_PASSWORD` you saved. If you are a Member, contact the Hub operator; do not send secrets through tickets or chat.
 
-Nếu còn quyền quản trị máy, người vận hành có thể cấu hình master password mới như trên. Giữ và sao lưu home trước khi sửa môi trường. Nếu không còn quyền quản trị hay thông tin recovery, hiện không có cách tự lấy lại account. Có thể dựng Hub mới, tận dụng file workspace còn truy cập được; lịch sử và cấu hình Hub không tự chuyển sang. **Không xóa home cũ để thử reset.**
+If you still have admin rights on the machine, the operator can configure a new master password as above. Keep and back up the home before changing the environment. Without admin rights or recovery information, there is no way to recover the account yourself today. You can set up a new Hub and reuse workspace files you can still reach; Hub history and configuration do not carry over. **Do not delete the old home to attempt a reset.**

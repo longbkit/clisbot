@@ -49,7 +49,7 @@ describe("checkout status projection", () => {
     const payload = normalizeCheckoutPrStatusPayload(
       {
         number: 993,
-        repoOwner: "getpaseo",
+        repoOwner: "longbkit",
         repoName: "clisbot",
         url: "https://github.com/longbkit/clisbot/pull/993",
         title: "Auto-merge UX",

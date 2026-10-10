@@ -24,7 +24,7 @@ type NormalizedFeishuGroupPolicy = Exclude<FeishuGroupPolicy, "allowall">;
 
 const FEISHU_PROVIDER_PREFIX_RE = /^(feishu|lark):/i;
 const FEISHU_TYPED_PREFIX_RE = /^(chat|group|channel|user|dm|open_id):/i;
-const FEISHU_ID_KIND = "plugin:feishu-id" as const;
+const _FEISHU_ID_KIND = "plugin:feishu-id" as const;
 
 export function normalizeFeishuAllowEntry(raw: string): string {
   const trimmed = raw.trim();
@@ -64,7 +64,7 @@ export function normalizeFeishuAllowEntry(raw: string): string {
   return "";
 }
 
-function normalizeFeishuDmPolicy(policy: string | null | undefined): FeishuDmPolicy {
+function _normalizeFeishuDmPolicy(policy: string | null | undefined): FeishuDmPolicy {
   return policy === "open" ||
     policy === "pairing" ||
     policy === "allowlist" ||
@@ -73,7 +73,7 @@ function normalizeFeishuDmPolicy(policy: string | null | undefined): FeishuDmPol
     : "pairing";
 }
 
-function normalizeFeishuGroupPolicy(policy: FeishuGroupPolicy): NormalizedFeishuGroupPolicy {
+function _normalizeFeishuGroupPolicy(policy: FeishuGroupPolicy): NormalizedFeishuGroupPolicy {
   return policy === "allowall" ? "open" : policy;
 }
 

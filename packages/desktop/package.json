@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/desktop",
-  "version": "0.11.1",
+  "version": "2.0.0",
   "private": true,
   "description": "Clisbot desktop app (Electron wrapper)",
   "homepage": "https://clisbot.com",
@@ -40,7 +40,7 @@
     "@electron/asar": "3.4.1",
     "@types/node": "24.6.0",
     "@types/ws": "^8.5.14",
-    "electron": "44.2.0",
+    "electron": "44.5.0",
     "electron-builder": "26.8.1",
     "typescript": "5.9.3",
     "unzip-crx-3": "^0.2.0",

@@ -169,6 +169,12 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=${{ matrix.node_heap_mb }}
         run: |
           set -euo pipefail
+          # An absent GitHub secret becomes an empty string. electron-builder
+          # treats CSC_LINK="" as a certificate path instead of missing config.
+          if [[ -z "${CSC_LINK:-}" ]]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+            echo "::warning::No Apple signing certificate configured; macOS artifacts will not be Developer ID signed or notarized."
+          fi
           build_args=(-- --publish never --mac --${{ matrix.electron_arch }})
           build_args+=("-c.publish.releaseType=$RELEASE_TYPE")
           build_args+=("-c.publish.channel=$RELEASE_CHANNEL")
@@ -199,7 +205,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-macos-${{ matrix.electron_arch }}
-          path: ${{ env.DESKTOP_PACKAGE_PATH }}/release/*.dmg
+          path: ${{ env.DESKTOP_PACKAGE_PATH }}/release/*
           retention-days: 7
 
       - name: Upload manifest artifact

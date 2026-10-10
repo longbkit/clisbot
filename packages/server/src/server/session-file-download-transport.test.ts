@@ -68,7 +68,7 @@ it("downloads linked uploads over real WS and HTTP after archive and capture-off
     await daemon.daemon.agentManager.flush();
     const directory = await daemon.daemon.agentStorage.getSessionDirectory(agent.id);
     const relative = path.relative(directory, uploaded.file.path);
-    expect(relative.startsWith("uploads/")).toBe(true);
+    expect(relative.startsWith(`uploads${path.sep}`)).toBe(true);
     await client.close();
     client = undefined;
     await daemon.close();
@@ -123,7 +123,7 @@ it("downloads linked uploads over real WS and HTTP after archive and capture-off
     await daemon?.close();
     await Promise.all(
       [root, ...staticDirectories].map((directory) =>
-        fs.rm(directory, { recursive: true, force: true }),
+        fs.rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }),
       ),
     );
   }

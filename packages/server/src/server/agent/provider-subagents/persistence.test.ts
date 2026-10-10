@@ -106,3 +106,27 @@ it("does not recreate deleted parent folders from a stale subagent resolver", as
   ).rejects.toThrow("deleted");
   await expect(fs.stat(directory)).rejects.toMatchObject({ code: "ENOENT" });
 });
+
+it("projects live child replies with storage writes disabled and does not persist them", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "provider-subagent-live-read-only-"));
+  roots.push(directory);
+  const options = { resolveParentDirectory: async () => directory, writable: false };
+  const live = new ProviderSubagentStore(options);
+  await live.applyCommitted("parent", "codex", { type: "upsert", id: "live-child" });
+  for (const text of ["A", "B", "C"]) {
+    await live.applyCommitted("parent", "codex", {
+      type: "timeline",
+      id: "live-child",
+      item: { type: "assistant_message", text },
+    });
+  }
+  const page = await live.fetchProjectedCommittedTimeline("parent", "live-child", { limit: 1 });
+  expect(page.entries).toMatchObject([{ seqStart: 1, seqEnd: 3, item: { text: "ABC" } }]);
+  expect((await live.fetchCommittedTimeline("parent", "live-child")).rows).toMatchObject([
+    { item: { text: "ABC" } },
+  ]);
+  const reopened = new ProviderSubagentStore(options);
+  await reopened.hydrate("parent");
+  expect(reopened.list("parent")).toEqual([]);
+  expect(await fs.readdir(directory)).toEqual([]);
+});

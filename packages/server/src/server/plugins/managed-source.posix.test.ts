@@ -30,7 +30,7 @@ async function createRepository(): Promise<string> {
 }
 
 async function commitAll(repository: string, message: string): Promise<string> {
-  await runGitCommand(["add", "-A"], { cwd: repository });
+  await runGitCommand(["add", "--force", "-A"], { cwd: repository });
   await runGitCommand(["commit", "-m", message], { cwd: repository });
   const { stdout } = await runGitCommand(["rev-parse", "HEAD"], { cwd: repository });
   return stdout.trim();

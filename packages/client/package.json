@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/client",
-  "version": "0.11.1",
+  "version": "2.0.0",
   "description": "Clisbot client SDK package",
   "files": [
     "dist",
@@ -43,9 +43,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@clisbot/device-access": "0.11.1",
-    "@clisbot/protocol": "0.11.1",
-    "@clisbot/relay": "0.11.1",
+    "@clisbot/device-access": "2.0.0",
+    "@clisbot/protocol": "2.0.0",
+    "@clisbot/relay": "2.0.0",
     "base64-js": "^1.5.1",
     "zod": "^4.4.3"
   },

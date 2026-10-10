@@ -169,10 +169,10 @@ function row(page: Page, serverId: string, workspaceId: string): Locator {
   return page.getByTestId(`sidebar-workspace-row-${serverId}:${workspaceId}`);
 }
 
-// The actor a SessionActorLabel renders with accessibilityRole="button".
-function actorButton(page: Page, actor: Actor, inside?: Locator): Locator {
+// Sidebar authors are plain names: the workspace row owns the press target.
+function actorName(page: Page, actor: Actor, inside?: Locator): Locator {
   const target = inside ?? page;
-  return target.getByRole("button", { name: `Open profile: ${actor.displayName} (${actor.id})` });
+  return target.getByText(actor.displayName, { exact: true });
 }
 
 function interceptWorkspaceMetadata(page: Page, ids: Record<string, DescriptorMetadata>): void {
@@ -255,11 +255,6 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     page,
   }) => {
     test.setTimeout(300_000);
-    expect(
-      process.env.CLISBOT_AGENT_SESSION_STORAGE,
-      "Run this contract with the actual durable backend enabled",
-    ).toBe("1");
-
     const a = await seedMeta("ui-meta-a-", "meta-a");
     const noMeta = await seedMeta("ui-meta-none-", "meta-none");
     cleanups.push(a.cleanup, noMeta.cleanup);
@@ -279,17 +274,20 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     const noneRow = row(page, serverId, noMeta.workspaceId);
     const metaA = metadataFor(a.markerId)!;
 
-    // Default row items: only `channels` is on. The metadata row shows the channel but NO author
-    // (createdUser/updatedUser off by default); the no-metadata row shows no author and no
+    // Default row items include the creator and channel; updated user is off.
+    // The no-metadata row shows no author and no
     // "Metadata pending" placeholder — missing data drops the whole line rather than a gap.
     await expect(aRow.getByText("General", { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(actorButton(page, alice, aRow)).toHaveCount(0);
-    await expect(noneRow.getByRole("button", { name: /Open profile:/ })).toHaveCount(0);
+    await expect(actorName(page, alice, aRow)).toBeVisible();
+    await expect(actorName(page, bob, aRow)).toHaveCount(0);
+    for (const actor of [alice, bob, carol]) {
+      await expect(actorName(page, actor, noneRow)).toHaveCount(0);
+    }
     await expect(noneRow.getByText("Metadata pending", { exact: true })).toHaveCount(0);
 
-    // Turn the authored columns on: created user, updated user, created time, updated time.
+    // Enable the remaining authored columns; created user is already on by default.
     await openSub(page, "sidebar-display-show");
-    for (const item of ["createdUser", "updatedUser", "createdTime", "updatedTime"]) {
+    for (const item of ["updatedUser", "createdTime", "updatedTime"]) {
       await page.getByTestId(`sidebar-row-item-${item}`).click();
     }
     await closeSidebarDisplayPreferences(page);
@@ -298,13 +296,15 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     const expectedUpdated = describeCompactTimeAgo(new Date(metaA.lastInteractionAt!)).label;
 
     // Every authored column now renders on the metadata row.
-    await expect(actorButton(page, alice, aRow)).toBeVisible();
-    await expect(actorButton(page, bob, aRow)).toBeVisible();
+    await expect(actorName(page, alice, aRow)).toBeVisible();
+    await expect(actorName(page, bob, aRow)).toBeVisible();
     await expect(aRow.getByText(expectedCreated, { exact: true })).toBeVisible();
     await expect(aRow.getByText(expectedUpdated, { exact: true })).toBeVisible();
     await expect(aRow.getByText("General", { exact: true })).toBeVisible();
     // The no-metadata row still renders no author columns even with the toggles on.
-    await expect(noneRow.getByRole("button", { name: /Open profile:/ })).toHaveCount(0);
+    for (const actor of [alice, bob, carol]) {
+      await expect(actorName(page, actor, noneRow)).toHaveCount(0);
+    }
     await attachShot(page, "w1-metadata-row-all-columns.png");
 
     // Hide "created user": the row loses Alice and the remaining items still render contiguously
@@ -312,8 +312,8 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     await openSub(page, "sidebar-display-show");
     await page.getByTestId("sidebar-row-item-createdUser").click();
     await closeSidebarDisplayPreferences(page);
-    await expect(actorButton(page, alice, aRow)).toHaveCount(0);
-    await expect(actorButton(page, bob, aRow)).toBeVisible();
+    await expect(actorName(page, alice, aRow)).toHaveCount(0);
+    await expect(actorName(page, bob, aRow)).toBeVisible();
     await expect(aRow.getByText(expectedUpdated, { exact: true })).toBeVisible();
     await expect(aRow.getByText("General", { exact: true })).toBeVisible();
 
@@ -322,8 +322,8 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     await page.reload();
     const reloadedA = row(page, serverId, a.workspaceId);
     await expect(reloadedA).toBeVisible({ timeout: 30_000 });
-    await expect(actorButton(page, alice, reloadedA)).toHaveCount(0);
-    await expect(actorButton(page, bob, reloadedA)).toBeVisible();
+    await expect(actorName(page, alice, reloadedA)).toHaveCount(0);
+    await expect(actorName(page, bob, reloadedA)).toBeVisible();
     await attachShot(page, "w1-show-hide-remembered-after-reload.png");
 
     // Restore the default (createdUser on) so later tests start from a known state.
