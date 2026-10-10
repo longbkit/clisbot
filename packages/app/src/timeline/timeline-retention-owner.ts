@@ -39,6 +39,9 @@ function keepUnpositionedOrPending(
 /** Metadata admission for the existing store; this class never retains timeline payloads. */
 export class TimelineRetentionOwner {
   private readonly registrations = new Map<string, () => void>();
+  // Live rows received before an authoritative baseline have no retained page yet.
+  // Keep their IDs pinned until a page includes them; never certify their coverage.
+  private readonly liveOverlayIds = new Map<string, Set<string>>();
   private disposed = false;
   private readonly visible = new Set<string>();
   private readonly reading = new Map<string, string>();
@@ -92,12 +95,13 @@ export class TimelineRetentionOwner {
     const session = store.sessions[this.serverId];
     const timeline = selectAgentTimelineState(session, agentId);
     if (timeline.status === "cold") return;
+    const keep = new Set([...change.keepItemIds, ...(this.liveOverlayIds.get(agentId) ?? [])]);
     store.applyAgentTimelineResponseState(this.serverId, agentId, {
-      items: keepUnpositionedOrPending(this.serverId, agentId, change.keepItemIds, timeline.items),
+      items: keepUnpositionedOrPending(this.serverId, agentId, keep, timeline.items),
       head: keepUnpositionedOrPending(
         this.serverId,
         agentId,
-        change.keepItemIds,
+        keep,
         session?.agentStreamHead.get(agentId) ?? [],
       ),
       range: change.range,
@@ -152,12 +156,16 @@ export class TimelineRetentionOwner {
       this.reservations.delete(event);
     }
     const key = this.ensure(agentId);
+    const cursor = result.cursor;
+    const overlayIds = cursor
+      ? (this.liveOverlayIds.get(agentId) ?? new Set<string>())
+      : new Set(result.head.map((item) => item.id));
     const localBytes = [...result.tail, ...result.head]
-      .filter((item) => !item.timelineCursor)
+      .filter((item) => !item.timelineCursor || overlayIds.has(item.id))
       .reduce((sum, item) => sum + itemBytes(item), 0);
     if (!this.budget.setPinnedBytes(key, localBytes))
       throw new Error("Live history exceeds the available memory budget");
-    const cursor = result.cursor;
+    this.liveOverlayIds.set(agentId, overlayIds);
     if (!cursor) return result;
     const entries = events.flatMap((event) => {
       if (
@@ -223,8 +231,24 @@ export class TimelineRetentionOwner {
     if (result.commit === "discard" || result.error || !payload.startCursor || !payload.endCursor)
       return result;
     const key = this.ensure(payload.agentId);
+    const pagePositions = new Set(
+      [...payload.entries, ...(payload.contextEntries ?? [])].map((entry) => entry.seqEnd),
+    );
+    const previousOverlay = this.liveOverlayIds.get(payload.agentId);
+    const overlayIds = new Set(
+      [...result.tail, ...result.head]
+        .filter(
+          (item) =>
+            previousOverlay?.has(item.id) &&
+            !(
+              item.timelineCursor?.epoch === payload.epoch &&
+              pagePositions.has(item.timelineCursor.seq)
+            ),
+        )
+        .map((item) => item.id),
+    );
     const localBytes = [...result.tail, ...result.head]
-      .filter((item) => !item.timelineCursor)
+      .filter((item) => !item.timelineCursor || overlayIds.has(item.id))
       .reduce((sum, item) => sum + itemBytes(item), 0);
     if (!this.budget.setPinnedBytes(key, localBytes))
       return {
@@ -241,20 +265,24 @@ export class TimelineRetentionOwner {
       (item) =>
         item.timelineCursor?.epoch === payload.epoch && positions.has(item.timelineCursor.seq),
     );
-    const accepted = this.budget.retain(key, {
-      epoch: payload.epoch,
-      startSeq: payload.startCursor.seq,
-      endSeq: payload.endCursor.seq,
-      itemIds: items.map((item) => item.id),
-      itemBytes: Object.fromEntries(items.map((item) => [item.id, itemBytes(item)])),
-      bytes: 0,
-      sourceSeqRanges: [...payload.entries, ...(payload.contextEntries ?? [])].flatMap((entry) =>
-        entry.sourceSeqRangesRef
-          ? []
-          : (entry.sourceSeqRanges ?? [{ startSeq: entry.seqStart, endSeq: entry.seqEnd }]),
-      ),
-      hasOlder: payload.hasOlder,
-    });
+    const accepted = this.budget.retain(
+      key,
+      {
+        epoch: payload.epoch,
+        startSeq: payload.startCursor.seq,
+        endSeq: payload.endCursor.seq,
+        itemIds: items.map((item) => item.id),
+        itemBytes: Object.fromEntries(items.map((item) => [item.id, itemBytes(item)])),
+        bytes: 0,
+        sourceSeqRanges: [...payload.entries, ...(payload.contextEntries ?? [])].flatMap((entry) =>
+          entry.sourceSeqRangesRef
+            ? []
+            : (entry.sourceSeqRanges ?? [{ startSeq: entry.seqStart, endSeq: entry.seqEnd }]),
+        ),
+        hasOlder: payload.hasOlder,
+      },
+      { replace: payload.reset },
+    );
     if (!accepted)
       return {
         ...result,
@@ -263,21 +291,13 @@ export class TimelineRetentionOwner {
         initResolution: "reject",
         error: "Timeline page exceeds the available history memory budget",
       };
+    this.liveOverlayIds.set(payload.agentId, overlayIds);
     const retained = this.budget.readRange(key)!;
+    const keep = new Set([...retained.keepItemIds, ...overlayIds]);
     return {
       ...result,
-      tail: keepUnpositionedOrPending(
-        this.serverId,
-        payload.agentId,
-        retained.keepItemIds,
-        result.tail,
-      ),
-      head: keepUnpositionedOrPending(
-        this.serverId,
-        payload.agentId,
-        retained.keepItemIds,
-        result.head,
-      ),
+      tail: keepUnpositionedOrPending(this.serverId, payload.agentId, keep, result.tail),
+      head: keepUnpositionedOrPending(this.serverId, payload.agentId, keep, result.head),
       cursor: retained.range,
       cursorChanged: true,
       older: retained.hasOlder ? "available" : "none",
@@ -287,6 +307,7 @@ export class TimelineRetentionOwner {
     this.disposed = true;
     for (const dispose of this.registrations.values()) dispose();
     this.registrations.clear();
+    this.liveOverlayIds.clear();
     this.visible.clear();
     this.reading.clear();
   }

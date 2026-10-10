@@ -216,7 +216,7 @@ export class TimelinePageRetention {
       this.bytes + this.pendingBytes + estimatedBytes <= this.limits.totalBytes,
     );
   }
-  private exceedsPinnedBudget(owner: TimelineOwner, page: StoredPage): boolean {
+  private exceedsPinnedBudget(owner: TimelineOwner, page: StoredPage, replace: boolean): boolean {
     let protectedBytes = 0;
     const sessions = new Map<string, number>();
     for (const [key, candidate] of this.owners) {
@@ -226,7 +226,8 @@ export class TimelinePageRetention {
         pinned &&
         !(
           candidate === owner &&
-          (pinned.epoch !== page.epoch ||
+          (replace ||
+            pinned.epoch !== page.epoch ||
             pageKey(pinned) === pageKey(page) ||
             (!owner.readingItemId && page.endSeq >= pinned.endSeq) ||
             (owner.readingItemId && page.itemIds.includes(owner.readingItemId)))
@@ -253,7 +254,7 @@ export class TimelinePageRetention {
     this.bytes += bytes - owner.bytes;
     owner.bytes = bytes;
   }
-  retain(key: string, page: RetainedTimelinePage): boolean {
+  retain(key: string, page: RetainedTimelinePage, options: { replace?: boolean } = {}): boolean {
     const owner = this.owners.get(key);
     if (!owner) throw new Error("Timeline retention owner is not registered");
     const stored: StoredPage = {
@@ -271,11 +272,11 @@ export class TimelinePageRetention {
     if (
       cost > this.limits.sessionBytes ||
       cost > this.limits.totalBytes ||
-      this.exceedsPinnedBudget(owner, stored)
+      this.exceedsPinnedBudget(owner, stored, options.replace === true)
     )
       return false;
     const previous = owner.pages.values().next().value as StoredPage | undefined;
-    if (previous && previous.epoch !== page.epoch) {
+    if (options.replace || (previous && previous.epoch !== page.epoch)) {
       owner.pages.clear();
       this.recount(owner);
     }

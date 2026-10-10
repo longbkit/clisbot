@@ -155,7 +155,8 @@ catch-up. The owner requests `after endSeq`, and requests `before startSeq` when
 history. Code outside the owner does not distinguish cached and network timelines.
 
 The first resume request is bounded. If it reports more newer history, fetch one latest bounded tail
-instead of replaying every missed page. Live gap recovery still pages forward until current.
+instead of replaying every missed page. Replacing that tail also replaces its retained-page metadata;
+discarded rows must not remain certified as loaded. Live gap recovery still pages forward until current.
 
 If the canonical window exceeds the cache item limit, contains a discontiguous retained range, has a
 live head, or includes presentation data the cache cannot encode losslessly, persistence drops the
@@ -164,7 +165,8 @@ falsely certifies discarded source rows. A display-only row paints without grant
 authority, so the owner uses the ordinary bounded `tail` bootstrap.
 
 Live rows received between cache paint and catch-up stay in the separate live head and reconcile with
-the authoritative range through the existing forward-page path. The cache does not persist sync
+the authoritative range through the existing forward-page path. The memory budget pins these live
+rows until a page includes them, without advancing authoritative coverage. The cache does not persist sync
 generation or unreconciled local submissions.
 
 Every daemon-derived live item carries its timeline epoch and sequence position. Bootstrap
