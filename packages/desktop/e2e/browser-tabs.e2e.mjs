@@ -367,6 +367,18 @@ async function readViewport(client, browserId) {
   return JSON.parse(evaluated.resultJson);
 }
 
+async function waitForViewport(client, browserId, expected) {
+  // Updating the webview style acknowledges the request before Chromium resizes its guest.
+  const deadline = Date.now() + 5_000;
+  let viewport;
+  do {
+    viewport = await readViewport(client, browserId);
+    if (viewport.width === expected.width && viewport.height === expected.height) return viewport;
+    await delay(50);
+  } while (Date.now() < deadline);
+  return viewport;
+}
+
 async function clickGuestElement(page, client, browserId, selector) {
   const evaluated = await callBrowserTool(client, "browser_evaluate", {
     browserId,
@@ -475,7 +487,7 @@ async function setWindowHidden(inspectorPort, hidden) {
               id: 1,
               method: "Runtime.evaluate",
               params: {
-                expression: `(() => { const win = process.mainModule.require('electron').BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('localhost:')); win.${hidden ? "hide" : "show"}(); if (win.isVisible() !== ${!hidden}) throw new Error('Window visibility did not change'); })()`,
+                expression: `(() => { const win = process.mainModule.require('electron').BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('localhost:')); win.webContents.setBackgroundThrottling(${hidden}); win.${hidden ? "hide" : "show"}(); if (win.isVisible() !== ${!hidden}) throw new Error('Window visibility did not change'); })()`,
               },
             }),
           ),
@@ -527,7 +539,8 @@ async function verifyHiddenBrowserScreenshots({
     await expectIdle("before-capture");
     await callBrowserTool(client, "browser_evaluate", {
       browserId,
-      function: "() => { document.body.style.background = 'rgb(0,255,0)'; }",
+      // White remains exact across display color profiles; the old frame is red.
+      function: "() => { document.body.style.background = 'rgb(255,255,255)'; }",
     });
     const response = await client.callTool({ name: "browser_screenshot", args: { browserId } });
     mcpPayload(response, "browser_screenshot");
@@ -552,7 +565,7 @@ async function verifyHiddenBrowserScreenshots({
       ];
     }, screenshot.data);
     assert(
-      JSON.stringify(pixel) === "[0,255,0,255]",
+      JSON.stringify(pixel) === "[255,255,255,255]",
       `Hidden screenshot returned stale pixels: ${pixel}`,
     );
     await expectIdle("after-capture");
@@ -706,7 +719,7 @@ async function runRegression({
   recordViewportMismatch(
     failures,
     "browser_resize updates the visible shared viewport",
-    await readViewport(client, browserId),
+    await waitForViewport(client, browserId, requestedViewport),
     requestedViewport,
   );
 
@@ -715,7 +728,7 @@ async function runRegression({
   recordViewportMismatch(
     failures,
     "oversized preset preserves the requested guest viewport",
-    await readViewport(client, browserId),
+    await waitForViewport(client, browserId, oversizedViewport),
     oversizedViewport,
   );
   await page.waitForFunction(
@@ -889,7 +902,13 @@ async function runRegression({
   const parkedGuest = await readGuest(page, browserId);
   assert(parkedGuest, "Browser guest was not parked after workspace eviction");
 
-  await verifyHiddenBrowserScreenshots({ page, client, browserId, artifactDir, inspectorPort });
+  await verifyHiddenBrowserScreenshots({
+    page,
+    client,
+    browserId,
+    artifactDir,
+    inspectorPort,
+  });
 
   const listed = await callBrowserTool(client, "browser_list_tabs");
   assert(
@@ -1025,7 +1044,7 @@ async function runRegression({
   await originalDeck.getByRole("button", { name: "Cancel element selector" }).click();
 
   await originalDeck.getByTestId(`workspace-tab-agent_${callerAgentId}`).click();
-  await page.getByTestId("sidebar-search").click();
+  await page.getByTestId("sidebar-footer-search").click();
   await page.getByTestId("command-center-input").fill("Split pane right");
   await page.getByText("Split pane right", { exact: true }).click();
   assert(
@@ -1190,8 +1209,12 @@ async function main() {
     children.push(desktop.child);
     await waitForPort(cdpPort, "Electron CDP", desktop);
 
-    browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
+    // Keep guest visibility native; default focus emulation keeps hidden tabs animating.
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`, { noDefaults: true });
     const page = await waitForAppPage(browser, expoPort);
+    // Keep the fixture rendering when another local window occludes it.
+    // The hidden-window assertions explicitly restore native throttling.
+    await setWindowHidden(inspectorPort, false);
     const status = await waitForDesktopStatus(page);
 
     const checkPluginLinks = () =>

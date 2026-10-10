@@ -207,7 +207,8 @@ rows already received live—for example, a tool call retained at its original d
 its completion advances `seqEnd`, followed by a merged assistant message. The app uses
 `sourceSeqRanges` to replace overlapping assistant and reasoning projections before applying the
 remaining page through the existing stream reducer. It must not append full projected text to a
-live prefix.
+live prefix. Explicitly different provider message IDs stay separate, even when their text is
+identical or one is a prefix of the other; text matching must never override known identity.
 
 Every path that sends a message to an agent — composer send, dictation accept-and-send, queued
 send-now, and the host runtime's automatic queue drain — goes through

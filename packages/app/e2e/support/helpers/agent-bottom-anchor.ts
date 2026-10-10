@@ -108,6 +108,7 @@ export async function waitForScrollableChat(
   page: Page,
   input: { minScrollableDistance: number; timeout?: number },
 ): Promise<void> {
+  await expect(getVisibleChatScroll(page)).toBeVisible({ timeout: input.timeout });
   await expect
     .poll(
       async () => {

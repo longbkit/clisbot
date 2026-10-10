@@ -50,7 +50,7 @@ async function openSettingsDestination(page, title) {
           element.getBoundingClientRect().width > 0 &&
           element.textContent === expectedTitle,
       ),
-    title,
+    title === "General" ? "Clisbot – General" : title,
   );
 }
 

@@ -29,6 +29,8 @@ Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/d
 - Kept Welcome settings accessible beside desktop window controls.
 - Kept the Settings Host picker usable near the bottom of the window.
 - Fixed Android release builds with Firebase analytics configured.
+- Kept separate assistant replies with identical text from merging during history synchronization.
+- Updated Electron to 44.5.0 so hidden browser tabs stop rendering after a screenshot.
 
 ## 0.11.1 - 2026-10-07
 

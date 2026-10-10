@@ -2526,6 +2526,63 @@ describe("processTimelineResponse", () => {
     expect(result.cursor).toEqual({ epoch: "epoch-1", startSeq: 1, endSeq: 5 });
   });
 
+  it("preserves distinct message IDs with equal text across a tail replacement", () => {
+    const result = processTimelineResponse({
+      ...baseTimelineInput,
+      currentHead: [
+        {
+          ...makeAssistantItem("Same answer", "second"),
+          messageId: "second",
+          timelineCursor: { epoch: "epoch-1", seq: 4 },
+        },
+      ],
+      currentCursor: { epoch: "epoch-1", startSeq: 1, endSeq: 4 },
+      payload: {
+        ...baseTimelineInput.payload,
+        reset: true,
+        epoch: "epoch-1",
+        startCursor: { seq: 1 },
+        endCursor: { seq: 3 },
+        entries: [
+          {
+            ...makeTimelineEntry(3, "Same answer"),
+            item: { type: "assistant_message", messageId: "first", text: "Same answer" },
+          },
+        ],
+      },
+    });
+    expect(result.tail).toEqual([
+      expect.objectContaining({ messageId: "first", text: "Same answer" }),
+    ]);
+    expect(result.head).toEqual([
+      expect.objectContaining({ messageId: "second", text: "Same answer" }),
+    ]);
+  });
+
+  it("keeps repeated text in different provider messages separate during forward catch-up", () => {
+    const result = processTimelineResponse({
+      ...baseTimelineInput,
+      currentHead: [{ ...makeAssistantItem("Same answer", "first"), messageId: "first" }],
+      currentCursor: { epoch: "epoch-1", startSeq: 1, endSeq: 3 },
+      payload: {
+        ...baseTimelineInput.payload,
+        epoch: "epoch-1",
+        startCursor: { seq: 4 },
+        endCursor: { seq: 4 },
+        entries: [
+          {
+            ...makeTimelineEntry(4, "Same answer"),
+            item: { type: "assistant_message", messageId: "second", text: "Same answer" },
+          },
+        ],
+      },
+    });
+    expect(getAssistantTexts(result.tail)).toEqual(["Same answer"]);
+    expect(result.head).toEqual([
+      expect.objectContaining({ messageId: "second", text: "Same answer" }),
+    ]);
+  });
+
   it("detects gap and emits catch-up side effect", () => {
     const existingCursor: TimelineCursor = {
       epoch: "epoch-1",
