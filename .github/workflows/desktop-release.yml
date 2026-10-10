@@ -205,7 +205,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-macos-${{ matrix.electron_arch }}
-          path: ${{ env.DESKTOP_PACKAGE_PATH }}/release/*.dmg
+          path: ${{ env.DESKTOP_PACKAGE_PATH }}/release/*
           retention-days: 7
 
       - name: Upload manifest artifact

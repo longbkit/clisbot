@@ -487,7 +487,7 @@ async function setWindowHidden(inspectorPort, hidden) {
               id: 1,
               method: "Runtime.evaluate",
               params: {
-                expression: `(() => { const win = process.mainModule.require('electron').BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('localhost:')); win.webContents.setBackgroundThrottling(${hidden}); win.${hidden ? "hide" : "show"}(); if (win.isVisible() !== ${!hidden}) throw new Error('Window visibility did not change'); })()`,
+                expression: `(() => { const win = process.mainModule.require('electron').BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('localhost:')); for (const contents of process.mainModule.require('electron').webContents.getAllWebContents()) contents.setBackgroundThrottling(${hidden}); win.${hidden ? "hide" : "show"}(); if (win.isVisible() !== ${!hidden}) throw new Error('Window visibility did not change'); })()`,
               },
             }),
           ),
