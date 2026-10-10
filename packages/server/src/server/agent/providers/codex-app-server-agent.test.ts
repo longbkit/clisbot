@@ -214,6 +214,41 @@ function deferred<T>() {
 }
 
 describe("Codex active-turn steering admission", () => {
+  test("does not reuse a delivery turn id when the same Codex thread is resumed", async () => {
+    const beforeRestart = createFakeCodexAppServer();
+    const first =
+      await createProviderWithFakeAppServer(beforeRestart).createSession(createConfig());
+    const originalTurn = await first.startTurn("before restart");
+    await beforeRestart.waitForTurnStart();
+    const handle = first.describePersistence()!;
+    await first.close();
+
+    const afterRestart = createFakeCodexAppServer();
+    const resumed = await createProviderWithFakeAppServer(afterRestart).resumeSession(handle);
+    const events: AgentStreamEvent[] = [];
+    const unsubscribe = resumed.subscribe((event) => events.push(event));
+    try {
+      const resumedTurn = await resumed.startTurn("after restart");
+      await afterRestart.waitForTurnStart();
+      expect(resumedTurn.turnId).not.toBe(originalTurn.turnId);
+      afterRestart.startsTurn({ threadId: "thread-1", turnId: "native-resumed-turn" });
+      afterRestart.completeTurn();
+      await vi.waitFor(() => {
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: "turn_completed",
+            turnId: resumedTurn.turnId,
+          }),
+        );
+      });
+      beforeRestart.assertNoErrors();
+      afterRestart.assertNoErrors();
+    } finally {
+      unsubscribe();
+      await resumed.close();
+    }
+  });
+
   test("a steer without the clearing contract leaves permissions open", async () => {
     const appServer = createFakeCodexAppServer({
       "turn/steer": () => ({ turn: { id: "native-A" } }),
@@ -3610,7 +3645,7 @@ describe("Codex app-server provider", () => {
       await expect(child).resolves.toMatchObject({
         type: "provider_subagent",
         provider: "codex",
-        turnId: "codex-turn-0",
+        turnId: expect.stringMatching(/^codex-turn-/),
         event: {
           type: "upsert",
           id: "legacy-only-child-thread",
@@ -3620,7 +3655,7 @@ describe("Codex app-server provider", () => {
       await expect(spawn).resolves.toMatchObject({
         type: "timeline",
         provider: "codex",
-        turnId: "codex-turn-0",
+        turnId: expect.stringMatching(/^codex-turn-/),
         item: {
           type: "tool_call",
           callId: "spawn-legacy-only-child",
