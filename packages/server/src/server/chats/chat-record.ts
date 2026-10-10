@@ -1,3 +1,4 @@
+import { BotLaunchDefaultsSchema } from "@clisbot/protocol/bots/types";
 // `chat.json`: the durable facts of a Chat (docs/features/bots-and-chats/README.md, D5, D9).
 // Strict on read like the persisted config: an unknown key is a bug or a newer daemon's
 // record, never silently dropped. Rule defaults are applied on read, not stored, so a
@@ -87,6 +88,7 @@ export const StoredChatSchema = z
     id: z.string().min(1),
     kind: z.enum(["direct", "group"]).optional(),
     title: z.string().nullable(),
+    launch: BotLaunchDefaultsSchema.optional(),
     participants: z.array(StoredChatParticipantSchema),
     rules: StoredChatRulesSchema,
     createdBy: SessionActorSchema.optional(),

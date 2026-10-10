@@ -1,4 +1,17 @@
 import {
+  QuickStartListRequestSchema,
+  QuickStartListResponseSchema,
+  QuickStartSaveRequestSchema,
+  QuickStartSaveResponseSchema,
+  QuickStartDeleteRequestSchema,
+  QuickStartDeleteResponseSchema,
+  QuickStartPinRequestSchema,
+  QuickStartPinResponseSchema,
+  QuickChatPrepareRequestSchema,
+  QuickChatPrepareResponseSchema,
+  QuickStartChangedSchema,
+} from "./quick-starts/rpc-schemas.js";
+import {
   TextAttachmentSchema,
   AgentAttachmentSchema,
   ForgeChangeRequestAttachmentSchema,
@@ -1286,6 +1299,13 @@ export const ProjectListRequestMessageSchema = z.object({
 export const FetchAgentHistoryRequestMessageSchema = z.object({
   type: z.literal("fetch_agent_history_request"),
   requestId: z.string(),
+  // COMPAT(inboxFilters): optional; gated on server_info.features.inboxFilters.
+  activityFilter: z
+    .object({
+      kind: z.enum(["bot", "project"]).optional(),
+      updatedAfter: z.string().datetime().optional(),
+    })
+    .optional(),
   filter: AgentDirectoryFilterSchema.optional(),
   // A free-text filter over agent title, workspace name, branch, and project name.
   // Matching rows follow the requested sort and cursor pagination.
@@ -3190,6 +3210,7 @@ export type HubExecutionControlRequest = z.infer<typeof HubExecutionControlReque
 
 // These connection event streams have no directory bootstrap or timeline membership.
 export const SessionEventSubscriptionSchema = z.enum([
+  "quick_start.changed",
   "bot.updated",
   "chat.updated",
   "chat.transcript.appended",
@@ -3301,6 +3322,11 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceLabelUpdateRequestSchema,
   WorkspaceLabelDeleteRequestSchema,
   WorkspaceLabelDeleteInspectRequestSchema,
+  QuickStartListRequestSchema,
+  QuickStartSaveRequestSchema,
+  QuickStartDeleteRequestSchema,
+  QuickStartPinRequestSchema,
+  QuickChatPrepareRequestSchema,
   BotCreateRequestSchema,
   BotListRequestSchema,
   BotUpdateRequestSchema,
@@ -3686,6 +3712,9 @@ export const ServerInfoStatusPayloadSchema = z
     botCreationAllowed: z.boolean().optional(),
     // COMPAT(desktopManaged): added in v0.1.X, remove optional parsing after 2027-01-16.
     desktopManaged: z.boolean().optional(),
+    // COMPAT(quickChatRoot): the Host's Quick chats folder, which marks its Quick chat projects;
+    // added in unreleased Fusion; review 2027-04-10.
+    quickChatRoot: z.string().optional(),
     capabilities: ServerCapabilitiesFromUnknownSchema.optional(),
     // COMPAT(providersSnapshot): added in v0.1.48, remove gating when all clients use snapshot
     features: z
@@ -3804,6 +3833,8 @@ export const ServerInfoStatusPayloadSchema = z
         agentTimelinePromptIndex: z.boolean().optional(),
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
+        // COMPAT(inboxFilters): newer clients hide filters on older Hosts.
+        inboxFilters: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
@@ -3895,6 +3926,11 @@ export const ServerInfoStatusPayloadSchema = z
         // agentProfiles to one is silently dropped. The client hides the feature
         // rather than letting a save appear to succeed.
         agentProfiles: z.boolean().optional(),
+        // COMPAT(quickStarts): added in unreleased Fusion; review 2027-04-10.
+        quickStarts: z.boolean().optional(),
+        // COMPAT(quickChat): whether this session may start a Quick chat; absent on older Hosts,
+        // which answer at prepare time instead. Added in unreleased Fusion; review 2027-04-10.
+        quickChat: z.boolean().optional(),
         // COMPAT(agentConfigApply): added in v0.3.2, remove gate after 2027-02-11.
         agentConfigApply: z.boolean().optional(),
         // COMPAT(scheduleExistingWorkspace): added in v0.10.3, remove gate after 2027-04-07.
@@ -7155,6 +7191,12 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceUpdateMessageSchema,
   WorkspaceLabelListResponseSchema,
   WorkspaceLabelUpdateSchema,
+  QuickStartListResponseSchema,
+  QuickStartSaveResponseSchema,
+  QuickStartDeleteResponseSchema,
+  QuickStartPinResponseSchema,
+  QuickChatPrepareResponseSchema,
+  QuickStartChangedSchema,
   BotCreateResponseSchema,
   BotListResponseSchema,
   BotUpdateResponseSchema,

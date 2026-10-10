@@ -1,3 +1,10 @@
+import { quickStartOwnerForActor } from "./quick-starts/identity.js";
+import { filterInboxCandidates } from "./quick-starts/inbox-filter.js";
+import { mkdir as mkdirQuickChat } from "node:fs/promises";
+import { allocateQuickChatFolder, quickChatsRoot } from "./quick-chats/quick-chat-folders.js";
+import { QuickStartSession } from "./quick-starts/session.js";
+import { type QuickStartStore } from "./quick-starts/store.js";
+import type { QuickStartOwner } from "@clisbot/protocol/quick-starts/types";
 import { browseProjectDirectories } from "./managed-access/browse-project-directories.js";
 import { routeChatSpokenInput } from "./session/chats/spoken-input.js";
 import { isBotChatEvent } from "./session/chats/chat-events.js";
@@ -505,6 +512,7 @@ export interface SessionOptions {
   directorySync?: DirectorySyncService;
   workspaceLabelService?: WorkspaceLabelService;
   botService?: BotService;
+  quickStartStore?: QuickStartStore;
   chatService?: ChatService;
   connectorService?: ConnectorService;
   filesystem?: SessionFileSystem;
@@ -772,6 +780,7 @@ export class Session {
   private readonly resourceAuthorizer: ManagedResourceAuthorizer;
   private readonly terminalProfileSession: TerminalProfileSession;
   private readonly botSession: BotSession | null;
+  private readonly quickStartSession: QuickStartSession | null;
   private readonly connectorSession: ConnectorSession | null;
   private readonly chatSession: ChatSession | null;
   private appVersion: string | null;
@@ -1232,6 +1241,7 @@ export class Session {
       (directory, messageId, files) =>
         this.workspaceFilesSession.attachChatMessageFiles(directory, messageId, files),
     );
+    this.quickStartSession = this.createQuickStartSession(options);
     this.botSession = createBotSession(
       options.botService,
       {
@@ -2651,12 +2661,97 @@ export class Session {
     if (promise) await promise;
   }
 
+  private createQuickStartSession(options: SessionOptions) {
+    if (!options.quickStartStore) return null;
+    return new QuickStartSession(
+      options.quickStartStore,
+      () => this.quickStartAuthority(options),
+      (message) => this.emit(message),
+    );
+  }
+  private quickStartAuthority(
+    options: SessionOptions,
+  ): import("./quick-starts/store.js").QuickStartAuthority {
+    return {
+      owner: this.quickStartOwner(),
+      administrator: this.authorization.allowsPermission("daemon.manage"),
+      canUse: async (target) => {
+        if (target.kind === "quickChat") return this.canUseQuickChat();
+        let projectId: string | undefined;
+        if (target.kind === "project") projectId = target.projectId;
+        else {
+          const bot = await options.botService?.get(target.botId);
+          if (!bot || bot.archivedAt) return false;
+          projectId = bot.projectId;
+        }
+        if (!projectId || !(await options.projectRegistry.get(projectId))) return false;
+        await this.resourceAuthorizer.ready();
+        if (target.kind === "bot")
+          return (
+            this.resourceAuthorizer.allowsProject(projectId, "project.use") &&
+            this.resourceAuthorizer.allowsProject(projectId, "agent.interact")
+          );
+        return (
+          this.resourceAuthorizer.allowsProject(projectId, "agent.create") &&
+          this.resourceAuthorizer.allowsProject(projectId, "workspace.create")
+        );
+      },
+    };
+  }
+  private quickStartOwner(): QuickStartOwner {
+    return quickStartOwnerForActor(
+      this.accountActor,
+      this.resourceAuthorizer.isRestricted() || !!this.authorization.leaseId(),
+    );
+  }
+  canUseQuickChat(): boolean {
+    return (
+      this.authorization.allowsPermission("workspace.write") &&
+      this.authorization.allowsDaemonPrivilege("workspace.create") &&
+      this.authorization.allowsDaemonPrivilege("agent.create")
+    );
+  }
+  private dispatchQuickChat(message: SessionInboundMessage): Promise<void> | undefined {
+    if (message.type !== "quick_chat.prepare.request") return undefined;
+    return (async () => {
+      try {
+        if (!this.canUseQuickChat())
+          throw new Error(
+            "Quick chat requires permission to create workspaces on this Host. Choose an accessible Project instead.",
+          );
+        // One Host-wide project; each chat claims its own folder when its workspace is created.
+        const cwd = quickChatsRoot(this.clisbotHome);
+        await mkdirQuickChat(cwd, { recursive: true });
+        const project = await this.workspaceProvisioning.findOrCreateProjectForDirectory(cwd);
+        if (project.displayName === "quick-chats")
+          await this.projectRegistry.update(project.projectId, (current) => ({
+            ...current,
+            displayName: "Quick chats",
+          }));
+        this.emit({
+          type: "quick_chat.prepare.response",
+          payload: { requestId: message.requestId, projectId: project.projectId, cwd, error: null },
+        });
+      } catch (error) {
+        this.emit({
+          type: "quick_chat.prepare.response",
+          payload: {
+            requestId: message.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+    })();
+  }
+
   private dispatchWorkspaceLifecycleMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     return (
       this.dispatchWorkspaceStateMessage(msg) ??
       this.dispatchWorkspaceLabelMessage(msg) ??
       this.dispatchWorkspaceSetupMessage(msg) ??
       this.dispatchWorkspaceAndProjectMessage(msg) ??
+      this.quickStartSession?.dispatch(msg) ??
+      this.dispatchQuickChat(msg) ??
       dispatchBotMessage(this.botSession, msg, (reply) => this.emit(reply)) ??
       dispatchConnectorMessage(this.connectorSession, msg, (reply) => this.emit(reply)) ??
       dispatchChatMessage(this.chatSession, msg, (reply) => this.emit(reply))
@@ -5977,7 +6072,7 @@ export class Session {
     };
 
     const search = agentDirectorySearchQuery(request);
-    let candidates = [...agents];
+    let candidates = filterInboxCandidates(agents, request);
     candidates.sort((left, right) => this.agentsPager.compare(left, right, sort));
     const cursorToken = request.page?.cursor;
     if (cursorToken) {
@@ -7239,18 +7334,28 @@ export class Session {
       throw new Error("Unexpected workspace source");
     }
 
-    const cwd = expandTilde(request.source.path);
-    const directoryExists = await this.filesystem.isDirectory(cwd).catch(() => false);
+    const requestedCwd = expandTilde(request.source.path);
+    const directoryExists = await this.filesystem.isDirectory(requestedCwd).catch(() => false);
     if (!directoryExists) {
-      throw new SessionRequestError("directory_not_found", `Directory not found: ${cwd}`);
+      throw new SessionRequestError("directory_not_found", `Directory not found: ${requestedCwd}`);
     }
 
     const explicitTitle = request.title?.trim() || null;
     const promptTitle = resolveFirstAgentPromptTitle(request.firstAgentContext);
+    // A chat started in the Quick chats folder gets a folder of its own, so chats never share
+    // files, and stays in the one Quick chats project rather than becoming a project of its own.
+    const quickChat = resolve(requestedCwd) === quickChatsRoot(this.clisbotHome);
+    const cwd = quickChat
+      ? await allocateQuickChatFolder(this.clisbotHome, explicitTitle ?? promptTitle)
+      : requestedCwd;
+    const projectId = quickChat
+      ? (request.source.projectId ??
+        (await this.workspaceProvisioning.findOrCreateProjectForDirectory(requestedCwd)).projectId)
+      : request.source.projectId;
     const workspace = await this.workspaceProvisioning.createWorkspaceForDirectory(
       cwd,
       explicitTitle ?? promptTitle,
-      request.source.projectId,
+      projectId,
       { expectsInitialAgent: Boolean(request.firstAgentContext), workspaceId },
     );
     await this.syncWorkspaceGitObserverForWorkspace(workspace);
@@ -9464,6 +9569,7 @@ export class Session {
     }
     this.providerCatalogSession.dispose();
     this.botSession?.dispose();
+    this.quickStartSession?.dispose();
     this.chatSession?.dispose();
 
     this.terminalController.dispose();
@@ -9528,7 +9634,7 @@ function isValidGitHubRepoSegment(value: string): boolean {
 }
 
 function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubscription | null {
-  if (isBotChatEvent(message.type)) return message.type;
+  if (isResourcePush(message.type)) return message.type;
   switch (message.type) {
     case "project.update":
     case "providers_snapshot_update":
@@ -9580,4 +9686,13 @@ function legacyWantsEvent(
     default:
       return true;
   }
+}
+
+function isResourcePush(
+  type: SessionOutboundMessage["type"],
+): type is Extract<
+  SessionEventSubscription,
+  `bot.${string}` | `chat.${string}` | "quick_start.changed"
+> {
+  return type === "quick_start.changed" || isBotChatEvent(type);
 }

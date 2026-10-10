@@ -1,3 +1,5 @@
+import { QuickStartStore } from "./quick-starts/store.js";
+import { quickChatsRoot } from "./quick-chats/quick-chat-folders.js";
 import {
   isDefinitiveAdmissionDenial,
   MANAGED_ACCESS_REBIND_CLOSE_CODE,
@@ -659,6 +661,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly downloadTokenStore: DownloadTokenStore;
   private readonly clisbotHome: string;
+  private readonly quickStartStore: QuickStartStore;
   private readonly passwordHash: string | undefined;
   private readonly credentialSource: DaemonAuthConfig | undefined;
   private readonly revokedDevicePrincipals = new Set<string>();
@@ -817,6 +820,7 @@ export class VoiceAssistantWebSocketServer {
     this.workspaceAutoName = workspaceAutoName;
     this.downloadTokenStore = downloadTokenStore;
     this.clisbotHome = clisbotHome;
+    this.quickStartStore = new QuickStartStore(join(clisbotHome, "quick-starts", "catalog.json"));
     this.passwordHash = auth?.password;
     this.worktreesRoot = daemonRuntimeConfig?.worktreesRoot;
     this.daemonConfigStore = daemonConfigStore;
@@ -1721,6 +1725,7 @@ export class VoiceAssistantWebSocketServer {
       workspaceRegistry: this.workspaceRegistry,
       workspaceLabelService: this.workspaceLabelService ?? undefined,
       botService: this.botService,
+      quickStartStore: this.quickStartStore,
       chatService: this.chatService,
       connectorService: this.connectorService,
       directorySync: this.directorySync,
@@ -2309,8 +2314,11 @@ export class VoiceAssistantWebSocketServer {
       ...(this.botService ? { botCreationAllowed: session.canCreateBot() } : {}),
       // COMPAT(desktopManaged): added in v0.1.X, remove optional parsing after 2027-01-16.
       desktopManaged: this.daemonRuntimeConfig?.desktopManaged === true,
+      quickChatRoot: quickChatsRoot(this.clisbotHome),
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
       features: {
+        quickStarts: true,
+        quickChat: session.canUseQuickChat(),
         ...buildDeviceAccessServerFeatures({
           localHubStartStatus,
           hasDeviceAuthority: Boolean(this.credentialSource?.deviceAuthority),
@@ -2403,6 +2411,7 @@ export class VoiceAssistantWebSocketServer {
         agentTimelinePromptIndex: true,
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: true,
+        inboxFilters: true,
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: true,
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97

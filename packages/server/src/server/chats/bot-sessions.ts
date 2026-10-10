@@ -124,7 +124,7 @@ export class BotSessions {
     { title, systemPrompt }: SessionStart,
     replaced: BotSessionReplacement | null,
   ): Promise<ResolvedBotSession> {
-    const { launch } = bot;
+    const launch = chat.launch ?? bot.launch;
     const result = await withSessionOperationIdentity({ actor: chat.createdBy }, () =>
       this.deps.createAgent({
         kind: "mcp",

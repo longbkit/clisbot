@@ -1,3 +1,4 @@
+import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
 import { ChatUpdatePatchSchema, type ChatUpdatePatch } from "@clisbot/protocol/chats/rpc-schemas";
 // `ChatStore`: every `chat.json` under `$CLISBOT_HOME/chats/{chatId}/`, cached after one scan,
 // written with the session record's durable write (temp file, fsync, rename, directory
@@ -22,6 +23,8 @@ const RECORD_FILE = "chat.json";
 
 export interface CreateChatInput {
   id?: string;
+  launch?: BotLaunchDefaults;
+  reuseExisting?: boolean;
   title?: string | null;
   botIds: readonly string[];
   kind?: "direct" | "group";
@@ -145,14 +148,21 @@ export class ChatStore {
       kind: new Set(input.botIds).size > 1 ? "group" : (input.kind ?? "direct"),
       participants: Array.from(new Set(input.botIds)).map((botId) => participant(botId, at)),
       rules: input.rules ?? {},
+      ...(input.launch ? { launch: input.launch } : {}),
       ...(input.createdBy ? { createdBy: input.createdBy } : {}),
       createdAt: at,
       updatedAt: at,
       lastMessageAt: null,
       archivedAt: null,
     });
-    if (this.cache.has(chat.id)) throw new Error(`Chat ${chat.id} already exists`);
-    return this.writes.run(chat.id, () => this.write(chat));
+    return this.writes.run(chat.id, () => {
+      const existing = this.cache.get(chat.id);
+      if (existing) {
+        if (input.reuseExisting) return Promise.resolve(existing);
+        throw new Error(`Chat ${chat.id} already exists`);
+      }
+      return this.write(chat);
+    });
   }
 
   updateSettings(chatId: string, input: ChatUpdatePatch): Promise<StoredChat> {

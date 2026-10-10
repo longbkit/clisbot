@@ -6,6 +6,11 @@ type OutboundOperation = SessionOutboundMessage["type"];
 export type PermissionRequirement = DaemonPermission | readonly DaemonPermission[] | null;
 
 const INBOUND_PERMISSION = {
+  "quick_start.list.request": "workspace.read",
+  "quick_start.save.request": "workspace.read",
+  "quick_start.delete.request": "workspace.read",
+  "quick_start.set_pins.request": "workspace.read",
+  "quick_chat.prepare.request": "workspace.read",
   "chat.create.request": "workspace.write",
   "chat.list.request": "workspace.read",
   "chat.participant.add.request": "workspace.write",
@@ -295,6 +300,12 @@ const OUTBOUND_PERMISSION = {
   "browser.host.register.response": ["workspace.write"],
   "bot.archive.response": ["workspace.manage", "hub.execute"],
   "bot.create.response": ["workspace.manage", "hub.execute"],
+  "quick_start.list.response": "workspace.read",
+  "quick_start.save.response": "workspace.read",
+  "quick_start.delete.response": "workspace.read",
+  "quick_start.set_pins.response": "workspace.read",
+  "quick_chat.prepare.response": "workspace.read",
+  "quick_start.changed": "workspace.read",
   "bot.list.response": ["workspace.read", "hub.execute"],
   "bot.template.seed.response": ["workspace.manage", "hub.execute"],
   "bot.template.preview.response": ["workspace.manage", "hub.execute"],

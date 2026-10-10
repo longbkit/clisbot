@@ -1,3 +1,4 @@
+import { HubDeviceAuthorityStore } from "./device-access/store.js";
 import { randomBytes } from "node:crypto";
 import { isIP } from "node:net";
 import { validateHeaderName, type IncomingMessage, type Server } from "node:http";
@@ -115,6 +116,10 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
         process.env["CLISBOT_HUB_MANAGED_ACCESS_LEASE_DURATION"],
       ),
       publicBaseUrl: identity.appUrl,
+      hubIdentity: await new HubDeviceAuthorityStore(
+        runtime,
+        !/^(0|false)$/i.test(process.env["CLISBOT_HUB_LOGIN_REQUIRED"] ?? ""),
+      ).transaction((state) => state.backendId),
     });
     let notifyAccessLeaseRevocation = (_daemonId: string, _leaseIds: readonly string[]): boolean =>
       false;

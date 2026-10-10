@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { LRUCache } from "lru-cache";
 import { CheckoutDiffCache } from "./checkout-diff-cache.js";
+import { isQuickChatPath } from "./quick-chats/quick-chat-folders.js";
 import pLimit from "p-limit";
 import type pino from "pino";
 import type { ProjectCheckoutLitePayload } from "@clisbot/protocol/messages";
@@ -759,11 +760,14 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   async getCheckout(cwd: string): Promise<ProjectCheckoutLitePayload> {
     this.assertNotDisposed();
     const normalizedCwd = resolve(cwd);
-    const status = await this.deps.getCheckoutStatus(normalizedCwd, {
-      clisbotHome: this.clisbotHome,
-      worktreesRoot: this.worktreesRoot,
-      logger: this.logger,
-    });
+    // The Quick chats folder is never a checkout, even inside a repo (quick-chats/quick-chat-folders.ts).
+    const status = isQuickChatPath(normalizedCwd, this.clisbotHome)
+      ? { isGit: false as const }
+      : await this.deps.getCheckoutStatus(normalizedCwd, {
+          clisbotHome: this.clisbotHome,
+          worktreesRoot: this.worktreesRoot,
+          logger: this.logger,
+        });
     if (!status.isGit) {
       return checkoutLiteFromGitSnapshot(normalizedCwd, {
         isGit: false,
