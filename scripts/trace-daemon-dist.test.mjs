@@ -43,6 +43,19 @@ test("traced closure ships OpenCode bridges, channels and a working local Hub", 
       }
     }
     await smokeHub(outRoot);
+    // Exercise lazy channel imports and native Sharp from the copied closure.
+    const { stdout: channels } = await promisify(execFile)(
+      process.execPath,
+      [
+        path.join(repoRoot, "docker/base/rootfs/usr/local/lib/clisbot-hub-smoke.mjs"),
+        path.join(outRoot, "packages/hub"),
+      ],
+      { cwd: outRoot, timeout: 120000, maxBuffer: 4 * 1024 * 1024 },
+    );
+    assert.equal(
+      (channels.match(/^Packaged channel loaded: /gmu) ?? []).length,
+      Object.values(pins.channels).filter((pin) => pin.loadMode === "in-repo").length,
+    );
     const installedBridgeUrl = pathToFileURL(path.join(outRoot, bridgeModule)).href;
     const { loadOpenCodeBridgePluginArtifact } = await import(installedBridgeUrl);
 

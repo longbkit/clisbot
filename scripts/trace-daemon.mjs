@@ -74,6 +74,15 @@ function resolvedPackageFiles(importer, specifier) {
   return path.join(path.dirname(manifest), "**");
 }
 
+// Sharp can have both glibc and musl optional packages installed. Retain only
+// the platform selected by Sharp itself, as the Electron packager does.
+const sharpRequire = requireFrom("packages/channels/whatsapp/package.json");
+const { runtimePlatformArch } = sharpRequire("sharp/lib/libvips");
+const sharpPackages = new Set([
+  `sharp-${runtimePlatformArch()}`,
+  `sharp-libvips-${runtimePlatformArch()}`,
+]);
+
 // Let node-pty select the native build it actually loads. npm hoisting and
 // prebuild/build layout are owned by the package, not this trace. Its Darwin
 // spawn-helper lives beside the selected addon; retain the files in that dir.
@@ -211,5 +220,7 @@ for (const pattern of additionalInputs) {
 
 // Emit sorted, deduplicated.
 for (const p of [...expanded].sort()) {
+  const sharpPackage = p.match(/(?:^|\/)node_modules\/@img\/(sharp-[^/]+)(?:\/|$)/)?.[1];
+  if (sharpPackage && !sharpPackages.has(sharpPackage)) continue;
   console.log(p);
 }

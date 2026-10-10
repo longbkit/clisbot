@@ -42,7 +42,11 @@ buildNpmPackage {
       && !(lib.hasPrefix "/.agents" relPath)
       && !(lib.hasPrefix "/.claude" relPath)
       && !(lib.hasPrefix "/.codex" relPath)
-      && !(lib.hasPrefix "/docker" relPath)
+      # afterSign runs the shared packaged-Hub smoke from the Docker tree.
+      && (
+        !(lib.hasPrefix "/docker" relPath)
+        || lib.hasPrefix relPath "/docker/base/rootfs/usr/local/lib/clisbot-hub-smoke.mjs"
+      )
       # The Hub Dockerfile points into the excluded Docker tree. Keep the
       # source free of dangling links when electron-builder walks workspaces.
       && relPath != "/packages/hub/Dockerfile"
