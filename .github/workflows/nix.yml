@@ -27,7 +27,7 @@ jobs:
         run: ./scripts/update-nix.sh
 
       - name: Build Nix package
-        run: nix build .#default -o result
+        run: nix build --print-build-logs .#default -o result
 
       - name: Smoke Nix daemon
         run: |
@@ -120,7 +120,7 @@ jobs:
           exit 1
 
       - name: Build Nix desktop package
-        run: nix build .#desktop -o result-desktop
+        run: nix build --print-build-logs .#desktop -o result-desktop
 
   build-desktop-darwin:
     runs-on: macos-14
@@ -132,7 +132,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Build Nix desktop package
-        run: nix build .#desktop -o result-desktop
+        run: nix build --print-build-logs .#desktop -o result-desktop
 
       - name: Verify macOS application bundle
         run: |

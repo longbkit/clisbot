@@ -52,9 +52,8 @@ buildNpmPackage rec {
       # not necessarily documentation: skills/*/SKILL.md is a runtime file the
       # daemon's trace script copies into the output.
       && builtins.match "/[^/]+\\.md" relPath == null
-      # Exclude test fixtures and debug files
-      && !(lib.hasSuffix ".test.ts" baseName)
-      && !(lib.hasSuffix ".e2e.test.ts" baseName)
+      # Keep TypeScript inputs intact; workspace tsconfigs own build exclusions.
+      # Exclude local dependencies and debug files.
       && baseName != "node_modules"
       && baseName != ".git"
       && baseName != ".clisbot"

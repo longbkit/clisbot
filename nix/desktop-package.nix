@@ -50,9 +50,8 @@ buildNpmPackage {
       # not necessarily documentation: skills/*/SKILL.md is a runtime file the
       # installPhase copies into the output.
       && builtins.match "/[^/]+\\.md" relPath == null
-      # Test fixtures and build artifacts
-      && !(lib.hasSuffix ".test.ts" baseName)
-      && !(lib.hasSuffix ".e2e.test.ts" baseName)
+      # Keep TypeScript inputs intact; workspace tsconfigs own build exclusions.
+      # Exclude local dependencies and build artifacts.
       && baseName != "node_modules"
       && baseName != ".git"
       && baseName != ".clisbot"
