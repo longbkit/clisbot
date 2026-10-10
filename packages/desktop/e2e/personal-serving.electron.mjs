@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron, expect } from "playwright/test";
 import { readDaemonInstance } from "@clisbot/server/daemon-control";
+import { editPersistedConfig } from "@clisbot/server/configuration";
 import { parseDevicePairingOfferFromUrl } from "@clisbot/protocol/device-pairing-offer";
 
 const repo = fileURLToPath(new URL("../../..", import.meta.url));
@@ -47,6 +48,7 @@ if (process.env.CLISBOT_E2E_SECRET_SERVICE === '1') app.commandLine.appendSwitch
 app.setPath('userData', ${JSON.stringify(userData)});
 protocol.registerSchemesAsPrivileged([{ scheme:'clisbot', privileges:{ standard:true, secure:true } }]);
 app.whenReady().then(async () => {
+ await require(${JSON.stringify(path.join(repo, "packages/desktop/dist/daemon/personal-serving.js"))}).preparePersonalDesktopHome(${JSON.stringify(home)});
  protocol.handle('clisbot', () => new Response('<html><body>Device credential fixture</body></html>',{headers:{'content-type':'text/html'}}));
  require(${JSON.stringify(path.join(repo, "packages/desktop/dist/features/device-credentials.js"))}).registerDeviceCredentialHandlers();
  global.fixture = require(${JSON.stringify(path.join(repo, "packages/desktop/dist/daemon/daemon-manager.js"))});
@@ -89,6 +91,10 @@ try {
   await expect
     .poll(() => desktop.evaluate(() => global.fixtureReady === true), { timeout: 15_000 })
     .toBe(true);
+  // Managed daemon launches deliberately discard setting environment overrides.
+  // Persist fixture speech settings so onboarding cannot download real models.
+  editPersistedConfig(home, "features.dictation.enabled", { value: false });
+  editPersistedConfig(home, "features.voiceMode.enabled", { value: false });
   if (env.CLISBOT_E2E_SECRET_SERVICE === "1") {
     assert.equal(process.platform, "linux");
     assert.equal(
@@ -165,6 +171,9 @@ try {
   await page.goto("clisbot://app");
   await page.evaluate((key) => window.secrets.remove(key), storageKey);
   assert.equal(await page.evaluate((key) => window.secrets.read(key), storageKey), null);
+  await assert.rejects(stat(path.join(home, "models", "local-speech", ".downloads")), {
+    code: "ENOENT",
+  });
   console.log(
     "Electron starts daemon only, explicitly starts Hub + gateway without restarting daemon; OS-encrypted credentials and trusted renderer IPC verified.",
   );
@@ -178,7 +187,7 @@ try {
   ])
     await cli(args).catch((error) => console.error(error.message));
   await closeDesktop(desktop);
-  if (completed) await rm(root, { recursive: true, force: true });
+  if (completed) await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   else console.error(`Isolated fixture retained: ${root}`);
 }
 
@@ -195,5 +204,9 @@ async function closeDesktop(app) {
   ]).finally(() => clearTimeout(timer));
   if (closed) return;
   console.error("Electron fixture did not exit within 20s of close(); killing it.");
-  app.process().kill("SIGKILL");
+  const child = app.process();
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = once(child, "exit", { signal: AbortSignal.timeout(5_000) });
+  child.kill("SIGKILL");
+  await exited;
 }

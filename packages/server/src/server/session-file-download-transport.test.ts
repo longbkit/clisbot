@@ -123,7 +123,7 @@ it("downloads linked uploads over real WS and HTTP after archive and capture-off
     await daemon?.close();
     await Promise.all(
       [root, ...staticDirectories].map((directory) =>
-        fs.rm(directory, { recursive: true, force: true }),
+        fs.rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }),
       ),
     );
   }
