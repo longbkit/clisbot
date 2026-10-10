@@ -27,7 +27,7 @@ test("Browse opens the folder selected by the desktop dialog", async ({
   });
 
   await openAddProjectFlow(page);
-  const browse = page.getByRole("button", { name: /^Browse/ });
+  const browse = page.getByTestId("add-project-flow-method-browse");
   await expect(browse).toBeVisible({ timeout: 30_000 });
   await browse.click();
   const dialogOptions = await waitForDirectoryDialog(page);
@@ -69,7 +69,7 @@ test("canceling Browse returns to the Add Project methods", async ({
   });
 
   await openAddProjectFlow(page);
-  const browse = page.getByRole("button", { name: /^Browse/ });
+  const browse = page.getByTestId("add-project-flow-method-browse");
   await expect(browse).toBeVisible({ timeout: 30_000 });
   await browse.click();
 

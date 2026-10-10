@@ -27,6 +27,8 @@ Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/d
 - Preserved live messages and access to older history when reconnecting to a chat.
 - Kept reading position stable when images finish loading while scrolling through chat history.
 - Kept Welcome settings accessible beside desktop window controls.
+- Kept the Settings Host picker usable near the bottom of the window.
+- Fixed Android release builds with Firebase analytics configured.
 
 ## 0.11.1 - 2026-10-07
 

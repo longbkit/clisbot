@@ -227,7 +227,9 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.desktop != 'false') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Includes backend/UI builds, installed-artifact smoke, Electron lifecycle,
+    # renderer tests and browser tabs; keep their individual timeouts bounded.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps: &desktop_test_steps
