@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.0.1 - 2026-10-11
+
+### Added
+
+- Added Home as the place to start a chat, with your Hosts and Hubs, the composer and your recent conversations
+- Added Quick chat, which starts an agent without choosing a project and gives each chat its own folder
+- Added Quick starts: saved prompts with where they run, pinned to Home and shared on a Host
+- Added search across every online Host's projects and Bots when choosing where to chat, switching to the Host you pick
+- Added a Quick chats section to the sidebar
+- Added staying connected to several saved Hubs and their Hosts at once
+
+### Changed
+
+- Changed History to Inbox, with type and date filters and the same rows as Home
+- Changed the sidebar to show your organization or Hub and account at the top, with Home first in navigation
+
+### Fixed
+
+- Fixed Codex channel replies being dropped after the daemon restarted and resumed the conversation
+- Fixed Nix desktop and personal Hub backend packages ([#24](https://github.com/longbkit/clisbot/pull/24))
+
 ## 2.0.0 - 2026-10-10
 
 Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/desktop app and Hub architecture. Its Paseo baseline is `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`; Clisbot now maintains an independent version series.
