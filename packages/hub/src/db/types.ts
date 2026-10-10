@@ -1901,6 +1901,8 @@ export interface DeliveryLedgerRecord {
 }
 
 export interface RecordDeliveryInput {
+  /** A fresh ID for one caller's insert attempt, retained only across its DB retries. */
+  recordId?: string;
   organizationId: string;
   channel: SupportedChannelName;
   accountId: string;

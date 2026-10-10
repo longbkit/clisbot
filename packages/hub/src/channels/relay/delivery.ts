@@ -4,6 +4,7 @@
 // closed. The ledger writes themselves are retried briefly: a row that cannot
 // be recorded means the answer is not posted, and a row that cannot be settled
 // stays `recorded` forever, so either is logged as an error, not dropped quietly.
+import { randomUUID } from "node:crypto";
 import type { ChannelStore } from "../../db/channels.js";
 import type { DeliveryLedgerKey } from "../../db/channel-delivery-retries.js";
 import { routeFingerprint, routePosition } from "../bindings/stored-route.js";
@@ -108,17 +109,25 @@ function replayedOutcome(record: { externalMessageId: string | null }): RelayPos
 }
 
 /**
- * Record the row before the post. A retried insert that finds the row already
- * there cannot tell its own lost commit from a replay racing it, so it does
- * not post (a double post is worse than a lost one) and says so as an error.
+ * Keep a fresh row ID across this call's DB retries. After a lost commit reply,
+ * only this caller can recognize its own new, still-unposted row. A concurrent
+ * replay has a different ID and must not take over the post.
  */
 async function recordRow(deps: RelayDeliveryDeps, request: RelayPostRequest) {
+  const recordId = randomUUID();
   let tries = 0;
   const recorded = await ledgerWrite(deps, request, "record", () => {
     tries += 1;
-    return deps.store.recordDelivery({ ...request.key, channel: request.context.channel });
+    return deps.store.recordDelivery({
+      ...request.key,
+      channel: request.context.channel,
+      recordId,
+    });
   });
   if (recorded !== undefined && !recorded.created && tries > 1) {
+    if (recorded.record.id === recordId && recorded.record.status === "recorded") {
+      return { ...recorded, created: true as const };
+    }
     (deps.logger.error ?? deps.logger.warn)("relay ledger record found its row after a retry", {
       ...logFields(request),
       status: recorded.record.status,
