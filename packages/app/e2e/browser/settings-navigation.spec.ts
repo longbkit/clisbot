@@ -6,6 +6,7 @@ import {
   buildSettingsHostSectionRoute,
   buildSettingsRoute,
   buildSettingsSectionRoute,
+  buildWelcomeRoute,
 } from "@/utils/host-routes";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
 import { getE2EDaemonPort } from "../support/helpers/daemon-port";
@@ -67,7 +68,8 @@ test.describe("Settings sidebar navigation", () => {
     await expectAboutContent(page);
 
     await openSettingsSection(page, "general");
-    await expectSettingsHeader(page, "General");
+    // The first app settings page names the product on its title line (settings-screen.tsx).
+    await expectSettingsHeader(page, "Clisbot – General");
     await expectGeneralContent(page);
 
     await openSettingsSection(page, "appearance");
@@ -265,19 +267,27 @@ test.describe("Settings — compact master-detail", () => {
     await openSettingsHostSection(page, secondaryServerId, "connections");
   });
 
-  test("removing the last active host returns to welcome after settings closes", async ({
+  test("removing the last active host leaves the reader in place with a way to welcome", async ({
     page,
     withWorkspace,
   }) => {
     const workspace = await withWorkspace({ prefix: "remove-host-compact-" });
+    const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
     await openWorkspace(page, workspace);
-    await openCompactSettings(page, buildHostWorkspaceRoute(getServerId(), workspace.workspaceId));
+    await openCompactSettings(page, workspaceRoute);
     await openSettingsHostSection(page, getServerId(), "host");
     await removeCurrentHostFromSettings(page);
     await closeCompactSettings(page);
 
-    await expect(page).toHaveURL(/\/welcome$/);
+    // A Host route never navigates on the Host's behalf (bf511ce33): the removed Host is shown
+    // as unavailable at the same URL, and Add a Host is the reader's way to Welcome.
+    await expectAppRoute(page, workspaceRoute);
+    const unavailable = page.getByTestId("host-unavailable");
+    await expect(unavailable).toBeVisible();
+    await expect(unavailable.getByTestId("host-unavailable-open-other")).toHaveCount(0);
+    await unavailable.getByTestId("host-unavailable-add-host").click();
+    await expectAppRoute(page, buildWelcomeRoute({ stay: true }));
     await expect(page.getByTestId("welcome-direct-connection")).toBeVisible();
   });
 });

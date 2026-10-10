@@ -213,7 +213,7 @@ test.describe("Agent timeline pagination", () => {
       await scrollTimelineUntilOlderHistoryIsReachable(page, agent.oldestPrompt);
       await expectTimelinePromptVisible(page, agent.oldestPrompt);
 
-      const hydration = await holdDaemonHydration(page);
+      const hydration = await holdDaemonHydration(page, agent.agentId);
       await reloadAgentTimelineFromPersistedReplica(page, agent);
       hydration.release();
       await scrollTimelineUntilOlderHistoryIsReachable(page, agent.oldestPrompt);

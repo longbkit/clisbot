@@ -1,121 +1,121 @@
-# Quyền: cấp gì thì được gì
+# Permissions: what each grant gives
 
-[User guide](../README.md) · [Cấp Access](members-and-teams.md) · [Daemon Administrator](daemon-administrator.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Grant Access](members-and-teams.md) · [Daemon Administrator](daemon-administrator.md) · [Q&A](../help/faq.md)
 
-Trang này trả lời: **cấp một mức quyền trên một tài nguyên thì người nhận làm được gì, và kéo theo hệ quả gì.** Cách bấm để cấp nằm ở [Cấp Access](members-and-teams.md).
+This page answers: **what can someone do with a given level on a given resource, and what follows from it.** How to grant is in [Grant Access](members-and-teams.md).
 
-Mọi thứ dưới đây chỉ có hiệu lực khi daemon bật [Managed Access **external**](../hosts/managed-access.md). Ở chế độ `off`, ai ghép nối được daemon thì có toàn quyền.
+Everything below applies only when the daemon has [Managed Access **external**](../hosts/managed-access.md) on. In `off` mode, anyone who can pair with the daemon has full rights.
 
-## 1. Ba điều cần nắm trước
+## 1. Three things to know first
 
-1. **Quyền luôn cấp trên một tài nguyên**: Host, Project, Connection hoặc Automation. Workspace và worktree không cấp riêng, mà theo quyền của Project chứa chúng.
-2. **Quyền chỉ cộng dồn, không trừ.** Người dùng nhận tổng các grant trực tiếp và grant từ mọi Team của họ, cả trên Host lẫn trên Project. Một grant nhỏ hơn không làm giảm một grant lớn hơn.
-3. **Đây không phải sandbox.** Ai có Terminal (shell), được duyệt lệnh shell, hay mở Terminal profile rồi tự duyệt tool trong đó, thì chạy được mọi thứ mà tài khoản chạy daemon chạy được, kể cả vượt giới hạn Project hay model. Nếu cần cách ly thật, dùng user hệ điều hành hoặc container riêng.
+1. **Permissions are always granted on a resource**: Host, Project, Connection, or Automation. Workspaces and worktrees are not granted separately; they follow the permissions of the Project that contains them.
+2. **Permissions only add up, never subtract.** A user gets the sum of their direct grants and the grants from all their Teams, on Hosts and on Projects. A smaller grant does not reduce a larger one.
+3. **This is not a sandbox.** Anyone with Terminal (shell), approval for shell commands, or a Terminal profile where they approve tools themselves can run anything the daemon's account can run, including past Project or model limits. For real isolation, use a separate OS user or container.
 
-## 2. Tài nguyên và phạm vi
+## 2. Resources and scope
 
-| Tài nguyên                          | Cấp ở đây thì áp cho                                    | Mức quyền có thể chọn                                         |
-| ----------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
-| **Tổ chức**                         | Toàn tổ chức; không cấp bằng assignment mà theo vai trò | Owner, Admin, Member                                          |
-| **Host** (một daemon)               | **Mọi Project** trên Host đó, kể cả Project thêm sau    | Connect, Office worker, Developer, Full access, Administrator |
-| **Project**                         | Chỉ Project đó, và mọi workspace/worktree bên trong     | Office worker, Developer, Full access                         |
-| **Workspace, worktree**             | Không cấp riêng; theo quyền của Project chứa nó         | —                                                             |
-| **Connection** (Slack, Telegram...) | Mọi conversation của Connection đó                      | Admin                                                         |
-| **Automation**                      | Một Automation của Hub                                  | Run                                                           |
+| Resource                            | Granting here applies to                                       | Levels you can choose                                         |
+| ----------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Organization**                    | The whole organization; set by role, not by assignment         | Owner, Admin, Member                                          |
+| **Host** (one daemon)               | **Every Project** on that Host, including Projects added later | Connect, Office worker, Developer, Full access, Administrator |
+| **Project**                         | Only that Project, and every workspace/worktree inside it      | Office worker, Developer, Full access                         |
+| **Workspace, worktree**             | Not granted separately; follows the Project that contains it   | —                                                             |
+| **Connection** (Slack, Telegram...) | Every conversation of that Connection                          | Admin                                                         |
+| **Automation**                      | One Hub Automation                                             | Run                                                           |
 
-Vai trò tổ chức:
+Organization roles:
 
-| Vai trò | Ý nghĩa                                                                                   |
-| ------- | ----------------------------------------------------------------------------------------- |
-| Owner   | Toàn quyền tổ chức và mọi tài nguyên, hiện tại lẫn sau này                                |
-| Admin   | Quản lý cấu hình, Members, Teams và Access. **Không** tự có quyền dùng daemon hay Project |
-| Member  | Chỉ dùng những gì được cấp trực tiếp hoặc qua Team                                        |
+| Role   | Meaning                                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------ |
+| Owner  | Full rights over the organization and every resource, now and later                                          |
+| Admin  | Manages configuration, Members, Teams, and Access. Does **not** get to use daemons or Projects automatically |
+| Member | Uses only what is granted directly or through a Team                                                         |
 
-## 3. Mỗi mức làm được gì
+## 3. What each level can do
 
-Office worker, Developer và Full access cấp trên Host thì áp cho mọi Project của Host đó; cấp trên Project thì chỉ áp cho Project đó. Connect và Administrator chỉ có ở cấp Host.
+Office worker, Developer, and Full access granted on a Host apply to every Project on that Host; granted on a Project, they apply only to that Project. Connect and Administrator exist only on a Host.
 
-| Đối tượng                | Hành động                                                                       | Office worker |       Developer        |      Full access       | Administrator  |
-| ------------------------ | ------------------------------------------------------------------------------- | :-----------: | :--------------------: | :--------------------: | :------------: |
-| **Host**                 | Kết nối Host (Connect)                                                          |      ✅       |           ✅           |           ✅           |       ✅       |
-|                          | Restart, update, sửa cấu hình daemon, bật provider, cài plugin                  |       —       |           —            |           —            |       ✅       |
-|                          | Quản lý truy cập daemon, kết nối Hub, bật/tắt Managed Access                    |       —       |           —            |           —            |       ✅       |
-|                          | Lịch và loop chạy trên daemon                                                   |       —       |           —            |           —            |       ✅       |
-| **Project**              | Thấy và dùng Project được cấp                                                   |      ✅       |           ✅           |           ✅           | ✅ mọi Project |
-|                          | **Tạo Project mới**                                                             |       —       |           —            |          ✅ ¹          | ✅ mọi thư mục |
-|                          | Đổi tên, đổi icon, **xóa** Project                                              |       —       |           —            |           ✅           |       ✅       |
-| **Workspace / worktree** | Tạo workspace local, tạo worktree                                               |       —       |           ✅           |           ✅           |       ✅       |
-|                          | Archive, khôi phục, đổi tên, ghim workspace; dọn worktree (có thể xóa trên đĩa) |       —       |           —            |           ✅           |       ✅       |
-|                          | Đóng nhiều agent/terminal cùng lúc                                              |       —       |           —            |           ✅           |       ✅       |
-| **Agent**                | Chat, dừng, đổi model trong phiên có sẵn                                        |      ✅       |           ✅           |           ✅           |       ✅       |
-|                          | Tạo phiên mới                                                                   |      ✅       |           ✅           |           ✅           |       ✅       |
-|                          | Bị giới hạn provider/model đã chọn                                              |      Có       |           Có           |           Có           |   **Không**    |
-|                          | Fast mode                                                                       |   Bật riêng   |       Bật riêng        |       Bật riêng        |       ✅       |
-| **Terminal**             | Mở Terminal profile được chọn (agent CLI, không có shell)                       |       —       |           ✅           |           ✅           |       ✅       |
-|                          | Mở shell và gõ lệnh bất kỳ (**Terminal (shell)**)                               |       —       | Tắt mặc định, bật được | Bật mặc định, tắt được |       ✅       |
-| **Phê duyệt**            | Sửa file                                                                        |      ✅       |           ✅           |           ✅           |       ✅       |
-|                          | Sửa cấu hình, lệnh shell thường                                                 |       —       |           ✅           |           ✅           |       ✅       |
-|                          | Lệnh phá hủy (`rm -rf`, `git reset --hard`...), tool khác (WebFetch, MCP)       |       —       |           ✅           |           ✅           |       ✅       |
-|                          | Chạy agent không hỏi phê duyệt                                                  |       —       |           ✅           |           ✅           |       ✅       |
+| Object                   | Action                                                                              | Office worker |            Developer             |           Full access            |  Administrator   |
+| ------------------------ | ----------------------------------------------------------------------------------- | :-----------: | :------------------------------: | :------------------------------: | :--------------: |
+| **Host**                 | Connect to the Host (Connect)                                                       |      ✅       |                ✅                |                ✅                |        ✅        |
+|                          | Restart, update, edit daemon configuration, enable providers, install plugins       |       —       |                —                 |                —                 |        ✅        |
+|                          | Manage daemon access, the Hub connection, turn Managed Access on/off                |       —       |                —                 |                —                 |        ✅        |
+|                          | Schedules and loops running on the daemon                                           |       —       |                —                 |                —                 |        ✅        |
+| **Project**              | See and use granted Projects                                                        |      ✅       |                ✅                |                ✅                | ✅ every Project |
+|                          | **Create new Projects**                                                             |       —       |                —                 |               ✅ ¹               |  ✅ any folder   |
+|                          | Rename, change icon, **delete** a Project                                           |       —       |                —                 |                ✅                |        ✅        |
+| **Workspace / worktree** | Create local workspaces, create worktrees                                           |       —       |                ✅                |                ✅                |        ✅        |
+|                          | Archive, restore, rename, pin workspaces; clean up worktrees (can delete from disk) |       —       |                —                 |                ✅                |        ✅        |
+|                          | Close many agents/terminals at once                                                 |       —       |                —                 |                ✅                |        ✅        |
+| **Agent**                | Chat, stop, change model in an existing session                                     |      ✅       |                ✅                |                ✅                |        ✅        |
+|                          | Create new sessions                                                                 |      ✅       |                ✅                |                ✅                |        ✅        |
+|                          | Limited to the chosen providers/models                                              |      Yes      |               Yes                |               Yes                |      **No**      |
+|                          | Fast mode                                                                           |    Opt-in     |              Opt-in              |              Opt-in              |        ✅        |
+| **Terminal**             | Open the chosen Terminal profiles (agent CLI, no shell)                             |       —       |                ✅                |                ✅                |        ✅        |
+|                          | Open a shell and type any command (**Terminal (shell)**)                            |       —       | Off by default, can be turned on | On by default, can be turned off |        ✅        |
+| **Approvals**            | Edit files                                                                          |      ✅       |                ✅                |                ✅                |        ✅        |
+|                          | Config edits, ordinary shell commands                                               |       —       |                ✅                |                ✅                |        ✅        |
+|                          | Destructive commands (`rm -rf`, `git reset --hard`...), other tools (WebFetch, MCP) |       —       |                ✅                |                ✅                |        ✅        |
+|                          | Run agents without approval prompts                                                 |       —       |                ✅                |                ✅                |        ✅        |
 
-¹ Chỉ Full access **trên Host**, và chỉ ở thư mục mà **chính sách thư mục của Host** cho phép (mục 4). Full access **trên một Project** quản lý Project đó nhưng không tạo Project nào. Không Project nào được tạo lồng trong Project khác.
+¹ Only Full access **on a Host**, and only in folders the **Host's folder policy** allows (section 4). Full access **on a Project** manages that Project but creates no Projects. No Project can be created inside another Project.
 
-Tóm tắt từng mức:
+Each level in short:
 
-- **Office worker**: dùng agent trong workspace đã có. Không terminal, không duyệt lệnh.
-- **Developer**: làm việc đầy đủ trong Project (Terminal profile, worktree, duyệt mọi lệnh), **không có shell** trừ khi bật **Terminal (shell)**, và **không tạo, không quản lý** Project hay workspace.
-- **Full access**: Developer và shell, cộng thêm tạo và quản lý Project, workspace, worktree. Tắt được shell và Can share trên từng grant, ví dụ để một người tự tạo Project mà không có shell.
-- **Administrator**: vận hành cả daemon và **không bị giới hạn provider/model**. Xem [Daemon Administrator](daemon-administrator.md).
+- **Office worker**: uses agents in existing workspaces. No terminal, no command approvals.
+- **Developer**: full work inside the Project (Terminal profiles, worktrees, approving every command), **no shell** unless **Terminal (shell)** is on, and **does not create or manage** Projects or workspaces.
+- **Full access**: Developer plus a shell, plus creating and managing Projects, workspaces, and worktrees. You can turn off the shell and Can share per grant, for example so someone can create Projects without a shell.
+- **Administrator**: operates the whole daemon and is **not limited by provider/model**. See [Daemon Administrator](daemon-administrator.md).
 
-Connection và Automation:
+Connection and Automation:
 
-| Mức                    | Làm được gì                                                                                                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Connection → **Admin** | Sửa audience rules, Route và Route default của Connection đó, trên app và trong chat. Ai được nói chuyện với bot thì đặt ở audience rules của Route, không cấp ở đây |
-| Automation → **Run**   | Chạy Automation đó                                                                                                                                                   |
+| Level                  | What it allows                                                                                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connection → **Admin** | Edit the audience rules, Routes, and Route default of that Connection, in the app and in chat. Who may talk to the bot is set in the Route's audience rules, not granted here |
+| Automation → **Run**   | Run that Automation                                                                                                                                                           |
 
-## 4. Hệ quả cần biết trước khi cấp
+## 4. Consequences to know before granting
 
-| Khi cấp                                             | Hệ quả                                                                                                                                                                                                                                                                                        |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bất kỳ mức nào **trên Host**                        | Áp cho cả Project được thêm **sau này**. Không cần cấp lại                                                                                                                                                                                                                                    |
-| **Full access trên Host**                           | Tạo Project ở thư mục chính sách của Host cho phép. Mặc định cho mọi nơi trừ `/`, `~`, `~/.ssh/**`, `/etc/**`; đổi bằng biến môi trường `CLISBOT_PROJECT_FOLDERS_ALLOW` và `CLISBOT_PROJECT_FOLDERS_DENY` trên máy daemon. Có thể thu hẹp thêm cho từng grant bằng **Narrow Project folders** |
-| **Full access** (mọi cấp)                           | Xóa Project sẽ **dừng agent và đóng terminal của mọi người** trong Project đó. Dọn worktree có thể **xóa thư mục trên đĩa**, mất phần chưa commit                                                                                                                                             |
-| Tạo Project **bên trong** Project khác              | **Bị chặn.** Project con sẽ lấy thư mục đó khỏi mọi người chỉ có quyền trên Project ngoài                                                                                                                                                                                                     |
-| Người tạo Project, khi có Full access **trên Host** | Project mới được grant Host phủ, dùng được sau khi **kết nối lại** Host                                                                                                                                                                                                                       |
-| Chọn **Guest**                                      | Guest là **mọi người** gửi tin trên Channel mà chưa link tài khoản, không phải một người                                                                                                                                                                                                      |
-| **Administrator**                                   | Bỏ giới hạn provider/model, và quản lý được chính cơ chế phân quyền của daemon                                                                                                                                                                                                                |
-| Giới hạn provider/model                             | Chỉ chặn phiên agent chạy qua Clisbot. Người có Terminal (shell) vẫn tự chạy CLI với model khác được                                                                                                                                                                                          |
-| Terminal profile                                    | Mở thẳng agent CLI, thoát là đóng terminal. Người dùng vẫn tự duyệt tool trong CLI đó, và CLI có thể có lối ra shell riêng (ví dụ `!` trong Claude Code)                                                                                                                                      |
+| When you grant                                     | Consequence                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Any level **on a Host**                            | Also applies to Projects added **later**. You do not grant again                                                                                                                                                                                                                                                                    |
+| **Full access on a Host**                          | Creates Projects in folders the Host's policy allows. By default that is everywhere except `/`, `~`, `~/.ssh/**`, `/etc/**`; change it with the `CLISBOT_PROJECT_FOLDERS_ALLOW` and `CLISBOT_PROJECT_FOLDERS_DENY` environment variables on the daemon machine. You can narrow it further per grant with **Narrow Project folders** |
+| **Full access** (on any scope)                     | Deleting a Project **stops agents and closes terminals for everyone** in that Project. Cleaning up a worktree can **delete the folder on disk**, losing uncommitted work                                                                                                                                                            |
+| Creating a Project **inside** another Project      | **Blocked.** The inner Project would take that folder away from everyone who has rights only on the outer Project                                                                                                                                                                                                                   |
+| A Project creator with Full access **on the Host** | The new Project is covered by the Host grant and usable after **reconnecting** to the Host                                                                                                                                                                                                                                          |
+| Choosing **Guest**                                 | Guest is **everyone** who sends messages on a Channel without a linked account, not one person                                                                                                                                                                                                                                      |
+| **Administrator**                                  | Removes provider/model limits, and can manage the daemon's own permission system                                                                                                                                                                                                                                                    |
+| Provider/model limits                              | Block only agent sessions run through Clisbot. Someone with Terminal (shell) can still run a CLI with another model themselves                                                                                                                                                                                                      |
+| Terminal profile                                   | Opens the agent CLI directly; exiting closes the terminal. The user still approves tools in that CLI, and the CLI can have its own shell escape (for example `!` in Claude Code)                                                                                                                                                    |
 
-## 5. Chọn nhanh
+## 5. Quick pick
 
-| Nhu cầu                                                                          | Cấp                                                                                                                                  |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Chỉ làm việc với agent trong workspace đã chuẩn bị                               | **Office worker** trên Project                                                                                                       |
-| Lập trình với agent, Terminal profile, tự tạo worktree trong vài Project cố định | **Developer** trên từng Project                                                                                                      |
-| Như trên, cần shell                                                              | **Developer** và bật **Terminal (shell)**                                                                                            |
-| Làm trên mọi Project của một Host, chỉ với model được chọn                       | **Developer** trên Host                                                                                                              |
-| Như trên, và tự thêm Project mới                                                 | **Full access** trên Host; tắt **Terminal (shell)** và **Can share** nếu không cần                                                   |
-| Vận hành máy daemon, cần mọi provider/model                                      | **Administrator** trên Host, chỉ cho người tin cậy                                                                                   |
-| Chỉ chat qua Slack/Telegram hoặc chạy một Automation                             | Thêm vào audience rules của Route; **Run** trên Automation; xem [Channels và Automations](../automation/channels-and-automations.md) |
+| Need                                                                                      | Grant                                                                                                                                        |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Work with agents only in prepared workspaces                                              | **Office worker** on the Project                                                                                                             |
+| Code with agents and Terminal profiles, create your own worktrees in a few fixed Projects | **Developer** on each Project                                                                                                                |
+| Same, with a shell                                                                        | **Developer** with **Terminal (shell)** on                                                                                                   |
+| Work on every Project of a Host, only with chosen models                                  | **Developer** on the Host                                                                                                                    |
+| Same, and add new Projects                                                                | **Full access** on the Host; turn off **Terminal (shell)** and **Can share** if not needed                                                   |
+| Operate the daemon machine, with every provider/model                                     | **Administrator** on the Host, only for people you trust                                                                                     |
+| Only chat through Slack/Telegram or run one Automation                                    | Add them to the Route's audience rules; **Run** on the Automation; see [Channels and Automations](../automation/channels-and-automations.md) |
 
-## 6. Sau khi cập nhật phiên bản
+## 6. After upgrading
 
-Cập nhật và restart **mọi daemon** trước, rồi mới cập nhật Hub. Daemon cũ **từ chối cả vé** khi vé có quyền nó chưa biết, nên làm ngược thứ tự thì người đó không vào được Host.
+Update and restart **every daemon** first, then update the Hub. An old daemon **rejects the whole ticket** when it carries a permission the daemon does not know, so in the reverse order that person cannot reach the Host.
 
-Đợt 2026-09-26 Hub tự chuyển grant đã lưu, không cần lưu lại:
+In the 2026-09-26 release the Hub migrated stored grants on its own; you do not need to save them again:
 
-| Grant đang có                | Sau khi cập nhật                                                             |
-| ---------------------------- | ---------------------------------------------------------------------------- |
-| Developer (có terminal)      | Mở mọi Terminal profile, **mất shell**. Bật lại **Terminal (shell)** nếu cần |
-| Full access                  | Giữ shell và Can share; thêm mọi Terminal profile                            |
-| Full access trên một Project | Không tạo Project được nữa, kể cả bên trong Project đó                       |
+| Existing grant            | After the update                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| Developer (with terminal) | Opens every Terminal profile, **loses the shell**. Turn **Terminal (shell)** back on if needed |
+| Full access               | Keeps the shell and Can share; gains every Terminal profile                                    |
+| Full access on a Project  | Can no longer create Projects, even inside that Project                                        |
 
-Các đợt trước cần mở **Access**, **Edit** assignment, chọn lại mức quyền rồi lưu:
+For earlier releases, open **Access**, **Edit** the assignment, choose the level again, and save:
 
-| Thay đổi                                                              | Ảnh hưởng nếu chưa lưu lại                         |
-| --------------------------------------------------------------------- | -------------------------------------------------- |
-| Developer và Full access có thêm quyền tạo workspace, worktree        | Không tạo được workspace hay worktree              |
-| Có thêm quyền duyệt tool khác (`approval.other`)                      | Không chạy được agent ở chế độ không hỏi phê duyệt |
-| Full access có thêm quyền tạo và quản lý Project (`workspace.manage`) | Full access vẫn chỉ làm được như Developer         |
+| Change                                                                 | Effect if not saved again                   |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
+| Developer and Full access gained creating workspaces and worktrees     | Cannot create workspaces or worktrees       |
+| Approving other tools was added (`approval.other`)                     | Cannot run agents in no-approval mode       |
+| Full access gained creating and managing Projects (`workspace.manage`) | Full access still works only like Developer |

@@ -1,38 +1,38 @@
-# Project, Workspace, worktree và session
+# Projects, Workspaces, worktrees, and sessions
 
-[User guide](../README.md) · [Các mức quyền](../access/permissions.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Permission levels](../access/permissions.md) · [Q&A](../help/faq.md)
 
-**Project** xác định thư mục gốc trên Host. **Workspace** thuộc một Project. **New worktree** tạo thư mục làm việc Git riêng trong Project đó, giúp làm nhánh khác mà không đổi cây làm việc đang dùng.
+A **Project** sets a root folder on a Host. A **Workspace** belongs to a Project. **New worktree** creates a separate Git working folder in that Project, so you can work on another branch without changing the working tree you are using.
 
-## Tạo Project
+## Create a Project
 
-1. Kết nối đúng Host.
-2. Chọn **Add Project → Browse folders on Host**. Chỉ có một ô đường dẫn, bắt đầu ở `~/` (home của người chạy daemon). **Enter** mở thư mục đang chọn, hoặc tới đúng đường dẫn vừa gõ/dán; **Backspace** ở cuối đường dẫn lên cấp cha. Phần sau dấu `/` cuối cùng là bộ lọc theo tên. Đây là thư mục trên Host, kể cả khi mở app từ điện thoại hay trình duyệt trên máy khác.
-3. Thêm thư mục ô đường dẫn đang trỏ tới bằng nút **Add** hoặc **⌘/Ctrl+Enter**. Enter không bao giờ thêm Project. Danh sách tối đa 100 thư mục mỗi lần, chỉ hiện các thư mục được quyền duyệt. Ở **Search for directory** cũng vậy: Enter mở kết quả trong bộ duyệt, **Add** hoặc ⌘/Ctrl+Enter mới thêm.
-4. Chưa có thư mục: quay lại **New directory**, duyệt để chọn thư mục cha rồi đặt tên. Luồng clone GitHub cũng có bộ duyệt chọn thư mục cha.
+1. Connect to the right Host.
+2. Choose **Add Project → Browse folders on Host**. There is one path field, starting at `~/` (the home of the user running the daemon). **Enter** opens the selected folder, or goes to the path you typed or pasted; **Backspace** at the end of the path goes up to the parent. The part after the last `/` filters by name. These are folders on the Host, even when you open the app from a phone or a browser on another machine.
+3. Add the folder the path field points to with the **Add** button or **⌘/Ctrl+Enter**. Enter never adds a Project. The list shows at most 100 folders at a time, and only folders you may browse. **Search for directory** works the same way: Enter opens the result in the browser, and only **Add** or ⌘/Ctrl+Enter adds it.
+4. No folder yet: go back to **New directory**, browse to choose the parent folder, and name it. The GitHub clone flow also has a browser for choosing the parent folder.
 
-Host cũ chưa hỗ trợ Browse sẽ yêu cầu cập nhật; **Search for directory**, nhập đường dẫn và bộ chọn Finder trên desktop vẫn hoạt động như trước. Có thể **Close** bất kỳ lúc nào để về app; thêm Project không phải bước bắt buộc sau khi kết nối Host. Muốn tạo Bot, dùng **Create a Bot** ở trang kết nối hoặc **New bot** trong sidebar; Bot tự tạo workspace riêng.
+Older Hosts without Browse support ask you to update; **Search for directory**, typing a path, and the Finder picker on desktop work as before. You can **Close** at any time to go back to the app; adding a Project is not a required step after connecting a Host. To create a Bot, use **Create a Bot** on the connect page or **New bot** in the sidebar; a Bot creates its own workspace.
 
-Cần một trong các quyền: Organization Owner, **Administrator** trên Host, hoặc **Full access**. Full access trên Host tạo được Project ở bất kỳ thư mục nào; Full access trên một Project chỉ tạo được Project bên trong thư mục của Project đó. Developer không tạo được Project. App kiểm tra quyền ngay khi mở Add Project; daemon vẫn là nơi quyết định cuối cùng. Với Full access trên Host, Project vừa tạo dùng được sau khi kết nối lại Host. Với Full access trên một Project, Project con vừa tạo cần được cấp quyền riêng mới dùng được, kể cả với người tạo. Xem [hệ quả khi cấp](../access/permissions.md#4-hệ-quả-cần-biết-trước-khi-cấp).
+You need one of: Organization Owner, **Administrator** on the Host, or **Full access**. Full access on a Host can create Projects in the folders the Host's folder policy allows. Full access on a Project manages that Project but creates no Projects. Developer cannot create Projects, and no Project can be created inside another Project. The app checks permission as soon as you open Add Project; the daemon makes the final decision. With Full access on a Host, the new Project is usable after you reconnect to the Host. See [consequences of granting](../access/permissions.md#4-consequences-to-know-before-granting).
 
-## Cho phép một người tự tạo worktree trong một Project
+## Let someone create worktrees in one Project
 
-Owner/Admin cấp cho người đó hoặc Team:
+An Owner/Admin grants that person or Team:
 
-1. **Connect** trên Host chứa Project.
-2. **Developer** trên đúng Project, có quyền `workspace.create` và cấu hình Agent được cho phép.
-3. Daemon bật **external**, dùng phiên bản hỗ trợ quyền mới.
+1. **Connect** on the Host that holds the Project.
+2. **Developer** on that Project, with `workspace.create` and an allowed Agent configuration.
+3. The daemon has **external** on and runs a version that supports the new permissions.
 
-Người dùng chọn Project → **New workspace** → **Isolation: New worktree**, điền các thông tin được form yêu cầu và tạo. Repo cần dùng Git và điều kiện tạo branch/worktree phải hợp lệ.
+The user chooses the Project → **New workspace** → **Isolation: New worktree**, fills in what the form asks for, and creates it. The repo must use Git, and the branch/worktree conditions must be valid.
 
-Để tạo Workspace không tách worktree, chọn **Isolation: Local**. Cùng quyền `workspace.create` cho phép cả hai cách; hiện không có grant tách riêng “chỉ worktree” và “chỉ local”. Đích worktree do daemon quản lý trong Project đã được cấp, không phải quyền tự thêm đường dẫn Project bất kỳ.
+To create a Workspace without a separate worktree, choose **Isolation: Local**. The same `workspace.create` permission allows both; there is currently no separate "worktree only" or "local only" grant. The daemon manages the worktree target inside the granted Project; it does not let you add arbitrary Project paths.
 
-Quyền này không cấp đổi tên/archive/xóa Project hoặc Workspace. Những thao tác quản lý vòng đời đó vẫn cần quyền quản trị daemon phù hợp.
+This permission does not grant renaming, archiving, or deleting Projects or Workspaces. Those lifecycle actions still need the matching daemon admin permission.
 
-## Tạo hoặc tiếp tục session
+## Create or continue a session
 
-Trong Workspace có sẵn, tạo Agent session và chọn cấu hình được Access cho phép. Office worker và Developer đều có thể tạo session khi grant có `agent.create`; tương tác session cần `agent.interact`.
+In an existing Workspace, create an Agent session and choose a configuration Access allows. Office worker and Developer can both create sessions when the grant has `agent.create`; interacting with a session needs `agent.interact`.
 
-Nếu chỉ muốn người dùng chat và làm file, Owner/Administrator tạo Workspace trước rồi cấp **Connect + Office worker**.
+If you only want people to chat and work on files, the Owner/Administrator creates the Workspace first, then grants **Connect + Office worker**.
 
-Với nhiều Project, luôn kiểm tra cả tên Host lẫn Project. Quyền tạo Workspace ở Project A không cho phép tạo ở Project B.
+With several Projects, always check both the Host name and the Project. Permission to create Workspaces in Project A does not allow creating them in Project B.

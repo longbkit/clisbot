@@ -1,92 +1,92 @@
-# Enroll và quản lý Hosts
+# Enroll and manage Hosts
 
 [User guide](../README.md) · [Managed Access](managed-access.md) · [Q&A](../help/faq.md)
 
-## Enroll daemon vào Hub
+## Enroll a daemon in the Hub
 
-Trên máy chạy daemon, dùng lệnh ở mục **Add a Host** trong **Settings → Hosts**, hoặc:
+On the machine running the daemon, use the command under **Add a Host** in **Settings → Hosts**, or:
 
 ```sh
 clisbot hub connect https://hub.example.com
 ```
 
-Daemon phải đang chạy. Terminal in URL đã chứa sẵn mã duyệt; mở URL trên thiết bị đã đăng nhập Hub (không cần nhập mã riêng), kiểm tra **Host**, **tổ chức**, **mã** và **quyền Hub trên Host**, rồi chấp thuận. Owner/Admin của tổ chức thực hiện bước duyệt này. Lệnh tự đăng ký Host và trả trạng thái hiện tại; nếu còn `connecting`, daemon tiếp tục kết nối ở nền và trang duyệt theo dõi đến khi Host xuất hiện; không có bước `login` trước hoặc câu hỏi xác nhận thứ hai.
+The daemon must be running. The terminal prints a URL that already contains the approval code; open it on a device signed in to the Hub (you do not type the code), check the **Host**, **organization**, **code**, and **Hub permissions on the Host**, then approve. An Owner/Admin of the organization does this approval. The command registers the Host itself and returns the current state; if it is still `connecting`, the daemon keeps connecting in the background and the approval page waits until the Host appears. There is no `login` step before it and no second confirmation prompt.
 
-Mã duyệt hết hạn sau 10 phút. Token đăng ký chỉ dùng được cho danh tính Host và bộ quyền đã duyệt, dùng một lần và hết hạn cùng yêu cầu. Daemon tự giữ credential kết nối riêng; **không tạo hay lưu credential quản trị CLI**. Mặc định cấp `hub.execute`, `daemon.read`, `workspace.read`, `workspace.write`, `workspace.manage`; dùng `--permission <permission...>` nếu muốn chỉ định bộ quyền khác. Đây là quyền của Hub trên Host; quyền người dùng vào Host/Project vẫn cấu hình trong Access.
+The approval code expires after 10 minutes. The enrollment token works only for the approved Host identity and permission set, is single-use, and expires with the request. The daemon keeps its own connection credential; **no CLI admin credential is created or stored**. By default it grants `hub.execute`, `daemon.read`, `workspace.read`, `workspace.write`, `workspace.manage`; use `--permission <permission...>` to choose a different set. These are the Hub's permissions on the Host; user access to Hosts/Projects is still configured in Access.
 
-Luồng giống nhau với terminal thường, `--json` và Docker `exec -T`: vẫn cần duyệt trên web, rồi CLI tự tiếp tục. Giữ lệnh chạy trong lúc duyệt, rồi để lệnh kết thúc. Theo dõi kết quả ở Hub → Hosts. Chạy lại `connect` với cùng Hub không đăng ký thêm Host; nhưng sau enrollment, `connect`/`hub status` cần kết nối daemon đã có quyền (IPC local hoặc vé Managed Access). Với Hub khác, phải `disconnect` rõ ràng trước. Nếu mất kết quả duyệt trước khi token tới daemon, bắt đầu lại `connect` để xin mã mới.
+The flow is the same in a regular terminal, with `--json`, and with Docker `exec -T`: you still approve on the web, then the CLI continues on its own. Keep the command running while you approve, then let it finish. Follow the result in Hub → Hosts. Running `connect` again with the same Hub does not register another Host; after enrollment, though, `connect`/`hub status` need a daemon connection that already has permission (local IPC or a Managed Access ticket). For a different Hub, `disconnect` explicitly first. If the approval result is lost before the token reaches the daemon, run `connect` again to get a new code.
 
-Để cài không có người duyệt, truyền API key có scope `daemons:enroll` bằng `CLISBOT_HUB_API_KEY` (hoặc `--api-key`). `connect` không tự dùng credential từ một lần `login` cũ.
+For installs without anyone to approve, pass an API key with the `daemons:enroll` scope through `CLISBOT_HUB_API_KEY` (or `--api-key`). `connect` does not reuse credentials from an earlier `login`.
 
-Host đã lưu sẵn trong app (ví dụ kết nối trực tiếp `localhost`) được gắn vào Hub luôn, giữ tên và kết nối cũ. Đăng xuất Hub chỉ gỡ phần Hub, Host đã lưu vẫn còn.
+Hosts already saved in the app (for example a direct `localhost` connection) are attached to the Hub right away and keep their name and existing connection. Signing out of the Hub removes only the Hub part; saved Hosts stay.
 
-Hiện tại, daemon chỉ công bố thông tin kết nối cho Hub khi relay được bật. Daemon mới mặc định tắt relay; nếu Host đã đăng ký nhưng thiếu thông tin kết nối, bật relay trong cấu hình daemon (Docker: `CLISBOT_RELAY_ENABLED=true`, rồi tạo lại container giữ nguyên volume). Đây là cấu hình đường kết nối, không cần đăng nhập CLI thêm.
+The daemon currently publishes connection info to the Hub only when relay is on. New daemons have relay off by default; if a Host is registered but lacks connection info, turn relay on in the daemon configuration (Docker: `CLISBOT_RELAY_ENABLED=true`, then recreate the container with the same volume). This configures the connection path; no extra CLI sign-in is needed.
 
-Trong **Connections** của Host, kết nối Hub cấp (thường là Relay) ghi **Provided by Hub** và không có nút Remove, vì Hub sẽ thêm lại. Kết nối bạn tự lưu vẫn xoá được.
+In a Host's **Connections**, the connection the Hub provides (usually Relay) says **Provided by Hub** and has no Remove button, because the Hub would add it back. Connections you saved yourself can still be removed.
 
-**Settings → Hosts** và bộ chọn Host dùng chung quy tắc: hiện Host bạn thêm trực tiếp và Host do Hub quản lý mà tài khoản hiện tại được phép dùng. Direct hay Relay chỉ là đường kết nối, không quyết định quyền. Host do Hub quản lý từ tài khoản hoặc tổ chức khác không hiện; khi đang tải quyền của tài khoản mới, app chưa hiện các Host đó. Host offline vẫn hiện để bạn mở cấu hình và kết nối lại. Một Host có nhiều đường kết nối chỉ hiện một lần. Host đã đăng ký trên Hub nhưng chưa có thông tin kết nối vẫn có trạng thái chờ trong Settings → Hosts; chưa thể chọn để làm việc.
+**Settings → Hosts** and the Host picker follow the same rule: they show Hosts you added directly and Hub-managed Hosts the current account may use. Direct or Relay is only the connection path; it does not decide permissions. Hub-managed Hosts from other accounts or organizations do not show; while a new account's permissions are loading, the app does not show those Hosts yet. Offline Hosts still show so you can open their settings and reconnect. A Host with several connection paths shows once. A Host registered on the Hub without connection info shows as pending in Settings → Hosts; you cannot pick it to work in yet.
 
-Quy tắc này cũng áp dụng cho bộ chọn Host ở New Workspace, Sessions và Schedules. Khi danh sách đang tải, hộp chọn hiện **Loading Hosts…**, không tự chọn Host khác hay chuyển sang Add Host; nếu tải lỗi, bấm **Retry**. URL Settings hoặc workspace cũ của Host không còn quyền sẽ báo không khả dụng thay vì mở nội dung Host đó.
+The same rule applies to the Host pickers in New Workspace, Sessions, and Schedules. While the list loads, the picker shows **Loading Hosts…** and does not pick another Host or switch to Add Host on its own; if loading fails, click **Retry**. A Settings URL or old workspace for a Host you no longer have access to reports it as unavailable instead of opening that Host's content.
 
-Khi mở workspace, Host đã biết là offline được báo ngay. Host managed không có quyền sẽ hướng dẫn xin quyền; lỗi tải danh sách quyền được báo riêng. Nếu kết nối hoặc tải workspace vẫn chưa có kết quả sau 20 giây, app hiện thông báo hết thời gian chờ cùng **Retry** và **Manage host**. Retry kết nối tạo lại kết nối của Host đó; Retry quyền tải lại danh sách từ Hub. App giữ nguyên URL để bạn tiếp tục khi Host sẵn sàng, không tự chuyển sang Host khác.
+When you open a workspace, a Host already known to be offline is reported right away. A managed Host you have no access to tells you how to request access; a failure to load the permission list is reported separately. If connecting or loading the workspace has no result after 20 seconds, the app shows a timeout message with **Retry** and **Manage host**. Retry on a connection recreates that Host's connection; Retry on permissions reloads the list from the Hub. The app keeps the URL so you can continue when the Host is ready, and does not switch to another Host on its own.
 
-Mỗi daemon là một Host riêng, nhận diện theo `serverId` trong `CLISBOT_HOME` của nó. Hai daemon trên cùng máy (ví dụ bản cài và bản dev) là hai Host, có thể trùng tên máy; đổi tên để phân biệt.
+Each daemon is its own Host, identified by the `serverId` in its `CLISBOT_HOME`. Two daemons on the same machine (for example the installed and dev builds) are two Hosts and can have the same machine name; rename them to tell them apart.
 
-Hub báo **Host "…" already uses this daemon's identity** khi `CLISBOT_HOME` bị copy từ máy khác (chuyển máy, clone VM, image Docker). Trên máy bị copy chạy `clisbot daemon stop`, `clisbot daemon reset-identity`, `clisbot daemon start` rồi `clisbot hub connect <URL-Hub>` lại. Host cũ trên Hub vẫn còn ở trạng thái offline; Owner xóa nếu không dùng.
+The Hub reports **Host "…" already uses this daemon's identity** when `CLISBOT_HOME` was copied from another machine (moving machines, cloning a VM, a Docker image). On the copied machine, run `clisbot daemon stop`, `clisbot daemon reset-identity`, `clisbot daemon start`, then `clisbot hub connect <Hub-URL>` again. The old Host stays on the Hub as offline; the Owner deletes it if it is not used.
 
-Host báo **Offline** ở **Settings → Hosts**: bấm **Reconnect**. Vẫn offline thì kiểm tra Clisbot đang chạy trên máy đó rồi mở **Connections**.
+If a Host shows **Offline** in **Settings → Hosts**, click **Reconnect**. If it stays offline, check that Clisbot is running on that machine, then open **Connections**.
 
-## Sau khi kết nối
+## After connecting
 
-Trang duyệt luôn có **Home** và **Settings**, kể cả khi đang đợi Host kết nối. Khi Host xuất hiện, chọn bước tiếp theo:
+The approval page always has **Home** and **Settings**, even while waiting for the Host to connect. When the Host appears, choose the next step:
 
-- **Create a Bot**: mở form tạo Bot trên Host vừa kết nối; Bot tự có workspace riêng, không cần thêm Project trước.
-- **Add a Project**: chọn thư mục tài liệu hoặc code trên Host. Có **Browse folders on Host** để duyệt từng cấp; xem [hướng dẫn Project](../work/projects-and-workspaces.md#tạo-project).
-- **Add another Host**: chọn managed qua Hub hoặc direct.
-- **Continue to Home**: vào app, có thể thiết lập sau.
+- **Create a Bot**: opens the Bot form on the Host you connected; a Bot gets its own workspace, so you do not need to add a Project first.
+- **Add a Project**: choose a docs or code folder on the Host. **Browse folders on Host** lets you browse level by level; see the [Project guide](../work/projects-and-workspaces.md#create-a-project).
+- **Add another Host**: choose managed through the Hub, or direct.
+- **Continue to Home**: go into the app; you can set things up later.
 
-Các thao tác tạo chỉ xuất hiện khi Host online, hỗ trợ tính năng và bạn có quyền tương ứng. Đóng form hoặc bỏ qua Add Project không làm mất Host đã kết nối. Đổi kích thước cửa sổ hoặc chuyển giữa layout desktop/mobile giữ kết quả duyệt trong phiên hiện tại và thư mục đang chọn.
+Create actions appear only when the Host is online, supports the feature, and you have the matching permission. Closing the form or skipping Add Project does not lose the connected Host. Resizing the window or switching between desktop and mobile layouts keeps the approval result for the current session and the selected folder.
 
-## `login`: chỉ dùng khi cần quyền CLI nâng cao
+## `login`: only for advanced CLI permissions
 
-**Không dùng `hub login` để thêm Host.** Chỉ dùng khi chủ động muốn cấp quyền quản trị API cho CLI, ví dụ export cấu hình hoặc sử dụng các API quản trị được hỗ trợ. Đọc [phạm vi và vòng đời credential](../../../hub.md#advanced-cli-login) trước khi chạy.
+**Do not use `hub login` to add a Host.** Use it only when you deliberately want to give the CLI admin API permissions, for example to export configuration or use the supported admin APIs. Read [credential scope and lifecycle](../../../hub.md#advanced-cli-login) before running it.
 
-Hiện `login` cấp cả năm scope `projects:read`, `configuration:validate`, `configuration:install`, `runs:dispatch`, `daemons:enroll`; không phải quyền chỉ đăng ký một Host. Credential không có hạn tự hết và vẫn hợp lệ cho tới khi thu hồi trên Hub. `hub logout` chỉ xóa bản lưu local, **không thu hồi credential trên Hub**. Token của các lần login trước không tự mất hiệu lực sau khi cập nhật bản mới; nếu không còn cần, Owner/Admin thu hồi tại Hub → Configuration → API keys.
+`login` currently grants all five scopes `projects:read`, `configuration:validate`, `configuration:install`, `runs:dispatch`, `daemons:enroll`; it is not a permission to enroll one Host only. The credential does not expire on its own and stays valid until revoked on the Hub. `hub logout` only deletes the local copy and **does not revoke the credential on the Hub**. Tokens from earlier logins keep working after an upgrade; if you no longer need them, an Owner/Admin revokes them in Hub → Configuration → API keys.
 
-Mỗi daemon có một quan hệ Hub tại một thời điểm, độc lập với credential CLI.
+Each daemon has one Hub relationship at a time, independent of CLI credentials.
 
-## Đổi tên Host
+## Rename a Host
 
-**Tên dùng chung trên Hub:** **Settings → Hosts → [Host] → Rename**, nhập tên và lưu. Ngắt Host khỏi Hub nằm ở menu **…** của Host đó (**Disconnect**). Cần quyền quản lý tài nguyên tổ chức (Owner/Admin); Daemon Administrator đơn thuần chưa đủ quyền đổi tên bản ghi Hub.
+**Shared name on the Hub:** **Settings → Hosts → [Host] → Rename**, enter the name, and save. Disconnecting the Host from the Hub is in that Host's **…** menu (**Disconnect**). You need permission to manage organization resources (Owner/Admin); Daemon Administrator alone cannot rename the Hub record.
 
-Tên ban đầu lấy từ hostname máy, chuẩn hóa thành slug chữ thường, bỏ dấu và thay ký tự phân cách bằng dấu `-`. Nếu trống dùng `daemon-<đầu ID>`; khi trùng thêm phần ID. Tên mới cũng được chuẩn hóa và phải duy nhất trong tổ chức.
+The initial name comes from the machine's hostname, normalized to a lowercase slug with accents removed and separators replaced by `-`. If that is empty, `daemon-<ID prefix>` is used; on a collision, part of the ID is appended. New names are normalized the same way and must be unique in the organization.
 
-Đổi tên không đổi daemon ID, hostname hệ điều hành hay địa chỉ mạng. Cấu hình tham chiếu bằng ID tiếp tục ổn định; rà lại cấu hình tự viết tham chiếu bằng tên/slug cũ.
+Renaming does not change the daemon ID, the OS hostname, or the network address. Configuration that references the ID keeps working; review hand-written configuration that references the old name/slug.
 
-**Tên riêng trên thiết bị của bạn:** Settings → **Hosts → [Host] → Appearance → Name**. Đây là nhãn local, không đổi tên Hub cho mọi người. Nhãn tùy chỉnh được giữ khi tên Hub đổi.
+**Your own name on your device:** Settings → **Hosts → [Host] → Appearance → Name**. This is a local label and does not rename the Host on the Hub for everyone. Your custom label stays when the Hub name changes.
 
-## Nhiều Host, nhiều Project
+## Many Hosts, many Projects
 
-1. Enroll riêng từng daemon; đặt tên dễ nhận biết như `dev-long`, `build-team`, `staging`.
-2. Đăng ký Project trên đúng Host chứa thư mục đó. Hai Project cùng tên ở hai Host vẫn là hai tài nguyên khác nhau.
-3. Cấp Connect theo từng Host, rồi cấp quyền theo từng Project. Quyền ở Host A không tự lan sang Host B.
-4. Bật `external` riêng trên từng daemon cần phân quyền. Kiểm tra Host và đường dẫn trước khi tạo Workspace hoặc chạy Agent.
+1. Enroll each daemon separately; give them recognizable names such as `dev-long`, `build-team`, `staging`.
+2. Register each Project on the Host that holds its folder. Two Projects with the same name on two Hosts are two different resources.
+3. Grant Connect per Host, then grant permissions per Project. Access on Host A does not extend to Host B.
+4. Turn on `external` separately on each daemon that needs access control. Check the Host and path before creating a Workspace or running an Agent.
 
-Nếu chạy nhiều daemon trên cùng máy, dùng cấu hình/thư mục dữ liệu riêng (`CLISBOT_HOME`) và endpoint riêng. Không sao chép danh tính/credential daemon để tạo Host thứ hai.
+If you run several daemons on the same machine, give each its own configuration/data folder (`CLISBOT_HOME`) and endpoint. Do not copy a daemon's identity or credentials to create a second Host.
 
 ## Unenroll
 
-Trên máy daemon:
+On the daemon machine:
 
 ```sh
 clisbot hub disconnect
 clisbot hub status
 ```
 
-Hoặc dùng **Disconnect** của Host trong phần cấu hình Hub khi tài khoản có cả quyền cấu hình tổ chức và quyền quản trị daemon cần thiết.
+Or use the Host's **Disconnect** in the Hub configuration, when your account has both organization configuration rights and the needed daemon admin rights.
 
-Disconnect gỡ quan hệ enrollment, thu hồi quyền kết nối liên quan và làm gián đoạn công việc phụ thuộc Hub. App tự gỡ Host do Hub quản lý — cùng workspace của nó — khi daemon rời khỏi danh sách Hub; Host bạn tự thêm vẫn được giữ. Nó không xóa thư mục mã nguồn của bạn. Muốn dùng lại, enroll lại và kiểm tra Access/cấu hình phụ thuộc.
+Disconnect removes the enrollment, revokes the related connection permissions, and interrupts work that depends on the Hub. The app removes Hub-managed Hosts, with their workspaces, when the daemon leaves the Hub list; Hosts you added yourself stay. It does not delete your source folders. To use the Host again, enroll it again and check Access and any configuration that depends on it.
 
-Nếu Hub không liên lạc được, `clisbot hub disconnect --force` cho phép dọn quan hệ local. Đây không phải xác nhận Hub đã thu hồi credential từ xa; cần dọn/thu hồi bản ghi phía Hub khi truy cập lại được.
+If the Hub cannot be reached, `clisbot hub disconnect --force` cleans up the local relationship. It does not confirm that the Hub revoked the credential remotely; clean up or revoke the record on the Hub once you can reach it again.
 
-`clisbot hub logout` xóa đăng nhập CLI; không đồng nghĩa unenroll. Nếu CLI hỏi có disconnect kèm theo, lựa chọn đó mới gỡ quan hệ daemon.
+`clisbot hub logout` removes the CLI sign-in; it does not unenroll. If the CLI asks whether to disconnect as well, only that choice removes the daemon relationship.

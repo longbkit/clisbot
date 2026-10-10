@@ -1,97 +1,97 @@
-# Mời Members, tạo Teams và cấp Access
+# Invite Members, create Teams, and grant Access
 
-[User guide](../README.md) · [Các mức quyền](permissions.md) · [Q&A](../help/faq.md)
+[User guide](../README.md) · [Permission levels](permissions.md) · [Q&A](../help/faq.md)
 
-Thực hiện bằng Owner/Admin có quyền quản lý tổ chức. Daemon cần ở chế độ [external](../hosts/managed-access.md) để quyền này được áp dụng cho kết nối app.
+Do this as an Owner/Admin who can manage the organization. The daemon must be in [external](../hosts/managed-access.md) mode for these permissions to apply to app connections.
 
-## Tạo Team và mời người
+## Create a Team and invite people
 
-Mở Settings → **People & access**. Trang có bốn tab: **Members** (mọi người trong tổ chức, kèm vai trò, Team và tài khoản chat đã liên kết), **Teams**, **Invitations** (lời mời đang chờ) và **Access** (ai được dùng gì). Các ô đếm phía trên mỗi tab là bộ lọc: bấm **No Team** để xem ai chưa vào Team nào, **Expiring soon** để xem lời mời sắp hết hạn.
+Open Settings → **People & access**. The page has four tabs: **Members** (everyone in the organization, with role, Teams, and linked chat accounts), **Teams**, **Invitations** (pending invitations), and **Access** (who can use what). The counters above each tab are filters: click **No Team** to see who is in no Team, **Expiring soon** to see invitations about to expire.
 
-1. Ở tab **Teams**, bấm **New Team** và đặt tên theo nhóm làm việc, ví dụ `Product` hoặc `AI Team`.
-2. Bấm **Invite people** (có ở mọi tab; mở từ trong một Team thì Team đó được chọn sẵn). Ô **People** nhận cả tên Member đã có lẫn email mới, ngăn cách bằng dấu phẩy hoặc xuống dòng; dạng `Tên <email>` cũng được. Chọn **Teams**; với email mới chọn thêm vai trò **Member** cho người chỉ cần làm việc trên tài nguyên, **Admin** khi người đó cần quản lý tổ chức.
-3. Đọc dòng xem trước, ví dụ `2 Members join Ops, BMS now · 1 invitation will be sent`, rồi bấm nút gửi. Member đã có vào Team ngay; email mới nhận một lời mời và vào đúng các Team đó khi đăng nhập. Email nào bị từ chối (đã là Member, hết seat) được giữ lại trong ô để gửi lại; các email khác đã gửi.
-4. Người nhận tham gia như bảng dưới, rồi kiểm tra ở tab **Members** là người đó đã có mặt và đúng Team.
+1. On the **Teams** tab, click **New Team** and name it after the working group, for example `Product` or `AI Team`.
+2. Click **Invite people** (on every tab; opened from inside a Team, that Team is preselected). The **People** field takes existing Member names and new emails, separated by commas or new lines; `Name <email>` also works. Choose **Teams**; for new emails also choose a role: **Member** for someone who only needs to work on resources, **Admin** when they need to manage the organization.
+3. Read the preview line, for example `2 Members join Ops, BMS now · 1 invitation will be sent`, then click the send button. Existing Members join the Team right away; new emails get an invitation and join those Teams when they sign in. Rejected emails (already a Member, no seats left) stay in the field so you can send again; the others were sent.
+4. The invitee joins as shown in the table below. Then check on the **Members** tab that they are there and in the right Team.
 
-| Người được mời                                             | Có cần bấm link mời?                                                                                              |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Chưa có tài khoản, đăng nhập **Continue with Google**      | Không. Lần đăng nhập đầu tiên tự nhận lời mời còn hạn mới nhất gửi tới email đó, kèm vai trò và Team.             |
-| Chưa có tài khoản, đăng ký qua **Email me a sign-up link** | Không. Như Google, vì link trong mail đã chứng minh email. Chỉ dùng được với email thuộc domain Hub cho phép.     |
-| Chưa có tài khoản, tự nhập email và mật khẩu               | Có. Mật khẩu gõ tay chưa chứng minh sở hữu email, nên chỉ form mở từ link mời mới tạo được tài khoản kèm lời mời. |
-| Đã có tài khoản trên Hub (kể cả đang ở tổ chức khác)       | Có. Lời mời không tự áp dụng cho tài khoản sẵn có; mở link mời khi đang đăng nhập rồi bấm **Accept invitation**.  |
+| Invitee                                                  | Do they need to open the invitation link?                                                                                                                |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No account, signs in with **Continue with Google**       | No. The first sign-in accepts the latest unexpired invitation sent to that email, with its role and Teams.                                               |
+| No account, signs up with **Email me a sign-up link**    | No. Same as Google, because the link in the email proves the email. Works only for emails in a domain the Hub allows.                                    |
+| No account, types an email and password                  | Yes. A typed password does not prove ownership of the email, so only the form opened from the invitation link can create an account with the invitation. |
+| Already has a Hub account (even in another organization) | Yes. Invitations do not apply to existing accounts on their own; open the invitation link while signed in and click **Accept invitation**.               |
 
-Lời mời hết hạn sau **48 giờ**; gửi lại (Resend) tính lại 48 giờ từ lúc gửi. Nếu người đó đăng nhập sau khi hết hạn thì không còn tự nhận lời mời: ở Hub `domain_self_registration`, email đúng domain vào tổ chức gắn với domain (chưa có thì tạo mới và người đó thành Owner), không kèm Team; email ngoài domain bị từ chối. Lời mời đã hết hạn không còn hiện trong tab **Invitations**; mời lại email đó bằng **Invite people**.
+Invitations expire after **48 hours**; Resend restarts the 48 hours from the time you send. If the person signs in after expiry, the invitation is no longer accepted automatically: on a `domain_self_registration` Hub, an email in the domain joins the organization tied to that domain (if there is none, one is created and the person becomes Owner), without Teams; emails outside the domain are rejected. Expired invitations no longer show on the **Invitations** tab; invite that email again with **Invite people**.
 
-Thêm Member đã có vào Team: mở Team → **Add people** rồi gõ tên hoặc email, hoặc bấm nút trên cột Teams của dòng Member, hoặc **Edit Teams** ở mục Teams khi mở chi tiết Member (**Add to a Team** khi họ chưa có Team, **Edit Teams** khi đã có): hộp thoại **Teams for …** chọn thêm nhiều Team một lần hoặc bỏ tick để đưa họ ra khỏi Team, rồi **Save**. Hộp thoại chỉ liệt kê Team bạn quản lý; Team khác họ đang thuộc về được ghi bên dưới. Owner và Admin tổ chức gõ tên một Team chưa có vào ô Teams (ở đây hoặc trong **Invite people**) sẽ thấy **Create Team "…"**: chọn là Team được tạo ngay và được tick sẵn; Team Admin chỉ chọn được Team đã có. Tab **Members** của Team liệt kê người đang ở Team; bấm **Remove** để bỏ ai đó khỏi Team. Vai trò **Admin** trong Team (Team Admin) cho phép người đó thêm, bớt và mời người vào Team này, và đặt người khác làm Team Admin. Team Admin mở People thấy các Team mình thuộc về hoặc quản lý; trong Team mình quản lý có **Add people**, **Remove**, ô vai trò Team, và tab **Access** chỉ xem (sửa quyền của Team vẫn là việc của Owner/Admin tổ chức). Khi Team Admin mời, ô Teams chỉ có Team họ quản lý và vai trò luôn là **Member**; tab **Invitations** của họ chỉ liệt kê lời mời loại đó, và họ gửi lại hoặc hủy được chính các lời mời này.
+To add an existing Member to a Team: open the Team → **Add people** and type a name or email, or click the button in the Teams column of the Member's row, or **Edit Teams** in the Teams section of the Member's details (**Add to a Team** when they have no Team, **Edit Teams** when they have one). The **Teams for …** dialog lets you add several Teams at once or untick a Team to take them out of it; then **Save**. The dialog lists only Teams you manage; other Teams they belong to are listed below it. When an organization Owner or Admin types the name of a Team that does not exist into the Teams field (here or in **Invite people**), they see **Create Team "…"**: choosing it creates the Team and ticks it. Team Admins can pick only existing Teams. A Team's **Members** tab lists who is in the Team; click **Remove** to take someone out. The **Admin** role in a Team (Team Admin) lets that person add, remove, and invite people to this Team, and make others Team Admin. A Team Admin who opens People sees the Teams they belong to or manage; in Teams they manage they get **Add people**, **Remove**, the Team role field, and a read-only **Access** tab (editing the Team's permissions stays with the organization Owner/Admin). When a Team Admin invites, the Teams field has only the Teams they manage and the role is always **Member**; their **Invitations** tab lists only those invitations, and they can resend or cancel them.
 
-Đổi vai trò tổ chức ngay trên dòng Member (Member / Admin, Owner chỉ hiện với Owner và cần xác nhận). Owner cuối cùng không thể tự hạ vai trò; Admin không đổi được vai trò của Owner. Bấm tên một Member để mở trang chi tiết: **Details** (vai trò, trạng thái), **Teams** (chỉ các Team người đó đang ở; **Add to Team…** để thêm, menu **…** của dòng để bỏ), **Access** và **Chat accounts**. **Remove Member** nằm trong menu **…** cạnh tên; mục này bị khóa khi Hub sẽ từ chối, lý do hiện dưới **Status** (Admin không xóa được Owner, không ai xóa được Owner cuối cùng). Trang Team có tab **Members** và **Access**; đổi tên và xóa Team nằm trong menu **…** cạnh tên Team. Tab **Invitations**: **Resend** gửi lại (lời mời tính lại 48 giờ), **Cancel invitation** trong menu của dòng.
+Change the organization role on the Member's row (Member / Admin; Owner shows only to Owners and needs confirmation). The last Owner cannot demote themselves; an Admin cannot change an Owner's role. Click a Member's name to open the detail page: **Details** (role, status), **Teams** (only the Teams that person is in; **Add to Team…** to add, the row's **…** menu to remove), **Access**, and **Chat accounts**. **Remove Member** is in the **…** menu next to the name; it is locked when the Hub would refuse, with the reason under **Status** (an Admin cannot remove an Owner, nobody can remove the last Owner). The Team page has **Members** and **Access** tabs; renaming and deleting a Team are in the **…** menu next to the Team name. On the **Invitations** tab, **Resend** sends again (the invitation gets a fresh 48 hours), and **Cancel invitation** is in the row's menu.
 
-Member mới không tự có quyền dùng tài nguyên. Nếu vào Team đã được cấp Access, người đó nhận các quyền của Team.
+A new Member cannot use any resource until granted. If they join a Team that has Access, they get the Team's permissions.
 
-## Cấp quyền làm việc trên một Project cố định
+## Grant work on one fixed Project
 
-Ví dụ muốn AI Team làm việc trên Project `longluongbrain` của Host `sandbox`:
+For example, to let AI Team work on Project `longluongbrain` on Host `sandbox`:
 
-1. Mở **Access**. Ở **Team or Member**, tìm và chọn `AI Team` trong nhóm Teams.
-2. Chọn tài nguyên Host `sandbox`, mức **Connect**, xác nhận cấp quyền.
-3. Chọn Project `longluongbrain` thuộc đúng Host đó.
-4. Chọn **Office worker** hoặc **Developer**; chọn cấu hình Agent cho phép, quyền phê duyệt và Fast mode theo nhu cầu; lưu.
-5. Đăng nhập bằng một Member của Team, kiểm tra chỉ thấy Project được phép và thử tạo session.
+1. Open **Access**. In **Team or Member**, search for and choose `AI Team` in the Teams group.
+2. Choose the Host resource `sandbox`, level **Connect**, and confirm the grant.
+3. Choose Project `longluongbrain` on that same Host.
+4. Choose **Office worker** or **Developer**; choose the allowed Agent configuration, approval rights, and Fast mode as needed; save.
+5. Sign in as a Member of the Team, check that only the allowed Project shows, and try creating a session.
 
-Với Office worker, Owner/Administrator chuẩn bị Workspace có sẵn. Với Developer, Member tạo được Workspace/worktree trong Project đó. Không cần cấp Daemon Administrator cho việc này.
+With Office worker, the Owner/Administrator prepares the Workspaces in advance. With Developer, the Member can create Workspaces/worktrees in that Project. You do not need Daemon Administrator for this.
 
-Mỗi dòng **Agent configuration** là một provider, chọn được **nhiều Models** và **nhiều Thinking** cùng lúc: mở ô, đánh dấu từng mục, danh sách vẫn mở trong lúc chọn. **All available** là mục đầu danh sách và tự bao cả model thêm sau. Dòng đã chọn xong thu gọn thành một dòng tóm tắt; bấm `▸` để sửa. Cần Thinking khác nhau cho từng model thì thêm dòng thứ hai cho cùng provider. Đổi danh sách Models sẽ đặt lại Thinking về tất cả.
+Each **Agent configuration** row is one provider, with **several Models** and **several Thinking** levels at once: open the field and tick each item; the list stays open while you choose. **All available** is the first item and also covers models added later. A finished row collapses to a one-line summary; click `▸` to edit it. For different Thinking per model, add a second row for the same provider. Changing the Models list resets Thinking to all.
 
-Ô tìm kiếm gợi ý khi gõ, chia nhóm Teams/Members hoặc loại tài nguyên. Tìm Member bằng email để tránh trùng tên; khi chọn Project kiểm tra Host đi kèm. Danh sách giới hạn số kết quả hiển thị mỗi nhóm, hãy gõ cụ thể hơn nếu chưa thấy mục cần chọn.
+The search field suggests as you type, grouped by Teams/Members or resource type. Search Members by email to avoid duplicate names; when choosing a Project, check the Host shown with it. The list caps the results shown per group, so type something more specific if you do not see what you need.
 
-## Cấp cho mọi Project trên một Host
+## Grant every Project on a Host
 
-Dùng khi Team cần làm trên tất cả Project của Host nhưng vẫn giới hạn provider/model:
+Use this when a Team needs to work on all Projects on a Host but stay limited to certain providers/models:
 
-1. Chọn Team/Member, rồi chọn chính **Host** làm tài nguyên (nhóm Hosts).
-2. Chọn **Office worker**, **Developer**, hoặc **Full access** nếu cần tự thêm Project mới. Không chọn Administrator nếu muốn giữ giới hạn provider/model.
-3. Chọn cấu hình Agent; lưu.
+1. Choose the Team/Member, then choose the **Host** itself as the resource (Hosts group).
+2. Choose **Office worker**, **Developer**, or **Full access** if they need to add new Projects. Do not choose Administrator if you want to keep provider/model limits.
+3. Choose the Agent configuration; save.
 
-Grant này áp cho mọi Project hiện có và Project thêm sau, kể cả Project daemon tạm thời không báo cáo. Không cần thêm grant Connect riêng. Mỗi người chỉ có một assignment trên một Host, nên lưu mức mới sẽ **thay** mức cũ trên Host đó — đổi Administrator thành Developer là mất quyền Administrator.
+This grant applies to every existing Project and every Project added later, including Projects the daemon is temporarily not reporting. You do not need a separate Connect grant. Each person has one assignment per Host, so saving a new level **replaces** the old one on that Host: changing Administrator to Developer removes Administrator.
 
-## Cấp cho nhiều Project cùng lúc
+## Grant several Projects at once
 
-Chọn một Project làm tài nguyên, rồi chọn thêm ở **Also apply to**. Chỉ hiện các Project **cùng Host**; mỗi Project được ghi thành một assignment riêng với cùng lựa chọn, trong một lần lưu.
+Choose one Project as the resource, then choose more under **Also apply to**. Only Projects on the **same Host** show; each Project is saved as its own assignment with the same choices, in one save.
 
-- Ô này không có lựa chọn "tất cả". Muốn mọi Project, kể cả Project thêm sau, thì cấp trên Host.
-- Nếu người đó đã có grant trên Project nào trong danh sách, grant cũ bị **thay thế**, kể cả cấu hình Agent của nó. Hộp xác nhận liệt kê các Project bị thay; đọc kỹ trước khi đồng ý.
+- This field has no "all" option. For every Project, including Projects added later, grant on the Host.
+- If the person already has a grant on any Project in the list, the old grant is **replaced**, including its Agent configuration. The confirmation lists the replaced Projects; read it before you agree.
 
-## Can share: cho người khác cấp tiếp
+## Can share: let others grant on
 
-Trên Host hoặc Project, dưới ô mức quyền có công tắc **Can share**: người được cấp có thể thêm, sửa, hoặc bỏ người trên đúng Host/Project đó, **tối đa bằng mức của chính họ**. Quy tắc chỉ có một: ai cũng chỉ cấp được những gì mình đang có.
+On a Host or Project, under the level field, there is a **Can share** switch: the grantee can add, edit, or remove people on that same Host/Project, **up to their own level**. There is one rule: you can grant only what you hold.
 
-| Mức           | Can share              |
-| ------------- | ---------------------- |
-| Connect       | Không có               |
-| Office worker | Tắt mặc định, bật được |
-| Developer     | Tắt mặc định, bật được |
-| Full access   | Bật mặc định, tắt được |
-| Administrator | Luôn bật               |
+| Level         | Can share                        |
+| ------------- | -------------------------------- |
+| Connect       | None                             |
+| Office worker | Off by default, can be turned on |
+| Developer     | Off by default, can be turned on |
+| Full access   | On by default, can be turned off |
+| Administrator | Always on                        |
 
-- Người có Can share ở mức Office worker chỉ cấp được Office worker; ở Host thì cấp được mọi Project trên Host đó. Trong **Access** họ chỉ thấy tài nguyên mình chia sẻ được; mức cao hơn mức của họ không hiện trong ô chọn (có dòng "Above your own level"); grant cao hơn hiện **Locked**, không sửa hay xóa được.
-- Với Project, người nhận vẫn cần **Connect** trên Host. Dù bạn không chia sẻ được Host đó, form vẫn cấp kèm Connect (và chỉ Connect) trên Host; nếu người nhận đã vào được Host thì Hub giữ nguyên grant Host của họ.
-- Mỗi grant hiện **by \<tên>** (ai đã cấp; **by Hub** khi Hub tự ghi) và **Can share** nếu có, cả trong trang Access lẫn phần Access của một người hoặc Team, để thu hồi nhanh khi cần.
-- Với Team, Connection, hoặc Automation, mức tương ứng gọi là **Admin**: quản lý đúng tài nguyên đó và ai được vào (Connection Admin cũng bổ nhiệm được Admin khác cho Route đó) (Team Admin chỉ quản lý thành viên, không đổi grant của Team). Owner/Admin tổ chức không bị giới hạn bởi quy tắc này.
+- Someone with Can share at Office worker can grant only Office worker; on a Host they can grant every Project on that Host. In **Access** they see only resources they can share; levels above their own do not show in the picker (an "Above your own level" line shows instead), and higher grants show **Locked** and cannot be edited or removed.
+- For a Project, the grantee still needs **Connect** on the Host. Even if you cannot share that Host, the form grants Connect (and only Connect) on the Host along with it; if the grantee can already reach the Host, the Hub keeps their Host grant as it is.
+- Each grant shows **by \<name>** (who granted it; **by Hub** when the Hub wrote it) and **Can share** if set, on the Access page and in the Access section of a person or Team, so you can revoke quickly.
+- For Teams, Connections, and Automations, the matching level is called **Admin**: it manages that resource and who gets in (a Connection Admin can also appoint other Admins for that Route) (a Team Admin manages only members and does not change the Team's grants). Organization Owners/Admins are not limited by this rule.
 
-**Cảnh báo khi chọn Administrator.** Chọn mức này mở hộp xác nhận trước khi form nhận mức: người đó điều khiển daemon (restart, cài plugin, dùng mọi Model, thấy mọi Project). Mọi Admin tổ chức được thông báo kèm tên người cấp và link mở đúng grant trong trang Access; Owner/Admin xem lại trong mục **Access events** ở cuối trang Access và bấm **Revoke** để thu hồi ngay. Mục này cũng liệt kê Automation mà Hub tạm dừng vì tác giả mất quyền.
+**Warning when choosing Administrator.** Choosing this level opens a confirmation before the form takes it: that person controls the daemon (restart, install plugins, use every Model, see every Project). Every organization Admin is notified with the granter's name and a link to that grant on the Access page; Owners/Admins review it under **Access events** at the bottom of the Access page and click **Revoke** to revoke it at once. This section also lists Automations the Hub paused because their author lost access.
 
-## Cấp cho Guest
+## Grant to Guest
 
-**Guest** là tất cả người gửi tin trên Channel chưa link tài khoản Member, không phải một người. Cấp Developer cho Guest trên một Host nghĩa là mọi người như vậy được duyệt lệnh phá hủy và chạy Agent không hỏi phê duyệt trên mọi Project của Host đó. Hộp xác nhận sẽ nhắc lại phạm vi này.
+**Guest** is everyone who sends messages on a Channel without a linked Member account, not one person. Granting Developer to Guest on a Host means every such person can approve destructive commands and run Agents without approval prompts on every Project of that Host. The confirmation repeats this scope.
 
-## Cấp riêng cho cá nhân
+## Grant to an individual
 
-Làm tương tự nhưng chọn người trong nhóm **Members**. Ưu tiên quyền Team cho công việc chung; dùng grant cá nhân cho ngoại lệ, ví dụ một người được thêm Project thứ hai.
+Same steps, but choose a person in the **Members** group. Prefer Team grants for shared work; use individual grants for exceptions, for example one person getting a second Project.
 
-Các grant **cộng dồn**: quyền trực tiếp + quyền từ mọi Team, và quyền trên Host + quyền trên từng Project. Grant ít quyền hơn không bao giờ hạn chế grant khác: cấp Project chỉ dùng Claude **không** bỏ được Codex đã cấp trên Host. Muốn giới hạn một Project thì cấp ít hơn trên Host.
+Grants **add up**: direct grants plus grants from every Team, and grants on the Host plus grants on each Project. A smaller grant never restricts another: a Project grant that allows only Claude does **not** remove Codex granted on the Host. To limit a Project, grant less on the Host.
 
-## Sửa hoặc thu hồi
+## Edit or revoke
 
-Trong **Access**, tìm assignment rồi **Edit** hoặc **Remove**. Các assignment giống nhau chỉ khác Project được gom thành một dòng; bấm `▸` để sửa hoặc xóa từng cái. Xem theo **Resource · Who has access** trên một Project sẽ hiện cả những người có quyền qua Host. Nếu muốn thu hồi hoàn toàn, kiểm tra cả grant cá nhân và mọi Team của người đó. Khi bỏ người khỏi Team, quyền nhận qua Team đó mất; các nguồn quyền khác vẫn còn.
+In **Access**, find the assignment, then **Edit** or **Remove**. Identical assignments that differ only by Project are grouped into one row; click `▸` to edit or remove each one. Viewing **Resource · Who has access** on a Project also shows people who have access through the Host. To revoke fully, check the person's individual grants and all their Teams. Removing someone from a Team removes the access they got through that Team; other sources remain.
 
-Sau khi sửa, kiểm tra lại bằng chính tài khoản Member và kết nối được cập nhật. Đừng dùng tài khoản Owner để chứng minh quyền đã bị giới hạn, vì Owner có quyền ngầm định trên toàn tổ chức.
+After editing, check with that Member's own account and a refreshed connection. Do not use an Owner account to prove access is limited, because the Owner has implicit rights across the organization.

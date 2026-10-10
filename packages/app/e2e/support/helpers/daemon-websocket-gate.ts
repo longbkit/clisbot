@@ -48,13 +48,15 @@ interface HeldServerMessage {
   browser: WebSocketRoute;
   message: string | Buffer;
   key: string;
-  agentStreamFollowers: Array<string | Buffer>;
+  followers: Array<string | Buffer>;
   blockedAgentId?: string;
+  followupMatches?: (message: ClientRequest | null) => boolean;
 }
 
 interface PendingServerMessageHold {
   matches: (message: ClientRequest | null) => boolean;
   blockAgentStreamFollowers?: boolean;
+  holdMatchingFollowers?: boolean;
 }
 
 function readSessionMessage(message: string | Buffer): ClientRequest | null {
@@ -391,6 +393,13 @@ export async function installDaemonWebSocketGate(page: Page) {
     message: string | Buffer;
     parsed: ClientRequest | null;
   }): boolean => {
+    // Metadata and durable-session updates can publish another running snapshot while
+    // the first is held. Keep that authority behind the same gate until release.
+    const heldUpdate = heldServerMessages.find((held) => held.followupMatches?.(input.parsed));
+    if (heldUpdate) {
+      heldUpdate.followers.push(input.message);
+      return true;
+    }
     const agentId = readAgentStreamAgentId(input.parsed);
     const blocked = agentId
       ? heldServerMessages.find((held) => held.blockedAgentId === agentId)
@@ -403,7 +412,7 @@ export async function installDaemonWebSocketGate(page: Page) {
       suppressAgentStream,
     });
     if (blocked) {
-      if (!suppressed) blocked.agentStreamFollowers.push(input.message);
+      if (!suppressed) blocked.followers.push(input.message);
       return true;
     }
     const matchedHold = Array.from(pendingServerMessageHolds).find(([, hold]) =>
@@ -416,7 +425,8 @@ export async function installDaemonWebSocketGate(page: Page) {
       browser: input.browser,
       message: input.message,
       key,
-      agentStreamFollowers: [],
+      followers: [],
+      followupMatches: hold.holdMatchingFollowers ? hold.matches : undefined,
       blockedAgentId:
         hold.blockAgentStreamFollowers || readAgentStreamEventType(input.parsed) === "turn_started"
           ? (agentId ?? undefined)
@@ -654,6 +664,7 @@ export async function installDaemonWebSocketGate(page: Page) {
       const heldAgentUpdate = { agentId, status };
       pendingServerMessageHolds.set(agentUpdateKey(agentId, status), {
         matches: (message) => matchesAgentUpdate(message, heldAgentUpdate),
+        holdMatchingFollowers: true,
       });
     },
     holdNextAgentStreamEvent(type: string): void {
@@ -689,7 +700,7 @@ export async function installDaemonWebSocketGate(page: Page) {
       const [heldServerMessage] = index >= 0 ? heldServerMessages.splice(index, 1) : [];
       if (!heldServerMessage) throw new Error("No held server message to release");
       heldServerMessage.browser.send(heldServerMessage.message);
-      for (const follower of heldServerMessage.agentStreamFollowers) {
+      for (const follower of heldServerMessage.followers) {
         heldServerMessage.browser.send(follower);
       }
     },
@@ -705,7 +716,7 @@ export async function installDaemonWebSocketGate(page: Page) {
       const [heldServerMessage] = index >= 0 ? heldServerMessages.splice(index, 1) : [];
       if (!heldServerMessage) throw new Error("No held agent update to release");
       heldServerMessage.browser.send(heldServerMessage.message);
-      for (const follower of heldServerMessage.agentStreamFollowers) {
+      for (const follower of heldServerMessage.followers) {
         heldServerMessage.browser.send(follower);
       }
     },
@@ -721,7 +732,7 @@ export async function installDaemonWebSocketGate(page: Page) {
       const [heldServerMessage] = index >= 0 ? heldServerMessages.splice(index, 1) : [];
       if (!heldServerMessage) throw new Error("No held agent stream event to release");
       heldServerMessage.browser.send(heldServerMessage.message);
-      for (const follower of heldServerMessage.agentStreamFollowers) {
+      for (const follower of heldServerMessage.followers) {
         heldServerMessage.browser.send(follower);
       }
     },
@@ -737,7 +748,7 @@ export async function installDaemonWebSocketGate(page: Page) {
       const [heldServerMessage] = index >= 0 ? heldServerMessages.splice(index, 1) : [];
       if (!heldServerMessage) throw new Error("No held agent stream item to release");
       heldServerMessage.browser.send(heldServerMessage.message);
-      for (const follower of heldServerMessage.agentStreamFollowers) {
+      for (const follower of heldServerMessage.followers) {
         heldServerMessage.browser.send(follower);
       }
     },

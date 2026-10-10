@@ -1,16 +1,16 @@
-# Onboarding: có bot Slack đầu tiên
+# Onboarding: your first Slack bot
 
-[User guide](../README.md) · [Xử lý lỗi](../help/faq.md#lỗi-onboarding-và-khởi-động) · [Mật khẩu và recovery](../account/password-and-recovery.md)
+[User guide](../README.md) · [Troubleshooting](../help/faq.md#onboarding-and-startup-errors) · [Password and recovery](../account/password-and-recovery.md)
 
-Nếu đã dùng Clisbot 0.1.x, bắt đầu từ [nâng cấp v2](upgrade-v2.md) để dùng lại home và workspace.
+Only need agents from the app, web or phone? See the [quick start](quick-start.md). Already on Clisbot 0.1.x? See [upgrade to v2](upgrade-v2.md).
 
-Bạn sẽ có bot personal dùng Codex, workspace đã seed template và dữ liệu lưu tại `~/.clisbot-dev-01`. Các lệnh dưới đây chạy trong Bash trên máy sẽ chạy bot.
+You end up with a personal bot on Codex, a workspace seeded from templates, and data stored in `~/.clisbot-dev-01`. Run the commands below in Bash on the machine that will run the bot.
 
-## 1. Chuẩn bị
+## 1. Prepare
 
-- Cài CLI bản có onboarding Clisbot. Codex phải được cài và đăng nhập trên **máy chạy daemon**, cùng user chạy bot.
-- Slack app đã bật **Socket Mode**, cấu hình event/quyền nhận tin nhắn và được cài vào workspace. Cần app token và bot token; xem [thiết lập Slack](../../../../public-docs/hub/self-hosting/slack-app.md).
-- Copy [`.env.example`](../../../../.env.example) ở thư mục gốc thành `.env` nếu chưa có (`cp -n .env.example .env`), rồi điền các biến sau. Giữ `.env` hiện có nếu đã cấu hình:
+- Install a CLI version that includes Clisbot onboarding. Codex must be installed and signed in on the **machine running the daemon**, as the same user that runs the bot.
+- A Slack app with **Socket Mode** on, events/permissions set up to receive messages, and installed to the workspace. You need the app token and the bot token; see [Slack setup](../../../../public-docs/hub/self-hosting/slack-app.md).
+- Copy [`.env.example`](../../../../.env.example) at the repository root to `.env` if it does not exist (`cp -n .env.example .env`), then fill in the variables below. Keep an existing `.env` if it is already configured:
 
 ```dotenv
 SLACK_APP_TOKEN='xapp-...'
@@ -19,7 +19,7 @@ OWNER_EMAIL='you@example.com'
 INITIAL_OWNER_PASSWORD='replace-with-a-password-at-least-12-characters'
 ```
 
-CLI không tự nạp `.env`. Nạp file bạn tin cậy vào shell trước khi chạy:
+The CLI does not load `.env` itself. Load a file you trust into the shell before running:
 
 ```bash
 chmod 600 .env
@@ -28,16 +28,16 @@ source .env
 set +a
 ```
 
-**Nếu chạy từ repository:** đứng tại thư mục gốc, build sau khi cập nhật code:
+**If you run from the repository:** stay at the repository root and build after updating the code:
 
 ```bash
 npm run build:server
 npm run build:hub
-npm run build:daemon-web-ui  # nếu cần mở Clisbot app bằng trình duyệt
+npm run build:daemon-web-ui  # if you need to open the Clisbot app in a browser
 clisbot() { ./packages/cli/bin/clisbot "$@"; }
 ```
 
-Hàm `clisbot` dùng bản vừa build, tránh gọi nhầm bản cài global. Giữ terminal này để chạy tiếp. Nếu dùng bản đã đóng gói có đủ tính năng thì không cần tự build. Cài dependencies lần đầu theo [development](../../../development.md).
+The `clisbot` function uses the build you made, so you do not call a global install by mistake. Keep this terminal open for the next steps. A packaged build with all features needs no build step. For first-time dependency install, follow [development](../../../development.md).
 
 ## 2. Onboard
 
@@ -52,32 +52,32 @@ CLISBOT_WEB_UI_ENABLED=true clisbot hub init \
   --owner-password '${INITIAL_OWNER_PASSWORD}'
 ```
 
-Giữ dấu nháy như trên: CLI tự đọc `${ENV_VAR}` cho **token/password**; email dùng `"$OWNER_EMAIL"` để shell đọc biến. Không đăng token hoặc output chứa mã link lên chat công khai.
+Keep the quotes as shown: the CLI reads `${ENV_VAR}` itself for **tokens/passwords**; the email uses `"$OWNER_EMAIL"` so the shell expands it. Do not post tokens or output containing link codes in public chats.
 
-Lệnh khởi động daemon và Hub nếu cần, tạo workspace + template + agent ban đầu, lưu Connection Slack và cấu hình truy cập owner. Không cần export file rồi sửa/deploy.
+The command starts the daemon and Hub if needed, creates the workspace + templates + initial agent, saves the Slack Connection and the owner access configuration. You do not export a file, edit it and deploy it.
 
-## 3. Hoàn tất liên kết owner
+## 3. Finish linking the owner
 
-Nếu output có **ACTION REQUIRED**, dùng tài khoản Slack của bạn gửi riêng lệnh `/link ...` được in ra cho bot. Mã **dùng một lần, hạn 10 phút**; output ghi giờ hết hạn. Sau đó DM bot để gửi yêu cầu; trong channel bot đã tham gia, dùng `@mention`.
+If the output shows **ACTION REQUIRED**, send the printed `/link ...` command to the bot privately from your Slack account. The code is **single-use and valid for 10 minutes**; the output shows the expiry time. Then DM the bot with your requests; in channels the bot has joined, use `@mention`.
 
-Nếu đã biết chắc Slack Member ID của owner, có thể thêm `--owner-identity YOUR_SLACK_MEMBER_ID` lúc init để không cần bước link. Token của bot không chứng minh ai là owner. Identity đã liên kết được giữ lại; người khác không tự có quyền owner.
+If you know the owner's Slack Member ID for sure, add `--owner-identity YOUR_SLACK_MEMBER_ID` at init to skip the link step. The bot token does not prove who the owner is. A linked identity is kept; nobody else gains owner rights on their own.
 
-**READY** nghĩa là owner đã linked và kết nối Slack đã started. Nếu còn `SETUP INCOMPLETE`, làm theo hướng dẫn output; kiểm tra provider nếu bot nhận tin nhưng không thực thi được.
+**READY** means the owner is linked and the Slack connection has started. If you still see `SETUP INCOMPLETE`, follow the output's instructions; check the provider if the bot receives messages but cannot run them.
 
-## Dữ liệu nằm ở đâu?
+## Where is the data?
 
-| Mục                                           | Mặc định                                                    |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| Hub home: dữ liệu và cấu hình của lần cài đặt | `--home` → `CLISBOT_HOME` → `CLISBOT_HOME` → `~/.clisbot`   |
-| Bot personal                                  | `personal-assistant`; workspace `<home>/workspaces/default` |
-| Bot team (`--bot-type team`)                  | `team-assistant`; workspace `<home>/workspaces/team`        |
-| Thư mục khác                                  | Chọn bằng `--workspace /absolute/path`                      |
+| Item                                            | Default                                                     |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| Hub home: data and configuration of the install | `--home` → `CLISBOT_HOME` → `~/.clisbot`                    |
+| Personal bot                                    | `personal-assistant`; workspace `<home>/workspaces/default` |
+| Team bot (`--bot-type team`)                    | `team-assistant`; workspace `<home>/workspaces/team`        |
+| Another folder                                  | Choose with `--workspace /absolute/path`                    |
 
-**Không seed vào thư mục đang đứng (`cwd`) hay thẳng OS `$HOME`.** Project/Workspace ở đây do **daemon** quản lý; Hub không có “Hub Project”. Worktree được seed vào đường dẫn thực tế do daemon trả về. Nhiều bot personal cùng home mặc định dùng chung workspace; chọn `--workspace` riêng nếu cần tách ngữ cảnh.
+**Onboarding does not seed into the current folder (`cwd`) or directly into the OS `$HOME`.** The Project/Workspace here is managed by the **daemon**; the Hub has no "Hub Project". The worktree is seeded at the actual path the daemon returns. Several personal bots in the same default home share one workspace; pick a separate `--workspace` to keep their contexts apart.
 
-Onboarding dùng bộ Markdown từ `clisbot main`: lớp `default`, `customized/default` và biến thể `personal-assistant` hoặc `team-assistant`. Riêng `BOOTSTRAP.md` hướng dẫn agent tự tìm timezone từ ngữ cảnh/công cụ sẵn có, hỏi người dùng xác nhận trước khi lưu; không yêu cầu CLI Clisbot. Workspace mới có `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, `LOOP.md`, `MEMORY.md`, `README.md`, `SOUL.md`, `TOOLS.md`, `USER.md`. Provider Claude có thêm symlink `CLAUDE.md → AGENTS.md`; Gemini có `GEMINI.md → AGENTS.md`. Template hướng dẫn bot xóa `BOOTSTRAP.md` sau lần trò chuyện đầu; chạy lại onboarding không tạo lại file đã xóa này. Mặc định chỉ tạo file thiếu và giữ nguyên file đã có, kể cả template cũ. Muốn thay các file hiện có, dùng `--overwrite-template` để sao lưu trước khi thay. Các cuộc trò chuyện tạo/resume session riêng trong workspace, không dùng chung tất cả vào agent ban đầu.
+Onboarding uses the Markdown set from `clisbot main`: the `default` layer, `customized/default`, and the `personal-assistant` or `team-assistant` variant. `BOOTSTRAP.md` tells the agent to work out the timezone from available context/tools and ask the user to confirm before saving; it does not require the Clisbot CLI. A new workspace has `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, `LOOP.md`, `MEMORY.md`, `README.md`, `SOUL.md`, `TOOLS.md`, `USER.md`. The Claude provider also gets a `CLAUDE.md → AGENTS.md` symlink; Gemini gets `GEMINI.md → AGENTS.md`. The template tells the bot to delete `BOOTSTRAP.md` after the first conversation; running onboarding again does not recreate it. By default onboarding only creates missing files and leaves existing ones untouched, old templates included. To replace existing files, use `--overwrite-template`, which backs them up first. Each conversation creates or resumes its own session in the workspace instead of sharing the initial agent.
 
-## Chạy lại, kiểm tra, dừng
+## Run again, check, stop
 
 ```bash
 clisbot bot start --home "$HOME/.clisbot-dev-01"
@@ -85,21 +85,21 @@ clisbot bot status personal-assistant --home "$HOME/.clisbot-dev-01"
 clisbot bot stop --home "$HOME/.clisbot-dev-01"
 ```
 
-- **Tự lưu**, không cần và không có flag `--persist` trong flow này. Chạy lại không cần token/password; dùng lại bot, workspace và Connection đã lưu. `hub init` cũng resume bot đã lưu.
-- Bỏ `--bot-name` chọn `personal-assistant`; bot team dùng `--bot-type team`, bot đặt tên khác phải truyền đúng `--bot-name`.
-- Bỏ `--owner-email` chỉ được tự chọn khi tổ chức có đúng một owner. Home mới chưa có account: truyền email/password như trên hoặc hoàn tất Account setup tại URL Hub.
-- `bot stop` dừng **Hub và các bot dùng chung Hub home đó**; daemon vẫn chạy, dữ liệu giữ nguyên. Dừng cả daemon bằng `clisbot daemon stop --home "$HOME/.clisbot-dev-01"`.
+- **Saved automatically**; this flow has no `--persist` flag and does not need one. Running again needs no token/password; it reuses the saved bot, workspace and Connection. `hub init` also resumes the saved bot.
+- Omitting `--bot-name` selects `personal-assistant`; a team bot uses `--bot-type team`, and a bot with another name needs the exact `--bot-name`.
+- Omitting `--owner-email` works only when the organization has exactly one owner. A new home with no account: pass email/password as above or finish Account setup at the Hub URL.
+- `bot stop` stops **the Hub and every bot sharing that Hub home**; the daemon keeps running and data is kept. Stop the daemon too with `clisbot daemon stop --home "$HOME/.clisbot-dev-01"`.
 
-## Mở app, cấu hình và biến thể
+## Open the app, configuration and variants
 
-- **URL Hub** trong output dùng cho Account/cấu hình. **URL daemon** phục vụ Clisbot web app khi bật web UI và có web assets. Init không tự dựng dev server Expo hay cấu hình Tailscale/reverse proxy.
-- Đổi cấu hình qua UI/API. Restart không tự ghi đè template hay mật khẩu owner.
-- Telegram: thay hai flag Slack bằng `--telegram-bot-token '${TELEGRAM_BOT_TOKEN}'`; owner identity là Telegram user ID. Nạp biến này vào shell trước.
-- Chỉ cần workspace, chưa dùng chat: `clisbot hub init --home "$HOME/.clisbot-dev-01" --provider codex`; thêm channel sau.
-- Thử lần cài mới: chọn **home khác chưa dùng**, ví dụ `~/.clisbot-dev-02`; không xóa home cũ.
+- The **Hub URL** in the output is for Account setup and configuration. The **daemon URL** serves the Clisbot web app when the web UI is on and web assets exist. Init does not start an Expo dev server or configure Tailscale/a reverse proxy.
+- Change configuration through the UI/API. A restart does not overwrite templates or the owner password.
+- Telegram: replace the two Slack flags with `--telegram-bot-token '${TELEGRAM_BOT_TOKEN}'`; the owner identity is the Telegram user ID. Load this variable into the shell first.
+- Workspace only, no chat yet: `clisbot hub init --home "$HOME/.clisbot-dev-01" --provider codex`; add channels later.
+- To try a fresh install, pick **a different, unused home**, for example `~/.clisbot-dev-02`; do not delete the old home.
 
-## Dùng Hub có sẵn hoặc được mời vào tổ chức
+## Use an existing Hub or join an organization by invitation
 
-Không cần dựng Hub local mới. Trong app vào **Settings → Account**, đăng nhập Hub của tổ chức. Người vận hành làm theo [kết nối Host](../hosts/connect-and-manage.md), cấu hình provider và thêm Project trên Host; [Managed Access](../hosts/managed-access.md) bật sẵn nên quyền theo Hub có hiệu lực ngay khi Host vào Hub.
+You do not need a new local Hub. In the app go to **Settings → Account** and sign in to your organization's Hub. Operators follow [connect a Host](../hosts/connect-and-manage.md), configure providers and add Projects on the Host; [Managed Access](../hosts/managed-access.md) is on by default, so Hub permissions take effect as soon as the Host joins the Hub.
 
-Member nhận lời mời đúng email → **Settings → Hosts** → chọn Host, Project và Workspace được cấp quyền → tạo Agent session. Không thấy tài nguyên: xem [Q&A](../help/faq.md). Mời người và cấp quyền theo [Members và Teams](../access/members-and-teams.md).
+A Member accepts the invitation with the right email → **Settings → Hosts** → picks the granted Host, Project and Workspace → creates an Agent session. If resources are missing, see the [Q&A](../help/faq.md). Invite people and grant access per [Members and Teams](../access/members-and-teams.md).

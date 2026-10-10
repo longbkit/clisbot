@@ -161,7 +161,10 @@ function recordRepeatedTimelineEntries(
   return repeats;
 }
 
-export async function holdDaemonHydration(page: Page): Promise<DaemonHydrationGate> {
+export async function holdDaemonHydration(
+  page: Page,
+  agentId: string,
+): Promise<DaemonHydrationGate> {
   let released = false;
   const delayedForwards: Array<() => void> = [];
 
@@ -169,7 +172,15 @@ export async function holdDaemonHydration(page: Page): Promise<DaemonHydrationGa
     const server = ws.connectToServer();
     ws.onMessage((message) => server.send(message));
     server.onMessage((message) => {
-      if (released) {
+      // A cold workspace needs the Host handshake before it can mount cached content.
+      // Delay authoritative history only; connection and directory setup stay live.
+      const sessionMessage = getSessionMessage(message);
+      const payload = sessionMessage ? getPayload(sessionMessage) : null;
+      if (
+        released ||
+        sessionMessage?.type !== "fetch_agent_timeline_response" ||
+        payload?.agentId !== agentId
+      ) {
         ws.send(message);
         return;
       }

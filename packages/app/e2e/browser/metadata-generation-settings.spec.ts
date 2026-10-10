@@ -41,7 +41,11 @@ test("chooses a metadata model and can return to automatic selection", async ({
   });
 
   await openManualMetadataModelPicker(page);
-  await page.getByText("Mock Load Test", { exact: true }).click();
+  // The home screen's Host readiness card behind Settings also lists provider names.
+  await page
+    .getByTestId("model-provider-mock")
+    .getByText("Mock Load Test", { exact: true })
+    .click();
   await expect(page.getByText("Ten second stream", { exact: true })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("metadata-model-picker.png"),

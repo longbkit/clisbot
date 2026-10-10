@@ -1,166 +1,166 @@
-# Q&A và troubleshooting
+# Q&A and troubleshooting
 
 [User guide](../README.md)
 
-## Lỗi onboarding và khởi động
+## Onboarding and startup errors
 
-Các lệnh dưới đây dùng home ví dụ `~/.clisbot-dev-01`; thay bằng home thật. Chưa setup: đọc [onboarding](../getting-started/onboarding.md).
+The commands below use the example home `~/.clisbot-dev-01`; replace it with your real home. Not set up yet: read [onboarding](../getting-started/onboarding.md).
 
-| Triệu chứng                                             | Kiểm tra / xử lý                                                                                                                                                                                                                                     |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Biến môi trường chưa có, email rỗng                     | Nạp `.env` vào shell trước khi chạy; sửa file không đổi môi trường của Hub đang chạy. Không in token/password để kiểm tra.                                                                                                                           |
-| `Select the existing organization owner...`             | `--owner-email` phải là owner của đúng tổ chức. Chưa có account: hoàn tất Account setup ở URL Hub, hoặc bootstrap email/password trên home mới. Nếu code vừa cập nhật, build và restart đúng Hub trước khi thử lại.                                  |
-| Đã truyền `--owner-password` vẫn conflict               | Flag này không thay owner/mật khẩu cũ. Kiểm tra email, home, Hub đang chạy và bản build; không xóa dữ liệu để tránh lỗi.                                                                                                                             |
-| `Managed access ticket required` / home đang `external` | Đây là home đã bật Managed Access. Dùng app đã đăng nhập Hub và có quyền để kết nối, hoặc đường quản trị socket/pipe local. Owner password không thay vé daemon. Xem [Managed Access](../hosts/managed-access.md); muốn test mới thì chọn home khác. |
-| Port bận / không khởi động được                         | Home mới tự chọn port khác khi port mặc định bận; home đã lưu giữ port cũ. Giải phóng đúng port hoặc chọn port rõ ràng; không dừng nhầm home khác.                                                                                                   |
-| Slack đã kết nối nhưng không trả lời                    | Kiểm tra owner linked, bot đã vào channel, có `@mention`, event/quyền Slack và Codex đã đăng nhập trên máy daemon. Test gửi ra thành công chưa chứng minh chiều nhận vào chạy.                                                                       |
-| Command/flag mới không nhận biết                        | Build lại và dùng `./packages/cli/bin/clisbot` tại repo; kiểm tra có đang gọi nhầm CLI global cũ.                                                                                                                                                    |
+| Symptom                                               | Check / fix                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Environment variable missing, email empty             | Load `.env` into the shell before running; editing the file does not change the environment of a running Hub. Do not print tokens/passwords to check them.                                                                                                                                 |
+| `Select the existing organization owner...`           | `--owner-email` must be the owner of the right organization. No account yet: finish Account setup at the Hub URL, or bootstrap email/password on a new home. If the code was recently updated, build and restart the right Hub before retrying.                                            |
+| Passed `--owner-password` and still get a conflict    | This flag does not replace the existing owner or password. Check the email, home, running Hub and build; do not delete data to get around the error.                                                                                                                                       |
+| `Managed access ticket required` / home is `external` | This home has Managed Access on. Connect from an app that is signed in to the Hub and has access, or use the local socket/pipe admin path. The owner password does not replace a daemon ticket. See [Managed Access](../hosts/managed-access.md); to test from scratch, pick another home. |
+| Port busy / will not start                            | A new home picks another port when the default one is busy; a saved home keeps its old port. Free the right port or set a port explicitly; do not stop another home by mistake.                                                                                                            |
+| Slack connected but no reply                          | Check that the owner is linked, the bot is in the channel, the message has an `@mention`, Slack events/scopes are set, and Codex is signed in on the daemon machine. A successful outbound test does not prove the inbound path works.                                                     |
+| New command/flag not recognized                       | Rebuild and use `./packages/cli/bin/clisbot` from the repo; check you are not calling an old global CLI.                                                                                                                                                                                   |
 
-**Mất/hết hạn mã `/link`:** chạy lại lệnh dưới. Nếu owner chưa linked, Hub cấp mã mới hạn 10 phút và vô hiệu mã cũ; không cần token. Nếu đã linked thì giữ nguyên.
+**Lost or expired `/link` code:** run the command below again. If the owner is not linked yet, the Hub issues a new code valid for 10 minutes and invalidates the old one; no token needed. If the owner is already linked, nothing changes.
 
 ```bash
 clisbot bot start --home "$HOME/.clisbot-dev-01"
 ```
 
-Bot có tên khác cần `--bot-name`; `bot status NAME --home ...` cũng in lệnh lấy mã mới. Mã cũ không thể đọc lại từ file.
+A bot with a different name needs `--bot-name`; `bot status NAME --home ...` also prints the command to get a new code. An old code cannot be read back from a file.
 
-### Hub chạy nhưng không mở được Clisbot web app
+### Hub is running but the Clisbot web app will not open
 
-URL **Hub** và URL **daemon** là hai địa chỉ khác nhau. Dùng địa chỉ thật được in ra, không mặc định mọi home đều dùng port 6868/6868.
+The **Hub** URL and the **daemon** URL are two different addresses. Use the actual address printed; do not assume every home uses port 6868/6868.
 
 ```bash
 clisbot daemon status --home "$HOME/.clisbot-dev-01"
 clisbot daemon restart --home "$HOME/.clisbot-dev-01" --web-ui
 ```
 
-Cần có web assets (`npm run build:daemon-web-ui` nếu chạy source). Mở HTTP origin của daemon sau restart. Biến `CLISBOT_WEB_UI_ENABLED=true` ở lệnh init không thay cấu hình một daemon đã chạy từ trước.
+You need the web assets (`npm run build:daemon-web-ui` if running from source). Open the daemon's HTTP origin after the restart. `CLISBOT_WEB_UI_ENABLED=true` on the init command does not change the config of a daemon that was already running.
 
-Nếu localhost mở được mà URL Tailscale/proxy không mở được, kiểm tra đích proxy. Ví dụ URL `:8444/` trỏ tới Expo `:8081` sẽ lỗi khi dev server đó đã dừng, dù Hub vẫn chạy. Init không tự sửa proxy hay khởi động Expo. Với web UI tích hợp, trỏ tới đúng daemon origin và hỗ trợ WebSocket; giữ đúng cấu hình proxy cho các URL Hub riêng.
+If localhost opens but the Tailscale/proxy URL does not, check the proxy target. For example, a `:8444/` URL that points to Expo `:8081` fails once that dev server stops, even while the Hub is running. Init does not fix the proxy or start Expo. For the built-in web UI, point to the right daemon origin with WebSocket support; keep the proxy config for separate Hub URLs as it is.
 
-Đọc `hub.log` và `daemon.log` trong home; `daemon status` cũng in đường dẫn log. Che secret, mã link và thông tin riêng trước khi gửi log cho hỗ trợ.
+Read `hub.log` and `daemon.log` in the home; `daemon status` also prints the log paths. Mask secrets, link codes and private details before sending logs to support.
 
-### Muốn seed lại template, ghi đè file hiện có
+### Re-seed the template and overwrite existing files
 
 ```bash
 clisbot hub init --home "$HOME/.clisbot-dev-01" --overwrite-template
 ```
 
-Với bot đặt tên riêng, thêm `--bot-name TEN_BOT`. Lệnh sao lưu file cũ vào `<workspace>/.clisbot-template-backup-*` rồi thay các file template, **gồm USER.md, MEMORY.md và BOOTSTRAP.md**; output ghi đường dẫn backup. File ngoài template và symlink được giữ nguyên. Khôi phục phần nội dung cần giữ từ backup trước khi chat tiếp. Flag chỉ áp dụng lần chạy này; lần sau lại giữ nguyên file.
+For a custom-named bot, add `--bot-name BOT_NAME`. The command backs up old files to `<workspace>/.clisbot-template-backup-*` and then replaces the template files, **including USER.md, MEMORY.md and BOOTSTRAP.md**; the output shows the backup path. Files outside the template and symlinks are left alone. Restore any content you need from the backup before you keep chatting. The flag applies to this run only; later runs keep files as they are.
 
-### Quên mật khẩu hoặc muốn đổi mật khẩu
+### Forgot or want to change your password
 
-Làm theo [Mật khẩu và recovery](../account/password-and-recovery.md). Chạy init lại không reset mật khẩu; dừng Hub không xóa account, dữ liệu hay Managed Access.
+Follow [Password and recovery](../account/password-and-recovery.md). Running init again does not reset the password; stopping the Hub does not delete accounts, data or Managed Access.
 
-## Đăng nhập Hub xong sao chưa thấy Host?
+## Signed in to the Hub, why is there no Host?
 
-Login chưa chắc đã enroll daemon. Chạy `clisbot hub status` trên đúng máy; nếu chưa kết nối, chạy `clisbot hub connect`. Trong app kiểm tra đúng Hub/tổ chức rồi **Refresh Hosts**. Member cần grant Connect; trạng thái offline còn cần kiểm tra daemon và đường mạng.
+Signing in does not enroll the daemon. Run `clisbot hub status` on the right machine; if it is not connected, run `clisbot hub connect`. In the app, check you are on the right Hub/organization, then **Refresh Hosts**. A Member needs a Connect grant; an offline status also means checking the daemon and the network path.
 
-## Enroll rồi có cần cấu hình provider nữa không?
+## After enrolling, do I still need to configure providers?
 
-Có. Credential Hub xác thực với Hub, không đăng nhập Claude/Codex hay provider khác thay bạn. Kiểm tra provider và thông tin đăng nhập trên chính máy daemon; sau đó chọn cấu hình Agent hợp lệ trong Project Access.
+Yes. The Hub credential authenticates you to the Hub; it does not sign in to Claude, Codex or any other provider for you. Check the provider and its sign-in on the daemon machine itself, then pick a valid Agent configuration in Project Access.
 
-## Bật external có cần restart không?
+## Does turning on external need a restart?
 
-Không, đổi mode áp dụng ngay. App phải kết nối lại để lấy vé Hub. Chỉ cần restart để nạp bản daemon mới khi vừa cập nhật phần mềm.
+No, a mode change applies immediately. The app must reconnect to get a Hub ticket. You only restart to load a new daemon build after a software update.
 
-## Sau khi bật external, app cũ hoặc pairing link không vào được?
+## After turning on external, an old app or pairing link cannot get in?
 
-App đó có thể không hỗ trợ vé Hub hoặc người đăng nhập thiếu Connect. Dùng app hỗ trợ Managed Access, đăng nhập đúng tổ chức, kiểm tra grant và kết nối lại. LAN/Tailscale/SSH tunnel không bỏ qua yêu cầu vé. Nếu mất đường quản trị, người vận hành dùng socket/pipe local để kiểm tra cấu hình.
+That app may not support Hub tickets, or the signed-in user lacks Connect. Use an app that supports Managed Access, sign in to the right organization, check the grant and reconnect. LAN/Tailscale/SSH tunnels do not bypass the ticket requirement. If you lose the admin path, the operator uses the local socket/pipe to check the config.
 
-## Off có phải mọi upstream Clisbot app đều vào được?
+## With off, can every upstream Clisbot app get in?
 
-App tương thích có thể dùng đường ghép nối tin cậy nếu có đủ thông tin kết nối và đáp ứng điều kiện endpoint. Không phải cứ biết địa chỉ là được vào. Nhưng Hub Project Access không giới hạn session tin cậy đó; dùng `external` khi cần phân quyền người dùng.
+A compatible app can use the trusted pairing path if it has the full connection details and meets the endpoint requirements. Knowing the address is not enough. Hub Project Access does not limit that trusted session, though; use `external` when you need per-user access.
 
-## Chỉ có Connect thì được làm gì?
+## What can I do with Connect only?
 
-Với `external`, Connect cho phép kết nối daemon; muốn làm việc cần thêm Project Access. Với `off`, kết nối tin cậy mang quyền owner của daemon, nên không có giới hạn Project như người quản trị Hub có thể kỳ vọng.
+With `external`, Connect lets you connect to the daemon; to do any work you also need Project Access. With `off`, a trusted connection carries the daemon owner's access, so there are none of the Project limits a Hub admin might expect.
 
-## Thấy Host nhưng không thấy Project?
+## I see the Host but not the Project?
 
-Kiểm tra grant Project thuộc đúng Host, Member đã vào Team và app đã nhận quyền mới. Connect không tự cấp tất cả Project. Dùng tài khoản Member để thử, vì Owner luôn có quyền rộng hơn.
+Check that the Project grant belongs to the right Host, the Member has joined the Team, and the app has received the new access. Connect does not grant every Project. Test with a Member account, because the Owner always has wider access.
 
-## Muốn cấp mọi Project trên Host nhưng chỉ cho dùng một số model?
+## Grant every Project on a Host but only some models?
 
-Chọn chính Host làm tài nguyên, mức **Developer** hoặc **Office worker**, rồi chọn cấu hình Agent. Không dùng Administrator: Administrator bỏ qua giới hạn provider/model. Xem [cấp cho mọi Project trên một Host](../access/members-and-teams.md#cấp-cho-mọi-project-trên-một-host).
+Pick the Host itself as the resource, the **Developer** or **Office worker** level, then pick the Agent configuration. Do not use Administrator: Administrator ignores provider/model limits. See [grant every Project on a Host](../access/members-and-teams.md#grant-every-project-on-a-host).
 
-## Cấp Project chỉ dùng Claude, sao người đó vẫn dùng được Codex?
+## The Project grant allows only Claude, why can the person still use Codex?
 
-Grant cộng dồn. Nếu Host đã cấp Codex, grant Project chỉ thêm Claude chứ không bỏ Codex. Muốn giới hạn thì giảm lựa chọn trên Host.
+Grants add up. If the Host already grants Codex, the Project grant only adds Claude; it does not remove Codex. To restrict, narrow the choices on the Host.
 
-## Agent chờ phê duyệt một tool (WebFetch, MCP…) mãi không ai duyệt được?
+## An Agent waits forever for a tool approval (WebFetch, MCP…) that nobody can approve?
 
-Bản cũ không có quyền nào duyệt được tool ngoài nhóm file/config/lệnh. Cập nhật và restart Hub cùng **mọi daemon** trước, rồi Edit assignment, chọn lại Developer hoặc Full access để nhận quyền `approval.other`. Làm ngược thứ tự thì daemon cũ từ chối vé và người đó không vào được.
+Older builds had no permission that could approve tools outside the file/config/command groups. Update and restart the Hub and **every daemon** first, then Edit assignment and pick Developer or Full access again to get the `approval.other` permission. In the reverse order, old daemons reject the ticket and the person cannot get in.
 
-## Sau khi cập nhật, Agent không còn chạy chế độ unattended?
+## After updating, the Agent no longer runs unattended?
 
-Grant lưu trước bản cập nhật thiếu `approval.other`, mà chạy không hỏi phê duyệt cần đủ mọi quyền phê duyệt. Cập nhật mọi daemon trước, rồi Edit assignment, chọn lại mức quyền và lưu. Xem [sau khi cập nhật phiên bản](../access/permissions.md#6-sau-khi-cập-nhật-phiên-bản).
+Grants saved before the update lack `approval.other`, and running without approval prompts needs every approval permission. Update every daemon first, then Edit assignment, pick the access level again and save. See [after a version update](../access/permissions.md#6-after-upgrading).
 
-## Developer có tạo Project mới được không?
+## Can Developer create a new Project?
 
-Không. Cấp **Full access** thay vì Developer: trên Host thì tạo được Project ở bất kỳ thư mục nào, trên một Project thì chỉ tạo được bên trong Project đó, và Project con cần được cấp quyền riêng mới dùng được. Muốn tự tạo rồi dùng ngay, cấp Full access trên Host. Không cần Administrator, và giới hạn provider/model vẫn giữ. Full access cũng quản lý được Project và workspace của người khác, nên xem [hệ quả khi cấp](../access/permissions.md#4-hệ-quả-cần-biết-trước-khi-cấp).
+No. Grant **Full access** instead of Developer: on a Host it can create Projects in any folder; on a Project it can only create inside that Project, and a child Project needs its own grant before anyone can use it. To create and use a Project right away, grant Full access on the Host. Administrator is not needed, and provider/model limits still apply. Full access can also manage other people's Projects and workspaces, so read [what granting it implies](../access/permissions.md#4-consequences-to-know-before-granting).
 
-## Developer vẫn không tạo được Workspace/worktree?
+## Developer still cannot create a Workspace/worktree?
 
-Grant cũ có thể chưa chứa `workspace.create`. Cập nhật và restart daemon trước, rồi Edit assignment, chọn lại Developer/Full access và lưu. Kiểm tra đúng Project, quyền Connect và cấu hình Agent. Nếu daemon báo quyền không nhận biết, phiên bản daemon chưa hỗ trợ vé mới.
+An old grant may not include `workspace.create`. Update and restart the daemon first, then Edit assignment, pick Developer/Full access again and save. Check the Project, the Connect permission and the Agent configuration. If the daemon reports an unrecognized permission, that daemon version does not support the new ticket yet.
 
-## Local Workspace và worktree có quyền khác nhau không?
+## Do a local Workspace and a worktree need different permissions?
 
-Hiện cùng dùng Project privilege `workspace.create`. Nó chỉ cho tạo trong Project đã được cấp, không cho thêm Project khác hoặc tự có quyền archive/xóa Workspace.
+Both use the Project privilege `workspace.create` today. It allows creating inside a granted Project only; it does not allow adding other Projects or archiving/deleting Workspaces.
 
-## Có quyền tạo worktree nhưng Git vẫn báo lỗi?
+## I can create worktrees but Git still errors?
 
-Nếu lỗi là repository/branch/path/lock thì kiểm tra repo thực sự là Git, branch không bị dùng bởi worktree khác, đường dẫn đích hợp lệ và tài khoản chạy daemon có quyền ghi. Phân quyền Access thành công không đảm bảo thao tác Git sẽ thành công.
+If the error is about the repository, branch, path or lock, check that the repo is really a Git repo, the branch is not in use by another worktree, the target path is valid, and the account running the daemon can write there. A successful Access grant does not guarantee the Git operation succeeds.
 
-## Office worker có chat session mới và sửa file được không?
+## Can an Office worker start a new chat session and edit files?
 
-Có, trong Workspace có sẵn, nếu có `agent.create` và cấu hình Agent được cấp. Có thể tương tác Agent và phê duyệt thao tác file. Không có terminal hay quyền tạo Workspace mặc định. Nhờ Owner/Administrator chuẩn bị Workspace hoặc cấp Developer nếu công việc cần.
+Yes, in an existing Workspace, with `agent.create` and a granted Agent configuration. They can interact with the Agent and approve file operations. They get no terminal and no Workspace creation by default. Ask an Owner/Administrator to prepare the Workspace, or grant Developer if the work needs it.
 
-## Vì sao không thấy model hoặc không tạo được session?
+## Why is a model missing, or why can't I create a session?
 
-Kiểm tra provider trên daemon đang hoạt động và assignment có cấu hình Agent đầy đủ: provider/model/thinking được phép. Quyền Project riêng không tự mở mọi model. Fast mode cũng phải được cấp riêng.
+Check that the provider is working on the daemon and that the assignment has a complete Agent configuration: allowed provider/model/thinking. A Project grant alone does not open every model. Fast mode also needs its own grant.
 
-## Resource not found có chắc là thiếu quyền?
+## Does Resource not found always mean missing access?
 
-Không. Tài nguyên có thể đã bị xóa, ID cũ hoặc thuộc phạm vi không được tiết lộ. Khi xác định được tài nguyên người dùng đã được phép biết nhưng thao tác thiếu quyền, code hiện trả **Access denied**. Tài nguyên ngoài phạm vi vẫn có thể trả **Resource not found**.
+No. The resource may have been deleted, the ID may be stale, or it may sit in a scope you are not allowed to see. When the code can tell the resource is one the user is allowed to know about but the action lacks permission, it returns **Access denied**. A resource outside that scope can still return **Resource not found**.
 
-Nếu terminal báo lỗi, kiểm tra Workspace còn tồn tại, Project grant và `terminal.use`; Office worker không có quyền terminal. Nếu đang dùng bản cũ, cập nhật app/daemon rồi kết nối lại để nhận thông báo quyền mới.
+If the terminal shows an error, check that the Workspace still exists, the Project grant and `terminal.use`; Office worker has no terminal access. On an older build, update the app/daemon and reconnect to get the new permission messages.
 
-## Vì sao Add Project báo không có quyền ngay?
+## Why does Add Project report no access right away?
 
-Đây là kiểm tra trước khi mở luồng tạo Project. Office worker và Developer không có quyền này; cần Full access hoặc Administrator. Nếu có Full access **trên một Project** thì nút vẫn hiện, nhưng tạo Project ngoài thư mục của Project đó sẽ bị từ chối. Nếu vừa được cấp quyền, kết nối lại để cập nhật thông tin session.
+This check runs before the Project creation flow opens. Office worker and Developer lack this permission; you need Full access or Administrator. With Full access **on a Project**, the button still shows, but creating a Project outside that Project's folder is refused. If you were granted access recently, reconnect to refresh the session details.
 
-## Cấp nhiều Project cùng lúc làm mất cấu hình cũ?
+## Does granting several Projects at once wipe the old config?
 
-Có thể. Nếu người đó đã có grant trên một Project được chọn, grant cũ bị thay, kể cả cấu hình Agent. Hộp xác nhận liệt kê các Project bị thay — kiểm tra trước khi đồng ý.
+It can. If the person already has a grant on a selected Project, the old grant is replaced, Agent configuration included. The confirmation dialog lists the Projects being replaced; check it before you agree.
 
-## Xóa một assignment rồi sao người đó vẫn vào được?
+## I removed an assignment, why can the person still get in?
 
-Kiểm tra grant trực tiếp, tất cả Team và vai trò Owner; quyền cộng dồn. Grant trên **Host** cũng mở mọi Project của Host đó: xem theo **Resource · Who has access** trên Project để thấy cả những dòng này. Kiểm tra daemon có đang `off` hoặc người đó còn đường ghép nối tin cậy khác không. Thu hồi đủ nguồn quyền và kiểm tra lại kết nối; đăng xuất một app không phải thu hồi toàn bộ quyền.
+Check direct grants, every Team and the Owner role; access adds up. A grant on the **Host** also opens every Project on that Host: use **Resource · Who has access** on the Project to see those rows too. Check whether the daemon is `off` or the person still has another trusted pairing path. Revoke every source of access and check the connection again; signing out of one app does not revoke all access.
 
-## Daemon Administrator có phải Hub Admin không?
+## Is a Daemon Administrator a Hub Admin?
 
-Không. Administrator quản trị toàn bộ một daemon: cấu hình, Project, Agent, terminal, file/Git, truy cập và tự động hóa local. Hub Admin quản lý tổ chức. Xem [toàn bộ phạm vi](../access/daemon-administrator.md); đặc biệt Administrator có thể chạy mã theo quyền OS của daemon và thay đổi cấu hình bảo mật.
+No. Administrator manages an entire daemon: config, Projects, Agents, terminals, files/Git, access and local automation. Hub Admin manages the organization. See [the full scope](../access/daemon-administrator.md); note that an Administrator can run code with the daemon's OS permissions and change security config.
 
-## Vì sao Administrator không thấy công tắc Managed Access hoặc Rename Host?
+## Why doesn't the Administrator see the Managed Access switch or Rename Host?
 
-Công tắc Managed Access trong app chỉ mở cho Organization Owner, dù quyền cấu hình backend của Daemon Administrator vẫn rộng. Rename tên dùng chung cần quyền quản lý tài nguyên Hub (Owner/Admin). Kiểm tra vai trò tổ chức; nếu chỉ cần nhãn riêng, dùng **Appearance → Name**.
+The Managed Access switch in the app is open to the Organization Owner only, even though a Daemon Administrator's backend config permission is broad. Renaming the shared name needs Hub resource management (Owner/Admin). Check your organization role; if you only need a private label, use **Appearance → Name**.
 
-## Đổi tên Host nhưng chỗ khác vẫn hiện tên cũ?
+## Renamed the Host but other places still show the old name?
 
-Kiểm tra bạn đổi tên dùng chung trên **Settings → Hosts** hay nhãn local trong **Appearance**. Nhãn local tùy chỉnh được giữ nguyên. Refresh danh sách và rà cấu hình tham chiếu slug cũ; daemon ID và hostname hệ điều hành không đổi theo thao tác Rename.
+Check whether you changed the shared name in **Settings → Hosts** or the local label in **Appearance**. A custom local label is kept. Refresh the list and review config that references the old slug; the daemon ID and the OS hostname do not change with Rename.
 
-## Logout có ngắt daemon khỏi Hub không?
+## Does logging out disconnect the daemon from the Hub?
 
-Không tự động. Login CLI và enrollment tách nhau. Dùng `clisbot hub disconnect` để unenroll; `--force` khi Hub không truy cập được chỉ bảo đảm dọn phía local, cần kiểm tra thu hồi phía Hub sau đó.
+Not automatically. CLI login and enrollment are separate. Use `clisbot hub disconnect` to unenroll; `--force` when the Hub is unreachable only guarantees the local cleanup, so check revocation on the Hub side afterwards.
 
-## Được Channel access sao vẫn không gọi được Agent?
+## I have Channel access, why can't I call the Agent?
 
-Kiểm tra đúng Connection/conversation, danh tính Channel đã liên kết đúng Member, Team membership và audience của route. Sau đó kiểm tra route đang bật, Host online và cấu hình thực thi đã lưu. Channel access không tự cho quyền mở Project trong app.
+Check the Connection/conversation, that the Channel identity is linked to the right Member, Team membership and the route's audience. Then check that the route is on, the Host is online and the execution config is saved. Channel access does not grant opening the Project in the app.
 
-## Automation không chạy dù có Run?
+## Automation does not run even with Run?
 
-Run chỉ cho phép yêu cầu chạy. Kiểm tra Workflow đã lưu, Host online/enrolled, Project/provider hợp lệ và quyền thực thi dịch vụ Hub (`hub.execute`) nếu luồng cần. Đọc lỗi của run để phân biệt từ chối quyền với lỗi provider hay từng bước.
+Run only allows requesting a run. Check that the Workflow is saved, the Host is online/enrolled, the Project/provider is valid, and the Hub service execution permission (`hub.execute`) is present if the flow needs it. Read the run's error to tell a permission refusal from a provider or step failure.
 
-## Test message thành công nhưng tin nhắn thật không có phản hồi?
+## Test message succeeds but real messages get no reply?
 
-Test message chỉ kiểm tra chiều gửi ra. Kiểm tra event/mention đầu vào, route khớp conversation, danh tính/audience và có run được tạo không. Nếu run chạy xong mà không trả lời, kiểm tra cả delivery của route và cấu hình **Result** của bước trả lời.
+A test message checks the outbound path only. Check the inbound event/mention, that the route matches the conversation, identity/audience, and whether a run was created. If the run finished without replying, also check the route's delivery and the **Result** config of the reply step.

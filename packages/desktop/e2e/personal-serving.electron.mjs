@@ -170,13 +170,30 @@ try {
   );
   completed = true;
 } finally {
-  await desktop?.close();
+  // The Hub and daemon outlive the fixture app; stop them before closing it.
   for (const args of [
     ["hub", "stop", "--web"],
     ["hub", "stop"],
     ["daemon", "stop"],
   ])
     await cli(args).catch((error) => console.error(error.message));
+  await closeDesktop(desktop);
   if (completed) await rm(root, { recursive: true, force: true });
   else console.error(`Isolated fixture retained: ${root}`);
+}
+
+// The fixture app is not the product quit path, so a stuck close must not hang CI
+// until the job timeout. Report it and kill the fixture instead.
+async function closeDesktop(app) {
+  if (!app) return;
+  let timer;
+  const closed = await Promise.race([
+    app.close().then(() => true),
+    new Promise((resolve) => {
+      timer = setTimeout(resolve, 20_000, false);
+    }),
+  ]).finally(() => clearTimeout(timer));
+  if (closed) return;
+  console.error("Electron fixture did not exit within 20s of close(); killing it.");
+  app.process().kill("SIGKILL");
 }
