@@ -41,6 +41,9 @@ await writeFile(
   main,
   `
 const { app, protocol, BrowserWindow, safeStorage } = require('electron');
+// Playwright's preload forces password-store=basic, overriding launch arguments.
+// The owned Secret Service fixture must select its real keyring before app ready.
+if (process.env.CLISBOT_E2E_SECRET_SERVICE === '1') app.commandLine.appendSwitch('password-store', 'gnome-libsecret');
 app.setPath('userData', ${JSON.stringify(userData)});
 protocol.registerSchemesAsPrivileged([{ scheme:'clisbot', privileges:{ standard:true, secure:true } }]);
 app.whenReady().then(async () => {

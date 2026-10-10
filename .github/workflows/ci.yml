@@ -426,7 +426,7 @@ jobs:
         run: node scripts/npm-retry.mjs install -g @anthropic-ai/claude-code @openai/codex@0.105.0 opencode-ai
 
       - name: Run Playwright E2E tests
-        run: npm run test:e2e --workspace=@clisbot/app -- --shard=${{ env.PLAYWRIGHT_SHARD }}
+        run: npm run test:e2e --workspace=@clisbot/app -- --shard=${{ env.PLAYWRIGHT_SHARD }} --reporter=list,github
         env:
           # Weight file groups by observed duration; raw test counts overload
           # early agent/Changes specs. Required check names remain unchanged.
