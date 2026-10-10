@@ -23,10 +23,18 @@ describe("Home startup policy", () => {
       });
     },
   );
-  it("allows an offline or empty registry to show Home's recovery UI", () => {
-    expect(resolveStartupRoute({ ...input, hosts: [], anyOnlineHostServerId: null })).toEqual({
+  it("shows Home's recovery UI when the saved Hosts are offline", () => {
+    expect(resolveStartupRoute({ ...input, anyOnlineHostServerId: null })).toEqual({
       kind: "redirect",
       href: "/open-project",
+    });
+  });
+  it("sends a first run with no Host to Welcome, as before Home V2", () => {
+    const empty = { ...input, hosts: [], anyOnlineHostServerId: null, workspaceSelection: null };
+    expect(resolveStartupRoute(empty)).toEqual({ kind: "splash" });
+    expect(resolveStartupRoute({ ...empty, hasGivenUpWaitingForHost: true })).toEqual({
+      kind: "redirect",
+      href: "/welcome",
     });
   });
 });

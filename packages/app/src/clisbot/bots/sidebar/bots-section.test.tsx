@@ -67,6 +67,7 @@ vi.mock("@/components/ui/tooltip", () => ({
 }));
 vi.mock("lucide-react-native", () => ({
   ChevronDown: () => <i />,
+  MessageCircle: () => <i />,
   ChevronRight: () => <i />,
   Bot: () => <i />,
   Folder: () => <i />,

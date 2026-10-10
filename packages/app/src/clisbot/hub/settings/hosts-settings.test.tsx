@@ -363,7 +363,8 @@ it("hides the previous account's Host immediately while a new Member's access lo
   adapters.role = "member";
   adapters.canManageResources = false;
   view.rerender(<InventoryViews />);
-  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("loading");
+  // A pending Hub never blocks a usable Host, so the chooser stays ready with the saved Host.
+  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("ready");
   expect(screen.queryByText("Hub Host")).toBeNull();
   expect(screen.getAllByText("Personal Host")).toHaveLength(2);
   await act(async () => finish(emptyHosts));
@@ -379,7 +380,7 @@ it("keeps direct Hosts usable when the Hub inventory request fails", async () =>
   adapters.get.mockRejectedValue(new Error("offline"));
   render(<InventoryViews />);
   await screen.findByText("Hosts unavailable");
-  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("error");
+  expect(screen.getByLabelText("Host choices").getAttribute("data-status")).toBe("ready");
   expect(screen.queryByText("Hub Host")).toBeNull();
   expect(screen.getAllByText("Personal Host")).toHaveLength(2);
 });

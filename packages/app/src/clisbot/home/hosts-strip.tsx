@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
+import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import { useRouter } from "expo-router";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -179,36 +181,58 @@ function ConnectMenu() {
     [router],
   );
   const troubleshoot = useCallback(() => useAppDiagnosticStore.getState().open(), []);
+  // The previous Home's "Pair device": a phone or browser joins the daemon on this computer.
+  const localServerId = useLocalDaemonServerId();
+  const [pairOpen, setPairOpen] = useState(false);
+  const openPair = useCallback(() => setPairOpen(true), []);
+  const closePair = useCallback(() => setPairOpen(false), []);
   return (
-    <DropdownMenu compactMode="sheet">
-      <DropdownMenuTrigger
-        style={toolbarLabelTriggerStyle}
-        accessibilityRole="button"
-        accessibilityLabel="Connect"
-        testID="home-connect"
-      >
-        {(state) => (
-          <>
-            <ToolbarLabelTriggerIcon>{plusGlyph}</ToolbarLabelTriggerIcon>
-            <Text style={toolbarLabelTriggerTextStyle(isToolbarLabelTriggerHighlighted(state))}>
-              Connect
-            </Text>
-          </>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sheetTitle="Connect">
-        <DropdownMenuItem
-          onSelect={connectComputer}
-          description="Pairing link, QR code, address or SSH"
+    <>
+      <DropdownMenu compactMode="sheet">
+        <DropdownMenuTrigger
+          style={toolbarLabelTriggerStyle}
+          accessibilityRole="button"
+          accessibilityLabel="Connect"
+          testID="home-connect"
         >
-          Connect a computer
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={addHub} description="Your own Hub or your company's">
-          Add a Hub
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={troubleshoot}>Troubleshoot a connection</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {(state) => (
+            <>
+              <ToolbarLabelTriggerIcon>{plusGlyph}</ToolbarLabelTriggerIcon>
+              <Text style={toolbarLabelTriggerTextStyle(isToolbarLabelTriggerHighlighted(state))}>
+                Connect
+              </Text>
+            </>
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sheetTitle="Connect">
+          <DropdownMenuItem
+            onSelect={connectComputer}
+            description="Pairing link, QR code, address or SSH"
+          >
+            Connect a computer
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={addHub} description="Your own Hub or your company's">
+            Add a Hub
+          </DropdownMenuItem>
+          {localServerId ? (
+            <DropdownMenuItem
+              onSelect={openPair}
+              description="Use this computer from your phone or a browser"
+              testID="open-project-pair-device"
+            >
+              Pair a phone or browser
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onSelect={troubleshoot}>Troubleshoot a connection</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <PairDeviceModal
+        serverId={localServerId ?? ""}
+        visible={pairOpen}
+        onClose={closePair}
+        testID="open-project-pair-device-modal"
+      />
+    </>
   );
 }
 

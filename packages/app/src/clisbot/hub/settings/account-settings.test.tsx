@@ -69,7 +69,10 @@ vi.mock("react-native-unistyles", () => ({
   withUnistyles: (component: unknown) => component,
 }));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
-vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
+vi.mock("@/constants/layout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/layout")>()),
+  useIsCompactFormFactor: () => false,
+}));
 vi.mock("./channel-settings", () => ({ ChannelSettings: () => null }));
 vi.mock("./automation-settings", () => ({ AutomationSettings: () => null }));
 vi.mock("./access-settings", () => ({ AccessSettings: () => null }));

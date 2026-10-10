@@ -78,6 +78,8 @@ const sessionMock = vi.hoisted(() => {
     wantsSourceEvent = (source: object) => !this.delivery.isModern(source);
     getSessionId = vi.fn(() => "mock-session-id");
     getPermissions = vi.fn(() => this.args.permissions as string[]);
+    canUseQuickChat = vi.fn(() => true);
+    canStartLocalHub = vi.fn(() => false);
     allowsInbound = vi.fn(() => true);
     allowsPermission = vi.fn(() => true);
     extendManagedLease = vi.fn(() => true);
