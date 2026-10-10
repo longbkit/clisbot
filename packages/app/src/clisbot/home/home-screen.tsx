@@ -1,7 +1,7 @@
 import { HOME_V2_ENABLED } from "./feature";
 import { NewWorkspaceScreen } from "@/screens/new-workspace-screen";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
@@ -9,13 +9,12 @@ import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { Button } from "@/components/ui/button";
-import { useIsCompactFormFactor } from "@/constants/layout";
-import { usePanelStore } from "@/stores/panel-store";
 import { buildWelcomeRoute } from "@/utils/host-routes";
 import { homeCopy } from "./copy";
 import { HostReadinessCard } from "./host-readiness";
 import { HomeActions } from "./home-actions";
 import { MoreActions } from "./more-actions";
+import { useOpenSidebarOnHome } from "./open-sidebar-on-home";
 
 /**
  * The home screen (`/open-project`): which Hosts are connected and which providers are ready on
@@ -23,11 +22,7 @@ import { MoreActions } from "./more-actions";
  */
 export function ClisbotHomeScreen() {
   const hosts = useAvailableHosts();
-  const isCompact = useIsCompactFormFactor();
-  const openDesktopAgentList = usePanelStore((s) => s.openDesktopAgentList);
-  useEffect(() => {
-    if (!isCompact) openDesktopAgentList();
-  }, [isCompact, openDesktopAgentList]);
+  useOpenSidebarOnHome(hosts);
   if (HOME_V2_ENABLED && hosts.length) return <NewWorkspaceScreen serverId="" home />;
   return (
     <View style={styles.container}>
