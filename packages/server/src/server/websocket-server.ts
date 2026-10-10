@@ -97,7 +97,10 @@ import {
   type DaemonAuthConfig,
 } from "./auth.js";
 import { resolveSessionAdmission } from "./session-admission-auth.js";
-import { buildDeviceAccessServerFeatures } from "./device-access/server-features.js";
+import {
+  buildDeviceAccessServerFeatures,
+  getHubLocalStartStatus,
+} from "./device-access/server-features.js";
 import { attachEncryptedSocket } from "./relay-transport.js";
 import {
   WebSocketRuntimeMetricsWindow,
@@ -1194,6 +1197,7 @@ export class VoiceAssistantWebSocketServer {
         connection.session.setPermissions(permissions);
       }
     }
+    this.broadcastCapabilitiesUpdate();
   }
 
   public prepareForShutdown(): void {
@@ -2283,7 +2287,17 @@ export class VoiceAssistantWebSocketServer {
     );
   }
 
+  private getLocalHubStartStatus(session: Session) {
+    return getHubLocalStartStatus({
+      hasDeviceAuthority: Boolean(this.credentialSource?.deviceAuthority),
+      hasLocalHubLauncher: Boolean(this.daemonRuntimeConfig?.startLocalHub),
+      managedAccessMode: this.managedAccess.mode,
+      canStartLocalHub: session.canStartLocalHub(),
+    });
+  }
+
   private buildServerInfoStatusPayload(session: Session): ServerInfoStatusPayload {
+    const localHubStartStatus = this.getLocalHubStartStatus(session);
     return {
       status: "server_info",
       protocolVersion: WS_PROTOCOL_VERSION,
@@ -2291,15 +2305,16 @@ export class VoiceAssistantWebSocketServer {
       hostname: getHostName(),
       version: this.daemonVersion,
       permissions: session.getPermissions(),
+      localHubStartStatus,
       ...(this.botService ? { botCreationAllowed: session.canCreateBot() } : {}),
       // COMPAT(desktopManaged): added in v0.1.X, remove optional parsing after 2027-01-16.
       desktopManaged: this.daemonRuntimeConfig?.desktopManaged === true,
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
       features: {
         ...buildDeviceAccessServerFeatures({
+          localHubStartStatus,
           hasDeviceAuthority: Boolean(this.credentialSource?.deviceAuthority),
           hasHubRelationships: Boolean(this.hubRelationships),
-          hasLocalHubLauncher: Boolean(this.daemonRuntimeConfig?.startLocalHub),
           hasHostTailscale: Boolean(this.daemonRuntimeConfig?.hostTailscale),
           canStartLocalHub: () => session.canStartLocalHub(),
         }),

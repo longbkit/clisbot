@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveAgentForm,
+  resolveFormStateFromProviderModels,
   resolveFormState,
   resolveEffectiveModel,
   resolveThinkingOptionId,
@@ -1250,7 +1251,7 @@ it("owns input readiness, reopening and user edits in the reducer", () => {
     initialValues: undefined,
     preferences: { provider: "codex", providerPreferences: { codex: { model: "astra" } } },
     allowedProviderMap: new Map(),
-    providerModelsByProvider: new Map(),
+    providerModelsByProvider: new Map([["codex", null]]),
   };
   let state = resolveAgentForm(makeState(), inputs);
   expect(state.resolution.status).toBe("pending");
@@ -1268,4 +1269,49 @@ it("owns input readiness, reopening and user edits in the reducer", () => {
   expect(state.resolution.status).toBe("pending");
   state = resolveAgentForm(state, { ...inputs, isPreferencesLoading: false, hasSnapshot: true });
   expect(state.form).toMatchObject({ provider: "codex", model: "astra" });
+});
+
+it("clears a provider remembered from another Host without selecting a different one silently", () => {
+  const resolved = resolveFormStateFromProviderModels(
+    undefined,
+    { provider: "codex-oauth-1", providerPreferences: { "codex-oauth-1": { model: "old-model" } } },
+    new Map([["codex-official-1", null]]),
+    INITIAL_USER_MODIFIED,
+    makeState({ provider: "codex-oauth-1", model: "old-model" }).form,
+    new Map(),
+  );
+  expect(resolved).toEqual({ provider: null, model: "", modeId: "", thinkingOptionId: "" });
+});
+
+it("keeps configured providers while discovery is pending or unavailable", () => {
+  const resolved = resolveFormStateFromProviderModels(
+    undefined,
+    { provider: "codex-oauth-1" },
+    new Map([["codex-oauth-1", null]]),
+    INITIAL_USER_MODIFIED,
+    makeState().form,
+    new Map(),
+  );
+  expect(resolved.provider).toBe("codex-oauth-1");
+});
+
+it("clears the previous Host's selection while the next Host loads", () => {
+  const state = {
+    ...makeState({ provider: "codex", model: "astra" }),
+    inputs: { serverId: "saas", initialValues: undefined, active: true },
+  };
+  const next = resolveAgentForm(state, {
+    type: "INPUTS_CHANGED",
+    serverId: "product",
+    isVisible: true,
+    isCreateFlow: true,
+    isPreferencesLoading: true,
+    hasSnapshot: false,
+    initialValues: undefined,
+    preferences: null,
+    providerModelsByProvider: new Map(),
+    allowedProviderMap: new Map(),
+  });
+  expect(next.form.provider).toBeNull();
+  expect(next.resolution.status).toBe("pending");
 });

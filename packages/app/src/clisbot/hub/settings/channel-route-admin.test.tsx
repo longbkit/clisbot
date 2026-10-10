@@ -17,8 +17,8 @@ const adapters = vi.hoisted(() => ({
   confirm: vi.fn(),
   push: vi.fn(),
 }));
-vi.mock("../account-provider", () => ({
-  useHubAccount: () => ({
+vi.mock("../account-provider", () => {
+  const account = () => ({
     enabled: true,
     origin: "https://hub.example.test",
     loading: false,
@@ -47,8 +47,9 @@ vi.mock("../account-provider", () => ({
       },
     },
     api: () => ({ get: adapters.get, post: adapters.post, put: adapters.put }),
-  }),
-}));
+  });
+  return { useHubAccount: account, useHubAccounts: () => [account()] };
+});
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: adapters.push }) }));
 vi.mock("@/components/confirmation-provider", () => ({
   ConfirmationProvider: ({ children }: { children: React.ReactNode }) => children,

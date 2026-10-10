@@ -41,8 +41,8 @@ const adapters = vi.hoisted(() => ({
 vi.mock("@/contexts/toast-api-context", () => ({
   useToast: () => ({ show: vi.fn(), error: vi.fn() }),
 }));
-vi.mock("../account-provider", () => ({
-  useHubAccount: () => ({
+vi.mock("../account-provider", () => {
+  const account = () => ({
     enabled: adapters.hubEnabled,
     origin: "https://hub.example.test",
     connectionOrigin: adapters.connectionOrigin,
@@ -58,8 +58,13 @@ vi.mock("../account-provider", () => ({
         }
       : null,
     api: () => ({ get: adapters.get, put: adapters.put, delete: adapters.delete }),
-  }),
-}));
+  });
+  return {
+    useHubAccount: account,
+    useHubAccounts: () => (adapters.hubEnabled ? [account()] : []),
+    HubAccountScope: ({ children }: { children: unknown }) => children,
+  };
+});
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => adapters.hosts,
   useHostMutations: () => ({ removeHost: adapters.remove }),

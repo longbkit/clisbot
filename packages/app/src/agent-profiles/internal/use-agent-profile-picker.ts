@@ -72,7 +72,7 @@ export function useAgentProfilePicker(
   // rather than a workspace's. That is also the key the settings section uses,
   // so every composer on a host shares one query instead of adding its own.
   const { entries } = useProvidersSnapshot(serverId, { cwd: null });
-  const { updatePreferences } = useFormPreferences();
+  const { updatePreferences } = useFormPreferences(serverId);
   const client = useSessionStore((state) => state.sessions[serverId ?? ""]?.client ?? null);
   const toast = useToast();
 

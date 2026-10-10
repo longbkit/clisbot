@@ -951,7 +951,7 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
     throw new Error(input.labels.composerStateRequired);
   }
   const provider = composerState.selectedProvider;
-  if (!provider) {
+  if (!provider || !composerState.providerDefinitionMap.has(provider)) {
     throw new Error(input.labels.selectModel);
   }
   const attachmentSubmitFormat = resolveComposerAttachmentSubmitFormat({

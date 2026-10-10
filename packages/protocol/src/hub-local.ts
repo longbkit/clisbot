@@ -29,3 +29,18 @@ export type HubLocalStartResult = Omit<
   z.infer<typeof HubLocalStartResponseSchema>["payload"],
   "requestId"
 >;
+
+/** Eligibility for this connection, not a guarantee that process startup will succeed. */
+export const HubLocalStartStatusSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("ready") }),
+  z.object({
+    status: z.literal("blocked"),
+    reason: z.enum([
+      "managed_access",
+      "device_pairing_required",
+      "owner_required",
+      "launcher_unavailable",
+    ]),
+  }),
+]);
+export type HubLocalStartStatus = z.infer<typeof HubLocalStartStatusSchema>;

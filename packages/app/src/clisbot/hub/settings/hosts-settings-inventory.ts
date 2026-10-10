@@ -1,14 +1,24 @@
 import { useMemo } from "react";
 import { useHostRuntimeConnectionStatuses } from "@/runtime/host-runtime";
 import { useHubAccount } from "../account-provider";
-import { useHostInventory } from "../host-inventory";
+import { useHostInventory, useHubDaemonsQuery } from "../host-inventory";
 import { projectHubHostOnboarding } from "../host-onboarding";
 
-/** One projection for the Hosts page and its live navigation count. */
+/**
+ * One projection for the Hosts page and its live navigation count. The page belongs to the
+ * selected Hub, so it leaves out Hosts another saved Hub manages.
+ */
 export function useHostsSettingsInventory() {
   const hub = useHubAccount();
   const inventory = useHostInventory();
-  const { hosts, daemons } = inventory;
+  const daemons = useHubDaemonsQuery();
+  const hosts = useMemo(
+    () =>
+      inventory.hosts.filter(
+        (host) => host.management === undefined || host.management.hubOrigin === hub.origin,
+      ),
+    [hub.origin, inventory.hosts],
+  );
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const connectionStatuses = useHostRuntimeConnectionStatuses(serverIds);
   const items = useMemo(
@@ -29,6 +39,8 @@ export function useHostsSettingsInventory() {
     savedHosts.filter((host) => connectionStatuses.get(host.serverId) === "online").length;
   return {
     ...inventory,
+    hosts,
+    daemons,
     items,
     savedHosts,
     connectionStatuses,

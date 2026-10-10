@@ -430,8 +430,9 @@ Hosts` (a Hub). Both groups stay on screen in every state, ✕ closes Welcome to
   - One account can hold managed Hosts and its own Hosts at the same time, so
     hiding either group after sign-in states something untrue.
   - Option 1 loops: Account's back returns to Welcome, which sends you to Account.
-  - A disabled `+ Add another Hub` row holds the place for several Hubs; one Hub
-    origin per app today (`packages/app/src/clisbot/hub/config.ts`).
+  - `+ Add another Hub` opens the existing **Hubs** add flow, with choices to start
+    a Hub or connect an existing one. Saved Hubs keep their own accounts and Hosts
+    ([Hub profiles](../access/device-pairing.md)).
 - **Consequence:** the card carries copy for every account status and Host state.
   `resolveHubWelcomeCard` in `packages/app/src/clisbot/hub/welcome-status.ts` owns
   that mapping so the component stays a renderer and the copy stays tested.

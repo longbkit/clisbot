@@ -286,6 +286,7 @@ export interface AgentFileExplorerState {
 
 export interface DaemonServerInfo {
   botCreationAllowed?: boolean;
+  localHubStartStatus?: ServerInfoStatusPayload["localHubStartStatus"];
   permissions?: ServerInfoStatusPayload["permissions"];
   serverId: string;
   hostname: string | null;
@@ -298,6 +299,9 @@ export interface DaemonServerInfo {
 export function toDaemonServerInfo(serverInfo: ServerInfoStatusPayload): DaemonServerInfo {
   return {
     serverId: serverInfo.serverId,
+    ...(serverInfo.localHubStartStatus
+      ? { localHubStartStatus: serverInfo.localHubStartStatus }
+      : {}),
     // Clisbot: Bots and managed access read these from the same handshake.
     ...(serverInfo.botCreationAllowed === undefined
       ? {}
@@ -705,6 +709,21 @@ function areServerInfoFeaturesEqual(
   return JSON.stringify(current ?? null) === JSON.stringify(next ?? null);
 }
 
+function isServerInfoAuthorityUnchanged(
+  current: DaemonServerInfo | null | undefined,
+  next: {
+    nextPermissions: DaemonServerInfo["permissions"];
+    nextBotCreationAllowed: DaemonServerInfo["botCreationAllowed"];
+    nextLocalHubStartStatus: DaemonServerInfo["localHubStartStatus"];
+  },
+): boolean {
+  return (
+    JSON.stringify(current?.localHubStartStatus) === JSON.stringify(next.nextLocalHubStartStatus) &&
+    current?.botCreationAllowed === next.nextBotCreationAllowed &&
+    JSON.stringify(current?.permissions) === JSON.stringify(next.nextPermissions)
+  );
+}
+
 function isSessionServerInfoUnchanged(input: {
   currentServerInfo: SessionState["serverInfo"] | undefined;
   nextHostname: string | null;
@@ -715,6 +734,7 @@ function isSessionServerInfoUnchanged(input: {
   nextServerId: string;
   nextPermissions: ServerInfoStatusPayload["permissions"];
   nextBotCreationAllowed: boolean | undefined;
+  nextLocalHubStartStatus: ServerInfoStatusPayload["localHubStartStatus"];
 }): boolean {
   const {
     currentServerInfo,
@@ -727,8 +747,7 @@ function isSessionServerInfoUnchanged(input: {
   const prevHostname = currentServerInfo?.hostname?.trim() || null;
   const prevVersion = currentServerInfo?.version?.trim() || null;
   return (
-    currentServerInfo?.botCreationAllowed === input.nextBotCreationAllowed &&
-    JSON.stringify(currentServerInfo?.permissions) === JSON.stringify(input.nextPermissions) &&
+    isServerInfoAuthorityUnchanged(currentServerInfo, input) &&
     currentServerInfo?.serverId === input.nextServerId &&
     prevHostname === nextHostname &&
     prevVersion === nextVersion &&
@@ -884,6 +903,7 @@ export const useSessionStore = create<SessionStore>()(
               nextServerId: info.serverId,
               nextPermissions: info.permissions,
               nextBotCreationAllowed: info.botCreationAllowed,
+              nextLocalHubStartStatus: info.localHubStartStatus,
             })
           ) {
             return prev;
@@ -897,6 +917,9 @@ export const useSessionStore = create<SessionStore>()(
                 ...session,
                 serverInfo: {
                   serverId: info.serverId,
+                  ...(info.localHubStartStatus
+                    ? { localHubStartStatus: info.localHubStartStatus }
+                    : {}),
                   ...(info.permissions === undefined ? {} : { permissions: info.permissions }),
                   ...(info.botCreationAllowed === undefined
                     ? {}

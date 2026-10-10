@@ -1,3 +1,4 @@
+import { useHubStartStatus } from "./hub-start-status";
 import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import { useHostRuntimeConnectedServerIds, useHosts } from "@/runtime/host-runti
 import { settingsStyles } from "@/styles/settings";
 import { tailscaleRowModel, useHostTailscale, type TailscaleRowModel } from "./host-tailscale";
 import type { HubProfile } from "./hub-profiles";
-import { canStartHubOnHost, findHubHost, isTailscaleOrigin, setUpHubTailscale } from "./hub-routes";
+import { findHubHost, isTailscaleOrigin, setUpHubTailscale } from "./hub-routes";
 import { TailscaleRouteRow } from "./tailscale-route-row";
 
 /** "Ways to connect" for a Hub. Tailscale shows only when this device can set it up through
@@ -50,7 +51,8 @@ function useHubTailscale(profile: HubProfile, onUpdated?: () => void) {
   const localServerId = useLocalDaemonServerId();
   const hostTailscale = useHostTailscale(host.serverId);
   const mapped = isTailscaleOrigin(profile.origin);
-  const canStart = host.serverId ? canStartHubOnHost(host.serverId, localServerId) : false;
+  const availability = useHubStartStatus(host.serverId ?? "", localServerId);
+  const canStart = Boolean(host.serverId) && availability.status === "ready";
   const setUp = useMutation({
     mutationFn: () => {
       if (!host.serverId) throw new Error(t("hub.connection.errors.connectHubHost"));

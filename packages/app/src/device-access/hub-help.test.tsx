@@ -17,14 +17,19 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 afterEach(cleanup);
-test("Hub help defaults expanded, shares collapse across screens and remembers remount", async () => {
+test("Hub help defaults collapsed, shares collapse across screens and remembers remount", async () => {
   const first = render(
     <>
       <WhatIsHub />
       <WhatIsHub />
     </>,
   );
-  await waitFor(() => expect(screen.getAllByText(/A Hub manages channels/)).toHaveLength(2));
+  await waitFor(() => expect(screen.queryByText(/A Hub manages channels/)).toBeNull());
+  expect(
+    screen.getAllByRole("button", { name: "What is a Hub?" })[0].getAttribute("aria-expanded"),
+  ).toBe("false");
+  fireEvent.click(screen.getAllByRole("button", { name: "What is a Hub?" })[0]);
+  expect(screen.getAllByText(/A Hub manages channels/)).toHaveLength(2);
   expect(
     screen.getAllByRole("button", { name: "What is a Hub?" })[0].getAttribute("aria-expanded"),
   ).toBe("true");

@@ -5,6 +5,7 @@ import type { WorkspaceDescriptorPayload } from "@clisbot/protocol/messages";
 
 import {
   normalizeWorkspaceDescriptor,
+  toDaemonServerInfo,
   selectAgentTurnPresentation,
   selectAgentTimelineState,
   useSessionStore,
@@ -833,5 +834,33 @@ it("updates and clears Bot creation authority independently of feature support",
     expect(useSessionStore.getState().sessions["test-server"]?.serverInfo?.botCreationAllowed).toBe(
       botCreationAllowed,
     );
+  }
+});
+
+it("retains, updates and clears startup reasons even when feature flags do not change", () => {
+  initializeTestSession();
+  const store = useSessionStore.getState();
+  const info = {
+    status: "server_info" as const,
+    serverId: "test-server",
+    hostname: null,
+    version: null,
+    features: { localHubStartStatus: true },
+  };
+  const updates = [
+    { status: "ready" as const },
+    { status: "blocked" as const, reason: "owner_required" as const },
+    { status: "blocked" as const, reason: "managed_access" as const },
+    undefined,
+  ];
+  for (const localHubStartStatus of updates) {
+    const previous = useSessionStore.getState().sessions["test-server"]?.serverInfo;
+    store.updateSessionServerInfo(
+      "test-server",
+      toDaemonServerInfo({ ...info, localHubStartStatus }),
+    );
+    const current = useSessionStore.getState().sessions["test-server"]?.serverInfo;
+    expect(current).not.toBe(previous);
+    expect(current?.localHubStartStatus).toEqual(localHubStartStatus);
   }
 });

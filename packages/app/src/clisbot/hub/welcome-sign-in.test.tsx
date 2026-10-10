@@ -185,14 +185,19 @@ describe("Hub sign-in on Welcome", () => {
     expect(retry).toHaveBeenCalled();
   });
 
-  it("holds a place for a second Hub once signed in, and never before", () => {
+  it("opens the add-Hub flow once signed in, and never before", () => {
     render(<HubWelcomeSignIn />);
     expect(screen.queryByText("+ Add another Hub")).toBeNull();
     cleanup();
     env.hub = signedInHub();
     env.daemons = { daemons: [daemon()] };
     render(<HubWelcomeSignIn />);
-    expect(screen.getByText("+ Add another Hub").hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "+ Add another Hub" }));
+    expect(env.push).toHaveBeenCalledWith({
+      pathname: "/settings/hub/[hubSection]",
+      params: { hubSection: "hubs", hubIntent: "add" },
+    });
+    expect(screen.queryByText("One Hub per app for now.")).toBeNull();
   });
 
   it("opens the app once the organization's Host is saved", () => {

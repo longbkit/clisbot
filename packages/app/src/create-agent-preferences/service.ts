@@ -61,3 +61,19 @@ export class CreateAgentPreferencesService {
 export const createAgentPreferencesService = new CreateAgentPreferencesService(
   new AsyncStorageCreateAgentPreferenceStorage(),
 );
+
+const hostServices = new Map<string, CreateAgentPreferencesService>();
+
+export function getCreateAgentPreferencesService(
+  serverId?: string | null,
+): CreateAgentPreferencesService {
+  if (!serverId) return createAgentPreferencesService;
+  let service = hostServices.get(serverId);
+  if (!service) {
+    service = new CreateAgentPreferencesService(
+      new AsyncStorageCreateAgentPreferenceStorage(serverId),
+    );
+    hostServices.set(serverId, service);
+  }
+  return service;
+}

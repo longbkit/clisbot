@@ -11,7 +11,11 @@ import { SessionOperationIdentitySchema } from "./session-operation.js";
 import { DeviceProofSchema, DeviceCredentialSchema } from "./device-access.js";
 import { DevicePairingOfferSchema } from "./device-pairing-offer.js";
 import { DaemonDevicesRequestSchema, DaemonDevicesResponseSchema } from "./daemon-devices.js";
-import { HubLocalStartRequestSchema, HubLocalStartResponseSchema } from "./hub-local.js";
+import {
+  HubLocalStartRequestSchema,
+  HubLocalStartResponseSchema,
+  HubLocalStartStatusSchema,
+} from "./hub-local.js";
 import {
   DaemonTailscaleSetupRequestSchema,
   DaemonTailscaleSetupResponseSchema,
@@ -3674,6 +3678,8 @@ export const ServerInfoStatusPayloadSchema = z
     version: ServerInfoVersionSchema.optional(),
     // COMPAT(sessionPermissions): optional while clients support older daemons.
     permissions: z.array(DaemonPermissionSchema).optional(),
+    // COMPAT(localHubStartStatus): added in v0.11.1; review after 2027-04-10.
+    localHubStartStatus: HubLocalStartStatusSchema.optional(),
     // COMPAT(devicePairing): added 2026-10-03; review after 2027-04-03.
     deviceCredential: DeviceCredentialSchema.optional(),
     // COMPAT(botCreationAllowed): older hosts omit authority; clients fail closed.
@@ -3687,6 +3693,8 @@ export const ServerInfoStatusPayloadSchema = z
         devicePairing: z.boolean().optional(),
         // COMPAT(localHubStart): absent on upstream/legacy or unauthorized sessions.
         localHubStart: z.boolean().optional(),
+        // COMPAT(localHubStartStatus): older Hosts cannot explain startup eligibility; review 2027-04-10.
+        localHubStartStatus: z.boolean().optional(),
         // COMPAT(hostTailscale): added in v0.10.3, remove after 2027-04-06. Absent on
         // upstream/legacy or unauthorized sessions.
         hostTailscale: z.boolean().optional(),

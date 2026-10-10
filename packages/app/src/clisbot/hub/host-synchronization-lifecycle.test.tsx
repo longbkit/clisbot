@@ -41,13 +41,18 @@ vi.mock("@/data/query", () => ({
     },
   }),
 }));
-vi.mock("./account-provider", () => ({
-  useHubAccount: () => ({
+vi.mock("./account-provider", () => {
+  const account = {
     enabled: true,
     origin: "https://hub.example.test",
     signedIn: { account: { id: "owner" }, organization: { id: "org" } },
-  }),
-}));
+  };
+  return {
+    useHubAccount: () => account,
+    useHubAccounts: () => [account],
+    HubAccountScope: ({ children }: { children: unknown }) => children,
+  };
+});
 vi.mock("@/runtime/host-session-access", () => ({
   registerHostAccessTicketResolver: adapters.register,
 }));

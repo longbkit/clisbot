@@ -57,11 +57,27 @@ Managed Access. Separate device trust, account authentication, authority and net
   turned on ([decision 2026-10-08](#decision-2026-10-08-the-web-ui-stays-opt-in)).
 - Hubs explains the service before offering setup: Hosts run agents; a Hub provides channels,
   automations and shared administration. Direct personal Host use does not require a Hub.
-  Prefer saved/detected Hubs; do not infer setup intent from opening this page. With no Hub,
-  offer starting one on a connected Host, connecting an existing personal/team Hub or returning
-  to Hosts. Open setup forms only after that choice; account policy remains independent.
+  Show saved/detected Hubs in compact rows with each Hub's own access state and one next action.
+  Selected context is separate from connection status. Put connection editing and removing a
+  saved Hub in its row menu; removal forgets the Hub on this device, including access to Hosts
+  available only through it, and does not stop backend services.
+  Keep “Run a Hub on your Hosts” visible even when every local Hub is already listed above;
+  name the Hosts that already have a Hub and offer connecting another Host as a compact
+  section action. Keep general Hub explanations in the “What is a Hub?” disclosure. Show other paired Hosts
+  with Start Hub only when their current connection can launch it. Otherwise offer “How to
+  start”, naming the Host, the known blocker, and concrete operator steps. The optional
+  `server_info.localHubStartStatus` diagnostic (gated by the matching feature) distinguishes
+  Managed access, protected device pairing not enabled, independent owner access missing, and
+  an unavailable local CLI launcher. Hub administration alone does not grant local startup.
+  Permission changes broadcast fresh capabilities; opening help or copying instructions never
+  starts a service, changes access policy, or sends an access request. Owner pairing routes
+  through the existing Add Host flow. Hosts without diagnostics stay explicitly unknown;
+  an absent capability is not proof of denied permission. Offline, unsupported and failed checks
+  stay explicit; they are never evidence that a Host has no Hub. Connecting an existing Hub remains
+  directly available. With no Hosts, offer connecting a Host before starting a Hub. Open setup
+  forms only after that choice; account policy remains independent.
   The shared “What is a Hub?” disclosure appears consistently across Hubs list, discovery,
-  setup, connection and authentication/recovery screens. It defaults to expanded and remembers
+  setup, connection and authentication/recovery screens. It defaults to collapsed and remembers
   the user's explicit expand/collapse choice on that app installation, independent of selected
   Hub or account. In listings, distinguish selected context from effective access; a reachable
   Hub requiring sign-in is not presented as an authenticated “Connected” Hub.
@@ -497,6 +513,17 @@ sending proof. The compatibility `origin` field is a stable cache/relationship s
 for paired profiles); `connectionOrigin` is the actual HTTP route used in enrollment commands.
 A relay-only Hub does not invent a CLI HTTP URL. Daemon→Hub enrollment still needs a reachable
 HTTP/WS control-plane origin; app→Hub relay is a separate supported path.
+
+Every saved Hub profile keeps its own account running, so a personal Hub's Hosts and a company
+Hub's Hosts are listed together and each Hub keeps issuing access tickets for its own Hosts.
+Selecting a Hub only chooses which account the Hub screens show (Overview, Channels, People &
+access, Automations, Hub settings → Hosts); it never signs out or reloads the others. A Host
+is judged by the Hub named in its `management.hubOrigin`, never by the selected Hub. Each Hub
+has exactly one account controller: refresh tokens rotate and the paired-device cookie jar is
+per Hub, so a second controller for the same Hub would sign the first one out. A web page's
+own same-origin Hub (browser cookie session) is used only while no Hub profile is saved,
+because its cookie cannot be sent to another origin; on the web, add more Hubs by pairing.
+Decision: [2026-10-10 Hosts from every saved Hub](../../audits/2026-10-10-hosts-from-every-saved-hub.md).
 
 Secrets stay out of ordinary profiles. Native uses SecureStore, web uses a nonextractable AES
 key in IndexedDB with serialized Web Locks updates, Electron uses OS safeStorage and trusted

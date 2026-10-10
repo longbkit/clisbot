@@ -112,5 +112,13 @@ test("a late owner response from the previous Hub cannot appear under the newly 
   expect(
     state.trace.filter((value) => value.origin === "hub://work").every((value) => !value.manage),
   ).toBe(true);
-  expect(state.close).toHaveBeenCalledWith("home");
+  // Home is still saved, so its account keeps running for the Hosts it manages.
+  expect(state.close).not.toHaveBeenCalled();
+  state.registry = {
+    profiles: state.registry.profiles.filter((profile) => profile.hubId !== "home"),
+    activeId: "work",
+  };
+  view.rerender(tree());
+  await waitFor(() => expect(state.close).toHaveBeenCalledWith("home"));
+  expect(view.getByTestId("scope").textContent).toContain("work-account");
 });

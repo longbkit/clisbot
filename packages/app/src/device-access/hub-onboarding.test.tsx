@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useCallback, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { i18n } from "@/i18n/i18next";
+import type { HubLocalStartStatus } from "@clisbot/protocol/hub-local";
 import type { HubProfile } from "./hub-profiles";
 import { HubConnectionSettings, HubOverviewSettings, HubLoginPolicySettings } from "./hub-settings";
 import { HubPicker } from "./hub-picker";
@@ -22,11 +23,20 @@ const state = vi.hoisted(() => ({
   connected: [] as string[],
   getHubStatus: vi.fn(),
   startLocalHub: vi.fn(),
-  features: { hubDiscovery: true, localHubStart: false },
+  features: { hubDiscovery: true, localHubStart: false } as {
+    hubDiscovery: boolean;
+    localHubStart: boolean;
+    localHubStartStatus?: boolean;
+  },
+  startStatus: undefined as HubLocalStartStatus | undefined,
+  copy: vi.fn(async (_text: string) => {}),
   request: vi.fn(),
   close: vi.fn(),
   select: vi.fn(),
   pair: vi.fn(),
+  remove: vi.fn(async () => {}),
+  confirm: vi.fn(async () => true),
+  otherAccounts: [] as Record<string, unknown>[],
   saveDiscovered: vi.fn(),
   account: {
     signedIn: null as Record<string, unknown> | null,
@@ -50,19 +60,44 @@ vi.mock("./hub-profiles", () => ({
   }),
   selectHubProfile: state.select,
   saveDiscoveredHub: state.saveDiscovered,
-  removeHubProfile: vi.fn(),
+  removeHubProfile: state.remove,
 }));
 vi.mock("@/clisbot/hub/account-provider", () => ({
   useHubAccount: () => state.account,
+  useHubAccounts: () => [
+    { ...state.account, origin: `hub://${state.activeId}` },
+    ...state.otherAccounts,
+  ],
 }));
+vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: state.confirm }));
 vi.mock("@/desktop/host", () => ({ getDesktopHost: () => null }));
+vi.mock("@/stores/session-store", () => ({
+  useSessionStore: (selector: (value: unknown) => unknown) =>
+    selector({
+      sessions: Object.fromEntries(
+        state.hosts.map((host) => [
+          host.serverId,
+          {
+            serverInfo: {
+              features: state.features,
+              localHubStartStatus: state.startStatus,
+            },
+          },
+        ]),
+      ),
+    }),
+}));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => state.hosts,
+  useHostRuntimeIsConnected: (id: string) => state.connected.includes(id),
   useHostRuntimeConnectedServerIds: () => state.connected,
   useHostRuntimeClient: () => null,
   useHostRuntimeSnapshot: () => ({
     client: {
-      getLastServerInfoMessage: () => ({ features: state.features }),
+      getLastServerInfoMessage: () => ({
+        features: state.features,
+        localHubStartStatus: state.startStatus,
+      }),
       startLocalHub: state.startLocalHub,
     },
   }),
@@ -70,7 +105,10 @@ vi.mock("@/runtime/host-runtime", () => ({
     getSnapshot: () => ({
       client: {
         getHubStatus: state.getHubStatus,
-        getLastServerInfoMessage: () => ({ features: state.features }),
+        getLastServerInfoMessage: () => ({
+          features: state.features,
+          localHubStartStatus: state.startStatus,
+        }),
         startLocalHub: state.startLocalHub,
       },
     }),
@@ -78,6 +116,25 @@ vi.mock("@/runtime/host-runtime", () => ({
 }));
 vi.mock("@/hooks/use-is-local-daemon", () => ({
   useLocalDaemonServerId: () => null,
+}));
+vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: state.copy }));
+vi.mock("@/components/adaptive-modal-sheet", () => ({
+  AdaptiveModalSheet: ({
+    children,
+    header,
+    visible,
+  }: {
+    children: ReactNode;
+    header: { title: string; subtitle: string };
+    visible: boolean;
+  }) =>
+    visible ? (
+      <div role="dialog" aria-label={header.title}>
+        <h2>{header.title}</h2>
+        <span>{header.subtitle}</span>
+        {children}
+      </div>
+    ) : null,
 }));
 vi.mock("./credentials", () => ({ readDeviceCredential: async () => null }));
 vi.mock("./hub-transport", () => ({
@@ -181,6 +238,8 @@ vi.mock("@/components/ui/form-field", () => ({
 }));
 beforeEach(() => {
   state.params = {};
+  state.otherAccounts = [];
+  state.startStatus = undefined;
   state.account.signedIn = null;
   state.profiles = [];
   state.activeId = null;
@@ -189,6 +248,8 @@ beforeEach(() => {
   state.account.connection = null;
   state.features = { hubDiscovery: true, localHubStart: false };
   vi.resetAllMocks();
+  state.confirm.mockResolvedValue(true);
+  state.remove.mockResolvedValue(undefined);
   state.getHubStatus.mockResolvedValue({ status: { hubOrigin: null } });
 });
 afterEach(() => {
@@ -196,14 +257,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("a checked empty Hub list offers the two v11 choices without requiring account login", async () => {
+test("an empty Hub list offers a Host connection or an existing Hub without a dead start form", async () => {
   render(<HubConnectionSettings />);
   await waitFor(() =>
     expect(
-      screen.getByText("No Hubs are connected. Add one when you need these features."),
+      screen.getByText("No saved Hubs. Start one on a Host below, or connect an existing Hub."),
     ).toBeTruthy(),
   );
-  expect(screen.getByRole("button", { name: "Start a Hub" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Connect a Host" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Connect existing Hub" })).toBeTruthy();
   expect(screen.queryByRole("textbox")).toBeNull();
 });
@@ -225,11 +286,11 @@ test("failed Host discovery preserves saved Hubs and does not promote the empty 
   await waitFor(() => expect(screen.getByText("Some Hosts could not be checked")).toBeTruthy());
   expect(screen.getByText("Personal Hub")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Retry discovery" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Start a Hub" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Start Hub" })).toBeNull();
   expect(screen.queryByText("private connection trace")).toBeNull();
 });
 
-test("an unreachable selected Hub says where it ran and offers a new Hub instead of Open Hub", async () => {
+test("an unreachable Hub offers retry without guessing that its Host has stopped", async () => {
   state.profiles = [
     { hubId: "old", publicKey: "key", label: "Personal Hub", origin: "http://127.0.0.1:6880" },
   ];
@@ -239,14 +300,11 @@ test("an unreachable selected Hub says where it ran and offers a new Hub instead
   Object.assign(state.account, { state: null, error: "Hub is not connected" });
   try {
     render(<HubConnectionSettings />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Start a new Hub on My computer" })).toBeTruthy(),
-    );
-    expect(
-      screen.getByText("A new Hub starts empty; channels from this one are not moved."),
-    ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Open Hub" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Remove from this device" })).toBeTruthy();
+    const row = within(screen.getByTestId("saved-hub-old"));
+    fireEvent.click(row.getByRole("button", { name: "Retry" }));
+    expect(state.account.refresh).toHaveBeenCalledOnce();
+    expect(row.queryByRole("button", { name: "Open Hub" })).toBeNull();
+    expect(row.getByRole("button", { name: "Remove from this device" })).toBeTruthy();
   } finally {
     Object.assign(state.account, { state: undefined, error: null });
   }
@@ -254,6 +312,7 @@ test("an unreachable selected Hub says where it ran and offers a new Hub instead
 
 test("a reachable selected Hub keeps the saved-Hub row", async () => {
   selectPersonalHub();
+  state.account.signedIn = {};
   state.hosts = [{ serverId: "host", label: "My computer" }];
   state.connected = ["host"];
   render(<HubConnectionSettings />);
@@ -261,8 +320,9 @@ test("a reachable selected Hub keeps the saved-Hub row", async () => {
   expect(screen.queryByTestId("unavailable-hub-card")).toBeNull();
 });
 
-test("a saved Hub names the Host it runs on with that Host's ID", async () => {
+test("a remote Hub names its address rather than claiming to run on an enrolled Host", async () => {
   selectPersonalHub();
+  state.account.signedIn = {};
   state.hosts = [{ serverId: "srv_host", label: "My computer" }];
   state.connected = ["srv_host"];
   state.getHubStatus.mockResolvedValue({
@@ -272,10 +332,11 @@ test("a saved Hub names the Host it runs on with that Host's ID", async () => {
     },
   });
   render(<HubConnectionSettings />);
-  await waitFor(() => expect(screen.getByText("My computer · srv_host")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("Connected · home.example.test")).toBeTruthy());
 });
 
 test("a stopped Hub on a connected Host is started again, not joined", async () => {
+  state.features.localHubStart = true;
   state.hosts = [{ serverId: "srv_host", label: "My computer" }];
   state.connected = ["srv_host"];
   // After the Hub stops, its Host still names its loopback address but is not connected.
@@ -538,24 +599,24 @@ test("account capability refresh keeps the same policy transport alive until its
   expect(state.close).toHaveBeenCalledOnce();
 });
 
-test("unsupported Host owner operations are explained before starting and do not send a request", async () => {
+test("unsupported Host owner operations are explained on the Host row without a start request", async () => {
   state.hosts = [{ serverId: "host", label: "My Host" }];
   state.connected = ["host"];
   const view = render(<HubConnectionSettings />);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Start a Hub" })).toBeTruthy());
-  fireEvent.click(screen.getByRole("button", { name: "Start a Hub" }));
-  const start = screen.getByRole("button", {
-    name: "Start Hub and connect this device",
-  }) as HTMLButtonElement;
-  expect(start.disabled).toBe(true);
-  expect(screen.getByText("This connection cannot start a Hub")).toBeTruthy();
-  expect(screen.getByText(/Hub account access alone does not allow/)).toBeTruthy();
-  fireEvent.click(start);
+  await waitFor(() =>
+    expect(
+      screen.getByText("This Host does not report why Hub startup is unavailable."),
+    ).toBeTruthy(),
+  );
+  expect(screen.queryByRole("button", { name: "Start Hub" })).toBeNull();
   expect(state.startLocalHub).not.toHaveBeenCalled();
   state.features = { hubDiscovery: true, localHubStart: true };
   view.rerender(<HubConnectionSettings />);
-  expect(start.disabled).toBe(false);
-  expect(screen.queryByText("This connection cannot start a Hub")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Start Hub" }));
+  expect(
+    (screen.getByRole("button", { name: "Start Hub and connect this device" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(false);
 });
 
 function selectPersonalHub() {
@@ -633,8 +694,8 @@ test("a Hub start that cannot pair shows the error and never navigates to a succ
   prepareHubStart();
   state.pair.mockRejectedValue(new Error("Pairing failed"));
   render(<HubConnectionSettings />);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Start a Hub" })).toBeTruthy());
-  fireEvent.click(screen.getByRole("button", { name: "Start a Hub" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start Hub" })).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: "Start Hub" }));
   fireEvent.click(screen.getByRole("button", { name: "Start Hub and connect this device" }));
   await waitFor(() => expect(screen.getByText("Pairing failed")).toBeTruthy());
   expect(state.push).not.toHaveBeenCalled();
@@ -645,8 +706,8 @@ test("successful Hub start carries the paired Hub identity to its ready screen",
   prepareHubStart();
   state.pair.mockResolvedValue(undefined);
   render(<HubConnectionSettings />);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Start a Hub" })).toBeTruthy());
-  fireEvent.click(screen.getByRole("button", { name: "Start a Hub" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start Hub" })).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: "Start Hub" }));
   fireEvent.click(screen.getByRole("button", { name: "Start Hub and connect this device" }));
   await waitFor(() =>
     expect(state.push).toHaveBeenCalledWith({
@@ -874,4 +935,239 @@ test("a started account Hub still directs the device to sign in before configuri
   expect(screen.getByText("Not signed in")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Sign in to this Hub" }));
   expect(state.push).toHaveBeenCalledWith("/settings/hub/account");
+});
+
+test("all saved Hubs show their own live status, including the unselected Hub", async () => {
+  selectPersonalHub();
+  state.account.signedIn = {};
+  state.profiles.push({
+    hubId: "company",
+    publicKey: "other",
+    label: "Company Hub",
+    origin: "https://company.test",
+  });
+  state.otherAccounts = [{ origin: "hub://company", signedIn: {}, loading: false, error: null }];
+  const view = render(<HubConnectionSettings />);
+  expect(
+    within(screen.getByTestId("saved-hub-company")).getByText("Connected · company.test"),
+  ).toBeTruthy();
+  state.otherAccounts = [
+    {
+      origin: "hub://company",
+      signedIn: null,
+      loading: false,
+      error: null,
+      state: { status: "signedOut" },
+    },
+  ];
+  view.rerender(<HubConnectionSettings />);
+  fireEvent.click(
+    within(screen.getByTestId("saved-hub-company")).getByRole("button", {
+      name: "Sign in to this Hub",
+    }),
+  );
+  await waitFor(() => expect(state.select).toHaveBeenCalledWith("company"));
+  expect(state.push).toHaveBeenCalledWith("/settings/hub/account");
+});
+
+test("removing an unselected Hub targets that Hub and requires confirmation", async () => {
+  selectPersonalHub();
+  state.profiles.push({ hubId: "company", publicKey: "other", label: "Company Hub" });
+  render(<HubConnectionSettings />);
+  const remove = within(screen.getByTestId("saved-hub-company")).getByRole("button", {
+    name: "Remove from this device",
+  });
+  state.confirm.mockResolvedValueOnce(false);
+  await act(async () => fireEvent.click(remove));
+  expect(state.remove).not.toHaveBeenCalled();
+  await act(async () => fireEvent.click(remove));
+  expect(state.confirm).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: "Remove Company Hub from this device?",
+      message: expect.stringContaining("Hosts accessed only through this Hub"),
+    }),
+  );
+  expect(state.remove).toHaveBeenCalledExactlyOnceWith("company");
+  expect(state.select).not.toHaveBeenCalled();
+});
+
+test("a Host with no Hub is actionable even when another Host fails discovery", async () => {
+  state.hosts = [
+    { serverId: "a", label: "Ready Host" },
+    { serverId: "b", label: "Broken Host" },
+    { serverId: "c", label: "Offline Host" },
+  ];
+  state.connected = ["a", "b"];
+  state.features.localHubStart = true;
+  state.getHubStatus
+    .mockResolvedValueOnce({ status: { hubOrigin: null } })
+    .mockRejectedValueOnce(new Error("failed"));
+  render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByText("Online · No Hub")).toBeTruthy());
+  expect(
+    within(screen.getByTestId("hub-host-b")).getByText("Hub status could not be checked"),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByTestId("hub-host-c")).getByText("Host offline · Hub status unknown"),
+  ).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Start Hub" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Start Hub" }));
+  expect(screen.getByText("Ready Host")).toBeTruthy();
+  expect(state.startLocalHub).not.toHaveBeenCalled();
+});
+
+test("legacy Hosts are not mistaken for a Host with no Hub", async () => {
+  state.hosts = [{ serverId: "old", label: "Legacy Host" }];
+  state.connected = ["old"];
+  state.features.hubDiscovery = false;
+  state.features.localHubStart = true;
+  render(<HubConnectionSettings />);
+  await waitFor(() =>
+    expect(screen.getByText("Update this Host to check its Hub status")).toBeTruthy(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "How to start" }));
+  expect(screen.getByText(/Startup is allowed. Choose Check again/)).toBeTruthy();
+  expect(state.getHubStatus).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Start Hub" })).toBeNull();
+});
+
+test("a slow Host cannot delay a ready Host and late discovery cannot overwrite a newer check", async () => {
+  state.hosts = [
+    { serverId: "ready", label: "Ready Host" },
+    { serverId: "slow", label: "Slow Host" },
+  ];
+  state.connected = ["ready", "slow"];
+  state.features.localHubStart = true;
+  let finishOld!: (value: unknown) => void;
+  state.getHubStatus.mockResolvedValueOnce({ status: { hubOrigin: null } }).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishOld = resolve;
+      }),
+  );
+  const view = render(<HubConnectionSettings />);
+  await waitFor(() =>
+    expect(
+      within(screen.getByTestId("hub-host-ready")).getByRole("button", { name: "Start Hub" }),
+    ).toBeTruthy(),
+  );
+  expect(
+    within(screen.getByTestId("hub-host-slow")).getByText("Checking Hub status…"),
+  ).toBeTruthy();
+  state.connected = ["ready"];
+  view.rerender(<HubConnectionSettings />);
+  await act(async () => finishOld({ status: { hubOrigin: null } }));
+  expect(
+    within(screen.getByTestId("hub-host-slow")).getByText("Host offline · Hub status unknown"),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByTestId("hub-host-slow")).queryByRole("button", { name: "Start Hub" }),
+  ).toBeNull();
+});
+
+test("different Hub identities at the same loopback address are never merged", async () => {
+  selectPersonalHub();
+  state.account.signedIn = {};
+  state.profiles[0].origin = "http://127.0.0.1:6870";
+  state.hosts = [{ serverId: "other", label: "Another computer" }];
+  state.connected = ["other"];
+  state.getHubStatus.mockResolvedValue({
+    status: {
+      state: "connected",
+      hubOrigin: "http://127.0.0.1:6870",
+      lastError: null,
+      hubConnection: { hubId: "different", publicKey: "other", origin: "http://127.0.0.1:6870" },
+    },
+  });
+  render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByText("Hub on Another computer")).toBeTruthy());
+  expect(
+    within(screen.getByTestId("saved-hub-saved")).getByText("Connected · 127.0.0.1:6870"),
+  ).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Connect" })).toBeTruthy();
+});
+
+test.each([
+  [
+    "managed_access",
+    "Managed access is enabled on this Host.",
+    "Keep the Host’s managed access policy unchanged.",
+  ],
+  [
+    "device_pairing_required",
+    "Protected device pairing is not enabled on this Host.",
+    "schedule any required daemon restart",
+  ],
+  [
+    "owner_required",
+    "This connection does not have independent Host owner access.",
+    "Pairing to a Hub alone is insufficient.",
+  ],
+  [
+    "launcher_unavailable",
+    "This Host cannot launch a Hub from the app.",
+    "same Clisbot home as this Host",
+  ],
+] as const)(
+  "startup help explains %s for the right Host and copies operator steps without launching",
+  async (reason, description, step) => {
+    state.hosts = [{ serverId: "blocked-host", label: "Shared workstation" }];
+    state.connected = ["blocked-host"];
+    state.features.localHubStartStatus = true;
+    state.startStatus = { status: "blocked", reason };
+    render(<HubConnectionSettings />);
+    await waitFor(() => expect(screen.getByText(description)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "How to start" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Start Hub on Shared workstation" }));
+    expect(dialog.getByText("blocked-host")).toBeTruthy();
+    expect(dialog.getByText((text) => text.includes(step))).toBeTruthy();
+    await act(async () =>
+      fireEvent.click(dialog.getByRole("button", { name: "Copy operator instructions" })),
+    );
+    expect(state.copy).toHaveBeenCalledWith(expect.stringContaining("Host ID: blocked-host"));
+    expect(state.copy).toHaveBeenCalledWith(expect.stringContaining(step));
+    expect(state.startLocalHub).not.toHaveBeenCalled();
+    expect(state.pair).not.toHaveBeenCalled();
+  },
+);
+
+test("startup diagnostics react to changed authority and never reuse an old allow flag", async () => {
+  state.hosts = [{ serverId: "host", label: "My Host" }];
+  state.connected = ["host"];
+  state.features.localHubStartStatus = true;
+  state.features.localHubStart = true;
+  state.startStatus = { status: "ready" };
+  const view = render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start Hub" })).toBeTruthy());
+  state.startStatus = { status: "blocked", reason: "owner_required" };
+  view.rerender(<HubConnectionSettings />);
+  expect(screen.queryByRole("button", { name: "Start Hub" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "How to start" }));
+  expect(screen.getByRole("button", { name: "Use owner pairing link" })).toBeTruthy();
+  state.connected = [];
+  view.rerender(<HubConnectionSettings />);
+  const dialog = within(screen.getByRole("dialog"));
+  expect(
+    dialog.getByText("This Host is offline. Startup eligibility cannot be checked."),
+  ).toBeTruthy();
+  expect(dialog.queryByRole("button", { name: "Use owner pairing link" })).toBeNull();
+});
+
+test("the run-on-Hosts section stays visible when all local Hubs are already listed", async () => {
+  selectPersonalHub();
+  state.account.signedIn = {};
+  state.hosts = [{ serverId: "host", label: "My Host" }];
+  state.connected = ["host"];
+  state.getHubStatus.mockResolvedValue({
+    status: {
+      state: "connected",
+      hubOrigin: "http://127.0.0.1:6870",
+      lastError: null,
+      hubConnection: { hubId: "saved", publicKey: "key", origin: "http://127.0.0.1:6870" },
+    },
+  });
+  render(<HubConnectionSettings />);
+  await waitFor(() => expect(screen.getByText("Hub already set up on: My Host.")).toBeTruthy());
+  expect(screen.getByText("Run a Hub on your Hosts")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Connect a Host" })).toBeTruthy();
 });

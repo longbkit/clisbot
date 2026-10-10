@@ -20,13 +20,10 @@ export function HostUnavailableScreen({ serverId }: { serverId: string }) {
   const router = useRouter();
   const savedHost = useHosts().find((host) => host.serverId === serverId);
   const { hosts, daemons, status, retry } = useHostInventory();
-  const daemon = daemons.isPlaceholderData
-    ? undefined
-    : daemons.data?.daemons.find(
-        (entry) =>
-          entry.connectionOffer?.serverId === serverId ||
-          entry.id === savedHost?.management?.daemonId,
-      );
+  const daemon = daemons.data?.daemons.find(
+    (entry) =>
+      entry.connectionOffer?.serverId === serverId || entry.id === savedHost?.management?.daemonId,
+  );
   const listedByHub = daemon !== undefined;
   const waiting =
     status === "loading" || (status === "ready" && listedByHub && daemon.presence !== "offline");

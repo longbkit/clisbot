@@ -58,7 +58,6 @@ const en = {
   },
   welcome: {
     addAnotherHub: "+ Add another Hub",
-    oneHubPerApp: "One Hub per app for now.",
     setUpHub: "Set up Hub",
     description: "Sign in to use the Hosts and Projects your organization shares with you.",
     whatIsHub: "What is a Hub?",
@@ -326,7 +325,6 @@ const ar: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ إضافة Hub آخر",
-    oneHubPerApp: "Hub واحد لكل تطبيق حاليًا.",
     setUpHub: "إعداد Hub",
     description: "سجّل الدخول لاستخدام المضيفين والمشاريع التي تشاركها مؤسستك معك.",
     whatIsHub: "ما هو Hub؟",
@@ -593,7 +591,6 @@ const es: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ Añadir otro Hub",
-    oneHubPerApp: "Por ahora, un Hub por app.",
     setUpHub: "Configurar Hub",
     description:
       "Inicia sesión para usar los Hosts y Proyectos que tu organización comparte contigo.",
@@ -867,7 +864,6 @@ const fr: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ Ajouter un autre Hub",
-    oneHubPerApp: "Un seul Hub par application pour l’instant.",
     setUpHub: "Configurer Hub",
     description:
       "Connectez-vous pour utiliser les Hôtes et les Projets que votre organisation partage avec vous.",
@@ -1140,7 +1136,6 @@ const ja: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ 別の Hub を追加",
-    oneHubPerApp: "現在は 1 つのアプリにつき 1 つの Hub です。",
     setUpHub: "Hub をセットアップ",
     description: "サインインすると、組織が共有しているホストとプロジェクトを使用できます。",
     whatIsHub: "Hub とは？",
@@ -1409,7 +1404,6 @@ const ko: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ 다른 Hub 추가",
-    oneHubPerApp: "현재는 앱당 Hub 하나만 사용할 수 있습니다.",
     setUpHub: "Hub 설정",
     description: "로그인하면 조직에서 공유한 호스트와 프로젝트를 사용할 수 있습니다.",
     whatIsHub: "Hub란?",
@@ -1675,7 +1669,6 @@ const ptBR: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ Adicionar outro Hub",
-    oneHubPerApp: "Por enquanto, um Hub por app.",
     setUpHub: "Configurar Hub",
     description: "Entre para usar os Hosts e Projetos que sua organização compartilha com você.",
     whatIsHub: "O que é um Hub?",
@@ -1945,7 +1938,6 @@ const ru: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ Добавить ещё один Hub",
-    oneHubPerApp: "Пока один Hub на приложение.",
     setUpHub: "Настроить Hub",
     description:
       "Войдите, чтобы использовать хосты и проекты, которыми с вами делится организация.",
@@ -2217,7 +2209,6 @@ const vi: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ Thêm Hub khác",
-    oneHubPerApp: "Hiện mỗi ứng dụng chỉ dùng được một Hub.",
     setUpHub: "Thiết lập Hub",
     description: "Đăng nhập để dùng các Host và dự án mà tổ chức chia sẻ với bạn.",
     whatIsHub: "Hub là gì?",
@@ -2478,7 +2469,6 @@ const zhCN: Translation<HubAccountCopy> = {
   },
   welcome: {
     addAnotherHub: "+ 添加另一个 Hub",
-    oneHubPerApp: "目前每个应用仅支持一个 Hub。",
     setUpHub: "设置 Hub",
     description: "登录后即可使用组织与你共享的主机和项目。",
     whatIsHub: "什么是 Hub？",

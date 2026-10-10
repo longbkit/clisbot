@@ -14,20 +14,34 @@ export interface CreateAgentPreferenceStorage {
 }
 
 export class AsyncStorageCreateAgentPreferenceStorage implements CreateAgentPreferenceStorage {
+  private readonly key: string;
+
+  constructor(serverId?: string | null) {
+    this.key = serverId
+      ? `${CREATE_AGENT_PREFERENCES_STORAGE_KEY}:host:${encodeURIComponent(serverId)}`
+      : CREATE_AGENT_PREFERENCES_STORAGE_KEY;
+  }
+
   async read(): Promise<unknown> {
-    return readValidatedJson(
+    const stored = await readValidatedJson(AsyncStorage, this.key, StoredFormPreferencesSchema);
+    if (stored !== null || this.key === CREATE_AGENT_PREFERENCES_STORAGE_KEY) return stored;
+    // Seed each Host once from existing device preferences. The provider resolver
+    // validates this legacy selection against that Host's complete catalogue.
+    const legacy = await readValidatedJson(
       AsyncStorage,
       CREATE_AGENT_PREFERENCES_STORAGE_KEY,
       StoredFormPreferencesSchema,
     );
+    await this.write(legacy ?? {});
+    return legacy;
   }
 
   async write(preferences: FormPreferences): Promise<void> {
     const result = FormPreferencesSchema.safeParse(preferences);
     if (!result.success) {
-      await AsyncStorage.removeItem(CREATE_AGENT_PREFERENCES_STORAGE_KEY);
+      await AsyncStorage.removeItem(this.key);
       return;
     }
-    await AsyncStorage.setItem(CREATE_AGENT_PREFERENCES_STORAGE_KEY, JSON.stringify(result.data));
+    await AsyncStorage.setItem(this.key, JSON.stringify(result.data));
   }
 }
