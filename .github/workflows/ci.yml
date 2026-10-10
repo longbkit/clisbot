@@ -244,6 +244,9 @@ jobs:
       - name: Build desktop backends
         run: npm run build:desktop-backends
 
+      - name: Build shared daemon web UI for packaged serving
+        run: npm run build:daemon-web-ui
+
       - name: Run desktop tests
         run: npm run test --workspace=@clisbot/desktop
 

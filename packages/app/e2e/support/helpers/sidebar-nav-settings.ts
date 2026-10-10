@@ -177,7 +177,7 @@ function shellFooterRow(page: Page, key: string): Locator {
 function footerSettingsRows(page: Page): Locator {
   return page
     .getByTestId("sidebar-nav-section-footer")
-    .locator('[data-testid^="sidebar-nav-item-"]');
+    .locator('[data-testid^="sidebar-nav-footer-item-"]');
 }
 
 export async function expectFooterSettingsKeys(page: Page, keys: string[]): Promise<void> {
@@ -187,7 +187,7 @@ export async function expectFooterSettingsKeys(page: Page, keys: string[]): Prom
         await footerSettingsRows(page).evaluateAll((rows) =>
           rows.map((row) => row.getAttribute("data-testid")),
         )
-      ).map((testID) => testID?.replace("sidebar-nav-item-", "")),
+      ).map((testID) => testID?.replace("sidebar-nav-footer-item-", "")),
     )
     .toEqual(keys);
 }
@@ -195,12 +195,14 @@ export async function expectFooterSettingsKeys(page: Page, keys: string[]): Prom
 export async function moveFooterItemUp(page: Page, key: string): Promise<void> {
   await page
     .getByTestId("sidebar-nav-section-footer")
-    .getByTestId(`sidebar-nav-move-up-${key}`)
+    .getByTestId(`sidebar-nav-footer-move-up-${key}`)
     .click();
 }
 
 function footerItemSwitch(page: Page, key: string): Locator {
-  return page.getByTestId("sidebar-nav-section-footer").getByTestId(`sidebar-nav-toggle-${key}`);
+  return page
+    .getByTestId("sidebar-nav-section-footer")
+    .getByTestId(`sidebar-nav-footer-toggle-${key}`);
 }
 
 export async function setFooterItemVisible(

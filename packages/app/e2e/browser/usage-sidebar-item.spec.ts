@@ -327,7 +327,7 @@ test.describe("Usage item", () => {
       await openSidebarNavSettings(page);
       const footer = page.getByTestId("sidebar-nav-section-footer");
       await expect(
-        footer.getByTestId("sidebar-nav-item-usage").getByText("Usage", { exact: true }),
+        footer.getByTestId("sidebar-nav-footer-item-usage").getByText("Usage", { exact: true }),
       ).toBeVisible();
       await qaScreenshot(page, "settings-sidebar-footer", { kind: "element", locator: footer });
       await leaveSettings(page);

@@ -315,7 +315,21 @@ async function holdHostResponsesUntilCacheIsVisible(page: Page): Promise<() => v
   await page.routeWebSocket(new RegExp(`:${getE2EDaemonPort()}(?:/|$)`), (socket) => {
     const server = socket.connectToServer();
     server.onMessage(async (message) => {
-      await ready;
+      const envelope = JSON.parse(typeof message === "string" ? message : message.toString()) as {
+        type?: string;
+        message?: { type?: string };
+      };
+      const type = envelope.message?.type ?? envelope.type;
+      // Let the real handshake establish the Host's capabilities and admission.
+      // Only authoritative directory data waits behind the damaged-cache proof.
+      if (
+        type === "fetch_workspaces_response" ||
+        type === "workspace_update" ||
+        type === "project.list.response" ||
+        type === "project.update"
+      ) {
+        await ready;
+      }
       socket.send(message);
     });
   });

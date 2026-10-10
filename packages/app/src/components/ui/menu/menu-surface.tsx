@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -144,7 +145,7 @@ function useSubAnchors(): {
   value: MenuSurfaceContextValue;
   getAnchor: (id: string) => React.RefObject<View | null> | null;
 } {
-  const anchors = useRef(new Map<string, React.RefObject<View | null>>());
+  const [anchors, setAnchors] = useState(() => new Map<string, React.RefObject<View | null>>());
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { openSub, closeSub } = useMenuContext("MenuSurface");
@@ -159,7 +160,12 @@ function useSubAnchors(): {
   useEffect(() => clearTimers, [clearTimers]);
 
   const registerSubAnchor = useCallback((id: string, ref: React.RefObject<View | null>) => {
-    anchors.current.set(id, ref);
+    // Placing/reopening the parent remounts its triggers. Flyouts must receive the
+    // replacement ref rather than keep measuring the detached previous trigger.
+    setAnchors((current) => {
+      if (current.get(id) === ref) return current;
+      return new Map(current).set(id, ref);
+    });
   }, []);
 
   const hoverOpen = useCallback(
@@ -190,7 +196,7 @@ function useSubAnchors(): {
     [registerSubAnchor, hoverOpen, hoverClose, cancelHoverClose],
   );
 
-  const getAnchor = useCallback((id: string) => anchors.current.get(id) ?? null, []);
+  const getAnchor = useCallback((id: string) => anchors.get(id) ?? null, [anchors]);
 
   return { value, getAnchor };
 }

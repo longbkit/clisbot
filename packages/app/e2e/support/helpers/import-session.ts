@@ -39,10 +39,16 @@ export class ImportSessionFlow {
     await expect(button).toBeInViewport();
   }
   async openGlobally() {
+    if ((this.page.viewportSize()?.width ?? 0) < 768) {
+      await openMobileAgentSidebar(this.page);
+      await expectMobileAgentSidebarVisible(this.page);
+    }
     await expect(this.page.getByTestId("sidebar-new")).toBeVisible();
     await this.page.getByTestId("sidebar-new").click();
     await this.page.getByTestId("sidebar-new-import-session").click();
-    await this.page.getByTestId(`host-chooser-row-${getServerId()}`).click();
+    const hostChoice = this.page.getByTestId(`host-chooser-row-${getServerId()}`);
+    await expect(this.page.getByTestId("import-session-sheet").or(hostChoice)).toBeVisible();
+    if (await hostChoice.isVisible()) await hostChoice.click();
     await this.expectSheetReady();
   }
   async openFromNewWorkspaceScreen() {

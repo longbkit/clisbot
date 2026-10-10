@@ -6,6 +6,9 @@ import { getServerId } from "../support/helpers/server-id";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
+// These foundation layout contracts exercise the documented Bots-disabled sidebar.
+test.use({ e2eDaemonEnvironment: { CLISBOT_BOTS_ENABLED: "0" } });
+
 async function rowTestIds(rows: Locator) {
   return rows.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-testid")),

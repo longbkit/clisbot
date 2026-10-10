@@ -2,7 +2,8 @@
 export async function warmMetro(port) {
   const origin = `http://127.0.0.1:${port}`;
   const configuredTimeout = process.env.E2E_METRO_WARMUP_TIMEOUT_MS;
-  const warmupTimeoutMs = configuredTimeout === undefined ? 120_000 : Number(configuredTimeout);
+  // A cold CI compile can take two minutes before the bundle starts transferring.
+  const warmupTimeoutMs = configuredTimeout === undefined ? 240_000 : Number(configuredTimeout);
   if (
     !Number.isSafeInteger(warmupTimeoutMs) ||
     warmupTimeoutMs < 1_000 ||

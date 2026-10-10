@@ -9,6 +9,9 @@ import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-cli
 import { getServerId } from "../support/helpers/server-id";
 import { selectSidebarStatusGrouping } from "../support/helpers/sidebar";
 
+// These foundation layout contracts exercise the documented Bots-disabled sidebar.
+test.use({ e2eDaemonEnvironment: { CLISBOT_BOTS_ENABLED: "0" } });
+
 // The pin shortcut used to be registered by the sidebar row itself, so it silently did nothing
 // whenever the row was unmounted — a collapsed project section being the common case. It now
 // lives in a single always-mounted handler keyed on the active route selection.
