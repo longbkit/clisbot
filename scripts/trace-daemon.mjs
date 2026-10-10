@@ -9,7 +9,7 @@
 // installPhase copies each path to $out/lib/clisbot/<path>, preserving the
 // directory structure node's module resolution expects.
 //
-// Run from the repo root, after `npm run build:server`. Requires
+// Run from the repo root, after `npm run build:desktop-backends`. Requires
 // node_modules populated (the Nix build invokes this post-configHook).
 
 import { nodeFileTrace } from "@vercel/nft";
@@ -29,6 +29,16 @@ const { sherpaPlatformPackageName } = await import(
   ).href
 );
 
+const hubBin = "packages/hub/bin/clisbot-hub.js";
+const channelPins = JSON.parse(
+  await readFile(path.join(REPO_ROOT, "packages/hub/channel-pins.json"), "utf8"),
+);
+const channelEntries = Object.values(channelPins.channels)
+  .filter((pin) => pin.loadMode === "in-repo")
+  .flatMap((pin) =>
+    [pin.entry, pin.plugin.specifier].map((entry) => path.posix.join(pin.inRepoPackage, entry)),
+  );
+
 const traceDesktop = process.env.CLISBOT_TRACE_DESKTOP === "1";
 const terminalModule = "packages/server/dist/server/terminal/terminal.js";
 const sherpaModule =
@@ -41,6 +51,9 @@ const sherpaEnvModule =
 // manifests and workspace symlinks used by Node's resolution.
 const runtimeDependencies = new Map([
   ["packages/cli/dist/commands/daemon/local-daemon.js", ["@clisbot/server"]],
+  ["packages/cli/dist/commands/hub/local-hub.js", ["@clisbot/hub/bin/clisbot-hub.js"]],
+  // The Hub loads these package entries through its channel-pins manifest.
+  [hubBin, channelEntries],
   [terminalModule, ["@clisbot/cli/bin/clisbot", "node-pty/package.json"]],
   [sherpaModule, ["sherpa-onnx-node"]],
   [sherpaEnvModule, [`${sherpaPlatformPackageName()}/package.json`]],
@@ -78,6 +91,8 @@ const ptyNativeFiles = (await readdir(ptyNativeRoot, { withFileTypes: true }))
 // process and preloads as well.
 const entries = [
   "packages/cli/dist/index.js",
+  hubBin,
+  "packages/hub/.output/server/start-server.js",
   "packages/server/dist/scripts/supervisor-entrypoint.js",
   "packages/server/dist/server/terminal/terminal-worker-process.js",
   "packages/server/dist/server/server/speech/providers/local/worker-process.js",
@@ -90,9 +105,18 @@ const entries = [
     : []),
 ];
 
+// Channel loader hooks import host modules by computed file URL.
+for await (const file of glob("packages/hub/dist/channels/loader/hosts/*.js", { cwd: REPO_ROOT })) {
+  entries.push(file);
+}
+
 // Files read at runtime via fs APIs rather than `require`. nft only
 // traces the module graph; data files have to be listed explicitly.
 const additionalInputs = [
+  "packages/hub/.output/**",
+  "packages/hub/drizzle/**",
+  "packages/hub/channel-pins.json",
+  "packages/hub/THIRD_PARTY_NOTICES",
   // Agent orchestration skill catalog loaded through filesystem paths
   "packages/server/dist/server/skills/**",
   "packages/server/dist/server/builtin-plugins/**",
@@ -137,7 +161,7 @@ const { fileList, warnings } = await nodeFileTrace(entries, {
     const dependencies = runtimeDependencies.get(path.relative(REPO_ROOT, file));
     if (!dependencies) return source;
     // These statements exist only in nft's input, never in the shipped code.
-    return `${source}\n${dependencies.map((specifier) => `require(${JSON.stringify(specifier)});`).join("\n")}`;
+    return `${source}\n${dependencies.map((specifier) => `import(${JSON.stringify(specifier)});`).join("\n")}`;
   },
   // Tolerate the conditional / dynamic patterns we already audited:
   // sherpa-onnx-${platform}-${arch} package resolution (the host package

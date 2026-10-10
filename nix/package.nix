@@ -87,6 +87,9 @@ buildNpmPackage rec {
   # Don't use the default npm build hook — we need a custom build sequence
   dontNpmBuild = true;
 
+  # Match the desktop build budget for the bundled Hub and runtime trace.
+  env.NODE_OPTIONS = "--max-old-space-size=4096";
+
   buildPhase = ''
     runHook preBuild
 
@@ -95,8 +98,8 @@ buildNpmPackage rec {
     # daemon closure by scripts/trace-daemon.mjs.
     npm rebuild node-pty
 
-    # Build all server packages in dependency order (defined in package.json)
-    npm run build:server
+    # Build the CLI, daemon and local Hub, including its channel runtimes.
+    npm run build:desktop-backends
     npm run build:daemon-web-ui
 
     runHook postBuild

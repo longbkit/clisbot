@@ -100,8 +100,8 @@ buildNpmPackage {
     # Native deps (terminal emulation; libuv-linked on Linux)
     npm rebuild node-pty
 
-    # Server workspaces (highlight + relay + protocol + client + server + cli)
-    npm run build:server
+    # Match desktop packaging: CLI, daemon, Hub and channel runtime assets.
+    npm run build:desktop-backends
 
     # App workspace deps not covered by build:server
     npm run build --workspace=@clisbot/expo-two-way-audio
