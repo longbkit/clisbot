@@ -292,6 +292,8 @@ export interface DaemonServerInfo {
   hostname: string | null;
   version: string | null;
   desktopManaged?: boolean;
+  // Clisbot: the Host's Quick chats folder (clisbot/quick-chats/quick-chat-projects.ts).
+  quickChatRoot?: string;
   capabilities?: ServerCapabilities;
   features?: ServerInfoStatusPayload["features"];
 }
@@ -312,6 +314,7 @@ export function toDaemonServerInfo(serverInfo: ServerInfoStatusPayload): DaemonS
     ...(serverInfo.desktopManaged !== undefined
       ? { desktopManaged: serverInfo.desktopManaged }
       : {}),
+    ...(serverInfo.quickChatRoot ? { quickChatRoot: serverInfo.quickChatRoot } : {}),
     ...(serverInfo.capabilities ? { capabilities: serverInfo.capabilities } : {}),
     ...(serverInfo.features ? { features: serverInfo.features } : {}),
   };
@@ -735,6 +738,7 @@ function isSessionServerInfoUnchanged(input: {
   nextPermissions: ServerInfoStatusPayload["permissions"];
   nextBotCreationAllowed: boolean | undefined;
   nextLocalHubStartStatus: ServerInfoStatusPayload["localHubStartStatus"];
+  nextQuickChatRoot?: string;
 }): boolean {
   const {
     currentServerInfo,
@@ -752,6 +756,7 @@ function isSessionServerInfoUnchanged(input: {
     prevHostname === nextHostname &&
     prevVersion === nextVersion &&
     currentServerInfo?.desktopManaged === nextDesktopManaged &&
+    currentServerInfo?.quickChatRoot === input.nextQuickChatRoot &&
     areServerCapabilitiesEqual(currentServerInfo?.capabilities, nextCapabilities) &&
     areServerInfoFeaturesEqual(currentServerInfo?.features, nextFeatures)
   );
@@ -904,6 +909,7 @@ export const useSessionStore = create<SessionStore>()(
               nextPermissions: info.permissions,
               nextBotCreationAllowed: info.botCreationAllowed,
               nextLocalHubStartStatus: info.localHubStartStatus,
+              nextQuickChatRoot: info.quickChatRoot,
             })
           ) {
             return prev;
@@ -929,6 +935,7 @@ export const useSessionStore = create<SessionStore>()(
                   ...(nextDesktopManaged !== undefined
                     ? { desktopManaged: nextDesktopManaged }
                     : {}),
+                  ...(info.quickChatRoot ? { quickChatRoot: info.quickChatRoot } : {}),
                   ...(nextCapabilities ? { capabilities: nextCapabilities } : {}),
                   ...(nextFeatures ? { features: nextFeatures } : {}),
                 },

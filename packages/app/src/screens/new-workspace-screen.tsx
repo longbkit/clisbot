@@ -1,3 +1,22 @@
+import { useIsFocused } from "@react-navigation/native";
+import { buildStartDestinations, StartDestinationOption } from "@/clisbot/home/start-destinations";
+import { orderStartOptions } from "@/clisbot/home/start-kinds";
+import { useStartTemplate, type PendingStartTemplate } from "@/clisbot/home/use-start-template";
+import { snapshotStart, composerLaunch } from "@/clisbot/home/start-template";
+import { findDestination } from "@/clisbot/quick-starts/model";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { HomeStartLayout, StartFeedback } from "@/clisbot/home/start-surface";
+import { StartSwitcher } from "@/clisbot/home/start-switcher";
+import { useFirstRunProvider, useQuickChatByDefault } from "@/clisbot/home/use-first-run-defaults";
+import { useCrossHostPicker } from "@/clisbot/home/use-cross-host-picker";
+import { useQuickChatAllowed, useQuickChatRoot } from "@/clisbot/quick-chats/quick-chat-projects";
+import { QuickStarts } from "@/clisbot/quick-starts/quick-starts";
+import type { QuickStartInput } from "@clisbot/protocol/quick-starts/types";
+import { useCreationRequest } from "@/clisbot/bots/sidebar/creation-request";
+import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
+import { router } from "expo-router";
+import { buildHostChatRoute } from "@/clisbot/bots/routes";
+import { useStartDestination } from "@/clisbot/home/use-start-destination";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import type {
   CreateAgentRequestOptions,
@@ -15,7 +34,14 @@ import type { PressableStateCallbackType } from "react-native";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
 import { createNameId } from "mnemonic-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Folder, FolderPlus, GitBranch, GitPullRequest } from "lucide-react-native";
+import {
+  Bot,
+  ChevronDown,
+  Folder,
+  FolderPlus,
+  GitBranch,
+  GitPullRequest,
+} from "lucide-react-native";
 import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
@@ -23,7 +49,7 @@ import {
   resolveComposerAttachmentSubmitFormat,
   splitComposerAttachmentsForSubmit,
 } from "@/composer/attachments/submit";
-import { HostStatusDot } from "@/components/host-status-dot";
+import { HostMark, HostStatusDot } from "@/components/host-status-dot";
 import { HostPicker } from "@/components/hosts/host-picker";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { Combobox, ComboboxItem } from "@/components/ui/combobox";
@@ -32,7 +58,7 @@ import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
-import { SidebarMenuToggle } from "@/components/headers/menu-header";
+import { MenuHeader, SidebarMenuToggle } from "@/components/headers/menu-header";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
@@ -129,13 +155,15 @@ import {
   upsertCreatedTerminalPayload,
 } from "./workspace/terminals/state";
 import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff";
-import { useNewWorkspaceScreenPresence } from "./new-workspace/screen-presence";
+import { useNewWorkspaceScreenPresence, startScreenPath } from "./new-workspace/screen-presence";
 
 const ThemedFolderPlus = withUnistyles(FolderPlus);
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const addProjectIcon = (
   <ThemedFolderPlus size={ICON_SIZE.sm} uniProps={foregroundMutedColorMapping} />
 );
+const ThemedBot = withUnistyles(Bot);
+const addBotIcon = <ThemedBot size={ICON_SIZE.sm} uniProps={foregroundMutedColorMapping} />;
 
 function useIsNewWorkspaceDraftHandoffActive(input: {
   draftId: string | undefined;
@@ -184,6 +212,7 @@ function buildFirstAgentContext(input: {
 }
 
 interface NewWorkspaceScreenProps {
+  home?: boolean;
   serverId: string;
   sourceDirectory?: string;
   projectId?: string;
@@ -698,7 +727,7 @@ function FormRow({ children }: { children: React.ReactNode }) {
 
 interface WorkspaceIsolationState {
   isolation: "local" | "worktree";
-  setIsolation: (value: "local" | "worktree") => void;
+  setIsolation: (value: "local" | "worktree", persist?: boolean) => void;
   effectiveIsolation: "local" | "worktree";
   canCreateWorktree: boolean;
   showRefPicker: boolean;
@@ -721,9 +750,9 @@ function useWorkspaceIsolation(input: {
   const isWorktree = isolation === "worktree" && canCreateWorktree;
 
   const setIsolation = useCallback(
-    (value: "local" | "worktree") => {
+    (value: "local" | "worktree", persist = true) => {
       setManualIsolation(value);
-      void updatePreferences({ isolation: value });
+      if (persist) void updatePreferences({ isolation: value });
     },
     [updatePreferences],
   );
@@ -1386,7 +1415,7 @@ interface NewWorkspaceFormStackInput {
     selectedOptionId: string;
     onSelect: (id: string) => void;
     onAddProject: () => void;
-    renderOption: RefPickerRenderOption;
+    renderOption?: RefPickerRenderOption;
   };
   host: FormPickerControl & {
     allHosts: HostProfile[];
@@ -1449,31 +1478,57 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
 
   const desktopControlStyle = isCompact ? undefined : styles.desktopControl;
 
+  const { onOpenChange: changeProjectOpen } = project;
+  const addBot = useCallback(() => {
+    useCreationRequest.getState().ask("bot");
+    changeProjectOpen(false);
+  }, [changeProjectOpen]);
+  const projectFooter = useMemo(
+    () =>
+      HOME_V2_ENABLED ? (
+        <View>
+          {addProjectAction}
+          <ComboboxItem
+            testID="new-workspace-project-picker-add-bot"
+            label="Add bot"
+            onPress={addBot}
+            leadingSlot={addBotIcon}
+          />
+        </View>
+      ) : (
+        addProjectAction
+      ),
+    [addProjectAction, addBot],
+  );
+  // Home's switcher draws the trigger; the picker stays here, anchored to whichever segment opened it.
+  const projectTrigger = HOME_V2_ENABLED ? null : (
+    <ProjectPickerTrigger
+      pickerAnchorRef={project.anchorRef}
+      onPress={project.open}
+      disabled={isPending}
+      badgePressableStyle={badgePressableStyle}
+      label={project.triggerLabel}
+      tooltipLabel={t("newWorkspace.tooltips.project")}
+      projectViewKey={project.selectedProject?.viewKey ?? null}
+      iconDataUri={
+        project.selectedProject
+          ? (project.iconDataByProjectViewKey.get(project.selectedProject.viewKey) ?? null)
+          : null
+      }
+      iconColor={theme.colors.foregroundMuted}
+      iconSize={theme.iconSize.sm}
+    />
+  );
   const projectControl = (
-    <View style={desktopControlStyle}>
-      <ProjectPickerTrigger
-        pickerAnchorRef={project.anchorRef}
-        onPress={project.open}
-        disabled={isPending}
-        badgePressableStyle={badgePressableStyle}
-        label={project.triggerLabel}
-        tooltipLabel={t("newWorkspace.tooltips.project")}
-        projectViewKey={project.selectedProject?.viewKey ?? null}
-        iconDataUri={
-          project.selectedProject
-            ? (project.iconDataByProjectViewKey.get(project.selectedProject.viewKey) ?? null)
-            : null
-        }
-        iconColor={theme.colors.foregroundMuted}
-        iconSize={theme.iconSize.sm}
-      />
+    <View style={HOME_V2_ENABLED ? undefined : desktopControlStyle}>
+      {projectTrigger}
       <Combobox
         options={project.options}
         value={project.selectedOptionId}
         onSelect={project.onSelect}
         searchable
-        searchPlaceholder="Search projects"
-        title="Project"
+        searchPlaceholder={HOME_V2_ENABLED ? "Search projects or bots" : "Search projects"}
+        title={HOME_V2_ENABLED ? "Where to chat" : "Project"}
         open={project.openState}
         onOpenChange={project.onOpenChange}
         desktopPlacement="bottom-start"
@@ -1481,7 +1536,7 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
         anchorRef={project.anchorRef}
         emptyText="No projects available."
         renderOption={project.renderOption}
-        footer={addProjectAction}
+        footer={projectFooter}
       />
     </View>
   );
@@ -1495,7 +1550,7 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
         open={host.openState}
         onOpenChange={host.onOpenChange}
         anchorRef={host.anchorRef}
-        searchable={false}
+        searchable
         title="Host"
         desktopPlacement="bottom-start"
         desktopMinWidth={200}
@@ -1513,7 +1568,11 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
               testID="host-picker-trigger"
             >
               <View style={styles.badgeIconBox}>
-                <HostStatusDot serverId={host.selectedServerId} />
+                {HOME_V2_ENABLED ? (
+                  <HostMark serverId={host.selectedServerId} size={14} />
+                ) : (
+                  <HostStatusDot serverId={host.selectedServerId} />
+                )}
               </View>
               <Text style={styles.badgeText} numberOfLines={1}>
                 {selectedHostLabel}
@@ -1601,6 +1660,40 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
     />
   );
 
+  return renderWorkspaceMetaLayout({
+    isCompact,
+    projectControl,
+    hostControl,
+    isolationControl,
+    baseControl,
+    launchControl,
+  });
+}
+function renderWorkspaceMetaLayout({
+  isCompact,
+  projectControl,
+  hostControl,
+  isolationControl,
+  baseControl,
+  launchControl,
+}: {
+  isCompact: boolean;
+  projectControl: ReactNode;
+  hostControl: ReactNode;
+  isolationControl: ReactNode;
+  baseControl: ReactNode;
+  launchControl: ReactNode;
+}) {
+  if (HOME_V2_ENABLED && isCompact)
+    return (
+      <View testID="new-workspace-ref-picker-row" style={styles.homeMeta} pointerEvents="box-none">
+        {hostControl}
+        {projectControl}
+        {isolationControl}
+        {baseControl}
+        {launchControl}
+      </View>
+    );
   return isCompact ? (
     <View testID="new-workspace-ref-picker-row" style={styles.formStack} pointerEvents="box-none">
       <FormRow>{projectControl}</FormRow>
@@ -1618,8 +1711,8 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
       style={styles.formStackDesktop}
       pointerEvents="box-none"
     >
-      {projectControl}
-      {hostControl}
+      {HOME_V2_ENABLED ? hostControl : projectControl}
+      {HOME_V2_ENABLED ? projectControl : hostControl}
       {isolationControl}
       {baseControl}
       <View style={styles.launchSpacer} pointerEvents="none" />
@@ -1629,12 +1722,14 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
 }
 
 export function NewWorkspaceScreen({
+  home = false,
   serverId,
   sourceDirectory: sourceDirectoryProp,
   projectId,
   displayName: displayNameProp,
   draftId,
 }: NewWorkspaceScreenProps) {
+  const focused = useIsFocused();
   const queryClient = useQueryClient();
   const { theme } = useUnistyles();
   const { t } = useTranslation();
@@ -1666,7 +1761,7 @@ export function NewWorkspaceScreen({
   // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
   const supportsWorkspaceMultiplicity = useHostFeature(selectedServerId, "workspaceMultiplicity");
   const supportsForgeSearch = useHostFeature(selectedServerId, "forgeSearch");
-  const [creationIdentity] = useState(() => ({
+  const [creationIdentity, setCreationIdentity] = useState(() => ({
     draftId: draftId ?? generateDraftId(),
     worktreeSlug: createNameId(),
   }));
@@ -1686,7 +1781,7 @@ export function NewWorkspaceScreen({
   const isolationPickerAnchorRef = useRef<View>(null);
   const hostPickerAnchorRef = useRef<View | null>(null);
   const isDraftHandoffActive = useIsNewWorkspaceDraftHandoffActive({ draftId, selectedServerId });
-  const isStillOnCreateScreen = useNewWorkspaceScreenPresence();
+  const isStillOnCreateScreen = useNewWorkspaceScreenPresence(startScreenPath(home));
 
   // Launch target: what the composer submits to (chat agent, or a terminal
   // profile). Mirrors useWorkspaceIsolation's pattern below: the derived
@@ -1696,12 +1791,12 @@ export function NewWorkspaceScreen({
   const { preferences: formPreferences, updatePreferences: updateFormPreferences } =
     useFormPreferences();
   const {
-    selectedProject,
-    selectedSourceDirectory,
+    selectedProject: pickedProject,
+    selectedSourceDirectory: pickedDirectory,
     projectPickerOptions,
     projectByOptionId,
-    selectedProjectOptionId,
-    projectTriggerLabel,
+    selectedProjectOptionId: pickedOptionId,
+    projectTriggerLabel: pickedLabel,
     handleSelectProjectOption: selectProjectOption,
   } = useNewWorkspaceProjectPicker({
     selectedServerId,
@@ -1711,6 +1806,33 @@ export function NewWorkspaceScreen({
     lastActiveProject,
     allowAllProjects: supportsWorkspaceMultiplicity,
   });
+  const {
+    startKind,
+    inferredStart,
+    selectedBot,
+    selectedProject,
+    selectedSourceDirectory,
+    selectedProjectOptionId,
+    projectTriggerLabel,
+    setStartTarget,
+    setQuickProject,
+    botQuery,
+    quickStartsFeature,
+  } = useStartDestination({
+    selectedServerId,
+    pickedProject,
+    pickedDirectory,
+    pickedOptionId,
+    pickedLabel,
+  });
+  const quickChatRoot = useQuickChatRoot(selectedServerId);
+  const quickChatPermitted = useQuickChatAllowed(selectedServerId);
+  const quickChatAllowed = quickStartsFeature && quickChatPermitted;
+  const currentStartDestination = useRef({ host: selectedServerId, kind: startKind });
+  currentStartDestination.current = { host: selectedServerId, kind: startKind };
+  const [pendingQuickStart, setPendingQuickStart] = useState<PendingStartTemplate | null>(null);
+  const [templateBaseRequired, setTemplateBaseRequired] = useState(false);
+  const [templateApplied, setTemplateApplied] = useState(false);
   // Clisbot Managed Access: only the profiles, and the shell, this Project grants.
   const {
     profiles: terminalProfiles,
@@ -1812,7 +1934,7 @@ export function NewWorkspaceScreen({
     return connectedClient;
   }, [selectedServerId, t]);
 
-  const clientReady = isConnected && Boolean(client);
+  const clientReady = useMemo(() => isConnected && Boolean(client), [isConnected, client]);
   const hasSelectedSourceDirectory = selectedSourceDirectory !== null;
   const pickerQueryEnabled = pickerOpen && clientReady && hasSelectedSourceDirectory;
 
@@ -1821,14 +1943,12 @@ export function NewWorkspaceScreen({
     cwd: selectedSourceDirectory ?? "",
   });
 
-  const worktreeSupport = selectedProject
-    ? getWorktreeSupportForHostProject({ project: selectedProject, serverId: selectedServerId })
-    : "unsupported";
+  const worktreeSupport = startWorktreeSupport(selectedProject, selectedServerId);
   const isPending = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
   const { effectiveIsolation, setIsolation, canCreateWorktree, showRefPicker } =
     useWorkspaceIsolation({
       supportsMultiplicity: supportsWorkspaceMultiplicity,
-      worktreeSupport,
+      worktreeSupport: startKind === "project" ? worktreeSupport : "unsupported",
     });
 
   const branchSuggestionsQuery = useQuery({
@@ -1893,6 +2013,7 @@ export function NewWorkspaceScreen({
   }, [itemById, selectedOptionId]);
   const selectPickerItem = useCallback(
     (item: PickerItem) => {
+      setTemplateBaseRequired(false);
       const nextAttachments = syncPickerPrAttachment({
         attachments: chatDraft.attachments,
         item,
@@ -1933,15 +2054,28 @@ export function NewWorkspaceScreen({
       // selectProjectOption enforces selectability (worktree-only when
       // multiplicity is off, any project when it's on); don't re-gate here on
       // canCreateWorktree or non-git projects become unselectable.
+      setPendingQuickStart(null);
+      setTemplateBaseRequired(false);
+      setTemplateApplied(false);
+      setStartTarget({ host: selectedServerId, kind: "project" });
       selectProjectOption(id);
       setProjectPickerOpen(false);
       clearPickerSelectionForTargetChange(selectedProjectOptionId, id);
     },
-    [clearPickerSelectionForTargetChange, selectProjectOption, selectedProjectOptionId],
+    [
+      clearPickerSelectionForTargetChange,
+      selectProjectOption,
+      setStartTarget,
+      selectedProjectOptionId,
+      selectedServerId,
+    ],
   );
 
   const handleSelectWorkspaceHost = useCallback(
     (id: string) => {
+      setPendingQuickStart(null);
+      setTemplateBaseRequired(false);
+      setTemplateApplied(false);
       handleSelectHost(id);
       clearPickerSelectionForTargetChange(selectedServerId, id);
     },
@@ -1972,7 +2106,7 @@ export function NewWorkspaceScreen({
   useKeyboardActionHandler({
     handlerId: "new-workspace-project-pick",
     actions: PROJECT_PICK_ACTIONS,
-    enabled: projectPickerOptions.length > 0,
+    enabled: focused && projectPickerOptions.length > 0,
     priority: 0,
     handle: handleProjectPick,
   });
@@ -1996,6 +2130,10 @@ export function NewWorkspaceScreen({
   const handleSelectIsolationOption = useCallback(
     (id: string) => {
       setIsolation(id === "worktree" ? "worktree" : "local");
+      if (id === "local") {
+        setTemplateBaseRequired(false);
+        setErrorMessage(null);
+      }
       setIsolationPickerOpen(false);
     },
     [setIsolation],
@@ -2063,7 +2201,11 @@ export function NewWorkspaceScreen({
         throw new Error("Choose a host for this project");
       }
       const connectedClient = withConnectedClient();
-      const createsWorktree = !supportsWorkspaceMultiplicity || effectiveIsolation === "worktree";
+      if (templateBaseRequired)
+        throw new Error("Choose a base branch or PR before starting this quick start.");
+      const createsWorktree =
+        startKind === "project" &&
+        (!supportsWorkspaceMultiplicity || effectiveIsolation === "worktree");
       const checkoutStatusForCreate = createsWorktree
         ? await ensureCheckoutStatus({
             queryClient,
@@ -2100,6 +2242,8 @@ export function NewWorkspaceScreen({
     [
       creationIdentity,
       creationResult,
+      startKind,
+      templateBaseRequired,
       effectiveIsolation,
       mergeWorkspaces,
       queryClient,
@@ -2113,15 +2257,85 @@ export function NewWorkspaceScreen({
     ],
   );
 
+  useFirstRunProvider({
+    focused,
+    pending: pendingQuickStart !== null,
+    serverId: selectedServerId,
+    composer: composerState,
+    preferences: formPreferences,
+  });
+  const { configurationProblem, acceptCurrent } = useStartTemplate({
+    focused,
+    pending: pendingQuickStart,
+    setPending: setPendingQuickStart,
+    draft: chatDraft,
+    composer: composerState,
+    directory: selectedSourceDirectory,
+    kind: startKind,
+    bot: selectedBot,
+    project: selectedProject,
+    serverId: selectedServerId,
+    preferences: formPreferences,
+    worktreeSupport,
+    setIsolation,
+    setBaseRequired: setTemplateBaseRequired,
+    setPickerOpen,
+    setError: setErrorMessage,
+    dispatchPicker: dispatchPickerSelection,
+  });
   const handleSubmitNewWorkspace = useCallback(
     async (payload: MessagePayload) => {
       try {
         setErrorMessage(null);
-        await composerState?.persistFormPreferences();
+        if (pendingQuickStart?.serverId === selectedServerId)
+          throw new Error("Wait for the destination and agent configuration to load.");
+        if (configurationProblem)
+          throw new Error(
+            configurationProblem + " Choose settings and confirm Use current settings.",
+          );
+        if (home) rememberChatReturn("/open-project");
+        if (!templateApplied) await composerState?.persistFormPreferences();
         await updateFormPreferences({ launchTarget });
+        if (startKind === "bot") {
+          if (!quickStartsFeature)
+            throw new Error("Update this Host to start a bot chat with these agent settings.");
+          const clearConsumedDraft = captureWorkspaceDraftCleanup({
+            draftId: creationIdentity.draftId,
+            draftKey,
+            clearDraft: chatDraft.clear,
+            draftContextScopeKey,
+          });
+          if (!selectedBot || !composerState?.selectedProvider)
+            throw new Error("Choose a bot and an available provider.");
+          setPendingAction("chat");
+          const wire = splitComposerAttachmentsForSubmit(payload.attachments, {
+            format: resolveComposerAttachmentSubmitFormat({
+              supportsForgeAttachments: supportsForgeSearch,
+            }),
+          });
+          const result = await withConnectedClient().createChat({
+            botIds: [selectedBot.id],
+            kind: "direct",
+            idempotencyKey: creationIdentity.draftId,
+            launch: composerLaunch(composerState),
+            firstMessage: {
+              text: payload.text,
+              images: await encodeImages(wire.images),
+              attachments: wire.attachments,
+              messageId: `${creationIdentity.draftId}:initial-message`,
+            },
+          });
+          if (result.error || !result.chat)
+            throw new Error(result.error ?? "Could not create chat.");
+          clearConsumedDraft();
+          setCreationIdentity({ draftId: generateDraftId(), worktreeSlug: createNameId() });
+          setPendingAction(null);
+          if (isStillOnCreateScreen())
+            router.push(buildHostChatRoute(selectedServerId, result.chat.id));
+          return;
+        }
         if (isEmptyWorkspaceSubmission(payload)) {
           setPendingAction("empty");
-          let outcome: SubmitOutcome = "background";
           await runCreateEmptyWorkspace({
             payload,
             ensureWorkspace: async (request) => (await ensureWorkspace(request)).workspace,
@@ -2130,20 +2344,19 @@ export function NewWorkspaceScreen({
               if (!isStillOnCreateScreen()) {
                 return;
               }
-              outcome = "navigated";
               navigateToWorkspace({ serverId: targetServerId, workspaceId });
             },
           });
           // Nothing navigated, so this screen may still be mounted under another route. Release
           // the pending lock it would otherwise keep forever.
-          if (outcome === "background") {
-            setPendingAction(null);
-          }
+          setCreationResult({ workspace: null });
+          setCreationIdentity({ draftId: generateDraftId(), worktreeSlug: createNameId() });
+          setPendingAction(null);
           return;
         }
 
         setPendingAction("chat");
-        const outcome = await runCreateChatAgent({
+        await runCreateChatAgent({
           payload,
           composerState,
           forkDraftSetup,
@@ -2161,9 +2374,9 @@ export function NewWorkspaceScreen({
             selectModel: t("newWorkspace.errors.selectModel"),
           },
         });
-        if (outcome === "background") {
-          setPendingAction(null);
-        }
+        setCreationResult({ workspace: null });
+        setCreationIdentity({ draftId: generateDraftId(), worktreeSlug: createNameId() });
+        setPendingAction(null);
       } catch (error) {
         const message = toErrorMessage(error);
         setPendingAction(null);
@@ -2173,9 +2386,16 @@ export function NewWorkspaceScreen({
     },
     [
       composerState,
+      home,
+      pendingQuickStart,
+      configurationProblem,
+      templateApplied,
+      startKind,
+      quickStartsFeature,
+      selectedBot,
       draftContextScopeKey,
       creationIdentity,
-      chatDraft.clear,
+      chatDraft,
       draftKey,
       ensureWorkspace,
       forkDraftSetup,
@@ -2195,7 +2415,7 @@ export function NewWorkspaceScreen({
       setErrorMessage(null);
       await updateFormPreferences({ launchTarget });
       setPendingAction("terminal");
-      let outcome: SubmitOutcome = "background";
+
       await runCreateTerminalWorkspace({
         cwd: selectedSourceDirectory ?? "",
         prompt: terminalPromptText,
@@ -2243,13 +2463,13 @@ export function NewWorkspaceScreen({
           if (!isStillOnCreateScreen()) {
             return;
           }
-          outcome = "navigated";
+
           navigateToWorkspace({ serverId: targetServerId, workspaceId, target });
         },
       });
-      if (outcome === "background") {
-        setPendingAction(null);
-      }
+      setCreationResult({ workspace: null });
+      setCreationIdentity({ draftId: generateDraftId(), worktreeSlug: createNameId() });
+      setPendingAction(null);
     } catch (error) {
       const message = toErrorMessage(error);
       setPendingAction(null);
@@ -2322,22 +2542,270 @@ export function NewWorkspaceScreen({
       ? t("newWorkspace.refPicker.searching")
       : t("newWorkspace.refPicker.noMatchingRefs");
 
+  const prepareQuickChat = useCallback(async () => {
+    const host = selectedServerId;
+    setPendingQuickStart(null);
+    setTemplateBaseRequired(false);
+    setTemplateApplied(false);
+    acceptCurrent();
+    setStartTarget({ host, kind: "quickChat" });
+    setProjectPickerOpen(false);
+    setErrorMessage(null);
+    try {
+      const c = getHostRuntimeStore().getClient(host);
+      if (!c || !quickStartsFeature)
+        throw new Error("Connect or update this Host to use Quick chat.");
+      const result = await c.prepareQuickChat();
+      if (result.error || !result.cwd || !result.projectId)
+        throw new Error(result.error ?? "Unable to prepare Quick chat");
+      if (
+        currentStartDestination.current.host === host &&
+        currentStartDestination.current.kind === "quickChat"
+      )
+        setQuickProject({ host, cwd: result.cwd, projectId: result.projectId });
+    } catch (error) {
+      if (
+        currentStartDestination.current.host === host &&
+        currentStartDestination.current.kind === "quickChat"
+      )
+        setErrorMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [selectedServerId, setStartTarget, setQuickProject, quickStartsFeature, acceptCurrent]);
+  // With several Hosts every picker row names its Host, the selected one included.
+  const currentHostLabel = hostLabelWhenSeveral(allHosts, selectedServerId);
+  const destinations = useMemo(
+    () =>
+      buildStartDestinations({
+        quickChat: quickChatAllowed,
+        quickChatRoot,
+        serverId: selectedServerId,
+        projects: projectPickerOptions,
+        byOption: projectByOptionId,
+        icons: projectIconDataByProjectViewKey,
+        bots: botQuery.data ?? [],
+        hostLabel: currentHostLabel,
+      }),
+    [
+      currentHostLabel,
+      quickChatAllowed,
+      quickChatRoot,
+      selectedServerId,
+      projectPickerOptions,
+      projectByOptionId,
+      projectIconDataByProjectViewKey,
+      botQuery.data,
+    ],
+  );
+  const selectDestination = useCallback(
+    (id: string) => {
+      dispatchPickerSelection({ type: "target-changed" });
+      setPendingQuickStart(null);
+      setTemplateApplied(false);
+      acceptCurrent();
+      setTemplateBaseRequired(false);
+      setErrorMessage(null);
+      if (id === "quickChat") {
+        void prepareQuickChat();
+        return;
+      }
+      if (id.startsWith("bot:")) {
+        const bot = botQuery.data?.find((entry) => `bot:${entry.id}` === id);
+        if (!bot) return;
+        setStartTarget({ host: selectedServerId, kind: "bot", botId: bot.id });
+        setPendingQuickStart({
+          serverId: selectedServerId,
+          template: {
+            name: bot.name,
+            visibility: "personal",
+            target: { kind: "bot", botId: bot.id },
+            startingPrompt: chatDraft.textSource.getSnapshot(),
+            agent: { kind: "configured", config: bot.launch },
+          },
+        });
+        setProjectPickerOpen(false);
+        return;
+      }
+      handleSelectProjectOption(id);
+    },
+    [
+      prepareQuickChat,
+      acceptCurrent,
+      botQuery.data,
+      selectedServerId,
+      setStartTarget,
+      chatDraft.textSource,
+      handleSelectProjectOption,
+    ],
+  );
+  const crossHost = useCrossHostPicker({
+    enabled: HOME_V2_ENABLED && focused,
+    selectedServerId,
+    hosts: allHosts,
+    projects,
+    icons: projectIconDataByProjectViewKey,
+    current: destinations,
+    selectHost: handleSelectWorkspaceHost,
+    selectCurrent: selectDestination,
+  });
+  const snapshotQuickStart = useCallback((): QuickStartInput | null => {
+    const destination = destinations.find((entry) => entry.option.id === selectedProjectOptionId);
+    return destination
+      ? snapshotStart(
+          destination.target,
+          chatDraft.textSource.getSnapshot(),
+          composerState,
+          effectiveIsolation,
+          selectedItem,
+        )
+      : null;
+  }, [
+    destinations,
+    selectedProjectOptionId,
+    chatDraft.textSource,
+    composerState,
+    effectiveIsolation,
+    selectedItem,
+  ]);
+  const applyQuickStart = useCallback(
+    (item: QuickStartInput) => {
+      const destination = findDestination(destinations, item.target);
+      if (!destination) {
+        setErrorMessage("This destination is unavailable. Choose another destination.");
+        return;
+      }
+      selectDestination(destination.option.id);
+      setPendingQuickStart({ serverId: selectedServerId, template: item });
+      setTemplateApplied(true);
+      setManualLaunchTarget({ kind: "chat" });
+    },
+    [destinations, selectDestination, selectedServerId],
+  );
+  // Reopening Home after a Bot chat restores that Bot with its own agent settings, through the
+  // same selection a pick makes; inference alone would launch it with the composer's settings.
+  const restoredBot = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focused || !inferredStart || startKind !== "bot" || !selectedBot) return;
+    const key = `${selectedServerId}:${selectedBot.id}`;
+    if (restoredBot.current === key) return;
+    restoredBot.current = key;
+    selectDestination(`bot:${selectedBot.id}`);
+  }, [focused, inferredStart, startKind, selectedBot, selectedServerId, selectDestination]);
+  const chooseStart = useCallback(
+    (kind: "quickChat" | "project" | "bot") => {
+      setManualLaunchTarget({ kind: "chat" });
+      if (kind === "quickChat") {
+        void prepareQuickChat();
+        return;
+      }
+      // The mode changes on the tap; the picker then asks which Project or Bot.
+      setPendingQuickStart(null);
+      setTemplateApplied(false);
+      setTemplateBaseRequired(false);
+      acceptCurrent();
+      setErrorMessage(null);
+      setStartTarget({
+        host: selectedServerId,
+        kind,
+        botId: kind === "bot" ? selectedBot?.id : undefined,
+      });
+      setProjectPickerOpen(true);
+    },
+    [prepareQuickChat, acceptCurrent, setStartTarget, selectedServerId, selectedBot],
+  );
+  const startMark = useMemo(
+    () =>
+      HOME_V2_ENABLED && startKind !== "project"
+        ? destinations
+            .find((entry) => entry.option.id === selectedProjectOptionId)
+            ?.mark?.(ICON_SIZE.md)
+        : undefined,
+    [destinations, selectedProjectOptionId, startKind],
+  );
+  const projectMark = useMemo(
+    () =>
+      startKind === "project" && selectedProject ? (
+        <ProjectIconView
+          iconDataUri={projectIconDataByProjectViewKey.get(selectedProject.viewKey) ?? null}
+          initial={(projectTriggerLabel.charAt(0) || "?").toUpperCase()}
+          projectViewKey={selectedProject.viewKey}
+          size={ICON_SIZE.md}
+          textStyle={styles.projectIconFallbackText}
+        />
+      ) : undefined,
+    [startKind, selectedProject, projectIconDataByProjectViewKey, projectTriggerLabel],
+  );
+  useQuickChatByDefault({
+    focused,
+    inferred: inferredStart,
+    supported: quickChatAllowed,
+    serverId: selectedServerId,
+    kind: startKind,
+    hasOrdinaryProject: destinations.some((entry) => entry.option.group === "Projects"),
+    prepare: prepareQuickChat,
+  });
+  const quickChat = useCallback(() => chooseStart("quickChat"), [chooseStart]);
+  const choices = useMemo(
+    () => (
+      <StartSwitcher
+        kind={startKind}
+        size={isCompact ? "md" : "sm"}
+        disabled={isPending}
+        label={projectTriggerLabel}
+        mark={startKind === "project" ? projectMark : startMark}
+        anchorRef={projectPickerAnchorRef}
+        quickChat={quickChatAllowed}
+        onQuickChat={quickChat}
+        onPick={chooseStart}
+      />
+    ),
+    [
+      startKind,
+      isCompact,
+      isPending,
+      projectTriggerLabel,
+      projectMark,
+      startMark,
+      quickChatAllowed,
+      quickChat,
+      chooseStart,
+    ],
+  );
+  const quickStarts = useMemo(
+    () => (
+      <QuickStarts
+        key={selectedServerId}
+        serverId={selectedServerId}
+        destinations={destinations}
+        snapshot={snapshotQuickStart}
+        onApply={applyQuickStart}
+      />
+    ),
+    [selectedServerId, destinations, snapshotQuickStart, applyQuickStart],
+  );
+  const renderStartOption = useCallback(
+    (props: Parameters<NonNullable<ComboboxProps["renderOption"]>>[0]) => (
+      <StartDestinationOption {...props} destinations={crossHost.destinations} />
+    ),
+    [crossHost.destinations],
+  );
   const formStack = useNewWorkspaceFormStack({
     isCompact,
     isPending,
     project: {
       anchorRef: projectPickerAnchorRef,
       open: openProjectPicker,
-      options: projectPickerOptions,
+      ...startPicker(
+        { options: orderStartOptions(crossHost.destinations, startKind), onSelect: crossHost.pick },
+        { options: projectPickerOptions, onSelect: handleSelectProjectOption },
+      ),
       triggerLabel: projectTriggerLabel,
       selectedProject,
       iconDataByProjectViewKey: projectIconDataByProjectViewKey,
       selectedOptionId: selectedProjectOptionId,
-      onSelect: handleSelectProjectOption,
       onAddProject: handleAddProject,
       openState: projectPickerOpen,
       onOpenChange: handleProjectPickerOpenChange,
-      renderOption: renderProjectOption,
+      renderOption: HOME_V2_ENABLED ? renderStartOption : renderProjectOption,
     },
     host: {
       allHosts,
@@ -2389,82 +2857,168 @@ export function NewWorkspaceScreen({
   const screenHeaderLeft = useMemo(() => <SidebarMenuToggle />, []);
   const importSession = useImportSession({ serverId: selectedServerId });
 
-  const composer = isTerminalLaunch ? (
-    <Composer
-      key="terminal"
-      inputMode="terminal"
-      readOnly={!terminalTakesPrompt}
-      placeholder={terminalPlaceholder}
-      submitLabel={terminalSubmitLabel}
-      agentId={draftKey}
-      serverId={selectedServerId}
-      isPaneFocused={true}
-      onSubmitMessage={handleSubmitTerminalLaunch}
-      allowEmptySubmit={true}
-      submitButtonAccessibilityLabel={t("newWorkspace.launch.submit")}
-      submitButtonTestID="new-workspace-launch-submit"
-      isSubmitLoading={isPending}
-      submitBehavior="preserve-and-lock"
-      blurOnSubmit={true}
-      textSource={terminalTextSource}
-      onChangeText={setTerminalPromptText}
-      textReplacement={terminalTextReplacement}
-      attachments={NO_TERMINAL_ATTACHMENTS}
-      onChangeAttachments={noopChangeAttachments}
-      cwd={selectedSourceDirectory ?? ""}
-      clearDraft={noopClearDraft}
-      autoFocus={terminalTakesPrompt}
-      autoFocusKey={launchFocusKey}
-    />
-  ) : (
-    <Composer
-      key="chat"
-      agentId={draftKey}
-      serverId={selectedServerId}
-      isPaneFocused={true}
-      onSubmitMessage={handleSubmitNewWorkspace}
-      allowEmptySubmit={true}
-      submitButtonAccessibilityLabel={t("newWorkspace.create")}
-      submitButtonTestID="workspace-create-submit"
-      submitIcon="return"
-      isSubmitLoading={isPending}
-      waitForForgeAutoAttachOnSubmit
-      submitBehavior="preserve-and-lock"
-      blurOnSubmit={true}
-      textSource={chatDraft.textSource}
-      onChangeText={chatDraft.editText}
-      textReplacement={chatDraft.textReplacement}
-      attachments={chatDraft.attachments}
-      attachmentScopeKeys={visibleDraftContextScopeKeys}
-      onChangeAttachments={chatDraft.setAttachments}
-      onForgeChangeRequestDetected={handleForgeChangeRequestDetected}
-      onForgeChangeRequestAutoAttach={handleForgeChangeRequestAutoAttach}
-      cwd={selectedSourceDirectory ?? ""}
-      clearDraft={handleClearDraft}
-      autoFocus
-      autoFocusKey={launchFocusKey}
-      commandDraft={composerState?.commandDraft}
-      agentControls={agentControlsWithDisabled}
-    />
+  const composer = useMemo(
+    () =>
+      isTerminalLaunch ? (
+        <Composer
+          key={`terminal:${creationIdentity.draftId}`}
+          inputMode="terminal"
+          readOnly={!terminalTakesPrompt}
+          placeholder={terminalPlaceholder}
+          submitLabel={terminalSubmitLabel}
+          agentId={draftKey}
+          serverId={selectedServerId}
+          isPaneFocused={focused}
+          onSubmitMessage={handleSubmitTerminalLaunch}
+          allowEmptySubmit={true}
+          submitButtonAccessibilityLabel={t("newWorkspace.launch.submit")}
+          submitButtonTestID="new-workspace-launch-submit"
+          isSubmitLoading={isPending}
+          submitBehavior="preserve-and-lock"
+          blurOnSubmit={true}
+          textSource={terminalTextSource}
+          onChangeText={setTerminalPromptText}
+          textReplacement={terminalTextReplacement}
+          attachments={NO_TERMINAL_ATTACHMENTS}
+          onChangeAttachments={noopChangeAttachments}
+          cwd={selectedSourceDirectory ?? ""}
+          clearDraft={noopClearDraft}
+          autoFocus={terminalTakesPrompt}
+          autoFocusKey={launchFocusKey}
+        />
+      ) : (
+        <Composer
+          key={`chat:${creationIdentity.draftId}`}
+          agentId={draftKey}
+          serverId={selectedServerId}
+          isPaneFocused={focused}
+          onSubmitMessage={handleSubmitNewWorkspace}
+          allowEmptySubmit={true}
+          submitButtonAccessibilityLabel={t("newWorkspace.create")}
+          submitButtonTestID="workspace-create-submit"
+          submitIcon="return"
+          isSubmitLoading={isPending}
+          waitForForgeAutoAttachOnSubmit
+          submitBehavior="preserve-and-lock"
+          blurOnSubmit={true}
+          textSource={chatDraft.textSource}
+          onChangeText={chatDraft.editText}
+          textReplacement={chatDraft.textReplacement}
+          attachments={chatDraft.attachments}
+          attachmentScopeKeys={visibleDraftContextScopeKeys}
+          onChangeAttachments={chatDraft.setAttachments}
+          onForgeChangeRequestDetected={handleForgeChangeRequestDetected}
+          onForgeChangeRequestAutoAttach={handleForgeChangeRequestAutoAttach}
+          cwd={selectedSourceDirectory ?? ""}
+          clearDraft={handleClearDraft}
+          autoFocus={!home}
+          autoFocusKey={launchFocusKey}
+          commandDraft={composerState?.commandDraft}
+          agentControls={agentControlsWithDisabled}
+        />
+      ),
+    [
+      isTerminalLaunch,
+      creationIdentity.draftId,
+      focused,
+      terminalTakesPrompt,
+      terminalPlaceholder,
+      terminalSubmitLabel,
+      draftKey,
+      selectedServerId,
+      handleSubmitTerminalLaunch,
+      t,
+      isPending,
+      terminalTextSource,
+      setTerminalPromptText,
+      terminalTextReplacement,
+      selectedSourceDirectory,
+      launchFocusKey,
+      handleSubmitNewWorkspace,
+      chatDraft,
+      visibleDraftContextScopeKeys,
+      handleForgeChangeRequestDetected,
+      handleForgeChangeRequestAutoAttach,
+      handleClearDraft,
+      home,
+      composerState,
+      agentControlsWithDisabled,
+    ],
   );
+  const feedback = useMemo(
+    () => (
+      <StartFeedback
+        error={errorMessage}
+        configurationProblem={configurationProblem}
+        onAccept={acceptCurrent}
+      />
+    ),
+    [errorMessage, configurationProblem, acceptCurrent],
+  );
+  const composerWithFeedback = useMemo(
+    () => (
+      <>
+        {composer}
+        {feedback}
+      </>
+    ),
+    [composer, feedback],
+  );
+  // Retain selection/draft state in the navigation stack, but mount only the foreground
+  // composer: attachments, keyboard shortcuts and upload ownership have one active UI owner.
+  if (!focused) return null;
   return (
     <FileDropZone style={styles.container}>
-      <ScreenHeader left={screenHeaderLeft} borderless />
+      <StartScreenHeader home={home} left={screenHeaderLeft} />
       <View style={styles.content}>
         <TitlebarDragRegion />
-        <NewWorkspaceLayout
-          isCompact={isCompact}
-          title={t("newWorkspace.title")}
-          formStack={formStack}
-          onImportSession={importSession.open}
-        >
-          {composer}
-          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-        </NewWorkspaceLayout>
+        {HOME_V2_ENABLED ? (
+          <HomeStartLayout
+            compact={isCompact}
+            title={startTitle(home, t)}
+            choices={choices}
+            form={formStack}
+            composer={composerWithFeedback}
+            quickStarts={quickStarts}
+            serverId={selectedServerId}
+            showActivity={home}
+            onImportSession={importSession.open}
+          />
+        ) : (
+          <NewWorkspaceLayout
+            isCompact={isCompact}
+            title={t("newWorkspace.title")}
+            formStack={formStack}
+            onImportSession={importSession.open}
+          >
+            {composerWithFeedback}
+          </NewWorkspaceLayout>
+        )}
       </View>
       {importSession.sheet}
     </FileDropZone>
   );
+}
+
+/** Home names itself in the header; New workspace keeps its title in the page. */
+/** With several Hosts, the name every picker row carries; none when there is only one. */
+function hostLabelWhenSeveral(hosts: HostProfile[], serverId: string): string | undefined {
+  if (hosts.length < 2) return undefined;
+  return hosts.find((host) => host.serverId === serverId)?.label;
+}
+
+/** Home's destination picker spans Hosts and Bots; the legacy picker lists this Host's projects. */
+function startPicker<T>(home: T, legacy: T): T {
+  return HOME_V2_ENABLED ? home : legacy;
+}
+
+function StartScreenHeader({ home, left }: { home: boolean; left: ReactNode }) {
+  if (HOME_V2_ENABLED && home) return <MenuHeader title="Home" borderless />;
+  return <ScreenHeader left={left} borderless />;
+}
+
+function startTitle(home: boolean, t: TFunction): string {
+  return home ? "Where would you like to start?" : t("newWorkspace.title");
 }
 
 function NewWorkspaceLayout({
@@ -2503,6 +3057,14 @@ function NewWorkspaceLayout({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  homeMeta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[2],
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface0,
@@ -2635,3 +3197,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 4,
   },
 }));
+
+function startWorktreeSupport(project: HostProjectListItem | null, serverId: string) {
+  return project ? getWorktreeSupportForHostProject({ project, serverId }) : "unsupported";
+}

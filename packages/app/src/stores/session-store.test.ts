@@ -837,6 +837,28 @@ it("updates and clears Bot creation authority independently of feature support",
   }
 });
 
+it("keeps the Host's Quick chats folder from the handshake", () => {
+  initializeTestSession();
+  const store = useSessionStore.getState();
+  const info = {
+    status: "server_info" as const,
+    serverId: "test-server",
+    hostname: null,
+    version: null,
+  };
+  store.updateSessionServerInfo(
+    "test-server",
+    toDaemonServerInfo({ ...info, quickChatRoot: "/home/me/.clisbot/quick-chats" }),
+  );
+  expect(useSessionStore.getState().sessions["test-server"]?.serverInfo?.quickChatRoot).toBe(
+    "/home/me/.clisbot/quick-chats",
+  );
+  store.updateSessionServerInfo("test-server", toDaemonServerInfo(info));
+  expect(
+    useSessionStore.getState().sessions["test-server"]?.serverInfo?.quickChatRoot,
+  ).toBeUndefined();
+});
+
 it("retains, updates and clears startup reasons even when feature flags do not change", () => {
   initializeTestSession();
   const store = useSessionStore.getState();

@@ -86,7 +86,8 @@ async function openColdRestoredWorkspaceWithOfflineHostFirst(
     },
   );
 
-  await page.goto("/");
+  // A cold start opens Home; a link to the workspace still wins and restores it.
+  await page.goto(buildHostWorkspaceRoute(connectedServerId, workspace.workspaceId));
   await expect(page).toHaveURL(buildHostWorkspaceRoute(connectedServerId, workspace.workspaceId), {
     timeout: 60_000,
   });

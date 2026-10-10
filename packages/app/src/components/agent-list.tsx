@@ -1,3 +1,6 @@
+import { activitySections } from "@/clisbot/home/activity";
+import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
+import { ActivityRow } from "@/clisbot/home/activity-row";
 import {
   View,
   Text,
@@ -36,6 +39,7 @@ interface AgentListProps {
   showAttentionIndicator?: boolean;
   showHostColumn?: boolean;
   search?: string;
+  activityGrouping?: boolean;
 }
 
 type DateSectionKey = "today" | "yesterday" | "thisWeek" | "thisMonth" | "older";
@@ -49,7 +53,7 @@ const DATE_SECTION_ORDER = [
 ] as const satisfies readonly DateSectionKey[];
 
 type FlatListItem =
-  | { type: "header"; key: string; section: DateSectionKey }
+  | { type: "header"; key: string; section: DateSectionKey; title?: string; subtle?: boolean }
   | { type: "agent"; key: string; agent: AggregatedAgent };
 
 function deriveDateSectionKey(lastActivityAt: Date): DateSectionKey {
@@ -160,7 +164,7 @@ function SessionRowTrailingAttention({
   );
 }
 
-function SessionRow({
+export function SessionRow({
   agent,
   search,
   isMobile,
@@ -346,6 +350,7 @@ export function AgentList({
   showAttentionIndicator = true,
   showHostColumn = false,
   search,
+  activityGrouping = false,
 }: AgentListProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
@@ -370,6 +375,7 @@ export function AgentList({
       const serverId = agent.serverId;
       const agentId = agent.id;
 
+      if (activityGrouping) rememberChatReturn("/sessions");
       onAgentSelect?.();
       navigateToAgent({
         serverId,
@@ -378,7 +384,7 @@ export function AgentList({
         pin: true,
       });
     },
-    [isActionSheetVisible, onAgentSelect],
+    [isActionSheetVisible, onAgentSelect, activityGrouping],
   );
 
   const handleAgentLongPress = useCallback(
@@ -413,6 +419,21 @@ export function AgentList({
   }, [actionAgent, actionClient, archiveAgent]);
 
   const flatItems = useMemo((): FlatListItem[] => {
+    if (activityGrouping) {
+      const result: FlatListItem[] = [];
+      for (const section of activitySections(agents)) {
+        result.push({
+          type: "header",
+          key: section.key,
+          section: "today",
+          title: section.title,
+          subtle: section.key.startsWith("date:"),
+        });
+        for (const agent of section.agents)
+          result.push({ type: "agent", key: `${agent.serverId}:${agent.id}`, agent });
+      }
+      return result;
+    }
     const buckets = new Map<DateSectionKey, AggregatedAgent[]>();
     for (const agent of agents) {
       const section = deriveDateSectionKey(agent.lastActivityAt);
@@ -433,17 +454,29 @@ export function AgentList({
       }
     }
     return result;
-  }, [agents]);
+  }, [agents, activityGrouping]);
 
   const renderItem: ListRenderItem<FlatListItem> = useCallback(
     ({ item }) => {
       if (item.type === "header") {
         return (
           <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>{formatDateSectionLabel(t, item.section)}</Text>
+            <Text style={item.subtle ? styles.sectionSubtitle : styles.sectionTitle}>
+              {item.title ?? formatDateSectionLabel(t, item.section)}
+            </Text>
           </View>
         );
       }
+      if (activityGrouping)
+        return (
+          <ActivityRow
+            agent={item.agent}
+            search={search}
+            showHost={showHostColumn}
+            onPress={handleAgentPress}
+            onLongPress={handleAgentLongPress}
+          />
+        );
       return (
         <SessionRow
           agent={item.agent}
@@ -466,6 +499,7 @@ export function AgentList({
       showAttentionIndicator,
       showHostColumn,
       t,
+      activityGrouping,
     ],
   );
 
@@ -575,6 +609,10 @@ const styles = StyleSheet.create((theme) => ({
   sectionTitle: {
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foregroundMuted,
+  },
+  sectionSubtitle: {
+    fontSize: theme.fontSize.sm,
     color: theme.colors.foregroundMuted,
   },
   row: {

@@ -1,8 +1,9 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { ConnectorsSidebarItem } from "@/clisbot/connectors/connectors-sidebar-item";
 import { router, usePathname } from "expo-router";
-import { CalendarClock, FolderPlus, History, Plus, Search } from "lucide-react-native";
+import { CalendarClock, FolderPlus, History, Home, Inbox, Plus, Search } from "lucide-react-native";
 import { memo, useCallback, useMemo, useRef, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import { View, type StyleProp, type ViewStyle } from "react-native";
@@ -39,11 +40,12 @@ export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps)
   const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
   const groupRef = useRef<View | null>(null);
 
-  if (visibleItems.length === 0)
+  if (visibleItems.length === 0 && !HOME_V2_ENABLED)
     return <ConnectorsSidebarItem groupStyle={style} onBeforeNavigate={onBeforeNavigate} />;
 
   return (
     <View ref={groupRef} collapsable={false} style={style}>
+      {HOME_V2_ENABLED ? <SidebarHomeRow onBeforeNavigate={onBeforeNavigate} /> : null}
       {visibleItems.map((item) => {
         if (item.kind === "plugin") {
           return (
@@ -61,6 +63,25 @@ export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps)
       })}
       <ConnectorsSidebarItem onBeforeNavigate={onBeforeNavigate} />
     </View>
+  );
+}
+
+/** Home V2 leads the navigation with Home, a destination like Inbox rather than the brand row. */
+function SidebarHomeRow({ onBeforeNavigate }: SidebarNavRowProps) {
+  const pathname = usePathname();
+  const handlePress = useCallback(() => {
+    onBeforeNavigate?.();
+    router.navigate("/open-project");
+  }, [onBeforeNavigate]);
+  return (
+    <SidebarHeaderRow
+      icon={Home}
+      label="Home"
+      onPress={handlePress}
+      isActive={pathname === "/open-project"}
+      testID="sidebar-home"
+      variant="compact"
+    />
   );
 }
 
@@ -113,8 +134,8 @@ function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
 
   return (
     <SidebarHeaderRow
-      icon={History}
-      label={t(builtinSidebarNavLabelKey("history"))}
+      icon={HOME_V2_ENABLED ? Inbox : History}
+      label={HOME_V2_ENABLED ? "Inbox" : t(builtinSidebarNavLabelKey("history"))}
       onPress={handlePress}
       isActive={pathname.includes("/sessions")}
       testID="sidebar-sessions"

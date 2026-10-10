@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { ChevronDown, Server } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -50,14 +58,14 @@ export function HostFilter({
   );
 
   const handleFilterOpen = useCallback(() => setIsFilterOpen(true), []);
-
-  const filterTriggerStyle = useCallback(
-    ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.filterTrigger,
-      Boolean(hovered) && styles.filterTriggerHovered,
-      pressed && styles.filterTriggerPressed,
-    ],
-    [],
+  const leading = useMemo(
+    () =>
+      selectedHost === ALL_HOSTS_OPTION_ID ? (
+        <ThemedServer size={14} uniProps={mutedColorMapping} />
+      ) : (
+        <HostStatusDotSlot serverId={selectedHost} />
+      ),
+    [selectedHost],
   );
 
   return (
@@ -74,27 +82,65 @@ export function HostFilter({
       desktopPlacement="bottom-start"
       hostOptionTestID={hostOptionTestID}
     >
-      <View ref={filterAnchorRef} collapsable={false} style={styles.filterTriggerWrap}>
-        <Pressable
-          onPress={handleFilterOpen}
-          style={filterTriggerStyle}
-          testID={triggerTestID}
-          accessibilityRole="button"
-          accessibilityLabel={`Filter: ${selectedHostLabel}`}
-        >
-          {selectedHost === ALL_HOSTS_OPTION_ID ? (
-            <ThemedServer size={14} uniProps={mutedColorMapping} />
-          ) : (
-            <HostStatusDotSlot serverId={selectedHost} />
-          )}
-          <Text style={styles.filterTriggerText} numberOfLines={1}>
-            {selectedHostLabel}
-          </Text>
-          <ThemedChevronDown size={14} uniProps={mutedColorMapping} />
-        </Pressable>
-      </View>
+      <FilterPill
+        anchorRef={filterAnchorRef}
+        onPress={handleFilterOpen}
+        testID={triggerTestID}
+        accessibilityLabel={`Filter: ${selectedHostLabel}`}
+        label={selectedHostLabel}
+        leading={leading}
+      />
     </HostPicker>
   );
+}
+
+/**
+ * The filter pill a list screen puts beside its search: label, chevron, and an optional leading
+ * glyph. HostFilter draws its trigger with it, and so does any other filter on the same row.
+ */
+export function FilterPill({
+  anchorRef,
+  label,
+  leading,
+  onPress,
+  testID,
+  accessibilityLabel,
+}: {
+  anchorRef: RefObject<View | null>;
+  label: string;
+  leading?: ReactNode;
+  onPress: () => void;
+  testID?: string;
+  accessibilityLabel?: string;
+}): ReactElement {
+  return (
+    <View ref={anchorRef} collapsable={false} style={styles.filterTriggerWrap}>
+      <Pressable
+        onPress={onPress}
+        style={filterTriggerStyle}
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+      >
+        {leading}
+        <Text style={styles.filterTriggerText} numberOfLines={1}>
+          {label}
+        </Text>
+        <ThemedChevronDown size={14} uniProps={mutedColorMapping} />
+      </Pressable>
+    </View>
+  );
+}
+
+function filterTriggerStyle({
+  pressed,
+  hovered = false,
+}: PressableStateCallbackType & { hovered?: boolean }) {
+  return [
+    styles.filterTrigger,
+    Boolean(hovered) && styles.filterTriggerHovered,
+    pressed && styles.filterTriggerPressed,
+  ];
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -109,15 +155,15 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[1.5],
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surfaceComposer,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.border,
   },
   filterTriggerHovered: {
-    backgroundColor: theme.colors.surface2,
+    backgroundColor: theme.colors.surface1,
   },
   filterTriggerPressed: {
-    backgroundColor: theme.colors.surface3,
+    backgroundColor: theme.colors.surface2,
   },
   filterTriggerText: {
     color: theme.colors.foreground,

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "../fixtures";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { gotoAppShell } from "./app";
 import { scrollTimelineToOldestLoadedEdge } from "./timeline-pagination";
@@ -133,8 +134,19 @@ export async function verifyDelayedWorkspaceCreation(
           (item) => item.type === "uploaded_file",
         );
         if (!upload) throw new Error("The create request did not contain the submitted file");
-        expect(await readFile(upload.path)).toEqual(CONTEXT.buffer);
         const agents = await client.fetchAgents();
+        const createdAgent = agents.entries.find(
+          (entry) => entry.agent.workspaceId === created.id,
+        )?.agent;
+        if (!createdAgent) throw new Error("Created agent missing");
+        const agentRoot = path.join(process.env.E2E_CLISBOT_HOME!, "agents");
+        const suffix = path.join(createdAgent.id, "uploads", upload.id, upload.fileName);
+        const retained = (await readdir(agentRoot, { recursive: true })).filter((file) =>
+          file.endsWith(suffix),
+        );
+        expect(retained).toHaveLength(1);
+        // Session storage moves accepted files out of temporary uploads; assert durable bytes.
+        expect(await readFile(path.join(agentRoot, retained[0]))).toEqual(CONTEXT.buffer);
         expect(
           agents.entries.find((entry) => entry.agent.workspaceId === created.id)?.agent,
         ).toMatchObject({

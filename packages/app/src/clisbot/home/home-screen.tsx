@@ -1,8 +1,10 @@
+import { HOME_V2_ENABLED } from "./feature";
+import { NewWorkspaceScreen } from "@/screens/new-workspace-screen";
+import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { useCallback, useEffect } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
-import { useHosts } from "@/runtime/host-runtime";
 import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -20,12 +22,13 @@ import { MoreActions } from "./more-actions";
  * them, then the two ways to start — a bot or a project. Everything else is a quiet link.
  */
 export function ClisbotHomeScreen() {
-  const hosts = useHosts();
+  const hosts = useAvailableHosts();
   const isCompact = useIsCompactFormFactor();
   const openDesktopAgentList = usePanelStore((s) => s.openDesktopAgentList);
   useEffect(() => {
     if (!isCompact) openDesktopAgentList();
   }, [isCompact, openDesktopAgentList]);
+  if (HOME_V2_ENABLED && hosts.length) return <NewWorkspaceScreen serverId="" home />;
   return (
     <View style={styles.container}>
       {/* The header is the window's drag region. A drag overlay inside the ScrollView would

@@ -9,6 +9,13 @@ Compact layouts have three mutually exclusive destinations:
 They are one interaction, not two independent drawers. The implementation lives in
 `packages/app/src/mobile-panels/`.
 
+## Home navigation
+
+The Home extension adds Home / Chat / Inbox / Automations tabs above the existing panel model.
+Chat selects `agent-list`; conversation detail hides tabs and provides Back to its entry surface.
+Panel gestures and the chat sidebar remain owned by the existing implementation. See
+[Home and Inbox](features/home-and-inbox/README.md) for startup, Quick starts and rollback.
+
 ## Ownership
 
 React/Zustand owns the durable intent:

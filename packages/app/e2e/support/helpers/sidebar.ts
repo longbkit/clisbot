@@ -239,6 +239,13 @@ export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
 }
 
 export async function openMobileAgentSidebar(page: Page): Promise<void> {
+  // With the Home tabs, a conversation shows Back instead of the menu; Chat is the sidebar.
+  const back = page.getByTestId("chat-back").filter({ visible: true });
+  if (await back.count()) {
+    await back.click();
+    await page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Chat" }).click();
+    return;
+  }
   await page.getByRole("button", { name: "Open menu" }).click();
 }
 

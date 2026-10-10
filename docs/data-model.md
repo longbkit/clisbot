@@ -2,6 +2,11 @@
 
 Session persistence and user/channel metadata: [agent session storage](features/agent-session-storage/README.md) — durable storage is implemented; the wider AC/W set is not yet fully accepted. Under consideration: [workspace naming and reuse](features/workspace-organization/README.md).
 
+## Quick starts
+
+Host-local daemon catalog, authenticated owner identity, per-user pins and optimistic revisions:
+[Home and Inbox data contract](features/home-and-inbox/README.md#quick-start-ownership-and-persistence).
+
 ## Project identity
 
 Projects are allocated for the exact root selected by the caller, normalized lexically with `path.resolve` (never `realpath`). New project IDs are opaque `prj_<16 hex>` values. Existing remote-shaped or path-shaped IDs are retained as readable compatibility records and are never rekeyed. An active exact root is idempotent; archived-only matches do not resurrect an old project. Workspace `projectId` is stable membership: reconciliation may update git-derived kind and branch metadata, but never rehomes a workspace or changes a project's root, ID, or default name.

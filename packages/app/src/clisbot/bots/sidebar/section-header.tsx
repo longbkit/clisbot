@@ -8,6 +8,7 @@ import {
   Layers,
   LayoutGrid,
   ListFilter,
+  MessageCircle,
   Pin,
   Plus,
 } from "lucide-react-native";
@@ -24,6 +25,7 @@ const icons = {
   "Group chats": withUnistyles(ListFilter),
   Projects: withUnistyles(LayoutGrid),
   Pinned: withUnistyles(Pin),
+  "Quick chats": withUnistyles(MessageCircle),
 };
 const Fallback = withUnistyles(Layers);
 const color = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });

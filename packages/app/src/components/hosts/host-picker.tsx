@@ -3,7 +3,8 @@ import { Pressable, Text, View } from "react-native";
 import type { GestureResponderEvent } from "react-native";
 import { Plus, Server, Settings } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { HostStatusDot } from "@/components/host-status-dot";
+import { HostMark, HostStatusDot } from "@/components/host-status-dot";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { HostsConnectionCount } from "@/clisbot/hub/settings/hosts-settings-label";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -40,7 +41,11 @@ export interface HostPickerHost {
 export function HostStatusDotSlot({ serverId }: { serverId: string }): ReactElement {
   return (
     <View style={styles.statusDotSlot}>
-      <HostStatusDot serverId={serverId} />
+      {HOME_V2_ENABLED ? (
+        <HostMark serverId={serverId} size={14} />
+      ) : (
+        <HostStatusDot serverId={serverId} />
+      )}
     </View>
   );
 }

@@ -1,3 +1,4 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import type { AppState } from "react-native";
 import type { ActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import type {
@@ -187,6 +188,8 @@ function resolveReadyIndexStartupRoute(input: ResolveIndexStartupRouteInput): St
   if (!isIndexPathname(input.route.pathname)) {
     return { kind: "render" };
   }
+
+  if (HOME_V2_ENABLED) return { kind: "redirect", href: buildOpenProjectRoute() };
 
   if (!input.isWorkspaceSelectionLoaded) {
     return { kind: "splash" };

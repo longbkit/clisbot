@@ -286,7 +286,7 @@ export async function expectNewWorkspaceDraft(page: Page, draft: string): Promis
 export async function selectNewWorkspaceHost(page: Page, hostLabel: string): Promise<void> {
   const trigger = page.getByTestId("host-picker-trigger");
   await trigger.click();
-  await page.getByRole("button", { name: hostLabel, exact: true }).click();
+  await page.getByText(hostLabel, { exact: true }).last().click();
   await expect(trigger).toContainText(hostLabel);
 }
 

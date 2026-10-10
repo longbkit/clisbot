@@ -1,3 +1,4 @@
+import { BackHeader } from "@/components/headers/back-header";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -483,6 +484,8 @@ export interface AdaptiveModalSheetProps {
   /** Whether the host supplies the scroll container. Caller-owned lists still share sheet gestures. */
   scrollable?: boolean;
   presentation?: "push" | "replace";
+  /** Compact task pages use the shared overlay stack without a draggable sheet handle. */
+  compactPresentation?: "sheet" | "page";
   /** Full body viewport below the header, including space beyond the content. */
   bodyStyle?: StyleProp<ViewStyle>;
   /** Layout intent for the sheet body, composed over the sheet's own content inset. */
@@ -507,6 +510,7 @@ export function AdaptiveModalSheet({
   desktopHeight,
   scrollable = true,
   presentation,
+  compactPresentation,
   contentStyle,
   bodyStyle,
   sizeContentToCurrentSnapPoint = true,
@@ -517,7 +521,11 @@ export function AdaptiveModalSheet({
   const isMobile = useIsCompactFormFactor();
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardVisibility(visible);
-  const resolvedSnapPoints = useMemo(() => snapPoints ?? ["65%", "90%"], [snapPoints]);
+  const isPage = compactPresentation === "page";
+  const resolvedSnapPoints = useMemo(
+    () => resolveTaskSnapPoints(isPage, snapPoints),
+    [snapPoints, isPage],
+  );
   const compactSafeAreaPadding = useMemo(
     () =>
       getCompactSheetSafeAreaPadding({
@@ -623,7 +631,7 @@ export function AdaptiveModalSheet({
   if (isMobile) {
     const sheetContent = (
       <>
-        <SheetHeaderView header={header} onClose={onClose} testID={testID} />
+        <CompactTaskHeader isPage={isPage} header={header} onClose={onClose} testID={testID} />
         <View style={[styles.compactStaticContent, bodyStyle]}>
           {scrollable ? (
             <ScrollView
@@ -658,8 +666,10 @@ export function AdaptiveModalSheet({
         onChange={handleSheetChange}
         onDismiss={handleDismiss}
         backdropOpacity={0.45}
-        enablePanDownToClose
-        backgroundComponent={SheetBackground}
+        enablePanDownToClose={!isPage}
+        enableContentPanningGesture={!isPage}
+        enableHandlePanningGesture={!isPage}
+        {...compactTaskPresentation(isPage)}
         handleIndicatorStyle={handleIndicatorStyle}
         keyboardBehavior="extend"
         keyboardBlurBehavior="restore"
@@ -748,4 +758,29 @@ export function AdaptiveModalSheet({
       <View style={styles.nativeDialogSurface}>{desktopContent}</View>
     </IsolatedBottomSheetModal>
   );
+}
+
+function compactTaskPresentation(isPage: boolean) {
+  // BackHeader owns the safe-area inset, just as it does on a routed screen.
+  if (isPage) return { topInset: 0, handleComponent: null };
+  return { backgroundComponent: SheetBackground };
+}
+function CompactTaskHeader({
+  isPage,
+  header,
+  onClose,
+  testID,
+}: {
+  isPage: boolean;
+  header: SheetHeader;
+  onClose: () => void;
+  testID?: string;
+}) {
+  if (isPage)
+    return <BackHeader title={header?.title} onBack={onClose} rightContent={header?.actions} />;
+  return <SheetHeaderView header={header} onClose={onClose} testID={testID} />;
+}
+
+function resolveTaskSnapPoints(page: boolean, snapPoints?: string[]) {
+  return page ? ["100%"] : (snapPoints ?? ["65%", "90%"]);
 }

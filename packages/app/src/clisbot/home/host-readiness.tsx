@@ -33,7 +33,7 @@ const CONNECTION: Record<HostRuntimeConnectionStatus, { label: string; tone: Ton
 };
 
 /** Providers a Host can add: the built-ins (less the test mocks) and the ACP catalog. */
-const ADDABLE_PROVIDER_COUNT = new Set([
+export const ADDABLE_PROVIDER_COUNT = new Set([
   ...AGENT_PROVIDER_DEFINITIONS.map((definition) => definition.id).filter(
     (id) => !id.startsWith("mock"),
   ),

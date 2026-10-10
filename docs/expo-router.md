@@ -28,7 +28,11 @@ render a blank screen.
 
 ## Startup
 
-The root `/` route chooses a host boundary. It does not jump directly into a host
+With the Home extension enabled (default), a cold `/` launch opens `/open-project`. Explicit
+workspace/chat links win, and resuming from background preserves the current screen. See
+[Home and Inbox](features/home-and-inbox/README.md) for tab navigation and rollback.
+
+With `EXPO_PUBLIC_CLISBOT_HOME_V2=0`, the root `/` route chooses a host boundary. It does not jump directly into a host
 leaf.
 
 - Good: `/` -> `/h/[serverId]`

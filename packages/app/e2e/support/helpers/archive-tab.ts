@@ -248,7 +248,7 @@ export async function openSessions(page: Page): Promise<void> {
   await expect(sessionsButton).toBeVisible({ timeout: 30_000 });
   await sessionsButton.click();
   await expectAppRoute(page, buildSessionsRoute(), { timeout: 30_000 });
-  await expect(page.getByText("History", { exact: true }).last()).toBeVisible({
+  await expect(page.getByText("Inbox", { exact: true }).last()).toBeVisible({
     timeout: 30_000,
   });
 }

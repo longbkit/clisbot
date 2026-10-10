@@ -1,7 +1,10 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { BotsSectionHeader, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
+import { QuickChatsSection } from "@/clisbot/quick-chats/quick-chats-section";
 import { router } from "expo-router";
 import {
   CircleGauge,
@@ -689,16 +692,23 @@ function MobileSidebar({
   insetsBottom,
   closeSidebar,
 }: MobileSidebarProps) {
+  const handleConversationPress = useCallback(() => {
+    if (HOME_V2_ENABLED) rememberChatReturn("/chat");
+    closeSidebar();
+  }, [closeSidebar]);
   const botsAndChatsSections = useMemo(
-    () => <BotsAndChatsSidebarSections onBeforeNavigate={closeSidebar} />,
-    [closeSidebar],
+    () => (
+      <>
+        <BotsAndChatsSidebarSections onBeforeNavigate={handleConversationPress} />
+        <QuickChatsSection onBeforeNavigate={handleConversationPress} />
+      </>
+    ),
+    [handleConversationPress],
   );
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture();
 
-  const handleWorkspacePress = useCallback(() => {
-    closeSidebar();
-  }, [closeSidebar]);
+  const handleWorkspacePress = handleConversationPress;
 
   const mobileSidebarInsetStyle = useMemo(
     () => ({
@@ -1222,6 +1232,11 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 
-const botsAndChatsSectionsElement = <BotsAndChatsSidebarSections />;
+const botsAndChatsSectionsElement = (
+  <>
+    <BotsAndChatsSidebarSections />
+    <QuickChatsSection />
+  </>
+);
 
 const displayPreferencesMenuElement = <SidebarDisplayPreferencesMenu />;

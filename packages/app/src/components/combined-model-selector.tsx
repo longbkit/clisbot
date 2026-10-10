@@ -42,6 +42,8 @@ interface CombinedModelSelectorProps {
     hovered: boolean;
     pressed: boolean;
   }) => React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onOpen?: () => void;
   onClose?: () => void;
   onRetryProvider?: (provider: AgentProvider) => void;
@@ -77,6 +79,8 @@ export function CombinedModelSelector({
   onCreateProfile,
   onEditProfile,
   renderTrigger,
+  open: controlledOpen,
+  onOpenChange,
   onOpen,
   onClose,
   onRetryProvider,
@@ -92,7 +96,8 @@ export function CombinedModelSelector({
   const isCompact = useIsCompactFormFactor();
   const modelBrowserScrolling = resolveModelBrowserScrolling({ isNative, isCompact });
   const anchorRef = useRef<View>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [localOpen, setIsOpen] = useState(false);
+  const isOpen = controlledOpen ?? localOpen;
   const [isContentReady, setIsContentReady] = useState(isWeb);
   const browser = useModelBrowser({
     providers,
@@ -107,6 +112,7 @@ export function CombinedModelSelector({
   const handleOpenChange = useCallback(
     (open: boolean) => {
       setIsOpen(open);
+      onOpenChange?.(open);
       if (open) {
         prepareToOpen();
         onOpen?.();
@@ -115,7 +121,7 @@ export function CombinedModelSelector({
       reset();
       onClose?.();
     },
-    [onClose, onOpen, prepareToOpen, reset],
+    [onClose, onOpen, onOpenChange, prepareToOpen, reset],
   );
 
   const handleSelect = useCallback(
