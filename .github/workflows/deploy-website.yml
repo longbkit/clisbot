@@ -23,6 +23,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: 8207c65724e22051f6016f582c2741d95df86a2d
 
       - uses: actions/setup-node@v4
         with:
@@ -41,4 +43,4 @@ jobs:
       - name: Deploy to Cloudflare Workers
         run: npm run deploy --workspace=@clisbot/website
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_APP_API_TOKEN }}
