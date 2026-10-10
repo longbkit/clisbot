@@ -43,6 +43,9 @@ buildNpmPackage {
       && !(lib.hasPrefix "/.claude" relPath)
       && !(lib.hasPrefix "/.codex" relPath)
       && !(lib.hasPrefix "/docker" relPath)
+      # The Hub Dockerfile points into the excluded Docker tree. Keep the
+      # source free of dangling links when electron-builder walks workspaces.
+      && relPath != "/packages/hub/Dockerfile"
       # Top-level prose only (README, CHANGELOG, AGENTS...). Deeper markdown is
       # not necessarily documentation: skills/*/SKILL.md is a runtime file the
       # installPhase copies into the output.
