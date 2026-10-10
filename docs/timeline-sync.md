@@ -227,6 +227,8 @@ prevents a later transport error from rolling back a prompt already observed.
 The daemon's accepted response waits for the correlated run start and guarantees that the canonical
 submitted row has been recorded. It publishes the accepted turn's liveness before that row, so the
 client applies authoritative activity before canonical acknowledgement retires optimistic activity.
+Provider output remains staged through the durable prompt lookup and write, so no response chunk can
+precede or straddle its canonical user row.
 Timeline render batching does not delay lifecycle application. Directory status never settles a
 submission. Overlapping sends settle independently rather than collapsing to one newest pending
 message.

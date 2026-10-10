@@ -3216,7 +3216,6 @@ export class AgentManager {
           agent.pendingReplacement = false;
         }
         const turnStartedAt = new Date();
-        pendingRun.start = { status: "started", turnId };
         agent.activeForegroundTurnId = turnId;
         this.openActiveTurn(agent, turnId, turnStartedAt);
         turnStream = this.runs.createTurnStream(turnId, (event) =>
@@ -3256,6 +3255,9 @@ export class AgentManager {
             this.handleAcceptedPromptFailure(agent, pendingRun, turnId, error),
           );
         }
+        // Keep provider output staged while the durable prompt lookup/write yields.
+        // Otherwise an assistant chunk can precede (or straddle) its canonical user row.
+        pendingRun.start = { status: "started", turnId };
         for (const stagedEvent of pendingRun.stagedEvents.splice(0)) {
           const isAcceptedTurnStart =
             stagedEvent.type === "turn_started" &&
