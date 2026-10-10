@@ -765,7 +765,10 @@ async function recordDelayedRunningTransition(
     await expect(page.getByRole("textbox", { name: "Message agent..." }).first()).toHaveValue("");
     await gate.waitForAgentStreamItem("user_message");
     await waitForActivityOracleArmed(page);
-    const elapsedBeforeAuthoritative = await page.getByTestId("turn-working-elapsed").count();
+    const elapsedBeforeAuthoritative = await page
+      .getByTestId("turn-working-elapsed")
+      .filter({ visible: true })
+      .count();
 
     if (releaseOrder === "turn-before-response") {
       gate.releaseHeldAgentStreamEvent("turn_started");

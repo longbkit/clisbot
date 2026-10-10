@@ -1,3 +1,4 @@
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
@@ -132,7 +133,9 @@ test("creates, renames, copies, and deletes entries through the file explorer", 
   const extraMutedChevronColor = await draftRow
     .locator("svg")
     .evaluate((icon) => getComputedStyle(icon).stroke);
-  expect(placeholderColor).toBe(extraMutedChevronColor);
+  // Placeholder and extra-muted icon tones are distinct in the light theme.
+  expect(placeholderColor).toBe("rgb(161, 161, 170)");
+  expect(extraMutedChevronColor).toBe("rgb(112, 112, 112)");
   await nameInput.press("Tab");
   await expect(nameInput).toBeHidden();
 
@@ -298,39 +301,21 @@ test("creates, renames, copies, and deletes entries through the file explorer", 
     .getByText("Delete", { exact: true })
     .evaluate((element) => getComputedStyle(element).color);
   await expect(deleteAction.locator("svg")).toHaveCSS("stroke", deleteLabelColor);
-  const cancelledConfirmation = new Promise<string>((resolve) => {
-    page.once("dialog", async (dialog) => {
-      const message = dialog.message();
-      await dialog.dismiss();
-      resolve(message);
-    });
-  });
+  const cancelledConfirmation = answerAppConfirmation(page, "dismiss");
   await page.getByText("Delete", { exact: true }).click();
-  expect(await cancelledConfirmation).toContain("renamed.txt");
+  expect((await cancelledConfirmation).message()).toContain("renamed.txt");
   await expect(entry("renamed.txt")).toBeVisible();
 
   await entry("renamed.txt").click({ button: "right" });
-  const confirmation = new Promise<string>((resolve) => {
-    page.once("dialog", async (dialog) => {
-      const message = dialog.message();
-      await dialog.accept();
-      resolve(message);
-    });
-  });
+  const confirmation = answerAppConfirmation(page, "accept");
   await page.getByText("Delete", { exact: true }).click();
-  expect(await confirmation).toContain("renamed.txt");
+  expect((await confirmation).message()).toContain("renamed.txt");
   await expect(entry("renamed.txt")).toBeHidden();
 
   await entry("renamed-folder").click({ button: "right" });
-  const folderConfirmation = new Promise<string>((resolve) => {
-    page.once("dialog", async (dialog) => {
-      const message = dialog.message();
-      await dialog.accept();
-      resolve(message);
-    });
-  });
+  const folderConfirmation = answerAppConfirmation(page, "accept");
   await page.getByText("Delete", { exact: true }).click();
-  expect(await folderConfirmation).toContain("renamed-folder");
+  expect((await folderConfirmation).message()).toContain("renamed-folder");
   await expect(entry("renamed-folder")).toBeHidden();
   await expect(entry("child.txt")).toBeHidden();
 });
@@ -390,7 +375,9 @@ test("shows an actionable error when the connection drops during creation", asyn
   await nameInput.press("Enter");
   await disconnect.wait();
 
-  await expect(page.getByText(/Context action connection failed/i)).toBeVisible({
+  await expect(
+    page.getByTestId("app-toast-message").filter({ hasText: /Context action connection failed/i }),
+  ).toBeVisible({
     timeout: 30_000,
   });
   await expect(
@@ -407,12 +394,7 @@ test("keeps an entry visible when deletion fails", async ({ page }) => {
     .getByTestId("file-explorer-tree-scroll")
     .getByText("README.md", { exact: true });
   await readme.click({ button: "right" });
-  const confirmation = new Promise<void>((resolve) => {
-    page.once("dialog", async (dialog) => {
-      await dialog.accept();
-      resolve();
-    });
-  });
+  const confirmation = answerAppConfirmation(page, "accept");
   await page.getByText("Delete", { exact: true }).click();
   await confirmation;
 

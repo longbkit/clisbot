@@ -137,7 +137,10 @@ test("finds literal text at the top of editable source and returns focus at the 
   });
 });
 
-test("searches the unsaved buffer while disconnected", async ({ page, withWorkspace }) => {
+test("searches unsaved content while disconnected and preserves it after reconnect", async ({
+  page,
+  withWorkspace,
+}) => {
   const gate = await installDaemonWebSocketGate(page);
   const workspace = await withWorkspace({ prefix: "pane-find-draft-" });
   const file = path.join(workspace.repoPath, "draft.txt");
@@ -145,11 +148,20 @@ test("searches the unsaved buffer while disconnected", async ({ page, withWorksp
   await workspace.navigateTo();
   await openSource(page, "draft.txt");
   await gate.drop();
+  await expect(source(page)).toBeVisible();
   await source(page).fill("unsaved needle\nsecond needle\n");
   await findInSource(page, "needle");
   await expect(status(page)).toHaveText("1 of 2");
   expect(await readFile(file, "utf8")).toBe("saved on disk\n");
   gate.restore();
+  await expect(source(page).locator(".cm-line")).toHaveText([
+    "unsaved needle",
+    "second needle",
+    "",
+  ]);
+  await findInSource(page, "needle");
+  await expect(status(page)).toHaveText("1 of 2");
+  expect(await readFile(file, "utf8")).toBe("saved on disk\n");
 });
 
 test("searches read-only source beyond the viewport without replace controls", async ({

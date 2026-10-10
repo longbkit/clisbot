@@ -43,17 +43,21 @@ async function qaScreenshot(page: Page, name: string, area?: Locator) {
   else await page.screenshot({ path: file });
 }
 
-/** Footer rows sit above the fixed bottom line, spanning it from Add project to Settings. */
+/** Footer rows span the bottom line's first action through Settings. */
 async function expectFooterRow(page: Page, row: Locator) {
   // Polled: on compact the drawer is still sliding in when the row first shows.
   await expect
     .poll(async () => {
-      const addProject = (await visibleTestId(page, "sidebar-add-project").boundingBox())!;
+      const firstAction = (await visibleTestId(page, "sidebar-footer-bottom-line")
+        .getByRole("button")
+        .filter({ visible: true })
+        .first()
+        .boundingBox())!;
       const settings = (await visibleTestId(page, "sidebar-settings").boundingBox())!;
       const box = (await row.boundingBox())!;
       return {
-        aboveBottomLine: box.y + box.height <= addProject.y,
-        alignedLeft: Math.abs(box.x - addProject.x) < 1,
+        aboveBottomLine: box.y + box.height <= firstAction.y,
+        alignedLeft: Math.abs(box.x - firstAction.x) < 1,
         alignedRight: Math.abs(box.x + box.width - (settings.x + settings.width)) < 1,
       };
     })
@@ -130,7 +134,7 @@ async function nextAlertsObservation(page: Page, previous: string | null): Promi
 }
 
 function sidebarFooter(page: Page): Locator {
-  return visibleTestId(page, "sidebar-add-project").locator("xpath=..");
+  return visibleTestId(page, "sidebar-footer");
 }
 
 test.describe("Plugin sidebar items", () => {
@@ -328,7 +332,7 @@ test.describe("Plugin sidebar items", () => {
         .first();
       const footerIcon = page
         .getByTestId("sidebar-nav-section-footer")
-        .getByTestId(`sidebar-nav-item-plugin:${SHOWCASE_PLUGIN_ID}:sync`)
+        .getByTestId(`sidebar-nav-footer-item-plugin:${SHOWCASE_PLUGIN_ID}:sync`)
         .locator("svg")
         .first();
       const markup = await showcaseIcon.innerHTML();

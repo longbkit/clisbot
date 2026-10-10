@@ -163,7 +163,13 @@ test.describe("Rewind sheet", () => {
         agentId: session.agentId,
         workspaceId: session.workspaceId,
       });
+      // The Host must establish the workspace catalog. Hold authoritative
+      // timeline reconciliation while verifying the legacy display-only row.
+      gate.holdTimelineResponses(session.agentId);
+      gate.setAgentStreamSuppressed(true);
+      gate.restore();
       await page.reload();
+      await gate.waitForHeldTimelineResponse();
       await waitForCachedMessageWithoutProviderId(page, prompt);
 
       const restoredMessage = userMessage(page, prompt);
@@ -171,6 +177,7 @@ test.describe("Rewind sheet", () => {
       await restoredMessage.hover();
       await expect(restoredMessage.getByTestId("rewind-menu-trigger")).toHaveCount(0);
     } finally {
+      gate.releaseHeldTimelineResponses();
       gate.restore();
       await session.cleanup();
     }

@@ -14,7 +14,7 @@ and rebuilds the projection when an agent resumes.
 
 The invariants are:
 
-> A continuously subscribed client applies every committed row in order. Opening or resuming an
+> A visible, continuously subscribed chat applies every committed row in order. Opening or resuming an
 > agent establishes the daemon's current tail in one bounded request, with older history reachable
 > through backward pagination.
 
@@ -79,7 +79,10 @@ cannot be reconstructed from sequence metadata. Forking the current context rema
 ## Resume behavior
 
 Opening, reconnecting, and returning from app background establish the current timeline through
-bounded catch-up. Switching between continuously subscribed open chats needs no fetch.
+bounded catch-up. Switching between continuously subscribed open chats needs no fetch when no
+payloads were skipped while hidden. The owner does not retain hidden live payloads or advance their
+cursor; revealing such a chat performs the ordinary bounded resume, followed by one latest tail
+if more newer history remains.
 Focus alone does not mutate timeline state; the response is compared with the local
 authoritative range first.
 
@@ -185,9 +188,10 @@ The app chooses one delivery policy from `server_info.features.selectiveAgentTim
   every one of those workspaces as just used (see
   [agent lifecycle](agent-lifecycle.md#workspace-activity)). Visible chats get the first catch-up
   attempt; the rest follow when those attempts settle, including failures, so a failed visible chat
-  does not starve background recovery. Split panes catch up together. Hidden chats update the
-  replica; on web their retained presentation stays suspended until revealed, on native it keeps
-  rendering. Revealing a chat reads the current store and preserves its local UI state.
+  does not starve background recovery. Split panes catch up together. Hidden chats retain their
+  last display window; skipped live payloads remain in durable history and trigger bounded catch-up
+  when revealed. On web their retained presentation stays suspended until revealed, on native it
+  keeps rendering. Revealing a chat preserves its local UI state while history catches up.
 - Legacy daemons keep globally streaming agent timelines. Visibility still triggers the existing
   authoritative catch-up, but the app does not issue selective-subscription RPCs.
 

@@ -71,7 +71,7 @@ async function crashAt(directory: string, phase: string) {
     child.on("exit", (code, signal) => {
       // A self SIGKILL uses TerminateProcess on Windows and is reported as exit code 1.
       if (signal === "SIGKILL" || (process.platform === "win32" && code === 1 && !stderr))
-        resolve(signal);
+        resolve("SIGKILL");
       else reject(new Error(`Child exited ${code}: ${stderr}`));
     });
   });

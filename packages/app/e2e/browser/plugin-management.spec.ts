@@ -9,6 +9,7 @@ import type { TestInfo } from "@playwright/test";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 import { expect, test as base, type Page } from "../support/fixtures";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { getServerId } from "../support/helpers/server-id";
 import { connectNewWorkspaceDaemonClient } from "../support/helpers/new-workspace";
@@ -384,8 +385,8 @@ async function expectSourceHierarchy(page: Page, description: string, source: st
     Number.parseFloat(getComputedStyle(element).fontSize),
   );
   expect(sourceSize).toBeLessThan(descriptionSize);
-  await expect(sourceText).toHaveCSS("color", "rgb(161, 161, 170)");
-  await expect(descriptionText).toHaveCSS("color", "rgb(113, 113, 122)");
+  await expect(sourceText).toHaveCSS("color", "rgb(112, 112, 112)");
+  await expect(descriptionText).toHaveCSS("color", "rgb(74, 74, 74)");
 }
 
 async function installLocalPluginWithStatusExamples(
@@ -508,8 +509,8 @@ async function toggleRemoveAndReinstallLocalPlugin(page: Page, directory: string
   await openContributionFromSettings(page, "Plugin v3", "Plugin v3 cleanup 6");
 
   await openPluginSettings(page);
-  page.once("dialog", (dialog) => dialog.accept());
   await selectPluginAction(page, "e2e-plugin", "Remove");
+  await answerAppConfirmation(page, "accept");
   await expect(page.getByTestId("plugin-row-e2e-plugin")).toHaveCount(0);
 
   await installPlugin(page, directory);
@@ -652,8 +653,8 @@ async function retryNpmInstallAndInspectRow(page: Page, width: number, testInfo:
 async function reloadAndRemoveNpmPlugin(page: Page) {
   await selectPluginAction(page, "npm-review", "Reload");
   await expect(page.getByText("Reloaded npm-review", { exact: true })).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
   await selectPluginAction(page, "npm-review", "Remove");
+  await answerAppConfirmation(page, "accept");
   await expect(page.getByText("Removed npm-review", { exact: true })).toBeVisible();
   await expect(page.getByLabel("npm-review running")).toHaveCount(0);
 }

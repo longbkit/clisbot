@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import {
   expectFileTabOpen,
   openFileExplorer,
@@ -107,8 +108,9 @@ async function expectDirtyConflictCanReload(page: Page): Promise<void> {
   await expectOnlyFileCallout(page, "Changed on disk");
   await expect(fileCallout(page).getByRole("button", { name: "Overwrite" })).toBeEnabled();
   await expect(fileCallout(page).getByRole("button", { name: "Reload" })).toBeEnabled();
-  page.once("dialog", (dialog) => dialog.accept());
+  const confirmation = answerAppConfirmation(page, "accept");
   await fileCallout(page).getByRole("button", { name: "Reload" }).click();
+  await confirmation;
   await expect(visibleEditor(page)).toContainText("const external = true;");
   await expect(fileCallout(page)).toHaveCount(0);
 }

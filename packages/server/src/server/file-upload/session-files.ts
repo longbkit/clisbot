@@ -159,7 +159,8 @@ async function addUploadedFiles(
     if (path.resolve(upload.path) !== path.resolve(destination)) {
       await copyDurable(upload.path, destination);
     }
-    const handle = await fs.open(destination, "r");
+    // Windows FlushFileBuffers requires a writable file handle.
+    const handle = await fs.open(destination, "r+");
     try {
       await handle.sync();
     } finally {

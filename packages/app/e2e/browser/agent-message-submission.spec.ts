@@ -524,9 +524,13 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     await expect(response).toBeVisible();
     await expectRenderedBefore(promptRow, responseStart);
     await expectRenderedBefore(promptRow, response);
-    // Open chats stay subscribed when their workspace view is evicted. Returning
-    // uses that live timeline without another resume check or startup tail fetch.
-    expect(rememberTimelineRequestCounts(gate, target.agentId)).toEqual(requestsBeforeReturn);
+    // Membership survives view eviction. The owner deliberately leaves hidden
+    // payloads in durable history; this display-only window needs one bounded
+    // tail on return, without replaying or repeatedly fetching hidden output.
+    expect(rememberTimelineRequestCounts(gate, target.agentId)).toEqual({
+      ...requestsBeforeReturn,
+      tail: requestsBeforeReturn.tail + 1,
+    });
   } finally {
     gate.setAgentStreamItemSuppressed("user_message", false);
     gate.restore();

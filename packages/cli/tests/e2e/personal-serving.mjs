@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { WebSocket } from "ws";
 import { readDaemonInstance } from "@clisbot/server/daemon-control";
 import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { selectLocalPort } from "../../dist/commands/hub/local-port.js";
 import { HubDeviceTransport } from "@clisbot/client/internal/hub-device-transport";
 import {
   createDeviceKey,
@@ -937,7 +938,8 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
       console.error("Cleanup:", error.message),
     );
   console.log("Owned services stopped.");
-  if (completed) await rm(taskHome, { recursive: true, force: true });
+  if (completed)
+    await rm(taskHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
 
 async function verifyRequiredLoginBootstrap() {
@@ -946,6 +948,16 @@ async function verifyRequiredLoginBootstrap() {
   let cookiesReceived = "";
   let verified = false;
   try {
+    // Managed service children read persisted config, not the fixture's voice env.
+    await writeFile(
+      resolvePath(requiredHome, "config.json"),
+      JSON.stringify({
+        version: 1,
+        daemon: { listen: `127.0.0.1:${await selectLocalPort(0, true)}` },
+        features: { dictation: { enabled: false }, voiceMode: { enabled: false } },
+      }),
+      { mode: 0o600 },
+    );
     const served = JSON.parse(
       await cli(
         ["hub", "start", "--personal", "--transport", "local", "--home", requiredHome, "--json"],
@@ -1053,6 +1065,7 @@ async function verifyRequiredLoginBootstrap() {
       await cli([...args, "--home", requiredHome]).catch((error) =>
         console.error("Login fixture cleanup:", error.message),
       );
-    if (verified) await rm(requiredHome, { recursive: true, force: true });
+    if (verified)
+      await rm(requiredHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }
