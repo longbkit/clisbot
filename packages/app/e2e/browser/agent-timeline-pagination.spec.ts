@@ -16,6 +16,7 @@ import {
   holdOlderHistoryPages,
   makeLoadedTimelineFitViewport,
   openAgentTimeline,
+  observeLiveAssistantText,
   rememberTimelineViewport,
   rememberTimelinePromptPosition,
   reloadAgentTimelineFromPersistedReplica,
@@ -160,6 +161,7 @@ test.describe("Agent timeline pagination", () => {
     // The live turn streams for thirty minutes, so it is still running at every assertion.
     const agent = await seedLongMockAgentTimeline({ turns: 40, liveTurns: "thirty-minute-stream" });
     try {
+      const liveText = await observeLiveAssistantText(page, agent.agentId);
       const history = await holdOlderHistoryPages(page, agent);
       await openAgentTimeline(page, agent);
       await userScrollsTimelineToHistoryStart(page);
@@ -171,7 +173,9 @@ test.describe("Agent timeline pagination", () => {
         (snapshot) => snapshot.status === "running",
       );
       const timeline = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
-      await expect(timeline.getByText("walking through").first()).toBeAttached();
+      // The live tail can be outside the mounted window while the reader is in
+      // history. Confirm delivery here, then its rendered content after returning.
+      await expect.poll(liveText).toContain("walking through");
       history.releasePage(1);
 
       await expect(timeline.getByText(agent.newestOlderPagePrompt, { exact: true })).toBeAttached();
@@ -180,6 +184,8 @@ test.describe("Agent timeline pagination", () => {
       expect(running.entries.find((entry) => entry.agent.id === agent.agentId)?.agent.status).toBe(
         "running",
       );
+      await scrollTimelineToNewestLoadedEdge(page);
+      await expect(timeline.getByText("walking through").first()).toBeAttached();
     } finally {
       await agent.cleanup();
     }

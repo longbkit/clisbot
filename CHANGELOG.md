@@ -24,6 +24,9 @@ Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/d
 - Kept Project tools available when a Connector cannot be loaded, and made newly enabled tools available to running sessions.
 - Avoided loading the daemon implementation during CLI command registration.
 - Daemon updates now update the public `clisbot` npm package and its matching CLI dependency.
+- Preserved live messages and access to older history when reconnecting to a chat.
+- Kept reading position stable when images finish loading while scrolling through chat history.
+- Kept Welcome settings accessible beside desktop window controls.
 
 ## 0.11.1 - 2026-10-07
 

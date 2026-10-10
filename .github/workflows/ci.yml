@@ -431,6 +431,9 @@ jobs:
           # Weight file groups by observed duration; raw test counts overload
           # early agent/Changes specs. Required check names remain unchanged.
           PWTEST_SHARD_WEIGHTS: "111:172:137:160"
+          # Stream rendering, Metro, and retry traces share each runner's CPU.
+          # Keep all four shards parallel, with one browser worker per runner.
+          E2E_WORKERS: "1"
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4

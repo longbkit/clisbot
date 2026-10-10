@@ -401,7 +401,8 @@ async function expectInterruptedTurnOrderAfterReconnect(
   const agent = await seedMockAgentWorkspace({
     repoPrefix: `submission-reconnect-${testInfo.workerIndex}-`,
     title: "Submission reconnect ordering",
-    model: "ten-second-stream",
+    // Queue interaction must precede natural completion, including on a busy CI worker.
+    model: "one-minute-stream",
   });
   const prompt = "Keep this prompt before its response.";
   try {
@@ -417,7 +418,7 @@ async function expectInterruptedTurnOrderAfterReconnect(
     await expect(promptRow).toBeVisible();
     await gate.waitForServerMessage("send_agent_message_response");
     await gate.drop();
-    await agent.client.waitForFinish(agent.agentId, 30_000);
+    await agent.client.waitForFinish(agent.agentId, 90_000);
     gate.setAgentStreamSuppressed(false);
     gate.forceNextTimelineEpochReset();
     gate.restoreFresh();
@@ -623,7 +624,8 @@ async function expectLegacyAssistantStartsAfterInterruptedPrompt(
   const agent = await seedMockAgentWorkspace({
     repoPrefix: `submission-legacy-assistant-${testInfo.workerIndex}-`,
     title: "Legacy assistant interrupt boundary",
-    model: "ten-second-stream",
+    // Queue interaction must precede natural completion, including on a busy CI worker.
+    model: "one-minute-stream",
   });
   const prompt = "Start the replacement answer after this prompt.";
   try {
@@ -638,7 +640,7 @@ async function expectLegacyAssistantStartsAfterInterruptedPrompt(
     const promptRow = page.getByTestId("user-message").filter({ hasText: prompt });
     const replacementAnswer = page.getByText("(end of synthetic stream)", { exact: true }).last();
     await expect(promptRow).toBeVisible();
-    await expect(replacementAnswer).toBeVisible({ timeout: 30_000 });
+    await expect(replacementAnswer).toBeVisible({ timeout: 90_000 });
     await expectRenderedBefore(promptRow, replacementAnswer);
   } finally {
     gate.setAssistantMessageIdsStripped(false);
@@ -718,20 +720,24 @@ async function expectCanonicalOrderWinsAcrossOverlappingClients(
     gate.releaseHeldClientRequest();
     await gate.waitForAgentStreamItem("user_message", userMessageCount + 1);
     await expect(localRow).toHaveAttribute("aria-busy", "false");
-    await expect(localRow.getByRole("button", { name: "Open image attachment" })).toBeVisible();
     await expect
-      .poll(async () => {
-        const localElement = await localRow.elementHandle();
-        if (!localElement) return false;
-        return remoteRow.evaluate(
-          (remoteElement, localNode) =>
-            Boolean(
-              remoteElement.compareDocumentPosition(localNode) & Node.DOCUMENT_POSITION_FOLLOWING,
-            ),
-          localElement,
-        );
-      })
+      .poll(() =>
+        page.evaluate(
+          ({ localText, remoteText }) => {
+            const rows = Array.from(document.querySelectorAll('[data-testid="user-message"]'));
+            const local = rows.find((row) => row.textContent?.includes(localText));
+            const remote = rows.find((row) => row.textContent?.includes(remoteText));
+            return Boolean(
+              local &&
+              remote &&
+              remote.compareDocumentPosition(local) & Node.DOCUMENT_POSITION_FOLLOWING,
+            );
+          },
+          { localText: localPrompt, remoteText: remotePrompt },
+        ),
+      )
       .toBe(true);
+    await expect(localRow.getByRole("button", { name: "Open image attachment" })).toBeVisible();
   } finally {
     gate.restore();
     await agent.cleanup();
@@ -1343,7 +1349,7 @@ test.describe("Agent message submission", () => {
   test("keeps a submitted prompt before its response when canonical history arrives", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     await expectInterruptedTurnOrderAfterReconnect(page, testInfo);
   });
 
@@ -1371,7 +1377,7 @@ test.describe("Agent message submission", () => {
   test("keeps an old-daemon replacement answer after its interrupted prompt", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     await expectLegacyAssistantStartsAfterInterruptedPrompt(page, testInfo);
   });
 

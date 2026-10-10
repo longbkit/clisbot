@@ -40,22 +40,14 @@ function closestToolCallToY(toolCalls: PositionedToolCall[], targetY: number) {
 }
 
 export async function readScrollMetrics(page: Page): Promise<ScrollMetrics> {
-  return getVisibleChatScroll(page).evaluate((root: Element) => {
-    const candidates = [root, ...Array.from(root.querySelectorAll("*"))]
-      .filter((element): element is HTMLElement => element instanceof HTMLElement)
-      .filter((element) => {
-        const tagName = element.tagName.toLowerCase();
-        const isEditable =
-          tagName === "textarea" ||
-          tagName === "input" ||
-          element.getAttribute("contenteditable") === "true";
-        return !isEditable && element.scrollHeight - element.clientHeight > 1;
-      });
-    const scrollElement =
-      candidates.sort(
-        (left, right) =>
-          right.scrollHeight - right.clientHeight - (left.scrollHeight - left.clientHeight),
-      )[0] ?? (root as HTMLElement);
+  return page.evaluate(() => {
+    // Read geometry in one browser task instead of waiting for a locator handle
+    // while the streaming transcript continually changes underneath it.
+    const root = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+    ).find((element) => element.getClientRects().length > 0);
+    if (!root) throw new Error("Agent chat scroll container is not visible");
+    const scrollElement = root;
 
     const offsetY = Math.max(0, scrollElement.scrollTop);
     const contentHeight = Math.max(0, scrollElement.scrollHeight);
@@ -133,11 +125,14 @@ export async function scrollChatAwayFromBottom(
   page: Page,
   input: { deltaY: number; minDistanceFromBottom: number },
 ): Promise<ScrollMetrics> {
-  const scroll = getVisibleChatScroll(page);
-  const box = await scroll.boundingBox();
-  if (!box) {
-    throw new Error("Agent chat scroll container is not visible");
-  }
+  const box = await page.evaluate(() => {
+    const root = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+    ).find((element) => element.getClientRects().length > 0);
+    if (!root) throw new Error("Agent chat scroll container is not visible");
+    const rect = root.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
   // Letting the scroll animation stop before measuring is an optimization, so it must never be
   // the thing that decides the test — the assertion below is. The old wait could not say that:
   // it resolved only from a `requestAnimationFrame` sampler started by a `wheel` listener, and
@@ -145,8 +140,12 @@ export async function scrollChatAwayFromBottom(
   // stalls the sampler on its first frame. A missed wheel event did the same. Either way the
   // test hung until its own timeout with nothing to read. A timed sampler with a deadline
   // cannot: worst case it gives up and the poll below reports what the scroll actually did.
-  const wheelSettled = scroll.evaluate((root: Element, timeoutMs: number) => {
-    const scrollElement = root as HTMLElement;
+  const wheelSettled = page.evaluate((timeoutMs: number) => {
+    const root = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+    ).find((element) => element.getClientRects().length > 0);
+    if (!root) throw new Error("Agent chat scroll container is not visible");
+    const scrollElement = root;
     return new Promise<void>((resolve) => {
       const startedAt = Date.now();
       let sawWheel = false;

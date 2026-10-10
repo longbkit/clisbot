@@ -20,11 +20,12 @@ async function completeSubmittedTurn(
   await submitMessage(page, prompt);
   const userMessage = page.getByTestId("user-message").filter({ hasText: prompt });
   await expect(userMessage).toBeVisible();
-
+  // Optimistic paint can precede the daemon receiving the submission. Waiting for
+  // idle before acknowledgement can return the previous turn's idle state.
+  await expect(userMessage).toHaveAttribute("aria-busy", "false");
   const finish = await agent.client.waitForFinish(agent.agentId, 30_000);
   expect(finish.status).toBe("idle");
   await expect(page.getByText("(end of synthetic stream)", { exact: true }).last()).toBeVisible();
-  await expect(userMessage).toHaveAttribute("aria-busy", "false");
   return userMessage;
 }
 
