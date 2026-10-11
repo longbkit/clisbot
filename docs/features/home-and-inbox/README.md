@@ -12,9 +12,18 @@ navigation row, above New workspace and Inbox, with the same active fill; an ear
 top row into "logo + Home" and "Hub" put a destination in the brand slot and left a bare "Hub"
 label floating mid-row. A cold launch at `/`
 opens `/open-project`; an explicit workspace/chat deep link wins. Background/resume does
-not reset navigation. The compact shell has Home, Chat, Inbox and Automations tabs.
-Chat opens the existing sidebar. Conversation detail hides tabs and provides Back to its
-entry surface. Settings and the aggregate Automations screen (`/schedules`) are unchanged.
+not reset navigation. The compact shell has Home, Chat, Inbox and Automations tabs, and a phone
+has no sidebar to open or close: Chat is a tab page that shows the conversation list above the
+tab bar. Tab pages have no header button and no edge swipe; every other page (conversation
+detail, and New workspace, Connectors or Bot settings opened from Chat) hides the tabs and leads
+with Back to its entry surface. Android Back follows the same model: a conversation returns to
+its entry surface, a tab other than Home goes Home, and Home leaves the app (switching tabs
+pushes routes, so the router's own Back would bounce between tabs). Chat drops the Home, Inbox
+and Automations rows the tab bar already has; its account row stays pinned while New workspace,
+Connectors and the lists scroll together. Its footer stays on one line, mirrored so New sits at
+the right edge under the thumb: Settings, Help, Hosts, Usage, Search, New, with Search reduced
+to its icon when its label does not fit whole. Settings and the aggregate Automations screen
+(`/schedules`) are unchanged.
 
 Home and New workspace share the existing creation composer, including Host, provider/model,
 effort, permission mode, attachments and launch options. Home adds Needs you, Active and

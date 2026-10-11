@@ -28,16 +28,32 @@ interface SidebarNavRowProps {
 interface SidebarNavRowsProps extends SidebarNavRowProps {
   /** Style for the group wrapper, which the sidebar owns. */
   style?: StyleProp<ViewStyle>;
+  /** The phone's Chat tab drops Home, Inbox and Automations: the tab bar below already has them. */
+  omitTabDestinations?: boolean;
 }
+
+const TAB_DESTINATIONS: ReadonlySet<BuiltinSidebarNavId> = new Set(["history", "schedules"]);
 
 /**
  * Top-level sidebar navigation, ordered and filtered by the user's
  * `sidebarNavItems` preference. Renders nothing — not even the bordered group
  * wrapper — when every item is hidden.
  */
-export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps) {
+export function SidebarNavRows({
+  style,
+  onBeforeNavigate,
+  omitTabDestinations = false,
+}: SidebarNavRowsProps) {
   const { items } = useSidebarNavItems("header");
-  const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
+  const visibleItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          item.visible &&
+          !(omitTabDestinations && item.kind !== "plugin" && TAB_DESTINATIONS.has(item.id)),
+      ),
+    [items, omitTabDestinations],
+  );
   const groupRef = useRef<View | null>(null);
 
   if (visibleItems.length === 0 && !HOME_V2_ENABLED)
@@ -45,7 +61,9 @@ export function SidebarNavRows({ style, onBeforeNavigate }: SidebarNavRowsProps)
 
   return (
     <View ref={groupRef} collapsable={false} style={style}>
-      {HOME_V2_ENABLED ? <SidebarHomeRow onBeforeNavigate={onBeforeNavigate} /> : null}
+      {HOME_V2_ENABLED && !omitTabDestinations ? (
+        <SidebarHomeRow onBeforeNavigate={onBeforeNavigate} />
+      ) : null}
       {visibleItems.map((item) => {
         if (item.kind === "plugin") {
           return (

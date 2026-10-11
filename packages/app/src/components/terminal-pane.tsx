@@ -87,6 +87,7 @@ import {
   type OpenFileDisposition,
   type WorkspaceFileOpenRequest,
 } from "@/workspace/file-open";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 
 interface TerminalPaneProps {
   serverId: string;
@@ -989,7 +990,8 @@ export function TerminalPane({
   }, []);
 
   const handleSwipeRight = useCallback(() => {
-    if (!swipeGesturesEnabled) return;
+    // Home V2 phones reach conversations through the Chat tab, not a swipe.
+    if (!swipeGesturesEnabled || HOME_V2_ENABLED) return;
     emulatorRef.current?.blur();
     showMobileAgentList();
   }, [swipeGesturesEnabled, showMobileAgentList]);

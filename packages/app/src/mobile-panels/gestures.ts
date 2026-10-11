@@ -130,7 +130,7 @@ export function useOpenAgentListGesture(enabled: boolean) {
   );
 }
 
-export function useCloseAgentListGesture() {
+export function useCloseAgentListGesture(enabled = true) {
   const {
     beginGesture,
     finishGesture,
@@ -148,6 +148,7 @@ export function useCloseAgentListGesture() {
     () =>
       Gesture.Pan()
         .withRef(leftCloseGestureRef)
+        .enabled(enabled)
         .manualActivation(true)
         .onTouchesDown((event) => {
           const touch = event.changedTouches[0];
@@ -207,6 +208,7 @@ export function useCloseAgentListGesture() {
     [
       beginGesture,
       commit,
+      enabled,
       finishGesture,
       leftCloseGestureRef,
       motionState,

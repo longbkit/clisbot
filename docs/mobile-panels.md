@@ -11,10 +11,12 @@ They are one interaction, not two independent drawers. The implementation lives 
 
 ## Home navigation
 
-The Home extension adds Home / Chat / Inbox / Automations tabs above the existing panel model.
-Chat selects `agent-list`; conversation detail hides tabs and provides Back to its entry surface.
-Panel gestures and the chat sidebar remain owned by the existing implementation. See
-[Home and Inbox](features/home-and-inbox/README.md) for startup, Quick starts and rollback.
+The Home extension (`HOME_V2_ENABLED`) adds Home / Chat / Inbox / Automations tabs above the
+existing panel model. Chat is a page, not a drawer: `/chat` selects `agent-list`, the switch has no
+slide, and the tab bar stays below the panel. The agent-list open and close gestures, the
+terminal's swipe-right and the sidebar's close button are off. If `agent-list` still settles
+closed while `/chat` is focused, the route goes Home rather than leave an empty page. See [Home and Inbox](features/home-and-inbox/README.md) for the page layout,
+startup, Quick starts and rollback.
 
 ## Ownership
 

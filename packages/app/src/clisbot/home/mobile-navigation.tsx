@@ -17,14 +17,21 @@ const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
 export function rememberChatReturn(path: string) {
   useReturn.setState({ path });
 }
+export const HOME_TAB_PATH = "/open-project";
 const entries = [
-  { path: "/open-project", name: "Home", Icon: Home },
+  { path: HOME_TAB_PATH, name: "Home", Icon: Home },
   { path: "/chat", name: "Chat", Icon: MessageSquare },
   { path: "/sessions", name: "Inbox", Icon: Inbox },
   { path: "/schedules", name: "Automations", Icon: CalendarClock },
 ];
 export function isHomeTabPath(path: string) {
   return entries.some((entry) => entry.path === path);
+}
+/** A Home V2 phone tab page: the tab bar is its navigation, so its header has no leading button. */
+export function useIsMobileTabPage() {
+  const compact = useIsCompactFormFactor();
+  const path = usePathname();
+  return HOME_V2_ENABLED && compact && isHomeTabPath(path);
 }
 function isChatDetail(path: string) {
   return path.startsWith("/h/") && (path.includes("/workspace/") || path.includes("/chat/"));
@@ -61,25 +68,39 @@ function Tab({
     </Pressable>
   );
 }
-export function MobileHomeTabs() {
-  const compact = useIsCompactFormFactor();
-  const path = usePathname();
+/**
+ * Android Back. A conversation returns to its entry surface; a tab other than Home goes Home; Home
+ * leaves the app. Switching tabs pushes routes, so the router's own Back would bounce between tabs.
+ */
+function useMobileHardwareBack(path: string, compact: boolean) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const returnPath = useReturn((s) => s.path);
   const detail = isChatDetail(path);
+  const tab = isHomeTabPath(path);
   useEffect(() => {
-    if (!HOME_V2_ENABLED || !compact || !detail) return;
+    if (!HOME_V2_ENABLED || !compact || (!detail && !tab)) return;
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (usePanelStore.getState().mobilePanel.target !== "agent") {
-        usePanelStore.getState().showMobileAgent();
+      const panels = usePanelStore.getState();
+      if (detail && panels.mobilePanel.target !== "agent") {
+        panels.showMobileAgent();
         return true;
       }
-      router.navigate(returnPath as Href);
+      if (path === HOME_TAB_PATH) {
+        BackHandler.exitApp();
+        return true;
+      }
+      panels.showMobileAgent();
+      router.navigate((detail ? returnPath : HOME_TAB_PATH) as Href);
       return true;
     });
     return () => listener.remove();
-  }, [compact, detail, returnPath, router]);
+  }, [compact, detail, path, returnPath, router, tab]);
+}
+export function MobileHomeTabs() {
+  const compact = useIsCompactFormFactor();
+  const path = usePathname();
+  const insets = useSafeAreaInsets();
+  useMobileHardwareBack(path, compact);
   const inset = useMemo(() => ({ paddingBottom: Math.max(insets.bottom, 6) }), [insets.bottom]);
   // Reads what Home and the sidebar already loaded; the tab bar never starts its own fetch.
   const { agents } = useAggregatedAgents({ demand: false });
@@ -98,7 +119,11 @@ export function MobileHomeTabs() {
     </View>
   );
 }
-export function MobileChatBack() {
+/**
+ * Home V2 phones have no sidebar to open: a tab page has no leading button, and every other page
+ * (conversation detail, or New workspace, Connectors and Bot settings opened from Chat) goes Back.
+ */
+export function MobileBack() {
   const path = usePathname();
   const router = useRouter();
   const compact = useIsCompactFormFactor();
@@ -107,11 +132,11 @@ export function MobileChatBack() {
     usePanelStore.getState().showMobileAgent();
     router.navigate(target as Href);
   }, [router, target]);
-  if (!HOME_V2_ENABLED || !compact || !isChatDetail(path)) return null;
+  if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Back to conversations"
+      accessibilityLabel="Back"
       testID="chat-back"
       onPress={back}
       style={backStyle}

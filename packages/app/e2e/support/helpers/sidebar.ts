@@ -240,36 +240,48 @@ export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
 }
 
 /**
- * Opens the compact sidebar and says where it is. With the Home tabs a conversation shows Back
- * instead of the menu and the sidebar is the Chat tab ("chat", route /chat), so leaving Settings
- * returns there; otherwise it slides over the current screen ("overlay").
+ * Opens the compact conversation list and says where it is. With the Home tabs the list is the
+ * Chat tab's page ("chat", route /chat): a tab page reaches it from the tab bar, any other page goes
+ * Back first. Without them it is a drawer opened from the menu ("overlay").
  */
 export async function openMobileAgentSidebar(page: Page): Promise<"chat" | "overlay"> {
+  const chatTab = page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Chat" });
   const back = page.getByTestId("chat-back").filter({ visible: true });
   const menu = page.getByRole("button", { name: "Open menu" }).filter({ visible: true });
   // Decide once the header has rendered, not on its first frame.
-  await expect(back.or(menu).first()).toBeVisible({ timeout: 15_000 });
-  if (await back.count()) {
-    await back.click();
-    await page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Chat" }).click();
+  await expect(chatTab.or(back).or(menu).first()).toBeVisible({ timeout: 15_000 });
+  if (!(await chatTab.isVisible()) && (await back.count())) await back.click();
+  if (await chatTab.isVisible().catch(() => false)) {
+    await chatTab.click();
     return "chat";
   }
-  await page.getByRole("button", { name: "Open menu" }).first().click();
+  await menu.first().click();
   return "overlay";
 }
 
+/** Leaves the list: the drawer's close button, or the Home tab when the list is the Chat tab. */
 export async function closeMobileAgentSidebar(page: Page): Promise<void> {
   const closeButton = page.getByTestId("sidebar-close");
-  await expect(closeButton).toBeInViewport({ ratio: 1, timeout: 5_000 });
-  await closeButton.click();
+  if (await closeButton.count()) {
+    await expect(closeButton).toBeInViewport({ ratio: 1, timeout: 5_000 });
+    await closeButton.click();
+    return;
+  }
+  await page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Home" }).click();
 }
 
-// The mobile sidebar panel animates via translateX. Waiting for its header to be fully visible
-// prevents a close click from targeting a button while the panel is still moving.
+// The mobile sidebar panel animates via translateX. Waiting for its footer to be fully visible
+// prevents a click from targeting a button while the panel is still moving. The footer is in the
+// list with and without the Home tabs (the Chat tab drops the Inbox row).
 export async function expectMobileAgentSidebarVisible(page: Page): Promise<void> {
-  await expect(page.getByTestId("sidebar-sessions")).toBeInViewport({ ratio: 1, timeout: 5_000 });
+  await expect(page.getByTestId("sidebar-footer-bottom-line")).toBeInViewport({
+    ratio: 1,
+    timeout: 5_000,
+  });
 }
 
 export async function expectMobileAgentSidebarHidden(page: Page): Promise<void> {
-  await expect(page.getByTestId("sidebar-sessions")).not.toBeInViewport({ timeout: 5_000 });
+  await expect(page.getByTestId("sidebar-footer-bottom-line")).not.toBeInViewport({
+    timeout: 5_000,
+  });
 }

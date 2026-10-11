@@ -48,7 +48,7 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     await expect(page).toHaveURL(/\/workspace\//);
     await page.getByTestId("chat-back").filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/sessions$/);
-    await page.getByTestId("menu-button").filter({ visible: true }).click();
+    await page.getByRole("tab", { name: "Chat", exact: true }).click();
     await page
       .locator('[data-testid^="sidebar-workspace-row-"]')
       .filter({ visible: true })

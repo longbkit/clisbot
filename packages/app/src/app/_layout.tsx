@@ -667,7 +667,8 @@ function MobileGestureWrapper({
   children: ReactNode;
   chromeEnabled: boolean;
 }) {
-  const openGesture = useOpenAgentListGesture(chromeEnabled);
+  // Home V2: the phone reaches conversations through the Chat tab, not an edge swipe.
+  const openGesture = useOpenAgentListGesture(chromeEnabled && !HOME_V2_ENABLED);
 
   return (
     <GestureDetector gesture={openGesture} touchAction={MOBILE_WEB_GESTURE_TOUCH_ACTION}>

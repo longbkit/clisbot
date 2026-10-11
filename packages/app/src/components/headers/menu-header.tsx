@@ -1,6 +1,5 @@
-import { usePathname } from "expo-router";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
-import { MobileChatBack } from "@/clisbot/home/mobile-navigation";
+import { MobileBack, useIsMobileTabPage } from "@/clisbot/home/mobile-navigation";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { View, type StyleProp, type ViewStyle } from "react-native";
@@ -111,7 +110,6 @@ function SidebarMenuToggleButton({
 
 export function SidebarMenuToggle({ style, ...props }: SidebarMenuToggleProps = {}) {
   const isMobile = useIsCompactFormFactor();
-  const pathname = usePathname();
   const ownsTopLeft = useOwnsWindowChromeCorner("top-left");
   const hasTopLeftWindowControls = useHasWindowChromeObstruction("top-left");
   const resolvedStyle = useMemo(() => [styles.leadingToggle, style], [style]);
@@ -120,13 +118,7 @@ export function SidebarMenuToggle({ style, ...props }: SidebarMenuToggleProps = 
     [resolvedStyle],
   );
 
-  if (
-    HOME_V2_ENABLED &&
-    isMobile &&
-    pathname.startsWith("/h/") &&
-    (pathname.includes("/workspace/") || pathname.includes("/chat/"))
-  )
-    return <MobileChatBack />;
+  if (HOME_V2_ENABLED && isMobile) return <MobileBack />;
 
   if (!isMobile && !ownsTopLeft) {
     return null;
@@ -156,6 +148,8 @@ export function WindowSidebarMenuToggle({ style, ...props }: SidebarMenuTogglePr
 }
 
 export function MenuHeader({ title, rightContent, borderless, transparent }: MenuHeaderProps) {
+  // Without a leading button the title moves in to the page's content edge.
+  const tabPage = useIsMobileTabPage();
   return (
     <ScreenHeader
       left={
@@ -165,7 +159,7 @@ export function MenuHeader({ title, rightContent, borderless, transparent }: Men
         </>
       }
       right={rightContent}
-      leftStyle={styles.left}
+      leftStyle={tabPage ? styles.leftTabPage : styles.left}
       borderless={borderless}
       transparent={transparent}
     />
@@ -181,6 +175,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   left: {
     gap: theme.spacing[2],
+  },
+  leftTabPage: {
+    gap: theme.spacing[2],
+    paddingLeft: theme.spacing[2],
   },
   mobileMenuIcon: {
     width: MOBILE_MENU_LINE_WIDTH,

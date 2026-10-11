@@ -37,6 +37,7 @@ import {
   type MobilePanelMotionState,
   type MobilePanelTransition,
 } from "./model";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 
 const ANIMATION_DURATION = 220;
 const ANIMATION_EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
@@ -128,8 +129,10 @@ export function MobilePanelsProvider({ children }: { children: ReactNode }) {
         return;
       }
       const target = transition.animationTarget;
+      // Home V2: the conversation list is the Chat tab's page, so it switches like a tab.
+      const switchesChatTab = HOME_V2_ENABLED && (target === "agent-list" || position.value < 0);
       position.value = withTiming(getMobilePanelAnchor(target), {
-        duration: ANIMATION_DURATION,
+        duration: switchesChatTab ? 0 : ANIMATION_DURATION,
         easing: ANIMATION_EASING,
       });
     },
@@ -154,13 +157,17 @@ export function MobilePanelsProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    return usePanelStore.subscribe((state, previousState) => {
+    const unsubscribe = usePanelStore.subscribe((state, previousState) => {
       const selection = state.mobilePanel;
       if (selection === previousState.mobilePanel) {
         return;
       }
       scheduleOnUI(applySelection, selection);
     });
+    // Child effects run before this one: a route that selected a panel on mount (a cold start on
+    // /chat) changed the store before this subscription existed. Applying a selection is idempotent.
+    scheduleOnUI(applySelection, usePanelStore.getState().mobilePanel);
+    return unsubscribe;
   }, [applySelection]);
 
   const beginGesture = useCallback(
