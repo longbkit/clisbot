@@ -1,9 +1,26 @@
 # Changelog
 
+## 2.0.3 - 2026-10-11
+
+### Changed
+
+- Changed Chat on phones to a tab page: the tab bar stays, with no sidebar to open or close
+- Changed the phone conversation list footer to one line, with New at the right edge
+
+### Fixed
+
+- Fixed Android Back bouncing between tabs instead of leaving the app from Home
+- Fixed Chat opening as an empty page on a cold start
+- Fixed a session imported from Clisbot 0.1.x history becoming read-only after its replay
+- Fixed a large 0.1.x history import that failed later showing the conversation as empty
+- Fixed subagent updates not being saved with their session
+- Fixed starting a saved draft deleting its session storage before the first prompt
+
 ## 2.0.2 - 2026-10-11
 
 ### Fixed
 
+- Fixed the Android app crashing on every launch after pairing a Host
 - Fixed a home upgraded from Clisbot 0.1.x starting with Clisbot and browser tools off for its agents. A home already upgraded by 2.0.0 or 2.0.1 gets them on at its next daemon start, unless you set them yourself
 
 ## 2.0.1 - 2026-10-11
