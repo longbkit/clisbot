@@ -312,6 +312,8 @@ New status pills use `<StatusBadge>`. Identity, shortcut, and interactive link b
 
 ## 15. Canonical surfaces by pattern
 
+Home exploration (proposal): [three complete HTML directions and a synthesis](audits/2026-10-09-home-concepts/directions/index.html), with [scope and Host flows](audits/2026-10-09-home-concepts/directions/README.md). All four follow current app tokens, cover local-first onboarding and context fallback, and include desktop/mobile previews. [Earlier concepts and the combined revision](audits/2026-10-09-home-concepts/README.md) remain available for comparison.
+
 | Pattern                                             | Reference                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | List+detail (compact stack, desktop sidebar+pane)   | `packages/app/src/screens/settings-screen.tsx`, `packages/app/src/screens/projects-screen.tsx`                                                                                                                                                                                                           |

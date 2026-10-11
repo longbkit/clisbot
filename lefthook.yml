@@ -9,6 +9,9 @@ pre-commit:
       run: npm run format:check:files -- {staged_files}
     - name: lint
       glob: "*.{js,jsx,ts,tsx}"
+      # Matches .oxlintrc.json ignorePatterns; oxlint fails when every passed file is ignored.
+      exclude:
+        - "docs/audits/**"
       run: npm run lint -- {staged_files}
     - name: typecheck
       # Workspace consumers resolve package declarations from dist; match CI's build-before-check order.

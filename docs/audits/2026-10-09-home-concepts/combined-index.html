@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Clisbot Home — Combined · Product UI</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="combined.css" />
+    <script defer src="data.js"></script>
+    <script defer src="views.js"></script>
+    <script defer src="app.js"></script>
+    <script defer src="actions.js"></script>
+    <script defer src="combined-icons.js"></script>
+    <script defer src="combined-model.js"></script>
+    <script defer src="combined-views.js"></script>
+    <script defer src="combined-actions.js"></script>
+  </head>
+  <body class="product-review">
+    <header class="review-bar" aria-label="Điều khiển bản thiết kế">
+      <div class="review-brand">Clisbot Home <small>Combined · theo UI sản phẩm</small></div>
+      <div class="review-tools">
+        <button class="review-link" data-action="host-guide">Luồng Host</button>
+        <button
+          class="review-icon"
+          data-action="viewport"
+          aria-label="Chuyển khung xem mobile"
+        ></button>
+        <button
+          class="review-icon"
+          data-action="theme"
+          aria-label="Đổi giao diện sáng / tối"
+        ></button>
+      </div>
+    </header>
+    <div class="scenario-bar">
+      <span class="scenario-label">TRẠNG THÁI DEMO</span>
+      <label for="scenario">Trạng thái</label>
+      <select id="scenario" aria-label="Trạng thái trải nghiệm"></select>
+      <span id="scenario-description"></span>
+      <button class="scenario-reset" data-action="reset">Đặt lại ↺</button>
+    </div>
+    <div class="stage"><div id="app" class="app-shell"></div></div>
+    <footer id="concept-note" class="concept-note"></footer>
+    <dialog id="modal" aria-labelledby="modal-title"></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
