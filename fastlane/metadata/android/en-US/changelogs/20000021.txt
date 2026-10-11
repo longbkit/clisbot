@@ -1,0 +1,4 @@
+Fixed
+- Fixed a home upgraded from Clisbot 0.1.x starting with Clisbot and browser tools off for its agents. A home already upgraded by 2.0.0 or 2.0.1 gets them on at its next daemon start, unless you set them yourself
+
+Full notes: https://clisbot.com/changelog

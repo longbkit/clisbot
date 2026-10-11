@@ -1,6 +1,6 @@
 {
   "name": "clisbot-workspace",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "description": "Clisbot: voice-controlled development environment for local AI coding agents",
   "keywords": [
