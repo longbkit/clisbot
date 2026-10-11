@@ -6,8 +6,6 @@ import { SiteShell } from "~/components/site-shell";
 import { pageMeta } from "~/meta";
 import {
   downloadUrls,
-  appStoreUrl,
-  playStoreUrl,
   thanksPageHref,
   webAppUrl,
   AppleIcon,
@@ -135,7 +133,7 @@ function Download() {
         <div className="divide-y divide-border">
           <PlatformRow icon={AndroidIcon} label="Android">
             <PillGroup>
-              {!onBeta && <DownloadPill href={playStoreUrl} label="Play Store" external />}
+              {!onBeta && <PendingStorePill label="Google Play" />}
               <DownloadPill href={thanksPageHref(urls.androidApk)} label="APK" />
             </PillGroup>
           </PlatformRow>
@@ -143,7 +141,7 @@ function Download() {
           {!onBeta && (
             <PlatformRow icon={AppleIcon} label="iOS">
               <PillGroup>
-                <DownloadPill href={appStoreUrl} label="App Store" external />
+                <PendingStorePill label="App Store" />
               </PillGroup>
             </PlatformRow>
           )}
@@ -321,6 +319,19 @@ function PlatformRow({
 
 function PillGroup({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2">{children}</div>;
+}
+
+function PendingStorePill({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-4 py-1.5 text-sm font-medium text-muted-foreground cursor-not-allowed"
+    >
+      {label}
+      <span className="text-xs">Pending</span>
+    </button>
+  );
 }
 
 function DownloadPill({

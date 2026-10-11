@@ -69,12 +69,10 @@ import { CursorFieldProvider } from "~/components/butterfly";
 import { CommandDialog } from "~/components/command-dialog";
 import { AGENT_PAGES } from "~/data/agent-pages";
 import {
-  appStoreUrl,
-  playStoreUrl,
   getDesktopDownload,
-  MOBILE_STORES,
+  MOBILE_DOWNLOADS,
   AppleIcon,
-  PlayStoreIcon,
+  AndroidIcon,
   TerminalIcon,
 } from "~/downloads";
 import type { DesktopPlatform, MobilePlatform } from "~/platform";
@@ -867,10 +865,10 @@ function DesktopDownloadButton({ platform }: { platform: DesktopPlatform }) {
 }
 
 function StoreButton({ platform }: { platform: MobilePlatform }) {
-  const store = MOBILE_STORES[platform];
+  const store = MOBILE_DOWNLOADS[platform];
   const Icon = store.icon;
   return (
-    <a href={store.href} target="_blank" rel="noopener noreferrer" className={PRIMARY_CTA_CLASS}>
+    <a href={store.href} className={PRIMARY_CTA_CLASS}>
       <Icon className="h-4 w-4" />
       Get the {store.label} app
     </a>
@@ -892,22 +890,18 @@ function StoreIconLinks() {
   return (
     <>
       <a
-        href={appStoreUrl}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={MOBILE_DOWNLOADS.ios.href}
         className={SECONDARY_CTA_CLASS}
-        aria-label="App Store"
+        aria-label="iOS downloads"
       >
         <AppleIcon className="h-5 w-5" />
       </a>
       <a
-        href={playStoreUrl}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={MOBILE_DOWNLOADS.android.href}
         className={SECONDARY_CTA_CLASS}
-        aria-label="Google Play"
+        aria-label="Android downloads"
       >
-        <PlayStoreIcon className="h-5 w-5" />
+        <AndroidIcon className="h-5 w-5" />
       </a>
     </>
   );
