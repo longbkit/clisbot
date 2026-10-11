@@ -71,9 +71,10 @@ const isDown = (status: HostRuntimeConnectionStatus) => status === "offline" || 
  */
 export function pickStripHosts(hosts: readonly StripHost[], limit = 3): StripHost[] {
   const local = hosts.filter((host) => host.local);
+  // Hermes has no Array.prototype.toSorted; filter() already returns a fresh array to sort.
   const others = hosts
     .filter((host) => !host.local && (host.lastActivity !== null || host.named))
-    .toSorted(
+    .sort(
       (a, b) =>
         (b.lastActivity ?? 0) - (a.lastActivity ?? 0) ||
         Number(b.status === "online") - Number(a.status === "online") ||

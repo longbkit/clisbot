@@ -25,7 +25,7 @@ export function RoundsField({
   const options = useMemo(() => {
     const values = CHOICES.includes(value as (typeof CHOICES)[number])
       ? [...CHOICES]
-      : [...CHOICES, value].toSorted((left, right) => left - right);
+      : [...CHOICES, value].sort((left, right) => left - right);
     return values.map((rounds) => ({
       id: String(rounds),
       value: String(rounds),
