@@ -329,38 +329,35 @@ Local-only `start`, `daemon run`, `config`, `onboard`, and `set-password` reject
 ## Hub
 
 ```bash
-clisbot hub login [url]          # Advanced: grant durable organization API access
-clisbot hub init                 # Create and optionally deploy a starter trigger here
-clisbot hub connect [url]        # Add this Host with one browser approval (no login)
-clisbot hub projects             # List legacy projects in the authenticated organization
+clisbot hub start --personal     # Start a personal Hub on this machine (no account sign-in)
+clisbot hub stop                 # Stop the local Hub; the daemon keeps running
+clisbot hub pair                 # Pair a device with the personal Hub
+clisbot hub devices              # List, label and revoke paired Hub devices
+clisbot hub init                 # Create an assistant Bot here and connect any supplied channel
+clisbot hub connect [url]        # Add this Host to a Hub with one browser approval (no login)
 clisbot hub status               # Show the current Hub relationship
 clisbot hub permissions list     # Show what this Hub may do on this daemon
-clisbot hub permissions grant hub.execute    # Let Hub automations run agents here
-clisbot hub permissions revoke hub.execute   # Take it back
-clisbot hub disconnect           # End it
-clisbot hub deploy               # Validate and install .clisbot/triggers/*.yml
-clisbot hub deploy --dry-run     # Validate without installing
-clisbot hub deploy -p <project>   # Deploy an existing legacy project bundle
+clisbot hub permissions revoke hub.execute   # Stop Hub from running agents here
+clisbot hub disconnect           # End the relationship
+clisbot hub login [url]          # Advanced: grant durable organization API access
 clisbot hub logout               # Remove the active stored CLI login
+
+clisbot channels add <channel>   # Add a channel Connection to the running Hub
+clisbot channels ls              # List channel Connections and their state
+clisbot bot list                 # List Bots with their live channel status
 ```
 
-Run deploy from the repository root. By default it reads every direct `.clisbot/triggers/*.yml` file in deterministic path order. It validates all triggers before installing them one at a time. If an installation fails after earlier ones succeeded, the error lists the installed files. `--dry-run` only validates; it does not create or activate revisions.
-
-Pass `-p, --project <slug>` for an existing legacy bundle: `.clisbot/hub.yml`, direct `.clisbot/workflows/*.yml` files, and referenced workflow partials. See [Deploy from the CLI](/docs/hub/configuration#deploy-from-the-cli).
+`init` seeds a Bot with starter instructions on this daemon. Pass `--telegram-bot-token`, or `--slack-bot-token` with `--slack-app-token`, to connect that channel too. See [Hub quickstart](/docs/hub/quickstart). The earlier `hub deploy` and `hub projects` commands exist only with `CLISBOT_ONBOARDING_ENABLED=0`.
 
 `connect <url>` is the Host onboarding command. Approve the Host, organization and requested permissions in the browser; the command enrolls it and waits for the connection, including in non-TTY/JSON mode. It creates no CLI credential. Use a scoped API key explicitly for unattended enrollment.
 
-`login` is an advanced administration command. It creates a durable credential with all five Public API scopes and no automatic expiry; it does not enroll a Host. Read [API authentication](/docs/hub/api#authentication) before using it. `logout` only deletes the local copy; server revocation is separate. The legacy guided-login/scaffold flow is available only with `CLISBOT_ONBOARDING_ENABLED=0`.
-
-`init` requires a TTY. It signs in and connects the daemon as needed, then lists the organization's app connections that can back a starter trigger. One usable connection is selected automatically; with several, you choose a **Trigger connection**. If none is ready, setup sends you to **Hub → Apps** and stops before selecting an agent or writing files.
-
-Setup asks which agent provider, model, and mode to run. Providers must be enabled and expose both a selectable model and an execution mode. Suggested model and mode entries are the daemon's defaults; a mode is still selected explicitly when there is no default. Hub validates the choice against the daemon before deploying, and accepts only Claude, Codex, and OpenCode for its unattended runs. `deploy` applies the same checks, so it needs the named daemon connected. Setup then asks for the identity allowed to trigger the bot: a GitHub username, Slack member ID, or Discord user ID. It validates the trigger, writes `.clisbot/triggers/<provider>-help.yml`, and asks whether to deploy. Replacing that file requires confirmation; existing legacy bundles and other trigger files are preserved. See the [generated starter trigger](/docs/hub/configuration#generated-starter-trigger).
+`login` is an advanced administration command. It creates a durable credential with all five Public API scopes and no automatic expiry; it does not enroll a Host. Read [API authentication](/docs/hub/api#authentication) before using it. `logout` only deletes the local copy; server revocation is separate.
 
 Interactive logout checks the same-origin daemon relationship and asks whether to disconnect before deleting the login. Declining removes only the login. JSON and noninteractive logout never prompt or disconnect implicitly; `--disconnect-daemon` is the explicit automation path, and `--force` applies to that daemon disconnection. If a requested disconnection fails, the login is preserved.
 
 Every command resolves and normalizes its destination before Hub or daemon work. Origin precedence is an explicit command origin or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login origin. There is no hosted default: with none of these, the command stops and asks for a Hub URL. Credential precedence is `--api-key <secret>`, then `CLISBOT_HUB_API_KEY`, then a stored login for the exact resolved origin. A stored credential is never sent to a different origin. API keys passed through flags or the environment are not stored.
 
-Human output reports the resolved destination before each action. JSON output keeps stdout machine-readable and includes the normalized Hub origin. Bundle diagnostics identify paths without printing configuration contents or credentials.
+Human output reports the resolved destination before each action. JSON output keeps stdout machine-readable and includes the normalized Hub origin.
 
 See [Daemons in Hub](/docs/hub/daemons), [Hub configuration](/docs/hub/configuration), and the [Hub public API](/docs/hub/api).
 

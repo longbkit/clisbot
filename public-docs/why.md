@@ -38,7 +38,7 @@ Clisbot is a self-hostable platform for running and orchestrating coding agents.
 
 - The CLI exposes the same surface as the app. Anything in the UI is scriptable.
 - [Clisbot tools](/docs/orchestration). Agents can drive Clisbot themselves: create isolated workspaces, spawn subagents, open terminals, and send prompts.
-- [Hub](/docs/hub). A service you host that starts agents on your daemon when someone mentions you on GitHub, Slack, or Discord.
+- [Hub](/docs/hub). A service you host that lets you chat with your agents from Slack, Telegram, and other chat apps, shares your daemons with a team, and starts agents from GitHub, Slack, or Discord activity.
 
 ## What it isn't
 

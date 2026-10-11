@@ -27,7 +27,7 @@ Save that key in your deployment secrets and reuse it across restarts. You can
 instead mount a secret and set `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` to its
 absolute path. Set exactly one key source.
 
-Follow the [quickstart](/docs/hub/quickstart) to connect Slack over Socket Mode and run the first workflow without a public server.
+Follow the [quickstart](/docs/hub/quickstart) to create your assistant and connect Slack over Socket Mode or Telegram without a public server.
 
 ## Local data
 
@@ -87,13 +87,13 @@ Use PostgreSQL for a durable server deployment, more than one Hub process, or an
 
 Hub holds up to 30 connections to PostgreSQL. Set `CLISBOT_HUB_DATABASE_POOL_SIZE` to change that; keep every Hub process's pool, added together, under the server's `max_connections`.
 
-The database also stores Hub's generated authentication secret. Set `CLISBOT_HUB_AUTH_SECRET` only when the deployment must supply that secret from a platform secret store. While the override is set, Hub uses it without replacing the stored secret. Changing the effective secret signs everyone out of the dashboard; execution credentials already issued remain valid until their execution ends.
+The database also stores Hub's generated authentication secret. Set `CLISBOT_HUB_AUTH_SECRET` only when the deployment must supply that secret from a platform secret store. While the override is set, Hub uses it without replacing the stored secret. Changing the effective secret signs everyone out of Hub; execution credentials already issued remain valid until their execution ends.
 
 ## App configuration
 
 The operator configures GitHub, Slack, and Discord under **Apps**. Hub verifies the credentials before saving them in its database and starts the same provider runtime used by environment-configured deployments.
 
-Environment variables remain available for deployments that manage secrets outside Hub. A complete environment configuration takes precedence over a saved application and appears as **Managed by environment** in the dashboard.
+Environment variables remain available for deployments that manage secrets outside Hub. A complete environment configuration takes precedence over a saved application and appears as **Managed by environment** in the app's Hub settings.
 
 ```sh
 # GitHub
@@ -134,7 +134,7 @@ CLISBOT_BOOTSTRAP_OWNER_EMAIL=me@example.com
 CLISBOT_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
 ```
 
-The password must be at least 12 characters. Sign in once, replace it in the dashboard, then remove `CLISBOT_BOOTSTRAP_OWNER_PASSWORD`. Hub keeps the account and organization.
+The password must be at least 12 characters. Sign in once, replace it in the app's Hub settings, then remove `CLISBOT_BOOTSTRAP_OWNER_PASSWORD`. Hub keeps the account and organization.
 
 ## Docker Compose
 
@@ -213,4 +213,4 @@ Keep one machine running. Hub holds Slack Socket Mode and Discord gateway connec
 
 Pull the new image or source and deploy it. Migrations are forward-only. Back up the embedded data directory or PostgreSQL database first; it contains accounts, app credentials, configuration revisions, connections, and execution history.
 
-The first start of Hub 0.7.3 or later re-seals every stored credential in a format older builds cannot read. After that start, rolling back to an older build makes every stored credential unreadable unless you restore the backup taken before the upgrade. Right after that upgrade, the app's Hub requests fail for up to 5 minutes, until its current access token expires and it fetches a new one. An agent run that received an attachment download link before the upgrade cannot open it afterwards; send its trigger again.
+The first start of Hub 2.0.0 or later re-seals every stored credential in a format older builds cannot read. After that start, rolling back to an older build makes every stored credential unreadable unless you restore the backup taken before the upgrade. Right after that upgrade, the app's Hub requests fail for up to 5 minutes, until its current access token expires and it fetches a new one. An agent run that received an attachment download link before the upgrade cannot open it afterwards; send its trigger again.
