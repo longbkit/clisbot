@@ -333,7 +333,9 @@ agents that can access the host through a shell.
 
 `daemon.mcp.injectIntoAgents` is the Host default. A new home writes it and
 `daemon.browserTools.enabled` as `true` into its first `config.json`; a home whose file lacks them
-reads both as `false`, so an existing Host does not gain tools on upgrade. When it is `false`, no provider receives
+reads both as `false`, so an existing Host does not gain tools on upgrade. A home upgraded from
+v1 (`clisbot.json`) counts as new: the upgrade writes both as `true` unless it kept an existing
+v2 `config.json`. When it is `false`, no provider receives
 Clisbot tools unless the session's Project turns them on; otherwise the provider policy applies. A
 Project can turn them on or off and narrow them per tool
 ([Agent tools](features/connectors/README.md#agent-tools)). Provider and global policy are resolved when a

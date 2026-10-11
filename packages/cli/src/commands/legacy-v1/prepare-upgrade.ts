@@ -3,7 +3,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, chmodSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { readPersistedConfig, savePersistedConfig } from "@clisbot/server/configuration";
+import {
+  editPersistedConfig,
+  getPersistedConfigValue,
+  readPersistedConfig,
+  savePersistedConfig,
+} from "@clisbot/server/configuration";
 import { readDaemonInstance } from "@clisbot/server/daemon-control";
 import { withServiceLaunchLock } from "../../utils/service-launch-lock.js";
 import { selectLocalPort } from "../hub/local-port.js";
@@ -140,10 +145,23 @@ async function applyConfig(home: string, report: LegacyUpgradeReport): Promise<v
   replaceLegacyWrapper(home, report.backup);
 }
 
+// COMPAT(v1UpgradeTools): added in v2.0.2, remove after 2027-04-01.
+// v2.0.0 and v2.0.1 wrote an upgraded config.json without the tool switches a
+// new home gets, so those homes started with Clisbot and browser tools off.
+// A key the user has since set, either way, is left alone.
+function restoreUpgradeTools(home: string, report: LegacyUpgradeReport): void {
+  if (report.config === "preserved" || !existsSync(path.join(home, "config.json"))) return;
+  for (const field of ["daemon.mcp.injectIntoAgents", "daemon.browserTools.enabled"]) {
+    if (getPersistedConfigValue(readPersistedConfig(home), field) === undefined)
+      editPersistedConfig(home, field, { value: true });
+  }
+}
+
 async function prepare(home: string): Promise<LegacyUpgradeReport> {
   const previous = readUpgradeReport(home);
   if (previous?.phase === "prepared") {
     await stopWithReport(home, previous);
+    restoreUpgradeTools(home, previous);
     return previous;
   }
   const config = parseLegacyConfig(readFileSync(path.join(home, "clisbot.json"), "utf8"));
