@@ -1895,9 +1895,9 @@ export const en = {
     },
     scan: {
       title: "Scan QR",
-      webUnavailableTitle: "Not available on web",
-      webUnavailableBody:
-        'QR scanning is not supported in the web build. Use "Paste link" instead.',
+      cameraUnavailableTitle: "Camera not available",
+      cameraUnavailableBody:
+        'This browser cannot open the camera here. Scanning needs HTTPS and camera access for this site. Use "Paste link" instead.',
       backToSettings: "Back to Settings",
       cameraPermissionTitle: "Camera permission",
       cameraPermissionBody: "Allow camera access to scan the pairing QR code from your daemon.",

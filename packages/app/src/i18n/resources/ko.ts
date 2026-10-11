@@ -1869,9 +1869,9 @@ export const ko: TranslationResources = {
     },
     scan: {
       title: "QR 스캔",
-      webUnavailableTitle: "웹에서 사용할 수 없습니다",
-      webUnavailableBody:
-        '웹 빌드에서는 QR 스캔이 지원되지 않습니다. 대신 "링크 붙여넣기"를 사용하세요.',
+      cameraUnavailableTitle: "카메라를 사용할 수 없습니다",
+      cameraUnavailableBody:
+        '이 브라우저에서는 여기서 카메라를 열 수 없습니다. 스캔하려면 HTTPS와 이 사이트의 카메라 권한이 필요합니다. 대신 "링크 붙여넣기"를 사용하세요.',
       backToSettings: "설정으로 돌아가기",
       cameraPermissionTitle: "카메라 권한",
       cameraPermissionBody: "데몬에서 페어링 QR 코드를 스캔하려면 카메라 접근을 허용하세요.",

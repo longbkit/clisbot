@@ -1876,9 +1876,9 @@ export const ja: TranslationResources = {
     },
     scan: {
       title: "QRをスキャン",
-      webUnavailableTitle: "Webでは利用できません",
-      webUnavailableBody:
-        "QRスキャンはWebビルドではサポートされていません。代わりに「リンクを貼り付け」を使用してください。",
+      cameraUnavailableTitle: "カメラを利用できません",
+      cameraUnavailableBody:
+        "このブラウザではここでカメラを開けません。スキャンにはHTTPSとこのサイトへのカメラ許可が必要です。代わりに「リンクを貼り付け」を使用してください。",
       backToSettings: "設定に戻る",
       cameraPermissionTitle: "カメラの権限",
       cameraPermissionBody:

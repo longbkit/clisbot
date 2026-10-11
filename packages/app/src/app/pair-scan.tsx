@@ -1,5 +1,5 @@
 import { pairedHubSettingsRoute } from "@/device-access/pairing-target";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
@@ -10,7 +10,7 @@ import type { BarcodeScanningResult, BarcodeSettings } from "expo-camera";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { openPairScan } from "@/hosts/pair-scan-model";
 import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
-import { isWeb } from "@/constants/platform";
+import { isQrCameraAvailable } from "@/hosts/qr-scan-support";
 import { BackHeader } from "@/components/headers/back-header";
 import { PairLinkModal } from "@/components/pair-link-modal";
 import { Button } from "@/components/ui/button";
@@ -125,6 +125,9 @@ export default function PairScanScreen() {
   const source = typeof params.source === "string" ? params.source : "settings";
 
   const [permission, requestPermission] = useCameraPermissions();
+  const [cameraAvailable] = useState(isQrCameraAvailable);
+  // Set when the camera stream fails to start, such as when another app holds the camera.
+  const [cameraFailed, setCameraFailed] = useState(false);
 
   const navigateToPairedHost = useCallback(
     (serverId: string) => {
@@ -159,11 +162,14 @@ export default function PairScanScreen() {
     }
   }, [router]);
 
+  // Ask once per visit, after the current status loads. Every answer is a new permission object,
+  // so asking again on each change would loop as fast as a refusal returns.
+  const permissionAsked = useRef(false);
   useEffect(() => {
-    if (isWeb) return;
-    if (permission && permission.granted) return;
+    if (!cameraAvailable || !permission || permission.granted || permissionAsked.current) return;
+    permissionAsked.current = true;
     void requestPermission().catch(() => undefined);
-  }, [permission, requestPermission]);
+  }, [cameraAvailable, permission, requestPermission]);
 
   const handleScan = useCallback(
     (result: BarcodeScanningResult) =>
@@ -172,6 +178,7 @@ export default function PairScanScreen() {
   );
 
   const handleRouterBack = useCallback(() => router.back(), [router]);
+  const handleCameraMountError = useCallback(() => setCameraFailed(true), []);
   const savePasswordPairing = useCallback(
     ({ serverId }: { serverId: string }) => navigateToPairedHost(serverId),
     [navigateToPairedHost],
@@ -189,14 +196,14 @@ export default function PairScanScreen() {
     [theme.colors.foreground],
   );
 
-  if (isWeb) {
+  if (!cameraAvailable || cameraFailed) {
     return (
       <View style={styles.container}>
         <BackHeader title={t("pairing.scan.title")} onBack={handleRouterBack} />
         <View style={bodyStyle}>
           <View style={styles.permissionCard}>
-            <Text style={styles.permissionTitle}>{t("pairing.scan.webUnavailableTitle")}</Text>
-            <Text style={styles.permissionBody}>{t("pairing.scan.webUnavailableBody")}</Text>
+            <Text style={styles.permissionTitle}>{t("pairing.scan.cameraUnavailableTitle")}</Text>
+            <Text style={styles.permissionBody}>{t("pairing.scan.cameraUnavailableBody")}</Text>
             <Pressable style={styles.permissionButton} onPress={closeToSource}>
               <Text style={styles.permissionButtonText}>{t("pairing.scan.backToSettings")}</Text>
             </Pressable>
@@ -228,6 +235,7 @@ export default function PairScanScreen() {
               facing="back"
               barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
               onBarcodeScanned={handleScan}
+              onMountError={handleCameraMountError}
             />
             <View style={styles.overlay} pointerEvents="box-none">
               <View style={styles.scanFrame}>

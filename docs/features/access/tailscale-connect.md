@@ -148,9 +148,24 @@ Before                                   After
 
 Welcome's **Your own computer** shows the same list as lifted cards, ahead of the Hub card, so
 both say where the link comes from and that it carries Tailscale; **How connecting works** opens
-[clisbot.com/docs/connectivity](../../../public-docs/connectivity.md). Where no QR can be scanned
-(web, F-Droid), Paste pairing link takes the QR row's description, since "Same as the QR code"
-would point at nothing. Nothing on Welcome is filled with accent: the cards and the Hub sign-in are
+[clisbot.com/docs/connectivity](../../../public-docs/connectivity.md). Where no QR can be scanned,
+Paste pairing link takes the QR row's description, since "Same as the QR code" would point at
+nothing.
+
+Which clients scan is decided in
+[`hosts/qr-scan-support`](../../../packages/app/src/hosts/qr-scan-support.web.ts) (2026-10-11):
+
+- **Native:** every build except F-Droid, which stubs the camera module.
+- **Browser:** only a touch-first browser (`pointer: coarse`) with `getUserMedia` in a secure
+  context. Browsers hide the camera over plain `http://`, so a self-hosted web UI opened by LAN IP
+  shows "Camera not available" on the scan screen and drops the row. Mouse-first browsers and the
+  desktop app drop the row because the QR is on the same screen; the scan screen still works
+  there if opened by URL.
+- **Web decoding** uses `expo-camera`'s web scanner, which loads jsQR from `cdn.jsdelivr.net`
+  inside a worker. A browser that cannot reach the CDN shows the camera but never decodes; use
+  Paste pairing link there.
+
+Nothing on Welcome is filled with accent: the cards and the Hub sign-in are
 choices, not one CTA.
 
 ### C. Direct connection

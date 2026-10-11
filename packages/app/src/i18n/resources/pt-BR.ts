@@ -1891,9 +1891,9 @@ export const ptBR: TranslationResources = {
     },
     scan: {
       title: "Escanear QR",
-      webUnavailableTitle: "Indisponível na web",
-      webUnavailableBody:
-        'Escanear QR não é compatível com a build web. Use "Colar link" em vez disso.',
+      cameraUnavailableTitle: "Câmera indisponível",
+      cameraUnavailableBody:
+        'Este navegador não consegue abrir a câmera aqui. Escanear exige HTTPS e acesso à câmera para este site. Use "Colar link" em vez disso.',
       backToSettings: "Voltar para Configurações",
       cameraPermissionTitle: "Permissão da câmera",
       cameraPermissionBody:
