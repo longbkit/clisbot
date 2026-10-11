@@ -1,3 +1,4 @@
+import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
@@ -242,7 +243,7 @@ test.describe("Plugin sidebar items", () => {
 
     await test.step("on a compact layout the popover is a bottom sheet", async () => {
       await page.setViewportSize(COMPACT);
-      await page.getByRole("button", { name: "Open menu", exact: true }).first().click();
+      await openMobileAgentSidebar(page);
       const compactSync = footerItem(page, SHOWCASE_PLUGIN_ID, "sync");
       await expect(compactSync).toBeInViewport();
       await expectFooterRow(page, compactSync);
@@ -447,7 +448,7 @@ test.describe("Plugin sidebar items", () => {
 
     await test.step("the compact sidebar shows the same group", async () => {
       await page.setViewportSize(COMPACT);
-      await page.getByRole("button", { name: "Open menu", exact: true }).first().click();
+      await openMobileAgentSidebar(page);
       await expect(botRow(page, "bot-1")).toBeInViewport();
       await expect(botRow(page, "status")).toBeInViewport();
       await qaScreenshot(page, "phase6-compact-sidebar-bots");

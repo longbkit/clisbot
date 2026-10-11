@@ -133,7 +133,10 @@ test.describe("Workspace pane mounting", () => {
       const originalComposer = await captureRenderedNode(composer);
 
       const workspaceRoute = buildHostWorkspaceRoute(serverId, workspace.workspaceId);
-      await openCompactSettings(page, workspaceRoute);
+      const sidebar = await openCompactSettings(page, workspaceRoute);
+      // With the Home tabs Settings is reached from the Chat tab, after leaving the conversation,
+      // so there is no composer kept underneath it to check.
+      if (sidebar === "chat") return;
       await page.goBack();
       await waitForWorkspaceRoute(page, workspaceRoute);
       await expectSameRenderedNode(originalComposer, composer);

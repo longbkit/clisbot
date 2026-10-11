@@ -53,9 +53,10 @@ Picking an entry on another Host switches the Host first and selects the entry o
 own list has it (`clisbot/home/use-cross-host-picker.ts`), so the composer loads that Host's agents.
 A Host with no ordinary project opens on Quick chat, but only after its workspaces loaded (the
 project list is empty, not absent, before that) and only while no choice was made on this screen.
-When the composer has no agent on the selected Host, Home fills in the saved agent if that Host
-has it ready, else the first ready one (Claude, Codex, OpenCode, Copilot, then the Host's order),
-once per Host and agent, and never while that Host's models are still loading.
+Home never picks an agent on its own: agent choices are remembered per Host, and a Host without
+the remembered agent asks the user to choose
+([decision](../../audits/2026-10-10-hosts-from-every-saved-hub.md)). On desktop, Home's composer
+opens its pickers downward, since it sits near the top of the page.
 Only the focused composer mounts its input/upload UI while retained screens preserve draft state.
 A pending template is bound to its Host and applies only while its screen is focused. Selecting
 another destination cancels it; unavailable settings on one destination do not block another.

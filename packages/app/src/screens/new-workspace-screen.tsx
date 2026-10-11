@@ -7,7 +7,7 @@ import { findDestination } from "@/clisbot/quick-starts/model";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { HomeStartLayout, StartFeedback } from "@/clisbot/home/start-surface";
 import { StartSwitcher } from "@/clisbot/home/start-switcher";
-import { useFirstRunProvider, useQuickChatByDefault } from "@/clisbot/home/use-first-run-defaults";
+import { useQuickChatByDefault } from "@/clisbot/home/use-quick-chat-default";
 import { useCrossHostPicker } from "@/clisbot/home/use-cross-host-picker";
 import { useQuickChatAllowed, useQuickChatRoot } from "@/clisbot/quick-chats/quick-chat-projects";
 import { QuickStarts } from "@/clisbot/quick-starts/quick-starts";
@@ -2257,13 +2257,6 @@ export function NewWorkspaceScreen({
     ],
   );
 
-  useFirstRunProvider({
-    focused,
-    pending: pendingQuickStart !== null,
-    serverId: selectedServerId,
-    composer: composerState,
-    preferences: formPreferences,
-  });
   const { configurationProblem, acceptCurrent } = useStartTemplate({
     focused,
     pending: pendingQuickStart,

@@ -1,3 +1,4 @@
+import { hostFormPreferencesKey } from "../support/helpers/form-preferences";
 import { expect, type Page } from "../support/fixtures";
 import { test } from "../support/creation-fixtures";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
@@ -74,7 +75,7 @@ async function readCodexModePreference(page: Page): Promise<unknown> {
       providerPreferences?: Record<string, { mode?: unknown }>;
     };
     return parsed.providerPreferences?.codex?.mode ?? null;
-  }, CREATE_AGENT_PREFERENCES_KEY);
+  }, hostFormPreferencesKey());
 }
 
 async function selectMode(page: Page, label: string): Promise<void> {

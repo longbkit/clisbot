@@ -1,3 +1,4 @@
+import { hostFormPreferencesKey } from "../support/helpers/form-preferences";
 import { expect, test, type Page } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -52,19 +53,22 @@ async function reloadWithPersistedPreferences(page: Page): Promise<void> {
 }
 
 async function readRememberedThinking(page: Page, modelId: string): Promise<string | null> {
-  return page.evaluate((selectedModelId) => {
-    const raw = localStorage.getItem("@clisbot:create-agent-preferences");
-    if (!raw) return null;
-    const preferences = JSON.parse(raw) as {
-      providerPreferences?: { mock?: { thinkingByModel?: Record<string, string> } };
-    };
-    return preferences.providerPreferences?.mock?.thinkingByModel?.[selectedModelId] ?? null;
-  }, modelId);
+  return page.evaluate(
+    ([selectedModelId, key]) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const preferences = JSON.parse(raw) as {
+        providerPreferences?: { mock?: { thinkingByModel?: Record<string, string> } };
+      };
+      return preferences.providerPreferences?.mock?.thinkingByModel?.[selectedModelId] ?? null;
+    },
+    [modelId, hostFormPreferencesKey()] as const,
+  );
 }
 
 async function seedLegacyModelPreference(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const storageKey = "@clisbot:create-agent-preferences";
+  // The app is running, so this Host already has its own entry; the device entry would be ignored.
+  await page.evaluate((storageKey) => {
     const raw = localStorage.getItem(storageKey);
     const preferences = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     localStorage.setItem(
@@ -81,7 +85,7 @@ async function seedLegacyModelPreference(page: Page): Promise<void> {
         },
       }),
     );
-  });
+  }, hostFormPreferencesKey());
 }
 
 test.describe("Workspace draft thinking preferences", () => {

@@ -239,15 +239,23 @@ export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
   await selectSidebarGrouping(page, "statusWorkspace");
 }
 
-export async function openMobileAgentSidebar(page: Page): Promise<void> {
-  // With the Home tabs, a conversation shows Back instead of the menu; Chat is the sidebar.
+/**
+ * Opens the compact sidebar and says where it is. With the Home tabs a conversation shows Back
+ * instead of the menu and the sidebar is the Chat tab ("chat", route /chat), so leaving Settings
+ * returns there; otherwise it slides over the current screen ("overlay").
+ */
+export async function openMobileAgentSidebar(page: Page): Promise<"chat" | "overlay"> {
   const back = page.getByTestId("chat-back").filter({ visible: true });
+  const menu = page.getByRole("button", { name: "Open menu" }).filter({ visible: true });
+  // Decide once the header has rendered, not on its first frame.
+  await expect(back.or(menu).first()).toBeVisible({ timeout: 15_000 });
   if (await back.count()) {
     await back.click();
     await page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Chat" }).click();
-    return;
+    return "chat";
   }
-  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("button", { name: "Open menu" }).first().click();
+  return "overlay";
 }
 
 export async function closeMobileAgentSidebar(page: Page): Promise<void> {

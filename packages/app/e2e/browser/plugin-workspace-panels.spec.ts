@@ -13,7 +13,7 @@ import { buildAgentRoute } from "../support/helpers/mock-agent";
 import { connectNewWorkspaceDaemonClient } from "../support/helpers/new-workspace";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
-import { expectMobileAgentSidebarHidden } from "../support/helpers/sidebar";
+import { expectMobileAgentSidebarHidden, openMobileAgentSidebar } from "../support/helpers/sidebar";
 import {
   switchWorkspaceViaSidebar,
   waitForWorkspaceInSidebar,
@@ -247,7 +247,7 @@ async function openRemoteAgentFromPlugin(
 }
 
 async function openCompactSidebar(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
+  await openMobileAgentSidebar(page);
   await expect(page.getByTestId("sidebar-footer-search").filter({ visible: true })).toBeVisible();
 }
 

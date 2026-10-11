@@ -10,6 +10,7 @@ import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { HomeActivity } from "./activity-preview";
 import { HostsStrip } from "./hosts-strip";
 import { ComposerDock } from "@/composer/dock";
+import { ComposerPickerPlacementProvider } from "@/composer/picker-placement";
 import { ChevronRight, Import } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import {
@@ -179,7 +180,10 @@ export function HomeStartLayout({
         {showActivity ? <HostsStrip /> : null}
         {heading}
         {context}
-        {composer}
+        {/* The composer sits near the top here, so its pickers open downward. */}
+        <ComposerPickerPlacementProvider value="bottom-start">
+          {composer}
+        </ComposerPickerPlacementProvider>
         <StartStatus serverId={serverId} onImportSession={onImportSession} />
         {quickStarts}
         {showActivity ? <HomeActivity /> : null}

@@ -1,3 +1,4 @@
+import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { test, expect } from "../support/fixtures";
 import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import {
@@ -193,7 +194,7 @@ test.describe("Settings — compact master-detail", () => {
     const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
     await openWorkspace(page, workspace);
-    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    const sidebar = await openMobileAgentSidebar(page);
     await page.getByTestId("sidebar-hosts-trigger").click();
     await page
       .getByTestId(`sidebar-host-row-${getServerId()}`)
@@ -207,7 +208,8 @@ test.describe("Settings — compact master-detail", () => {
     await expectCompactSettingsList(page);
 
     await goBackInSettings(page);
-    await expectAppRoute(page, workspaceRoute);
+    // Settings returns to where the sidebar was: the conversation, or the Chat tab.
+    await expectAppRoute(page, sidebar === "chat" ? "/chat" : workspaceRoute);
   });
 
   test("All hosts settings opens the compact Hosts list without Hub sign-in", async ({
@@ -217,7 +219,7 @@ test.describe("Settings — compact master-detail", () => {
     const workspace = await withWorkspace({ prefix: "all-hosts-settings-back-" });
     const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
     await openWorkspace(page, workspace);
-    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await openMobileAgentSidebar(page);
     await page.getByTestId("sidebar-hosts-trigger").click();
     await expect(page.getByPlaceholder("Search hosts")).toBeVisible();
     await page
@@ -275,10 +277,15 @@ test.describe("Settings — compact master-detail", () => {
     const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
     await openWorkspace(page, workspace);
-    await openCompactSettings(page, workspaceRoute);
+    const sidebar = await openCompactSettings(page, workspaceRoute);
     await openSettingsHostSection(page, getServerId(), "host");
     await removeCurrentHostFromSettings(page);
     await closeCompactSettings(page);
+    // From the Chat tab, Settings closes back to it: the reader was never on the Host's route.
+    if (sidebar === "chat") {
+      await expectAppRoute(page, "/chat");
+      return;
+    }
 
     // A Host route never navigates on the Host's behalf (bf511ce33): the removed Host is shown
     // as unavailable at the same URL, and Add a Host is the reader's way to Welcome.

@@ -1,3 +1,4 @@
+import { hostFormPreferencesKey } from "../support/helpers/form-preferences";
 import { expect, test, type Page } from "../support/fixtures";
 import path from "node:path";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
@@ -52,7 +53,7 @@ async function readProviderModePreference(page: Page, provider: string): Promise
       const preferences = JSON.parse(raw) as FormPreferences;
       return preferences.providerPreferences?.[providerId]?.mode ?? null;
     },
-    { preferencesKey: CREATE_AGENT_PREFERENCES_KEY, providerId: provider },
+    { preferencesKey: hostFormPreferencesKey(), providerId: provider },
   );
 }
 
@@ -64,7 +65,7 @@ async function readProviderFeaturePreferences(page: Page, provider: string): Pro
       const preferences = JSON.parse(raw) as FormPreferences;
       return preferences.providerPreferences?.[providerId]?.featureValues ?? null;
     },
-    { preferencesKey: CREATE_AGENT_PREFERENCES_KEY, providerId: provider },
+    { preferencesKey: hostFormPreferencesKey(), providerId: provider },
   );
 }
 

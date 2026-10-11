@@ -1,5 +1,5 @@
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
-import { View, Text, Pressable, BackHandler } from "react-native";
+import { View, Text, Pressable, BackHandler, type PressableStateCallbackType } from "react-native";
 import { useCallback, useEffect, useMemo } from "react";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
@@ -114,12 +114,17 @@ export function MobileChatBack() {
       accessibilityLabel="Back to conversations"
       testID="chat-back"
       onPress={back}
-      style={styles.back}
+      style={backStyle}
     >
       <BackGlyph size={22} />
     </Pressable>
   );
 }
+// The same hover and press fill as the other header buttons.
+const backStyle = ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+  styles.back,
+  (hovered || pressed) && styles.backHighlighted,
+];
 const styles = StyleSheet.create((t) => ({
   tabs: {
     flexDirection: "row",
@@ -143,7 +148,9 @@ const styles = StyleSheet.create((t) => ({
     minHeight: MIN_TOUCH_TARGET_SIZE,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: t.borderRadius.md,
   },
+  backHighlighted: { backgroundColor: t.colors.interactionHighlight },
 }));
 
 function Glyph({ Icon, color }: { Icon: typeof Home; color?: string }) {
