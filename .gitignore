@@ -117,6 +117,8 @@ app.json
 !/packages/server/src/server/plugins/**
 !/packages/channels/core/src/plugins/
 !/packages/channels/core/src/plugins/**
+!/packages/website/src/plugins/
+!/packages/website/src/plugins/**
 
 # Versioned Hub examples and fixtures are not local runtime homes.
 !/packages/hub/examples/single-repo-team-bot/.clisbot/

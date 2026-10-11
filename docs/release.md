@@ -436,6 +436,7 @@ The GitHub Release body is populated automatically by the `Release Notes Sync` w
 
 ## Website behavior
 
+- Website cache freshness, install counter migration, and rollback requirements are maintained in [website cache and install counts](guides/developer-guide/website-cache.md). Deploy its SQLite Durable Object binding and exported class together.
 - Release metadata and GitHub stars are optional for rendering the website. If no ready Clisbot desktop release exists or the GitHub lookup fails, the homepage links to `/download`, which shows links to the setup guide and GitHub releases instead of constructing download URLs for missing assets.
 - The website download page defaults to GitHub's latest published **stable** release.
 - A published beta prerelease is offered behind the Stable/Beta switch on `/download` (`?channel=beta`), never as the default. The switch only appears while the newest prerelease leads stable on its core version, so promoting `X.Y.Z-beta.N` to `X.Y.Z` retires the beta channel from the page until the next beta line opens.

@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { fileURLToPath } from "node:url";
+import { build } from "vite";
+import { Miniflare } from "miniflare";
 import {
   addedAgo,
   featuredPlugins,
@@ -12,7 +15,14 @@ import {
   readmeBody,
   searchPlugins,
 } from "./registry";
-import { readInstallCounts, recordInstall } from "./installs";
+import {
+  countInstalls,
+  readInstallCounts,
+  readCounterCounts,
+  recordClientInstall,
+  utcDay,
+  DAY_MS,
+} from "./installs";
 import { handlePluginRegistryRequest, loadRegistryIndex, loadRegistryPlugin } from "./published";
 const plugin: Plugin = {
   id: "acme/example",
@@ -124,94 +134,263 @@ describe("plugin registry", () => {
   it("counts installs this week, this month, and all time from the daily record", async () => {
     const cache = memoryKv();
     const day = (date: string) => new Date(`${date}T12:00:00.000Z`);
-    await cache.put("plugin-installs:acme/example", "40");
-    await recordInstall(cache, "acme/example", day("2026-07-01"));
-    await recordInstall(cache, "acme/example", day("2026-09-10"));
-    await recordInstall(cache, "acme/example", day("2026-09-30"));
-    await recordInstall(cache, "acme/example", day("2026-10-04"));
+    await cache.put("plugin-installs:acme/example", "44");
+    await cache.put(
+      "plugin-installs-daily:acme/example",
+      JSON.stringify({
+        "2026-09-10": 1,
+        "2026-09-30": 1,
+        "2026-10-04": 1,
+      }),
+    );
     expect(await readInstallCounts(cache, ["acme/example"], day("2026-10-04"))).toEqual({
       "acme/example": { week: 2, month: 3, all: 44 },
     });
-    expect(
-      Object.keys(JSON.parse((await cache.get("plugin-installs-daily:acme/example")) ?? "{}")),
-    ).toEqual(["2026-09-10", "2026-09-30", "2026-10-04"]);
   });
   it("counts repeated install reports from the same IP once per hour", async () => {
-    let now = Date.now();
-    const cache = memoryKv(() => now);
+    const f = await counterFixture();
     const headers = { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
-    await resolvePlugin(cache, headers);
-    now += 3_599_000;
-    await resolvePlugin(cache, headers);
-    expect(await readInstallCounts(cache, [plugin.id], new Date())).toEqual({
+    await resolvePlugin(f.cache, headers, { counter: f.counter });
+    await f.setTime(testNow + 3_599_000);
+    await resolvePlugin(f.cache, headers, { counter: f.counter });
+    expect(await readCounterCounts(f.counter)).toEqual({
       [plugin.id]: { week: 1, month: 1, all: 1 },
     });
-    now += 1_000;
-    await resolvePlugin(cache, headers);
-    expect(await readInstallCounts(cache, [plugin.id], new Date())).toEqual({
+    await f.setTime(testNow + 3_600_000);
+    await resolvePlugin(f.cache, headers, { counter: f.counter });
+    expect(await readCounterCounts(f.counter)).toEqual({
       [plugin.id]: { week: 2, month: 2, all: 2 },
     });
   });
   it("counts different IPs and plugins independently, including query install intent", async () => {
-    const cache = memoryKv();
+    const f = await counterFixture();
     const first = { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
-    await resolvePlugin(cache, first);
-    await resolvePlugin(cache, { "CF-Connecting-IP": "2001:db8::1" }, { query: "?intent=install" });
-    await resolvePlugin(cache, first, { id: "acme/other" });
-    await resolvePlugin(cache, first, { query: "?intent=install" });
-    await resolvePlugin(cache, first, { id: "acme/other", staticDetail: true });
-    expect(await readInstallCounts(cache, [plugin.id, "acme/other"], new Date())).toEqual({
+    await resolvePlugin(f.cache, first, { counter: f.counter });
+    await resolvePlugin(
+      f.cache,
+      { "CF-Connecting-IP": "2001:db8::1" },
+      { query: "?intent=install", counter: f.counter },
+    );
+    await resolvePlugin(f.cache, first, { id: "acme/other", counter: f.counter });
+    await resolvePlugin(f.cache, first, { query: "?intent=install", counter: f.counter });
+    await resolvePlugin(f.cache, first, {
+      id: "acme/other",
+      staticDetail: true,
+      counter: f.counter,
+    });
+    expect(await readCounterCounts(f.counter)).toEqual({
       [plugin.id]: { week: 2, month: 2, all: 2 },
       "acme/other": { week: 1, month: 1, all: 1 },
     });
+    const receipts = await f.sql("SELECT id, hash FROM receipts ORDER BY id, hash");
     const hash = createHash("sha256").update(first["CF-Connecting-IP"]).digest("hex");
-    expect(await cache.get(`plugin-installs-client:${plugin.id}:${hash}`)).toBe("1");
-    expect(JSON.stringify([...cache.values])).not.toContain("192.0.2.1");
-    expect(JSON.stringify([...cache.values])).not.toContain("2001:db8::1");
+    expect(receipts).toContainEqual({ id: plugin.id, hash });
+    expect(JSON.stringify(receipts)).not.toContain("192.0.2.1");
+    expect(JSON.stringify(receipts)).not.toContain("2001:db8::1");
   });
   it("does not count without a Cloudflare IP or install intent", async () => {
-    const cache = memoryKv();
-    await resolvePlugin(cache, { "X-Clisbot-Install": "1", "X-Forwarded-For": "192.0.2.1" });
-    await resolvePlugin(cache, {}, { query: "?intent=install" });
-    await resolvePlugin(cache, { "X-Clisbot-Install": "1", "CF-Connecting-IP": "" });
-    await resolvePlugin(cache, { "CF-Connecting-IP": "192.0.2.1" });
-    expect(await readInstallCounts(cache, [plugin.id], new Date())).toEqual({
-      [plugin.id]: { week: 0, month: 0, all: 0 },
-    });
-    expect([...cache.values.keys()].filter((key) => key.startsWith("plugin-installs"))).toEqual([]);
+    const f = await counterFixture();
+    await resolvePlugin(
+      f.cache,
+      { "X-Clisbot-Install": "1", "X-Forwarded-For": "192.0.2.1" },
+      { counter: f.counter },
+    );
+    await resolvePlugin(f.cache, {}, { query: "?intent=install", counter: f.counter });
+    await resolvePlugin(
+      f.cache,
+      { "X-Clisbot-Install": "1", "CF-Connecting-IP": "" },
+      { counter: f.counter },
+    );
+    await resolvePlugin(f.cache, { "CF-Connecting-IP": "192.0.2.1" }, { counter: f.counter });
+    expect(await readCounterCounts(f.counter)).toEqual({});
   });
   it("preserves historical totals and the installs endpoint response", async () => {
-    const cache = memoryKv();
-    await cache.put(`plugin-installs:${plugin.id}`, "40");
+    const f = await counterFixture();
+    await f.cache.put(`plugin-installs:${plugin.id}`, "40");
     const headers = { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
-    await resolvePlugin(cache, headers);
-    await resolvePlugin(cache, headers);
+    await resolvePlugin(f.cache, headers, { counter: f.counter });
+    await resolvePlugin(f.cache, headers, { counter: f.counter });
     const base = "https://registry.example.test";
-    await cache.put(
-      `plugins:index:v1:${base}`,
-      JSON.stringify({
-        fetchedAt: Date.now(),
-        value: {
-          schemaVersion: 1,
-          registry: { name: "Internal", url: base },
-          categories: [],
-          plugins: [plugin],
-          featured: [],
-          generatedAt: "2026-10-03",
+    await seedIndex(f.cache, base);
+    const response = await handlePluginRegistryRequest(
+      new Request("https://clisbot.com/api/plugins/installs"),
+      { PLUGINS_REGISTRY_URL: base, PLUGIN_INSTALLS: f.counter },
+      { cache: f.cache, waitUntil: () => undefined },
+    );
+    expect(response?.status).toBe(200);
+    expect(await response?.json()).toEqual({ [plugin.id]: 41 });
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 1, month: 1, all: 41 },
+    });
+    expect(await f.cache.get(`plugin-installs:${plugin.id}`)).toBe("40");
+  });
+  it("uses two list operations and no missing-key reads for 223 zero-count plugins", async () => {
+    const cache = memoryKv();
+    const get = vi.spyOn(cache, "get");
+    const list = vi.spyOn(cache, "list");
+    const ids = Array.from({ length: 223 }, (_, i) => `acme/plugin-${i}`);
+    const counts = await readInstallCounts(cache, ids, new Date(testNow));
+    expect(counts).toEqual(
+      Object.fromEntries(ids.map((id) => [id, { week: 0, month: 0, all: 0 }])),
+    );
+    expect(get).toHaveBeenCalledTimes(0);
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+  it("imports sparse legacy counters once daily and merges late old-Worker writes without overwriting new increments", async () => {
+    const f = await counterFixture();
+    await f.cache.put(`plugin-installs:${plugin.id}`, "40");
+    await f.cache.put(
+      `plugin-installs-daily:${plugin.id}`,
+      JSON.stringify({ [utcDay(new Date(testNow), 1)]: 3 }),
+    );
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 3, month: 3, all: 40 },
+    });
+    await f.setTime(testNow + 2 * 3_600_000);
+    await f.resetOperations();
+    await recordClientInstall({ counter: f.counter, id: plugin.id, ip: "192.0.2.1" });
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 4, month: 4, all: 41 },
+    });
+    expect(await f.operations()).toEqual({ get: 0, put: 0, list: 0 });
+    await f.cache.put(`plugin-installs:${plugin.id}`, "42");
+    await f.cache.put(
+      `plugin-installs-daily:${plugin.id}`,
+      JSON.stringify({ [utcDay(new Date(testNow), 1)]: 5 }),
+    );
+    await f.setTime(testNow + DAY_MS + 1);
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 6, month: 6, all: 43 },
+    });
+    expect(await f.operations()).toEqual({ get: 2, put: 0, list: 2 });
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 6, month: 6, all: 43 },
+    });
+    expect(await f.operations()).toEqual({ get: 2, put: 0, list: 2 });
+  });
+  it("keeps all simultaneous increments and deduplicates simultaneous reports across stubs", async () => {
+    const f = await counterFixture();
+    await readCounterCounts(f.counter);
+    await f.setTime(testNow + 2 * 3_600_000);
+    await f.resetOperations();
+    await Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        recordClientInstall({ counter: f.counter, id: plugin.id, ip: `192.0.2.${i}` }),
+      ),
+    );
+    await Promise.all(
+      Array.from({ length: 20 }, () =>
+        recordClientInstall({ counter: f.counter, id: plugin.id, ip: "192.0.2.100" }),
+      ),
+    );
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 51, month: 51, all: 51 },
+    });
+    expect(await f.operations()).toEqual({ get: 0, put: 0, list: 0 });
+  });
+  it("rolls back the receipt and total together when the daily increment fails", async () => {
+    const f = await counterFixture();
+    await f.sql(
+      "CREATE TRIGGER fail_daily BEFORE INSERT ON daily BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+    );
+    await expect(
+      recordClientInstall({ counter: f.counter, id: plugin.id, ip: "192.0.2.1" }),
+    ).rejects.toThrow();
+    expect(await readCounterCounts(f.counter)).toEqual({});
+    expect(await f.sql("SELECT * FROM receipts")).toEqual([]);
+    await f.sql("DROP TRIGGER fail_daily");
+    await recordClientInstall({ counter: f.counter, id: plugin.id, ip: "192.0.2.1" });
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 1, month: 1, all: 1 },
+    });
+  });
+  it("honors pre-cutover KV receipts and leaves all legacy keys untouched", async () => {
+    const f = await counterFixture();
+    const ip = "192.0.2.1";
+    const hash = createHash("sha256").update(ip).digest("hex");
+    await f.cache.put(`plugin-installs-client:${plugin.id}:${hash}`, "1", { expirationTtl: 3600 });
+    await recordClientInstall({ counter: f.counter, id: plugin.id, ip });
+    expect(await readCounterCounts(f.counter)).toEqual({});
+    await f.setTime(testNow + 3_660_001);
+    await recordClientInstall({ counter: f.counter, id: plugin.id, ip });
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 1, month: 1, all: 1 },
+    });
+    expect(await f.cache.get(`plugin-installs-client:${plugin.id}:${hash}`)).toBe("1");
+  });
+  it("ages UTC windows while preserving all-time counts", () => {
+    const now = new Date("2026-10-11T00:00:00Z");
+    expect(
+      countInstalls(
+        {
+          "2026-10-11": 1,
+          "2026-10-05": 2,
+          "2026-10-04": 3,
+          "2026-09-12": 4,
+          "2026-09-11": 5,
+          "2026-10-12": 99,
         },
+        100,
+        now,
+      ),
+    ).toEqual({ week: 3, month: 10, all: 100 });
+  });
+  it("ages SQLite windows and survives a Worker restart without reimporting KV", async () => {
+    const f = await counterFixture();
+    await f.cache.put(`plugin-installs:${plugin.id}`, "100");
+    await f.cache.put(
+      `plugin-installs-daily:${plugin.id}`,
+      JSON.stringify({
+        "2026-10-11": 1,
+        "2026-10-05": 2,
+        "2026-10-04": 3,
+        "2026-09-12": 4,
+        "2026-09-11": 5,
       }),
     );
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 3, month: 10, all: 100 },
+    });
+    await f.setTime(testNow + DAY_MS);
+    expect(await readCounterCounts(f.counter)).toEqual({
+      [plugin.id]: { week: 1, month: 6, all: 100 },
+    });
+    const restarted = await f.restart();
+    expect(await readCounterCounts(restarted)).toEqual({
+      [plugin.id]: { week: 3, month: 10, all: 100 },
+    });
+    expect(await f.operations()).toEqual({ get: 0, put: 0, list: 0 });
+  });
+  it("paginates legacy keys and reads only counters that exist", async () => {
+    const cache = memoryKv();
+    for (let index = 0; index < 1001; index++)
+      await cache.put(`plugin-installs:acme/plugin-${index}`, "1");
+    const list = vi.spyOn(cache, "list");
+    const get = vi.spyOn(cache, "get");
+    expect(
+      await readInstallCounts(cache, ["acme/plugin-1000", "acme/new"], new Date(testNow)),
+    ).toEqual({
+      "acme/plugin-1000": { week: 0, month: 0, all: 1 },
+      "acme/new": { week: 0, month: 0, all: 0 },
+    });
+    expect(list).toHaveBeenCalledTimes(3);
+    expect(get).toHaveBeenCalledTimes(1001);
+  });
+  it("keeps legacy counts readable when the Durable Object binding is disabled", async () => {
+    const cache = memoryKv();
+    const base = "https://registry.example.test";
+    await cache.put(`plugin-installs:${plugin.id}`, "40");
+    await seedIndex(cache, base);
+    await resolvePlugin(cache, { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" });
     const response = await handlePluginRegistryRequest(
       new Request("https://clisbot.com/api/plugins/installs"),
       { PLUGINS_REGISTRY_URL: base },
       { cache, waitUntil: () => undefined },
     );
-    expect(response?.status).toBe(200);
-    expect(await response?.json()).toEqual({ [plugin.id]: 41 });
-    expect(await readInstallCounts(cache, [plugin.id], new Date())).toEqual({
-      [plugin.id]: { week: 1, month: 1, all: 41 },
-    });
+    expect(await response?.json()).toEqual({ [plugin.id]: 40 });
+    expect(await cache.get(`plugin-installs:${plugin.id}`)).toBe("40");
   });
+
   it("searches name, description, ID, and author, ignoring case", () => {
     const other = {
       ...plugin,
@@ -279,6 +458,16 @@ function memoryKv(now = Date.now): KVNamespace & { values: Map<string, string> }
       const value = values.get(key) ?? null;
       return options?.type === "json" && value !== null ? JSON.parse(value) : value;
     },
+    list: async ({ prefix = "", cursor = "0", limit = 1000 } = {}) => {
+      const keys = [...values.keys()].filter((key) => key.startsWith(prefix)).sort();
+      const offset = Number(cursor);
+      const page = keys.slice(offset, offset + limit).map((name) => ({ name }));
+      return {
+        keys: page,
+        list_complete: offset + limit >= keys.length,
+        cursor: String(offset + limit),
+      };
+    },
     put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
       values.set(key, value);
       expiresAt.set(key, options?.expirationTtl ? now() + options.expirationTtl * 1000 : Infinity);
@@ -290,7 +479,12 @@ function memoryKv(now = Date.now): KVNamespace & { values: Map<string, string> }
 async function resolvePlugin(
   cache: KVNamespace,
   headers: HeadersInit,
-  { id = plugin.id, query = "", staticDetail = false } = {},
+  {
+    id = plugin.id,
+    query = "",
+    staticDetail = false,
+    counter = undefined,
+  }: { id?: string; query?: string; staticDetail?: boolean; counter?: DurableObjectNamespace } = {},
 ): Promise<void> {
   const base = "https://registry.example.test";
   const detail = { ...plugin, id, readme: "# Example" };
@@ -302,10 +496,124 @@ async function resolvePlugin(
   const path = staticDetail ? `/plugins/${id}.json` : `/api/plugins/resolve/${id}`;
   const response = await handlePluginRegistryRequest(
     new Request(`https://clisbot.com${path}${query}`, { headers }),
-    { PLUGINS_REGISTRY_URL: base },
+    { PLUGINS_REGISTRY_URL: base, PLUGIN_INSTALLS: counter },
     { cache, waitUntil: (promise) => pending.push(promise) },
   );
   expect(response?.status).toBe(200);
   expect(await response?.json()).toEqual(detail);
   await Promise.all(pending);
+}
+
+async function seedIndex(cache: KVNamespace, base: string) {
+  await cache.put(
+    `plugins:index:v1:${base}`,
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      value: {
+        schemaVersion: 1,
+        registry: { name: "Internal", url: base },
+        categories: [],
+        plugins: [plugin],
+        featured: [],
+        generatedAt: "2026-10-03",
+      },
+    }),
+  );
+}
+
+const testNow = Date.parse("2026-10-11T12:00:00Z");
+let counterScript = "";
+const runtimes: Miniflare[] = [];
+beforeAll(async () => {
+  const result = await build({
+    configFile: false,
+    logLevel: "silent",
+    ssr: { noExternal: true },
+    build: {
+      ssr: true,
+      write: false,
+      rollupOptions: { input: fileURLToPath(new URL("./install-counter.ts", import.meta.url)) },
+    },
+  });
+  const outputs = Array.isArray(result) ? result : [result];
+  const chunk = outputs
+    .flatMap((output) => ("output" in output ? output.output : []))
+    .find((output) => output.type === "chunk");
+  if (!chunk || chunk.type !== "chunk") throw new Error("Missing counter bundle");
+  counterScript =
+    chunk.code +
+    `
+    let testNow = ${testNow};
+    const RealDate = Date;
+    globalThis.Date = class extends RealDate {
+      constructor(value) { if (arguments.length) super(value); else super(testNow); }
+      static now() { return testNow; }
+    };
+    let operations = { get: 0, put: 0, list: 0 };
+    export class TestCounter extends PluginInstallCounter {
+      constructor(ctx, env) {
+        const cache = env.WEBSITE_CACHE;
+        super(ctx, { ...env, WEBSITE_CACHE: {
+          get(...args) { operations.get++; return cache.get(...args); },
+          put(...args) { operations.put++; return cache.put(...args); },
+          list(...args) { operations.list++; return cache.list(...args); },
+        } });
+        this.testState = ctx;
+      }
+      async fetch(request) {
+        if (new URL(request.url).pathname === '/test/sql') {
+          const { query } = await request.json();
+          return Response.json(this.testState.storage.sql.exec(query).toArray());
+        }
+        return super.fetch(request);
+      }
+    }
+    export default { fetch(request, env) {
+      const url = new URL(request.url);
+      if (url.pathname === '/time') { testNow = Number(url.searchParams.get('ms')); return new Response(null, { status: 204 }); }
+      if (url.pathname === '/ops') {
+        if (url.searchParams.has('reset')) operations = { get: 0, put: 0, list: 0 };
+        return Response.json(operations);
+      }
+      return env.PLUGIN_INSTALLS.get(env.PLUGIN_INSTALLS.idFromName('plugin-installs:v1')).fetch(request);
+    } };
+  `;
+}, 30_000);
+afterEach(async () => {
+  await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
+});
+
+async function counterFixture() {
+  const options = {
+    modules: true,
+    script: counterScript,
+    compatibilityDate: "2024-12-01",
+    kvNamespaces: ["WEBSITE_CACHE"],
+    durableObjects: { PLUGIN_INSTALLS: { className: "TestCounter", useSQLite: true } },
+  };
+  const runtime = new Miniflare(options);
+  runtimes.push(runtime);
+  const { WEBSITE_CACHE, PLUGIN_INSTALLS } = await runtime.getBindings<{
+    WEBSITE_CACHE: KVNamespace;
+    PLUGIN_INSTALLS: DurableObjectNamespace;
+  }>();
+  return {
+    cache: WEBSITE_CACHE,
+    counter: PLUGIN_INSTALLS,
+    setTime: (ms: number) => runtime.dispatchFetch(`http://test/time?ms=${ms}`),
+    resetOperations: () => runtime.dispatchFetch("http://test/ops?reset=1"),
+    operations: async () => (await runtime.dispatchFetch("http://test/ops")).json(),
+    sql: async (query: string) =>
+      (
+        await runtime.dispatchFetch("http://test/test/sql", {
+          method: "POST",
+          body: JSON.stringify({ query }),
+        })
+      ).json(),
+    restart: async () => {
+      await runtime.setOptions({ ...options, compatibilityDate: "2024-12-02" });
+      const bindings = await runtime.getBindings<{ PLUGIN_INSTALLS: DurableObjectNamespace }>();
+      return bindings.PLUGIN_INSTALLS;
+    },
+  };
 }

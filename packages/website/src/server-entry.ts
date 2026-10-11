@@ -11,7 +11,10 @@ import { collectDesktopAnalytics, type DesktopAnalyticsEnv } from "~/desktop-ana
 interface WebsiteEnv extends DesktopAnalyticsEnv {
   WEBSITE_CACHE?: KVNamespace;
   PLUGINS_REGISTRY_URL?: string;
+  PLUGIN_INSTALLS?: DurableObjectNamespace;
 }
+
+export { PluginInstallCounter } from "./plugins/install-counter";
 
 function markdownResponse(body: string): Response {
   return new Response(body, {
@@ -85,6 +88,7 @@ export default {
 
     const pluginResponse = await handlePluginRegistryRequest(request, env, {
       cache: env.WEBSITE_CACHE ?? null,
+      edgeCache: caches.open("website-data:v2"),
       waitUntil: (promise) => context.waitUntil(promise),
     });
     if (pluginResponse) return pluginResponse;
@@ -119,6 +123,7 @@ export default {
     if (url.pathname === "/android-version.txt") {
       const version = await getLatestAndroidVersion({
         cache: env.WEBSITE_CACHE ?? null,
+        edgeCache: caches.open("website-data:v2"),
         waitUntil: (promise) => context.waitUntil(promise),
       });
       return plainTextResponse(`${getAndroidVersionCode(version)}\n`);

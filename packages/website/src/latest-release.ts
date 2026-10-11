@@ -1,4 +1,4 @@
-import { getBlockingColdCache, type WebsiteCacheContext } from "./github-cache";
+import { CACHE_POLICIES, getBlockingColdCache, type WebsiteCacheContext } from "./github-cache";
 
 interface GitHubAsset {
   name: string;
@@ -195,6 +195,7 @@ export async function getReleaseChannels(
   return getBlockingColdCache({
     context,
     key: `${RELEASE_CACHE_KEY}:${releasesUrl}`,
+    policy: CACHE_POLICIES.releases,
     isValue: isReleaseChannels,
     fetchFresh: () => fetchReleaseChannels(releasesUrl),
   });
@@ -204,6 +205,7 @@ export async function getLatestAndroidVersion(context: WebsiteCacheContext): Pro
   return getBlockingColdCache({
     context,
     key: ANDROID_RELEASE_CACHE_KEY,
+    policy: CACHE_POLICIES.releases,
     isValue: isAndroidVersion,
     fetchFresh: fetchLatestAndroidVersion,
   });
