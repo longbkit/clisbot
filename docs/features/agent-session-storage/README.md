@@ -31,6 +31,13 @@ replacement. This keeps the session writable, retains its submission and permiss
 and commits the complete replay before marking history ready. Permanent session deletion is
 reserved for removing the agent; it must never be used to clear history for a replay.
 
+Whole-history replacements use a separate admission budget (32 MiB per agent, 64 MiB total,
+at most two per agent and four process-wide). Live writes keep their 8 MiB per-agent budget.
+If an import fails, loading closes its runtime before returning the error; the next load
+resumes the provider again so a one-shot replay is not mistaken for an empty conversation.
+An empty in-memory timeline left by registration does not count as imported history and
+cannot suppress a retry or a read of an existing committed timeline.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an

@@ -5,13 +5,15 @@
  */
 export class SessionStorageOverloadError extends Error {}
 
-export type StoreOperationKind = "read" | "write";
+export type StoreOperationKind = "read" | "write" | "replacement";
 
 /**
  * Per-agent write limits sit above the pending event budget (1,024 events / 8 MiB estimated
  * per agent), so a manager write that reserved an event is refused there first; global limits
  * are several agents deep, so one stalled agent cannot refuse every other agent's writes.
  * Reads are counted apart: a stalled write never makes another caller's read fail admission.
+ * Whole-history replacements have their own bounded budget: an existing transcript can be
+ * larger than the live-event queue without widening that queue or starving ordinary writes.
  */
 export const STORE_ADMISSION_LIMITS = {
   agentWriteOperations: 1536,
@@ -20,6 +22,10 @@ export const STORE_ADMISSION_LIMITS = {
   writeBytes: 32 * 1024 * 1024,
   agentReadOperations: 1024,
   readOperations: 8192,
+  agentReplacementOperations: 2,
+  agentReplacementBytes: 32 * 1024 * 1024,
+  replacementOperations: 4,
+  replacementBytes: 64 * 1024 * 1024,
 } as const;
 
 interface Usage {
@@ -36,6 +42,13 @@ interface Limits {
 
 function limitsFor(kind: StoreOperationKind): Limits {
   const limits = STORE_ADMISSION_LIMITS;
+  if (kind === "replacement")
+    return {
+      agentOperations: limits.agentReplacementOperations,
+      agentBytes: limits.agentReplacementBytes,
+      operations: limits.replacementOperations,
+      bytes: limits.replacementBytes,
+    };
   return kind === "write"
     ? {
         agentOperations: limits.agentWriteOperations,
@@ -96,6 +109,7 @@ class UsageLedger {
 const ledgers: Record<StoreOperationKind, UsageLedger> = {
   read: new UsageLedger(limitsFor("read")),
   write: new UsageLedger(limitsFor("write")),
+  replacement: new UsageLedger(limitsFor("replacement")),
 };
 
 /** Admits one store operation or throws `SessionStorageOverloadError`. Release exactly once. */

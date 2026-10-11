@@ -80,6 +80,54 @@ function observeLogHandles(hooks: {
 }
 
 describe("admission", () => {
+  it("bounds queued replacements without spending another agent's live write budget", async () => {
+    const root = await temporaryRoot();
+    const stalled = gate();
+    const store = new FileAgentTimelineStore(async (agentId) => {
+      if (agentId === "stalled") await stalled.wait;
+      return path.join(root, agentId);
+    });
+    const replacements = Array.from(
+      { length: STORE_ADMISSION_LIMITS.agentReplacementOperations },
+      () => store.replaceCommitted("stalled", [row(1)]),
+    );
+    await expect(store.replaceCommitted("stalled", [row(2)])).rejects.toBeInstanceOf(
+      SessionStorageOverloadError,
+    );
+    await store.bulkInsert("healthy", [row(1)]);
+    expect(await store.getLatestCommittedSeq("healthy")).toBe(1);
+    stalled.open();
+    await Promise.all(replacements);
+    expect(storeOperationUsage("replacement")).toEqual({ operations: 0, bytes: 0 });
+  });
+
+  it("imports history larger than the live write budget and keeps later writes bounded", async () => {
+    const root = await temporaryRoot();
+    const store = new FileAgentTimelineStore(async () => root);
+    await store.bulkInsert("agent", [row(1, "before import")]);
+    const history = Array.from({ length: 9 }, (_, index) =>
+      row(index + 1, String(index).repeat(1024 * 1024)),
+    );
+    expect(Buffer.byteLength(JSON.stringify(history))).toBeGreaterThan(
+      STORE_ADMISSION_LIMITS.agentWriteBytes,
+    );
+    const epoch = await store.replaceCommitted("agent", history);
+    expect(await store.getLatestCommittedSeq("agent")).toBe(9);
+    expect((await store.fetchCommitted("agent", { limit: 1 })).rows).toEqual([history[8]]);
+    await expect(store.bulkInsert("agent", history)).rejects.toBeInstanceOf(
+      SessionStorageOverloadError,
+    );
+    await store.bulkInsert("agent", [row(10, "continued")]);
+    await store.flush();
+    SessionEventLog.forget(root);
+    const reopened = new FileAgentTimelineStore(async () => root);
+    expect(await reopened.getEpoch("agent")).toBe(epoch);
+    expect((await reopened.fetchCommitted("agent", { limit: 1 })).rows).toEqual([
+      row(10, "continued"),
+    ]);
+    expect(await reopened.getLatestCommittedSeq("agent")).toBe(10);
+  });
+
   it("refuses a stalled agent's writes without refusing another agent or its own reads", async () => {
     const root = await temporaryRoot();
     const stalled = gate();

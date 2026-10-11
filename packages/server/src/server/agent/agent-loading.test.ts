@@ -17,6 +17,83 @@ import type {
   AgentSessionConfig,
 } from "./agent-sdk-types.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
+import { FileAgentTimelineStore } from "./session-storage/file-agent-timeline-store.js";
+import { SessionStorageOverloadError } from "./session-storage/store-admission.js";
+
+test("a failed one-shot history import closes the runtime so the next load replays native history", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "agent-loading-history-retry-"));
+  const logger = createTestLogger();
+  const storage = new AgentStorage(path.join(root, "agents"), logger, { sessionLayout: true });
+  const baseClient = createTestAgentClients().codex!;
+  let resumes = 0;
+  const client: AgentClient = {
+    ...baseClient,
+    provider: baseClient.provider,
+    capabilities: baseClient.capabilities,
+    createSession: (...args) => baseClient.createSession(...args),
+    fetchCatalog: (...args) => baseClient.fetchCatalog(...args),
+    isAvailable: () => baseClient.isAvailable(),
+    resumeSession: async (...args) => {
+      resumes++;
+      const session = await baseClient.resumeSession(...args);
+      let pending = true;
+      session.streamHistory = async function* () {
+        if (!pending) return;
+        pending = false;
+        yield {
+          type: "timeline",
+          provider: "codex",
+          item: { type: "user_message", text: "original prompt" },
+        };
+        yield {
+          type: "timeline",
+          provider: "codex",
+          item: { type: "assistant_message", text: "original reply" },
+        };
+      };
+      return session;
+    },
+  };
+  class RefuseOnceStore extends FileAgentTimelineStore {
+    refuse = true;
+    override async replaceCommitted(
+      ...args: Parameters<FileAgentTimelineStore["replaceCommitted"]>
+    ) {
+      if (this.refuse) {
+        this.refuse = false;
+        throw new SessionStorageOverloadError("replacement refused");
+      }
+      return super.replaceCommitted(...args);
+    }
+  }
+  const store = new RefuseOnceStore((id) => storage.getSessionDirectory(id));
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    durableTimelineStore: store,
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: root }, undefined, {
+    workspaceId: undefined,
+  });
+  const deps = { agentManager: manager, agentStorage: storage, logger };
+  try {
+    await manager.closeAgent(agent.id);
+    await expect(ensureAgentLoaded(agent.id, deps)).rejects.toThrow("replacement refused");
+    expect(manager.getAgent(agent.id)).toBeNull();
+    await ensureAgentLoaded(agent.id, deps);
+    expect(resumes).toBe(2);
+    expect((await store.getCommittedRows(agent.id)).map((entry) => entry.item)).toEqual([
+      { type: "user_message", text: "original prompt" },
+      { type: "assistant_message", text: "original reply" },
+    ]);
+  } finally {
+    await manager.closeAgent(agent.id).catch(() => undefined);
+    await manager.flush();
+    await storage.flush();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("loads archived records for history and active records with the interactive default", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "agent-loading-purpose-"));

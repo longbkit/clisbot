@@ -4355,7 +4355,7 @@ export class AgentManager {
       // an explicit false still requests a provider replay for disk refresh.
       if (session.initialTimeline?.length && options?.historyPrimed === undefined) {
         managed.historyPrimed =
-          this.timelineStore.has(resolvedAgentId) ||
+          this.isTimelinePrimedInMemory(resolvedAgentId) ||
           (!buildExplicitTimelineSeedForRegister(now, options) &&
             !managed.internal &&
             this.durableTimelineStore !== undefined &&
@@ -4482,6 +4482,15 @@ export class AgentManager {
     throw new Error(`Provider '${storedConfig.provider}' does not support MCP servers`);
   }
 
+  private isTimelinePrimedInMemory(agentId: string): boolean {
+    // Registration creates an empty cache before a legacy replay. That cache
+    // must not suppress another replay when the first import failed.
+    return (
+      this.timelineStore.has(agentId) &&
+      this.timelineStore.fetch(agentId, { limit: 1 }).window.nextSeq > 1
+    );
+  }
+
   private async initializeAgentTimelineForRegister(params: {
     agentId: string;
     now: Date;
@@ -4497,11 +4506,11 @@ export class AgentManager {
       | undefined;
   }): Promise<{ durableTimelineHasRows: boolean }> {
     const { agentId, now, options } = params;
-    const timelineAlreadyPrimed = this.timelineStore.has(agentId);
+    const timelineAlreadyPrimed = this.isTimelinePrimedInMemory(agentId);
     const explicitTimelineSeed = buildExplicitTimelineSeedForRegister(now, options);
     const shouldSeedFromDurable =
       !explicitTimelineSeed &&
-      !this.timelineStore.has(agentId) &&
+      !timelineAlreadyPrimed &&
       this.durableTimelineStore &&
       !this.agents.get(agentId)?.internal;
     const durableTimelineSeed = shouldSeedFromDurable
@@ -5294,7 +5303,11 @@ export class AgentManager {
     }> = [];
     const providerSubagentEvents: AgentManagerEvent[] = [];
     for (const event of historySubagentEvents) {
-      const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
+      const update = await this.providerSubagents.applyCommitted(
+        agent.id,
+        event.provider,
+        event.event,
+      );
       const managerEvent: AgentManagerEvent = { type: "provider_subagent", event: update };
       if (deferredBroadcast) {
         providerSubagentEvents.push(managerEvent);

@@ -852,6 +852,20 @@ test.each([false, true])(
         };
         if (failReplay) throw new Error("history interrupted");
         yield {
+          type: "provider_subagent",
+          provider: "codex",
+          event: { type: "upsert", id: "legacy-child", title: "Original child" },
+        };
+        yield {
+          type: "provider_subagent",
+          provider: "codex",
+          event: {
+            type: "timeline",
+            id: "legacy-child",
+            item: { type: "assistant_message", text: "original child reply" },
+          },
+        };
+        yield {
           type: "timeline",
           provider: "codex",
           item: { type: "assistant_message", text: "original reply" },
@@ -928,6 +942,21 @@ test.each([false, true])(
           "text" in row.item ? row.item.text : undefined,
         ),
       ).toEqual(["original prompt", "original reply", "continue", "continued reply"]);
+      const reopenedManager = new AgentManager({
+        clients: { codex: client },
+        registry,
+        durableTimelineStore: reopened,
+        logger,
+      });
+      expect(
+        (await reopenedManager.readProviderSubagents(agent.id)).map((child) => child.id),
+      ).toEqual(["legacy-child"]);
+      expect(
+        (await reopenedManager.readProviderSubagentTimeline(agent.id, "legacy-child")).rows.map(
+          (row) => row.item,
+        ),
+      ).toEqual([{ type: "assistant_message", text: "original child reply" }]);
+      await reopenedManager.flush();
       await reopened.flush();
     } finally {
       if (agentId && manager.getAgent(agentId)) await manager.closeAgent(agentId);

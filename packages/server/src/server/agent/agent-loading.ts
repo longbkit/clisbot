@@ -27,7 +27,7 @@ export type AgentLoaderManager = Pick<
   | "hydrateTimelineFromProvider"
   | "resumeAgentFromPersistence"
 > &
-  Partial<Pick<AgentManager, "waitForAgentClose" | "markAgentInUse">>;
+  Partial<Pick<AgentManager, "waitForAgentClose" | "markAgentInUse" | "closeAgent">>;
 
 export interface EnsureAgentLoadedDeps {
   agentManager: AgentLoaderManager;
@@ -135,9 +135,21 @@ export async function ensureAgentLoaded(
       deps.logger.info({ agentId, provider: record.provider }, "Agent created from stored config");
     }
 
-    await deps.agentManager.hydrateTimelineFromProvider(agentId, {
-      broadcast: () => pendingOptions.broadcastTimeline,
-    });
+    try {
+      await deps.agentManager.hydrateTimelineFromProvider(agentId, {
+        broadcast: () => pendingOptions.broadcastTimeline,
+      });
+    } catch (error) {
+      // Some providers consume their replay once. A failed import must not leave
+      // that runtime cached: the next load needs a fresh replay from native history.
+      await deps.agentManager.closeAgent?.(agentId).catch((closeError: unknown) => {
+        deps.logger.warn(
+          { err: closeError, agentId },
+          "Failed to close after history import failed",
+        );
+      });
+      throw error;
+    }
     return deps.agentManager.getAgent(agentId) ?? snapshot;
   })();
 

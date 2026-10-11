@@ -569,7 +569,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
         await this.syncAuthorship(agentId);
         return epoch;
       },
-      "write",
+      "replacement",
       bytes,
     );
   }
