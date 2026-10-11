@@ -144,7 +144,11 @@ async function completeTurnAndLeaveOnCompact(page: Page, { subject, other }: Fin
     await returnToChat(page, subject.workspaceId);
     await subject.client.sendAgentMessage(subject.agentId, "Finish another turn.");
     await subject.client.waitForFinish(subject.agentId, 20_000);
-    await openMobileAgentSidebar(page);
+    if ((await openMobileAgentSidebar(page)) === "chat") {
+      // Back to conversations is itself the departure.
+      await expectStatus(page, subject.workspaceId, "done");
+      return;
+    }
     await expectStatus(page, subject.workspaceId, "attention");
     await openWorkspaceOnCompact(page, other.workspaceId);
     await expectStatus(page, subject.workspaceId, "done");
