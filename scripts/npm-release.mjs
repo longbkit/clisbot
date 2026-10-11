@@ -80,11 +80,21 @@ function publish(pkg, tag, dryRun) {
       { stdio: "inherit" },
     );
   }
-  if (!dryRun) {
-    npm(["dist-tag", "add", `${pkg.name}@${pkg.version}`, tag], { stdio: "inherit" });
-    if (tag === "latest")
-      npm(["dist-tag", "add", `${pkg.name}@${pkg.version}`, "beta"], { stdio: "inherit" });
+  if (dryRun) return;
+  // Every registry write asks for 2FA, so only write the tags that are not already set.
+  const current = distTags(pkg);
+  for (const wanted of tag === "latest" ? ["latest", "beta"] : [tag]) {
+    if (current[wanted] !== pkg.version)
+      npm(["dist-tag", "add", `${pkg.name}@${pkg.version}`, wanted], { stdio: "inherit" });
   }
+}
+
+function distTags(pkg) {
+  const value = npm(["view", pkg.name, "dist-tags", "--json", "--prefer-online"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  return JSON.parse(value);
 }
 
 export function runNpmRelease(argv) {
