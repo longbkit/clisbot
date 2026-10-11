@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-telegram",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "In-repo Telegram channel vertical (blueprint docs/audits/2026-08-26-in-repo-channel-verticals.md §6.5). L1 Bot API (port of the pinned send-* chunk, grammy stack kept) + L2 getUpdates long-poll + L4 lifecycle + outbound. Sync reference: openclaw@2026.7.1-2 dist.",
   "files": [
     "dist",
@@ -22,9 +22,9 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@clisbot/channels-core": "2.0.2",
-    "@clisbot/channels-markdown-core": "2.0.2",
-    "@clisbot/channels-shared": "2.0.2",
+    "@clisbot/channels-core": "2.0.3",
+    "@clisbot/channels-markdown-core": "2.0.3",
+    "@clisbot/channels-shared": "2.0.3",
     "@grammyjs/runner": "2.0.3",
     "@grammyjs/transformer-throttler": "1.2.1",
     "grammy": "1.46.0",
