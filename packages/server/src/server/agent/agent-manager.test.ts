@@ -829,6 +829,114 @@ test("a failed history replay leaves the committed timeline intact", async () =>
   }
 });
 
+test.each([false, true])(
+  "legacy session hydration stays writable through resume and restart (replay fails first: %s)",
+  async (failFirstReplay) => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-legacy-resume-"));
+    const registry = new AgentStorage(join(workdir, "agents"), logger, {
+      sessionLayout: true,
+    });
+    await registry.initialize();
+    const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+    let failReplay = failFirstReplay;
+    class LegacySession extends TestAgentSession {
+      override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+        yield {
+          type: "timeline",
+          provider: "codex",
+          item: {
+            type: "user_message",
+            text: "original prompt",
+            messageId: "original",
+          },
+        };
+        if (failReplay) throw new Error("history interrupted");
+        yield {
+          type: "timeline",
+          provider: "codex",
+          item: { type: "assistant_message", text: "original reply" },
+        };
+      }
+      override async startTurn(prompt?: AgentPromptInput): Promise<{ turnId: string }> {
+        const turnId = "continued-turn";
+        setTimeout(() => {
+          this.pushEvent({ type: "turn_started", provider: "codex", turnId });
+          this.pushEvent({
+            type: "timeline",
+            provider: "codex",
+            turnId,
+            item: {
+              type: "user_message",
+              text: String(prompt),
+              messageId: "continued",
+            },
+          });
+          this.pushEvent({
+            type: "timeline",
+            provider: "codex",
+            turnId,
+            item: { type: "assistant_message", text: "continued reply" },
+          });
+          this.pushEvent({ type: "turn_completed", provider: "codex", turnId });
+        }, 0);
+        return { turnId };
+      }
+    }
+    const client = new (class extends TestAgentClient {
+      override async resumeSession(): Promise<AgentSession> {
+        return new LegacySession({ provider: "codex", cwd: workdir });
+      }
+    })();
+    const manager = new AgentManager({
+      clients: { codex: client },
+      registry,
+      durableTimelineStore: store,
+      logger,
+    });
+    let agentId: string | undefined;
+    try {
+      const agent = await manager.resumeAgentFromPersistence(
+        { provider: "codex", sessionId: "legacy-native-session" },
+        { cwd: workdir },
+      );
+      agentId = agent.id;
+      if (failFirstReplay) {
+        await expect(manager.hydrateTimelineFromProvider(agent.id)).rejects.toThrow(
+          "history interrupted",
+        );
+        expect(await store.getCommittedRows(agent.id)).toEqual([]);
+        failReplay = false;
+      }
+      await manager.hydrateTimelineFromProvider(agent.id);
+      await manager.flush();
+      expect(
+        (await store.getCommittedRows(agent.id)).map((row) =>
+          "text" in row.item ? row.item.text : undefined,
+        ),
+      ).toEqual(["original prompt", "original reply"]);
+      await drainAsyncGenerator(manager.streamAgent(agent.id, "continue"));
+      await manager.flush();
+      expect(
+        (await store.getCommittedRows(agent.id)).map((row) =>
+          "text" in row.item ? row.item.text : undefined,
+        ),
+      ).toEqual(["original prompt", "original reply", "continue", "continued reply"]);
+      await manager.closeAgent(agent.id);
+      const reopened = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+      expect(
+        (await reopened.getCommittedRows(agent.id)).map((row) =>
+          "text" in row.item ? row.item.text : undefined,
+        ),
+      ).toEqual(["original prompt", "original reply", "continue", "continued reply"]);
+      await reopened.flush();
+    } finally {
+      if (agentId && manager.getAgent(agentId)) await manager.closeAgent(agentId);
+      await manager.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  },
+);
+
 test("retries provider history hydration after a stream failure", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-history-retry-"));
   let attempts = 0;

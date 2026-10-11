@@ -26,6 +26,11 @@ Sessions written before 2026-09-13 used a segmented layout (`events-000001.jsonl
 `permissions/`, `submissions/`, `projection/` folders). The first durable read imports them into
 `events.jsonl`, keeping `epoch` and `seq`.
 
+Legacy sessions that only have provider history import their replay through atomic timeline
+replacement. This keeps the session writable, retains its submission and permission ledgers,
+and commits the complete replay before marking history ready. Permanent session deletion is
+reserved for removing the agent; it must never be used to clear history for a replay.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an

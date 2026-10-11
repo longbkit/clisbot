@@ -5216,6 +5216,39 @@ export class AgentManager {
     }
   }
 
+  private async seedLegacyTimeline(
+    agent: ActiveManagedAgent,
+    events: readonly Extract<AgentStreamEvent, { type: "timeline" }>[],
+  ): Promise<AgentTimelineRow[]> {
+    if (!this.durableTimelineStore?.replaceCommitted || agent.internal) {
+      // Compatibility stores replace their replay by clearing the old rows.
+      await this.deleteCommittedTimeline(agent.id);
+      return events.map((event) =>
+        this.recordTimeline(
+          agent.id,
+          event.item,
+          event.timestamp ? { timestamp: event.timestamp } : undefined,
+        ),
+      );
+    }
+    // Canonical deletion is permanent. An atomic replay keeps the session writable
+    // and retains its submission and permission ledgers if the import is retried.
+    await this.waitForTimelinePersistence(agent.id);
+    const rows: AgentTimelineRow[] = [];
+    for (const event of events) {
+      rows.push(await this.makeReplacementTimelineRow(agent.id, event, rows.length + 1));
+    }
+    const epoch = await this.durableTimelineStore.replaceCommitted(agent.id, rows);
+    this.timelineRetention.delete(agent.id);
+    this.timelineStore.initialize(agent.id, {
+      epoch,
+      rows: rows.slice(-40),
+      nextSeq: rows.length + 1,
+    });
+    this.timelineRetention.retain(agent.id, rows.slice(-40));
+    return rows;
+  }
+
   private async primeTimelineFromLegacyProviderHistory(
     agent: ActiveManagedAgent,
     broadcast: boolean | (() => boolean),
@@ -5253,9 +5286,7 @@ export class AgentManager {
       throw error;
     }
 
-    // The replay is the timeline, so drop the rows a previous hydration committed.
-    // Keeping them would leave getTimelineRows reading one copy per hydration.
-    await this.deleteCommittedTimeline(agent.id);
+    const replayRows = await this.seedLegacyTimeline(agent, historyEvents);
 
     const timelineEvents: Array<{
       event: Extract<AgentStreamEvent, { type: "timeline" }>;
@@ -5271,12 +5302,8 @@ export class AgentManager {
         this.dispatch(managerEvent);
       }
     }
-    for (const event of historyEvents) {
-      const row = this.recordTimeline(
-        agent.id,
-        event.item,
-        event.timestamp ? { timestamp: event.timestamp } : undefined,
-      );
+    for (const [index, event] of historyEvents.entries()) {
+      const row = replayRows[index]!;
       if (deferredBroadcast) {
         timelineEvents.push({ event, row });
       } else if (broadcast) {
