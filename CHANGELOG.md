@@ -19,6 +19,8 @@
 ### Fixed
 
 - Fixed Codex channel replies being dropped after the daemon restarted and resumed the conversation
+- Fixed a channel reply being skipped when the Hub retried saving it after losing the database's reply
+- Fixed pinned workspaces in the sidebar keeping their old name after a rename
 - Fixed Nix desktop and personal Hub backend packages ([#24](https://github.com/longbkit/clisbot/pull/24))
 
 ## 2.0.0 - 2026-10-10
