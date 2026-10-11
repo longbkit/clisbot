@@ -38,6 +38,10 @@ resumes the provider again so a one-shot replay is not mistaken for an empty con
 An empty in-memory timeline left by registration does not count as imported history and
 cannot suppress a retry or a read of an existing committed timeline.
 
+A persisted draft with no provider handle and no committed timeline starts its first provider
+session under the same Clisbot ID. Creation clears only retained memory for that draft; it must
+not permanently delete its canonical store before the first prompt writes to it.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an

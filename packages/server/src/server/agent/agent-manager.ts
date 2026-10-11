@@ -1720,7 +1720,22 @@ export class AgentManager {
       config = { ...request.config, internal: config.internal };
       options = { ...options, env: request.env };
     }
-    await this.deleteAgentState(resolvedAgentId);
+    const storedDraft = await this.registry?.get(resolvedAgentId);
+    if (
+      this.durableTimelineStore &&
+      storedDraft &&
+      !storedDraft.persistence &&
+      !storedDraft.internal &&
+      !config.internal &&
+      (await this.durableTimelineStore.getLatestCommittedSeq(resolvedAgentId)) === 0
+    ) {
+      // A persisted draft has no provider chat to replace. Reuse its identity without
+      // permanently deleting the canonical store the first session must write to.
+      await this.providerSubagents.flushParent(resolvedAgentId);
+      this.discardRetainedAgentState(resolvedAgentId);
+    } else {
+      await this.deleteAgentState(resolvedAgentId);
+    }
     const { storedConfig, launchConfig, clisbotToolPolicy } = await this.prepareSessionConfig(
       config,
       resolvedAgentId,

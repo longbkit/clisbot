@@ -669,6 +669,101 @@ async function startAndSteerThroughManager(
   return { manager, agentId: agent.id, workdir };
 }
 
+test("starts a persisted empty draft under its existing ID without deleting its canonical store", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-canonical-draft-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  const agentId = randomUUID();
+  const now = new Date().toISOString();
+  await storage.upsert({
+    id: agentId,
+    provider: "codex",
+    cwd: workdir,
+    workspaceId: "draft-workspace",
+    createdAt: now,
+    updatedAt: now,
+    labels: { purpose: "draft" },
+    lastStatus: "closed",
+    config: { model: "gpt-5.4" },
+  });
+  const durable = new FileAgentTimelineStore((id) => storage.getSessionDirectory(id));
+  const submission = {
+    id: "draft-submission",
+    digest: "draft-digest",
+    identity: {},
+    timestamp: now,
+    status: "pending" as const,
+  };
+  await durable.writeMessageSubmission(agentId, submission);
+  let creates = 0;
+  let resumes = 0;
+  class DraftSession extends TestAgentSession {
+    override streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      throw new Error("A first session must not replay legacy history");
+    }
+    override async startTurn(): Promise<{ turnId: string }> {
+      const turnId = "draft-turn";
+      setTimeout(() => {
+        this.pushEvent({ type: "turn_started", provider: "codex", turnId });
+        this.pushEvent({
+          type: "timeline",
+          provider: "codex",
+          turnId,
+          item: { type: "user_message", text: "first prompt", messageId: "draft-user" },
+        });
+        this.pushEvent({
+          type: "timeline",
+          provider: "codex",
+          turnId,
+          item: { type: "assistant_message", text: "DRAFT_REUSE_OK", messageId: "draft-answer" },
+        });
+        this.pushEvent({ type: "turn_completed", provider: "codex", turnId });
+      }, 0);
+      return { turnId };
+    }
+  }
+  const client = new (class extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      creates++;
+      return new DraftSession(config);
+    }
+    override async resumeSession(): Promise<AgentSession> {
+      resumes++;
+      throw new Error("A draft has no provider session to resume");
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    durableTimelineStore: durable,
+    logger,
+  });
+  try {
+    await ensureAgentLoaded(agentId, { agentManager: manager, agentStorage: storage, logger });
+    await manager.runAgent(agentId, "first prompt");
+    await manager.flush();
+    expect(creates).toBe(1);
+    expect(resumes).toBe(0);
+    expect(await durable.getLatestCommittedSeq(agentId)).toBe(2);
+    expect((await durable.fetchCommitted(agentId, { limit: 1 })).rows[0]?.item).toMatchObject({
+      type: "assistant_message",
+      text: "DRAFT_REUSE_OK",
+    });
+    expect(await durable.writeMessageSubmission(agentId, submission)).toMatchObject({
+      created: false,
+      record: { id: "draft-submission" },
+    });
+    expect(await storage.get(agentId)).toMatchObject({
+      id: agentId,
+      workspaceId: "draft-workspace",
+      cwd: workdir,
+    });
+  } finally {
+    await manager.closeAgent(agentId);
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("uses an injected timeline store without making it a production requirement", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-timeline-store-"));
   const store = new RecordingTimelineStore();
