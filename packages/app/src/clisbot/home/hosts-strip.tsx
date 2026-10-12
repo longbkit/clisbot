@@ -70,23 +70,27 @@ export function HostsStrip() {
       ) : (
         <View style={[styles.list, styles.wrap]}>{list}</View>
       )}
-      {issues.length ? (
-        <Pressable
-          onPress={openDetails}
-          style={issueStyle}
-          accessibilityRole="button"
-          testID="home-connection-issues"
-        >
-          <WarningGlyph size={14} />
-          <Text style={[styles.issueText, styles.grow]} numberOfLines={1}>
-            {issues.length === 1
-              ? "1 connection needs attention"
-              : `${issues.length} connections need attention`}
-          </Text>
-          <Text style={styles.muted}>View details</Text>
-          <MutedChevron size={14} />
-        </Pressable>
-      ) : null}
+      <View style={styles.issueSlot}>
+        {issues.length ? (
+          <Pressable
+            onPress={openDetails}
+            style={issueStyle}
+            accessibilityRole="button"
+            testID="home-connection-issues"
+          >
+            <WarningGlyph size={14} />
+            <Text style={[styles.issueText, styles.grow]} numberOfLines={1}>
+              {issues.length === 1
+                ? "1 connection needs attention"
+                : `${issues.length} connections need attention`}
+            </Text>
+            <Text style={styles.muted}>View details</Text>
+            <MutedChevron size={14} />
+          </Pressable>
+        ) : (
+          <Text style={styles.muted}>No connection issues</Text>
+        )}
+      </View>
       <ConnectionIssuesSheet issues={issues} visible={detailsOpen} onClose={closeDetails} />
     </View>
   );
@@ -283,7 +287,8 @@ const styles = StyleSheet.create((t) => ({
     paddingVertical: t.spacing[1.5],
     paddingHorizontal: t.spacing[2],
     borderRadius: t.borderRadius.lg,
-    maxWidth: 200,
+    width: { xs: 160, md: 180 },
+    flexShrink: 0,
   },
   hovered: { backgroundColor: t.colors.surface1 },
   pressed: { backgroundColor: t.colors.surface2 },
@@ -306,5 +311,6 @@ const styles = StyleSheet.create((t) => ({
     marginHorizontal: -t.spacing[2],
     borderRadius: t.borderRadius.lg,
   },
+  issueSlot: { height: 36, justifyContent: "center" },
   issueText: { color: t.colors.foreground, fontSize: t.fontSize.sm },
 }));

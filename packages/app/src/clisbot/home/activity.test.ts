@@ -1,10 +1,19 @@
 import { expect, test } from "vitest";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { activitySections } from "./activity";
-import { activityContext, activityStatus } from "./activity-row";
+import { activityContext, activityStatus, heldActivityStatus } from "./activity-row";
 function agent(id: string, date: Date, extra: Partial<AggregatedAgent> = {}): AggregatedAgent {
   return { id, lastActivityAt: date, status: "idle", ...extra } as AggregatedAgent;
 }
+test("held Home rows tell the truth while waiting to move; Inbox status stays unchanged", () => {
+  const idle = agent("done", new Date());
+  expect(heldActivityStatus(idle, "active")).toEqual({ label: "Finished", variant: "muted" });
+  expect(heldActivityStatus(idle)).toBeNull();
+  expect(activityStatus(idle)).toBeNull();
+  expect(
+    heldActivityStatus(agent("running", new Date(), { status: "running" }), "date:Today"),
+  ).toEqual({ label: "Running", variant: "muted" });
+});
 test("attention precedes running; archived sessions stay in Recent with calendar date groups", () => {
   const today = new Date(2026, 9, 10, 12);
   const yesterday = new Date(2026, 9, 9, 23);

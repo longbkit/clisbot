@@ -120,7 +120,9 @@ export function useHostsStrip() {
     });
     return {
       entries: pickStripHosts(stripHosts),
-      hubs: hubs.filter((hub) => !hub.personal),
+      hubs: hubs
+        .filter((hub) => !hub.personal)
+        .sort((a, b) => a.name.localeCompare(b.name) || a.origin.localeCompare(b.origin)),
       issues: connectionIssues(stripHosts, hubs),
       summary: onlineSummary(stripHosts),
     };

@@ -34,11 +34,32 @@ until all loaded activity is visible. Needs you always counts the whole group. T
 header has a Search icon that opens the same cross-Host search as the sidebar, on native and web.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
+
+Home keeps placement separate from live conversation data. Active and Needs you retain their
+order within a run/group; streaming timestamps cannot reorder them. Recent is chronological when
+updates are applied. Arrivals, removals, date/group changes and Recent reordering wait while the
+user hovers, touches, focuses a control, scrolls, reads below the top or backgrounds the app.
+Otherwise the first pending change starts a 750ms batch deadline at the top (the first empty load
+is immediate). Further arrivals or streaming updates join that batch without extending its deadline;
+interaction cancels the timer until Home is idle again.
+A reserved bar outside the scroller offers Show N updates and the live Needs you count. Applying
+updates keeps the first surviving visible conversation at its pixel position where scroll bounds
+allow it, including when shortening the list clamps its scroll offset. Restoration uses the current
+offset and yields to new wheel, keyboard, pointer or touch input rather than treating layout-induced
+scroll events as user input. The bar remains reachable on a phone above the composer. Live titles, unread marks,
+status and attention counts never wait: a finished conversation held under Active says Finished;
+a running conversation held in Recent says Running. Layout state stores only Host-qualified IDs;
+removed conversations become inert placeholders until applied, without retaining stale content.
+Home rows reserve their height, scaled with the system font size. Inbox keeps its existing behavior.
+
 Home opens with the Hosts strip (`clisbot/home/hosts-strip*.ts(x)`), a status line rather than a
-card: `Hosts · n of m online`, then this computer, up to three Hosts you used most recently (by
-agent activity) or added yourself, and one entry per shared Hub (`online/total`, Sign in,
-Unreachable); a personal Hub's Hosts are listed by name instead. A shared Hub's other Hosts stay
-inside its entry, so a company Hub never becomes a long list. Connect offers Connect a computer,
+card: `Hosts · n of m online`, then this computer, up to three individually named Hosts, and one
+entry per shared Hub (`online/total`, Sign in, Unreachable). Named Hosts are direct connections
+and Hosts from personal/small Hubs. Hosts sort by name then ID, Hubs by name then origin; activity
+and online/offline changes cannot replace or reorder entries. Shared Hubs' remaining Hosts stay
+inside their entry, so a company Hub never becomes a long list. Fixed entry widths and a reserved
+connection-status line prevent status text and warnings from shifting the content below.
+Connect offers Connect a computer,
 Add a Hub and Troubleshoot. Problems the user can act on (a Host they use that is down, a Hub to
 sign in to or reach) collapse into one "connections need attention" line whose sheet gives each
 one action. The runtime reports an unreachable Host as connecting forever, so the strip calls a

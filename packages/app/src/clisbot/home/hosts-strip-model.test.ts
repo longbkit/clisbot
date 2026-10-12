@@ -28,11 +28,11 @@ test("a small Hub's Hosts are listed by name and count as yours", () => {
     host("mac", { hubOrigin: "hub://team", named: true }),
     host("build", { hubOrigin: "hub://team", named: true, status: "offline" }),
   ];
-  expect(pickStripHosts(hosts).map((entry) => entry.serverId)).toEqual(["mac", "build"]);
+  expect(pickStripHosts(hosts).map((entry) => entry.serverId)).toEqual(["build", "mac"]);
   expect(connectionIssues(hosts, []).map((issue) => issue.kind)).toEqual(["host"]);
 });
 
-test("this computer leads, then recently used Hosts; a shared Hub's unused Hosts stay in its entry", () => {
+test("this computer leads, then named Hosts in stable name order; shared Hub Hosts stay in their entry", () => {
   const hosts = [
     host("company-a", { hubOrigin: "hub://co" }),
     host("company-used", { hubOrigin: "hub://co", lastActivity: 50 }),
@@ -43,13 +43,30 @@ test("this computer leads, then recently used Hosts; a shared Hub's unused Hosts
   expect(pickStripHosts(hosts).map((entry) => entry.serverId)).toEqual([
     "this-mac",
     "dev-server",
-    "company-used",
     "studio",
   ]);
   expect(pickStripHosts(hosts, 1).map((entry) => entry.serverId)).toEqual([
     "this-mac",
     "dev-server",
   ]);
+});
+
+test("activity, connection flapping and directory arrival order never replace or reorder Host slots", () => {
+  const hosts = [host("z"), host("b"), host("a"), host("c")];
+  const before = pickStripHosts(hosts).map((entry) => entry.serverId);
+  expect(before).toEqual(["a", "b", "c"]);
+  const changed = hosts.toReversed().map((entry, index) =>
+    host(entry.serverId, {
+      lastActivity: index * 1000,
+      status: "offline" as const,
+    }),
+  );
+  expect(pickStripHosts(changed).map((entry) => entry.serverId)).toEqual(before);
+  expect(
+    pickStripHosts([host("b", { label: "Same" }), host("a", { label: "Same" })]).map(
+      (entry) => entry.serverId,
+    ),
+  ).toEqual(["a", "b"]);
 });
 
 test("issues are only what the user can act on", () => {

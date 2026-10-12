@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { useCallback, type ReactNode, type ReactElement } from "react";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -8,6 +8,8 @@ import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { HomeActivity } from "./activity-preview";
+import { ActivityScrollView, ActivityViewportProvider } from "./activity-viewport";
+import { ActivityUpdates, HomeActivityProvider } from "./activity-state";
 import { HostsStrip } from "./hosts-strip";
 import { ComposerDock } from "@/composer/dock";
 import { ComposerPickerPlacementProvider } from "@/composer/picker-placement";
@@ -129,7 +131,21 @@ function ReadyIconGlyph({
 const ReadyIcon = withUnistyles(ReadyIconGlyph, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
-export function HomeStartLayout({
+export function HomeStartLayout(props: Parameters<typeof StartLayoutContent>[0]) {
+  return (
+    <ActivityViewportProvider>
+      {props.showActivity === false ? (
+        <StartLayoutContent {...props} />
+      ) : (
+        <HomeActivityProvider>
+          <StartLayoutContent {...props} />
+        </HomeActivityProvider>
+      )}
+    </ActivityViewportProvider>
+  );
+}
+
+function StartLayoutContent({
   compact,
   title,
   choices,
@@ -162,7 +178,7 @@ export function HomeStartLayout({
     return (
       <ComposerDock>
         <View style={styles.flex}>
-          <ScrollView
+          <ActivityScrollView
             testID="home-scroll"
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scroll}
@@ -172,31 +188,35 @@ export function HomeStartLayout({
             <StartStatus serverId={serverId} onImportSession={onImportSession} />
             {quickStarts}
             {showActivity ? <HomeActivity /> : null}
-          </ScrollView>
+          </ActivityScrollView>
+          {showActivity ? <ActivityUpdates /> : null}
           {context}
         </View>
         {composer}
       </ComposerDock>
     );
   return (
-    <ScrollView
-      testID="home-scroll"
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.desktopScroll}
-    >
-      <View style={styles.column}>
-        {showActivity ? <HostsStrip /> : null}
-        {heading}
-        {context}
-        {/* The composer sits near the top here, so its pickers open downward. */}
-        <ComposerPickerPlacementProvider value="bottom-start">
-          {composer}
-        </ComposerPickerPlacementProvider>
-        <StartStatus serverId={serverId} onImportSession={onImportSession} />
-        {quickStarts}
-        {showActivity ? <HomeActivity /> : null}
-      </View>
-    </ScrollView>
+    <>
+      <ActivityScrollView
+        testID="home-scroll"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.desktopScroll}
+      >
+        <View style={styles.column}>
+          {showActivity ? <HostsStrip /> : null}
+          {heading}
+          {context}
+          {/* The composer sits near the top here, so its pickers open downward. */}
+          <ComposerPickerPlacementProvider value="bottom-start">
+            {composer}
+          </ComposerPickerPlacementProvider>
+          <StartStatus serverId={serverId} onImportSession={onImportSession} />
+          {quickStarts}
+          {showActivity ? <HomeActivity /> : null}
+        </View>
+      </ActivityScrollView>
+      {showActivity ? <ActivityUpdates /> : null}
+    </>
   );
 }
 const styles = StyleSheet.create((t) => ({

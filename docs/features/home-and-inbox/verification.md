@@ -1,5 +1,56 @@
 # Verification — 2026-10-10
 
+## Review fixes — 2026-10-12
+
+Both review findings first failed focused regression tests against the old implementation:
+new streaming agents reset the batch deadline, and a layout-induced scroll clamp prevented
+anchor restoration. The fixes pass all 10 tests in `use-activity-layout.test.tsx` and
+`use-activity-anchor.test.tsx`. These cover a fixed first-change deadline while order/count change,
+cancelling a reverted batch, restoration with and without clamping, new input during measurement
+or after applying, and unmount cleanup. The anchor hook is separate from its view wrappers so
+native measurement/scroll events can be exercised without a browser layout engine.
+
+The two multi-Host E2E cases pass at 1440px and 390px with an added regression: load every row,
+read 100px above the bottom, archive six conversations above the visible anchor, then apply.
+They assert the new maximum offset is below the old offset (clamping is unavoidable), while the
+surviving row remains within half a pixel of its original position. App typecheck, scoped lint,
+format and diff checks pass. Native devices and Electron were not rerun for this follow-up.
+
+```sh
+npm test --workspace=@clisbot/app -- src/clisbot/home/use-activity-layout.test.tsx src/clisbot/home/use-activity-anchor.test.tsx
+npm run test:e2e --workspace=@clisbot/app -- e2e/browser/home-hosts.spec.ts --grep 'Home holds live'
+```
+
+## Stable Home activity across Hosts — 2026-10-12
+
+The focused model/hook suites pass 18 tests: deterministic Host slots despite activity and
+connection changes, stable Active ordering, Host-qualified identities, membership/reorder counts,
+Recent limits across dates, truthful held statuses, idle batching, hover/focus/touch/scroll and
+background gates, and local-day rollover. App typecheck and changed-file lint pass.
+
+`home-hosts.spec.ts` exercises two isolated real daemons with 24 idle mock conversations and two
+streaming conversations at 1440×900 and 390×900. It checks that renaming, finishing, requesting
+approval, adding a conversation and stopping a Host update live content/counts without changing
+row positions, scroll offset or Host slots. Applying updates admits the new rows and keeps the
+first surviving visible row within half a pixel of its previous position. Browser scroll anchoring
+is disabled only for Home's scroller so it cannot compete with that explicit restoration. Scroll
+bounds can still constrain restoration at the ends of a short list. The test explicitly applies
+late initial Host snapshots before reading; the composer's initial focus can hold those updates.
+Both viewport cases passed twice consecutively (`--repeat-each=2`), and their screenshots were
+reviewed. Initial-snapshot setup hovers the update bar to pause automatic application before
+clicking, with a bounded click timeout so an already-applied update cannot stall the test.
+
+The existing Host troubleshooting and Home scroll/Recent/mobile search/Inbox Host-filter cases
+also passed with the final application code. Native touch gating is covered at hook
+level; iOS, Android and Electron were not rerun for this change. Browser viewport tests are not
+native-device verification. All behavior remains under the Home V2 flag with no protocol change.
+
+```sh
+npm test --workspace=@clisbot/app -- src/clisbot/home/activity.test.ts src/clisbot/home/activity-layout.test.ts src/clisbot/home/hosts-strip-model.test.ts src/clisbot/home/use-activity-layout.test.tsx src/clisbot/home/use-local-day.test.tsx
+npm run test:e2e --workspace=@clisbot/app -- e2e/browser/home-hosts.spec.ts e2e/browser/home-quick-starts.spec.ts --grep 'Home holds live|Home scrolls from blank|Home lists Hosts'
+npm run test:e2e --workspace=@clisbot/app -- e2e/browser/home-hosts.spec.ts --grep 'Home holds live' --repeat-each=2
+```
+
 ## Home scrolling and mobile Inbox — 2026-10-12
 
 `home-quick-starts.spec.ts`, case `Home scrolls from blank space, expands Recent and offers

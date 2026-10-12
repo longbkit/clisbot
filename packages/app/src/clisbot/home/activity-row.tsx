@@ -52,17 +52,20 @@ export function ActivityRow({
   showHost,
   onPress,
   onLongPress,
+  homeBucket,
 }: {
   agent: AggregatedAgent;
   search?: string;
   showHost: boolean;
   onPress: (agent: AggregatedAgent) => void;
   onLongPress?: (agent: AggregatedAgent) => void;
+  /** The held Home section may lag the live status until the reader applies updates. */
+  homeBucket?: string;
 }) {
   const { t } = useTranslation();
   const title = agent.title || t("agentList.fallbackTitle");
   const context = activityContext(agent, showHost);
-  const status = activityStatus(agent);
+  const status = activityStatus(agent) ?? heldActivityStatus(agent, homeBucket);
   const time = useTimeAgo(agent.lastActivityAt);
   const titleRanges = useMemo(() => findHighlightRanges(search ?? "", title), [search, title]);
   const press = useCallback(() => onPress(agent), [onPress, agent]);
@@ -115,6 +118,19 @@ export function ActivityRow({
       </View>
     </Pressable>
   );
+}
+
+export function heldActivityStatus(
+  agent: AggregatedAgent,
+  homeBucket?: string,
+): ReturnType<typeof activityStatus> {
+  if (!homeBucket) return null;
+  const current = activityBucket(agent);
+  if (current === "active" && homeBucket !== "active")
+    return { label: "Running", variant: "muted" };
+  if (current === "recent" && (homeBucket === "active" || homeBucket === "needs"))
+    return { label: "Finished", variant: "muted" };
+  return null;
 }
 
 function ProviderGlyphIcon({

@@ -11,7 +11,7 @@ export interface StripHost {
   hubOrigin: string | null;
   /**
    * Shown by name: this computer, a Host added directly, or one from a Hub small enough to list.
-   * Other Hub Hosts are summarised by their Hub's entry unless you used them.
+   * Other Hub Hosts stay summarised by their Hub's entry regardless of recent activity.
    */
   named: boolean;
 }
@@ -65,21 +65,15 @@ export function effectiveHostStatus(input: {
 const isDown = (status: HostRuntimeConnectionStatus) => status === "offline" || status === "error";
 
 /**
- * Hosts shown by name: this computer, then the Hosts you used most recently, then ones you added
- * yourself. A shared Hub's other Hosts are summarised by that Hub's entry, so a Hub with a hundred
- * Hosts never turns into a hundred entries.
+ * This computer, then named Hosts by name and identity. Activity and connection changes must
+ * never replace a visible slot. Large shared Hubs keep their Hosts inside the Hub entry.
  */
 export function pickStripHosts(hosts: readonly StripHost[], limit = 3): StripHost[] {
-  const local = hosts.filter((host) => host.local);
+  const byName = (a: StripHost, b: StripHost) =>
+    a.label.localeCompare(b.label) || a.serverId.localeCompare(b.serverId);
+  const local = hosts.filter((host) => host.local).sort(byName);
   // Hermes has no Array.prototype.toSorted; filter() already returns a fresh array to sort.
-  const others = hosts
-    .filter((host) => !host.local && (host.lastActivity !== null || host.named))
-    .sort(
-      (a, b) =>
-        (b.lastActivity ?? 0) - (a.lastActivity ?? 0) ||
-        Number(b.status === "online") - Number(a.status === "online") ||
-        a.label.localeCompare(b.label),
-    );
+  const others = hosts.filter((host) => !host.local && host.named).sort(byName);
   return [...local, ...others.slice(0, limit)];
 }
 
