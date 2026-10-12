@@ -2519,6 +2519,20 @@ const x = 1;
     expect(branches[0]?.committerDate).toEqual(expect.any(Number));
   });
 
+  it("paginates more than 200 matching branches without repeating or truncating the tail", async () => {
+    const commands =
+      Array.from(
+        { length: 211 },
+        (_, i) => `create refs/heads/paged/${i.toString().padStart(3, "0")} HEAD`,
+      ).join("\n") + "\n";
+    execFileSync("git", ["update-ref", "--stdin"], { cwd: repoDir, input: commands });
+    const first = await listBranchSuggestions(repoDir, { query: "paged/", limit: 200 });
+    const tail = await listBranchSuggestions(repoDir, { query: "paged/", limit: 200, offset: 200 });
+    expect(first).toHaveLength(200);
+    expect(tail).toHaveLength(11);
+    expect(new Set([...first, ...tail].map((b) => b.name)).size).toBe(211);
+  });
+
   it("disables GitHub features when gh is unavailable", async () => {
     execFileSync("git", ["remote", "add", "origin", "https://github.com/longbkit/clisbot.git"], {
       cwd: repoDir,

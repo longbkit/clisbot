@@ -1019,7 +1019,7 @@ accountId: main
 connectionId: connection-id
 transport: { mode: socket }
 defaults:
-  workspace: { organize: false }
+  workspace: { organize: false, commands: false }
 routes:
   - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
     agent: worker-app
@@ -1027,7 +1027,7 @@ routes:
   - audience: [{ who: { roles: [member] }, where: { conversations: [C0ORGANIZED] } }]
     agent: worker-app
     environment: repo-app
-    workspace: { organize: true }
+    workspace: { organize: true, commands: true }
 `,
       }),
     );
@@ -1036,6 +1036,8 @@ routes:
     // the second turns it back on.
     assert.equal(routes[0]!.defaults.workspace?.organize, false);
     assert.equal(routes[1]!.defaults.workspace?.organize, true);
+    assert.equal(routes[0]!.defaults.workspace?.commands, false);
+    assert.equal(routes[1]!.defaults.workspace?.commands, true);
     // Unauthored anywhere, the key is absent: a revision written before the
     // knob existed keeps the exact compiled block (and route fingerprint) it
     // had, and absence reads as organization ON.

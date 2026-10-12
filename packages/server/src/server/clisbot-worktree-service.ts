@@ -75,7 +75,7 @@ async function createClisbotWorktreeWithPriority(
   const workspaceCwdPlan = await planWorkspaceCwdForWorktree(input.cwd, deps.workspaceGitService);
   const createdWorktree = await createWorktreeCore(input, deps);
   try {
-    maybeMarkFirstAgentBranchAutoNameEligible({ createdWorktree });
+    if (!input.branchName?.trim()) maybeMarkFirstAgentBranchAutoNameEligible({ createdWorktree });
     const workspaceCwd = mapWorkspaceRelativeCwdToWorktree({
       relativeWorkspaceCwd: workspaceCwdPlan.relativeWorkspaceCwd,
       targetWorktreePath: createdWorktree.worktree.worktreePath,

@@ -160,3 +160,32 @@ describe("workspace organization", () => {
     expect(warn).toHaveBeenCalledOnce();
   });
 });
+
+it("honors explicit Workspace even with organization disabled and never inherits another Project's Workspace", async () => {
+  const f = fakeDaemon({
+    agents: [{ ...agent("source", "workspace-source"), projectId: "project-a" }],
+  });
+  expect(
+    await resolveSessionWorkspaceId(f.daemon, {
+      organize: false,
+      sourceAgentId: "source",
+      cwd: "/b",
+      projectId: "project-b",
+      workspaceId: "explicit-b",
+    }),
+  ).toBe("explicit-b");
+  expect(f.listAgents).not.toHaveBeenCalled();
+  expect(
+    await resolveSessionWorkspaceId(f.daemon, {
+      organize: true,
+      sourceAgentId: "source",
+      cwd: "/b",
+      projectId: "project-b",
+      firstAgentContext: { prompt: "fix login" },
+    }),
+  ).toBe("workspace-new");
+  expect(f.createWorkspace).toHaveBeenCalledWith(
+    { cwd: "/b", projectId: "project-b", firstAgentContext: { prompt: "fix login" } },
+    undefined,
+  );
+});

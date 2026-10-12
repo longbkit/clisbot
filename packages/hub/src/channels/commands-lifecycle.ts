@@ -19,6 +19,8 @@ export interface LifecycleCommandContext {
   message: InboundMessage;
   account: CompiledChannelAccount;
   route: CompiledRoute;
+  /** Original serving Route when a one-off projects relay-only defaults. */
+  selectionRoute?: CompiledRoute;
   agentId?: string | undefined;
   accessTarget?: import("./plane/types.js").ChannelAgentAccessTarget;
   /** Who asked, resolved once by the plane for `/help`, `/me`, `/status`. */
@@ -38,7 +40,20 @@ export interface LifecycleCommandDependencies {
     context: LifecycleCommandContext,
     capability?: ChannelReplyAgentCapability,
   ): Promise<CreateAgentConfig>;
-  issueCapability?(context: LifecycleCommandContext): ChannelReplyAgentCapability;
+  resolveSourceConfig?(
+    context: LifecycleCommandContext,
+    capability?: ChannelReplyAgentCapability,
+  ): Promise<CreateAgentConfig>;
+  issueCapability?(
+    context: LifecycleCommandContext,
+    config?: CreateAgentConfig,
+  ): ChannelReplyAgentCapability;
+  authorizeFork?(context: LifecycleCommandContext): Promise<void>;
+  synchronizePlacement?(agent: AgentSnapshot, context: LifecycleCommandContext): Promise<void>;
+  resolveAgentTarget?(
+    agent: AgentSnapshot,
+    context: LifecycleCommandContext,
+  ): Promise<import("./plane/types.js").ChannelAgentAccessTarget>;
   bindCapability?(token: string, agentId: string): boolean;
   revokeCapability?(token: string): void;
   /** Revoke what a create that was given up was launched with. */
@@ -107,6 +122,7 @@ export class ChannelLifecycleCommands {
   }
 
   private async fresh(context: LifecycleCommandContext, prompt?: string): Promise<string> {
+    await this.deps.resolveConfig(context);
     const key = deriveBindingKey(context.message, context.route);
     if (context.agentId !== undefined) await this.deps.daemon.cancelAgent(context.agentId);
     const released = await this.deps.store.releaseThreadBinding({
@@ -138,7 +154,12 @@ export class ChannelLifecycleCommands {
     if (agent === undefined || !(await this.deps.authorizeResume(agent, context))) {
       throw new Error("That session is unavailable or you do not have access to it here.");
     }
-    if (agent.id === context.agentId) return `Session ${agent.id} is already bound here.`;
+    if (agent.id === context.agentId) {
+      await this.deps.synchronizePlacement?.(agent, context);
+      return `Session ${agent.id} is already bound here.`;
+    }
+    const target = await this.deps.resolveAgentTarget?.(agent, context);
+    if (target) context = { ...context, accessTarget: target };
     const change = await this.prepareRebind(
       agent.id,
       context,
@@ -146,6 +167,7 @@ export class ChannelLifecycleCommands {
     );
     try {
       await this.deps.attach(change.binding, change.context);
+      await this.deps.synchronizePlacement?.(agent, context);
     } catch (error) {
       await this.rollbackRebind(change);
       throw error;
@@ -195,6 +217,7 @@ export class ChannelLifecycleCommands {
     ) {
       throw new Error("This host does not support session forks.");
     }
+    await this.deps.authorizeFork?.(context);
     const fork = await this.deps.daemon.buildAgentForkContext(context.agentId);
     return fork.attachment === null ? undefined : [fork.attachment];
   }
@@ -206,16 +229,18 @@ export class ChannelLifecycleCommands {
   ): Promise<string> {
     const oneOff = name !== "fork";
     if (oneOff && !prompt) throw new Error(`Usage: /${name} <message>`);
+    const config = await this.resolveCreateConfig(name, context);
     const attachments = await this.forkAttachments(name, context);
     // One-offs have their own relay association and never inherit a bound Agent's tool capability.
     const outputContext = oneOff ? this.relayContext(context) : context;
-    const capability = this.capabilityFor(outputContext);
+    const capability = this.capabilityFor(outputContext, config);
     const created = await this.createConfiguredAgent(
       name,
       outputContext,
       capability,
       oneOff,
       prompt,
+      config,
     );
     context.onAgentCreated?.(created.agentId);
     let change: BindingChange | undefined;
@@ -226,9 +251,10 @@ export class ChannelLifecycleCommands {
       ) {
         throw new Error("Channel reply capability could not bind to the created session.");
       }
-      if (oneOff) await this.attachOneOff(created.agentId, outputContext);
+      if (oneOff)
+        await this.attachOneOff(created.agentId, await this.createdContext(created, outputContext));
       else {
-        change = await this.prepareRebind(created.agentId, context);
+        change = await this.prepareCreatedRebind(created, context);
         await this.deps.attach(change.binding, change.context);
       }
       // Subscribe before starting: initialPrompt at creation races first-turn stream attachment.
@@ -254,12 +280,40 @@ export class ChannelLifecycleCommands {
       : `Forked into session ${created.agentId}.`;
   }
 
-  private capabilityFor(context: LifecycleCommandContext): ChannelReplyAgentCapability | undefined {
+  private resolveCreateConfig(
+    name: string,
+    context: LifecycleCommandContext,
+    capability?: ChannelReplyAgentCapability,
+  ) {
+    if (name === "side" && this.deps.resolveSourceConfig)
+      return this.deps.resolveSourceConfig(context, capability);
+    return this.deps.resolveConfig(context, capability);
+  }
+
+  private async prepareCreatedRebind(
+    created: Awaited<ReturnType<DaemonConnection["createAgent"]>>,
+    context: LifecycleCommandContext,
+  ) {
+    return this.prepareRebind(created.agentId, await this.createdContext(created, context));
+  }
+
+  private async createdContext(
+    created: Awaited<ReturnType<DaemonConnection["createAgent"]>>,
+    context: LifecycleCommandContext,
+  ) {
+    const target = await this.deps.resolveAgentTarget?.(created.agent, context);
+    return target ? { ...context, accessTarget: target } : context;
+  }
+
+  private capabilityFor(
+    context: LifecycleCommandContext,
+    config?: CreateAgentConfig,
+  ): ChannelReplyAgentCapability | undefined {
     if (!outboundAttachesTool(context.route.defaults.outbound.path)) return undefined;
     if (!this.deps.issueCapability || !this.deps.bindCapability || !this.deps.revokeCapability) {
       throw new Error("Channel reply capability is unavailable.");
     }
-    return this.deps.issueCapability(context);
+    return this.deps.issueCapability(context, config);
   }
 
   private async createConfiguredAgent(
@@ -268,10 +322,25 @@ export class ChannelLifecycleCommands {
     capability: ChannelReplyAgentCapability | undefined,
     oneOff: boolean,
     prompt: string | undefined,
+    placementConfig: CreateAgentConfig,
   ) {
     try {
+      const resolved = await this.resolveCreateConfig(name, context, capability);
+      const {
+        cwd: _cwd,
+        projectId: _project,
+        workspaceId: _workspace,
+        worktree: _worktree,
+        ...rest
+      } = resolved;
       const config = applyRouteAutoAccept(
-        await this.deps.resolveConfig(context, capability),
+        {
+          ...rest,
+          cwd: placementConfig.cwd,
+          ...(placementConfig.projectId ? { projectId: placementConfig.projectId } : {}),
+          ...(placementConfig.workspaceId ? { workspaceId: placementConfig.workspaceId } : {}),
+          ...(placementConfig.worktree ? { worktree: placementConfig.worktree } : {}),
+        },
         context.route,
       );
       const workspaceId = await this.resolveSessionWorkspace(name, context, config, prompt);
@@ -302,6 +371,8 @@ export class ChannelLifecycleCommands {
       organize: context.route.defaults.workspace?.organize,
       ...(continues ? { sourceAgentId: context.agentId } : {}),
       cwd: config.cwd,
+      workspaceId: config.workspaceId,
+      worktree: config.worktree !== undefined,
       ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
       ...(continues || prompt === undefined ? {} : { firstAgentContext: { prompt } }),
       source: context.message,
@@ -312,6 +383,7 @@ export class ChannelLifecycleCommands {
   private relayContext(context: LifecycleCommandContext): LifecycleCommandContext {
     return {
       ...context,
+      selectionRoute: context.selectionRoute ?? context.route,
       route: {
         ...context.route,
         defaults: {
@@ -344,6 +416,7 @@ export class ChannelLifecycleCommands {
       agentId,
       initiator: context.message.senderIdentity,
       route: {
+        ...(context.accessTarget ? { placement: context.accessTarget } : {}),
         ...bindingSummary(
           context.route,
           context.message.conversation,
@@ -412,7 +485,10 @@ export class ChannelLifecycleCommands {
       agentId,
       daemonId: null,
       initiator: context.message.senderIdentity,
-      route: bindingSummary(context.route, context.message.conversation),
+      route: {
+        ...bindingSummary(context.route, context.message.conversation),
+        ...(context.accessTarget ? { placement: context.accessTarget } : {}),
+      },
       createdAt: new Date(),
       resolvedAt: new Date(),
     };

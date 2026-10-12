@@ -376,13 +376,14 @@ export class CheckoutSession {
   }
 
   async handleBranchSuggestionsRequest(msg: BranchSuggestionsRequest): Promise<void> {
-    const { cwd, query, limit, requestId } = msg;
+    const { cwd, query, limit, offset, requestId } = msg;
 
     try {
       const resolvedCwd = expandTilde(cwd);
       const branchDetails = await this.workspaceGitService.suggestBranchesForCwd(resolvedCwd, {
         query,
         limit,
+        offset,
       });
       this.host.emit({
         type: "branch_suggestions_response",

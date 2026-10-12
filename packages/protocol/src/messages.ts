@@ -2441,6 +2441,8 @@ export const StashListRequestSchema = z.object({
 
 export const BranchSuggestionsRequestSchema = z.object({
   type: z.literal("branch_suggestions_request"),
+  // COMPAT(branchSuggestionPaging): optional until supported peers negotiate this feature; review 2027-04-11.
+  offset: z.number().int().nonnegative().optional(),
   cwd: z.string(),
   query: z.string().optional(),
   limit: z.number().int().min(1).max(200).optional(),
@@ -3800,6 +3802,8 @@ export const ServerInfoStatusPayloadSchema = z
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
         workspaceMultiplicity: z.boolean().optional(),
+        // COMPAT(branchSuggestionPaging): optional capability for branch offsets; review 2027-04-11.
+        branchSuggestionPaging: z.boolean().optional(),
         // COMPAT(projectRemove): added in v0.1.97, drop the gate when floor >= v0.1.97.
         projectRemove: z.boolean().optional(),
         // COMPAT(projectAdd): added in v0.1.97, drop the gate when floor >= v0.1.97.

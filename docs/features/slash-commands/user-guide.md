@@ -252,3 +252,22 @@ these fixes works and reaches the same command:
 If a bare word isn't recognized, prefix it with `/` (or `\` on Slack) and send it
 on its own line — commands match the whole message, so extra text around them
 makes them ordinary prompts to the agent instead.
+
+## Choose where the next session runs
+
+Use `/project list` or `/project search payments` to find a Project on this bot's
+Host, then `/project <project-id>`. Use `/workspace list` to choose an existing
+Workspace, `/workspace list --worktree` for only worktrees, or `/branch` to find
+local/origin branches. Workspace lists and searches put recent activity first.
+Every list/search shows up to 10 results; add `--page 2` for the next page.
+
+`/workspace new main` creates a worktree from `main`, with automatic naming.
+`/workspace new main --branch fix/login --name "Fix login"` preserves that branch
+and titles the Workspace. `/workspace new --local` uses the Project's existing
+checkout. Creation happens immediately; the Agent starts on `/new <message>` or
+the next accepted prompt after `/new`.
+
+Selections apply to everyone sharing this thread/conversation, and the running
+session keeps its location. `/project clear` returns to the Route default;
+`/workspace clear` keeps the Project. A mentioned `/project` can be the first
+interaction when a direct Route already serves the conversation.

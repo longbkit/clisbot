@@ -1,3 +1,9 @@
+import { ChannelPlacementCommands } from "./commands-placement.js";
+import {
+  placementRouteFingerprint,
+  placementTarget,
+  resolvePlacementConfiguration,
+} from "./placement-selection.js";
 import { runExtensionCommand } from "./commands-extension.js";
 import { runFollowUpCommand } from "./commands-follow-up.js";
 import { APPROVAL_PRIVILEGES } from "../access/contract.js";
@@ -6,7 +12,7 @@ import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js"
 import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
 import type { ChannelPlaneDeps, InboundMessage } from "./plane/types.js";
-import { deriveBindingKey } from "./bindings/index.js";
+import { applyRouteAutoAccept, deriveBindingKey, routePosition } from "./bindings/index.js";
 import {
   channelCommandAccess,
   commandRefusalText,
@@ -82,7 +88,7 @@ export class ChannelCommandDispatcher {
     if (!receipt.claimed) {
       const detail =
         receipt.status === "pending"
-          ? "An earlier attempt is in progress or was interrupted. Inspect the session before retrying with a new message."
+          ? pendingCommandText(command.name)
           : `/${command.name} was already processed for this message.`;
       await context.post(detail).catch(() => false);
       return { handled: true, detail: "duplicate command consumed" };
@@ -111,6 +117,14 @@ export class ChannelCommandDispatcher {
         return this.reply(context, await this.status(context), "status");
       if (command.name === "followup") return this.followUp(command.value, context);
       if (context.route.target.kind === "workflow") return this.workflow(command, context);
+      if (command.name === "project" || command.name === "workspace" || command.name === "branch") {
+        const commands = new ChannelPlacementCommands({
+          ...this.deps,
+          baseConfig: (placementContext) => this.baseConfig(placementContext),
+          authorizeConfiguration: (input) => this.authorizeConfiguration(input),
+        });
+        return this.reply(context, await commands.run(command, context));
+      }
       const lifecycle = await this.deps.lifecycle.handle(command, context);
       if (lifecycle) return lifecycle;
       if (command.name === "routedefault" || command.name === "promoteroutedefault")
@@ -139,6 +153,8 @@ export class ChannelCommandDispatcher {
       return `/${command.name} is not available on an automation route.`;
     }
     if (context.route.target.kind === "workflow") return undefined;
+    // /resume is checked against the actual destination, inside the lifecycle handler.
+    if (command.name === "resume") return undefined;
     const privilege = channelCommandAccess(command);
     if (privilege === "public" || privilege === "chat") return undefined;
     const { plane } = this.deps;
@@ -161,8 +177,8 @@ export class ChannelCommandDispatcher {
 
   /**
    * What a new session in this conversation runs: the Route's configuration
-   * with the conversation's selection folded on. Neither is re-checked against
-   * the sender — the publisher and the selector were checked when they chose it.
+   * with its configuration and placement selections. An explicit destination
+   * is checked again against this sender before creating another session.
    */
   async resolveConfig(
     context: LifecycleCommandContext,
@@ -171,10 +187,38 @@ export class ChannelCommandDispatcher {
     const selection = await this.deps.store.access.findConversationSelection(
       this.selectionKey(context),
     );
-    return resolveConversationConfiguration(
-      this.routeConfig(context, undefined, capability),
-      selection,
+    const route = context.selectionRoute ?? context.route;
+    const target = this.deps.plane.resolveAgentAccessTarget(
+      route.target as Extract<typeof route.target, { kind: "agent" }>,
     );
+    const config = await resolvePlacementConfiguration({
+      config: resolveConversationConfiguration(
+        this.routeConfig(context, undefined, capability),
+        selection,
+      ),
+      selection,
+      account: context.account,
+      route,
+      target,
+      daemon: this.deps.daemon,
+    });
+    if (selection?.selectedPlacement && route.defaults.workspace?.commands !== false) {
+      const result = await this.authorizeConfiguration({
+        ...context,
+        config,
+        accessTarget: placementTarget(selection.selectedPlacement),
+      });
+      if (!result.allowed)
+        throw new Error(result.reason ?? "The selected Project is no longer authorized.");
+    }
+    return config;
+  }
+
+  private async baseConfig(context: LifecycleCommandContext): Promise<CreateAgentConfig> {
+    const selection = await this.deps.store.access.findConversationSelection(
+      this.selectionKey(context),
+    );
+    return resolveConversationConfiguration(this.routeConfig(context), selection);
   }
 
   /** What the Route starts for this conversation, before the conversation's own choice. */
@@ -210,6 +254,7 @@ export class ChannelCommandDispatcher {
     account: CompiledChannelAccount;
     route: CompiledRoute;
     config: CreateAgentConfig;
+    accessTarget?: import("./plane/types.js").ChannelAgentAccessTarget;
   }): Promise<{ allowed: boolean; reason?: string }> {
     const request = commandAccessRequest(
       this.deps.plane,
@@ -217,7 +262,41 @@ export class ChannelCommandDispatcher {
       input.account,
       input.route,
       "agent.create",
+      input.accessTarget ??
+        (input.route.target.kind === "agent"
+          ? {
+              ...this.deps.plane.resolveAgentAccessTarget(input.route.target),
+              ...(input.config.projectId ? { projectId: input.config.projectId } : {}),
+            }
+          : undefined),
     );
+    if (
+      !(
+        await this.deps.plane.commandAccess?.authorizeChannelPrivilege({
+          ...request,
+          privilege: "project.use",
+        })
+      )?.allowed
+    )
+      return { allowed: false, reason: "The destination Project needs project.use." };
+    if (!(await this.deps.plane.commandAccess?.authorizeChannelPrivilege(request))?.allowed)
+      return {
+        allowed: false,
+        reason: "Creating an Agent needs agent.create in the destination Project.",
+      };
+    if (
+      createsWorktree(input.config) &&
+      !(
+        await this.deps.plane.commandAccess?.authorizeChannelPrivilege({
+          ...request,
+          privilege: "workspace.create",
+        })
+      )?.allowed
+    )
+      return {
+        allowed: false,
+        reason: "Creating a worktree needs workspace.create in the destination Project.",
+      };
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) return { allowed: false, reason: "Agent configuration access is unavailable." };
     const checks = await Promise.all(
@@ -228,7 +307,7 @@ export class ChannelCommandDispatcher {
     try {
       await validateAgentConfigurationAuthority(
         this.deps.daemon,
-        input.config,
+        applyRouteAutoAccept(input.config, input.route),
         access,
         checks.every((entry) => entry?.allowed),
         (
@@ -248,10 +327,10 @@ export class ChannelCommandDispatcher {
   }
 
   async authorizeResume(agent: AgentSnapshot, context: LifecycleCommandContext): Promise<boolean> {
-    const config = await this.resolveConfig(context);
-    if (config.projectId !== undefined) {
-      if (!(await this.deps.daemon.isAgentInProject(agent, config.projectId))) return false;
-    } else if (agent.cwd !== config.cwd) return false;
+    const config = await this.baseConfig(context);
+    const target = await this.agentTarget(agent, context).catch(() => undefined);
+    if (!target) return false;
+    context = { ...context, accessTarget: target };
     const request = commandAccessRequest(
       this.deps.plane,
       context.message,
@@ -269,6 +348,82 @@ export class ChannelCommandDispatcher {
         config: snapshotConfiguration(config, agent),
       })
     ).allowed;
+  }
+
+  async agentTarget(agent: AgentSnapshot, context: LifecycleCommandContext) {
+    if (context.route.target.kind !== "agent") throw new Error("A direct Route is required.");
+    const host = this.deps.plane.resolveAgentAccessTarget(context.route.target);
+    const project = await this.deps.daemon.getAgentProject?.(agent);
+    if (!project) throw new Error("The session's Project is unavailable.");
+    return { ...host, projectId: project.projectId, projectRoot: project.projectRootPath };
+  }
+
+  async synchronizePlacement(agent: AgentSnapshot, context: LifecycleCommandContext) {
+    if (context.route.defaults.workspace?.commands === false) return;
+    const target = await this.agentTarget(agent, context);
+    if (!target.projectId || !target.projectRoot) return;
+    await this.deps.store.access.setConversationSelection(this.selectionKey(context), {
+      selectedPlacement: {
+        projectId: target.projectId,
+        projectRoot: target.projectRoot,
+        ...(agent.workspaceId ? { workspaceId: agent.workspaceId } : {}),
+        daemonReference: target.daemonReference,
+        routePosition: routePosition(context.account, context.route),
+        routeFingerprint: placementRouteFingerprint(context.route),
+      },
+      selectedBy: context.message.senderIdentity,
+    });
+  }
+
+  async resolveSourceConfig(
+    context: LifecycleCommandContext,
+    capability?: import("./plane/types.js").ChannelReplyAgentCapability,
+  ) {
+    const selection = await this.deps.store.access.findConversationSelection(
+      this.selectionKey(context),
+    );
+    if (!selection?.selectedPlacement || context.route.defaults.workspace?.commands === false)
+      return this.resolveConfig(context, capability);
+    const source = (await this.deps.daemon.listAgents()).find((a) => a.id === context.agentId);
+    if (!source) throw new Error("The source session is unavailable.");
+    const base = resolveConversationConfiguration(
+      this.routeConfig(context, undefined, capability),
+      selection,
+    );
+    const { projectId: _project, workspaceId: _workspace, worktree: _worktree, ...rest } = base;
+    const accessTarget = await this.agentTarget(source, context);
+    const config: CreateAgentConfig = {
+      ...rest,
+      cwd: source.cwd,
+      projectId: accessTarget.projectId,
+      ...(source.workspaceId ? { workspaceId: source.workspaceId } : {}),
+    };
+    const result = await this.authorizeConfiguration({ ...context, config, accessTarget });
+    if (!result.allowed)
+      throw new Error(result.reason ?? "The source Project is no longer authorized.");
+    return config;
+  }
+
+  async authorizeFork(context: LifecycleCommandContext): Promise<void> {
+    const selection = await this.deps.store.access.findConversationSelection(
+      this.selectionKey(context),
+    );
+    if (!selection?.selectedPlacement || context.route.defaults.workspace?.commands === false)
+      return;
+    if (!context.agentId) throw new Error("No bound session to fork.");
+    const agent = (await this.deps.daemon.listAgents()).find((a) => a.id === context.agentId);
+    if (!agent) throw new Error("The source session is unavailable.");
+    const target = await this.agentTarget(agent, context);
+    const request = commandAccessRequest(
+      this.deps.plane,
+      context.message,
+      context.account,
+      context.route,
+      "agent.interact",
+      target,
+    );
+    if (!(await this.deps.plane.commandAccess?.authorizeChannelPrivilege(request))?.allowed)
+      throw new Error("Forking context needs agent.interact in the source Project.");
   }
 
   private async mayUseLiveMode(
@@ -323,25 +478,37 @@ export class ChannelCommandDispatcher {
     );
   }
 
+  private async nextAccessTarget(context: LifecycleCommandContext) {
+    const selection = await this.deps.store.access.findConversationSelection(
+      this.selectionKey(context),
+    );
+    if (!selection?.selectedPlacement || context.route.defaults.workspace?.commands === false)
+      return undefined;
+    return placementTarget(selection.selectedPlacement);
+  }
+
   private async configurationInput(
     command: Parameters<typeof runConfigurationCommand>[0]["command"],
     context: LifecycleCommandContext,
   ): Promise<Parameters<typeof runConfigurationCommand>[0]> {
+    const boundAgent = context.agentId
+      ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
+      : undefined;
+    const base = await this.baseConfig(context);
+    const agent = boundAgent?.provider === base.provider ? boundAgent : undefined;
+    // Live configuration belongs to the bound session even if the next choice expired.
+    const config = agent ? snapshotConfiguration(base, agent) : await this.resolveConfig(context);
+    const target = agent ? context.accessTarget : await this.nextAccessTarget(context);
     const request = commandAccessRequest(
       this.deps.plane,
       context.message,
       context.account,
       context.route,
       "agent.interact",
-      context.accessTarget,
+      target,
     );
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) throw new Error("Agent configuration access is unavailable.");
-    const config = await this.resolveConfig(context);
-    const boundAgent = context.agentId
-      ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
-      : undefined;
-    const agent = boundAgent?.provider === config.provider ? boundAgent : undefined;
     if (
       agent &&
       command.value &&
@@ -412,7 +579,8 @@ export class ChannelCommandDispatcher {
       this.selectionKey(context),
     );
     const route = this.routeConfig(context);
-    if (selection !== undefined) return resolveConversationConfiguration(route, selection);
+    if (selection?.selectedProvider != null || selection?.selectedModel != null)
+      return resolveConversationConfiguration(route, selection);
     const agent = context.agentId
       ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
       : undefined;
@@ -586,8 +754,21 @@ export class ChannelCommandDispatcher {
   }
 }
 
+function pendingCommandText(name: string) {
+  if (name === "workspace" || name === "project")
+    return `An earlier /${name} attempt is in progress or was interrupted. Use /${name} to inspect the result before retrying with a new message.`;
+  return "An earlier attempt is in progress or was interrupted. Inspect the session before retrying with a new message.";
+}
+
+function createsWorktree(config: CreateAgentConfig): boolean {
+  return config.worktree !== undefined && config.workspaceId === undefined;
+}
+
 function isMutation(command: ChannelTextCommand): boolean {
-  if (["help", "me", "status", "cowork", "routedefault"].includes(command.name)) return false;
+  if (["help", "me", "status", "cowork", "routedefault", "branch"].includes(command.name))
+    return false;
+  if (command.name === "project" || command.name === "workspace")
+    return command.value !== undefined && !/^(list|search|show)(?:\s|$)/iu.test(command.value);
   if (command.name === "followup")
     return followUpActionChangesState(parseFollowUpArguments(command.value));
   if (
@@ -606,12 +787,17 @@ function snapshotConfiguration(base: CreateAgentConfig, agent: AgentSnapshot): C
     thinkingOptionId: _thinking,
     modeId: _mode,
     featureValues: _features,
+    projectId: _project,
+    workspaceId: _workspace,
+    worktree: _worktree,
     ...location
   } = base;
   return {
     ...location,
     provider: agent.provider,
     cwd: agent.cwd,
+    ...(agent.projectId ? { projectId: agent.projectId } : {}),
+    ...(agent.workspaceId ? { workspaceId: agent.workspaceId } : {}),
     ...(agent.model === undefined ? {} : { model: agent.model }),
     ...(agent.thinkingOptionId === undefined ? {} : { thinkingOptionId: agent.thinkingOptionId }),
     ...(agent.modeId === undefined ? {} : { modeId: agent.modeId }),

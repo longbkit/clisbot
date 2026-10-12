@@ -50,7 +50,7 @@ export interface EffectiveDefaults extends EffectiveConversationDefaults {
   /** Workspace organization (`workspace.organize`). ABSENT — the floor — means
    * on, and keeps a revision authored before the knob existed compiling to the
    * block (and the `routeFingerprint`) it always had. */
-  workspace?: { organize: boolean } | undefined;
+  workspace?: { organize?: boolean; commands?: boolean } | undefined;
   /** The reply-path toggle (E4/E6), folded like every other default leaf;
    * `template` stays null at the org floor (= the default injection block). */
   outbound: { path: OutboundPath; template: string | null };
@@ -324,9 +324,15 @@ function foldProgressDefaults(
 }
 
 /** Fold `workspace.organize`; unauthored at every layer stays `undefined`. */
-function foldWorkspaceDefaults(pick: LeafPicker): { organize: boolean } | undefined {
+function foldWorkspaceDefaults(pick: LeafPicker): EffectiveDefaults["workspace"] {
   const organize = pick((layer) => layer?.workspace?.organize);
-  return organize === undefined ? undefined : { organize };
+  const commands = pick((layer) => layer?.workspace?.commands);
+  return organize === undefined && commands === undefined
+    ? undefined
+    : {
+        ...(organize === undefined ? {} : { organize }),
+        ...(commands === undefined ? {} : { commands }),
+      };
 }
 
 /**

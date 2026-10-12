@@ -12,6 +12,12 @@
 // the narrowed slice of the engine's, so the dependencies of minting a session
 // are visible without reading the engine.
 
+import {
+  ChannelPlacementRefusedError,
+  placementTarget,
+  resolvePlacementConfiguration,
+  type ChannelPlacementSelection,
+} from "../placement-selection.js";
 import type { ChannelStore } from "../../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
 import { outboundAttachesTool } from "../config/enums.js";
@@ -39,6 +45,15 @@ import { sessionTitle } from "./prompt.js";
 
 /** What minting a session needs from the plane; `BindingEngineContext` extends it. */
 export interface SessionCreateContext {
+  authorizePlacement?:
+    | ((input: {
+        account: CompiledChannelAccount;
+        route: CompiledRoute;
+        message: InboundMessage;
+        config: CreateAgentConfig;
+        accessTarget: ChannelAgentAccessTarget;
+      }) => Promise<{ allowed: boolean; reason?: string }>)
+    | undefined;
   organizationId: string;
   channelRevisionId?: string | null | undefined;
   logger: PlaneLogger;
@@ -133,11 +148,14 @@ function issueReplyCapability(
     executionId: string;
     requester: InboundMessage;
     target: Extract<CompiledRoute["target"], { kind: "agent" }>;
+    placement?: ChannelPlacementSelection | null | undefined;
   },
 ): { token: string; canSendFiles: boolean } {
   const { account, route, ref, executionId, requester } = input;
   const capabilities = context.replyCapabilities;
-  const accessTarget = context.resolveAgentAccessTarget?.(input.target);
+  const accessTarget = input.placement
+    ? placementTarget(input.placement)
+    : context.resolveAgentAccessTarget?.(input.target);
   if (capabilities === undefined || accessTarget === undefined) {
     throw new Error("Channel reply capability is unavailable");
   }
@@ -179,6 +197,7 @@ export async function createRouteSession(
   key: ThreadKey,
   executionId: string,
   requester: InboundMessage,
+  capturedPlacement?: ChannelPlacementSelection | null,
 ): Promise<{ agentId: string }> {
   const routeTarget = route.target;
   if (routeTarget.kind !== "agent") {
@@ -193,13 +212,19 @@ export async function createRouteSession(
   // `/agent` and `/model` are conversation-scoped and outlive every session
   // in it, so they are read here — at the one place a session is minted —
   // rather than carried on the binding row that `/new` deletes.
-  const chosen = await context.store.access.findConversationSelection({
-    organizationId: context.organizationId,
-    ...ref,
-  });
+  const chosen = await sessionChoice(context, route, ref, capturedPlacement);
+  const selectedPlacement = chosen?.selectedPlacement;
   const target = routeTarget;
   const issued = outboundAttachesTool(route.defaults.outbound.path)
-    ? issueReplyCapability(context, { account, route, ref, executionId, requester, target })
+    ? issueReplyCapability(context, {
+        account,
+        route,
+        ref,
+        executionId,
+        requester,
+        target,
+        placement: selectedPlacement,
+      })
     : undefined;
   const capabilityToken = issued?.token;
   const canSendFiles = issued?.canSendFiles === true;
@@ -216,12 +241,23 @@ export async function createRouteSession(
           },
       undefined,
     );
-    // No per-sender Access check: the Route publisher delegated this
-    // configuration and the conversation selection was checked against whoever
-    // made it. Chat authority was settled at admission.
+    // The Route publisher delegates its default. An explicit placement is
+    // revalidated against the creator before expanding that default.
     const config = applyRouteAutoAccept(
-      resolveConversationConfiguration(baseConfig, chosen),
+      await resolvePlacementConfiguration({
+        config: resolveConversationConfiguration(baseConfig, chosen),
+        selection: chosen,
+        route,
+        account,
+        daemon: context.daemon,
+        target: context.resolveAgentAccessTarget?.(target) ?? { daemonReference: "" },
+      }),
       route,
+    );
+    await authorizeSessionPlacement(
+      context,
+      { account, route, message: requester, config },
+      selectedPlacement,
     );
     const workspaceId = await resolveSessionWorkspace(context, route, config, requester);
     const created = await context.daemon
@@ -257,6 +293,46 @@ export async function createRouteSession(
   }
 }
 
+async function sessionChoice(
+  context: SessionCreateContext,
+  route: CompiledRoute,
+  ref: ChannelReplyBindingRef,
+  capturedPlacement: ChannelPlacementSelection | null | undefined,
+) {
+  const stored = await context.store.access.findConversationSelection({
+    organizationId: context.organizationId,
+    ...ref,
+  });
+  if (!stored) return undefined;
+  const placement = capturedPlacement === undefined ? stored.selectedPlacement : capturedPlacement;
+  return {
+    ...stored,
+    selectedPlacement: route.defaults.workspace?.commands === false ? null : (placement ?? null),
+  };
+}
+
+async function authorizeSessionPlacement(
+  context: SessionCreateContext,
+  input: {
+    account: CompiledChannelAccount;
+    route: CompiledRoute;
+    message: InboundMessage;
+    config: CreateAgentConfig;
+  },
+  placement: ChannelPlacementSelection | null | undefined,
+) {
+  if (!placement) return;
+  if (!context.authorizePlacement) throw new Error("Placement authorization is unavailable.");
+  const result = await context.authorizePlacement({
+    ...input,
+    accessTarget: placementTarget(placement),
+  });
+  if (!result.allowed)
+    throw new ChannelPlacementRefusedError(
+      result.reason ?? "The selected Project is no longer authorized.",
+    );
+}
+
 /**
  * A thread's first session has no session to continue, so it opens a new
  * workspace named from the inbound that mints it (A3). Off, or on a daemon
@@ -271,6 +347,8 @@ async function resolveSessionWorkspace(
   return await resolveSessionWorkspaceId(context.daemon, {
     organize: route.defaults.workspace?.organize,
     cwd: config.cwd,
+    workspaceId: config.workspaceId,
+    worktree: config.worktree !== undefined,
     ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
     firstAgentContext: { prompt: requester.text },
     source: requester,

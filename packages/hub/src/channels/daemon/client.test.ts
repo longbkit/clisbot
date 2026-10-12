@@ -60,6 +60,7 @@ class FakeDaemon {
   clients: Set<import("ws").WebSocket>;
   port = 0;
   channelFileRead = true;
+  agentProjectId: string | null = "project-channel";
 
   constructor() {
     this.wss = new WebSocketServer({ noServer: true });
@@ -117,6 +118,7 @@ class FakeDaemon {
               serverId: "fake",
               features: {
                 agentForkContext: true,
+                branchSuggestionPaging: true,
                 agentConfigApply: true,
                 channelFileRead: this.channelFileRead,
               },
@@ -138,6 +140,11 @@ class FakeDaemon {
 
   private respond(client: import("ws").WebSocket, message: RecordedMessage): void {
     const catalog: Record<string, Record<string, unknown>> = {
+      fetch_agent_request: {
+        agent: { id: "agent-1", workspaceId: "workspace-channel" },
+        project: { projectKey: this.agentProjectId },
+        error: null,
+      },
       "channel.file.read.request": {
         data: Buffer.from(message["offset"] === 0 ? "first" : "second").toString("base64"),
         size: 11,
@@ -152,6 +159,17 @@ class FakeDaemon {
         config: { agentProfiles: [{ id: "preset", name: "Preset", provider: "codex" }] },
       },
       fetch_workspaces_request: asWorkspacePage(message),
+      "project.list.request": {
+        projects: [
+          {
+            projectId: "project-channel",
+            projectDisplayName: "Channel",
+            projectRootPath: "/repo",
+            projectKind: "git",
+          },
+        ],
+      },
+      branch_suggestions_request: branchSuggestionPayload(message),
       list_commands_request: {
         commands: [{ name: "review", description: "Review", argumentHint: "", kind: "skill" }],
       },
@@ -335,8 +353,10 @@ class FakeDaemon {
                 requestId: message["requestId"],
                 entries: [
                   {
+                    project: { projectKey: "project-channel" },
                     agent: {
                       id: "agent-1",
+                      projectId: "untrusted-snapshot-field",
                       provider: "codex",
                       status: "idle",
                       workspaceId: "workspace-channel",
@@ -580,6 +600,27 @@ describe("channel trusted-client daemon connection", () => {
       agents.map((agent) => agent.id),
       ["agent-1", "agent-2", "agent-3"],
     );
+    assert.equal(agents[0]?.projectId, "project-channel");
+    assert.equal(agents[1]?.projectId, undefined);
+  });
+
+  it("resolves the exact Agent Workspace's Project from separate wire placement, failing closed without it", async () => {
+    const created = await client.createAgent({ provider: "codex", cwd: "/repo" });
+    assert.equal(created.agent.projectId, undefined, "raw snapshots do not carry a Project");
+    const project = await client.getAgentProject!({ ...created.agent, projectId: "spoofed" });
+    assert.equal(project?.projectId, "project-channel");
+    assert.equal(project?.projectRootPath, "/repo");
+    assert.equal(
+      await client.getAgentProject!({ ...created.agent, workspaceId: "other" }),
+      undefined,
+    );
+    assert.equal(await client.getAgentProject!({ ...created.agent, id: "other" }), undefined);
+    daemon.agentProjectId = null;
+    try {
+      assert.equal(await client.getAgentProject!(created.agent), undefined);
+    } finally {
+      daemon.agentProjectId = "project-channel";
+    }
   });
 
   it("sets the selective timeline subscription", async () => {
@@ -673,6 +714,50 @@ describe("channel trusted-client daemon connection", () => {
     // The Hub never titles the workspace: the daemon's auto-naming owns the
     // name and leaves a user-set title alone (A3/A4).
     assert.equal(frame["title"], undefined);
+  });
+
+  it("uses the existing workspace wire with title, branch, base and retry key", async () => {
+    await client.createWorkspace({
+      cwd: "/repo",
+      projectId: "project-channel",
+      kind: "worktree",
+      baseRef: "main",
+      branchName: "fix/login",
+      title: "Fix login",
+      idempotencyKey: "stable-key",
+    });
+    const frame = daemon.messages.findLast((m) => m.type === "workspace.create.request");
+    assert.deepEqual(frame?.["source"], {
+      kind: "worktree",
+      cwd: "/repo",
+      projectId: "project-channel",
+      action: "branch-off",
+      refName: "main",
+      branchName: "fix/login",
+    });
+    assert.equal(frame?.["title"], "Fix login");
+    assert.equal(frame?.["idempotencyKey"], "stable-key");
+    await client.createAgent(
+      { provider: "codex", cwd: "/trees/a", projectId: "project-channel", workspaceId: "explicit" },
+      { workspaceId: "inherited" },
+    );
+    const agent = daemon.messages.findLast((m) => m.type === "create_agent_request");
+    assert.equal(agent?.["workspaceId"], "explicit");
+    assert.equal((agent!["config"] as Record<string, unknown>)["workspaceId"], undefined);
+  });
+  it("preserves activity and branch across Workspace pages and reads branches beyond 200", async () => {
+    assert.equal((await client.listProjects!())[0]?.projectId, "project-channel");
+    const workspaces = await client.listWorkspaces!("project-channel");
+    assert.equal(workspaces.length, 2);
+    assert.equal(workspaces[0]?.branch, "fix/login");
+    assert.equal(workspaces[0]?.activityAt, "2026-01-02T00:00:00Z");
+    assert.equal(workspaces[0]?.workspaceDirectory, "/trees/a");
+    assert.equal((await client.listBranches!("/repo")).length, 211);
+    const frames = daemon.messages.filter((m) => m.type === "branch_suggestions_request");
+    assert.deepEqual(
+      frames.map((m) => m["offset"]),
+      [0, 200],
+    );
   });
 
   it("surfaces a refused workspace creation as an error", async () => {
@@ -945,11 +1030,31 @@ function asWorkspacePage(message: RecordedMessage): Record<string, unknown> {
     return { entries: [], pageInfo: { hasMore: false, nextCursor: null } };
   return cursor === undefined
     ? {
-        entries: [{ id: "other-workspace", projectId }],
+        entries: [
+          {
+            id: "other-workspace",
+            projectId,
+            projectRootPath: "/repo",
+            workspaceDirectory: "/trees/a",
+            activityAt: "2026-01-02T00:00:00Z",
+            gitRuntime: { currentBranch: "fix/login" },
+          },
+        ],
         pageInfo: { hasMore: true, nextCursor: "next-page" },
       }
     : {
         entries: [{ id: "workspace-channel", projectId }],
         pageInfo: { hasMore: false, nextCursor: null },
       };
+}
+
+function branchSuggestionPayload(message: RecordedMessage) {
+  const offset = Number(message["offset"] ?? 0);
+  return {
+    branchDetails: Array.from({ length: offset === 0 ? 200 : 11 }, (_, i) => ({
+      name: `branch-${offset + i}`,
+      committerDate: i,
+      hasLocal: true,
+    })),
+  };
 }

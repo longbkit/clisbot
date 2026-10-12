@@ -79,7 +79,7 @@ export async function promoteRouteDefault(
   const outcome = await publisher.promote(target, controls);
   if (outcome.status !== "published") return reply(outcomeText(outcome));
   // The conversation's own choice is now the Route's, so it stops overriding it.
-  await deps.store.access.clearConversationSelection(deps.selectionKey(context));
+  await deps.store.access.clearConversationConfiguration(deps.selectionKey(context));
   return published(
     [
       `Default set for ${routeLabel(context)}:`,

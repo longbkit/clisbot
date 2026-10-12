@@ -137,7 +137,9 @@ export type ReplyDefaults = z.infer<typeof ReplyDefaultsSchema>;
  * this route. A floor value would rewrite every fingerprint on upgrade and
  * orphan both.
  */
-export const WorkspaceDefaultsSchema = z.object({ organize: z.boolean().optional() }).strict();
+export const WorkspaceDefaultsSchema = z
+  .object({ organize: z.boolean().optional(), commands: z.boolean().optional() })
+  .strict();
 export type WorkspaceDefaults = z.infer<typeof WorkspaceDefaultsSchema>;
 
 /**

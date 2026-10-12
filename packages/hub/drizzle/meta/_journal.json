@@ -638,6 +638,13 @@
       "when": 1791271451632,
       "tag": "0090_whatsapp_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1791652246044,
+      "tag": "0091_channel_workspace_selection",
+      "breakpoints": true
     }
   ]
 }

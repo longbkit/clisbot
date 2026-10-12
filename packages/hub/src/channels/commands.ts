@@ -60,6 +60,34 @@ export interface ApprovalCommand {
  */
 export const CHANNEL_COMMANDS = [
   {
+    name: "project",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/project [list|search <text>|<id-or-name>|clear] [--page N]",
+    description: "find or select the Project for the next session",
+  },
+  {
+    name: "workspace",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage:
+      "/workspace [list [--worktree]|search <text>|show <id>|<id>|clear|new [base] [--branch name] [--name title]|new --local]",
+    description: "find, select or create a Workspace for the next session",
+  },
+  {
+    name: "branch",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/branch [list|search <text>] [--page N]",
+    description: "list local and origin branches in the selected Project",
+  },
+  {
     name: "status",
     aliases: ["state"],
     args: false,

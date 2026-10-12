@@ -25,6 +25,7 @@ export interface ChannelPairingRecord {
 
 /** The conversation's `/agent` + `/model` choice; absent = the route's own. */
 export interface ChannelConversationSelectionRecord {
+  selectedPlacement?: import("../channels/placement-selection.js").ChannelPlacementSelection | null;
   selectedAgent: string | null;
   selectedModel: string | null;
   selectedProvider: string | null;
@@ -216,6 +217,7 @@ export class ChannelAccessStore extends ChannelFollowUpStore {
         accountId: key.accountId,
         externalConversationId: key.externalConversationId,
         externalThreadId: key.externalThreadId,
+        selectedPlacement: selection.selectedPlacement ?? null,
         selectedAgent: selection.selectedAgent ?? null,
         selectedModel: selection.selectedModel ?? null,
         selectedProvider: selection.selectedProvider ?? null,
@@ -239,7 +241,23 @@ export class ChannelAccessStore extends ChannelFollowUpStore {
     return toSelection(updated);
   }
 
-  /** Drop the conversation's choice so its next session follows the Route default. */
+  /** Clear configuration axes atomically, retaining concurrent Project/Workspace choices. */
+  async clearConversationConfiguration(key: ChannelConversationKey): Promise<void> {
+    await this.database
+      .update(schema.channelConversationSelections)
+      .set({
+        selectedAgent: null,
+        selectedModel: null,
+        selectedProvider: null,
+        selectedThinkingOption: null,
+        selectedMode: null,
+        selectedFeatureValues: null,
+        updatedAt: new Date(),
+      })
+      .where(and(...conversationWhere(key)));
+  }
+
+  /** Drop every selection, including Project/Workspace placement. */
   async clearConversationSelection(key: ChannelConversationKey): Promise<void> {
     await this.database
       .delete(schema.channelConversationSelections)
@@ -251,6 +269,7 @@ function toSelection(
   row: typeof schema.channelConversationSelections.$inferSelect,
 ): ChannelConversationSelectionRecord {
   return {
+    ...(row.selectedPlacement === null ? {} : { selectedPlacement: row.selectedPlacement }),
     selectedAgent: row.selectedAgent,
     selectedModel: row.selectedModel,
     selectedProvider: row.selectedProvider,

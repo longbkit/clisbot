@@ -201,6 +201,7 @@ function makeFakeDaemon(
     response: AgentPermissionResponse;
   }[] = [];
   const cancelled: string[] = [];
+  const agentProjects = new Map<string, import("../daemon/types.js").ProjectSnapshot>();
   let seq = 0;
   const daemon: DaemonConnection = {
     ...configurationDaemonStub(),
@@ -211,7 +212,18 @@ function makeFakeDaemon(
       if (options.failCreate === true) throw new Error("create refused");
       created.push({ config, title: opts?.title ?? null });
       const id = `agent-${seq++}`;
-      return { agentId: id, agent: snapshotOf(id, opts?.title ?? null, opts?.labels ?? {}) };
+      const agent = {
+        ...snapshotOf(id, opts?.title ?? null, opts?.labels ?? {}),
+        cwd: config.cwd,
+        workspaceId: config.workspaceId ?? opts?.workspaceId ?? `workspace-${id}`,
+      };
+      agentProjects.set(id, {
+        projectId: config.projectId ?? "project-1",
+        projectRootPath: config.cwd,
+        projectDisplayName: "Test",
+        projectKind: "git",
+      });
+      return { agentId: id, agent };
     },
     sendAgentMessage: async (agentId, text, opts) => {
       options.order?.push("send");
@@ -234,6 +246,13 @@ function makeFakeDaemon(
       responses.push({ agentId, requestId, response });
     },
     listAgents: async () => listAgents,
+    getAgentProject: async (agent) =>
+      agentProjects.get(agent.id) ?? {
+        projectId: agent.projectId ?? "project-1",
+        projectRootPath: agent.cwd,
+        projectDisplayName: "Test",
+        projectKind: "git",
+      },
     setTimelineSubscription: async () => {
       options.order?.push("subscribe");
     },
@@ -296,6 +315,7 @@ function makeHarness(
     progress?: Partial<EffectiveDefaults["sync"]["progress"]>;
     daemonOptions?: Parameters<typeof makeFakeDaemon>[1];
     daemonAgents?: AgentSnapshot[];
+    agentConfig?: CreateAgentConfig;
     processingTtlMs?: number;
     resolveChannelSender?: ChannelPlaneDeps["resolveChannelSender"];
     authorizeChannelApproval?: ChannelPlaneDeps["authorizeChannelApproval"];
@@ -407,6 +427,7 @@ function makeHarness(
     resolveAgentSpec: () => ({
       provider: "codex",
       cwd: opts.media?.agentCwd ?? "/tmp/repo",
+      ...opts.agentConfig,
     }),
     resolveAgentAccessTarget: () => ({
       daemonReference: "daemon-1",
@@ -3796,5 +3817,194 @@ describe("/me and /status disclosure", () => {
     const admitted = await send(quiet, { text: "/status", conversation: room("C0QUIET") });
     assert.equal(admitted.outcome?.kind, "command");
     await quiet.plane.stop();
+  });
+});
+
+describe("Project/Workspace placement through channel ingress", () => {
+  it("rechecks inherited worktree access before the first prompt and leaves no pending binding on refusal", async () => {
+    let canCreateWorkspace = true;
+    let workspaceCreates = 0;
+    const h = makeHarness({
+      agentConfig: {
+        provider: "codex",
+        cwd: "/tmp/repo",
+        worktree: { mode: "branch-off", newBranch: "generated" },
+      },
+      commandAccess: {
+        resolveChannelMember: async () => LINKED_MEMBER,
+        authorizeChannelPrivilege: async (request) =>
+          request.privilege === "workspace.create" && !canCreateWorkspace
+            ? { allowed: false, reason: "Workspace creation access revoked" }
+            : { allowed: true },
+        resolveChannelAgentConfigurations: async () => ({
+          unrestricted: true,
+          agentConfigurations: [],
+        }),
+      },
+    });
+    h.fake.daemon.getServerInfo = () => ({
+      serverId: "host",
+      features: { workspaceMultiplicity: true },
+    });
+    h.fake.daemon.listProjects = async () => [
+      {
+        projectId: "project-b",
+        projectDisplayName: "B",
+        projectRootPath: "/b",
+        projectKind: "git",
+      },
+    ];
+    h.fake.daemon.createWorkspace = async (input) => {
+      workspaceCreates += 1;
+      assert.equal(input.projectId, "project-b");
+      assert.equal(input.cwd, "/b");
+      return { workspaceId: "workspace-b" };
+    };
+    const opener = "1712000000.001000";
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C-WORKTREE-ACCESS",
+      rootConversationId: "C-WORKTREE-ACCESS",
+      threadId: null,
+    };
+    const send = async (text: string, externalMessageId: string, inThread = true) => {
+      h.next.message = message({
+        text,
+        externalMessageId,
+        conversation: inThread
+          ? { ...conversation, kind: "thread", threadId: opener }
+          : conversation,
+      });
+      return h.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    };
+    await h.plane.start(h.fake.daemon, store);
+    assert.equal((await send("<@BOT> /project project-b", opener, false)).outcome?.kind, "command");
+    canCreateWorkspace = false;
+    assert.equal((await send("Fix login", "1712000000.001001")).outcome?.kind, "ignored");
+    assert.match(h.posted.at(-1) ?? "", /workspace\.create/u);
+    assert.equal(h.postedThreads.at(-1), opener);
+    assert.equal(h.activity.at(-1)?.outcome, "denied");
+    assert.equal(workspaceCreates, 0);
+    assert.equal(h.fake.created.length, 0);
+    assert.equal(h.fake.cancelled.length, 0);
+    assert.equal(
+      await store.findThreadBinding(
+        ORGANIZATION_ID,
+        ACCOUNT_ID,
+        conversation.rootConversationId,
+        opener,
+      ),
+      undefined,
+    );
+    canCreateWorkspace = true;
+    assert.equal((await send("Fix login", "1712000000.001002")).outcome?.kind, "bound");
+    // Inherited worktrees are created by createAgent's existing source contract.
+    assert.equal(workspaceCreates, 0);
+    assert.equal(h.fake.created.length, 1);
+    assert.equal(h.fake.created[0]?.config.projectId, "project-b");
+    assert.equal(h.fake.created[0]?.config.cwd, "/b");
+    assert.deepEqual(h.fake.created[0]?.config.worktree, {
+      mode: "branch-off",
+      newBranch: "generated",
+    });
+    await h.plane.stop();
+  });
+
+  it("selects by mention before a session exists, creates in that Workspace and keeps captured authority after a new selection", async () => {
+    const requests: { projectId?: string; privilege: string }[] = [];
+    const h = makeHarness({
+      commandAccess: {
+        resolveChannelMember: async () => LINKED_MEMBER,
+        authorizeChannelPrivilege: async (request) => {
+          requests.push(request);
+          return { allowed: true };
+        },
+        resolveChannelAgentConfigurations: async () => ({
+          unrestricted: true,
+          agentConfigurations: [],
+        }),
+      },
+    });
+    const projects = [
+      {
+        projectId: "project-a",
+        projectDisplayName: "A",
+        projectRootPath: "/a",
+        projectKind: "git",
+      },
+      {
+        projectId: "project-b",
+        projectDisplayName: "B",
+        projectRootPath: "/b",
+        projectKind: "git",
+      },
+    ];
+    h.fake.daemon.getServerInfo = () => ({
+      serverId: "host",
+      features: { workspaceMultiplicity: true, agentForkContext: true },
+    });
+    h.fake.daemon.listProjects = async () => projects;
+    h.fake.daemon.listWorkspaces = async (id) => [
+      {
+        ...projects.find((p) => p.projectId === id)!,
+        id: `workspace-${id}`,
+        name: "Login",
+        workspaceDirectory: `/${id}/login`,
+        workspaceKind: "worktree",
+        activityAt: "2026-10-11T00:00:00Z",
+      },
+    ];
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C-PLACEMENT",
+      rootConversationId: "C-PLACEMENT",
+      threadId: null,
+    };
+    await h.plane.start(h.fake.daemon, store);
+    const send = async (
+      text: string,
+      threadId: string | null = null,
+      externalMessageId?: string,
+    ) => {
+      h.next.message = message({
+        text,
+        conversation: {
+          ...conversation,
+          threadId,
+          ...(threadId ? { kind: "thread" as const } : {}),
+        },
+        ...(externalMessageId ? { externalMessageId } : {}),
+      });
+      return h.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    };
+    const opener = "1712000000.000900";
+    assert.equal((await send("<@BOT> /project project-b", null, opener)).outcome?.kind, "command");
+    assert.equal(h.fake.created.length, 0);
+    await send("/workspace workspace-project-b", opener, "1712000000.000901");
+    const bound = await send("Fix login", opener, "1712000000.000902");
+    assert.equal(bound.outcome?.kind, "bound");
+    assert.equal(h.fake.created[0]?.config.projectId, "project-b");
+    assert.equal(h.fake.created[0]?.config.cwd, "/project-b/login");
+    assert.equal(h.fake.created[0]?.config.workspaceId, "workspace-project-b");
+    const binding = await store.findThreadBinding(
+      ORGANIZATION_ID,
+      ACCOUNT_ID,
+      conversation.rootConversationId,
+      opener,
+    );
+    assert.deepEqual((binding!.route as { placement: unknown }).placement, {
+      daemonReference: "daemon-1",
+      projectId: "project-b",
+      projectRoot: "/b",
+    });
+    await send("/project project-a", opener, "1712000000.000903");
+    assert.equal(h.fake.created.length, 1);
+    assert.equal(h.fake.cancelled.length, 0);
+    requests.length = 0;
+    await send("/cowork", opener, "1712000000.000904");
+    assert.ok(
+      requests.some((r) => r.privilege === "agent.interact" && r.projectId === "project-b"),
+    );
+    await h.plane.stop();
   });
 });

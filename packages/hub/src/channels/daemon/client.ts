@@ -92,6 +92,11 @@ export interface CreateAgentResult {
 }
 
 export interface DaemonConnection {
+  /** Project placement confirmed by the daemon for this exact Agent/Workspace. */
+  getAgentProject?(agent: AgentSnapshot): Promise<import("./types.js").ProjectSnapshot | undefined>;
+  listProjects?(): Promise<import("./types.js").ProjectSnapshot[]>;
+  listWorkspaces?(projectId: string): Promise<import("./types.js").WorkspaceSnapshot[]>;
+  listBranches?(cwd: string, query?: string): Promise<import("./types.js").BranchSnapshot[]>;
   discovery: DaemonDiscoveryResult;
   /** Resolves when the trusted session is established (daemon `server_info` seen). */
   waitForConnected(timeoutMs?: number): Promise<void>;
@@ -308,7 +313,10 @@ async function fetchAllAgents(socket: ChannelDaemonSocket): Promise<AgentSnapsho
     );
     const entries = Array.isArray(payload?.["entries"]) ? payload["entries"] : [];
     for (const entry of entries) {
-      const agent = normalizeAgentSnapshot(asRecord(entry)?.["agent"]);
+      const value = asRecord(entry);
+      const agent = normalizeAgentSnapshot(value?.["agent"]);
+      const projectId = asRecord(value?.["project"])?.["projectKey"];
+      if (agent && typeof projectId === "string") agent.projectId = projectId;
       if (agent !== undefined) agents.push(agent);
     }
     const pageInfo = asRecord(payload?.["pageInfo"]);
@@ -392,6 +400,85 @@ function createFacade(
           socket.call("create_agent_request", request, PROVIDER_START_RPC_TIMEOUT_MS),
         ),
       );
+    },
+    listProjects: async () => {
+      const payload = asRecord(await socket.call("project.list.request", {}));
+      if (typeof payload?.["error"] === "string") throw new Error(payload["error"]);
+      return (payload?.["projects"] ?? []) as import("./types.js").ProjectSnapshot[];
+    },
+    getAgentProject: async (agent) => {
+      if (!agent.workspaceId) return undefined;
+      const payload = checkedPayload(
+        await socket.call("fetch_agent_request", { agentId: agent.id }),
+      );
+      const current = asRecord(payload["agent"]);
+      const projectId = asRecord(payload["project"])?.["projectKey"];
+      if (
+        current?.["id"] !== agent.id ||
+        current["workspaceId"] !== agent.workspaceId ||
+        typeof projectId !== "string"
+      )
+        return undefined;
+      const projects = checkedPayload(await socket.call("project.list.request", {}))["projects"];
+      return Array.isArray(projects)
+        ? (projects as import("./types.js").ProjectSnapshot[]).find(
+            (p) => p.projectId === projectId,
+          )
+        : undefined;
+    },
+    listWorkspaces: async (projectId) => {
+      const entries: import("./types.js").WorkspaceSnapshot[] = [];
+      let cursor: string | undefined;
+      const seen = new Set<string>();
+      do {
+        const payload = asRecord(
+          await socket.call("fetch_workspaces_request", {
+            filter: { projectId },
+            sort: [
+              { key: "activity_at", direction: "desc" },
+              { key: "name", direction: "asc" },
+            ],
+            page: { limit: 200, ...(cursor ? { cursor } : {}) },
+          }),
+        );
+        if (!Array.isArray(payload?.["entries"]))
+          throw new Error("Host did not report Workspaces.");
+        for (const entry of payload["entries"]) {
+          const value = entry as import("./types.js").WorkspaceSnapshot & {
+            gitRuntime?: { currentBranch?: string | null };
+          };
+          entries.push({
+            ...value,
+            workspaceDirectory: value.workspaceDirectory ?? value.projectRootPath,
+            ...(value.gitRuntime?.currentBranch ? { branch: value.gitRuntime.currentBranch } : {}),
+          });
+        }
+        const page = asRecord(payload["pageInfo"]);
+        cursor =
+          page?.["hasMore"] === true && typeof page["nextCursor"] === "string"
+            ? page["nextCursor"]
+            : undefined;
+        if (cursor && seen.has(cursor)) throw new Error("Host repeated a Workspace cursor.");
+        if (cursor) seen.add(cursor);
+      } while (cursor);
+      return entries;
+    },
+    listBranches: async (cwd, query) => {
+      if (asRecord(socket.serverInfo?.["features"])?.["branchSuggestionPaging"] !== true)
+        throw new Error("Update this Host to support paginated branch discovery.");
+      const entries: import("./types.js").BranchSnapshot[] = [];
+      for (let offset = 0; ; offset += 200) {
+        const payload = asRecord(
+          await socket.call("branch_suggestions_request", { cwd, query, limit: 200, offset }),
+        );
+        if (typeof payload?.["error"] === "string") throw new Error(payload["error"]);
+        const page = payload?.["branchDetails"] as
+          | import("./types.js").BranchSnapshot[]
+          | undefined;
+        if (!page) throw new Error("Host did not report branches.");
+        entries.push(...page);
+        if (page.length < 200) return entries;
+      }
     },
     createWorkspace: async (input, options) =>
       workspaceIdFromResponse(
@@ -524,11 +611,23 @@ function withTitle(config: CreateAgentConfig, title?: string): CreateAgentConfig
 
 function createWorkspacePayload(input: CreateWorkspaceInput) {
   return {
-    source: {
-      kind: "directory",
-      path: input.cwd,
-      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
-    },
+    source:
+      input.kind === "worktree"
+        ? {
+            kind: "worktree",
+            cwd: input.cwd,
+            projectId: input.projectId,
+            action: "branch-off",
+            ...(input.baseRef ? { refName: input.baseRef } : {}),
+            ...(input.branchName ? { branchName: input.branchName } : {}),
+          }
+        : {
+            kind: "directory",
+            path: input.cwd,
+            ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+          },
+    ...(input.title === undefined ? {} : { title: input.title }),
+    ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
     ...(input.firstAgentContext === undefined
       ? {}
       : {
@@ -555,10 +654,11 @@ function workspaceIdFromResponse(payload: unknown): { workspaceId: string } {
 }
 
 function createAgentPayload(config: CreateAgentConfig, options?: CreateAgentOptions) {
-  const { projectId, worktree, ...sessionConfig } = config;
+  const { projectId, worktree, workspaceId: selectedWorkspaceId, ...sessionConfig } = config;
+  const workspaceId = selectedWorkspaceId ?? options?.workspaceId;
   return {
     config: withTitle(sessionConfig, options?.title),
-    ...(options?.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
+    ...(workspaceId === undefined ? {} : { workspaceId }),
     ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
     ...(options?.initialPrompt === undefined ? {} : { initialPrompt: options.initialPrompt }),
     ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
@@ -581,6 +681,8 @@ function normalizeAgentSnapshot(value: unknown): AgentSnapshot | undefined {
   const source = asRecord(value);
   if (typeof source?.["id"] !== "string") return undefined;
   const agent = { ...source } as unknown as AgentSnapshot;
+  // The wire snapshot carries workspaceId; Project authority is the separate placement.
+  delete agent.projectId;
   const mode = "currentModeId" in source ? source["currentModeId"] : source["modeId"];
   const thinking =
     "effectiveThinkingOptionId" in source

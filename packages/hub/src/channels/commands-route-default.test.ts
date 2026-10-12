@@ -93,7 +93,7 @@ function harness(
     setFollowUp: vi.fn(),
     apply: vi.fn(),
   };
-  const clearConversationSelection = vi.fn(async (_key: ChannelConversationKey) => undefined);
+  const clearConversationConfiguration = vi.fn(async (_key: ChannelConversationKey) => undefined);
   const deps: RouteDefaultCommandDependencies = {
     plane: {
       organizationId: "org",
@@ -103,7 +103,7 @@ function harness(
           options.manager === false ? undefined : { membershipId: "m", userId: "u" },
       },
     } as unknown as ChannelPlaneDeps,
-    store: { access: { clearConversationSelection } } as unknown as ChannelStore,
+    store: { access: { clearConversationConfiguration } } as unknown as ChannelStore,
     routeConfig: (current, override) =>
       configFor(
         applyAgentControls(
@@ -120,7 +120,7 @@ function harness(
       externalThreadId: null,
     }),
   };
-  return { deps, context, publisher, clearConversationSelection };
+  return { deps, context, publisher, clearConversationConfiguration };
 }
 
 describe("/promoteroutedefault", () => {
@@ -137,7 +137,7 @@ describe("/promoteroutedefault", () => {
   });
 
   it("sets the serving route's default and stops the conversation overriding it", async () => {
-    const { deps, context, publisher, clearConversationSelection } = harness({
+    const { deps, context, publisher, clearConversationConfiguration } = harness({
       conversation: OPUS,
     });
     const result = await promoteRouteDefault(deps, context, undefined);
@@ -158,7 +158,7 @@ describe("/promoteroutedefault", () => {
       model: "claude-opus-5",
       thinkingOptionId: "high",
     });
-    assert.equal(clearConversationSelection.mock.calls.length, 1);
+    assert.equal(clearConversationConfiguration.mock.calls.length, 1);
   });
 
   it("publishes a default that starts exactly what the conversation runs", async () => {
@@ -194,7 +194,7 @@ describe("/promoteroutedefault", () => {
   });
 
   it("tells the sender when the route changed under them", async () => {
-    const { deps, context, clearConversationSelection } = harness({
+    const { deps, context, clearConversationConfiguration } = harness({
       conversation: OPUS,
       outcome: { status: "route_changed" },
     });
@@ -203,7 +203,7 @@ describe("/promoteroutedefault", () => {
       result.text,
       "This route changed since this session started. Check /routedefault, then try again.",
     );
-    assert.equal(clearConversationSelection.mock.calls.length, 0);
+    assert.equal(clearConversationConfiguration.mock.calls.length, 0);
   });
 
   it("restores the previous default on undo", async () => {

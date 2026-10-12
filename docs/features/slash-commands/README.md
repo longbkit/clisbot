@@ -48,6 +48,71 @@ group:
 
 The per-command **Requires** columns below repeat this at the row level.
 
+### Project, Workspace and branch discovery
+
+All three commands are singular, like `/provider` and `/model`. They require a
+matching direct Route and its admission rules; a mention does not bootstrap an
+unserved topic. They work before the first Agent exists.
+
+| Command                                                                    | Meaning                                                        | Requires                                              |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
+| `/project` · `/project list [--page N]`                                    | Current/next placement and Projects on the serving Host        | `project.use` on each visible Project                 |
+| `/project search <text> [--page N]`                                        | Search names, IDs and roots                                    | `project.use`                                         |
+| `/project <id-or-exact-name>`                                              | Select the next session's Project; clear Workspace selection   | `project.use`, `agent.create` and configuration grant |
+| `/project clear`                                                           | Clear both placement choices; return to Route default          | Destination `agent.create` and grant                  |
+| `/workspace` · `/workspace list [--worktree] [--page N]`                   | Registered Workspaces in the selected/default Project          | `project.use`                                         |
+| `/workspace search <text> [--worktree] [--page N]`                         | Search Workspace names, IDs and branches                       | `project.use`                                         |
+| `/workspace show <id-or-exact-name>`                                       | Details without selecting                                      | `project.use`                                         |
+| `/workspace <id-or-exact-name>`                                            | Select an existing Workspace for the next session              | Destination `agent.create` and grant                  |
+| `/workspace clear`                                                         | Clear Workspace choice, retain Project                         | Destination `agent.create` and grant                  |
+| `/workspace new [base-ref] [--branch name] [--name "title"]`               | Create and select a new worktree Workspace immediately         | `workspace.create`, `agent.create` and grant          |
+| `/workspace new --local [--name "title"]`                                  | Create a Workspace using the Project's existing checkout       | Same as above                                         |
+| `/branch` · `/branch list [--page N]` · `/branch search <text> [--page N]` | Discover local/origin branches in the selected/default Project | `project.use`                                         |
+
+List and search show **10 results per page**, with counts and complete next/previous
+commands. Authorization precedes search and pagination; inaccessible Projects
+never contribute to counts. Project ordering is name then ID. Workspace ordering
+is daemon `activityAt` descending (fall back to `createdAt`), then ID; branch
+ordering is latest commit time then name. Search matches all space-separated
+terms case-insensitively. Exact names must be unique; use IDs when names repeat.
+Invalid pages return an error, without silently selecting another page.
+
+A worktree's random directory slug, Git branch and Workspace title are distinct.
+Omit `--branch` to keep automatic naming; an explicit branch is preserved. Omit
+the base to use the daemon's default branch resolver. Only daemon-registered
+Workspaces are selectable; raw external Git worktrees are not imported.
+
+Choices persist across `/new` and restarts and follow the Route's binding scope
+(thread/topic or whole conversation), shared by its participants. Selection leaves
+the running session intact. `/new`/the first prompt applies the choice; `/fork`
+uses an explicit destination Workspace, or creates in the destination Project
+when it differs from the source. `/side` stays in the source Workspace. `/quick`
+uses the next-session choice without rebinding. `/resume` checks the actual
+session's Project and synchronizes the next choice after successful attachment.
+
+The Hub stores the next choice separately from the binding's captured Project
+for current-session authorization. It verifies the Route position/fingerprint,
+Host, Project, Workspace and configuration authority before use. The placement
+fingerprint excludes provider/model defaults, whose grants are checked again
+before creation. An inherited worktree configuration also needs `workspace.create`
+in an explicitly selected Project. A refused or stale choice answers in the
+conversation and releases an unbound session's pending marker, before any
+Workspace/Agent creation; it does not retry the same prompt automatically.
+`/project clear` or re-selection recovers. Host/RPC failures retain durable retry.
+Workspace create uses
+both a durable command receipt and the daemon's idempotency key.
+
+`workspace.commands: false` at any defaults layer disables these commands and
+ignores staged placement for future sessions; bound session authority remains
+captured. Absence is enabled and does not change existing compiled fingerprints.
+The combined design incorporates the Project authorization/provenance proposal
+from [#21](https://github.com/longbkit/clisbot/pull/21) and Workspace placement
+proposal from [#23](https://github.com/longbkit/clisbot/pull/23), implemented
+against the current Route + Rules model.
+
+Workspace commands need Host `workspaceMultiplicity`; paginated branch discovery
+needs `branchSuggestionPaging`. Older Hosts get an update message.
+
 ### Session controls and approvals
 
 | Command                                 | Does                                                                                                                                                   | Requires                |
@@ -433,8 +498,9 @@ which one served this message. That Route is the one changed, and `/routedefault
   checking all of them would refuse a Connection manager whose own Route is
   within their grants whenever another account uses a Project they lack. A Hub UI
   save still checks every Route.
-- **What happens to the conversation.** Its own selection is cleared, since the
-  Route now says the same thing. Its behavior does not change.
+- **What happens to the conversation.** Its provider/model configuration selection
+  is cleared, since the Route now says the same thing. Project/Workspace placement
+  stays selected. Its behavior does not change.
 - **What happens to running sessions.** Nothing. The default is not part of the
   Route target, so bindings keep their sessions, and only the next session a
   Route starts uses the new value. The supervisor adopts a revision that differs
