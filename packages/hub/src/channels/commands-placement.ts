@@ -161,7 +161,6 @@ export class ChannelPlacementCommands {
       const matches = search(scope.projects, parsed.query, (p) => [
         p.projectId,
         p.projectDisplayName,
-        p.projectRootPath,
       ]);
       matches.sort(
         (a, b) =>

@@ -643,6 +643,34 @@ describe("Project and Workspace commands", () => {
       await f.commands.run({ name: "project", value: "search no-match" }, f.context),
     ).toContain("0 results");
   });
+  it.each(["search slash", 'search "SLASH"', "search slash qa"])(
+    "searches visible Project names and IDs, without matching shared roots: %s",
+    async (value) => {
+      const f = placementFixture();
+      f.projects.forEach((project, i) => {
+        project.projectRootPath = `/slash-test/project-${i}`;
+      });
+      f.projects[0]!.projectDisplayName = "Slash QA A";
+      f.projects[1]!.projectDisplayName = "Slash QA B";
+
+      const reply = await f.commands.run({ name: "project", value }, f.context);
+
+      expect(reply).toContain("Page 1/1 · 2 results");
+      expect(reply).toContain("Slash QA A — prj_00");
+      expect(reply).toContain("Slash QA B — prj_01");
+      expect(reply).not.toContain("Payments");
+      expect(reply).not.toContain("Next:");
+    },
+  );
+  it("finds a Project by ID and returns no matches for root-only terms", async () => {
+    const f = placementFixture();
+    const reply = await f.commands.run({ name: "project", value: "search PRJ_07" }, f.context);
+    expect(reply).toContain("Page 1/1 · 1 results");
+    expect(reply).toContain("Payments 07 — prj_07");
+    expect(await f.commands.run({ name: "project", value: 'search "/repo"' }, f.context)).toContain(
+      "0 results",
+    );
+  });
   it.each([0, 10, 11])("limits discovery to 10 rows at the %i-result boundary", async (count) => {
     const f = placementFixture();
     f.projects.splice(count);

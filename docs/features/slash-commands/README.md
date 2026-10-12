@@ -57,7 +57,7 @@ unserved topic. They work before the first Agent exists.
 | Command                                                                    | Meaning                                                        | Requires                                              |
 | -------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
 | `/project` · `/project list [--page N]`                                    | Current/next placement and Projects on the serving Host        | `project.use` on each visible Project                 |
-| `/project search <text> [--page N]`                                        | Search names, IDs and roots                                    | `project.use`                                         |
+| `/project search <text> [--page N]`                                        | Search names and IDs                                           | `project.use`                                         |
 | `/project <id-or-exact-name>`                                              | Select the next session's Project; clear Workspace selection   | `project.use`, `agent.create` and configuration grant |
 | `/project clear`                                                           | Clear both placement choices; return to Route default          | Destination `agent.create` and grant                  |
 | `/workspace` · `/workspace list [--worktree] [--page N]`                   | Registered Workspaces in the selected/default Project          | `project.use`                                         |
@@ -74,7 +74,9 @@ commands. Authorization precedes search and pagination; inaccessible Projects
 never contribute to counts. Project ordering is name then ID. Workspace ordering
 is daemon `activityAt` descending (fall back to `createdAt`), then ID; branch
 ordering is latest commit time then name. Search matches all space-separated
-terms case-insensitively. Exact names must be unique; use IDs when names repeat.
+terms case-insensitively. Project search uses the displayed name and ID, not its
+directory path, so a shared parent directory does not match every Project.
+Exact names must be unique; use IDs when names repeat.
 Invalid pages return an error, without silently selecting another page.
 
 A worktree's random directory slug, Git branch and Workspace title are distinct.
