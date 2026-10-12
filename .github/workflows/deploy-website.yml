@@ -41,4 +41,4 @@ jobs:
       - name: Deploy to Cloudflare Workers
         run: npm run deploy --workspace=@clisbot/website
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_APP_API_TOKEN }}
