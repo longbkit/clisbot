@@ -251,15 +251,15 @@ const FOOTER_GEOMETRY_TOLERANCE = 0.01;
 /**
  * The controls are one line of same-size icons, evenly spaced with separate hit regions, Help and
  * Settings last and Settings at the bar's end. The actions sit before them: on the same line when
- * the bar is wide enough, otherwise on the line above.
+ * the desktop bar is wide enough, otherwise on the line above. Phones mirror both groups on one line.
  */
 export async function expectFooterIconRow(
   page: Page,
-  options: { actions?: readonly string[] } = {},
+  options: { actions?: readonly string[]; compact?: boolean } = {},
 ): Promise<void> {
   const actions = options.actions ?? ["sidebar-new", "sidebar-footer-search"];
   // Read one browser-frame snapshot: the compact drawer can translate between separate RPCs.
-  const { bar, boxes } = await page
+  const { bar, boxes: renderedBoxes } = await page
     .locator('[data-testid="sidebar-footer-bottom-line"]:visible')
     .evaluate(
       (line, testIDs) => {
@@ -278,28 +278,52 @@ export async function expectFooterIconRow(
         const style = getComputedStyle(line);
         const lineBox = box(line);
         return {
-          bar: { right: lineBox.x + lineBox.width - Number.parseFloat(style.paddingRight) },
+          bar: {
+            left: lineBox.x + Number.parseFloat(style.paddingLeft),
+            right: lineBox.x + lineBox.width - Number.parseFloat(style.paddingRight),
+          },
           boxes: present.map(box),
         };
       },
       [...FOOTER_ACTION_TEST_IDS, ...FOOTER_CONTROL_TEST_IDS],
     );
-  expect(boxes.map((box) => box.testID)).toEqual([...actions, ...FOOTER_CONTROL_TEST_IDS]);
+  const expectedOrder = [...actions, ...FOOTER_CONTROL_TEST_IDS];
+  expect(renderedBoxes.map((box) => box.testID)).toEqual(
+    options.compact ? expectedOrder.toReversed() : expectedOrder,
+  );
+  // Reflect phone coordinates so the same spacing checks apply to both documented orders.
+  const boxes = options.compact
+    ? renderedBoxes.toReversed().map((box) => ({
+        testID: box.testID,
+        x: -(box.x + box.width),
+        y: box.y,
+        width: box.width,
+        height: box.height,
+      }))
+    : renderedBoxes;
+  const rightEdge = options.compact ? -bar.left : bar.right;
+  if (options.compact) {
+    for (const box of boxes) {
+      expect(Math.abs(box.y + box.height / 2 - boxes[0]!.y - boxes[0]!.height / 2)).toBeLessThan(2);
+    }
+  }
   const controls = boxes.slice(actions.length);
   const [first] = controls;
   for (const box of controls) {
     expect(Math.abs(box.y + box.height / 2 - first!.y - first!.height / 2)).toBeLessThan(2);
     expect(Math.abs(box.width - first!.width)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
+    if (options.compact) expect(box.width).toBeGreaterThanOrEqual(48);
   }
   const gaps = controls
     .slice(1)
     .map((box, index) => box.x - (controls[index]!.x + controls[index]!.width));
   for (const gap of gaps) {
-    expect(gap).toBeGreaterThan(0);
+    if (options.compact) expect(gap).toBeGreaterThanOrEqual(0);
+    else expect(gap).toBeGreaterThan(0);
     expect(Math.abs(gap - gaps[0]!)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
   }
   const last = controls[controls.length - 1]!;
-  expect(Math.abs(last.x + last.width - bar.right)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
+  expect(Math.abs(last.x + last.width - rightEdge)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
   const lastAction = boxes[actions.length - 1]!;
   const sameLine = lastAction.y + lastAction.height > first!.y;
   if (sameLine) expect(lastAction.x + lastAction.width).toBeLessThan(first!.x);

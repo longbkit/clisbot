@@ -38,7 +38,7 @@ const FOOTER_ACTIONS_WITH_ADD_PROJECT = [
   "sidebar-footer-search",
 ] as const;
 
-test("footer bar keeps its control icons on one line, Help and Settings at the end", async ({
+test("footer bar keeps its control icons on one line and mirrors their order on phones", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -48,8 +48,8 @@ test("footer bar keeps its control icons on one line, Help and Settings at the e
     { key: "add-project", visible: true },
     { key: "usage", visible: true },
   ]);
-  const expectFooterIconRowWithAddProject = () =>
-    expectFooterIconRow(page, { actions: FOOTER_ACTIONS_WITH_ADD_PROJECT });
+  const expectFooterIconRowWithAddProject = (compact = false) =>
+    expectFooterIconRow(page, { actions: FOOTER_ACTIONS_WITH_ADD_PROJECT, compact });
   await page.setViewportSize({ width: 1440, height: 900 });
   await gotoAppShell(page);
   await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
@@ -71,7 +71,7 @@ test("footer bar keeps its control icons on one line, Help and Settings at the e
   await page.setViewportSize({ width: 390, height: 844 });
   await openCompactSidebar(page);
   await expectFooterSeparator(page, false);
-  await expectFooterIconRowWithAddProject();
+  await expectFooterIconRowWithAddProject(true);
   await footerScreenshot(page, "footer-compact-without-rows");
   await page.locator('[data-testid="sidebar-add-project"]:visible').hover();
   await expect(page.getByTestId("sidebar-add-project-tooltip")).toHaveCount(0);
@@ -86,7 +86,7 @@ test("footer bar keeps its control icons on one line, Help and Settings at the e
   await page.setViewportSize({ width: 390, height: 844 });
   await openCompactSidebar(page);
   await expectFooterSeparator(page, true);
-  await expectFooterIconRowWithAddProject();
+  await expectFooterIconRowWithAddProject(true);
   await footerScreenshot(page, "footer-compact-with-rows");
 });
 

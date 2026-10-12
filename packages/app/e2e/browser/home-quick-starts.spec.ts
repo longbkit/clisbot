@@ -220,7 +220,8 @@ test.describe("Home and daemon quick starts", () => {
       });
       await tabs.getByRole("tab", { name: "Chat", exact: true }).click();
       await expect(page).toHaveURL(/\/chat$/);
-      await expect(page.getByTestId("sidebar-home")).toBeVisible();
+      await expect(page.getByTestId("sidebar-home")).toHaveCount(0);
+      await expect(page.getByTestId("sidebar-global-new-workspace")).toBeVisible();
       await tabs.getByRole("tab", { name: "Inbox", exact: true }).click();
       await expect(page.getByText("Inbox", { exact: true }).first()).toBeVisible();
       await tabs.getByRole("tab", { name: "Automations", exact: true }).click();
