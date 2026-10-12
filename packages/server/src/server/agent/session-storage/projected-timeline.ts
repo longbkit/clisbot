@@ -117,8 +117,20 @@ function itemPreview(item: AgentTimelineItem): AgentTimelineItem {
 }
 
 /** Stable across reads because it is derived only from facts the canonical log already fixes. */
-function descriptorId(epoch: string, entry: TimelineProjectionEntry): string {
+function legacyDescriptorId(epoch: string, entry: TimelineProjectionEntry): string {
   return createHash("sha256").update(`${epoch}:${entry.seqStart}:${entry.seqEnd}`).digest("hex");
+}
+
+/** Keep the 64-hex wire format: version 01, a 14-hex canonical anchor, and a
+ * 192-bit digest of epoch/start/end. The anchor is a hint, never trusted as an entry. */
+function descriptorId(epoch: string, entry: TimelineProjectionEntry): string {
+  return `01${entry.seqStart.toString(16).padStart(14, "0")}${legacyDescriptorId(epoch, entry).slice(0, 48)}`;
+}
+
+function descriptorAnchor(id: string, state: SessionEventState): number | undefined {
+  if (!/^01[a-f0-9]{62}$/.test(id)) return undefined;
+  const seq = Number.parseInt(id.slice(2, 16), 16);
+  return Number.isSafeInteger(seq) && seq >= state.minSeq && seq <= state.maxSeq ? seq : undefined;
 }
 
 function projectionControl(state: SessionEventState, options: AgentTimelineFetchOptions) {
@@ -147,6 +159,31 @@ function mergesWithNeighbour(row: AgentTimelineRow): boolean {
   return row.item.type === "assistant_message" || row.item.type === "reasoning";
 }
 
+/** A continuation may inherit an earlier chunk's message id. Once an explicit
+ * id is seen, a different explicit id proves a boundary even across id-less chunks. */
+function textBoundaries(rows: readonly AgentTimelineRow[]): number[] {
+  const boundaries: number[] = [];
+  let messageId: string | undefined;
+  for (const [index, row] of rows.entries()) {
+    const previous = rows[index - 1];
+    const adjacentText =
+      previous &&
+      mergesWithNeighbour(row) &&
+      previous.item.type === row.item.type &&
+      previous.turnId === row.turnId &&
+      previous.seq + 1 === row.seq;
+    if (!adjacentText) {
+      if (index > 0) boundaries.push(index);
+      messageId = undefined;
+    }
+    if (row.item.type !== "assistant_message" || row.item.messageId === undefined) continue;
+    if (adjacentText && messageId !== undefined && messageId !== row.item.messageId)
+      boundaries.push(index);
+    messageId = row.item.messageId;
+  }
+  return boundaries;
+}
+
 function containingRange(
   entry: TimelineProjectionEntry,
   seq: number,
@@ -161,7 +198,7 @@ function selectSourceRanges(
   direction: "tail" | "before" | "after",
   cursor: number | undefined,
   limit: number,
-): ProjectedTimelinePageSelection {
+): ProjectedTimelinePageSelection | null {
   const bySeq = new Map<number, TimelineProjectionEntry>();
   for (const entry of entries)
     for (const range of entry.sourceSeqRanges)
@@ -179,7 +216,7 @@ function selectSourceRanges(
   while (seq >= minSeq && seq <= state.maxSeq && selected.size < limit) {
     const entry = bySeq.get(seq);
     const range = entry ? containingRange(entry, seq) : undefined;
-    if (!entry || !range) throw new Error("Invalid projected source reference");
+    if (!entry || !range) return null;
     selected.set(entry.seqStart, entry);
     seq = forward ? range.endSeq + 1 : range.startSeq - 1;
   }
@@ -244,13 +281,6 @@ export class ProjectedTimeline {
     return this.readRange(state.minSeq, state.maxSeq, budget);
   }
 
-  private async project(
-    state: SessionEventState,
-    budget: ProjectionBudget,
-  ): Promise<TimelineProjectionEntry[]> {
-    return projectTimelineRows({ rows: await this.readRows(state, budget), mode: "projected" });
-  }
-
   /** The seq range a page of `span` rows starts from, before any merge can widen it. */
   private windowBounds(
     state: SessionEventState,
@@ -279,23 +309,28 @@ export class ProjectedTimeline {
       const from = Math.max(state.minSeq, rows[0].seq - MERGE_STEP_ROWS);
       const step = await this.readRange(from, rows[0].seq - 1, budget);
       if (!step.length) break;
-      rows.unshift(...step);
+      const boundary = textBoundaries([...step, rows[0]!]).at(-1);
+      rows.unshift(...step.slice(boundary ?? 0));
       if (rows.length > MAX_WINDOW_ROWS) return false;
+      if (boundary !== undefined) break;
     }
     let last = rows.at(-1);
     while (last && last.seq < state.maxSeq && mergesWithNeighbour(last)) {
       const to = Math.min(state.maxSeq, last.seq + MERGE_STEP_ROWS);
       const step = await this.readRange(last.seq + 1, to, budget);
       if (!step.length) break;
-      rows.push(...step);
+      const boundary = textBoundaries([...rows, ...step]).find((index) => index >= rows.length);
+      const count = boundary === undefined ? step.length : boundary - rows.length;
+      rows.push(...step.slice(0, count));
       if (rows.length > MAX_WINDOW_ROWS) return false;
+      if (boundary !== undefined) break;
       last = rows.at(-1);
     }
     return true;
   }
 
   /** A tool lifecycle can reach across the whole history; pull its other rows by canonical id. */
-  private async pullToolRows(rows: AgentTimelineRow[]): Promise<boolean> {
+  private async pullToolRows(rows: AgentTimelineRow[], budget: ProjectionBudget): Promise<boolean> {
     const present = new Set(rows.map((row) => row.seq));
     const missing = new Set<number>();
     for (const row of rows) {
@@ -306,8 +341,7 @@ export class ProjectedTimeline {
     }
     if (missing.size > MAX_WINDOW_ROWS) return false;
     for (const seq of missing) {
-      const entry = (await this.source.read(seq, seq))[0];
-      if (entry) rows.push(entry.value);
+      rows.push(...(await this.readRange(seq, seq, budget)));
     }
     if (missing.size) rows.sort((left, right) => left.seq - right.seq);
     return true;
@@ -329,7 +363,9 @@ export class ProjectedTimeline {
     if (end < start) return [];
     const rows = await this.readRange(start, end, budget);
     if (!(await this.extendMerges(rows, state, budget))) return null;
-    return (await this.pullToolRows(rows)) ? rows : null;
+    // Plugin identities have no occurrence index; preserve their whole-history merge.
+    if (rows.some((row) => row.item.type === "plugin")) return null;
+    return (await this.pullToolRows(rows, budget)) ? rows : null;
   }
 
   /** Widens until the page cannot be truncated by its own window, then gives up on bounding. */
@@ -343,7 +379,23 @@ export class ProjectedTimeline {
     if (state.maxSeq === 0) return [];
     if (limit >= MAX_WINDOW_ROWS) return this.readRows(state, budget);
     for (let span = Math.max(MERGE_STEP_ROWS, limit * 8); span <= MAX_WINDOW_ROWS; span *= 4) {
-      const rows = await this.windowRows(state, span, direction, cursorSeq, budget);
+      budget.release();
+      let rows = await this.windowRows(state, span, direction, cursorSeq, budget);
+      if (!rows) break;
+      // Legacy pages certify the whole min/max envelope, including a distant tool's gap.
+      let filledSpan = 0;
+      while (rows.some((row, index) => index > 0 && row.seq !== rows![index - 1]!.seq + 1)) {
+        const firstSeq = rows[0]!.seq;
+        const envelopeSpan = rows.at(-1)!.seq - firstSeq + 1;
+        if (envelopeSpan <= filledSpan) {
+          rows = null;
+          break;
+        }
+        filledSpan = envelopeSpan;
+        budget.release();
+        rows = await this.windowRows(state, envelopeSpan, "after", firstSeq - 1, budget);
+        if (!rows) break;
+      }
       if (!rows) break;
       const covers =
         rows.length === 0 || (rows[0]!.seq <= state.minSeq && rows.at(-1)!.seq >= state.maxSeq);
@@ -351,7 +403,43 @@ export class ProjectedTimeline {
       if (covers || projectTimelineRows({ rows, mode: "projected" }).length > limit + 1)
         return rows;
     }
+    budget.release();
     return this.readRows(state, budget);
+  }
+
+  /** Select only after every source range traversed by the page is present. Distant
+   * tool rows complete an entry but cannot certify unread seqs between its updates. */
+  private async sourceRangePage(
+    state: SessionEventState,
+    direction: "tail" | "before" | "after",
+    cursorSeq: number | undefined,
+    limit: number,
+    budget: ProjectionBudget,
+  ): Promise<ProjectedTimelinePageSelection> {
+    const select = (rows: AgentTimelineRow[]) =>
+      selectSourceRanges(
+        projectTimelineRows({ rows, mode: "projected" }),
+        state,
+        direction,
+        cursorSeq,
+        limit,
+      );
+    for (
+      let span = Math.max(MERGE_STEP_ROWS, limit * 2);
+      ;
+      span = Math.min(span * 2, MAX_WINDOW_ROWS)
+    ) {
+      budget.release();
+      const rows = await this.windowRows(state, span, direction, cursorSeq, budget);
+      if (!rows) break;
+      const page = select(rows);
+      if (page) return page;
+      if (span === MAX_WINDOW_ROWS) break;
+    }
+    budget.release();
+    const page = select(await this.readRows(state, budget));
+    if (!page) throw new Error("Invalid projected source reference");
+    return page;
   }
 
   /** A large entry travels as a preview plus a descriptor; the client pages the rest by id. */
@@ -381,35 +469,31 @@ export class ProjectedTimeline {
     const control = projectionControl(state, options);
     const budget = new ProjectionBudget();
     try {
-      const rows =
-        options.pagingMode === "source_ranges"
-          ? await this.readRows(state, budget)
-          : await this.pageRows(
-              state,
-              control.selectedDirection,
-              options.cursor?.seq,
-              control.limit,
-              budget,
-            );
-      const page =
-        options.pagingMode === "source_ranges"
-          ? selectSourceRanges(
-              projectTimelineRows({ rows, mode: "projected" }),
-              state,
-              control.selectedDirection,
-              options.cursor?.seq,
-              Math.min(control.limit, 200),
-            )
-          : selectProjectedTimelinePage({
-              rows,
-              // A bounded window must still answer for the whole history it was cut from.
-              ...(state.maxSeq > 0
-                ? { bounds: { minSeq: state.minSeq, maxSeq: state.maxSeq } }
-                : {}),
-              direction: control.selectedDirection,
-              cursorSeq: options.cursor?.seq,
-              limit: control.limit,
-            });
+      let page: ProjectedTimelinePageSelection;
+      if (options.pagingMode === "source_ranges") {
+        page = await this.sourceRangePage(
+          state,
+          control.selectedDirection,
+          options.cursor?.seq,
+          Math.min(control.limit, 200),
+          budget,
+        );
+      } else {
+        const rows = await this.pageRows(
+          state,
+          control.selectedDirection,
+          options.cursor?.seq,
+          control.limit,
+          budget,
+        );
+        page = selectProjectedTimelinePage({
+          rows,
+          ...(state.maxSeq > 0 ? { bounds: { minSeq: state.minSeq, maxSeq: state.maxSeq } } : {}),
+          direction: control.selectedDirection,
+          cursorSeq: options.cursor?.seq,
+          limit: control.limit,
+        });
+      }
       const deferrable = options.allowDeferredPayloads === true;
       return {
         epoch: state.epoch,
@@ -436,14 +520,49 @@ export class ProjectedTimeline {
     }
   }
 
-  /** Resolves a descriptor by re-deriving it; an unknown or stale id can never read a payload. */
+  /** Old descriptors have no seek hint. Scan bounded pages, releasing each before
+   * advancing, so a saved descriptor still works after an upgrade or restart. */
+  private async resolveLegacy(
+    state: SessionEventState,
+    id: string,
+    budget: ProjectionBudget,
+  ): Promise<TimelineProjectionEntry | undefined> {
+    let cursor = state.maxSeq + 1;
+    while (cursor > state.minSeq) {
+      budget.release();
+      const page = await this.sourceRangePage(state, "before", cursor, 40, budget);
+      const entry = [...page.entries, ...(page.contextEntries ?? [])].find(
+        (candidate) => legacyDescriptorId(state.epoch, candidate) === id,
+      );
+      if (entry) return entry;
+      if (!page.hasOlder || page.startSeq === null || page.startSeq >= cursor) break;
+      cursor = page.startSeq;
+    }
+    return undefined;
+  }
+
+  /** Re-derive the complete merge at the hinted anchor and verify its descriptor.
+   * No descriptor cache or full-history projection is needed for indexed entries. */
   private async resolve(epoch: string, id: string): Promise<TimelineProjectionEntry> {
     const state = await this.source.state();
     if (state.epoch !== epoch) throw new Error("Stale timeline document epoch");
     const budget = new ProjectionBudget();
     try {
-      for (const entry of await this.project(state, budget))
-        if (descriptorId(epoch, entry) === id) return entry;
+      const anchor = descriptorAnchor(id, state);
+      if (anchor !== undefined) {
+        let rows = await this.windowRows(state, 1, "after", anchor - 1, budget);
+        if (!rows) {
+          budget.release();
+          rows = await this.readRows(state, budget);
+        }
+        const entry = projectTimelineRows({ rows, mode: "projected" }).find(
+          (candidate) => candidate.seqStart === anchor && descriptorId(epoch, candidate) === id,
+        );
+        if (entry) return entry;
+      }
+      // A legacy digest can coincidentally begin with the new version/anchor prefix.
+      const legacy = await this.resolveLegacy(state, id, budget);
+      if (legacy) return legacy;
     } finally {
       budget.release();
     }

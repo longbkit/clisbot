@@ -99,6 +99,36 @@ log.
 Details and evidence: [implementation.md](implementation.md) ·
 [iteration acceptance](iterations/2026-09-13-acceptance-matrix.md).
 
+## History paging limits
+
+The 32 MiB projection budget is shared by concurrent daemon reads. It applies before a
+response is sent, over both direct and relay connections; the relay's frame-size ceiling is
+separate. Raising the projection budget does not repair an unbounded history read.
+
+Paging checks must measure source bytes for both legacy and `source_ranges` requests, not
+only the number of returned entries. Keep a history larger than the projection budget in
+regression coverage, including text continuations without message IDs, forward/backward
+cursors, and a tool updated long after it started. A page must not claim an unread gap as
+loaded. The source-range path reads a cursor window and its merge dependencies; plugin
+identities without an occurrence index and overflowing tool occurrence indexes still require
+the full-projection fallback and remain subject to the read budget.
+
+### Deferred document lookup
+
+`payload()` and `sourceRanges()` resolve the complete entry from its canonical anchor
+and merge dependencies, rather than projecting the entire session. New opaque descriptors
+retain the existing 64-lowercase-hex wire shape: `01` (version), 14 hex digits for the
+starting seq, and 48 hex digits from SHA-256 of `epoch:start:end`. The anchor is only a
+seek hint; the daemon re-derives the entry and checks the entire descriptor before returning
+its payload or ranges. Epoch changes and changed merge endpoints invalidate descriptors.
+No descriptor cache is needed, including across daemon restarts.
+
+Legacy SHA-256 descriptors remain readable by scanning projected pages and releasing each
+page's read budget before advancing. This can scan the session but does not retain all its
+rows at once. The plugin/overflow fallback limits above still apply. Regression coverage
+must fetch a deferred entry and then read every payload/range page on a session larger
+than 32 MiB, including after restart, stale/invalid descriptors, and legacy IDs.
+
 ## What is not done yet
 
 Per the 2026-09-12 campaign verdicts — **Met**: AC2, AC4, AC5, AC8, W1, W4, W5, W6.

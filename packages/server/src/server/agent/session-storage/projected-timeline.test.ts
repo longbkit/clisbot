@@ -260,6 +260,123 @@ describe("durable projected timeline", () => {
     expect(legacy.startSeq).toBe(1);
     expect(legacy.entries).toHaveLength(99);
   });
+  it.each([1, 2])(
+    "pages a text-only history larger than the projection budget with %i chunks per message",
+    async (chunks) => {
+      const { store } = await fixture();
+      const rows: AgentTimelineRow[] = Array.from({ length: 1_100 }, (_, index) => ({
+        ...message(index + 1),
+        item: {
+          type: "assistant_message",
+          text: "x".repeat(16 * 1024),
+          ...(index % chunks === 0 ? { messageId: String(index / chunks) } : {}),
+        },
+      }));
+      for (let start = 0; start < rows.length; start += 32)
+        await store.bulkInsert("a", rows.slice(start, start + 32));
+      const epoch = await store.getEpoch("a");
+      for (const limit of [40, 200]) {
+        for (const [direction, cursorSeq, startSeq, endSeq] of [
+          ["tail", 0, 1101 - limit * chunks, 1100],
+          ["before", 601, 601 - limit * chunks, 600],
+          ["after", 600, 601, 600 + limit * chunks],
+        ] as const) {
+          const page = await store.fetchProjectedCommitted("a", {
+            pagingMode: "source_ranges",
+            direction,
+            cursor: { epoch, seq: cursorSeq },
+            limit,
+          });
+          expect([page.startSeq, page.endSeq]).toEqual([startSeq, endSeq]);
+          expect(page.entries).toEqual(
+            projectTimelineRows({ rows: rows.slice(startSeq - 1, endSeq), mode: "projected" }),
+          );
+          expect(page.contextEntries).toEqual([]);
+        }
+      }
+    },
+  );
+
+  it("walks source pages without gaps or truncated merges across cursors and reused tool ids", async () => {
+    const { store } = await fixture();
+    const rows: AgentTimelineRow[] = Array.from({ length: 900 }, (_, index) => ({
+      ...message(index + 1),
+      item: {
+        type: "assistant_message",
+        text: `${index},`,
+        ...(index % 20 === 0 ? { messageId: String(Math.floor(index / 20)) } : {}),
+      },
+    }));
+    rows[0] = tool(1, "ancient", "running");
+    rows[450] = tool(451, "ancient", "completed");
+    rows[100] = tool(101, "overlap", "running");
+    rows[650] = tool(651, "overlap", "completed");
+    rows[700] = { ...tool(701, "ancient", "running"), turnId: "second" };
+    rows[899] = { ...tool(900, "ancient", "completed"), turnId: "second" };
+    for (let seq = 302; seq <= 421; seq++)
+      rows[seq - 1] = {
+        ...message(seq),
+        turnId: `reasoning-${Math.floor(seq / 30)}`,
+        item: { type: "reasoning", text: `${seq},` },
+      };
+    await store.bulkInsert("a", rows);
+    const epoch = await store.getEpoch("a");
+    const expected = projectTimelineRows({ rows, mode: "projected" });
+    const byStart = new Map(expected.map((entry) => [entry.seqStart, entry]));
+    for (const direction of ["before", "after"] as const) {
+      for (const limit of [1, 4, 40]) {
+        const visited = new Map<number, (typeof expected)[number]>();
+        let seq = direction === "before" ? rows.length + 1 : 0;
+        let hasMore = true;
+        while (hasMore) {
+          const page = await store.fetchProjectedCommitted("a", {
+            pagingMode: "source_ranges",
+            direction,
+            cursor: { epoch, seq },
+            limit,
+          });
+          const entries = [...page.entries, ...(page.contextEntries ?? [])];
+          expect(entries.length).toBeGreaterThan(0);
+          expect(entries.length).toBeLessThanOrEqual(limit);
+          for (const entry of entries) {
+            expect(entry).toEqual(byStart.get(entry.seqStart));
+            visited.set(entry.seqStart, entry);
+          }
+          if (direction === "before") {
+            expect(page.endSeq).toBe(seq - 1);
+            expect(page.startSeq).toBeLessThan(seq);
+            seq = page.startSeq!;
+            hasMore = page.hasOlder;
+          } else {
+            expect(page.startSeq).toBe(seq + 1);
+            expect(page.endSeq).toBeGreaterThan(seq);
+            seq = page.endSeq!;
+            hasMore = page.hasNewer;
+          }
+        }
+        expect([...visited.values()].sort((a, b) => a.seqStart - b.seqStart)).toEqual(expected);
+      }
+    }
+    for (const direction of ["before", "after"] as const) {
+      const page = await store.fetchProjectedCommitted("a", {
+        pagingMode: "source_ranges",
+        direction,
+        cursor: { epoch, seq: 335 },
+        limit: 1,
+      });
+      expect([...page.entries, ...(page.contextEntries ?? [])]).toEqual([byStart.get(330)]);
+    }
+  });
+
+  it("finishes legacy paging when a stored timeline has sparse source seqs", async () => {
+    const { store } = await fixture();
+    const rows = [tool(1, "sparse", "running"), tool(100, "sparse", "completed")];
+    await store.bulkInsert("a", rows);
+    const page = await store.fetchProjectedCommitted("a", { limit: 1 });
+    expect(page.entries).toEqual(projectTimelineRows({ rows, mode: "projected" }));
+    expect([page.startSeq, page.endSeq]).toEqual([1, 100]);
+  });
+
   // Required gates are 1,000 and 10,000 rows; 100,000 is an optional ceiling diagnostic
   // that only runs under CLISBOT_SESSION_STORAGE_CEILING. See the iteration benchmark contract.
   for (const canonicalRows of [1_000, 10_000, 100_000]) {
@@ -337,12 +454,14 @@ describe("durable projected timeline", () => {
         // The oldest tool now reaches across the entire journal. Source-range mode
         // resolves it by canonical id without certifying the intervening history.
         await store.bulkInsert("a", [tool(canonicalRows + 1, "tool-0", "completed")]);
+        sourceBytes = 0;
         const ancient = await new FileAgentTimelineStore(
           async () => directory,
         ).fetchProjectedCommitted("a", { pagingMode: "source_ranges", limit: 40 });
         expect(ancient.entries.length + (ancient.contextEntries?.length ?? 0)).toBeLessThanOrEqual(
           40,
         );
+        expect(sourceBytes).toBeLessThan(2 * 1024 * 1024);
         expect(ancient.endSeq).toBe(canonicalRows + 1);
         expect(ancient.hasOlder).toBe(true);
         expect(
