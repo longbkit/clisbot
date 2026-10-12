@@ -20,11 +20,14 @@ export interface ToolTurnDeliveries {
   acted: boolean;
   /** The text of the latest sends that landed, oldest first. */
   texts: string[];
+  /** The local files sends that landed carried, as `localMediaKey`s: the
+   * relay drops its own Markdown for a file the tool already posted. */
+  media: string[];
 }
 
 /** One landed tool call. */
 export type ToolDelivery =
-  | { kind: "send"; final: boolean; text?: string | undefined }
+  | { kind: "send"; final: boolean; text?: string | undefined; media?: readonly string[] }
   | { kind: "action" };
 
 /**
@@ -49,6 +52,7 @@ export function emptyToolTurn(): ToolTurnRecord {
     progress: false,
     acted: false,
     texts: [],
+    media: [],
     lastProgressAt: null,
   };
 }
@@ -64,6 +68,10 @@ export function recordToolDelivery(record: ToolTurnRecord, delivery: ToolDeliver
   } else {
     record.progress = true;
     record.lastProgressAt = now;
+  }
+  for (const key of delivery.media ?? []) {
+    record.media.push(key);
+    if (record.media.length > KEPT_TEXTS) record.media.shift();
   }
   if (delivery.text === undefined || delivery.text === "") return;
   record.texts.push(delivery.text);
@@ -85,6 +93,7 @@ export function mergeToolTurns(records: readonly ToolTurnRecord[]): ToolTurnDeli
     progress: records.some((record) => record.progress),
     acted: records.some((record) => record.acted),
     texts: records.flatMap((record) => record.texts),
+    media: records.flatMap((record) => record.media),
   };
 }
 

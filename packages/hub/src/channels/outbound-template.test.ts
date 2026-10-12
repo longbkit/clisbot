@@ -52,6 +52,16 @@ describe("composeMessageToolPrompt", () => {
     );
   });
 
+  it("tells every path not to link local files, and a fileless channel to describe them", () => {
+    for (const path of ["tool", "hybrid"] as const) {
+      for (const canSendFiles of [true, false]) {
+        const block = composeMessageToolPrompt(null, { channel: "slack", path, canSendFiles });
+        assert.ok(block.includes("never write a local file as a link or image"), block);
+        assert.equal(block.includes("cannot receive files"), !canSendFiles, block);
+      }
+    }
+  });
+
   it("replaces the whole block with a route template, trimmed", () => {
     assert.equal(
       composeMessageToolPrompt("  Reply only through the message tool.  ", { channel: "slack" }),

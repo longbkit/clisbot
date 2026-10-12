@@ -25,6 +25,7 @@ import {
   type SendReservation,
 } from "./channel-reply-send-ledger.js";
 import { isMediaChannel } from "./channel-message-tool.js";
+import { rewriteLocalEmbeds, sendMediaKeys } from "./media/local-embeds.js";
 import {
   ChannelMediaRefusedError,
   createChannelMediaStager,
@@ -268,17 +269,18 @@ function issuedSendParams(
   eventTurnId: string,
   admitted: MessagePresentation | undefined,
 ): Record<string, unknown> {
-  if (call.args["presentation"] === undefined) return { ...call.args };
+  const args = withChannelText(call.args);
+  if (args["presentation"] === undefined) return args;
   // Nothing survived admission: send the text alone rather than hand the runner
   // blocks it will drop again.
   if (admitted === undefined) {
-    const { presentation: _refused, ...rest } = call.args;
+    const { presentation: _refused, ...rest } = args;
     return rest;
   }
   const { capability } = call;
   const ref = capability.ref;
   return {
-    ...call.args,
+    ...args,
     presentation: mintPresentationCommandButtons(admitted, {
       organizationId: capability.organizationId,
       channel: ref.channel,
@@ -291,6 +293,25 @@ function issuedSendParams(
         capability.requesterSenderId === undefined ? [] : [capability.requesterSenderId],
     }),
   };
+}
+
+/**
+ * The send's text as the channel can show it: an embed of a file this send
+ * carries goes (the file posts right after the text), any other local-file
+ * Markdown becomes a notice naming the file (`media/local-embeds.ts`).
+ */
+function withChannelText(args: Record<string, unknown>): Record<string, unknown> {
+  const delivered = new Set(sendMediaKeys(args));
+  const next = { ...args };
+  for (const key of ["message", "text", "caption"] as const) {
+    const value = args[key];
+    if (typeof value !== "string") continue;
+    const rewritten = rewriteLocalEmbeds(value, { delivered });
+    if (rewritten.trim() !== "") next[key] = rewritten;
+    // Only the embed of a file it carries: the file is the message.
+    else if (delivered.size > 0) delete next[key];
+  }
+  return next;
 }
 
 /** The post seam as `runSend` sees it: the post, and what its failures meant. */

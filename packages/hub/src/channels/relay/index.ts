@@ -8,6 +8,7 @@
 // flows through this same consumer to the approval engine — the relay and the
 // approvals are two handlers on one stream path, never two consumers.
 import type { ChannelStore } from "../../db/channels.js";
+import { rewriteLocalEmbeds } from "../media/local-embeds.js";
 import { isHubFinishExecutionToolName } from "../../hub/protocol.js";
 import { toolActivity, type EffectiveDefaults } from "../config/compile.js";
 import type { AgentStreamTimelineItem } from "../daemon/types.js";
@@ -401,11 +402,18 @@ export class RelayEngine {
     // Subagent scopes carry a prefix and are relayed as their own posts; only
     // the root answer is drafted.
     if (prefix !== "") return;
+    // The draft shows what the final post will: local-file Markdown rewritten,
+    // and an embed still being streamed held back until it closes.
+    const draft = rewriteLocalEmbeds(turn.pendingAssistantText, {
+      delivered: this.toolMedia(stream),
+      partial: true,
+    });
+    if (draft.trim() === "") return;
     await this.relay.streaming?.onAssistantText(
       stream.context,
       key,
       replyLocationFor(stream.context),
-      turn.pendingAssistantText,
+      draft,
     );
   }
 
@@ -437,13 +445,20 @@ export class RelayEngine {
       return;
     }
     turn.postedAssistantTexts.add(text);
-    const caption = `${prefix}${text}`;
+    const shown = rewriteLocalEmbeds(text, { delivered: this.toolMedia(stream) });
+    // An answer that was only an image the tool already posted says nothing more.
+    if (shown.trim() === "") {
+      this.relay.streaming?.discard(stream.context, key);
+      return;
+    }
+    const caption = `${prefix}${shown}`;
     // The message is closing, so its draft closes with it: the transport
     // finishes the draft in place (and falls back to the plain post path
     // itself), which keeps this one post on one ledger row either way.
     const transport = this.relay.streaming?.takeFinalizeTransport(stream.context, key);
-    // The caption posts verbatim: files leave through the `message` tool's
-    // media params (channel-reply.ts), never through a text parse of the answer.
+    // Files leave through the `message` tool's media params (channel-reply.ts),
+    // never through a text parse of the answer: local-file Markdown is only
+    // rewritten to what the channel can show (`media/local-embeds.ts`).
     await this.post(stream, key, turn, caption, finalAnswer, "assistant", transport);
   }
 
@@ -563,7 +578,9 @@ export class RelayEngine {
     // The `tool` path relays no text, so a channel turn that never answered
     // through the tool would end in silence: forward its last message instead.
     const fallback = toolTurnFallback(deliveries, finalText);
-    if (fallback !== undefined) await this.post(stream, turnId, turn, fallback, true, "assistant");
+    if (fallback === undefined) return;
+    const shown = rewriteLocalEmbeds(fallback, { delivered: new Set(deliveries.media) });
+    if (shown.trim() !== "") await this.post(stream, turnId, turn, shown, true, "assistant");
   }
 
   /**
@@ -604,6 +621,12 @@ export class RelayEngine {
     if (stream.context.route.defaults.outbound.path !== "hybrid") return false;
     const deliveries = this.relay.toolDeliveries?.peekTurnDeliveries(stream.context.agentId);
     return toolAlreadySent(text, deliveries);
+  }
+
+  /** The files the `message` tool posted in the Agent's running turn. */
+  private toolMedia(stream: RelayStream): ReadonlySet<string> {
+    const deliveries = this.relay.toolDeliveries?.peekTurnDeliveries(stream.context.agentId);
+    return new Set(deliveries?.media ?? []);
   }
 
   private takeToolDeliveries(stream: RelayStream, keepChannelTurn = false) {

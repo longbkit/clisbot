@@ -538,6 +538,83 @@ describe("channel-reply MCP endpoint", () => {
     ]);
   });
 
+  it("drops the text's embed of a file the same send attaches, and records the file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "channel-reply-embed-"));
+    const png = join(directory, "chart.png");
+    await writeFile(png, PNG_BYTES);
+    const fixture = makeFixture({
+      projectRoot: directory,
+      turnId: "turn-embed",
+      mediaPost: async () => ({ ok: true, externalMessageId: "file-1", mediaPosted: true }),
+    });
+    const body = await fixture.call("tools/call", {
+      name: "message",
+      arguments: {
+        action: "send",
+        message: `The chart:\n![Chart](file://${png})`,
+        attachments: [{ media: png }],
+      },
+    });
+    assert.equal(ToolResultSchema.parse(body.result).isError, undefined, resultText(body));
+    assert.deepEqual(
+      fixture.posts.map((post) => post.text),
+      ["The chart:"],
+    );
+    assert.deepEqual(fixture.registry.takeTurnDeliveries("agent-1")?.media, [png]);
+  });
+
+  it("rewrites a local embed in the caption too", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "channel-reply-caption-"));
+    const png = join(directory, "chart.png");
+    await writeFile(png, PNG_BYTES);
+    const fixture = makeFixture({
+      projectRoot: directory,
+      turnId: "turn-caption",
+      mediaPost: async () => ({ ok: true, externalMessageId: "file-1", mediaPosted: true }),
+    });
+    const body = await fixture.call("tools/call", {
+      name: "message",
+      arguments: {
+        action: "send",
+        media: png,
+        caption: "Chart ![old](file:///other/old.png)",
+      },
+    });
+    assert.equal(ToolResultSchema.parse(body.result).isError, undefined, resultText(body));
+    const shown = fixture.posts.map((post) => post.text).join("\n");
+    assert.ok(shown.includes("[Image not attached: old.png]"), shown);
+    assert.equal(shown.includes("file:"), false, shown);
+  });
+
+  it("records no delivered file for an attachment that could not be read", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "channel-reply-missing-"));
+    const missing = join(directory, "gone.png");
+    const fixture = makeFixture({
+      projectRoot: directory,
+      turnId: "turn-missing",
+      mediaPost: async () => ({ ok: true, externalMessageId: "file-1", mediaPosted: true }),
+    });
+    const body = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { action: "send", message: "Chart:", attachments: [{ media: missing }] },
+    });
+    assert.equal(ToolResultSchema.parse(body.result).isError, true, resultText(body));
+    assert.deepEqual(fixture.registry.takeTurnDeliveries("agent-1")?.media ?? [], []);
+  });
+
+  it("turns an embed of a file the send does not carry into a notice, keeping the text", async () => {
+    const fixture = makeFixture({ turnId: "turn-notice" });
+    const body = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { message: "Done.\n![Chart](file:///missing/chart.png)" },
+    });
+    assert.equal(ToolResultSchema.parse(body.result).isError, undefined, resultText(body));
+    assert.deepEqual(
+      fixture.posts.map((post) => post.text),
+      ["Done.\n[Image not attached: chart.png]"],
+    );
+  });
+
   it("stages inline base64 buffer bytes and posts them as a file", async () => {
     const directory = await mkdtemp(join(tmpdir(), "channel-reply-buffer-"));
     let staged: { fileName: string; mimeType?: string; bytes: number } | undefined;
@@ -1012,6 +1089,7 @@ describe("channel-reply send idempotency", () => {
       progress: true,
       acted: false,
       texts: ["Looking", "Done"],
+      media: [],
     });
   });
 

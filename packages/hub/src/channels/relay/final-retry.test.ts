@@ -207,6 +207,21 @@ describe("final answer retry", () => {
     assert.deepEqual(retry.posted, ["the answer"]);
   });
 
+  it("retries the answer as the channel shows it, never the raw local image Markdown", async () => {
+    const clock = new ManualClock(START);
+    const first = scriptedPost([failed("unavailable")]);
+    await answer(
+      engineFor(first.post, clock, context("local-image")),
+      "turn-1",
+      "Chart:\n![Image](file:///w/artifacts/chart.png)",
+    );
+    const retry = scriptedPost([]);
+    clock.advance(finalAnswerRetryDelayMs(1));
+    assert.equal(await retrierFor(retry.post, clock, "local-image").runDue(), 1);
+    assert.deepEqual(first.posted, ["Chart:\n[Image not attached: chart.png]"]);
+    assert.deepEqual(retry.posted, first.posted);
+  });
+
   it("resumes a scheduled retry after the store is reopened", async () => {
     const clock = new ManualClock(START);
     const first = scriptedPost([failed("rate_limited")]);

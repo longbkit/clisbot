@@ -366,3 +366,79 @@ describe("actionDelivery", () => {
     assert.equal(actionDelivery("not-an-action"), undefined);
   });
 });
+
+describe("local images in channel text", () => {
+  const IMAGE = "/w/artifacts/po-dev-effort.png";
+  const EMBED = `![Image](file://${IMAGE})`;
+  const NOTICE = "[Image not attached: po-dev-effort.png]";
+
+  /** An editable draft transport: every draft text, then the text it was finished with. */
+  function editableDrafts() {
+    const drafts: string[] = [];
+    const finished: string[] = [];
+    const streaming = {
+      onAssistantText: async (_c: unknown, _k: string, _l: unknown, text: string) => {
+        drafts.push(text);
+      },
+      takeFinalizeTransport: () => async (params: { text: string }) => {
+        finished.push(params.text);
+        return { ok: true as const, externalMessageId: "draft-1" };
+      },
+      discard: () => undefined,
+    };
+    engine = new RelayEngine({
+      organizationId: ORGANIZATION_ID,
+      logger: { warn: () => undefined, info: () => undefined },
+      clock: new ManualClock(),
+      store,
+      post: async (params) => {
+        posted.push(params.text);
+        return { ok: true, externalMessageId: `m${posted.length}` };
+      },
+      toolDeliveries: capabilities,
+      streaming: streaming as unknown as NonNullable<
+        ConstructorParameters<typeof RelayEngine>[0]["streaming"]
+      >,
+    });
+    return { drafts, finished };
+  }
+
+  it("a streamed draft never shows a split local embed, and ends as the final post reads", async () => {
+    const { drafts, finished } = editableDrafts();
+    start("hybrid");
+    const answer = `Scores are in.\n${EMBED}\nPO effort is highest.`;
+    for (let index = 0; index < answer.length; index += 9) {
+      await say("t1", "m1", answer.slice(index, index + 9));
+    }
+    await complete("t1");
+    for (const draft of drafts) assert.equal(draft.includes("file:"), false, draft);
+    assert.deepEqual(finished, [`Scores are in.\n${NOTICE}\nPO effort is highest.`]);
+    assert.equal(drafts.at(-1), finished[0]);
+    assert.deepEqual(posted, []);
+  });
+
+  it("a final-only channel gets the notice in place of the embed, and the rest of the answer", async () => {
+    start("relay");
+    await say("t1", "m1", `Done.\n\n${EMBED}`);
+    await complete("t1");
+    assert.deepEqual(posted, [`Done.\n\n${NOTICE}`]);
+  });
+
+  it("on hybrid drops the embed of an image the tool already posted, and posts nothing for it alone", async () => {
+    start("hybrid");
+    capabilities.noteDelivery(token, { kind: "send", final: false, media: [IMAGE] });
+    await say("t1", "m1", `Chart attached above.\n${EMBED}`);
+    await say("t1", "m2", EMBED);
+    await complete("t1");
+    assert.deepEqual(posted, ["Chart attached above."]);
+  });
+
+  it("on Channel tool the fallback for a silent turn shows the notice, not the Markdown", async () => {
+    start("tool");
+    await say("t1", "m1", EMBED);
+    await complete("t1");
+    assert.equal(posted.length, 1);
+    assert.ok(posted[0]!.includes(NOTICE), posted[0]);
+    assert.equal(posted[0]!.includes("file:"), false);
+  });
+});

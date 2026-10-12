@@ -178,6 +178,26 @@ Two things about the staging seam are not visible from either side alone:
   many organizations and each call stages in its own temporary directory with its own
   channel cap.
 
+Text is never parsed into uploads. An Agent whose own app renders images still
+writes `![Chart](file:///…/chart.png)` from habit, and a channel shows that as raw
+Markdown no one can open. So channel-bound text (the streamed draft, the relayed
+final answer and its retries, the `tool`-path fallback, and a `send`'s
+`message`/`text`/`caption`) goes through one rewrite,
+`packages/hub/src/channels/media/local-embeds.ts`:
+
+- an embed or `file:` link of a file the `message` tool posted this turn is
+  dropped; an answer that was only that embed posts nothing more;
+- any other image of a `file:` URL or absolute path, or `file:` link, becomes `[Image not attached: chart.png]`
+  (`[file not attached: …]` for links), so the answer around it survives and no
+  one is told an image was sent; an embed cut off before its `)` counts too;
+- `http(s)` and relative images, plain paths written as text, fenced and indented
+  code, inline code and quoted lines stay as written;
+- a draft holds back an embed still being streamed, so a split URL never shows.
+
+The tool-path prompt tells the Agent to attach generated images and never to link
+local files. A `send` that fails part-way records no delivered file, so text that
+embeds a file it did post still shows the notice.
+
 One `send` becomes several platform messages: the body, then one per attachment,
 each with its own delivery-ledger row under one `eventTurnId`. A failure part
 way through reports `sentBeforeError` with the per-message receipts, so the

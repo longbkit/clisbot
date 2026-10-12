@@ -34,6 +34,7 @@ import {
   type OutboundPostResult,
 } from "./plane/types.js";
 import type { StagedChannelMedia } from "./media/outbound-stager.js";
+import { sendMediaKeys } from "./media/local-embeds.js";
 import type { MessagePresentation } from "@clisbot/channels-core/plugin-sdk/interactive-runtime";
 import {
   executeChannelSend,
@@ -296,7 +297,12 @@ async function messageCall(
     reserveOutput: () => reserveOutput(mcp, capability, token),
   });
   if (result.isError !== true) {
-    mcp.noteDelivery?.(token, { kind: "send", final, text: sendText(args) });
+    mcp.noteDelivery?.(token, {
+      kind: "send",
+      final,
+      text: sendText(args),
+      media: sendMediaKeys(args),
+    });
   }
   return result;
 }

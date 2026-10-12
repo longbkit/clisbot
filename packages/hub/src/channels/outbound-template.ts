@@ -28,7 +28,18 @@ import { CHANNEL_REPLY_MCP_SERVER_NAME, CHANNEL_REPLY_TOOL_NAME } from "./plane/
 const MESSAGE_TOOL = `mcp__${CHANNEL_REPLY_MCP_SERVER_NAME}__${CHANNEL_REPLY_TOOL_NAME}`;
 
 const FILE_INSTRUCTION =
-  '- To send files (documents, images, video, voice notes), add `attachments` — e.g. `attachments:[{media:"/abs/path/a.png"},{media:"/abs/path/b.pdf"}]`, ABSOLUTE paths, one or many per message. Never write a file path as a link in message text; the user cannot open local links.';
+  '- To send files (documents, images, video, voice notes), add `attachments` — e.g. `attachments:[{media:"/abs/path/a.png"},{media:"/abs/path/b.pdf"}]`, ABSOLUTE paths, one or many per message. An image you generated or saved is a file too: attach it.';
+
+/**
+ * Said on every tool path, files or not. An Agent whose own app renders
+ * `![…](file:///…)` writes it out of habit, and a channel shows that as raw
+ * Markdown (the relay rewrites what slips through: `media/local-embeds.ts`).
+ */
+const LOCAL_LINK_INSTRUCTION =
+  "- The user sees plain channel text: never write a local file as a link or image (`![…](/path)`, `file://…`); they cannot open it.";
+
+const NO_FILES_INSTRUCTION =
+  "- This channel cannot receive files; describe a file or image in words instead.";
 
 /**
  * Compose the prompt block for a tool-attaching path: the route's `template`
@@ -51,7 +62,10 @@ export function composeMessageToolPrompt(
     if (trimmed !== "") return trimmed;
   }
   const label = getChannelCatalogEntry(options.channel)?.label ?? options.channel;
-  const files = options.canSendFiles === false ? [] : [FILE_INSTRUCTION];
+  const files = [
+    options.canSendFiles === false ? NO_FILES_INSTRUCTION : FILE_INSTRUCTION,
+    LOCAL_LINK_INSTRUCTION,
+  ];
   if (options.path === "hybrid") {
     return [
       "## Messaging",
