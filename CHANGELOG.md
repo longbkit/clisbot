@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.0 - 2026-10-13
+
+### Added
+
+- Added account Hubs to the multi-Hub app, using each Hub's own login page and Google configuration
+- Added collapsed, expanded and header-only tool-call displays for Bots and group chats
+- Added Show updates on Home to apply activity changes while preserving your reading position
+
+### Fixed
+
+- Fixed loading pages and deferred documents from conversation histories larger than the daemon's read budget
+- Fixed channel replies showing local image links that recipients cannot open
+- Fixed partially failed attachment sends losing track of files already delivered
+- Fixed Home activity and Host entries reordering while you read
+- Fixed mobile Inbox filters overlapping the conversation list
+- Fixed heartbeat acknowledgements appearing as chat replies
+- Fixed native Hub credentials sharing a storage key and web tabs keeping cached credentials after sign-out
+
+Native users with an existing Hub login may need to sign in again; accounts, organizations and access grants are preserved.
+
+Paseo baseline remains `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`.
+
 ## 2.0.3 - 2026-10-11
 
 ### Changed
