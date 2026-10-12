@@ -6,6 +6,7 @@ import { AgentAttachmentSchema, ImageAttachmentSchema } from "../agent-attachmen
 // the removed chat-rooms feature kept as `COMPAT(chatRooms)`.
 import { z } from "zod";
 import { SessionActorSchema } from "../session-authorship.js";
+import { ChatDisplaySchema } from "./tool-display.js";
 
 /** What a busy bot does with a new message: steer the running turn or wait for it. */
 export const ChatWhenBusySchema = z.enum(["steer", "queue"]);
@@ -60,6 +61,11 @@ export const ChatRulesSchema = z.object({
    * `/new` and new members (docs/features/connectors/README.md, "In a Chat").
    */
   tools: z.object({ off: z.array(z.string()).optional() }).optional(),
+  /**
+   * How a group Chat shows its Bots' tool calls; a direct chat follows its Bot's `display`.
+   * COMPAT(chatToolDisplay): older daemons omit it; the app treats absent as `collapsed`.
+   */
+  display: ChatDisplaySchema.optional(),
 });
 export type ChatRules = z.infer<typeof ChatRulesSchema>;
 

@@ -3,9 +3,14 @@
 // fixed because the engine reads its output: `PASS` is silence and `@slug` decides who
 // wakes. Room instructions are the part the chat owner may change. Pure.
 import { createHash } from "node:crypto";
-import { DEFAULT_ROOM_INSTRUCTIONS, isSilentReply, PASS_REPLY } from "@clisbot/protocol/chats/room";
+import {
+  DEFAULT_ROOM_INSTRUCTIONS,
+  isHeartbeatAck,
+  isSilentReply,
+  PASS_REPLY,
+} from "@clisbot/protocol/chats/room";
 
-export { isSilentReply, PASS_REPLY };
+export { isHeartbeatAck, isSilentReply, PASS_REPLY };
 
 export interface RoomMember {
   slug: string;

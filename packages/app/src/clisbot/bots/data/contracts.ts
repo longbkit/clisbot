@@ -26,7 +26,9 @@ export type BotPayload = Pick<
   | "canConfigure"
   | "isOwner"
 > &
-  Partial<Pick<WireBot, "template" | "sharesProject">> & { launchDefaults: BotLaunchDefaults };
+  Partial<Pick<WireBot, "template" | "sharesProject" | "display">> & {
+    launchDefaults: BotLaunchDefaults;
+  };
 export type ChatParticipant = Pick<WireChat["participants"][number], "botId" | "agentId"> &
   Partial<Pick<WireChat["participants"][number], "displayName">>;
 export type ChatPayload = Pick<WireChat, "id" | "kind" | "rules" | "createdAt" | "updatedAt"> & {

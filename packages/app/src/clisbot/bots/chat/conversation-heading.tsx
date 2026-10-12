@@ -4,6 +4,8 @@ import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { i18n } from "@/i18n/i18next";
 import { useChatOptionsState } from "./chat-options-context";
+import { ChatToolActivityHeaderLine } from "./chat-tool-activity-header";
+import { useChatToolActivityHeader } from "./tool-activity-context";
 
 export function conversationHeaderSummary(
   group: boolean,
@@ -36,13 +38,28 @@ export function ConversationHeading({
   const { t } = useTranslation();
   const { visible, setVisible } = useChatOptionsState();
   const open = useCallback(() => setVisible(true), [setVisible]);
+  const toolActivity = useChatToolActivityHeader();
   const summary = conversationHeaderSummary(group, memberCount, hostName, tabCount);
+  const accessibilityLabel = t("bots.chat.header.accessibilityLabel", { title, ...summary });
+  // Clisbot: the `header` tool call display takes the subtitle while a Bot's turn used tools.
+  if (toolActivity?.activities.length)
+    return (
+      <HeadingWithToolActivity
+        avatar={avatar}
+        title={title}
+        accessibilityLabel={accessibilityLabel}
+        expanded={visible}
+        open={open}
+      >
+        <ChatToolActivityHeaderLine header={toolActivity} context={summary.context} />
+      </HeadingWithToolActivity>
+    );
   return (
     <Pressable
       onPress={open}
       style={styles.heading}
       accessibilityRole="button"
-      accessibilityLabel={t("bots.chat.header.accessibilityLabel", { title, ...summary })}
+      accessibilityLabel={accessibilityLabel}
       aria-expanded={visible}
       testID="conversation-header-details"
     >
@@ -59,6 +76,48 @@ export function ConversationHeading({
         </View>
       </View>
     </Pressable>
+  );
+}
+
+/**
+ * The heading with the tool activity line as its subtitle. The line is a trigger of its own, so
+ * the mark and the title keep opening the chat options beside it rather than around it.
+ */
+function HeadingWithToolActivity({
+  avatar,
+  title,
+  accessibilityLabel,
+  expanded,
+  open,
+  children,
+}: {
+  avatar: ReactNode;
+  title: string;
+  accessibilityLabel: string;
+  expanded: boolean;
+  open: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.heading}>
+      <Pressable onPress={open} accessible={false} focusable={false}>
+        {avatar}
+      </Pressable>
+      <View style={styles.text}>
+        <Pressable
+          onPress={open}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          aria-expanded={expanded}
+          testID="conversation-header-details"
+        >
+          <Text numberOfLines={1} style={styles.title}>
+            {title}
+          </Text>
+        </Pressable>
+        {children}
+      </View>
+    </View>
   );
 }
 

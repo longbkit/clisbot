@@ -7,18 +7,26 @@ import type { BotPayload } from "../data/contracts";
 import { toCreateRequest, toUpdateRequest } from "./bot-form-model";
 import { useBotForm, type BotCreateFormProps } from "./use-bot-form";
 
-const inputs = vi.hoisted(() => ({ preferences: {} as FormPreferences, create: vi.fn() }));
+const inputs = vi.hoisted(() => ({
+  preferences: {} as FormPreferences,
+  create: vi.fn(),
+  update: vi.fn(),
+  displaySupported: true,
+}));
 vi.mock("@/hooks/use-form-preferences", () => ({
   useFormPreferences: () => ({ preferences: inputs.preferences }),
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
-    getClient: () => ({ createBot: inputs.create }),
+    getClient: () => ({ createBot: inputs.create, updateBot: inputs.update }),
     getSnapshot: () => ({ connectionStatus: "online" }),
   }),
 }));
 vi.mock("../data/runtime", () => ({ refreshBotsAndChats: vi.fn() }));
 vi.mock("./use-bot-provider-snapshot", () => ({ useBotProviderSnapshot: () => ({}) }));
+vi.mock("./bot-tool-call-display-field", () => ({
+  useHostSupportsToolCallDisplay: () => inputs.displaySupported,
+}));
 
 const ENTRIES: ProviderSnapshotEntry[] = [
   {
@@ -59,6 +67,7 @@ const PROPS: BotCreateFormProps = {
 };
 beforeEach(() => {
   inputs.preferences = {};
+  inputs.displaySupported = true;
 });
 afterEach(cleanup);
 
@@ -192,7 +201,44 @@ describe("useBotForm saved defaults", () => {
       name: "Existing bot",
       description: null,
       launch: bot.launchDefaults,
+      // Unset on the record: the default, shown and saved as such.
+      display: { toolCalls: "collapsed" },
     });
+  });
+});
+
+describe("Bot settings: tool calls", () => {
+  const bot: BotPayload = {
+    id: "bot-a",
+    slug: "assistant",
+    name: "Existing bot",
+    projectId: "project-a",
+    workspaceId: "workspace-a",
+    cwd: "/bots/assistant",
+    kind: "team",
+    display: { toolCalls: "header" },
+    launchDefaults: { provider: "mock", model: "saved-model", modeId: "ask" },
+  };
+
+  async function save(change?: "expanded") {
+    inputs.update.mockResolvedValue({ bot: { id: bot.id }, error: null });
+    const { result } = renderHook(() => useBotForm({ ...PROPS, defaultServerId: "host-a", bot }));
+    act(() => result.current.model.applyProviderSnapshot("host-a", { entries: ENTRIES }));
+    expect(result.current.state.toolCallDisplay).toBe("header");
+    if (change) act(() => result.current.model.setToolCallDisplay(change));
+    await act(async () => result.current.submitAction());
+    return inputs.update.mock.calls.at(-1)?.[0];
+  }
+
+  it("opens on the Bot's setting, keeps it through an unrelated save, and saves a change", async () => {
+    inputs.displaySupported = true;
+    expect(await save()).toMatchObject({ display: { toolCalls: "header" } });
+    expect(await save("expanded")).toMatchObject({ display: { toolCalls: "expanded" } });
+  });
+
+  it("sends nothing about it to a Host that does not keep the setting", async () => {
+    inputs.displaySupported = false;
+    expect(await save()).not.toHaveProperty("display");
   });
 });
 

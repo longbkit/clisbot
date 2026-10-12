@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AgentProfileSchema } from "../agent-profile.js";
 import { SessionActorSchema } from "../session-authorship.js";
+import { ChatDisplaySchema } from "../chats/tool-display.js";
 
 /**
  * The daemon-side Bot record (docs/features/bots-and-chats/README.md, D2).
@@ -54,6 +55,11 @@ export const StoredBotSchema = z.object({
   skillIds: z.array(z.string()).optional(),
   /** References by id only (D2); the shape is decided with the tool policy work. */
   mcpToolPolicy: z.unknown().optional(),
+  /**
+   * How the Bot's direct chat shows its tool calls; unset = `collapsed`.
+   * COMPAT(chatToolDisplay): older daemons drop it; the app gates the setting on the feature.
+   */
+  display: ChatDisplaySchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   archivedAt: z.string().nullable(),

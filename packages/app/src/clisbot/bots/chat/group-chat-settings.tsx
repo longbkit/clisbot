@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { RoomInstructionsField } from "./room-instructions-field";
 import { RoundsField } from "./rounds-field";
+import { ToolCallDisplayField } from "./tool-call-display-field";
 import { useGroupSettingsForm } from "./use-group-settings-form";
 function replyChoices(t: TFunction) {
   const all = { label: t("bots.chat.group.replyAll") };
@@ -64,6 +65,14 @@ export function GroupChatSettings({
         disabled={disabled}
         size={size}
       />
+      {form.toolCallDisplaySupported ? (
+        <ToolCallDisplayField
+          value={draft.toolCallDisplay}
+          onChange={form.setToolCallDisplay}
+          disabled={disabled}
+          size={size}
+        />
+      ) : null}
       <RoomInstructionsField
         initialValue={draft.roomInstructions}
         onChangeText={form.setRoomInstructions}

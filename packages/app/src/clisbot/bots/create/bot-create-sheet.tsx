@@ -9,6 +9,7 @@ import { BotFormLayout } from "./form-layout";
 import { BotTemplateField } from "./bot-template-field";
 import { BotProjectField } from "./bot-project-field";
 import { BotDescriptionField } from "./bot-description-field";
+import { BotToolCallDisplayField } from "./bot-tool-call-display-field";
 import { BotConfiguration } from "./bot-configuration";
 import { botFormStyles as styles } from "./bot-form-styles";
 import { useBotForm, type BotCreateFormProps } from "./use-bot-form";
@@ -61,6 +62,7 @@ export function BotCreateForm(props: BotCreateFormProps) {
       <BotProjectField state={state} />
       <BotDescriptionField state={state} model={model} size={size} />
       <BotTemplateField state={state} model={model} editing={Boolean(bot)} />
+      {bot ? <BotToolCallDisplayField state={state} model={model} size={size} /> : null}
       <BotConfiguration
         state={state}
         model={model}

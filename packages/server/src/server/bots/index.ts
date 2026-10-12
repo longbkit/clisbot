@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { Logger } from "pino";
 import type { BotKind, BotLaunchDefaults, StoredBot } from "@clisbot/protocol/bots/types";
+import { DEFAULT_CHAT_TOOL_DISPLAY, type ChatDisplay } from "@clisbot/protocol/chats/tool-display";
 import type { ProjectRegistry, WorkspaceRegistry } from "../workspace-registry.js";
 import {
   BotRequestError,
@@ -45,6 +46,8 @@ export interface BotUpdatePatch {
   description?: string | null;
   avatar?: string | null;
   launch?: BotLaunchDefaults;
+  /** Replaces the display settings; the default leaves no key, as an older daemon expects. */
+  display?: ChatDisplay;
 }
 
 export interface BotService {
@@ -133,6 +136,7 @@ async function updateBot(
     ...(patch.description !== undefined ? { description: patch.description } : {}),
     ...(patch.avatar !== undefined ? { avatar: patch.avatar } : {}),
     ...(patch.launch !== undefined ? { launch: patch.launch } : {}),
+    ...(patch.display !== undefined ? { display: displayOf(patch.display) } : {}),
     updatedAt: new Date().toISOString(),
   }));
   if (!updated) throw botNotFound(botId);
@@ -140,6 +144,12 @@ async function updateBot(
     await projectRegistry.update(bot.projectId, (record) => ({ ...record, customName: name }));
   }
   return updated;
+}
+
+/** A Bot showing tool calls the default way keeps no `display` key (undefined is not written). */
+function displayOf(display: ChatDisplay): ChatDisplay | undefined {
+  const { toolCalls } = display;
+  return toolCalls && toolCalls !== DEFAULT_CHAT_TOOL_DISPLAY ? { toolCalls } : undefined;
 }
 
 async function archiveBot(

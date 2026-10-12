@@ -195,6 +195,22 @@ describe("createBotService", () => {
     await expect(lstat(path.join(root, "denied"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("update keeps how the Bot shows tool calls; the default leaves no key on disk", async () => {
+    const { bot } = await service.create(
+      { name: "Display Bot", launch: { provider: "codex" } },
+      { owner: OWNER },
+    );
+    expect(bot.display).toBeUndefined();
+    await service.update(bot.id, { display: { toolCalls: "header" } });
+    expect((await service.get(bot.id))?.display).toEqual({ toolCalls: "header" });
+    // Another edit leaves the setting alone.
+    await service.update(bot.id, { name: "Display Bot 2" });
+    expect((await service.get(bot.id))?.display).toEqual({ toolCalls: "header" });
+    await service.update(bot.id, { display: { toolCalls: "collapsed" } });
+    const stored = await service.get(bot.id);
+    expect(stored && "display" in stored).toBe(false);
+  });
+
   it("update renames the bot and its Project but never the slug; archive keeps the directory", async () => {
     const { bot } = await service.create(
       { name: "Ops Bot", launch: { provider: "codex" } },

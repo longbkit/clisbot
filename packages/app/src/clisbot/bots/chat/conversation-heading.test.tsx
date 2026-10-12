@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ConversationHeading } from "./conversation-heading";
 import { ChatOptionsProvider, useChatOptionsState } from "./chat-options-context";
+import { ChatToolActivityHeaderContext } from "./tool-activity-context";
+import type { BotToolActivity } from "./tool-activity";
 
 vi.mock("react-native", () => ({
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -27,6 +29,12 @@ vi.mock("react-native", () => ({
     >
       {children}
     </button>
+  ),
+}));
+// The activity line owns its menu; here only where the heading puts it matters.
+vi.mock("./chat-tool-activity-header", () => ({
+  ChatToolActivityHeaderLine: ({ context }: { context: string }) => (
+    <button type="button">{`Tool activity under ${context}`}</button>
   ),
 }));
 vi.mock("@/components/headers/screen-title", () => ({
@@ -120,4 +128,51 @@ it("uses the group summary even when one member remains", () => {
   expect(
     screen.getByRole("button", { name: "Team, 1 member · 1 tab. Open chat options" }),
   ).toBeTruthy();
+});
+const RUNNING = { botId: "a", turnActive: true } as BotToolActivity;
+const WITH_ACTIVITY = { serverId: "s", group: false, bots: new Map(), activities: [RUNNING] };
+const WITHOUT_ACTIVITY = { serverId: "s", group: false, bots: new Map(), activities: [] };
+
+it("the header tool call display takes the subtitle; the title still opens chat options", () => {
+  render(
+    <ChatOptionsProvider>
+      <ChatToolActivityHeaderContext.Provider value={WITH_ACTIVITY}>
+        <ConversationHeading
+          avatar={null}
+          title="CTO"
+          group={false}
+          memberCount={1}
+          hostName="Long MacBook"
+          tabCount={1}
+        />
+      </ChatToolActivityHeaderContext.Provider>
+      <OptionsTrigger />
+    </ChatOptionsProvider>,
+  );
+  expect(screen.getByRole("button", { name: "Tool activity under Long MacBook" })).toBeTruthy();
+  expect(screen.queryByText("Long MacBook")).toBeNull();
+  const title = screen.getByRole("button", {
+    name: "CTO, Long MacBook · 1 tab. Open chat options",
+  });
+  fireEvent.click(title);
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+});
+
+it("without tool activity the header keeps the Host subtitle", () => {
+  render(
+    <ChatOptionsProvider>
+      <ChatToolActivityHeaderContext.Provider value={WITHOUT_ACTIVITY}>
+        <ConversationHeading
+          avatar={null}
+          title="CTO"
+          group={false}
+          memberCount={1}
+          hostName="Long MacBook"
+          tabCount={1}
+        />
+      </ChatToolActivityHeaderContext.Provider>
+    </ChatOptionsProvider>,
+  );
+  expect(screen.getByText("Long MacBook")).toBeTruthy();
+  expect(screen.queryByText(/Tool activity/)).toBeNull();
 });

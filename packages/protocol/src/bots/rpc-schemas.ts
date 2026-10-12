@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BotKindSchema, BotLaunchDefaultsSchema, BotPayloadSchema } from "./types.js";
+import { ChatDisplaySchema } from "../chats/tool-display.js";
 
 /**
  * `bot.*` RPCs (docs/features/bots-and-chats/README.md, "RPC surface"). Gated once on
@@ -76,6 +77,8 @@ export const BotUpdateRequestSchema = z.object({
   description: z.string().nullable().optional(),
   avatar: z.string().nullable().optional(),
   launch: BotLaunchDefaultsSchema.optional(),
+  /** Replaces the Bot's display settings; gated on `server_info.features.chatToolDisplay`. */
+  display: ChatDisplaySchema.optional(),
 });
 
 export const BotUpdateResponseSchema = z.object({

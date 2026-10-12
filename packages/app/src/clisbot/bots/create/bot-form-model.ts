@@ -1,4 +1,5 @@
 import type { AgentProfile } from "@clisbot/protocol/agent-profile";
+import type { ChatDisplay, ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 import type {
   AgentMode,
   AgentModelDefinition,
@@ -85,6 +86,8 @@ export interface BotFormState {
   name: string;
   /** What other bots in a group read to decide when to tag this one; empty = none. */
   description: string;
+  /** How the Bot's direct chat shows its tool calls. */
+  toolCallDisplay: ChatToolDisplay;
   /** The directory name the daemon will derive (README D3); the record's slug in edit mode. */
   slugPreview: string;
   kind: BotKind;
@@ -129,6 +132,7 @@ export interface BotUpdateRequest {
   name: string;
   description: string | null;
   launch: BotLaunchDefaults;
+  display: ChatDisplay;
 }
 
 export interface BotFormModel {
@@ -141,6 +145,7 @@ export interface BotFormModel {
   applyProfile: (profile: AgentProfile) => void;
   setName: (value: string) => void;
   setDescription: (value: string) => void;
+  setToolCallDisplay: (value: ChatToolDisplay) => void;
   setKind: (value: BotKind) => void;
   setTemplate: (choice: BotTemplateChoice) => void;
   setConflictPolicy: (policy: BotTemplateConflictPolicy) => void;
@@ -193,6 +198,7 @@ export function toUpdateRequest(state: BotFormState, botId: string): BotUpdateRe
     name: state.name.trim(),
     description: state.description.trim() || null,
     launch: launchOf(state),
+    display: { toolCalls: state.toolCallDisplay },
   };
 }
 
@@ -364,15 +370,19 @@ function templateMethods(
   };
 }
 
-/** The bot's own fields: name, description, kind, Host, and the submit error. */
+/** The bot's own fields: name, description, kind, Host, display, and the submit error. */
 function identityMethods(
   session: BotFormSession,
-): Pick<BotFormModel, "setName" | "setDescription" | "setKind" | "setHost" | "setSubmitError"> {
+): Pick<
+  BotFormModel,
+  "setName" | "setDescription" | "setToolCallDisplay" | "setKind" | "setHost" | "setSubmitError"
+> {
   const patch = (fields: Partial<BotFormState>) =>
     publish(session, { ...session.state, ...fields });
   return {
     setName: (value) => patch({ name: value }),
     setDescription: (value) => patch({ description: value }),
+    setToolCallDisplay: (value) => patch({ toolCallDisplay: value }),
     setKind: (value) => patch({ kind: value }),
     setSubmitError: (value) => patch({ submitError: value }),
     setHost(serverId, display) {

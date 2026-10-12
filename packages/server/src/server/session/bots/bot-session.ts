@@ -141,6 +141,7 @@ export class BotSession {
         description: request.description,
         avatar: request.avatar,
         launch: request.launch,
+        display: request.display,
       });
       this.host.emit({
         type: "bot.update.response",

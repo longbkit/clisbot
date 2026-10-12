@@ -7,6 +7,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Logger } from "pino";
 import type { ChatRules } from "@clisbot/protocol/chats/types";
+import {
+  DEFAULT_CHAT_TOOL_DISPLAY,
+  type ChatToolDisplay,
+} from "@clisbot/protocol/chats/tool-display";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { writeDurableJson } from "../agent/session-storage/durable-file.js";
 import { assertSessionId } from "../agent/session-storage/layout.js";
@@ -43,6 +47,17 @@ function withToolsOff(chat: StoredChat, toolsOff: readonly string[] | undefined)
   const { tools: _previous, ...rules } = chat.rules;
   const off = [...new Set(toolsOff)].sort();
   return { ...chat, rules: off.length > 0 ? { ...rules, tools: { off } } : rules };
+}
+
+/**
+ * Sets how a group shows tool calls. The default leaves no `display` key, so a Chat that never
+ * changed it stays readable by an older daemon, whose stored rules are strict.
+ */
+function withToolCallDisplay(chat: StoredChat, toolCalls: ChatToolDisplay | undefined): StoredChat {
+  if (toolCalls === undefined) return chat;
+  const { display: _previous, ...rules } = chat.rules;
+  if (toolCalls === DEFAULT_CHAT_TOOL_DISPLAY) return { ...chat, rules };
+  return { ...chat, rules: { ...rules, display: { toolCalls } } };
 }
 
 export class ChatStore {
@@ -174,7 +189,7 @@ export class ChatStore {
       const onlyTools = Object.keys(patch).every((key) => key === "toolsOff");
       if (!group && !onlyTools) throw new Error("Only group chats have editable group settings");
       if (chat.archivedAt) throw new Error("Archived chats cannot be edited");
-      return withToolsOff(
+      const updated = withToolsOff(
         {
           ...chat,
           ...(patch.title !== undefined ? { title: patch.title?.trim() || null } : {}),
@@ -196,6 +211,7 @@ export class ChatStore {
         },
         patch.toolsOff,
       );
+      return withToolCallDisplay(updated, patch.toolCallDisplay);
     });
   }
 

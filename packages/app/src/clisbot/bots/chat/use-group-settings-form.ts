@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
+import type { ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 import { useSessionStore } from "@/stores/session-store";
 import { useHostRuntimeClient, useHostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import { useFormLifetime } from "../create/use-form-lifetime";
@@ -30,7 +31,19 @@ function useGroupSettingsDraft(chat: ChatPayload) {
     (value: string) => setField("requireMention", value === "mentioned"),
     [setField],
   );
-  return { original, draft, setTitle, setRoundsMax, setRoomInstructions, setReply };
+  const setToolCallDisplay = useCallback(
+    (value: ChatToolDisplay) => setField("toolCallDisplay", value),
+    [setField],
+  );
+  return {
+    original,
+    draft,
+    setTitle,
+    setRoundsMax,
+    setRoomInstructions,
+    setReply,
+    setToolCallDisplay,
+  };
 }
 
 /** Group settings: the draft, whether the Host can take it, and saving it as one patch. */
@@ -40,6 +53,10 @@ export function useGroupSettingsForm(serverId: string, chat: ChatPayload, onSave
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
   const supported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
+  );
+  // COMPAT(chatToolDisplay): an older Host rejects the patch key; hide the field there.
+  const toolCallDisplaySupported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.chatToolDisplay === true,
   );
   const fields = useGroupSettingsDraft(chat);
   const { draft, original } = fields;
@@ -63,5 +80,5 @@ export function useGroupSettingsForm(serverId: string, chat: ChatPayload, onSave
     }
   }, [client, online, supported, busy, draft, original, chat.id, onSaved, isCurrent]);
   const changed = hasGroupSettingsChanges(draft, original);
-  return { ...fields, supported, online, busy, error, changed, save };
+  return { ...fields, supported, toolCallDisplaySupported, online, busy, error, changed, save };
 }

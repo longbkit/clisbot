@@ -43,6 +43,8 @@ describe("chat record", () => {
       context: { maxMessages: 20 },
       limits: { maxInputCharacters: "off", maxRuntimeSeconds: 60 },
       tools: { off: [] },
+      // Unset on an existing Chat: the default display, with no migration.
+      display: { toolCalls: "collapsed" },
     });
     expect(limitValue(resolved, "maxInputCharacters")).toBeNull();
     expect(limitValue(resolved, "maxRuntimeSeconds")).toBe(60);
@@ -304,6 +306,26 @@ test("a chat keeps its tools off list, direct chats included, and nothing else c
   expect(
     (await store.updateSettings("direct-tools", { toolsOff: [] })).rules.tools,
   ).toBeUndefined();
+});
+
+test("a group keeps how it shows tool calls; the default leaves no key and direct chats refuse it", async () => {
+  const root = await temporary();
+  const store = new ChatStore(root, createTestLogger());
+  await store.create({ id: "group-display", kind: "group", botIds: ["a", "b"] });
+  const expanded = await store.updateSettings("group-display", { toolCallDisplay: "expanded" });
+  expect(expanded.rules.display).toEqual({ toolCalls: "expanded" });
+  expect(await new ChatStore(root, createTestLogger()).get("group-display")).toEqual(expanded);
+  expect(resolveChatRules(expanded.rules).display).toEqual({ toolCalls: "expanded" });
+  // Another setting leaves it alone.
+  const renamed = await store.updateSettings("group-display", { title: "Launch" });
+  expect(renamed.rules.display).toEqual({ toolCalls: "expanded" });
+  const back = await store.updateSettings("group-display", { toolCallDisplay: "collapsed" });
+  expect(back.rules.display).toBeUndefined();
+  expect(resolveChatRules(back.rules).display).toEqual({ toolCalls: "collapsed" });
+  await store.create({ id: "direct-display", kind: "direct", botIds: ["a"] });
+  await expect(
+    store.updateSettings("direct-display", { toolCallDisplay: "header" }),
+  ).rejects.toThrow("Only group");
 });
 
 test("group settings reject direct and archived chats and unknown rule fields", async () => {

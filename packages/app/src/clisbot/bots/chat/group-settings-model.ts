@@ -4,6 +4,7 @@ import {
   type ChatUpdatePatch,
 } from "@clisbot/protocol/chats/rpc-schemas";
 import { DEFAULT_CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/room";
+import { resolveChatToolDisplay, type ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 import { i18n } from "@/i18n/i18next";
 export interface GroupSettingsDraft {
   title: string;
@@ -12,6 +13,8 @@ export interface GroupSettingsDraft {
   roomInstructions: string;
   /** How many rounds a discussion may run before the daemon stops it. */
   roundsMax: number;
+  /** How the group shows its Bots' tool calls. */
+  toolCallDisplay: ChatToolDisplay;
 }
 
 export function openGroupSettingsDraft(chat: ChatPayload): GroupSettingsDraft {
@@ -20,6 +23,7 @@ export function openGroupSettingsDraft(chat: ChatPayload): GroupSettingsDraft {
     requireMention: chat.rules.interaction?.requireMention ?? false,
     roomInstructions: chat.rules.room?.instructions ?? "",
     roundsMax: chat.rules.rounds?.max ?? DEFAULT_CHAT_ROUNDS_MAX,
+    toolCallDisplay: resolveChatToolDisplay(chat.rules.display),
   };
 }
 export function groupSettingsPatch(
@@ -39,6 +43,8 @@ export function groupSettingsPatch(
   if (instructions !== original.roomInstructions.trim())
     patch.roomInstructions = instructions || null;
   if (draft.roundsMax !== original.roundsMax) patch.roundsMax = draft.roundsMax;
+  if (draft.toolCallDisplay !== original.toolCallDisplay)
+    patch.toolCallDisplay = draft.toolCallDisplay;
   return Object.keys(patch).length ? patch : null;
 }
 /** Whether saving would change anything; an over-limit draft counts as a change to report. */

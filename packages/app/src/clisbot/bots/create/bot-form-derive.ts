@@ -1,3 +1,4 @@
+import { resolveChatToolDisplay, type ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 import type {
   AgentMode,
   AgentModelDefinition,
@@ -240,6 +241,11 @@ function initialTemplateChoice(
   return project ? "none" : "personal";
 }
 
+/** An existing Bot's setting; a new Bot, or one that never set it, starts at the default. */
+function initialToolCallDisplay(snapshot: BotFormSnapshot): ChatToolDisplay {
+  return resolveChatToolDisplay(snapshot.bot?.display);
+}
+
 export function buildInitialState(snapshot: BotFormSnapshot): BotFormState {
   const selectedServerId = resolveInitialServerId(snapshot);
   const launch = snapshot.bot?.launchDefaults;
@@ -250,6 +256,7 @@ export function buildInitialState(snapshot: BotFormSnapshot): BotFormState {
     mode: snapshot.mode,
     name: snapshot.bot?.name ?? snapshot.defaults.name ?? "",
     description: snapshot.bot?.description ?? "",
+    toolCallDisplay: initialToolCallDisplay(snapshot),
     slugPreview: "",
     kind: snapshot.bot?.kind ?? "personal",
     ...initialProjectAndTemplate(snapshot),

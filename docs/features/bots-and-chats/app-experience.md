@@ -158,6 +158,29 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   Nested files show their directory on the secondary line to distinguish duplicate filenames.
   Tab-type icons distinguish Messages, documents and changes without changing their names.
 
+### Tool calls
+
+A Bot's running turn can call dozens of tools. How a conversation shows them is a setting with
+three choices: Bot settings keep it for the Bot's direct chat (`StoredBot.display.toolCalls`),
+Group settings for the group (`rules.display.toolCalls`), so one transcript never mixes two
+displays. Unset is **Collapsed** for every existing Bot and Chat; the daemon stores no key for the
+default, so an older daemon can still read the record. The setting is offered only when the Host
+advertises `server_info.features.chatToolDisplay`.
+
+- **Collapsed**: the turn's text stays in place and its tool calls fold into one bar after it
+  (`ExpandableBadge`, as the agent stream's overview group). The bar counts the calls, says how many
+  failed (red icon), and names the latest call with the shimmer while it runs. Expanding shows the
+  same rows as Expanded (a sheet on compact screens). The bar is keyed by turn, so a new turn starts
+  closed and a streamed update never reopens or moves it.
+- **Expanded**: every call is its own row, as before.
+- **In the header**: the transcript keeps text, approvals and the running footer; the header
+  subtitle names the running call (with the Bot in a group) and the count, and returns to the Host
+  or member count once every turn ended, with the last turn's count beside it. Pressing the line
+  opens the calls through the menu engine: a popover on wide screens, a sheet on compact ones,
+  one section per Bot and turn. It opens on press, not hover, so touch and keyboard reach it.
+
+Approvals, notices and errors are visible in every display.
+
 ## Responsive controls and compatibility
 
 Desktop retains its compact workspace header and tab styling. Mobile uses the existing responsive

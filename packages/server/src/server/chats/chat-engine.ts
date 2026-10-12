@@ -25,6 +25,7 @@ import type { ChatStore } from "./chat-store.js";
 import { renderChatPrompt, sessionTitleFor } from "./context-prompt.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
 import {
+  isHeartbeatAck,
   isSilentReply,
   renderRoomContract,
   roomFingerprint,
@@ -573,6 +574,8 @@ export class ChatEngine implements TurnTrackerHost {
     if (!chat || !(await this.recordCompletedTurn(chat, outcome)))
       return this.releaseFloor(outcome);
     if (chatKindOf(chat) === "group") return this.appendGroupReply(chat, outcome);
+    // A heartbeat run with nothing to report: the turn happened, the transcript stays quiet.
+    if (isHeartbeatAck(outcome.text)) return;
     if (outcome.text === null) {
       if (outcome.expectation) {
         const bot = await this.deps.bots.get(outcome.botId);

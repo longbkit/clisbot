@@ -18,6 +18,12 @@ import {
 import { SessionActorSchema } from "@clisbot/protocol/session-authorship";
 import { CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/rpc-schemas";
 import { DEFAULT_CHAT_ROUNDS_MAX } from "@clisbot/protocol/chats/room";
+import {
+  ChatToolDisplaySchema,
+  DEFAULT_CHAT_TOOL_DISPLAY,
+  resolveChatToolDisplay,
+  type ChatToolDisplay,
+} from "@clisbot/protocol/chats/tool-display";
 
 const StoredChatLimitsSchema = z
   .object(
@@ -48,6 +54,8 @@ export const StoredChatRulesSchema = z
       .object({ off: z.array(z.string()).optional() })
       .strict()
       .optional(),
+    /** How a group shows tool calls (`ChatRulesSchema.display`); absent = the default. */
+    display: z.object({ toolCalls: ChatToolDisplaySchema.optional() }).strict().optional(),
   })
   .strict();
 export type StoredChatRules = z.infer<typeof StoredChatRulesSchema>;
@@ -117,6 +125,8 @@ export interface ResolvedChatRules {
   limits: Partial<Record<ChatLimitName, ChatLimitValue>>;
   /** What every Bot in the Chat leaves off; empty = each Bot's own settings. */
   tools: { off: string[] };
+  /** How a group shows its Bots' tool calls; a direct chat follows its Bot. */
+  display: { toolCalls: ChatToolDisplay };
 }
 
 export const CHAT_RULE_DEFAULTS: ResolvedChatRules = {
@@ -127,6 +137,7 @@ export const CHAT_RULE_DEFAULTS: ResolvedChatRules = {
   context: { maxMessages: 20 },
   limits: { maxInputCharacters: 8_000 },
   tools: { off: [] },
+  display: { toolCalls: DEFAULT_CHAT_TOOL_DISPLAY },
 };
 
 export function resolveChatRules(rules: ChatRules | undefined): ResolvedChatRules {
@@ -143,7 +154,13 @@ export function resolveChatRules(rules: ChatRules | undefined): ResolvedChatRule
     context: { maxMessages: rules?.context?.maxMessages ?? defaults.context.maxMessages },
     limits: { ...defaults.limits, ...rules?.limits },
     tools: { off: rules?.tools?.off ?? [] },
+    display: displayRulesOf(rules),
   };
+}
+
+/** Unset on an existing Chat is the default display; nothing is migrated. */
+function displayRulesOf(rules: ChatRules | undefined): ResolvedChatRules["display"] {
+  return { toolCalls: resolveChatToolDisplay(rules?.display) };
 }
 
 /** Blank instructions are no instructions: the built-in default applies. */

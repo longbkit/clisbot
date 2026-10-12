@@ -59,6 +59,7 @@ vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("react-native", () => ({
   StyleSheet: { create: (styles: unknown) => styles },
   Platform: { OS: "web" },
+  ScrollView: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
   ),
@@ -132,6 +133,36 @@ vi.mock("@/components/message", () => ({
     );
   },
   Notification: ({ message }: { message: string }) => <p data-kind="notice">{message}</p>,
+  ExpandableBadge: ({
+    label,
+    secondaryLabel,
+    isError,
+    isLoading,
+    isExpanded,
+    onToggle,
+    renderDetails,
+    testID,
+  }: {
+    label: string;
+    secondaryLabel?: string;
+    isError?: boolean;
+    isLoading?: boolean;
+    isExpanded: boolean;
+    onToggle: () => void;
+    renderDetails?: () => ReactNode;
+    testID?: string;
+  }) => (
+    <div data-testid={testID} data-error={String(isError)} data-loading={String(isLoading)}>
+      <button type="button" aria-expanded={isExpanded} onClick={onToggle}>
+        {[label, secondaryLabel].filter(Boolean).join(" | ")}
+      </button>
+      {isExpanded ? renderDetails?.() : null}
+    </div>
+  ),
+}));
+vi.mock("@/utils/tool-call-icon", () => ({ resolveToolCallIcon: () => () => null }));
+vi.mock("@/tool-calls/detail-level/overview/sheet", () => ({
+  OverviewToolCallGroupSheet: () => null,
 }));
 vi.mock("@/components/question-form-card", () => ({ QuestionFormCard: () => <form /> }));
 vi.mock("./bot-face", () => ({ BotFace: ({ name }: { name: string }) => <b>{name.charAt(0)}</b> }));
@@ -365,4 +396,98 @@ it("routes question permissions through the shared receipt-aware, pending-state 
   expect(card.getAttribute("data-agent")).toBe("agent-r");
   expect(card.getAttribute("data-server")).toBe("host-a");
   expect(screen.queryByRole("form")).toBeNull();
+});
+
+describe("tool call displays", () => {
+  function shell(
+    id: string,
+    at: number,
+    status: "running" | "completed" | "failed",
+    command: string,
+  ) {
+    return {
+      kind: "tool_call",
+      id,
+      turnId: "turn-1",
+      timestamp: new Date(at),
+      payload: {
+        source: "agent",
+        data: {
+          provider: "mock",
+          callId: id,
+          name: "shell",
+          status,
+          error: status === "failed" ? { message: "exit 1" } : undefined,
+          detail: { type: "shell", command },
+        },
+      },
+    } as StreamItem;
+  }
+  const heads = new Map<string, ChatLiveHead>([
+    [
+      "research",
+      {
+        agentId: "agent-r",
+        turnActive: true,
+        permissions: [],
+        items: [
+          {
+            kind: "assistant_message",
+            id: "intro",
+            text: "Checking the sheets",
+            timestamp: new Date(1),
+          },
+          shell("t1", 2, "completed", "gog drive ls"),
+          shell("t2", 3, "failed", "gog drive search"),
+          shell("t3", 4, "running", "gog sheets get 1wqb"),
+        ],
+      },
+    ],
+  ]);
+  function renderWith(toolDisplay?: "collapsed" | "expanded" | "header") {
+    render(
+      <ChatScreen
+        serverId="host-a"
+        chatId="chat-1"
+        title="Research"
+        bots={[BOTS[0]!]}
+        transcript={[line({ kind: "user" }, "Audit the PR files")]}
+        liveHeads={heads}
+        onSubmitMessage={vi.fn(async () => {})}
+        toolDisplay={toolDisplay}
+      />,
+    );
+  }
+
+  it("collapsed: one bar names the latest call, keeps the failure and running state, expands to every row", () => {
+    renderWith("collapsed");
+    expect(screen.getByText("Checking the sheets")).toBeTruthy();
+    expect(document.querySelectorAll('[data-kind="tool"]')).toHaveLength(0);
+    const bars = screen.getAllByTestId("chat-tool-activity-bar");
+    expect(bars).toHaveLength(1);
+    expect(bars[0]!.getAttribute("data-error")).toBe("true");
+    expect(bars[0]!.getAttribute("data-loading")).toBe("true");
+    const toggle = screen.getByRole("button", { name: /3 tool calls, 1 failed/ });
+    expect(toggle.textContent).toContain("gog sheets get 1wqb");
+    fireEvent.click(toggle);
+    expect(
+      [...document.querySelectorAll('[data-kind="tool"]')].map((row) =>
+        row.getAttribute("data-status"),
+      ),
+    ).toEqual(["completed", "failed", "running"]);
+  });
+
+  it("expanded: every call is its own row, as before", () => {
+    renderWith("expanded");
+    expect(screen.queryByTestId("chat-tool-activity-bar")).toBeNull();
+    expect(document.querySelectorAll('[data-kind="tool"]')).toHaveLength(3);
+  });
+
+  it("header: the transcript keeps the text and the running footer, not the calls", () => {
+    renderWith("header");
+    expect(screen.getByText("Checking the sheets")).toBeTruthy();
+    expect(screen.queryByTestId("chat-tool-activity-bar")).toBeNull();
+    expect(document.querySelectorAll('[data-kind="tool"]')).toHaveLength(0);
+    expect(screen.getByTestId("turn-working-indicator")).toBeTruthy();
+  });
 });

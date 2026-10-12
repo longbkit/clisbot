@@ -15,6 +15,7 @@ test("settings open from the current chat and save only changed fields", () => {
     requireMention: true,
     roomInstructions: "",
     roundsMax: 5,
+    toolCallDisplay: "collapsed",
   });
   expect(groupSettingsPatch({ ...original, roundsMax: 8 }, original)).toEqual({ roundsMax: 8 });
   expect(groupSettingsPatch(original, original)).toBeNull();
@@ -46,4 +47,17 @@ test("room instructions save trimmed, clear to the default, and report an over-l
   expect(() => groupSettingsPatch(long, original)).toThrow("4000");
   expect(hasGroupSettingsChanges(long, original)).toBe(true);
   expect(hasGroupSettingsChanges(original, original)).toBe(false);
+});
+test("tool call display opens from the group's rules, collapsed when unset, and saves only a change", () => {
+  const unset = openGroupSettingsDraft({ title: null, rules: {} } as ChatPayload);
+  expect(unset.toolCallDisplay).toBe("collapsed");
+  const original = openGroupSettingsDraft({
+    title: null,
+    rules: { display: { toolCalls: "header" } },
+  } as ChatPayload);
+  expect(original.toolCallDisplay).toBe("header");
+  expect(groupSettingsPatch(original, original)).toBeNull();
+  expect(groupSettingsPatch({ ...original, toolCallDisplay: "expanded" }, original)).toEqual({
+    toolCallDisplay: "expanded",
+  });
 });

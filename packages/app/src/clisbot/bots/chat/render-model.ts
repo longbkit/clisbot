@@ -1,6 +1,11 @@
 import type { PendingPermission } from "@/types/shared";
 import type { StreamItem } from "@/types/stream";
-import { isSilentReply } from "@clisbot/protocol/chats/room";
+import {
+  HEARTBEAT_ACK_REPLY,
+  isHeartbeatAck,
+  isSilentReply,
+  PASS_REPLY,
+} from "@clisbot/protocol/chats/room";
 import type { ChatMessage } from "../data/contracts";
 
 /**
@@ -48,6 +53,39 @@ export function chatRowSender(row: ChatRenderRow | undefined): string | null {
 }
 
 const senderOf = chatRowSender;
+
+/**
+ * A Bot reply that is silence, never a message: exactly `PASS` or `HEARTBEAT_OK` in a group, and
+ * exactly `HEARTBEAT_OK` in a direct chat, where `PASS` can be a real answer. Matching is on the
+ * trimmed text, so a reply that only mentions a marker still shows.
+ */
+export function isSilentBotText(text: string, group: boolean): boolean {
+  return group ? isSilentReply(text) : isHeartbeatAck(text);
+}
+
+/** A still-streaming reply that so far spells the start of a silence marker. */
+function mayBecomeSilent(text: string, group: boolean): boolean {
+  const trimmed = text.trim();
+  const markers = group ? [PASS_REPLY, HEARTBEAT_ACK_REPLY] : [HEARTBEAT_ACK_REPLY];
+  return trimmed !== "" && markers.some((marker) => marker.startsWith(trimmed));
+}
+
+/**
+ * The live items without silence: a finished silent reply, and the running turn's last reply
+ * while it still spells a marker's start, so `HEARTBEAT_OK` never flashes on screen.
+ */
+function withoutSilence(
+  items: readonly StreamItem[],
+  group: boolean,
+  turnActive: boolean,
+): StreamItem[] {
+  const last = items.findLastIndex((item) => item.kind === "assistant_message");
+  return items.filter((item, index) => {
+    if (item.kind !== "assistant_message") return true;
+    if (isSilentBotText(item.text, group)) return false;
+    return !(turnActive && index === last && mayBecomeSilent(item.text, group));
+  });
+}
 
 function transcriptRow(line: ChatMessage, previous: ChatRenderRow | undefined): ChatRenderRow {
   const key = `line:${line.id}`;
@@ -134,9 +172,21 @@ function unreferencedItems(
 function groupTurnItems(head: ChatLiveHead): readonly StreamItem[] {
   if (!head.turnActive) return [];
   const lastPrompt = head.items.findLastIndex((item) => item.kind === "user_message");
-  return head.items
+  return head.items.slice(lastPrompt + 1);
+}
+
+/**
+ * A direct chat's tail, less a finished turn that ended in silence: a heartbeat run answered
+ * `HEARTBEAT_OK` writes no line, so its tool calls must not linger below the transcript.
+ */
+function directTurnItems(head: ChatLiveHead): readonly StreamItem[] {
+  if (head.turnActive) return head.items;
+  const lastPrompt = head.items.findLastIndex((item) => item.kind === "user_message");
+  const reply = head.items
     .slice(lastPrompt + 1)
-    .filter((item) => !(item.kind === "assistant_message" && isSilentReply(item.text)));
+    .findLast((item) => item.kind === "assistant_message");
+  const silent = reply?.kind === "assistant_message" && isSilentBotText(reply.text, false);
+  return silent ? head.items.slice(0, lastPrompt + 1) : head.items;
 }
 
 function liveRow(
@@ -146,8 +196,9 @@ function liveRow(
   previous: ChatRenderRow | undefined,
   group: boolean,
 ): ChatRenderRow | null {
-  const tail = group ? groupTurnItems(head) : head.items;
-  const items = unreferencedItems(tail, linesFromAgent(transcript, botId, head.agentId));
+  const tail = group ? groupTurnItems(head) : directTurnItems(head);
+  const unreferenced = unreferencedItems(tail, linesFromAgent(transcript, botId, head.agentId));
+  const items = withoutSilence(unreferenced, group, head.turnActive);
   const permissions = [...head.permissions];
   if (!head.turnActive && items.length === 0 && permissions.length === 0) return null;
   return {
@@ -173,9 +224,14 @@ export function buildChatRenderModel(
   options: { group?: boolean } = {},
 ): ChatRenderModel {
   const rows: ChatRenderRow[] = [];
-  for (const line of transcript) rows.push(transcriptRow(line, rows[rows.length - 1]));
+  const group = options.group === true;
+  for (const line of transcript) {
+    // A silent reply persisted before the daemon dropped it (or by an older one) stays hidden.
+    if (line.sender.kind === "bot" && isSilentBotText(line.text, group)) continue;
+    rows.push(transcriptRow(line, rows[rows.length - 1]));
+  }
   for (const [botId, head] of liveHeadsByBot) {
-    const row = liveRow(transcript, botId, head, rows[rows.length - 1], options.group === true);
+    const row = liveRow(transcript, botId, head, rows[rows.length - 1], group);
     if (row) rows.push(row);
   }
   return { rows };

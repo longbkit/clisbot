@@ -7,6 +7,7 @@ import {
   ChatRulesSchema,
   ChatTranscriptDirectionSchema,
 } from "./types.js";
+import { ChatToolDisplaySchema } from "./tool-display.js";
 
 /**
  * `chat.*` RPCs (docs/features/bots-and-chats/README.md, "RPC surface"; plans/server-chat.md §4).
@@ -229,7 +230,7 @@ export const CHAT_ROOM_INSTRUCTIONS_MAX_CHARS = 4000;
 /** The most rounds a group discussion may be allowed; a guard rail, not a budget. */
 export const CHAT_ROUNDS_MAX = 20;
 
-/** Group name, the everyday reply policy, the room instructions and the tools off list. */
+/** Group name, reply policy, room instructions, the tools off list and the tool call display. */
 export const ChatUpdatePatchSchema = z
   .object({
     title: z.string().max(256).nullable().optional(),
@@ -238,6 +239,8 @@ export const ChatUpdatePatchSchema = z
     roundsMax: z.number().int().positive().max(CHAT_ROUNDS_MAX).optional(),
     /** The whole tools off list of the Chat; a direct chat may change only this. */
     toolsOff: z.array(z.string().min(1).max(300)).max(1000).optional(),
+    /** How the group shows tool calls; gated on `server_info.features.chatToolDisplay`. */
+    toolCallDisplay: ChatToolDisplaySchema.optional(),
   })
   .strict()
   .refine(
@@ -246,7 +249,8 @@ export const ChatUpdatePatchSchema = z
       patch.requireMention !== undefined ||
       patch.roomInstructions !== undefined ||
       patch.roundsMax !== undefined ||
-      patch.toolsOff !== undefined,
+      patch.toolsOff !== undefined ||
+      patch.toolCallDisplay !== undefined,
     "Choose a group setting to update",
   );
 export const ChatUpdateRequestSchema = z.object({

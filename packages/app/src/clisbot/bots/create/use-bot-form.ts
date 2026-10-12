@@ -15,6 +15,7 @@ import {
 } from "./bot-form-model";
 import { useBotTemplatePreview } from "./use-bot-template-preview";
 import { useBotProviderSnapshot } from "./use-bot-provider-snapshot";
+import { useHostSupportsToolCallDisplay } from "./bot-tool-call-display-field";
 export interface BotCreateFormProps {
   name: string;
   defaultServerId?: string;
@@ -53,6 +54,7 @@ export function useBotForm({
   const providerSnapshot = useBotProviderSnapshot(model, state, bot?.cwd ?? project?.path);
   useBotTemplatePreview(model, state);
   const [busy, setBusy] = useState(false);
+  const displaySupported = useHostSupportsToolCallDisplay(state.selectedServerId);
   useEffect(() => () => model.close(), [model]);
   useEffect(() => model.applyHosts(hosts), [hosts, model]);
   useEffect(() => model.applyPreferences(preferences), [preferences, model]);
@@ -64,7 +66,9 @@ export function useBotForm({
       const client = getHostRuntimeStore().getClient(serverId);
       if (!client || getHostRuntimeStore().getSnapshot(serverId)?.connectionStatus !== "online")
         throw new Error(t("bots.workspace.errors.hostDisconnected"));
-      const { serverId: _serverId, ...update } = toUpdateRequest(state, bot?.id ?? "");
+      const { serverId: _serverId, display, ...rest } = toUpdateRequest(state, bot?.id ?? "");
+      // Only a Host that keeps the setting is sent it; the field is hidden on the others.
+      const update = displaySupported ? { ...rest, display } : rest;
       const result = bot ? await client.updateBot(update) : await client.createBot(request);
       if (result.error || !result.bot)
         throw new Error(result.error ?? t("bots.workspace.errors.createBotFailed"));
@@ -76,7 +80,7 @@ export function useBotForm({
     } finally {
       if (isCurrent()) setBusy(false);
     }
-  }, [state, model, onCreated, bot, isCurrent, updatePreferences, t]);
+  }, [state, model, onCreated, bot, isCurrent, updatePreferences, t, displaySupported]);
   const submitAction = useCallback(() => {
     if (state.canSubmit && !busy) void submit();
   }, [submit, state.canSubmit, busy]);

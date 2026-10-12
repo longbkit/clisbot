@@ -465,6 +465,31 @@ describe("ChatEngine", () => {
     expect((await h.lines("cht_1")).at(-1)?.text).toBe("⚠️ Alpha finished without a reply.");
   });
 
+  test("HEARTBEAT_OK is silence in a direct chat; PASS and a reply naming the marker are replies", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id] });
+    await h.engine.send({ chatId: "cht_1", text: "check in", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", " HEARTBEAT_OK\n", "turn-1");
+    expect((await h.lines("cht_1")).map((line) => line.text)).toEqual(["check in"]);
+    // The turn still counts as done: the next message is delivered, not held.
+    expect((await h.store.require("cht_1")).participants[0]?.completedTurn?.turnId).toBe("turn-1");
+
+    await h.engine.send({ chatId: "cht_1", text: "did the tests pass?", messageId: "m2" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "PASS", "turn-2");
+    await h.engine.send({ chatId: "cht_1", text: "and the heartbeat?", messageId: "m3" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "It answered HEARTBEAT_OK at 9:00.", "turn-3");
+    expect((await h.lines("cht_1")).map((line) => line.text)).toEqual([
+      "check in",
+      "did the tests pass?",
+      "PASS",
+      "and the heartbeat?",
+      "It answered HEARTBEAT_OK at 9:00.",
+    ]);
+  });
+
   test("/new leaves a system line and the next delivery goes to a fresh session", async () => {
     const h = await harness();
     await h.store.create({ id: "cht_1", botIds: [alpha.id] });
@@ -920,6 +945,20 @@ describe("group room contract (plans/group-discussion.md)", () => {
     await h.engine.send({ chatId: "cht_g", text: "@alpha thanks", messageId: "m3" });
     await h.engine.idle();
     expect(String(h.sent.at(-1)!.prompt)).not.toContain("[Room update]");
+  });
+
+  test("HEARTBEAT_OK is silence in a group: no line, and no member is woken to discuss it", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_g", botIds: [alpha.id, beta.id] });
+    await h.engine.send({ chatId: "cht_g", text: "status?", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "HEARTBEAT_OK");
+    // Beta takes its own turn with nothing new from Alpha, answers the same, and the room ends.
+    expect(h.sent.map((prompt) => prompt.agentId)).toEqual(["agent-bot_a-1", "agent-bot_b-2"]);
+    expect(String(h.sent[1]!.prompt)).not.toContain("HEARTBEAT_OK");
+    await h.completeTurn("agent-bot_b-2", "HEARTBEAT_OK");
+    expect(h.sent).toHaveLength(2);
+    expect((await h.lines("cht_g")).map((line) => line.text)).toEqual(["status?"]);
   });
 
   test("PASS and an empty turn are silence in a group: no line, no notice, no forwarding", async () => {

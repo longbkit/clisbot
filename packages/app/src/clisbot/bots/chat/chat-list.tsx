@@ -18,6 +18,7 @@ import {
 } from "./chat-rows";
 import type { MentionMember } from "./member-mentions";
 import { chatRowSender, type ChatRenderRow } from "./render-model";
+import type { ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 
 interface ChatListProps {
   rows: readonly ChatRenderRow[];
@@ -28,6 +29,8 @@ interface ChatListProps {
   members?: readonly MentionMember[];
   /** The top of the transcript came into view: load the older page. */
   onReachTop?: () => void;
+  /** How a Bot's running turn shows its tool calls. */
+  toolDisplay?: ChatToolDisplay;
 }
 
 const NO_MEMBERS: readonly MentionMember[] = [];
@@ -49,6 +52,7 @@ export const ChatList = memo(function ChatList({
   members = NO_MEMBERS,
   scrollKey = serverId,
   onReachTop,
+  toolDisplay = "expanded",
 }: ChatListProps) {
   const scrollPosition = useChatScrollPosition<ChatRenderRow>(scrollKey);
   const keyboardDismiss = useChatKeyboardDismiss();
@@ -80,11 +84,12 @@ export const ChatList = memo(function ChatList({
             members={members}
             closesGroup={closesGroup}
             heartbeatIds={item.kind === "bot" ? heartbeatsByLine.get(item.line.id) : undefined}
+            toolDisplay={toolDisplay}
           />
         </View>
       );
     },
-    [bots, data, heartbeatsByLine, members, serverId],
+    [bots, data, heartbeatsByLine, members, serverId, toolDisplay],
   );
   return (
     <FlatList
@@ -113,6 +118,7 @@ function ChatRowView({
   members,
   closesGroup,
   heartbeatIds,
+  toolDisplay,
 }: {
   row: ChatRenderRow;
   serverId: string;
@@ -120,6 +126,7 @@ function ChatRowView({
   members: readonly MentionMember[];
   closesGroup: boolean;
   heartbeatIds?: readonly string[];
+  toolDisplay: ChatToolDisplay;
 }) {
   switch (row.kind) {
     case "user":
@@ -145,7 +152,12 @@ function ChatRowView({
     case "live":
       return (
         <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>
-          <ChatLiveRow row={row} bot={botIdentity(bots, row.botId)} serverId={serverId} />
+          <ChatLiveRow
+            row={row}
+            bot={botIdentity(bots, row.botId)}
+            serverId={serverId}
+            toolDisplay={toolDisplay}
+          />
         </BotWorkspaceContext>
       );
   }

@@ -29,6 +29,9 @@ import { useHostBotsFeature } from "../feature";
 import { botsRuntime, useBotCatalog } from "../data/runtime";
 import { useChatTranscriptQuery } from "../data/use-chat-transcript";
 import { ChatScreen } from "./chat-screen";
+import { conversationToolDisplay } from "./tool-activity";
+import { useChatToolActivityHeaderValue } from "./use-chat-tool-activity-header";
+import { ChatToolActivityHeaderContext } from "./tool-activity-context";
 const EMPTY_PARTICIPANTS: ChatPayload["participants"] = [];
 
 export default function ChatRoute() {
@@ -97,6 +100,16 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   // Clisbot Connectors: the Chat's own tools off list, for the composer's Tools chip.
   const chatTools = useChatToolsValue({ serverId, chat, bots: identities, group, client });
   const headingActions = useChatHeadingActions({ chat, serverId, botRows });
+  // Clisbot: a direct chat shows tool calls as its Bot says, a group as the group says.
+  const directBot = !group ? botRows.find((b) => b.id === chat?.participants[0]?.botId) : undefined;
+  const toolDisplay = conversationToolDisplay(chat, group, directBot);
+  const toolActivityHeader = useChatToolActivityHeaderValue({
+    enabled: toolDisplay === "header",
+    serverId,
+    group,
+    heads,
+    identities,
+  });
   const options = useChatHeaderOptions({
     chat,
     chatId,
@@ -123,30 +136,33 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
         </Text>
       ) : null}
       <ChatToolsContext.Provider value={chatTools}>
-        <ConversationWorkspace
-          group={group}
-          serverId={serverId}
-          chatId={chatId}
-          accessScope={principalScope}
-          title={title}
-          bots={identities}
-          headerActions={options}
-          headingActions={headingActions}
-        >
-          <ChatScreen
-            hideHeader
+        <ChatToolActivityHeaderContext.Provider value={toolActivityHeader}>
+          <ConversationWorkspace
+            group={group}
             serverId={serverId}
             chatId={chatId}
+            accessScope={principalScope}
             title={title}
             bots={identities}
-            group={group}
-            transcript={transcript.transcript.messages}
-            liveHeads={heads}
-            canSend={online && !sending}
-            onSubmitMessage={send}
-            onReachTop={reachTop}
-          />
-        </ConversationWorkspace>
+            headerActions={options}
+            headingActions={headingActions}
+          >
+            <ChatScreen
+              hideHeader
+              serverId={serverId}
+              chatId={chatId}
+              title={title}
+              bots={identities}
+              group={group}
+              transcript={transcript.transcript.messages}
+              liveHeads={heads}
+              canSend={online && !sending}
+              onSubmitMessage={send}
+              onReachTop={reachTop}
+              toolDisplay={toolDisplay}
+            />
+          </ConversationWorkspace>
+        </ChatToolActivityHeaderContext.Provider>
       </ChatToolsContext.Provider>
     </View>
   );

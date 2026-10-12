@@ -248,3 +248,71 @@ describe("group live rows", () => {
     expect(rows.map((row) => row.kind)).toEqual(["user", "live"]);
   });
 });
+
+describe("silence markers", () => {
+  const reply = (id: string, at: number, text: string): StreamItem => ({
+    kind: "assistant_message",
+    id,
+    text,
+    timestamp: new Date(at),
+  });
+  const botLine = (text: string, botId = "a") => ({ ...line({ kind: "bot", botId }, 9), text });
+
+  it("a direct chat hides an exact HEARTBEAT_OK line but keeps PASS and replies naming it", () => {
+    const transcript = [
+      { ...line(user, 1), text: "check in" },
+      botLine(" HEARTBEAT_OK\n"),
+      botLine("PASS"),
+      botLine("It said HEARTBEAT_OK."),
+    ];
+    const rows = buildChatRenderModel(transcript, new Map()).rows;
+    expect(rows.map((row) => ("line" in row ? row.line.text : row.kind))).toEqual([
+      "check in",
+      "PASS",
+      "It said HEARTBEAT_OK.",
+    ]);
+  });
+
+  it("a group hides persisted PASS and HEARTBEAT_OK lines, never a user's", () => {
+    const transcript = [
+      { ...line(user, 1), text: "PASS" },
+      botLine("PASS"),
+      botLine("HEARTBEAT_OK", "b"),
+      botLine("PASS — nothing to add, but see above"),
+    ];
+    const rows = buildChatRenderModel(transcript, new Map(), { group: true }).rows;
+    expect(rows.map((row) => ("line" in row ? row.line.text : row.kind))).toEqual([
+      "PASS",
+      "PASS — nothing to add, but see above",
+    ]);
+  });
+
+  it("a direct chat's live HEARTBEAT_OK never shows, even while it is still being typed", () => {
+    const streaming = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([
+        ["a", head("agent-a", [tool("t1", 2), reply("r", 3, "HEARTBEAT_")], { turnActive: true })],
+      ]),
+    ).rows;
+    const live = streaming.find((row) => row.kind === "live");
+    expect(live?.kind === "live" && live.items.map((item) => item.id)).toEqual(["t1"]);
+    // A real reply that merely starts like the marker shows once it says more.
+    const real = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([
+        ["a", head("agent-a", [reply("r", 3, "HEARTBEAT_OK is fine")], { turnActive: true })],
+      ]),
+    ).rows;
+    expect(real.find((row) => row.kind === "live")).toMatchObject({ items: [{ id: "r" }] });
+  });
+
+  it("a finished silent direct turn leaves none of its tool calls behind", () => {
+    const rows = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([
+        ["a", head("agent-a", [userItem("hb", 2), tool("t1", 3), reply("r", 4, "HEARTBEAT_OK")])],
+      ]),
+    ).rows;
+    expect(rows.map((row) => row.kind)).toEqual(["user"]);
+  });
+});

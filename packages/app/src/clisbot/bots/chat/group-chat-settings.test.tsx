@@ -4,10 +4,23 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { GroupChatSettings } from "./group-chat-settings";
-const state = vi.hoisted(() => ({ supported: true, online: true, update: vi.fn() }));
+const state = vi.hoisted(() => ({
+  supported: true,
+  toolDisplay: false,
+  online: true,
+  update: vi.fn(),
+}));
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: (select: (state: unknown) => unknown) =>
-    select({ sessions: { host: { serverInfo: { features: { bots: state.supported } } } } }),
+    select({
+      sessions: {
+        host: {
+          serverInfo: {
+            features: { bots: state.supported, chatToolDisplay: state.toolDisplay },
+          },
+        },
+      },
+    }),
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeClient: () => ({ updateChat: state.update }),
@@ -97,6 +110,7 @@ const chat = {
 } as ChatPayload;
 beforeEach(() => {
   state.supported = true;
+  state.toolDisplay = false;
   state.online = true;
   state.update.mockReset();
 });
@@ -175,4 +189,23 @@ test("the discussion limit saves as roundsMax", async () => {
   fireEvent.click(screen.getByText("Save changes"));
   await waitFor(() => expect(saved).toHaveBeenCalledOnce());
   expect(state.update).toHaveBeenLastCalledWith({ chatId: "group", patch: { roundsMax: 3 } });
+});
+
+test("tool calls show only on a Host that keeps the setting, and save as one patch key", async () => {
+  render(<GroupChatSettings serverId="host" chat={chat} onSaved={vi.fn()} />);
+  expect(screen.queryByLabelText("Tool calls")).toBeNull();
+  cleanup();
+  state.toolDisplay = true;
+  state.update.mockResolvedValueOnce({ error: null });
+  const saved = vi.fn();
+  render(<GroupChatSettings serverId="host" chat={chat} onSaved={saved} />);
+  const field = screen.getByLabelText("Tool calls") as HTMLSelectElement;
+  expect(field.value).toBe("collapsed");
+  fireEvent.change(field, { target: { value: "header" } });
+  fireEvent.click(screen.getByText("Save changes"));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(state.update).toHaveBeenLastCalledWith({
+    chatId: "group",
+    patch: { toolCallDisplay: "header" },
+  });
 });

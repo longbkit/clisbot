@@ -13,8 +13,19 @@ export const DEFAULT_CHAT_ROUNDS_MAX = 5;
 /** The reply a group bot gives when it has nothing to add; it is silence, never a transcript line. */
 export const PASS_REPLY = "PASS";
 
-/** A group turn that chose silence: no text, or exactly `PASS`. */
+/**
+ * The reply a Bot gives a heartbeat run when nothing needs attention (the Bot templates' heartbeat
+ * prompt). It is silence in a direct chat and in a group, never a transcript line.
+ */
+export const HEARTBEAT_ACK_REPLY = "HEARTBEAT_OK";
+
+/** Exactly `HEARTBEAT_OK` once trimmed; a reply that only mentions it is a reply. */
+export function isHeartbeatAck(text: string | null | undefined): boolean {
+  return text?.trim() === HEARTBEAT_ACK_REPLY;
+}
+
+/** A group turn that chose silence: no text, or exactly `PASS` or `HEARTBEAT_OK`. */
 export function isSilentReply(text: string | null | undefined): boolean {
   const trimmed = text?.trim() ?? "";
-  return trimmed === "" || trimmed === PASS_REPLY;
+  return trimmed === "" || trimmed === PASS_REPLY || trimmed === HEARTBEAT_ACK_REPLY;
 }

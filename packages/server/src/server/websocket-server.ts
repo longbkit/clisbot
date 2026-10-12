@@ -2498,8 +2498,15 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(agentConfigApply): added in v0.3.2, remove gate after 2027-02-11.
         agentConfigApply: true,
         ...this.clisbotScheduleFeatures(),
+        ...this.clisbotChatFeatures(),
       },
     };
+  }
+
+  private clisbotChatFeatures() {
+    // COMPAT(chatToolDisplay): added in v2.0.4, remove gate after 2027-04-12.
+    // A Bot's `display` and a group's `toolCallDisplay` patch; only with Bots and Chats.
+    return this.botService && this.chatService ? { chatToolDisplay: true as const } : {};
   }
 
   private clisbotScheduleFeatures() {

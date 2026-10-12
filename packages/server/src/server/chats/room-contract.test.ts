@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { DEFAULT_ROOM_INSTRUCTIONS } from "@clisbot/protocol/chats/room";
 import {
+  isHeartbeatAck,
   isSilentReply,
   renderRoomContract,
   renderRoomUpdate,
@@ -98,7 +99,16 @@ test("renderRoomUpdate restates the members and the instructions", () => {
   expect(update).toContain("A greeting or casual conversation is worth answering");
 });
 
-test("isSilentReply accepts no text, blank text and PASS only", () => {
+test("isHeartbeatAck matches exactly HEARTBEAT_OK once trimmed", () => {
+  expect(isHeartbeatAck(" HEARTBEAT_OK\n")).toBe(true);
+  expect(isHeartbeatAck("HEARTBEAT_OK, but the build is red")).toBe(false);
+  expect(isHeartbeatAck("heartbeat_ok")).toBe(false);
+  expect(isHeartbeatAck(null)).toBe(false);
+});
+
+test("isSilentReply accepts no text, blank text, PASS and HEARTBEAT_OK only", () => {
+  expect(isSilentReply("HEARTBEAT_OK")).toBe(true);
+  expect(isSilentReply("Reply HEARTBEAT_OK when idle.")).toBe(false);
   expect(isSilentReply(null)).toBe(true);
   expect(isSilentReply("  ")).toBe(true);
   expect(isSilentReply(" PASS \n")).toBe(true);

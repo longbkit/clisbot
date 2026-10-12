@@ -12,6 +12,7 @@ import { mentionMembersOf } from "./member-mentions";
 import { ChatList } from "./chat-list";
 import type { ChatBotIdentity } from "./chat-rows";
 import { buildChatRenderModel, type ChatLiveHead } from "./render-model";
+import type { ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 
 export interface ChatScreenProps {
   serverId: string;
@@ -29,6 +30,8 @@ export interface ChatScreenProps {
   onReachTop?: () => void;
   headerRight?: ReactNode;
   hideHeader?: boolean;
+  /** How a Bot's running turn shows its tool calls (the Bot's or the group's setting). */
+  toolDisplay?: ChatToolDisplay;
 }
 
 /**
@@ -49,6 +52,7 @@ export function ChatScreen({
   onReachTop,
   headerRight,
   hideHeader = false,
+  toolDisplay,
 }: ChatScreenProps) {
   const { t } = useTranslation();
   const model = useMemo(
@@ -73,6 +77,7 @@ export function ChatScreen({
             bots={botsById}
             members={members}
             onReachTop={onReachTop}
+            toolDisplay={toolDisplay}
           />
         </ToolCallSheetProvider>
         <ChatComposer

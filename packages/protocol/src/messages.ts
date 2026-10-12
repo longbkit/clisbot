@@ -3937,6 +3937,9 @@ export const ServerInfoStatusPayloadSchema = z
         scheduleExistingWorkspace: z.boolean().optional(),
         // COMPAT(scheduleChatDelivery): added in v0.10.3, remove gate after 2027-04-07.
         scheduleChatDelivery: z.boolean().optional(),
+        // COMPAT(chatToolDisplay): Bot `display` and the group `toolCallDisplay` patch. Added in
+        // v2.0.4; remove gate after 2027-04-12.
+        chatToolDisplay: z.boolean().optional(),
       })
       .optional(),
   })
