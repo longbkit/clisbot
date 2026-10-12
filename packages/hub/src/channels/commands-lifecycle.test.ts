@@ -701,6 +701,59 @@ describe("Project and Workspace commands", () => {
     );
     expect(f.daemon.listGitWorktrees).not.toHaveBeenCalled();
   });
+  it("identifies Workspaces by session or selection, never by the first shared checkout", async () => {
+    const f = gitFixture();
+    const root = "/repo/0";
+    f.trees.unshift({ ...f.trees[0]!, path: root, branch: "main" });
+    Object.assign(f.workspaces[0]!, {
+      name: "Older work",
+      workspaceDirectory: root,
+      workspaceKind: "local_checkout",
+    });
+    Object.assign(f.workspaces[1]!, {
+      name: "Selected work",
+      workspaceDirectory: root,
+      workspaceKind: "local_checkout",
+    });
+    const before = { ...f.context, agentId: undefined };
+    const unbound = await f.commands.run({ name: "worktree" }, before);
+    expect(unbound).toContain("**Current session**\nNone.");
+    expect(unbound).toContain("Workspace: not selected");
+    expect(unbound).toContain("Kind: local (Project root)");
+    expect(unbound).not.toContain("Older work");
+    expect(unbound).not.toContain("wks_00");
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+    await f.commands.run({ name: "workspace", value: "wks_01" }, before);
+    const selected = await f.commands.run({ name: "worktree" }, before);
+    expect(selected).toContain("**Next session**\nWorkspace: Selected work (wks_01)");
+    expect(selected).not.toContain("Older work");
+    Object.assign(f.old, { projectId: "prj_00", workspaceId: "wks_00", cwd: root });
+    const current = await f.commands.run({ name: "worktree" }, f.context);
+    expect(current).toContain("**Current session**\nWorkspace: Older work (wks_00)");
+    expect(current).not.toContain("Selected work");
+    const shown = await f.commands.run({ name: "worktree", value: "show wks_01" }, f.context);
+    expect(shown).toContain("Workspace: Selected work (wks_01)");
+    expect(shown).not.toContain("Older work");
+    const path = await f.commands.run({ name: "worktree", value: `show ${root}` }, f.context);
+    const list = await f.commands.run({ name: "worktree", value: "list" }, f.context);
+    for (const reply of [path, list]) {
+      expect(reply).toContain("Workspaces: 2 registered here");
+      expect(reply).not.toContain("Older work");
+      expect(reply).not.toContain("Selected work");
+    }
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+    expect(f.createAgent).not.toHaveBeenCalled();
+    f.workspaces.splice(1, 1);
+    await expect(f.commands.run({ name: "worktree" }, before)).rejects.toThrow(
+      "Selected Workspace is unavailable",
+    );
+    expect(await f.commands.run({ name: "worktree", value: "list" }, before)).toContain(
+      "**Git worktrees**",
+    );
+    expect(await f.commands.run({ name: "worktree", value: `show ${root}` }, before)).toContain(
+      "Kind: local (Project root)",
+    );
+  });
   it("shows current worktree status and commit without changing placement or creating sessions", async () => {
     const f = gitFixture();
     Object.assign(f.old, { projectId: "prj_00", workspaceId: "wks_05", cwd: "/worktrees/5" });

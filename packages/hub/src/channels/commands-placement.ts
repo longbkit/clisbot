@@ -437,6 +437,8 @@ export class ChannelPlacementCommands {
     );
     const workspaceId = scope.chosen ? scope.chosen.workspaceId : scope.base.workspaceId;
     const chosen = workspaces.find((w) => w.id === workspaceId);
+    if (!args.length && !agent && workspaceId && !chosen)
+      throw new Error("Selected Workspace is unavailable. Use /workspace to choose again.");
     return new ChannelWorktreeCommands(this.deps.daemon).run(args, {
       project,
       workspaces,
@@ -446,6 +448,8 @@ export class ChannelPlacementCommands {
           ? agent.cwd
           : (chosen?.workspaceDirectory ?? project.projectRootPath),
       currentWorkspaceId: agent?.workspaceId,
+      selectedWorkspaceId: workspaceId,
+      hasCurrentSession: agent !== undefined,
     });
   }
 

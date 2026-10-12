@@ -298,6 +298,13 @@ the commit subject. Lists use latest commit first and 10 results per page; dirty
 files do not change the order. Status excludes ignored files and does not show file
 names or diffs. Use `/workspace` to create or choose where the next session runs.
 
+Bare `/worktree` identifies the running session's Workspace, or the chosen/configured
+Workspace before a session. With neither it says Current session is None and
+shows the Project root with no Workspace selected. The primary checkout is
+`Kind: local (Project root)`; a separate Git worktree is `Kind: worktree`.
+Several Workspaces can share one checkout. List/show by path reports the count
+in that case; `show <workspace-id>` shows the exact Workspace you requested.
+
 Branch lists show short commit hash, committed date in UTC and author. They use
 the refs already on the Host. Fetch is explicit, uses the Host's Git credentials
 and needs command approval permission for this Project. It updates remote branch

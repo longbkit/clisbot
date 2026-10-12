@@ -109,11 +109,18 @@ the base to use the daemon's default branch resolver. Only daemon-registered
 Workspaces are selectable; raw external Git worktrees are not imported.
 
 `/worktree` is read-only Git inspection. It includes Host and Project name/ID,
-Workspace name/ID when registered, branch, full path, status counts and latest
+Workspace name/ID by the bound session or explicit selection, branch, full path, status counts and latest
 commit (short hash, committed date in UTC, author). `show` also includes the commit
 subject. Status counts tracked, staged, unstaged, conflicting and untracked files;
 ignored files are excluded. An inaccessible/prunable worktree reports unavailable
 status. Creation and next-session selection stay under `/workspace`.
+
+Bare `/worktree` uses the running Agent's Workspace ID; before a session it uses
+the selected/configured Workspace ID. With neither, it says Current session is
+None and inspects the Project root without assigning another Workspace's name or
+ID. Replies distinguish `local (Project root)` from `worktree`. Multiple registered
+Workspaces can share a Git checkout; list/show by path reports their count rather
+than choosing one. Use `show <workspace-id>` to inspect a specific association.
 
 Branch results keep namespaces distinct (`main`, `origin/main`, `upstream/main`)
 and include short commit hash, committed date in UTC and author. List/search uses
