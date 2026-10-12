@@ -125,8 +125,22 @@ function SessionsFilterRow({
 }): ReactElement | null {
   const showHostFilter = hosts.length > 1;
   if (!showHostFilter && !isSearchSupported && !extra) return null;
+  const pills = (
+    <>
+      {showHostFilter ? (
+        <HostFilter
+          hosts={hosts}
+          selectedHost={selectedHost}
+          onSelectHost={onSelectHost}
+          triggerTestID="sessions-host-filter-trigger"
+          hostOptionTestID={sessionsHostOptionTestID}
+        />
+      ) : null}
+      {extra}
+    </>
+  );
   return (
-    <View style={styles.filterContainer}>
+    <View style={[styles.filterContainer, HOME_V2_ENABLED && styles.inboxFilters]}>
       {isSearchSupported ? (
         <View style={HOME_V2_ENABLED ? styles.searchWrap : styles.searchWrapLegacy}>
           <SearchField
@@ -139,16 +153,7 @@ function SessionsFilterRow({
           />
         </View>
       ) : null}
-      {showHostFilter ? (
-        <HostFilter
-          hosts={hosts}
-          selectedHost={selectedHost}
-          onSelectHost={onSelectHost}
-          triggerTestID="sessions-host-filter-trigger"
-          hostOptionTestID={sessionsHostOptionTestID}
-        />
-      ) : null}
-      {extra}
+      {HOME_V2_ENABLED ? <View style={styles.filterPills}>{pills}</View> : pills}
     </View>
   );
 }
@@ -365,6 +370,20 @@ const styles = StyleSheet.create((theme) => ({
     },
     paddingTop: theme.spacing[4],
   },
+  inboxFilters: {
+    flexDirection: { xs: "column", md: "row" },
+    alignItems: "stretch",
+    flexShrink: 0,
+    paddingBottom: theme.spacing[3],
+  },
+  filterPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    minWidth: 0,
+    flexShrink: 0,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -393,10 +412,10 @@ const styles = StyleSheet.create((theme) => ({
   // On a phone the search takes its own row and the filter pills wrap under it.
   // A fixed width short of SearchField's own cap keeps search, Host, Type and Date on one row.
   searchWrap: {
-    flexGrow: { xs: 1, md: 0 },
-    flexShrink: 1,
-    flexBasis: { xs: "100%", md: 320 },
-    minWidth: 200,
+    flexDirection: "row",
+    width: { xs: "100%", md: 320 },
+    minWidth: 0,
+    flexShrink: 0,
   },
   searchWrapLegacy: { flex: 1 },
   // Inbox rows read as one line of meaning; a reading-width column keeps time and status near it.

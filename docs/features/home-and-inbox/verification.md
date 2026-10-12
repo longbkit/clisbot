@@ -1,5 +1,27 @@
 # Verification — 2026-10-10
 
+## Home scrolling and mobile Inbox — 2026-10-12
+
+`home-quick-starts.spec.ts`, case `Home scrolls from blank space, expands Recent and offers
+mobile search without Inbox overlap`, passes with two isolated real daemons and mock agents:
+
+- Desktop at 1440×800: wheel over blank space beside the content scrolls Home; ten initial
+  Recent rows expand to all fourteen seeded rows, then Show more disappears.
+- Mobile web at 390×844 and 320×844: the Home search icon opens the shared command center and
+  finds matching conversations on both Hosts. Inbox search is below the header; Host and Type
+  controls stay below search, within the viewport, without overlapping. Date wraps at 320px.
+- The existing Host filter returns both matching conversations for All hosts, then only the
+  selected Host's conversation for each individual Host, and restores both after clearing the filter.
+
+App typecheck and changed-file lint pass. The focused activity/startup suites pass all ten tests,
+including the legacy startup flag path. The UI changes remain under `EXPO_PUBLIC_CLISBOT_HOME_V2`;
+no daemon or wire contracts change. Browser verification does not prove native touch behavior or
+Electron's OS-level drag handling; neither a native device nor Electron was run for this pass.
+
+Command: `npm run test:e2e --workspace=@clisbot/app -- e2e/browser/home-quick-starts.spec.ts --grep 'Home scrolls from blank'`.
+
+## Original implementation
+
 Worktree: `feat/multi-hub-hosts` (base `6e375e325`). Tests use isolated temporary daemon homes,
 real Git repositories/worktrees and mock/fake providers. They never connect to the developer daemon.
 

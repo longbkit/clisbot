@@ -4,9 +4,131 @@ import { gotoAppShell } from "../support/helpers/app";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { fillNewWorkspaceDraft, expectNewWorkspaceDraft } from "../support/helpers/new-workspace";
+import { createMockIdleAgent } from "../support/helpers/archive-tab";
+import { addConnectedHostAndReload } from "../support/helpers/hosts";
+import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
+import { getServerId } from "../support/helpers/server-id";
+import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker-constants";
+
+function scrollTop(element: HTMLElement | SVGElement) {
+  return element.scrollTop;
+}
 
 test.describe("Home and daemon quick starts", () => {
   test.describe.configure({ timeout: 180000 });
+  test("Home scrolls from blank space, expands Recent and offers mobile search without Inbox overlap", async ({
+    page,
+  }, info) => {
+    test.setTimeout(300000);
+    const workspace = await seedWorkspace({ repoPrefix: "home-layout-" });
+    let secondaryDaemon: Awaited<ReturnType<typeof startIsolatedHostDaemon>> | undefined;
+    let secondaryWorkspace: Awaited<ReturnType<typeof seedWorkspace>> | undefined;
+    try {
+      for (let index = 0; index < 14; index++) {
+        await createMockIdleAgent(workspace.client, {
+          cwd: workspace.workspaceDirectory,
+          workspaceId: workspace.workspaceId,
+          title: `Home layout conversation ${index}`,
+        });
+      }
+      await page.setViewportSize({ width: 1440, height: 800 });
+      await gotoAppShell(page);
+      const activity = page.getByTestId("home-activity");
+      const rows = activity.getByRole("button").filter({ hasText: "Home layout conversation" });
+      await expect(rows).toHaveCount(10);
+      const scroll = page.getByTestId("home-scroll");
+      const bounds = (await scroll.boundingBox())!;
+      await page.mouse.move(bounds.x + bounds.width - 30, bounds.y + 100);
+      await page.mouse.wheel(0, 500);
+      await expect.poll(() => scroll.evaluate(scrollTop)).toBeGreaterThan(100);
+      await activity.getByRole("button", { name: "Show more", exact: true }).click();
+      await expect(rows).toHaveCount(14);
+      await expect(activity.getByRole("button", { name: "Show more", exact: true })).toHaveCount(0);
+
+      secondaryDaemon = await startIsolatedHostDaemon("home-layout-secondary");
+      secondaryWorkspace = await seedWorkspace({
+        repoPrefix: "home-layout-secondary-",
+        port: secondaryDaemon.port,
+      });
+      await createMockIdleAgent(secondaryWorkspace.client, {
+        cwd: secondaryWorkspace.workspaceDirectory,
+        workspaceId: secondaryWorkspace.workspaceId,
+        title: "Secondary Home layout conversation 13",
+      });
+      await addConnectedHostAndReload(page, {
+        serverId: secondaryDaemon.serverId,
+        label: "Secondary Host",
+        port: secondaryDaemon.port,
+        primaryLabel: "Primary Host",
+      });
+
+      for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        const search = page.getByTestId("home-search");
+        await expect(search).toBeVisible();
+        await search.click();
+        await page.getByTestId("command-center-input").fill("Home layout conversation 13");
+        await expect(
+          page
+            .getByTestId(/^command-center-agent-/)
+            .filter({ hasText: "Home layout conversation 13" }),
+        ).toHaveCount(2);
+        await page.keyboard.press("Escape");
+        await page
+          .getByTestId("home-mobile-tabs")
+          .getByRole("tab", { name: "Inbox", exact: true })
+          .click();
+        const input = page.getByTestId("sessions-search-input").filter({ visible: true });
+        await expect(input).toBeVisible();
+        const type = page.getByRole("button", { name: "Type: All types", exact: true });
+        await expect(type).toBeVisible();
+        const inputBounds = (await input.boundingBox())!;
+        const typeBounds = (await type.boundingBox())!;
+        expect(inputBounds.height).toBeGreaterThanOrEqual(20);
+        expect(typeBounds.y).toBeGreaterThan(inputBounds.y + inputBounds.height);
+        const host = page.getByTestId("sessions-host-filter-trigger").filter({ visible: true });
+        await expect(host).toBeVisible();
+        const hostBounds = (await host.boundingBox())!;
+        expect(hostBounds.y).toBeGreaterThan(inputBounds.y + inputBounds.height);
+        expect(hostBounds.x + hostBounds.width).toBeLessThanOrEqual(width);
+        expect(typeBounds.x + typeBounds.width).toBeLessThanOrEqual(width);
+        expect(
+          hostBounds.x + hostBounds.width <= typeBounds.x ||
+            hostBounds.y + hostBounds.height <= typeBounds.y,
+        ).toBe(true);
+        const header = page.getByTestId("composer-dock-header").filter({ visible: true });
+        const headerBounds = (await header.boundingBox())!;
+        expect(inputBounds.y).toBeGreaterThanOrEqual(headerBounds.y + headerBounds.height);
+        await input.fill("Home layout conversation 13");
+        const matches = page
+          .getByTestId(/^agent-row-title-/)
+          .filter({ visible: true })
+          .filter({ hasText: "Home layout conversation" });
+        await expect(matches).toHaveCount(2);
+        await host.click();
+        await page.getByTestId(`sessions-host-filter-item-${getServerId()}`).click();
+        await expect(matches).toHaveCount(1);
+        await expect(matches).toHaveText("Home layout conversation 13");
+        await host.click();
+        await page.getByTestId(`sessions-host-filter-item-${secondaryDaemon.serverId}`).click();
+        await expect(matches).toHaveCount(1);
+        await expect(matches).toHaveText("Secondary Home layout conversation 13");
+        await host.click();
+        await page.getByTestId(`sessions-host-filter-item-${ALL_HOSTS_OPTION_ID}`).click();
+        await expect(matches).toHaveCount(2);
+        await page.screenshot({ path: info.outputPath(`inbox-${width}.png`), fullPage: true });
+        await page
+          .getByTestId("home-mobile-tabs")
+          .getByRole("tab", { name: "Home", exact: true })
+          .click();
+        await page.screenshot({ path: info.outputPath(`home-${width}.png`), fullPage: true });
+      }
+    } finally {
+      await secondaryWorkspace?.cleanup();
+      await secondaryDaemon?.close();
+      await workspace.cleanup();
+    }
+  });
   test("saves, pins, synchronizes and applies a worktree quick start", async ({ page }, info) => {
     const workspace = await seedWorkspace({ repoPrefix: "home-quick-start-" });
     const client = await connectDaemonClient<DaemonClient>({

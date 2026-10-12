@@ -29,6 +29,11 @@ Home and New workspace share the existing creation composer, including Host, pro
 effort, permission mode, attachments and launch options. Home adds Needs you, Active and
 Recent below; New workspace does not. Each group title is the way into Inbox (title, count,
 chevron); there is no separate Open Inbox button. Recent groups by local Today, Yesterday and date.
+Home initially shows up to ten conversations per group; Show more reveals ten more per group
+until all loaded activity is visible. Needs you always counts the whole group. The mobile Home
+header has a Search icon that opens the same cross-Host search as the sidebar, on native and web.
+The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
+including blank space beside the reading column.
 Home opens with the Hosts strip (`clisbot/home/hosts-strip*.ts(x)`), a status line rather than a
 card: `Hosts · n of m online`, then this computer, up to three Hosts you used most recently (by
 agent activity) or added yourself, and one entry per shared Hub (`online/total`, Sign in,
@@ -76,7 +81,8 @@ Inbox replaces the History label at the existing `/sessions` route. It retains s
 Host selection, import, archive/session actions and cursor-based Load more. Type/date filters
 run on the daemon before search, sorting and pagination. Current attention/running sessions
 are merged into unfiltered results; filtered searches only include matching daemon results.
-Search, Host and the Type/Date pills share one filter row; on a phone search takes its own line.
+Search, Host and the Type/Date pills share one filter row; on a phone search takes its own line,
+with a separate wrapping row for the pills. Both rows retain their height above the conversation list.
 
 Home and Inbox draw a conversation with one row (`clisbot/home/activity-row.tsx`): title, then
 project · workspace · branch · Host, then why it needs you (Needs approval, Failed, Needs you, or

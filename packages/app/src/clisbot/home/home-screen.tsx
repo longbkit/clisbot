@@ -8,6 +8,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
+import { HomeHeader } from "./home-header";
 import { Button } from "@/components/ui/button";
 import { buildWelcomeRoute } from "@/utils/host-routes";
 import { homeCopy } from "./copy";
@@ -28,7 +29,7 @@ export function ClisbotHomeScreen() {
     <View style={styles.container}>
       {/* The header is the window's drag region. A drag overlay inside the ScrollView would
           swallow wheel events everywhere but on buttons, so the page would not scroll. */}
-      <MenuHeader borderless transparent />
+      {HOME_V2_ENABLED ? <HomeHeader /> : <MenuHeader borderless transparent />}
       <ScrollView contentContainerStyle={styles.content}>
         <ClisbotLogo size={44} />
         {hosts.length ? <ReadyHome hosts={hosts} /> : <NoHost />}

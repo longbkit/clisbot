@@ -58,7 +58,8 @@ import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
-import { MenuHeader, SidebarMenuToggle } from "@/components/headers/menu-header";
+import { SidebarMenuToggle } from "@/components/headers/menu-header";
+import { HomeHeader } from "@/clisbot/home/home-header";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
@@ -2964,7 +2965,6 @@ export function NewWorkspaceScreen({
     <FileDropZone style={styles.container}>
       <StartScreenHeader home={home} left={screenHeaderLeft} />
       <View style={styles.content}>
-        <TitlebarDragRegion />
         {HOME_V2_ENABLED ? (
           <HomeStartLayout
             compact={isCompact}
@@ -2978,14 +2978,17 @@ export function NewWorkspaceScreen({
             onImportSession={importSession.open}
           />
         ) : (
-          <NewWorkspaceLayout
-            isCompact={isCompact}
-            title={t("newWorkspace.title")}
-            formStack={formStack}
-            onImportSession={importSession.open}
-          >
-            {composerWithFeedback}
-          </NewWorkspaceLayout>
+          <>
+            <TitlebarDragRegion />
+            <NewWorkspaceLayout
+              isCompact={isCompact}
+              title={t("newWorkspace.title")}
+              formStack={formStack}
+              onImportSession={importSession.open}
+            >
+              {composerWithFeedback}
+            </NewWorkspaceLayout>
+          </>
         )}
       </View>
       {importSession.sheet}
@@ -3006,7 +3009,7 @@ function startPicker<T>(home: T, legacy: T): T {
 }
 
 function StartScreenHeader({ home, left }: { home: boolean; left: ReactNode }) {
-  if (HOME_V2_ENABLED && home) return <MenuHeader title="Home" borderless />;
+  if (HOME_V2_ENABLED && home) return <HomeHeader />;
   return <ScreenHeader left={left} borderless />;
 }
 

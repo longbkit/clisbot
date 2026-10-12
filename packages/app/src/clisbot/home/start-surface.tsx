@@ -162,7 +162,11 @@ export function HomeStartLayout({
     return (
       <ComposerDock>
         <View style={styles.flex}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
+          <ScrollView
+            testID="home-scroll"
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scroll}
+          >
             {showActivity ? <HostsStrip /> : null}
             {heading}
             <StartStatus serverId={serverId} onImportSession={onImportSession} />
@@ -175,7 +179,11 @@ export function HomeStartLayout({
       </ComposerDock>
     );
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.desktopScroll}>
+    <ScrollView
+      testID="home-scroll"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.desktopScroll}
+    >
       <View style={styles.column}>
         {showActivity ? <HostsStrip /> : null}
         {heading}
