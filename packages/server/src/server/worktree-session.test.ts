@@ -8,6 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -589,7 +590,9 @@ describe("create-agent worktree setup boundary", () => {
       });
       expect(liveItems).toEqual([]);
     } finally {
-      rmSync(tempDir, { recursive: true, force: true });
+      // The background continuation can finish releasing Git handles after its
+      // completed event. Allow that work to progress while retrying on Windows.
+      await rm(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   });
 });
