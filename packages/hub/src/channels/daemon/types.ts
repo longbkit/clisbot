@@ -143,6 +143,7 @@ export interface AgentProfile {
 }
 export interface DaemonServerInfo {
   serverId: string;
+  hostname?: string | null;
   features?: Record<string, boolean | undefined>;
 }
 export interface ProviderModel {

@@ -495,7 +495,10 @@ export class ChannelCommandDispatcher {
       ? (await this.deps.daemon.listAgents()).find((entry) => entry.id === context.agentId)
       : undefined;
     const base = await this.baseConfig(context);
-    const agent = boundAgent?.provider === base.provider ? boundAgent : undefined;
+    const agent =
+      boundAgent && (!command.value?.trim() || boundAgent.provider === base.provider)
+        ? boundAgent
+        : undefined;
     // Live configuration belongs to the bound session even if the next choice expired.
     const config = agent ? snapshotConfiguration(base, agent) : await this.resolveConfig(context);
     const target = agent ? context.accessTarget : await this.nextAccessTarget(context);
@@ -509,17 +512,7 @@ export class ChannelCommandDispatcher {
     );
     const access = await this.deps.plane.commandAccess?.resolveChannelAgentConfigurations(request);
     if (!access) throw new Error("Agent configuration access is unavailable.");
-    if (
-      agent &&
-      command.value &&
-      !/^(list|search)(?:\s|$)/iu.test(command.value) &&
-      command.name !== "permission" &&
-      !(await this.mayUseLiveMode(agent, context))
-    ) {
-      throw new Error(
-        "The current session mode is unavailable. Select an explicit /permission mode before changing its configuration.",
-      );
-    }
+    await this.requireLiveModeForEdit(command, agent, context);
     const fastAccess = await this.deps.plane.commandAccess?.authorizeChannelPrivilege({
       ...request,
       privilege: "agent.fast.use",
@@ -527,6 +520,7 @@ export class ChannelCommandDispatcher {
     return {
       command,
       daemon: this.deps.daemon,
+      nextConfiguration: base,
       config: agent ? snapshotConfiguration(config, agent) : config,
       ...(boundAgent
         ? {
@@ -539,6 +533,24 @@ export class ChannelCommandDispatcher {
       canSuppressApprovals: await this.canSuppressApprovals(context),
       canUseFastMode: fastAccess?.allowed === true,
     };
+  }
+
+  private async requireLiveModeForEdit(
+    command: Parameters<typeof runConfigurationCommand>[0]["command"],
+    agent: AgentSnapshot | undefined,
+    context: LifecycleCommandContext,
+  ): Promise<void> {
+    if (
+      !agent ||
+      !command.value?.trim() ||
+      command.name === "permission" ||
+      /^(list|search)(?:\s|$)/iu.test(command.value)
+    )
+      return;
+    if (await this.mayUseLiveMode(agent, context)) return;
+    throw new Error(
+      "The current session mode is unavailable. Select an explicit /permission mode before changing its configuration.",
+    );
   }
 
   private async followUp(

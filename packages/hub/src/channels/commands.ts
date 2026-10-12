@@ -66,7 +66,7 @@ export const CHANNEL_COMMANDS = [
     access: "chat",
     directOnly: true,
     usage: "/project [list|search <text>|<id-or-name>|clear] [--page N]",
-    description: "find or select the Project for the next session",
+    description: "show the current Project; list, search or select the next Project",
   },
   {
     name: "workspace",
@@ -76,7 +76,7 @@ export const CHANNEL_COMMANDS = [
     directOnly: true,
     usage:
       "/workspace [list [--worktree]|search <text>|show <id>|<id>|clear|new [base] [--branch name] [--name title]|new --local]",
-    description: "find, select or create a Workspace for the next session",
+    description: "show the current Workspace; list, search, select or create the next Workspace",
   },
   {
     name: "branch",
@@ -85,7 +85,7 @@ export const CHANNEL_COMMANDS = [
     access: "chat",
     directOnly: true,
     usage: "/branch [list|search <text>] [--page N]",
-    description: "list local and origin branches in the selected Project",
+    description: "show current branch; list or search local and origin branches",
   },
   {
     name: "status",
@@ -185,7 +185,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: true,
     usage: "/agent [list|search <text>|name]",
-    description: "list or apply an agent profile",
+    description: "show current configuration; list or apply an agent profile",
   },
   {
     name: "provider",
@@ -194,7 +194,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: true,
     usage: "/provider [list|search <text>|id]",
-    description: "list or switch provider",
+    description: "show current provider; list, search or switch provider",
   },
   {
     name: "model",
@@ -203,7 +203,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: true,
     usage: "/model [list|search <text>|id]",
-    description: "list or set this provider's model",
+    description: "show current model; list, search or set this provider's model",
   },
   {
     name: "effort",
@@ -211,8 +211,8 @@ export const CHANNEL_COMMANDS = [
     args: true,
     access: "agent.interact",
     directOnly: true,
-    usage: "/effort [list|id]",
-    description: "list or set this model's thinking option",
+    usage: "/effort [list|search <text>|id]",
+    description: "show current effort; list or set this model's thinking option",
   },
   {
     name: "permission",
@@ -220,7 +220,7 @@ export const CHANNEL_COMMANDS = [
     args: true,
     access: "agent.interact",
     directOnly: true,
-    usage: "/permission [mode]",
+    usage: "/permission [list|search <text>|mode]",
     description: "list or set the provider's mode",
   },
   {

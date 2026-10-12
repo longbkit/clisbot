@@ -6,6 +6,15 @@ import type { ChannelAgentAccessTarget, ChannelPlaneDeps } from "./plane/types.j
 import type { LifecycleCommandContext } from "./commands-lifecycle.js";
 import { commandAccessRequest } from "./commands-context.js";
 import { deriveBindingKey, routePosition } from "./bindings/index.js";
+import { inlineCode, literalText } from "./command-reply-format.js";
+import {
+  folderName,
+  hostLine,
+  projectLine,
+  workspaceDetails,
+  workspaceListLine,
+  placementStatus,
+} from "./commands-placement-display.js";
 import {
   placementRouteFingerprint,
   assertWorktreeProject,
@@ -53,6 +62,12 @@ export class ChannelPlacementCommands {
   ): Promise<string> {
     const scope = await this.prepare(context);
     const args = tokenizePlacementArguments(command.value ?? "");
+    if (!args.length)
+      return [
+        await this.status(scope),
+        "",
+        `List: /${command.name} list · Search: /${command.name} search <text>`,
+      ].join("\n");
     if (args[0] === "clear") return this.clear(command.name, args, scope);
     if (command.name === "project") return this.project(args, scope);
     const project = this.selectedProject(scope);
@@ -100,6 +115,7 @@ export class ChannelPlacementCommands {
       selectedPlacement,
       selectedBy: scope.context.message.senderIdentity,
     });
+    scope.chosen = selectedPlacement;
   }
 
   private async authorize(
@@ -130,9 +146,15 @@ export class ChannelPlacementCommands {
     return placement;
   }
 
-  private acknowledgement(scope: PlacementScope, label: string) {
+  private async acknowledgement(scope: PlacementScope, label: string) {
     const location = scope.key.externalThreadId === null ? "this conversation" : "this thread";
-    return `${label}\nApplies to the next session in ${location}. The current session keeps its location. Use /new or /fork to start there.`;
+    let details: string;
+    try {
+      details = await this.status(scope);
+    } catch {
+      details = `${hostLine(this.deps.daemon, scope.target.daemonReference)}\nLocation details unavailable; use /project or /workspace to refresh.`;
+    }
+    return `${label}\n\n${details}\n\nApplies to the next session in ${location}. The current session keeps its location. Use /new or /fork to start there.`;
   }
 
   private async clear(name: string, args: string[], scope: PlacementScope) {
@@ -155,12 +177,13 @@ export class ChannelPlacementCommands {
 
   private async project(args: string[], scope: PlacementScope) {
     const action = args[0];
-    if (!action || action === "list" || action === "search") {
+    if (action === "list" || action === "search") {
       const parsed = discoveryArguments(args);
       if (parsed.worktree) throw new Error("--worktree only applies to /workspace list or search.");
       const matches = search(scope.projects, parsed.query, (p) => [
         p.projectId,
         p.projectDisplayName,
+        folderName(p.projectRootPath),
       ]);
       matches.sort(
         (a, b) =>
@@ -171,11 +194,13 @@ export class ChannelPlacementCommands {
         matches,
         parsed,
         "/project",
-        (p) => `${p.projectDisplayName} — ${p.projectId}`,
+        (p) =>
+          `${literalText(p.projectDisplayName)} — ${p.projectId}\n   Folder: ${inlineCode(folderName(p.projectRootPath))}`,
       );
       return [
-        !action ? await this.status(scope) : undefined,
-        `Projects on Host ${scope.target.daemonReference}`,
+        "**Projects**",
+        hostLine(this.deps.daemon, scope.target.daemonReference),
+        "",
         page,
         "Select: /project <project-id>",
       ]
@@ -192,7 +217,7 @@ export class ChannelPlacementCommands {
     await this.save(scope, await this.authorize(scope, project));
     return this.acknowledgement(
       scope,
-      `Selected Project: ${project.projectDisplayName} (${project.projectId}). Workspace selection cleared.`,
+      `Selected Project: ${literalText(project.projectDisplayName)} (${project.projectId}). Workspace selection cleared.`,
     );
   }
 
@@ -218,7 +243,7 @@ export class ChannelPlacementCommands {
     return project;
   }
 
-  private async branch(args: string[], _scope: PlacementScope, project: ProjectSnapshot) {
+  private async branch(args: string[], scope: PlacementScope, project: ProjectSnapshot) {
     const parsed = discoveryArguments(args);
     if (parsed.worktree) throw new Error("--worktree only applies to /workspace list or search.");
     if (!this.deps.daemon.listBranches)
@@ -230,13 +255,16 @@ export class ChannelPlacementCommands {
     );
     branches.sort((a, b) => b.committerDate - a.committerDate || a.name.localeCompare(b.name));
     return [
-      `Branches in ${project.projectDisplayName}`,
+      "**Branches** — latest commit first",
+      hostLine(this.deps.daemon, scope.target.daemonReference),
+      projectLine(project),
+      "",
       pageText(
         branches,
         parsed,
         "/branch",
         (b) =>
-          `${b.name} — ${[b.hasLocal && "local", b.hasRemote && "origin"].filter(Boolean).join(", ")}`,
+          `${literalText(b.name)} — ${[b.hasLocal && "local", b.hasRemote && "origin"].filter(Boolean).join(", ")}`,
       ),
       "Create: /workspace new <base-branch>",
     ].join("\n");
@@ -278,7 +306,7 @@ export class ChannelPlacementCommands {
     await this.save(scope, this.stamp(scope, project, created.workspaceId));
     return this.acknowledgement(
       scope,
-      `Created and selected Workspace: ${creation.title ?? created.workspaceId} (${created.workspaceId}). No Agent session has been created yet.`,
+      `Created and selected Workspace: ${literalText(creation.title ?? created.workspaceId)} (${created.workspaceId}). No Agent session has been created yet.`,
     );
   }
 
@@ -289,18 +317,20 @@ export class ChannelPlacementCommands {
       (w) => w.projectId === project.projectId,
     );
     const action = args[0];
-    if (!action || action === "list" || action === "search") {
+    if (action === "list" || action === "search") {
       const parsed = discoveryArguments(args);
       const matches = search(
         workspaces.filter((w) => !parsed.worktree || w.workspaceKind === "worktree"),
         parsed.query,
-        (w) => [w.id, w.name, w.branch ?? ""],
+        (w) => [w.id, w.name, w.branch ?? "", folderName(w.workspaceDirectory)],
       );
       matches.sort((a, b) => activity(b) - activity(a) || a.id.localeCompare(b.id));
       return [
-        !action ? await this.status(scope) : undefined,
-        `Workspaces in ${project.projectDisplayName} — latest activity first`,
-        pageText(matches, parsed, "/workspace", workspaceLine),
+        "**Workspaces** — latest activity first",
+        hostLine(this.deps.daemon, scope.target.daemonReference),
+        projectLine(project),
+        "",
+        pageText(matches, parsed, "/workspace", workspaceListLine),
         "Select: /workspace <workspace-id> · Branches: /branch",
       ]
         .filter(Boolean)
@@ -315,18 +345,15 @@ export class ChannelPlacementCommands {
     );
     if (action === "show")
       return [
-        `Workspace: ${workspace.name} (${workspace.id})`,
-        `Project: ${project.projectDisplayName} (${project.projectId})`,
-        `Directory: ${workspace.workspaceDirectory}`,
-        `Kind: ${workspace.workspaceKind}`,
-        `Branch: ${workspace.branch ?? "none"}`,
-        `Last activity: ${workspace.activityAt ?? workspace.createdAt ?? "unknown"}`,
+        hostLine(this.deps.daemon, scope.target.daemonReference),
+        projectLine(project),
+        ...workspaceDetails(workspace),
         `Select: /workspace ${workspace.id}`,
       ].join("\n");
     await this.save(scope, await this.authorize(scope, project, workspace));
     return this.acknowledgement(
       scope,
-      `Selected Workspace: ${workspace.name} (${workspace.id}) in ${project.projectDisplayName}.`,
+      `Selected Workspace: ${literalText(workspace.name)} (${workspace.id}) in ${literalText(project.projectDisplayName)}.`,
     );
   }
 
@@ -355,27 +382,21 @@ export class ChannelPlacementCommands {
   }
 
   private async status(scope: PlacementScope): Promise<string> {
-    const { context, chosen, projects } = scope;
-    const agent = context.agentId
-      ? (await this.deps.daemon.listAgents()).find((a) => a.id === context.agentId)
-      : undefined;
-    const visible = new Set(projects.map((p) => p.projectId));
-    let current = "none";
-    if (agent)
-      current = visible.has(agent.projectId ?? "")
-        ? `${agent.projectId} / ${agent.workspaceId ?? agent.cwd}`
-        : "location unavailable";
-    let next = "Route default";
-    if (chosen)
-      next = visible.has(chosen.projectId)
-        ? `${chosen.projectId} / ${chosen.workspaceId ?? "new Workspace"}`
-        : "location unavailable";
-    return [`Current session: ${current}`, `Next session: ${next}`].join("\n");
+    const { context, chosen } = scope;
+    return placementStatus({
+      daemon: this.deps.daemon,
+      hostReference: scope.target.daemonReference,
+      projects: scope.projects,
+      agentId: context.agentId,
+      base: scope.base,
+      chosen,
+      selectionValid:
+        !chosen ||
+        (chosen.daemonReference === scope.target.daemonReference &&
+          chosen.routePosition === routePosition(context.account, context.route) &&
+          chosen.routeFingerprint === placementRouteFingerprint(context.route)),
+    });
   }
-}
-
-function workspaceLine(w: WorkspaceSnapshot) {
-  return `${w.name} — ${w.id} · ${w.workspaceKind === "worktree" ? "worktree" : "local"}${w.branch ? ` · ${w.branch}` : ""} · ${w.activityAt ?? w.createdAt ?? "no activity"}`;
 }
 
 interface DiscoveryArguments {
@@ -502,7 +523,7 @@ function pageText<T>(
     ...(items.length
       ? items.slice(start, start + 10).map((item, i) => `${start + i + 1}. ${line(item)}`)
       : ["No matches."]),
-    ...(args.page > 1 ? [`Previous: ${prefix} --page ${args.page - 1}`] : []),
-    ...(args.page < pages ? [`Next: ${prefix} --page ${args.page + 1}`] : []),
+    ...(args.page > 1 ? [`Previous: ${inlineCode(`${prefix} --page ${args.page - 1}`)}`] : []),
+    ...(args.page < pages ? [`Next: ${inlineCode(`${prefix} --page ${args.page + 1}`)}`] : []),
   ].join("\n");
 }

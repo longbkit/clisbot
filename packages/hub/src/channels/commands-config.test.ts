@@ -60,6 +60,44 @@ function fixture(
     canSuppressApprovals: false,
   };
 }
+it.each(["provider", "model", "agent", "effort", "permission"] as const)(
+  "shows current configuration without catalog reads or mutations for bare /%s",
+  async (name) => {
+    const input = fixture(name);
+    const providers = vi.spyOn(input.daemon, "listAvailableProviders");
+    const result = await runConfigurationCommand(input);
+    expect(result.text).toContain("Current session");
+    expect(result.text).toContain("Model: small");
+    expect(result.text).toContain(`List: /${name} list`);
+    expect(result.text).not.toContain("Available");
+    expect(result.selection).toBeUndefined();
+    expect(providers).not.toHaveBeenCalled();
+    expect(input.daemon.listProviderModels).not.toHaveBeenCalled();
+    expect(input.daemon.applyAgentConfig).not.toHaveBeenCalled();
+    expect(input.daemon.setAgentMode).not.toHaveBeenCalled();
+    expect(input.daemon.setAgentThinkingOption).not.toHaveBeenCalled();
+    expect(input.daemon.createAgent).not.toHaveBeenCalled();
+  },
+);
+it("distinguishes live provider and model from a staged next configuration", async () => {
+  const input = fixture("provider");
+  input.activeConfiguration = { ...input.config, provider: "claude", model: "live-model" };
+  input.nextConfiguration = { ...input.config, model: "next-model" };
+  const result = await runConfigurationCommand(input);
+  const [current, next] = result.text.split("**Next session**");
+  expect(current).toContain("Model: live-model");
+  expect(next).toContain("Model: next-model");
+  expect(result.selection).toBeUndefined();
+});
+it("shows the next configuration before the first Agent exists", async () => {
+  const input = fixture("model");
+  delete input.agentId;
+  input.nextConfiguration = { ...input.config, model: "next-model" };
+  const result = await runConfigurationCommand(input);
+  expect(result.text).toContain("**Next session**\n");
+  expect(result.text).toContain("Model: next-model");
+  expect(result.text).not.toContain("Current session");
+});
 it("applies model and default effort live without creating an agent", async () => {
   const input = fixture("model", "large");
   const result = await runConfigurationCommand(input);

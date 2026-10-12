@@ -566,7 +566,11 @@ describe("Project and Workspace commands", () => {
     const daemon: DaemonConnection = {
       ...f.daemon,
       ...configurationDaemonStub(),
-      getServerInfo: () => ({ serverId: "host", features: { workspaceMultiplicity: true } }),
+      getServerInfo: () => ({
+        serverId: "host",
+        hostname: "Dev Host",
+        features: { workspaceMultiplicity: true },
+      }),
       listProjects: async () => [
         ...projects,
         { ...projects[0]!, projectId: "secret", projectDisplayName: "Hidden" },
@@ -632,7 +636,7 @@ describe("Project and Workspace commands", () => {
     expect(reply).toContain("11. Payments 10");
     expect(reply).not.toContain("Payments 00 —");
     expect(reply).not.toContain("Hidden");
-    expect(reply).toContain('Next: /project search "Payments" --page 3');
+    expect(reply).toContain('Next: `/project search "Payments" --page 3`');
     await expect(
       f.commands.run({ name: "project", value: "list --page 4" }, f.context),
     ).rejects.toThrow("Page 4");
@@ -671,6 +675,118 @@ describe("Project and Workspace commands", () => {
       "0 results",
     );
   });
+  it.each(["/shared/project-seven/", "C:\\shared\\project-seven\\"])(
+    "searches the last folder name across Host platforms: %s",
+    async (root) => {
+      const f = placementFixture();
+      f.projects[7]!.projectRootPath = root;
+      const reply = await f.commands.run(
+        { name: "project", value: "search PROJECT-SEVEN" },
+        f.context,
+      );
+      expect(reply).toContain("1 results");
+      expect(reply).toContain("Payments 07 — prj_07");
+      expect(reply).toContain("Folder: `project-seven`");
+      expect(
+        await f.commands.run({ name: "project", value: "search shared" }, f.context),
+      ).toContain("0 results");
+    },
+  );
+  it.each(["project", "workspace", "branch"] as const)(
+    "shows named current and next locations without listing or changing state: /%s",
+    async (name) => {
+      const f = placementFixture();
+      Object.assign(f.old, { projectId: "prj_00", workspaceId: "wks_05", cwd: "/worktrees/5" });
+      await f.commands.run({ name: "project", value: "prj_01" }, f.context);
+      const before = await store.access.findConversationSelection(f.key);
+      f.policy.create = false;
+
+      const reply = await f.commands.run({ name }, f.context);
+
+      expect(reply).toContain("Host: Dev Host (host)");
+      expect(reply).toContain("**Current session**\nProject: Payments 00 (prj_00)");
+      expect(reply).toContain("Workspace: Login 5 (wks_05)");
+      expect(reply).toContain("Branch: `fix/login-5`");
+      expect(reply).toContain("Path: `/worktrees/5`");
+      expect(reply).toContain("**Next session** — selected\nProject: Payments 01 (prj_01)");
+      expect(reply).toContain("Workspace: new; created when the next session starts");
+      expect(reply).not.toContain("results ·");
+      expect(await store.access.findConversationSelection(f.key)).toEqual(before);
+      expect(f.createWorkspace).not.toHaveBeenCalled();
+      expect(f.createAgent).not.toHaveBeenCalled();
+    },
+  );
+  it("shows the Route default before a session exists without fabricating Workspace metadata", async () => {
+    const f = placementFixture();
+    const reply = await f.commands.run({ name: "workspace" }, { ...f.context, agentId: undefined });
+    expect(reply).toContain("**Current session**\nNone.");
+    expect(reply).toContain("**Next session** — Route default\nProject: Payments 00 (prj_00)");
+    expect(reply).toContain("Workspace: new; created when the next session starts");
+    expect(reply).not.toContain("Workspace: Login");
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+  });
+  it("hides current Workspace metadata for a Project the caller cannot access", async () => {
+    const f = placementFixture();
+    Object.assign(f.old, {
+      projectId: "secret",
+      workspaceId: "secret-workspace",
+      cwd: "/private/hidden",
+    });
+    const read = vi.fn(async () => f.workspaces);
+    f.daemon.listWorkspaces = read;
+    const reply = await f.commands.run({ name: "project" }, f.context);
+    expect(reply).toContain("Location unavailable or you do not have access.");
+    expect(reply).not.toContain("secret");
+    expect(reply).not.toContain("/private");
+    expect(read).not.toHaveBeenCalled();
+  });
+  it("keeps the live location readable when a staged Route selection expires", async () => {
+    const f = placementFixture();
+    Object.assign(f.old, { projectId: "prj_00", workspaceId: "wks_05", cwd: "/worktrees/5" });
+    await f.commands.run({ name: "project", value: "prj_01" }, f.context);
+    const changed = { ...f.context.route, where: { ...f.context.route.where, dm: true } };
+    const reply = await f.commands.run(
+      { name: "workspace" },
+      { ...f.context, route: changed, account: { ...f.context.account, routes: [changed] } },
+    );
+    expect(reply).toContain("Workspace: Login 5 (wks_05)");
+    expect(reply).toContain("Selection expired");
+    expect(reply).not.toContain("Project: Payments 01");
+  });
+  it("preserves a successful selection if an optional detail read fails", async () => {
+    const f = placementFixture();
+    f.daemon.listAgents = async () => {
+      throw new Error("Host read interrupted");
+    };
+    const reply = await f.commands.run({ name: "project", value: "prj_01" }, f.context);
+    expect(reply).toContain("Selected Project: Payments 01");
+    expect(reply).toContain("Location details unavailable");
+    expect(
+      (await store.access.findConversationSelection(f.key))?.selectedPlacement?.projectId,
+    ).toBe("prj_01");
+  });
+  it("keeps bare configuration reads on the bound provider when a different provider is staged", async () => {
+    const f = placementFixture();
+    f.old.model = "live-model";
+    await store.access.setConversationSelection(f.key, {
+      selectedProvider: "claude",
+      selectedModel: "next-model",
+      selectedBy: f.context.message.senderIdentity,
+    });
+    const before = await store.access.findConversationSelection(f.key);
+    const catalog = vi.fn(f.daemon.listProviderModels);
+    f.daemon.listProviderModels = catalog;
+    const result = await f.dispatcher.handle({ name: "model" }, f.context);
+    expect(result.handled).toBe(true);
+    const reply = vi.mocked(f.context.post).mock.calls.at(-1)?.[0];
+    expect(reply).toContain("Current session");
+    expect(reply).toContain("Model: live-model");
+    expect(reply).toContain("**Next session**");
+    expect(reply).toContain("Model: next-model");
+    expect(reply).not.toContain("Available model");
+    expect(catalog).not.toHaveBeenCalled();
+    expect(await store.access.findConversationSelection(f.key)).toEqual(before);
+  });
   it.each([0, 10, 11])("limits discovery to 10 rows at the %i-result boundary", async (count) => {
     const f = placementFixture();
     f.projects.splice(count);
@@ -696,6 +812,55 @@ describe("Project and Workspace commands", () => {
     expect(await f.commands.run({ name: "branch", value: "list" }, f.context)).toContain(
       "main — local, origin",
     );
+  });
+  it("searches Workspace leaf folders and shows full paths with named Project and Host context", async () => {
+    const f = placementFixture();
+    f.workspaces[7]!.workspaceDirectory = "/shared/workspace-seven/";
+    const reply = await f.commands.run(
+      { name: "workspace", value: "search workspace-seven" },
+      f.context,
+    );
+    expect(reply).toContain("1 results");
+    expect(reply).toContain("Login 7 — wks_07");
+    expect(reply).toContain("Host: Dev Host (host)");
+    expect(reply).toContain("Project: Payments 00 (prj_00)");
+    expect(reply).toContain("Branch: `fix/login-7`");
+    expect(reply).toContain("Path: `/shared/workspace-seven/`");
+    expect(
+      await f.commands.run({ name: "workspace", value: "search shared" }, f.context),
+    ).toContain("0 results");
+  });
+  it("keeps names, branches and full Host paths literal for channel renderers", async () => {
+    const f = placementFixture();
+    f.projects[0]!.projectDisplayName = "QA [Dev]";
+    Object.assign(f.workspaces[0]!, {
+      name: "Login *QA*",
+      branch: "fix/login_one_two",
+      workspaceDirectory: "C:\\Users\\qa_one\\repo[1] <draft>",
+    });
+    const reply = await f.commands.run({ name: "workspace", value: "show wks_00" }, f.context);
+    expect(reply).toContain("Project: QA \\[Dev\\]");
+    expect(reply).toContain("Workspace: Login \\*QA\\*");
+    expect(reply).toContain("Branch: `fix/login_one_two`");
+    expect(reply).toContain("Path: `C:\\Users\\qa_one\\repo[1] <draft>`");
+    expect(await store.access.findConversationSelection(f.key)).toBeUndefined();
+  });
+  it("hides a revoked next Project and does not read its Workspace metadata", async () => {
+    const f = placementFixture();
+    await f.commands.run({ name: "workspace", value: "wks_05" }, f.context);
+    const authorize = f.plane.commandAccess!.authorizeChannelPrivilege;
+    f.plane.commandAccess!.authorizeChannelPrivilege = async (request) =>
+      request.projectId === "prj_00"
+        ? { allowed: false, reason: "Project access revoked" }
+        : authorize(request);
+    const read = vi.fn(async () => f.workspaces);
+    f.daemon.listWorkspaces = read;
+    const reply = await f.commands.run({ name: "workspace" }, f.context);
+    expect(reply).toContain("Location unavailable or you do not have access.");
+    expect(reply).not.toContain("Payments 00");
+    expect(reply).not.toContain("Login 5");
+    expect(reply).not.toContain("/worktrees");
+    expect(read).not.toHaveBeenCalled();
   });
   it("stages before the first session, selects existing Workspaces and isolates thread choices", async () => {
     const f = placementFixture();
@@ -996,7 +1161,7 @@ describe("Project and Workspace commands", () => {
       f.commands.run({ name: "workspace", value: "Login 0" }, f.context),
     ).rejects.toThrow("Select by ID");
     expect(await f.commands.run({ name: "workspace", value: "show wks_01" }, f.context)).toContain(
-      "Directory: /worktrees/1",
+      "Path: `/worktrees/1`",
     );
     expect(await store.access.findConversationSelection(f.key)).toBeUndefined();
   });

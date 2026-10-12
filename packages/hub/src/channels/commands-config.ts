@@ -1,6 +1,7 @@
 import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
 import type { AgentConfigurationGrant } from "../access/contract.js";
 import type { DaemonConnection } from "./daemon/client.js";
+import { literalText } from "./command-reply-format.js";
 import type {
   AgentProfile,
   CreateAgentConfig,
@@ -28,6 +29,8 @@ export interface ConfigurationCommandInput {
   activeProvider?: string;
   /** The normalized bound snapshot, including features that omitted RPC fields cannot clear. */
   activeConfiguration?: CreateAgentConfig;
+  /** Conversation choices for the next session, separate from the bound process. */
+  nextConfiguration?: CreateAgentConfig;
   access: ConfigurationAccess;
   canSuppressApprovals: boolean;
   /** Separate Access privilege for the provider's faster paid service tier. */
@@ -75,7 +78,9 @@ export async function runConfigurationCommand(
   input: ConfigurationCommandInput,
 ): Promise<ConfigurationCommandResult> {
   try {
-    const listing = listQuery(input.command.value);
+    const value = input.command.value?.trim();
+    if (!value) return { text: configurationStatus(input) };
+    const listing = listQuery(value);
     if (listing !== undefined) return { text: await configurationMenu(input, listing) };
     const next = effectiveLiveConfiguration(input, await resolveTarget(input));
     await validateAgentConfigurationAuthority(
@@ -118,8 +123,38 @@ function effectiveLiveConfiguration(
   };
 }
 
-function listQuery(value: string | undefined): string | undefined {
-  if (!value || value.toLowerCase() === "list") return "";
+function configurationStatus(input: ConfigurationCommandInput): string {
+  const next = input.nextConfiguration ?? input.config;
+  const current = input.agentId ? (input.activeConfiguration ?? input.config) : next;
+  const axes = (config: CreateAgentConfig) => [
+    config.provider,
+    config.model,
+    config.thinkingOptionId,
+    config.modeId,
+  ];
+  return [
+    input.agentId ? "**Current session**" : "**Next session**",
+    ...configurationDetails(current),
+    ...(input.agentId && JSON.stringify(axes(current)) !== JSON.stringify(axes(next))
+      ? ["", "**Next session**", ...configurationDetails(next)]
+      : []),
+    "",
+    `List: /${input.command.name} list · Search: /${input.command.name} search <text>`,
+  ].join("\n");
+}
+
+function configurationDetails(config: CreateAgentConfig): string[] {
+  const label = AGENT_PROVIDER_DEFINITIONS.find((p) => p.id === config.provider)?.label;
+  return [
+    `Provider: ${literalText(label ? `${label} (${config.provider})` : config.provider)}`,
+    `Model: ${literalText(config.model ?? "provider default")}`,
+    `Effort: ${literalText(config.thinkingOptionId ?? "provider default")}`,
+    `Permission: ${literalText(config.modeId ?? "provider default")}`,
+  ];
+}
+
+function listQuery(value: string): string | undefined {
+  if (value.toLowerCase() === "list") return "";
   const search = /^search(?:\s+([\s\S]+))?$/iu.exec(value);
   return search ? (search[1] ?? "").toLowerCase() : undefined;
 }

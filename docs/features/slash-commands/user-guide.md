@@ -101,13 +101,15 @@ matching approval privilege.
 | See / set mode (permission) | `/permission`, `/permission plan`                        |
 
 An **agent profile** is a saved bundle (provider + model + mode + thinking);
-`/agent <name>` applies one in a single step, and `/agent` lists the profiles you
+`/agent <name>` applies one in a single step, and `/agent list` lists the profiles you
 may use. `/provider`, `/model`, and `/effort` tune one axis at a time, and
-`/permission` sets the mode. A bare command shows the menu.
+`/permission` sets the mode. A bare command shows the current configuration and
+any different selection for the next session. Add `list` or `search <text>` to
+discover options; reading the current configuration does not change it.
 
 These three nest — a provider has its own models, and each model its own effort
-levels — so the bot keeps them unambiguous: `/model` lists only the current
-provider's models, `/effort` only the current model's levels, look-alike names show
+levels — so the bot keeps them unambiguous: `/model list` lists only the current
+provider's models, `/effort list` only the current model's levels, look-alike names show
 as `provider/model`, and every change confirms the full setup ("Provider: codex ·
 Model: … · Effort: …"). You can't accidentally pick another provider's model.
 
@@ -257,9 +259,14 @@ makes them ordinary prompts to the agent instead.
 
 Use `/project list` or `/project search payments` to find a Project on this bot's
 Host, then `/project <project-id>`. Use `/workspace list` to choose an existing
-Workspace, `/workspace list --worktree` for only worktrees, or `/branch` to find
+Workspace, `/workspace list --worktree` for only worktrees, or `/branch list` to find
 local/origin branches. Workspace lists and searches put recent activity first.
 Every list/search shows up to 10 results; add `--page 2` for the next page.
+Project and Workspace search also matches the final folder name, without matching
+parent folders. `/project` and `/workspace` by themselves show Current session
+and Next session, with Project/Workspace names and IDs and the Host name/ID.
+Workspace information includes its branch and full path; an uncreated Workspace
+is identified as new, with no invented name or worktree path.
 
 `/workspace new main` creates a worktree from `main`, with automatic naming.
 `/workspace new main --branch fix/login --name "Fix login"` preserves that branch
