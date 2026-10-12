@@ -18,6 +18,8 @@
 // Destinations are read the CommonMark way (balanced parentheses, `<…>`, an
 // optional title), so `chart(1).png` keeps its name.
 
+import { paragraphCodeSpans, type LineRange } from "./code-spans.js";
+
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const WINDOWS_DRIVE = /^[a-z]:[\\/]/i;
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
@@ -221,17 +223,17 @@ function rewriteProse(prose: string, context: RewriteContext): string {
   return out;
 }
 
-/** Rewrites one prose line around its inline code spans. */
-function rewriteLine(line: string, context: RewriteContext): string {
-  const parts = line.split(/(`+[^`]*`+)/);
-  return parts
-    .map((part, index) => {
-      if (index % 2 === 1) return part;
-      // Only the last prose part can still grow.
-      const growing = context.growing && index === parts.length - 1;
-      return rewriteProse(part, { ...context, growing });
-    })
-    .join("");
+/** Rewrites one prose line outside its code-span `ranges` (sorted, disjoint). */
+function rewriteLine(line: string, ranges: readonly LineRange[], context: RewriteContext): string {
+  let out = "";
+  let cursor = 0;
+  for (const [start, end] of ranges) {
+    out += rewriteProse(line.slice(cursor, start), { ...context, growing: false });
+    out += line.slice(start, end);
+    cursor = end;
+  }
+  // Only prose that reaches the end of the line can still grow.
+  return out + rewriteProse(line.slice(cursor), context);
 }
 
 /** Line kinds Markdown shows literally: fenced and indented code. */
@@ -271,22 +273,50 @@ function codeLines(lines: readonly string[]): boolean[] {
 export function rewriteLocalEmbeds(text: string, options: LocalEmbedOptions = {}): string {
   const delivered = options.delivered ?? new Set<string>();
   const lines = text.split("\n");
-  const literal = codeLines(lines);
+  // Code and quoted lines are examples, never something the Agent meant to show.
+  const literal = codeLines(lines).map((code, index) => code || /^\s*>/.test(lines[index]!));
+  const spans = codeSpansByLine(lines, literal, options.partial === true);
   const out: string[] = [];
   lines.forEach((line, index) => {
-    // Code and quoted lines are examples, never something the Agent meant to show.
-    if (literal[index] || /^\s*>/.test(line)) {
+    if (literal[index]) {
       out.push(line);
       return;
     }
     const growing = options.partial === true && index === lines.length - 1;
-    const rewritten = rewriteLine(line, { delivered, growing });
+    const rewritten = rewriteLine(line, spans[index]!, { delivered, growing });
     // A line that only held a delivered image goes, rather than leaving a gap.
     if (rewritten.trim() === "" && line.trim() !== "") return;
     out.push(rewritten);
   });
   const result = out.join("\n");
   return result === text ? text : result.replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+/**
+ * Code-span ranges per line. A span can cross lines inside a paragraph, which
+ * ends at a blank or literal line; a draft's last paragraph may hold an open one.
+ */
+function codeSpansByLine(
+  lines: readonly string[],
+  literal: readonly boolean[],
+  partial: boolean,
+): LineRange[][] {
+  const spans: LineRange[][] = lines.map(() => []);
+  let start = 0;
+  while (start < lines.length) {
+    if (literal[start] || lines[start]!.trim() === "") {
+      start += 1;
+      continue;
+    }
+    let end = start;
+    while (end < lines.length && !literal[end] && lines[end]!.trim() !== "") end += 1;
+    const paragraph = paragraphCodeSpans(lines.slice(start, end), partial && end === lines.length);
+    paragraph.forEach((ranges, offset) => {
+      spans[start + offset] = ranges;
+    });
+    start = end;
+  }
+  return spans;
 }
 
 const SEND_MEDIA_KEYS = ["media", "mediaUrl", "path", "filePath", "fileUrl", "image"] as const;

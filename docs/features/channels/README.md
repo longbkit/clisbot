@@ -195,8 +195,10 @@ final answer and its retries, the `tool`-path fallback, and a `send`'s
 - a draft holds back an embed still being streamed, so a split URL never shows.
 
 The tool-path prompt tells the Agent to attach generated images and never to link
-local files. A `send` that fails part-way records no delivered file, so text that
-embeds a file it did post still shows the notice.
+local files. A file counts as posted only once its ledger row is confirmed: a
+`send` that fails part-way still names the files it posted (a `media` delivery
+that neither answers nor reports progress), and a retry of the same key resumes
+after them. Code spans follow CommonMark: matching backtick runs, across lines.
 
 One `send` becomes several platform messages: the body, then one per attachment,
 each with its own delivery-ledger row under one `eventTurnId`. A failure part

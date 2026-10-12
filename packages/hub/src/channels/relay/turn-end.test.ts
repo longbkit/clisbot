@@ -433,6 +433,14 @@ describe("local images in channel text", () => {
     assert.deepEqual(posted, ["Chart attached above."]);
   });
 
+  it("after a part-failed send, drops only the posted file's embed and notes the other", async () => {
+    start("hybrid");
+    capabilities.noteDelivery(token, { kind: "media", media: [IMAGE] });
+    await say("t1", "m1", `Two charts:\n${EMBED}\n![b](file:///w/artifacts/second.png)`);
+    await complete("t1");
+    assert.deepEqual(posted, ["Two charts:\n[Image not attached: second.png]"]);
+  });
+
   it("on Channel tool the fallback for a silent turn shows the notice, not the Markdown", async () => {
     start("tool");
     await say("t1", "m1", EMBED);

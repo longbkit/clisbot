@@ -289,12 +289,14 @@ async function messageCall(
   }
   const final = args["final"] !== false;
   if (!final && mcp.admitProgress?.(token) === false) return progressThrottled();
+  const posted: string[] = [];
   const result = await executeChannelSend({
     mcp,
     capability,
     token,
     args,
     reserveOutput: () => reserveOutput(mcp, capability, token),
+    onMediaPosted: (key) => posted.push(key),
   });
   if (result.isError !== true) {
     mcp.noteDelivery?.(token, {
@@ -303,6 +305,9 @@ async function messageCall(
       text: sendText(args),
       media: sendMediaKeys(args),
     });
+  } else if (posted.length > 0) {
+    // A send that failed part-way: only the files it confirmed are in the conversation.
+    mcp.noteDelivery?.(token, { kind: "media", media: posted });
   }
   return result;
 }

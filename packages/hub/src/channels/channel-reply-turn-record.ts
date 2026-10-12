@@ -28,7 +28,10 @@ export interface ToolTurnDeliveries {
 /** One landed tool call. */
 export type ToolDelivery =
   | { kind: "send"; final: boolean; text?: string | undefined; media?: readonly string[] }
-  | { kind: "action" };
+  | { kind: "action" }
+  /** Files a send that failed later confirmed posting: they are in the
+   * conversation, but the send neither answered nor reported progress. */
+  | { kind: "media"; media: readonly string[] };
 
 /**
  * The shortest gap between two `final=false` sends of one turn. The prompt
@@ -63,19 +66,28 @@ export function recordToolDelivery(record: ToolTurnRecord, delivery: ToolDeliver
     record.acted = true;
     return;
   }
+  if (delivery.kind === "media") {
+    keepMedia(record, delivery.media);
+    return;
+  }
   if (delivery.final) {
     record.answered = true;
   } else {
     record.progress = true;
     record.lastProgressAt = now;
   }
-  for (const key of delivery.media ?? []) {
-    record.media.push(key);
-    if (record.media.length > KEPT_TEXTS) record.media.shift();
-  }
+  keepMedia(record, delivery.media ?? []);
   if (delivery.text === undefined || delivery.text === "") return;
   record.texts.push(delivery.text);
   if (record.texts.length > KEPT_TEXTS) record.texts.shift();
+}
+
+function keepMedia(record: ToolTurnRecord, media: readonly string[]): void {
+  for (const key of media) {
+    if (record.media.includes(key)) continue;
+    record.media.push(key);
+    if (record.media.length > KEPT_TEXTS) record.media.shift();
+  }
 }
 
 /** Whether a `final=false` send may go out now. */

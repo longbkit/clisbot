@@ -586,6 +586,58 @@ describe("channel-reply MCP endpoint", () => {
     assert.equal(shown.includes("file:"), false, shown);
   });
 
+  it("records the file a part-failed send posted, and its retry posts only the rest", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "channel-reply-partial-"));
+    const first = join(directory, "first.png");
+    const second = join(directory, "second.png");
+    await writeFile(first, PNG_BYTES);
+    await writeFile(second, PNG_BYTES);
+    const uploads: string[] = [];
+    let secondFails = true;
+    const fixture = makeFixture({
+      projectRoot: directory,
+      turnId: "turn-partial",
+      mediaPost: async (_ref, file) => {
+        uploads.push(file.fileName);
+        if (file.fileName === "second.png" && secondFails)
+          return { ok: false, error: "upload refused" };
+        return { ok: true, externalMessageId: `file-${uploads.length}`, mediaPosted: true };
+      },
+    });
+    const send = () =>
+      fixture.call("tools/call", {
+        name: "message",
+        arguments: {
+          action: "send",
+          message: "Charts",
+          attachments: [{ media: first }, { media: second }],
+          idempotencyKey: "charts",
+        },
+      });
+    const failed = await send();
+    assert.equal(ToolResultSchema.parse(failed.result).isError, true, resultText(failed));
+    // Only the confirmed file counts; the failed call answered nothing.
+    assert.deepEqual(fixture.registry.peekTurnDeliveries("agent-1"), {
+      channelTurn: true,
+      answered: false,
+      progress: false,
+      acted: false,
+      texts: [],
+      media: [first],
+    });
+    secondFails = false;
+    const retried = await send();
+    assert.equal(ToolResultSchema.parse(retried.result).isError, undefined, resultText(retried));
+    assert.deepEqual(uploads, ["first.png", "second.png", "second.png"]);
+    assert.deepEqual(
+      fixture.posts.map((post) => post.text),
+      ["Charts"],
+    );
+    const turn = fixture.registry.takeTurnDeliveries("agent-1");
+    assert.equal(turn?.answered, true);
+    assert.deepEqual(turn?.media, [first, second]);
+  });
+
   it("records no delivered file for an attachment that could not be read", async () => {
     const directory = await mkdtemp(join(tmpdir(), "channel-reply-missing-"));
     const missing = join(directory, "gone.png");

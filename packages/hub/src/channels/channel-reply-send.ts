@@ -25,7 +25,7 @@ import {
   type SendReservation,
 } from "./channel-reply-send-ledger.js";
 import { isMediaChannel } from "./channel-message-tool.js";
-import { rewriteLocalEmbeds, sendMediaKeys } from "./media/local-embeds.js";
+import { localMediaKey, rewriteLocalEmbeds, sendMediaKeys } from "./media/local-embeds.js";
 import {
   ChannelMediaRefusedError,
   createChannelMediaStager,
@@ -62,6 +62,9 @@ export interface ChannelSendCall {
   token: string;
   args: Record<string, unknown>;
   reserveOutput: ReserveChannelReplyOutput;
+  /** Each local file the ledger confirmed posted (now or by an earlier attempt
+   * of the same key), as its `localMediaKey`, even when a later file fails. */
+  onMediaPosted?: ((key: string) => void) | undefined;
 }
 
 /** Validates, reserves, and runs one `send`. */
@@ -188,6 +191,7 @@ async function runSend(
   const { mcp, capability } = call;
   const ref = capability.ref;
   const seam = ambiguityAwarePost(mcp, ref);
+  const sources = stagedSources(call.onMediaPosted);
   // Admission before the runner: core's normalizer drops a table the model
   // wrote without a caption, and everything downstream would then be reporting
   // a message that never carried it (D-W6-02).
@@ -202,8 +206,12 @@ async function runSend(
         to: ref.externalConversationId,
         ...(ref.externalThreadId === null ? {} : { threadId: ref.externalThreadId }),
       },
-      send: async (params) => await ledger.post(async () => await seam.post(params)),
-      stageMedia: sendFileStager(call),
+      send: async (params) => {
+        const result = await ledger.post(async () => await seam.post(params));
+        if (result.ok && params.media !== undefined) sources.confirm(params.media.filePath);
+        return result;
+      },
+      stageMedia: sources.track(sendFileStager(call)),
       ...(capability.requesterSenderId === undefined
         ? {}
         : { requesterSenderId: capability.requesterSenderId }),
@@ -454,6 +462,29 @@ async function mediaPost(
     ...(result.mediaPosted === undefined ? {} : { mediaPosted: result.mediaPosted }),
     ...(result.error === undefined ? {} : { error: result.error }),
     ...(result.failure === undefined ? {} : { failure: result.failure }),
+  };
+}
+
+/**
+ * Which local file each staged copy came from, so a confirmed post can name the
+ * file the Agent sent. A resumed send stages again and its already-posted rows
+ * come back confirmed from the ledger, so their files are named too.
+ */
+function stagedSources(onMediaPosted: ((key: string) => void) | undefined) {
+  const sourceByStagedPath = new Map<string, string>();
+  return {
+    track(stager: ChannelMediaStager): ChannelMediaStager {
+      return async (source) => {
+        const staged = await stager(source);
+        const key = source.media === undefined ? null : localMediaKey(source.media);
+        if (key !== null) sourceByStagedPath.set(staged.filePath, key);
+        return staged;
+      };
+    },
+    confirm(stagedPath: string): void {
+      const key = sourceByStagedPath.get(stagedPath);
+      if (key !== undefined) onMediaPosted?.(key);
+    },
   };
 }
 

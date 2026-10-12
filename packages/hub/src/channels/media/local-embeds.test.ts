@@ -117,6 +117,46 @@ describe("rewriteLocalEmbeds review regressions", () => {
   });
 });
 
+describe("rewriteLocalEmbeds code spans", () => {
+  it("leaves a double-backtick span holding a single backtick as written", () => {
+    const text = "Use ``a ` ![x](file:///tmp/a.png)`` as text.";
+    assert.equal(rewriteLocalEmbeds(text), text);
+    assert.equal(rewriteLocalEmbeds(text, { partial: true }), text);
+  });
+
+  it("leaves a code span that crosses lines as written", () => {
+    const text = "Use `example\n![x](file:///tmp/a.png)\nend` here.";
+    assert.equal(rewriteLocalEmbeds(text), text);
+    assert.equal(rewriteLocalEmbeds(text, { partial: true }), text);
+  });
+
+  it("still rewrites around a span, and after a backtick run that never closes", () => {
+    assert.equal(
+      rewriteLocalEmbeds("`code` then ![x](file:///tmp/a.png)"),
+      "`code` then [Image not attached: a.png]",
+    );
+    // A final answer: an unclosed run is literal text, so the embed after it is prose.
+    assert.equal(
+      rewriteLocalEmbeds("a ` b ![x](file:///tmp/a.png)"),
+      "a ` b [Image not attached: a.png]",
+    );
+    // A span does not cross a blank line.
+    assert.equal(
+      rewriteLocalEmbeds("open `\n\n![x](file:///tmp/a.png) `"),
+      "open `\n\n[Image not attached: a.png] `",
+    );
+  });
+
+  it("a draft keeps a span still being streamed as typed, and the final agrees once it closes", () => {
+    const final = "Try `![x](file:///tmp/a.png)` in the app.";
+    for (let end = 1; end <= final.length; end += 1) {
+      const draft = rewriteLocalEmbeds(final.slice(0, end), { partial: true });
+      assert.ok(final.startsWith(draft), draft);
+    }
+    assert.equal(rewriteLocalEmbeds(final), final);
+  });
+});
+
 describe("sendMediaKeys", () => {
   it("collects local files from every send media param, never remote ones", () => {
     assert.deepEqual(
