@@ -1,0 +1,9 @@
+Native users with an existing Hub login may need to sign in again; accounts, organizations and access grants are preserved.
+
+Paseo baseline remains v0.11.1 at ab10a6694ccf068959d1a6b67b6c915e21a9fe91.
+
+Added
+- Added account Hubs to the multi-Hub app, using each Hub's own login page and Google configuration
+- Added collapsed, expanded and header-only tool-call displays for Bots and group chats
+
+Full notes: https://clisbot.com/changelog
