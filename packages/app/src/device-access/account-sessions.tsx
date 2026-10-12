@@ -56,6 +56,8 @@ function AccountSessionsScope({
   const { t } = useTranslation();
   const generation = useRef(0);
   const transport = useMemo(() => {
+    if (profile?.authentication === "oauth")
+      return createHubTransport({ origin: profile.origin, accountProfile: profile });
     if (profile) return new PairedHubTransport(profile);
     if (hub.origin) return createHubTransport({ origin: hub.origin });
     return null;

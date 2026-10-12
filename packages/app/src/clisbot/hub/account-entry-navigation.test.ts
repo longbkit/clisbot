@@ -48,6 +48,37 @@ function invitationAuthorizationUrl() {
 }
 
 describe("Hub browser authorization continuation", () => {
+  it("preserves the official web callback and PKCE through the Hub's own login page", () => {
+    const input = {
+      ...authorizationInput,
+      redirectUri: "https://app.clisbot.com/hub-auth-callback",
+    };
+    const entryUrl = new URL(oauthAuthorizeUrl(input));
+    entryUrl.pathname = "/";
+    const route = hubAccountEntryRoute(entryUrl.href);
+    expect(route).toMatchObject({
+      params: {
+        redirect_uri: input.redirectUri,
+        state: input.state,
+        code_challenge: input.challenge,
+      },
+    });
+    entryUrl.pathname = "/settings/hub/account";
+    expect(
+      hubClientAuthorizationContinuation({
+        url: entryUrl.href,
+        origin,
+        state: { status: "signedOut" },
+      }),
+    ).toBeNull();
+    expect(
+      hubClientAuthorizationContinuation({
+        url: entryUrl.href,
+        origin,
+        state: { status: "active" },
+      }),
+    ).toBe(oauthAuthorizeUrl(input));
+  });
   it("keeps the native invitation PKCE round trip through Account and returns to Hub authorization", () => {
     const entry = hubAccountEntryRoute(invitationAuthorizationUrl());
     expect(entry).toMatchObject({

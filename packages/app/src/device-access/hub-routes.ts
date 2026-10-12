@@ -22,6 +22,12 @@ export async function saveVerifiedHubRoutes(
   profile: HubProfile,
   routes: { origin?: string; relay?: HubProfile["relay"]; label?: string },
 ): Promise<void> {
+  if (profile.authentication === "oauth") {
+    if (routes.origin !== profile.origin || routes.relay)
+      throw new Error(i18n.t("hub.connection.errors.endpointMismatch"));
+    await updateHubProfile(profile.hubId, { label: routes.label });
+    return;
+  }
   const candidate = { ...profile, origin: routes.origin, relay: routes.relay };
   validateHubRoutes(candidate);
   const transport = new PairedHubTransport(candidate);

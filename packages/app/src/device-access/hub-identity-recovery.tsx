@@ -28,6 +28,7 @@ export function HubIdentityRecovery({
     value: HubIdentityChange;
   } | null>(null);
   useEffect(() => {
+    if (profile.authentication === "oauth") return;
     let current = true;
     void inspectHubIdentity(profile).then((value) => {
       if (current) setChange(value ? { profile, value } : null);

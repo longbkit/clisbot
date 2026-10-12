@@ -1,11 +1,11 @@
 import { useMemo, useRef } from "react";
 import equal from "fast-deep-equal";
-import { type HubProfile, useHubProfiles } from "@/device-access/hub-profiles";
+import { type HubProfile, useHubProfiles, hubProfileOrigin } from "@/device-access/hub-profiles";
 import { getHubConfiguration, type HubConfiguration } from "./config";
 
 /** One Hub this app keeps an account controller running for. */
 export interface HubAccountScopeConfiguration {
-  /** Stable scope for caches and managed relationships; `hub://<id>` for a saved Hub. */
+  /** Stable scope: the OAuth issuer for an account Hub, or `hub://<id>` for a paired Hub. */
   origin: string;
   configuration: HubConfiguration;
 }
@@ -18,15 +18,27 @@ function profileScope(
 ): HubAccountScopeConfiguration {
   if (
     previous &&
-    equal(connectionInputs(profile), connectionInputs(previous.configuration.deviceProfile))
+    equal(
+      connectionInputs(profile),
+      connectionInputs(
+        previous.configuration.deviceProfile ?? previous.configuration.accountProfile,
+      ),
+    )
   )
     return previous;
-  const origin = `hub://${profile.hubId}`;
-  return { origin, configuration: { origin, deviceProfile: profile } };
+  const origin = hubProfileOrigin(profile);
+  return {
+    origin,
+    configuration:
+      profile.authentication === "oauth"
+        ? { origin, accountProfile: profile }
+        : { origin, deviceProfile: profile },
+  };
 }
 
 function connectionInputs(profile: HubProfile | undefined) {
   return [
+    profile?.authentication,
     profile?.hubId,
     profile?.publicKey,
     profile?.origin,
@@ -58,11 +70,13 @@ export function useHubAccountScopes(): {
       return { scopes: [configuredRef.current], activeOrigin: configured.origin };
     }
     const scopes = registry.profiles.map((profile) =>
-      profileScope(profile, savedRef.current.get(`hub://${profile.hubId}`)),
+      profileScope(profile, savedRef.current.get(hubProfileOrigin(profile))),
     );
     savedRef.current = new Map(scopes.map((scope) => [scope.origin, scope]));
     const active = scopes.find(
-      (scope) => scope.configuration.deviceProfile?.hubId === registry.activeId,
+      (scope) =>
+        (scope.configuration.deviceProfile ?? scope.configuration.accountProfile)?.hubId ===
+        registry.activeId,
     );
     return { scopes, activeOrigin: active?.origin ?? null };
   }, [registry]);

@@ -12,7 +12,11 @@ declare global {
 
 export interface HubConfiguration {
   origin: string;
-  deviceProfile?: import("@/device-access/hub-profiles").HubProfile;
+  deviceProfile?: import("@/device-access/hub-profiles").PairedHubProfile;
+  accountProfile?: Extract<
+    import("@/device-access/hub-profiles").HubProfile,
+    { authentication: "oauth" }
+  >;
 }
 
 export function getHubConfiguration(): HubConfiguration | null {
@@ -37,8 +41,8 @@ export function resolveHubConfiguration(
   );
   if (configured === null || browserOrigin === undefined) return configured;
 
-  // Browser Hub access is deliberately same-origin so its HTTP-only session
-  // cookie never crosses origins. Resolve the public reverse-proxy origin at
+  // The configured browser Hub uses same-origin cookies. Saved account profiles
+  // select a separate OAuth transport. Resolve the public reverse-proxy origin at
   // runtime instead of trusting a Metro-cached build-time hostname.
   return parseHubConfiguration({ origin: browserOrigin });
 }

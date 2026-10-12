@@ -20,6 +20,7 @@ export interface HubTransport {
     context?: { invitationId?: string },
   ): Promise<void>;
   signOut(): Promise<void>;
+  subscribeSessionChange?(listener: () => void): () => void;
   /** Present only where the client runs on the Hub origin. System-browser transports reach
    * Google through the Hub sign-in page instead. */
   signInWithGoogle?(context?: GoogleSignInContext): Promise<void>;

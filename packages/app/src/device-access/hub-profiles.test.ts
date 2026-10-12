@@ -116,3 +116,37 @@ test("removing a Hub that is not selected keeps the selection", async () => {
   await registry.removeHubProfile("stale");
   expect(registry.currentHubProfile()?.hubId).toBe("current");
 });
+
+test("account Hubs coexist with paired Hubs, survive reload, and pin their OAuth issuer", async () => {
+  let registry = await import("./hub-profiles");
+  await registry.saveHubProfile({
+    hubId: "personal",
+    publicKey: "personal-key",
+    origin: "https://home.test",
+  });
+  const company = {
+    authentication: "oauth" as const,
+    hubId: "https://company.test",
+    origin: "https://company.test",
+    label: "Company",
+    entry: "account" as const,
+  };
+  await registry.saveDiscoveredHub(company);
+  expect(registry.hubProfileOrigin(registry.currentHubProfile()!)).toBe(company.origin);
+  await expect(
+    registry.updateHubProfile(company.hubId, { origin: "https://elsewhere.test" }),
+  ).rejects.toThrow();
+  await expect(
+    registry.updateHubProfile(company.hubId, { relay: { endpoint: "relay.test" } }),
+  ).rejects.toThrow();
+  await expect(registry.updateHubProfile(company.hubId, { origin: null })).rejects.toThrow();
+  await registry.updateHubProfile(company.hubId, { label: "Work" });
+  vi.resetModules();
+  registry = await import("./hub-profiles");
+  await registry.loadHubProfiles();
+  expect(registry.currentHubProfile()).toMatchObject({ ...company, label: "Work" });
+  await registry.selectHubProfile("personal");
+  expect(registry.hubProfileOrigin(registry.currentHubProfile()!)).toBe("hub://personal");
+  await registry.removeHubProfile("personal");
+  expect(registry.currentHubProfile()?.hubId).toBe(company.origin);
+});

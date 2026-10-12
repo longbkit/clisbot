@@ -28,7 +28,8 @@ separate additive protocol change.
 
 Option 1. The sidebar, Hosts and Projects stay as they are.
 
-- `HubAccountProvider` keeps one controller per saved Hub, keyed by its `hub://<id>` origin.
+- `HubAccountProvider` keeps one controller per saved Hub, keyed by its `hub://<id>` origin
+  for pairing, or its HTTPS issuer for account Hubs (extended 2026-10-13).
   `useHubAccount()` is the selected Hub; `useHubAccounts()` lists them all.
 - `HubHostSynchronization` registers the Hosts of every signed-in Hub, each under its own
   account.
@@ -41,9 +42,11 @@ Option 1. The sidebar, Hosts and Projects stay as they are.
 
 ## Limits
 
-- The web page's same-origin cookie Hub is used only while no Hub profile is saved. More Hubs
-  on the web are added by pairing (`CLISBOT_HUB_DEVICE_ALLOWED_ORIGINS` on a Hub that serves a
-  self-hosted web app on another origin).
+- The web page's configured same-origin cookie Hub is used while no Hub profile is saved.
+  Saved account Hubs use that cookie when same-origin, or per-Hub OAuth on `app.clisbot.com`.
+  Protected Hubs retain pairing (`CLISBOT_HUB_DEVICE_ALLOWED_ORIGINS` on a Hub that serves a
+  self-hosted web app on another origin). See the
+  [account Hub contract](../features/access/device-pairing.md#account-hubs-keep-their-own-login-2026-10-13).
 - A Hub whose session expired still hides its managed-access Hosts, as before.
 - Each saved Hub keeps its own connection and polls its daemon list every 60 seconds.
 

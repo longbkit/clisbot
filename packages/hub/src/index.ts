@@ -58,6 +58,7 @@ import { resolveHubDataDirectory } from "./data-directory.js";
 import { applyClisbotEnvDefaults } from "./env-alias.js";
 import { composeInvitationMailer, composeVerificationMailer } from "./invitations/index.js";
 import { readGoogleAuthConfig, readGoogleIdTokenConfig } from "./auth/google-sign-in.js";
+import { withHubWebClients } from "./auth/web-clients.js";
 import { readProfileImageHosts } from "./auth/profile-update.js";
 import {
   readCredentialCipherEnvironment,
@@ -524,15 +525,20 @@ async function main(): Promise<void> {
   // while the listener was still accepting, so a request that arrived during
   // the teardown reached a half-disposed database or supervisor.
   const admission = createHttpAdmission((request) => build.default.fetch(request));
-  const server = createFetchServer((request) => admission.fetch(request), {
-    ...(config.trustedClientIpHeader === undefined
-      ? {}
-      : { trustedClientIpHeader: config.trustedClientIpHeader }),
-    ...(config.trustedProxyAddresses === undefined
-      ? {}
-      : { trustedProxyAddresses: config.trustedProxyAddresses }),
-    ...(canonicalRequestOrigin === undefined ? {} : { canonicalRequestOrigin }),
-  });
+  const server = createFetchServer(
+    withHubWebClients((request) => admission.fetch(request), {
+      enabled: !/^(1|true)$/i.test(process.env["CLISBOT_HUB_DEVICE_PAIRING"] ?? ""),
+    }),
+    {
+      ...(config.trustedClientIpHeader === undefined
+        ? {}
+        : { trustedClientIpHeader: config.trustedClientIpHeader }),
+      ...(config.trustedProxyAddresses === undefined
+        ? {}
+        : { trustedProxyAddresses: config.trustedProxyAddresses }),
+      ...(canonicalRequestOrigin === undefined ? {} : { canonicalRequestOrigin }),
+    },
+  );
   const deviceIngress = await startDeviceIngress(
     server,
     build,

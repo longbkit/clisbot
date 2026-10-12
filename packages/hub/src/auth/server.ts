@@ -1,3 +1,4 @@
+import { oauthProductSession } from "./oauth-product-session.js";
 import {
   MasterPasswordReset,
   MASTER_PASSWORD_RESET_PATH,
@@ -64,6 +65,7 @@ import {
 import type { HubDeviceAccess } from "../device-access/index.js";
 import { withDeviceAccess } from "../device-access/auth-server.js";
 import { currentAccountSession } from "../device-access/account-sessions.js";
+import { accountHubDiscovery } from "./web-clients.js";
 
 export interface AuthServer {
   googleClientId?: string;
@@ -259,6 +261,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     oauthConsent: schema.oauthConsents,
     jwks: schema.authSigningKeys,
   };
+  const oauthProducts = oauthProductSession(options.database);
   const auth = betterAuth({
     baseURL: options.baseURL,
     secret: options.secret,
@@ -331,6 +334,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           return referenceId === undefined ? {} : { [HUB_ORGANIZATION_CLAIM]: referenceId };
         },
       }),
+      oauthProducts.plugin,
       tanstackStartCookies(),
     ],
   });
@@ -476,6 +480,12 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     },
     handle(request) {
       const path = new URL(request.url).pathname;
+      const discovery = accountHubDiscovery(
+        request,
+        options.baseURL,
+        Boolean(options.deviceAccess),
+      );
+      if (discovery) return Promise.resolve(discovery);
       const registrationResponse = registrationRoutes.handle(path, request);
       if (registrationResponse !== undefined) return registrationResponse;
       if (path.startsWith("/api/auth/clisbot/")) {
@@ -514,7 +524,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           request,
           requestBrowserOrigin(request, browserOrigin),
         );
-        return rejected === undefined ? auth.handler(request) : Promise.resolve(rejected);
+        return rejected === undefined ? productHandler(request) : Promise.resolve(rejected);
       }
       if (TEAM_AUTH_PATHS.has(path)) {
         const rejected = rejectCrossOriginCookieMutation(
@@ -526,7 +536,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           const session = TEAM_AUTH_MUTATION_PATHS.has(path)
             ? await sessions.read(request.headers)
             : undefined;
-          const response = await auth.handler(request);
+          const response = await productHandler(request);
           const organizationId = session?.activeOrganizationId;
           if (response.ok && organizationId !== null && organizationId !== undefined) {
             try {
@@ -671,6 +681,18 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     return { claim, headers: signedIn.headers };
   }
 
+  async function productHandler(request: Request): Promise<Response> {
+    if (
+      options.deviceAccess ||
+      !request.headers.get("authorization")?.startsWith("Bearer ") ||
+      request.headers.has("cookie")
+    )
+      return auth.handler(request);
+    const account = await accountSessions.read(request.headers);
+    if (!account) return Response.json({ error: "unauthenticated" }, { status: 401 });
+    return oauthProducts.handle(request, account, (authorized) => auth.handler(authorized));
+  }
+
   async function changePassword(request: Request): Promise<Response> {
     const session = await sessions.read(request.headers);
     const body = await request
@@ -680,14 +702,14 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       .catch(() => undefined);
     const response =
       typeof body === "object" && body !== null
-        ? await auth.handler(
+        ? await productHandler(
             new Request(request.url, {
               method: "POST",
               headers: request.headers,
               body: JSON.stringify({ ...body, revokeOtherSessions: !options.deviceAccess }),
             }),
           )
-        : await auth.handler(request);
+        : await productHandler(request);
     if (response.ok && session !== undefined) {
       await options.deviceAccess?.accountSessions.revokeAccount(session.userId, session.sessionId);
       await options.database.query(`update "user" set must_change_password = false where id = $1`, [

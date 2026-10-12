@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Return to Clisbot</title>
+  </head>
+  <body>
+    <p id="status">Completing Hub sign-in…</p>
+    <script>
+      (() => {
+        const callback = new URL(location.href);
+        history.replaceState(null, "", location.pathname);
+        const state = callback.searchParams.get("state");
+        if (
+          location.origin !== "https://app.clisbot.com" ||
+          !state ||
+          !/^[A-Za-z0-9_-]{43}$/.test(state)
+        ) {
+          document.getElementById("status").textContent =
+            "This sign-in request is invalid. Return to Clisbot and try again.";
+          return;
+        }
+        const result = { url: callback.href };
+        if (window.opener) window.opener.postMessage(result, location.origin);
+        const channel = new BroadcastChannel(`clisbot-hub-login:${state}`);
+        channel.postMessage(result);
+        channel.close();
+        document.getElementById("status").textContent =
+          "You can return to Clisbot and close this window.";
+      })();
+    </script>
+  </body>
+</html>

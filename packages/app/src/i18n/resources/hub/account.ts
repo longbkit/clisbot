@@ -32,6 +32,8 @@ const en = {
       "An account with this email exists, but Google couldn't prove the address. Sign in with your password.",
   },
   signIn: {
+    allowPopups: "Allow popups to sign in to this Hub.",
+    officialWebRequired: "Open app.clisbot.com to sign in to another Hub.",
     canceled: "Hub sign-in was canceled.",
     noRefreshToken: "Hub did not issue a refresh token.",
     credentialExchangeFailed: "Hub credential exchange failed ({{status}}).",
@@ -301,6 +303,8 @@ const ar: Translation<HubAccountCopy> = {
       "يوجد حساب بهذا البريد الإلكتروني، لكن Google لم يتمكن من إثبات العنوان. سجّل الدخول بكلمة المرور.",
   },
   signIn: {
+    allowPopups: "اسمح بالنوافذ المنبثقة لتسجيل الدخول إلى هذا Hub.",
+    officialWebRequired: "افتح app.clisbot.com لتسجيل الدخول إلى Hub آخر.",
     canceled: "أُلغي تسجيل الدخول إلى Hub.",
     noRefreshToken: "لم يُصدر Hub رمز تحديث.",
     credentialExchangeFailed: "فشل تبادل بيانات الاعتماد مع Hub ({{status}}).",
@@ -565,6 +569,8 @@ const es: Translation<HubAccountCopy> = {
       "Ya existe una cuenta con este correo, pero Google no pudo verificar la dirección. Inicia sesión con tu contraseña.",
   },
   signIn: {
+    allowPopups: "Permite ventanas emergentes para iniciar sesión en este Hub.",
+    officialWebRequired: "Abre app.clisbot.com para iniciar sesión en otro Hub.",
     canceled: "Se canceló el inicio de sesión en Hub.",
     noRefreshToken: "Hub no emitió un token de actualización.",
     credentialExchangeFailed: "Falló el intercambio de credenciales con Hub ({{status}}).",
@@ -837,6 +843,8 @@ const fr: Translation<HubAccountCopy> = {
       "Un compte existe avec cet e-mail, mais Google n’a pas pu prouver l’adresse. Connectez-vous avec votre mot de passe.",
   },
   signIn: {
+    allowPopups: "Autorisez les fenêtres pop-up pour vous connecter à ce Hub.",
+    officialWebRequired: "Ouvrez app.clisbot.com pour vous connecter à un autre Hub.",
     canceled: "La connexion à Hub a été annulée.",
     noRefreshToken: "Hub n’a pas émis de jeton d’actualisation.",
     credentialExchangeFailed: "L’échange d’identifiants avec Hub a échoué ({{status}}).",
@@ -1110,6 +1118,8 @@ const ja: Translation<HubAccountCopy> = {
       "このメールアドレスのアカウントは存在しますが、Google でアドレスを確認できませんでした。パスワードでサインインしてください。",
   },
   signIn: {
+    allowPopups: "この Hub にサインインするにはポップアップを許可してください。",
+    officialWebRequired: "別の Hub にサインインするには app.clisbot.com を開いてください。",
     canceled: "Hub へのサインインがキャンセルされました。",
     noRefreshToken: "Hub がリフレッシュトークンを発行しませんでした。",
     credentialExchangeFailed: "Hub との認証情報の交換に失敗しました（{{status}}）。",
@@ -1379,6 +1389,8 @@ const ko: Translation<HubAccountCopy> = {
       "이 이메일로 된 계정이 있지만 Google에서 주소를 확인하지 못했습니다. 비밀번호로 로그인하세요.",
   },
   signIn: {
+    allowPopups: "이 Hub에 로그인하려면 팝업을 허용하세요.",
+    officialWebRequired: "다른 Hub에 로그인하려면 app.clisbot.com을 여세요.",
     canceled: "Hub 로그인이 취소되었습니다.",
     noRefreshToken: "Hub가 새로 고침 토큰을 발급하지 않았습니다.",
     credentialExchangeFailed: "Hub 자격 증명 교환에 실패했습니다({{status}}).",
@@ -1643,6 +1655,8 @@ const ptBR: Translation<HubAccountCopy> = {
       "Já existe uma conta com este e-mail, mas o Google não conseguiu comprovar o endereço. Entre com sua senha.",
   },
   signIn: {
+    allowPopups: "Permita pop-ups para entrar neste Hub.",
+    officialWebRequired: "Abra app.clisbot.com para entrar em outro Hub.",
     canceled: "O login no Hub foi cancelado.",
     noRefreshToken: "O Hub não emitiu um token de atualização.",
     credentialExchangeFailed: "A troca de credenciais com o Hub falhou ({{status}}).",
@@ -1912,6 +1926,8 @@ const ru: Translation<HubAccountCopy> = {
       "Аккаунт с этим адресом существует, но Google не смог подтвердить адрес. Войдите с паролем.",
   },
   signIn: {
+    allowPopups: "Разрешите всплывающие окна для входа в этот Hub.",
+    officialWebRequired: "Откройте app.clisbot.com для входа в другой Hub.",
     canceled: "Вход в Hub отменён.",
     noRefreshToken: "Hub не выдал токен обновления.",
     credentialExchangeFailed: "Не удалось обменять учётные данные с Hub ({{status}}).",
@@ -2183,6 +2199,8 @@ const vi: Translation<HubAccountCopy> = {
       "Đã có tài khoản dùng email này, nhưng Google không xác thực được địa chỉ đó. Hãy đăng nhập bằng mật khẩu.",
   },
   signIn: {
+    allowPopups: "Cho phép cửa sổ bật lên để đăng nhập Hub này.",
+    officialWebRequired: "Mở app.clisbot.com để đăng nhập Hub khác.",
     canceled: "Đã hủy đăng nhập Hub.",
     noRefreshToken: "Hub không cấp refresh token.",
     credentialExchangeFailed: "Trao đổi thông tin xác thực với Hub thất bại ({{status}}).",
@@ -2445,6 +2463,8 @@ const zhCN: Translation<HubAccountCopy> = {
     accountNotLinked: "已有使用此邮箱的账号，但 Google 无法证明该地址。请使用密码登录。",
   },
   signIn: {
+    allowPopups: "请允许弹出窗口以登录此 Hub。",
+    officialWebRequired: "请打开 app.clisbot.com 以登录其他 Hub。",
     canceled: "已取消登录 Hub。",
     noRefreshToken: "Hub 没有签发刷新令牌。",
     credentialExchangeFailed: "Hub 凭据交换失败（{{status}}）。",

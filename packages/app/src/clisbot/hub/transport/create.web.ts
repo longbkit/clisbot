@@ -2,9 +2,12 @@ import { getDesktopHost } from "@/desktop/host";
 import type { HubConfiguration } from "../config";
 import type { GoogleSignInContext, HubRequestInput, HubTransport } from "./contract";
 import { i18n } from "@/i18n/i18next";
+import { BrowserOAuthHubTransport } from "./browser-oauth";
 
 export function createHubTransport(configuration: HubConfiguration): HubTransport {
   const bridge = getDesktopHost()?.hub;
+  if (!bridge && configuration.accountProfile && window.location.origin !== configuration.origin)
+    return new BrowserOAuthHubTransport(configuration.origin);
   return bridge === undefined
     ? new BrowserHubTransport(configuration.origin)
     : new ElectronHubTransport(configuration.origin, bridge);

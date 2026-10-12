@@ -11,6 +11,68 @@ Personal onboarding must work from the distributed mobile, web and desktop app w
 custom build or a Hub account. A Hub relationship in the baseline also activates account-backed
 Managed Access. Separate device trust, account authentication, authority and network routes.
 
+## Account Hubs keep their own login (2026-10-13)
+
+An existing account Hub, such as `work.vexere.net`, keeps its own login page, Google project,
+users, organizations, memberships and access grants. Connecting it from a distributed client
+does not require enabling `CLISBOT_HUB_DEVICE_PAIRING` or migrating those records.
+
+- **Same-origin web:** existing HTTP-only Hub cookies and Google callbacks remain unchanged.
+  An expired session signs in again to the same account.
+- **Add Hub:** the app first reads public `/api/auth/clisbot/connection`. A Hub without protected
+  device admission advertises `{ authentication: "oauth", issuer: "<Hub origin>" }`. The issuer
+  must exactly match the entered origin. Older/protected Hubs fall back to device discovery.
+- **Sign in from app:** web, native and desktop open that Hub's existing OAuth authorization
+  endpoint. The Hub reuses its browser session or presents its own login, including its own
+  Google configuration. Clisbot receives a one-use authorization code with PKCE and checks
+  `state` and `iss`; Google credentials/tokens are not handed to the distributed app.
+- **Official web client:** `https://app.clisbot.com/hub-auth-callback` is registered alongside
+  the existing native/loopback callbacks. The extensionless path matches Cloudflare's canonical
+  static asset URL. The callback clears its query and returns via a same-origin channel so a
+  Google COOP navigation that severs `window.opener` does not break the return. The app stores
+  refresh credentials separately per issuer using the existing encrypted browser secret store
+  and Web Locks. Tokens refresh under that issuer's lock; API calls omit cookies and reject
+  redirects. An invalid refresh signs out only that Hub; network failures retain credentials.
+- **HTTP boundary:** account Hubs allow bearer CORS for the official app origin only, with no
+  credentialed CORS. Cookie-bearing cross-origin requests are rejected. Grant exchange and
+  revocation never proxy browser cookies. With `CLISBOT_HUB_DEVICE_PAIRING=1`, this adapter is
+  disabled and existing protected device admission continues unchanged.
+- **Credential isolation and sign-out:** native and web credentials use a collision-resistant
+  issuer key and store the issuer alongside the refresh token. Native's legacy 32-bit keys are
+  deliberately not migrated because their issuer cannot be established; existing app users sign
+  in again. Cached access tokens are tied to the current stored login generation. Browser tabs
+  notify each other on login/sign-out, and every request checks shared storage even if a tab missed
+  the notification. This stops the app from reusing a signed-out token; issued JWTs still have
+  their existing five-minute server lifetime.
+- **Account actions:** a verified OAuth identity enters the existing Better Auth profile,
+  organization and Team handlers through a request-scoped adapter. It retains validation and
+  role checks and bounds organization/Team IDs to the grant's organization, independently of the
+  browser's currently selected organization. Browser session cookies are never returned to the
+  app. Password changes additionally require the original server session to remain live and the
+  current password; otherwise the user must sign in at the Hub again.
+- **Multiple Hubs:** account profiles use their canonical HTTPS OAuth issuer as the identity
+  and query/Host scope; paired profiles retain their pinned key and `hub://<id>` scope. Both
+  use the same saved-Hub registry and one account controller per Hub. Selecting one changes
+  the settings context; it does not sign out another Hub. Account issuer edits are rejected;
+  add a different origin as a different Hub.
+
+`CLISBOT_GOOGLE_AUTH_CLIENT_ID` and `CLISBOT_GOOGLE_AUTH_CLIENT_SECRET` stay on each Hub.
+The Google callback stays `<Hub origin>/api/auth/callback/google`; this path does **not** require
+`CLISBOT_GOOGLE_ID_TOKEN_CLIENT_ID` or adding `app.clisbot.com` to each Hub's Google client.
+The separate ID-token flow below still applies to protected device/relay deployments.
+
+Rollout requires the updated Hub (discovery, callback registration and CORS) and updated app
+(account profiles and web callback). Deploying this code does not itself toggle device policy
+or rewrite Google/account data. Rollback to the previous app/Hub preserves the old same-origin
+web login; added OAuth profiles require a compatible app. Self-hosted web pages retain their
+own cookie login; cross-origin OAuth in a browser is supported on `app.clisbot.com`.
+
+Verification: `auth/web-client.embedded.integration.test.ts` runs existing Google-provider
+login, cookie reuse, PKCE exchange, refresh and re-login against the real auth/database stack
+with Google's remote token response simulated. App tests cover mixed account/paired inventory,
+issuer isolation, reload, sign-out and callback rejection. This does not certify a production
+Google consent round trip; verify that after deploying the Hub and app.
+
 ## Decisions
 
 - A pairing invitation expires after five minutes by default and grants one device access.
@@ -39,7 +101,7 @@ Managed Access. Separate device trust, account authentication, authority and net
 - A daemon relationship exposes Hub discovery information. It does not itself authorize
   minting human Hub credentials. Combined pairing includes only grants approved by each
   backend's authorized operator. Never disclose the relationship credential to the app.
-- Save Hub identity and endpoints at runtime. Credentials are scoped to stable backend
+- Save paired Hub identity and endpoints at runtime. Device credentials are scoped to stable backend
   identity, not hostname. Verify a new endpoint before sending credentials. Pairing method,
   account login, reachability and effective capabilities are separate app state.
   Failed re-pairing retains the working credential. A disconnected Hub selects its routes

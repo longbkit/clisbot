@@ -40,6 +40,8 @@ export async function appDevicePairingOffer(
 
 /** A Hub invitation approved by this device as the Hub's instance operator. */
 export async function approvedHubOffer(profile: HubProfile): Promise<HubDeviceOffer> {
+  if (profile.authentication === "oauth")
+    throw new Error(i18n.t("hub.connection.errors.operatorMustApprove"));
   const transport = new PairedHubTransport(profile);
   try {
     const capabilities = await readHubDeviceCapabilities(transport);

@@ -1,12 +1,14 @@
 import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
+import { HUB_WEB_CLIENT_CALLBACK } from "./web-clients.js";
 
-/** Stable OAuth identity shared by the Clisbot native and desktop applications. */
+/** Stable OAuth identity shared by the Clisbot web, native and desktop applications. */
 export const CLISBOT_CLIENT_ID = "clisbot-client";
 export const HUB_ACCESS_SCOPE = "hub:access";
 export const HUB_AUTHORIZATION_SCOPES = [HUB_ACCESS_SCOPE, "offline_access"] as const;
 export const HUB_ORGANIZATION_CLAIM = "https://clisbot.com/organization_id";
 
 export const CLISBOT_CLIENT_REDIRECT_URIS = [
+  HUB_WEB_CLIENT_CALLBACK,
   "clisbot://hub-auth/callback",
   "http://127.0.0.1/hub-auth/callback",
   "http://[::1]/hub-auth/callback",

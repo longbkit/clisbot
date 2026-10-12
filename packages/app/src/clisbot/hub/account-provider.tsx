@@ -263,6 +263,13 @@ function EnabledHubAccountController({
       ...(configuration.deviceProfile ? [connection.refetch()] : []),
     ]);
   }, [account, configuration.deviceProfile, connection]);
+  useEffect(
+    () =>
+      transport.subscribeSessionChange?.(() => {
+        void refresh();
+      }),
+    [transport, refresh],
+  );
   const run = useCallback(
     async (operation: () => Promise<void>) => {
       setMutationError(null);

@@ -7,7 +7,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { buildSettingsSectionRoute } from "@/utils/host-routes";
 import { isHubUnreachable } from "@/device-access/unavailable-hub";
-import { useHubProfiles } from "@/device-access/hub-profiles";
+import { useHubProfiles, hubProfileOrigin } from "@/device-access/hub-profiles";
 import { useHubAccount } from "./account-provider";
 import { buildHubSettingsRoute } from "./navigation";
 import {
@@ -46,7 +46,7 @@ export function HubSidebarTopRow({ onBeforeNavigate }: { onBeforeNavigate?: () =
   if (unreachable) fallbackLabel = t("hub.account.sidebar.hubUnavailable");
   const accessibilityLabel = presentation?.accessibilityLabel ?? fallbackLabel;
   // Home V2 names where you are: the signed-in organization, else the selected Hub, else Clisbot.
-  const hubName = profiles.find((profile) => `hub://${profile.hubId}` === hub.origin)?.label;
+  const hubName = profiles.find((profile) => hubProfileOrigin(profile) === hub.origin)?.label;
   const label = HOME_V2_ENABLED
     ? (hub.signedIn?.organization.name ?? (hub.enabled ? hubName : undefined) ?? "Clisbot")
     : "Clisbot";

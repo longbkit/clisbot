@@ -14,7 +14,10 @@ interface CapabilityState {
 /** Account refresh keeps the transport and in-progress form in the same Hub scope. */
 export function useHubDeviceCapabilities(profile: HubProfile | undefined) {
   const account = useHubAccount();
-  const transport = useMemo(() => (profile ? new PairedHubTransport(profile) : null), [profile]);
+  const transport = useMemo(
+    () => (profile && profile.authentication !== "oauth" ? new PairedHubTransport(profile) : null),
+    [profile],
+  );
   const [state, setState] = useState<CapabilityState>({
     scope: null,
     capabilities: null,

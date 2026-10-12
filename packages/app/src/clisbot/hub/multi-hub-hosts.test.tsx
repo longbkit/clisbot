@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   loadHubProfiles,
   saveHubProfile,
+  saveDiscoveredHub,
   updateHubProfile,
   selectHubProfile,
   removeHubProfile,
@@ -31,6 +32,8 @@ const state = vi.hoisted(() => ({
     activeId: "personal" as string | null,
   },
   pendingHub: null as string | null,
+  accountSignedIn: true,
+  accountListeners: new Set<() => void>(),
   hosts: [] as FakeHost[],
   listeners: new Set<() => void>(),
   register: vi.fn(),
@@ -44,6 +47,27 @@ const hubHosts: Record<string, string> = { personal: "laptop", company: "build-0
 vi.mock("expo-linking", () => ({ useURL: () => null }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ setParams: vi.fn() }) }));
 vi.mock("@/clisbot/hub/config", () => ({ getHubConfiguration: () => null }));
+vi.mock("@/clisbot/hub/transport/create", () => ({
+  createHubTransport: () => ({
+    signInKind: "system-browser",
+    subscribeSessionChange(listener: () => void) {
+      state.accountListeners.add(listener);
+      return () => {
+        state.accountListeners.delete(listener);
+      };
+    },
+    async request(path: string) {
+      if (path === "/api/auth/clisbot/state")
+        return Response.json(
+          state.accountSignedIn
+            ? active("company")
+            : { status: "signedOut", registration: "invite_only" },
+        );
+      if (path.endsWith("/daemons")) return Response.json({ daemons: [daemon("company")] });
+      return new Response(null, { status: 404 });
+    },
+  }),
+}));
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {
     getItem: async () =>
@@ -203,7 +227,9 @@ function Probe() {
 beforeEach(async () => {
   vi.stubGlobal("React", React);
   state.pendingHub = null;
+  state.accountSignedIn = true;
   await loadHubProfiles();
+  await removeHubProfile("https://company.test");
   for (const profile of state.registry.profiles) {
     await saveHubProfile(
       { ...profile, origin: `https://${profile.hubId}.example.test` },
@@ -213,8 +239,62 @@ beforeEach(async () => {
   await selectHubProfile("personal");
 });
 
-afterEach(() => {
+test("a company OAuth Hub and a paired personal Hub keep their Hosts through selection and remount", async () => {
+  await removeHubProfile("company");
+  await saveDiscoveredHub({
+    authentication: "oauth",
+    hubId: "https://company.test",
+    origin: "https://company.test",
+    label: "Company",
+    entry: "account",
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = () => (
+    <QueryClientProvider client={client}>
+      <HubAccountProvider>
+        <HubHostSynchronization />
+        <Probe />
+      </HubAccountProvider>
+    </QueryClientProvider>
+  );
+  let view = render(tree());
+  const probe = () => JSON.parse(view.getByTestId("probe").textContent ?? "{}");
+  await waitFor(() =>
+    expect(probe()).toMatchObject({
+      selected: "https://company.test",
+      hosts: ["build-03", "laptop"],
+    }),
+  );
+  await act(() => selectHubProfile("personal"));
+  await waitFor(() =>
+    expect(probe()).toMatchObject({ selected: "hub://personal", hosts: ["build-03", "laptop"] }),
+  );
+  expect(state.hosts.map((host) => host.management?.hubOrigin).sort()).toEqual([
+    "https://company.test",
+    "hub://personal",
+  ]);
+  view.unmount();
+  view = render(tree());
+  await waitFor(() => expect(probe().hosts).toEqual(["build-03", "laptop"]));
+  // A sign-out notification from another tab updates the account and removes only its Hosts.
+  act(() => {
+    state.accountSignedIn = false;
+    for (const listener of state.accountListeners) listener();
+  });
+  await waitFor(() => expect(probe().hosts).toEqual(["laptop"]));
+  act(() => {
+    state.accountSignedIn = true;
+    for (const listener of state.accountListeners) listener();
+  });
+  await waitFor(() => expect(probe().hosts).toEqual(["build-03", "laptop"]));
+  await act(() => removeHubProfile("https://company.test"));
+  await waitFor(() => expect(probe().hosts).toEqual(["laptop"]));
+});
+
+afterEach(async () => {
   cleanup();
+  await waitFor(() => expect(state.hosts).toEqual([]));
+  expect(state.accountListeners.size).toBe(0);
   state.hosts = [];
   state.register.mockClear();
   state.remove.mockClear();

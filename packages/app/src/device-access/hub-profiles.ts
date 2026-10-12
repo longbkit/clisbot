@@ -5,15 +5,34 @@ import { z } from "zod";
 import { i18n } from "@/i18n/i18next";
 import { isHubSwitchLocked } from "./hub-edit-lock";
 
-const ProfileSchema = HubDeviceOfferSchema.omit({
+const PairedProfileSchema = HubDeviceOfferSchema.omit({
   pairing: true,
   ownerSetupToken: true,
 }).extend({
+  authentication: z.literal("device").optional(),
   label: z.string().min(1).max(80),
   entry: z.enum(["account", "pairing", "owner-setup"]).optional(),
   setupStatus: z.enum(["ready", "owner-required", "blocked"]).optional(),
 });
+const AccountProfileSchema = z
+  .object({
+    authentication: z.literal("oauth"),
+    // Account-only Hubs are identified by their HTTPS OAuth issuer, not a device key.
+    hubId: z.string().url(),
+    origin: z.string().url(),
+    label: z.string().min(1).max(80),
+    publicKey: z.never().optional(),
+    relay: z.never().optional(),
+    entry: z.literal("account"),
+    setupStatus: z.literal("ready").optional(),
+  })
+  .refine((profile) => profile.hubId === profile.origin, "Hub issuer must match its origin");
+const ProfileSchema = z.union([AccountProfileSchema, PairedProfileSchema]);
+export type PairedHubProfile = z.infer<typeof PairedProfileSchema>;
 export type HubProfile = z.infer<typeof ProfileSchema>;
+export function hubProfileOrigin(profile: HubProfile): string {
+  return profile.authentication === "oauth" ? profile.origin : `hub://${profile.hubId}`;
+}
 const RegistrySchema = z.object({
   profiles: z.array(ProfileSchema).max(32),
   activeId: z.string().nullable(),
@@ -171,7 +190,10 @@ function mutate(action: () => typeof snapshot): Promise<void> {
   return operation;
 }
 
-export function validateHubRoutes(offer: HubDeviceOffer): void {
+export function validateHubRoutes(offer: {
+  origin?: string;
+  relay?: HubDeviceOffer["relay"];
+}): void {
   if (!offer.origin && !offer.relay) throw new Error(i18n.t("hub.connection.errors.noRoute"));
   if (offer.relay)
     parseHubRelayUrl(`${offer.relay.useTls === false ? "ws" : "wss"}://${offer.relay.endpoint}`);

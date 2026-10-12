@@ -17,7 +17,10 @@ const state = vi.hoisted(() => ({
 vi.mock("expo-linking", () => ({ useURL: () => null }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ setParams: vi.fn() }) }));
 vi.mock("@/clisbot/hub/config", () => ({ getHubConfiguration: () => null }));
-vi.mock("./hub-profiles", () => ({ useHubProfiles: () => state.registry }));
+vi.mock("./hub-profiles", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./hub-profiles")>()),
+  useHubProfiles: () => state.registry,
+}));
 vi.mock("./hub-transport", () => ({
   PairedHubTransport: class {
     readonly signInKind = "password";

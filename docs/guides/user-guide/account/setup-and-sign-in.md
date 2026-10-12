@@ -4,6 +4,13 @@
 
 Open the Hub in the Clisbot web app at **Settings → Account**. The native and desktop apps open this same page in a browser to sign in, then return to the app.
 
+To add a company Hub, open **Settings → Hubs → Connect existing Hub** in the app or at
+`app.clisbot.com`, paste the Hub URL, then choose **Continue in browser** in Account. The Hub
+opens its own login page. It reuses your existing Hub login when possible; otherwise sign in
+again with the same account. Your organizations and permissions stay the same. You can still
+use the Hub's own website, and each added Hub keeps a separate login. This requires a Hub and
+app version that support account Hub discovery; an older Hub needs an operator update.
+
 The **Welcome** screen has two groups of Host sources: **Managed Hosts** (the **Clisbot Hub** tile) and **Your own computer** (QR, pairing link, direct, Remote SSH on desktop). You can use both at once, so the lower group stays after you sign in to the Hub.
 
 After you sign in from Welcome, if the organization already has a Host you can use, the app goes straight to the workspace. With no Host yet, **Settings → Account** shows **Add your first Host** at the top: **Add via Hub** opens the `hub connect` instructions and Host approval; **Connect directly** opens the daemon address/password form, saves the Host on the device and opens it. A Member with no granted Host sees how to request access through **View shared Hosts** and still has the direct option. The app waits for the Host list to load; a load error shows a Retry button. A registered Host, even offline or without connection details, counts as a Host. Any missing account steps (choosing an organization, changing the password…) still come first. On later visits to Welcome, the **Clisbot Hub** tile shows the signed-in account and the Host status: connecting, the organization has shared no Host, the Host has not published how to connect, or a Host save error with a **Retry** button. **Refresh Hosts** reloads the Host list from the Hub, like the button of the same name in **Settings → Hosts**.

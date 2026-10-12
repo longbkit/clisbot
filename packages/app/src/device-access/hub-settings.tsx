@@ -49,6 +49,7 @@ import { isTailscaleOrigin, saveVerifiedHubRoutes, startHubOnHost } from "./hub-
 import { HubRoutesCard } from "./hub-routes-card";
 import { HubPairDevicePanel } from "./hub-pair-device";
 import { fetchPublicHubIdentity } from "./hub-identity-check";
+import { discoverAccountHub } from "@/clisbot/hub/connection-discovery";
 import { HubIdentityRecovery } from "./hub-identity-recovery";
 import { readDeviceCredential } from "./credentials";
 import { PairedDeviceList } from "./device-list";
@@ -158,6 +159,14 @@ export function HubConnectionSettings() {
         }
         const configuration = parseHubConfiguration({ origin: input.trim() });
         if (!configuration) throw new Error(t("hub.connection.errors.pasteUrl"));
+        const accountHub = await discoverAccountHub(configuration.origin);
+        if (accountHub) {
+          await saveDiscoveredHub(accountHub);
+          router.push("/settings/hub/account");
+          setIntent(null);
+          setLink("");
+          return;
+        }
         const result = IdentitySchema.safeParse(await fetchPublicHubIdentity(configuration.origin));
         if (!result.success) throw new Error(t("hub.connection.errors.invalidResponse"));
         const identity = result.data;
@@ -557,7 +566,25 @@ export function HubOverviewSettings() {
   }, [params.hubPanel]);
   const openDevices = useCallback(() => router.setParams({ hubPanel: "devices" }), [router]);
   const closeDevices = useCallback(() => router.setParams({ hubPanel: undefined }), [router]);
+  const openAccount = useCallback(() => router.push("/settings/hub/account"), [router]);
   if (!profile) return <HubConnectionSettings />;
+  if (profile.authentication === "oauth")
+    return editing ? (
+      <HubConnectionEditor profile={profile} close={closeEditor} />
+    ) : (
+      <>
+        <SettingsSection title={profile.label}>
+          <Text selectable>{profile.origin}</Text>
+          <View style={hubStyles.actions}>
+            <Button onPress={openAccount}>{t("hub.settings.navigation.account")}</Button>
+            <Button variant="outline" onPress={openEditor}>
+              {t("hub.connection.overview.editConnection")}
+            </Button>
+          </View>
+        </SettingsSection>
+        <HubOverviewDestinations />
+      </>
+    );
   return (
     <>
       {params.hubPanel === "devices" ? (
@@ -621,7 +648,9 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
   return (
     <>
       <HubContextNote>{t("hub.connection.editor.switchNote")}</HubContextNote>
-      <HubRoutesCard profile={profile} onUpdated={close} />
+      {profile.authentication !== "oauth" ? (
+        <HubRoutesCard profile={profile} onUpdated={close} />
+      ) : null}
       <View style={[settingsStyles.card, hubStyles.form]}>
         <Field
           label={t("hub.connection.editor.nameLabel")}
@@ -638,16 +667,22 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
           <Text style={hubStyles.hint}>
             {t("hub.connection.editor.hubId", { id: profile.hubId })}
           </Text>
-          <HubStatusBadge label={t("hub.connection.editor.verified")} tone="success" />
+          {profile.authentication !== "oauth" ? (
+            <HubStatusBadge label={t("hub.connection.editor.verified")} tone="success" />
+          ) : null}
         </View>
-        <CustomAddressFields
-          initiallyOpen={Boolean(profile.origin) && !isTailscaleOrigin(profile.origin)}
-          origin={origin}
-          relay={relay}
-          setOrigin={setOrigin}
-          setRelay={setRelay}
-          busy={busy}
-        />
+        {profile.authentication === "oauth" ? (
+          <Text selectable>{profile.origin}</Text>
+        ) : (
+          <CustomAddressFields
+            initiallyOpen={Boolean(profile.origin) && !isTailscaleOrigin(profile.origin)}
+            origin={origin}
+            relay={relay}
+            setOrigin={setOrigin}
+            setRelay={setRelay}
+            busy={busy}
+          />
+        )}
         <View style={hubStyles.actions}>
           <Button variant="outline" disabled={busy} onPress={close}>
             {t("hub.connection.common.cancel")}
@@ -663,7 +698,9 @@ function HubConnectionEditor({ profile, close }: { profile: HubProfile; close():
         </View>
         {error ? <Text accessibilityRole="alert">{error}</Text> : null}
       </View>
-      <HubContextNote>{t("hub.connection.editor.proveNote")}</HubContextNote>
+      {profile.authentication !== "oauth" ? (
+        <HubContextNote>{t("hub.connection.editor.proveNote")}</HubContextNote>
+      ) : null}
     </>
   );
 }

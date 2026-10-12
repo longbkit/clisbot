@@ -38,6 +38,7 @@ const state = vi.hoisted(() => ({
   confirm: vi.fn(async () => true),
   otherAccounts: [] as Record<string, unknown>[],
   saveDiscovered: vi.fn(),
+  discoverAccount: vi.fn(async () => null as import("./hub-profiles").HubProfile | null),
   account: {
     signedIn: null as Record<string, unknown> | null,
     refresh: vi.fn(async () => {}),
@@ -53,7 +54,11 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({ push: state.push, setParams: state.setParams }),
   useLocalSearchParams: () => state.params,
 }));
-vi.mock("./hub-profiles", () => ({
+vi.mock("@/clisbot/hub/connection-discovery", () => ({
+  discoverAccountHub: state.discoverAccount,
+}));
+vi.mock("./hub-profiles", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./hub-profiles")>()),
   useHubProfiles: () => ({
     profiles: state.profiles,
     activeId: state.activeId,
@@ -517,6 +522,7 @@ test("Hub connection groups Cancel with the primary action, locks pending input,
   expect((screen.getByRole("textbox", { name: "Device label" }) as HTMLInputElement).disabled).toBe(
     true,
   );
+  await waitFor(() => expect(fetchIdentity).toHaveBeenCalledOnce());
   await act(async () => rejectRequest(new TypeError("Failed to fetch")));
   const error = screen.getByText(/Could not reach this Hub\. Check the address/);
   expect(form.contains(error)).toBe(true);
@@ -554,6 +560,29 @@ test("editing a Hub address clears the previous target's owner setup notice", as
   expect(screen.queryByText("Owner setup is not complete")).toBeNull();
   expect(state.pair).not.toHaveBeenCalled();
   expect(state.saveDiscovered).not.toHaveBeenCalled();
+});
+
+test("a company Hub discovered by URL goes to its account without device pairing", async () => {
+  const company = {
+    authentication: "oauth" as const,
+    hubId: "https://work.test",
+    origin: "https://work.test",
+    label: "work.test",
+    entry: "account" as const,
+  };
+  state.discoverAccount.mockResolvedValueOnce(company);
+  state.params = { hubIntent: "connect" };
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(<HubConnectionSettings />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Hub URL or pairing link" }), {
+    target: { value: company.origin },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Connect Hub" }));
+  await waitFor(() => expect(state.push).toHaveBeenCalledWith("/settings/hub/account"));
+  expect(state.saveDiscovered).toHaveBeenCalledWith(company);
+  expect(state.pair).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 test("account capability refresh keeps the same policy transport alive until its scope unmounts", async () => {

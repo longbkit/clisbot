@@ -16,7 +16,7 @@ import { useToast } from "@/contexts/toast-api-context";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { settingsStyles } from "@/styles/settings";
 import type { HostProfile } from "@/types/host-connection";
-import { removeHubProfile, type HubProfile } from "./hub-profiles";
+import { removeHubProfile, type HubProfile, hubProfileOrigin } from "./hub-profiles";
 import { HubNetworkIcon, HubLaptopIcon, hubMutedIconProps } from "./hub-ui";
 import type { DetectedHub, HostHubCheck } from "./hub-host-discovery";
 
@@ -94,7 +94,7 @@ export function SavedHubList({
           profile={profile}
           selected={profile.hubId === activeId}
           disabled={disabled}
-          account={accounts.find((account) => account.origin === `hub://${profile.hubId}`)}
+          account={accounts.find((account) => account.origin === hubProfileOrigin(profile))}
           detected={detected.find((hub) => matchesSavedHub(hub, profile))}
           localServerId={localServerId}
           open={open}

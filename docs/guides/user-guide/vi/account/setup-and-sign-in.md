@@ -10,6 +10,13 @@ Màn **Welcome** có hai nhóm nguồn Host: **Managed Hosts** (ô **Clisbot Hub
 
 Đóng Welcome bằng nút **✕** ở góc trên phải để về màn hình chính; từ đó tile **Add a Host** mở lại Welcome. Nút **⚙** cạnh nó mở Settings.
 
+Để thêm Hub công ty, mở **Settings → Hubs → Connect existing Hub** trong app hoặc tại
+`app.clisbot.com`, nhập URL Hub, rồi chọn **Continue in browser** trong Account. App mở trang
+đăng nhập của chính Hub đó. Nếu còn phiên đăng nhập thì Hub dùng lại; nếu hết phiên thì đăng
+nhập lại bằng tài khoản cũ. Tổ chức và quyền truy cập giữ nguyên. Bạn vẫn dùng được website
+riêng của Hub, và mỗi Hub đã thêm có phiên đăng nhập riêng. Hub và app cần phiên bản hỗ trợ
+thêm Hub qua tài khoản; Hub phiên bản cũ cần người vận hành cập nhật.
+
 ## Người vận hành: bật Google và chọn cách đăng ký
 
 Đặt các biến sau trong môi trường chạy Hub rồi restart Hub:

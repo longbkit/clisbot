@@ -1,7 +1,8 @@
 import { Buffer } from "buffer";
 import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
-import * as SecureStore from "expo-secure-store";
+import { readSecret, writeSecret, deleteSecret, lockSecret } from "@/device-access/secret-storage";
+import { oauthCredentialKey, parseOAuthCredential } from "./oauth-credentials";
 import * as WebBrowser from "expo-web-browser";
 import type { HubConfiguration } from "../config";
 import type { HubRequestInput, HubTransport } from "./contract";
@@ -17,6 +18,7 @@ import { i18n } from "@/i18n/i18next";
 interface AccessCredential {
   accessToken: string;
   expiresAt: number;
+  generation: string;
 }
 
 export function createHubTransport(configuration: HubConfiguration): HubTransport {
@@ -27,16 +29,17 @@ class NativeHubTransport implements HubTransport {
   readonly signInKind = "system-browser" as const;
   private access: AccessCredential | null = null;
   private readonly refreshKey: string;
-  private refreshInFlight: Promise<string | null> | null = null;
 
   constructor(private readonly origin: string) {
-    this.refreshKey = `clisbot.hub.${shortOriginHash(origin)}.refresh`;
+    this.refreshKey = oauthCredentialKey(origin);
   }
 
   async request(path: string, input: HubRequestInput = {}): Promise<Response> {
     const accessToken = await this.currentAccessToken();
     return fetch(new URL(assertHubPath(path), this.origin), {
       method: input.method ?? "GET",
+      credentials: "omit",
+      redirect: "error",
       headers: {
         ...input.headers,
         ...(accessToken === null ? {} : { authorization: `Bearer ${accessToken}` }),
@@ -73,89 +76,86 @@ class NativeHubTransport implements HubTransport {
       state,
       issuer: this.origin,
     });
-    const token = await this.exchange(
-      tokenRequestBody({
-        origin: this.origin,
-        redirectUri,
-        code,
-        verifier,
-      }),
+    await lockSecret(this.refreshKey, () =>
+      this.exchange(tokenRequestBody({ origin: this.origin, redirectUri, code, verifier }), state),
     );
-    if (token.refresh_token === undefined)
-      throw new Error(i18n.t("hub.account.signIn.noRefreshToken"));
-    await SecureStore.setItemAsync(this.refreshKey, token.refresh_token, {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
   }
 
   async signOut(): Promise<void> {
-    const refreshToken = await SecureStore.getItemAsync(this.refreshKey);
-    this.access = null;
-    await SecureStore.deleteItemAsync(this.refreshKey);
-    if (refreshToken === null) return;
-    await fetch(new URL("/api/auth/oauth2/revoke", this.origin), {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ token: refreshToken, client_id: CLISBOT_CLIENT_ID }),
-    }).catch(() => undefined);
+    await lockSecret(this.refreshKey, async () => {
+      const credential = parseOAuthCredential(await readSecret(this.refreshKey), this.origin);
+      this.access = null;
+      await deleteSecret(this.refreshKey);
+      if (!credential) return;
+      await fetch(new URL("/api/auth/oauth2/revoke", this.origin), {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: credential.refreshToken, client_id: CLISBOT_CLIENT_ID }),
+      }).catch(() => undefined);
+    });
   }
 
   private async currentAccessToken(): Promise<string | null> {
-    if (this.access !== null && this.access.expiresAt - Date.now() > 30_000) {
-      return this.access.accessToken;
-    }
-    if (this.refreshInFlight === null) {
-      this.refreshInFlight = this.refresh().finally(() => {
-        this.refreshInFlight = null;
-      });
-    }
-    return this.refreshInFlight;
-  }
-
-  private async refresh(): Promise<string | null> {
-    const refreshToken = await SecureStore.getItemAsync(this.refreshKey);
-    if (refreshToken === null) return null;
-    try {
-      const token = await this.exchange(tokenRequestBody({ origin: this.origin, refreshToken }));
-      const nextRefreshToken = token.refresh_token;
-      if (nextRefreshToken === undefined) throw new Error("Hub did not rotate the refresh token.");
-      await SecureStore.setItemAsync(this.refreshKey, nextRefreshToken, {
-        keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-      });
-      return token.access_token;
-    } catch {
+    return lockSecret(this.refreshKey, async () => {
+      const credential = parseOAuthCredential(await readSecret(this.refreshKey), this.origin);
+      if (!credential) {
+        this.access = null;
+        return null;
+      }
+      if (
+        this.access?.generation === credential.generation &&
+        this.access.expiresAt - Date.now() > 30_000
+      )
+        return this.access.accessToken;
       this.access = null;
-      await SecureStore.deleteItemAsync(this.refreshKey);
-      return null;
-    }
+      const token = await this.exchange(
+        tokenRequestBody({ origin: this.origin, refreshToken: credential.refreshToken }),
+        credential.generation,
+      );
+      return token?.access_token ?? null;
+    });
   }
 
-  private async exchange(body: URLSearchParams) {
+  private async exchange(body: URLSearchParams, generation: string) {
     const response = await fetch(new URL("/api/auth/oauth2/token", this.origin), {
       method: "POST",
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(20_000),
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body,
     });
-    if (!response.ok)
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      if (
+        body.get("grant_type") === "refresh_token" &&
+        response.status === 400 &&
+        error?.error === "invalid_grant"
+      ) {
+        this.access = null;
+        await deleteSecret(this.refreshKey);
+        return null;
+      }
       throw new Error(
         i18n.t("hub.account.signIn.credentialExchangeFailed", { status: response.status }),
       );
+    }
     const token = OAuthTokenResponseSchema.parse(await response.json());
+    if (!token.refresh_token) throw new Error(i18n.t("hub.account.signIn.noRefreshToken"));
+    await writeSecret(
+      this.refreshKey,
+      JSON.stringify({ issuer: this.origin, refreshToken: token.refresh_token, generation }),
+    );
     this.access = {
+      generation,
       accessToken: token.access_token,
       expiresAt: Date.now() + token.expires_in * 1_000,
     };
     return token;
   }
-}
-
-function shortOriginHash(origin: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < origin.length; index += 1) {
-    hash ^= origin.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function assertHubPath(path: string): string {
