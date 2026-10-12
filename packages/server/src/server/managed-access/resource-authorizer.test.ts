@@ -532,6 +532,62 @@ describe("ManagedResourceAuthorizer", () => {
       }),
     ).toBe(false);
   });
+  it("requires Project command authority for fetch and filters Git inspection to the granted Project", async () => {
+    const reader = createHarness(["project.use"]);
+    expect(
+      await reader.allowsInbound({
+        type: "project.git.inspect.request",
+        projectId: "project-a",
+        kind: "worktrees",
+        requestId: "read",
+      }),
+    ).toBe(true);
+    expect(
+      await reader.allowsInbound({
+        type: "project.git.inspect.request",
+        projectId: "project-b",
+        kind: "worktrees",
+        requestId: "read",
+      }),
+    ).toBe(false);
+    expect(
+      await reader.allowsInbound({
+        type: "project.git.fetch.request",
+        projectId: "project-a",
+        remote: "origin",
+        requestId: "fetch",
+      }),
+    ).toBe(false);
+    const developer = createHarness(["project.use", "approval.command"]);
+    expect(
+      await developer.allowsInbound({
+        type: "project.git.fetch.request",
+        projectId: "project-a",
+        remote: "origin",
+        requestId: "fetch",
+      }),
+    ).toBe(true);
+    expect(
+      await developer.allowsInbound({
+        type: "project.git.fetch.request",
+        projectId: "project-b",
+        remote: "origin",
+        requestId: "fetch",
+      }),
+    ).toBe(false);
+    expect(
+      reader.allowsOutbound({
+        type: "project.git.inspect.response",
+        payload: { projectId: "project-a", requestId: "read", worktrees: [], error: null },
+      }),
+    ).toBe(true);
+    expect(
+      reader.allowsOutbound({
+        type: "project.git.inspect.response",
+        payload: { projectId: "project-b", requestId: "read", worktrees: [], error: null },
+      }),
+    ).toBe(false);
+  });
 
   it("requires an exact active Workspace root for managed file operations", async () => {
     const authorizer = createHarness(["project.use"]);

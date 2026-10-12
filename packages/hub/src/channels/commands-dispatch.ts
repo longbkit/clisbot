@@ -61,7 +61,14 @@ export interface CommandResult {
 
 /** Platform commands target the route's execution owner after one Access check. */
 export class ChannelCommandDispatcher {
-  constructor(private readonly deps: CommandDispatcherDependencies) {}
+  private readonly placement: ChannelPlacementCommands;
+  constructor(private readonly deps: CommandDispatcherDependencies) {
+    this.placement = new ChannelPlacementCommands({
+      ...deps,
+      baseConfig: (context) => this.baseConfig(context),
+      authorizeConfiguration: (input) => this.authorizeConfiguration(input),
+    });
+  }
 
   async handle(
     command: ChannelTextCommand,
@@ -117,13 +124,13 @@ export class ChannelCommandDispatcher {
         return this.reply(context, await this.status(context), "status");
       if (command.name === "followup") return this.followUp(command.value, context);
       if (context.route.target.kind === "workflow") return this.workflow(command, context);
-      if (command.name === "project" || command.name === "workspace" || command.name === "branch") {
-        const commands = new ChannelPlacementCommands({
-          ...this.deps,
-          baseConfig: (placementContext) => this.baseConfig(placementContext),
-          authorizeConfiguration: (input) => this.authorizeConfiguration(input),
-        });
-        return this.reply(context, await commands.run(command, context));
+      if (
+        command.name === "project" ||
+        command.name === "workspace" ||
+        command.name === "branch" ||
+        command.name === "worktree"
+      ) {
+        return this.reply(context, await this.placement.run(command, context));
       }
       const lifecycle = await this.deps.lifecycle.handle(command, context);
       if (lifecycle) return lifecycle;
@@ -777,7 +784,9 @@ function createsWorktree(config: CreateAgentConfig): boolean {
 }
 
 function isMutation(command: ChannelTextCommand): boolean {
-  if (["help", "me", "status", "cowork", "routedefault", "branch"].includes(command.name))
+  if (command.name === "branch")
+    return command.value !== undefined && !/^(list|search)(?:\s|$)/iu.test(command.value);
+  if (["help", "me", "status", "cowork", "routedefault", "worktree"].includes(command.name))
     return false;
   if (command.name === "project" || command.name === "workspace")
     return command.value !== undefined && !/^(list|search|show)(?:\s|$)/iu.test(command.value);

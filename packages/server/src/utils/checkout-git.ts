@@ -1110,6 +1110,10 @@ export interface GitWorktreeEntry {
   path: string;
   branchRef?: string;
   isBare?: boolean;
+  head?: string;
+  detached?: boolean;
+  locked?: boolean;
+  prunable?: boolean;
 }
 
 /** Check whether a path is under Clisbot's worktree root. */
@@ -1140,8 +1144,9 @@ export function isDescendantPath(child: string, parent: string): boolean {
 export function parseWorktreeList(output: string): GitWorktreeEntry[] {
   const entries: GitWorktreeEntry[] = [];
   let current: GitWorktreeEntry | null = null;
-  for (const line of output.split("\n")) {
-    const trimmed = line.trim();
+  const nul = output.includes("\0");
+  for (const line of output.split(nul ? "\0" : "\n")) {
+    const trimmed = nul ? line : line.trim();
     if (!trimmed) {
       continue;
     }
@@ -1149,15 +1154,21 @@ export function parseWorktreeList(output: string): GitWorktreeEntry[] {
       if (current) {
         entries.push(current);
       }
-      current = { path: trimmed.slice("worktree ".length).trim() };
+      const path = trimmed.slice("worktree ".length);
+      current = { path: nul ? path : path.trim() };
       continue;
     }
-    if (current && trimmed.startsWith("branch ")) {
+    if (!current) continue;
+    if (trimmed.startsWith("branch ")) {
       current.branchRef = trimmed.slice("branch ".length).trim();
     }
-    if (current && trimmed === "bare") {
+    if (trimmed === "bare") {
       current.isBare = true;
     }
+    if (trimmed.startsWith("HEAD ")) current.head = trimmed.slice(5);
+    if (trimmed === "detached") current.detached = true;
+    if (trimmed === "locked" || trimmed.startsWith("locked ")) current.locked = true;
+    if (trimmed === "prunable" || trimmed.startsWith("prunable ")) current.prunable = true;
   }
   if (current) {
     entries.push(current);

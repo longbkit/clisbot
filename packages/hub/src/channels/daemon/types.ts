@@ -214,6 +214,9 @@ export interface WorkspaceSnapshot extends ProjectSnapshot {
 export interface BranchSnapshot {
   name: string;
   committerDate: number;
+  source?: "local" | "remote";
+  remote?: string | undefined;
+  commit?: import("@clisbot/protocol/messages").GitCommitSummary;
   hasLocal?: boolean;
   hasRemote?: boolean;
 }

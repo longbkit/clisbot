@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createProjectGitClient } from "./project-git.js";
 import type { InboundMessage } from "../plane/types.js";
 import {
   channelMessageId,
@@ -92,6 +93,15 @@ export interface CreateAgentResult {
 }
 
 export interface DaemonConnection {
+  listGitBranches?(projectId: string): Promise<import("./types.js").BranchSnapshot[]>;
+  listGitWorktrees?(
+    projectId: string,
+  ): Promise<import("@clisbot/protocol/messages").GitWorktreeSummary[]>;
+  inspectGitWorktree?(
+    projectId: string,
+    path: string,
+  ): Promise<import("@clisbot/protocol/messages").GitWorktreeInspection>;
+  fetchGitRemote?(projectId: string, remote: string, source: InboundMessage): Promise<string>;
   /** Project placement confirmed by the daemon for this exact Agent/Workspace. */
   getAgentProject?(agent: AgentSnapshot): Promise<import("./types.js").ProjectSnapshot | undefined>;
   listProjects?(): Promise<import("./types.js").ProjectSnapshot[]>;
@@ -352,6 +362,7 @@ function createFacade(
   };
   return {
     discovery,
+    ...createProjectGitClient(socket, identify),
     waitForConnected: (timeoutMs) => socket.waitForConnected(timeoutMs),
     hasFreeCreateSlot: () => hostHasCreateSlot(hostKey),
     async *readChannelFile(input) {

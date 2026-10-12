@@ -48,9 +48,9 @@ group:
 
 The per-command **Requires** columns below repeat this at the row level.
 
-### Project, Workspace and branch discovery
+### Project, Workspace and Git discovery
 
-All three commands are singular, like `/provider` and `/model`. They require a
+These commands are singular, like `/provider` and `/model`. They require a
 matching direct Route and its admission rules; a mention does not bootstrap an
 unserved topic. They work before the first Agent exists.
 
@@ -59,23 +59,27 @@ and the next session's selection/default, without listing or changing anything.
 Use `list` or `search` explicitly for discovery. The same rule applies to the
 configuration commands `/agent`, `/provider`, `/model`, `/effort` and `/permission`.
 
-| Command                                                        | Meaning                                                         | Requires                                              |
-| -------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------- |
-| `/project`                                                     | Current/next Project and Workspace, with Host name and ID       | `project.use` on each visible Project                 |
-| `/project list [--page N]`                                     | Projects on the serving Host                                    | `project.use` on each visible Project                 |
-| `/project search <text> [--page N]`                            | Search names, IDs and final directory names                     | `project.use`                                         |
-| `/project <id-or-exact-name>`                                  | Select the next session's Project; clear Workspace selection    | `project.use`, `agent.create` and configuration grant |
-| `/project clear`                                               | Clear both placement choices; return to Route default           | Destination `agent.create` and grant                  |
-| `/workspace`                                                   | Current/next Workspace, Project and Host, with branch and path  | `project.use`                                         |
-| `/workspace list [--worktree] [--page N]`                      | Registered Workspaces in the selected/default Project           | `project.use`                                         |
-| `/workspace search <text> [--worktree] [--page N]`             | Search Workspace names, IDs, branches and final directory names | `project.use`                                         |
-| `/workspace show <id-or-exact-name>`                           | Details without selecting                                       | `project.use`                                         |
-| `/workspace <id-or-exact-name>`                                | Select an existing Workspace for the next session               | Destination `agent.create` and grant                  |
-| `/workspace clear`                                             | Clear Workspace choice, retain Project                          | Destination `agent.create` and grant                  |
-| `/workspace new [base-ref] [--branch name] [--name "title"]`   | Create and select a new worktree Workspace immediately          | `workspace.create`, `agent.create` and grant          |
-| `/workspace new --local [--name "title"]`                      | Create a Workspace using the Project's existing checkout        | Same as above                                         |
-| `/branch`                                                      | Current/next location, including branch                         | `project.use`                                         |
-| `/branch list [--page N]` · `/branch search <text> [--page N]` | Discover local/origin branches in the selected/default Project  | `project.use`                                         |
+| Command                                                            | Meaning                                                                                   | Requires                                              |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `/project`                                                         | Current/next Project and Workspace, with Host name and ID                                 | `project.use` on each visible Project                 |
+| `/project list [--page N]`                                         | Projects on the serving Host                                                              | `project.use` on each visible Project                 |
+| `/project search <text> [--page N]`                                | Search names, IDs and final directory names                                               | `project.use`                                         |
+| `/project <id-or-exact-name>`                                      | Select the next session's Project; clear Workspace selection                              | `project.use`, `agent.create` and configuration grant |
+| `/project clear`                                                   | Clear both placement choices; return to Route default                                     | Destination `agent.create` and grant                  |
+| `/workspace`                                                       | Current/next Workspace, Project and Host, with branch and path                            | `project.use`                                         |
+| `/workspace list [--worktree] [--page N]`                          | Registered Workspaces in the selected/default Project                                     | `project.use`                                         |
+| `/workspace search <text> [--worktree] [--page N]`                 | Search Workspace names, IDs, branches and final directory names                           | `project.use`                                         |
+| `/workspace show <id-or-exact-name>`                               | Details without selecting                                                                 | `project.use`                                         |
+| `/workspace <id-or-exact-name>`                                    | Select an existing Workspace for the next session                                         | Destination `agent.create` and grant                  |
+| `/workspace clear`                                                 | Clear Workspace choice, retain Project                                                    | Destination `agent.create` and grant                  |
+| `/workspace new [base-ref] [--branch name] [--name "title"]`       | Create and select a new worktree Workspace immediately                                    | `workspace.create`, `agent.create` and grant          |
+| `/workspace new --local [--name "title"]`                          | Create a Workspace using the Project's existing checkout                                  | Same as above                                         |
+| `/branch`                                                          | Current/next location, branch, status and latest commit                                   | `project.use`                                         |
+| `/branch list [--page N]` · `/branch search <text> [--page N]`     | Local and all remote-tracking branches with latest commit                                 | `project.use`                                         |
+| `/branch fetch [remote]`                                           | Fetch one configured remote's branch refs; default `origin`                               | `approval.command` in the selected/default Project    |
+| `/worktree`                                                        | Inspect the current session's Git worktree, or selected/default checkout before a session | `project.use`                                         |
+| `/worktree list [--page N]` · `/worktree search <text> [--page N]` | Git worktrees including the primary checkout and unregistered worktrees                   | `project.use`                                         |
+| `/worktree show <path-or-workspace-id>`                            | Inspect one worktree without selecting it                                                 | `project.use`                                         |
 
 List and search show **10 results per page**, with counts and complete next/previous
 commands. Authorization precedes search and pagination; inaccessible Projects
@@ -85,6 +89,9 @@ ordering is latest commit time then name. Search matches all space-separated
 terms case-insensitively. Project and Workspace search includes the final directory
 name, handling either Host path separator and trailing separators; parent directory
 names do not contribute matches. Project results show the matching folder name.
+Git worktrees are ordered by latest commit time, then path; uncommitted edits do
+not change that ordering. Worktree search matches branch, final folder name and
+any registered Workspace name/ID. Only the displayed page reads live status.
 Exact names must be unique; use IDs when names repeat.
 Invalid pages return an error, without silently selecting another page.
 
@@ -100,6 +107,21 @@ A worktree's random directory slug, Git branch and Workspace title are distinct.
 Omit `--branch` to keep automatic naming; an explicit branch is preserved. Omit
 the base to use the daemon's default branch resolver. Only daemon-registered
 Workspaces are selectable; raw external Git worktrees are not imported.
+
+`/worktree` is read-only Git inspection. It includes Host and Project name/ID,
+Workspace name/ID when registered, branch, full path, status counts and latest
+commit (short hash, committed date in UTC, author). `show` also includes the commit
+subject. Status counts tracked, staged, unstaged, conflicting and untracked files;
+ignored files are excluded. An inaccessible/prunable worktree reports unavailable
+status. Creation and next-session selection stay under `/workspace`.
+
+Branch results keep namespaces distinct (`main`, `origin/main`, `upstream/main`)
+and include short commit hash, committed date in UTC and author. List/search uses
+refs already on the Host; it never fetches implicitly. `/branch fetch [remote]`
+uses that Host's configured Git credentials and updates only remote branch refs;
+it does not change local branches, tags, HEAD or working files, prune refs or
+fetch submodules. Fetch is bounded and requires an explicit request and command
+approval authority. Retried deliveries share the existing command receipt.
 
 Choices persist across `/new` and restarts and follow the Route's binding scope
 (thread/topic or whole conversation), shared by its participants. Selection leaves
@@ -129,8 +151,11 @@ from [#21](https://github.com/longbkit/clisbot/pull/21) and Workspace placement
 proposal from [#23](https://github.com/longbkit/clisbot/pull/23), implemented
 against the current Route + Rules model.
 
-Workspace commands need Host `workspaceMultiplicity`; paginated branch discovery
-needs `branchSuggestionPaging`. Older Hosts get an update message.
+Workspace commands need Host `workspaceMultiplicity`; Git discovery/fetch needs
+`projectGitCommands`. Older Hosts get an update message. The daemon owns Git
+execution and validates the exact Project and worktree membership; the shared Hub
+commands own search, pagination and reply formatting. No new package dependency
+or schema migration is required.
 
 ### Session controls and approvals
 
@@ -140,7 +165,7 @@ needs `branchSuggestionPaging`. Older Hosts get an update message.
 | `/stop`                                 | Stop the running turn.                                                                                                                                 | channel.use             |
 | `/new`                                  | Clear the binding; the next message starts fresh. `/new <message>` starts immediately.                                                                 | channel.use             |
 | `/agent [<name>]`                       | Switch the conversation's agent. Apply an **agent profile** bounded by the caller's configuration grant ([below](#agent-profiles-and-the-route-menu)). | agent.interact + grant² |
-| `/model [<name>]`                       | Bare: show the model menu. `/model <name>`: switch this conversation's model.                                                                          | agent.interact + grant² |
+| `/model [<name>]`                       | Bare: current/next configuration. Add `list` or `search` to discover; `<name>` switches the model.                                                     | agent.interact + grant² |
 | `/help`                                 | This command list.                                                                                                                                     | — (public)              |
 | `/approve [id] [answer]` · `/deny [id]` | Answer the newest open approval, or the one named by `<id>`.                                                                                           | approval authority¹     |
 

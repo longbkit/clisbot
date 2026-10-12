@@ -1,4 +1,13 @@
+import {
+  discoveryArguments,
+  pageText,
+  search,
+  tokenizePlacementArguments,
+} from "./commands-discovery.js";
+export { tokenizePlacementArguments } from "./commands-discovery.js";
 import { createHash, randomUUID } from "node:crypto";
+import { ChannelWorktreeCommands } from "./commands-worktree.js";
+import { commitLine } from "./commands-git-display.js";
 import type { ChannelStore } from "../db/channels.js";
 import type { CreateAgentConfig, ProjectSnapshot, WorkspaceSnapshot } from "./daemon/types.js";
 import type { DaemonConnection } from "./daemon/client.js";
@@ -57,14 +66,15 @@ export class ChannelPlacementCommands {
   constructor(private readonly deps: PlacementDependencies) {}
 
   async run(
-    command: { name: "project" | "workspace" | "branch"; value?: string },
+    command: { name: "project" | "workspace" | "branch" | "worktree"; value?: string },
     context: LifecycleCommandContext,
   ): Promise<string> {
     const scope = await this.prepare(context);
     const args = tokenizePlacementArguments(command.value ?? "");
+    if (command.name === "worktree") return this.worktree(args, scope);
     if (!args.length)
       return [
-        await this.status(scope),
+        await this.status(scope, command.name === "branch"),
         "",
         `List: /${command.name} list · Search: /${command.name} search <text>`,
       ].join("\n");
@@ -244,14 +254,18 @@ export class ChannelPlacementCommands {
   }
 
   private async branch(args: string[], scope: PlacementScope, project: ProjectSnapshot) {
+    if (args[0] === "fetch") return this.fetch(args, scope, project);
     const parsed = discoveryArguments(args);
     if (parsed.worktree) throw new Error("--worktree only applies to /workspace list or search.");
-    if (!this.deps.daemon.listBranches)
-      throw new Error("Branch discovery is unavailable on this Host.");
+    if (
+      this.deps.daemon.getServerInfo()?.features?.["projectGitCommands"] !== true ||
+      !this.deps.daemon.listGitBranches
+    )
+      throw new Error("Update this Host to support branch discovery.");
     const branches = search(
-      await this.deps.daemon.listBranches(project.projectRootPath),
+      await this.deps.daemon.listGitBranches(project.projectId),
       parsed.query,
-      (b) => [b.name, ...(b.hasRemote ? [`origin/${b.name}`] : [])],
+      (b) => [b.name],
     );
     branches.sort((a, b) => b.committerDate - a.committerDate || a.name.localeCompare(b.name));
     return [
@@ -263,10 +277,10 @@ export class ChannelPlacementCommands {
         branches,
         parsed,
         "/branch",
-        (b) =>
-          `${literalText(b.name)} — ${[b.hasLocal && "local", b.hasRemote && "origin"].filter(Boolean).join(", ")}`,
+        (b) => `${literalText(b.name)} — ${b.source}\n   ${commitLine(b.commit)}`,
       ),
       "Create: /workspace new <base-branch>",
+      "Refresh remote refs: /branch fetch [remote] (default: origin)",
     ].join("\n");
   }
 
@@ -381,7 +395,61 @@ export class ChannelPlacementCommands {
     return projects.filter((_, i) => checks[i]?.allowed === true);
   }
 
-  private async status(scope: PlacementScope): Promise<string> {
+  private async fetch(args: string[], scope: PlacementScope, project: ProjectSnapshot) {
+    if (args.length > 2 || !this.deps.daemon.fetchGitRemote)
+      throw new Error("Usage: /branch fetch [remote]");
+    const request = commandAccessRequest(
+      this.deps.plane,
+      scope.context.message,
+      scope.context.account,
+      scope.context.route,
+      "approval.command",
+      placementTarget(this.stamp(scope, project)),
+    );
+    if (!(await this.deps.plane.commandAccess?.authorizeChannelPrivilege(request))?.allowed)
+      throw new Error("Fetching remote refs needs approval.command in this Project.");
+    const remote = args[1] ?? "origin";
+    const fetchedAt = await this.deps.daemon.fetchGitRemote(
+      project.projectId,
+      remote,
+      scope.context.message,
+    );
+    return [
+      hostLine(this.deps.daemon, scope.target.daemonReference),
+      projectLine(project),
+      `Fetched ${inlineCode(remote)} at ${fetchedAt}.`,
+      "Remote branch refs updated; working files and checked-out branch stay as they were.",
+      "List: /branch list",
+    ].join("\n");
+  }
+
+  private async worktree(args: string[], scope: PlacementScope) {
+    const agent =
+      !args.length && scope.context.agentId
+        ? (await this.deps.daemon.listAgents()).find((a) => a.id === scope.context.agentId)
+        : undefined;
+    const currentProject = scope.projects.find((p) => p.projectId === agent?.projectId);
+    if (agent && !currentProject)
+      throw new Error("Current worktree unavailable or you do not have access.");
+    const project = currentProject ?? this.selectedProject(scope);
+    const workspaces = ((await this.deps.daemon.listWorkspaces?.(project.projectId)) ?? []).filter(
+      (w) => w.projectId === project.projectId,
+    );
+    const workspaceId = scope.chosen ? scope.chosen.workspaceId : scope.base.workspaceId;
+    const chosen = workspaces.find((w) => w.id === workspaceId);
+    return new ChannelWorktreeCommands(this.deps.daemon).run(args, {
+      project,
+      workspaces,
+      hostReference: scope.target.daemonReference,
+      defaultPath:
+        agent?.projectId === project.projectId
+          ? agent.cwd
+          : (chosen?.workspaceDirectory ?? project.projectRootPath),
+      currentWorkspaceId: agent?.workspaceId,
+    });
+  }
+
+  private async status(scope: PlacementScope, gitInfo = false): Promise<string> {
     const { context, chosen } = scope;
     return placementStatus({
       daemon: this.deps.daemon,
@@ -390,6 +458,7 @@ export class ChannelPlacementCommands {
       agentId: context.agentId,
       base: scope.base,
       chosen,
+      gitInfo,
       selectionValid:
         !chosen ||
         (chosen.daemonReference === scope.target.daemonReference &&
@@ -399,34 +468,6 @@ export class ChannelPlacementCommands {
   }
 }
 
-interface DiscoveryArguments {
-  query: string;
-  page: number;
-  worktree: boolean;
-}
-function discoveryArguments(args: string[]): DiscoveryArguments {
-  const tokens = [...args];
-  const action = tokens.shift() ?? "list";
-  if (action !== "list" && action !== "search")
-    throw new Error("Usage: list or search <text> [--page N]");
-  let page = 1;
-  let worktree = false;
-  const words: string[] = [];
-  while (tokens.length) {
-    const token = tokens.shift()!;
-    if (token === "--page") {
-      const number = tokens.shift();
-      if (!number || !/^[1-9]\d*$/.test(number) || !Number.isSafeInteger(Number(number)))
-        throw new Error("--page must be a positive integer.");
-      page = Number(number);
-    } else if (token === "--worktree") worktree = true;
-    else if (token.startsWith("--")) throw new Error(`Unknown option: ${token}`);
-    else words.push(token);
-  }
-  if ((action === "search" && words.length === 0) || (action === "list" && words.length > 0))
-    throw new Error("Usage: list [--page N] or search <text> [--page N]");
-  return { query: words.join(" "), page, worktree };
-}
 function creationArguments(args: string[]) {
   let local = false;
   let branchName: string | undefined;
@@ -455,34 +496,6 @@ function creationArguments(args: string[]) {
     ...(title ? { title } : {}),
   };
 }
-export function tokenizePlacementArguments(text: string): string[] {
-  const result: string[] = [];
-  let word = "";
-  let quote: string | undefined;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]!;
-    if (c === "\\" && i + 1 < text.length && /["'\\]/.test(text[i + 1]!)) word += text[++i];
-    else if (quote) {
-      if (c === quote) quote = undefined;
-      else word += c;
-    } else if (c === '"' || c === "'") quote = c;
-    else if (/\s/.test(c)) {
-      if (word) {
-        result.push(word);
-        word = "";
-      }
-    } else word += c;
-  }
-  if (quote) throw new Error("Close the quoted argument before sending this command.");
-  if (word) result.push(word);
-  return result;
-}
-function search<T>(items: T[], query: string, fields: (item: T) => string[]): T[] {
-  const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return items.filter((item) =>
-    terms.every((term) => fields(item).some((field) => field.toLocaleLowerCase().includes(term))),
-  );
-}
 function exactChoice<T>(
   items: T[],
   query: string,
@@ -506,24 +519,4 @@ function exactChoice<T>(
 function activity(w: WorkspaceSnapshot): number {
   const date = Date.parse(w.activityAt ?? w.createdAt ?? "");
   return Number.isFinite(date) ? date : 0;
-}
-function pageText<T>(
-  items: T[],
-  args: DiscoveryArguments,
-  command: string,
-  line: (item: T) => string,
-): string {
-  const pages = Math.max(1, Math.ceil(items.length / 10));
-  if (args.page > pages)
-    throw new Error(`Page ${args.page} is unavailable. There are ${pages} page(s).`);
-  const start = (args.page - 1) * 10;
-  const prefix = `${command} ${args.query ? `search ${JSON.stringify(args.query)}` : "list"}${args.worktree ? " --worktree" : ""}`;
-  return [
-    `Page ${args.page}/${pages} · ${items.length} results · up to 10 per page`,
-    ...(items.length
-      ? items.slice(start, start + 10).map((item, i) => `${start + i + 1}. ${line(item)}`)
-      : ["No matches."]),
-    ...(args.page > 1 ? [`Previous: ${inlineCode(`${prefix} --page ${args.page - 1}`)}`] : []),
-    ...(args.page < pages ? [`Next: ${inlineCode(`${prefix} --page ${args.page + 1}`)}`] : []),
-  ].join("\n");
 }

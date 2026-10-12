@@ -84,8 +84,17 @@ export const CHANNEL_COMMANDS = [
     args: true,
     access: "chat",
     directOnly: true,
-    usage: "/branch [list|search <text>] [--page N]",
-    description: "show current branch; list or search local and origin branches",
+    usage: "/branch [list|search <text>|fetch [remote]] [--page N]",
+    description: "show current branch; discover branches or fetch a configured remote",
+  },
+  {
+    name: "worktree",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/worktree [list|search <text>|show <path-or-workspace-id>] [--page N]",
+    description: "inspect Git worktrees, status and latest commit",
   },
   {
     name: "status",
@@ -476,13 +485,14 @@ export function parseChannelTextCommand(text: string): ChannelTextCommand | null
   if (match === null || match[1] === undefined) return null;
   const name = COMMAND_ALIASES.get(match[1].toLowerCase());
   if (name === undefined) return null;
+  // The closed alias registry has already validated this discriminant.
   const argument = match[2]?.trim();
-  if (argument === undefined || argument === "") return { name };
+  if (argument === undefined || argument === "") return { name } as ChannelTextCommand;
   // An argument on a no-argument verb is prose ("stop doing that"), not a
   // command; only `/agent` and `/model` carry one.
   if (!channelCommandSpec(name).args) return null;
   if (name === "followup" && parseFollowUpArguments(argument) === null) return null;
-  return { name, value: argument };
+  return { name, value: argument } as ChannelTextCommand;
 }
 
 /** The help text is generated from the same registry as parsing and gating. */

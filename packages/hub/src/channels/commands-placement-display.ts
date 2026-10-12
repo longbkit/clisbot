@@ -2,6 +2,7 @@ import type { DaemonConnection } from "./daemon/client.js";
 import type { CreateAgentConfig, ProjectSnapshot, WorkspaceSnapshot } from "./daemon/types.js";
 import type { ChannelPlacementSelection } from "./placement-selection.js";
 import { inlineCode, literalText } from "./command-reply-format.js";
+import { commitLine, gitStatusLine } from "./commands-git-display.js";
 
 export function folderName(directory: string): string {
   return directory.split(/[\\/]/u).findLast((part) => part.length > 0) ?? "";
@@ -44,10 +45,10 @@ interface PlacementStatusInput {
   base: CreateAgentConfig;
   chosen: ChannelPlacementSelection | null | undefined;
   selectionValid: boolean;
+  gitInfo?: boolean;
 }
 
-/** Read only locations in Projects already authorized by the command owner. */
-export async function placementStatus(input: PlacementStatusInput): Promise<string> {
+async function readPlacementLocations(input: PlacementStatusInput) {
   const { daemon, projects, chosen, base } = input;
   const read = workspaceReader(daemon);
   const agent = input.agentId
@@ -69,17 +70,76 @@ export async function placementStatus(input: PlacementStatusInput): Promise<stri
       : undefined,
     nextProject && nextValid && workspaceId ? read(nextProject, workspaceId) : undefined,
   ]);
+  return {
+    agent,
+    currentProject,
+    nextProject,
+    currentWorkspace,
+    nextWorkspace,
+    nextValid,
+    workspaceId,
+  };
+}
+
+/** Read only locations in Projects already authorized by the command owner. */
+export async function placementStatus(input: PlacementStatusInput): Promise<string> {
+  const { daemon, chosen, base } = input;
+  const {
+    agent,
+    currentProject,
+    nextProject,
+    currentWorkspace,
+    nextWorkspace,
+    nextValid,
+    workspaceId,
+  } = await readPlacementLocations(input);
+  const [currentGit, nextGit] = await Promise.all([
+    locationGitDetails(input, currentProject, agent?.cwd),
+    locationGitDetails(
+      input,
+      nextValid ? nextProject : undefined,
+      nextWorkspace?.workspaceDirectory ??
+        (!base.worktree && !workspaceId ? nextProject?.projectRootPath : undefined),
+    ),
+  ]);
   return [
     hostLine(daemon, input.hostReference),
     "",
     "**Current session**",
     ...(currentProject && agent
-      ? [projectLine(currentProject), ...currentWorkspaceDetails(currentWorkspace, agent)]
+      ? [
+          projectLine(currentProject),
+          ...currentWorkspaceDetails(currentWorkspace, agent),
+          ...currentGit,
+        ]
       : [input.agentId ? "Location unavailable or you do not have access." : "None."]),
     "",
     `**Next session** — ${chosen ? "selected" : "Route default"}`,
     ...nextLocation(nextProject, nextWorkspace, workspaceId, base, nextValid),
+    ...nextGit,
   ].join("\n");
+}
+
+async function locationGitDetails(
+  input: PlacementStatusInput,
+  project?: ProjectSnapshot,
+  path?: string,
+): Promise<string[]> {
+  if (
+    !input.gitInfo ||
+    !project ||
+    !path ||
+    project.projectKind !== "git" ||
+    input.daemon.getServerInfo()?.features?.["projectGitCommands"] !== true ||
+    !input.daemon.inspectGitWorktree
+  )
+    return [];
+  try {
+    const info = await input.daemon.inspectGitWorktree(project.projectId, path);
+    return [gitStatusLine(info), commitLine(info.commit)];
+  } catch {
+    return ["Git details: unavailable"];
+  }
 }
 
 function workspaceReader(daemon: DaemonConnection) {

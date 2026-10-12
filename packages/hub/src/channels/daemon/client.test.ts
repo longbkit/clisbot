@@ -3,16 +3,78 @@ import { createServer, type Server } from "node:http";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { WebSocketServer } from "ws";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it, vi } from "vitest";
 import {
   connectChannelDaemon,
   connectNoHostChannelDaemon,
   type DaemonConnection,
+  type ChannelDaemonSocket,
 } from "./client.js";
+import { createProjectGitClient } from "./project-git.js";
+import type { InboundMessage } from "../plane/types.js";
 import type { AgentSnapshot } from "./types.js";
 import { AgentRequestRefusedError } from "./agent-request-refusal.js";
 import { DaemonSessionProtocol } from "./session-protocol.js";
 import { ingressAttempt } from "../ingress/attempt.js";
+
+describe("Project Git RPC contract", () => {
+  function fixture(enabled = true) {
+    const call = vi.fn(async (_type: string, payload: Record<string, unknown>) => ({
+      requestId: "git",
+      projectId: payload["projectId"],
+      remote: payload["remote"],
+      fetchedAt: "2026-10-12T07:00:00Z",
+      branches: [],
+      error: null,
+    }));
+    const socket = { serverInfo: { features: { projectGitCommands: enabled } }, call };
+    const identify = vi.fn(async (_type, payload, _source) => ({ ...payload, operationId: "op" }));
+    const client = createProjectGitClient(socket as unknown as ChannelDaemonSocket, identify);
+    return { client, call, identify };
+  }
+  it("requires capability before sending a Git request", async () => {
+    const f = fixture(false);
+    await assert.rejects(f.client.listGitBranches("prj_a"), /Update this Host/);
+    assert.equal(f.call.mock.calls.length, 0);
+  });
+  it("rejects discovery responses for a different Project", async () => {
+    const f = fixture();
+    f.call.mockImplementationOnce(async () => ({
+      requestId: "git",
+      projectId: "prj_b",
+      remote: undefined,
+      fetchedAt: "2026-10-12T07:00:00Z",
+      branches: [],
+      error: null,
+    }));
+    await assert.rejects(f.client.listGitBranches("prj_a"), /different Project/);
+  });
+  it("identifies fetch with the originating message and exact Project and remote", async () => {
+    const f = fixture();
+    const source = { channel: "slack", senderIdentity: "owner" } as InboundMessage;
+    assert.equal(
+      await f.client.fetchGitRemote("prj_a", "upstream", source),
+      "2026-10-12T07:00:00Z",
+    );
+    assert.deepEqual(f.identify.mock.calls[0], [
+      "project.git.fetch.request",
+      {
+        projectId: "prj_a",
+        remote: "upstream",
+      },
+      source,
+    ]);
+    assert.deepEqual(f.call.mock.calls[0], [
+      "project.git.fetch.request",
+      {
+        projectId: "prj_a",
+        remote: "upstream",
+        operationId: "op",
+      },
+      45_000,
+    ]);
+  });
+});
 
 describe("expired ingress RPC boundary", () => {
   it("blocks a late continuation without blocking another dispatch", async () => {

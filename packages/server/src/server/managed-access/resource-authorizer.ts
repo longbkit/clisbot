@@ -978,6 +978,14 @@ export class ManagedResourceAuthorizer {
   private async allowsOperationalInbound(
     message: SessionInboundMessage,
   ): Promise<boolean | undefined> {
+    if (
+      message.type === "project.git.inspect.request" ||
+      message.type === "project.git.fetch.request"
+    )
+      return this.allowsProject(
+        message.projectId,
+        message.type === "project.git.fetch.request" ? "approval.command" : "project.use",
+      );
     if (message.type === "close_items_request") {
       const agentsAllowed = await Promise.all(
         message.agentIds.map((agentId) => this.allowsAgent(agentId, "agent.interact")),

@@ -626,6 +626,159 @@ describe("Project and Workspace commands", () => {
     const key = placementSelectionKey("lifecycle", f.context);
     return { ...f, plane, daemon, projects, workspaces, policy, base, dispatcher, commands, key };
   }
+  function gitFixture() {
+    const f = placementFixture();
+    const commit = {
+      hash: "a".repeat(40),
+      committedAt: "2026-10-12T07:00:00Z",
+      author: "QA Author",
+      subject: "Fix login",
+    };
+    f.daemon.getServerInfo = () => ({
+      serverId: "host",
+      hostname: "Dev Host",
+      features: { workspaceMultiplicity: true, projectGitCommands: true },
+    });
+    const trees = Array.from({ length: 12 }, (_, i) => ({
+      path: `/worktrees/${i}`,
+      branch: `fix/login-${i}`,
+      head: commit.hash,
+      bare: false,
+      detached: false,
+      locked: false,
+      prunable: false,
+      commit,
+    }));
+    trees.push({ ...trees[0]!, path: "/outside/unregistered", branch: "outside" });
+    f.daemon.listGitWorktrees = vi.fn(async () => trees);
+    f.daemon.inspectGitWorktree = vi.fn(async (_projectId, path) => ({
+      path,
+      commit,
+      status: { tracked: 0, untracked: 7, staged: 0, unstaged: 0, conflicts: 0 },
+    }));
+    f.daemon.listGitBranches = vi.fn(async () => [
+      { name: "main", source: "local" as const, commit, committerDate: 1 },
+      {
+        name: "origin/main",
+        source: "remote" as const,
+        remote: "origin",
+        commit,
+        committerDate: 2,
+      },
+      {
+        name: "upstream/main",
+        source: "remote" as const,
+        remote: "upstream",
+        commit,
+        committerDate: 3,
+      },
+    ]);
+    f.daemon.fetchGitRemote = vi.fn(async () => "2026-10-12T07:00:00Z");
+    return { ...f, trees, commit };
+  }
+  it("lists all remote namespaces with commit hash, date and author", async () => {
+    const f = gitFixture();
+    const reply = await f.commands.run({ name: "branch", value: "list" }, f.context);
+    expect(reply).toContain("upstream/main — remote");
+    expect(reply).toContain("origin/main — remote");
+    expect(reply).toContain("main — local");
+    expect(reply).toContain("`aaaaaaaa` · 2026-10-12 07:00 UTC · QA Author");
+    const search = await f.commands.run({ name: "branch", value: "search upstream/" }, f.context);
+    expect(search).toContain("1 results");
+    expect(search).not.toContain("origin/main");
+  });
+  it("uses the Route's existing Workspace before a session and hides inaccessible current worktrees", async () => {
+    const f = gitFixture();
+    const before = { ...f.context, agentId: undefined };
+    f.base.workspaceId = "wks_05";
+    expect(await f.commands.run({ name: "worktree" }, before)).toContain(
+      "Workspace: Login 5 (wks_05)",
+    );
+    vi.mocked(f.daemon.listGitWorktrees!).mockClear();
+    Object.assign(f.old, { projectId: "secret", cwd: "/private/secret" });
+    await expect(f.commands.run({ name: "worktree" }, f.context)).rejects.toThrow(
+      "do not have access",
+    );
+    expect(f.daemon.listGitWorktrees).not.toHaveBeenCalled();
+  });
+  it("shows current worktree status and commit without changing placement or creating sessions", async () => {
+    const f = gitFixture();
+    Object.assign(f.old, { projectId: "prj_00", workspaceId: "wks_05", cwd: "/worktrees/5" });
+    const reply = await f.commands.run({ name: "worktree" }, f.context);
+    expect(reply).toContain("Workspace: Login 5 (wks_05)");
+    expect(reply).toContain("Status: 7 untracked files; no tracked changes");
+    expect(reply).toContain("Branch: `fix/login-5`");
+    expect(reply).toContain("QA Author");
+    expect(await store.access.findConversationSelection(f.key)).toBeUndefined();
+    expect(f.createAgent).not.toHaveBeenCalled();
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+    const branch = await f.commands.run({ name: "branch" }, f.context);
+    expect(branch).toContain("Commit:");
+    expect(branch).toContain("QA Author");
+  });
+  it("pages worktrees before inspecting status, including unregistered paths", async () => {
+    const f = gitFixture();
+    const reply = await f.commands.run(
+      { name: "worktree", value: "search Login --page 2" },
+      f.context,
+    );
+    expect(reply).toContain("Page 2/2 · 12 results");
+    expect(f.daemon.inspectGitWorktree).toHaveBeenCalledTimes(2);
+    vi.mocked(f.daemon.inspectGitWorktree!).mockClear();
+    const external = await f.commands.run(
+      { name: "worktree", value: "show /outside/unregistered" },
+      f.context,
+    );
+    expect(external).toContain("Workspace: not registered");
+    expect(external).toContain("Path: `/outside/unregistered`");
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+    await expect(
+      f.commands.run({ name: "worktree", value: "show /private/foreign" }, f.context),
+    ).rejects.toThrow("unavailable in this Project");
+    expect(f.daemon.inspectGitWorktree).toHaveBeenCalledTimes(1);
+  });
+  it("requires command authority for fetch and consumes replayed deliveries once", async () => {
+    const f = gitFixture();
+    const authorize = f.plane.commandAccess!.authorizeChannelPrivilege;
+    f.plane.commandAccess!.authorizeChannelPrivilege = async (request) =>
+      request.privilege === "approval.command"
+        ? { allowed: false, reason: "No command permission" }
+        : authorize(request);
+    await expect(f.commands.run({ name: "branch", value: "fetch" }, f.context)).rejects.toThrow(
+      "approval.command",
+    );
+    expect(f.daemon.fetchGitRemote).not.toHaveBeenCalled();
+    f.plane.commandAccess!.authorizeChannelPrivilege = authorize;
+    const context = {
+      ...f.context,
+      message: { ...f.context.message, externalMessageId: "fetch-once" },
+    };
+    expect((await f.dispatcher.handle({ name: "branch", value: '"fetch"' }, context)).handled).toBe(
+      true,
+    );
+    expect((await f.dispatcher.handle({ name: "branch", value: "fetch" }, context)).handled).toBe(
+      true,
+    );
+    expect(f.daemon.fetchGitRemote).toHaveBeenCalledTimes(1);
+    expect(f.daemon.fetchGitRemote).toHaveBeenCalledWith("prj_00", "origin", context.message);
+    expect(f.createAgent).not.toHaveBeenCalled();
+  });
+  it("gates /worktree on Host capability and the existing commands switch", async () => {
+    const f = placementFixture();
+    await expect(f.commands.run({ name: "worktree", value: "list" }, f.context)).rejects.toThrow(
+      "Update this Host",
+    );
+    const disabled = {
+      ...f.context.route,
+      defaults: { ...f.context.route.defaults, workspace: { commands: false } },
+    };
+    await expect(
+      f.commands.run(
+        { name: "worktree", value: "list" },
+        { ...f.context, route: disabled, account: { ...f.context.account, routes: [disabled] } },
+      ),
+    ).rejects.toThrow("disabled");
+  });
   it("filters permissions before pagination, preserves the search and rejects invalid pages", async () => {
     const f = placementFixture();
     const reply = await f.commands.run(
@@ -809,8 +962,8 @@ describe("Project and Workspace commands", () => {
     expect(
       await f.commands.run({ name: "workspace", value: "list --worktree" }, f.context),
     ).toContain("12 results");
-    expect(await f.commands.run({ name: "branch", value: "list" }, f.context)).toContain(
-      "main — local, origin",
+    await expect(f.commands.run({ name: "branch", value: "list" }, f.context)).rejects.toThrow(
+      "Update this Host",
     );
   });
   it("searches Workspace leaf folders and shows full paths with named Project and Host context", async () => {
