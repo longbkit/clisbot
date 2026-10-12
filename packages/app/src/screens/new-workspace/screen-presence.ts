@@ -17,7 +17,7 @@ export function isNewWorkspaceScreenActive(input: NewWorkspaceScreenPresence): b
   return input.isMounted && input.pathname === NEW_WORKSPACE_PATHNAME;
 }
 
-export function useNewWorkspaceScreenPresence(): () => boolean {
+export function useNewWorkspaceScreenPresence(activePath = NEW_WORKSPACE_PATHNAME): () => boolean {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
@@ -31,11 +31,11 @@ export function useNewWorkspaceScreenPresence(): () => boolean {
   }, []);
 
   return useCallback(
-    () =>
-      isNewWorkspaceScreenActive({
-        isMounted: isMountedRef.current,
-        pathname: pathnameRef.current,
-      }),
-    [],
+    () => isMountedRef.current && pathnameRef.current === activePath,
+    [activePath],
   );
+}
+
+export function startScreenPath(home: boolean): string {
+  return home ? "/open-project" : NEW_WORKSPACE_PATHNAME;
 }

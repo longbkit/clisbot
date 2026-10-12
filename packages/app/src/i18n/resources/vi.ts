@@ -1058,8 +1058,9 @@ export const vi: TranslationResources = {
     },
     scan: {
       title: "Quét QR",
-      webUnavailableTitle: "Không có trên bản web",
-      webUnavailableBody: 'Bản web không hỗ trợ quét QR. Hãy dùng "Dán link".',
+      cameraUnavailableTitle: "Không dùng được camera",
+      cameraUnavailableBody:
+        'Trình duyệt này không mở được camera ở đây. Quét QR cần HTTPS và quyền camera cho trang này. Hãy dùng "Dán link".',
       backToSettings: "Quay lại Cài đặt",
       cameraPermissionTitle: "Quyền camera",
       cameraPermissionBody: "Cho phép truy cập camera để quét mã QR ghép nối từ daemon của bạn.",

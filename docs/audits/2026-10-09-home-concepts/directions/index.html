@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clisbot Home — 3 hướng và 1 bản tổng hòa</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f5f5;
+        color: #1d1c1d;
+        font:
+          14px/1.6 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      header {
+        background: #fff;
+        border-bottom: 1px solid #e4e4e4;
+        padding: 16px 28px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      header span {
+        color: #707070;
+        font-size: 12px;
+      }
+      main {
+        max-width: 1280px;
+        margin: auto;
+        padding: 40px 28px;
+      }
+      .intro {
+        display: flex;
+        justify-content: space-between;
+        gap: 40px;
+        align-items: center;
+        margin-bottom: 32px;
+      }
+      .intro p {
+        color: #707070;
+        max-width: 750px;
+        margin: 8px 0 0;
+      }
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 1px;
+        color: #707070;
+        font-weight: 500;
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 500;
+        letter-spacing: -0.6px;
+        margin: 8px 0;
+        line-height: 1.3;
+      }
+      h2 {
+        font-size: 17px;
+        font-weight: 500;
+        margin: 6px 0;
+      }
+      .button {
+        padding: 10px 14px;
+        background: #20744a;
+        color: #fff;
+        border: 1px solid #20744a;
+        border-radius: 7px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        font-size: 12px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+      }
+      article {
+        background: #fff;
+        border: 1px solid #e4e4e4;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .preview {
+        display: block;
+        height: 265px;
+        overflow: hidden;
+        border-bottom: 1px solid #e4e4e4;
+        background: #eee;
+      }
+      .preview img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .card-body {
+        padding: 20px;
+      }
+      .card-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #707070;
+        font-size: 10px;
+        letter-spacing: 0.8px;
+      }
+      .badge {
+        background: #edf6ef;
+        border: 1px solid #d7e8db;
+        color: #20744a;
+        padding: 2px 6px;
+        border-radius: 4px;
+        letter-spacing: 0;
+      }
+      article p {
+        color: #707070;
+        font-size: 12px;
+        min-height: 40px;
+        margin: 8px 0 14px;
+      }
+      .card-links {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .card-links a {
+        color: #1d1c1d;
+        text-decoration: none;
+        font-size: 12px;
+        padding: 7px 0;
+      }
+      .card-links a:first-child {
+        font-weight: 500;
+      }
+      .recommended {
+        border-color: #9bbba5;
+      }
+      .rationale {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 36px;
+        background: #fff;
+        border: 1px solid #e4e4e4;
+        border-radius: 10px;
+        padding: 26px;
+        margin-top: 28px;
+      }
+      .rationale h2 {
+        font-size: 17px;
+      }
+      .rationale p {
+        color: #707070;
+        font-size: 12px;
+        margin-bottom: 0;
+      }
+      .rationale ul {
+        padding-left: 18px;
+        margin: 10px 0 0;
+        color: #4a4a4a;
+        font-size: 12px;
+      }
+      .rationale li {
+        padding: 4px 0;
+      }
+      .comparison {
+        margin-top: 32px;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        font-size: 12px;
+      }
+      th,
+      td {
+        padding: 14px;
+        border-bottom: 1px solid #e4e4e4;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        font-weight: 500;
+        color: #707070;
+        background: #f0f0f0;
+      }
+      td:first-child {
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      footer {
+        color: #707070;
+        font-size: 11px;
+        margin-top: 28px;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      a:focus-visible {
+        outline: 2px solid #20744a;
+        outline-offset: 4px;
+      }
+      @media (max-width: 700px) {
+        header {
+          padding: 14px 18px;
+        }
+        header span {
+          display: none;
+        }
+        main {
+          padding: 26px 18px;
+        }
+        h1 {
+          font-size: 23px;
+        }
+        .intro {
+          display: block;
+        }
+        .intro .button {
+          margin-top: 18px;
+        }
+        .cards,
+        .rationale {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+        .preview {
+          height: 230px;
+        }
+        .rationale {
+          padding: 20px;
+        }
+        article p {
+          min-height: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Clisbot / Home</strong
+      ><span>Đề xuất UI · 09.10.2026 · HTML tương tác, dữ liệu mẫu</span>
+    </header>
+    <main>
+      <div class="intro">
+        <div>
+          <div class="eyebrow">THREE DIRECTIONS. ONE HOME.</div>
+          <h1>Ba cách bắt đầu.<br />Một Home kết nối tất cả.</h1>
+          <p>
+            Bốn bản hoàn chỉnh, cùng UI Clisbot hiện tại. Mỗi bản có chat, Host / Project, công việc
+            gần đây, lịch sắp chạy và việc cần chú ý — với cách sắp xếp khác nhau.
+          </p>
+        </div>
+        <a class="button" href="04-home.html">Mở bản 4 · Tổng hòa ↗</a>
+      </div>
+      <div class="cards">
+        <article>
+          <a class="preview" href="01-chat.html"
+            ><img
+              src="previews/01-chat-desktop.png"
+              alt="Bản 1: composer ở trung tâm, gợi ý và session dạng thẻ"
+          /></a>
+          <div class="card-body">
+            <div class="card-label">01 / CHAT FIRST</div>
+            <h2>Bắt đầu nhanh</h2>
+            <p>
+              Chat làm điểm bắt đầu. Ngữ cảnh ngay trên ô nhập, gợi ý ngay dưới, session gần đây
+              thành thẻ để tiếp tục nhanh.
+            </p>
+            <div class="card-links">
+              <a href="01-chat.html">Mở HTML ↗</a
+              ><a href="01-chat.html#firstdesktop">Lần đầu · Local</a
+              ><a href="01-chat.html#firstmobile">Lần đầu · Mobile</a>
+            </div>
+          </div>
+        </article>
+        <article>
+          <a class="preview" href="02-project.html"
+            ><img
+              src="previews/02-project-desktop.png"
+              alt="Bản 2: chọn Host, composer trong Project và các nhóm session"
+          /></a>
+          <div class="card-body">
+            <div class="card-label">02 / PROJECT FIRST</div>
+            <h2>Theo Project</h2>
+            <p>
+              Máy tính và thư mục rõ ngay từ đầu. Composer đi cùng ngữ cảnh Project, session nhóm
+              theo cả Host và Project.
+            </p>
+            <div class="card-links">
+              <a href="02-project.html">Mở HTML ↗</a
+              ><a href="02-project.html#firstwebmissing">Web chưa có local</a
+              ><a href="02-project.html#projectmissing">Project không còn</a>
+            </div>
+          </div>
+        </article>
+        <article>
+          <a class="preview" href="03-today.html"
+            ><img
+              src="previews/03-today-desktop.png"
+              alt="Bản 3: chat cùng ba khu vực phản hồi, tiếp tục công việc và lịch"
+          /></a>
+          <div class="card-body">
+            <div class="card-label">03 / TODAY FIRST</div>
+            <h2>Nhịp công việc</h2>
+            <p>
+              Biết việc đang chạy, việc cần mình và lần chạy tiếp theo. Chat vẫn ở phía trước; các
+              hoạt động chia thành ba cột dễ quét.
+            </p>
+            <div class="card-links">
+              <a href="03-today.html">Mở HTML ↗</a
+              ><a href="03-today.html#offline">Mọi Host offline</a
+              ><a href="03-today.html#noactivity">Chưa có hoạt động</a>
+            </div>
+          </div>
+        </article>
+        <article class="recommended">
+          <a class="preview" href="04-home.html"
+            ><img
+              src="previews/04-home-desktop.png"
+              alt="Bản 4: composer chính diện, vùng kết nối cạnh bên, session và lịch phía dưới"
+          /></a>
+          <div class="card-body">
+            <div class="card-label">04 / HOME <span class="badge">ĐỀ XUẤT</span></div>
+            <h2>Tổng hòa theo trạng thái</h2>
+            <p>
+              Chat chính diện; Host có vùng kết nối riêng. Hướng dẫn mở khi cần, ngữ cảnh gọn khi đã
+              sẵn sàng. Đưa một việc cần phản hồi lên gần chat.
+            </p>
+            <div class="card-links">
+              <a href="04-home.html">Mở HTML ↗</a
+              ><a href="04-home.html#firstdesktop">Local sẵn sàng</a
+              ><a href="04-home.html#firstmobile">Ghép nối mobile</a
+              ><a href="04-home.html#fallback">Host cũ offline</a>
+            </div>
+          </div>
+        </article>
+      </div>
+      <section class="rationale">
+        <div>
+          <div class="eyebrow">VÌ SAO BẢN 4</div>
+          <h2>Giữ thế mạnh, giảm quyết định cần đưa ra.</h2>
+          <p>
+            Lấy điểm bắt đầu gọn của bản 1, ngữ cảnh rõ của bản 2 và ưu tiên công việc của bản 3.
+            Bản 4 thêm cách hiển thị theo trạng thái: lần đầu cần hướng dẫn, hằng ngày cần bắt đầu
+            nhanh, sự cố cần đường khôi phục.
+          </p>
+          <ul>
+            <li>Ba vùng cố định: bắt đầu → kết nối → tiếp tục.</li>
+            <li>Host rõ ràng; local ưu tiên, remote luôn dễ tìm.</li>
+            <li>Chỉ một việc cần phản hồi cạnh chat; phần còn lại bên dưới.</li>
+            <li>Lọc công việc độc lập với ngữ cảnh gửi tin mới.</li>
+          </ul>
+        </div>
+        <div>
+          <div class="eyebrow">CÓ TRONG CẢ BỐN</div>
+          <h2>Luồng Host được thiết kế đầy đủ.</h2>
+          <ul>
+            <li>Nhớ Host / Project sau lần gửi thành công; fallback có thông báo.</li>
+            <li>Desktop tự chuẩn bị local; Web kiểm tra local và hướng dẫn nếu thiếu / bị chặn.</li>
+            <li>Mobile hướng dẫn QR / liên kết ghép nối remote; có lỗi hết hạn và lỗi mạng.</li>
+            <li>Giữ draft khi đổi Host, Project, Bot hoặc đang khôi phục dữ liệu.</li>
+            <li>Session và lịch giữ Host gốc; thiếu Project / provider có lối xử lý.</li>
+            <li>17 trạng thái, giao diện sáng / tối và bố cục desktop / mobile.</li>
+          </ul>
+        </div>
+      </section>
+      <div class="comparison">
+        <table>
+          <thead>
+            <tr>
+              <th>Phương án</th>
+              <th>Điểm tập trung</th>
+              <th>Phù hợp</th>
+              <th>Đánh đổi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>01 · Bắt đầu nhanh</td>
+              <td>Tin nhắn đầu tiên</td>
+              <td>Một việc, một ngữ cảnh</td>
+              <td>Cần mở thêm để quản lý nhiều Project</td>
+            </tr>
+            <tr>
+              <td>02 · Theo Project</td>
+              <td>Host + thư mục làm việc</td>
+              <td>Nhiều Project, nhiều máy</td>
+              <td>Nhiều thông tin trước ô chat</td>
+            </tr>
+            <tr>
+              <td>03 · Nhịp công việc</td>
+              <td>Phản hồi + hoạt động + lịch</td>
+              <td>Theo dõi agent và automation</td>
+              <td>Màn hình bận hơn khi có nhiều hoạt động</td>
+            </tr>
+            <tr>
+              <td>04 · Tổng hòa</td>
+              <td>Chat + kết nối theo trạng thái</td>
+              <td>Home chung cho Desktop, Web và Mobile</td>
+              <td>Cần giữ thứ tự ưu tiên khi bổ sung tính năng</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <footer>
+        Mỗi file HTML chứa toàn bộ CSS, JavaScript và icon; mở offline. Kết nối, provider và phản
+        hồi agent được mô phỏng. Đây là đề xuất thiết kế, chưa tích hợp vào app.
+      </footer>
+    </main>
+  </body>
+</html>

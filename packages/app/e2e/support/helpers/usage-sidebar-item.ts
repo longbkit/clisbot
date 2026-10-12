@@ -7,6 +7,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { connectNewWorkspaceDaemonClient } from "./new-workspace";
 import { pluginRequirements } from "./plugin-fixture";
 import { waitForSettledPosition } from "./sheet-layout";
+import { openMobileAgentSidebar } from "./sidebar";
 
 /** Real usage-source plugin; its long report makes the Usage modal scroll. */
 export async function installTallUsageSource() {
@@ -289,7 +290,7 @@ export async function refreshAllUsage(page: Page): Promise<void> {
   await visible(page, "usage-refresh-all").click();
 }
 
-/** Opens the compact sidebar drawer. */
+/** Opens the compact conversation list (the Chat tab, or the drawer without the Home tabs). */
 export async function openCompactSidebar(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Open menu", exact: true }).first().click();
+  await openMobileAgentSidebar(page);
 }

@@ -145,9 +145,10 @@ test.describe("Worktree restore after daemon restart", () => {
     const branchCell = page.getByTestId(`agent-row-branch-${serverId}-${agent.id}`);
     const workspaceCell = page.getByTestId(`agent-row-workspace-${serverId}-${agent.id}`);
 
-    await expect(branchCell).toBeVisible({ timeout: 60_000 });
-    await expect(branchCell).toHaveText(worktreeSlug, { timeout: 60_000 });
     await expect(workspaceCell).toHaveText(worktree.workspaceName, { timeout: 60_000 });
+    // Inbox rows leave the branch out when it only repeats the workspace name.
+    if (worktree.workspaceName === worktreeSlug) await expect(branchCell).toHaveCount(0);
+    else await expect(branchCell).toHaveText(worktreeSlug, { timeout: 60_000 });
     await restoreWorkspaceFromHistory(page, serverId, agent.id);
     await expectCommittedFileAfterReload(page, "restart-change.txt");
   });

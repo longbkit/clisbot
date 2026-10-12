@@ -91,7 +91,7 @@ Installation requires `configuration:install`. It creates or updates the organiz
 }
 ```
 
-Invalid YAML or an unknown organization resource returns `422` with field issues. Each installation is a separate request; a later failure does not undo earlier successful installs. See [Deploy from the CLI](/docs/hub/configuration#deploy-from-the-cli).
+Invalid YAML or an unknown organization resource returns `422` with field issues. Each installation is a separate request; a later failure does not undo earlier successful installs. See [Repository bundles](/docs/hub/configuration#repository-bundles).
 
 ## Project list
 
@@ -185,7 +185,7 @@ curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/configurations/instal
   --data @configuration-install.json
 ```
 
-`clisbot hub deploy -p <project>` selects this legacy endpoint with the discovered local bundle. The command uses an exact-origin stored login when flags and environment credentials are absent. See [Deploy from the CLI](/docs/hub/configuration#deploy-from-the-cli).
+`clisbot hub deploy -p <project>` selects this legacy endpoint with the discovered local bundle. The command uses an exact-origin stored login when flags and environment credentials are absent. See [Repository bundles](/docs/hub/configuration#repository-bundles).
 
 ## Manual run dispatch
 

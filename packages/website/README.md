@@ -2,21 +2,17 @@
 
 ## Plugin install counts
 
-Clients report an install by resolving a plugin with `X-Clisbot-Install: 1` or
-`?intent=install`, using `/api/plugins/resolve/<owner>/<slug>` or
-`/plugins/<owner>/<slug>.json`. Ordinary resolves do not count. These numbers
-measure install intent, not successful artifact installation or npm downloads.
+Clients report install intent with `X-Clisbot-Install: 1` or `?intent=install`
+on `/api/plugins/resolve/<owner>/<slug>` or `/plugins/<owner>/<slug>.json`.
+Ordinary resolves do not count. The Worker requires `CF-Connecting-IP` and
+stores only its SHA-256 hash, with one report per plugin/IP per hour.
 
-The worker requires Cloudflare's `CF-Connecting-IP` header to count a report.
-It stores the plugin ID plus a SHA-256 hash of the IP in a `WEBSITE_CACHE` KV key
-with a one hour TTL, never the raw IP. An existing key skips the count; repeats
-do not extend the hour. Missing or empty IP headers do not count.
+`PLUGIN_INSTALLS` owns transactional SQLite counters and deduplication. Existing
+KV totals and daily buckets remain as an imported baseline; new reports do not
+write KV counters. `/api/plugins/installs` keeps its plugin-ID-to-all-time-total
+response and shares the 15-minute aggregate cache with the website rankings.
+These numbers measure intent, not completed installations or npm downloads.
 
-Accepted reports increment the existing all-time total and UTC daily buckets in
-`WEBSITE_CACHE`. Daily buckets retain 60 days and supply the website's seven-day
-and thirty-day rankings. `/api/plugins/installs` still returns plugin IDs mapped
-to all-time totals. The [registry build](https://github.com/getpaseo/plugins/blob/main/scripts/build.ts)
-reads that endpoint into the published plugin details and index; the website
-reads windowed counts from KV through its five-minute cache. Existing counts
-remain intact. The KV guard is advisory: concurrent requests and KV propagation
-are not serialized.
+Read [website cache and install counts](../../docs/guides/developer-guide/website-cache.md)
+for freshness intervals, quota estimates, migration, tests, binding requirements,
+and rollback constraints before deploying this change.

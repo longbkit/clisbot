@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.0.3 - 2026-10-11
+
+### Changed
+
+- Changed Chat on phones to a tab page: the tab bar stays, with no sidebar to open or close
+- Changed the phone conversation list footer to one line, with New at the right edge
+
+### Fixed
+
+- Fixed Android Back bouncing between tabs instead of leaving the app from Home
+- Fixed Chat opening as an empty page on a cold start
+- Fixed a session imported from Clisbot 0.1.x history becoming read-only after its replay
+- Fixed a large 0.1.x history import that failed later showing the conversation as empty
+- Fixed subagent updates not being saved with their session
+- Fixed starting a saved draft deleting its session storage before the first prompt
+
+## 2.0.2 - 2026-10-11
+
+### Fixed
+
+- Fixed the Android app crashing on every launch after pairing a Host
+- Fixed a home upgraded from Clisbot 0.1.x starting with Clisbot and browser tools off for its agents. A home already upgraded by 2.0.0 or 2.0.1 gets them on at its next daemon start, unless you set them yourself
+
+## 2.0.1 - 2026-10-11
+
+### Added
+
+- Added Home as the place to start a chat, with your Hosts and Hubs, the composer and your recent conversations
+- Added Quick chat, which starts an agent without choosing a project and gives each chat its own folder
+- Added Quick starts: saved prompts with where they run, pinned to Home and shared on a Host
+- Added search across every online Host's projects and Bots when choosing where to chat, switching to the Host you pick
+- Added a Quick chats section to the sidebar
+- Added staying connected to several saved Hubs and their Hosts at once
+
+### Changed
+
+- Changed History to Inbox, with type and date filters and the same rows as Home
+- Changed the sidebar to show your organization or Hub and account at the top, with Home first in navigation
+
+### Fixed
+
+- Fixed Codex channel replies being dropped after the daemon restarted and resumed the conversation
+- Fixed a channel reply being skipped when the Hub retried saving it after losing the database's reply
+- Fixed pinned workspaces in the sidebar keeping their old name after a rename
+- Fixed Nix desktop and personal Hub backend packages ([#24](https://github.com/longbkit/clisbot/pull/24))
+
 ## 2.0.0 - 2026-10-10
 
 Clisbot 2 replaces the legacy 0.1.x runtime with the daemon, shared mobile/web/desktop app and Hub architecture. Its Paseo baseline is `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`; Clisbot now maintains an independent version series.

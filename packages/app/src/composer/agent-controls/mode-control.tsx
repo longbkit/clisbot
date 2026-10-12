@@ -1,3 +1,4 @@
+import { useComposerPickerPlacement } from "@/composer/picker-placement";
 import { useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -85,6 +86,7 @@ export function AgentModeControl({
   surface = "toolbar",
   onClose,
 }: AgentModeControlValue & { surface?: "toolbar" | "sheet"; onClose?: () => void }) {
+  const pickerPlacement = useComposerPickerPlacement();
   const { theme } = useUnistyles();
   const { presentation } = useComposerControlLayout();
   const { t } = useTranslation();
@@ -227,7 +229,7 @@ export function AgentModeControl({
         open={open}
         onOpenChange={handleOpenChange}
         anchorRef={anchorRef}
-        desktopPlacement="top-start"
+        desktopPlacement={pickerPlacement}
         desktopMinWidth={260}
         header={sheetHeader}
         renderOption={renderOption}
@@ -263,7 +265,7 @@ export function useLiveAgentModeControl(
     compareAvailableModes,
   );
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
-  const { updatePreferences } = useFormPreferences();
+  const { updatePreferences } = useFormPreferences(serverId);
   const toast = useToast();
   const { entries: snapshotEntries } = useProvidersSnapshot(serverId, { cwd: slice?.cwd });
 

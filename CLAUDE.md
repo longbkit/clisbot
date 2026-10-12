@@ -109,6 +109,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 - **One subject per doc.** If the subject doesn't fit in a sentence, split the doc. A section per provider, vendor, or platform is a table plus one worked example.
 - **Delete.** Obsolete sections go. Prefer a `packages/app/src/thing.ts:120` reference over a pasted block.
 - **New doc?** Make it discoverable from the relevant topic index or related docs. Keep the Docs table above focused on topic indexes and essential starting docs.
+- **Public docs have a word budget.** A `public-docs/` page grows at most 10% over its recorded baseline; see [docs/public-docs.md](docs/public-docs.md).
 - Code-level facts belong in comments next to the code, not here.
 
 ### Doc voice

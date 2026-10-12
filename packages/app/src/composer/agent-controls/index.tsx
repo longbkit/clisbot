@@ -1,3 +1,4 @@
+import { useComposerPickerPlacement } from "@/composer/picker-placement";
 import {
   memo,
   useCallback,
@@ -885,6 +886,7 @@ interface DesktopAgentControlsContentProps {
 const DESKTOP_SEARCH_THRESHOLD = 6;
 
 function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
+  const pickerPlacement = useComposerPickerPlacement();
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const {
@@ -971,7 +973,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
             open={openSelector === "provider"}
             onOpenChange={handleProviderOpenChange}
             anchorRef={providerAnchorRef}
-            desktopPlacement="top-start"
+            desktopPlacement={pickerPlacement}
           />
         </>
       ) : null}
@@ -997,7 +999,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
                 onRetryProvider={onRetryModelProvider}
                 isRetryingProvider={isRetryingModelProvider}
                 serverId={modelSelectorServerId}
-                desktopPlacement="top-start"
+                desktopPlacement={pickerPlacement}
                 desktopMinWidth={360}
                 toolbar={modelToolbar}
               />
@@ -1042,7 +1044,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
             open={openSelector === "thinking"}
             onOpenChange={handleThinkingOpenChange}
             anchorRef={thinkingAnchorRef}
-            desktopPlacement="top-start"
+            desktopPlacement={pickerPlacement}
             desktopMinWidth={200}
             renderOption={renderThinkingOption}
           />
@@ -1287,6 +1289,7 @@ function DesktopFeatureItem({
   onSetFeature?: (featureId: string, value: unknown) => void;
   onActionComplete?: () => void;
 }) {
+  const pickerPlacement = useComposerPickerPlacement();
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const featureSelector: AgentControlSelector = `feature-${feature.id}`;
@@ -1390,7 +1393,7 @@ function DesktopFeatureItem({
           open={openSelector === featureSelector}
           onOpenChange={handleFeatureOpenChange}
           anchorRef={featureAnchorRef}
-          desktopPlacement="top-start"
+          desktopPlacement={pickerPlacement}
         />
       </>
     );
@@ -1548,7 +1551,7 @@ export const AgentControls = memo(function AgentControls({
   onDropdownClose,
   isCompactLayout,
 }: AgentControlsProps) {
-  const { updatePreferences } = useFormPreferences();
+  const { updatePreferences } = useFormPreferences(serverId);
   const agent = useSessionStore(
     useShallow((state) => selectAgentControlsSlice(state, serverId, agentId)),
   );

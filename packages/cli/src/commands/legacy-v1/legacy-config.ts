@@ -80,6 +80,9 @@ export function upgradeConfig(agents: LegacyAgent[], port = 6868): PersistedConf
     daemon: {
       listen: `127.0.0.1:${port}`,
       managedAccess: { mode: "off" },
+      // An upgraded home is a new v2 home, so it gets the tools a new home gets.
+      mcp: { injectIntoAgents: true },
+      browserTools: { enabled: true },
       agentProfiles: agents
         .filter((agent) => providers.has(agent.provider))
         .map((agent, index) => ({

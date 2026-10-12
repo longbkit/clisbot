@@ -77,6 +77,26 @@ async function harness(
 }
 
 describe("BotSessions", () => {
+  test("applies per-chat launch controls across a fresh session without changing the Bot", async () => {
+    const { store, chat, sessions, created } = await harness();
+    const launch = {
+      provider: "codex",
+      model: "chosen",
+      modeId: "safe",
+      thinkingOptionId: "high",
+      featureValues: { web: false },
+    };
+    const configured = await store.update(chat.id, (record) => ({ ...record, launch }));
+    await sessions.resolve(configured, bot);
+    expect(created[0]).toMatchObject({
+      provider: "codex/chosen",
+      mode: "safe",
+      thinking: "high",
+      features: { web: false },
+    });
+    expect(bot.launch.model).not.toBe("chosen");
+  });
+
   test("creates a labelled session in the bot's workspace with its launch defaults, once per pair", async () => {
     const { store, chat, sessions, created } = await harness();
     const [first, second] = await Promise.all([

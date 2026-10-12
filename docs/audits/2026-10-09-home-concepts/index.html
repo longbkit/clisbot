@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Clisbot Home — 4 hướng thiết kế</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="data.js"></script>
+    <script defer src="views.js"></script>
+    <script defer src="app.js"></script>
+    <script defer src="actions.js"></script>
+  </head>
+  <body>
+    <header class="review-bar" aria-label="Điều khiển bản thiết kế">
+      <div class="review-brand">
+        <span class="review-spark">✳</span
+        ><span>HOME EXPLORATIONS <small>Clisbot / 09.10.2026</small></span>
+      </div>
+      <nav class="concept-tabs" aria-label="Ý tưởng thiết kế">
+        <button data-concept="focus"><span>01</span> Focus</button>
+        <button data-concept="workspace"><span>02</span> Workspace</button>
+        <button data-concept="pulse"><span>03</span> Pulse</button>
+        <button data-concept="fusion">
+          <span>04</span> Tổng hợp <span class="tab-star">✦</span>
+        </button>
+      </nav>
+      <div class="review-tools">
+        <button
+          class="review-icon"
+          data-action="viewport"
+          title="Chuyển khung xem mobile"
+          aria-label="Chuyển khung xem mobile"
+        ></button>
+        <button
+          class="review-icon"
+          data-action="theme"
+          title="Đổi giao diện sáng / tối"
+          aria-label="Đổi giao diện sáng / tối"
+        ></button>
+        <button class="review-link" data-action="compare">So sánh <span>↗</span></button>
+      </div>
+    </header>
+    <div class="scenario-bar">
+      <span class="scenario-label">THỬ TRẢI NGHIỆM</span>
+      <label for="scenario">Trạng thái</label>
+      <select id="scenario" aria-label="Trạng thái trải nghiệm"></select>
+      <span id="scenario-description"></span>
+      <button data-action="reset" class="scenario-reset">Đặt lại ↺</button>
+    </div>
+    <div class="stage"><div id="app" class="app-shell"></div></div>
+    <footer id="concept-note" class="concept-note"></footer>
+    <dialog id="modal" aria-labelledby="modal-title"></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

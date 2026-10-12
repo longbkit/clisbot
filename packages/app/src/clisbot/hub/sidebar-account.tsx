@@ -1,3 +1,4 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { usePathname, useRouter } from "expo-router";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +7,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { buildSettingsSectionRoute } from "@/utils/host-routes";
 import { isHubUnreachable } from "@/device-access/unavailable-hub";
+import { useHubProfiles } from "@/device-access/hub-profiles";
 import { useHubAccount } from "./account-provider";
 import { buildHubSettingsRoute } from "./navigation";
 import {
@@ -24,6 +26,7 @@ export function HubSidebarTopRow({ onBeforeNavigate }: { onBeforeNavigate?: () =
   const hub = useHubAccount();
   const router = useRouter();
   const pathname = usePathname();
+  const { profiles } = useHubProfiles();
   const presentation = resolveHubSidebarAccountPresentation({
     enabled: hub.enabled,
     account: hub.signedIn?.account ?? null,
@@ -36,13 +39,20 @@ export function HubSidebarTopRow({ onBeforeNavigate }: { onBeforeNavigate?: () =
     onBeforeNavigate?.();
     router.push(route);
   }, [onBeforeNavigate, route, router]);
-  let fallbackLabel = `Clisbot · ${t("settings.sections.about")}`;
+  let fallbackLabel = HOME_V2_ENABLED
+    ? "Clisbot · Hubs"
+    : `Clisbot · ${t("settings.sections.about")}`;
   if (hub.enabled) fallbackLabel = t("hub.account.sidebar.signInToAccount");
   if (unreachable) fallbackLabel = t("hub.account.sidebar.hubUnavailable");
   const accessibilityLabel = presentation?.accessibilityLabel ?? fallbackLabel;
+  // Home V2 names where you are: the signed-in organization, else the selected Hub, else Clisbot.
+  const hubName = profiles.find((profile) => `hub://${profile.hubId}` === hub.origin)?.label;
+  const label = HOME_V2_ENABLED
+    ? (hub.signedIn?.organization.name ?? (hub.enabled ? hubName : undefined) ?? "Clisbot")
+    : "Clisbot";
   const row = (
     <SidebarTopRow
-      label="Clisbot"
+      label={label}
       isActive={pathname === route}
       onPress={open}
       accessibilityLabel={accessibilityLabel}
@@ -63,7 +73,8 @@ export function HubSidebarTopRow({ onBeforeNavigate }: { onBeforeNavigate?: () =
 }
 
 function hubTopRowRoute(enabled: boolean, unreachable: boolean) {
-  if (!enabled) return buildSettingsSectionRoute("about");
+  if (!enabled)
+    return HOME_V2_ENABLED ? buildHubSettingsRoute("hubs") : buildSettingsSectionRoute("about");
   return unreachable ? buildHubSettingsRoute("hubs") : buildHubSettingsRoute("account");
 }
 
@@ -86,7 +97,7 @@ function AccountMark({
   }
   if (!hubEnabled) return null;
   return (
-    <Text style={styles.signInLabel}>
+    <Text style={[styles.signInLabel, unreachable && HOME_V2_ENABLED && styles.unavailable]}>
       {unreachable ? t("hub.account.sidebar.hubUnavailable") : t("hub.account.sidebar.signIn")}
     </Text>
   );
@@ -98,6 +109,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
   },
+  unavailable: { color: theme.colors.statusWarning },
   avatar: {
     width: 22,
     height: 22,

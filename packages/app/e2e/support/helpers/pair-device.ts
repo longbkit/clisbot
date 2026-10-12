@@ -168,7 +168,12 @@ export async function openPairDeviceFromHome(page: Page): Promise<void> {
     localStorage.setItem("@clisbot:e2e-disable-default-seed-once", nonce);
   });
   await page.goto("/open-project");
-  await page.getByTestId("open-project-pair-device").click();
+  // Home V2 keeps Pair device in the Hosts strip's Connect menu; the previous Home shows it inline.
+  const connect = page.getByTestId("home-connect");
+  const pair = page.getByTestId("open-project-pair-device");
+  await expect(connect.or(pair).first()).toBeVisible({ timeout: 30_000 });
+  if (await connect.isVisible()) await connect.click();
+  await pair.click();
   await expect(page.getByTestId("open-project-pair-device-modal")).toBeVisible();
 }
 

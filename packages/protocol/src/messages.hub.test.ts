@@ -412,3 +412,31 @@ describe("Hub session protocol", () => {
     expect(SessionOutboundMessageSchema.parse(message)).toEqual(message);
   });
 });
+
+test("Hub startup diagnostics are optional, preserve reasons and keep old peers parseable", async () => {
+  const { ServerInfoStatusPayloadSchema } = await import("./messages.js");
+  const legacy = { status: "server_info", serverId: "host-1" };
+  expect(ServerInfoStatusPayloadSchema.parse(legacy).localHubStartStatus).toBeUndefined();
+  const current = {
+    ...legacy,
+    features: { localHubStartStatus: true },
+    localHubStartStatus: { status: "blocked", reason: "managed_access" },
+  };
+  expect(ServerInfoStatusPayloadSchema.parse(current).localHubStartStatus).toEqual(
+    current.localHubStartStatus,
+  );
+  // Old peers accept unknown top-level fields and strip unknown feature flags.
+  const oldSchema = ServerInfoStatusPayloadSchema.in
+    .omit({
+      localHubStartStatus: true,
+      features: true,
+    })
+    .extend({ features: z.object({ localHubStart: z.boolean().optional() }).optional() });
+  expect(oldSchema.parse(current).serverId).toBe("host-1");
+  expect(
+    ServerInfoStatusPayloadSchema.safeParse({
+      ...current,
+      localHubStartStatus: { status: "blocked" },
+    }).success,
+  ).toBe(false);
+});

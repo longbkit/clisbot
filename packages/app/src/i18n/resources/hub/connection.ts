@@ -1,6 +1,60 @@
 // Hub › Hubs list, Overview, Connection, Paired devices, Sign-in policy, Add or start a Hub.
 // `en` is the source; every locale carries the same keys (resources.test.ts checks it).
 const en = {
+  startHelp: {
+    action: "How to start",
+    title: "Start Hub on {{host}}",
+    copy: "Copy operator instructions",
+    copyFailed: "Could not copy. You can select and copy the text above.",
+    pair: "Use owner pairing link",
+    check: "Check again",
+    alreadyListed: "Hub already set up on: {{hosts}}.",
+    reasons: {
+      ready: "This connection can start a Hub.",
+      unknown: "This Host does not report why Hub startup is unavailable.",
+      offline: "This Host is offline. Startup eligibility cannot be checked.",
+      managed_access: "Managed access is enabled on this Host.",
+      device_pairing_required: "Protected device pairing is not enabled on this Host.",
+      owner_required: "This connection does not have independent Host owner access.",
+      launcher_unavailable: "This Host cannot launch a Hub from the app.",
+    },
+    steps: {
+      ready:
+        "Startup is allowed. Choose Check again to refresh the Hub status, then use Start Hub if available. Otherwise, open View Host to check its connection.",
+      unknown:
+        "Ask the Host operator to check the Clisbot installation and update it if needed. Reconnect after updating, then check again. No permission denial has been established.",
+      offline: "Bring the Host online or check its connection settings, then check again.",
+      managed_access:
+        "Ask the Host operator to start or reuse a Hub locally and share its connection link. Being an admin of the current Hub does not grant this startup operation. Keep the Host’s managed access policy unchanged.",
+      device_pairing_required:
+        "Ask the Host operator to enable protected device pairing and schedule any required daemon restart. Then pair this device with an approved owner invitation. Running agents may be interrupted by a restart.",
+      owner_required:
+        "On your own computer, create an owner pairing invitation for this Host and use its link here. For a shared Host, ask its operator to pair this device with the approved permissions or start the Hub locally and share its link. Pairing to a Hub alone is insufficient.",
+      launcher_unavailable:
+        "Ask the Host operator to check or update the Clisbot CLI installation. They can start or reuse the Hub locally with clisbot hub start --personal, using the same Clisbot home as this Host, then share its connection link.",
+    },
+  },
+  inventory: {
+    empty: "No saved Hubs. Start one on a Host below, or connect an existing Hub.",
+    runOnHosts: "Run a Hub on your Hosts",
+    connectHostHint:
+      "Connect a Host first to run your own Hub for channels, automations and shared access.",
+    connectHost: "Connect a Host",
+    viewHost: "View Host",
+    checking: "Checking Hub status…",
+    failed: "Hub status could not be checked",
+    unsupported: "Update this Host to check its Hub status",
+    offline: "Host offline · Hub status unknown",
+    noHub: "Online · No Hub",
+    ownerRequired:
+      "Online · Starting a Hub requires independent Host owner access and a supported CLI",
+    stopped: "Hub stopped",
+    needsAttention: "Needs attention",
+    review: "Review connection",
+    actions: "Actions for {{name}}",
+    removeMessage:
+      "This removes the Hub from this device. Hosts accessed only through this Hub will no longer be available here. The Hub and its running agents are not stopped. You can connect again later.",
+  },
   common: {
     cancel: "Cancel",
     retry: "Retry",
@@ -398,6 +452,58 @@ const en = {
 } as const;
 
 const ar = {
+  startHelp: {
+    action: "كيفية التشغيل",
+    title: "تشغيل Hub على {{host}}",
+    copy: "نسخ تعليمات المشغّل",
+    copyFailed: "تعذر النسخ. يمكنك تحديد النص أعلاه ونسخه.",
+    pair: "استخدام رابط اقتران المالك",
+    check: "التحقق مجددًا",
+    alreadyListed: "تم إعداد Hub على: {{hosts}}.",
+    reasons: {
+      ready: "يمكن لهذا الاتصال تشغيل Hub.",
+      unknown: "لا يوضح هذا Host سبب تعذر تشغيل Hub.",
+      offline: "Host غير متصل. لا يمكن التحقق من شروط التشغيل.",
+      managed_access: "الوصول المُدار مفعّل على هذا Host.",
+      device_pairing_required: "اقتران الأجهزة المحمي غير مفعّل على هذا Host.",
+      owner_required: "هذا الاتصال لا يملك صلاحية مالك Host المستقلة.",
+      launcher_unavailable: "لا يمكن لهذا Host تشغيل Hub من التطبيق.",
+    },
+    steps: {
+      ready:
+        "التشغيل مسموح. اختر التحقق مجددًا لتحديث حالة Hub، ثم Start Hub إن توفر. وإلا افتح عرض Host لفحص الاتصال.",
+      unknown:
+        "اطلب من المشغّل فحص تثبيت Clisbot وتحديثه عند الحاجة، ثم أعد الاتصال والتحقق. لم يثبت رفض الصلاحيات.",
+      offline: "أعد Host إلى الاتصال أو افحص إعدادات الاتصال، ثم تحقق مجددًا.",
+      managed_access:
+        "اطلب من المشغّل تشغيل Hub محليًا أو إعادة استخدامه ومشاركة رابطه. صلاحية مسؤول Hub لا تسمح بهذه العملية. أبقِ سياسة الوصول المُدار كما هي.",
+      device_pairing_required:
+        "اطلب من المشغّل تفعيل الاقتران المحمي وجدولة أي إعادة تشغيل مطلوبة، ثم استخدم دعوة مالك معتمدة. قد تقاطع إعادة التشغيل الوكلاء قيد العمل.",
+      owner_required:
+        "على جهازك، أنشئ دعوة اقتران مالك لهذا Host. في Host مشترك، اطلب من المشغّل صلاحيات معتمدة أو تشغيل Hub ومشاركة رابطه. الاقتران بـ Hub وحده لا يكفي.",
+      launcher_unavailable:
+        "اطلب من المشغّل فحص Clisbot CLI أو تحديثه. يمكنه تشغيل clisbot hub start --personal باستخدام مجلد Clisbot home نفسه لهذا Host، ثم مشاركة الرابط.",
+    },
+  },
+  inventory: {
+    empty: "لا توجد Hubs محفوظة. شغّل واحدة على Host أدناه أو اتصل بـ Hub موجودة.",
+    runOnHosts: "تشغيل Hub على Hosts الخاصة بك",
+    connectHostHint: "اتصل بـ Host أولًا لتشغيل Hub للقنوات والأتمتة والوصول المشترك.",
+    connectHost: "الاتصال بـ Host",
+    viewHost: "عرض Host",
+    checking: "جارٍ التحقق من حالة Hub…",
+    failed: "تعذر التحقق من حالة Hub",
+    unsupported: "حدّث هذا Host للتحقق من حالة Hub",
+    offline: "Host غير متصل · حالة Hub غير معروفة",
+    noHub: "متصل · لا توجد Hub",
+    ownerRequired: "متصل · يتطلب تشغيل Hub صلاحية مالك Host مستقلة وCLI مدعومة",
+    stopped: "Hub متوقفة",
+    needsAttention: "يتطلب إجراءً",
+    review: "مراجعة الاتصال",
+    actions: "إجراءات {{name}}",
+    removeMessage:
+      "سيؤدي هذا إلى إزالة Hub من هذا الجهاز. لن تتوفر هنا Hosts التي لا يمكن الوصول إليها إلا عبر هذه Hub. لن تتوقف Hub أو الوكلاء قيد التشغيل. يمكنك الاتصال مجددًا لاحقًا.",
+  },
   common: {
     cancel: "إلغاء",
     retry: "إعادة المحاولة",
@@ -789,6 +895,60 @@ const ar = {
 };
 
 const es = {
+  startHelp: {
+    action: "Cómo iniciar",
+    title: "Iniciar Hub en {{host}}",
+    copy: "Copiar instrucciones",
+    copyFailed: "No se pudo copiar. Selecciona y copia el texto anterior.",
+    pair: "Usar enlace de propietario",
+    check: "Comprobar de nuevo",
+    alreadyListed: "Hub ya configurado en: {{hosts}}.",
+    reasons: {
+      ready: "Esta conexión puede iniciar un Hub.",
+      unknown: "Este Host no indica por qué no puede iniciar un Hub.",
+      offline: "Host sin conexión. No se pueden comprobar los requisitos.",
+      managed_access: "Este Host tiene acceso administrado activado.",
+      device_pairing_required: "Este Host no tiene emparejamiento protegido activado.",
+      owner_required: "Esta conexión no tiene acceso independiente de propietario del Host.",
+      launcher_unavailable: "Este Host no puede iniciar un Hub desde la aplicación.",
+    },
+    steps: {
+      ready:
+        "El inicio está permitido. Elige Comprobar de nuevo para actualizar el estado del Hub y después Start Hub si está disponible. Si no, abre Ver Host para comprobar la conexión.",
+      unknown:
+        "Pide al operador que compruebe o actualice Clisbot. Vuelve a conectar y comprobar. No se ha confirmado una denegación de permisos.",
+      offline: "Conecta el Host o revisa su conexión y vuelve a comprobar.",
+      managed_access:
+        "Pide al operador que inicie o reutilice un Hub localmente y comparta su enlace. Ser administrador del Hub no concede esta operación. Mantén la política de acceso administrado.",
+      device_pairing_required:
+        "Pide al operador que active el emparejamiento protegido y programe cualquier reinicio necesario. Después usa una invitación de propietario aprobada. Reiniciar puede interrumpir agentes en ejecución.",
+      owner_required:
+        "En tu equipo, crea una invitación de propietario para este Host. En un Host compartido, pide al operador permisos aprobados o que inicie el Hub y comparta su enlace. Emparejar solo con el Hub no basta.",
+      launcher_unavailable:
+        "Pide al operador que compruebe o actualice Clisbot CLI. Puede ejecutar clisbot hub start --personal con el mismo directorio Clisbot home de este Host y compartir el enlace.",
+    },
+  },
+  inventory: {
+    empty: "No hay Hubs guardados. Inicia uno en un Host o conecta un Hub existente.",
+    runOnHosts: "Ejecuta un Hub en tus Hosts",
+    connectHostHint:
+      "Conecta un Host para ejecutar tu Hub de canales, automatizaciones y acceso compartido.",
+    connectHost: "Conectar un Host",
+    viewHost: "Ver Host",
+    checking: "Comprobando el Hub…",
+    failed: "No se pudo comprobar el Hub",
+    unsupported: "Actualiza este Host para comprobar su Hub",
+    offline: "Host sin conexión · Estado del Hub desconocido",
+    noHub: "En línea · Sin Hub",
+    ownerRequired:
+      "En línea · Iniciar un Hub requiere acceso independiente de propietario del Host y una CLI compatible",
+    stopped: "Hub detenido",
+    needsAttention: "Requiere atención",
+    review: "Revisar conexión",
+    actions: "Acciones de {{name}}",
+    removeMessage:
+      "Se eliminará el Hub de este dispositivo. Los Hosts accesibles solo mediante este Hub dejarán de estar disponibles aquí. El Hub y sus agentes seguirán funcionando. Puedes volver a conectarte.",
+  },
   common: {
     cancel: "Cancelar",
     retry: "Reintentar",
@@ -1205,6 +1365,60 @@ const es = {
 };
 
 const fr = {
+  startHelp: {
+    action: "Comment démarrer",
+    title: "Démarrer un Hub sur {{host}}",
+    copy: "Copier les instructions",
+    copyFailed: "Copie impossible. Sélectionnez et copiez le texte ci-dessus.",
+    pair: "Utiliser un lien propriétaire",
+    check: "Vérifier à nouveau",
+    alreadyListed: "Hub déjà configuré sur : {{hosts}}.",
+    reasons: {
+      ready: "Cette connexion peut démarrer un Hub.",
+      unknown: "Ce Host ne précise pas pourquoi le démarrage est indisponible.",
+      offline: "Host hors ligne. Impossible de vérifier les conditions.",
+      managed_access: "L’accès géré est activé sur ce Host.",
+      device_pairing_required: "L’appairage protégé n’est pas activé sur ce Host.",
+      owner_required: "Cette connexion ne dispose pas d’un accès propriétaire indépendant au Host.",
+      launcher_unavailable: "Ce Host ne peut pas démarrer un Hub depuis l’application.",
+    },
+    steps: {
+      ready:
+        "Le démarrage est autorisé. Choisissez Vérifier à nouveau pour actualiser le statut du Hub, puis Start Hub si disponible. Sinon, ouvrez Voir Host pour vérifier sa connexion.",
+      unknown:
+        "Demandez à l’opérateur de vérifier ou mettre à jour Clisbot. Reconnectez-vous puis vérifiez. Aucun refus de permission n’est établi.",
+      offline: "Connectez le Host ou vérifiez sa connexion, puis réessayez.",
+      managed_access:
+        "Demandez à l’opérateur de démarrer ou réutiliser un Hub localement et de partager son lien. Le rôle admin du Hub ne permet pas cette opération. Conservez la politique d’accès géré.",
+      device_pairing_required:
+        "Demandez à l’opérateur d’activer l’appairage protégé et de planifier tout redémarrage requis. Utilisez ensuite une invitation propriétaire approuvée. Un redémarrage peut interrompre les agents.",
+      owner_required:
+        "Sur votre ordinateur, créez une invitation propriétaire pour ce Host. Sur un Host partagé, demandez à l’opérateur les permissions approuvées ou de démarrer le Hub et partager son lien. L’appairage au Hub seul ne suffit pas.",
+      launcher_unavailable:
+        "Demandez à l’opérateur de vérifier ou mettre à jour Clisbot CLI. Il peut lancer clisbot hub start --personal avec le même répertoire Clisbot home que ce Host, puis partager le lien.",
+    },
+  },
+  inventory: {
+    empty: "Aucun Hub enregistré. Démarrez-en un sur un Host ou connectez un Hub existant.",
+    runOnHosts: "Exécuter un Hub sur vos Hosts",
+    connectHostHint:
+      "Connectez un Host pour exécuter votre Hub de canaux, automatisations et accès partagé.",
+    connectHost: "Connecter un Host",
+    viewHost: "Voir le Host",
+    checking: "Vérification du Hub…",
+    failed: "État du Hub indisponible",
+    unsupported: "Mettez à jour ce Host pour vérifier son Hub",
+    offline: "Host hors ligne · État du Hub inconnu",
+    noHub: "En ligne · Aucun Hub",
+    ownerRequired:
+      "En ligne · Démarrer un Hub nécessite un accès propriétaire indépendant au Host et une CLI compatible",
+    stopped: "Hub arrêté",
+    needsAttention: "Action requise",
+    review: "Vérifier la connexion",
+    actions: "Actions pour {{name}}",
+    removeMessage:
+      "Le Hub sera retiré de cet appareil. Les Hosts accessibles uniquement via ce Hub ne seront plus disponibles ici. Le Hub et ses agents continueront à fonctionner. Vous pourrez vous reconnecter.",
+  },
   common: {
     cancel: "Annuler",
     retry: "Réessayer",
@@ -1618,6 +1832,59 @@ const fr = {
 };
 
 const ja = {
+  startHelp: {
+    action: "起動方法",
+    title: "{{host}} で Hub を起動",
+    copy: "操作手順をコピー",
+    copyFailed: "コピーできません。上のテキストを選択してコピーしてください。",
+    pair: "所有者のペアリングリンクを使う",
+    check: "再確認",
+    alreadyListed: "Hub 設定済みの Host: {{hosts}}。",
+    reasons: {
+      ready: "この接続は Hub を起動できます。",
+      unknown: "この Host は起動できない理由を提供していません。",
+      offline: "Host がオフラインです。起動条件を確認できません。",
+      managed_access: "この Host は管理アクセスが有効です。",
+      device_pairing_required: "この Host は保護されたデバイスペアリングが無効です。",
+      owner_required: "この接続には独立した Host 所有者アクセスがありません。",
+      launcher_unavailable: "この Host はアプリから Hub を起動できません。",
+    },
+    steps: {
+      ready:
+        "起動は許可されています。再確認で Hub の状態を更新し、表示されたら Start Hub を選択してください。表示されない場合は Host を表示して接続を確認してください。",
+      unknown:
+        "運用者に Clisbot の確認や必要な更新を依頼してください。更新後に再接続して確認します。権限拒否とは断定できません。",
+      offline: "Host をオンラインにするか接続設定を確認して、再確認してください。",
+      managed_access:
+        "運用者にローカルで Hub を起動または再利用し、リンクを共有してもらってください。Hub 管理者権限では起動できません。管理アクセスポリシーは維持してください。",
+      device_pairing_required:
+        "運用者に保護されたペアリングの有効化と、必要な再起動の予定を依頼してください。その後、承認済みの所有者招待でペアリングします。再起動は実行中のエージェントを中断する場合があります。",
+      owner_required:
+        "自分のコンピューターでこの Host の所有者招待を作成してください。共有 Host では運用者に権限の承認か Hub の起動とリンク共有を依頼してください。Hub とのペアリングだけでは不十分です。",
+      launcher_unavailable:
+        "運用者に Clisbot CLI の確認や更新を依頼してください。この Host と同じ Clisbot home を使って clisbot hub start --personal を実行し、接続リンクを共有できます。",
+    },
+  },
+  inventory: {
+    empty: "保存済みの Hub はありません。下の Host で起動するか、既存の Hub に接続してください。",
+    runOnHosts: "Host で Hub を実行",
+    connectHostHint:
+      "チャンネル、自動化、アクセス共有用の Hub を実行するには、まず Host に接続してください。",
+    connectHost: "Host に接続",
+    viewHost: "Host を表示",
+    checking: "Hub の状態を確認中…",
+    failed: "Hub の状態を確認できませんでした",
+    unsupported: "Hub の状態を確認するには Host を更新してください",
+    offline: "Host オフライン · Hub の状態不明",
+    noHub: "オンライン · Hub なし",
+    ownerRequired: "オンライン · Hub の起動には独立した Host 所有者アクセスと対応 CLI が必要です",
+    stopped: "Hub 停止中",
+    needsAttention: "対応が必要",
+    review: "接続を確認",
+    actions: "{{name}} の操作",
+    removeMessage:
+      "このデバイスから Hub を削除します。この Hub 経由でのみアクセスできる Host は、ここでは利用できなくなります。Hub と実行中のエージェントは停止しません。後で再接続できます。",
+  },
   common: {
     cancel: "キャンセル",
     retry: "再試行",
@@ -2028,6 +2295,59 @@ const ja = {
 };
 
 const ko = {
+  startHelp: {
+    action: "시작 방법",
+    title: "{{host}}에서 Hub 시작",
+    copy: "운영자 안내 복사",
+    copyFailed: "복사하지 못했습니다. 위 텍스트를 선택하여 복사하세요.",
+    pair: "소유자 페어링 링크 사용",
+    check: "다시 확인",
+    alreadyListed: "Hub가 이미 설정된 Host: {{hosts}}.",
+    reasons: {
+      ready: "이 연결은 Hub를 시작할 수 있습니다.",
+      unknown: "이 Host는 Hub를 시작할 수 없는 이유를 제공하지 않습니다.",
+      offline: "Host가 오프라인입니다. 시작 조건을 확인할 수 없습니다.",
+      managed_access: "이 Host는 관리형 접근이 활성화되어 있습니다.",
+      device_pairing_required: "이 Host는 보호된 기기 페어링이 활성화되지 않았습니다.",
+      owner_required: "이 연결에는 독립적인 Host 소유자 접근 권한이 없습니다.",
+      launcher_unavailable: "이 Host는 앱에서 Hub를 시작할 수 없습니다.",
+    },
+    steps: {
+      ready:
+        "시작이 허용됩니다. 다시 확인으로 Hub 상태를 갱신한 다음 Start Hub가 표시되면 선택하세요. 표시되지 않으면 Host 보기에서 연결을 확인하세요.",
+      unknown:
+        "운영자에게 Clisbot 확인 및 필요한 업데이트를 요청하세요. 업데이트 후 다시 연결하고 확인하세요. 권한 거부로 확인된 것은 아닙니다.",
+      offline: "Host를 온라인으로 전환하거나 연결 설정을 확인한 다음 다시 확인하세요.",
+      managed_access:
+        "운영자에게 로컬에서 Hub를 시작하거나 재사용하고 링크를 공유하도록 요청하세요. Hub 관리자 권한은 이 작업을 허용하지 않습니다. 관리형 접근 정책을 유지하세요.",
+      device_pairing_required:
+        "운영자에게 보호된 페어링 활성화 및 필요한 재시작 일정 조정을 요청하세요. 이후 승인된 소유자 초대로 페어링하세요. 재시작은 실행 중인 에이전트를 중단할 수 있습니다.",
+      owner_required:
+        "자신의 컴퓨터에서 해당 Host의 소유자 초대를 만드세요. 공유 Host는 운영자에게 승인된 권한이나 Hub 시작 및 링크 공유를 요청하세요. Hub 페어링만으로는 부족합니다.",
+      launcher_unavailable:
+        "운영자에게 Clisbot CLI 확인이나 업데이트를 요청하세요. 해당 Host와 같은 Clisbot home으로 clisbot hub start --personal을 실행한 뒤 링크를 공유할 수 있습니다.",
+    },
+  },
+  inventory: {
+    empty: "저장된 Hub가 없습니다. 아래 Host에서 시작하거나 기존 Hub에 연결하세요.",
+    runOnHosts: "Host에서 Hub 실행",
+    connectHostHint: "채널, 자동화 및 공유 접근용 Hub를 실행하려면 먼저 Host에 연결하세요.",
+    connectHost: "Host 연결",
+    viewHost: "Host 보기",
+    checking: "Hub 상태 확인 중…",
+    failed: "Hub 상태를 확인할 수 없습니다",
+    unsupported: "Hub 상태를 확인하려면 Host를 업데이트하세요",
+    offline: "Host 오프라인 · Hub 상태 알 수 없음",
+    noHub: "온라인 · Hub 없음",
+    ownerRequired:
+      "온라인 · Hub를 시작하려면 독립적인 Host 소유자 접근 권한과 지원되는 CLI가 필요합니다",
+    stopped: "Hub 중지됨",
+    needsAttention: "조치 필요",
+    review: "연결 검토",
+    actions: "{{name}} 작업",
+    removeMessage:
+      "이 기기에서 Hub를 제거합니다. 이 Hub를 통해서만 접근하는 Host는 여기서 사용할 수 없게 됩니다. Hub와 실행 중인 에이전트는 중지되지 않습니다. 나중에 다시 연결할 수 있습니다.",
+  },
   common: {
     cancel: "취소",
     retry: "다시 시도",
@@ -2422,6 +2742,60 @@ const ko = {
 };
 
 const ptBR = {
+  startHelp: {
+    action: "Como iniciar",
+    title: "Iniciar Hub em {{host}}",
+    copy: "Copiar instruções",
+    copyFailed: "Não foi possível copiar. Selecione e copie o texto acima.",
+    pair: "Usar link de proprietário",
+    check: "Verificar novamente",
+    alreadyListed: "Hub já configurado em: {{hosts}}.",
+    reasons: {
+      ready: "Esta conexão pode iniciar um Hub.",
+      unknown: "Este Host não informa por que não pode iniciar um Hub.",
+      offline: "Host offline. Não é possível verificar os requisitos.",
+      managed_access: "O acesso gerenciado está ativo neste Host.",
+      device_pairing_required: "O pareamento protegido não está ativo neste Host.",
+      owner_required: "Esta conexão não tem acesso independente de proprietário do Host.",
+      launcher_unavailable: "Este Host não pode iniciar um Hub pelo aplicativo.",
+    },
+    steps: {
+      ready:
+        "A inicialização é permitida. Escolha Verificar novamente para atualizar o estado do Hub e depois Start Hub, se disponível. Caso contrário, abra Ver Host para conferir a conexão.",
+      unknown:
+        "Peça ao operador para verificar ou atualizar o Clisbot. Reconecte e verifique novamente. Não foi confirmada falta de permissão.",
+      offline: "Conecte o Host ou revise suas configurações de conexão e verifique novamente.",
+      managed_access:
+        "Peça ao operador para iniciar ou reutilizar um Hub localmente e compartilhar o link. Ser administrador do Hub não concede esta operação. Mantenha a política de acesso gerenciado.",
+      device_pairing_required:
+        "Peça ao operador para ativar o pareamento protegido e agendar qualquer reinício necessário. Depois use um convite de proprietário aprovado. Reiniciar pode interromper agentes em execução.",
+      owner_required:
+        "No seu computador, crie um convite de proprietário para este Host. Num Host compartilhado, peça ao operador permissões aprovadas ou que inicie o Hub e compartilhe o link. Parear apenas com o Hub não basta.",
+      launcher_unavailable:
+        "Peça ao operador para verificar ou atualizar o Clisbot CLI. Ele pode executar clisbot hub start --personal usando o mesmo diretório Clisbot home deste Host e compartilhar o link.",
+    },
+  },
+  inventory: {
+    empty: "Nenhum Hub salvo. Inicie um em um Host abaixo ou conecte um Hub existente.",
+    runOnHosts: "Execute um Hub nos seus Hosts",
+    connectHostHint:
+      "Conecte um Host para executar seu Hub de canais, automações e acesso compartilhado.",
+    connectHost: "Conectar um Host",
+    viewHost: "Ver Host",
+    checking: "Verificando o Hub…",
+    failed: "Não foi possível verificar o Hub",
+    unsupported: "Atualize este Host para verificar seu Hub",
+    offline: "Host offline · Estado do Hub desconhecido",
+    noHub: "Online · Sem Hub",
+    ownerRequired:
+      "Online · Iniciar um Hub exige acesso independente de proprietário do Host e uma CLI compatível",
+    stopped: "Hub parado",
+    needsAttention: "Requer atenção",
+    review: "Revisar conexão",
+    actions: "Ações de {{name}}",
+    removeMessage:
+      "O Hub será removido deste dispositivo. Hosts acessíveis apenas por este Hub não estarão mais disponíveis aqui. O Hub e seus agentes continuarão funcionando. Você pode conectar novamente depois.",
+  },
   common: {
     cancel: "Cancelar",
     retry: "Tentar novamente",
@@ -2830,6 +3204,61 @@ const ptBR = {
 };
 
 const ru = {
+  startHelp: {
+    action: "Как запустить",
+    title: "Запустить Hub на {{host}}",
+    copy: "Копировать инструкции",
+    copyFailed: "Не удалось скопировать. Выделите и скопируйте текст выше.",
+    pair: "Использовать ссылку владельца",
+    check: "Проверить снова",
+    alreadyListed: "Hub уже настроен на: {{hosts}}.",
+    reasons: {
+      ready: "Это подключение может запустить Hub.",
+      unknown: "Этот Host не сообщает причину недоступности запуска.",
+      offline: "Host не в сети. Условия запуска нельзя проверить.",
+      managed_access: "На этом Host включён управляемый доступ.",
+      device_pairing_required: "На этом Host не включено защищённое сопряжение устройств.",
+      owner_required: "У подключения нет независимых прав владельца Host.",
+      launcher_unavailable: "Этот Host не может запустить Hub из приложения.",
+    },
+    steps: {
+      ready:
+        "Запуск разрешён. Нажмите Проверить снова, чтобы обновить статус Hub, затем Start Hub, если кнопка доступна. Иначе откройте Host и проверьте подключение.",
+      unknown:
+        "Попросите оператора проверить или обновить Clisbot. Затем подключитесь заново и проверьте. Отказ в правах не установлен.",
+      offline:
+        "Подключите Host к сети или проверьте настройки подключения, затем повторите проверку.",
+      managed_access:
+        "Попросите оператора запустить или использовать существующий Hub локально и поделиться ссылкой. Права администратора Hub не разрешают эту операцию. Сохраните политику управляемого доступа.",
+      device_pairing_required:
+        "Попросите оператора включить защищённое сопряжение и запланировать необходимый перезапуск. Затем используйте одобренное приглашение владельца. Перезапуск может прервать работающих агентов.",
+      owner_required:
+        "На своём компьютере создайте приглашение владельца для этого Host. Для общего Host попросите оператора предоставить одобренные права или запустить Hub и передать ссылку. Сопряжения только с Hub недостаточно.",
+      launcher_unavailable:
+        "Попросите оператора проверить или обновить Clisbot CLI. Он может запустить clisbot hub start --personal с тем же каталогом Clisbot home, что у этого Host, и передать ссылку.",
+    },
+  },
+  inventory: {
+    empty: "Нет сохранённых Hub. Запустите Hub на Host ниже или подключите существующий.",
+    runOnHosts: "Запустить Hub на ваших Host",
+    connectHostHint:
+      "Сначала подключите Host для запуска Hub с каналами, автоматизациями и общим доступом.",
+    connectHost: "Подключить Host",
+    viewHost: "Открыть Host",
+    checking: "Проверка Hub…",
+    failed: "Не удалось проверить состояние Hub",
+    unsupported: "Обновите Host для проверки Hub",
+    offline: "Host не в сети · Состояние Hub неизвестно",
+    noHub: "В сети · Нет Hub",
+    ownerRequired:
+      "В сети · Для запуска Hub нужны независимые права владельца Host и совместимый CLI",
+    stopped: "Hub остановлен",
+    needsAttention: "Требуется действие",
+    review: "Проверить подключение",
+    actions: "Действия для {{name}}",
+    removeMessage:
+      "Hub будет удалён с этого устройства. Host, доступные только через этот Hub, больше не будут доступны здесь. Hub и работающие агенты не остановятся. Позже можно подключиться снова.",
+  },
   common: {
     cancel: "Отмена",
     retry: "Повторить",
@@ -3240,6 +3669,59 @@ const ru = {
 };
 
 const vi = {
+  startHelp: {
+    action: "Cách khởi động",
+    title: "Khởi động Hub trên {{host}}",
+    copy: "Copy hướng dẫn cho người vận hành",
+    copyFailed: "Không copy được. Bạn có thể chọn và sao chép nội dung phía trên.",
+    pair: "Dùng link ghép nối owner",
+    check: "Kiểm tra lại",
+    alreadyListed: "Đã thiết lập Hub trên: {{hosts}}.",
+    reasons: {
+      ready: "Kết nối này có thể khởi động Hub.",
+      unknown: "Host này chưa cung cấp lý do không thể khởi động Hub.",
+      offline: "Host đang ngoại tuyến. Chưa thể kiểm tra điều kiện khởi động.",
+      managed_access: "Host này đang bật Managed access.",
+      device_pairing_required: "Host này chưa bật ghép nối thiết bị có xác thực.",
+      owner_required: "Kết nối này chưa có quyền owner độc lập của Host.",
+      launcher_unavailable: "Host này không thể khởi động Hub từ ứng dụng.",
+    },
+    steps: {
+      ready:
+        "Kết nối được phép khởi động. Chọn Kiểm tra lại để cập nhật trạng thái Hub, rồi chọn Start Hub nếu có. Nếu chưa có, mở Xem Host để kiểm tra kết nối.",
+      unknown:
+        "Nhờ người vận hành kiểm tra bản cài Clisbot và cập nhật nếu cần. Kết nối lại sau khi cập nhật rồi kiểm tra lại. Chưa có đủ thông tin để kết luận thiếu quyền.",
+      offline: "Đưa Host trực tuyến hoặc kiểm tra cấu hình kết nối rồi kiểm tra lại.",
+      managed_access:
+        "Nhờ người vận hành khởi động hoặc dùng lại Hub tại máy rồi chia sẻ link kết nối. Quyền admin của Hub hiện tại không cấp quyền khởi động này. Giữ nguyên chính sách Managed access của Host.",
+      device_pairing_required:
+        "Nhờ người vận hành bật ghép nối thiết bị có xác thực và sắp xếp thời điểm khởi động lại daemon nếu cần. Sau đó ghép nối thiết bị bằng lời mời owner đã được duyệt. Khởi động lại có thể ngắt các agent đang chạy.",
+      owner_required:
+        "Trên máy của mình, tạo lời mời ghép nối owner cho đúng Host rồi dùng link tại đây. Với Host dùng chung, nhờ người vận hành ghép nối thiết bị với quyền được duyệt hoặc khởi động Hub tại máy và chia sẻ link. Chỉ ghép nối với Hub là chưa đủ.",
+      launcher_unavailable:
+        "Nhờ người vận hành kiểm tra hoặc cập nhật Clisbot CLI. Họ có thể khởi động hoặc dùng lại Hub tại máy bằng clisbot hub start --personal, với cùng thư mục Clisbot home của Host này, rồi chia sẻ link kết nối.",
+    },
+  },
+  inventory: {
+    empty: "Chưa lưu Hub nào. Khởi động trên Host bên dưới hoặc kết nối Hub có sẵn.",
+    runOnHosts: "Chạy Hub trên các Host của bạn",
+    connectHostHint:
+      "Kết nối Host trước để chạy Hub cho kênh chat, tự động hóa và chia sẻ quyền truy cập.",
+    connectHost: "Kết nối Host",
+    viewHost: "Xem Host",
+    checking: "Đang kiểm tra trạng thái Hub…",
+    failed: "Chưa kiểm tra được trạng thái Hub",
+    unsupported: "Cập nhật Host để kiểm tra trạng thái Hub",
+    offline: "Host ngoại tuyến · Chưa rõ trạng thái Hub",
+    noHub: "Trực tuyến · Chưa có Hub",
+    ownerRequired: "Trực tuyến · Cần quyền owner độc lập của Host và CLI hỗ trợ để khởi động Hub",
+    stopped: "Hub đã dừng",
+    needsAttention: "Cần xử lý",
+    review: "Xem kết nối",
+    actions: "Thao tác với {{name}}",
+    removeMessage:
+      "Gỡ Hub khỏi thiết bị này. Các Host chỉ truy cập qua Hub này sẽ không còn khả dụng tại đây. Hub và các agent đang chạy không bị dừng. Bạn có thể kết nối lại sau.",
+  },
   common: {
     cancel: "Hủy",
     retry: "Thử lại",
@@ -3642,6 +4124,58 @@ const vi = {
 };
 
 const zhCN = {
+  startHelp: {
+    action: "如何启动",
+    title: "在 {{host}} 上启动 Hub",
+    copy: "复制操作指南",
+    copyFailed: "无法复制。请选中并复制上方文本。",
+    pair: "使用所有者配对链接",
+    check: "重新检查",
+    alreadyListed: "已在以下 Host 上配置 Hub：{{hosts}}。",
+    reasons: {
+      ready: "此连接可以启动 Hub。",
+      unknown: "此 Host 未提供无法启动 Hub 的原因。",
+      offline: "Host 离线，无法检查启动条件。",
+      managed_access: "此 Host 已启用托管访问。",
+      device_pairing_required: "此 Host 未启用受保护的设备配对。",
+      owner_required: "此连接没有独立的 Host 所有者权限。",
+      launcher_unavailable: "此 Host 无法通过应用启动 Hub。",
+    },
+    steps: {
+      ready:
+        "已允许启动。选择重新检查以刷新 Hub 状态，然后在可用时选择 Start Hub。否则，请打开查看 Host 来检查连接。",
+      unknown:
+        "请运维人员检查 Clisbot 安装并按需更新。更新后重新连接并检查。尚不能确定是权限不足。",
+      offline: "使 Host 上线或检查连接设置，然后重新检查。",
+      managed_access:
+        "请运维人员在本机启动或复用 Hub 并分享连接链接。Hub 管理员权限不包含此启动操作。保留 Host 的托管访问策略。",
+      device_pairing_required:
+        "请运维人员启用受保护的配对并安排必要的重启，然后使用已批准的所有者邀请配对。重启可能中断正在运行的代理。",
+      owner_required:
+        "在自己的电脑上为此 Host 创建所有者配对邀请。对于共享 Host，请运维人员授予已批准的权限，或启动 Hub 并分享链接。只与 Hub 配对还不够。",
+      launcher_unavailable:
+        "请运维人员检查或更新 Clisbot CLI。他们可以使用与此 Host 相同的 Clisbot home 运行 clisbot hub start --personal，再分享连接链接。",
+    },
+  },
+  inventory: {
+    empty: "尚未保存 Hub。可在下方 Host 上启动，或连接现有 Hub。",
+    runOnHosts: "在你的 Host 上运行 Hub",
+    connectHostHint: "先连接 Host，即可运行用于频道、自动化和共享访问的 Hub。",
+    connectHost: "连接 Host",
+    viewHost: "查看 Host",
+    checking: "正在检查 Hub 状态…",
+    failed: "无法检查 Hub 状态",
+    unsupported: "请更新此 Host 以检查 Hub 状态",
+    offline: "Host 离线 · Hub 状态未知",
+    noHub: "在线 · 无 Hub",
+    ownerRequired: "在线 · 启动 Hub 需要独立的 Host 所有者权限和受支持的 CLI",
+    stopped: "Hub 已停止",
+    needsAttention: "需要处理",
+    review: "检查连接",
+    actions: "{{name}} 的操作",
+    removeMessage:
+      "这会从此设备移除 Hub。只能通过此 Hub 访问的 Host 将不再在此处可用。Hub 和正在运行的代理不会停止。你可以稍后重新连接。",
+  },
   common: {
     cancel: "取消",
     retry: "重试",

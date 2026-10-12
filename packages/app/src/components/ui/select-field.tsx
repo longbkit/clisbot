@@ -64,6 +64,8 @@ export interface SelectFieldProps<TValue> {
   field?: boolean;
   testID?: string;
   triggerTestID?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export interface SelectFieldTriggerProps {
@@ -195,9 +197,19 @@ export function SelectField<TValue>({
   field = true,
   testID,
   triggerTestID,
+  open: controlledOpen,
+  onOpenChange,
 }: SelectFieldProps<TValue>): ReactElement {
   const anchorRef = useRef<View>(null);
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setLocalOpen(next);
+      onOpenChange?.(next);
+    },
+    [onOpenChange],
+  );
   const [triggerFocused, setTriggerFocused] = useState(false);
   const visibleOptions = useVisibleSelectOptions(options, loading);
   const selectedOptionId = useMemo(
@@ -229,15 +241,15 @@ export function SelectField<TValue>({
       onChange(option.value, { label: option.label, description: option.description });
       setOpen(false);
     },
-    [onChange, optionById],
+    [onChange, optionById, setOpen],
   );
 
   const handlePress = useCallback(() => {
     if (disabled) {
       return;
     }
-    setOpen((current) => !current);
-  }, [disabled]);
+    setOpen(!open);
+  }, [disabled, open, setOpen]);
   const handleTriggerFocus = useCallback((_event: NativeSyntheticEvent<TargetedEvent>) => {
     setTriggerFocused(true);
   }, []);

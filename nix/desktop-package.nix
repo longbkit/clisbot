@@ -42,14 +42,20 @@ buildNpmPackage {
       && !(lib.hasPrefix "/.agents" relPath)
       && !(lib.hasPrefix "/.claude" relPath)
       && !(lib.hasPrefix "/.codex" relPath)
-      && !(lib.hasPrefix "/docker" relPath)
+      # afterSign runs the shared packaged-Hub smoke from the Docker tree.
+      && (
+        !(lib.hasPrefix "/docker" relPath)
+        || lib.hasPrefix relPath "/docker/base/rootfs/usr/local/lib/clisbot-hub-smoke.mjs"
+      )
+      # The Hub Dockerfile points into the excluded Docker tree. Keep the
+      # source free of dangling links when electron-builder walks workspaces.
+      && relPath != "/packages/hub/Dockerfile"
       # Top-level prose only (README, CHANGELOG, AGENTS...). Deeper markdown is
       # not necessarily documentation: skills/*/SKILL.md is a runtime file the
       # installPhase copies into the output.
       && builtins.match "/[^/]+\\.md" relPath == null
-      # Test fixtures and build artifacts
-      && !(lib.hasSuffix ".test.ts" baseName)
-      && !(lib.hasSuffix ".e2e.test.ts" baseName)
+      # Keep TypeScript inputs intact; workspace tsconfigs own build exclusions.
+      # Exclude local dependencies and build artifacts.
       && baseName != "node_modules"
       && baseName != ".git"
       && baseName != ".clisbot"
@@ -82,6 +88,9 @@ buildNpmPackage {
   dontNpmBuild = true;
 
   env = {
+    # Match the macOS ARM desktop release build: Metro processes the generated
+    # outbound validator beyond Node's default 2 GiB heap.
+    NODE_OPTIONS = "--max-old-space-size=4096";
     EXPO_NO_TELEMETRY = "1";
     # Expo's web build pulls in some pre-bundled assets; ensure it doesn't try
     # to phone home during the build.
@@ -94,8 +103,8 @@ buildNpmPackage {
     # Native deps (terminal emulation; libuv-linked on Linux)
     npm rebuild node-pty
 
-    # Server workspaces (highlight + relay + protocol + client + server + cli)
-    npm run build:server
+    # Match desktop packaging: CLI, daemon, Hub and channel runtime assets.
+    npm run build:desktop-backends
 
     # App workspace deps not covered by build:server
     npm run build --workspace=@clisbot/expo-two-way-audio

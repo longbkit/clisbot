@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Clisbot Home {{number}} — {{name}}</title>
+  </head>
+  <body class="product-review direction-review" data-direction="{{number}}">
+    <header class="review-bar" aria-label="Điều khiển bản thiết kế">
+      <a class="review-brand" href="index.html">Clisbot Home <small>4 hướng thiết kế</small></a>
+      <nav class="direction-links" aria-label="So sánh 4 phương án">
+        <a href="01-chat.html" data-direction-link="1">01 <span>Bắt đầu nhanh</span></a>
+        <a href="02-project.html" data-direction-link="2">02 <span>Theo Project</span></a>
+        <a href="03-today.html" data-direction-link="3">03 <span>Nhịp công việc</span></a>
+        <a href="04-home.html" data-direction-link="4">04 <span>Tổng hòa</span></a>
+      </nav>
+      <div class="review-tools">
+        <button class="review-link" data-action="direction-detail">Chủ đích</button>
+        <button
+          class="review-icon"
+          data-action="viewport"
+          aria-label="Chuyển khung xem mobile"
+        ></button>
+        <button
+          class="review-icon"
+          data-action="theme"
+          aria-label="Đổi giao diện sáng / tối"
+        ></button>
+      </div>
+    </header>
+    <div class="scenario-bar">
+      <span class="scenario-label">DEMO · DỮ LIỆU MẪU</span>
+      <label for="scenario">Trạng thái</label>
+      <select id="scenario" aria-label="Trạng thái trải nghiệm"></select>
+      <span id="scenario-description"></span>
+      <button class="scenario-reset" data-action="reset">Đặt lại ↺</button>
+    </div>
+    <div class="stage"><div id="app" class="app-shell"></div></div>
+    <footer id="concept-note" class="concept-note"></footer>
+    <dialog id="modal" aria-labelledby="modal-title"></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

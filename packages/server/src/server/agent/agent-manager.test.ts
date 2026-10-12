@@ -669,6 +669,101 @@ async function startAndSteerThroughManager(
   return { manager, agentId: agent.id, workdir };
 }
 
+test("starts a persisted empty draft under its existing ID without deleting its canonical store", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-canonical-draft-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  const agentId = randomUUID();
+  const now = new Date().toISOString();
+  await storage.upsert({
+    id: agentId,
+    provider: "codex",
+    cwd: workdir,
+    workspaceId: "draft-workspace",
+    createdAt: now,
+    updatedAt: now,
+    labels: { purpose: "draft" },
+    lastStatus: "closed",
+    config: { model: "gpt-5.4" },
+  });
+  const durable = new FileAgentTimelineStore((id) => storage.getSessionDirectory(id));
+  const submission = {
+    id: "draft-submission",
+    digest: "draft-digest",
+    identity: {},
+    timestamp: now,
+    status: "pending" as const,
+  };
+  await durable.writeMessageSubmission(agentId, submission);
+  let creates = 0;
+  let resumes = 0;
+  class DraftSession extends TestAgentSession {
+    override streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      throw new Error("A first session must not replay legacy history");
+    }
+    override async startTurn(): Promise<{ turnId: string }> {
+      const turnId = "draft-turn";
+      setTimeout(() => {
+        this.pushEvent({ type: "turn_started", provider: "codex", turnId });
+        this.pushEvent({
+          type: "timeline",
+          provider: "codex",
+          turnId,
+          item: { type: "user_message", text: "first prompt", messageId: "draft-user" },
+        });
+        this.pushEvent({
+          type: "timeline",
+          provider: "codex",
+          turnId,
+          item: { type: "assistant_message", text: "DRAFT_REUSE_OK", messageId: "draft-answer" },
+        });
+        this.pushEvent({ type: "turn_completed", provider: "codex", turnId });
+      }, 0);
+      return { turnId };
+    }
+  }
+  const client = new (class extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      creates++;
+      return new DraftSession(config);
+    }
+    override async resumeSession(): Promise<AgentSession> {
+      resumes++;
+      throw new Error("A draft has no provider session to resume");
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    durableTimelineStore: durable,
+    logger,
+  });
+  try {
+    await ensureAgentLoaded(agentId, { agentManager: manager, agentStorage: storage, logger });
+    await manager.runAgent(agentId, "first prompt");
+    await manager.flush();
+    expect(creates).toBe(1);
+    expect(resumes).toBe(0);
+    expect(await durable.getLatestCommittedSeq(agentId)).toBe(2);
+    expect((await durable.fetchCommitted(agentId, { limit: 1 })).rows[0]?.item).toMatchObject({
+      type: "assistant_message",
+      text: "DRAFT_REUSE_OK",
+    });
+    expect(await durable.writeMessageSubmission(agentId, submission)).toMatchObject({
+      created: false,
+      record: { id: "draft-submission" },
+    });
+    expect(await storage.get(agentId)).toMatchObject({
+      id: agentId,
+      workspaceId: "draft-workspace",
+      cwd: workdir,
+    });
+  } finally {
+    await manager.closeAgent(agentId);
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("uses an injected timeline store without making it a production requirement", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-timeline-store-"));
   const store = new RecordingTimelineStore();
@@ -828,6 +923,143 @@ test("a failed history replay leaves the committed timeline intact", async () =>
     rmSync(workdir, { recursive: true, force: true });
   }
 });
+
+test.each([false, true])(
+  "legacy session hydration stays writable through resume and restart (replay fails first: %s)",
+  async (failFirstReplay) => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-legacy-resume-"));
+    const registry = new AgentStorage(join(workdir, "agents"), logger, {
+      sessionLayout: true,
+    });
+    await registry.initialize();
+    const store = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+    let failReplay = failFirstReplay;
+    class LegacySession extends TestAgentSession {
+      override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+        yield {
+          type: "timeline",
+          provider: "codex",
+          item: {
+            type: "user_message",
+            text: "original prompt",
+            messageId: "original",
+          },
+        };
+        if (failReplay) throw new Error("history interrupted");
+        yield {
+          type: "provider_subagent",
+          provider: "codex",
+          event: { type: "upsert", id: "legacy-child", title: "Original child" },
+        };
+        yield {
+          type: "provider_subagent",
+          provider: "codex",
+          event: {
+            type: "timeline",
+            id: "legacy-child",
+            item: { type: "assistant_message", text: "original child reply" },
+          },
+        };
+        yield {
+          type: "timeline",
+          provider: "codex",
+          item: { type: "assistant_message", text: "original reply" },
+        };
+      }
+      override async startTurn(prompt?: AgentPromptInput): Promise<{ turnId: string }> {
+        const turnId = "continued-turn";
+        setTimeout(() => {
+          this.pushEvent({ type: "turn_started", provider: "codex", turnId });
+          this.pushEvent({
+            type: "timeline",
+            provider: "codex",
+            turnId,
+            item: {
+              type: "user_message",
+              text: String(prompt),
+              messageId: "continued",
+            },
+          });
+          this.pushEvent({
+            type: "timeline",
+            provider: "codex",
+            turnId,
+            item: { type: "assistant_message", text: "continued reply" },
+          });
+          this.pushEvent({ type: "turn_completed", provider: "codex", turnId });
+        }, 0);
+        return { turnId };
+      }
+    }
+    const client = new (class extends TestAgentClient {
+      override async resumeSession(): Promise<AgentSession> {
+        return new LegacySession({ provider: "codex", cwd: workdir });
+      }
+    })();
+    const manager = new AgentManager({
+      clients: { codex: client },
+      registry,
+      durableTimelineStore: store,
+      logger,
+    });
+    let agentId: string | undefined;
+    try {
+      const agent = await manager.resumeAgentFromPersistence(
+        { provider: "codex", sessionId: "legacy-native-session" },
+        { cwd: workdir },
+      );
+      agentId = agent.id;
+      if (failFirstReplay) {
+        await expect(manager.hydrateTimelineFromProvider(agent.id)).rejects.toThrow(
+          "history interrupted",
+        );
+        expect(await store.getCommittedRows(agent.id)).toEqual([]);
+        failReplay = false;
+      }
+      await manager.hydrateTimelineFromProvider(agent.id);
+      await manager.flush();
+      expect(
+        (await store.getCommittedRows(agent.id)).map((row) =>
+          "text" in row.item ? row.item.text : undefined,
+        ),
+      ).toEqual(["original prompt", "original reply"]);
+      await drainAsyncGenerator(manager.streamAgent(agent.id, "continue"));
+      await manager.flush();
+      expect(
+        (await store.getCommittedRows(agent.id)).map((row) =>
+          "text" in row.item ? row.item.text : undefined,
+        ),
+      ).toEqual(["original prompt", "original reply", "continue", "continued reply"]);
+      await manager.closeAgent(agent.id);
+      const reopened = new FileAgentTimelineStore((id) => registry.getSessionDirectory(id));
+      expect(
+        (await reopened.getCommittedRows(agent.id)).map((row) =>
+          "text" in row.item ? row.item.text : undefined,
+        ),
+      ).toEqual(["original prompt", "original reply", "continue", "continued reply"]);
+      const reopenedManager = new AgentManager({
+        clients: { codex: client },
+        registry,
+        durableTimelineStore: reopened,
+        logger,
+      });
+      expect(
+        (await reopenedManager.readProviderSubagents(agent.id)).map((child) => child.id),
+      ).toEqual(["legacy-child"]);
+      expect(
+        (await reopenedManager.readProviderSubagentTimeline(agent.id, "legacy-child")).rows.map(
+          (row) => row.item,
+        ),
+      ).toEqual([{ type: "assistant_message", text: "original child reply" }]);
+      await reopenedManager.flush();
+      await reopened.flush();
+    } finally {
+      if (agentId && manager.getAgent(agentId)) await manager.closeAgent(agentId);
+      await manager.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  },
+);
 
 test("retries provider history hydration after a stream failure", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-history-retry-"));

@@ -71,6 +71,8 @@ describe("v1 home handover", () => {
     const config = JSON.parse(readFileSync(path.join(directory, "config.json"), "utf8"));
     expect(config.features.devicePairing).toBe(true);
     expect(config.daemon.managedAccess.mode).toBe("off");
+    expect(config.daemon.mcp.injectIntoAgents).toBe(true);
+    expect(config.daemon.browserTools.enabled).toBe(true);
     expect(config.daemon.agentProfiles).toEqual([
       { id: "legacy-v1-0", name: "My assistant", provider: "codex" },
     ]);
@@ -85,6 +87,30 @@ describe("v1 home handover", () => {
     writeFileSync(path.join(directory, "config.json"), original);
     const report = await prepareV1Upgrade(directory);
     expect(report?.config).toBe("preserved");
+    expect(readFileSync(path.join(directory, "config.json"), "utf8")).toBe(original);
+  });
+
+  it("turns tools on for a home upgraded before the upgrade wrote them, once", async () => {
+    const directory = home();
+    await prepareV1Upgrade(directory);
+    const configPath = path.join(directory, "config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+    delete config.daemon.mcp;
+    config.daemon.browserTools = { enabled: false };
+    writeFileSync(configPath, JSON.stringify(config));
+    await prepareV1Upgrade(directory);
+    const repaired = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(repaired.daemon.mcp.injectIntoAgents).toBe(true);
+    expect(repaired.daemon.browserTools.enabled).toBe(false);
+    expect(repaired.daemon.agentProfiles).toEqual(config.daemon.agentProfiles);
+  });
+
+  it("leaves the tool switches of a preserved config.json unset", async () => {
+    const directory = home();
+    const original = '{"version":1,"daemon":{"listen":"127.0.0.1:7878"}}\n';
+    writeFileSync(path.join(directory, "config.json"), original);
+    await prepareV1Upgrade(directory);
+    await prepareV1Upgrade(directory);
     expect(readFileSync(path.join(directory, "config.json"), "utf8")).toBe(original);
   });
 

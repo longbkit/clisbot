@@ -455,6 +455,7 @@ it("stores only a verifier, consumes once, binds the client, and rechecks curren
   );
   const tickets = new AccessTicketService(bundle.runtime, access, {
     leaseDurationMs: 60_000,
+    hubIdentity: "hub-stable-test-id",
   });
   const first = await tickets.issue({
     ...fixture,
@@ -482,6 +483,7 @@ it("stores only a verifier, consumes once, binds the client, and rechecks curren
     clientId: "client-a",
   });
   assert.equal(admission.principalId, fixture.memberMembershipId);
+  assert.equal(admission.actor?.hubIdentity, "hub-stable-test-id");
   assert.equal(admission.projects[0]?.projectId, "project-alpha");
   assert.equal(admission.leaseExpiresAt.getTime() > Date.now(), true);
   const refreshed = await tickets.refresh({
@@ -490,6 +492,7 @@ it("stores only a verifier, consumes once, binds the client, and rechecks curren
     now: new Date(admission.leaseExpiresAt.getTime() - 30_000),
   });
   assert.equal(refreshed.leaseId, admission.leaseId);
+  assert.equal(refreshed.actor?.hubIdentity, "hub-stable-test-id");
   assert.equal(refreshed.leaseExpiresAt.getTime(), admission.leaseExpiresAt.getTime() + 30_000);
   await assert.rejects(
     tickets.consume({

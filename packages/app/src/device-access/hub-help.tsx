@@ -11,7 +11,7 @@ const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedChevronRight = withUnistyles(ChevronRight);
 
 const KEY = "clisbot:hub-help-expanded:v1";
-let expanded = true;
+let expanded = false;
 let ready: Promise<void> | undefined;
 const listeners = new Set<() => void>();
 let revision = 0;
@@ -26,7 +26,7 @@ export function WhatIsHub() {
       return () => listeners.delete(listener);
     },
     () => expanded,
-    () => true,
+    () => false,
   );
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -84,6 +84,7 @@ export function WhatIsHub() {
               body={t("hub.connection.help.team")}
             />
           </View>
+          <Text style={styles.context}>{t("hub.connection.list.switchNote")}</Text>
         </View>
       ) : null}
       {error ? <Text style={styles.copy}>{t("hub.connection.help.saveFailed")}</Text> : null}
@@ -122,6 +123,12 @@ const styles = StyleSheet.create((theme) => ({
   body: {
     paddingHorizontal: theme.spacing[4],
     paddingBottom: theme.spacing[3],
+  },
+  context: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 19,
+    marginTop: theme.spacing[3],
   },
   bullets: {
     marginTop: theme.spacing[2],

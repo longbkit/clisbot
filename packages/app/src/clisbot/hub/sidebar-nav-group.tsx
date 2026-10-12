@@ -9,15 +9,21 @@ import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
 import { HubSidebarTopRow } from "./sidebar-account";
 import { useHubAccount } from "./account-provider";
 import { PersonalHubSwitcher } from "./personal-hub-switcher";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 
 const PERSONAL_HUB_ROUTE = "/settings/hub/overview";
 
-/** One top row (Clisbot mark, account avatar) opens the account; navigation follows below. */
+/**
+ * One top row (Clisbot mark, account avatar) opens the account; navigation follows below. The
+ * phone sidebar passes `rows={false}` and puts `SidebarNavRows` at the top of its scrolling list.
+ */
 export function SidebarNavGroup({
   style,
+  rows = true,
   onBeforeNavigate,
 }: {
   style?: StyleProp<ViewStyle>;
+  rows?: boolean;
   onBeforeNavigate?: () => void;
 }) {
   const compact = useIsCompactFormFactor();
@@ -31,7 +37,7 @@ export function SidebarNavGroup({
   const personal = hub.enabled && hub.connection?.accountAuthentication === "personal";
   return (
     <View style={style}>
-      <View style={[styles.topRow, compact && styles.topRowCompact]}>
+      <View style={[styles.topRow, compact && !HOME_V2_ENABLED && styles.topRowCompact]}>
         {personal ? (
           <PersonalHubSwitcher
             isActive={pathname === PERSONAL_HUB_ROUTE}
@@ -41,7 +47,7 @@ export function SidebarNavGroup({
           <HubSidebarTopRow onBeforeNavigate={onBeforeNavigate} />
         )}
       </View>
-      <SidebarNavRows onBeforeNavigate={onBeforeNavigate} />
+      {rows ? <SidebarNavRows onBeforeNavigate={onBeforeNavigate} /> : null}
     </View>
   );
 }

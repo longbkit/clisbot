@@ -45,6 +45,8 @@ test("real daemon pairs without relay, reconnects, protects HTTP and closes revo
     expect(await authorizedMcp.text()).toContain("agents_count=0");
     await operator.connect();
     expect(operator.getLastServerInfoMessage()?.features?.devicePairing).toBe(true);
+    expect(operator.getLastServerInfoMessage()?.features?.localHubStartStatus).toBe(true);
+    expect(operator.getLastServerInfoMessage()?.localHubStartStatus).toEqual({ status: "ready" });
     const pairing = await operator.getDaemonPairingOffer({
       label: "Pixel",
       direct: { endpoint: `127.0.0.1:${handle.port}`, useTls: false },
@@ -79,6 +81,7 @@ test("real daemon pairs without relay, reconnects, protects HTTP and closes revo
     expect((await device.devices()).devices[0]?.label).toBe("Long's Pixel");
     expect(savedId).toBeTruthy();
     expect(device.getLastServerInfoMessage()?.permissions).toContain("access.manage");
+    expect(device.getLastServerInfoMessage()?.localHubStartStatus).toEqual({ status: "ready" });
     await device.close();
     device = connect();
     await device.connect();

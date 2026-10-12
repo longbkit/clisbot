@@ -1,3 +1,4 @@
+import { openMobileAgentSidebar } from "./sidebar";
 import { expect, type Page } from "@playwright/test";
 import { buildCreateAgentPreferences, buildSeededHost, TEST_HOST_LABEL } from "./daemon-registry";
 import { getServerId } from "./server-id";
@@ -112,14 +113,19 @@ export async function toggleHostAdvanced(page: Page): Promise<void> {
   await page.getByTestId("direct-host-advanced-toggle").click();
 }
 
-export async function openCompactSettings(page: Page, expectedStartRoute: string): Promise<void> {
+/** Opens Settings from the compact sidebar; returns where the sidebar was (see openMobileAgentSidebar). */
+export async function openCompactSettings(
+  page: Page,
+  expectedStartRoute: string,
+): Promise<"chat" | "overlay"> {
   await expectAppRoute(page, expectedStartRoute, { timeout: 15_000 });
-  await page.getByRole("button", { name: "Open menu", exact: true }).first().click();
+  const sidebar = await openMobileAgentSidebar(page);
   const settingsButton = page.locator('[data-testid="sidebar-settings"]:visible').first();
   await expect(settingsButton).toBeVisible();
   await settingsButton.click();
   await expectAppRoute(page, buildSettingsRoute());
   await expect(page.getByTestId("settings-sidebar")).toBeVisible();
+  return sidebar;
 }
 
 export async function seedSavedSettingsHosts(

@@ -2,6 +2,11 @@
 
 Session persistence and user/channel metadata: [agent session storage](features/agent-session-storage/README.md) — durable storage is implemented; the wider AC/W set is not yet fully accepted. Under consideration: [workspace naming and reuse](features/workspace-organization/README.md).
 
+## Quick starts
+
+Host-local daemon catalog, authenticated owner identity, per-user pins and optimistic revisions:
+[Home and Inbox data contract](features/home-and-inbox/README.md#quick-start-ownership-and-persistence).
+
 ## Project identity
 
 Projects are allocated for the exact root selected by the caller, normalized lexically with `path.resolve` (never `realpath`). New project IDs are opaque `prj_<16 hex>` values. Existing remote-shaped or path-shaped IDs are retained as readable compatibility records and are never rekeyed. An active exact root is idempotent; archived-only matches do not resurrect an old project. Workspace `projectId` is stable membership: reconciliation may update git-derived kind and branch metadata, but never rehomes a workspace or changes a project's root, ID, or default name.
@@ -328,7 +333,9 @@ agents that can access the host through a shell.
 
 `daemon.mcp.injectIntoAgents` is the Host default. A new home writes it and
 `daemon.browserTools.enabled` as `true` into its first `config.json`; a home whose file lacks them
-reads both as `false`, so an existing Host does not gain tools on upgrade. When it is `false`, no provider receives
+reads both as `false`, so an existing Host does not gain tools on upgrade. A home upgraded from
+v1 (`clisbot.json`) counts as new: the upgrade writes both as `true` unless it kept an existing
+v2 `config.json`. When it is `false`, no provider receives
 Clisbot tools unless the session's Project turns them on; otherwise the provider policy applies. A
 Project can turn them on or off and narrow them per tool
 ([Agent tools](features/connectors/README.md#agent-tools)). Provider and global policy are resolved when a

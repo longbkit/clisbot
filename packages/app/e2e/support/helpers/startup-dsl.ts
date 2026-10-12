@@ -1,6 +1,7 @@
 import type { Route } from "@playwright/test";
 import { expect, type Page } from "../fixtures";
 import { buildCreateAgentPreferences, buildSeededHost } from "./daemon-registry";
+import { openMobileAgentSidebar } from "./sidebar";
 import { wsRoutePatternForPort } from "./daemon-port";
 
 const DISABLE_DEFAULT_SEED_ONCE_KEY = "@clisbot:e2e-disable-default-seed-once";
@@ -160,7 +161,7 @@ class StartupAssertions {
   }
 
   async expectsSavedHostShell(input: { serverId: string; label: string }): Promise<this> {
-    await this.page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await openMobileAgentSidebar(this.page);
     await this.page.getByTestId("sidebar-hosts-trigger").click();
     const hostRow = this.page.getByTestId(`sidebar-host-row-${input.serverId}`);
     await expect(hostRow).toBeVisible({ timeout: 15_000 });

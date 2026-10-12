@@ -8,6 +8,8 @@ export const SessionActorSchema = z.object({
   displayName: z.string().optional(),
   avatarUrl: z.string().optional(),
   hubOrigin: z.string().optional(),
+  // COMPAT(quickStarts): stable Hub authority identity, optional for older Hubs.
+  hubIdentity: z.string().optional(),
   organizationId: z.string().optional(),
   connectionId: z.string().optional(),
   memberId: z.string().optional(),

@@ -4,19 +4,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostConnectionMethods } from "./host-connection-methods";
 
-const env = vi.hoisted(() => ({ isNative: false, isFdroid: false, isElectron: false }));
+const env = vi.hoisted(() => ({ offersQrScan: false, isElectron: false }));
 /** Any theme path reads as 0: the stylesheet only needs its keys here. */
 const THEME = vi.hoisted(() => new Proxy({}, { get: () => new Proxy({}, { get: () => 0 }) }));
-vi.mock("@/constants/platform", () => ({
-  get isNative() {
-    return env.isNative;
-  },
-}));
-vi.mock("@/constants/build-profile", () => ({
-  get isFdroidBuild() {
-    return env.isFdroid;
-  },
-}));
+vi.mock("@/hosts/qr-scan-support", () => ({ shouldOfferQrScan: () => env.offersQrScan }));
 vi.mock("@/desktop/host", () => ({ isElectronRuntime: () => env.isElectron }));
 vi.mock("@/styles/settings", () => ({ settingsStyles: { card: "settingsCard" } }));
 vi.mock("@/components/ui/external-link", () => ({
@@ -82,8 +73,7 @@ function rowOrder(): string[] {
 }
 
 beforeEach(() => {
-  env.isNative = false;
-  env.isFdroid = false;
+  env.offersQrScan = false;
   env.isElectron = false;
   for (const handler of Object.values(handlers)) handler.mockReset();
 });
@@ -91,7 +81,7 @@ afterEach(cleanup);
 
 describe("HostConnectionMethods", () => {
   it("leads with pairing and the Pair device hint, then the manual ways under Other ways", () => {
-    env.isNative = true;
+    env.offersQrScan = true;
     renderMethods();
     expect(screen.getByText("pairing.connectionMethods.intro")).toBeTruthy();
     expect(screen.getByText("pairing.connectionMethods.docs").getAttribute("href")).toBe(
@@ -107,7 +97,7 @@ describe("HostConnectionMethods", () => {
     );
   });
 
-  it("on web, where no QR can be scanned, the pairing link says it uses Tailscale or relay", () => {
+  it("where no QR can be scanned, the pairing link says it uses Tailscale or relay", () => {
     renderMethods();
     expect(rowOrder()).toEqual(["paste", "direct"]);
     expect(screen.getByText("pairing.connectionMethods.scanQr.description")).toBeTruthy();
@@ -115,15 +105,13 @@ describe("HostConnectionMethods", () => {
   });
 
   it("beside the QR row, the pairing link refers to it", () => {
-    env.isNative = true;
+    env.offersQrScan = true;
     renderMethods();
     expect(screen.getByText("pairing.connectionMethods.pasteLink.description")).toBeTruthy();
     expect(screen.getAllByText("pairing.connectionMethods.scanQr.description")).toHaveLength(1);
   });
 
-  it("drops QR on F-Droid and adds Remote SSH on the desktop app", () => {
-    env.isNative = true;
-    env.isFdroid = true;
+  it("drops QR where it cannot scan and adds Remote SSH on the desktop app", () => {
     env.isElectron = true;
     renderMethods();
     expect(rowOrder()).toEqual(["paste", "direct", "ssh"]);
@@ -144,7 +132,7 @@ describe("HostConnectionMethods", () => {
   });
 
   it("each row runs its own action", () => {
-    env.isNative = true;
+    env.offersQrScan = true;
     env.isElectron = true;
     renderMethods();
     fireEvent.click(screen.getByTestId("scan"));

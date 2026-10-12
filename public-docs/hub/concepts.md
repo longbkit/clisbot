@@ -1,6 +1,6 @@
 ---
 title: How Hub works
-description: How a provider event reaches a workflow and a Clisbot daemon.
+description: How a chat message or provider event reaches an agent on a Clisbot daemon, and who may use which daemon.
 nav: How it works
 order: 62
 category: Hub
@@ -8,63 +8,59 @@ category: Hub
 
 # How Hub works
 
-Hub connects the places where requests arrive to the machines where your agents run.
+Hub connects the places where requests arrive to the machines where your agents run, and decides who may use them.
 
 ```text
-GitHub / Slack / Discord / manual request
-                    ↓
-                  Hub
-        matches a channel route or trigger
-                    ↓
-                workflow
-          runs ordered agent steps
-                    ↓
-             Clisbot daemon
-             starts the agent
+Slack / Telegram / … message      GitHub / Slack / Discord event
+            ↓                                   ↓
+     Route and its Rules               Automation trigger
+            └──────────────┬────────────────────┘
+                         Hub
+                           ↓
+                    Clisbot daemon
+                   starts the agent
 ```
 
 ## The pieces
 
-- A **connection** lets Hub receive events from GitHub, Slack, or Discord.
-- A **daemon** is a registered machine running the Clisbot daemon.
-- An **organization** owns Hub configuration, Connections, Members, and registered daemons. Hub has no Project.
-- A daemon **Project** is a filesystem root that owns its Workspaces.
-- A **Channel–Agent Route** selects an agent configuration and daemon environment for direct chat, creating or resuming sessions per conversation.
-- An **environment** names where a workflow step runs: a daemon, its working directory, and an optional worktree.
-- A **trigger** says which provider event can start a workflow and which events are allowed through.
-- A **workflow** is the ordered set of steps that runs after a trigger matches.
-- A **step** starts one agent execution, with its own prompt, agent selection, credentials, reply capabilities, and limits.
+- An **organization** owns everything below: Members, Connections, Routes, Automations, and connected daemons.
+- A **daemon** is a connected machine running the Clisbot daemon. A daemon **Project** is a folder on it with its Workspaces. Hub has no Project of its own.
+- A **Connection** holds one credential: a Slack workspace installation, a bot token, a QR login.
+- A **Route** sends a Connection's messages to a direct agent, a Bot, or an Automation. Its **Rules** say where and from whom a message gets in. Each conversation keeps its own session.
+- An **Automation** is a trigger and a workflow. The **trigger** says which provider event can start it; the **workflow** runs ordered **steps**, each one agent execution on an **environment**: a daemon, its working directory, and an optional worktree.
+- A **Member** signs in to the Hub. **People & access** grants Members and Teams the daemons and Projects they may use.
 
-The Hub UI and resource APIs persist organization-owned configuration revisions. Exported YAML is an optional portability format. Local assistant onboarding creates and seeds the daemon Workspace and updates these APIs directly; no filesystem bundle or deployment step is required.
+You edit all of it in the app's Hub settings (**Channels**, **Automations**, **People & access**, **Hosts**) or through the [Hub API](/docs/hub/api). Exported YAML is an optional portability format.
+
+## From message to reply
+
+1. The Connection receives a message, and Hub stores it before acknowledging the platform.
+2. Hub tries each Route in order. The first Route with a Rule that lets the message in wins; a sender no Route admits is refused.
+3. Hub creates or resumes that conversation's session on the Route's daemon.
+4. The agent's reply goes back to the same conversation.
+
+[Channels](/docs/hub/channels) covers each platform.
 
 ## From event to agent
 
 1. A provider sends an event to Hub. GitHub and Slack use webhooks; Discord uses its gateway connection; manual runs use the Hub API.
-2. Hub verifies the provider event and identifies its provider resource, such as a repository, workspace, or guild.
-3. Hub evaluates triggers and their filters, including the required `from_users` allowlist.
-4. A matching trigger creates a workflow run from the active configuration revision.
-5. The workflow evaluates its next step. A false `if` condition skips that step; a true condition starts it on the configured daemon.
-6. The daemon starts the agent and Hub records its replies, structured output, status, and completion.
-7. The next step sees the completed step's output. When no steps remain, the workflow run is complete.
+2. Hub verifies the event and evaluates triggers and their filters, including the required `from_users` allowlist.
+3. A matching trigger creates a workflow run from the active revision.
+4. Each step whose `if` condition holds starts on its daemon. The next step sees the completed step's output.
+5. Hub records replies, structured output, status, and completion.
 
 Complete configurations are in [Workflows](/docs/hub/workflows).
 
-## Activation
+## Saving a change
 
-When Hub syncs the bundle, it validates every source file and resolves its references:
+When you save, Hub validates the change and resolves its references: connections and their filters, the daemon slug or ID, step ids, expressions, output schemas, durations, and named agents. If validation fails, Hub keeps the previous active revision and shows the error.
 
-- `filters.repo`, `filters.workspace`, and `filters.guild` must name resources available through the organization's connections.
-- `environment.daemon` must match a registered daemon's friendly slug or immutable ID in the same organization.
-- Step ids, expressions, input filters, output schemas, and durations must be valid.
-- Every finite environment or named-agent result must exist and validate.
-- Prompt partials must resolve below `.clisbot/workflows/partials/` at the exact commit.
+## Managed access
 
-If activation fails, Hub keeps the previous active revision. The Configuration tab shows the failed sync and its validation error; Activity continues to reflect the last active revision.
+A daemon in managed access accepts a session only with a Hub access ticket, so a Member reaches exactly what they were granted. Your own daemons on a personal Hub keep managed access off.
 
 ## Security boundaries
 
-Triggers require a non-empty `from_users` allowlist for externally sourced events. Protect the configuration repository because anyone who can change the active configuration can choose which connections, daemons, and agent capabilities an automation uses.
+Routes admit only the senders their Rules allow. Triggers require a non-empty `from_users` allowlist. Anyone who can change Routes or Automations can choose which connections, daemons, and agent capabilities they use, so grant that carefully.
 
-These controls do not sandbox the agent or make input safe. See [Hub security](/docs/hub/security) for the host boundary, provider-native policy, and defense-in-depth guidance.
-
-GitHub credentials are never implied by the trigger. A step holds GitHub authority only when it declares a [`github` block](/docs/hub/github), whatever started the run.
+These controls do not sandbox the agent or make input safe. See [Hub security](/docs/hub/security). A step holds GitHub authority only when it declares a [`github` block](/docs/hub/github).

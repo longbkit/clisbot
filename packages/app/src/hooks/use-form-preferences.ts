@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DEFAULT_FORM_PREFERENCES,
@@ -7,7 +7,7 @@ import {
   type ProviderPreferences,
 } from "@/create-agent-preferences/preferences";
 import {
-  createAgentPreferencesService,
+  getCreateAgentPreferencesService,
   type FormPreferenceUpdate,
 } from "@/create-agent-preferences/service";
 
@@ -17,21 +17,22 @@ export type { FormPreferences, ProviderPreferences };
 
 export { mergeProviderPreferences };
 
-async function loadFormPreferences(): Promise<FormPreferences> {
-  return createAgentPreferencesService.load();
-}
-
 export interface UseFormPreferencesReturn {
   preferences: FormPreferences;
   isLoading: boolean;
   updatePreferences: (updates: FormPreferenceUpdate) => Promise<FormPreferences>;
 }
 
-export function useFormPreferences(): UseFormPreferencesReturn {
+export function useFormPreferences(serverId?: string | null): UseFormPreferencesReturn {
   const queryClient = useQueryClient();
+  const service = getCreateAgentPreferencesService(serverId);
+  const queryKey = useMemo(
+    () => (serverId ? [...FORM_PREFERENCES_QUERY_KEY, serverId] : FORM_PREFERENCES_QUERY_KEY),
+    [serverId],
+  );
   const { data, isPending } = useQuery({
-    queryKey: FORM_PREFERENCES_QUERY_KEY,
-    queryFn: loadFormPreferences,
+    queryKey,
+    queryFn: () => service.load(),
     staleTime: Infinity,
     gcTime: Infinity,
   });
@@ -40,11 +41,11 @@ export function useFormPreferences(): UseFormPreferencesReturn {
 
   const updatePreferences = useCallback(
     async (updates: FormPreferenceUpdate) => {
-      const next = await createAgentPreferencesService.update(updates);
-      queryClient.setQueryData<FormPreferences>(FORM_PREFERENCES_QUERY_KEY, next);
+      const next = await service.update(updates);
+      queryClient.setQueryData<FormPreferences>(queryKey, next);
       return next;
     },
-    [queryClient],
+    [queryClient, queryKey, service],
   );
 
   return {

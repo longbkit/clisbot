@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "../support/fixtures";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
+import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { openSettingsSection } from "../support/helpers/settings";
 import { openWhatsNew, release, serveChangelog } from "../support/helpers/changelog";
 
@@ -169,7 +170,7 @@ test.describe("compact sidebar help", () => {
 
   test("offers diagnostics without advertising disabled keyboard shortcuts", async ({ page }) => {
     await gotoAppShell(page);
-    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await openCompactSidebar(page);
 
     await openHelpMenu(page);
     await expect(page.getByTestId("sidebar-help-shortcuts")).toHaveCount(0);
@@ -179,7 +180,7 @@ test.describe("compact sidebar help", () => {
 });
 
 async function openCompactSidebar(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
+  await openMobileAgentSidebar(page);
   await expect(page.getByTestId("sidebar-footer-bottom-line")).toBeVisible();
 }
 

@@ -28,7 +28,7 @@ export function HostsSettings() {
   const { t } = useTranslation();
   const hub = useHubAccount();
   const inventory = useHostsSettingsInventory();
-  const { daemons, status, retry } = inventory;
+  const { daemons, error, retry } = inventory;
   const openAddProject = useOpenAddProject();
   const signedIn = hub.enabled && hub.signedIn !== null;
   const canManage = signedIn && hub.signedIn?.capabilities.manageResources === true;
@@ -55,7 +55,9 @@ export function HostsSettings() {
         trailing={signedIn ? refreshAction : undefined}
         testID="settings-hosts-list"
       >
-        {status === "error" ? (
+        {/* The selected Hub failing is news even while saved Hosts stay usable: its own Hosts
+            vanish from the list, and only this notice says why. */}
+        {error ? (
           <Alert
             variant="error"
             title={t("hub.settings.hosts.unavailableTitle")}

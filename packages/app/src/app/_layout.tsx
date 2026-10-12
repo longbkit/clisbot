@@ -1,3 +1,5 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { MobileHomeTabs } from "@/clisbot/home/mobile-navigation";
 import { OfferLinkListener } from "@/device-access/offer-link-listener";
 import "@/styles/unistyles";
 import { ProductAnalyticsHost } from "@/clisbot/analytics/host";
@@ -626,7 +628,10 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   );
 
   const content = isCompactLayout ? (
-    <MobileGestureWrapper chromeEnabled={chromeEnabled}>{surface}</MobileGestureWrapper>
+    <View style={flexStyle}>
+      <MobileGestureWrapper chromeEnabled={chromeEnabled}>{surface}</MobileGestureWrapper>
+      <MobileHomeTabs />
+    </View>
   ) : (
     surface
   );
@@ -662,7 +667,8 @@ function MobileGestureWrapper({
   children: ReactNode;
   chromeEnabled: boolean;
 }) {
-  const openGesture = useOpenAgentListGesture(chromeEnabled);
+  // Home V2: the phone reaches conversations through the Chat tab, not an edge swipe.
+  const openGesture = useOpenAgentListGesture(chromeEnabled && !HOME_V2_ENABLED);
 
   return (
     <GestureDetector gesture={openGesture} touchAction={MOBILE_WEB_GESTURE_TOUCH_ACTION}>
@@ -832,6 +838,7 @@ function AppWithSidebar({ children }: { children: ReactNode }) {
     storeReady &&
     (pathname === "/open-project" ||
       pathname === "/new" ||
+      (HOME_V2_ENABLED && pathname === "/chat") ||
       pathname === "/sessions" ||
       pathname === "/schedules" ||
       pathname === "/automations" ||
@@ -868,6 +875,7 @@ function RootStack() {
         <Stack.Screen name="settings/hub/[hubSection]" />
         <Stack.Screen name="new" />
         <Stack.Screen name="open-project" />
+        <Stack.Screen name="chat" />
         <Stack.Screen name="sessions" />
         <Stack.Screen name="schedules" />
         <Stack.Screen name="automations" />

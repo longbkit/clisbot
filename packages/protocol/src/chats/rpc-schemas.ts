@@ -1,3 +1,4 @@
+import { BotLaunchDefaultsSchema } from "../bots/types.js";
 import { AgentAttachmentSchema, ImageAttachmentSchema } from "../agent-attachments.js";
 import { z } from "zod";
 import {
@@ -35,6 +36,9 @@ export const ChatCreateRequestSchema = z.object({
   type: z.literal("chat.create.request"),
   requestId: z.string(),
   botIds: z.array(z.string()),
+  // COMPAT(quickStarts): per-chat configuration and retry identity; gated on quickStarts.
+  launch: BotLaunchDefaultsSchema.optional(),
+  idempotencyKey: z.string().min(1).max(200).optional(),
   kind: z.enum(["direct", "group"]).optional(),
   title: z.string().nullable().optional(),
   rules: ChatRulesSchema.optional(),

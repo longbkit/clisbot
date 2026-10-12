@@ -3,13 +3,19 @@ import {
   PluginRegistryIndexSchema,
   PublishedPluginDetailSchema,
 } from "@clisbot/protocol/plugin-registry";
-import { getBlockingColdCache, type WebsiteCacheContext } from "../github-cache";
+import { CACHE_POLICIES, getBlockingColdCache, type WebsiteCacheContext } from "../github-cache";
 import { handlePluginThumbnailRequest } from "./thumbnails";
 import { CATEGORIES } from "./categories";
-import { type InstallCounts, readInstallCounts, recordClientInstall } from "./installs";
+import {
+  isInstallCounts,
+  readCounterCounts,
+  readInstallCounts,
+  recordClientInstall,
+} from "./installs";
 export interface RegistryEnvironment {
   PLUGINS_REGISTRY_URL?: string;
   WEBSITE_CACHE?: KVNamespace;
+  PLUGIN_INSTALLS?: DurableObjectNamespace;
 }
 async function documentAt(base: string, path: string): Promise<unknown> {
   const response = await fetch(`${base.replace(/\/+$/, "")}/${path}`);
@@ -21,23 +27,30 @@ export function loadRegistryIndex(base: string, context: WebsiteCacheContext) {
   return getBlockingColdCache({
     context,
     key: `plugins:index:v1:${base}`,
+    policy: CACHE_POLICIES.pluginIndex,
     isValue: (value): value is ReturnType<typeof PluginRegistryIndexSchema.parse> =>
       PluginRegistryIndexSchema.safeParse(value).success,
     fetchFresh: async () => PluginRegistryIndexSchema.parse(await documentAt(base, "index.json")),
   });
 }
-/** Install counts per window for every listed plugin, refreshed with the index cache. */
-export async function loadInstallCounts(base: string, context: WebsiteCacheContext) {
+/** The aggregate cache is shared by browse pages and the registry build API. */
+export async function loadInstallCounts(
+  base: string,
+  context: WebsiteCacheContext,
+  counter: DurableObjectNamespace | null = null,
+) {
   const index = await loadRegistryIndex(base, context);
   const ids = index.plugins.map((plugin) => plugin.id);
   return getBlockingColdCache({
     context,
-    key: `plugins:installs:v1:${base}`,
-    isValue: (value): value is Record<string, InstallCounts> =>
-      typeof value === "object" &&
-      value !== null &&
-      Object.values(value).every((counts) => typeof counts?.all === "number"),
-    fetchFresh: () => readInstallCounts(context.cache, ids, new Date()),
+    key: `plugins:installs:v2:${counter ? "durable" : "legacy"}:${base}`,
+    policy: CACHE_POLICIES.installs,
+    isValue: isInstallCounts,
+    fetchFresh: async () => {
+      if (!counter) return readInstallCounts(context.cache, ids, new Date());
+      const counts = await readCounterCounts(counter);
+      return Object.fromEntries(ids.map((id) => [id, counts[id] ?? { week: 0, month: 0, all: 0 }]));
+    },
   });
 }
 export async function loadRegistryPlugin(base: string, id: string, context: WebsiteCacheContext) {
@@ -45,6 +58,7 @@ export async function loadRegistryPlugin(base: string, id: string, context: Webs
   return getBlockingColdCache({
     context,
     key: `plugins:detail:v1:${base}:${id}`,
+    policy: CACHE_POLICIES.pluginDetail,
     isValue: (value): value is ReturnType<typeof PublishedPluginDetailSchema.parse> | null =>
       value === null || PublishedPluginDetailSchema.safeParse(value).success,
     fetchFresh: async () => {
@@ -96,12 +110,7 @@ export async function handlePluginRegistryRequest(
     );
   }
   if (url.pathname === "/api/plugins/installs") {
-    const index = await loadRegistryIndex(base, context);
-    const counts = await readInstallCounts(
-      context.cache,
-      index.plugins.map((plugin) => plugin.id),
-      new Date(),
-    );
+    const counts = await loadInstallCounts(base, context, env.PLUGIN_INSTALLS ?? null);
     return Response.json(
       Object.fromEntries(Object.entries(counts).map(([id, count]) => [id, count.all])),
     );
@@ -117,11 +126,11 @@ export async function handlePluginRegistryRequest(
     request.headers.get("X-Clisbot-Install") === "1" ||
     url.searchParams.get("intent") === "install"
   ) {
-    const cache = context.cache;
-    if (cache)
+    const counter = env.PLUGIN_INSTALLS;
+    if (counter)
       context.waitUntil(
-        recordClientInstall({ cache, id, ip: request.headers.get("CF-Connecting-IP") }).catch(
-          () => undefined,
+        recordClientInstall({ counter, id, ip: request.headers.get("CF-Connecting-IP") }).catch(
+          (error: unknown) => console.error("Plugin install report failed", id, error),
         ),
       );
   }

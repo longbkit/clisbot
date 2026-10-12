@@ -74,6 +74,7 @@ Configuration and local state live under `CLISBOT_HOME` (defaults to `~/.clisbot
 ## Join an existing Hub
 
 - **Member:** accept the email invitation, then sign in with the **Clisbot Hub** tile on the Welcome screen or **Settings → Account**. Hosts shared with you appear in **Settings → Hosts**.
+- **Run your own Hub, or use several:** a personal Hub, your company's Hub, or both at once. See [Hub](/docs/hub).
 - **Add a machine to the Hub:** start the daemon on it, run `clisbot hub connect https://hub.example.com`, and open the printed URL. An Owner or Admin approves it. See [Hub daemons](/docs/hub/daemons).
 
 ## Docker

@@ -1,3 +1,4 @@
+import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { test, expect } from "../support/fixtures";
 import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import {
@@ -51,7 +52,14 @@ async function openWorkspace(
   workspace: { workspaceId: string },
 ) {
   await page.goto(buildHostWorkspaceRoute(getServerId(), workspace.workspaceId));
-  await expect(page.getByTestId("menu-button")).toBeVisible();
+  // A compact conversation leads with Back to conversations on Home, the menu otherwise.
+  await expect(
+    page
+      .getByTestId("chat-back")
+      .or(page.getByTestId("menu-button"))
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
 }
 
 test.describe("Settings sidebar navigation", () => {
@@ -193,7 +201,7 @@ test.describe("Settings — compact master-detail", () => {
     const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
     await openWorkspace(page, workspace);
-    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await openMobileAgentSidebar(page);
     await page.getByTestId("sidebar-hosts-trigger").click();
     await page
       .getByTestId(`sidebar-host-row-${getServerId()}`)
@@ -207,6 +215,7 @@ test.describe("Settings — compact master-detail", () => {
     await expectCompactSettingsList(page);
 
     await goBackInSettings(page);
+    // Settings returns to the last workspace, from the sliding sidebar or the Chat tab alike.
     await expectAppRoute(page, workspaceRoute);
   });
 
@@ -217,7 +226,7 @@ test.describe("Settings — compact master-detail", () => {
     const workspace = await withWorkspace({ prefix: "all-hosts-settings-back-" });
     const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
     await openWorkspace(page, workspace);
-    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await openMobileAgentSidebar(page);
     await page.getByTestId("sidebar-hosts-trigger").click();
     await expect(page.getByPlaceholder("Search hosts")).toBeVisible();
     await page

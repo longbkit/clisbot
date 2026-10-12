@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "../support/fixtures";
+import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { gotoAppShell } from "../support/helpers/app";
 import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -18,7 +19,7 @@ test("project and workspace kebabs open action sheets on compact layouts", async
 
   try {
     await gotoAppShell(page);
-    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await openMobileAgentSidebar(page);
     await waitForSidebarHydration(page);
 
     await page

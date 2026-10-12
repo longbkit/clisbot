@@ -435,6 +435,15 @@ export function resolveFormStateFromProviderModels(
     currentState,
     allowedProviderMap,
   );
+  // Snapshot entries include loading/disabled providers. Absence means this Host
+  // does not configure the provider, not a transient discovery failure.
+  if (
+    !userModified.provider &&
+    providerResolved.provider &&
+    !providerModelsByProvider.has(providerResolved.provider)
+  ) {
+    return { provider: null, model: "", modeId: "", thinkingOptionId: "" };
+  }
   const availableModels = providerResolved.provider
     ? (providerModelsByProvider.get(providerResolved.provider) ?? null)
     : null;
@@ -599,7 +608,16 @@ function receiveInputs(
   let next = state;
   if (changed) {
     next = {
-      ...resolveAgentForm(state, { type: action.isVisible ? "REQUEST_RESOLUTION" : "RESET" }),
+      ...resolveAgentForm(state, {
+        type:
+          !action.isVisible || previous?.serverId !== action.serverId
+            ? "RESET"
+            : "REQUEST_RESOLUTION",
+      }),
+      form:
+        previous?.serverId !== action.serverId
+          ? { provider: null, model: "", modeId: "", thinkingOptionId: "" }
+          : state.form,
       inputs: { serverId: action.serverId, initialValues: initial, active },
     };
   }

@@ -449,6 +449,7 @@ export class ChannelStore {
       const [recorded] = await transaction
         .insert(schema.deliveryLedger)
         .values({
+          id: input.recordId,
           organizationId: input.organizationId,
           channel: input.channel,
           accountId: input.accountId,

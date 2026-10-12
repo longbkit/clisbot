@@ -255,7 +255,6 @@ function WorkspaceUnreachable({
   const hubOffline =
     management &&
     !daemons.error &&
-    !daemons.isPlaceholderData &&
     daemons.data?.daemons.some(
       (daemon) => daemon.id === management.daemonId && daemon.presence === "offline",
     );

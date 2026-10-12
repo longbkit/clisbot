@@ -99,13 +99,13 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[1.5],
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface1,
+    // The composer's surface: an input you type into reads the same wherever it sits.
+    backgroundColor: theme.colors.surfaceComposer,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.border,
   },
   fieldFocused: {
     borderColor: theme.colors.borderAccent,
-    backgroundColor: theme.colors.surface2,
   },
   input: {
     flex: 1,

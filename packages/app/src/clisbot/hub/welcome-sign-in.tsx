@@ -200,15 +200,23 @@ export function WelcomeOwnComputerLabel() {
   return <Text style={styles.sectionLabel}>{t("onboarding.groups.ownComputer")}</Text>;
 }
 
-/** Placed now so a second Hub does not change this layout later; one Hub origin per app today. */
+/** Reuse the Hubs add flow so Welcome offers the same start and connect choices. */
 function AddAnotherHubRow() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const addHub = useCallback(
+    () =>
+      router.push({
+        pathname: "/settings/hub/[hubSection]",
+        params: { hubSection: "hubs", hubIntent: "add" },
+      }),
+    [router],
+  );
   return (
     <View style={styles.addHubRow}>
-      <Button size="sm" variant="ghost" disabled>
+      <Button size="sm" variant="ghost" onPress={addHub}>
         {t("hub.account.welcome.addAnotherHub")}
       </Button>
-      <Text style={styles.hint}>{t("hub.account.welcome.oneHubPerApp")}</Text>
     </View>
   );
 }
@@ -421,9 +429,5 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-  },
-  hint: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
   },
 }));

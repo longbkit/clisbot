@@ -1,6 +1,7 @@
 import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
 import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
 import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
+import { quickChatProjectKeys, useQuickChatRoots } from "@/clisbot/quick-chats/quick-chat-projects";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
@@ -155,12 +156,18 @@ export function useSidebarWorkspacesList(options?: {
   const botProjectKeys = useSidebarBotProjectKeys();
   const showBotProjects = useBotProjectsPreference((state) => state.showBotProjects);
 
+  // Clisbot: Quick chats have their own sidebar section, so their project leaves Projects.
+  const quickChatRoots = useQuickChatRoots(directoryServerIds);
   const sidebarModel = useMemo(
     () =>
       buildSidebarWorkspacePlacementModel({
-        projects: projectBotWorkspaces(hostProjects, botProjectKeys, showBotProjects),
+        projects: projectBotWorkspaces(
+          projectBotWorkspaces(hostProjects, botProjectKeys, showBotProjects),
+          quickChatProjectKeys(hostProjects, quickChatRoots),
+          false,
+        ),
       }),
-    [hostProjects, botProjectKeys, showBotProjects],
+    [hostProjects, botProjectKeys, showBotProjects, quickChatRoots],
   );
 
   const projects = sidebarModel.projects.length > 0 ? sidebarModel.projects : EMPTY_PROJECTS;

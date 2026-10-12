@@ -22,7 +22,7 @@ The command starts the local daemon and Hub as needed. Its default directory is 
 
 The daemon owns the **Project** and **Workspace**. Hub has no Project to create or select. For worktree isolation, templates are written into the actual worktree directory returned by the daemon.
 
-The personal or team template (`--bot-type personal|team`) creates missing `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `IDENTITY.md`, `BOOTSTRAP.md`, and `TOOLS.md` before creating the agent. Existing files and symlinks are preserved by default and counted in the result. The OS home root cannot be used as the seed destination. Team assistants default to `<Clisbot home>/workspaces/team` so they do not share the personal assistant’s files. Choose an explicit separate workspace for any other assistants that must not share context. Existing saved workspace paths are preserved.
+The personal or team template (`--kind personal|team`) creates missing `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `IDENTITY.md`, `BOOTSTRAP.md`, and `TOOLS.md` before creating the agent. Existing files and symlinks are preserved by default and counted in the result. The OS home root cannot be used as the seed destination. Team assistants default to `<Clisbot home>/workspaces/team` so they do not share the personal assistant’s files. Choose an explicit separate workspace for any other assistants that must not share context. Existing saved workspace paths are preserved.
 
 ## Configure the owner and a channel
 

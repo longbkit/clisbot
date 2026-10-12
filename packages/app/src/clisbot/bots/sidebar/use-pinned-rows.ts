@@ -78,7 +78,9 @@ export function usePinnedRows(onBeforeNavigate?: () => void): {
     .flatMap((p) => p.workspaces)
     .flatMap((w) => {
       const descriptor = metadata.workspaces[w.serverId]?.get(w.workspaceId);
-      return descriptor?.pinnedAt ? [{ ...w, pinnedAt: descriptor.pinnedAt }] : [];
+      return descriptor?.pinnedAt
+        ? [{ ...w, name: descriptor.name, pinnedAt: descriptor.pinnedAt }]
+        : [];
     });
   workspaces.sort((a, b) => {
     const ai = nativeOrder.indexOf(a.workspaceKey),

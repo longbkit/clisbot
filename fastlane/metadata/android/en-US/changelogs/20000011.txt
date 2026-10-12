@@ -1,0 +1,7 @@
+Added
+- Added Home as the place to start a chat, with your Hosts and Hubs, the composer and your recent conversations
+- Added Quick chat, which starts an agent without choosing a project and gives each chat its own folder
+- Added Quick starts: saved prompts with where they run, pinned to Home and shared on a Host
+- Added search across every online Host's projects and Bots when choosing where to chat, switching to the Host you pick
+
+Full notes: https://clisbot.com/changelog

@@ -1,14 +1,9 @@
+import { useHubStartStatus } from "./hub-start-status";
 import { suggestedDeviceLabel } from "./device-label";
 import { z } from "zod";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  useHosts,
-  getHostRuntimeStore,
-  useHostRuntimeConnectedServerIds,
-  useHostRuntimeSnapshot,
-} from "@/runtime/host-runtime";
+import { useHosts, useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { parseHubConfiguration } from "@/clisbot/hub/config";
 import { useHubSwitchLocked, useHubEditLock } from "./hub-edit-lock";
@@ -19,7 +14,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { ChevronDown, ChevronRight, Plus, Server, Link } from "lucide-react-native";
+import { ChevronDown, ChevronRight, Link } from "lucide-react-native";
 import { settingsStyles } from "@/styles/settings";
 import { parsePublicHubConnection } from "./google-sign-in";
 import { HubText as Text } from "./hub-text";
@@ -27,13 +22,7 @@ import { Alert } from "@/components/ui/alert";
 import { SettingsSection } from "@/components/settings";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
-import {
-  HubNetworkIcon,
-  hubMutedIconProps,
-  HubContextNote,
-  HubMetadataRow,
-  HubStatusBadge,
-} from "./hub-ui";
+import { HubContextNote, HubStatusBadge } from "./hub-ui";
 import { WhatIsHub } from "./hub-help";
 import { HubReadyNotice, HubOverviewSummary } from "./hub-access-summary";
 import { HubOverviewDestinations } from "@/clisbot/hub/settings/hub-overview-destinations";
@@ -42,7 +31,6 @@ import { useHubDeviceCapabilities } from "./use-hub-device-capabilities";
 import { requestHubDevices, type HubDeviceAction } from "./hub-device-operations";
 import {
   HubDeviceOfferSchema,
-  HubConnectionSchema,
   parseHubPairingOfferFromUrl,
   parseDevicePairingOfferFromUrl,
 } from "@clisbot/protocol/device-pairing-offer";
@@ -52,24 +40,18 @@ import {
   saveDiscoveredHub,
   parseHubRelayUrl,
   type HubProfile,
-  removeHubProfile,
 } from "./hub-profiles";
 import { pairHub } from "./hub-transport";
-import { UnavailableHubCard, useSelectedUnavailableHub } from "./unavailable-hub-card";
-import { isStoppedHostHub, type DetectedHubRef } from "./unavailable-hub";
-import {
-  canStartHubOnHost,
-  isTailscaleOrigin,
-  saveVerifiedHubRoutes,
-  startHubOnHost,
-} from "./hub-routes";
+import { useHubHostDiscovery, type DetectedHub } from "./hub-host-discovery";
+import { SavedHubList, DetectedHubList, HubStartHosts, matchesSavedHub } from "./hub-list";
+import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { isTailscaleOrigin, saveVerifiedHubRoutes, startHubOnHost } from "./hub-routes";
 import { HubRoutesCard } from "./hub-routes-card";
 import { HubPairDevicePanel } from "./hub-pair-device";
 import { fetchPublicHubIdentity } from "./hub-identity-check";
 import { HubIdentityRecovery } from "./hub-identity-recovery";
 import { readDeviceCredential } from "./credentials";
 import { PairedDeviceList } from "./device-list";
-import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { HubDeviceCapabilityError } from "./hub-capabilities";
 
 function usePublicHubTarget(
@@ -116,7 +98,6 @@ export function HubConnectionSettings() {
   const compact = useIsCompactFormFactor();
   const params = useLocalSearchParams<{ hubIntent?: string }>();
   const registry = useHubProfiles();
-  const account = useHubAccount();
   const allHosts = useHosts();
   const hostIds = useMemo(() => allHosts.map((host) => host.serverId), [allHosts]);
   const connectedIds = useHostRuntimeConnectedServerIds(hostIds);
@@ -137,29 +118,18 @@ export function HubConnectionSettings() {
   const [error, setError] = useState<string | null>(null);
   const [entryNotice, setEntryNotice] = useState<HubEntryNotice | null>(null);
   const [busy, setBusy] = useState(false);
+  const unavailableActions = locked || busy;
   usePublicHubTarget(router, setBusy, setError);
-  const [detected, setDetected] = useState<DetectedHub[]>([]);
-  const [discovery, setDiscovery] = useState<"loading" | "ready" | "error">("loading");
   const [discoveryAttempt, setDiscoveryAttempt] = useState(0);
   const retryDiscovery = useCallback(() => setDiscoveryAttempt((value) => value + 1), []);
-  const noHubs = isEmptyHubList(registry.profiles.length, detected.length, discovery);
-  useEffect(() => {
-    let alive = true;
-    setDiscovery("loading");
-    void Promise.allSettled(hosts.map(discoverHub)).then((results) => {
-      if (!alive) return undefined;
-      const known = results.flatMap((result) =>
-        result.status === "fulfilled" && result.value ? [result.value] : [],
-      );
-      const failed = results.some((result) => result.status === "rejected");
-      setDetected((previous) => uniqueDetectedHubs(failed ? [...previous, ...known] : known));
-      setDiscovery(failed ? "error" : "ready");
-      return undefined;
-    });
-    return () => {
-      alive = false;
-    };
-  }, [hosts, discoveryAttempt]);
+  const { checks, detected, state: discovery } = useHubHostDiscovery(hosts, discoveryAttempt);
+  const connectHost = useCallback(
+    () => router.push(buildSettingsAddHostRoute(Date.now())),
+    [router],
+  );
+  const available = detected.filter(
+    (hub) => !registry.profiles.some((profile) => matchesSavedHub(hub, profile)),
+  );
   const connectInput = useCallback(
     async (input: string, started?: { relay: boolean; reason?: string }) => {
       setBusy(true);
@@ -241,10 +211,6 @@ export function HubConnectionSettings() {
       setBusy(false);
     }
   }, [hosts, hostId, label, connectInput, localServerId, canStartHub, t]);
-  const addHub = useCallback(() => {
-    setIntent("add");
-    router.setParams({ hubIntent: "add" });
-  }, [router]);
   const chooseStart = useCallback(() => {
     setIntent("start");
     router.setParams({ hubIntent: "start" });
@@ -269,10 +235,18 @@ export function HubConnectionSettings() {
     void connectInput(link);
   }, [connectInput, link]);
   const openSaved = useCallback(
-    async (id: string) => {
+    async (id: string, destination?: "account" | "connection") => {
       try {
         await selectHubProfile(id);
-        router.push("/settings/hub/overview");
+        if (destination === "connection")
+          router.push({
+            pathname: "/settings/hub/[hubSection]",
+            params: { hubSection: "overview", hubPanel: "connection" },
+          });
+        else
+          router.push(
+            destination === "account" ? "/settings/hub/account" : "/settings/hub/overview",
+          );
       } catch (caught) {
         setError(
           caught instanceof Error ? caught.message : t("hub.connection.errors.couldNotSelect"),
@@ -300,34 +274,12 @@ export function HubConnectionSettings() {
     },
     [router, label, t],
   );
-  const unavailableHub = useSelectedUnavailableHub({
-    account,
-    profile: registry.profiles.find((profile) => profile.hubId === registry.activeId),
-    hosts: allHosts,
-    connectedIds,
-    detected,
-    discoveryReady: discovery !== "loading",
-    localServerId,
-  });
   const startOnHost = useCallback(
     (serverId: string) => {
       setHostId(serverId);
       chooseStart();
     },
     [chooseStart],
-  );
-  const switchToDetected = useCallback(
-    (hub: DetectedHubRef) => {
-      const match = detected.find((value) => value.serverId === hub.serverId);
-      if (match) void connectDetected(match);
-    },
-    [connectDetected, detected],
-  );
-  const formOptions = useMemo(
-    () => (
-      <HubAddOptions compact={compact} chooseStart={chooseStart} chooseConnect={chooseConnect} />
-    ),
-    [compact, chooseStart, chooseConnect],
   );
   const formHostPicker = useMemo(
     () => (
@@ -346,121 +298,89 @@ export function HubConnectionSettings() {
   );
   return (
     <View style={PROFILE_STYLE}>
-      {intent === null && registry.profiles.length ? (
+      {intent === null || intent === "add" ? (
         <>
-          <View style={hubStyles.toolbar}>
-            <Text style={hubStyles.sectionLabel}>{t("hub.connection.list.savedHubs")}</Text>
-            <Button
-              size={compact ? "md" : "sm"}
-              variant="outline"
-              leftIcon={Plus}
-              disabled={locked}
-              onPress={addHub}
-            >
-              {t("hub.connection.list.addHub")}
-            </Button>
-          </View>
           <View style={hubStyles.collection}>
-            {registry.profiles.map((profile) =>
-              profile.hubId === registry.activeId && unavailableHub ? (
-                <UnavailableHubCard
-                  key={profile.hubId}
-                  profile={profile}
-                  diagnosis={unavailableHub}
-                  disabled={locked || busy}
-                  startOn={startOnHost}
-                  switchToOther={switchToDetected}
-                  retry={account.refresh}
-                  remove={removeHubProfile}
-                />
-              ) : (
-                <SavedHubRow
-                  key={profile.hubId}
-                  profile={profile}
-                  selected={registry.activeId === profile.hubId}
-                  status={hubListingStatus(t, profile.hubId === registry.activeId, account)}
-                  runsOn={detected.find(
-                    (hub) =>
-                      hub.connection?.hubId === profile.hubId || hub.origin === profile.origin,
-                  )}
-                  account={profile.hubId === registry.activeId ? account : null}
-                  disabled={locked || busy}
-                  open={openSaved}
-                />
-              ),
+            <View style={hubStyles.toolbar}>
+              <Text style={hubStyles.sectionLabel}>{t("hub.connection.list.savedHubs")}</Text>
+              <Button
+                size={compact ? "md" : "sm"}
+                variant="outline"
+                leftIcon={Link}
+                disabled={unavailableActions}
+                onPress={chooseConnect}
+              >
+                {t("hub.connection.add.connectExisting")}
+              </Button>
+            </View>
+            {registry.profiles.length ? (
+              <SavedHubList
+                profiles={registry.profiles}
+                activeId={registry.activeId}
+                detected={detected}
+                localServerId={localServerId}
+                disabled={unavailableActions}
+                open={openSaved}
+                startOn={startOnHost}
+                retry={retryDiscovery}
+              />
+            ) : (
+              <Text style={hubStyles.intro}>{t("hub.connection.inventory.empty")}</Text>
             )}
           </View>
-        </>
-      ) : null}
-      {intent === null &&
-      detected.filter(
-        (hub) =>
-          !registry.profiles.some(
-            (profile) => profile.hubId === hub.connection?.hubId || profile.origin === hub.origin,
-          ),
-      ).length ? (
-        <SettingsSection title={t("hub.connection.list.availableHubs")}>
-          {detected
-            .filter(
-              (hub) =>
-                !registry.profiles.some(
-                  (profile) =>
-                    profile.hubId === hub.connection?.hubId || profile.origin === hub.origin,
-                ),
-            )
-            .map((hub) => (
-              <DetectedHubRow
-                key={hub.origin}
-                hub={hub}
-                disabled={busy || locked}
+          {available.length ? (
+            <SettingsSection title={t("hub.connection.list.availableHubs")}>
+              <DetectedHubList
+                hubs={available}
+                localServerId={localServerId}
+                disabled={unavailableActions}
                 connect={connectDetected}
                 startOn={startOnHost}
+                retry={retryDiscovery}
               />
-            ))}
-        </SettingsSection>
-      ) : null}
-      <HubDiscoveryStatus
-        visible={intent === null}
-        state={discovery}
-        busy={busy}
-        retry={retryDiscovery}
-        connect={chooseConnect}
-      />
-      {intent === null && !noHubs ? (
-        <HubListingContext
-          saved={registry.profiles.length}
-          detected={detected.length}
-          locked={locked}
-          addHub={addHub}
-        />
-      ) : (
-        <>
-          {noHubs && intent === null ? (
-            <Text style={hubStyles.intro}>{t("hub.connection.list.noHubs")}</Text>
+            </SettingsSection>
           ) : null}
-          <SettingsSection title={t("hub.connection.list.addAHub")}>
-            <HubAddForm
-              intent={intent}
-              noHubs={noHubs}
-              compact={compact}
-              options={formOptions}
-              hostPicker={formHostPicker}
-              hasHosts={hosts.length > 0}
-              label={label}
-              setLabel={setLabel}
-              link={link}
-              setLink={changeLink}
-              busy={busy}
-              canStartHub={canStartHub}
-              start={start}
-              connectEntered={connectEntered}
-              scan={scan}
-              cancel={cancel}
-              error={error}
-              entryNotice={formNotice}
-            />
-          </SettingsSection>
+          <HubStartHosts
+            hosts={allHosts}
+            connectedIds={connectedIds}
+            checks={checks}
+            connectHost={connectHost}
+            localServerId={localServerId}
+            disabled={unavailableActions}
+            startOn={startOnHost}
+            retry={retryDiscovery}
+          />
+          <HubDiscoveryStatus
+            visible
+            state={discovery}
+            busy={unavailableActions}
+            retry={retryDiscovery}
+            connect={chooseConnect}
+          />
         </>
+      ) : (
+        <View>
+          <HubAddForm
+            intent={intent}
+            noHubs={false}
+            compact={compact}
+            options={null}
+            hostPicker={formHostPicker}
+            hasHosts={hosts.length > 0}
+            label={label}
+            setLabel={setLabel}
+            link={link}
+            setLink={changeLink}
+            busy={busy}
+            canStartHub={canStartHub && !locked}
+            start={start}
+            connectEntered={connectEntered}
+            scan={scan}
+            cancel={cancel}
+            error={error}
+            entryNotice={formNotice}
+          />
+        </View>
       )}
       {error && intent !== "connect" && intent !== "start" ? (
         <Alert
@@ -468,9 +388,6 @@ export function HubConnectionSettings() {
           title={t("hub.connection.list.finishFailedTitle")}
           description={error}
         />
-      ) : null}
-      {!registry.profiles.length && intent === null && discovery === "ready" ? (
-        <HubContextNote>{t("hub.connection.list.onlyHostNote")}</HubContextNote>
       ) : null}
     </View>
   );
@@ -521,9 +438,8 @@ function useHubStartSupport(hosts: HostProfile[], hostId: string, localServerId:
   const selectedId = hosts.some((host) => host.serverId === hostId)
     ? hostId
     : (hosts[0]?.serverId ?? "");
-  // Subscribing re-evaluates when that Host reconnects with new features.
-  useHostRuntimeSnapshot(selectedId);
-  return Boolean(selectedId) && canStartHubOnHost(selectedId, localServerId);
+  const availability = useHubStartStatus(selectedId, localServerId);
+  return Boolean(selectedId) && availability.status === "ready";
 }
 
 type HubEntryNotice = "owner-required" | "blocked" | "pairing";
@@ -568,113 +484,9 @@ function HubUrlEntryNotice({ notice, scan }: { notice: HubEntryNotice; scan(): v
   );
 }
 
-function HubListingContext({
-  saved,
-  detected,
-  locked,
-  addHub,
-}: {
-  saved: number;
-  detected: number;
-  locked: boolean;
-  addHub(): void;
-}) {
-  const { t } = useTranslation();
-  if (saved + detected === 0) return null;
-  return (
-    <>
-      <HubContextNote>{t("hub.connection.list.switchNote")}</HubContextNote>
-      {saved === 0 && detected > 0 ? (
-        <Button
-          variant="ghost"
-          leftIcon={Plus}
-          disabled={locked}
-          onPress={addHub}
-          style={hubStyles.startAligned}
-        >
-          {t("hub.connection.list.addAnother")}
-        </Button>
-      ) : null}
-    </>
-  );
-}
-
 function initialHubIntent(value?: string): "add" | "start" | "connect" | null {
   if (value === "add" || value === "start" || value === "connect") return value;
   return null;
-}
-function isEmptyHubList(saved: number, detected: number, discovery: string): boolean {
-  return saved === 0 && detected === 0 && discovery === "ready";
-}
-
-function uniqueDetectedHubs(hubs: DetectedHub[]): DetectedHub[] {
-  return [...new Map(hubs.map((hub) => [hub.connection?.hubId ?? hub.origin, hub])).values()];
-}
-
-async function discoverHub(host: HostProfile): Promise<DetectedHub | null> {
-  const client = getHostRuntimeStore().getSnapshot(host.serverId)?.client;
-  if (!client) throw new Error("Host disconnected");
-  const { status } = await client.getHubStatus();
-  const connection =
-    client.getLastServerInfoMessage()?.features?.hubDiscovery === true
-      ? status.hubConnection
-      : undefined;
-  if (!status.hubOrigin) return null;
-  return {
-    origin: status.hubOrigin,
-    serverId: host.serverId,
-    hostLabel: host.label,
-    // A stopped Hub on the Host is started again, not joined.
-    stopped: isStoppedHostHub(status),
-    ...(connection ? { connection: HubConnectionSchema.parse(connection) } : {}),
-  };
-}
-
-function HubAddOptions({
-  compact,
-  chooseStart,
-  chooseConnect,
-}: {
-  compact: boolean;
-  chooseStart(): void;
-  chooseConnect(): void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <View style={compact ? MOBILE_OPTION_STYLE : OPTION_STYLE}>
-      <View
-        style={[
-          settingsStyles.card,
-          compact ? MOBILE_OPTION_CARD : OPTION_CARD,
-          hubStyles.optionCard,
-        ]}
-      >
-        <Text style={hubStyles.rowTitle}>{t("hub.connection.add.runOwnTitle")}</Text>
-        <Text style={hubStyles.hint}>{t("hub.connection.add.runOwnBody")}</Text>
-        <Button variant="outline" leftIcon={Server} onPress={chooseStart}>
-          {t("hub.connection.add.startHub")}
-        </Button>
-      </View>
-      <View style={compact ? MOBILE_OR_STYLE : OR_STYLE}>
-        <View style={compact ? MOBILE_OR_LINE : OR_LINE} />
-        <Text>{t("hub.connection.add.or")}</Text>
-        <View style={compact ? MOBILE_OR_LINE : OR_LINE} />
-      </View>
-      <View
-        style={[
-          settingsStyles.card,
-          compact ? MOBILE_OPTION_CARD : OPTION_CARD,
-          hubStyles.optionCard,
-        ]}
-      >
-        <Text style={hubStyles.rowTitle}>{t("hub.connection.add.useExistingTitle")}</Text>
-        <Text style={hubStyles.hint}>{t("hub.connection.add.useExistingBody")}</Text>
-        <Button variant="outline" leftIcon={Link} onPress={chooseConnect}>
-          {t("hub.connection.add.connectExisting")}
-        </Button>
-      </View>
-    </View>
-  );
 }
 
 function HubStartHostPicker({
@@ -913,32 +725,6 @@ const IdentitySchema = z.object({
   setupStatus: z.enum(["ready", "owner-required", "blocked"]),
   relay: HubDeviceOfferSchema.shape.relay,
 });
-const OPTION_STYLE = {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 16,
-} as const;
-const OPTION_CARD = { flex: 1, minWidth: 220, gap: 12 } as const;
-const OR_STYLE = { alignItems: "center", gap: 8 } as const;
-const OR_LINE = {
-  width: 1,
-  flex: 1,
-  minHeight: 24,
-  backgroundColor: "#d6d6d6",
-} as const;
-const MOBILE_OPTION_STYLE = { gap: 16 } as const;
-const MOBILE_OPTION_CARD = { gap: 12 } as const;
-const MOBILE_OR_STYLE = {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 12,
-} as const;
-const MOBILE_OR_LINE = {
-  height: 1,
-  flex: 1,
-  backgroundColor: "#d6d6d6",
-} as const;
-
 /** Started on relay: says so next to the start result, with Tailscale's own reason. */
 function HubRelayNotice({ reason, setUpTailscale }: { reason?: string; setUpTailscale(): void }) {
   const { t } = useTranslation();
@@ -1120,174 +906,21 @@ function HubAccessRecovery({
 
 export { HubLoginPolicySettings } from "./hub-login-policy-settings";
 
-const PROFILE_STYLE = { gap: 16 } as const;
+const PROFILE_STYLE = { gap: 24 } as const;
 
-interface DetectedHub {
-  origin: string;
-  serverId: string;
-  hostLabel: string;
-  /** A Hub on this Host that is not running: the row offers Start Hub, not Connect. */
-  stopped: boolean;
-  connection?: z.infer<typeof HubConnectionSchema>;
-}
-function SavedHubRow({
-  profile,
-  selected,
-  status,
-  runsOn,
-  account,
-  disabled,
-  open,
-}: {
-  profile: HubProfile;
-  selected: boolean;
-  status: string;
-  /** The connected Host this Hub runs on; its ID tells same-named Hosts apart. */
-  runsOn?: Pick<DetectedHub, "hostLabel" | "serverId">;
-  account: ReturnType<typeof useHubAccount> | null;
-  disabled: boolean;
-  open(id: string): Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const compact = useIsCompactFormFactor();
-  const select = useCallback(() => {
-    void open(profile.hubId);
-  }, [open, profile.hubId]);
-  let access = t("hub.connection.row.openToCheck");
-  let badge = t("hub.connection.status.saved");
-  let tone: "success" | "warning" | "muted" = "muted";
-  if (account?.signedIn) {
-    badge = t("hub.connection.status.connected");
-    tone = "success";
-    access =
-      account.connection?.accountAuthentication === "personal"
-        ? t("hub.connection.common.noAccountSignIn")
-        : t("hub.connection.row.signedInAs", { email: account.signedIn.account.email });
-  } else if (selected) {
-    badge = status;
-    tone = account?.error ? "warning" : "muted";
-    if (profile.entry === "account") access = t("hub.connection.row.accountSignInRequired");
-    else if (profile.entry === "owner-setup") access = t("hub.connection.row.ownerSetupRequired");
-    else access = t("hub.connection.row.pairingRequired");
-  }
-  let host = runsOn ? hostWithId(runsOn) : undefined;
-  if (!host && profile.origin) host = new URL(profile.origin).hostname;
-  if (!host) host = t("hub.connection.row.viaRelay");
-  return (
-    <View style={[settingsStyles.card, hubStyles.rowCard]}>
-      <View style={hubStyles.rowHeading}>
-        <HubNetworkIcon size={18} uniProps={hubMutedIconProps} />
-        <Text style={hubStyles.rowTitle}>{profile.label}</Text>
-        {selected ? (
-          <View style={hubStyles.selected}>
-            <Text style={hubStyles.selectedText}>{t("hub.connection.row.selected")}</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={hubStyles.metadata}>
-        <HubMetadataRow label={t("hub.connection.common.host")}>{host}</HubMetadataRow>
-        <HubMetadataRow label={t("hub.connection.common.access")}>{access}</HubMetadataRow>
-      </View>
-      <View style={hubStyles.rowFooter}>
-        <HubStatusBadge label={badge} tone={tone} />
-        <Button
-          size={compact ? "md" : "sm"}
-          variant="outline"
-          disabled={disabled}
-          onPress={select}
-          style={hubStyles.openAction}
-        >
-          {t("hub.connection.row.openHub")}
-        </Button>
-      </View>
-    </View>
-  );
-}
-function DetectedHubRow({
-  hub,
-  disabled,
-  connect,
-  startOn,
-}: {
-  hub: DetectedHub;
-  disabled: boolean;
-  connect(hub: DetectedHub): Promise<void>;
-  startOn(serverId: string): void;
-}) {
-  const { t } = useTranslation();
-  const compact = useIsCompactFormFactor();
-  const open = useCallback(() => {
-    if (hub.stopped) startOn(hub.serverId);
-    else void connect(hub);
-  }, [connect, hub, startOn]);
-  return (
-    <View style={[settingsStyles.card, hubStyles.rowCard]}>
-      <View style={hubStyles.rowHeading}>
-        <HubNetworkIcon size={18} uniProps={hubMutedIconProps} />
-        <Text style={hubStyles.rowTitle}>
-          {t("hub.connection.row.hubOnHost", { host: hub.hostLabel })}
-        </Text>
-      </View>
-      <View style={hubStyles.metadata}>
-        <HubMetadataRow label={t("hub.connection.common.host")}>{hostWithId(hub)}</HubMetadataRow>
-        {hub.stopped ? null : (
-          <HubMetadataRow label={t("hub.connection.common.access")}>
-            {t("hub.connection.row.checkedOnConnect")}
-          </HubMetadataRow>
-        )}
-      </View>
-      {hub.stopped ? (
-        <Text style={hubStyles.hint}>{t("hub.connection.unavailable.stopped")}</Text>
-      ) : null}
-      <View style={hubStyles.rowFooter}>
-        {hub.stopped ? (
-          <HubStatusBadge label={t("hub.connection.status.unavailable")} tone="warning" />
-        ) : (
-          <HubStatusBadge label={t("hub.connection.row.detected")} />
-        )}
-        <Button
-          size={compact ? "md" : "sm"}
-          variant="outline"
-          leftIcon={hub.stopped ? Server : Link}
-          disabled={disabled}
-          onPress={open}
-          style={hubStyles.openAction}
-        >
-          {hub.stopped
-            ? t("hub.connection.unavailable.startAgain")
-            : t("hub.connection.common.connect")}
-        </Button>
-      </View>
-    </View>
-  );
-}
-/** A Host's name with its ID, so two Hosts with the same name can be told apart. */
-function hostWithId(host: Pick<DetectedHub, "hostLabel" | "serverId">): string {
-  return `${host.hostLabel} · ${host.serverId}`;
-}
-
-function hubListingStatus(
-  t: TFunction,
-  selected: boolean,
-  account: ReturnType<typeof useHubAccount>,
-): string {
-  if (!selected) return t("hub.connection.status.saved");
-  if (account.signedIn) return t("hub.connection.status.connected");
-  if (account.loading) return t("hub.connection.status.connecting");
-  if (account.error) return t("hub.connection.status.unavailable");
-  return t("hub.connection.status.signInRequired");
-}
 const hubStyles = StyleSheet.create((theme) => ({
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginHorizontal: theme.spacing[1],
-    marginBottom: theme.spacing[3],
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
   },
   sectionLabel: {
     fontSize: theme.fontSize.sm,
-    color: theme.colors.foregroundMuted,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foreground,
   },
   collection: { gap: theme.spacing[3] },
   rowCard: { padding: theme.spacing[4] },

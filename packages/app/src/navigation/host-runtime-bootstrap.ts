@@ -1,3 +1,4 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import type { AppState } from "react-native";
 import type { ActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import type {
@@ -187,6 +188,11 @@ function resolveReadyIndexStartupRoute(input: ResolveIndexStartupRouteInput): St
   if (!isIndexPathname(input.route.pathname)) {
     return { kind: "render" };
   }
+
+  // Home V2 is where a known Host is used, online or not; a first run with no Host at all still
+  // goes to Welcome, which is the only screen that connects one.
+  if (HOME_V2_ENABLED && input.hosts.length > 0)
+    return { kind: "redirect", href: buildOpenProjectRoute() };
 
   if (!input.isWorkspaceSelectionLoaded) {
     return { kind: "splash" };

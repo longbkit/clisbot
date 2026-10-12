@@ -3,6 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
+import { buildSessionsRoute } from "@/utils/host-routes";
 import {
   createIdleAgent,
   openSessions,
@@ -87,7 +88,8 @@ async function verifyAllSearchFieldHighlights(page: Page): Promise<void> {
     await search(page, `${NONCE} main`);
     await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
     const row = rowTitles(page).filter({ hasText: NONCE }).first();
-    for (const field of ["workspace", "title", "project", "branch"]) {
+    // Inbox names the branch only when it differs from the workspace; here both are "main".
+    for (const field of ["workspace", "title", "project"]) {
       await expect(
         row.getByTestId(new RegExp(`^agent-row-${field}-`)).getByText(/^main$/i),
       ).toBeVisible();
@@ -136,6 +138,14 @@ test.describe("History search", () => {
     await client?.removeProject(projectId).catch(() => undefined);
     await client?.close().catch(() => undefined);
     await tempRepo?.cleanup();
+  });
+
+  test("a cold link to History loads once the Host connects", async ({ page }) => {
+    await resetSeededPageState(page);
+    await page.goto(buildSessionsRoute());
+    await expect(page.getByTestId("sessions-search-input")).toBeVisible({ timeout: 30_000 });
+    await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
+    await expect(page.getByTestId("sessions-host-errors")).toHaveCount(0);
   });
 
   for (const viewport of [

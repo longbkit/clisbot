@@ -39,13 +39,6 @@ export async function saveVerifiedHubRoutes(
   }
 }
 
-/** Whether this device may start (or restart) a Hub on that Host. */
-export function canStartHubOnHost(serverId: string, localServerId: string | null): boolean {
-  if (getDesktopHost()?.invoke && serverId === localServerId) return true;
-  const client = getHostRuntimeStore().getSnapshot(serverId)?.client;
-  return client?.getLastServerInfoMessage()?.features?.localHubStart === true;
-}
-
 /** Starts a personal Hub on a Host, or re-runs it with a new transport. Only the Hub
  * restarts; the daemon keeps running. */
 export async function startHubOnHost(input: {

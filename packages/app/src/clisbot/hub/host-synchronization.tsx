@@ -5,7 +5,7 @@ import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
 import type { HubHostManagement } from "@/types/host-connection";
 import { i18n } from "@/i18n/i18next";
-import { useHubAccount } from "./account-provider";
+import { HubAccountScope, useHubAccount, useHubAccounts } from "./account-provider";
 import { HubAccessTicketSchema } from "./contracts";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
 import { orphanedManagedHosts } from "./managed-host-reconciliation";
@@ -39,7 +39,19 @@ export function useHubListsHost(serverId: string | null): boolean | undefined {
   return daemons.data.daemons.some((daemon) => daemon.connectionOffer?.serverId === serverId);
 }
 
+/**
+ * Registers the Hosts of every saved Hub account, each under its own account, so Hosts from a
+ * personal Hub and a company Hub sit side by side and selecting a Hub never removes the others'.
+ */
 export function HubHostSynchronization() {
+  return useHubAccounts().map((account) => (
+    <HubAccountScope key={account.origin} account={account}>
+      <AccountHostSynchronization />
+    </HubAccountScope>
+  ));
+}
+
+function AccountHostSynchronization() {
   const hub = useHubAccount();
   const signedIn = hub.signedIn;
   const hubOrigin = hub.origin;

@@ -3,9 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { QrCode, Link2, ClipboardPaste, Terminal } from "lucide-react-native";
-import { isFdroidBuild } from "@/constants/build-profile";
-import { isNative } from "@/constants/platform";
 import { isElectronRuntime } from "@/desktop/host";
+import { shouldOfferQrScan } from "@/hosts/qr-scan-support";
 import { ExternalLink } from "@/components/ui/external-link";
 import { settingsStyles } from "@/styles/settings";
 import type { Theme } from "@/styles/theme";
@@ -37,7 +36,7 @@ export interface HostConnectionMethodsProps {
 export function HostConnectionMethods(props: HostConnectionMethodsProps) {
   const { t } = useTranslation();
   const { testIDs } = props;
-  const scanQr = isNative && !isFdroidBuild;
+  const scanQr = shouldOfferQrScan();
   return (
     <View style={styles.root}>
       <View style={styles.introBlock}>

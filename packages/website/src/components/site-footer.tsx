@@ -1,6 +1,6 @@
 import { PLUGINS_LINKED } from "~/plugins/launch";
 import { getAlternativePages } from "~/data/alternative-pages";
-import { appStoreUrl, playStoreUrl, webAppUrl } from "~/downloads";
+import { MOBILE_DOWNLOADS, webAppUrl } from "~/downloads";
 import { openAnalyticsSettings } from "~/components/website-analytics";
 
 interface SiteFooterProps {
@@ -167,21 +167,23 @@ export function SiteFooter({ width = "default" }: SiteFooterProps) {
           <p className="text-extra-muted-foreground">Download</p>
           <div className="space-y-2">
             <a
-              href={appStoreUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={MOBILE_DOWNLOADS.ios.href}
               className="block text-muted-foreground hover:text-foreground transition-colors"
             >
-              App Store
+              iOS
             </a>
+            <span aria-disabled="true" className="block text-extra-muted-foreground text-xs">
+              App Store — Pending
+            </span>
             <a
-              href={playStoreUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={MOBILE_DOWNLOADS.android.href}
               className="block text-muted-foreground hover:text-foreground transition-colors"
             >
-              Google Play
+              Android
             </a>
+            <span aria-disabled="true" className="block text-extra-muted-foreground text-xs">
+              Google Play — Pending
+            </span>
             <a
               href="https://github.com/longbkit/clisbot/releases"
               target="_blank"

@@ -141,10 +141,14 @@ async function leaveMarkedWorkspaceAndReopenOnCompact(
 
 async function completeTurnAndLeaveOnCompact(page: Page, { subject, other }: FinishedWorkspaces) {
   await test.step("ordinary completion still clears on departure", async () => {
-    await closeMobileAgentSidebar(page);
+    await returnToChat(page, subject.workspaceId);
     await subject.client.sendAgentMessage(subject.agentId, "Finish another turn.");
     await subject.client.waitForFinish(subject.agentId, 20_000);
-    await openMobileAgentSidebar(page);
+    if ((await openMobileAgentSidebar(page)) === "chat") {
+      // Back to conversations is itself the departure.
+      await expectStatus(page, subject.workspaceId, "done");
+      return;
+    }
     await expectStatus(page, subject.workspaceId, "attention");
     await openWorkspaceOnCompact(page, other.workspaceId);
     await expectStatus(page, subject.workspaceId, "done");
@@ -176,6 +180,13 @@ async function addFinishedAgent(workspace: MockAgentWorkspace) {
   });
 }
 
+/** Back to the chat: close the sliding sidebar, or reopen the chat from the Chat tab. */
+async function returnToChat(page: Page, workspaceId: string) {
+  if (await page.getByTestId("home-mobile-tabs").filter({ visible: true }).count())
+    await openWorkspace(page, workspaceId);
+  else await closeMobileAgentSidebar(page);
+}
+
 async function openCompactWorkspace(page: Page, workspace: MockAgentWorkspace) {
   await page.setViewportSize({ width: 390, height: 844 });
   await openAgentRoute(page, workspace);
@@ -185,7 +196,7 @@ async function openCompactWorkspace(page: Page, workspace: MockAgentWorkspace) {
 async function markUnreadThenResumeChat(page: Page, workspaceId: string) {
   await test.step("interacting with the visible chat clears manual unread", async () => {
     await markAsUnread(page, workspaceId);
-    await closeMobileAgentSidebar(page);
+    await returnToChat(page, workspaceId);
     await page.getByRole("textbox", { name: "Message agent..." }).click();
     await openMobileAgentSidebar(page);
     await expectStatus(page, workspaceId, "done");

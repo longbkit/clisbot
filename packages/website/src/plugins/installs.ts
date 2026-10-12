@@ -1,23 +1,29 @@
-// Install counts live in the website KV. The all-time counter predates the daily record and
-// stays the "All time" number; the daily record keeps the last 60 days for the shorter windows.
+// Legacy KV totals remain the baseline. New increments belong to the SQLite
+// Durable Object, so importing the baseline again cannot overwrite increments.
 export type InstallWindow = "week" | "month" | "all";
 export type InstallCounts = Record<InstallWindow, number>;
-/** UTC day (YYYY-MM-DD) to installs that day. */
 export type DailyInstalls = Record<string, number>;
+export interface LegacyInstalls {
+  total: number;
+  daily: DailyInstalls;
+}
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const DAYS_KEPT = 60;
+export const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAYS_KEPT = 60;
 const WINDOW_DAYS = { week: 7, month: 30 } as const;
+const TOTAL_PREFIX = "plugin-installs:";
+const DAILY_PREFIX = "plugin-installs-daily:";
 
-const totalKey = (id: string) => `plugin-installs:${id}`;
-const dailyKey = (id: string) => `plugin-installs-daily:${id}`;
+export function installCounter(namespace: DurableObjectNamespace): DurableObjectStub {
+  return namespace.get(namespace.idFromName("plugin-installs:v1"));
+}
 
 export async function recordClientInstall({
-  cache,
+  counter,
   id,
   ip,
 }: {
-  cache: KVNamespace;
+  counter: DurableObjectNamespace;
   id: string;
   ip: string | null;
 }): Promise<void> {
@@ -26,18 +32,64 @@ export async function recordClientInstall({
   const hash = Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
-  const key = `plugin-installs-client:${id}:${hash}`;
-  if ((await cache.get(key)) !== null) return;
-  await cache.put(key, "1", { expirationTtl: 3600 });
-  await recordInstall(cache, id, new Date());
+  const response = await installCounter(counter).fetch("https://counter/install", {
+    method: "POST",
+    body: JSON.stringify({ id, hash }),
+  });
+  if (!response.ok) throw new Error(`Plugin install counter returned ${response.status}`);
 }
 
-export async function recordInstall(cache: KVNamespace, id: string, now: Date): Promise<void> {
-  const [total, daily] = await Promise.all([cache.get(totalKey(id)), readDaily(cache, id)]);
-  await Promise.all([
-    cache.put(totalKey(id), String(Number(total ?? 0) + 1)),
-    cache.put(dailyKey(id), JSON.stringify(addInstall(daily, now))),
+async function listKeys(cache: KVNamespace, prefix: string): Promise<string[]> {
+  const names: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await cache.list({ prefix, cursor, limit: 1000 });
+    names.push(...page.keys.map((key) => key.name));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor !== undefined);
+  return names;
+}
+
+/** List existing counters, including unlisted plugins; never probe every registry ID. */
+export async function readLegacyInstalls(
+  cache: KVNamespace | null,
+): Promise<Record<string, LegacyInstalls>> {
+  if (!cache) return {};
+  const [totals, days] = await Promise.all([
+    listKeys(cache, TOTAL_PREFIX),
+    listKeys(cache, DAILY_PREFIX),
   ]);
+  const result: Record<string, LegacyInstalls> = {};
+  const totalEntries = await Promise.all(
+    totals.map(async (key) => {
+      const raw = await cache.get(key);
+      const total = Number(raw ?? 0);
+      if (!Number.isSafeInteger(total) || total < 0)
+        throw new Error(`Invalid legacy install total: ${key}`);
+      return { id: key.slice(TOTAL_PREFIX.length), total };
+    }),
+  );
+  for (const { id, total } of totalEntries) result[id] = { total, daily: {} };
+  const dailyEntries = await Promise.all(
+    days.map(async (key) => {
+      const raw: unknown = await cache.get(key, { type: "json" });
+      const daily: DailyInstalls = {};
+      if (typeof raw === "object" && raw !== null) {
+        for (const [day, count] of Object.entries(raw)) {
+          if (
+            /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+            typeof count === "number" &&
+            Number.isSafeInteger(count) &&
+            count >= 0
+          )
+            daily[day] = count;
+        }
+      }
+      return { id: key.slice(DAILY_PREFIX.length), daily };
+    }),
+  );
+  for (const { id, daily } of dailyEntries) result[id] = { total: result[id]?.total ?? 0, daily };
+  return result;
 }
 
 export async function readInstallCounts(
@@ -45,49 +97,48 @@ export async function readInstallCounts(
   ids: string[],
   now: Date,
 ): Promise<Record<string, InstallCounts>> {
-  const entries = await Promise.all(
-    ids.map(async (id) => {
-      if (!cache) return [id, countInstalls({}, 0, now)] as const;
-      const [total, daily] = await Promise.all([cache.get(totalKey(id)), readDaily(cache, id)]);
-      return [id, countInstalls(daily, Number(total ?? 0), now)] as const;
-    }),
+  const legacy = await readLegacyInstalls(cache);
+  return Object.fromEntries(
+    ids.map((id) => [id, countInstalls(legacy[id]?.daily ?? {}, legacy[id]?.total ?? 0, now)]),
   );
-  return Object.fromEntries(entries);
 }
 
-export function addInstall(daily: DailyInstalls, now: Date): DailyInstalls {
-  const oldest = utcDay(now, DAYS_KEPT - 1);
-  const kept = Object.fromEntries(Object.entries(daily).filter(([day]) => day >= oldest));
-  const today = utcDay(now, 0);
-  kept[today] = (kept[today] ?? 0) + 1;
-  return kept;
+export function isInstallCounts(value: unknown): value is Record<string, InstallCounts> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  return Object.values(value).every((counts) => {
+    if (typeof counts !== "object" || counts === null) return false;
+    return [counts.week, counts.month, counts.all].every(
+      (count) => Number.isSafeInteger(count) && count >= 0,
+    );
+  });
+}
+
+export async function readCounterCounts(
+  counter: DurableObjectNamespace,
+): Promise<Record<string, InstallCounts>> {
+  const response = await installCounter(counter).fetch("https://counter/counts");
+  if (!response.ok) throw new Error(`Plugin install counter returned ${response.status}`);
+  const counts: unknown = await response.json();
+  if (!isInstallCounts(counts)) throw new Error("Invalid plugin install counter response");
+  return counts;
 }
 
 export function countInstalls(daily: DailyInstalls, total: number, now: Date): InstallCounts {
+  const today = utcDay(now, 0);
   return {
-    week: installsSince(daily, utcDay(now, WINDOW_DAYS.week - 1)),
-    month: installsSince(daily, utcDay(now, WINDOW_DAYS.month - 1)),
+    week: installsSince(daily, utcDay(now, WINDOW_DAYS.week - 1), today),
+    month: installsSince(daily, utcDay(now, WINDOW_DAYS.month - 1), today),
     all: total,
   };
 }
 
-function installsSince(daily: DailyInstalls, oldest: string): number {
+function installsSince(daily: DailyInstalls, oldest: string, today: string): number {
   return Object.entries(daily).reduce(
-    (sum, [day, count]) => (day >= oldest ? sum + count : sum),
+    (sum, [day, count]) => (day >= oldest && day <= today ? sum + count : sum),
     0,
   );
 }
 
-function utcDay(now: Date, daysBefore: number): string {
+export function utcDay(now: Date, daysBefore: number): string {
   return new Date(now.getTime() - daysBefore * DAY_MS).toISOString().slice(0, 10);
-}
-
-async function readDaily(cache: KVNamespace, id: string): Promise<DailyInstalls> {
-  const value: unknown = await cache.get(dailyKey(id), { type: "json" });
-  if (typeof value !== "object" || value === null) return {};
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, number] => typeof entry[1] === "number",
-    ),
-  );
 }

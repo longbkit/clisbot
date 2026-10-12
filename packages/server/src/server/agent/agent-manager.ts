@@ -1720,7 +1720,22 @@ export class AgentManager {
       config = { ...request.config, internal: config.internal };
       options = { ...options, env: request.env };
     }
-    await this.deleteAgentState(resolvedAgentId);
+    const storedDraft = await this.registry?.get(resolvedAgentId);
+    if (
+      this.durableTimelineStore &&
+      storedDraft &&
+      !storedDraft.persistence &&
+      !storedDraft.internal &&
+      !config.internal &&
+      (await this.durableTimelineStore.getLatestCommittedSeq(resolvedAgentId)) === 0
+    ) {
+      // A persisted draft has no provider chat to replace. Reuse its identity without
+      // permanently deleting the canonical store the first session must write to.
+      await this.providerSubagents.flushParent(resolvedAgentId);
+      this.discardRetainedAgentState(resolvedAgentId);
+    } else {
+      await this.deleteAgentState(resolvedAgentId);
+    }
     const { storedConfig, launchConfig, clisbotToolPolicy } = await this.prepareSessionConfig(
       config,
       resolvedAgentId,
@@ -4355,7 +4370,7 @@ export class AgentManager {
       // an explicit false still requests a provider replay for disk refresh.
       if (session.initialTimeline?.length && options?.historyPrimed === undefined) {
         managed.historyPrimed =
-          this.timelineStore.has(resolvedAgentId) ||
+          this.isTimelinePrimedInMemory(resolvedAgentId) ||
           (!buildExplicitTimelineSeedForRegister(now, options) &&
             !managed.internal &&
             this.durableTimelineStore !== undefined &&
@@ -4482,6 +4497,15 @@ export class AgentManager {
     throw new Error(`Provider '${storedConfig.provider}' does not support MCP servers`);
   }
 
+  private isTimelinePrimedInMemory(agentId: string): boolean {
+    // Registration creates an empty cache before a legacy replay. That cache
+    // must not suppress another replay when the first import failed.
+    return (
+      this.timelineStore.has(agentId) &&
+      this.timelineStore.fetch(agentId, { limit: 1 }).window.nextSeq > 1
+    );
+  }
+
   private async initializeAgentTimelineForRegister(params: {
     agentId: string;
     now: Date;
@@ -4497,11 +4521,11 @@ export class AgentManager {
       | undefined;
   }): Promise<{ durableTimelineHasRows: boolean }> {
     const { agentId, now, options } = params;
-    const timelineAlreadyPrimed = this.timelineStore.has(agentId);
+    const timelineAlreadyPrimed = this.isTimelinePrimedInMemory(agentId);
     const explicitTimelineSeed = buildExplicitTimelineSeedForRegister(now, options);
     const shouldSeedFromDurable =
       !explicitTimelineSeed &&
-      !this.timelineStore.has(agentId) &&
+      !timelineAlreadyPrimed &&
       this.durableTimelineStore &&
       !this.agents.get(agentId)?.internal;
     const durableTimelineSeed = shouldSeedFromDurable
@@ -5216,6 +5240,39 @@ export class AgentManager {
     }
   }
 
+  private async seedLegacyTimeline(
+    agent: ActiveManagedAgent,
+    events: readonly Extract<AgentStreamEvent, { type: "timeline" }>[],
+  ): Promise<AgentTimelineRow[]> {
+    if (!this.durableTimelineStore?.replaceCommitted || agent.internal) {
+      // Compatibility stores replace their replay by clearing the old rows.
+      await this.deleteCommittedTimeline(agent.id);
+      return events.map((event) =>
+        this.recordTimeline(
+          agent.id,
+          event.item,
+          event.timestamp ? { timestamp: event.timestamp } : undefined,
+        ),
+      );
+    }
+    // Canonical deletion is permanent. An atomic replay keeps the session writable
+    // and retains its submission and permission ledgers if the import is retried.
+    await this.waitForTimelinePersistence(agent.id);
+    const rows: AgentTimelineRow[] = [];
+    for (const event of events) {
+      rows.push(await this.makeReplacementTimelineRow(agent.id, event, rows.length + 1));
+    }
+    const epoch = await this.durableTimelineStore.replaceCommitted(agent.id, rows);
+    this.timelineRetention.delete(agent.id);
+    this.timelineStore.initialize(agent.id, {
+      epoch,
+      rows: rows.slice(-40),
+      nextSeq: rows.length + 1,
+    });
+    this.timelineRetention.retain(agent.id, rows.slice(-40));
+    return rows;
+  }
+
   private async primeTimelineFromLegacyProviderHistory(
     agent: ActiveManagedAgent,
     broadcast: boolean | (() => boolean),
@@ -5253,9 +5310,7 @@ export class AgentManager {
       throw error;
     }
 
-    // The replay is the timeline, so drop the rows a previous hydration committed.
-    // Keeping them would leave getTimelineRows reading one copy per hydration.
-    await this.deleteCommittedTimeline(agent.id);
+    const replayRows = await this.seedLegacyTimeline(agent, historyEvents);
 
     const timelineEvents: Array<{
       event: Extract<AgentStreamEvent, { type: "timeline" }>;
@@ -5263,7 +5318,11 @@ export class AgentManager {
     }> = [];
     const providerSubagentEvents: AgentManagerEvent[] = [];
     for (const event of historySubagentEvents) {
-      const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
+      const update = await this.providerSubagents.applyCommitted(
+        agent.id,
+        event.provider,
+        event.event,
+      );
       const managerEvent: AgentManagerEvent = { type: "provider_subagent", event: update };
       if (deferredBroadcast) {
         providerSubagentEvents.push(managerEvent);
@@ -5271,12 +5330,8 @@ export class AgentManager {
         this.dispatch(managerEvent);
       }
     }
-    for (const event of historyEvents) {
-      const row = this.recordTimeline(
-        agent.id,
-        event.item,
-        event.timestamp ? { timestamp: event.timestamp } : undefined,
-      );
+    for (const [index, event] of historyEvents.entries()) {
+      const row = replayRows[index]!;
       if (deferredBroadcast) {
         timelineEvents.push({ event, row });
       } else if (broadcast) {

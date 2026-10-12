@@ -13,7 +13,7 @@ import { buildAgentRoute } from "../support/helpers/mock-agent";
 import { connectNewWorkspaceDaemonClient } from "../support/helpers/new-workspace";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
-import { expectMobileAgentSidebarHidden } from "../support/helpers/sidebar";
+import { expectMobileAgentSidebarHidden, openMobileAgentSidebar } from "../support/helpers/sidebar";
 import {
   switchWorkspaceViaSidebar,
   waitForWorkspaceInSidebar,
@@ -247,8 +247,26 @@ async function openRemoteAgentFromPlugin(
 }
 
 async function openCompactSidebar(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
+  await openMobileAgentSidebar(page);
   await expect(page.getByTestId("sidebar-footer-search").filter({ visible: true })).toBeVisible();
+}
+
+/**
+ * Runs an agent-context command from the compact sidebar and reports whether it could. Home's
+ * Chat tab lists conversations away from the agent, so it offers no agent commands; the composer
+ * pill is the compact way into an agent panel there. The sliding sidebar keeps the agent open,
+ * and its Search row dismisses the sidebar on its way to the command center.
+ */
+async function runAgentCommandOnCompact(page: Page, title: string): Promise<boolean> {
+  const chatTab = (await page.getByTestId("chat-back").filter({ visible: true }).count()) > 0;
+  await openCompactSidebar(page);
+  if (chatTab) {
+    await expectCommandUnavailable(page, title);
+    return false;
+  }
+  await runCommand(page, title);
+  await expectMobileAgentSidebarHidden(page);
+  return true;
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string): Promise<void> {
@@ -462,11 +480,11 @@ test.describe("plugin workspace panels and Command Center", () => {
         // Pressing removed the pill from that page only. The reloaded page evaluates
         // the plugin again, and its agents snapshot contributes the pill afresh.
         await expect(page.getByRole("button", { name: "Open composer review" })).toBeVisible();
-        await openCompactSidebar(page);
-        // The sidebar's Search row dismisses the compact sidebar on its way to the
-        // command center, so nothing has to close it after the command runs.
-        await runCommand(page, "Open plugin agent");
-        await expectMobileAgentSidebarHidden(page);
+        if (!(await runAgentCommandOnCompact(page, "Open plugin agent"))) {
+          await page.goto(buildAgentRoute(primary.workspaceId, agent.id));
+          await page.waitForURL(isSettledWorkspaceUrl, { timeout: 60_000 });
+          await page.getByRole("button", { name: "Open composer review" }).click();
+        }
         await expect(page.getByText(`Agent bridge ${agent.id}`)).toBeVisible();
         await expect(
           page.getByText(`Workspace ${primary.workspaceId}`, { exact: true }),

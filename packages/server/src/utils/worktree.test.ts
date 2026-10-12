@@ -90,7 +90,8 @@ describe("clisbot worktree manager", () => {
   });
 
   afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+    // Windows may briefly retain Git helper handles after the silent remote closes.
+    rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   it("treats a worktree as clisbot-owned even when its .git admin is missing", async () => {

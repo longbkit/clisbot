@@ -1,4 +1,5 @@
 import { expect, test } from "../support/fixtures";
+import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { gotoAppShell } from "../support/helpers/app";
 import { getServerId } from "../support/helpers/server-id";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -351,7 +352,7 @@ test.describe("Workspace labels", () => {
           assigned: true,
         });
         await gotoAppShell(page);
-        await page.getByRole("button", { name: "Open menu", exact: true }).click();
+        await openMobileAgentSidebar(page);
         await waitForSidebarHydration(page);
 
         const serverId = getServerId();

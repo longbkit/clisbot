@@ -19,42 +19,52 @@ import type { HostProfile } from "@/types/host-connection";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { i18n } from "@/i18n/i18next";
 import { useSessionStore } from "@/stores/session-store";
-import { useHubAccount } from "../account-provider";
+import { useHubAccounts } from "../account-provider";
 import { hasIndependentHostCredential } from "./independent-host-credential";
 import {
   useManagedAccessTransition,
   type ManagedAccessTransition,
 } from "./managed-access-transition";
 
-/** Clisbot-owned mount for the daemon policy; the generic Host page stays transport-agnostic. */
-export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
-  const { t } = useTranslation();
-  const hub = useHubAccount();
-  const [pairLinkVisible, setPairLinkVisible] = useState(false);
-  const devicePairing = useSessionStore(
-    (state) => state.sessions[host.serverId]?.serverInfo?.features?.devicePairing === true,
-  );
-  const { config, isLoading, patchConfig } = useDaemonConfig(host.serverId);
+/**
+ * The saved Hub account that manages `host`, whichever Hub is selected, and whether that
+ * account owns the Host's organization.
+ */
+function useManagingHub(host: HostProfile) {
+  const accounts = useHubAccounts();
   const sessionManagement = useSyncExternalStore(
     subscribeHostSessionAccess,
     () => hostSessionHubManagement(host.serverId),
     () => undefined,
   );
   const management = host.management ?? sessionManagement;
-  const managedByCurrentHub = management?.kind === "hub" && management.hubOrigin === hub.origin;
-  const isOwner =
-    managedByCurrentHub &&
-    hub.signedIn?.organization.id === management.organizationId &&
-    hub.signedIn.membership.role === "owner";
+  const hub = accounts.find((account) => account.origin === management?.hubOrigin);
+  const signedIn = hub?.signedIn ?? null;
+  const origin = hub?.origin ?? null;
+  const organizationId = signedIn?.organization.id ?? null;
+  const accountId = signedIn?.account.id ?? null;
+  const daemonId = management?.daemonId ?? "";
   const scope = useMemo(
-    () => ({
-      origin: hub.origin,
-      organizationId: hub.signedIn?.organization.id ?? null,
-      accountId: hub.signedIn?.account.id ?? null,
-      daemonId: management?.daemonId ?? "",
-    }),
-    [hub.origin, hub.signedIn?.organization.id, hub.signedIn?.account.id, management?.daemonId],
+    () => ({ origin, organizationId, accountId, daemonId }),
+    [accountId, daemonId, organizationId, origin],
   );
+  const managedBySavedHub = management?.kind === "hub" && hub !== undefined;
+  const isOwner =
+    managedBySavedHub &&
+    organizationId === management.organizationId &&
+    signedIn?.membership.role === "owner";
+  return { managedBySavedHub, isOwner, scope };
+}
+
+/** Clisbot-owned mount for the daemon policy; the generic Host page stays transport-agnostic. */
+export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
+  const { t } = useTranslation();
+  const [pairLinkVisible, setPairLinkVisible] = useState(false);
+  const devicePairing = useSessionStore(
+    (state) => state.sessions[host.serverId]?.serverInfo?.features?.devicePairing === true,
+  );
+  const { config, isLoading, patchConfig } = useDaemonConfig(host.serverId);
+  const { managedBySavedHub, isOwner, scope } = useManagingHub(host);
   const applyMode = useCallback(
     async (mode: ManagedAccessMode) => {
       await patchConfig({ managedAccess: { mode } });
@@ -100,7 +110,7 @@ export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
     [switchMode, devicePairing],
   );
 
-  if (!managedByCurrentHub) return null;
+  if (!managedBySavedHub) return null;
 
   return (
     <SettingsSection title={t("hub.settings.managedAccess.title")}>

@@ -208,7 +208,12 @@ async function holdButton(page: Page, button: Locator) {
 }
 
 async function openCompactOverflowWithHeaderChrome(page: Page) {
-  const hamburger = page.getByRole("button", { name: "Open menu", exact: true });
+  // The header's leading button: the menu, or Back in a conversation with the Home tabs.
+  const hamburger = page
+    .getByRole("button", { name: "Open menu", exact: true })
+    .or(page.getByTestId("chat-back"))
+    .filter({ visible: true })
+    .first();
   const action = page.getByRole("button", { name: "Deploy application", exact: true });
   const overflow = page
     .getByRole("toolbar", { name: "Workspace actions", exact: true })

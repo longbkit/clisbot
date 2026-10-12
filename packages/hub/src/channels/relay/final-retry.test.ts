@@ -364,7 +364,7 @@ describe("final answer retry", () => {
     assert.match(JSON.stringify(errors), /"step":"record".*not posted/);
   });
 
-  it("says so as an error when a retried ledger record finds its own row", async () => {
+  it("posts once when a retried ledger insert finds its own committed row", async () => {
     const clock = new ManualClock(START);
     let lostReplies = 1;
     // The first insert commits, but its reply is lost on the way back.
@@ -389,7 +389,89 @@ describe("final answer retry", () => {
     });
     engine.attach(context("lost-reply"));
     await answer(engine, "turn-lost", "reply lost after commit");
-    assert.deepEqual(script.posted, [], "no double-post risk is taken");
+    assert.deepEqual(script.posted, ["reply lost after commit"]);
+    assert.equal((await ledgerRow("lost-reply", "turn-lost")).status, "posted");
+    assert.equal(errors.length, 0);
+
+    await answer(engineFor(script.post, clock, context("lost-reply")), "turn-lost", "replayed");
+    assert.deepEqual(
+      script.posted,
+      ["reply lost after commit"],
+      "a later replay cannot post again",
+    );
+  });
+
+  it("does not give a racing replay ownership of an insert whose reply was lost", async () => {
+    const clock = new ManualClock(START);
+    let committed: () => void = () => undefined;
+    let release: () => void = () => undefined;
+    const firstCommitted = new Promise<void>((resolve) => (committed = resolve));
+    const resumeFirst = new Promise<void>((resolve) => (release = resolve));
+    let first = true;
+    class DelayedReplyStore extends ChannelStore {
+      override async recordDelivery(...args: Parameters<ChannelStore["recordDelivery"]>) {
+        const recorded = await super.recordDelivery(...args);
+        if (first) {
+          first = false;
+          committed();
+          await resumeFirst;
+          throw new Error("connection reset after commit");
+        }
+        return recorded;
+      }
+    }
+    const script = scriptedPost([]);
+    const sharedStore = new DelayedReplyStore(bundle.runtime);
+    const makeEngine = () => {
+      const engine = new RelayEngine({
+        organizationId: ORGANIZATION_ID,
+        logger: SILENT,
+        clock,
+        store: sharedStore,
+        post: script.post,
+      });
+      engine.attach(context("lost-reply-race"));
+      return engine;
+    };
+    const original = answer(makeEngine(), "turn-race", "owned answer");
+    await firstCommitted;
+    try {
+      await answer(makeEngine(), "turn-race", "racing replay");
+      assert.deepEqual(script.posted, [], "the other caller cannot claim the recorded row");
+    } finally {
+      release();
+    }
+    await original;
+    assert.deepEqual(script.posted, ["owned answer"]);
+    assert.equal((await ledgerRow("lost-reply-race", "turn-race")).status, "posted");
+  });
+
+  it("still refuses an ambiguous retry that finds another caller's row", async () => {
+    const clock = new ManualClock(START);
+    let lostReplies = 1;
+    class OtherOwnerStore extends ChannelStore {
+      override async recordDelivery(input: Parameters<ChannelStore["recordDelivery"]>[0]) {
+        if (lostReplies > 0) {
+          lostReplies -= 1;
+          const { recordId: _recordId, ...otherCaller } = input;
+          await super.recordDelivery(otherCaller);
+          throw new Error("connection reset while another caller commits");
+        }
+        return await super.recordDelivery(input);
+      }
+    }
+    const errors: unknown[] = [];
+    const script = scriptedPost([]);
+    const engine = new RelayEngine({
+      organizationId: ORGANIZATION_ID,
+      logger: { warn: () => undefined, error: (_m, meta) => errors.push(meta) },
+      clock,
+      store: new OtherOwnerStore(bundle.runtime),
+      post: script.post,
+    });
+    engine.attach(context("other-owner"));
+    await answer(engine, "turn-other", "cannot claim another caller's answer");
+    assert.deepEqual(script.posted, []);
     assert.match(JSON.stringify(errors), /may have committed/);
   });
 

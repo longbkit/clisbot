@@ -412,6 +412,7 @@ export class ManagedResourceAuthorizer {
       const requestId = "payload" in message ? stringProperty(message.payload, "requestId") : null;
       if (requestId !== null && this.admittedProjectCreations.delete(requestId)) return true;
     }
+    if (isQuickStartMessage(message.type)) return true; // Their handlers check owner and exact target authority.
     if (message.type.startsWith("chat.")) return true; // ChatSession checks owner and current Project authority.
     const bot = allowsBotOutbound(message, (projectId) => this.allowsProject(projectId));
     if (bot !== undefined) return bot;
@@ -746,7 +747,7 @@ export class ManagedResourceAuthorizer {
 
     const management = await this.allowsManagementInbound(message);
     if (management !== undefined) return management;
-    if (message.type.startsWith("chat.")) return true; // ChatSession resolves private Chat authority.
+    if (hasResourceAuthorityHandler(message.type)) return true; // Resource handlers enforce exact ownership and access.
     const bot = allowsBotInbound(message, this.authorization, this.admittedProjectCreations);
     if (bot !== undefined) return bot;
 
@@ -1645,4 +1646,12 @@ const DESTRUCTIVE_COMMAND_PATTERNS: readonly RegExp[] = [
 
 function isDestructiveCommand(command: string): boolean {
   return DESTRUCTIVE_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
+}
+
+function isQuickStartMessage(type: string): boolean {
+  return type.startsWith("quick_start.") || type.startsWith("quick_chat.");
+}
+
+function hasResourceAuthorityHandler(type: string) {
+  return isQuickStartMessage(type) || type.startsWith("chat.");
 }

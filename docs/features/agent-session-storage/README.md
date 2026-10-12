@@ -26,6 +26,22 @@ Sessions written before 2026-09-13 used a segmented layout (`events-000001.jsonl
 `permissions/`, `submissions/`, `projection/` folders). The first durable read imports them into
 `events.jsonl`, keeping `epoch` and `seq`.
 
+Legacy sessions that only have provider history import their replay through atomic timeline
+replacement. This keeps the session writable, retains its submission and permission ledgers,
+and commits the complete replay before marking history ready. Permanent session deletion is
+reserved for removing the agent; it must never be used to clear history for a replay.
+
+Whole-history replacements use a separate admission budget (32 MiB per agent, 64 MiB total,
+at most two per agent and four process-wide). Live writes keep their 8 MiB per-agent budget.
+If an import fails, loading closes its runtime before returning the error; the next load
+resumes the provider again so a one-shot replay is not mistaken for an empty conversation.
+An empty in-memory timeline left by registration does not count as imported history and
+cannot suppress a retry or a read of an existing committed timeline.
+
+A persisted draft with no provider handle and no committed timeline starts its first provider
+session under the same Clisbot ID. Creation clears only retained memory for that draft; it must
+not permanently delete its canonical store before the first prompt writes to it.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an

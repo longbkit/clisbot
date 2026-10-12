@@ -1,4 +1,5 @@
 import { createDaemonDeviceAuthority, createDeviceRuntimeAccess } from "./device-access/runtime.js";
+import { fenceQuickChatsFromGit } from "./quick-chats/quick-chat-folders.js";
 import { startHostLocalHub } from "./hub/local-start.js";
 import { localCliEntrypoint } from "./local-cli.js";
 import { readHostTailscale, setUpHostTailscale } from "./network/host-tailscale.js";
@@ -1061,6 +1062,8 @@ export async function createClisbotDaemon(
     workspaceRegistry,
   });
   const github = createGitHubService();
+  // Before any git read or agent launch, so a Quick chat folder never resolves to an outer repo.
+  fenceQuickChatsFromGit(config.clisbotHome);
   const workspaceGitService = new WorkspaceGitServiceImpl({
     logger,
     clisbotHome: config.clisbotHome,

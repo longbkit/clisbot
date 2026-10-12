@@ -285,7 +285,8 @@ export async function navigateToWorkspaceViaSidebar(
 }
 
 export async function leaveWorkspaceViaHistory(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "History", exact: true }).click();
+  // History is labelled Inbox with the Home tabs; the sidebar row keeps one test id.
+  await page.getByTestId("sidebar-sessions").filter({ visible: true }).first().click();
   await expect(page).toHaveURL(/\/sessions$/, { timeout: 30_000 });
 }
 

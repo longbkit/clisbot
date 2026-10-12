@@ -20,6 +20,14 @@ enabled = true
 binding = "WEBSITE_CACHE"
 id = "ff77612425414e4695294410e7c6c2e1"
 
+[[durable_objects.bindings]]
+name = "PLUGIN_INSTALLS"
+class_name = "PluginInstallCounter"
+
+[[migrations]]
+tag = "plugin-installs-v1"
+new_sqlite_classes = ["PluginInstallCounter"]
+
 [[ratelimits]]
 name = "DESKTOP_ANALYTICS_LIMITER"
 namespace_id = "556929300"

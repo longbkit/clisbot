@@ -16,7 +16,8 @@ import {
 import { useFetchQuery } from "@/data/query";
 import { i18n } from "@/i18n/i18next";
 import { HubApiClient } from "./api-client";
-import { getHubConfiguration, type HubConfiguration } from "./config";
+import type { HubConfiguration } from "./config";
+import { type HubAccountScopeConfiguration, useHubAccountScopes } from "./account-scopes";
 import {
   HubAccountStateSchema,
   HubRegistrationLinkSchema,
@@ -26,7 +27,7 @@ import {
 } from "./contracts";
 import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
-import { useHubProfiles, updateHubProfile } from "@/device-access/hub-profiles";
+import { updateHubProfile } from "@/device-access/hub-profiles";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
 import {
@@ -34,7 +35,7 @@ import {
   type HubDeviceCapabilities,
 } from "@/device-access/hub-capabilities";
 
-interface HubAccountContextValue {
+export interface HubAccountContextValue {
   googleSignInLabel?: string;
   connection?: HubDeviceCapabilities | null;
   enabled: boolean;
@@ -135,85 +136,91 @@ const disabledValue: HubAccountContextValue = {
 };
 
 const HubAccountContext = createContext<HubAccountContextValue>(disabledValue);
-const unconfiguredHub = { origin: "hub://unconfigured" };
-const disabledTransport: HubTransport = {
-  signInKind: "password",
-  request: async () => {
-    throw new Error(i18n.t("hub.account.errors.pairFirst"));
-  },
-  signIn: disabledValue.signIn,
-  signOut: disabledValue.signOut,
-};
+/** Every saved Hub's account, signed in or not; the selected one is also `useHubAccount()`. */
+const HubAccountsContext = createContext<readonly HubAccountContextValue[]>([]);
 
+/**
+ * Runs one account controller per saved Hub, keyed by its logical origin, so a Host managed by
+ * any of them keeps its access tickets and stays listed. Selecting a Hub only changes which
+ * account the Hub screens read; it never remounts a controller, so no two controllers share a
+ * Hub's credentials.
+ */
 export function HubAccountProvider({ children }: { children: ReactNode }) {
-  const registry = useHubProfiles();
-  const configuration = useMemo(() => {
-    const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
-    // The logical origin keeps caches and managed relationships stable when routes change.
-    return profile
-      ? { origin: `hub://${profile.hubId}`, deviceProfile: profile }
-      : getHubConfiguration();
-  }, [registry]);
-  const scope = configuration?.origin ?? unconfiguredHub.origin;
-  const selection = useRef({ scope, generation: 0 });
-  if (selection.current.scope !== scope)
-    selection.current = { scope, generation: selection.current.generation + 1 };
-  const generation = selection.current.generation;
-  const [published, setPublished] = useState<{
-    generation: number;
-    value: HubAccountContextValue;
-  } | null>(null);
-  const publish = useCallback(
-    (value: HubAccountContextValue) => {
-      if (selection.current.generation !== generation || value.origin !== scope) return;
-      setPublished({ generation, value });
-    },
-    [generation, scope],
+  const { scopes, activeOrigin } = useHubAccountScopes();
+  const [published, setPublished] = useState<ReadonlyMap<string, HubAccountContextValue>>(
+    () => new Map(),
   );
-  // Account state is isolated by a keyed controller, while the navigation tree
-  // remains mounted when saved profiles hydrate or a user changes Hub.
-  const value = useMemo(() => {
-    if (configuration === null) return disabledValue;
-    if (published?.generation === generation) return published.value;
-    return {
-      ...disabledValue,
-      enabled: true,
-      loading: true,
-      origin: scope,
-      connectionOrigin: configuration.deviceProfile
-        ? (configuration.deviceProfile.origin ?? null)
-        : configuration.origin,
-    };
-  }, [configuration, generation, published, scope]);
+  const publish = useCallback((origin: string, value: HubAccountContextValue | null) => {
+    setPublished((current) => {
+      if (value === null ? !current.has(origin) : current.get(origin) === value) return current;
+      const next = new Map(current);
+      if (value === null) next.delete(origin);
+      else next.set(origin, value);
+      return next;
+    });
+  }, []);
+  const accounts = useMemo(
+    () => scopes.map((scope) => published.get(scope.origin) ?? loadingValue(scope)),
+    [published, scopes],
+  );
+  const value = accounts.find((account) => account.origin === activeOrigin) ?? disabledValue;
   return (
     <>
-      <HubAccountController
-        key={`${generation}:${scope}`}
-        configuration={configuration ?? unconfiguredHub}
-        enabled={configuration !== null}
-        publish={publish}
-      />
-      <HubAccountContext.Provider value={value}>{children}</HubAccountContext.Provider>
+      {scopes.map((scope) => (
+        <HubAccountController
+          key={scope.origin}
+          configuration={scope.configuration}
+          foreground={scope.origin === activeOrigin}
+          publish={publish}
+        />
+      ))}
+      <HubAccountsContext.Provider value={accounts}>
+        <HubAccountContext.Provider value={value}>{children}</HubAccountContext.Provider>
+      </HubAccountsContext.Provider>
     </>
   );
+}
+
+/** The account a scope shows until its controller publishes its first value. */
+function loadingValue(scope: HubAccountScopeConfiguration): HubAccountContextValue {
+  return {
+    ...disabledValue,
+    enabled: true,
+    loading: true,
+    origin: scope.origin,
+    connectionOrigin: scope.configuration.deviceProfile
+      ? (scope.configuration.deviceProfile.origin ?? null)
+      : scope.configuration.origin,
+  };
+}
+
+/** Makes one saved Hub's account the `useHubAccount()` value for `children`. */
+export function HubAccountScope({
+  account,
+  children,
+}: {
+  account: HubAccountContextValue;
+  children: ReactNode;
+}) {
+  return <HubAccountContext.Provider value={account}>{children}</HubAccountContext.Provider>;
 }
 
 const HubAccountController = memo(EnabledHubAccountController);
 
 function EnabledHubAccountController({
   configuration,
-  enabled,
+  foreground,
   publish,
 }: {
   configuration: HubConfiguration;
-  enabled: boolean;
-  publish(value: HubAccountContextValue): void;
+  /** Only the selected Hub acts on invitation, registration, and sign-in links in the URL. */
+  foreground: boolean;
+  publish(origin: string, value: HubAccountContextValue | null): void;
 }) {
   const transport = useMemo<HubTransport>(() => {
-    if (!enabled) return disabledTransport;
     if (configuration.deviceProfile) return new PairedHubTransport(configuration.deviceProfile);
     return createHubTransport(configuration);
-  }, [configuration, enabled]);
+  }, [configuration]);
   useEffect(
     () => () => {
       if (transport instanceof PairedHubTransport) transport.close();
@@ -222,7 +229,8 @@ function EnabledHubAccountController({
   );
   const router = useRouter();
   const queryClient = useQueryClient();
-  const currentUrl = Linking.useURL();
+  const linkedUrl = Linking.useURL();
+  const currentUrl = foreground ? linkedUrl : null;
   const currentUrlRef = useRef(currentUrl);
   currentUrlRef.current = currentUrl;
   const [consumedInvitation, setConsumedInvitation] = useState<{
@@ -237,7 +245,6 @@ function EnabledHubAccountController({
   const account = useFetchQuery({
     queryKey: ["clisbot", "hub", configuration.origin, "account", invitationId],
     queryFn: () => readAccountState(transport, invitationId),
-    enabled,
     dataShape: "value",
     retry: false,
     staleTimeMs: 15_000,
@@ -476,7 +483,7 @@ function EnabledHubAccountController({
   const accountError = accountErrorMessage(account.error, account.isError);
   const value = useMemo<HubAccountContextValue>(
     () => ({
-      enabled,
+      enabled: true,
       origin: configuration.origin,
       connectionOrigin: configuration.deviceProfile
         ? (configuration.deviceProfile.origin ?? null)
@@ -487,9 +494,7 @@ function EnabledHubAccountController({
       state,
       signedIn,
       connection: configuration.deviceProfile ? (connection.data ?? null) : null,
-      loading:
-        enabled &&
-        (account.isPending || Boolean(configuration.deviceProfile && connection.isPending)),
+      loading: account.isPending || Boolean(configuration.deviceProfile && connection.isPending),
       error: mutationError ?? accountError ?? signInRedirectError(currentUrl),
       signIn,
       signUp,
@@ -516,7 +521,6 @@ function EnabledHubAccountController({
       api,
     }),
     [
-      enabled,
       accountError,
       account.isPending,
       connection.data,
@@ -554,8 +558,9 @@ function EnabledHubAccountController({
     ],
   );
   useLayoutEffect(() => {
-    publish(value);
-  }, [publish, value]);
+    publish(configuration.origin, value);
+  }, [configuration.origin, publish, value]);
+  useLayoutEffect(() => () => publish(configuration.origin, null), [configuration.origin, publish]);
   return null;
 }
 
@@ -566,6 +571,11 @@ function accountErrorMessage(error: unknown, isError: boolean): string | null {
 
 export function useHubAccount(): HubAccountContextValue {
   return useContext(HubAccountContext);
+}
+
+/** Every saved Hub's account; Host synchronization and the Host list read all of them. */
+export function useHubAccounts(): readonly HubAccountContextValue[] {
+  return useContext(HubAccountsContext);
 }
 
 async function readAccountState(

@@ -16,7 +16,11 @@ export const getRegistry = createServerFn({ method: "GET" }).handler(async () =>
   const context = getWebsiteCacheContext();
   const [index, installs] = await Promise.all([
     loadRegistryIndex(registryBase(), context),
-    loadInstallCounts(registryBase(), context),
+    loadInstallCounts(
+      registryBase(),
+      context,
+      (env as RegistryEnvironment).PLUGIN_INSTALLS ?? null,
+    ),
   ]);
   return {
     plugins: index.plugins,

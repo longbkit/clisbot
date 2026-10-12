@@ -2148,6 +2148,61 @@ export class DaemonClient {
     }
   }
 
+  listQuickStarts(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "quick_start.list.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"quick_start.list.response">({
+      message: { ...params, type: "quick_start.list.request" },
+    });
+  }
+
+  saveQuickStart(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "quick_start.save.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"quick_start.save.response">({
+      message: { ...params, type: "quick_start.save.request" },
+    });
+  }
+
+  deleteQuickStart(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "quick_start.delete.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"quick_start.delete.response">({
+      message: { ...params, type: "quick_start.delete.request" },
+    });
+  }
+
+  setQuickStartPins(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "quick_start.set_pins.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"quick_start.set_pins.response">({
+      message: { ...params, type: "quick_start.set_pins.request" },
+    });
+  }
+
+  prepareQuickChat(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "quick_chat.prepare.request" }>,
+      "type" | "requestId"
+    > = {},
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"quick_chat.prepare.response">({
+      message: { ...params, type: "quick_chat.prepare.request" },
+    });
+  }
+
   createBot(
     params: Omit<
       Extract<SessionInboundMessage, { type: "bot.create.request" }>,
@@ -2834,6 +2889,7 @@ export class DaemonClient {
     const message = SessionInboundMessageSchema.parse({
       type: "fetch_agent_history_request",
       requestId: resolvedRequestId,
+      ...(options?.activityFilter ? { activityFilter: options.activityFilter } : {}),
       ...(options?.filter ? { filter: options.filter } : {}),
       ...(options?.search ? { search: options.search } : {}),
       ...(options?.sort ? { sort: options.sort } : {}),

@@ -1,7 +1,10 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { BotsSectionHeader, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
+import { QuickChatsSection } from "@/clisbot/quick-chats/quick-chats-section";
 import { router } from "expo-router";
 import {
   CircleGauge,
@@ -21,6 +24,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
 } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
@@ -86,6 +90,7 @@ import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarMetadataNotice } from "./sidebar/empty-states";
 import { SidebarWorkspaceList } from "./sidebar-workspace-list";
 import { SidebarNavGroup } from "@/clisbot/hub/sidebar-nav-group";
+import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
 
 type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
 
@@ -383,24 +388,65 @@ function FooterSearchField({ theme }: { theme: SidebarTheme }) {
     if (compact) showMobileAgent();
     setCommandCenterOpen(true);
   }, [compact, showMobileAgent, setCommandCenterOpen]);
+  const showLabel = useFooterSearchLabelFits(compact, theme);
   return (
     <Pressable
       style={[
         styles.footerSearchField,
         compact || !finePointer ? styles.footerTouchSearchField : null,
+        compact ? styles.footerCompactSearchField : null,
+        showLabel.fits ? null : styles.footerSearchIconOnly,
       ]}
+      onLayout={compact ? showLabel.measureField : undefined}
       testID="sidebar-footer-search"
       accessibilityRole="button"
       accessibilityLabel={t("sidebar.sections.search")}
       onPress={openSearch}
     >
       <Search size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
-      <Text style={styles.footerSearchLabel} numberOfLines={1}>
-        {t("sidebar.sections.search")}
-      </Text>
+      {showLabel.fits ? (
+        <Text style={styles.footerSearchLabel} numberOfLines={1}>
+          {t("sidebar.sections.search")}
+        </Text>
+      ) : null}
+      {compact ? (
+        <View
+          style={styles.footerSearchMeasureFrame}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text style={styles.footerSearchLabelMeasure} onLayout={showLabel.measureLabel}>
+            {t("sidebar.sections.search")}
+          </Text>
+        </View>
+      ) : null}
       {shortcutKeys ? <Shortcut chord={shortcutKeys} /> : null}
     </Pressable>
   );
+}
+
+/**
+ * On a phone the footer stays on one line, so the search field may be too narrow for its label.
+ * Show the label only when it fits whole (measured, so any language and text size work);
+ * otherwise the field keeps just its icon.
+ */
+function useFooterSearchLabelFits(compact: boolean, theme: SidebarTheme) {
+  const [fieldWidth, setFieldWidth] = useState<number | null>(null);
+  const [labelWidth, setLabelWidth] = useState<number | null>(null);
+  const measureField = useCallback(
+    (event: LayoutChangeEvent) => setFieldWidth(event.nativeEvent.layout.width),
+    [],
+  );
+  const measureLabel = useCallback(
+    (event: LayoutChangeEvent) => setLabelWidth(event.nativeEvent.layout.width),
+    [],
+  );
+  // Border, horizontal padding, icon and the gap before the label.
+  const chrome = 2 + theme.spacing[2] * 2 + theme.iconSize.sm + theme.spacing[1];
+  const fits =
+    !compact || fieldWidth === null || labelWidth === null || fieldWidth - chrome >= labelWidth;
+  return { fits, measureField, measureLabel };
 }
 
 function SidebarHostPicker({
@@ -527,8 +573,9 @@ function SidebarFooter({
   const finePointer = useHasFinePointer();
   const touchTarget = compact || !finePointer;
   const actions = items.filter((item) => item.visible && item.group === "actions");
+  // A phone keeps every footer action on one line: search shrinks to its icon instead of wrapping.
   const actionWidths: Record<string, number> = {
-    search: FOOTER_SEARCH_MIN_WIDTH,
+    search: compact ? MIN_TOUCH_TARGET_SIZE : FOOTER_SEARCH_MIN_WIDTH,
     new: touchTarget ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.sm,
     "add-project": touchTarget ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.xs,
   };
@@ -536,78 +583,104 @@ function SidebarFooter({
     actions.reduce((width, item) => width + actionWidths[item.key], 0) +
     Math.max(0, actions.length - 1) * theme.spacing[touchTarget ? 2 : 1];
 
-  // Footer rows (Usage, plugins) above the bottom bar: actions left, controls, Help and Settings right.
+  const actionNodes = actions.map((item) => {
+    if (item.key === "new") {
+      return (
+        <SidebarNewMenu
+          key={item.key}
+          onAddProject={handleOpenProject}
+          onImportSession={handleImportSession}
+        />
+      );
+    }
+    if (item.key === "search") {
+      return <FooterSearchField key={item.key} theme={theme} />;
+    }
+    return (
+      <FooterIconButton
+        key={item.key}
+        onPress={handleOpenProject}
+        label={labels.addProject}
+        shortcutKeys={newAgentKeys}
+        icon={FolderPlus}
+        testID="sidebar-add-project"
+        theme={theme}
+      />
+    );
+  });
+  const controlNodes = [
+    ...items
+      .filter((item) => item.visible && item.group === "controls")
+      .map((item) => {
+        if (item.key === "hosts") {
+          return (
+            <SidebarHostPicker
+              key={item.key}
+              theme={theme}
+              label={labels.hosts}
+              onAddHost={handleAddHost}
+              onOpenHostSettings={handleOpenHostSettings}
+            />
+          );
+        }
+        if (item.key === "usage-icon") {
+          return <SidebarUsageIcon key={item.key} label={labels.usage} theme={theme} />;
+        }
+        return (
+          <FooterIconButton
+            key={item.key}
+            onPress={handleImportSession}
+            testID="sidebar-import-session"
+            label={labels.importSession}
+            icon={Import}
+            theme={theme}
+          />
+        );
+      }),
+    <SidebarHelpMenu key="help" />,
+    <FooterIconButton
+      key="settings"
+      onPress={handleSettings}
+      testID="sidebar-settings"
+      label={labels.settings}
+      icon={Settings}
+      shortcutKeys={settingsKeys}
+      theme={theme}
+    />,
+  ];
+  // A phone mirrors the line so New lands under the thumb at the right edge: Settings, Help,
+  // Hosts, Usage, then Search and New. Desktop keeps actions left, controls right.
+  const actionsGroup = (
+    <View style={styles.footerActions(actionMinWidth, touchTarget)}>
+      {compact ? actionNodes.toReversed() : actionNodes}
+    </View>
+  );
+  const controlsGroup = (
+    <View style={[styles.footerIconRow, compact && styles.footerIconRowCompact]}>
+      {compact ? controlNodes.toReversed() : controlNodes}
+    </View>
+  );
+
+  // Footer rows (Usage, plugins) above the bottom bar.
   return (
     <UsageSidebarRoot>
       <View style={styles.footerContainer} testID="sidebar-footer">
         <SidebarFooterRows onBeforeNavigate={onBeforeNavigate} />
-        <View style={styles.sidebarFooter} testID="sidebar-footer-bottom-line">
-          <View style={styles.footerActions(actionMinWidth, touchTarget)}>
-            {actions.map((item) => {
-              if (item.key === "new") {
-                return (
-                  <SidebarNewMenu
-                    key={item.key}
-                    onAddProject={handleOpenProject}
-                    onImportSession={handleImportSession}
-                  />
-                );
-              }
-              if (item.key === "search") {
-                return <FooterSearchField key={item.key} theme={theme} />;
-              }
-              return (
-                <FooterIconButton
-                  key={item.key}
-                  onPress={handleOpenProject}
-                  label={labels.addProject}
-                  shortcutKeys={newAgentKeys}
-                  icon={FolderPlus}
-                  testID="sidebar-add-project"
-                  theme={theme}
-                />
-              );
-            })}
-          </View>
-          <View style={styles.footerIconRow}>
-            {items
-              .filter((item) => item.visible && item.group === "controls")
-              .map((item) => {
-                if (item.key === "hosts") {
-                  return (
-                    <SidebarHostPicker
-                      key={item.key}
-                      theme={theme}
-                      label={labels.hosts}
-                      onAddHost={handleAddHost}
-                      onOpenHostSettings={handleOpenHostSettings}
-                    />
-                  );
-                }
-                if (item.key === "usage-icon") {
-                  return <SidebarUsageIcon key={item.key} label={labels.usage} theme={theme} />;
-                }
-                return (
-                  <FooterIconButton
-                    key={item.key}
-                    onPress={handleImportSession}
-                    testID="sidebar-import-session"
-                    label={labels.importSession}
-                    icon={Import}
-                    theme={theme}
-                  />
-                );
-              })}
-            <SidebarHelpMenu />
-            <FooterIconButton
-              onPress={handleSettings}
-              testID="sidebar-settings"
-              label={labels.settings}
-              icon={Settings}
-              shortcutKeys={settingsKeys}
-              theme={theme}
-            />
-          </View>
+        <View
+          style={[styles.sidebarFooter, compact && styles.sidebarFooterCompact]}
+          testID="sidebar-footer-bottom-line"
+        >
+          {compact ? (
+            <>
+              {controlsGroup}
+              {actionsGroup}
+            </>
+          ) : (
+            <>
+              {actionsGroup}
+              {controlsGroup}
+            </>
+          )}
         </View>
       </View>
     </UsageSidebarRoot>
@@ -689,21 +762,37 @@ function MobileSidebar({
   insetsBottom,
   closeSidebar,
 }: MobileSidebarProps) {
-  const botsAndChatsSections = useMemo(
-    () => <BotsAndChatsSidebarSections onBeforeNavigate={closeSidebar} />,
-    [closeSidebar],
-  );
-  const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
-  const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture();
-
-  const handleWorkspacePress = useCallback(() => {
+  const handleConversationPress = useCallback(() => {
+    if (HOME_V2_ENABLED) rememberChatReturn("/chat");
     closeSidebar();
   }, [closeSidebar]);
+  // On a phone the navigation rows scroll with the list; only the account row stays pinned.
+  const botsAndChatsSections = useMemo(
+    () => (
+      <>
+        <SidebarNavRows
+          style={styles.mobileNavRows}
+          omitTabDestinations={HOME_V2_ENABLED}
+          onBeforeNavigate={closeSidebar}
+        />
+        <BotsAndChatsSidebarSections onBeforeNavigate={handleConversationPress} />
+        <QuickChatsSection onBeforeNavigate={handleConversationPress} />
+      </>
+    ),
+    [closeSidebar, handleConversationPress],
+  );
+  const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
+  // Home V2 makes this the Chat tab's page: no close gesture, no X, and the tab bar below it owns
+  // the bottom safe area.
+  const { gesture: closeGesture, gestureRef: closeGestureRef } =
+    useCloseAgentListGesture(!HOME_V2_ENABLED);
+
+  const handleWorkspacePress = handleConversationPress;
 
   const mobileSidebarInsetStyle = useMemo(
     () => ({
       paddingTop: insetsTop,
-      paddingBottom: insetsBottom,
+      paddingBottom: HOME_V2_ENABLED ? 0 : insetsBottom,
       backgroundColor: theme.colors.surfaceSidebar,
     }),
     [insetsTop, insetsBottom, theme.colors.surfaceSidebar],
@@ -717,30 +806,38 @@ function MobileSidebar({
     >
       <View style={styles.sidebarContent} pointerEvents="auto">
         <WindowChromeSafeArea placement="below" />
-        <SidebarNavGroup style={styles.sidebarHeaderGroup} onBeforeNavigate={closeSidebar} />
-        <WindowChromeSafeArea
-          pointerEvents="box-none"
-          placement="inline"
-          style={styles.mobileCloseButtonRow}
-        >
-          <Pressable
-            style={styles.mobileCloseButton}
-            onPress={closeSidebar}
-            testID="sidebar-close"
-            nativeID="sidebar-close"
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel={labels.closeSidebar}
-            hitSlop={8}
+        <SidebarNavGroup
+          style={styles.sidebarHeaderGroup}
+          rows={false}
+          onBeforeNavigate={closeSidebar}
+        />
+        {HOME_V2_ENABLED ? null : (
+          <WindowChromeSafeArea
+            pointerEvents="box-none"
+            placement="inline"
+            style={styles.mobileCloseButtonRow}
           >
-            {({ hovered, pressed }) => (
-              <X
-                size={theme.iconSize.md}
-                color={hovered || pressed ? theme.colors.foreground : theme.colors.foregroundMuted}
-              />
-            )}
-          </Pressable>
-        </WindowChromeSafeArea>
+            <Pressable
+              style={styles.mobileCloseButton}
+              onPress={closeSidebar}
+              testID="sidebar-close"
+              nativeID="sidebar-close"
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={labels.closeSidebar}
+              hitSlop={8}
+            >
+              {({ hovered, pressed }) => (
+                <X
+                  size={theme.iconSize.md}
+                  color={
+                    hovered || pressed ? theme.colors.foreground : theme.colors.foregroundMuted
+                  }
+                />
+              )}
+            </Pressable>
+          </WindowChromeSafeArea>
+        )}
 
         <SidebarMetadataNotice />
         {isInitialLoad && !hasActiveHostFilter ? (
@@ -1046,6 +1143,16 @@ const styles = StyleSheet.create((theme) => ({
   sidebarHeaderGroupBelowChrome: {
     paddingTop: 0,
   },
+  // The header group's rows, moved into the list: undo the list's inset, keep the divider below.
+  mobileNavRows: {
+    marginHorizontal: -theme.spacing[2],
+    gap: 2,
+    paddingTop: theme.spacing[1],
+    paddingBottom: theme.spacing[1.5],
+    marginBottom: theme.spacing[1],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
   workspacesSectionHeader: {
     gap: theme.spacing[1],
     // Rendered inside the scroll's listContent (paddingHorizontal spacing[2]). The title
@@ -1142,12 +1249,20 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[3],
   },
+  sidebarFooterCompact: {
+    flexWrap: "nowrap",
+  },
   footerIconRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
     flexShrink: 0,
     marginLeft: "auto",
+  },
+  // Touch targets are already 48pt wide; their glyphs need no extra gap. The row leads the line.
+  footerIconRowCompact: {
+    gap: 0,
+    marginLeft: 0,
   },
   footerActions: (minWidth: number, touchTarget: boolean) => ({
     flex: 1,
@@ -1184,6 +1299,26 @@ const styles = StyleSheet.create((theme) => ({
   footerTouchSearchField: {
     height: MIN_TOUCH_TARGET_SIZE,
     paddingHorizontal: theme.spacing[2],
+  },
+  footerCompactSearchField: {
+    minWidth: MIN_TOUCH_TARGET_SIZE,
+    overflow: "hidden",
+  },
+  footerSearchIconOnly: {
+    justifyContent: "center",
+  },
+  // Wide and unconstrained so the label measures at its natural width; clipped by the field.
+  footerSearchMeasureFrame: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: 1000,
+    flexDirection: "row",
+    opacity: 0,
+  },
+  footerSearchLabelMeasure: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.normal,
   },
   footerIconButton: (isCompact: boolean) => ({
     width: isCompact ? buttonControlHeight.md : buttonControlHeight.xs,
@@ -1222,6 +1357,11 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 
-const botsAndChatsSectionsElement = <BotsAndChatsSidebarSections />;
+const botsAndChatsSectionsElement = (
+  <>
+    <BotsAndChatsSidebarSections />
+    <QuickChatsSection />
+  </>
+);
 
 const displayPreferencesMenuElement = <SidebarDisplayPreferencesMenu />;

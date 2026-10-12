@@ -1,3 +1,7 @@
+import { isDeepStrictEqual } from "node:util";
+import { createHash } from "node:crypto";
+import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
+import { sessionActorKey } from "@clisbot/protocol/session-authorship";
 // `createChatService`: wires the store, the transcripts, the sessions and the
 // engine into the one object the Session handlers and bootstrap talk to
 // (docs/features/bots-and-chats/plans/server-chat.md). Only built when
@@ -45,6 +49,8 @@ export interface ChatServiceOptions {
 }
 
 export interface CreateChatServiceInput {
+  launch?: BotLaunchDefaults;
+  idempotencyKey?: string;
   botIds: readonly string[];
   kind?: "direct" | "group";
   title?: string | null;
@@ -315,17 +321,45 @@ async function createChat(
   engine: ChatEngine,
   input: CreateChatServiceInput,
 ): Promise<{ chat: ChatPayload; sent: SendMessageResult | null }> {
+  if (input.launch && (input.botIds.length !== 1 || input.kind === "group"))
+    throw new Error("Launch settings can only be selected for a direct chat.");
+  const draftId = input.idempotencyKey
+    ? `chat_${createHash("sha256")
+        .update(
+          JSON.stringify([
+            input.createdBy ? sessionActorKey(input.createdBy) : "hostOwner",
+            input.idempotencyKey,
+          ]),
+        )
+        .digest("hex")
+        .slice(0, 32)}`
+    : undefined;
   const chat = await store.create({
+    ...(draftId ? { id: draftId, reuseExisting: true } : {}),
+    ...(input.launch ? { launch: input.launch } : {}),
     botIds: input.botIds,
     kind: input.kind,
     ...(input.title !== undefined ? { title: input.title } : {}),
     ...(input.rules ? { rules: input.rules } : {}),
     ...(input.createdBy ? { createdBy: input.createdBy } : {}),
   });
+  if (
+    draftId &&
+    (!isDeepStrictEqual(
+      chat.participants.map((p) => p.botId),
+      [...new Set(input.botIds)],
+    ) ||
+      !isDeepStrictEqual(chat.launch, input.launch))
+  )
+    throw new Error(
+      "This chat draft already started with different settings. Open it or start a new draft.",
+    );
   const sent = input.firstMessage
     ? await engine.send({
         chatId: chat.id,
         text: input.firstMessage.text,
+        images: input.firstMessage.images,
+        attachments: input.firstMessage.attachments,
         ...(input.firstMessage.messageId ? { messageId: input.firstMessage.messageId } : {}),
         ...(input.createdBy ? { actor: input.createdBy } : {}),
       })

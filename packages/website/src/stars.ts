@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getWebsiteCacheContext } from "./cloudflare-cache";
-import { getBlockingColdCache } from "./github-cache";
+import { CACHE_POLICIES, getBlockingColdCache } from "./github-cache";
 
 interface GitHubRepo {
   stargazers_count: number;
@@ -41,6 +41,7 @@ export const getStarCount = createServerFn({ method: "GET" }).handler(async () =
   const stars = await getBlockingColdCache({
     context: getWebsiteCacheContext(),
     key: STARS_CACHE_KEY,
+    policy: CACHE_POLICIES.stars,
     isValue: isStars,
     fetchFresh: fetchStarCount,
   });

@@ -48,15 +48,17 @@ export class AccessTicketService {
 
   /** Absent only where a composition has no configured public URL; the actor then omits its scope. */
   private readonly hubOrigin: string | undefined;
+  private readonly hubIdentity: string | undefined;
 
   constructor(
     private readonly runtime: DatabaseRuntime,
     private readonly access: AccessStore,
-    options: { leaseDurationMs?: number; publicBaseUrl?: string } = {},
+    options: { leaseDurationMs?: number; publicBaseUrl?: string; hubIdentity?: string } = {},
   ) {
     this.leaseDurationMs = validateLeaseDuration(
       options.leaseDurationMs ?? DEFAULT_ACCESS_LEASE_DURATION_MS,
     );
+    this.hubIdentity = options.hubIdentity;
     this.hubOrigin =
       options.publicBaseUrl === undefined ? undefined : normalizeHubOrigin(options.publicBaseUrl);
   }
@@ -170,7 +172,7 @@ export class AccessTicketService {
         ...authority,
         leaseId: lease.id,
         leaseExpiresAt,
-        actor: await accountActor(database, ticket, this.hubOrigin),
+        actor: await accountActor(database, ticket, this.hubOrigin, this.hubIdentity),
       };
     });
   }
@@ -233,7 +235,7 @@ export class AccessTicketService {
         ...authority,
         leaseId: lease.id,
         leaseExpiresAt,
-        actor: await accountActor(database, lease, this.hubOrigin),
+        actor: await accountActor(database, lease, this.hubOrigin, this.hubIdentity),
       };
     });
     if (admission === null) {
@@ -402,6 +404,7 @@ async function accountActor(
   database: DrizzleHandle,
   identity: { clientId: string; userId: string; organizationId: string; membershipId: string },
   hubOrigin: string | undefined,
+  hubIdentity: string | undefined,
 ): Promise<SessionActor | undefined> {
   if (identity.clientId.startsWith("channel-account:")) return undefined;
   const [user] = await database
@@ -415,6 +418,7 @@ async function accountActor(
     organizationId: identity.organizationId,
     memberId: identity.membershipId,
     ...(hubOrigin ? { hubOrigin } : {}),
+    ...(hubIdentity ? { hubIdentity } : {}),
     ...(user?.name ? { displayName: user.name } : {}),
     ...(user?.image ? { avatarUrl: user.image } : {}),
   };

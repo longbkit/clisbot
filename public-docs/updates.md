@@ -19,24 +19,24 @@ Clisbot follows [Semantic Versioning](https://semver.org) with prerelease tags.
 A stable release looks like this:
 
 ```
-v0.1.90
+v2.1.0
 ```
 
 A beta for the same release looks like this:
 
 ```
-v0.1.90-beta.1
+v2.1.0-beta.1
 ```
 
 If a release needs more testing, we cut additional betas:
 
 ```
-v0.1.92-beta.1
-v0.1.92-beta.2
-v0.1.92-beta.3
+v2.2.0-beta.1
+v2.2.0-beta.2
+v2.2.0-beta.3
 ```
 
-When the release is ready, the final stable tag is `v0.1.92` — not `v0.1.93`. The betas are checkpoints on the way to the same stable version.
+When the release is ready, the final stable tag is `v2.2.0` — not `v2.2.1`. The betas are checkpoints on the way to the same stable version.
 
 ## Stable channel
 
@@ -62,9 +62,7 @@ The app will check for beta updates from then on.
 
 ## App stores
 
-Desktop releases and the CLI are usually available first. App Store and Play Store releases can lag behind because they go through review.
-
-There is no beta channel in the app stores right now — only stable builds are submitted. If you want early Android builds, download the APK from the [GitHub releases page](https://github.com/longbkit/clisbot/releases).
+The iOS and Android apps are not in the App Store or Google Play yet. On Android, install the APK from [clisbot.com/download](https://clisbot.com/download) or the [GitHub releases page](https://github.com/longbkit/clisbot/releases). On any phone, the pairing link opens the web app.
 
 ## What to do if something breaks
 

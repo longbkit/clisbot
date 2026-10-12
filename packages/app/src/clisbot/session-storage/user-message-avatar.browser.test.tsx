@@ -31,6 +31,7 @@ vi.mock("expo-web-browser", () => ({
 const boundary = vi.hoisted(() => ({ hub: null as unknown }));
 vi.mock("@/clisbot/hub/account-provider", () => ({
   useHubAccount: () => boundary.hub,
+  useHubAccounts: () => (boundary.hub ? [boundary.hub] : []),
 }));
 vi.mock("react-native-unistyles", async () => {
   const { lightTheme } = await import("@/styles/theme");

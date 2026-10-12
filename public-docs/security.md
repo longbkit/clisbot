@@ -123,7 +123,7 @@ See [Docker](/docs/docker) for Compose and reverse proxy examples.
 
 ## Agent authentication
 
-Clisbot wraps agent CLIs (Claude Code, Codex, OpenCode, Muse Code) but does not manage their authentication. Each agent provider handles its own credentials:
+Clisbot wraps agent CLIs (see [Supported providers](/docs/supported-providers)) but does not manage their authentication. Each agent provider handles its own credentials, for example:
 
 - **Claude Code**, authenticates via Anthropic's OAuth flow, stored in `~/.claude/`
 - **Codex**, uses your OpenAI API key or OAuth session
@@ -149,4 +149,4 @@ Hub CLI credentials are bearer secrets. Remote Hub origins must use HTTPS; clear
 - **Never bind to 0.0.0.0 without a password**, without one, any device on your network can connect
 - **Scope Docker mounts tightly**, agents can access mounted workspaces and provider credentials
 - **Keep your daemon updated**, security improvements are released regularly
-- **Protect the Hub configuration branch**, push access to the `.clisbot` bundle controls what that project can reach, see [How Hub works](/docs/hub/concepts)
+- **Keep Hub access narrow**, a Route's Rules decide who can reach an agent from a chat platform, and each Hub member reaches only the daemons and projects you grant, see [Hub security](/docs/hub/security)

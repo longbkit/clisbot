@@ -1,9 +1,19 @@
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, type Page } from "../fixtures";
 import { drillIntoProvider, openModelPicker } from "./agent-profiles";
+import {
+  DEVICE_FORM_PREFERENCES_KEY,
+  hostFormPreferencesKey,
+  readHostFormPreferences,
+} from "./form-preferences";
 
 export async function startWithoutRememberedModel(page: Page) {
-  await page.addInitScript(() => localStorage.removeItem("@clisbot:create-agent-preferences"));
+  await page.addInitScript(
+    (keys) => {
+      for (const key of keys) localStorage.removeItem(key);
+    },
+    [DEVICE_FORM_PREFERENCES_KEY, hostFormPreferencesKey()],
+  );
 }
 
 export async function chooseModel(page: Page, provider: string, label: string) {
@@ -33,11 +43,7 @@ async function selectProviderModel(page: Page, provider: string, label: string) 
 
 export async function expectSavedSelection(page: Page, provider: string, model: string) {
   await expect
-    .poll(() =>
-      page.evaluate(() =>
-        JSON.parse(localStorage.getItem("@clisbot:create-agent-preferences") ?? "null"),
-      ),
-    )
+    .poll(() => readHostFormPreferences(page))
     .toMatchObject({ provider, providerPreferences: { [provider]: { model } } });
 }
 

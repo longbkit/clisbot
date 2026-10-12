@@ -1,5 +1,15 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { useInboxFilters, mergeInboxAgents } from "@/clisbot/home/inbox-filters";
+import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import { useMemo, useState, useCallback, useEffect, type ReactElement } from "react";
+import {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { View, Text } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -17,6 +27,7 @@ import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
+import { useHostRuntimeConnectionStatuses } from "@/runtime/host-runtime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
 /** Long enough that a typed word is one request, short enough to feel live. */
@@ -31,19 +42,27 @@ const sessionsHostOptionTestID = (serverId: string) => `sessions-host-filter-ite
  */
 function SessionHostErrorsBanner({
   errors,
+  connecting = [],
   t,
 }: {
   errors: AgentHistoryHostError[];
+  connecting?: readonly AgentHistoryHostError[];
   t: TFunction;
 }): ReactElement {
   return (
     <View style={styles.errorsBannerWrap}>
       <View style={styles.errorsBanner} testID="sessions-host-errors">
-        {errors.map((error) => (
-          <Text key={error.serverId} style={styles.errorsBannerText}>
-            {t("sessions.hostLoadFailed", { host: error.serverName })}
-          </Text>
-        ))}
+        {errors.map((error) =>
+          connecting.includes(error) ? (
+            <Text key={error.serverId} style={styles.connectingText}>
+              {error.serverName}: connecting… its sessions appear once it answers.
+            </Text>
+          ) : (
+            <Text key={error.serverId} style={styles.errorsBannerText}>
+              {t("sessions.hostLoadFailed", { host: error.serverName })}
+            </Text>
+          ),
+        )}
       </View>
     </View>
   );
@@ -60,17 +79,87 @@ function resolveEmptyText(input: {
   return "No sessions for this host";
 }
 
+function isConnecting(status: string | undefined): boolean {
+  return status === undefined || status === "connecting" || status === "idle";
+}
+
+/**
+ * Names every Host missing from the list. One still connecting reads as that, not as a
+ * failure: History used to show "Could not load history" on every cold start.
+ */
+function HostBanners({
+  errors,
+  t,
+}: {
+  errors: AgentHistoryHostError[];
+  t: TFunction;
+}): ReactElement {
+  const statuses = useHostRuntimeConnectionStatuses(
+    useMemo(() => errors.map((error) => error.serverId), [errors]),
+  );
+  const connecting = HOME_V2_ENABLED
+    ? errors.filter((error) => isConnecting(statuses.get(error.serverId)))
+    : [];
+  return <SessionHostErrorsBanner errors={errors} connecting={connecting} t={t} />;
+}
+
+/** Search, Host and (in Inbox) the type/date pills, on one wrapping row. */
+function SessionsFilterRow({
+  hosts,
+  selectedHost,
+  onSelectHost,
+  isSearchSupported,
+  searchInput,
+  onChangeSearch,
+  extra,
+  t,
+}: {
+  hosts: ReturnType<typeof useAvailableHosts>;
+  selectedHost: string;
+  onSelectHost: (serverId: string) => void;
+  isSearchSupported: boolean;
+  searchInput: string;
+  onChangeSearch: (value: string) => void;
+  extra: ReactNode;
+  t: TFunction;
+}): ReactElement | null {
+  const showHostFilter = hosts.length > 1;
+  if (!showHostFilter && !isSearchSupported && !extra) return null;
+  return (
+    <View style={styles.filterContainer}>
+      {isSearchSupported ? (
+        <View style={HOME_V2_ENABLED ? styles.searchWrap : styles.searchWrapLegacy}>
+          <SearchField
+            value={searchInput}
+            onChangeText={onChangeSearch}
+            placeholder={HOME_V2_ENABLED ? "Search conversations" : t("sessions.searchPlaceholder")}
+            clearAccessibilityLabel={t("sessions.actions.clearSearch")}
+            testID="sessions-search-input"
+            clearTestID="sessions-search-clear"
+          />
+        </View>
+      ) : null}
+      {showHostFilter ? (
+        <HostFilter
+          hosts={hosts}
+          selectedHost={selectedHost}
+          onSelectHost={onSelectHost}
+          triggerTestID="sessions-host-filter-trigger"
+          hostOptionTestID={sessionsHostOptionTestID}
+        />
+      ) : null}
+      {extra}
+    </View>
+  );
+}
+
 export function SessionsScreen() {
-  const isFocused = useIsFocused();
-
-  if (!isFocused) {
-    return <View style={styles.container} />;
-  }
-
   return <SessionsScreenContent />;
 }
 
 function SessionsScreenContent() {
+  const focused = useIsFocused();
+  const live = useAggregatedAgents({ demand: focused });
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const importSession = useImportSession();
@@ -79,6 +168,11 @@ function SessionsScreenContent() {
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const historyServerId = selectedHost === ALL_HOSTS_OPTION_ID ? null : selectedHost;
+  const filters = useInboxFilters(
+    hosts
+      .filter((host) => !historyServerId || host.serverId === historyServerId)
+      .map((host) => host.serverId),
+  );
   const {
     agents,
     hasMore,
@@ -93,7 +187,21 @@ function SessionsScreenContent() {
   } = useAgentHistory({
     serverId: historyServerId,
     search,
+    activityFilter: HOME_V2_ENABLED ? filters.activityFilter : undefined,
   });
+  const inboxAgents = useMemo(
+    () =>
+      HOME_V2_ENABLED
+        ? mergeInboxAgents(
+            agents,
+            live.agents,
+            historyServerId,
+            search,
+            Boolean(filters.activityFilter?.kind || filters.activityFilter?.updatedAfter),
+          )
+        : agents,
+    [agents, live.agents, historyServerId, search, filters.activityFilter],
+  );
   const isSearching = isSearchSupported && search.length > 0;
 
   useEffect(() => {
@@ -118,8 +226,6 @@ function SessionsScreenContent() {
     isSearching,
     isAllHosts: selectedHost === ALL_HOSTS_OPTION_ID,
   });
-  const showHostFilter = hosts.length > 1;
-  const showFilterRow = showHostFilter || isSearchSupported;
   const showLoadError = isError && agents.length === 0;
 
   const handleBack = useCallback(() => {
@@ -150,49 +256,20 @@ function SessionsScreenContent() {
     );
   }, [hasMore, isLoadingMore, isSearchTruncated, loadMore, t]);
 
-  return (
-    <View style={styles.container}>
-      <MenuHeader title={t("sessions.title")} />
-      {showFilterRow ? (
-        <View style={styles.filterContainer}>
-          {isSearchSupported ? (
-            <SearchField
-              value={searchInput}
-              onChangeText={setSearchInput}
-              placeholder={t("sessions.searchPlaceholder")}
-              clearAccessibilityLabel={t("sessions.actions.clearSearch")}
-              testID="sessions-search-input"
-              clearTestID="sessions-search-clear"
-            />
-          ) : null}
-          {showHostFilter ? (
-            <HostFilter
-              hosts={hosts}
-              selectedHost={selectedHost}
-              onSelectHost={setSelectedHost}
-              triggerTestID="sessions-host-filter-trigger"
-              hostOptionTestID={sessionsHostOptionTestID}
-            />
-          ) : null}
-        </View>
-      ) : null}
-      {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}
-      {isInitialLoad ? (
-        <View style={styles.loadingContainer}>
-          <LoadingSpinner size="large" color={theme.colors.foregroundMuted} />
-        </View>
-      ) : null}
-      {!isInitialLoad && showLoadError ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Unable to load sessions</Text>
-          <Button variant="ghost" onPress={handleRefresh}>
-            Try again
-          </Button>
-        </View>
-      ) : null}
-      {!isInitialLoad && !showLoadError && agents.length === 0 ? (
+  const importAction = useMemo(
+    () => (
+      <Button variant="ghost" onPress={importSession.open}>
+        Import session
+      </Button>
+    ),
+    [importSession.open],
+  );
+  const emptyView = useMemo(
+    () =>
+      !isInitialLoad && !showLoadError && inboxAgents.length === 0 ? (
         <View style={styles.emptyContainer} testID="sessions-empty">
           <Text style={styles.emptyText}>{emptyText}</Text>
+          {hasMore ? listFooterComponent : null}
           {isSearching ? (
             <Button variant="ghost" onPress={handleClearSearch}>
               {t("sessions.actions.clearSearch")}
@@ -206,19 +283,67 @@ function SessionsScreenContent() {
             {t("importSession.title")}
           </Button>
         </View>
-      ) : null}
-      {!isInitialLoad && !showLoadError && agents.length > 0 ? (
-        <AgentList
-          agents={agents}
-          showCheckoutInfo={false}
-          isRefreshing={isManualRefresh}
-          onRefresh={handleRefresh}
-          listFooterComponent={listFooterComponent}
-          showAttentionIndicator={false}
-          showHostColumn
-          search={isSearching ? search : undefined}
+      ) : null,
+    [
+      isInitialLoad,
+      showLoadError,
+      inboxAgents.length,
+      emptyText,
+      hasMore,
+      listFooterComponent,
+      isSearching,
+      handleClearSearch,
+      t,
+      handleBack,
+      importSession.open,
+    ],
+  );
+  return (
+    <View style={styles.container}>
+      <MenuHeader
+        title={HOME_V2_ENABLED ? "Inbox" : t("sessions.title")}
+        rightContent={importAction}
+      />
+      <View style={HOME_V2_ENABLED ? styles.body : styles.fill}>
+        <SessionsFilterRow
+          hosts={hosts}
+          selectedHost={selectedHost}
+          onSelectHost={setSelectedHost}
+          isSearchSupported={isSearchSupported}
+          searchInput={searchInput}
+          onChangeSearch={setSearchInput}
+          extra={HOME_V2_ENABLED ? filters.view : null}
+          t={t}
         />
-      ) : null}
+        {hostErrors.length > 0 ? <HostBanners errors={hostErrors} t={t} /> : null}
+        {isInitialLoad ? (
+          <View style={styles.loadingContainer}>
+            <LoadingSpinner size="large" color={theme.colors.foregroundMuted} />
+          </View>
+        ) : null}
+        {!isInitialLoad && showLoadError ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Unable to load sessions</Text>
+            <Button variant="ghost" onPress={handleRefresh}>
+              Try again
+            </Button>
+          </View>
+        ) : null}
+        {emptyView}
+        {!isInitialLoad && !showLoadError && inboxAgents.length > 0 ? (
+          <AgentList
+            agents={inboxAgents}
+            activityGrouping={HOME_V2_ENABLED}
+            showCheckoutInfo={false}
+            isRefreshing={isManualRefresh}
+            onRefresh={handleRefresh}
+            listFooterComponent={listFooterComponent}
+            showAttentionIndicator={false}
+            showHostColumn={!HOME_V2_ENABLED || hosts.length > 1}
+            search={isSearching ? search : undefined}
+          />
+        ) : null}
+      </View>
       {importSession.sheet}
     </View>
   );
@@ -231,6 +356,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   filterContainer: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: theme.spacing[2],
     paddingHorizontal: {
@@ -262,6 +388,22 @@ const styles = StyleSheet.create((theme) => ({
   footerHint: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
+  },
+  fill: { flex: 1 },
+  // On a phone the search takes its own row and the filter pills wrap under it.
+  // A fixed width short of SearchField's own cap keeps search, Host, Type and Date on one row.
+  searchWrap: {
+    flexGrow: { xs: 1, md: 0 },
+    flexShrink: 1,
+    flexBasis: { xs: "100%", md: 320 },
+    minWidth: 200,
+  },
+  searchWrapLegacy: { flex: 1 },
+  // Inbox rows read as one line of meaning; a reading-width column keeps time and status near it.
+  body: { flex: 1, width: "100%", maxWidth: theme.contentMaxWidth, alignSelf: "center" },
+  connectingText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   errorsBannerWrap: {
     paddingHorizontal: {

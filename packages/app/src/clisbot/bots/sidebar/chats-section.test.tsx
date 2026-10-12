@@ -80,6 +80,7 @@ vi.mock("@/stores/session-store", () => ({
 }));
 vi.mock("lucide-react-native", () => ({
   ChevronDown: () => <i />,
+  MessageCircle: () => <i />,
   ChevronRight: () => <i />,
   Bot: () => <i />,
   UsersRound: () => <i />,

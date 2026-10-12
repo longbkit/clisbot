@@ -88,7 +88,7 @@ export class ChatSession {
         throw new Error("Existing Bot session configuration access denied");
       if (
         !(await this.authority.allowsAgentConfiguration(bot.workspaceId, {
-          ...bot.launch,
+          ...(chat.launch ?? bot.launch),
           cwd: bot.cwd,
         }))
       )
@@ -136,6 +136,17 @@ export class ChatSession {
   ): Promise<Record<string, unknown>> {
     if (!request.botIds.length) throw new Error("A Chat needs at least one Bot");
     for (const botId of request.botIds) await this.requireBot(botId);
+    if (request.launch) {
+      const bot = await this.bots.get(request.botIds[0]!);
+      if (
+        !bot ||
+        !(await this.authority.allowsAgentConfiguration(bot.workspaceId, {
+          ...request.launch,
+          cwd: bot.cwd,
+        }))
+      )
+        throw new Error("Bot session configuration access denied");
+    }
     const result = await this.service.create({
       ...request,
       firstMessage: undefined,

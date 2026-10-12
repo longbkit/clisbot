@@ -9,7 +9,10 @@ import { expectWorkspaceTabVisible, openSessions } from "../support/helpers/arch
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { getServerId } from "../support/helpers/server-id";
 import { switchWorkspaceViaSidebar } from "../support/helpers/workspace-ui";
-import { expectMobileAgentSidebarVisible } from "../support/helpers/sidebar";
+import {
+  expectMobileAgentSidebarVisible,
+  openMobileAgentSidebar,
+} from "../support/helpers/sidebar";
 import { expectNewWorkspaceProjectSelected } from "../support/helpers/new-workspace";
 
 const TEST_COMMANDS = [
@@ -376,6 +379,9 @@ test.describe("Composer autocomplete", () => {
     const commandRequestsByAgentId = recordCommandRequestsByAgentId(page);
 
     await page.goto("/new");
+    // Home V2 opens a Host with no project on Quick chat; this case is Project mode with none chosen.
+    await page.getByTestId("new-workspace-project-picker-trigger").click();
+    await page.keyboard.press("Escape");
     await expectNewWorkspaceProjectSelected(page, "Choose project");
     await composerLocator(page).fill("/");
 
@@ -701,9 +707,12 @@ test.describe("Composer autocomplete", () => {
           timeout: 30_000,
         });
 
-        await page.getByRole("button", { name: "Open menu" }).click();
+        await openMobileAgentSidebar(page);
         await expectMobileAgentSidebarVisible(page);
 
+        // With the Home tabs the sidebar is the Chat tab's own screen: the popover is gone with
+        // the conversation rather than drawn beneath the sidebar.
+        if (!(await popover.isVisible())) return;
         const popoverBox = await popover.boundingBox();
         expect(popoverBox).not.toBeNull();
 
