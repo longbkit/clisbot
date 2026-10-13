@@ -52,7 +52,7 @@
 - **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 38 ACP catalog presets including Grok. Pick the model for each task.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
 - **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
-- **Privacy-first:** Clisbot doesn't have any telemetry, tracking, or forced log-ins.
+- **Privacy controls:** Supported production app builds enable optional usage analytics by default. You can turn it off in Settings → General → Privacy. See [analytics scope and controls](docs/product-analytics.md).
 
 [Run parallel tasks in Clisbot](https://clisbot.com/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
 
