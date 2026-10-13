@@ -59,7 +59,7 @@ for (const width of [1440, 390]) {
         expect(left).not.toBeNull();
         expect(right).not.toBeNull();
         expect(left!.x + left!.width).toBeLessThanOrEqual(right!.x);
-        expect(Math.abs(left!.y - right!.y)).toBeLessThan(2);
+        expect(Math.abs(left!.y + left!.height / 2 - right!.y - right!.height / 2)).toBeLessThan(2);
         await toggle.click();
         await expect(titles).toHaveCount(7);
         await expect(toggle).toHaveAttribute("aria-label", "Show less");

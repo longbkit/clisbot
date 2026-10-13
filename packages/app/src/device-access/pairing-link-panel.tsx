@@ -89,6 +89,8 @@ function PairingQr({ svg, isError }: { svg: string | null; isError: boolean }) {
     return (
       <SvgXml
         xml={svg}
+        width="100%"
+        height="100%"
         style={styles.qrImage}
         accessibilityRole="image"
         accessibilityLabel={t("pairing.device.qrAccessibility")}

@@ -343,11 +343,30 @@ async function selectSendBehaviorInSettings(
     .toBe(stored);
 }
 
+async function configureDetailedToolCalls(page: Page): Promise<void> {
+  // These stream/race assertions inspect individual calls rather than the default summary.
+  await page.addInitScript(() => {
+    const settings = JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "{}");
+    localStorage.setItem(
+      "@clisbot:app-settings",
+      JSON.stringify({ ...settings, toolCallDetailLevel: "detailed" }),
+    );
+    const marker = JSON.parse(localStorage.getItem("@clisbot:settings-migrations") ?? "{}");
+    localStorage.setItem(
+      "@clisbot:settings-migrations",
+      JSON.stringify({
+        applied: [...new Set([...(marker.applied ?? []), "summary-with-latest-call-default"])],
+      }),
+    );
+  });
+}
+
 async function replaySteeredSleepTurnInBrowser(
   page: Page,
   testInfo: { workerIndex: number },
   shape: "claude" | "codex",
 ): Promise<void> {
+  await configureDetailedToolCalls(page);
   const gate = await installDaemonWebSocketGate(page);
   gate.holdNextShellToolCall("completed");
   await gotoAppShell(page);
@@ -660,6 +679,7 @@ async function expectStaleCanonicalPagePreservesNewerLiveOutput(
   page: Page,
   testInfo: { workerIndex: number },
 ): Promise<void> {
+  await configureDetailedToolCalls(page);
   const gate = await installDaemonWebSocketGate(page);
   const agent = await seedMockAgentWorkspace({
     repoPrefix: `submission-stale-canonical-${testInfo.workerIndex}-`,

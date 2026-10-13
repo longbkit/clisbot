@@ -378,14 +378,18 @@ for (const layout of ["desktop", "phone-web"] as const) {
         await expect(group.locator('[style*="clisbot-toolcall-shimmer"]')).toHaveCount(0);
         await capture("collapsed-error");
         gate.release();
-        await expect(page.getByTestId("tool-call-group")).toHaveCount(2);
-        await expect(page.getByTestId("tool-call-group").last()).toContainText(
-          "simulate-stream-burst.mjs",
-        );
         await agent.client.waitForAgentUpsert(
           agent.agentId,
           (snapshot) => snapshot.status === "idle",
           30_000,
+        );
+        // A timed stream can emit additional cycles while the touch interactions run.
+        // Preserve the separated runs and check exact grouping against Overview below.
+        await expect
+          .poll(() => page.getByTestId("tool-call-group").count())
+          .toBeGreaterThanOrEqual(2);
+        await expect(page.getByTestId("tool-call-group").last()).toContainText(
+          "simulate-stream-burst.mjs",
         );
         await expect(
           page.getByTestId("tool-call-group").last().locator('[style*="clisbot-toolcall-shimmer"]'),
