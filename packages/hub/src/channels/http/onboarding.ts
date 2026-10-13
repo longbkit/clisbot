@@ -1,3 +1,5 @@
+import type { BotPayload } from "@clisbot/protocol/bots/types";
+import { ProductRequestError } from "../../auth/organization-access.js";
 import { conflict, invalidRequest } from "./problems.js";
 // Local operator onboarding composes existing enrollment, Channel revisions and
 // verified Member identities. Authentication stays in the control-plane gate.
@@ -41,7 +43,20 @@ export const ChannelOnboardingSchema = z
   .strict();
 export type ChannelOnboarding = z.infer<typeof ChannelOnboardingSchema>;
 
+export type OnboardingAuthority =
+  | { kind: "local-operator" }
+  | {
+      kind: "account";
+      userId: string;
+      membershipId: string;
+      isInstanceOperator: boolean;
+      source: "browser" | "apiKey" | "cliCredential";
+    };
+
 export interface OnboardingServices {
+  /** Absent only behind the pre-existing OS-local operator gate. Never infer it from HTTP origin. */
+  authority?: OnboardingAuthority;
+  readBot?: (daemonId: string, botId: string) => Promise<BotPayload | undefined>;
   runtime: DatabaseRuntime;
   access: AccessStore;
   providerApplications?: import("../../provider-applications/index.js").ProviderApplications;
@@ -64,7 +79,10 @@ export async function onboardingOwner(
       "Select the existing organization owner with --owner-email; finish Account setup if no owner exists.",
     );
   }
-  return result.rows[0]!;
+  const owner = result.rows[0]!;
+  if (email && owner.email.toLowerCase() !== email.toLowerCase())
+    throw conflict("The supplied Owner email and Member do not match.");
+  return owner;
 }
 
 export async function prepareChannelOnboarding(
@@ -184,7 +202,7 @@ export async function linkOnboardingOwner(
   organizationId: string,
   connectionId: string,
   input: ChannelOnboarding,
-): Promise<{ ready: boolean; command?: string; expiresAt?: string }> {
+): Promise<{ ready: boolean; command?: string; expiresAt?: string; guidance?: string }> {
   const owner = await onboardingOwner(
     services,
     organizationId,
@@ -216,6 +234,7 @@ export async function linkOnboardingOwner(
       "The owner already has a verified channel identity. Replace it explicitly in Hub identity administration; retry does not replace the owner.",
     );
   if (input.ownerIdentity) {
+    requireDirectIdentityAuthority(services);
     await services.access.bindChannelIdentity({
       organizationId,
       memberId: owner.id,
@@ -223,12 +242,18 @@ export async function linkOnboardingOwner(
       externalSubjectId: input.ownerIdentity,
       displayName: null,
       verificationMethod: "administrator",
-      verifiedByUserId: owner.user_id,
+      verifiedByUserId: services.authority?.kind === "account" ? services.authority.userId : null,
     });
   }
   if (input.ownerIdentity || identities.some((identity) => identity.memberId === owner.id)) {
     return { ready: true };
   }
+  if (services.authority?.kind === "account" && services.authority.userId !== owner.user_id)
+    return {
+      ready: false,
+      guidance:
+        "The Bot Owner must sign in to this Hub with their own account and verify their Channel identity using Settings → Channel identities. Ask them to redeem their own /link command in DM (or a group); this configuration has not issued their invitation to you.",
+    };
   const challenge = await services.access.issueChannelIdentityChallenge({
     organizationId,
     userId: owner.user_id,
@@ -253,7 +278,8 @@ export async function configureOnboardingSlack(
     input.ownerEmail,
     input.ownerMemberId,
   );
-  const result = await configure(request, { userId: owner.user_id, organizationId }, input);
+  const userId = services.authority?.kind === "account" ? services.authority.userId : owner.user_id;
+  const result = await configure(request, { userId, organizationId }, input);
   const connections = (await database.organizationConnectionUsage(organizationId)).slack;
   const connection = connections.find(
     (entry) =>
@@ -268,14 +294,62 @@ export async function validateOnboardingTarget(
   services: OnboardingServices | undefined,
   organizationId: string,
   input: ChannelOnboarding,
-): Promise<void> {
+): Promise<ChannelOnboarding> {
   if (!services) throw conflict("Local onboarding services are unavailable");
   if (input.ownerOrganizationId && input.ownerOrganizationId !== organizationId)
     throw conflict(
       "This Bot owner belongs to a different Hub organization. Select the Bot's own Hub before linking.",
     );
-  await onboardingOwner(services, organizationId, input.ownerEmail, input.ownerMemberId);
+  if (input.ownerIdentity) requireDirectIdentityAuthority(services);
   const daemon = await database.findDaemonForOrganization(organizationId, input.daemonId);
   if (!daemon || daemon.status !== "active")
     throw invalidRequest("The onboarding daemon is not enrolled in this organization");
+  if (services.authority?.kind === "account")
+    return validateRemoteBotOwner(services, organizationId, input);
+  await onboardingOwner(services, organizationId, input.ownerEmail, input.ownerMemberId);
+  return input;
+}
+
+function requireDirectIdentityAuthority(services: OnboardingServices): void {
+  const authority = services.authority;
+  if (
+    authority?.kind === "account" &&
+    !(authority.source === "browser" && authority.isInstanceOperator)
+  )
+    throw new ProductRequestError(403, "channel_identity_verification_required");
+}
+
+async function validateRemoteBotOwner(
+  services: OnboardingServices,
+  organizationId: string,
+  input: ChannelOnboarding,
+): Promise<ChannelOnboarding> {
+  if (!input.botId || !services.readBot)
+    throw conflict(
+      "The Bot Owner cannot be verified. Connect the Bot's Host and retry, or configure it through the authorized local CLI.",
+    );
+  const bot = await services.readBot(input.daemonId, input.botId);
+  if (!bot || bot.archivedAt || bot.projectId !== input.projectId || bot.cwd !== input.cwd)
+    throw conflict("The Bot does not match this enrolled Host, Project and folder.");
+  if (
+    bot.owner.kind !== "user" ||
+    !bot.owner.memberId ||
+    bot.owner.organizationId !== organizationId
+  )
+    throw conflict(
+      "This Bot has no verified Owner membership in this Hub. Its local Owner must complete authorized local onboarding; the configuring Admin is not substituted.",
+    );
+  const owner = await onboardingOwner(services, organizationId, undefined, bot.owner.memberId);
+  if (
+    owner.user_id !== bot.owner.id ||
+    (input.ownerMemberId && input.ownerMemberId !== owner.id) ||
+    (input.ownerEmail && input.ownerEmail.toLowerCase() !== owner.email.toLowerCase())
+  )
+    throw conflict("The supplied Owner does not match the Bot's authoritative Owner membership.");
+  return {
+    ...input,
+    ownerMemberId: owner.id,
+    ownerOrganizationId: organizationId,
+    ownerEmail: owner.email,
+  };
 }

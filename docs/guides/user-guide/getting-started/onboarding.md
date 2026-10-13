@@ -61,7 +61,7 @@ Then use the Bot’s **Connect to a channel…** action. Stopping web preserves 
 
 If the output shows **ACTION REQUIRED**, send the printed `/link ...` command to the bot privately from your Slack account. The code is **single-use and valid for 10 minutes**; the output shows the expiry time. Then DM the bot with your requests; in channels the bot has joined, use `@mention`.
 
-If you know the owner's Slack Member ID for sure, add `--owner-identity YOUR_SLACK_MEMBER_ID` at start to skip the link step. The bot token does not prove who the owner is. A linked identity is kept; nobody else gains owner rights on their own.
+In authorized OS-local onboarding, if you know the owner's Slack Member ID for sure, add `--owner-identity YOUR_SLACK_MEMBER_ID` at start to skip the link step. The bot token does not prove who the owner is. A linked identity is kept; nobody else gains owner rights on their own. Remote configuration does not let an Admin bind arbitrary identities. The Bot Owner must sign in and verify their own identity; only their own `/link` command is issued to them.
 
 **READY** means the owner is linked and the Slack connection has started. If you still see `SETUP INCOMPLETE`, follow the output's instructions; check the provider if the bot receives messages but cannot run them.
 

@@ -1,3 +1,4 @@
+import type { OnboardingServices } from "../channels/http/onboarding.js";
 import { accountChannelOnboarding } from "./channel-onboarding.js";
 import { ChannelAccessStore, type ChannelPairingRecord } from "../db/channel-access.js";
 import { channelTestPreview, CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
@@ -389,6 +390,7 @@ export class ManagementApi {
       renameDaemon?: (request: Request, daemonId: string) => Promise<Response>;
       /** Bearer credentials, so a logged-in CLI can request daemon access tickets. */
       credentials?: OperationAuthenticator;
+      readOnboardingBot?: OnboardingServices["readBot"];
       /** Delivers access notices (Administrator granted) when the Hub can send email. */
       notificationMailer?: NotificationMailer;
     },
@@ -480,6 +482,7 @@ export class ManagementApi {
           onboarding: {
             runtime: this.options.runtime,
             access: this.options.access,
+            ...(this.options.readOnboardingBot ? { readBot: this.options.readOnboardingBot } : {}),
             ...(this.options.providerApplications
               ? { providerApplications: this.options.providerApplications }
               : {}),

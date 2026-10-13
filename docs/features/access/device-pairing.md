@@ -395,6 +395,15 @@ bundled in the installed package. In a source checkout the command prepares miss
 automatically. It reports the actual selected loopback port, plus a Tailscale HTTPS URL only
 when its own Serve mapping succeeds. Relay transports backend traffic, not static pages.
 
+Web can be the first command on an empty home. Shared personal provisioning enables protected
+pairing before any config read can create legacy defaults, before Host launch and before gateway
+or private mapping exposure. Existing homes are not migrated: a legacy/password-only Host needs
+planned protected setup first, and a running Host's advertised capability is checked. No gateway
+or mapping is created on refusal. Stop an older unprotected web service before that maintenance.
+Start/status print local/private URLs, observed mapping availability and the required access path.
+A stale Serve record is not reported as a working private URL; enrolled external access needs Hub
+sign-in/tickets rather than an Owner invitation bypass.
+
 The gateway forwards fixed Host and Hub HTTP/WS namespaces. Hub-before-web and
 web-before-Hub use operator-authenticated hot target updates, preserving both backend PIDs.
 Explicit Hub stop records `stoppedAt`; saved-service startup honors it and does not
@@ -749,7 +758,7 @@ never changes the canonical Hub URL, OAuth issuer/audience or callback registrat
 
 ### Start Hub guidance and browser owner setup
 
-A fresh Bot-only CLI home enables protected device pairing and personal serving before its
+A fresh personal Bot or web-first CLI home enables protected device pairing and personal serving before its
 Host starts, with Managed Access off. `web start` prints a five-minute owner invitation for
 that Host. Opening this invitation deliberately authorizes the browser; a loopback page alone
 never gains owner authority. The Bot's Connect channel action then starts/reuses Hub on that
@@ -764,3 +773,18 @@ It offers one relevant recovery action. Managed Access stays unchanged; owner de
 pairing on the same form. Bot and Host intent survives recovery until the Route form opens.
 New Bot attachment Rules name one owner Member; an unresolved owner starts closed. Existing
 custom Rules retain their settings.
+
+### Remote channel onboarding identity authority
+
+Configuration authority is distinct from identity verification. Remote onboarding retains the
+browser account or approving API/CLI Member and its trust source. It reads the Bot from its exact
+enrolled Host and verifies the supplied Owner against that Bot's Member, user, organization,
+Project and folder. An unresolved local Owner needs authorized local onboarding; an Admin is
+never silently substituted.
+
+A remote non-operator cannot directly bind even their own external identity. They can request only
+their own provider-verification challenge. Configuring another Bot Owner leaves identity pending,
+with self-verification guidance and no other Member's `/link` code. Direct binding requires the
+existing browser instance-operator authority; configuration credentials do not inherit that
+capability. Its verifier is the acting operator. The OS-local authorized flow retains explicit
+Owner flags, but records no fabricated account verifier for an OS operator.

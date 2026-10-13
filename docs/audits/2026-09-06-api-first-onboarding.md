@@ -286,5 +286,13 @@ owners as OS-local onboarding. Cookie/OAuth access uses live organization capabi
 CLI/API credentials require configuration scope and their approving Member's current
 manage-resources authority. Tenant mismatch, role loss, revoked credentials and owner realm
 mismatch fail closed. An organization Admin does not become a generated route's audience:
-new Who rules still name the Bot's exact owner Member, derived from daemon authorship when
-available, or the personal local owner. Existing customized routes retain their policy.
+new Who rules still name the Bot's exact owner Member, verified from the exact enrolled Host's daemon authorship. Personal local Owner mapping remains
+in the OS-local authorized flow; remote requests cannot invent that mapping. Existing customized routes retain their policy.
+
+CTO-011 independent acceptance correction: remote configuration retains the authenticated actor
+and trust source. Configuration API/CLI scopes do not allow direct channel identity binding.
+Only a browser instance operator retains that administration boundary, with the actual acting
+user recorded as verifier. Non-operators receive only their own verification challenge; another
+Bot Owner stays pending with self-verification guidance. Remote requests verify Bot ownership via
+the exact enrolled Host before authoring routes, and reject mismatching owner fields. The
+OS-local authorized personal flow and explicit owner flags remain available.

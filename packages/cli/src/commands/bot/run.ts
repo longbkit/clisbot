@@ -1,3 +1,4 @@
+import { prepareFreshPersonalHome } from "../serve/personal-home.js";
 // Start the local daemon and Hub, provision a daemon-owned Bot, then connect a channel.
 // The local manifest contains only restart metadata; the daemon owns identity and files.
 
@@ -398,7 +399,7 @@ function withOnboardingStatus(
   installed: ChannelAddResult,
   template?: WorkspaceTemplateResult,
 ): BotStartReport {
-  let nextStep = "Check bot status; the channel is not ready yet";
+  let nextStep = installed.owner?.guidance ?? "Check bot status; the channel is not ready yet";
   if (installed.owner?.command)
     nextStep =
       "Send the owner linking command to this bot from your channel account, then send your request";
@@ -645,17 +646,13 @@ export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotSta
     },
     ensureDaemonUp: async (_home, _childEnv) => {
       const fresh = !existsSync(path.join(home, "config.json"));
+      if (fresh) await prepareFreshPersonalHome(home);
       if (isOnboardingEnabled(env)) await assertLocalOnboardingAccess(home, env);
       const state = await readDaemonInstance(home);
       const listen =
         state?.listen ??
         (isOnboardingEnabled(env) ? await onboardingDaemonListen(home, env) : undefined);
       if (state) return { daemon: "already-running" };
-      if (fresh) {
-        editPersistedConfig(home, "features.devicePairing", { value: true });
-        editPersistedConfig(home, "daemon.managedAccess.mode", { value: "off" });
-        editPersistedConfig(home, "features.personalServing", { value: true });
-      }
       if (listen) editPersistedConfig(home, "daemon.listen", { value: listen });
       await startLocalDaemonDetached({ home, ...(listen ? { listen } : {}) });
       return { daemon: "started" };

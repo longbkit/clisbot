@@ -24,6 +24,7 @@ const channelAddResultSchema = z
         destination: z.string().url().optional(),
         command: z.string().optional(),
         expiresAt: z.string().datetime().optional(),
+        guidance: z.string().optional(),
       })
       .optional(),
   })

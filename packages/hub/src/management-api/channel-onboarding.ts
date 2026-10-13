@@ -1,3 +1,5 @@
+import type { OperationAuthorization } from "../auth/api-keys.js";
+import type { OnboardingAuthority } from "../channels/http/onboarding.js";
 import { z } from "zod";
 import type { Database } from "../db/types.js";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
@@ -28,8 +30,8 @@ export async function accountChannelOnboarding(
   suffix?: string,
 ): Promise<Response> {
   if (!isChannelsEnabled()) return Response.json({ error: "not_found" }, { status: 404 });
-  const rejected = await authorizeOnboarding(options, request, organizationId);
-  if (rejected) return rejected;
+  const authority = await authorizeOnboarding(options, request, organizationId);
+  if (authority instanceof Response) return authority;
   if (request.method === "GET" && suffix === "status") {
     const snapshot = await loadChannelControlPlane(options.database, organizationId);
     const allowed = new Set(
@@ -48,7 +50,17 @@ export async function accountChannelOnboarding(
     });
   }
   if ((request.method === "POST" || request.method === "PUT") && suffix === undefined)
-    return handleAddChannel(options.database, request, options.operations, organizationId);
+    return handleAddChannel(
+      options.database,
+      request,
+      {
+        ...options.operations,
+        ...(options.operations.onboarding
+          ? { onboarding: { ...options.operations.onboarding, authority } }
+          : {}),
+      },
+      organizationId,
+    );
   return Response.json({ error: "not_found" }, { status: 404 });
 }
 
@@ -56,35 +68,63 @@ async function authorizeOnboarding(
   options: Parameters<typeof accountChannelOnboarding>[0],
   request: Request,
   organizationId: string,
-): Promise<Response | undefined> {
-  const credential = request.headers.has("authorization")
-    ? await options.credentials?.authorize(request, "configuration:install")
-    : undefined;
+): Promise<Response | OnboardingAuthority> {
+  if (!request.headers.has("authorization"))
+    return browserOnboardingAuthority(options, request, organizationId);
+  const credential = await options.credentials?.authorize(request, "configuration:install");
   if (credential?.status === "forbidden") throw new ProductRequestError(403, "forbidden");
-  if (credential?.status === "authorized") {
-    if (credential.access.organizationId !== organizationId)
-      throw new ProductRequestError(403, "organization_required");
-    const table =
-      credential.access.kind === "cliCredential"
-        ? "organization_cli_credentials"
-        : "organization_api_keys";
-    const rows = await options.runtime.query<{ role: string }>(
-      `select m.role from ${table} c join member m on m.user_id = c.created_by_user_id and m.organization_id = c.organization_id
-       where c.id = $1 and c.organization_id = $2 and c.revoked_at is null`,
-      [credential.access.credentialId, organizationId],
-    );
-    const role = parseOrganizationRole(rows.rows[0]?.role ?? "");
-    if (!role || !capabilitiesFor(role).manageResources)
-      throw new ProductRequestError(403, "forbidden");
-  } else {
-    const access = await options.auth.resolveOrganizationAccess(request);
-    if (access.organization.id !== organizationId)
-      throw new ProductRequestError(404, "organization_unavailable");
-    if (!access.capabilities.manageResources) throw new ProductRequestError(403, "forbidden");
-    if (request.method !== "GET") {
-      const rejected = options.auth.rejectCookieMutation(request);
-      if (rejected) return rejected;
-    }
+  if (credential?.status !== "authorized")
+    throw new ProductRequestError(401, "invalid_credentials");
+  return credentialOnboardingAuthority(options, credential.access, organizationId);
+}
+
+async function credentialOnboardingAuthority(
+  options: Parameters<typeof accountChannelOnboarding>[0],
+  credential: OperationAuthorization,
+  organizationId: string,
+): Promise<OnboardingAuthority> {
+  if (credential.organizationId !== organizationId)
+    throw new ProductRequestError(403, "organization_required");
+  const table =
+    credential.kind === "cliCredential" ? "organization_cli_credentials" : "organization_api_keys";
+  const rows = await options.runtime.query<{ role: string; user_id: string; member_id: string }>(
+    `select m.role, m.user_id, m.id as member_id from ${table} c join member m on m.user_id = c.created_by_user_id and m.organization_id = c.organization_id
+     where c.id = $1 and c.organization_id = $2 and c.revoked_at is null`,
+    [credential.credentialId, organizationId],
+  );
+  const role = parseOrganizationRole(rows.rows[0]?.role ?? "");
+  const actor = rows.rows[0];
+  if (!role || !actor || !capabilitiesFor(role).manageResources)
+    throw new ProductRequestError(403, "forbidden");
+  return {
+    kind: "account",
+    userId: actor.user_id,
+    membershipId: actor.member_id,
+    isInstanceOperator: false,
+    source: credential.kind,
+  };
+}
+
+async function browserOnboardingAuthority(
+  options: Parameters<typeof accountChannelOnboarding>[0],
+  request: Request,
+  organizationId: string,
+): Promise<Response | OnboardingAuthority> {
+  const access = await options.auth.resolveOrganizationAccess(request);
+  if (access.organization.id !== organizationId)
+    throw new ProductRequestError(404, "organization_unavailable");
+  if (!access.capabilities.manageResources) throw new ProductRequestError(403, "forbidden");
+  const account = await options.auth.resolveAccount(request);
+  if (account.account.id !== access.account.id) throw new ProductRequestError(403, "forbidden");
+  if (request.method !== "GET") {
+    const rejected = options.auth.rejectCookieMutation(request);
+    if (rejected) return rejected;
   }
-  return undefined;
+  return {
+    kind: "account",
+    userId: access.account.id,
+    membershipId: access.membership.id,
+    isInstanceOperator: account.isInstanceOperator,
+    source: "browser",
+  };
 }

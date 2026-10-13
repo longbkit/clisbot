@@ -218,7 +218,14 @@ export function createChannelControlPlaneOps(
 ): ChannelControlPlaneOps {
   return {
     addChannel: (request) =>
-      gate(options, request, (database) => handleAddChannel(database, request, options)),
+      gate(options, request, (database) =>
+        handleAddChannel(database, request, {
+          ...options,
+          ...(options.onboarding
+            ? { onboarding: { ...options.onboarding, authority: { kind: "local-operator" } } }
+            : {}),
+        }),
+      ),
     removeChannel: (request) =>
       gate(options, request, (database) => handleRemoveChannel(database, request, options)),
     listChannels: (request) =>
@@ -336,7 +343,7 @@ export async function handleAddChannel(
   }
   const snapshot = await loadSnapshot(database, organizationId);
   if (body.setup)
-    await validateOnboardingTarget(
+    body.setup = await validateOnboardingTarget(
       database,
       options.onboarding,
       snapshot.organizationId,
@@ -464,7 +471,7 @@ async function handleRemoveChannel(
       revision: true,
       connectionId: account.connectionId,
     },
-    { status: 200 },
+    { status: 200, headers: { "cache-control": "no-store" } },
   );
 }
 
@@ -482,6 +489,7 @@ async function resolveOnboardingConnection(
       botToken: body.botToken,
       appToken: body.appToken,
       ...(body.setup?.ownerEmail ? { ownerEmail: body.setup.ownerEmail } : {}),
+      ...(body.setup?.ownerMemberId ? { ownerMemberId: body.setup.ownerMemberId } : {}),
     });
   }
   throw invalidRequest("Supply a Slack Connection ID or both app token and bot token");

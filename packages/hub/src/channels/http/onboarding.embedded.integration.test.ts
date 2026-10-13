@@ -129,6 +129,8 @@ describe("local owner onboarding on embedded storage", () => {
       expect(snapshot.controlPlane.accounts[0]?.routes).toHaveLength(2);
       expect(JSON.stringify(snapshot.files)).not.toContain("test-private-token");
       const identity = (await access.listChannelIdentities(preparation.organizationId))[0]!;
+      expect(identity.verificationMethod).toBe("administrator");
+      expect(identity.verifiedByUserId).toBeNull(); // OS operator is not a claimed victim account.
       const sender = {
         organizationId: preparation.organizationId,
         channel: "telegram",

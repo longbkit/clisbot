@@ -58,6 +58,26 @@ it("authenticates remote onboarding, scopes it to the signed-in organization and
       access,
       tickets: new AccessTicketService(bundle.runtime, access),
       channelSupervisor: null,
+      readOnboardingBot: async () => ({
+        id: "bot_1234567890123456",
+        slug: "remote-assistant",
+        name: "Remote Assistant",
+        kind: "personal",
+        projectId: "prj_fixture",
+        workspaceId: "ws_fixture",
+        cwd: "/isolated/bot",
+        launch: { provider: "codex" },
+        template: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        archivedAt: null,
+        owner: {
+          kind: "user",
+          id: state.account.id,
+          memberId: ownerMemberId,
+          organizationId,
+        },
+      }),
       ...(auth.publicCredentials ? { credentials: auth.publicCredentials } : {}),
     });
     const login = await fetch(`${origin}/api/auth/sign-in/email`, {
@@ -74,6 +94,12 @@ it("authenticates remote onboarding, scopes it to the signed-in organization and
       await fetch(`${origin}/api/auth/clisbot/state`, { headers: { cookie } })
     ).json();
     const organizationId = state.organization.id;
+    const ownerMemberId = (
+      await bundle.runtime.query<{ id: string }>(
+        "select id from member where organization_id = $1 and user_id = $2",
+        [organizationId, state.account.id],
+      )
+    ).rows[0]!.id;
     const endpoint = `${origin}/api/management/v1/organizations/${organizationId}/channel-onboarding`;
     const prepare = (url = endpoint, authenticated = true) =>
       fetch(url, {

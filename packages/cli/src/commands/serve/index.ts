@@ -1,3 +1,4 @@
+import { prepareFreshPersonalHome } from "./personal-home.js";
 import { readWebIntent, updateLocalWebHub } from "./web.js";
 import { select, isCancel } from "@clack/prompts";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -356,15 +357,8 @@ async function prepareDaemon(home: string, relay: boolean): Promise<{ origin: st
       await client.close();
     }
   } else {
-    const fresh = !existsSync(path.join(home, "config.json"));
+    await prepareFreshPersonalHome(home, { relay });
     editPersistedConfig(home, "features.devicePairing", { value: true });
-    if (fresh) {
-      editPersistedConfig(home, "daemon.managedAccess.mode", { value: "off" });
-      editPersistedConfig(home, "daemon.listen", {
-        value: `127.0.0.1:${await selectLocalPort(6868, true)}`,
-      });
-      editPersistedConfig(home, "daemon.relay.enabled", { value: relay });
-    }
   }
   const launch = await launchLocalDaemon({ home, timeoutMs: 60_000 });
   const listen = launch.instance.listen;

@@ -1,3 +1,4 @@
+import { onboardingBotReader } from "./channels/http/onboarding-bot.js";
 import {
   createChannelOperationTicketResolver,
   resolveChannelOperationIdentity,
@@ -241,6 +242,7 @@ async function createOwnedApplicationRuntime(
       url.searchParams.set("connectionId", input.connectionId);
       return action(new Request(url, { method: "POST", headers: request.headers }));
     },
+    () => hostSessions,
   );
   return {
     hub: application.hub,
@@ -564,6 +566,7 @@ function createManagementApi(
   disconnectProviderConnection: NonNullable<
     ConstructorParameters<typeof ManagementApi>[0]["disconnectProviderConnection"]
   >,
+  hostSessions: () => import("./daemons/protocol.js").DaemonSessionAccess | undefined,
 ): ManagementApi | null {
   if (
     options.database === null ||
@@ -584,6 +587,7 @@ function createManagementApi(
     tickets: accessTickets,
     ...(options.auth.publicCredentials ? { credentials: options.auth.publicCredentials } : {}),
     channelSupervisor,
+    readOnboardingBot: onboardingBotReader(hostSessions),
     providerApplications: options.providerApplications ?? null,
     disconnectProviderConnection,
     accessLeaseRevocation,

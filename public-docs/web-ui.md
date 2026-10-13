@@ -23,14 +23,17 @@ clisbot web status
 clisbot web stop
 ```
 
-Start reuses your Host and any running Hub. It starts no Hub for Bot-only use. Open the actual
+Start also works as the first command on an empty home, preparing protected Owner access before
+exposing web. It reuses your Host and any running Hub. It starts no Hub for Bot-only use. Open the actual
 loopback URL printed by the command; an occupied preferred port selects an available one.
 Tailscale is preferred: when available, the command also prints a private HTTPS URL. Without
 Tailscale, loopback still works. Relay carries backend traffic, not these static web pages.
 
 For a protected Host, start also prints a single-use owner pairing link, valid for five minutes.
 Open it deliberately to authorize this browser, then use the Bot’s Connect channel action.
-A local page alone grants no owner access.
+A web URL alone grants no Owner access. An existing legacy/password-only Host needs planned
+protected setup first; web refuses exposure without changing its policy or restarting it.
+Status checks the actual private mapping and explains fallback. Managed Hosts require Hub access.
 
 Web start saves your choice. Clisbot daemon start and personal serving restore enabled web;
 reboot restoration needs an installed OS service. Web stop clears the choice and stops only
