@@ -1,4 +1,4 @@
-import { test } from "../support/fixtures";
+import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import {
   expectCommandCenterToRemainAtTheTop,
@@ -10,6 +10,11 @@ import {
   openCommandCenterWithKeyboard,
 } from "../support/helpers/command-center-scroll";
 import { seedWorkspace } from "../support/helpers/seed-client";
+
+async function readScrollTopAfterPaint(element: HTMLElement): Promise<number> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  return element.scrollTop;
+}
 
 test.use({
   userAgent:
@@ -47,6 +52,25 @@ test("opening the command center keeps its first result fully visible", async ({
     await expectVisibleKeyboardNavigationNotToScroll(page, panel);
     await expectTightTwoLineResultSpacing(panel, "Command Center Scroll 00");
     await expectWorkspaceResultsToBeLimitedUntilSearch(panel);
+
+    await panel.getByTestId("command-center-input").fill("");
+    const results = panel.getByTestId("command-center-results");
+    await expect.poll(() => results.evaluate((element) => element.scrollTop)).toBe(0);
+    await results.hover();
+    const scrollTop = await results.evaluate(
+      (element) => element.scrollHeight - element.clientHeight,
+    );
+    expect(scrollTop).toBeGreaterThan(0);
+    await page.mouse.wheel(0, scrollTop + 100);
+    await expect.poll(() => results.evaluate((element) => element.scrollTop)).toBe(scrollTop);
+
+    await seeded.client.renameProject(seeded.projectId, "Renamed Scroll Project");
+    await expect(panel.getByTestId("command-center-workspace-subtitle").first()).toContainText(
+      "Renamed Scroll Project",
+    );
+    // Observe the committed directory update through the next paint, including its effects.
+    const nextScrollTop = await results.evaluate(readScrollTopAfterPaint);
+    expect(nextScrollTop).toBe(scrollTop);
   } finally {
     await seeded.cleanup();
   }

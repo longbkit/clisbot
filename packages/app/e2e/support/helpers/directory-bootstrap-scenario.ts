@@ -115,7 +115,12 @@ export class DirectoryBootstrapScenario {
     const agentLink = this.page.getByText(agent.title, { exact: true });
     await expect(agentLink).toHaveCount(1);
     await expect(agentLink).toBeVisible();
-    await agentLink.click();
+    // Live agents re-rank unfiltered results while the list reveals its active row.
+    // Search before clicking so the target stays in the panel viewport.
+    const panel = this.page.getByTestId("command-center-panel");
+    await panel.getByTestId("command-center-input").fill(agent.title);
+    await expect(panel.getByText(agent.title, { exact: true })).toHaveCount(1);
+    await panel.getByText(agent.title, { exact: true }).click();
     await expect(this.page).toHaveURL(
       new RegExp(
         `/workspace/${workspace.workspaceId}/agent/${agent.id}|/workspace/${workspace.workspaceId}`,

@@ -117,7 +117,7 @@ export default defineConfig((): UserConfig => {
     },
     plugins: [
       cloudflare({ viteEnvironment: { name: "ssr" } }),
-      tsConfigPaths(),
+      tsConfigPaths({ root: __dirname }),
       tanstackStart({
         router: {
           quoteStyle: "double",
