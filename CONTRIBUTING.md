@@ -38,7 +38,7 @@ Focused fixes for reproducible bugs are welcome. If you submit one, follow the p
 
 ## Discuss workflows before proposing features
 
-Product discussions, including feature requests, belong in [GitHub Discussions](https://github.com/longbkit/clisbot/discussions). Feature requests opened as issues will be closed.
+Describe product workflows in [GitHub Discussions](https://github.com/longbkit/clisbot/discussions). Use Issues for reproducible bugs.
 
 Explain:
 
