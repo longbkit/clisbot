@@ -54,7 +54,8 @@ Keep the quotes as shown: the CLI reads `${ENV_VAR}` itself for **tokens/passwor
 The command reuses or starts the Host and a personal backend Hub if needed, creates the Bot home and templates, saves the Slack Connection and the owner access configuration. You do not export a file, edit it and deploy it.
 
 To create a Bot without channels or Hub, use `clisbot bot start --bot-name "Sandbox Assistant" --provider codex`.
-Optional local web: `clisbot web start`; stopping web preserves Bot and Hub.
+Optional local web: `clisbot web start`; open its owner pairing link to authorize your browser.
+Then use the Bot’s **Connect to a channel…** action. Stopping web preserves Bot and Hub.
 
 ## 3. Finish linking the owner
 

@@ -65,6 +65,7 @@ import {
   useMountedRef,
   useRouteAgentTarget,
   useRouteAudienceState,
+  useBotOwnerAudienceRules,
   useRouteAutomationCreator,
   useRouteBehaviorChanges,
   useRouteBotTarget,
@@ -184,7 +185,7 @@ export function ChannelAccountForm({
     connections.find(({ id }) => id === connectionId),
   );
   const accountId = accountIdDraft ?? suggestedAccountId;
-  const audience = useRouteAudienceState(initial);
+  const audience = useRouteAudienceState(initial, initialBot);
   const { audienceRules, setAudienceRules, open, replyPlaces } = audience;
   const { behavior, setBehavior, approvalChoice, setApprovalChoice } = audience;
   const audienceOptions = useMemo<{ teams: AudienceOption[] }>(
@@ -218,6 +219,7 @@ export function ChannelAccountForm({
     targetChosen,
     setTarget,
   });
+  useBotOwnerAudienceRules(audience, routeBot.selected);
   const selection = channelFormSelection({
     existingAccounts,
     existingAccountKey,

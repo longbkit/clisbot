@@ -9,6 +9,7 @@ import {
   extraConversations,
   isOpenAudienceDraft,
   newAudienceRule,
+  newBotOwnerRules,
   routeAudienceDraft,
   visibilityFilterMatchesNothing,
   whoChoiceOf,
@@ -349,4 +350,20 @@ describe("room visibility", () => {
     expect(visibilityFilterMatchesNothing(where, true)).toBe(false);
     expect(visibilityFilterMatchesNothing({ ...where, groups: "all" }, false)).toBe(false);
   });
+});
+
+it("Bot attachment names exactly one owner Member in DMs and mentioned groups; missing owner stays closed", () => {
+  const rules = newBotOwnerRules("bot-owner");
+  expect(rules).toHaveLength(2);
+  for (const rule of rules) {
+    expect(rule.who.roles).toEqual([]);
+    expect(rule.who.members).toEqual(["bot-owner"]);
+    expect(rule.who.anyone).toBe(false);
+    expect(rule.conditions.requireMention).toBe(rule.place === "groups");
+  }
+  expect(rules[1]!.where.groups).toBe("all");
+  for (const rule of newBotOwnerRules()) {
+    expect(rule.who.roles).toEqual([]);
+    expect(rule.who.members).toEqual([]);
+  }
 });

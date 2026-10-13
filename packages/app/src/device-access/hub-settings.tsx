@@ -1,3 +1,5 @@
+import { hubStartAvailability, hubStartReason } from "./hub-start-availability";
+import { PairLinkModal } from "@/components/pair-link-modal";
 import { useHubStartStatus } from "./hub-start-status";
 import { suggestedDeviceLabel } from "./device-label";
 import { z } from "zod";
@@ -106,12 +108,8 @@ export function HubConnectionSettings({
   const hostIds = useMemo(() => allHosts.map((host) => host.serverId), [allHosts]);
   const connectedIds = useHostRuntimeConnectedServerIds(hostIds);
   const hosts = useMemo(
-    () =>
-      allHosts.filter(
-        (host) =>
-          connectedIds.includes(host.serverId) && (!fixedHostId || host.serverId === fixedHostId),
-      ),
-    [allHosts, connectedIds, fixedHostId],
+    () => allHosts.filter((host) => !fixedHostId || host.serverId === fixedHostId),
+    [allHosts, fixedHostId],
   );
   const localServerId = useLocalDaemonServerId();
   const router = useRouter();
@@ -120,7 +118,16 @@ export function HubConnectionSettings({
     fixedHostId ? "start" : initialHubIntent(params.hubIntent),
   );
   const [hostId, setHostId] = useState(fixedHostId ?? hosts[0]?.serverId ?? "");
-  const canStartHub = useHubStartSupport(hosts, hostId, localServerId);
+  const selectedId = selectedStartHostId(hosts, hostId, fixedHostId);
+  const reportedStart = useHubStartStatus(selectedId, localServerId);
+  const startAvailability = hubStartAvailability({
+    selected: hosts.some((host) => host.serverId === selectedId),
+    connected: connectedIds.includes(selectedId),
+    locked,
+    reported: reportedStart,
+  });
+  const canStartHub = startAvailability.status === "ready";
+  const [ownerPairing, setOwnerPairing] = useState(false);
   const [link, setLink] = useState("");
   const [label, setLabel] = useState(suggestedDeviceLabel);
   const [error, setError] = useState<string | null>(null);
@@ -304,6 +311,21 @@ export function HubConnectionSettings({
     },
     [chooseStart],
   );
+  const recoverStart = useCallback(() => {
+    const reason = hubStartReason(startAvailability);
+    if (reason === "owner_required" || reason === "no_host") setOwnerPairing(true);
+    else if (reason === "managed_access") chooseConnect();
+    else if (
+      ["offline", "device_pairing_required", "launcher_unavailable", "unknown"].includes(reason)
+    )
+      router.push(`/settings/hosts/${selectedId}/host`);
+    else retryDiscovery();
+  }, [startAvailability, chooseConnect, router, selectedId, retryDiscovery]);
+  const closeOwnerPairing = useCallback(() => setOwnerPairing(false), []);
+  const ownerPaired = useCallback(() => {
+    setOwnerPairing(false);
+    retryDiscovery();
+  }, [retryDiscovery]);
   const formHostPicker = useMemo(
     () => (
       <HubStartHostPicker
@@ -395,7 +417,10 @@ export function HubConnectionSettings({
             link={link}
             setLink={changeLink}
             busy={busy}
-            canStartHub={canStartHub && !locked}
+            startHostLabel={hosts.find((host) => host.serverId === selectedId)?.label ?? selectedId}
+            startAvailability={startAvailability}
+            recoverStart={recoverStart}
+            canStartHub={canStartHub}
             start={start}
             connectEntered={connectEntered}
             scan={scan}
@@ -405,6 +430,9 @@ export function HubConnectionSettings({
           />
         </View>
       )}
+      {ownerPairing ? (
+        <PairLinkModal visible onClose={closeOwnerPairing} onSaved={ownerPaired} />
+      ) : null}
       {error && intent !== "connect" && intent !== "start" ? (
         <Alert
           variant="error"
@@ -455,14 +483,6 @@ function HubDiscoveryStatus({
       </Alert>
     );
   return null;
-}
-
-function useHubStartSupport(hosts: HostProfile[], hostId: string, localServerId: string | null) {
-  const selectedId = hosts.some((host) => host.serverId === hostId)
-    ? hostId
-    : (hosts[0]?.serverId ?? "");
-  const availability = useHubStartStatus(selectedId, localServerId);
-  return Boolean(selectedId) && availability.status === "ready";
 }
 
 type HubEntryNotice = "owner-required" | "blocked" | "pairing";
@@ -1032,3 +1052,7 @@ const hubStyles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
   },
 }));
+
+function selectedStartHostId(hosts: HostProfile[], selected: string, fixed?: string): string {
+  return selected || fixed || hosts[0]?.serverId || "";
+}

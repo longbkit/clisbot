@@ -746,3 +746,19 @@ OAuth entry, CLI approval and their packaged browser assets are necessary authen
 surfaces. Public/native clients need no optional local web process. Browser-origin admission
 and account/organization authorization remain enforced by their domain owners. Adding web
 never changes the canonical Hub URL, OAuth issuer/audience or callback registration.
+
+### Start Hub guidance and browser owner setup
+
+A fresh Bot-only CLI home enables protected device pairing and personal serving before its
+Host starts, with Managed Access off. `web start` prints a five-minute owner invitation for
+that Host. Opening this invitation deliberately authorizes the browser; a loopback page alone
+never gains owner authority. The Bot's Connect channel action then starts/reuses Hub on that
+Host without feature flags or a daemon restart.
+
+Start Hub reads the selected connection's structured `localHubStartStatus`. The form preserves
+`managed_access`, `device_pairing_required`, `owner_required` and `launcher_unavailable`, and
+separately identifies checking, older unknown capability, offline Host and a locked Hub edit.
+It offers one relevant recovery action. Managed Access stays unchanged; owner denial opens
+pairing on the same form. Bot and Host intent survives recovery until the Route form opens.
+New Bot attachment Rules name one owner Member; an unresolved owner starts closed. Existing
+custom Rules retain their settings.

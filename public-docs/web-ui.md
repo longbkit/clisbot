@@ -28,6 +28,10 @@ loopback URL printed by the command; an occupied preferred port selects an avail
 Tailscale is preferred: when available, the command also prints a private HTTPS URL. Without
 Tailscale, loopback still works. Relay carries backend traffic, not these static web pages.
 
+For a protected Host, start also prints a single-use owner pairing link, valid for five minutes.
+Open it deliberately to authorize this browser, then use the Bot’s Connect channel action.
+A local page alone grants no owner access.
+
 Web start saves your choice. Clisbot daemon start and personal serving restore enabled web;
 reboot restoration needs an installed OS service. Web stop clears the choice and stops only
 the web process. The Host's **Local web UI** controls use the same lifecycle.

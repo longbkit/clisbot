@@ -1,3 +1,4 @@
+import { botRouteOwnerMember } from "./channel-route-bot";
 import { describe, expect, it } from "vitest";
 import type { BotPayload } from "@/clisbot/bots/data/contracts";
 import { buildChannelRouteCandidate, replaceChannelRouteCandidate } from "./channel-configuration";
@@ -248,4 +249,38 @@ describe("botLaunchChanged", () => {
     const plain = { ...lunaOption(), bot: bot({ launchDefaults: { provider: "codex" } }) };
     expect(botLaunchChanged(plain, { provider: "codex", featureValues: {} })).toBe(false);
   });
+});
+
+it("does not use a foreign Bot owner in the selected Hub, even when the viewer owns it", () => {
+  const hub = { organizationId: "org-current", memberId: "current-owner" };
+  expect(
+    botRouteOwnerMember(
+      {
+        isOwner: true,
+        owner: {
+          kind: "user",
+          id: "user",
+          memberId: "foreign-owner",
+          organizationId: "org-foreign",
+        },
+      },
+      hub,
+    ),
+  ).toBeUndefined();
+  expect(
+    botRouteOwnerMember(
+      {
+        isOwner: false,
+        owner: { kind: "user", id: "user", memberId: "bot-owner", organizationId: "org-current" },
+      },
+      hub,
+    ),
+  ).toBe("bot-owner");
+  expect(botRouteOwnerMember({ isOwner: true, owner: { kind: "user", id: "owner" } }, hub)).toBe(
+    "current-owner",
+  );
+  expect(
+    botRouteOwnerMember({ isOwner: false, owner: { kind: "user", id: "owner" } }, hub),
+  ).toBeUndefined();
+  expect(botRouteOwnerMember({ isOwner: true }, hub)).toBeUndefined();
 });

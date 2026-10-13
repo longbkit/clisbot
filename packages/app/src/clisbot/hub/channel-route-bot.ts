@@ -131,3 +131,17 @@ function sameFeatureValues(stored: unknown, launch: Record<string, unknown> | un
 function isRecord(value: unknown): value is ConfigurationRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+/** Hub-linked owners keep their realm; the independently owned local actor maps to the
+ * personal Hub's current owner projection, never to a role-wide audience. */
+export function botRouteOwnerMember(
+  bot: Pick<BotPayload, "owner" | "isOwner"> | undefined,
+  hub: { organizationId: string; memberId: string } | undefined,
+): string | undefined {
+  if (!bot || !hub) return undefined;
+  const owner = bot.owner;
+  if (owner?.memberId)
+    return owner.organizationId === hub.organizationId ? owner.memberId : undefined;
+  if (bot.isOwner === true && owner?.kind === "user" && owner.id === "owner") return hub.memberId;
+  return undefined;
+}

@@ -1,3 +1,6 @@
+import { useHubAccount } from "../account-provider";
+import { newBotOwnerRules } from "./channel-route-audience";
+import type { RouteBotOption } from "../channel-route-bot";
 import { i18n } from "@/i18n/i18next";
 import {
   isOpenAudienceDraft,
@@ -25,6 +28,7 @@ import {
 } from "../channel-configuration";
 import {
   botLaunchChanged,
+  botRouteOwnerMember,
   routeBotKey,
   routeBotMatch,
   type RouteBotRequest,
@@ -153,9 +157,13 @@ export function useRouteDestination(
 }
 
 /** The Route's Rules, and the reply and permission behavior that follows who they let in. */
-export function useRouteAudienceState(initial: ChannelFormInitialState) {
+export function useRouteAudienceState(
+  initial: ChannelFormInitialState,
+  initialBot: RouteBotRequest | null = null,
+) {
+  const botOwnerSeed = useRef(initialBot && !initial.isEditing ? newBotOwnerRules() : null);
   const [audienceRules, setAudienceRulesState] = useState<AudienceRuleDraft[]>(
-    initial.audienceRules,
+    botOwnerSeed.current ?? initial.audienceRules,
   );
   const [behavior, setBehavior] = useState<ChannelRouteBehavior>(initial.behavior.behavior);
   const [approvalChoice, setApprovalChoice] = useState<RouteApprovalChoice>(
@@ -186,6 +194,7 @@ export function useRouteAudienceState(initial: ChannelFormInitialState) {
     [audienceRules, open],
   );
   return {
+    botOwnerSeed,
     audienceRules,
     setAudienceRules,
     open,
@@ -444,4 +453,26 @@ export function useRouteFormOptions(input: {
     automationDisplay,
     automationNames,
   };
+}
+
+export function useBotOwnerAudienceRules(
+  audience: ReturnType<typeof useRouteAudienceState>,
+  selected: RouteBotOption | null,
+) {
+  const hub = useHubAccount();
+  const seeded = useRef(false);
+  const memberId = botRouteOwnerMember(
+    selected?.bot,
+    hub.signedIn
+      ? { organizationId: hub.signedIn.organization.id, memberId: hub.signedIn.membership.id }
+      : undefined,
+  );
+  const { botOwnerSeed, setAudienceRules } = audience;
+  useEffect(() => {
+    if (!botOwnerSeed.current || seeded.current || !memberId) return;
+    seeded.current = true;
+    setAudienceRules((current) =>
+      current === botOwnerSeed.current ? newBotOwnerRules(memberId) : current,
+    );
+  }, [memberId, botOwnerSeed, setAudienceRules]);
 }

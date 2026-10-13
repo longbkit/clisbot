@@ -1765,9 +1765,9 @@ export class HostRuntimeStore {
       : readInitialDaemonConnectionHint();
     if (initialHint) {
       const bootstrapped = await this.bootstrapInitialConnectionHint(initialHint);
-      if (bootstrapped) {
-        return;
-      }
+      // A served UI points at its own Host. A failed protected pairing probe
+      // must not discover a different daemon on the default localhost port.
+      if (bootstrapped || !override) return;
     }
 
     if (override) {

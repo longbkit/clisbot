@@ -556,3 +556,15 @@ export function audienceRuleErrors(message: string, position: number): Map<numbe
   }
   return errors;
 }
+
+/** Bot attachment defaults name one Member, never the Hub owner role. Missing identity stays closed. */
+export function newBotOwnerRules(memberId?: string): AudienceRuleDraft[] {
+  const rules = [newAudienceRule("dm"), newAudienceRule("groups")];
+  for (const rule of rules) {
+    rule.who.roles = [];
+    rule.who.members = memberId ? [memberId] : [];
+    rule.picking = true;
+    if (rule.place === "groups") rule.where.groups = "all";
+  }
+  return rules;
+}

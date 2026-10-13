@@ -1,6 +1,34 @@
 // Hub › Hubs list, Overview, Connection, Paired devices, Sign-in policy, Add or start a Hub.
 // `en` is the source; every locale carries the same keys (resources.test.ts checks it).
 const en = {
+  startRecovery: {
+    steps: {
+      checking: "Wait for the Host reply, then check again.",
+      unknown:
+        "Update this Host to a version that reports startup status, then reconnect and check again.",
+      offline: "Reconnect this Host, then check again.",
+      managed_access:
+        "Connect the Hub supplied by this Host’s operator. Managed access stays unchanged.",
+      device_pairing_required:
+        "Ask this Host’s operator to enable protected device pairing during planned maintenance.",
+      owner_required: "Use this Host’s owner pairing invitation to authorize this device.",
+      launcher_unavailable:
+        "Ask this Host’s operator to repair the local CLI launcher, then check again.",
+      locked: "Finish or cancel the current edit.",
+      no_host: "Connect the Bot’s Host.",
+    },
+    actions: {
+      checking: "Check again",
+      unknown: "View Host",
+      offline: "View Host",
+      managed_access: "Connect existing Hub",
+      device_pairing_required: "View Host",
+      owner_required: "Use owner pairing link",
+      launcher_unavailable: "View Host",
+      locked: "Check again",
+      no_host: "Connect Host",
+    },
+  },
   localWeb: {
     title: "Local web UI",
     enable: "Enable",
@@ -17,6 +45,10 @@ const en = {
     check: "Check again",
     alreadyListed: "Hub already set up on: {{hosts}}.",
     reasons: {
+      checking: "Checking this Host’s startup permission…",
+      locked: "Finish the current Hub edit before starting another Hub.",
+      no_host: "No Host is selected.",
+
       ready: "This connection can start a Hub.",
       unknown: "This Host does not report why Hub startup is unavailable.",
       offline: "This Host is offline. Startup eligibility cannot be checked.",
@@ -459,6 +491,30 @@ const en = {
 } as const;
 
 const ar = {
+  startRecovery: {
+    steps: {
+      checking: "انتظر رد Host ثم تحقق مجدداً.",
+      unknown: "حدّث Host إلى إصدار يعرض حالة التشغيل ثم أعد الاتصال والتحقق.",
+      offline: "أعد اتصال هذا Host ثم تحقق مجدداً.",
+      managed_access: "اتصل بـ Hub الذي يقدمه مشغّل Host. لا يتغير الوصول المُدار.",
+      device_pairing_required: "اطلب من المشغّل تفعيل الاقتران المحمي أثناء صيانة مخططة.",
+      owner_required: "استخدم دعوة مالك هذا Host للسماح لهذا الجهاز.",
+      launcher_unavailable: "اطلب من المشغّل إصلاح مشغّل CLI المحلي ثم تحقق مجدداً.",
+      locked: "أكمل التعديل الحالي أو ألغِه.",
+      no_host: "اتصل بـ Host الخاص بالبوت.",
+    },
+    actions: {
+      checking: "تحقق مجدداً",
+      unknown: "عرض Host",
+      offline: "عرض Host",
+      managed_access: "اتصال بـ Hub موجود",
+      device_pairing_required: "عرض Host",
+      owner_required: "استخدم رابط المالك",
+      launcher_unavailable: "عرض Host",
+      locked: "تحقق مجدداً",
+      no_host: "اتصال بـ Host",
+    },
+  },
   localWeb: {
     title: "واجهة الويب المحلية",
     enable: "تفعيل",
@@ -475,6 +531,10 @@ const ar = {
     check: "التحقق مجددًا",
     alreadyListed: "تم إعداد Hub على: {{hosts}}.",
     reasons: {
+      checking: "جارٍ فحص صلاحية التشغيل على هذا Host…",
+      locked: "أكمل تعديل Hub الحالي قبل تشغيل آخر.",
+      no_host: "لم يتم اختيار Host.",
+
       ready: "يمكن لهذا الاتصال تشغيل Hub.",
       unknown: "لا يوضح هذا Host سبب تعذر تشغيل Hub.",
       offline: "Host غير متصل. لا يمكن التحقق من شروط التشغيل.",
@@ -909,6 +969,35 @@ const ar = {
 };
 
 const es = {
+  startRecovery: {
+    steps: {
+      checking: "Espera la respuesta del Host y comprueba de nuevo.",
+      unknown:
+        "Actualiza este Host a una versión que informe del estado de inicio, vuelve a conectar y comprueba.",
+      offline: "Vuelve a conectar este Host y comprueba de nuevo.",
+      managed_access:
+        "Conecta el Hub proporcionado por el operador de este Host. El acceso administrado no cambia.",
+      device_pairing_required:
+        "Pide al operador que active el emparejamiento protegido durante un mantenimiento programado.",
+      owner_required:
+        "Usa la invitación del propietario de este Host para autorizar este dispositivo.",
+      launcher_unavailable:
+        "Pide al operador que repare el lanzador CLI local y comprueba de nuevo.",
+      locked: "Termina o cancela la edición actual.",
+      no_host: "Conecta el Host del Bot.",
+    },
+    actions: {
+      checking: "Comprobar de nuevo",
+      unknown: "Ver Host",
+      offline: "Ver Host",
+      managed_access: "Conectar Hub existente",
+      device_pairing_required: "Ver Host",
+      owner_required: "Usar enlace del propietario",
+      launcher_unavailable: "Ver Host",
+      locked: "Comprobar de nuevo",
+      no_host: "Conectar Host",
+    },
+  },
   localWeb: {
     title: "Interfaz web local",
     enable: "Activar",
@@ -926,6 +1015,10 @@ const es = {
     check: "Comprobar de nuevo",
     alreadyListed: "Hub ya configurado en: {{hosts}}.",
     reasons: {
+      checking: "Comprobando el permiso de inicio de este Host…",
+      locked: "Termina la edición actual del Hub antes de iniciar otro.",
+      no_host: "No hay Host seleccionado.",
+
       ready: "Esta conexión puede iniciar un Hub.",
       unknown: "Este Host no indica por qué no puede iniciar un Hub.",
       offline: "Host sin conexión. No se pueden comprobar los requisitos.",
@@ -1387,6 +1480,35 @@ const es = {
 };
 
 const fr = {
+  startRecovery: {
+    steps: {
+      checking: "Attendez la réponse du Host, puis vérifiez à nouveau.",
+      unknown:
+        "Mettez à jour ce Host vers une version signalant l’état de démarrage, reconnectez et vérifiez.",
+      offline: "Reconnectez ce Host, puis vérifiez à nouveau.",
+      managed_access:
+        "Connectez le Hub fourni par l’opérateur de ce Host. L’accès géré reste inchangé.",
+      device_pairing_required:
+        "Demandez à l’opérateur d’activer l’association protégée lors d’une maintenance planifiée.",
+      owner_required:
+        "Utilisez l’invitation du propriétaire de ce Host pour autoriser cet appareil.",
+      launcher_unavailable:
+        "Demandez à l’opérateur de réparer le lanceur CLI local, puis vérifiez.",
+      locked: "Terminez ou annulez la modification actuelle.",
+      no_host: "Connectez le Host du Bot.",
+    },
+    actions: {
+      checking: "Vérifier à nouveau",
+      unknown: "Voir le Host",
+      offline: "Voir le Host",
+      managed_access: "Connecter un Hub existant",
+      device_pairing_required: "Voir le Host",
+      owner_required: "Utiliser le lien du propriétaire",
+      launcher_unavailable: "Voir le Host",
+      locked: "Vérifier à nouveau",
+      no_host: "Connecter un Host",
+    },
+  },
   localWeb: {
     title: "Interface web locale",
     enable: "Activer",
@@ -1404,6 +1526,10 @@ const fr = {
     check: "Vérifier à nouveau",
     alreadyListed: "Hub déjà configuré sur : {{hosts}}.",
     reasons: {
+      checking: "Vérification du droit de démarrage sur cet Host…",
+      locked: "Terminez la modification du Hub avant d’en démarrer un autre.",
+      no_host: "Aucun Host sélectionné.",
+
       ready: "Cette connexion peut démarrer un Hub.",
       unknown: "Ce Host ne précise pas pourquoi le démarrage est indisponible.",
       offline: "Host hors ligne. Impossible de vérifier les conditions.",
@@ -1862,6 +1988,31 @@ const fr = {
 };
 
 const ja = {
+  startRecovery: {
+    steps: {
+      checking: "Hostの応答を待って再確認してください。",
+      unknown: "起動状態を報告できるバージョンにHostを更新し、再接続して確認してください。",
+      offline: "このHostに再接続して確認してください。",
+      managed_access: "Hostの管理者が提供するHubに接続してください。管理アクセスは変更されません。",
+      device_pairing_required:
+        "予定された保守で保護された端末ペアリングを有効にするよう管理者に依頼してください。",
+      owner_required: "このHostの所有者の招待リンクで端末を承認してください。",
+      launcher_unavailable: "ローカルCLIランチャーの修復を管理者に依頼し、再確認してください。",
+      locked: "現在の編集を完了またはキャンセルしてください。",
+      no_host: "BotのHostに接続してください。",
+    },
+    actions: {
+      checking: "再確認",
+      unknown: "Hostを表示",
+      offline: "Hostを表示",
+      managed_access: "既存のHubに接続",
+      device_pairing_required: "Hostを表示",
+      owner_required: "所有者のリンクを使用",
+      launcher_unavailable: "Hostを表示",
+      locked: "再確認",
+      no_host: "Hostに接続",
+    },
+  },
   localWeb: {
     title: "ローカル Web UI",
     enable: "有効にする",
@@ -1878,6 +2029,10 @@ const ja = {
     check: "再確認",
     alreadyListed: "Hub 設定済みの Host: {{hosts}}。",
     reasons: {
+      checking: "このHostの起動権限を確認中…",
+      locked: "別のHubを起動する前に現在の編集を完了してください。",
+      no_host: "Hostが選択されていません。",
+
       ready: "この接続は Hub を起動できます。",
       unknown: "この Host は起動できない理由を提供していません。",
       offline: "Host がオフラインです。起動条件を確認できません。",
@@ -2332,6 +2487,31 @@ const ja = {
 };
 
 const ko = {
+  startRecovery: {
+    steps: {
+      checking: "Host의 응답을 기다린 후 다시 확인하세요.",
+      unknown: "시작 상태를 보고하는 버전으로 Host를 업데이트하고 다시 연결해 확인하세요.",
+      offline: "이 Host에 다시 연결한 후 확인하세요.",
+      managed_access: "Host 운영자가 제공한 Hub에 연결하세요. 관리 액세스는 유지됩니다.",
+      device_pairing_required:
+        "예정된 유지보수에서 보호된 기기 페어링을 활성화하도록 운영자에게 요청하세요.",
+      owner_required: "이 Host 소유자의 페어링 초대로 기기를 승인하세요.",
+      launcher_unavailable: "로컬 CLI 실행기를 복구하도록 운영자에게 요청한 후 확인하세요.",
+      locked: "현재 편집을 완료하거나 취소하세요.",
+      no_host: "Bot의 Host에 연결하세요.",
+    },
+    actions: {
+      checking: "다시 확인",
+      unknown: "Host 보기",
+      offline: "Host 보기",
+      managed_access: "기존 Hub 연결",
+      device_pairing_required: "Host 보기",
+      owner_required: "소유자 페어링 링크 사용",
+      launcher_unavailable: "Host 보기",
+      locked: "다시 확인",
+      no_host: "Host 연결",
+    },
+  },
   localWeb: {
     title: "로컬 웹 UI",
     enable: "활성화",
@@ -2348,6 +2528,10 @@ const ko = {
     check: "다시 확인",
     alreadyListed: "Hub가 이미 설정된 Host: {{hosts}}.",
     reasons: {
+      checking: "이 Host의 시작 권한 확인 중…",
+      locked: "다른 Hub를 시작하기 전에 현재 편집을 완료하세요.",
+      no_host: "선택된 Host가 없습니다.",
+
       ready: "이 연결은 Hub를 시작할 수 있습니다.",
       unknown: "이 Host는 Hub를 시작할 수 없는 이유를 제공하지 않습니다.",
       offline: "Host가 오프라인입니다. 시작 조건을 확인할 수 없습니다.",
@@ -2786,6 +2970,34 @@ const ko = {
 };
 
 const ptBR = {
+  startRecovery: {
+    steps: {
+      checking: "Aguarde a resposta do Host e verifique novamente.",
+      unknown:
+        "Atualize este Host para uma versão que informe o estado de início, reconecte e verifique.",
+      offline: "Reconecte este Host e verifique novamente.",
+      managed_access:
+        "Conecte o Hub fornecido pelo operador deste Host. O acesso gerenciado permanece igual.",
+      device_pairing_required:
+        "Peça ao operador para ativar o pareamento protegido durante uma manutenção programada.",
+      owner_required: "Use o convite do proprietário deste Host para autorizar este dispositivo.",
+      launcher_unavailable:
+        "Peça ao operador para reparar o inicializador CLI local e verifique novamente.",
+      locked: "Conclua ou cancele a edição atual.",
+      no_host: "Conecte o Host do Bot.",
+    },
+    actions: {
+      checking: "Verificar novamente",
+      unknown: "Ver Host",
+      offline: "Ver Host",
+      managed_access: "Conectar Hub existente",
+      device_pairing_required: "Ver Host",
+      owner_required: "Usar link do proprietário",
+      launcher_unavailable: "Ver Host",
+      locked: "Verificar novamente",
+      no_host: "Conectar Host",
+    },
+  },
   localWeb: {
     title: "Interface web local",
     enable: "Ativar",
@@ -2802,6 +3014,10 @@ const ptBR = {
     check: "Verificar novamente",
     alreadyListed: "Hub já configurado em: {{hosts}}.",
     reasons: {
+      checking: "Verificando a permissão de início deste Host…",
+      locked: "Conclua a edição atual do Hub antes de iniciar outro.",
+      no_host: "Nenhum Host selecionado.",
+
       ready: "Esta conexão pode iniciar um Hub.",
       unknown: "Este Host não informa por que não pode iniciar um Hub.",
       offline: "Host offline. Não é possível verificar os requisitos.",
@@ -3255,6 +3471,33 @@ const ptBR = {
 };
 
 const ru = {
+  startRecovery: {
+    steps: {
+      checking: "Дождитесь ответа Host и проверьте снова.",
+      unknown:
+        "Обновите Host до версии с отчётом о состоянии запуска, переподключитесь и проверьте.",
+      offline: "Переподключите этот Host и проверьте снова.",
+      managed_access:
+        "Подключите Hub, предоставленный оператором Host. Управляемый доступ не меняется.",
+      device_pairing_required:
+        "Попросите оператора включить защищённое сопряжение при плановом обслуживании.",
+      owner_required: "Используйте приглашение владельца этого Host для авторизации устройства.",
+      launcher_unavailable: "Попросите оператора исправить локальный запуск CLI и проверьте снова.",
+      locked: "Завершите или отмените текущее редактирование.",
+      no_host: "Подключите Host бота.",
+    },
+    actions: {
+      checking: "Проверить снова",
+      unknown: "Открыть Host",
+      offline: "Открыть Host",
+      managed_access: "Подключить существующий Hub",
+      device_pairing_required: "Открыть Host",
+      owner_required: "Использовать ссылку владельца",
+      launcher_unavailable: "Открыть Host",
+      locked: "Проверить снова",
+      no_host: "Подключить Host",
+    },
+  },
   localWeb: {
     title: "Локальный веб-интерфейс",
     enable: "Включить",
@@ -3271,6 +3514,10 @@ const ru = {
     check: "Проверить снова",
     alreadyListed: "Hub уже настроен на: {{hosts}}.",
     reasons: {
+      checking: "Проверяем право запуска на этом Host…",
+      locked: "Завершите редактирование Hub перед запуском другого.",
+      no_host: "Host не выбран.",
+
       ready: "Это подключение может запустить Hub.",
       unknown: "Этот Host не сообщает причину недоступности запуска.",
       offline: "Host не в сети. Условия запуска нельзя проверить.",
@@ -3727,6 +3974,31 @@ const ru = {
 };
 
 const vi = {
+  startRecovery: {
+    steps: {
+      checking: "Chờ Host phản hồi rồi kiểm tra lại.",
+      unknown: "Cập nhật Host lên bản có trạng thái khởi động, kết nối lại rồi kiểm tra lại.",
+      offline: "Kết nối lại Host rồi kiểm tra lại.",
+      managed_access: "Kết nối Hub do người vận hành Host cung cấp. Giữ nguyên Managed Access.",
+      device_pairing_required:
+        "Nhờ người vận hành bật ghép nối thiết bị bảo vệ trong lần bảo trì đã lên lịch.",
+      owner_required: "Dùng lời mời ghép nối owner của Host này để cấp quyền cho thiết bị.",
+      launcher_unavailable: "Nhờ người vận hành sửa launcher CLI trên Host rồi kiểm tra lại.",
+      locked: "Hoàn tất hoặc hủy chỉnh sửa hiện tại.",
+      no_host: "Kết nối Host của Bot.",
+    },
+    actions: {
+      checking: "Kiểm tra lại",
+      unknown: "Xem Host",
+      offline: "Xem Host",
+      managed_access: "Kết nối Hub có sẵn",
+      device_pairing_required: "Xem Host",
+      owner_required: "Dùng link ghép nối owner",
+      launcher_unavailable: "Xem Host",
+      locked: "Kiểm tra lại",
+      no_host: "Kết nối Host",
+    },
+  },
   localWeb: {
     title: "Giao diện web cục bộ",
     enable: "Bật",
@@ -3743,6 +4015,10 @@ const vi = {
     check: "Kiểm tra lại",
     alreadyListed: "Đã thiết lập Hub trên: {{hosts}}.",
     reasons: {
+      checking: "Đang kiểm tra quyền khởi động trên Host này…",
+      locked: "Hoàn tất chỉnh sửa Hub hiện tại trước khi khởi động Hub khác.",
+      no_host: "Chưa chọn Host.",
+
       ready: "Kết nối này có thể khởi động Hub.",
       unknown: "Host này chưa cung cấp lý do không thể khởi động Hub.",
       offline: "Host đang ngoại tuyến. Chưa thể kiểm tra điều kiện khởi động.",
@@ -4189,6 +4465,30 @@ const vi = {
 };
 
 const zhCN = {
+  startRecovery: {
+    steps: {
+      checking: "等待Host响应后再次检查。",
+      unknown: "将Host更新到可报告启动状态的版本，重新连接后检查。",
+      offline: "重新连接此Host后再次检查。",
+      managed_access: "连接此Host管理员提供的Hub。托管访问保持不变。",
+      device_pairing_required: "请管理员在计划维护时启用受保护的设备配对。",
+      owner_required: "使用此Host所有者的配对邀请授权此设备。",
+      launcher_unavailable: "请管理员修复本地CLI启动器后再次检查。",
+      locked: "完成或取消当前编辑。",
+      no_host: "连接Bot的Host。",
+    },
+    actions: {
+      checking: "再次检查",
+      unknown: "查看Host",
+      offline: "查看Host",
+      managed_access: "连接现有Hub",
+      device_pairing_required: "查看Host",
+      owner_required: "使用所有者配对链接",
+      launcher_unavailable: "查看Host",
+      locked: "再次检查",
+      no_host: "连接Host",
+    },
+  },
   localWeb: {
     title: "本地 Web 界面",
     enable: "启用",
@@ -4205,6 +4505,10 @@ const zhCN = {
     check: "重新检查",
     alreadyListed: "已在以下 Host 上配置 Hub：{{hosts}}。",
     reasons: {
+      checking: "正在检查此Host的启动权限…",
+      locked: "启动另一个Hub前请完成当前编辑。",
+      no_host: "尚未选择Host。",
+
       ready: "此连接可以启动 Hub。",
       unknown: "此 Host 未提供无法启动 Hub 的原因。",
       offline: "Host 离线，无法检查启动条件。",

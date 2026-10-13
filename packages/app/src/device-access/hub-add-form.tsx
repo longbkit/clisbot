@@ -1,3 +1,4 @@
+import { hubStartReason, type HubStartAvailability } from "./hub-start-availability";
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -22,6 +23,9 @@ interface HubAddFormProps {
   setLink(value: string): void;
   busy: boolean;
   canStartHub: boolean;
+  startAvailability: HubStartAvailability;
+  startHostLabel: string;
+  recoverStart(): void;
   start(): Promise<void>;
   connectEntered(): void;
   scan(): void;
@@ -56,12 +60,24 @@ function StartHubForm(props: HubAddFormProps) {
       <Text style={styles.hint}>{t("hub.connection.add.startBody")}</Text>
       <Field label={t("hub.connection.common.host")}>{props.hostPicker}</Field>
       <Text style={styles.hint}>{t("hub.connection.add.personalBadge")}</Text>
-      {props.hasHosts && !props.canStartHub ? (
-        <Alert
-          variant="info"
-          title={t("hub.connection.add.cannotStartTitle")}
-          description={t("hub.connection.add.cannotStartBody")}
-        />
+      {!props.canStartHub ? (
+        <View style={styles.form}>
+          <Alert
+            variant="info"
+            title={t("hub.connection.startHelp.title", { host: props.startHostLabel })}
+            description={t(
+              `hub.connection.startHelp.reasons.${hubStartReason(props.startAvailability)}`,
+            )}
+          />
+          <Text style={styles.hint}>
+            {t(`hub.connection.startRecovery.steps.${hubStartReason(props.startAvailability)}`)}
+          </Text>
+          {props.startAvailability.status !== "locked" ? (
+            <Button variant="outline" onPress={props.recoverStart} disabled={props.busy}>
+              {t(`hub.connection.startRecovery.actions.${hubStartReason(props.startAvailability)}`)}
+            </Button>
+          ) : null}
+        </View>
       ) : null}
       <DeviceLabelField {...props} />
       <Text style={styles.hint}>{t("hub.connection.add.preferTailscale")}</Text>

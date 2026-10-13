@@ -4470,6 +4470,26 @@ describe("readInitialDaemonConnectionHint", () => {
 });
 
 describe("HostRuntimeStore initial connection hint bootstrap", () => {
+  it("does not probe an unrelated localhost daemon when the served Host requires pairing", async () => {
+    const probes: string[] = [];
+    const store = new HostRuntimeStore({
+      deps: {
+        createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
+        connectToDaemon: async ({ connection }) => {
+          if (connection.type === "directTcp") probes.push(connection.endpoint);
+          throw new Error("Password required");
+        },
+        getClientId: async () => "cid_served_host",
+        readInitialConnectionHint: () => ({ listen: "127.0.0.1:16872", useTls: false }),
+      },
+      storage: createMemoryHostRuntimeStorage(),
+    });
+    await store.boot();
+    expect(probes).toEqual(["localhost:16872"]);
+    expect(store.getHosts()).toEqual([]);
+    store.syncHosts([]);
+  });
+
   it("starts saved remote-host probes while desktop daemon startup is still pending", async () => {
     const host = makeHost({
       serverId: "srv_remote_saved",
