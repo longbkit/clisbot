@@ -6,6 +6,10 @@ Managed Access is a **per-daemon** setting. It decides whether the daemon forces
 
 Clisbot defaults to `external` from the first run, with no environment variable or flag. The daemon asks for a ticket only once it belongs to a Hub: before enrollment no Hub issues tickets, so you connect, sign in, and run `clisbot hub connect` as usual. After enrollment, the daemon closes sessions without a ticket, and from then on every connection needs one. Losing the Hub (revoked, or in the middle of disconnecting) keeps the ticket requirement; the daemon stops asking for tickets only after the Owner finishes disconnecting. Setting `daemon.managedAccess.mode` in `config.json` overrides the default.
 
+New personal Bot and Desktop provisioning explicitly select protected `off` access so the
+Owner can use the Host independently of Hub. This does not change the raw daemon default or
+an existing home's policy. See [personal device access](../../../features/access/device-pairing.md).
+
 |                                         | `off`                                               | `external`                                           |
 | --------------------------------------- | --------------------------------------------------- | ---------------------------------------------------- |
 | App connection                          | The ordinary trusted Clisbot flow                   | Needs an access ticket issued by the Hub             |
