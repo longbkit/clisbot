@@ -1,7 +1,9 @@
 # Pinned upstream main integration — CTO-015
 
-Status: merge candidate verified within the scope below; Atlas independent review and
-local `main` promotion remain pending.
+Status: independently accepted by Atlas and integrated into local `main` on
+2026-10-13. Reviewed candidate: `2b5bd1ce95601cc7a6e92caaad40afa095f7bc13`;
+merge commit: `f2cf565bf688e6a7165854d6fa9b6e05e3c65738`. This final audit update
+changes documentation only.
 Procedure: [upstream sync playbook](../../guides/developer-guide/upstream-sync-and-contribution.md).
 The owner explicitly authorized local promotion of this freshly fetched main snapshot
 instead of a release tag. This exception does not authorize pushing, publishing,
@@ -92,9 +94,11 @@ Project survived a user filter, obscuring zero-result state. The focused real-br
 fixture reproduces this (expected 0 headers, received 1), then the narrow guard adds
 `!hasMetadataFilter`. The fixture also checks no-filter and selected-Project-only
 preservation, user/channel filters with background shown/hidden, and zero-result
-recovery. The rebuilt production-browser case passes; the three affected sidebar unit files
-pass 19 tests. Normal revision hooks and independent acceptance are recorded in
-the CTO evidence.
+recovery. Two focused production-browser cases pass in separate runs (user filter and
+channel/zero-result recovery); the three affected sidebar unit files pass 19 tests.
+The first green log covered only the user case; the separate channel case then
+passed in 28.8 seconds against the unchanged export. Normal revision hooks and
+independent acceptance are recorded in the CTO evidence.
 
 The compact header preserves Home back navigation, managed Shell/profile access,
 focused heartbeat controls, copy-path behavior and sidebar theme subscription.
@@ -184,3 +188,20 @@ sends were used. The independent CTO-011 worktree and WIP were not incorporated.
 The weakest evidence is native rendering/startup and full packaged cross-OS
 operation. Canonical unrelated dirty docs have exact byte/diff backups and will
 be rechecked immediately around the already-authorized local main promotion.
+
+## Local integration and cleanup
+
+Atlas independently accepted APP-1 and the focused server review, then issued final
+acceptance for the reviewed candidate. Canonical `main` fast-forwarded from
+`f87b35fcd0a92884f48624cdd935d9a38d15727a` to
+`2b5bd1ce95601cc7a6e92caaad40afa095f7bc13`; no intervening commits needed
+reconciliation. The staged area stayed empty. Both unrelated dirty docs retained
+exact byte hashes and their complete binary-capable Git diff. Canonical workspace
+dependencies resolve with the unchanged lock; no dependency-install churn.
+Required generated outputs are refreshed without restarting the primary daemon.
+
+The isolated test heartbeat was deleted after its completed one-run check. Only
+task-owned candidate/baseline process groups were stopped; ports 7315 and 7316
+are closed. Recovery/transform worktrees and evidence remain. Exact pre/post
+commits, hashes, commands, readiness and cleanup PIDs are recorded in external
+CTO evidence `integration.json`. No push, release or sync-verified tag.
