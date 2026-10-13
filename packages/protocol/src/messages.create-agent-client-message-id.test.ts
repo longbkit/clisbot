@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SessionInboundMessageSchema } from "./messages";
-import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "@getpaseo/protocol/agent-title-limits";
+import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "@clisbot/protocol/agent-title-limits";
 
 describe("create_agent_request clientMessageId", () => {
   it("accepts clientMessageId for stable initial prompt transfer", () => {

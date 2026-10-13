@@ -3,12 +3,12 @@ import { expandUserPath } from "../../classify.js";
 import { createInterface } from "node:readline/promises";
 import { reviewPluginUpdates, type UpdateOutcome } from "./update.js";
 import { Command } from "commander";
-import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
+import type { PluginListItem, PluginLogEntry } from "@clisbot/protocol/messages";
 import {
   formatPluginSourceReference,
   parsePluginSourceReference,
   formatPluginIdentity,
-} from "@getpaseo/protocol/plugin-source-reference";
+} from "@clisbot/protocol/plugin-source-reference";
 import type { CommandOptions, ListResult, OutputSchema, SingleResult } from "../../output/index.js";
 import { withOutput } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions, addJsonOption } from "../../utils/command-options.js";
@@ -126,7 +126,7 @@ export async function runPluginInstallCommand(
   _command: Command,
 ): Promise<SingleResult<PluginListItem>> {
   process.stderr.write(
-    "Trusting plugin code: server code and preparation commands run unsandboxed on the daemon host; client code runs inside Paseo. Dependencies and future updates are part of the codebase you trust.\n",
+    "Trusting plugin code: server code and preparation commands run unsandboxed on the daemon host; client code runs inside Clisbot. Dependencies and future updates are part of the codebase you trust.\n",
   );
   const reference = parsePluginSourceReference(source);
   let resolvedSource = source;
@@ -236,7 +236,7 @@ export function createPluginCommand(): Command {
         "<source>",
         "Registry owner/slug or host/owner/slug, host directory, explicit git:owner/repo or Git URL, or npm: source",
       )
-      .option("--id <id>", "Runtime plugin ID (defaults to paseo-plugin.json id)")
+      .option("--id <id>", "Runtime plugin ID (defaults to clisbot-plugin.json id)")
       .option("--ref <ref>", "Git branch, tag, or commit")
       .option("--path <path>", "Legacy form of the :plugin/path source suffix"),
   ).action(withOutput(runPluginInstallCommand));

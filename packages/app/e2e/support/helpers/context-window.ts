@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
-import type { UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { UsageReportEntry } from "@clisbot/protocol/messages";
 import { expectComposerVisible } from "./composer";
 import { openAgentRoute, seedMockAgentWorkspace } from "./mock-agent";
 import { installUsageReportsFixture, type UsageListResponse } from "./usage-reports";
@@ -169,9 +169,9 @@ export async function scriptAgentUsage(page: Page): Promise<AgentUsageScript> {
   };
 }
 
-/** Set PASEO_QA_SCREENSHOT_DIR to keep a QA screenshot. */
+/** Set CLISBOT_QA_SCREENSHOT_DIR to keep a QA screenshot. */
 export async function qaScreenshot(page: Page, name: string): Promise<void> {
-  const directory = process.env.PASEO_QA_SCREENSHOT_DIR;
+  const directory = process.env.CLISBOT_QA_SCREENSHOT_DIR;
   if (!directory) return;
   // Let the sheet and hover card animations settle.
   await page.waitForTimeout(600);

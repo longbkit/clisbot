@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { PaseoBrowserWebviewRegistry } from "./registry.js";
+import { ClisbotBrowserWebviewRegistry } from "./registry.js";
 
-describe("PaseoBrowserWebviewRegistry", () => {
+describe("ClisbotBrowserWebviewRegistry", () => {
   it("keeps one authoritative webContents target per host and browser", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 1,
@@ -34,7 +34,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps the active browser when the same guest registers again", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 1,
@@ -60,7 +60,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("ignores stale destroy events after a duplicate browserId moved", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 1,
@@ -78,7 +78,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("returns the active browser only from the requested host window", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 11,
@@ -112,7 +112,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps active updates and clears inside their owning host window", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 11,
@@ -151,7 +151,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps same-browser active references in separate host windows", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 11,
@@ -181,7 +181,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("removes only the closing host's same-browser guest", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 11,
@@ -206,7 +206,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("unregisters a browser only from the requesting host", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
     registry.registerWebContents({
       webContentsId: 11,
       browserId: "browser-a",
@@ -227,7 +227,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps another host's active browser when one guest is destroyed", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.registerWebContents({
       webContentsId: 11,
@@ -258,7 +258,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps the same-window active selection made before the guest attaches", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.setWorkspaceActiveBrowser({
       hostWebContentsId: 101,
@@ -275,7 +275,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps a pre-attach selection when another host attaches the same browser", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.setWorkspaceActiveBrowser({
       hostWebContentsId: 101,
@@ -293,7 +293,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("keeps a pre-attach selection when another host tears down the same browser", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
 
     registry.setWorkspaceActiveBrowser({
       hostWebContentsId: 101,
@@ -316,7 +316,7 @@ describe("PaseoBrowserWebviewRegistry", () => {
   });
 
   it("reports when another host still owns the same browser", () => {
-    const registry = new PaseoBrowserWebviewRegistry();
+    const registry = new ClisbotBrowserWebviewRegistry();
     registry.registerWebContents({
       webContentsId: 11,
       browserId: "browser-a",

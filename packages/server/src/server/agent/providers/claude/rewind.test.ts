@@ -26,7 +26,7 @@ describe("Claude rewind", () => {
     expect(sessionId).toBe("forked-session-1");
   });
 
-  test("translates Paseo timeline message ids before forking", async () => {
+  test("translates Clisbot timeline message ids before forking", async () => {
     const claude = new FakeClaudeSdk();
     let sessionId = "original-session";
 
@@ -55,7 +55,7 @@ describe("Claude rewind", () => {
     expect(claude.recordedFileRewinds).toEqual([{ userMessageId: "user-message-1" }]);
   });
 
-  test("translates Paseo timeline message ids before rewinding files", async () => {
+  test("translates Clisbot timeline message ids before rewinding files", async () => {
     const claude = new FakeClaudeSdk();
 
     await revertClaudeFiles({

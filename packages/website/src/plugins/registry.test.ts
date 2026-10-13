@@ -26,7 +26,7 @@ const plugin: Plugin = {
   repository: { url: "https://github.com/acme/example" },
   artifact: {
     kind: "npm",
-    package: "paseo-example",
+    package: "clisbot-example",
     version: "1.2.3",
     resolved: "https://registry.npmjs.org/example.tgz",
     integrity: "sha512-YWJj",
@@ -166,7 +166,7 @@ describe("plugin registry", () => {
   it("counts repeated install reports from the same IP once per hour", async () => {
     let now = Date.now();
     const cache = memoryKv(() => now);
-    const headers = { "X-Paseo-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
+    const headers = { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
     await resolvePlugin(cache, headers);
     now += 3_599_000;
     await resolvePlugin(cache, headers);
@@ -181,7 +181,7 @@ describe("plugin registry", () => {
   });
   it("counts different IPs and plugins independently, including query install intent", async () => {
     const cache = memoryKv();
-    const first = { "X-Paseo-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
+    const first = { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
     await resolvePlugin(cache, first);
     await resolvePlugin(cache, { "CF-Connecting-IP": "2001:db8::1" }, { query: "?intent=install" });
     await resolvePlugin(cache, first, { id: "acme/other" });
@@ -198,9 +198,9 @@ describe("plugin registry", () => {
   });
   it("does not count without a Cloudflare IP or install intent", async () => {
     const cache = memoryKv();
-    await resolvePlugin(cache, { "X-Paseo-Install": "1", "X-Forwarded-For": "192.0.2.1" });
+    await resolvePlugin(cache, { "X-Clisbot-Install": "1", "X-Forwarded-For": "192.0.2.1" });
     await resolvePlugin(cache, {}, { query: "?intent=install" });
-    await resolvePlugin(cache, { "X-Paseo-Install": "1", "CF-Connecting-IP": "" });
+    await resolvePlugin(cache, { "X-Clisbot-Install": "1", "CF-Connecting-IP": "" });
     await resolvePlugin(cache, { "CF-Connecting-IP": "192.0.2.1" });
     expect(await readInstallCounts(cache, [plugin.id], new Date())).toEqual({
       [plugin.id]: { week: 0, month: 0, all: 0 },
@@ -210,7 +210,7 @@ describe("plugin registry", () => {
   it("preserves historical totals and the installs endpoint response", async () => {
     const cache = memoryKv();
     await cache.put(`plugin-installs:${plugin.id}`, "40");
-    const headers = { "X-Paseo-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
+    const headers = { "X-Clisbot-Install": "1", "CF-Connecting-IP": "192.0.2.1" };
     await resolvePlugin(cache, headers);
     await resolvePlugin(cache, headers);
     const base = "https://registry.example.test";
@@ -229,7 +229,7 @@ describe("plugin registry", () => {
       }),
     );
     const response = await handlePluginRegistryRequest(
-      new Request("https://paseo.sh/api/plugins/installs"),
+      new Request("https://clisbot.com/api/plugins/installs"),
       { PLUGINS_REGISTRY_URL: base },
       { cache, waitUntil: () => undefined },
     );
@@ -269,7 +269,7 @@ describe("plugin registry", () => {
       named("acme/kit", "PromptKit", "Rewrite prompts"),
       named("omp/tools", "Tools", "Helpers", "omp"),
       named("acme/history", "History", "Inspect raw composer records"),
-      named("acme/omp", "OMP", "Paseo integration for OMP"),
+      named("acme/omp", "OMP", "Clisbot integration for OMP"),
     ];
     expect(searchPlugins(plugins, "omp").map((p) => p.id)).toEqual([
       "acme/omp",
@@ -290,7 +290,7 @@ describe("plugin registry", () => {
     );
   });
   it("offers a registry install command", () => {
-    expect(installCommand(plugin)).toBe("paseo plugin add acme/example");
+    expect(installCommand(plugin)).toBe("clisbot plugin add acme/example");
     expect(formatInstalls(1250)).toBe("1.3k");
   });
   it("reports bugs on the source repository's GitHub issue tracker", () => {
@@ -342,7 +342,7 @@ async function resolvePlugin(
   const pending: Promise<unknown>[] = [];
   const path = staticDetail ? `/plugins/${id}.json` : `/api/plugins/resolve/${id}`;
   const response = await handlePluginRegistryRequest(
-    new Request(`https://paseo.sh${path}${query}`, { headers }),
+    new Request(`https://clisbot.com${path}${query}`, { headers }),
     { PLUGINS_REGISTRY_URL: base },
     { cache, waitUntil: (promise) => pending.push(promise) },
   );

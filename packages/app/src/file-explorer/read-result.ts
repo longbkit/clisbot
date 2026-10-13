@@ -1,4 +1,4 @@
-import type { FileReadResult } from "@getpaseo/client/internal/daemon-client";
+import type { FileReadResult } from "@clisbot/client/internal/daemon-client";
 import type { ExplorerFile } from "@/stores/session-store";
 
 export function explorerFileFromReadResult(file: FileReadResult): ExplorerFile {

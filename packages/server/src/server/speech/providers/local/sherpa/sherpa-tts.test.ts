@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 function createTts(numThreads?: number, beforeGenerate?: () => Promise<void>) {
-  const modelDir = mkdtempSync(join(tmpdir(), "paseo-tts-"));
+  const modelDir = mkdtempSync(join(tmpdir(), "clisbot-tts-"));
   directories.push(modelDir);
   for (const name of ["model.onnx", "voices.bin", "tokens.txt"])
     writeFileSync(join(modelDir, name), "");

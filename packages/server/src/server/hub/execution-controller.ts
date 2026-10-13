@@ -6,7 +6,7 @@ import type {
   HubExecutionAgentValidationIssue,
   HubExecutionControlRequest,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import {
   ProviderOptionsValidationError,
   ToolPolicyUnsupportedError,

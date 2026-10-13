@@ -173,14 +173,14 @@ describe("PiCliRuntime", () => {
 
     await runtime.startSession({
       cwd: "/workspace/project",
-      mcpConfigPath: "/tmp/paseo-pi-mcp/mcp.json",
+      mcpConfigPath: "/tmp/clisbot-pi-mcp/mcp.json",
     });
 
     expect(launches).toEqual([
       expect.objectContaining({
         cwd: "/workspace/project",
-        mcpConfigPath: "/tmp/paseo-pi-mcp/mcp.json",
-        argv: ["pi", "--mode", "rpc", "--mcp-config", "/tmp/paseo-pi-mcp/mcp.json"],
+        mcpConfigPath: "/tmp/clisbot-pi-mcp/mcp.json",
+        argv: ["pi", "--mode", "rpc", "--mcp-config", "/tmp/clisbot-pi-mcp/mcp.json"],
       }),
     ]);
   });

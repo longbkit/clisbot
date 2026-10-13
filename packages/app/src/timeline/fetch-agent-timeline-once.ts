@@ -1,4 +1,4 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 
 type TimelineClient = Pick<DaemonClient, "fetchAgentTimeline">;
 type TimelineRequest = Parameters<TimelineClient["fetchAgentTimeline"]>[1];

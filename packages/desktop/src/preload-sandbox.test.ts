@@ -3,12 +3,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { PASEO_BROWSER_PROFILE_PARTITION } from "./features/browser-profile.js";
+import { CLISBOT_BROWSER_PROFILE_PARTITION } from "./features/browser-profile.js";
 
 // The preload runs inside Electron's sandbox and is tsc-compiled (not bundled), so at
 // runtime it may only load Electron's sandbox allowlist. Any other module (local or
 // third-party) emits a require() that the sandbox rejects synchronously, aborting the
-// preload before contextBridge.exposeInMainWorld runs and leaving window.paseoDesktop
+// preload before contextBridge.exposeInMainWorld runs and leaving window.clisbotDesktop
 // undefined. That regression (0.1.108, #2103) is what this test guards against.
 const SANDBOX_ALLOWLIST = new Set(["electron"]);
 
@@ -89,11 +89,11 @@ describe("preload sandbox safety", () => {
 
   it("inlines the browser profile partition instead of importing it", () => {
     const source = readFileSync(preloadPath, "utf8");
-    const match = source.match(/const\s+PASEO_BROWSER_PROFILE_PARTITION\s*=\s*"([^"]+)"/);
+    const match = source.match(/const\s+CLISBOT_BROWSER_PROFILE_PARTITION\s*=\s*"([^"]+)"/);
     expect(
       match,
-      "PASEO_BROWSER_PROFILE_PARTITION not found as a double-quoted string literal in preload.ts",
+      "CLISBOT_BROWSER_PROFILE_PARTITION not found as a double-quoted string literal in preload.ts",
     ).not.toBeNull();
-    expect(match![1]).toBe(PASEO_BROWSER_PROFILE_PARTITION);
+    expect(match![1]).toBe(CLISBOT_BROWSER_PROFILE_PARTITION);
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
+import type { ToolPolicy } from "@clisbot/protocol/agent-types";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type {

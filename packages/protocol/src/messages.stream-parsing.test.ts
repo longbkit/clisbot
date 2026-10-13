@@ -98,18 +98,18 @@ describe("shared messages stream parsing", () => {
             item: {
               type: "tool_call",
               callId: "setup-1",
-              name: "paseo_worktree_setup",
+              name: "clisbot_worktree_setup",
               status: "completed",
               detail: {
                 type: "worktree_setup",
-                worktreePath: "/repo/.paseo/worktrees/feature",
+                worktreePath: "/repo/.clisbot/worktrees/feature",
                 branchName: "feature",
                 log: "setup complete",
                 commands: [
                   {
                     index: 1,
                     command: "npm install",
-                    cwd: "/repo/.paseo/worktrees/feature",
+                    cwd: "/repo/.clisbot/worktrees/feature",
                     status: "completed",
                     exitCode: 0,
                     durationMs: 100,
@@ -367,8 +367,8 @@ describe("shared messages stream parsing", () => {
     const responseParsed = SessionOutboundMessageSchema.safeParse({
       type: "directory_suggestions_response",
       payload: {
-        directories: ["/Users/test/projects/paseo"],
-        entries: [{ path: "/Users/test/projects/paseo", kind: "directory" }],
+        directories: ["/Users/test/projects/clisbot"],
+        entries: [{ path: "/Users/test/projects/clisbot", kind: "directory" }],
         error: null,
         requestId: "req-dir-1",
       },

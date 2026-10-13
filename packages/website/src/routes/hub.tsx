@@ -24,8 +24,8 @@ import { pageMeta } from "~/meta";
 export const Route = createFileRoute("/hub")({
   head: () =>
     pageMeta(
-      "Paseo Hub - GitHub, Slack, and Discord triggers",
-      "Run Paseo Hub yourself and start agents on your own machines from GitHub, Slack, and Discord.",
+      "Clisbot Hub - GitHub, Slack, and Discord triggers",
+      "Run Clisbot Hub yourself and start agents on your own machines from GitHub, Slack, and Discord.",
       "/hub",
     ),
   loader: async () => {
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/hub")({
   component: Hub,
 });
 
-const HOSTED_HUB_URL = "https://hub.paseo.sh";
+const HOSTED_HUB_URL = "https://hub.clisbot.com";
 
 const LINK_CLASS = "underline hover:text-white/80";
 
@@ -46,7 +46,7 @@ function Hub() {
   const { plans } = Route.useLoaderData();
   return (
     <SiteShell width="default">
-      <h1 className="text-3xl font-medium tracking-tight mb-4">Paseo Hub</h1>
+      <h1 className="text-3xl font-medium tracking-tight mb-4">Clisbot Hub</h1>
       <p className="text-lg text-white/70 leading-relaxed max-w-2xl">
         An optional service that sits above your daemons and gives them extra capabilities.
       </p>
@@ -287,13 +287,13 @@ function DiscordDemo() {
           <span className="font-mono text-xs text-white/50">#engineering</span>
         </div>
         <div className="space-y-5 p-5">
-          <DemoMessage author="moboudra" time="09:41">
+          <DemoMessage author="long" time="09:41">
             <p>
               <Mention /> show me the latest P0 issues
             </p>
           </DemoMessage>
 
-          <DemoMessage author="paseo-bot" time="09:41" bot>
+          <DemoMessage author="clisbot-bot" time="09:41" bot>
             <p>Three P0 issues are open:</p>
             <ul className="space-y-1">
               {DEMO_ISSUES.map((issue) => (
@@ -305,17 +305,17 @@ function DiscordDemo() {
             </ul>
           </DemoMessage>
 
-          <DemoMessage author="moboudra" time="09:43">
+          <DemoMessage author="long" time="09:43">
             <p>
               <Mention /> create a pull request for the first one
             </p>
           </DemoMessage>
 
-          <DemoMessage author="paseo-bot" time="09:48" bot>
+          <DemoMessage author="clisbot-bot" time="09:48" bot>
             <p>
               Ran on <span className="font-mono text-white/50">macbook-pro</span>. Opened{" "}
               <span className="text-white/80 underline decoration-white/20">
-                getpaseo/paseo#1234
+                longbkit/clisbot#1234
               </span>{" "}
               with a fix for the terminal writes.
             </p>
@@ -338,7 +338,7 @@ function DiscordDemo() {
 }
 
 function Mention() {
-  return <span className="rounded bg-indigo-400/15 px-1 py-0.5 text-indigo-200">@paseo-bot</span>;
+  return <span className="rounded bg-indigo-400/15 px-1 py-0.5 text-indigo-200">@clisbot-bot</span>;
 }
 
 function DemoMessage({
@@ -487,7 +487,7 @@ function Shape() {
 
           <Connector label="direct connection or relay" />
 
-          <DiagramRow label="Paseo apps">
+          <DiagramRow label="Clisbot apps">
             {DIAGRAM_CLIENTS.map((client) => (
               <DiagramCard key={client} name={client} />
             ))}
@@ -553,14 +553,14 @@ function FaqSection() {
       <h2 className="text-3xl font-medium">FAQ</h2>
       <div className="space-y-6">
         <FAQItem question="What is the Hub?">
-          A separate service that sits above your Paseo daemons. You connect one or more daemons to
-          it and it gives them GitHub, Slack, and Discord triggers, with collaboration features
-          planned. Paseo works fully without it.
+          A separate service that sits above your Clisbot daemons. You connect one or more daemons
+          to it and it gives them GitHub, Slack, and Discord triggers, with collaboration features
+          planned. Clisbot works fully without it.
         </FAQItem>
         <FAQItem question="Why is it a separate service instead of part of the daemon?">
           <p>
             The daemon stays one lean executable on one machine. The Hub talks to daemons over the
-            same RPCs the app and the CLI use, so anyone can build their own hub on top of Paseo.
+            same RPCs the app and the CLI use, so anyone can build their own hub on top of Clisbot.
           </p>
           <p>
             It also has a different job. The Hub is meant to be exposed to the internet, shared with
@@ -568,7 +568,7 @@ function FaqSection() {
           </p>
         </FAQItem>
         <FAQItem question="Can I run it myself?">
-          Yes. Run <code>npx @getpaseo/hub</code> and complete setup in the browser. The source is
+          Yes. Run <code>npx @clisbot/hub</code> and complete setup in the browser. The source is
           available on{" "}
           <a href="https://github.com/getpaseo/hub" className={LINK_CLASS}>
             GitHub
@@ -580,7 +580,7 @@ function FaqSection() {
           covers more involved deployments.
         </FAQItem>
         <FAQItem question="What do I need to run it?">
-          Node.js and a running Paseo daemon. Hub guides you through connecting the provider apps
+          Node.js and a running Clisbot daemon. Hub guides you through connecting the provider apps
           you want.
         </FAQItem>
         <FAQItem question="Is there a hosted version?">
@@ -596,7 +596,8 @@ function FaqSection() {
         </FAQItem>
         <FAQItem question="Do I have to move my team to a new tool?">
           No. The Hub works in the Slack or Discord your team already uses, and on the daemons you
-          already run. When the work gets serious you switch to the Paseo app on those same daemons.
+          already run. When the work gets serious you switch to the Clisbot app on those same
+          daemons.
         </FAQItem>
         <FAQItem question="Which agents does it run?">
           Whichever ones your daemons have configured, with your own subscriptions and skills. The

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import pino from "pino";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { createDaemonTestContext } from "../test-utils/daemon-test-context.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createMessageCollector } from "../test-utils/message-collector.js";
@@ -12,7 +12,7 @@ import { createFakeCodexAppServer } from "./providers/codex/test-utils/fake-app-
 import type { AgentClient } from "./agent-sdk-types.js";
 
 test("projects Codex child history and confines old-client degradation to the child transcript", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "paseo-projected-contract-"));
+  const cwd = await mkdtemp(join(tmpdir(), "clisbot-projected-contract-"));
   const app = createFakeCodexAppServer();
   const session = new CodexAppServerAgentSession(
     { provider: "codex", cwd },

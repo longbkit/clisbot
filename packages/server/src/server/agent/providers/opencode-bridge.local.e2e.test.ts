@@ -12,7 +12,7 @@ import {
   getRealProviderConfig,
   getRealProviderRuntimeSettings,
 } from "../../daemon-e2e/real-provider-test-config.js";
-import type { PaseoToolCatalog } from "../tools/types.js";
+import type { ClisbotToolCatalog } from "../tools/types.js";
 import { OpenCodeAgentClient } from "./opencode-agent.js";
 import { OpenCodeV2AgentClient } from "./opencode/v2/agent.js";
 import { OpenCodeBridge } from "./opencode/bridge.js";
@@ -24,7 +24,7 @@ import {
 } from "./opencode/test-utils/v2-local-e2e-helpers.js";
 
 test("real OpenCode server persists provider permissions across creation and resume", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-permissions-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-permissions-"));
   const cwd = path.join(root, "repo");
   const logger = createTestLogger();
   const manager = new OpenCodeServerManager({ logger, resolveHomeDir: () => root });
@@ -70,11 +70,11 @@ test("real OpenCode server persists provider permissions across creation and res
 }, 120_000);
 
 test("real OpenCode server shares one process while shell.env stays session-scoped", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-real-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-real-"));
   const firstCwd = path.join(root, "first");
   const secondCwd = path.join(root, "second");
   const logger = createTestLogger();
-  const bridge = new OpenCodeBridge({ paseoHome: root, logger });
+  const bridge = new OpenCodeBridge({ clisbotHome: root, logger });
   await bridge.start();
   const firstTools = createCallerCatalog("real-agent-one");
   const secondTools = createCallerCatalog("real-agent-two");
@@ -106,8 +106,8 @@ test("real OpenCode server shares one process while shell.env stays session-scop
       },
       {
         agentId: "real-agent-one",
-        env: { PASEO_AGENT_ID: "real-agent-one", PASEO_AGENT_CWD: firstCwd },
-        paseoTools: firstTools,
+        env: { CLISBOT_AGENT_ID: "real-agent-one", CLISBOT_AGENT_CWD: firstCwd },
+        clisbotTools: firstTools,
       },
       { persistSession: false },
     );
@@ -115,8 +115,8 @@ test("real OpenCode server shares one process while shell.env stays session-scop
       { provider: "opencode", cwd: secondCwd },
       {
         agentId: "real-agent-two",
-        env: { PASEO_AGENT_ID: "real-agent-two", PASEO_AGENT_CWD: secondCwd },
-        paseoTools: secondTools,
+        env: { CLISBOT_AGENT_ID: "real-agent-two", CLISBOT_AGENT_CWD: secondCwd },
+        clisbotTools: secondTools,
       },
       { persistSession: false },
     );
@@ -128,13 +128,13 @@ test("real OpenCode server shares one process while shell.env stays session-scop
         sessionID: requireSessionId(first),
         directory: firstCwd,
         agent: "build",
-        command: 'printf "%s|%s" "$PASEO_AGENT_ID" "$PASEO_AGENT_CWD"',
+        command: 'printf "%s|%s" "$CLISBOT_AGENT_ID" "$CLISBOT_AGENT_CWD"',
       }),
       sdk.session.shell({
         sessionID: requireSessionId(second),
         directory: secondCwd,
         agent: "build",
-        command: 'printf "%s|%s" "$PASEO_AGENT_ID" "$PASEO_AGENT_CWD"',
+        command: 'printf "%s|%s" "$CLISBOT_AGENT_ID" "$CLISBOT_AGENT_CWD"',
       }),
     ]);
 
@@ -155,14 +155,14 @@ test("real OpenCode server shares one process while shell.env stays session-scop
       },
       {
         agentId: "real-agent-one",
-        env: { PASEO_AGENT_ID: "real-agent-one", PASEO_AGENT_CWD: firstCwd },
-        paseoTools: firstTools,
+        env: { CLISBOT_AGENT_ID: "real-agent-one", CLISBOT_AGENT_CWD: firstCwd },
+        clisbotTools: firstTools,
       },
       { persistSession: false },
     );
     const agentResult = await first.run(
       [
-        "Use the bash tool to run: env | grep -E '^(PASEO_AGENT_ID|PASEO_AGENT_CWD)='",
+        "Use the bash tool to run: env | grep -E '^(CLISBOT_AGENT_ID|CLISBOT_AGENT_CWD)='",
         "Then report both values in your response:",
         "AGENT=real-agent-one",
         `CWD=${firstCwd}`,
@@ -179,7 +179,7 @@ test("real OpenCode server shares one process while shell.env stays session-scop
 
     const callerResult = await first.run(
       [
-        "Use the paseo_report_caller_agent_id tool to read your Paseo caller agent ID.",
+        "Use the clisbot_report_caller_agent_id tool to read your Clisbot caller agent ID.",
         "Then report that ID in your response.",
       ].join("\n"),
     );
@@ -187,7 +187,7 @@ test("real OpenCode server shares one process while shell.env stays session-scop
       expect.arrayContaining([
         expect.objectContaining({
           type: "tool_call",
-          name: "paseo_report_caller_agent_id",
+          name: "clisbot_report_caller_agent_id",
           status: "completed",
         }),
       ]),
@@ -203,11 +203,11 @@ test("real OpenCode server shares one process while shell.env stays session-scop
   }
 }, 240_000);
 
-test("real OpenCode server asks before running a Paseo tool with an ask rule", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-ask-"));
+test("real OpenCode server asks before running a Clisbot tool with an ask rule", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-ask-"));
   const cwd = path.join(root, "repo");
   const logger = createTestLogger();
-  const bridge = new OpenCodeBridge({ paseoHome: root, logger });
+  const bridge = new OpenCodeBridge({ clisbotHome: root, logger });
   await bridge.start();
   const catalog = createCallerCatalog("ask-rule-agent");
   bridge.setManifestCatalog(catalog);
@@ -216,7 +216,7 @@ test("real OpenCode server asks before running a Paseo tool with an ask rule", a
     ...realSettings,
     env: {
       ...realSettings.env,
-      OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { "paseo_*": "ask" } }),
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { "clisbot_*": "ask" } }),
     },
   };
   const manager = new OpenCodeServerManager({
@@ -235,7 +235,7 @@ test("real OpenCode server asks before running a Paseo tool with an ask rule", a
     await mkdir(cwd);
     session = await client.createSession(
       { ...getRealProviderConfig("opencode"), cwd },
-      { agentId: "ask-rule-agent", paseoTools: catalog },
+      { agentId: "ask-rule-agent", clisbotTools: catalog },
       { persistSession: false },
     );
     const asked: string[] = [];
@@ -256,11 +256,11 @@ test("real OpenCode server asks before running a Paseo tool with an ask rule", a
     });
 
     await session.run(
-      "Call the paseo_report_caller_agent_id tool once, then reply with its exact result. Do not use any other tools.",
+      "Call the clisbot_report_caller_agent_id tool once, then reply with its exact result. Do not use any other tools.",
     );
 
-    expect(completedTools).toContain("paseo_report_caller_agent_id");
-    expect(asked).toContain("paseo_report_caller_agent_id");
+    expect(completedTools).toContain("clisbot_report_caller_agent_id");
+    expect(asked).toContain("clisbot_report_caller_agent_id");
   } finally {
     await session?.close();
     await manager.shutdown();
@@ -269,11 +269,11 @@ test("real OpenCode server asks before running a Paseo tool with an ask rule", a
   }
 }, 180_000);
 
-function createCallerCatalog(callerAgentId: string): PaseoToolCatalog {
+function createCallerCatalog(callerAgentId: string): ClisbotToolCatalog {
   const tool = {
     name: "report_caller_agent_id",
-    title: "Report Paseo caller agent ID",
-    description: "Returns the caller agent ID assigned by Paseo.",
+    title: "Report Clisbot caller agent ID",
+    description: "Returns the caller agent ID assigned by Clisbot.",
     inputSchema: {},
     async handler() {
       return { content: [{ type: "text", text: callerAgentId }] };
@@ -292,10 +292,10 @@ function createCallerCatalog(callerAgentId: string): PaseoToolCatalog {
 }
 
 test("v2 native tool bridge preserves caller identity", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-v2-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-v2-"));
   const logger = createTestLogger();
-  const bridge = new OpenCodeBridge({ paseoHome: root, logger });
-  const catalog = createCallerCatalog("paseo-v2-caller");
+  const bridge = new OpenCodeBridge({ clisbotHome: root, logger });
+  const catalog = createCallerCatalog("clisbot-v2-caller");
   bridge.setManifestCatalog(catalog);
   await bridge.start();
   const client = new OpenCodeV2AgentClient({ logger, bridge });
@@ -308,22 +308,26 @@ test("v2 native tool bridge preserves caller identity", async () => {
         model: process.env.OPENCODE_TEST_MODEL ?? "openai/gpt-6-astra",
         featureValues: { auto_accept: true },
       },
-      { agentId: "paseo-v2-caller", paseoTools: catalog, env: { PASEO_TEST_SCOPE: "V2_ENV_OK" } },
+      {
+        agentId: "clisbot-v2-caller",
+        clisbotTools: catalog,
+        env: { CLISBOT_TEST_SCOPE: "V2_ENV_OK" },
+      },
       { persistSession: false },
     );
     const result = await session.run(
-      "Call the paseo_report_caller_agent_id tool once, then reply with its exact result. Do not use any other tools.",
+      "Call the clisbot_report_caller_agent_id tool once, then reply with its exact result. Do not use any other tools.",
     );
-    expect(readAssistantText(result.timeline)).toContain("paseo-v2-caller");
+    expect(readAssistantText(result.timeline)).toContain("clisbot-v2-caller");
     const environment = await session.run(
-      "Use the shell tool to run printf '%s' \"$PASEO_TEST_SCOPE\", then reply with its output.",
+      "Use the shell tool to run printf '%s' \"$CLISBOT_TEST_SCOPE\", then reply with its output.",
     );
     expect(environment.finalText).toContain("V2_ENV_OK");
     expect(result.timeline).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           type: "tool_call",
-          name: "paseo_report_caller_agent_id",
+          name: "clisbot_report_caller_agent_id",
           status: "completed",
         }),
       ]),
@@ -369,7 +373,7 @@ test.each([
     expectedInitialTimeline,
     expectedNotices,
   }) => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-versioned-"));
+    const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-versioned-"));
     const client = new OpenCodeRuntimeClient(createTestLogger(), {
       command: {
         mode: "replace",

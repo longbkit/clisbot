@@ -16,9 +16,9 @@ describe("assistant image metadata", () => {
   it("extracts markdown image sources", () => {
     expect(
       extractAssistantImageSources(
-        'Before\n\n![local](/tmp/paseo.png)\n\n![remote](https://example.com/test.png "Remote")',
+        'Before\n\n![local](/tmp/clisbot.png)\n\n![remote](https://example.com/test.png "Remote")',
       ),
-    ).toEqual(["/tmp/paseo.png", "https://example.com/test.png"]);
+    ).toEqual(["/tmp/clisbot.png", "https://example.com/test.png"]);
   });
 
   it("keeps local image metadata scoped to its server and workspace", () => {

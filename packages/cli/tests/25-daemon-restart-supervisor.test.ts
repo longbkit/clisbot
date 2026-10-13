@@ -15,17 +15,17 @@ import {
   DaemonClient,
   DaemonConnectionError,
   type WebSocketLike,
-} from "@getpaseo/client/internal/daemon-client";
-import { readDaemonInstance, isSameDaemonInstance } from "@getpaseo/server/daemon-control";
-import { runLocalPaseo } from "./helpers/local-cli.ts";
+} from "@clisbot/client/internal/daemon-client";
+import { readDaemonInstance, isSameDaemonInstance } from "@clisbot/server/daemon-control";
+import { runLocalClisbot } from "./helpers/local-cli.ts";
 import { getAvailablePort } from "./helpers/network.ts";
 
 const pollIntervalMs = 100;
 const daemonReadyTimeoutMs = 120_000;
 const testEnv = {
-  PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: process.env.PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD ?? "0",
-  PASEO_DICTATION_ENABLED: process.env.PASEO_DICTATION_ENABLED ?? "0",
-  PASEO_VOICE_MODE_ENABLED: process.env.PASEO_VOICE_MODE_ENABLED ?? "0",
+  CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: process.env.CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD ?? "0",
+  CLISBOT_DICTATION_ENABLED: process.env.CLISBOT_DICTATION_ENABLED ?? "0",
+  CLISBOT_VOICE_MODE_ENABLED: process.env.CLISBOT_VOICE_MODE_ENABLED ?? "0",
 };
 
 function sleep(ms: number): Promise<void> {
@@ -45,8 +45,11 @@ function isProcessRunning(pid: number): boolean {
   }
 }
 
-async function readCapturedSupervisorLogs(paseoHome: string, recentLogs: string): Promise<string> {
-  const durableLogs = await readFile(join(paseoHome, "daemon.log"), "utf8").catch(() => "");
+async function readCapturedSupervisorLogs(
+  clisbotHome: string,
+  recentLogs: string,
+): Promise<string> {
+  const durableLogs = await readFile(join(clisbotHome, "daemon.log"), "utf8").catch(() => "");
   return `${recentLogs}\n${durableLogs}`;
 }
 
@@ -70,18 +73,18 @@ async function waitFor(
 console.log("=== Daemon Restart (supervisor regression) ===\n");
 
 const port = await getAvailablePort();
-const paseoHome = await mkdtemp(join(tmpdir(), "paseo-restart-supervisor-"));
+const clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-restart-supervisor-"));
 const cliRoot = join(import.meta.dirname, "..");
 const host = `127.0.0.1:${port}`;
 
 let supervisorProcess: ChildProcess | null = null;
 let recentSupervisorLogs = "";
 let client: DaemonClient | undefined;
-const availabilityLog = join(paseoHome, "availability.log");
+const availabilityLog = join(clisbotHome, "availability.log");
 
 try {
   if (process.platform !== "win32") {
-    const provider = join(paseoHome, "slow-provider");
+    const provider = join(clisbotHome, "slow-provider");
     await writeFile(
       provider,
       `#!${process.execPath}
@@ -93,14 +96,14 @@ import('node:fs').then(({appendFileSync}) => {
       { mode: 0o700 },
     );
     await writeFile(
-      join(paseoHome, "config.json"),
+      join(clisbotHome, "config.json"),
       JSON.stringify({
         version: 1,
         agents: { providers: { claude: { command: { mode: "replace", argv: [provider] } } } },
       }),
     );
   }
-  console.log("Test 1: start supervisor-entrypoint in dev mode with isolated PASEO_HOME");
+  console.log("Test 1: start supervisor-entrypoint in dev mode with isolated CLISBOT_HOME");
 
   supervisorProcess = spawn(
     process.execPath,
@@ -109,14 +112,14 @@ import('node:fs').then(({appendFileSync}) => {
       cwd: cliRoot,
       env: {
         ...Object.fromEntries(
-          Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_")),
+          Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
         ),
-        HOME: paseoHome,
-        USERPROFILE: paseoHome,
+        HOME: clisbotHome,
+        USERPROFILE: clisbotHome,
         ...testEnv,
-        PASEO_HOME: paseoHome,
-        PASEO_LISTEN: host,
-        PASEO_RELAY_ENABLED: "false",
+        CLISBOT_HOME: clisbotHome,
+        CLISBOT_LISTEN: host,
+        CLISBOT_RELAY_ENABLED: "false",
         CI: "true",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -130,10 +133,10 @@ import('node:fs').then(({appendFileSync}) => {
     recentSupervisorLogs = (recentSupervisorLogs + chunk.toString()).slice(-8000);
   });
 
-  let supervisor = await readDaemonInstance(paseoHome);
+  let supervisor = await readDaemonInstance(clisbotHome);
   await waitFor(
     async () => {
-      supervisor = await readDaemonInstance(paseoHome);
+      supervisor = await readDaemonInstance(clisbotHome);
       return supervisor?.pid === supervisorProcess?.pid && Boolean(supervisor?.listen);
     },
     daemonReadyTimeoutMs,
@@ -204,7 +207,7 @@ import('node:fs').then(({appendFileSync}) => {
     "worker pid should change after restart",
   );
   assert(isProcessRunning(statusAfterRestart.pid), "replacement worker should remain running");
-  const current = await readDaemonInstance(paseoHome);
+  const current = await readDaemonInstance(clisbotHome);
   assert(current?.listen, "daemon should remain bound after restart");
   assert.strictEqual(
     current.pid,
@@ -215,7 +218,10 @@ import('node:fs').then(({appendFileSync}) => {
     isSameDaemonInstance(supervisor, current),
     "supervisor start time should remain stable across restart",
   );
-  const capturedSupervisorLogs = await readCapturedSupervisorLogs(paseoHome, recentSupervisorLogs);
+  const capturedSupervisorLogs = await readCapturedSupervisorLogs(
+    clisbotHome,
+    recentSupervisorLogs,
+  );
   assert(
     capturedSupervisorLogs.includes('"msg":"Worker requested restart"') &&
       capturedSupervisorLogs.includes('"reason":"settings_update"'),
@@ -243,8 +249,8 @@ import('node:fs').then(({appendFileSync}) => {
     });
   }
 
-  await runLocalPaseo(["daemon", "stop", "--home", paseoHome, "--force"]);
-  await rm(paseoHome, { recursive: true, force: true });
+  await runLocalClisbot(["daemon", "stop", "--home", clisbotHome, "--force"]);
+  await rm(clisbotHome, { recursive: true, force: true });
 }
 
 if (recentSupervisorLogs.trim().length === 0) {

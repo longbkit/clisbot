@@ -10,7 +10,7 @@ category: Hub
 
 `slack.mention` fires when the bot is mentioned in a channel where it is present. Direct messages, slash commands, and interactive components do not produce this trigger.
 
-`.paseo/workflows/slack-help.yml`:
+`.clisbot/workflows/slack-help.yml`:
 
 ```yaml
 name: slack-help
@@ -29,7 +29,7 @@ steps:
     prompt:
       - text: |
           Answer with hub.reply, then call hub.finish_execution.
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
     allow_outputs:
       - { type: slack.reply, max: 1, required: true }
 ```
@@ -41,10 +41,10 @@ The reply posts in the triggering thread. A root message gets a thread; a thread
 Leading declared inputs follow the mention:
 
 ```text
-@Paseo repo=project agent=claude investigate the failed sync
+@Clisbot repo=project agent=claude investigate the failed sync
 ```
 
-Hub consumes consecutive declared headers and exposes the remainder as `${{ paseo.prompt }}`. See [Workflows](/docs/hub/workflows).
+Hub consumes consecutive declared headers and exposes the remainder as `${{ clisbot.prompt }}`. See [Workflows](/docs/hub/workflows).
 
 ## Find your Slack IDs
 

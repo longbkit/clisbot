@@ -4,7 +4,7 @@ import { StyleSheet } from "react-native-unistyles";
 import {
   WORKSPACE_LABEL_COLORS,
   type WorkspaceLabelColor,
-} from "@getpaseo/protocol/workspace-labels";
+} from "@clisbot/protocol/workspace-labels";
 import { identityForeground } from "@/styles/identity-colors";
 import { i18n } from "@/i18n/i18next";
 import type { Theme } from "@/styles/theme";

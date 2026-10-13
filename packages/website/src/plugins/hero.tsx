@@ -24,7 +24,7 @@ export function PluginsHero({ pluginCount, authorCount, searchScope }: PluginsHe
         </span>
       </h1>
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-        Browse community plugins that extend Paseo with new functionality.
+        Browse community plugins that extend Clisbot with new functionality.
       </p>
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-3">

@@ -1,6 +1,6 @@
-Paseo 是运行在你自己机器上的 AI 编程 agents 的客户端。把你的开发环境装进口袋。
+Clisbot 是运行在你自己机器上的 AI 编程 agents 的客户端。把你的开发环境装进口袋。
 
-Paseo 会在你的电脑上运行一个名为 daemon 的本地服务，由它管理编程 agents 并实时推送输出。本应用连接到该 daemon，因此你的代码不会离开你的机器，中间也没有任何云服务。
+Clisbot 会在你的电脑上运行一个名为 daemon 的本地服务，由它管理编程 agents 并实时推送输出。本应用连接到该 daemon，因此你的代码不会离开你的机器，中间也没有任何云服务。
 
 <b>支持的 agents</b>
 
@@ -12,7 +12,7 @@ Paseo 会在你的电脑上运行一个名为 daemon 的本地服务，由它管
 <li>Pi</li>
 </ul>
 
-你使用自己的提供商凭据和现有订阅。Paseo 不加价，也不产生自己的推理费用。
+你使用自己的提供商凭据和现有订阅。Clisbot 不加价，也不产生自己的推理费用。
 
 <b>你可以做什么</b>
 
@@ -32,6 +32,6 @@ Paseo 会在你的电脑上运行一个名为 daemon 的本地服务，由它管
 
 <b>你需要一个可连接的 daemon</b>
 
-本应用无法独立使用。请在存放代码和 agent CLI 的电脑上安装 Paseo daemon，然后在设置中将本应用与其配对。桌面应用已内置 daemon，你也可以通过 npm、Docker 或 Nix 运行。
+本应用无法独立使用。请在存放代码和 agent CLI 的电脑上安装 Clisbot daemon，然后在设置中将本应用与其配对。桌面应用已内置 daemon，你也可以通过 npm、Docker 或 Nix 运行。
 
-安装说明：https://paseo.sh
+安装说明：https://clisbot.com

@@ -1,4 +1,4 @@
-appId: sh.paseo.debug
+appId: sh.clisbot.debug
 ---
 - launchApp
 - extendedWaitUntil:

@@ -71,13 +71,12 @@ export function formatAgentMessage(message: AgentMessage): string {
     : 'kind="user-message"';
   const title = source?.title ? ` source-agent-title="${escapeXml(source.title)}"` : "";
   const event = source?.kind === "agent-notification" ? ` event="${source.event}"` : "";
-  return `<paseo-system version="1" ${attributes} message-id="${escapeXml(message.id)}"${title}${event}>\n${escapeXml(message.text)}\n</paseo-system>`;
+  return `<clisbot-system version="1" ${attributes} message-id="${escapeXml(message.id)}"${title}${event}>\n${escapeXml(message.text)}\n</clisbot-system>`;
 }
 
 export function parseAgentMessage(text: string): AgentMessage | null {
-  const envelope = /^<paseo-system((?:\s+[a-z-]+="[^"<>]*")+)>\n([\s\S]*)\n<\/paseo-system>$/.exec(
-    text,
-  );
+  const envelope =
+    /^<clisbot-system((?:\s+[a-z-]+="[^"<>]*")+)>\n([\s\S]*)\n<\/clisbot-system>$/.exec(text);
   if (!envelope) return null;
   const attributes = new Map<string, string>();
   for (const match of envelope[1].matchAll(/\s+([a-z-]+)="([^"<>]*)"/g)) {
@@ -159,7 +158,7 @@ export function projectAgentMessage(item: AgentTimelineItem): AgentTimelineItem 
   }
   return {
     type: "tool_call",
-    callId: `paseo-agent-message:${message.id}`,
+    callId: `clisbot-agent-message:${message.id}`,
     agentMessage: {
       event: source.kind === "agent-message" ? "message" : source.event,
       sender: { id: source.agentId, ...(source.title ? { title: source.title } : {}) },
@@ -176,15 +175,15 @@ export function projectAgentMessage(item: AgentTimelineItem): AgentTimelineItem 
 }
 
 /**
- * Wrap a body in <paseo-system>…</paseo-system> so the receiving agent
+ * Wrap a body in <clisbot-system>…</clisbot-system> so the receiving agent
  * recognizes the prompt as system-injected context — not a user turn.
  * Used by schedule fires; agent messages use the versioned envelope.
  */
 export function formatSystemNotificationPrompt(reason: string): string {
-  return `<paseo-system>\n${reason}\n</paseo-system>`;
+  return `<clisbot-system>\n${reason}\n</clisbot-system>`;
 }
 
-const SYSTEM_ENVELOPE_PATTERN = /^<paseo-system>\n[\s\S]*\n<\/paseo-system>$/;
+const SYSTEM_ENVELOPE_PATTERN = /^<clisbot-system>\n[\s\S]*\n<\/clisbot-system>$/;
 
 export function isSystemInjectedEnvelope(text: string): boolean {
   return SYSTEM_ENVELOPE_PATTERN.test(text);

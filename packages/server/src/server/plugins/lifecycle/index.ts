@@ -1,18 +1,18 @@
 import type { AgentStreamEvent, AgentTimelineItem } from "../../agent/agent-sdk-types.js";
 import { z } from "zod";
-import { CreateAgentRequestMessageSchema } from "@getpaseo/protocol/messages";
+import { CreateAgentRequestMessageSchema } from "@clisbot/protocol/messages";
 import type {
   PluginHookAgent,
   PluginHookContext,
   PluginLifecycleRegistration,
-} from "@getpaseo/plugin/server";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+} from "@clisbot/plugin/server";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import type {
   PluginBeforeRequests,
   PluginHookWorkspace,
   PluginLifecycleEvents,
-} from "@getpaseo/plugin/server";
-import { WorkspaceCreateRequestSchema } from "@getpaseo/protocol/messages";
+} from "@clisbot/plugin/server";
+import { WorkspaceCreateRequestSchema } from "@clisbot/protocol/messages";
 import type { PersistedWorkspaceRecord } from "../../workspace-registry.js";
 
 export const lifecycleEventNames = [
@@ -196,7 +196,7 @@ export class PluginHookHandlers implements PluginLifecycleRegistration {
     kind: "event" | "before",
     name: string,
     input: unknown,
-    paseo: PluginHookContext["paseo"],
+    clisbot: PluginHookContext["clisbot"],
   ): Promise<unknown> {
     const controller = new AbortController();
     this.active.set(id, controller);
@@ -204,18 +204,18 @@ export class PluginHookHandlers implements PluginLifecycleRegistration {
       if (kind === "before") {
         if (
           !beforeHookNames.includes(
-            name as keyof import("@getpaseo/plugin/server").PluginBeforeRequests,
+            name as keyof import("@clisbot/plugin/server").PluginBeforeRequests,
           )
         ) {
           throw new Error(`Unknown before hook: ${name}`);
         }
-        const hookName = name as keyof import("@getpaseo/plugin/server").PluginBeforeRequests;
+        const hookName = name as keyof import("@clisbot/plugin/server").PluginBeforeRequests;
         let request = validateBeforeRequest(hookName, input);
         for (const handler of this.transforms.get(name) ?? []) {
           controller.signal.throwIfAborted();
           const result = await handler(
             { request: structuredClone(request) },
-            { paseo, signal: controller.signal },
+            { clisbot, signal: controller.signal },
           );
           if (result !== undefined) {
             request = validateBeforeResult(hookName, request, result);
@@ -226,7 +226,7 @@ export class PluginHookHandlers implements PluginLifecycleRegistration {
       for (const handler of this.events.get(name) ?? []) {
         controller.signal.throwIfAborted();
         try {
-          await handler(structuredClone(input), { paseo, signal: controller.signal });
+          await handler(structuredClone(input), { clisbot, signal: controller.signal });
         } catch (error) {
           console.error(`Lifecycle hook ${name} failed`, error);
         }

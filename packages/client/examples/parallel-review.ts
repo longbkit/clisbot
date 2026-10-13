@@ -1,7 +1,7 @@
-import type { PaseoAgentHandle, PaseoClient } from "@getpaseo/client";
+import type { ClisbotAgentHandle, ClisbotClient } from "@clisbot/client";
 
-export async function reviewInParallel(client: PaseoClient, cwd: string): Promise<string[]> {
-  const agents: PaseoAgentHandle[] = [];
+export async function reviewInParallel(client: ClisbotClient, cwd: string): Promise<string[]> {
+  const agents: ClisbotAgentHandle[] = [];
 
   try {
     agents.push(

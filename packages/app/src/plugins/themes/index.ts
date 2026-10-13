@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { z } from "zod";
-import type { PluginThemeContribution } from "@getpaseo/plugin";
+import type { PluginThemeContribution } from "@clisbot/plugin";
 import { useHostFeatureMap } from "@/runtime/host-features";
 import {
   buildDarkSemanticColors,

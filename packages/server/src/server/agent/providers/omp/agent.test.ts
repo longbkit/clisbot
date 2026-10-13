@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { AgentStreamEvent } from "../../agent-sdk-types.js";
-import type { PaseoToolCatalog } from "../../tools/types.js";
+import type { ClisbotToolCatalog } from "../../tools/types.js";
 import type { OmpAgentMessage } from "./rpc-types.js";
 import type { OmpNoTurnScheduler, OmpProviderIdleScheduler } from "./agent.js";
 import type { OmpUsagePollScheduler } from "./usage-poller.js";
@@ -51,7 +51,7 @@ test("OMP ready timeout defaults to 20 seconds and RPC timeout overrides both", 
 });
 
 test("OMP import uses the runtime's custom agent directory without a configured sessionDir", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-omp-import-dir-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-omp-import-dir-"));
   const agentDir = path.join(root, "agent");
   const sessionFile = path.join(agentDir, "sessions", "project", "session.jsonl");
   await mkdir(path.dirname(sessionFile), { recursive: true });
@@ -197,14 +197,14 @@ class ManualUsagePollScheduler implements OmpUsagePollScheduler {
   }
 }
 
-function createToolCatalog(): PaseoToolCatalog {
+function createToolCatalog(): ClisbotToolCatalog {
   return {
     tools: new Map([
       [
         "create_agent",
         {
           name: "create_agent",
-          description: "Create a Paseo agent.",
+          description: "Create a Clisbot agent.",
           handler: async () => ({ content: [] }),
         },
       ],
@@ -220,7 +220,7 @@ describe("OMP agent client and session", () => {
     await omp.start({ modeId: "ask" }, createToolCatalog());
 
     expect(omp.launchConfiguration()).toEqual({
-      cwd: "/tmp/paseo-omp-agent-test",
+      cwd: "/tmp/clisbot-omp-agent-test",
       protocolMode: "rpc-ui",
       modeId: "ask",
       argv: ["omp", "--mode", "rpc-ui", "--approval-mode", "always-ask"],
@@ -230,7 +230,7 @@ describe("OMP agent client and session", () => {
     ]);
     expect(omp.capabilities()).toMatchObject({
       supportsMcpServers: true,
-      supportsNativePaseoTools: true,
+      supportsNativeClisbotTools: true,
     });
   });
 
@@ -266,7 +266,7 @@ describe("OMP agent client and session", () => {
     await omp.start({ modeId: "write" });
 
     expect(omp.launchConfiguration()).toEqual({
-      cwd: "/tmp/paseo-omp-agent-test",
+      cwd: "/tmp/clisbot-omp-agent-test",
       protocolMode: "rpc-ui",
       modeId: "write",
       argv: ["omp", "--mode", "rpc-ui", "--approval-mode", "write"],
@@ -888,7 +888,7 @@ describe("OMP agent client and session", () => {
       type: "tool_execution_start",
       toolCallId: "search-failed",
       toolName: "web_search",
-      args: { query: "Paseo" },
+      args: { query: "Clisbot" },
     });
     omp.emit({
       type: "tool_execution_end",
@@ -907,7 +907,7 @@ describe("OMP agent client and session", () => {
       type: "tool_call",
       status: "failed",
       error: "All web search providers failed",
-      detail: { type: "search", query: "Paseo" },
+      detail: { type: "search", query: "Clisbot" },
     });
   });
 
@@ -1050,7 +1050,7 @@ describe("OMP agent client and session", () => {
       cwd: "/workspace/resumed",
       protocolMode: "rpc-ui",
       modeId: "ask",
-      session: expect.stringMatching(/[\\/]paseo-omp-resume-.*[\\/]session\.jsonl$/),
+      session: expect.stringMatching(/[\\/]clisbot-omp-resume-.*[\\/]session\.jsonl$/),
       argv: [
         "omp",
         "--mode",
@@ -1060,7 +1060,7 @@ describe("OMP agent client and session", () => {
         "--thinking",
         "high",
         "--session",
-        expect.stringMatching(/[\\/]paseo-omp-resume-.*[\\/]session\.jsonl$/),
+        expect.stringMatching(/[\\/]clisbot-omp-resume-.*[\\/]session\.jsonl$/),
       ],
     });
     await expect(omp.history()).resolves.toEqual([

@@ -1,8 +1,8 @@
 import type { TerminalFindResult } from "../runtime/terminal-emulator-runtime";
 import type { ITheme } from "@xterm/xterm";
 import xtermCss from "@xterm/xterm/css/xterm.css";
-import type { TerminalState } from "@getpaseo/protocol/messages";
-import type { TerminalInputModeState } from "@getpaseo/protocol/terminal-input-mode";
+import type { TerminalState } from "@clisbot/protocol/messages";
+import type { TerminalInputModeState } from "@clisbot/protocol/terminal-input-mode";
 import type { PendingTerminalModifiers } from "@/utils/terminal-keys";
 import {
   encodeTerminalOutput,
@@ -97,8 +97,8 @@ declare global {
     ReactNativeWebView?: {
       postMessage?: (data: string) => void;
     };
-    __PASEO_TERMINAL_WEBVIEW_RECEIVE__?: (message: InboundMessage) => void;
-    __PASEO_TERMINAL_WEBVIEW_BLUR__?: () => void;
+    __CLISBOT_TERMINAL_WEBVIEW_RECEIVE__?: (message: InboundMessage) => void;
+    __CLISBOT_TERMINAL_WEBVIEW_BLUR__?: () => void;
   }
 }
 
@@ -106,7 +106,7 @@ const sendToNative = (message: OutboundMessage): void => {
   window.ReactNativeWebView?.postMessage?.(JSON.stringify(message));
 };
 
-const TERMINAL_BACKGROUND_CSS_VAR = "--paseo-terminal-background";
+const TERMINAL_BACKGROUND_CSS_VAR = "--clisbot-terminal-background";
 const DEFAULT_TERMINAL_BACKGROUND = "#0b0b0b";
 const TERMINAL_TAP_MOVE_TOLERANCE_PX = 8;
 
@@ -563,6 +563,6 @@ root.appendChild(host);
 document.body.appendChild(root);
 
 const bridge = new TerminalWebViewBridge(root, host);
-window.__PASEO_TERMINAL_WEBVIEW_RECEIVE__ = bridge.receive;
-window.__PASEO_TERMINAL_WEBVIEW_BLUR__ = bridge.blur;
+window.__CLISBOT_TERMINAL_WEBVIEW_RECEIVE__ = bridge.receive;
+window.__CLISBOT_TERMINAL_WEBVIEW_BLUR__ = bridge.blur;
 sendToNative({ type: "bridgeReady" });

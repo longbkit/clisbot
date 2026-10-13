@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import pino from "pino";
-import { generateKeyPair } from "@getpaseo/relay";
+import { generateKeyPair } from "@clisbot/relay";
 import { createRelayRuntime } from "./relay-runtime.js";
 import { startRelayTransport, type RelayTransportController } from "./relay-transport.js";
 

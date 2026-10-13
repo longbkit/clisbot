@@ -1,0 +1,19 @@
+@echo off
+setlocal
+
+set "SCRIPT_DIR=%~dp0"
+set "RESOURCES_DIR=%SCRIPT_DIR%.."
+set "APP_EXECUTABLE=%RESOURCES_DIR%\..\Clisbot.exe"
+if not exist "%APP_EXECUTABLE%" (
+  echo Bundled Clisbot executable not found at %APP_EXECUTABLE% 1>&2
+  exit /b 1
+)
+
+set "ELECTRON_RUN_AS_NODE=1"
+set "CLISBOT_NODE_ENV=production"
+rem CLISBOT_DESKTOP_MANAGED marks daemons started through this bundled CLI as
+rem desktop-managed, so the desktop app restarts them when it upgrades.
+set "CLISBOT_DESKTOP_MANAGED=1"
+set "CLISBOT_CLI=%~f0"
+"%APP_EXECUTABLE%" --disable-warning=DEP0040 "%RESOURCES_DIR%\app.asar.unpacked\dist\daemon\node-entrypoint-runner.js" node-script "%RESOURCES_DIR%\app.asar\node_modules\@clisbot\cli\dist\index.js" %*
+exit /b %errorlevel%

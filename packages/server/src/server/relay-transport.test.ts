@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import pino from "pino";
-import { createClientChannel, type Transport } from "@getpaseo/relay/e2ee";
-import { exportPublicKey, generateKeyPair } from "@getpaseo/relay";
+import { createClientChannel, type Transport } from "@clisbot/relay/e2ee";
+import { exportPublicKey, generateKeyPair } from "@clisbot/relay";
 import { startRelayTransport } from "./relay-transport";
 
 function createMockLogger() {
@@ -155,7 +155,7 @@ describe("relay-transport control lifecycle", () => {
         attachSocket: async () => {
           attachments += 1;
         },
-        relayEndpoint: "relay.paseo.sh:443",
+        relayEndpoint: "relay.clisbot.com:443",
         relayUseTls: true,
         serverId: "srv_test",
         daemonKeyPair: generateKeyPair(),
@@ -182,7 +182,7 @@ describe("relay-transport control lifecycle", () => {
     const controller = startRelayTransport({
       logger: logger as unknown as pino.Logger,
       attachSocket: async () => {},
-      relayEndpoint: "relay.paseo.sh:443",
+      relayEndpoint: "relay.clisbot.com:443",
       relayUseTls: true,
       serverId: "srv_test",
       createWebSocket: relay.createWebSocket,
@@ -206,7 +206,7 @@ describe("relay-transport control lifecycle", () => {
     const controller = startRelayTransport({
       logger: logger as unknown as pino.Logger,
       attachSocket: async () => {},
-      relayEndpoint: "relay.paseo.sh:443",
+      relayEndpoint: "relay.clisbot.com:443",
       relayUseTls: true,
       serverId: "srv_test",
       createWebSocket: relay.createWebSocket,
@@ -230,7 +230,7 @@ describe("relay-transport control lifecycle", () => {
     const controller = startRelayTransport({
       logger: logger as unknown as pino.Logger,
       attachSocket: async () => {},
-      relayEndpoint: "relay.paseo.sh:443",
+      relayEndpoint: "relay.clisbot.com:443",
       relayUseTls: true,
       serverId: "srv_test",
       createWebSocket: relay.createWebSocket,
@@ -258,7 +258,7 @@ describe("relay-transport control lifecycle", () => {
     const controller = startRelayTransport({
       logger: logger as unknown as pino.Logger,
       attachSocket,
-      relayEndpoint: "relay.paseo.sh:443",
+      relayEndpoint: "relay.clisbot.com:443",
       relayUseTls: true,
       serverId: "srv_test",
       createWebSocket: relay.createWebSocket,
@@ -296,7 +296,7 @@ describe("relay-transport control lifecycle", () => {
     const controller = startRelayTransport({
       logger: logger as unknown as pino.Logger,
       attachSocket: async (socket) => resolveAttached?.(socket),
-      relayEndpoint: "relay.paseo.sh:443",
+      relayEndpoint: "relay.clisbot.com:443",
       relayUseTls: true,
       serverId: "srv_test",
       daemonKeyPair,

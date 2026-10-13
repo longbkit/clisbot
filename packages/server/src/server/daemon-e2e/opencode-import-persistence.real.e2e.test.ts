@@ -7,7 +7,7 @@ import pino from "pino";
 
 import type { AgentPersistenceHandle, AgentTimelineItem } from "../agent/agent-sdk-types.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import {
   canRunRealProvider,
   createRealProviderClients,
@@ -27,7 +27,7 @@ async function withConnectedOpenCodeDaemon(
   run: (context: { client: DaemonClient }) => Promise<void>,
 ): Promise<void> {
   const logger = pino({ level: "silent" });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: createRealProviderClients(["opencode"], logger),
     logger,
   });

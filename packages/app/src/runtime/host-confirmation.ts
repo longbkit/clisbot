@@ -1,4 +1,4 @@
-import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import {
   hostHasConnection,
   relayConnectionFromOffer,

@@ -16,7 +16,7 @@ import {
   encodeFileTransferFrame,
   FileTransferOpcode,
   type FileTransferFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import {
   WorkspaceFilesSession,
   type WorkspaceFilesSessionHost,
@@ -55,18 +55,18 @@ function makeSubsystem(
     },
     hasBinaryChannel: () => hasBinary,
   };
-  const paseoHome = makeDir("workspace-files-home-");
+  const clisbotHome = makeDir("workspace-files-home-");
   const subsystem = new WorkspaceFilesSession({
     host,
     downloadTokenStore: new DownloadTokenStore({ ttlMs: 60_000 }),
-    paseoHome,
+    clisbotHome,
     logger: pino({ level: "silent" }),
   });
   return {
     subsystem,
     emitted,
     binary,
-    paseoHome,
+    clisbotHome,
     setHasBinary: (value: boolean) => {
       hasBinary = value;
     },
@@ -554,7 +554,7 @@ describe("WorkspaceFilesSession", () => {
   });
 
   test("round-trips an upload through transfer frames", async () => {
-    const { subsystem, emitted, paseoHome } = makeSubsystem();
+    const { subsystem, emitted, clisbotHome } = makeSubsystem();
 
     const source = {};
     const ownership = new SessionDelivery((_source, message) => {
@@ -607,7 +607,7 @@ describe("WorkspaceFilesSession", () => {
     expect(message.payload.file?.fileName).toBe("notes.txt");
     const file = message.payload.file;
     if (!file) throw new Error("Expected uploaded file");
-    expect(file.path.startsWith(join(paseoHome, "uploads"))).toBe(true);
+    expect(file.path.startsWith(join(clisbotHome, "uploads"))).toBe(true);
     expect(readFileSync(file.path, "utf8")).toBe("hello world");
     await ownership.close();
   });

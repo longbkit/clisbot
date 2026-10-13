@@ -587,7 +587,7 @@ export const PROVIDERS_HUNK_TAIL: DiffRow[] = [
   {
     kind: "line",
     n: "78",
-    text: "OpenCode 1 keeps MCP and process environment outside the session boundary. Paseo shares",
+    text: "OpenCode 1 keeps MCP and process environment outside the session boundary. Clisbot shares",
     mark: "add",
   },
   { kind: "line", n: "79", text: "", mark: "add" },
@@ -601,7 +601,7 @@ export const PROVIDERS_HUNK_TAIL: DiffRow[] = [
   {
     kind: "line",
     n: "82",
-    text: "OpenCode owns user message IDs. Do not pass Paseo-generated IDs to OpenCode prompt APIs",
+    text: "OpenCode owns user message IDs. Do not pass Clisbot-generated IDs to OpenCode prompt APIs",
   },
   { kind: "line", n: "83", text: "" },
 ];

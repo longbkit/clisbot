@@ -6,8 +6,8 @@ import {
   TerminalStreamOpcode,
   decodeTerminalStreamFrame,
   type TerminalStreamFrame,
-} from "@getpaseo/protocol/binary-frames/index";
-import type { TerminalCell, TerminalState } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/binary-frames/index";
+import type { TerminalCell, TerminalState } from "@clisbot/protocol/messages";
 import type { ServerMessage, TerminalSession, TerminalStateSnapshot } from "./terminal.js";
 import {
   TerminalSessionController,
@@ -523,7 +523,7 @@ describe("terminal-session-controller subdirectory aggregation", () => {
 
   test("keeps nested workspace terminals out of the parent workspace terminal list", async () => {
     const rootCwd = "/work/repo";
-    const worktreeCwd = "/work/repo/.dev/paseo-home/worktrees/hash/feature-a";
+    const worktreeCwd = "/work/repo/.dev/clisbot-home/worktrees/hash/feature-a";
     const rootTerminal = listSession({ id: "root-term", name: "Terminal 1", cwd: rootCwd });
     const worktreeTerminal = listSession({
       id: "worktree-term",

@@ -48,7 +48,7 @@ jobs:
           release_args=(
             release create "$RELEASE_TAG"
             --repo "${{ github.repository }}"
-            --title "Paseo $RELEASE_TAG"
+            --title "Clisbot $RELEASE_TAG"
             --notes ""
             --draft
           )
@@ -134,7 +134,7 @@ jobs:
             exit 1
           fi
 
-          asset_name="paseo-${RELEASE_TAG}-android.apk"
+          asset_name="clisbot-${RELEASE_TAG}-android.apk"
           asset_path="$RUNNER_TEMP/$asset_name"
 
           curl --fail --location --output "$asset_path" "$artifact_url"

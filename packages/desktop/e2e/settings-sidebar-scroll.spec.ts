@@ -6,7 +6,7 @@ test.describe("Settings sidebar scrolling", () => {
 
   test("desktop drag region does not cover the scroll body", async ({ page }) => {
     await page.addInitScript(() => {
-      window.paseoDesktop = {
+      window.clisbotDesktop = {
         platform: "darwin",
         events: { on: () => () => {} },
         invoke: async (command: string) => {

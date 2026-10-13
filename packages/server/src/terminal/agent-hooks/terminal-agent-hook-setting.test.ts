@@ -36,13 +36,13 @@ function hookPaths(root: string) {
   return {
     claude: join(root, "claude", "settings.json"),
     codex: join(root, "codex", "hooks.json"),
-    opencode: join(root, "opencode", "plugins", "paseo-terminal-activity.js"),
+    opencode: join(root, "opencode", "plugins", "clisbot-terminal-activity.js"),
   };
 }
 
-function createStore(paseoHome: string, enableTerminalAgentHooks: boolean): DaemonConfigStore {
+function createStore(clisbotHome: string, enableTerminalAgentHooks: boolean): DaemonConfigStore {
   return new DaemonConfigStore(
-    paseoHome,
+    clisbotHome,
     {
       mcp: { injectIntoAgents: false },
       providers: {},
@@ -57,8 +57,8 @@ function createStore(paseoHome: string, enableTerminalAgentHooks: boolean): Daem
 
 describe("applyTerminalAgentHookSetting", () => {
   it("leaves agent configs untouched when the setting is disabled", () => {
-    const root = createTempDir("paseo-hook-setting-");
-    const store = createStore(createTempDir("paseo-hook-setting-home-"), false);
+    const root = createTempDir("clisbot-hook-setting-");
+    const store = createStore(createTempDir("clisbot-hook-setting-home-"), false);
 
     applyTerminalAgentHookSetting({ store, install: createInstallEnv(root) });
 
@@ -69,8 +69,8 @@ describe("applyTerminalAgentHookSetting", () => {
   });
 
   it("installs agent hooks when the setting is enabled", () => {
-    const root = createTempDir("paseo-hook-setting-");
-    const store = createStore(createTempDir("paseo-hook-setting-home-"), true);
+    const root = createTempDir("clisbot-hook-setting-");
+    const store = createStore(createTempDir("clisbot-hook-setting-home-"), true);
 
     applyTerminalAgentHookSetting({ store, install: createInstallEnv(root) });
 
@@ -81,8 +81,8 @@ describe("applyTerminalAgentHookSetting", () => {
   });
 
   it("installs on enable and removes hooks on disable when toggled live", () => {
-    const root = createTempDir("paseo-hook-setting-");
-    const store = createStore(createTempDir("paseo-hook-setting-home-"), false);
+    const root = createTempDir("clisbot-hook-setting-");
+    const store = createStore(createTempDir("clisbot-hook-setting-home-"), false);
     const paths = hookPaths(root);
 
     applyTerminalAgentHookSetting({ store, install: createInstallEnv(root) });

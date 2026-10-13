@@ -6,7 +6,7 @@
     "piVersion": "0.84.4",
     "captureDate": "2026-09-23",
     "model": "openrouter/google/gemini-3.6-flash",
-    "source": "isolated Paseo web QA Pi session JSONL"
+    "source": "isolated Clisbot web QA Pi session JSONL"
   },
   "result": {
     "content": [

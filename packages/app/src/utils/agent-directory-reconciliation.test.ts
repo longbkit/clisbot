@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FetchAgentsEntry } from "@getpaseo/client/internal/daemon-client";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { reconcileAgentDirectory } from "./agent-directory-reconciliation";
 
 function snapshot(id: string, status: AgentSnapshotPayload["status"]): AgentSnapshotPayload {
@@ -42,7 +42,7 @@ function entry(id: string, status: AgentSnapshotPayload["status"]): FetchAgentsE
         currentBranch: null,
         remoteUrl: null,
         worktreeRoot: null,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       },
     },

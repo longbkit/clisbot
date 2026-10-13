@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { createPaseoApi } from "@getpaseo/client";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { createClisbotApi } from "@clisbot/client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { PluginHookHandlers } from "./index.js";
 
-const paseo = createPaseoApi(
+const clisbot = createClisbotApi(
   new DaemonClient({ url: "ws://127.0.0.1:1/ws", clientId: "lifecycle-unit" }),
 );
 
@@ -24,7 +24,7 @@ test("removing an old registration twice preserves a newer registration for the 
     {
       source: { kind: "directory", path: "/project" },
     },
-    paseo,
+    clisbot,
   );
   expect(output).toEqual({ source: { kind: "directory", path: "/project" }, title: "new" });
 });
@@ -41,7 +41,7 @@ test("before hooks compose returned requests and preserve the original input", a
     return { ...request, title: request.title + ":second" };
   });
   const input = { source: { kind: "directory", path: "/project" } };
-  expect(await hooks.invoke("operation", "before", "workspace.create", input, paseo)).toEqual({
+  expect(await hooks.invoke("operation", "before", "workspace.create", input, clisbot)).toEqual({
     source: { kind: "directory", path: "/project" },
     title: "first:second",
   });
@@ -68,7 +68,7 @@ test("teardown aborts an active callback and removes its registrations", async (
     {
       source: { kind: "directory", path: "/project" },
     },
-    paseo,
+    clisbot,
   );
   hooks.close();
   await expect(invocation).rejects.toThrow("Hook aborted");
@@ -94,7 +94,7 @@ test("session-open hooks reject changes to session identity instead of silently 
         purpose: "interactive",
         env: {},
       },
-      paseo,
+      clisbot,
     ),
   ).rejects.toThrow("agent.session_open hooks can only change env");
 });

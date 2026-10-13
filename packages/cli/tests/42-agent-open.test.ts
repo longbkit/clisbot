@@ -4,7 +4,7 @@ import assert from "node:assert";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { runPaseoCli, startTestDaemon } from "./helpers/test-daemon.ts";
+import { runClisbotCli, startTestDaemon } from "./helpers/test-daemon.ts";
 
 console.log("=== Agent Open Command Tests ===\n");
 
@@ -15,18 +15,18 @@ if (process.platform !== "linux") {
 
 const daemon = await startTestDaemon();
 
-// runPaseoCli sets HOME to the daemon's home, where the CLI looks for
-// ~/Applications/Paseo.AppImage on Linux. The fake app records its launch.
-const launchRecord = join(daemon.paseoHome, "desktop-launches.txt");
-const fakeDesktop = join(daemon.paseoHome, "Applications", "Paseo.AppImage");
-await mkdir(join(daemon.paseoHome, "Applications"), { recursive: true });
+// runClisbotCli sets HOME to the daemon's home, where the CLI looks for
+// ~/Applications/Clisbot.AppImage on Linux. The fake app records its launch.
+const launchRecord = join(daemon.clisbotHome, "desktop-launches.txt");
+const fakeDesktop = join(daemon.clisbotHome, "Applications", "Clisbot.AppImage");
+await mkdir(join(daemon.clisbotHome, "Applications"), { recursive: true });
 await writeFile(fakeDesktop, `#!/bin/sh\necho "$@" >> "${launchRecord}"\n`);
 await chmod(fakeDesktop, 0o755);
 
 try {
   {
     console.log("Test 1: an unknown agent ID fails without opening Desktop");
-    const result = await runPaseoCli(daemon, [
+    const result = await runClisbotCli(daemon, [
       "agent",
       "open",
       "does-not-exist",

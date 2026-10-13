@@ -4,15 +4,15 @@ import path from "node:path";
 import { z } from "zod";
 import appPackage from "../../../package.json";
 
-export const pluginRequirements = { paseo: `>=${appPackage.version}` };
+export const pluginRequirements = { clisbot: `>=${appPackage.version}` };
 
 export async function copyPluginExample(name: string) {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-example-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-example-"));
   try {
     await cp(path.resolve(__dirname, "../../../../../plugin-examples", name), directory, {
       recursive: true,
     });
-    const manifestPath = path.join(directory, "paseo-plugin.json");
+    const manifestPath = path.join(directory, "clisbot-plugin.json");
     const manifest = z
       .record(z.string(), z.unknown())
       .parse(JSON.parse(await readFile(manifestPath, "utf8")));

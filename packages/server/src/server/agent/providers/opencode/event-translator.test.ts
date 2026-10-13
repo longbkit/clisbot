@@ -1566,7 +1566,7 @@ describe("OpenCode v2 history reconciliation", () => {
       type: "user",
       text: "hello",
       time: { created: 1 },
-      metadata: { paseoClientMessageId: "client-message" },
+      metadata: { clisbotClientMessageId: "client-message" },
     };
     expect(new V2Timeline().messages([user])).toMatchObject([
       { item: { clientMessageId: "client-message", messageId: "native-message" } },

@@ -1,5 +1,5 @@
 import type pino from "pino";
-import type { KeyPair } from "@getpaseo/relay/e2ee";
+import type { KeyPair } from "@clisbot/relay/e2ee";
 import type { ExternalSocketMetadata } from "./websocket-server.js";
 import {
   startRelayTransport,

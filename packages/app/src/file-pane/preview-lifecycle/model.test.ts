@@ -1,4 +1,4 @@
-import type { FileReadResult } from "@getpaseo/client/internal/daemon-client";
+import type { FileReadResult } from "@clisbot/client/internal/daemon-client";
 import type { LiveFileSnapshot } from "../live-file/model";
 import { describe, expect, it } from "vitest";
 import {

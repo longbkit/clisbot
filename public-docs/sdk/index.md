@@ -1,6 +1,6 @@
 ---
 title: TypeScript SDK
-description: Run Paseo coding agents from a TypeScript program.
+description: Run Clisbot coding agents from a TypeScript program.
 nav: Overview
 order: 50
 category: TypeScript SDK
@@ -8,9 +8,9 @@ category: TypeScript SDK
 
 # TypeScript SDK
 
-`@getpaseo/client` is a TypeScript library that drives a Paseo daemon from your own program. You pick a provider and model, give an agent a prompt and a directory, and wait for the answer.
+`@clisbot/client` is a TypeScript library that drives a Clisbot daemon from your own program. You pick a provider and model, give an agent a prompt and a directory, and wait for the answer.
 
-The daemon does the work: it launches the provider CLI, keeps the session alive, and streams it to the Paseo app. Your program is a client. Agents you create show up in Paseo next to the ones you started by hand, and they stay there after your program exits.
+The daemon does the work: it launches the provider CLI, keeps the session alive, and streams it to the Clisbot app. Your program is a client. Agents you create show up in Clisbot next to the ones you started by hand, and they stay there after your program exits.
 
 Use it to:
 
@@ -22,17 +22,17 @@ Use it to:
 ## Start a daemon
 
 ```bash
-npx @getpaseo/cli
+npx @clisbot/cli
 ```
 
-It listens on `ws://127.0.0.1:6767/ws`.
+It listens on `ws://127.0.0.1:6868/ws`.
 
 ## Run an agent
 
 ```ts
-import { createPaseoClient } from "@getpaseo/client";
+import { createClisbotClient } from "@clisbot/client";
 
-const client = createPaseoClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6868/ws" });
 await client.connect();
 
 const agent = await client.agents.create({

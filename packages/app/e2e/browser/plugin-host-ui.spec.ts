@@ -12,14 +12,14 @@ import {
 
 const PLUGIN_ID = "plugin-host-ui-e2e";
 
-const PLUGIN_SOURCE = `import { usePaseo } from "@getpaseo/plugin/client";
-import { Icon, Modal, useToast } from "@getpaseo/plugin/client/react-native";
+const PLUGIN_SOURCE = `import { useClisbot } from "@clisbot/plugin/client";
+import { Icon, Modal, useToast } from "@clisbot/plugin/client/react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 function ModalBody({ onSaved }) {
-  usePaseo();
+  useClisbot();
   useQueryClient();
   const toast = useToast();
 
@@ -125,11 +125,11 @@ async function savePluginIssue(page: Page): Promise<void> {
 }
 
 test("plugin modal adapts its presentation and preserves host contexts", async ({ page }) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-host-ui-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-host-ui-e2e-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
   );
   const audio = await readFile(path.resolve(__dirname, "../../assets/audio/thinking-tone.wav"));

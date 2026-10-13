@@ -17,7 +17,7 @@ interface FixturePackage {
 
 /** A registry serving real npm-packed artifacts, including integrity and host auth configuration. */
 export async function startNpmRegistry(packages: FixturePackage[]) {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-npm-registry-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-npm-registry-"));
   const artifacts = new Map<string, Buffer>();
   const manifests = new Map<
     string,
@@ -121,12 +121,12 @@ export async function startNpmRegistry(packages: FixturePackage[]) {
 
 export function npmPluginPackages() {
   const files = {
-    "paseo-plugin.json": JSON.stringify({
+    "clisbot-plugin.json": JSON.stringify({
       id: "npm-review",
       description: "Installed from the npm fixture registry",
-      requirements: { paseo: ">=0.4.0" },
+      requirements: { clisbot: ">=0.4.0" },
     }),
-    "index.server.ts": `import value from "paseo-fixture-dependency";
+    "index.server.ts": `import value from "clisbot-fixture-dependency";
 export default function contribute() {
   if (value !== "dependency loaded") throw new Error("Dependency did not resolve");
   console.log(value);
@@ -135,30 +135,30 @@ export default function contribute() {
   };
   return [
     {
-      name: "paseo-fixture-dependency",
+      name: "clisbot-fixture-dependency",
       version: "1.0.0",
       files: { "index.js": 'module.exports = "dependency loaded";' },
     },
     {
-      name: "paseo-fixture-plugin",
+      name: "clisbot-fixture-plugin",
       version: "1.0.0",
       files,
-      dependencies: { "paseo-fixture-dependency": "1.0.0" },
+      dependencies: { "clisbot-fixture-dependency": "1.0.0" },
       tags: ["stable"],
     },
     {
-      name: "paseo-fixture-plugin",
+      name: "clisbot-fixture-plugin",
       version: "1.1.0",
       files,
-      dependencies: { "paseo-fixture-dependency": "1.0.0" },
+      dependencies: { "clisbot-fixture-dependency": "1.0.0" },
       tags: ["latest", "next"],
     },
     {
-      name: "@paseo-fixture/review",
+      name: "@clisbot-fixture/review",
       version: "2.0.0",
       files,
-      dependencies: { "paseo-fixture-dependency": "1.0.0" },
-      peerDependencies: { "@getpaseo/plugin": "*" },
+      dependencies: { "clisbot-fixture-dependency": "1.0.0" },
+      peerDependencies: { "@clisbot/plugin": "*" },
     },
   ];
 }

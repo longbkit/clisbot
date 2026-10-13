@@ -1,4 +1,4 @@
-import type { ScheduleCadence } from "@getpaseo/protocol/schedule/types";
+import type { ScheduleCadence } from "@clisbot/protocol/schedule/types";
 
 type CronCadence = Extract<ScheduleCadence, { type: "cron" }>;
 

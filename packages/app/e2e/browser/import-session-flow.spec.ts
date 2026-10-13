@@ -15,9 +15,9 @@ import { createTempDirectory, createTempGitRepo } from "../support/helpers/works
 
 const SCREENSHOT_DIRECTORY = path.join(
   process.env.HOME ?? tmpdir(),
-  ".paseo/plans/import-session-ux",
+  ".clisbot/plans/import-session-ux",
 );
-const claudeConfigDirectory = mkdtempSync(path.join(tmpdir(), "paseo-import-flow-claude-"));
+const claudeConfigDirectory = mkdtempSync(path.join(tmpdir(), "clisbot-import-flow-claude-"));
 const brokenProvider = "broken-acp";
 
 test.use({

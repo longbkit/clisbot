@@ -35,7 +35,7 @@ const test = base.extend<
   { npmRegistry: Awaited<ReturnType<typeof startNpmRegistry>> }
 >({
   pluginEnvironment: async ({ e2eWorker: _e2eWorker }, provide) => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugins-e2e-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugins-e2e-"));
     const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
     const previous = await client.getDaemonConfig();
     try {
@@ -135,7 +135,7 @@ import { Text } from "react-native";
 export default function contribute(plugin) {
   function Surface() {
     ${renderError ? `throw new Error(${JSON.stringify(renderError)});` : ""}
-    const cleanups = Number(globalThis.sessionStorage?.getItem("paseo-plugin-cleanups") || "0");
+    const cleanups = Number(globalThis.sessionStorage?.getItem("clisbot-plugin-cleanups") || "0");
     return <Text>${title} cleanup {cleanups}</Text>;
   }
   plugin.addSurface("main", Surface);
@@ -150,8 +150,8 @@ export default function contribute(plugin) {
   return () => {
     const storage = globalThis.sessionStorage;
     if (storage) {
-      const cleanups = Number(storage.getItem("paseo-plugin-cleanups") || "0");
-      storage.setItem("paseo-plugin-cleanups", String(cleanups + 1));
+      const cleanups = Number(storage.getItem("clisbot-plugin-cleanups") || "0");
+      storage.setItem("clisbot-plugin-cleanups", String(cleanups + 1));
     }
   };
 }`;
@@ -247,7 +247,8 @@ async function expectPluginSourceDocsOpen(page: Page): Promise<void> {
     .context()
     .waitForEvent(
       "request",
-      (request) => request.isNavigationRequest() && request.url().startsWith("https://paseo.sh/"),
+      (request) =>
+        request.isNavigationRequest() && request.url().startsWith("https://clisbot.com/"),
     );
   const docsPagePromise = page.context().waitForEvent("page");
   await page.getByRole("link", { name: "Docs", exact: true }).click();
@@ -257,7 +258,7 @@ async function expectPluginSourceDocsOpen(page: Page): Promise<void> {
     expect(new URL(request.url()).pathname).toBe("/docs/plugins/reference");
     // The deployed site can redirect while the matching website change is still in this PR.
     await docsPage.waitForURL(
-      (url) => url.origin === "https://paseo.sh" && url.hash === "#plugin-sources",
+      (url) => url.origin === "https://clisbot.com" && url.hash === "#plugin-sources",
       { waitUntil: "commit" },
     );
   } finally {
@@ -269,7 +270,7 @@ async function createGitPluginRepository(root: string): Promise<string> {
   const repository = path.join(root, "repository");
   await mkdir(repository);
   await writeFile(
-    path.join(repository, "paseo-plugin.json"),
+    path.join(repository, "clisbot-plugin.json"),
     JSON.stringify({
       id: "git-e2e-plugin",
       description: "Adds review tools from a Git repository",
@@ -278,11 +279,11 @@ async function createGitPluginRepository(root: string): Promise<string> {
   );
   await writeFile(path.join(repository, "index.client.tsx"), pluginSource("Git plugin"));
   execFileSync("git", ["init", "-b", "main"], { cwd: repository, stdio: "ignore" });
-  execFileSync("git", ["config", "user.name", "Paseo Tests"], {
+  execFileSync("git", ["config", "user.name", "Clisbot Tests"], {
     cwd: repository,
     stdio: "ignore",
   });
-  execFileSync("git", ["config", "user.email", "paseo@example.test"], {
+  execFileSync("git", ["config", "user.email", "clisbot@example.test"], {
     cwd: repository,
     stdio: "ignore",
   });
@@ -299,7 +300,7 @@ async function createDirectoryPlugin(
 ): Promise<string> {
   const directory = await mkdtemp(path.join(root, "plugin-row-"));
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id, description, requirements: pluginRequirements }),
   );
   await writeFile(
@@ -407,7 +408,7 @@ async function installLocalPluginWithStatusExamples(
   );
   const { client } = pluginEnvironment;
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "e2e-plugin",
       description: "Exercises the complete local plugin lifecycle",
@@ -631,13 +632,13 @@ async function retryNpmInstallAndInspectRow(page: Page, width: number, testInfo:
   await installPlugin(page, "npm:missing-plugin");
   await expect(page.getByTestId("plugin-management-feedback")).toContainText("404");
   await expect(page.getByLabel("Plugin source")).toHaveValue("npm:missing-plugin");
-  await installPlugin(page, "npm:@paseo-fixture/review@^2.0.0");
+  await installPlugin(page, "npm:@clisbot-fixture/review@^2.0.0");
   await expect(page.getByText("Installed npm-review", { exact: true })).toBeVisible();
   await expect(page.getByLabel("npm-review running")).toBeVisible();
   await expectSourceHierarchy(
     page,
     "Installed from the npm fixture registry",
-    "npm:@paseo-fixture/review · 2.0.0",
+    "npm:@clisbot-fixture/review · 2.0.0",
   );
   await expect(
     page.getByText("Installed from the npm fixture registry", { exact: true }),

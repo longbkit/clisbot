@@ -2,7 +2,7 @@ import type {
   AgentSnapshotPayload,
   CreationSnapshot,
   WorkspaceCreateResponse,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { CreateAgentRequestOptions, CreateWorkspaceRequestOptions } from "../daemon-client.js";
 
 type Kind = CreationSnapshot["kind"];

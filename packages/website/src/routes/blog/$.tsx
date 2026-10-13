@@ -8,8 +8,8 @@ export const Route = createFileRoute("/blog/$")({
     const slug = params._splat ?? "";
     const path = `/blog/${slug}`;
     const post = getPost(slug);
-    if (!post) return pageMeta("Not Found - Paseo", "Post not found.", path);
-    return pageMeta(`${post.frontmatter.title} - Paseo`, post.frontmatter.description, path);
+    if (!post) return pageMeta("Not Found - Clisbot", "Post not found.", path);
+    return pageMeta(`${post.frontmatter.title} - Clisbot`, post.frontmatter.description, path);
   },
   component: BlogPost,
 });
@@ -45,15 +45,7 @@ function BlogPost() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-4">{post.frontmatter.title}</h1>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <a
-            href="https://x.com/moboudra"
-            target="_blank"
-            rel="nofollow noopener noreferrer"
-            className="flex items-center gap-3 text-foreground hover:text-primary transition-colors"
-          >
-            <img src="/9viSwGkz_400x400.jpg" alt="Mo Boudra" className="size-6 rounded-full" />
-            <span className="font-medium">Mo Boudra</span>
-          </a>
+          <span className="font-medium">{post.frontmatter.author}</span>
           <span>·</span>
           <span className="tabular-nums">{formatDate(new Date(post.frontmatter.date))}</span>
         </div>

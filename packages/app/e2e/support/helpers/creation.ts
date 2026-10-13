@@ -1,4 +1,4 @@
-import type { WorkspaceCreateRequest } from "@getpaseo/protocol/messages";
+import type { WorkspaceCreateRequest } from "@clisbot/protocol/messages";
 import { expect, type Page } from "@playwright/test";
 import { daemonWsRoutePattern } from "./daemon-port";
 import { gotoAppShell } from "./app";

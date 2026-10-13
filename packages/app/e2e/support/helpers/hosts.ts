@@ -4,9 +4,9 @@ import { openSettings } from "./app";
 import { buildSeededHost } from "./daemon-registry";
 import { clickSettingsBackToWorkspace, openHostSection, selectSettingsHost } from "./settings";
 
-const REGISTRY_KEY = "@paseo:daemon-registry";
-const SEED_NONCE_KEY = "@paseo:e2e-seed-nonce";
-const DISABLE_DEFAULT_SEED_ONCE_KEY = "@paseo:e2e-disable-default-seed-once";
+const REGISTRY_KEY = "@clisbot:daemon-registry";
+const SEED_NONCE_KEY = "@clisbot:e2e-seed-nonce";
+const DISABLE_DEFAULT_SEED_ONCE_KEY = "@clisbot:e2e-disable-default-seed-once";
 
 // The multi-host UI (the command-center host label, the sidebar host filter) only renders once
 // more than one host exists. The e2e harness runs a single real daemon, so we add an extra registry

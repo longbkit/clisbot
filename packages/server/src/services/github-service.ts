@@ -3,7 +3,7 @@ import {
   isGitHubHost,
   parseGitHubRemoteUrl,
   parseGitRemoteLocation,
-} from "@getpaseo/protocol/git-remote";
+} from "@clisbot/protocol/git-remote";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
 import { runGitCommand } from "../utils/run-git-command.js";
 import { execCommand } from "../utils/spawn.js";
@@ -731,7 +731,7 @@ type BatchPollPrNode = z.infer<typeof BatchPollPrNodeSchema>;
 type BatchPollRepository = z.infer<typeof BatchPollRepositorySchema>;
 
 const BATCH_PR_STATUS_FRAGMENT = `
-fragment PaseoPollPullRequest on PullRequest {
+fragment ClisbotPollPullRequest on PullRequest {
   number
   url
   title
@@ -797,12 +797,12 @@ function buildBatchPullRequestStatusQuery(
       entry.headRef,
     )}, first: ${BATCH_PR_CANDIDATE_LIMIT}, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes {
-        ...PaseoPollPullRequest
+        ...ClisbotPollPullRequest
       }
     }
   }`,
   );
-  return `query PaseoBatchPullRequestStatus {
+  return `query ClisbotBatchPullRequestStatus {
   rateLimit {
     limit
     remaining
@@ -859,7 +859,7 @@ function buildBatchPullRequestChecksQuery(
     }
   }`,
   );
-  return `query PaseoBatchPullRequestChecks {
+  return `query ClisbotBatchPullRequestChecks {
   rateLimit {
     limit
     remaining

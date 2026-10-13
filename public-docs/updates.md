@@ -1,6 +1,6 @@
 ---
 title: Updates
-description: How Paseo releases work, the difference between stable and beta channels, and how to opt in to earlier updates.
+description: How Clisbot releases work, the difference between stable and beta channels, and how to opt in to earlier updates.
 nav: Updates
 order: 5
 category: Getting started
@@ -8,13 +8,13 @@ category: Getting started
 
 # Updates
 
-Paseo ships updates through two channels: **Stable** and **Beta**.
+Clisbot ships updates through two channels: **Stable** and **Beta**.
 
 Most releases go out on the stable channel. Betas are release candidates that let you test what's coming next before it rolls out to everyone.
 
 ## Version numbers
 
-Paseo follows [Semantic Versioning](https://semver.org) with prerelease tags.
+Clisbot follows [Semantic Versioning](https://semver.org) with prerelease tags.
 
 A stable release looks like this:
 
@@ -64,7 +64,7 @@ The app will check for beta updates from then on.
 
 Desktop releases and the CLI are usually available first. App Store and Play Store releases can lag behind because they go through review.
 
-There is no beta channel in the app stores right now — only stable builds are submitted. If you want early Android builds, download the APK from the [GitHub releases page](https://github.com/getpaseo/paseo/releases).
+There is no beta channel in the app stores right now — only stable builds are submitted. If you want early Android builds, download the APK from the [GitHub releases page](https://github.com/longbkit/clisbot/releases).
 
 ## What to do if something breaks
 

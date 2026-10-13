@@ -4,7 +4,7 @@ import type {
   ProviderModel,
   ProviderMode,
   ProviderStatus,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { probe } from "./process.js";
 import { AntigravityError } from "./wire.js";
 
@@ -15,7 +15,7 @@ const modes: readonly ProviderMode[] = [
     colorTier: "dangerous",
     label: "Full access",
     description:
-      "Antigravity cannot ask for permission when another app drives it. Paseo starts it with --dangerously-skip-permissions.",
+      "Antigravity cannot ask for permission when another app drives it. Clisbot starts it with --dangerously-skip-permissions.",
     isUnattended: true,
   },
 ];

@@ -2,7 +2,7 @@
 
 import assert from "node:assert";
 import { basename } from "node:path";
-import { createPaseoClient } from "@getpaseo/client";
+import { createClisbotClient } from "@clisbot/client";
 import { createE2ETestContext } from "./helpers/test-daemon.ts";
 
 console.log("=== Workspace Rename Command ===\n");
@@ -10,7 +10,7 @@ console.log("=== Workspace Rename Command ===\n");
 const ctx = await createE2ETestContext({ timeout: 30000 });
 
 try {
-  const created = await ctx.paseo([
+  const created = await ctx.clisbot([
     "workspace",
     "create",
     "--isolation",
@@ -24,14 +24,14 @@ try {
   assert.strictEqual(created.exitCode, 0, created.stderr);
   const workspaceId = JSON.parse(created.stdout).workspaceId as string;
 
-  const renamed = await ctx.paseo(["workspace", "rename", workspaceId, "Auth rework", "--json"]);
+  const renamed = await ctx.clisbot(["workspace", "rename", workspaceId, "Auth rework", "--json"]);
   assert.strictEqual(renamed.exitCode, 0, renamed.stderr);
   assert.deepStrictEqual(JSON.parse(renamed.stdout), {
     workspaceId,
     title: "Auth rework",
   });
 
-  const renamedList = await ctx.paseo(["workspace", "ls", "--json"]);
+  const renamedList = await ctx.clisbot(["workspace", "ls", "--json"]);
   assert.strictEqual(renamedList.exitCode, 0, renamedList.stderr);
   assert.strictEqual(
     JSON.parse(renamedList.stdout).find(
@@ -40,11 +40,11 @@ try {
     "Auth rework",
   );
 
-  const reset = await ctx.paseo(["workspace", "rename", workspaceId, "--reset", "--json"]);
+  const reset = await ctx.clisbot(["workspace", "rename", workspaceId, "--reset", "--json"]);
   assert.strictEqual(reset.exitCode, 0, reset.stderr);
   assert.deepStrictEqual(JSON.parse(reset.stdout), { workspaceId, title: null });
 
-  const resetList = await ctx.paseo(["workspace", "ls", "--json"]);
+  const resetList = await ctx.clisbot(["workspace", "ls", "--json"]);
   assert.strictEqual(resetList.exitCode, 0, resetList.stderr);
   assert.strictEqual(
     JSON.parse(resetList.stdout).find(
@@ -61,7 +61,7 @@ try {
 console.log("=== Workspace Rename Command Tests Passed ===");
 
 async function verifyWorkspaceCallerContext() {
-  const sdk = createPaseoClient({ url: `${ctx.wsUrl}/ws`, reconnect: { enabled: false } });
+  const sdk = createClisbotClient({ url: `${ctx.wsUrl}/ws`, reconnect: { enabled: false } });
   try {
     await sdk.connect();
     const parentWorkspace = await sdk.workspaces.create({
@@ -81,7 +81,7 @@ async function verifyWorkspaceCallerContext() {
       { caller: "", background: true, expected: true },
     ];
     for (const entry of cases) {
-      const result = await ctx.paseo(
+      const result = await ctx.clisbot(
         [
           "workspace",
           "create",
@@ -96,7 +96,7 @@ async function verifyWorkspaceCallerContext() {
             : [entry.background ? "--background" : "--no-background"]),
           "--json",
         ],
-        { env: { PASEO_AGENT_ID: entry.caller } },
+        { env: { CLISBOT_AGENT_ID: entry.caller } },
       );
       assert.strictEqual(result.exitCode, 0, result.stderr);
       assert.strictEqual(

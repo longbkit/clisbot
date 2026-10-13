@@ -23,27 +23,27 @@ function resolveToolCallName(toolCall: PiTrackedToolCall, result: PiToolResult) 
 describe("pi-mcp-adapter adapter", () => {
   test("normalizes Pi MCP proxy calls from requested tool args while running", () => {
     const toolCall = parseToolArgs("mcp", {
-      tool: "paseo_list_models",
+      tool: "clisbot_list_models",
       args: '{"provider":"pi"}',
     });
 
-    expect(resolveToolCallName(toolCall, null)).toBe("paseo.list_models");
+    expect(resolveToolCallName(toolCall, null)).toBe("clisbot.list_models");
   });
 
   test("normalizes Pi MCP proxy calls from result details when completed", () => {
     const toolCall = parseToolArgs("mcp", {
-      tool: "paseo_list_models",
+      tool: "clisbot_list_models",
       args: '{"provider":"pi"}',
     });
     const result = parseToolResult({
       content: [{ type: "text", text: "(empty result)" }],
       details: {
         mode: "call",
-        server: "paseo",
+        server: "clisbot",
         tool: "list_models",
       },
     });
 
-    expect(resolveToolCallName(toolCall, result)).toBe("paseo.list_models");
+    expect(resolveToolCallName(toolCall, result)).toBe("clisbot.list_models");
   });
 });

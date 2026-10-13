@@ -86,7 +86,7 @@ const OmpBashExecutionMessageSchema = z
     timestamp: z.number(),
   })
   .passthrough();
-// Roles Paseo does not render. They are listed so that a frame carrying one, such as
+// Roles Clisbot does not render. They are listed so that a frame carrying one, such as
 // agent_end, still parses; every role in OMP's RPC AgentMessage must appear in the union.
 const OmpPythonExecutionMessageSchema = z
   .object({ role: z.literal("pythonExecution") })

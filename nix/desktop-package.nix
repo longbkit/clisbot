@@ -13,12 +13,12 @@
   buildVersion,
   # Reuse the daemon's prebuilt npm-deps FOD. Same lockfile, same content —
   # without this, the desktop drv produces a separately-named store path
-  # (`paseo-desktop-<v>-npm-deps`) and refetches the entire registry. Override
-  # the upstream hash via `paseo.override { npmDepsHash = "..."; }`.
-  paseo,
+  # (`clisbot-desktop-<v>-npm-deps`) and refetches the entire registry. Override
+  # the upstream hash via `clisbot.override { npmDepsHash = "..."; }`.
+  clisbot,
 }:
 buildNpmPackage {
-  pname = "paseo-desktop";
+  pname = "clisbot-desktop";
   version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
 
   src = lib.cleanSourceWith {
@@ -52,13 +52,13 @@ buildNpmPackage {
       && !(lib.hasSuffix ".e2e.test.ts" baseName)
       && baseName != "node_modules"
       && baseName != ".git"
-      && baseName != ".paseo"
+      && baseName != ".clisbot"
       && baseName != ".DS_Store"
       && baseName != "release";
   };
 
   nodejs = nodejs_22;
-  inherit (paseo) npmDeps;
+  inherit (clisbot) npmDeps;
 
   # Prevent onnxruntime-node's install script from running during automatic
   # npm rebuild. We manually rebuild only node-pty in buildPhase.
@@ -98,13 +98,13 @@ buildNpmPackage {
     npm run build:server
 
     # App workspace deps not covered by build:server
-    npm run build --workspace=@getpaseo/expo-two-way-audio
+    npm run build --workspace=@clisbot/expo-two-way-audio
 
     # Expo web export for the Electron renderer
-    ( cd packages/app && PASEO_WEB_PLATFORM=electron npx expo export --platform web )
+    ( cd packages/app && CLISBOT_WEB_PLATFORM=electron npx expo export --platform web )
 
     # Desktop main process
-    npm run build:main --workspace=@getpaseo/desktop
+    npm run build:main --workspace=@clisbot/desktop
 
     ${lib.optionalString stdenv.hostPlatform.isDarwin ''
       # Let electron-builder create the native bundle layout (including helper
@@ -143,77 +143,77 @@ buildNpmPackage {
     mkdir -p $out/bin
 
     ${lib.optionalString stdenv.hostPlatform.isLinux ''
-      mkdir -p $out/share/paseo-desktop
+      mkdir -p $out/share/clisbot-desktop
 
       # Materialize only the desktop and daemon runtime graphs. Copying the
       # complete monorepo used to ship every build-time dependency (including
       # Electron, Expo tooling, and cross-platform builder binaries), making the
       # desktop output larger than 2 GiB.
-      PASEO_TRACE_DESKTOP=1 node scripts/trace-daemon.mjs > desktop-files.txt
+      CLISBOT_TRACE_DESKTOP=1 node scripts/trace-daemon.mjs > desktop-files.txt
 
       while IFS= read -r path; do
         [ -z "$path" ] && continue
-        mkdir -p "$out/share/paseo-desktop/$(dirname "$path")"
-        cp -a "$path" "$out/share/paseo-desktop/$path"
+        mkdir -p "$out/share/clisbot-desktop/$(dirname "$path")"
+        cp -a "$path" "$out/share/clisbot-desktop/$path"
       done < desktop-files.txt
 
       # Shell hooks invoke the retained CLI bin directly, without a system Node.
-      patchShebangs --build "$out/share/paseo-desktop"
+      patchShebangs --build "$out/share/clisbot-desktop"
 
       # Keep the same unpackaged monorepo layout expected by main.js.
-      cp package.json $out/share/paseo-desktop/
-      mkdir -p $out/share/paseo-desktop/packages/app
-      cp -a packages/app/dist $out/share/paseo-desktop/packages/app/
+      cp package.json $out/share/clisbot-desktop/
+      mkdir -p $out/share/clisbot-desktop/packages/app
+      cp -a packages/app/dist $out/share/clisbot-desktop/packages/app/
 
       for runtime_path in \
         packages/desktop/dist/main.js \
         packages/desktop/dist/preload.js \
         packages/desktop/dist/features/browser-keyboard/guest-preload.js \
         packages/desktop/package.json; do
-        if [ ! -e "$out/share/paseo-desktop/$runtime_path" ]; then
+        if [ ! -e "$out/share/clisbot-desktop/$runtime_path" ]; then
           echo "desktop runtime trace omitted $runtime_path" >&2
           exit 1
         fi
       done
 
-      if [ -e $out/share/paseo-desktop/node_modules/electron ]; then
+      if [ -e $out/share/clisbot-desktop/node_modules/electron ]; then
         echo "desktop runtime trace included npm Electron" >&2
         exit 1
       fi
 
       # Hicolor icon for desktop environments
       install -Dm644 packages/desktop/assets/icon.png \
-        $out/share/icons/hicolor/512x512/apps/paseo-desktop.png
+        $out/share/icons/hicolor/512x512/apps/clisbot-desktop.png
 
       # Electron derives Wayland's toplevel app_id from the package name in the
-      # app root it launches. Point it at a one-file app named "paseo-desktop"
+      # app root it launches. Point it at a one-file app named "clisbot-desktop"
       # so shells can match the window to the desktop entry and hicolor icon.
-      mkdir -p $out/share/paseo-desktop/electron-app
-      printf '%s\n' "{ \"name\": \"paseo-desktop\", \"version\": \"$version\", \"main\": \"index.js\" }" \
-        > $out/share/paseo-desktop/electron-app/package.json
+      mkdir -p $out/share/clisbot-desktop/electron-app
+      printf '%s\n' "{ \"name\": \"clisbot-desktop\", \"version\": \"$version\", \"main\": \"index.js\" }" \
+        > $out/share/clisbot-desktop/electron-app/package.json
       printf '%s\n' 'require("../packages/desktop/dist/main.js");' \
-        > $out/share/paseo-desktop/electron-app/index.js
+        > $out/share/clisbot-desktop/electron-app/index.js
 
       # Chromium's setuid sandbox cannot live in the immutable Nix store.
-      makeWrapper ${electron}/bin/electron $out/bin/paseo-desktop \
-        --add-flags "$out/share/paseo-desktop/electron-app" \
+      makeWrapper ${electron}/bin/electron $out/bin/clisbot-desktop \
+        --add-flags "$out/share/clisbot-desktop/electron-app" \
         --add-flags "--no-sandbox" \
-        --add-flags "--class=paseo-desktop" \
-        --set EXPO_DEV_URL "paseo://app/" \
-        --set CHROME_DESKTOP "paseo-desktop.desktop"
+        --add-flags "--class=clisbot-desktop" \
+        --set EXPO_DEV_URL "clisbot://app/" \
+        --set CHROME_DESKTOP "clisbot-desktop.desktop"
 
       copyDesktopItems
     ''}
 
     ${lib.optionalString stdenv.hostPlatform.isDarwin ''
-      app="$(find packages/desktop/release -maxdepth 3 -type d -name Paseo.app -print -quit)"
+      app="$(find packages/desktop/release -maxdepth 3 -type d -name Clisbot.app -print -quit)"
       if [ -z "$app" ]; then
-        echo "electron-builder did not produce Paseo.app" >&2
+        echo "electron-builder did not produce Clisbot.app" >&2
         exit 1
       fi
       mkdir -p "$out/Applications"
-      cp -R "$app" "$out/Applications/Paseo.app"
-      ln -s ../Applications/Paseo.app/Contents/MacOS/Paseo "$out/bin/paseo-desktop"
+      cp -R "$app" "$out/Applications/Clisbot.app"
+      ln -s ../Applications/Clisbot.app/Contents/MacOS/Clisbot "$out/bin/clisbot-desktop"
     ''}
 
     runHook postInstall
@@ -221,38 +221,38 @@ buildNpmPackage {
 
   desktopItems = lib.optionals stdenv.hostPlatform.isLinux [
     (makeDesktopItem {
-      name = "paseo-desktop";
-      desktopName = "Paseo";
+      name = "clisbot-desktop";
+      desktopName = "Clisbot";
       genericName = "AI Coding Agents";
       comment = "Self-hosted daemon for AI coding agents";
-      exec = "paseo-desktop";
-      icon = "paseo-desktop";
+      exec = "clisbot-desktop";
+      icon = "clisbot-desktop";
       categories = ["Development"];
-      startupWMClass = "paseo-desktop";
+      startupWMClass = "clisbot-desktop";
     })
     # Hidden alias entry. Which of the two names Electron ends up publishing as
     # the Wayland app_id depends on the Electron version: 41 uses the app-root
-    # package.json `name` ("paseo-desktop"), 38 uses the runtime app name that
-    # main.ts sets ("Paseo"). Ship a NoDisplay entry for the second spelling so
+    # package.json `name` ("clisbot-desktop"), 38 uses the runtime app name that
+    # main.ts sets ("Clisbot"). Ship a NoDisplay entry for the second spelling so
     # the icon resolves either way without a duplicate launcher item.
     (makeDesktopItem {
-      name = "Paseo";
-      desktopName = "Paseo";
+      name = "Clisbot";
+      desktopName = "Clisbot";
       genericName = "AI Coding Agents";
       comment = "Self-hosted daemon for AI coding agents";
-      exec = "paseo-desktop";
-      icon = "paseo-desktop";
+      exec = "clisbot-desktop";
+      icon = "clisbot-desktop";
       categories = [ "Development" ];
-      startupWMClass = "Paseo";
+      startupWMClass = "Clisbot";
       noDisplay = true;
     })
   ];
 
   meta = {
-    description = "Paseo desktop app (Electron wrapper)";
-    homepage = "https://github.com/getpaseo/paseo";
+    description = "Clisbot desktop app (Electron wrapper)";
+    homepage = "https://github.com/longbkit/clisbot";
     license = lib.licenses.agpl3Plus;
-    mainProgram = "paseo-desktop";
+    mainProgram = "clisbot-desktop";
     platforms = lib.platforms.linux ++ lib.platforms.darwin;
   };
 }

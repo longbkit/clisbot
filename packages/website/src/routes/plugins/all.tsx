@@ -20,8 +20,8 @@ export const Route = createFileRoute("/plugins/all")({
   }),
   head: () =>
     pageMeta(
-      "All plugins – Paseo plugins",
-      "Every community plugin for Paseo, by installs or newest first.",
+      "All plugins – Clisbot plugins",
+      "Every community plugin for Clisbot, by installs or newest first.",
       "/plugins/all",
     ),
   loader: () => getRegistry(),

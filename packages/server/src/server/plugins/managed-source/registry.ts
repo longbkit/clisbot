@@ -3,8 +3,8 @@ import {
   PluginRegistryIdSchema,
   type PluginRegistries,
   type PluginRegistryIdentity,
-} from "@getpaseo/protocol/plugin-registry";
-import type { PluginUpdateTarget } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/plugin-registry";
+import type { PluginUpdateTarget } from "@clisbot/protocol/messages";
 import { z } from "zod";
 
 // Install reads only these fields; the rest of a published plugin is the directory's display data.
@@ -34,7 +34,7 @@ export async function resolveRegistryPlugin(
     throw new Error("Registry credentials require HTTPS");
   const headers: Record<string, string> = {};
   if (authorization) headers.Authorization = authorization;
-  if (install) headers["X-Paseo-Install"] = "1";
+  if (install) headers["X-Clisbot-Install"] = "1";
   const url = `${identity.url.replace(/\/+$/, "")}/plugins/${identity.id}.json`;
   let response: Response;
   try {

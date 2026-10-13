@@ -12,14 +12,14 @@ function formatStars(count: number): string {
   return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k`;
 }
 
-const GITHUB_REPO_URL = "https://api.github.com/repos/getpaseo/paseo";
+const GITHUB_REPO_URL = "https://api.github.com/repos/longbkit/clisbot";
 const STARS_CACHE_KEY = "github-stars:v1";
 
 async function fetchStarCount(): Promise<string> {
   const res = await fetch(GITHUB_REPO_URL, {
     headers: {
       Accept: "application/vnd.github+json",
-      "User-Agent": "paseo-website",
+      "User-Agent": "clisbot-website",
     },
     cf: {
       cacheEverything: true,

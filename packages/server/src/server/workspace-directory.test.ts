@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import type { AgentSnapshotPayload, WorkspaceDescriptorPayload } from "./messages.js";
 import { WorkspaceDirectory } from "./workspace-directory.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
-import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
+import type { TerminalActivity } from "@clisbot/protocol/terminal-activity";
 import type { ProviderSubagentWorkspaceActivity } from "./workspace-directory.js";
 
 const NOW = "2026-03-01T12:00:00.000Z";
@@ -35,7 +35,7 @@ class WorkspaceStatus {
   private readonly worktreeWorkspace: PersistedWorkspaceRecord = {
     workspaceId: "workspace-worktree",
     projectId: this.project.projectId,
-    cwd: "/workspace/project/.paseo/worktrees/feature",
+    cwd: "/workspace/project/.clisbot/worktrees/feature",
     kind: "worktree",
     displayName: "feature",
     createdAt: NOW,

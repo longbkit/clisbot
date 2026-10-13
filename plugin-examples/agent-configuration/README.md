@@ -13,11 +13,11 @@ this example. The URL is a placeholder. The `company` entry replaces an existing
 Install on a daemon with plugins enabled:
 
 ```bash
-paseo plugin install /absolute/path/to/plugin-examples/agent-configuration
+clisbot plugin install /absolute/path/to/plugin-examples/agent-configuration
 ```
 
 The callback receives the request after earlier plugins have transformed it. The nested spreads
-preserve their settings; the explicit values replace only the named fields. Paseo validates and saves
+preserve their settings; the explicit values replace only the named fields. Clisbot validates and saves
 the resulting configuration before starting the agent. Existing agents are unchanged.
 
 See the [lifecycle reference](../../public-docs/plugins/reference.md#lifecycle-hooks) for ordering

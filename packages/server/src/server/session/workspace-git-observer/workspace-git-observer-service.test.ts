@@ -250,7 +250,7 @@ describe("recordDescriptorState", () => {
     const titledMain = makeDescriptor({
       id: "ws1",
       workspaceDirectory: WS1,
-      name: "Paseo main",
+      name: "Clisbot main",
       currentBranch: "main",
     });
     h.service.syncObservers([titledMain]);

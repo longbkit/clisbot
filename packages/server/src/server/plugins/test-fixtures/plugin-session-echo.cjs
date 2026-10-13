@@ -1,4 +1,4 @@
 process.on("message", (message) => {
-  if (message?.type !== "paseo_frame") return;
+  if (message?.type !== "clisbot_frame") return;
   process.send?.(message);
 });

@@ -43,8 +43,8 @@ function rowWithText(
 describe("native terminal selection", () => {
   it("expands a long-press coordinate to the whole terminal word", async () => {
     const terminal = createNativeHeadlessTerminal({ rows: 4, cols: 32, scrollbackLines: 20 });
-    await terminal.write("before PASEO_TARGET after\r\n");
-    const row = rowWithText(terminal, "before PASEO_TARGET after");
+    await terminal.write("before CLISBOT_TARGET after\r\n");
+    const row = rowWithText(terminal, "before CLISBOT_TARGET after");
 
     const selection = resolveTerminalWordSelection({
       terminal,
@@ -60,7 +60,7 @@ describe("native terminal selection", () => {
         end: { row, col: 18 },
         coordinateEpoch: terminal.getBufferBounds().coordinateEpoch,
       },
-      text: "PASEO_TARGET",
+      text: "CLISBOT_TARGET",
     });
   });
 

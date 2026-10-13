@@ -33,7 +33,7 @@ export async function runCreateCommand(
   const client = await connectToDaemon({ target: options.daemonTarget });
 
   try {
-    const response = await client.createPaseoWorktree(request);
+    const response = await client.createClisbotWorktree(request);
 
     const workspace = response.workspace;
     if (!workspace || response.error) {

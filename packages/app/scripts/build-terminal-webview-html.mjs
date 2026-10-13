@@ -33,7 +33,7 @@ async function resolveTsPath(basePath) {
 }
 
 const aliasPlugin = {
-  name: "paseo-alias",
+  name: "clisbot-alias",
   setup(build) {
     build.onResolve({ filter: /^@\// }, async (args) => ({
       path: await resolveTsPath(path.join(appRoot, "src", args.path.slice(2))),

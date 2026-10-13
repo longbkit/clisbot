@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ConnectionLinkImport, LinkPairing } from "@/runtime/host-runtime";
 import { openPairScan, type PairScanModel } from "./pair-scan-model";
 
-const LINK = "https://app.paseo.sh/#offer=abc";
+const LINK = "https://app.clisbot.com/#offer=abc";
 const PAIRING: LinkPairing = { submit: async () => ({ status: "cancelled" }) };
 
 /** The host runtime's side of a scan: each import resolves with the next queued outcome. */

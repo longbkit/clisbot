@@ -10,7 +10,7 @@ import type {
   ProviderMcpServerConfig,
   ProviderCatalog,
   ProviderToolCallDetail,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import type { z } from "zod";
 import { MspConnection, commandId, type Notification } from "./connection.js";
 import { MuseError, actionableError } from "./errors.js";

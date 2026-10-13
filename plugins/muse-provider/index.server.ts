@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { createMuseProvider } from "./server/provider.js";
 
 import { Usage } from "./server/usage.js";

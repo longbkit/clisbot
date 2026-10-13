@@ -5,14 +5,14 @@ describe("parseForgeRef", () => {
   it.each([
     [
       "GitHub pull request",
-      "git@github.com:getpaseo/paseo.git",
-      "https://github.com/getpaseo/paseo/pull/994/files?diff=split#discussion_r123",
+      "git@github.com:longbkit/clisbot.git",
+      "https://github.com/longbkit/clisbot/pull/994/files?diff=split#discussion_r123",
       { kind: "change_request", number: 994 },
     ],
     [
       "GitHub issue",
-      "https://github.com/getpaseo/paseo.git",
-      "https://github.com/getpaseo/paseo/issues/456",
+      "https://github.com/longbkit/clisbot.git",
+      "https://github.com/longbkit/clisbot/issues/456",
       { kind: "issue", number: 456 },
     ],
     [
@@ -52,8 +52,8 @@ describe("parseForgeRef", () => {
   it("canonicalizes a cloud SSH alias to its web host", () => {
     expect(
       parseForgeRef(
-        "https://github.com/getpaseo/paseo/pull/994",
-        "ssh://git@ssh.github.com/getpaseo/paseo.git",
+        "https://github.com/longbkit/clisbot/pull/994",
+        "ssh://git@ssh.github.com/longbkit/clisbot.git",
       ),
     ).toEqual({ kind: "change_request", number: 994 });
   });
@@ -72,8 +72,8 @@ describe("parseForgeRef", () => {
   it("does not apply another forge's route grammar to a known cloud host", () => {
     expect(
       parseForgeRef(
-        "https://github.com/getpaseo/paseo/pulls/31",
-        "git@github.com:getpaseo/paseo.git",
+        "https://github.com/longbkit/clisbot/pulls/31",
+        "git@github.com:longbkit/clisbot.git",
       ),
     ).toBeNull();
     expect(
@@ -98,7 +98,7 @@ describe("extractForgeRefs", () => {
   });
 
   it("returns no references without text or a valid remote", () => {
-    expect(extractForgeRefs("", "git@github.com:getpaseo/paseo.git")).toEqual([]);
-    expect(extractForgeRefs("https://github.com/getpaseo/paseo/pull/1", null)).toEqual([]);
+    expect(extractForgeRefs("", "git@github.com:longbkit/clisbot.git")).toEqual([]);
+    expect(extractForgeRefs("https://github.com/longbkit/clisbot/pull/1", null)).toEqual([]);
   });
 });

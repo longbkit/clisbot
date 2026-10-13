@@ -1,6 +1,6 @@
 # Custom Provider Configuration
 
-Paseo supports configuring custom agent providers through `config.json` (located at `$PASEO_HOME/config.json`, typically `~/.paseo/config.json`). You can extend built-in providers with different API backends, add ACP-compatible agents, set custom binaries, disable providers, and create multiple profiles for the same underlying provider.
+Clisbot supports configuring custom agent providers through `config.json` (located at `$CLISBOT_HOME/config.json`, typically `~/.clisbot/config.json`). You can extend built-in providers with different API backends, add ACP-compatible agents, set custom binaries, disable providers, and create multiple profiles for the same underlying provider.
 
 Provider definitions live under `agents.providers` in config.json:
 
@@ -29,7 +29,7 @@ agent catalog during startup, raise the limit in milliseconds:
 ```
 
 The limit applies independently to every provider refresh and covers availability plus the entire
-catalog probe. `PASEO_PROVIDER_REFRESH_TIMEOUT_MS` sets it when the config field is absent.
+catalog probe. `CLISBOT_PROVIDER_REFRESH_TIMEOUT_MS` sets it when the config field is absent.
 
 ## Provider options
 
@@ -232,7 +232,7 @@ For pay-as-you-go, use `ANTHROPIC_API_KEY` with a standard Model Studio key (`sk
 
 Codex talks to OpenAI's Responses API by default. Custom providers that extend `"codex"` can point Codex at any OpenAI-compatible endpoint (OpenRouter, LiteLLM, vLLM, llama.cpp server, an internal gateway, etc.) by setting `OPENAI_BASE_URL` and `OPENAI_API_KEY` in the provider `env`.
 
-Paseo passes those variables through to the Codex app-server process **and** maps them into Codex's thread config under `model_provider` / `model_providers`, because Codex reads provider routing from config rather than from `OPENAI_BASE_URL` alone.
+Clisbot passes those variables through to the Codex app-server process **and** maps them into Codex's thread config under `model_provider` / `model_providers`, because Codex reads provider routing from config rather than from `OPENAI_BASE_URL` alone.
 
 ### Setup
 
@@ -255,9 +255,9 @@ Paseo passes those variables through to the Codex app-server process **and** map
 }
 ```
 
-### What Paseo wires up
+### What Clisbot wires up
 
-Under the hood, for each custom Codex provider Paseo injects this into Codex's config:
+Under the hood, for each custom Codex provider Clisbot injects this into Codex's config:
 
 ```toml
 model_provider = "my-codex"
@@ -270,15 +270,15 @@ env_key = "OPENAI_API_KEY"
 requires_openai_auth = false
 ```
 
-- `base_url` — taken from `OPENAI_BASE_URL`. If it does not already end in `/v1`, Paseo appends `/v1`. Trailing slashes are stripped.
+- `base_url` — taken from `OPENAI_BASE_URL`. If it does not already end in `/v1`, Clisbot appends `/v1`. Trailing slashes are stripped.
 - `wire_api` — always `"responses"` (OpenAI Responses API protocol).
-- `env_key` — set to `"OPENAI_API_KEY"` when that env var is present and non-empty, so Codex reads the key from the same env var Paseo passes through.
+- `env_key` — set to `"OPENAI_API_KEY"` when that env var is present and non-empty, so Codex reads the key from the same env var Clisbot passes through.
 - `requires_openai_auth` — forced to `false` when `OPENAI_API_KEY` is provided, so Codex skips its built-in OpenAI login flow.
 
 ### Notes
 
 - The endpoint must speak the OpenAI **Responses API**, not just chat completions. Many gateways (OpenRouter, LiteLLM) support both — pick the Responses-compatible route.
-- Set `models` explicitly. Custom endpoints expose their own model IDs (`anthropic/claude-opus-4-7`, `qwen/qwen3-coder`, `local/llama`, etc.), and Paseo does not discover them automatically for Codex.
+- Set `models` explicitly. Custom endpoints expose their own model IDs (`anthropic/claude-opus-4-7`, `qwen/qwen3-coder`, `local/llama`, etc.), and Clisbot does not discover them automatically for Codex.
 - To run multiple endpoints side-by-side, define multiple entries that each extend `"codex"` with different IDs, labels, and env. Each appears as its own provider in the app.
 - If you only want to override the binary (e.g. a nightly Codex build) without changing the endpoint, omit `OPENAI_BASE_URL` and use `command` instead — see [Custom binary for a provider](#custom-binary-for-a-provider).
 
@@ -317,7 +317,7 @@ Example: two different Anthropic accounts as separate profiles:
 }
 ```
 
-Each profile appears as a separate provider in the Paseo app. You can select which one to use when launching an agent.
+Each profile appears as a separate provider in the Clisbot app. You can select which one to use when launching an agent.
 
 You can also combine profiles with model overrides to pin specific models per profile:
 
@@ -390,7 +390,7 @@ Override the command used to launch any provider with the `command` field. This 
 }
 ```
 
-The `command` array completely replaces the default command for that provider. The binary must exist on the system — Paseo checks for its availability and will mark the provider as unavailable if not found.
+The `command` array completely replaces the default command for that provider. The binary must exist on the system — Clisbot checks for its availability and will mark the provider as unavailable if not found.
 
 ### OMP profiles and Pi-compatible forks
 
@@ -406,7 +406,7 @@ OMP ships as a first-class built-in provider option. It is disabled by default; 
 }
 ```
 
-Custom OMP profiles should extend `omp`. They inherit the OMP adapter's `rpc-ui` approvals, native Paseo host tools, provider-managed subagents, and import behavior:
+Custom OMP profiles should extend `omp`. They inherit the OMP adapter's `rpc-ui` approvals, native Clisbot host tools, provider-managed subagents, and import behavior:
 
 ```json
 {
@@ -433,7 +433,7 @@ Custom OMP profiles should extend `omp`. They inherit the OMP adapter's `rpc-ui`
 }
 ```
 
-`options.sessionDir` is used only for importing sessions that were started outside Paseo. If `command` or XDG env vars move OMP's state directory, set `options.sessionDir` to the resulting OMP JSONL session directory; launching and resuming still go through the configured command. OMP waits 20 seconds for its initial `ready` frame and 60 seconds for later control-plane RPCs by default. `options.rpcTimeoutMs` overrides both deadlines.
+`options.sessionDir` is used only for importing sessions that were started outside Clisbot. If `command` or XDG env vars move OMP's state directory, set `options.sessionDir` to the resulting OMP JSONL session directory; launching and resuming still go through the configured command. OMP waits 20 seconds for its initial `ready` frame and 60 seconds for later control-plane RPCs by default. `options.rpcTimeoutMs` overrides both deadlines.
 
 For other providers that keep Pi's `--mode rpc` API but write sessions somewhere else, extend `pi`, replace the command, and provide the JSONL session directory:
 
@@ -480,11 +480,11 @@ This works for both built-in and custom providers. To re-enable, set `enabled: t
 
 ## ACP providers
 
-The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) is an open standard for communication between editors and AI coding agents — think LSP but for AI agents. Any agent that supports ACP can be added to Paseo as a custom provider.
+The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) is an open standard for communication between editors and AI coding agents — think LSP but for AI agents. Any agent that supports ACP can be added to Clisbot as a custom provider.
 
-ACP agents communicate over JSON-RPC 2.0 on stdio. Paseo spawns the agent process and talks to it through stdin/stdout.
+ACP agents communicate over JSON-RPC 2.0 on stdio. Clisbot spawns the agent process and talks to it through stdin/stdout.
 
-Paseo also ships an in-app ACP provider catalog for common agents, including CodeWhale, Cursor, DeepAgents, DimCode, Gemini CLI, Hermes, Qwen Code, and Kimi Code. Catalog entries create the same `extends: "acp"` provider config shown below.
+Clisbot also ships an in-app ACP provider catalog for common agents, including CodeWhale, Cursor, DeepAgents, DimCode, Gemini CLI, Hermes, Qwen Code, and Kimi Code. Catalog entries create the same `extends: "acp"` provider config shown below.
 
 ### Adding a generic ACP provider
 
@@ -513,7 +513,7 @@ Required fields for ACP providers:
 - `label`
 - `command` — the command to spawn the agent process (must support ACP over stdio)
 
-Paseo tools such as subagent creation come from the shared internal tool catalog. ACP providers receive those tools through the MCP fallback by default because ACP exposes `mcpServers`, not Paseo's native tool catalog. Some ACP adapters cannot create sessions when `mcpServers` is non-empty. Disable injected MCP for those providers with `options.supportsMcpServers: false`:
+Clisbot tools such as subagent creation come from the shared internal tool catalog. ACP providers receive those tools through the MCP fallback by default because ACP exposes `mcpServers`, not Clisbot's native tool catalog. Some ACP adapters cannot create sessions when `mcpServers` is non-empty. Disable injected MCP for those providers with `options.supportsMcpServers: false`:
 
 ```json
 {
@@ -533,8 +533,8 @@ Paseo tools such as subagent creation come from the shared internal tool catalog
 ```
 
 ACP agents execute filesystem operations in their own environment by default,
-while terminal operations run through Paseo on the host. To customize which
-operations Paseo handles, configure client capabilities in provider options:
+while terminal operations run through Clisbot on the host. To customize which
+operations Clisbot handles, configure client capabilities in provider options:
 
 ```json
 {
@@ -561,13 +561,13 @@ operations Paseo handles, configure client capabilities in provider options:
 
 When an agent runs in a container or remote environment that manages its own
 terminal, set `terminal: false` to keep command execution inside the agent
-container. When delegating filesystem operations to Paseo (`fs.readTextFile: true`
-or `fs.writeTextFile: true`), ensure the agent and Paseo share equivalent
+container. When delegating filesystem operations to Clisbot (`fs.readTextFile: true`
+or `fs.writeTextFile: true`), ensure the agent and Clisbot share equivalent
 absolute workspace paths.
 
 ### Generic ACP diagnostics
 
-Paseo diagnostics for `extends: "acp"` providers report the configured command, resolved launcher binary, version output, ACP `initialize`, ACP `session/new`, model count, modes, and final status.
+Clisbot diagnostics for `extends: "acp"` providers report the configured command, resolved launcher binary, version output, ACP `initialize`, ACP `session/new`, model count, modes, and final status.
 
 For package-runner commands such as `npx -y @google/gemini-cli --acp`, the version probe keeps the package spec and runs `npx -y @google/gemini-cli --version`. This diagnoses the actual agent package instead of only proving that `npx` exists.
 
@@ -623,19 +623,19 @@ Ref: [Gemini CLI ACP mode docs](https://github.com/google-gemini/gemini-cli/blob
 
 Ref: [Hermes ACP docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/acp)
 
-### How ACP providers work in Paseo
+### How ACP providers work in Clisbot
 
 When you launch an agent with an ACP provider:
 
-1. Paseo spawns the process using the configured `command`
+1. Clisbot spawns the process using the configured `command`
 2. Sends an `initialize` JSON-RPC request over stdin
 3. The agent responds with its capabilities, available modes, and models
-4. Paseo creates a session and sends prompts through the ACP protocol
+4. Clisbot creates a session and sends prompts through the ACP protocol
 5. The agent streams responses, tool calls, and permission requests back over stdout
 
-Every ACP provider exposes an **Auto Accept** toggle. Enable it per session to let Paseo approve
+Every ACP provider exposes an **Auto Accept** toggle. Enable it per session to let Clisbot approve
 ACP permission requests without surfacing each prompt. If the provider sends no allow option,
-Paseo leaves the request for you to answer. Unattended agents enable Auto Accept unless you
+Clisbot leaves the request for you to answer. Unattended agents enable Auto Accept unless you
 explicitly disable it.
 
 Models and modes are discovered dynamically at runtime from the agent process. If you want to override the model list (e.g., to curate which models appear in the UI), use the `models` field:
@@ -743,9 +743,9 @@ Each entry in the `models` array:
 
 ### Claude settings.json model discovery
 
-The built-in `claude` provider appends concrete model IDs from `~/.claude/settings.json` to its first-party Claude model list. Paseo reads the top-level `model` field and these `env` keys: `ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `ANTHROPIC_DEFAULT_FABLE_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, and `ANTHROPIC_DEFAULT_HAIKU_MODEL`.
+The built-in `claude` provider appends concrete model IDs from `~/.claude/settings.json` to its first-party Claude model list. Clisbot reads the top-level `model` field and these `env` keys: `ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `ANTHROPIC_DEFAULT_FABLE_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, and `ANTHROPIC_DEFAULT_HAIKU_MODEL`.
 
-This lets users who already configured Claude Code for Bedrock, OpenRouter, ollama, Z.AI, or another Anthropic-compatible gateway select the exact model ID in Paseo. Explicit model IDs are passed unchanged to Claude Code, even when the same string is a compatibility alias for a built-in model. When `agents.providers.claude.models` is set it **replaces** both the hardcoded first-party Claude list and any settings.json-discovered entries; use `agents.providers.claude.additionalModels` to keep the first-party list and append curated entries on top.
+This lets users who already configured Claude Code for Bedrock, OpenRouter, ollama, Z.AI, or another Anthropic-compatible gateway select the exact model ID in Clisbot. Explicit model IDs are passed unchanged to Claude Code, even when the same string is a compatibility alias for a built-in model. When `agents.providers.claude.models` is set it **replaces** both the hardcoded first-party Claude list and any settings.json-discovered entries; use `agents.providers.claude.additionalModels` to keep the first-party list and append curated entries on top.
 
 ### Gotcha: `extends: "claude"` with third-party endpoints
 

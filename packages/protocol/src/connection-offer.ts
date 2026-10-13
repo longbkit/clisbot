@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Relay-only pairing offer.
  *
- * `serverId` is a stable daemon identifier scoped to `PASEO_HOME`, and is also
+ * `serverId` is a stable daemon identifier scoped to `CLISBOT_HOME`, and is also
  * used as the relay session identifier.
  */
 export const ConnectionOfferV2Schema = z.object({
@@ -46,7 +46,7 @@ function extractOfferFragmentEncoded(input: string): string | null {
 }
 
 /**
- * Parse a pairing-offer URL of the form `https://app.paseo.sh/#offer=<base64url>`.
+ * Parse a pairing-offer URL of the form `https://app.clisbot.com/#offer=<base64url>`.
  *
  * Returns `null` if the input has no `#offer=` fragment. Throws if the fragment
  * exists but the payload is malformed or fails schema validation.

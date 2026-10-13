@@ -11,7 +11,7 @@ import {
 } from "../support/helpers/composer";
 import { ensureExplorerSidebar, openFilesPanel } from "../support/helpers/workspace-tabs";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 function visibleMainPane(page: Page) {
   return page.getByTestId("workspace-pane-main").filter({ visible: true });

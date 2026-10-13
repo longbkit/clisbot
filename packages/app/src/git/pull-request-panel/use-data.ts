@@ -5,8 +5,8 @@ import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-
 import type {
   CheckoutPrStatusResponse,
   PullRequestTimelineResponse,
-} from "@getpaseo/protocol/messages";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/protocol/messages";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useCheckoutPrStatusQuery } from "@/git/use-pr-status-query";
 import type { Forge } from "@/git/forge";
 import { i18n } from "@/i18n/i18next";

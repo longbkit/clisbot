@@ -20,7 +20,7 @@ describe("Git metadata event rules", () => {
     ["worktree", "index", { kind: "owner", refreshBase: false }],
     ["worktree", "HEAD", { kind: "owner", refreshBase: true }],
     ["worktree", "config.worktree", { kind: "owner", refreshBase: true }],
-    ["worktree", "paseo/worktree.json", { kind: "owner", refreshBase: true }],
+    ["worktree", "clisbot/worktree.json", { kind: "owner", refreshBase: true }],
     ["worktree", "COMMIT_EDITMSG", { kind: "ignore" }],
     ["worktree", "ORIG_HEAD", { kind: "ignore" }],
     ["common", "index", { kind: "owner", refreshBase: false }],

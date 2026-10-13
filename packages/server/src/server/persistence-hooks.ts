@@ -1,5 +1,5 @@
 import type { AgentManager } from "./agent/agent-manager.js";
-import { stripInternalPaseoMcpServer } from "./agent/runtime-mcp-config.js";
+import { stripInternalClisbotMcpServer } from "./agent/runtime-mcp-config.js";
 import type {
   AgentPersistenceHandle,
   AgentProvider,
@@ -64,7 +64,7 @@ export function attachAgentStoragePersistence(
 }
 
 export function buildConfigOverrides(record: StoredAgentRecord): Partial<AgentSessionConfig> {
-  return stripInternalPaseoMcpServer({
+  return stripInternalClisbotMcpServer({
     provider: record.provider,
     cwd: record.cwd,
     // lastModeId is the last live mode — it also covers provider-side switches
@@ -89,7 +89,7 @@ export function buildSessionConfig(
     return null;
   }
   const overrides = buildConfigOverrides(record);
-  return stripInternalPaseoMcpServer({
+  return stripInternalClisbotMcpServer({
     provider: record.provider,
     cwd: record.cwd,
     modeId: overrides.modeId,

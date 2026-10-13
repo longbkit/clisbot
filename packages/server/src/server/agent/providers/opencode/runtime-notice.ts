@@ -10,7 +10,7 @@ const Notices = z.array(
   z.object({ major: z.union([z.literal(1), z.literal(2)]), timestamp: z.string().datetime() }),
 );
 
-// These rows belong to Paseo, not OpenCode's conversation. Keep their original
+// These rows belong to Clisbot, not OpenCode's conversation. Keep their original
 // timestamps in the persistence handle so history rebuilds preserve placement.
 export function withOpenCodeRuntimeNotice(
   session: AgentSession,

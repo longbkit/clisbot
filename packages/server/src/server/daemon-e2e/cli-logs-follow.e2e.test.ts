@@ -2,13 +2,13 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 // A real daemon and CLI with a deterministic provider emitting two text chunks.
 // The live Claude reproduction is recorded in the PR; this locks its CLI behavior.
 test("logs --follow preserves the same assistant text as one-shot logs", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   let follow: ReturnType<typeof spawn> | undefined;
   let stdout = "";
@@ -18,7 +18,7 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
     await client.fetchAgents({ subscribe: {} });
     const agent = await client.createAgent({
       provider: "claude",
-      cwd: daemon.paseoHome,
+      cwd: daemon.clisbotHome,
       title: "Follow transcript regression",
       modeId: "bypassPermissions",
     });
@@ -40,7 +40,7 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
         "assistant_message",
       ],
       {
-        env: { ...process.env, PASEO_HOME: daemon.paseoHome },
+        env: { ...process.env, CLISBOT_HOME: daemon.clisbotHome },
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -62,7 +62,7 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
         { timeout: 20_000 },
       )
       .toContain("Following logs");
-    await client.sendMessage(agent.id, "respond with exactly: paseo-pr-cycle 한국어 보고서");
+    await client.sendMessage(agent.id, "respond with exactly: clisbot-pr-cycle 한국어 보고서");
     await client.waitForAgentUpsert(agent.id, (snapshot) => snapshot.status === "idle", 20_000);
     const transcript = await client.fetchAgentTimeline(agent.id, {
       direction: "tail",

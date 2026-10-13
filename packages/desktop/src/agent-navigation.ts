@@ -1,4 +1,4 @@
-import { parseAgentDeepLink, type AgentDeepLinkTarget } from "@getpaseo/protocol/agent-deep-link";
+import { parseAgentDeepLink, type AgentDeepLinkTarget } from "@clisbot/protocol/agent-deep-link";
 
 export function parseAgentDeepLinkFromArgv(argv: string[]): AgentDeepLinkTarget | null {
   for (const arg of argv) {

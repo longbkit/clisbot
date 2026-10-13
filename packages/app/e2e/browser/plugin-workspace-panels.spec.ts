@@ -36,9 +36,9 @@ function pluginClientSource(input: {
 }): string {
   return `import React, { useRef } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Icon } from "@getpaseo/plugin/client/react-native";
-import { useAgent, useWorkspace, openExternalUrl } from "@getpaseo/plugin/client";
-import { ExternalLink } from "@getpaseo/plugin/client/ui";
+import { Icon } from "@clisbot/plugin/client/react-native";
+import { useAgent, useWorkspace, openExternalUrl } from "@clisbot/plugin/client";
+import { ExternalLink } from "@clisbot/plugin/client/ui";
 import { recordComposerOpen } from "./shared/rpc";
 
 function WorkspacePanel({ workspaceId, host, layout }) {
@@ -108,7 +108,7 @@ function contributeClient(client) {
     pills.set(agent.id, () => pill.remove());
   };
   const lifetime = new AbortController();
-  void client.paseo.agents.list({ subscribe: {}, signal: lifetime.signal }).then(({ subscription }) => {
+  void client.clisbot.agents.list({ subscribe: {}, signal: lifetime.signal }).then(({ subscription }) => {
     subscription.subscribe({
       snapshot({ entries }) {
         for (const removePill of pills.values()) removePill();
@@ -139,7 +139,7 @@ export default function contribute(client) {
 }`;
 }
 
-const pluginSharedSource = `import { defineRpc } from "@getpaseo/plugin";
+const pluginSharedSource = `import { defineRpc } from "@clisbot/plugin";
 import { z } from "zod";
 
 export const recordComposerOpen = defineRpc({
@@ -151,8 +151,8 @@ export const recordComposerOpen = defineRpc({
 const pluginServerSource = `import { recordComposerOpen } from "./shared/rpc";
 
 export default function contribute(server) {
-  server.handle(recordComposerOpen, async ({ workspaceId }, { paseo }) => {
-    await paseo.workspaces.ref(workspaceId).setTitle("Opened from composer pill");
+  server.handle(recordComposerOpen, async ({ workspaceId }, { clisbot }) => {
+    await clisbot.workspaces.ref(workspaceId).setTitle("Opened from composer pill");
     return { opened: true };
   });
   return () => {};
@@ -263,7 +263,7 @@ test.describe("plugin workspace panels and Command Center", () => {
   test("follows workspace, agent, host, compact, and unavailable state", async ({
     page,
   }, testInfo) => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-workspace-panel-e2e-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-workspace-panel-e2e-"));
     const primaryClient = await connectNewWorkspaceDaemonClient({ ownProjects: false });
     const previousConfig = await primaryClient.getDaemonConfig();
     const primary = await seedWorkspace({ repoPrefix: "plugin-panel-primary-" });
@@ -281,7 +281,7 @@ test.describe("plugin workspace panels and Command Center", () => {
       modeId: "load-test",
     });
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
     );
     await writePluginSources(directory, {

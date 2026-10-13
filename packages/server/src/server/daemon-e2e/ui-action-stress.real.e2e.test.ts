@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import {
   canRunRealProvider,
@@ -457,7 +457,7 @@ describe.each(realProviders)("daemon E2E (real %s) - UI action stress", (provide
   test("normal UI submit path (idle sends) stays correct", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients([provider], logger),
       logger,
     });
@@ -491,7 +491,7 @@ describe.each(realProviders)("daemon E2E (real %s) - UI action stress", (provide
   test("queued-send-now path is stable under overlap", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients([provider], logger),
       logger,
     });

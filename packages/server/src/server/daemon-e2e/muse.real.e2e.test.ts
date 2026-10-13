@@ -5,13 +5,13 @@ import path from "node:path";
 import { expect, test } from "vitest";
 import { isCommandAvailable } from "../../executable-resolution/executable-resolution.js";
 import { loadPersistedConfig } from "../persisted-config.js";
-import { resolvePaseoHome } from "../paseo-home.js";
+import { resolveClisbotHome } from "../clisbot-home.js";
 import { BuiltinPluginLoader } from "../plugins/builtin/index.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 test("Muse registers without a client settings bundle", async () => {
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     builtinPlugins: new BuiltinPluginLoader(undefined, ["muse-provider"]),
   });
   const client = new DaemonClient({
@@ -34,11 +34,11 @@ test("Muse creates an agent, streams a text reply, and executes a real tool", as
     context.skip();
     return;
   }
-  const cwd = await mkdtemp(path.join(os.tmpdir(), "paseo-muse-e2e-"));
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-muse-e2e-"));
   await writeFile(path.join(cwd, "f"), "MUSE_TOOL_E2E_OK\n");
   execFileSync("git", ["init", cwd], { stdio: "ignore" });
-  const configured = loadPersistedConfig(resolvePaseoHome()).agents?.providers?.muse;
-  const daemon = await createTestPaseoDaemon({
+  const configured = loadPersistedConfig(resolveClisbotHome()).agents?.providers?.muse;
+  const daemon = await createTestClisbotDaemon({
     builtinPlugins: new BuiltinPluginLoader(undefined, ["muse-provider"]),
     providerOverrides: { muse: { ...configured, enabled: true } },
   });

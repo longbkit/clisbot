@@ -8,7 +8,7 @@ category: Hub
 
 # Hub
 
-A daemon runs agents on one machine, for you. Paseo Hub is the layer above your daemons. You register your daemons with it, and it gives them capabilities they do not have on their own.
+A daemon runs agents on one machine, for you. Clisbot Hub is the layer above your daemons. You register your daemons with it, and it gives them capabilities they do not have on their own.
 
 ```text
              Hub
@@ -28,10 +28,10 @@ Your daemons keep running agents where they always did. Hub decides when to ask 
 
 ## What lives in your repository
 
-`paseo hub init` creates one self-contained starter trigger:
+`clisbot hub init` creates one self-contained starter trigger:
 
 ```text
-.paseo/
+.clisbot/
 └── triggers/
     └── slack-help.yml
 ```
@@ -55,4 +55,4 @@ If a workflow accepts requests from GitHub, Slack, Discord, or the API, read [Hu
 
 Start on your machine with the embedded database, then add PostgreSQL or a public deployment only when you need them. [Self-hosting](/docs/hub/self-hosting) covers each step.
 
-[Hosted Hub](/docs/hub/hosted) uses the same triggers, daemons, and activity model. [Create a free account](https://hub.paseo.sh); it needs no card and does not expire.
+[Hosted Hub](/docs/hub/hosted) uses the same triggers, daemons, and activity model. [Create a free account](https://hub.clisbot.com); it needs no card and does not expire.

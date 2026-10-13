@@ -34,7 +34,7 @@ test("settings restart replaces the worker when a provider CLI answers --version
 }) => {
   test.skip(process.platform === "win32", "The slow provider stub is a POSIX script");
   const daemon = await startIsolatedHostDaemon(randomUUID(), {
-    paseoHome: await createHomeWithSlowProvider(1_800),
+    clisbotHome: await createHomeWithSlowProvider(1_800),
   });
   try {
     const previousWorker = await readWorkerPid(daemon);
@@ -48,19 +48,19 @@ test("settings restart replaces the worker when a provider CLI answers --version
 });
 
 async function createHomeWithSlowProvider(versionDelayMs: number): Promise<string> {
-  const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-e2e-slow-provider-"));
-  const provider = path.join(paseoHome, "slow-provider");
+  const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-slow-provider-"));
+  const provider = path.join(clisbotHome, "slow-provider");
   await writeFile(
     provider,
     `#!${process.execPath}\nsetTimeout(() => console.log("provider 1.0.0"), ${versionDelayMs});\n`,
     { mode: 0o700 },
   );
   await writeFile(
-    path.join(paseoHome, "config.json"),
+    path.join(clisbotHome, "config.json"),
     `${JSON.stringify({
       version: 1,
       agents: { providers: { claude: { command: { mode: "replace", argv: [provider] } } } },
     })}\n`,
   );
-  return paseoHome;
+  return clisbotHome;
 }

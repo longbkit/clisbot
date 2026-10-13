@@ -35,7 +35,7 @@ test("a fresh client restores an archived Codex agent across a reload without ag
 test("restore an archived worktree, then unarchive its completed Codex agent", async ({
   codexRestore,
 }) => {
-  await test.step("1. Create a managed worktree with a real Codex agent through Paseo MCP", async () => {
+  await test.step("1. Create a managed worktree with a real Codex agent through Clisbot MCP", async () => {
     await codexRestore.createWorktreeWithCodex();
   });
   await test.step("2. Wait for Codex to finish and show its reply", async () => {

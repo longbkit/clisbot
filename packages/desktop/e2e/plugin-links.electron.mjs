@@ -2,20 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect } from "@playwright/test";
 
-export function seedPluginLinks(paseoHome, workspaceId, url, remoteWorkspaceId) {
-  const directory = path.join(paseoHome, "link-plugin");
+export function seedPluginLinks(clisbotHome, workspaceId, url, remoteWorkspaceId) {
+  const directory = path.join(clisbotHome, "link-plugin");
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(
-    path.join(directory, "paseo-plugin.json"),
-    JSON.stringify({ id: "link-check", requirements: { paseo: ">=0.8.0" } }),
+    path.join(directory, "clisbot-plugin.json"),
+    JSON.stringify({ id: "link-check", requirements: { clisbot: ">=0.8.0" } }),
   );
   fs.writeFileSync(
     path.join(directory, "index.client.tsx"),
     `
 import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
-import { openExternalUrl } from "@getpaseo/plugin/client";
-import { ExternalLink } from "@getpaseo/plugin/client/ui";
+import { openExternalUrl } from "@clisbot/plugin/client";
+import { ExternalLink } from "@clisbot/plugin/client/ui";
 function Links({ navigation }) {
   const [result, setResult] = useState("Ready");
   return <View>
@@ -31,7 +31,7 @@ function Links({ navigation }) {
 export default function(client) { client.addSurface("main", Links); client.addSidebarItem({ id: "links", title: "Plugin links QA", icon: "Link", surface: "main" }); return () => {}; }
 `,
   );
-  const configPath = path.join(paseoHome, "config.json");
+  const configPath = path.join(clisbotHome, "config.json");
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   config.pluginsEnabled = true;
   config.plugins = { "link-check": { source: "directory", path: directory, enabled: true } };
@@ -50,7 +50,7 @@ export async function runPluginLinksRegression({
   const pluginEntry = page.getByRole("button", { name: "Plugin links QA", exact: true });
   await expect(pluginEntry).toBeVisible({ timeout: 90_000 });
   await page.evaluate((port) => {
-    const key = "@paseo:daemon-registry";
+    const key = "@clisbot:daemon-registry";
     const registry = JSON.parse(localStorage.getItem(key));
     const endpoint = `127.0.0.1:${port}`;
     const connection = { id: `direct:${endpoint}`, type: "directTcp", endpoint };

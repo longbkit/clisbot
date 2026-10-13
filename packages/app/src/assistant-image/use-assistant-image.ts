@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { ImageLoadEvent } from "react-native";
 import { useTranslation } from "react-i18next";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { isWeb } from "@/constants/platform";
 import { useStableEvent } from "@/hooks/use-stable-event";

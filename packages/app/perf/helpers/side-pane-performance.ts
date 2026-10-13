@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 export interface ProfileTarget {
   serverId: string;
@@ -53,7 +53,7 @@ interface BrowserMeasurementState {
 
 declare global {
   interface Window {
-    __PASEO_SIDE_PANE_MEASUREMENT__?: BrowserMeasurementState;
+    __CLISBOT_SIDE_PANE_MEASUREMENT__?: BrowserMeasurementState;
   }
 }
 
@@ -68,11 +68,11 @@ function parseCliJson<T>(output: string): T {
 export function resolveProfileTarget(): ProfileTarget {
   const repoRoot = resolve(process.cwd(), "../..");
   const serverId = (
-    process.env.PASEO_PROFILE_SERVER_ID ??
-    readFileSync(resolve(repoRoot, ".dev/paseo-home/server-id"), "utf8")
+    process.env.CLISBOT_PROFILE_SERVER_ID ??
+    readFileSync(resolve(repoRoot, ".dev/clisbot-home/server-id"), "utf8")
   ).trim();
-  const requestedName = process.env.PASEO_PROFILE_WORKSPACE_NAME?.trim() || "Paseo";
-  const requestedWorkspaceId = process.env.PASEO_PROFILE_WORKSPACE_ID?.trim();
+  const requestedName = process.env.CLISBOT_PROFILE_WORKSPACE_NAME?.trim() || "Clisbot";
+  const requestedWorkspaceId = process.env.CLISBOT_PROFILE_WORKSPACE_ID?.trim();
   if (requestedWorkspaceId) return { serverId, workspaceId: requestedWorkspaceId };
 
   const output = execFileSync("npm", ["run", "cli", "--", "workspace", "ls", "--json"], {
@@ -86,7 +86,7 @@ export function resolveProfileTarget(): ProfileTarget {
     (candidate) => candidate.name === requestedName && candidate.cwd === repoRoot,
   );
   if (!workspace) {
-    throw new Error(`No Paseo workspace named ${requestedName} points at ${repoRoot}`);
+    throw new Error(`No Clisbot workspace named ${requestedName} points at ${repoRoot}`);
   }
   return { serverId, workspaceId: workspace.workspaceId };
 }
@@ -217,7 +217,7 @@ async function waitForReactIdle(page: Page, quietMs = 250): Promise<void> {
   let unchangedSince = Date.now();
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
-    const count = await page.evaluate(() => globalThis.__PASEO_RENDER_PROFILE__?.length ?? 0);
+    const count = await page.evaluate(() => globalThis.__CLISBOT_RENDER_PROFILE__?.length ?? 0);
     if (count !== previousCount) {
       previousCount = count;
       unchangedSince = Date.now();
@@ -268,7 +268,7 @@ function summarizeRenders(
 async function beginMeasurement(page: Page, selectors: string[]): Promise<void> {
   await waitForReactIdle(page);
   await page.evaluate((trackedSelectors) => {
-    globalThis.__PASEO_RESET_RENDER_PROFILE__?.();
+    globalThis.__CLISBOT_RESET_RENDER_PROFILE__?.();
     const collectTestIds = (node: Node, output: Set<string>) => {
       if (!(node instanceof Element)) return;
       const ownTestId = node.getAttribute("data-testid");
@@ -304,7 +304,7 @@ async function beginMeasurement(page: Page, selectors: string[]): Promise<void> 
       }
     });
     state.observer.observe(document.body, { childList: true, subtree: true });
-    window.__PASEO_SIDE_PANE_MEASUREMENT__ = state;
+    window.__CLISBOT_SIDE_PANE_MEASUREMENT__ = state;
   }, selectors);
 }
 
@@ -317,10 +317,10 @@ async function finishMeasurement(page: Page, name: string): Promise<InteractionM
   );
   await waitForReactIdle(page);
   const raw = await page.evaluate((measurementName) => {
-    const state = window.__PASEO_SIDE_PANE_MEASUREMENT__;
+    const state = window.__CLISBOT_SIDE_PANE_MEASUREMENT__;
     if (!state) throw new Error("Side-pane performance measurement was not started");
     state.observer?.disconnect();
-    const samples = globalThis.__PASEO_RENDER_PROFILE__ ?? [];
+    const samples = globalThis.__CLISBOT_RENDER_PROFILE__ ?? [];
     return {
       name: measurementName,
       latencyMs: Math.round((performance.now() - state.startedAt) * 100) / 100,
@@ -341,7 +341,7 @@ async function finishMeasurement(page: Page, name: string): Promise<InteractionM
         };
       }),
       samples,
-      reasons: globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {},
+      reasons: globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {},
     };
   }, name);
   return {

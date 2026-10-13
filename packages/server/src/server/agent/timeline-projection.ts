@@ -1,5 +1,5 @@
 import type { AgentTimelineItem, ToolCallDetail } from "./agent-sdk-types.js";
-import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
+import { timelineItemIdentity } from "@clisbot/protocol/timeline-identity";
 
 import type { AgentTimelineRow } from "./agent-timeline-store-types.js";
 

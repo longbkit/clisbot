@@ -1,5 +1,5 @@
-export const PARENT_AGENT_ID_LABEL = "paseo.parent-agent-id";
-const OPEN_AGENT_TAB_LABEL_PREFIX = "paseo.open-agent-tab.";
+export const PARENT_AGENT_ID_LABEL = "clisbot.parent-agent-id";
+const OPEN_AGENT_TAB_LABEL_PREFIX = "clisbot.open-agent-tab.";
 
 export function getOpenAgentTabLabel(clientId: string): string {
   return `${OPEN_AGENT_TAB_LABEL_PREFIX}${clientId}`;

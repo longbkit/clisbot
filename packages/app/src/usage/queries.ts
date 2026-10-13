@@ -1,4 +1,4 @@
-import { supportsUsageReports } from "@getpaseo/client/internal/daemon-client";
+import { supportsUsageReports } from "@clisbot/client/internal/daemon-client";
 import { useCallback, useMemo } from "react";
 import {
   skipToken,

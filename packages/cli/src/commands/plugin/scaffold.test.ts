@@ -30,7 +30,7 @@ afterEach(async () => {
 
 describe("plugin scaffold", () => {
   it("creates an author overview beside the manifest", async () => {
-    const parent = await mkdtemp(path.join(tmpdir(), "paseo-plugin-scaffold-"));
+    const parent = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-scaffold-"));
     directories.push(parent);
     const directory = path.join(parent, "hello-plugin");
     await scaffoldPluginDirectory(directory);
@@ -41,7 +41,7 @@ describe("plugin scaffold", () => {
     expect(overview.replace(/<!--[\s\S]*?-->/g, "").trim()).toBe("");
     expect(overview).toContain("required to list");
     expect(overview).toContain("README");
-    expect(overview).toContain("choosing a plugin in Paseo");
+    expect(overview).toContain("choosing a plugin in Clisbot");
     expect(overview).toContain("Length follows complexity");
     expect(overview).toContain("1. Describe what your plugin is and does");
     expect(overview).toContain("2. Explain how it works only when it is not obvious");
@@ -52,11 +52,11 @@ describe("plugin scaffold", () => {
     expect(overview).not.toContain("This plugin entry was imported");
     const packageJson = JSON.parse(await readFile(path.join(directory, "package.json"), "utf8"));
     expect(packageJson.files).toContain("OVERVIEW.md");
-    expect(await readdir(directory)).toContain("paseo-plugin.json");
+    expect(await readdir(directory)).toContain("clisbot-plugin.json");
   });
 
   it("includes the author overview in the packed npm artifact", async () => {
-    const parent = await mkdtemp(path.join(tmpdir(), "paseo-plugin-scaffold-"));
+    const parent = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-scaffold-"));
     directories.push(parent);
     const directory = path.join(parent, "packed-plugin");
     await scaffoldPluginDirectory(directory);
@@ -66,7 +66,7 @@ describe("plugin scaffold", () => {
     });
     const [artifact] = JSON.parse(stdout) as { files: { path: string }[] }[];
     expect(artifact.files.map((file) => file.path)).toEqual(
-      expect.arrayContaining(["OVERVIEW.md", "paseo-plugin.json"]),
+      expect.arrayContaining(["OVERVIEW.md", "clisbot-plugin.json"]),
     );
   });
 
@@ -90,20 +90,20 @@ describe("plugin scaffold", () => {
       const cliPackageJson = JSON.parse(
         await readFile(new URL("../../../package.json", import.meta.url), "utf8"),
       ) as { version: string };
-      expect(JSON.parse(await readFile(path.join(directory, "paseo-plugin.json"), "utf8"))).toEqual(
-        {
-          id: "hello-plugin",
-          $comment: expect.stringContaining('"icon": "assets/icon.png"'),
-          media: [],
-          requirements: { paseo: `>=${cliPackageJson.version}` },
-        },
-      );
+      expect(
+        JSON.parse(await readFile(path.join(directory, "clisbot-plugin.json"), "utf8")),
+      ).toEqual({
+        id: "hello-plugin",
+        $comment: expect.stringContaining('"icon": "assets/icon.png"'),
+        media: [],
+        requirements: { clisbot: `>=${cliPackageJson.version}` },
+      });
       expect(JSON.parse(await readFile(path.join(directory, "package.json"), "utf8"))).toEqual({
         name: "hello-plugin",
         private: true,
         version: "0.0.0",
         files: [
-          "paseo-plugin.json",
+          "clisbot-plugin.json",
           "OVERVIEW.md",
           "index.client.ts",
           "index.client.tsx",
@@ -115,7 +115,7 @@ describe("plugin scaffold", () => {
         ],
         scripts: { typecheck: "tsc --noEmit" },
         devDependencies: {
-          "@getpaseo/plugin": cliPackageJson.version,
+          "@clisbot/plugin": cliPackageJson.version,
           "@tanstack/react-query": "^5.90.11",
           "@types/react": "~19.2.0",
           react: "19.1.0",
@@ -124,7 +124,7 @@ describe("plugin scaffold", () => {
           zod: "^4.4.3",
         },
       });
-      expect(await readdir(directory)).not.toContain("paseo-plugin.d.ts");
+      expect(await readdir(directory)).not.toContain("clisbot-plugin.d.ts");
       await expect(readFile(path.join(directory, "index.client.tsx"), "utf8")).resolves.toContain(
         'from "./client/greeting"',
       );
@@ -145,7 +145,7 @@ describe("plugin scaffold", () => {
       );
       await expect(
         readFile(path.join(directory, "client/greeting.tsx"), "utf8"),
-      ).resolves.toContain(`openExternal("https://paseo.sh")`);
+      ).resolves.toContain(`openExternal("https://clisbot.com")`);
       await expect(readFile(path.join(directory, "server/greeting.ts"), "utf8")).resolves.toContain(
         '"Hello, " + name + "!"',
       );
@@ -160,15 +160,15 @@ describe("plugin scaffold", () => {
     },
   );
 
-  it("typechecks client and server Paseo API access", async () => {
+  it("typechecks client and server Clisbot API access", async () => {
     const parent = await mkdtemp(path.join(process.cwd(), ".plugin-scaffold-"));
     directories.push(parent);
-    const directory = path.join(parent, "paseo-api-plugin");
+    const directory = path.join(parent, "clisbot-api-plugin");
     await scaffoldPluginDirectory(directory);
     await Promise.all([
       writeFile(
         path.join(directory, "shared", "inspect.ts"),
-        `import { defineRpc } from "@getpaseo/plugin";
+        `import { defineRpc } from "@clisbot/plugin";
 import { z } from "zod";
 
 export const inspect = defineRpc({
@@ -180,15 +180,15 @@ export const inspect = defineRpc({
       ),
       writeFile(
         path.join(directory, "server", "inspect.ts"),
-        `import type { PluginHandlerContext } from "@getpaseo/plugin/server";
-import type { RpcInput } from "@getpaseo/plugin";
+        `import type { PluginHandlerContext } from "@clisbot/plugin/server";
+import type { RpcInput } from "@clisbot/plugin";
 import { inspect } from "../shared/inspect";
 
 export async function inspectConfig(
   _input: RpcInput<typeof inspect>,
-  { paseo }: PluginHandlerContext,
+  { clisbot }: PluginHandlerContext,
 ) {
-  return { configured: Boolean((await paseo.config.get()).config) };
+  return { configured: Boolean((await clisbot.config.get()).config) };
 }
 `,
       ),
@@ -196,14 +196,14 @@ export async function inspectConfig(
         path.join(directory, "client", "main.tsx"),
         `import React from "react";
 import { Text } from "react-native";
-import { Icon, Modal, useToast } from "@getpaseo/plugin/client/react-native";
-import { type PluginAgentPanelProps, type PluginClientContext, type PluginSurfaceProps, useAgent, usePaseo, useWorkspace } from "@getpaseo/plugin/client";
+import { Icon, Modal, useToast } from "@clisbot/plugin/client/react-native";
+import { type PluginAgentPanelProps, type PluginClientContext, type PluginSurfaceProps, useAgent, useClisbot, useWorkspace } from "@clisbot/plugin/client";
 import { inspect } from "../shared/inspect";
 
 export function Surface({ navigation }: PluginSurfaceProps) {
-  const paseo = usePaseo();
+  const clisbot = useClisbot();
   const toast = useToast();
-  const createWorkspace = () => paseo.workspaces.create({
+  const createWorkspace = () => clisbot.workspaces.create({
     source: { kind: "directory", path: "/repo" },
   });
   navigation?.openAgent({ agentId: "agent-1" });
@@ -211,7 +211,7 @@ export function Surface({ navigation }: PluginSurfaceProps) {
   navigation?.openAgent({ serverId: "server-2", agentId: "agent-2" });
   navigation?.openWorkspace({ serverId: "server-2", workspaceId: "workspace-2" });
   void createWorkspace;
-  return <><Icon name="Settings" size={18} color="#123456" /><Text onPress={() => toast.show("Ready")}>Paseo API</Text><Modal title="Example" icon={<Icon name="Settings" />} open={false} onOpenChange={() => {}}><Modal.Content><Text>Modal</Text></Modal.Content></Modal></>;
+  return <><Icon name="Settings" size={18} color="#123456" /><Text onPress={() => toast.show("Ready")}>Clisbot API</Text><Modal title="Example" icon={<Icon name="Settings" />} open={false} onOpenChange={() => {}}><Modal.Content><Text>Modal</Text></Modal.Content></Modal></>;
 }
 
 export function AgentPanel({ workspaceId, agentId }: PluginAgentPanelProps) {
@@ -268,7 +268,7 @@ export function contributeClient(client: PluginClientContext) {
       ),
       writeFile(
         path.join(directory, "index.client.tsx"),
-        `import type { PluginClientContext } from "@getpaseo/plugin/client";
+        `import type { PluginClientContext } from "@clisbot/plugin/client";
 import { AgentPanel, contributeClient, Surface } from "./client/main";
 import { inspect } from "./shared/inspect";
 
@@ -286,8 +286,8 @@ export default function contribute(client: PluginClientContext) {
     title: "Open review",
     icon: "Scan",
     context: "agent",
-    async onSelect({ paseo, rpc, workspace, openPanel }) {
-      await paseo.workspaces.ref(workspace.id).setTitle("Review");
+    async onSelect({ clisbot, rpc, workspace, openPanel }) {
+      await clisbot.workspaces.ref(workspace.id).setTitle("Review");
       await rpc(inspect, {});
       openPanel("review");
     },
@@ -298,7 +298,7 @@ export default function contribute(client: PluginClientContext) {
       ),
       writeFile(
         path.join(directory, "index.server.ts"),
-        `import type { PluginServerContext } from "@getpaseo/plugin/server";
+        `import type { PluginServerContext } from "@clisbot/plugin/server";
 import { inspectConfig } from "./server/inspect";
 import { inspect } from "./shared/inspect";
 
@@ -321,7 +321,7 @@ export default function contribute(server: PluginServerContext) {
     await writeFile(
       path.join(directory, "index.client.tsx"),
       `
-import type { PluginClientContext, PluginComposerPillProps } from "@getpaseo/plugin/client";
+import type { PluginClientContext, PluginComposerPillProps } from "@clisbot/plugin/client";
 
 export default function contribute(client: PluginClientContext) {
   const oldPill = {
@@ -347,7 +347,7 @@ export default function contribute(client: PluginClientContext) {
   }, 20_000);
 
   it("refuses to write into a non-empty directory", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-scaffold-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-scaffold-"));
     directories.push(directory);
     await writeFile(path.join(directory, "notes.txt"), "keep me");
 

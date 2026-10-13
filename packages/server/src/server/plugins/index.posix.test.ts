@@ -36,9 +36,9 @@ const emptyUsageRuntime = {
 } satisfies Pick<TestPluginRuntime, "getUsageSourceRegistrations" | "fetchUsage" | "discoverUsage">;
 
 async function createPlugin(id: string, source: string): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-service-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-service-"));
   roots.push(directory);
-  await writeFile(path.join(directory, "paseo-plugin.json"), JSON.stringify({ id }));
+  await writeFile(path.join(directory, "clisbot-plugin.json"), JSON.stringify({ id }));
   await writeFile(path.join(directory, "index.server.ts"), source);
   return directory;
 }
@@ -71,7 +71,7 @@ function createService(
 }
 
 function bindTestSessionHost(service: PluginService): PluginService {
-  service.bindPaseoSessionHost({
+  service.bindClisbotSessionHost({
     async attachPluginSocket(_pluginId, socket) {
       const closed = new Promise<void>((resolve) => socket.once("close", resolve));
       socket.on("message", (data) => {
@@ -138,7 +138,7 @@ function createPausedRuntime() {
       running.clear();
     },
     subscribe: () => () => undefined,
-    bindPaseoSessionHost: () => undefined,
+    bindClisbotSessionHost: () => undefined,
   };
   return { runtime, started, releaseStart };
 }
@@ -174,7 +174,7 @@ function createPluginSelectivePausedRuntime(pausedPluginId: string) {
       running.clear();
     },
     subscribe: () => () => undefined,
-    bindPaseoSessionHost: () => undefined,
+    bindClisbotSessionHost: () => undefined,
   };
   return { runtime, started, releaseStart, starts };
 }
@@ -188,7 +188,7 @@ describe("PluginService", () => {
   ])(
     "publishes status and launch metadata through $runtime despite a configured provider (extends: $shadow)",
     async ({ shadow, runtime }) => {
-      const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+      const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
       roots.push(home);
       const directory = await createPlugin(
         "provider-status",
@@ -253,7 +253,7 @@ describe("PluginService", () => {
   );
 
   it("resolves a provider icon path to sanitized inline SVG", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const directory = await createPlugin(
       "provider-icon",
@@ -289,7 +289,7 @@ describe("PluginService", () => {
   });
 
   it("publishes provider registrations only while their plugin is running", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const directory = await createPlugin(
       "provider-lifecycle",
@@ -315,7 +315,7 @@ describe("PluginService", () => {
   });
 
   it("retains logs when disabled and clears them only when removed", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const entries = [
       {
@@ -339,7 +339,7 @@ describe("PluginService", () => {
       stopPluginById: async () => false,
       stopAll: async () => undefined,
       subscribe: () => () => undefined,
-      bindPaseoSessionHost: () => undefined,
+      bindClisbotSessionHost: () => undefined,
     };
     const service = createService(
       home,
@@ -358,7 +358,7 @@ describe("PluginService", () => {
   });
 
   it("publishes each configured plugin after its startup state settles", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const first = await createPlugin(
       "startup-first",
@@ -382,7 +382,7 @@ describe("PluginService", () => {
   }, 20_000);
 
   it("uses an explicit config key, exposes reload failure, and retries from disk", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const directory = await createPlugin(
       "manifest-default",
@@ -420,13 +420,13 @@ describe("PluginService", () => {
   }, 20_000);
 
   it("lists manifest metadata for running and disabled plugins without hiding malformed entries", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const running = await createPlugin("running", "export default () => () => {};");
     const disabled = await createPlugin("disabled", "export default () => () => {};");
     const malformed = await createPlugin("malformed", "export default () => () => {};");
     await writeFile(
-      path.join(running, "paseo-plugin.json"),
+      path.join(running, "clisbot-plugin.json"),
       JSON.stringify({
         id: "running",
         description: "Runs checks",
@@ -436,10 +436,10 @@ describe("PluginService", () => {
       }),
     );
     await writeFile(
-      path.join(disabled, "paseo-plugin.json"),
+      path.join(disabled, "clisbot-plugin.json"),
       JSON.stringify({ id: "disabled", description: "Waits until enabled" }),
     );
-    await writeFile(path.join(malformed, "paseo-plugin.json"), "{");
+    await writeFile(path.join(malformed, "clisbot-plugin.json"), "{");
     const service = createService(home, {
       running: { source: "directory", path: running },
       disabled: { source: "directory", path: disabled, enabled: false },
@@ -471,7 +471,7 @@ describe("PluginService", () => {
   });
 
   it("resolves a bare registry id even when a matching directory exists in the daemon cwd", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     const owner = path.join(process.cwd(), `registry-shadow-${randomUUID()}`);
     await mkdir(owner);
     roots.push(home, owner);
@@ -484,9 +484,9 @@ describe("PluginService", () => {
     await runGitCommand(
       [
         "-c",
-        "user.name=Paseo Tests",
+        "user.name=Clisbot Tests",
         "-c",
-        "user.email=paseo@example.test",
+        "user.email=clisbot@example.test",
         "commit",
         "-m",
         "fixture",
@@ -556,7 +556,7 @@ describe("PluginService", () => {
   }, 30_000);
 
   it("names a missing explicit directory instead of trying a managed source", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const directory = path.join(home, "missing");
     const service = createService(home);
@@ -566,14 +566,14 @@ describe("PluginService", () => {
   });
 
   it("installs an explicit directory and its selected plugin subdirectory", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const repository = await mkdtemp(path.join(tmpdir(), "owner-repository-"));
     roots.push(repository);
     const pluginDirectory = path.join(repository, "plugins", "review");
     await mkdir(pluginDirectory, { recursive: true });
     await writeFile(
-      path.join(pluginDirectory, "paseo-plugin.json"),
+      path.join(pluginDirectory, "clisbot-plugin.json"),
       JSON.stringify({ id: "local-monorepo" }),
     );
     await writeFile(
@@ -592,22 +592,22 @@ describe("PluginService", () => {
   it.each([true, false])(
     "updates the shipped legacy Git layout with enabled=%s",
     async (enabled) => {
-      const home = await mkdtemp(path.join(tmpdir(), "paseo-legacy-layout-"));
+      const home = await mkdtemp(path.join(tmpdir(), "clisbot-legacy-layout-"));
       roots.push(home);
-      const repository = await mkdtemp(path.join(tmpdir(), "paseo-legacy-remote-"));
+      const repository = await mkdtemp(path.join(tmpdir(), "clisbot-legacy-remote-"));
       roots.push(repository);
       const id = "legacy-review";
       const pluginPath = "plugins/review";
       await mkdir(path.join(repository, pluginPath), { recursive: true });
       await writeFile(
-        path.join(repository, pluginPath, "paseo-plugin.json"),
-        JSON.stringify({ id, requirements: { paseo: ">=0.8.0" } }),
+        path.join(repository, pluginPath, "clisbot-plugin.json"),
+        JSON.stringify({ id, requirements: { clisbot: ">=0.8.0" } }),
       );
       await writeFile(
         path.join(repository, pluginPath, "index.server.ts"),
-        `import { defineSettings } from "@getpaseo/plugin";
+        `import { defineSettings } from "@clisbot/plugin";
 import { z } from "zod";
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 export default function contribute(server: PluginServerContext) {
   server.registerSettings(defineSettings({ id: "preferences", scope: "host", version: 1, schema: z.object({ message: z.string().default("default") }) }));
   return () => {};
@@ -734,15 +734,15 @@ export default function contribute(server: PluginServerContext) {
   );
 
   it("keeps the running commit when a Git update build command fails", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
-    const repository = await mkdtemp(path.join(tmpdir(), "paseo-plugin-repository-"));
+    const repository = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-repository-"));
     roots.push(repository);
     await runGitCommand(["init", "-b", "main"], { cwd: repository });
-    await runGitCommand(["config", "user.name", "Paseo Tests"], { cwd: repository });
-    await runGitCommand(["config", "user.email", "paseo@example.test"], { cwd: repository });
+    await runGitCommand(["config", "user.name", "Clisbot Tests"], { cwd: repository });
+    await runGitCommand(["config", "user.email", "clisbot@example.test"], { cwd: repository });
     await writeFile(
-      path.join(repository, "paseo-plugin.json"),
+      path.join(repository, "clisbot-plugin.json"),
       JSON.stringify({ id: "git-update" }),
     );
     await writeFile(
@@ -764,7 +764,7 @@ export default function contribute(server: PluginServerContext) {
     const installedCommit = installed.commit;
 
     await writeFile(
-      path.join(repository, "paseo-plugin.json"),
+      path.join(repository, "clisbot-plugin.json"),
       JSON.stringify({
         id: "git-update",
         build: [
@@ -798,15 +798,15 @@ export default function contribute(server: PluginServerContext) {
   }, 30_000);
 
   it("runs Git build commands in staging before validation and activation on install and update", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
-    const repository = await mkdtemp(path.join(tmpdir(), "paseo-plugin-repository-"));
+    const repository = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-repository-"));
     roots.push(repository);
     await runGitCommand(["init", "-b", "main"], { cwd: repository });
-    await runGitCommand(["config", "user.name", "Paseo Tests"], { cwd: repository });
-    await runGitCommand(["config", "user.email", "paseo@example.test"], { cwd: repository });
+    await runGitCommand(["config", "user.name", "Clisbot Tests"], { cwd: repository });
+    await runGitCommand(["config", "user.email", "clisbot@example.test"], { cwd: repository });
     await writeFile(
-      path.join(repository, "paseo-plugin.json"),
+      path.join(repository, "clisbot-plugin.json"),
       JSON.stringify({
         id: "prepared-git-plugin",
         build: [
@@ -843,7 +843,7 @@ export default function contribute(server: PluginServerContext) {
       stopPluginById: async (pluginId) => running.delete(pluginId),
       stopAll: async () => running.clear(),
       subscribe: () => () => undefined,
-      bindPaseoSessionHost: () => undefined,
+      bindClisbotSessionHost: () => undefined,
     };
     const service = createService(
       home,
@@ -861,7 +861,7 @@ export default function contribute(server: PluginServerContext) {
     await expect(stat(path.join(installed.path, "shell-injection"))).rejects.toThrow();
 
     await writeFile(
-      path.join(repository, "paseo-plugin.json"),
+      path.join(repository, "clisbot-plugin.json"),
       JSON.stringify({
         id: "prepared-git-plugin",
         build: [
@@ -884,15 +884,15 @@ export default function contribute(server: PluginServerContext) {
   }, 30_000);
 
   it("activates an update when the enabled plugin previously failed to start", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
-    const repository = await mkdtemp(path.join(tmpdir(), "paseo-plugin-repository-"));
+    const repository = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-repository-"));
     roots.push(repository);
     await runGitCommand(["init", "-b", "main"], { cwd: repository });
-    await runGitCommand(["config", "user.name", "Paseo Tests"], { cwd: repository });
-    await runGitCommand(["config", "user.email", "paseo@example.test"], { cwd: repository });
+    await runGitCommand(["config", "user.name", "Clisbot Tests"], { cwd: repository });
+    await runGitCommand(["config", "user.email", "clisbot@example.test"], { cwd: repository });
     await writeFile(
-      path.join(repository, "paseo-plugin.json"),
+      path.join(repository, "clisbot-plugin.json"),
       JSON.stringify({ id: "failed-update" }),
     );
     await writeFile(path.join(repository, "index.server.ts"), "export default () => () => {};\n");
@@ -927,7 +927,7 @@ export default function contribute(server: PluginServerContext) {
       stopPluginById: async (pluginId) => running.delete(pluginId),
       stopAll: async () => running.clear(),
       subscribe: () => () => undefined,
-      bindPaseoSessionHost: () => undefined,
+      bindClisbotSessionHost: () => undefined,
     };
     const store = createStore(home, {
       "failed-update": { source: "directory", path: initial.directory, enabled: true },
@@ -962,7 +962,7 @@ export default function contribute(server: PluginServerContext) {
   it.each([false, true])(
     "cleans a failed update when restoration also fails=%s",
     async (failRestore) => {
-      const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-recovery-"));
+      const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-recovery-"));
       roots.push(home);
       const repository = await createPlugin("recovery", "export default () => () => {};\n");
       for (const args of [
@@ -989,7 +989,7 @@ export default function contribute(server: PluginServerContext) {
         stopPluginById: async (id) => running.delete(id),
         stopAll: async () => running.clear(),
         subscribe: () => () => undefined,
-        bindPaseoSessionHost: () => undefined,
+        bindClisbotSessionHost: () => undefined,
       };
       const service = createService(
         home,
@@ -1031,7 +1031,7 @@ export default function contribute(server: PluginServerContext) {
   );
 
   it("disables and removes a plugin without touching its source directory", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const cleanupFile = path.join(home, "cleanup.txt");
     const directory = await createPlugin(
@@ -1061,7 +1061,7 @@ export default function contribute(plugin: unknown) {
   }, 20_000);
 
   it("detaches every plugin synchronously when the global switch turns off and recovers", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const first = await createPlugin(
       "first",
@@ -1095,7 +1095,7 @@ export default function contribute(plugin: unknown) {
   }, 20_000);
 
   it("does not publish an in-flight start after a later global disable", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const store = createStore(home, {
       slow: { source: "directory", path: "/plugins/slow", enabled: true },
@@ -1120,7 +1120,7 @@ export default function contribute(plugin: unknown) {
   });
 
   it("does not publish an in-flight enable after a later plugin disable", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const store = createStore(home, {
       slow: { source: "directory", path: "/plugins/slow", enabled: false },
@@ -1144,7 +1144,7 @@ export default function contribute(plugin: unknown) {
   });
 
   it("keeps a later disable authoritative over an enable waiting behind another plugin", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const store = createStore(home, {
       occupier: { source: "directory", path: "/plugins/occupier", enabled: false },
@@ -1178,7 +1178,7 @@ export default function contribute(plugin: unknown) {
   });
 
   it("notifies exactly once after successful and failed configured installs", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const successful = await createPlugin(
       "successful-install",
@@ -1203,10 +1203,10 @@ export default function contribute(plugin: unknown) {
   });
 
   it("reports invalid manifests, missing entries, and startup failures", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const invalid = await createPlugin("valid-before-corruption", "export default () => () => {};");
-    await writeFile(path.join(invalid, "paseo-plugin.json"), JSON.stringify({}));
+    await writeFile(path.join(invalid, "clisbot-plugin.json"), JSON.stringify({}));
     const missingEntry = await createPlugin("missing-entry", "export default () => () => {};");
     await rm(path.join(missingEntry, "index.server.ts"));
     const legacy = await createPlugin("legacy-plugin", "export default () => () => {};");
@@ -1224,7 +1224,7 @@ export default function contribute(plugin: unknown) {
       "Plugin entry points are missing",
     );
     await expect(service.installDirectory({ path: legacy })).rejects.toThrow(
-      "This plugin was made for an older version of Paseo and cannot run on Paseo v0.8. Ask its author to update it. Plugin authors can follow the migration guide: https://paseo.sh/docs/plugins/migration",
+      "This plugin was made for an older version of Clisbot and cannot run on Clisbot v0.8. Ask its author to update it. Plugin authors can follow the migration guide: https://clisbot.com/docs/plugins/migration",
     );
     await expect(service.installDirectory({ path: startupFailure })).rejects.toThrow(
       "startup exploded",
@@ -1234,7 +1234,7 @@ export default function contribute(plugin: unknown) {
         id: "legacy-plugin",
         status: "failed",
         error:
-          "This plugin was made for an older version of Paseo and cannot run on Paseo v0.8. Ask its author to update it. Plugin authors can follow the migration guide: https://paseo.sh/docs/plugins/migration",
+          "This plugin was made for an older version of Clisbot and cannot run on Clisbot v0.8. Ask its author to update it. Plugin authors can follow the migration guide: https://clisbot.com/docs/plugins/migration",
       }),
       expect.objectContaining({
         id: "missing-entry",
@@ -1251,7 +1251,7 @@ export default function contribute(plugin: unknown) {
   });
 
   it("contains cleanup errors and invokes server cleanup once per stopped installation", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-home-"));
     roots.push(home);
     const cleanupFile = path.join(home, "cleanups.txt");
     const directory = await createPlugin(
@@ -1285,13 +1285,13 @@ describe("npm plugin installation", () => {
     const fixture = packages[1];
     packages.push({ ...fixture, version: "2.0.0", tags: ["future"] });
     const failures: Array<[string, Record<string, string>]> = [
-      ["bad-manifest", { "paseo-plugin.json": "{}" }],
+      ["bad-manifest", { "clisbot-plugin.json": "{}" }],
       [
         "bad-build",
         {
-          "paseo-plugin.json": JSON.stringify({
+          "clisbot-plugin.json": JSON.stringify({
             id: "bad-build",
-            requirements: { paseo: ">=0.4.0" },
+            requirements: { clisbot: ">=0.4.0" },
             build: [[process.execPath, "-e", "throw new Error('preparation failed')"]],
           }),
         },
@@ -1299,9 +1299,9 @@ describe("npm plugin installation", () => {
       [
         "bad-requirements",
         {
-          "paseo-plugin.json": JSON.stringify({
+          "clisbot-plugin.json": JSON.stringify({
             id: "bad-requirements",
-            requirements: { paseo: ">=999.0.0" },
+            requirements: { clisbot: ">=999.0.0" },
           }),
         },
       ],
@@ -1318,14 +1318,14 @@ describe("npm plugin installation", () => {
     const registry = await startNpmRegistry([
       ...packages,
       {
-        name: "paseo-prepared-plugin",
+        name: "clisbot-prepared-plugin",
         version: "1.0.0",
-        dependencies: { "paseo-fixture-dependency": "1.0.0" },
+        dependencies: { "clisbot-fixture-dependency": "1.0.0" },
         scripts: { postinstall: "node -e \"throw new Error('npm lifecycle must not run')\"" },
         files: {
-          "nested/paseo-plugin.json": JSON.stringify({
+          "nested/clisbot-plugin.json": JSON.stringify({
             id: "prepared",
-            requirements: { paseo: ">=0.4.0" },
+            requirements: { clisbot: ">=0.4.0" },
             build: [
               [
                 process.execPath,
@@ -1335,7 +1335,7 @@ describe("npm plugin installation", () => {
             ],
           }),
           "nested/index.server.ts": `import generated from "./server/generated.js";
-import dependency from "paseo-fixture-dependency";
+import dependency from "clisbot-fixture-dependency";
 import { z } from "zod";
 export default function contribute() {
   if (generated !== 42 || z.string().parse(dependency) !== "dependency loaded") throw new Error("Preparation failed");
@@ -1345,7 +1345,7 @@ export default function contribute() {
       },
       ...failedPackages,
     ]);
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-npm-service-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-npm-service-"));
     roots.push(home);
     const previousConfig = process.env.npm_config_userconfig;
     const previousPath = process.env.PATH;
@@ -1360,12 +1360,14 @@ export default function contribute() {
     let service = open();
     try {
       await service.start();
-      const installed = await service.installSource({ source: "npm:paseo-fixture-plugin@^1.0.0" });
+      const installed = await service.installSource({
+        source: "npm:clisbot-fixture-plugin@^1.0.0",
+      });
       expect(installed).toMatchObject({
         id: "npm-review",
         status: "running",
         installation: {
-          identity: { kind: "npm", packageName: "paseo-fixture-plugin", pluginPath: "." },
+          identity: { kind: "npm", packageName: "clisbot-fixture-plugin", pluginPath: "." },
           currentRevision: "1.1.0",
         },
       });
@@ -1385,13 +1387,13 @@ export default function contribute() {
       ).toEqual({ kind: "npm" });
       expect(
         JSON.parse(await readFile(path.join(installRoot, "package-lock.json"), "utf8")).packages[
-          "node_modules/paseo-fixture-dependency"
+          "node_modules/clisbot-fixture-dependency"
         ].version,
       ).toBe("1.0.0");
       for (const [source, id, version] of [
-        ["npm:paseo-fixture-plugin@1.0.0", "exact", "1.0.0"],
-        ["paseo-fixture-plugin@stable", "tag", "1.0.0"],
-        ["npm:@paseo-fixture/review", "scoped", "2.0.0"],
+        ["npm:clisbot-fixture-plugin@1.0.0", "exact", "1.0.0"],
+        ["clisbot-fixture-plugin@stable", "tag", "1.0.0"],
+        ["npm:@clisbot-fixture/review", "scoped", "2.0.0"],
       ]) {
         expect(await service.installSource({ source, id })).toMatchObject({
           id,
@@ -1407,7 +1409,7 @@ export default function contribute() {
       });
       const before = (await service.listPlugins()).find((item) => item.id === "exact")!;
       await service.disablePlugin("exact");
-      registry.setTag("paseo-fixture-plugin", "latest", "2.0.0");
+      registry.setTag("clisbot-fixture-plugin", "latest", "2.0.0");
       const results = await service.applyUpdates([
         { ...preview!.proposal!, id: "missing-plugin" },
         preview!.proposal!,
@@ -1420,7 +1422,7 @@ export default function contribute() {
         },
       ]);
       expect(results[1]?.plugin?.installation?.identity).toEqual(before.installation?.identity);
-      registry.setTag("paseo-fixture-plugin", "latest", "1.1.0");
+      registry.setTag("clisbot-fixture-plugin", "latest", "1.1.0");
       expect(await service.applyUpdates([preview!.proposal!])).toMatchObject([
         { outcome: "error", error: expect.stringContaining("changed since review") },
       ]);
@@ -1454,7 +1456,7 @@ export default function contribute() {
       expect((await service.previewUpdates({ pluginId: "exact" }))[0]?.outcome).toBe("update");
       await expect(service.updateSources("exact")).rejects.toThrow("Update the client");
       const prepared = await service.installSource({
-        source: "npm:paseo-prepared-plugin@1.0.0:nested",
+        source: "npm:clisbot-prepared-plugin@1.0.0:nested",
       });
       expect(prepared).toMatchObject({ id: "prepared", status: "running" });
       expect(await readFile(path.join(prepared.path, "server/generated.js"), "utf8")).toBe(
@@ -1462,12 +1464,12 @@ export default function contribute() {
       );
       expect(prepared.installation).toMatchObject({ identity: { pluginPath: "nested" } });
       await service.removePlugin("prepared");
-      expect(registry.requests).not.toContain("/@getpaseo/plugin");
+      expect(registry.requests).not.toContain("/@clisbot/plugin");
       await expect(service.installSource({ source: "npm:missing-plugin" })).rejects.toThrow();
       await expect(
-        service.installSource({ source: "npm:paseo-fixture-plugin", ref: "main" }),
+        service.installSource({ source: "npm:clisbot-fixture-plugin", ref: "main" }),
       ).rejects.toThrow("--ref is only valid for Git");
-      await expect(service.installSource({ source: "npm:paseo-fixture-plugin" })).rejects.toThrow(
+      await expect(service.installSource({ source: "npm:clisbot-fixture-plugin" })).rejects.toThrow(
         "already configured",
       );
       expect(await readdir(path.join(home, "plugins", ".staging"))).toEqual([]);
@@ -1517,7 +1519,7 @@ export default function contribute() {
         installation: installed.installation,
       });
       await expect(
-        service.installSource({ source: "npm:paseo-fixture-plugin", id: "missing-npm" }),
+        service.installSource({ source: "npm:clisbot-fixture-plugin", id: "missing-npm" }),
       ).rejects.toThrow("npm is required on the daemon host");
       expect(await readdir(path.join(home, "plugins", ".staging"))).toEqual([]);
       const packagePath = path.join(installed.path, "package.json");

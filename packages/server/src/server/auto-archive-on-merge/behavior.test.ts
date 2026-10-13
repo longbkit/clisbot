@@ -37,19 +37,19 @@ async function createWorkspaceJourney() {
   cleanupPaths.push(tempDir);
   const repoDir = path.join(tempDir, "repo");
   run(tempDir, ["init", "-b", "main", repoDir]);
-  run(repoDir, ["config", "user.email", "test@getpaseo.local"]);
-  run(repoDir, ["config", "user.name", "Paseo Test"]);
+  run(repoDir, ["config", "user.email", "test@clisbot.local"]);
+  run(repoDir, ["config", "user.name", "Clisbot Test"]);
   writeFileSync(path.join(repoDir, "README.md"), "workspace journey\n");
   run(repoDir, ["add", "README.md"]);
   run(repoDir, ["-c", "commit.gpgsign=false", "commit", "-m", "initial"]);
 
-  const paseoHome = path.join(tempDir, ".paseo");
+  const clisbotHome = path.join(tempDir, ".clisbot");
   const worktree = await createWorktree({
     cwd: repoDir,
     worktreeSlug: "workspace",
     source: { kind: "branch-off", baseBranch: "main", branchName: "workspace" },
     runSetup: false,
-    paseoHome,
+    clisbotHome,
   });
   const workspaceId = "workspace-under-test";
   let active = true;
@@ -70,7 +70,7 @@ async function createWorkspaceJourney() {
         mainRepoRoot: repoDir,
         currentBranch: branch,
         remoteUrl: "https://github.com/acme/repo.git",
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isDirty: false,
         baseRef: "main",
         aheadBehind: { ahead: 0, behind: 0 },

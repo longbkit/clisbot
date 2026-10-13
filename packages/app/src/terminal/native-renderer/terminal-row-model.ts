@@ -1,5 +1,5 @@
 import type { TextStyle } from "react-native";
-import type { TerminalCell } from "@getpaseo/protocol/messages";
+import type { TerminalCell } from "@clisbot/protocol/messages";
 
 import type { TerminalCellStyleResolver } from "./colors";
 import { resolveTerminalCustomGlyph, type TerminalCustomGlyph } from "./terminal-custom-glyph";

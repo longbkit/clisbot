@@ -1,0 +1,6 @@
+{
+  "id": "agent-configuration",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

@@ -1,23 +1,23 @@
 import { execFileSync } from "node:child_process";
 import type { z } from "zod";
-import { BUILTIN_PROVIDER_IDS } from "@getpaseo/protocol/provider-manifest";
+import { BUILTIN_PROVIDER_IDS } from "@clisbot/protocol/provider-manifest";
 import { WebSocket } from "ws";
-import { SessionInboundMessageSchema, WSOutboundMessageSchema } from "@getpaseo/protocol/messages";
+import { SessionInboundMessageSchema, WSOutboundMessageSchema } from "@clisbot/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import pino from "pino";
-import type { CreationSnapshot, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { CreationSnapshot, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import type { AgentTimelineItem } from "../agent/agent-sdk-types.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
-function createCreationDaemon(options: Parameters<typeof createTestPaseoDaemon>[0] = {}) {
+function createCreationDaemon(options: Parameters<typeof createTestClisbotDaemon>[0] = {}) {
   const agentClients = options.agentClients ?? createTestAgentClients();
-  return createTestPaseoDaemon({
+  return createTestClisbotDaemon({
     ...options,
     agentClients,
     // Installed provider CLIs must not change when background naming starts.

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { highlightCode, isLanguageSupported, type HighlightToken } from "@getpaseo/highlight";
+import { highlightCode, isLanguageSupported, type HighlightToken } from "@clisbot/highlight";
 
 const MAX_DIFF_HIGHLIGHT_LINE_CHARS = 10_000;
 

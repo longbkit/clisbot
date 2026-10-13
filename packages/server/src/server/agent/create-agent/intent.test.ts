@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { resolveCreateAgentIntent } from "./intent.js";
 
 describe("resolveCreateAgentIntent", () => {

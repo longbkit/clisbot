@@ -8,7 +8,7 @@ import {
 } from "./configuration.js";
 import { commands } from "./commands.js";
 
-import { waitForLocationReady, awaitPaseoPlugin } from "./readiness.js";
+import { waitForLocationReady, awaitClisbotPlugin } from "./readiness.js";
 
 import type { SessionInfo } from "@opencode/client";
 
@@ -56,7 +56,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
   private readonly runtime: Pick<V2Runtime, "acquire" | "shutdown">;
   private readonly connections = new Map<string, V2Connection>();
   constructor(private readonly options: V2AgentOptions) {
-    this.capabilities = { ...V2_CAPABILITIES, supportsNativePaseoTools: Boolean(options.bridge) };
+    this.capabilities = { ...V2_CAPABILITIES, supportsNativeClisbotTools: Boolean(options.bridge) };
     this.runtime =
       options.runtime ??
       new V2Runtime({
@@ -166,7 +166,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
     const unbind = this.options.bridge?.bindSession({
       sessionId: info.id,
       env: launch?.env ?? {},
-      tools: launch?.paseoTools,
+      tools: launch?.clisbotTools,
     });
     const bound = new Map<string, () => void>();
     const bindChild = (childId: string) => {
@@ -175,7 +175,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
       const childUnbind = this.options.bridge?.bindSession({
         sessionId: childId,
         env: launch?.env ?? {},
-        tools: launch?.paseoTools,
+        tools: launch?.clisbotTools,
       });
       if (childUnbind) bound.set(childId, childUnbind);
     };
@@ -206,7 +206,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
     try {
       if (this.options.bridge) {
         const location = { directory: config.cwd };
-        await awaitPaseoPlugin({ client: connection.client, location });
+        await awaitClisbotPlugin({ client: connection.client, location });
       }
       await session.initialize(
         launch?.env

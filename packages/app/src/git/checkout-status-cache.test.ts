@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CheckoutStatusUpdate } from "@getpaseo/protocol/messages";
+import type { CheckoutStatusUpdate } from "@clisbot/protocol/messages";
 import {
   checkoutCommitsQueryKey,
   checkoutPrStatusQueryKey,
@@ -42,7 +42,7 @@ function checkoutStatus(overrides: Partial<CheckoutStatusPayload> = {}): Checkou
     error: null,
     requestId: "checkout-status-1",
     isGit: true,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     repoRoot: cwd,
     currentBranch: "main",
     isDirty: false,
@@ -51,7 +51,7 @@ function checkoutStatus(overrides: Partial<CheckoutStatusPayload> = {}): Checkou
     aheadOfOrigin: 0,
     behindOfOrigin: 0,
     hasRemote: true,
-    remoteUrl: "git@github.com:getpaseo/paseo.git",
+    remoteUrl: "git@github.com:longbkit/clisbot.git",
     ...overrides,
   } as CheckoutStatusPayload;
 }
@@ -61,7 +61,7 @@ function prStatus(overrides: Partial<CheckoutPrStatusPayload> = {}): CheckoutPrS
     cwd,
     status: {
       forge: "github",
-      url: "https://github.com/getpaseo/paseo/pull/42",
+      url: "https://github.com/longbkit/clisbot/pull/42",
       title: "My PR",
       state: "open",
       baseRefName: "main",
@@ -202,7 +202,7 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(
       checkoutStatusQueryKey(serverId, cwd),
-      checkoutStatus({ currentBranch: "chore/build-paseo" }),
+      checkoutStatus({ currentBranch: "chore/build-clisbot" }),
     );
     const thisCheckout = draftAgentCommandsQueryKey({
       serverId,
@@ -212,8 +212,8 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
       serverId,
       draftConfig: { provider: "claude", cwd: "/repo2", model: "haiku" },
     });
-    queryClient.setQueryData(thisCheckout, [{ name: "build-paseo" }]);
-    queryClient.setQueryData(otherCheckout, [{ name: "build-paseo" }]);
+    queryClient.setQueryData(thisCheckout, [{ name: "build-clisbot" }]);
+    queryClient.setQueryData(otherCheckout, [{ name: "build-clisbot" }]);
 
     applyCheckoutStatusUpdateFromEvent({
       queryClient,
@@ -222,7 +222,7 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
     });
 
     expect(queryClient.getQueryData(thisCheckout)).toBeUndefined();
-    expect(queryClient.getQueryData(otherCheckout)).toEqual([{ name: "build-paseo" }]);
+    expect(queryClient.getQueryData(otherCheckout)).toEqual([{ name: "build-clisbot" }]);
   });
 
   it("keeps the checkout's draft slash commands when a push leaves its branch unchanged", () => {
@@ -232,7 +232,7 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
       serverId,
       draftConfig: { provider: "claude", cwd, model: "haiku" },
     });
-    queryClient.setQueryData(thisCheckout, [{ name: "build-paseo" }]);
+    queryClient.setQueryData(thisCheckout, [{ name: "build-clisbot" }]);
 
     applyCheckoutStatusUpdateFromEvent({
       queryClient,
@@ -240,7 +240,7 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
       message: checkoutStatusUpdate(checkoutStatus({ isDirty: true })),
     });
 
-    expect(queryClient.getQueryData(thisCheckout)).toEqual([{ name: "build-paseo" }]);
+    expect(queryClient.getQueryData(thisCheckout)).toEqual([{ name: "build-clisbot" }]);
   });
 
   it("writes the PR status cache when prStatus is present, and skips it otherwise", () => {

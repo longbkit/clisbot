@@ -137,7 +137,7 @@ function ShipPanel() {
             <GitPullRequest size={12} />
             Open
           </span>
-          <span className="text-mock-fg-muted">getpaseo/paseo</span>
+          <span className="text-mock-fg-muted">longbkit/clisbot</span>
         </div>
       </div>
 

@@ -22,11 +22,13 @@ async function closeExample(page: Page) {
 async function copyAndPaste(page: Page) {
   await page.getByRole("button", { name: "Copy text", exact: true }).click();
   await expect(page.getByText("Text copied", { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Copied from Paseo");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Copied from Clisbot");
   await page.getByRole("textbox", { name: "Paste here" }).focus();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.press("ControlOrMeta+V");
-  await expect(page.getByRole("textbox", { name: "Paste here" })).toHaveValue("Copied from Paseo");
+  await expect(page.getByRole("textbox", { name: "Paste here" })).toHaveValue(
+    "Copied from Clisbot",
+  );
 }
 
 async function scrollToLastRow(page: Page) {

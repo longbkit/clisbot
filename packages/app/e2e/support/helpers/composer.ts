@@ -398,7 +398,7 @@ export async function queueComposerWithButton(page: Page): Promise<void> {
 }
 export async function configureComposerQueueSend(page: Page): Promise<void> {
   await page.addInitScript(() =>
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ sendBehavior: "queue" })),
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ sendBehavior: "queue" })),
   );
 }
 

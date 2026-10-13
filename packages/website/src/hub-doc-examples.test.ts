@@ -40,10 +40,10 @@ describe("Hub public documentation examples", () => {
       await Promise.all((await markdownFiles(hubDocs)).map((file) => readFile(file, "utf8")))
     ).join("\n");
 
-    expect(markdown).not.toContain(".paseo/partials/");
+    expect(markdown).not.toContain(".clisbot/partials/");
     expect(markdown).not.toMatch(/^triggers:/mu);
     expect(markdown).not.toMatch(/^\s+uses:/mu);
-    expect(markdown).not.toContain("paseo hub deploy [file]");
+    expect(markdown).not.toContain("clisbot hub deploy [file]");
   });
 });
 

@@ -1,6 +1,6 @@
 # Settings with Add host visible: no saved hosts, or the host picker already open.
 context platform=ios timeout=180000 retries=0
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 open "${APP_ID}"
 wait "id=\"settings-add-host\"" 20000
 screenshot "${OUT}/09-settings.png"
@@ -38,7 +38,7 @@ fill "id=\"direct-password-input\"" "${PASSWORD}"
 wait stable
 press "id=\"direct-host-submit\""
 wait stable
-open "${APP_ID}" "paseo://settings"
+open "${APP_ID}" "clisbot://settings"
 wait "label=\"Connections\"" 10000
 press "label=\"Connections\""
 wait stable

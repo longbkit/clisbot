@@ -7,12 +7,12 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      paseo_version:
+      clisbot_version:
         description: "Expected source version to build. Required when publish is true."
         required: false
         default: ""
       publish:
-        description: "Publish the image to GHCR. Manual publishes require paseo_version."
+        description: "Publish the image to GHCR. Manual publishes require clisbot_version."
         required: false
         default: "false"
         type: choice
@@ -20,7 +20,7 @@ on:
           - "false"
           - "true"
       publish_latest:
-        description: "Also publish ghcr.io/getpaseo/paseo:latest. Ignored for prereleases."
+        description: "Also publish ghcr.io/longbkit/clisbot:latest. Ignored for prereleases."
         required: false
         default: "false"
         type: choice
@@ -50,7 +50,7 @@ jobs:
 
       - id: values
         env:
-          INPUT_PASEO_VERSION: ${{ inputs.paseo_version }}
+          INPUT_CLISBOT_VERSION: ${{ inputs.clisbot_version }}
           INPUT_PUBLISH: ${{ inputs.publish }}
           INPUT_PUBLISH_LATEST: ${{ inputs.publish_latest }}
           REPO_OWNER: ${{ github.repository_owner }}
@@ -59,9 +59,9 @@ jobs:
           set -euo pipefail
 
           owner="$(printf '%s' "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          image="ghcr.io/${owner}/paseo"
+          image="ghcr.io/${owner}/clisbot"
           package_version="$(node -p "require('./package.json').version")"
-          install_version="${INPUT_PASEO_VERSION:-${package_version}}"
+          install_version="${INPUT_CLISBOT_VERSION:-${package_version}}"
           publish=false
           publish_latest=false
           prerelease=false
@@ -76,8 +76,8 @@ jobs:
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             if [[ "${INPUT_PUBLISH:-false}" == "true" ]]; then
-              if [[ -z "${INPUT_PASEO_VERSION}" || "${INPUT_PASEO_VERSION}" == "latest" ]]; then
-                echo "::error::paseo_version is required for manual Docker publishes."
+              if [[ -z "${INPUT_CLISBOT_VERSION}" || "${INPUT_CLISBOT_VERSION}" == "latest" ]]; then
+                echo "::error::clisbot_version is required for manual Docker publishes."
                 exit 1
               fi
               publish=true
@@ -128,12 +128,12 @@ jobs:
           file: docker/base/Dockerfile
           platforms: ${{ env.PLATFORMS }}
           build-args: |
-            PASEO_VERSION=${{ needs.setup.outputs.install_version }}
+            CLISBOT_VERSION=${{ needs.setup.outputs.install_version }}
           tags: ${{ needs.setup.outputs.check_tag }}
           push: false
           provenance: false
-          cache-from: type=gha,scope=paseo
-          cache-to: type=gha,scope=paseo,mode=max
+          cache-from: type=gha,scope=clisbot
+          cache-to: type=gha,scope=clisbot,mode=max
 
   publish:
     needs: setup
@@ -161,9 +161,9 @@ jobs:
           file: docker/base/Dockerfile
           platforms: ${{ env.PLATFORMS }}
           build-args: |
-            PASEO_VERSION=${{ needs.setup.outputs.install_version }}
+            CLISBOT_VERSION=${{ needs.setup.outputs.install_version }}
           tags: ${{ needs.setup.outputs.publish_tags }}
           push: true
           provenance: false
-          cache-from: type=gha,scope=paseo
-          cache-to: type=gha,scope=paseo,mode=max
+          cache-from: type=gha,scope=clisbot
+          cache-to: type=gha,scope=clisbot,mode=max

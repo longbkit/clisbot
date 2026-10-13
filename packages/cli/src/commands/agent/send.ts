@@ -121,7 +121,7 @@ async function resolvePromptInput(options: {
       code: "MISSING_PROMPT",
       message: "A prompt is required",
       details:
-        "Usage: paseo agent send [options] <id> [prompt] | --prompt <text> | --prompt-file <path>",
+        "Usage: clisbot agent send [options] <id> [prompt] | --prompt <text> | --prompt-file <path>",
     };
     throw error;
   }
@@ -173,7 +173,7 @@ export async function runSendCommand(
     const error: CommandError = {
       code: "MISSING_AGENT_ID",
       message: "Agent ID is required",
-      details: "Usage: paseo agent send [options] <id> [prompt]",
+      details: "Usage: clisbot agent send [options] <id> [prompt]",
     };
     throw error;
   }
@@ -194,7 +194,7 @@ export async function runSendCommand(
     // Send the message
     await client.sendAgentMessage(agentIdArg, promptInput, {
       images,
-      sourceAgentId: process.env.PASEO_AGENT_ID?.trim() || undefined,
+      sourceAgentId: process.env.CLISBOT_AGENT_ID?.trim() || undefined,
     });
 
     // If --no-wait, return immediately

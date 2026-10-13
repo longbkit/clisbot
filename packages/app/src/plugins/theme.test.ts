@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { PluginThemeContribution } from "@getpaseo/plugin";
+import type { PluginThemeContribution } from "@clisbot/plugin";
 import { describe, expect, it } from "vitest";
 import { darkTheme, lightTheme } from "@/styles/theme";
 import { collectPluginThemes, rememberPluginThemeHost } from "./themes";
@@ -51,7 +51,7 @@ function installed(serverId: string, themes: PluginThemeContribution[]): Install
     clientBundle: serverId,
     lifetime: new AbortController(),
     queryClient: new QueryClient(),
-    paseo: {} as InstalledPlugin["paseo"],
+    clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
     settingsScreens: [],
     surfaces: [],

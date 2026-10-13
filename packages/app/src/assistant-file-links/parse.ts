@@ -353,7 +353,7 @@ export function parseAssistantFileLink(
   if (options.decodeHref) {
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(trimmed, "http://paseo.invalid");
+      parsedUrl = new URL(trimmed, "http://clisbot.invalid");
     } catch {
       return null;
     }

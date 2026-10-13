@@ -1,5 +1,5 @@
 import { replaceEqualDeep } from "@tanstack/react-query";
-import type { ParsedDiffFile, SubscribeCheckoutDiffResponse } from "@getpaseo/protocol/messages";
+import type { ParsedDiffFile, SubscribeCheckoutDiffResponse } from "@clisbot/protocol/messages";
 
 type DiffPayload = Omit<SubscribeCheckoutDiffResponse["payload"], "subscriptionId">;
 

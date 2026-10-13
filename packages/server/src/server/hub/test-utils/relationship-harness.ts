@@ -20,7 +20,11 @@ import type {
   CreateAgentWorktreeTarget,
   SessionOutboundMessage,
 } from "../../messages.js";
-import { createPaseoDaemon, type PaseoDaemon, type PaseoDaemonConfig } from "../../bootstrap.js";
+import {
+  createClisbotDaemon,
+  type ClisbotDaemon,
+  type ClisbotDaemonConfig,
+} from "../../bootstrap.js";
 import type { WebSocketLike } from "../../websocket-server.js";
 import type {
   AgentClient,
@@ -447,10 +451,10 @@ const providerCatalog = {
 export class HubRelationshipHarness {
   private readonly clock = new TestRelationshipClock();
   private readonly remote = new InMemoryHubRelationships(() => this.captureRelationship());
-  private daemon: PaseoDaemon | null = null;
-  private config!: PaseoDaemonConfig;
+  private daemon: ClisbotDaemon | null = null;
+  private config!: ClisbotDaemonConfig;
   private root = "";
-  private paseoHome = "";
+  private clisbotHome = "";
   private host = "";
   private readonly logs: string[] = [];
   private readonly providerPrompts: AgentPromptInput[] = [];
@@ -556,7 +560,7 @@ export class HubRelationshipHarness {
 
   async relationshipStateBecomes(expected: string | null): Promise<void> {
     const observed = deferred<void>();
-    const watcher = watch(this.paseoHome, () => {
+    const watcher = watch(this.clisbotHome, () => {
       if ((this.relationshipFile()?.state ?? null) === expected) observed.resolve();
     });
     if ((this.relationshipFile()?.state ?? null) === expected) observed.resolve();
@@ -847,7 +851,7 @@ export class HubRelationshipHarness {
 
   async durableOwnedAgentIdsOnDisk(): Promise<string[]> {
     const storage = new AgentStorage(
-      path.join(this.paseoHome, "agents"),
+      path.join(this.clisbotHome, "agents"),
       pino({ level: "silent" }),
     );
     return (await storage.list())
@@ -916,7 +920,7 @@ export class HubRelationshipHarness {
   }
 
   async hubExecutionIntentFiles(): Promise<string[]> {
-    const directory = path.join(this.paseoHome, "hub-executions");
+    const directory = path.join(this.clisbotHome, "hub-executions");
     return existsSync(directory) ? readdir(directory) : [];
   }
 
@@ -971,7 +975,7 @@ export class HubRelationshipHarness {
 
   private workspaceArchivedAt(workspaceId: string): string | null {
     const records = JSON.parse(
-      readFileSync(path.join(this.paseoHome, "projects", "workspaces.json"), "utf8"),
+      readFileSync(path.join(this.clisbotHome, "projects", "workspaces.json"), "utf8"),
     ) as Array<{ workspaceId: string; archivedAt?: string | null }>;
     return records.find((workspace) => workspace.workspaceId === workspaceId)?.archivedAt ?? null;
   }
@@ -1262,7 +1266,7 @@ export class HubRelationshipHarness {
 
   async reconstructAndReplay(executionId = "execution-1") {
     const storage = new AgentStorage(
-      path.join(this.paseoHome, "agents"),
+      path.join(this.clisbotHome, "agents"),
       pino({ level: "silent" }),
     );
     const manager = new AgentManager({
@@ -1281,7 +1285,7 @@ export class HubRelationshipHarness {
   async removeOwnedAgent(agentId: string) {
     await this.daemon!.agentStorage.remove(agentId);
     const storage = new AgentStorage(
-      path.join(this.paseoHome, "agents"),
+      path.join(this.clisbotHome, "agents"),
       pino({ level: "silent" }),
     );
     return {
@@ -1330,22 +1334,22 @@ export class HubRelationshipHarness {
   }
 
   relationshipFile(): PersistedRelationship | null {
-    const file = path.join(this.paseoHome, "hub-relationship.json");
+    const file = path.join(this.clisbotHome, "hub-relationship.json");
     if (!existsSync(file)) return null;
     return JSON.parse(readFileSync(file, "utf8")) as PersistedRelationship;
   }
 
   relationshipFileMode(): number {
-    return statSync(path.join(this.paseoHome, "hub-relationship.json")).mode & 0o777;
+    return statSync(path.join(this.clisbotHome, "hub-relationship.json")).mode & 0o777;
   }
 
   async corruptRelationshipFile(contents = "{not-json"): Promise<void> {
     await this.stopDaemon();
-    await writeFile(path.join(this.paseoHome, "hub-relationship.json"), contents, "utf8");
+    await writeFile(path.join(this.clisbotHome, "hub-relationship.json"), contents, "utf8");
   }
 
   async quarantinedRelationshipFiles(): Promise<string[]> {
-    return (await readdir(this.paseoHome)).filter((file) =>
+    return (await readdir(this.clisbotHome)).filter((file) =>
       file.startsWith("hub-relationship.invalid-"),
     );
   }
@@ -1387,10 +1391,10 @@ export class HubRelationshipHarness {
   }
 
   private async createHome(): Promise<void> {
-    this.root = await mkdtemp(path.join(tmpdir(), "paseo-hub-relationship-"));
-    this.paseoHome = path.join(this.root, ".paseo");
+    this.root = await mkdtemp(path.join(tmpdir(), "clisbot-hub-relationship-"));
+    this.clisbotHome = path.join(this.root, ".clisbot");
     const staticDir = path.join(this.root, "static");
-    await Promise.all([mkdir(this.paseoHome, { recursive: true }), mkdir(staticDir)]);
+    await Promise.all([mkdir(this.clisbotHome, { recursive: true }), mkdir(staticDir)]);
     execFileSync("git", ["init", "-b", "main", this.root], { stdio: "ignore" });
     execFileSync("git", ["-C", this.root, "config", "user.email", "hub@test.invalid"]);
     execFileSync("git", ["-C", this.root, "config", "user.name", "Hub Test"]);
@@ -1399,7 +1403,7 @@ export class HubRelationshipHarness {
     });
     this.config = {
       listen: "0.0.0.0:0",
-      paseoHome: this.paseoHome,
+      clisbotHome: this.clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: this.mcpEnabled,
@@ -1409,10 +1413,10 @@ export class HubRelationshipHarness {
         ...createTestAgentClients(),
         codex: this.codex,
       },
-      agentStoragePath: path.join(this.paseoHome, "agents"),
+      agentStoragePath: path.join(this.clisbotHome, "agents"),
       relayEnabled: false,
-      relayEndpoint: "relay.paseo.sh:443",
-      appBaseUrl: "https://app.paseo.sh",
+      relayEndpoint: "relay.clisbot.com:443",
+      appBaseUrl: "https://app.clisbot.com",
     };
   }
 
@@ -1423,7 +1427,7 @@ export class HubRelationshipHarness {
         done();
       },
     });
-    this.daemon = await createPaseoDaemon(this.config, pino({ level: "trace" }, destination), {
+    this.daemon = await createClisbotDaemon(this.config, pino({ level: "trace" }, destination), {
       hubRelationshipRemote: this.remote,
       hubRelationshipClock: this.clock,
       hubRelationshipRetryPolicy: this.clock,

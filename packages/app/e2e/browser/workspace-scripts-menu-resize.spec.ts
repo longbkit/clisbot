@@ -15,7 +15,7 @@ import { buildHostWorkspaceRoute } from "../../src/utils/host-routes";
 test("scripts menu resizes when a service row grows after launch", async ({ page }) => {
   const client = await connectWorkspaceSetupClient();
   const repo = await createTempGitRepo("script-menu-resize-", {
-    paseoConfig: {
+    clisbotConfig: {
       worktree: {
         setup: ["sh -c 'echo setup complete'"],
       },

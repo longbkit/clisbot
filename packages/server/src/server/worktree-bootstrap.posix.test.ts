@@ -30,7 +30,7 @@ interface CreateAgentWorktreeTestOptions {
   branchName: string;
   baseBranch: string;
   worktreeSlug: string;
-  paseoHome?: string;
+  clisbotHome?: string;
 }
 
 interface CreateAgentWorktreeTestResult {
@@ -66,7 +66,7 @@ async function createBootstrapWorktreeForTest(
       branchName: options.branchName,
     },
     runSetup: false,
-    paseoHome: options.paseoHome,
+    clisbotHome: options.clisbotHome,
   });
   return { worktree, shouldBootstrap: true };
 }
@@ -75,7 +75,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
   describe("runAsyncWorktreeBootstrap", () => {
     let tempDir: string;
     let repoDir: string;
-    let paseoHome: string;
+    let clisbotHome: string;
     let realTerminalManagers: TerminalManager[];
 
     async function waitForPathExists(targetPath: string, timeoutMs = 10000): Promise<void> {
@@ -108,7 +108,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
       realTerminalManagers = [];
       tempDir = realpathSync(mkdtempSync(join(tmpdir(), "worktree-bootstrap-test-")));
       repoDir = join(tempDir, "repo");
-      paseoHome = join(tempDir, "paseo-home");
+      clisbotHome = join(tempDir, "clisbot-home");
 
       mkdirSync(repoDir, { recursive: true });
       execFileSync("git", ["init", "-b", "main"], { cwd: repoDir, stdio: "pipe" });
@@ -131,14 +131,14 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
     });
     it("streams running setup updates live and persists only a final setup timeline row", async () => {
       writeFileSync(
-        join(repoDir, "paseo.json"),
+        join(repoDir, "clisbot.json"),
         JSON.stringify({
           worktree: {
             setup: ['echo "line-one"; echo "line-two" 1>&2', 'echo "line-three"'],
           },
         }),
       );
-      execFileSync("git", ["add", "paseo.json"], { cwd: repoDir, stdio: "pipe" });
+      execFileSync("git", ["add", "clisbot.json"], { cwd: repoDir, stdio: "pipe" });
       execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "add setup"], {
         cwd: repoDir,
         stdio: "pipe",
@@ -149,7 +149,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
         branchName: "feature-streaming-setup",
         baseBranch: "main",
         worktreeSlug: "feature-streaming-setup",
-        paseoHome,
+        clisbotHome,
       });
 
       const persisted: AgentTimelineItem[] = [];
@@ -174,13 +174,13 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
       const liveSetupItems = live.filter(
         (item) =>
           item.type === "tool_call" &&
-          item.name === "paseo_worktree_setup" &&
+          item.name === "clisbot_worktree_setup" &&
           item.status === "running",
       );
       expect(liveSetupItems.length).toBeGreaterThan(0);
 
       const persistedSetupItems = persisted.filter(
-        (item) => item.type === "tool_call" && item.name === "paseo_worktree_setup",
+        (item) => item.type === "tool_call" && item.name === "clisbot_worktree_setup",
       );
       expect(persistedSetupItems).toHaveLength(1);
       expect(persistedSetupItems[0]?.type).toBe("tool_call");
@@ -242,7 +242,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
 
     it("keeps only the final carriage-return-updated content in command logs", async () => {
       writeFileSync(
-        join(repoDir, "paseo.json"),
+        join(repoDir, "clisbot.json"),
         JSON.stringify({
           worktree: {
             setup: [
@@ -251,7 +251,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
           },
         }),
       );
-      execFileSync("git", ["add", "paseo.json"], { cwd: repoDir, stdio: "pipe" });
+      execFileSync("git", ["add", "clisbot.json"], { cwd: repoDir, stdio: "pipe" });
       execFileSync(
         "git",
         ["-c", "commit.gpgsign=false", "commit", "-m", "add carriage return setup"],
@@ -266,7 +266,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
         branchName: "feature-carriage-return",
         baseBranch: "main",
         worktreeSlug: "feature-carriage-return",
-        paseoHome,
+        clisbotHome,
       });
 
       const persisted: AgentTimelineItem[] = [];
@@ -285,7 +285,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
 
       const persistedSetupItem = persisted.find(
         (item): item is Extract<AgentTimelineItem, { type: "tool_call" }> =>
-          item.type === "tool_call" && item.name === "paseo_worktree_setup",
+          item.type === "tool_call" && item.name === "clisbot_worktree_setup",
       );
       expect(persistedSetupItem?.detail.type).toBe("worktree_setup");
       if (!persistedSetupItem || persistedSetupItem.detail.type !== "worktree_setup") {
@@ -300,10 +300,10 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
 
     it("shares the same worktree runtime port across setup and bootstrap terminals", async () => {
       writeFileSync(
-        join(repoDir, "paseo.json"),
+        join(repoDir, "clisbot.json"),
         JSON.stringify({
           worktree: {
-            setup: ['echo "$PASEO_WORKTREE_PORT" > setup-port.txt'],
+            setup: ['echo "$CLISBOT_WORKTREE_PORT" > setup-port.txt'],
             terminals: [
               {
                 name: "Port Terminal",
@@ -313,7 +313,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
           },
         }),
       );
-      execFileSync("git", ["add", "paseo.json"], { cwd: repoDir, stdio: "pipe" });
+      execFileSync("git", ["add", "clisbot.json"], { cwd: repoDir, stdio: "pipe" });
       execFileSync(
         "git",
         ["-c", "commit.gpgsign=false", "commit", "-m", "add port setup and terminals"],
@@ -328,7 +328,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
         branchName: "feature-shared-runtime-port",
         baseBranch: "main",
         worktreeSlug: "feature-shared-runtime-port",
-        paseoHome,
+        clisbotHome,
       });
 
       const registeredEnvs: Array<{ cwd: string; env: Record<string, string> }> = [];
@@ -400,15 +400,15 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
       expect(setupPort.length).toBeGreaterThan(0);
       expect(registeredEnvs).toHaveLength(1);
       expect(registeredEnvs[0]?.cwd).toBe(worktreeBootstrap.worktree.worktreePath);
-      expect(registeredEnvs[0]?.env.PASEO_WORKTREE_PORT).toBe(setupPort);
+      expect(registeredEnvs[0]?.env.CLISBOT_WORKTREE_PORT).toBe(setupPort);
       expect(createTerminalEnvs.length).toBeGreaterThan(0);
-      expect(createTerminalEnvs[0]?.PASEO_WORKTREE_PORT).toBe(setupPort);
+      expect(createTerminalEnvs[0]?.CLISBOT_WORKTREE_PORT).toBe(setupPort);
       expect(createTerminalWorkspaceIds).toEqual(["ws-shared-runtime-port"]);
 
       const terminalToolCall = persisted.find(
         (item): item is Extract<AgentTimelineItem, { type: "tool_call" }> =>
           item.type === "tool_call" &&
-          item.name === "paseo_worktree_terminals" &&
+          item.name === "clisbot_worktree_terminals" &&
           item.status === "completed",
       );
       expect(terminalToolCall?.status).toBe("completed");
@@ -416,7 +416,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
 
     it("injects real peer service env into terminal-backed services", async () => {
       writeFileSync(
-        join(repoDir, "paseo.json"),
+        join(repoDir, "clisbot.json"),
         JSON.stringify({
           scripts: {
             api: {
@@ -432,7 +432,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
           },
         }),
       );
-      execFileSync("git", ["add", "paseo.json"], { cwd: repoDir, stdio: "pipe" });
+      execFileSync("git", ["add", "clisbot.json"], { cwd: repoDir, stdio: "pipe" });
       execFileSync(
         "git",
         ["-c", "commit.gpgsign=false", "commit", "-m", "add real peer env services"],
@@ -455,7 +455,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
             projectSlug: "repo",
             branchName: "feature-peer-env",
             scriptName,
-            daemonPort: 6767,
+            daemonPort: 6868,
             serviceProxy: routeStore,
             runtimeStore,
             terminalManager,
@@ -471,32 +471,32 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
       const apiEnv = readEnvFile(apiEnvPath);
       const webEnv = readEnvFile(webEnvPath);
 
-      expect(apiEnv.PASEO_SERVICE_API_URL).toBe(
-        "http://api--feature-peer-env--repo.localhost:6767",
+      expect(apiEnv.CLISBOT_SERVICE_API_URL).toBe(
+        "http://api--feature-peer-env--repo.localhost:6868",
       );
-      expect(apiEnv.PASEO_SERVICE_WEB_URL).toBe(
-        "http://web--feature-peer-env--repo.localhost:6767",
+      expect(apiEnv.CLISBOT_SERVICE_WEB_URL).toBe(
+        "http://web--feature-peer-env--repo.localhost:6868",
       );
-      expect(apiEnv.PASEO_SERVICE_API_PORT).toEqual(expect.stringMatching(/^\d+$/));
-      expect(apiEnv.PASEO_SERVICE_WEB_PORT).toEqual(expect.stringMatching(/^\d+$/));
-      expect(apiEnv.PASEO_URL).toBe(apiEnv.PASEO_SERVICE_API_URL);
-      expect(apiEnv.PASEO_PORT).toBe(apiEnv.PASEO_SERVICE_API_PORT);
+      expect(apiEnv.CLISBOT_SERVICE_API_PORT).toEqual(expect.stringMatching(/^\d+$/));
+      expect(apiEnv.CLISBOT_SERVICE_WEB_PORT).toEqual(expect.stringMatching(/^\d+$/));
+      expect(apiEnv.CLISBOT_URL).toBe(apiEnv.CLISBOT_SERVICE_API_URL);
+      expect(apiEnv.CLISBOT_PORT).toBe(apiEnv.CLISBOT_SERVICE_API_PORT);
       expect(apiEnv).not.toHaveProperty("PORT");
 
-      expect(webEnv.PASEO_SERVICE_API_URL).toBe(
-        "http://api--feature-peer-env--repo.localhost:6767",
+      expect(webEnv.CLISBOT_SERVICE_API_URL).toBe(
+        "http://api--feature-peer-env--repo.localhost:6868",
       );
-      expect(webEnv.PASEO_SERVICE_WEB_URL).toBe(
-        "http://web--feature-peer-env--repo.localhost:6767",
+      expect(webEnv.CLISBOT_SERVICE_WEB_URL).toBe(
+        "http://web--feature-peer-env--repo.localhost:6868",
       );
-      expect(webEnv.PASEO_SERVICE_API_PORT).toBe(apiEnv.PASEO_SERVICE_API_PORT);
-      expect(webEnv.PASEO_SERVICE_WEB_PORT).toBe(apiEnv.PASEO_SERVICE_WEB_PORT);
-      expect(webEnv.PASEO_URL).toBe(webEnv.PASEO_SERVICE_WEB_URL);
-      expect(webEnv.PASEO_PORT).toBe(webEnv.PASEO_SERVICE_WEB_PORT);
+      expect(webEnv.CLISBOT_SERVICE_API_PORT).toBe(apiEnv.CLISBOT_SERVICE_API_PORT);
+      expect(webEnv.CLISBOT_SERVICE_WEB_PORT).toBe(apiEnv.CLISBOT_SERVICE_WEB_PORT);
+      expect(webEnv.CLISBOT_URL).toBe(webEnv.CLISBOT_SERVICE_WEB_URL);
+      expect(webEnv.CLISBOT_PORT).toBe(webEnv.CLISBOT_SERVICE_WEB_PORT);
       expect(webEnv).not.toHaveProperty("PORT");
 
-      const apiPort = Number(apiEnv.PASEO_SERVICE_API_PORT);
-      const webPort = Number(apiEnv.PASEO_SERVICE_WEB_PORT);
+      const apiPort = Number(apiEnv.CLISBOT_SERVICE_API_PORT);
+      const webPort = Number(apiEnv.CLISBOT_SERVICE_WEB_PORT);
       expect(Number.isInteger(apiPort)).toBe(true);
       expect(Number.isInteger(webPort)).toBe(true);
       expect(routeStore.listRoutes()).toEqual([

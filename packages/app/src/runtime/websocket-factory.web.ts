@@ -1,5 +1,5 @@
-import { defaultWebSocketFactory } from "@getpaseo/client/internal/daemon-client-websocket-transport";
-import type { WebSocketFactory } from "@getpaseo/client/internal/daemon-client-transport-types";
+import { defaultWebSocketFactory } from "@clisbot/client/internal/daemon-client-websocket-transport";
+import type { WebSocketFactory } from "@clisbot/client/internal/daemon-client-transport-types";
 
 export function createAppWebSocketFactory(): WebSocketFactory {
   return defaultWebSocketFactory;

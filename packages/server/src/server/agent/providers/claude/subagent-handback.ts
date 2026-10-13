@@ -1,7 +1,7 @@
 /**
  * Since Claude Code 2.1.271, a subagent in auto mode delivers its report to its caller through a
  * `SubagentHandback` tool call instead of its final text. The report is the subagent's final
- * message, so Paseo shows it as one and hides the call and its acknowledgement.
+ * message, so Clisbot shows it as one and hides the call and its acknowledgement.
  */
 const SUBAGENT_HANDBACK_TOOL_NAME = "SubagentHandback";
 

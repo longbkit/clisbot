@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ASTNode, RenderRules } from "react-native-markdown-display";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

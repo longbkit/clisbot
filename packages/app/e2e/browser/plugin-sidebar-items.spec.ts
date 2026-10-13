@@ -28,11 +28,11 @@ import { getServerId } from "../support/helpers/server-id";
 import { installUsageReportsFixture } from "../support/helpers/usage-reports";
 import { claudeAndCodexReports } from "../support/helpers/usage-sidebar-item";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
-/** Set PASEO_QA_SCREENSHOT_DIR to keep QA screenshots of each state. */
+/** Set CLISBOT_QA_SCREENSHOT_DIR to keep QA screenshots of each state. */
 async function qaScreenshot(page: Page, name: string, area?: Locator) {
-  const directory = process.env.PASEO_QA_SCREENSHOT_DIR;
+  const directory = process.env.CLISBOT_QA_SCREENSHOT_DIR;
   if (!directory) return;
   // Let popover, sheet and drawer animations settle so the image shows the final state.
   await page.waitForTimeout(600);

@@ -1,4 +1,4 @@
-import { TerminalStreamOpcode } from "@getpaseo/protocol/binary-frames/index";
+import { TerminalStreamOpcode } from "@clisbot/protocol/binary-frames/index";
 import { describe, expect, test } from "vitest";
 
 import { TerminalStreamRouter, type TerminalStreamEvent } from "./terminal-stream-router.js";

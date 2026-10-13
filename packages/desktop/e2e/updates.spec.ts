@@ -44,7 +44,7 @@ test.describe("Desktop updates", () => {
     const updateCard = page.getByTestId("host-page-update-card");
     await expect(updateCard).toBeVisible();
     await expect(updateCard).toContainText(
-      "This daemon is managed by Paseo Desktop. Update Paseo Desktop on the host.",
+      "This daemon is managed by Clisbot Desktop. Update Clisbot Desktop on the host.",
     );
     await expect(page.getByTestId("host-page-update-button")).toBeDisabled();
   });
@@ -153,7 +153,7 @@ test.describe("Desktop daemon management", () => {
     }) => {
       const serverId = getServerId();
       const realState = await loadRealDaemonState();
-      const daemonHome = process.env.E2E_PASEO_HOME!;
+      const daemonHome = process.env.E2E_CLISBOT_HOME!;
       await installDesktopRuntime(page, {
         serverId,
         daemonPid: realState.pid,

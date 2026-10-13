@@ -8,11 +8,11 @@ import { afterEach, expect, test } from "vitest";
 
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { DaemonClient, type DaemonEvent } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { type PersistedProjectRecord } from "../workspace-registry.js";
 
 const cleanupPaths = new Set<string>();
-const cleanupDaemons = new Set<TestPaseoDaemon>();
+const cleanupDaemons = new Set<TestClisbotDaemon>();
 const cleanupClients = new Set<DaemonClient>();
 const cleanupListeners = new Set<() => void>();
 const execFile = promisify(execFileCallback);
@@ -49,15 +49,15 @@ afterEach(async () => {
 
 test("an empty project becomes Git without changing its identity or creating a workspace", async () => {
   const projectRoot = realpathSync(
-    mkdtempSync(path.join(os.tmpdir(), "paseo-project-becomes-git-")),
+    mkdtempSync(path.join(os.tmpdir(), "clisbot-project-becomes-git-")),
   );
-  const paseoHomeRoot = realpathSync(
-    mkdtempSync(path.join(os.tmpdir(), "paseo-project-becomes-git-home-")),
+  const clisbotHomeRoot = realpathSync(
+    mkdtempSync(path.join(os.tmpdir(), "clisbot-project-becomes-git-home-")),
   );
   cleanupPaths.add(projectRoot);
-  cleanupPaths.add(paseoHomeRoot);
+  cleanupPaths.add(clisbotHomeRoot);
 
-  const daemon = await createTestPaseoDaemon({ paseoHomeRoot, cleanup: false });
+  const daemon = await createTestClisbotDaemon({ clisbotHomeRoot, cleanup: false });
   cleanupDaemons.add(daemon);
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   cleanupClients.add(client);
@@ -108,7 +108,7 @@ test("an empty project becomes Git without changing its identity or creating a w
   });
 
   const persistedProjects = JSON.parse(
-    await readFile(path.join(daemon.paseoHome, "projects", "projects.json"), "utf8"),
+    await readFile(path.join(daemon.clisbotHome, "projects", "projects.json"), "utf8"),
   ) as PersistedProjectRecord[];
   expect(persistedProjects).toContainEqual({
     projectId: project.projectId,

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { CheckoutCommitFile, ParsedDiffFile } from "@getpaseo/protocol/messages";
+import type { CheckoutCommitFile, ParsedDiffFile } from "@clisbot/protocol/messages";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useFetchQueries } from "@/data/query";
 import { commitFileDiffQueryOptions } from "./commit-file-diff-query";

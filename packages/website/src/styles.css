@@ -701,7 +701,7 @@
   --color-secondary-foreground: #fafafa;
 
   /* Mockup palette. Every value below is copied from the app's default dark
-     theme — `paseoDarkColors` in packages/app/src/styles/theme.ts. Do not
+     theme — `clisbotDarkColors` in packages/app/src/styles/theme.ts. Do not
      eyeball these from a screenshot; re-read theme.ts and copy. */
 
   /* Surfaces */
@@ -757,7 +757,7 @@
   --color-mock-diff-remove-fg: #ef4444;
 
   /* The one darkHighlightColors role the --color-syn-* block below is missing.
-     @getpaseo/highlight src/colors.ts, `class`. */
+     @clisbot/highlight src/colors.ts, `class`. */
   --color-mock-syn-class: #ffa657;
 
   /* Terminal ANSI — darkTerminalAnsi, theme.ts:358-373 */

@@ -46,7 +46,7 @@ export function ContributeSection() {
         Build your own plugin
       </h2>
       <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-        Plugins add themes, workspace panels, slash commands, and agent hooks to Paseo. Write one
+        Plugins add themes, workspace panels, slash commands, and agent hooks to Clisbot. Write one
         with the plugin docs, then submit it to get it listed here.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">

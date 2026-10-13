@@ -146,15 +146,15 @@ export function applyMacWindowControlsUpdate(input: {
 }
 
 export function registerWindowManager(input: { mode: DesktopWindowChromeMode }): void {
-  ipcMain.handle("paseo:window:minimize", (event) => {
+  ipcMain.handle("clisbot:window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });
 
-  ipcMain.handle("paseo:window:close", (event) => {
+  ipcMain.handle("clisbot:window:close", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
 
-  ipcMain.handle("paseo:window:toggleMaximize", (event) => {
+  ipcMain.handle("clisbot:window:toggleMaximize", (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
     if (win.isMaximized()) {
@@ -164,21 +164,21 @@ export function registerWindowManager(input: { mode: DesktopWindowChromeMode }):
     }
   });
 
-  ipcMain.handle("paseo:window:isFullscreen", (event) => {
+  ipcMain.handle("clisbot:window:isFullscreen", (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return win?.isFullScreen() ?? false;
   });
 
-  ipcMain.handle("paseo:window:isMaximized", (event) => {
+  ipcMain.handle("clisbot:window:isMaximized", (event) => {
     return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
   });
 
-  ipcMain.handle("paseo:window:setFullscreen", (event, fullscreen: unknown) => {
+  ipcMain.handle("clisbot:window:setFullscreen", (event, fullscreen: unknown) => {
     if (typeof fullscreen !== "boolean") return;
     BrowserWindow.fromWebContents(event.sender)?.setFullScreen(fullscreen);
   });
 
-  ipcMain.handle("paseo:window:setBadgeCount", (_event, count?: unknown) => {
+  ipcMain.handle("clisbot:window:setBadgeCount", (_event, count?: unknown) => {
     if (process.platform === "darwin" || process.platform === "linux") {
       const badgeCount = readBadgeCount(count);
       try {
@@ -193,7 +193,7 @@ export function registerWindowManager(input: { mode: DesktopWindowChromeMode }):
     }
   });
 
-  ipcMain.handle("paseo:window:updateChrome", (event, update?: unknown) => {
+  ipcMain.handle("clisbot:window:updateChrome", (event, update?: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) {
       return;
@@ -222,7 +222,7 @@ export function setupWindowResizeEvents(win: BrowserWindow): void {
     if (win.isDestroyed() || win.webContents.isDestroyed()) {
       return;
     }
-    win.webContents.send("paseo:window:resized", {});
+    win.webContents.send("clisbot:window:resized", {});
   };
 
   win.on("resize", notifyResized);

@@ -1,5 +1,5 @@
-import { isSyntaxThemeId, type SyntaxThemeId } from "@getpaseo/highlight";
-import type { ActiveTurnBehavior } from "@getpaseo/protocol/messages";
+import { isSyntaxThemeId, type SyntaxThemeId } from "@clisbot/highlight";
+import type { ActiveTurnBehavior } from "@clisbot/protocol/messages";
 import type { QueryClient } from "@tanstack/react-query";
 import type { DesktopSettings } from "@/desktop/settings/desktop-settings";
 import type { AppLanguage } from "@/i18n/locales";

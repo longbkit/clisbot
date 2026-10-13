@@ -9,10 +9,10 @@ describe("cli-install-path", () => {
       resolveCliInstallSourcePath({
         platform: "darwin",
         isPackaged: true,
-        executablePath: "/Applications/Paseo.app/Contents/MacOS/Paseo",
-        shimPath: "/Applications/Paseo.app/Contents/Resources/bin/paseo",
+        executablePath: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
+        shimPath: "/Applications/Clisbot.app/Contents/Resources/bin/clisbot",
       }),
-    ).toBe("/Applications/Paseo.app/Contents/Resources/bin/paseo");
+    ).toBe("/Applications/Clisbot.app/Contents/Resources/bin/clisbot");
   });
 
   it("prefers the original AppImage path on linux", () => {
@@ -20,11 +20,11 @@ describe("cli-install-path", () => {
       resolveCliInstallSourcePath({
         platform: "linux",
         isPackaged: true,
-        executablePath: "/tmp/.mount_paseo123/paseo",
-        shimPath: "/tmp/.mount_paseo123/resources/bin/paseo",
-        appImagePath: "/home/user/Applications/Paseo.AppImage",
+        executablePath: "/tmp/.mount_clisbot123/clisbot",
+        shimPath: "/tmp/.mount_clisbot123/resources/bin/clisbot",
+        appImagePath: "/home/user/Applications/Clisbot.AppImage",
       }),
-    ).toBe("/home/user/Applications/Paseo.AppImage");
+    ).toBe("/home/user/Applications/Clisbot.AppImage");
   });
 
   it("uses the bundled shim for packaged linux installs outside an AppImage", () => {
@@ -32,10 +32,10 @@ describe("cli-install-path", () => {
       resolveCliInstallSourcePath({
         platform: "linux",
         isPackaged: true,
-        executablePath: "/opt/Paseo/Paseo",
-        shimPath: "/opt/Paseo/resources/bin/paseo",
+        executablePath: "/opt/Clisbot/Clisbot",
+        shimPath: "/opt/Clisbot/resources/bin/clisbot",
       }),
-    ).toBe("/opt/Paseo/resources/bin/paseo");
+    ).toBe("/opt/Clisbot/resources/bin/clisbot");
   });
 
   it("falls back to the shim on windows and in development", () => {
@@ -43,25 +43,25 @@ describe("cli-install-path", () => {
       resolveCliInstallSourcePath({
         platform: "win32",
         isPackaged: true,
-        executablePath: "C:\\Users\\user\\AppData\\Local\\Programs\\Paseo\\Paseo.exe",
-        shimPath: "C:\\Users\\user\\AppData\\Local\\Programs\\Paseo\\resources\\bin\\paseo.cmd",
+        executablePath: "C:\\Users\\user\\AppData\\Local\\Programs\\Clisbot\\Clisbot.exe",
+        shimPath: "C:\\Users\\user\\AppData\\Local\\Programs\\Clisbot\\resources\\bin\\clisbot.cmd",
       }),
-    ).toBe("C:\\Users\\user\\AppData\\Local\\Programs\\Paseo\\resources\\bin\\paseo.cmd");
+    ).toBe("C:\\Users\\user\\AppData\\Local\\Programs\\Clisbot\\resources\\bin\\clisbot.cmd");
 
     expect(
       resolveCliInstallSourcePath({
         platform: "linux",
         isPackaged: false,
-        executablePath: "/opt/Paseo/paseo",
-        shimPath: "/opt/Paseo/resources/bin/paseo",
+        executablePath: "/opt/Clisbot/clisbot",
+        shimPath: "/opt/Clisbot/resources/bin/clisbot",
       }),
-    ).toBe("/opt/Paseo/resources/bin/paseo");
+    ).toBe("/opt/Clisbot/resources/bin/clisbot");
   });
 });
 
 describe("CLI executable selection", () => {
   const resolveWorkspaceCli = () =>
-    createRequire(import.meta.url).resolve("@getpaseo/cli/bin/paseo");
+    createRequire(import.meta.url).resolve("@clisbot/cli/bin/clisbot");
 
   it("uses the workspace CLI for an unpackaged Electron launcher", () => {
     expect(
@@ -79,17 +79,17 @@ describe("CLI executable selection", () => {
       resolveCliShimPath({
         platform: "linux",
         isPackaged: true,
-        executablePath: "/opt/Paseo/paseo",
+        executablePath: "/opt/Clisbot/clisbot",
         resolveWorkspaceCli,
       }),
-    ).toBe(path.join("/opt/Paseo", "resources", "bin", "paseo"));
+    ).toBe(path.join("/opt/Clisbot", "resources", "bin", "clisbot"));
     expect(
       resolveCliShimPath({
         platform: "darwin",
         isPackaged: true,
-        executablePath: "/Applications/Paseo.app/Contents/MacOS/Paseo",
+        executablePath: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
         resolveWorkspaceCli,
       }),
-    ).toBe(path.join("/Applications/Paseo.app", "Contents", "Resources", "bin", "paseo"));
+    ).toBe(path.join("/Applications/Clisbot.app", "Contents", "Resources", "bin", "clisbot"));
   });
 });

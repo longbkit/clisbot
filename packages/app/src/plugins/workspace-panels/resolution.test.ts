@@ -10,7 +10,7 @@ function installed(): InstalledPlugin {
     clientBundle: "bundle",
     lifetime: new AbortController(),
     queryClient: new QueryClient(),
-    paseo: {} as InstalledPlugin["paseo"],
+    clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
     cleanup: () => {},
     settingsScreens: [],

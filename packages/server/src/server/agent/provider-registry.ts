@@ -1,5 +1,5 @@
 import type { Logger } from "pino";
-import type { ProviderOptions, ToolPolicy } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions, ToolPolicy } from "@clisbot/protocol/agent-types";
 
 import type {
   AgentClient,
@@ -55,7 +55,7 @@ import {
   DEV_AGENT_PROVIDER_DEFINITIONS,
   getAgentProviderDefinition,
   type AgentProviderDefinition,
-} from "@getpaseo/protocol/provider-manifest";
+} from "@clisbot/protocol/provider-manifest";
 
 function isNonEmptyStringArray(value: string[]): value is [string, ...string[]] {
   return value.length > 0;

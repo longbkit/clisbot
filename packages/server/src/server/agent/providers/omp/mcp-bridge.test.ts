@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import { OmpHarness } from "./test-utils/omp-harness.js";
-import type { PaseoToolCatalog } from "../../tools/types.js";
+import type { ClisbotToolCatalog } from "../../tools/types.js";
 
 const fixture = fileURLToPath(new URL("./test-utils/echo-mcp-server.mjs", import.meta.url));
 const healthy = { type: "stdio" as const, command: process.execPath, args: [fixture] };
 
 describe("OMP MCP host tools", () => {
   test("registers a stdio MCP tool and proxies its call", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const omp = new OmpHarness();
     await omp.start({ mcpServers: { local: healthy } });
     try {
@@ -88,7 +88,7 @@ describe("OMP MCP host tools", () => {
   });
 
   test("skips a failed server and registers a healthy one", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const omp = new OmpHarness();
     await omp.start({
       mcpServers: { broken: { type: "stdio", command: "/nonexistent/omp-mcp" }, local: healthy },
@@ -118,7 +118,7 @@ describe("OMP MCP host tools", () => {
   });
 
   test("starts with a healthy server when another never answers initialize", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const omp = new OmpHarness();
     const started = Date.now();
     await omp.start({
@@ -145,7 +145,7 @@ describe("OMP MCP host tools", () => {
   }, 80_000);
 
   test("passes runtime and launch env to stdio, then applies server env", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const omp = new OmpHarness({
       runtimeEnv: { OMP_MCP_RUNTIME_ENV: "runtime", OMP_MCP_PRECEDENCE: "runtime" },
     });
@@ -156,7 +156,7 @@ describe("OMP MCP host tools", () => {
         },
       },
       undefined,
-      { PASEO_AGENT_ID: "agent-123", OMP_MCP_PRECEDENCE: "launch" },
+      { CLISBOT_AGENT_ID: "agent-123", OMP_MCP_PRECEDENCE: "launch" },
     );
     try {
       const runtime = omp.runtime();
@@ -184,7 +184,7 @@ describe("OMP MCP host tools", () => {
   });
 
   test("replays the bridge label and Codex-style detail after archive", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const omp = new OmpHarness();
     await omp.start({ mcpServers: { local: healthy } });
     try {
@@ -245,9 +245,9 @@ describe("OMP MCP host tools", () => {
     }
   });
 
-  test("registers Paseo and MCP tools in the same replacement set", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
-    const paseoTools: PaseoToolCatalog = {
+  test("registers Clisbot and MCP tools in the same replacement set", async () => {
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
+    const clisbotTools: ClisbotToolCatalog = {
       tools: new Map([
         [
           "create_agent",
@@ -262,7 +262,7 @@ describe("OMP MCP host tools", () => {
       executeTool: async () => ({ content: [] }),
     };
     const omp = new OmpHarness();
-    await omp.start({ mcpServers: { local: healthy } }, paseoTools);
+    await omp.start({ mcpServers: { local: healthy } }, clisbotTools);
     try {
       expect(omp.registeredHostTools()).toHaveLength(1);
       expect(omp.registeredHostTools()[0]?.map((tool) => tool.name)).toEqual([
@@ -275,7 +275,7 @@ describe("OMP MCP host tools", () => {
   });
 
   test("registers MCP tools after resume and crash relaunch", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const omp = new OmpHarness();
     await omp.resume(
       { user: { id: "user-1", text: "hello" }, assistant: { id: "assistant-1", text: "hi" } },
@@ -295,7 +295,7 @@ describe("OMP MCP host tools", () => {
   });
 
   test("closes the stdio MCP child with the session", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const directory = await mkdtemp(join(tmpdir(), "omp-mcp-pid-"));
     const pidFile = join(directory, "pid");
     const omp = new OmpHarness();
@@ -307,7 +307,7 @@ describe("OMP MCP host tools", () => {
   });
 
   test("cancels an in-flight MCP call when OMP cancels its host tool", async () => {
-    await mkdir("/tmp/paseo-omp-agent-test", { recursive: true });
+    await mkdir("/tmp/clisbot-omp-agent-test", { recursive: true });
     const directory = await mkdtemp(join(tmpdir(), "omp-mcp-cancel-"));
     const waitFile = join(directory, "waiting");
     const cancelFile = join(directory, "cancelled");

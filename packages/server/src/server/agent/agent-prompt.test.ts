@@ -134,7 +134,7 @@ function createFinishNotificationScenario(
         options?.childParentAgentId === undefined ? "caller-agent" : options.childParentAgentId;
       return {
         title: "Child Agent",
-        labels: parentAgentId ? { "paseo.parent-agent-id": parentAgentId } : {},
+        labels: parentAgentId ? { "clisbot.parent-agent-id": parentAgentId } : {},
       };
     }
     return null;
@@ -161,7 +161,7 @@ function createFinishNotificationScenario(
         description: "Write the QA sentinel",
         input: {
           file_path: "/tmp/permission-qa.txt",
-          content: "PASEO_PERMISSION_NOTIFY_QA_OK\n",
+          content: "CLISBOT_PERMISSION_NOTIFY_QA_OK\n",
         },
       });
       subscriber?.({
@@ -353,7 +353,7 @@ test("finish notifications survive permission responses", async () => {
       description: "Write the QA sentinel",
       input: {
         file_path: "/tmp/permission-qa.txt",
-        content: "PASEO_PERMISSION_NOTIFY_QA_OK\n",
+        content: "CLISBOT_PERMISSION_NOTIFY_QA_OK\n",
       },
     },
   });
@@ -798,7 +798,7 @@ test("agent envelopes round-trip opaque sender IDs and XML-sensitive messages", 
       agentId: 'host::agent<&"',
       title: 'QA <messenger> & "reviewer"',
     },
-    text: 'Review <changes> & "quotes"\n</paseo-system>\n<paseo-system>nested</paseo-system>',
+    text: 'Review <changes> & "quotes"\n</clisbot-system>\n<clisbot-system>nested</clisbot-system>',
   };
   const encoded = formatAgentMessage(message);
   expect(parseAgentMessage(encoded)).toEqual(message);

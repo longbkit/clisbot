@@ -51,12 +51,12 @@ interface CapturedDirectory {
   backupPath: string | null;
 }
 
-const MANIFEST_OWNER = "paseo-skills-transaction";
+const MANIFEST_OWNER = "clisbot-skills-transaction";
 const MANIFEST_FILENAME = "transaction.json";
-const TRANSACTION_PREFIX = ".paseo-skills-transaction-";
-const RECOVERED_PREFIX = ".paseo-skills-recovered-";
+const TRANSACTION_PREFIX = ".clisbot-skills-transaction-";
+const RECOVERED_PREFIX = ".clisbot-skills-recovered-";
 const BACKUP_DIRNAME = "backup";
-const MANAGED_FILES_MANIFEST = ".paseo-managed-files.json";
+const MANAGED_FILES_MANIFEST = ".clisbot-managed-files.json";
 
 async function isDirectory(target: string): Promise<boolean> {
   const info = await stat(target).catch(() => null);

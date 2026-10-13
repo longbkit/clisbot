@@ -1,6 +1,6 @@
 ---
 title: Supported providers
-description: Every coding agent Paseo can launch, natively supported providers and the ACP catalog.
+description: Every coding agent Clisbot can launch, natively supported providers and the ACP catalog.
 nav: Supported providers
 order: 21
 category: Providers
@@ -8,7 +8,7 @@ category: Providers
 
 # Supported providers
 
-For the concept and how Paseo manages providers, see [Providers](/docs/providers). To add or configure your own, see [Custom providers](/docs/custom-providers).
+For the concept and how Clisbot manages providers, see [Providers](/docs/providers). To add or configure your own, see [Custom providers](/docs/custom-providers).
 
 ## Native support
 
@@ -24,23 +24,23 @@ Work out of the box once the underlying CLI is installed and authenticated.
 ### Antigravity
 
 Install the Antigravity CLI (`agy`) on your daemon host, then run `agy` once to sign in. Pick
-**Antigravity** in Paseo. The provider ships with Paseo; no separate plugin install is required.
+**Antigravity** in Clisbot. The provider ships with Clisbot; no separate plugin install is required.
 
 **Full access** is the only permission mode. Antigravity cannot ask for permission when another
-app drives it, so Paseo starts `agy` with `--dangerously-skip-permissions`. Every tool call,
+app drives it, so Clisbot starts `agy` with `--dangerously-skip-permissions`. Every tool call,
 including shell commands, runs without asking. Each session starts with a warning explaining
 this, including when you reopen a chat. Antigravity's own policy can still deny
 an action.
 
-After a daemon restart, Antigravity remembers the conversation, but Paseo's transcript starts
+After a daemon restart, Antigravity remembers the conversation, but Clisbot's transcript starts
 fresh because `agy` does not replay its history.
 
 This integration uses your installed CLI and sign-in. It is not endorsed by Google.
 
-Paseo MCP tools and steering are unavailable. Your own `agy` MCP servers still work. Attached
+Clisbot MCP tools and steering are unavailable. Your own `agy` MCP servers still work. Attached
 images are passed as file references for the agent to read.
 
-If `agy` is outside your daemon's PATH, override its command in `~/.paseo/config.json`. Use `env`
+If `agy` is outside your daemon's PATH, override its command in `~/.clisbot/config.json`. Use `env`
 for provider-specific environment variables:
 
 ```json

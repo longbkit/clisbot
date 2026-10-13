@@ -4,7 +4,7 @@ import type {
   UsageProblem,
   ProviderUsageWindow,
   ProviderUsageBalance,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { renderTable, type OutputSchema } from "../../output/index.js";
 
 function value(input: string | number | null | undefined): string {

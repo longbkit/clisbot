@@ -8,7 +8,7 @@ const runningManagedStatus: DesktopDaemonStatus = {
   listen: null,
   hostname: null,
   pid: 123,
-  home: "/tmp/paseo",
+  home: "/tmp/clisbot",
   version: "1.0.0",
   desktopManaged: true,
   ownedByDesktop: true,

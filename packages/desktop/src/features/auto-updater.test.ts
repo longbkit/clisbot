@@ -302,7 +302,7 @@ describe("shouldAdmitToRollout", () => {
   });
 
   it("creates and then reuses the on-disk staging user id", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "paseo-updater-id-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-updater-id-"));
     const filePath = path.join(tempDir, ".updaterId");
 
     try {

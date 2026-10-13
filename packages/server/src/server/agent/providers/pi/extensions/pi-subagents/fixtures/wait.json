@@ -59,7 +59,7 @@
             "remaining": 63
           },
           "missionId": "812446a0-b883-48e0-ac3c-f810ffbcb7a9",
-          "missionPath": "/tmp/paseo-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/812446a0-b883-48e0-ac3c-f810ffbcb7a9.json",
+          "missionPath": "/tmp/clisbot-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/812446a0-b883-48e0-ac3c-f810ffbcb7a9.json",
           "mission": {
             "schemaVersion": 1,
             "id": "812446a0-b883-48e0-ac3c-f810ffbcb7a9",
@@ -91,8 +91,8 @@
               }
             ],
             "receipts": [],
-            "cwd": "/tmp/paseo-pi-extension-phase3/workspace",
-            "ownerSessionId": "/tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198.jsonl"
+            "cwd": "/tmp/clisbot-pi-extension-phase3/workspace",
+            "ownerSessionId": "/tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198.jsonl"
           }
         }
       },
@@ -152,16 +152,16 @@
                     "cost": 0.00889125,
                     "turns": 3
                   },
-                  "sessionFile": "/tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
+                  "sessionFile": "/tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
                   "success": true,
                   "outputState": "present",
                   "model": "openrouter/google/gemini-3.6-flash:low",
                   "artifactPaths": {
-                    "inputPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_input.md",
-                    "outputPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_output.md",
-                    "jsonlPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout.jsonl",
-                    "transcriptPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_transcript.jsonl",
-                    "metadataPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_meta.json"
+                    "inputPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_input.md",
+                    "outputPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_output.md",
+                    "jsonlPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout.jsonl",
+                    "transcriptPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_transcript.jsonl",
+                    "metadataPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_meta.json"
                   }
                 }
               ],
@@ -177,7 +177,7 @@
       "message": {
         "role": "custom",
         "customType": "subagent-notify",
-        "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\nNo files found in workspace `/tmp/paseo-pi-extension-phase3/workspace`.\n\n## Key Code\nNone. The directory is empty.\n\n## Architecture\nN/A - Empty workspace.\n\n## Start Here\n`/tmp/paseo-pi-extension-phase3/workspace` - Root workspace directory.\n\nOutput saved to: /tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/33b193f7-7519-4395-a09c-e45e8f5ce4fa/context.md (275 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/33b193f7-7519-4395-a09c-e45e8f5ce4fa\n\nSession file: /tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
+        "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\nNo files found in workspace `/tmp/clisbot-pi-extension-phase3/workspace`.\n\n## Key Code\nNone. The directory is empty.\n\n## Architecture\nN/A - Empty workspace.\n\n## Start Here\n`/tmp/clisbot-pi-extension-phase3/workspace` - Root workspace directory.\n\nOutput saved to: /tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/33b193f7-7519-4395-a09c-e45e8f5ce4fa/context.md (275 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/33b193f7-7519-4395-a09c-e45e8f5ce4fa\n\nSession file: /tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
         "display": false,
         "timestamp": 1790198222119
       }
@@ -262,7 +262,7 @@
           "remaining": 63
         },
         "missionId": "812446a0-b883-48e0-ac3c-f810ffbcb7a9",
-        "missionPath": "/tmp/paseo-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/812446a0-b883-48e0-ac3c-f810ffbcb7a9.json",
+        "missionPath": "/tmp/clisbot-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/812446a0-b883-48e0-ac3c-f810ffbcb7a9.json",
         "mission": {
           "schemaVersion": 1,
           "id": "812446a0-b883-48e0-ac3c-f810ffbcb7a9",
@@ -294,8 +294,8 @@
             }
           ],
           "receipts": [],
-          "cwd": "/tmp/paseo-pi-extension-phase3/workspace",
-          "ownerSessionId": "/tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198.jsonl"
+          "cwd": "/tmp/clisbot-pi-extension-phase3/workspace",
+          "ownerSessionId": "/tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198.jsonl"
         }
       },
       "isError": false,
@@ -367,16 +367,16 @@
                   "cost": 0.00889125,
                   "turns": 3
                 },
-                "sessionFile": "/tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
+                "sessionFile": "/tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
                 "success": true,
                 "outputState": "present",
                 "model": "openrouter/google/gemini-3.6-flash:low",
                 "artifactPaths": {
-                  "inputPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_input.md",
-                  "outputPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_output.md",
-                  "jsonlPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout.jsonl",
-                  "transcriptPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_transcript.jsonl",
-                  "metadataPath": "/tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_meta.json"
+                  "inputPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_input.md",
+                  "outputPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_output.md",
+                  "jsonlPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout.jsonl",
+                  "transcriptPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_transcript.jsonl",
+                  "metadataPath": "/tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/33b193f7-7519-4395-a09c-e45e8f5ce4fa_scout_meta.json"
                 }
               }
             ],
@@ -404,7 +404,7 @@
     {
       "role": "custom",
       "customType": "subagent-notify",
-      "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\nNo files found in workspace `/tmp/paseo-pi-extension-phase3/workspace`.\n\n## Key Code\nNone. The directory is empty.\n\n## Architecture\nN/A - Empty workspace.\n\n## Start Here\n`/tmp/paseo-pi-extension-phase3/workspace` - Root workspace directory.\n\nOutput saved to: /tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/33b193f7-7519-4395-a09c-e45e8f5ce4fa/context.md (275 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/33b193f7-7519-4395-a09c-e45e8f5ce4fa\n\nSession file: /tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
+      "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\nNo files found in workspace `/tmp/clisbot-pi-extension-phase3/workspace`.\n\n## Key Code\nNone. The directory is empty.\n\n## Architecture\nN/A - Empty workspace.\n\n## Start Here\n`/tmp/clisbot-pi-extension-phase3/workspace` - Root workspace directory.\n\nOutput saved to: /tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/33b193f7-7519-4395-a09c-e45e8f5ce4fa/context.md (275 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/33b193f7-7519-4395-a09c-e45e8f5ce4fa\n\nSession file: /tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-16-49-809Z_01a0d020-dd11-7a6e-a902-107f51c3c198/53dcdf6f-7871-44ae-bf72-7744df7845f2/run-0/session.jsonl",
       "display": false,
       "timestamp": 1790198222119
     }

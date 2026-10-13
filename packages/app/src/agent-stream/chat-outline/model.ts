@@ -1,4 +1,4 @@
-import type { AgentTimelinePromptIndexPayload } from "@getpaseo/client/internal/daemon-client";
+import type { AgentTimelinePromptIndexPayload } from "@clisbot/client/internal/daemon-client";
 
 export type ChatOutlinePrompt = AgentTimelinePromptIndexPayload["prompts"][number];
 

@@ -25,7 +25,7 @@ import {
 import { spawnSync } from "node:child_process";
 import * as pty from "node-pty";
 import xterm from "@xterm/headless";
-import { renderTerminalSnapshotToAnsi } from "@getpaseo/protocol/terminal-snapshot";
+import { renderTerminalSnapshotToAnsi } from "@clisbot/protocol/terminal-snapshot";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { setImmediate as waitForImmediate, setTimeout as delay } from "node:timers/promises";
@@ -532,7 +532,7 @@ describe("createTerminal", () => {
   it("restores CJK text without injected spaces when a snapshot round-trips through the client", async () => {
     // Each Hangul syllable is a wide char: xterm stores it as a 2-cell pair
     // whose second cell has no chars. Capturing that continuation as " " made
-    // every restored syllable three columns wide (paseo#3434).
+    // every restored syllable three columns wide (clisbot#3434).
     const text = "통합 구현은 전체 테스트를 통과했습니다";
     const session = trackSession(
       await createTerminal({
@@ -696,14 +696,14 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
     temporaryDirs.push(homeDir);
     const realZdotdir = join(homeDir, ".config", "zsh");
     mkdirSync(realZdotdir, { recursive: true });
-    writeFileSync(join(realZdotdir, ".zshenv"), "export PASEO_TEST_REAL_ZDOTDIR=1\n");
+    writeFileSync(join(realZdotdir, ".zshenv"), "export CLISBOT_TEST_REAL_ZDOTDIR=1\n");
 
     const session = trackSession(
       await createTerminal({
         workspaceId: "ws-test",
         cwd: homeDir,
         command: "/bin/zsh",
-        args: ["-c", 'printf \'%s\\n%s\\n\' "${ZDOTDIR-}" "${PASEO_TEST_REAL_ZDOTDIR-}"'],
+        args: ["-c", 'printf \'%s\\n%s\\n\' "${ZDOTDIR-}" "${CLISBOT_TEST_REAL_ZDOTDIR-}"'],
         env: {
           HOME: homeDir,
           ZDOTDIR: realZdotdir,
@@ -928,14 +928,14 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
   it.skipIf(!hasZsh)("loads the user's zsh prompt when the integration dir is packaged", () => {
     const homeDir = mkdtempSync(join(tmpdir(), "terminal-zsh-packaged-home-"));
     temporaryDirs.push(homeDir);
-    writeFileSync(join(homeDir, ".zshrc"), "PS1='PASEO_CUSTOM_PROMPT> '\n");
+    writeFileSync(join(homeDir, ".zshrc"), "PS1='CLISBOT_CUSTOM_PROMPT> '\n");
 
-    const fakeAppRoot = join(homeDir, "Paseo.app", "Contents", "Resources");
+    const fakeAppRoot = join(homeDir, "Clisbot.app", "Contents", "Resources");
     const inaccessiblePackagedIntegrationDir = join(
       fakeAppRoot,
       "app.asar",
       "node_modules",
-      "@getpaseo",
+      "@clisbot",
       "server",
       "dist",
       "server",
@@ -947,7 +947,7 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
       fakeAppRoot,
       "app.asar.unpacked",
       "node_modules",
-      "@getpaseo",
+      "@clisbot",
       "server",
       "dist",
       "server",
@@ -974,7 +974,7 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout.split(/\r?\n/)).toContain("PASEO_CUSTOM_PROMPT> ");
+    expect(result.stdout.split(/\r?\n/)).toContain("CLISBOT_CUSTOM_PROMPT> ");
   });
 
   it.skipIf(!hasZsh)("emits zsh shell integration command completion", async () => {
@@ -1309,10 +1309,10 @@ describe("terminal activity interruption", () => {
 // the prompt instead of executing part of it, which is the failure the
 // escaping exists to prevent (the CVE-2024-27980 class).
 describe.runIf(isPlatform("win32"))(".cmd shim argv round-trip on Windows", () => {
-  const argvMarker = "__PASEO_ARGV__";
+  const argvMarker = "__CLISBOT_ARGV__";
 
   function writeArgvEchoShim(): { dir: string; cmdPath: string } {
-    const dir = mkdtempSync(join(tmpdir(), "paseo-cmd-shim-"));
+    const dir = mkdtempSync(join(tmpdir(), "clisbot-cmd-shim-"));
     temporaryDirs.push(dir);
     const cmdPath = join(dir, "echoargv.cmd");
     const scriptPath = join(dir, "echoargv.js");

@@ -15,7 +15,7 @@ export function createWatcherLivenessCanary(
   watchRoot: string,
   options: { timeoutMs?: number } = {},
 ): WatcherLivenessCanary {
-  const canaryPath = join(watchRoot, `.paseo-watcher-canary-${randomUUID()}`);
+  const canaryPath = join(watchRoot, `.clisbot-watcher-canary-${randomUUID()}`);
   const timeoutMs = options.timeoutMs ?? WATCHER_LIVENESS_CANARY_TIMEOUT_MS;
   let reportCanary!: () => void;
   const reported = new Promise<void>((resolve) => {
@@ -32,7 +32,7 @@ export function createWatcherLivenessCanary(
       return filtered;
     },
     async verify(signal) {
-      await writeFile(canaryPath, "paseo watcher liveness canary\n", { flag: "wx" });
+      await writeFile(canaryPath, "clisbot watcher liveness canary\n", { flag: "wx" });
       let timeout: NodeJS.Timeout | null = null;
       let removeAbortListener = () => {};
       try {

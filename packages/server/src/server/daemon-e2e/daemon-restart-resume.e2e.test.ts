@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { createDaemonTestContext, type DaemonTestContext } from "../test-utils/index.js";
-import type { PersistenceHandle } from "@getpaseo/protocol/messages";
+import type { PersistenceHandle } from "@clisbot/protocol/messages";
 
 function tmpCwd(): string {
   return mkdtempSync(path.join(tmpdir(), "daemon-restart-resume-"));

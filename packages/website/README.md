@@ -1,8 +1,8 @@
-# Paseo website
+# Clisbot website
 
 ## Plugin install counts
 
-Clients report an install by resolving a plugin with `X-Paseo-Install: 1` or
+Clients report an install by resolving a plugin with `X-Clisbot-Install: 1` or
 `?intent=install`, using `/api/plugins/resolve/<owner>/<slug>` or
 `/plugins/<owner>/<slug>.json`. Ordinary resolves do not count. These numbers
 measure install intent, not successful artifact installation or npm downloads.

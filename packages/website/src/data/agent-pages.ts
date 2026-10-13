@@ -90,7 +90,7 @@ export const AGENT_PAGES = [
       "Run your installed Antigravity CLI on your machine and drive it from your phone or desktop.",
     metaTitle: "Antigravity Mobile and Desktop App, Open Source",
     metaDescription:
-      "Run your installed Antigravity CLI through Paseo. Watch agents work and review changes from your phone or desktop. Self-hosted, your code stays on your machine.",
+      "Run your installed Antigravity CLI through Clisbot. Watch agents work and review changes from your phone or desktop. Self-hosted, your code stays on your machine.",
   },
   {
     slug: "copilot",

@@ -262,7 +262,7 @@ describe("OMP CLI runtime", () => {
     expect(eventTypes).toEqual(["message_end", "agent_end"]);
   });
 
-  test("emits agent_end for a run that contains every OMP message role Paseo does not render", async () => {
+  test("emits agent_end for a run that contains every OMP message role Clisbot does not render", async () => {
     const child = createOmpChild();
     const session = await createRuntime(child).startSession({ cwd: "/workspace/project" });
     const eventTypes: string[] = [];

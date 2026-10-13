@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { findExecutable } from "../../executable-resolution/executable-resolution.js";
 import { BuiltinPluginLoader } from "../plugins/builtin/index.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { execFileSync } from "node:child_process";
 import { createDaemonTestContext } from "../test-utils/index.js";
@@ -110,12 +110,12 @@ test("Antigravity creates an agent and answers a prompt with real agy", async ({
     skip("agy is not resolvable");
     return;
   }
-  const cwd = await mkdtemp(path.join(os.tmpdir(), "paseo-antigravity-e2e-"));
-  const daemon = await createTestPaseoDaemon({
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-antigravity-e2e-"));
+  const daemon = await createTestClisbotDaemon({
     agentClients: {},
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, ["antigravity-provider"]),
-    providerOverrides: { antigravity: { command: [command], paseoTools: { enabled: false } } },
+    providerOverrides: { antigravity: { command: [command], clisbotTools: { enabled: false } } },
   });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -146,7 +146,7 @@ test("Antigravity creates an agent and answers a prompt with real agy", async ({
         type: "notification",
         level: "warning",
         message:
-          "Antigravity is running with full access\nAntigravity's CLI cannot ask for permission when another app drives it, so Paseo starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
+          "Antigravity is running with full access\nAntigravity's CLI cannot ask for permission when another app drives it, so Clisbot starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
       },
     ]);
     await client.sendMessage(agent.id, "Reply with exactly ANTIGRAVITY_E2E_OK. No tools.");

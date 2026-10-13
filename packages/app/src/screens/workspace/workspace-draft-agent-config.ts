@@ -1,4 +1,4 @@
-import type { AgentSessionConfig } from "@getpaseo/protocol/agent-types";
+import type { AgentSessionConfig } from "@clisbot/protocol/agent-types";
 
 export function buildWorkspaceDraftAgentConfig(input: {
   provider: AgentSessionConfig["provider"];

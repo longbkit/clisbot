@@ -1,6 +1,6 @@
 /* eslint-disable no-empty-pattern -- Playwright reads fixture dependencies from destructured parameters. */
 import { randomUUID } from "node:crypto";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { metroTest, expect } from "../support/fixtures";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
@@ -162,9 +162,9 @@ for (const version of ["0.2.5", "0.7.2", "0.8.0"]) {
       });
       await page.addInitScript(
         ({ seededHost, preferences }) => {
-          localStorage.setItem("@paseo:e2e", "1");
-          localStorage.setItem("@paseo:daemon-registry", JSON.stringify([seededHost]));
-          localStorage.setItem("@paseo:create-agent-preferences", JSON.stringify(preferences));
+          localStorage.setItem("@clisbot:e2e", "1");
+          localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([seededHost]));
+          localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(preferences));
         },
         { seededHost: host, preferences: buildCreateAgentPreferences() },
       );
