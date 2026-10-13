@@ -2107,7 +2107,6 @@ describe("create_agent MCP tool", () => {
       await tool.handler({
         ...detachedWorktreeWorkspace(repoDir, {
           kind: "branch-off",
-          branchName: "feat/placeholder-auto-title",
           baseBranch: "main",
         }),
         title: "Agent title",
@@ -2132,7 +2131,6 @@ describe("create_agent MCP tool", () => {
         version: 2,
         firstAgentBranchAutoName: {
           status: "attempted",
-          placeholderBranchName: "feat/placeholder-auto-title",
         },
       });
       expect(branchName).toBe("workspace-auto-title-flow");
@@ -2153,6 +2151,7 @@ describe("create_agent MCP tool", () => {
     const broadcasts: string[] = [];
     const createdWorkspaceIds: string[] = [];
     const workspaceRecords = new Map<string, PersistedWorkspaceRecord>();
+    const generatedName = Promise.withResolvers<GeneratedWorkspaceName | null>();
 
     try {
       execFileSync("git", ["init", repoDir], { stdio: "pipe" });
@@ -2189,10 +2188,7 @@ describe("create_agent MCP tool", () => {
           broadcasts,
           createdWorkspaceIds,
           workspaceRecords,
-          generateWorkspaceName: async () => ({
-            title: "Generated Manual Race Title",
-            branch: "generated-manual-race-title",
-          }),
+          generateWorkspaceName: () => generatedName.promise,
         }),
         workspaceRegistry: {
           get: async (workspaceId) => workspaceRecords.get(workspaceId) ?? null,
@@ -2209,7 +2205,6 @@ describe("create_agent MCP tool", () => {
       await createAgentTool.handler({
         ...detachedWorktreeWorkspace(repoDir, {
           kind: "branch-off",
-          branchName: "feat/manual-title-placeholder",
           baseBranch: "main",
         }),
         title: "Agent title",
@@ -2221,6 +2216,10 @@ describe("create_agent MCP tool", () => {
       await renameWorkspaceTool.handler({
         workspaceId: createdWorkspaceIds[0],
         title: "Manual Workspace Title",
+      });
+      generatedName.resolve({
+        title: "Generated Manual Race Title",
+        branch: "generated-manual-race-title",
       });
       const workspaceId = z.string().parse(createdWorkspaceIds[0]);
       await waitForWorkspaceBranch(workspaceRecords, workspaceId, "generated-manual-race-title");
@@ -2244,7 +2243,7 @@ describe("create_agent MCP tool", () => {
     }
   });
 
-  it("uses create_agent title for the agent while still auto-titling the worktree workspace", async () => {
+  it("preserves explicit agent and branch titles while auto-titling the worktree workspace", async () => {
     const { agentManager, agentStorage, spies } = createTestDeps();
     const tempDir = await mkdtemp(join(tmpdir(), "clisbot-mcp-agent-title-workspace-title-"));
     const repoDir = join(tempDir, "repo");
@@ -2320,8 +2319,15 @@ describe("create_agent MCP tool", () => {
       );
       expect(workspace).toMatchObject({
         title: "Generated Workspace Title",
-        branch: "generated-workspace-title",
+        branch: "feat/agent-title-placeholder",
       });
+      const agentCwd = z.string().parse(spies.agentManager.createAgent.mock.calls[0]?.[0].cwd);
+      expect(
+        execFileSync("git", ["branch", "--show-current"], {
+          cwd: agentCwd,
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("feat/agent-title-placeholder");
     } finally {
       await removeTempDir(tempDir);
     }

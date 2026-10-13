@@ -13,6 +13,7 @@ import {
 import { join } from "path";
 import { win32 } from "node:path";
 import { tmpdir } from "os";
+import { areEquivalentPaths } from "./path.js";
 import pino from "pino";
 import {
   countGitStatus,
@@ -310,7 +311,7 @@ describe("checkout git utilities", () => {
       { cwd: tree },
     );
     const trees = await listProjectGitWorktrees(repoDir);
-    expect(trees.find((w) => w.path === realpathSync(tree))).toMatchObject({
+    expect(trees.find((w) => areEquivalentPaths(w.path, realpathSync(tree)))).toMatchObject({
       branch: "worktree-test",
       locked: true,
       commit: { author: "Test" },
