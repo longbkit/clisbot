@@ -21,7 +21,8 @@ export interface SessionMessageAnchor {
 export const AMBIGUOUS_ID = -1;
 
 export interface SessionEventIndex {
-  version: 2;
+  /** Version 2 checkpoints are upgraded by repairing only truncated tool lists. */
+  version: 2 | 3;
   epoch: string;
   /** Bytes of `events.jsonl` already folded in. The tail past it is rescanned on load. */
   scannedBytes: number;
@@ -55,8 +56,6 @@ export interface SessionEventEnvelope<T> extends JournalEntry<T> {
 }
 
 const PREVIEW_LIMIT = 120;
-/** Past this a tool's lifecycle is no longer cheap to complete from an index alone. */
-export const TOOL_OCCURRENCE_LIMIT = 256;
 /**
  * Minimum checkpoint interval. Rewriting the whole index per append would cost O(rows²) bytes,
  * so the interval also grows with the index: see `checkpointDue`.
@@ -89,7 +88,7 @@ export function messagePreview(text: string): string {
 
 export function emptyIndex(epoch: string = randomUUID()): SessionEventIndex {
   return {
-    version: 2,
+    version: 3,
     epoch,
     scannedBytes: 0,
     operationOrder: 0,
@@ -141,7 +140,7 @@ export function isIndex(value: unknown): value is SessionEventIndex {
   if (!value || typeof value !== "object") return false;
   const index = value as Partial<SessionEventIndex>;
   return (
-    index.version === 2 &&
+    (index.version === 2 || index.version === 3) &&
     typeof index.epoch === "string" &&
     typeof index.scannedBytes === "number" &&
     typeof index.operationOrder === "number" &&
@@ -159,6 +158,7 @@ export function absorbLine(
   anchors: Map<string, SessionMessageAnchor>,
   line: string,
   offset: number,
+  length = Buffer.byteLength(line) + 1,
 ): void {
   let envelope: SessionEventEnvelope<unknown>;
   try {
@@ -166,7 +166,7 @@ export function absorbLine(
   } catch {
     return;
   }
-  absorbEnvelope(index, anchors, envelope, offset, Buffer.byteLength(line) + 1);
+  absorbEnvelope(index, anchors, envelope, offset, length);
 }
 
 /**
@@ -192,9 +192,14 @@ export function absorbEnvelope(
   const callId = toolCallId(envelope);
   if (callId) {
     const seqs = (index.tools[callId] ??= []);
-    // Overflow is recorded as a truncated list; readers widen to a full projection instead.
-    if (seqs.length < TOOL_OCCURRENCE_LIMIT && !seqs.includes(envelope.seq))
+    // Keep every pointer: truncation forces even a small page to project the whole session.
+    // Appends arrive in seq order; only rewrites need the linear duplicate check.
+    const last = seqs.at(-1);
+    if (last === undefined || envelope.seq > last) seqs.push(envelope.seq);
+    else if (!seqs.includes(envelope.seq)) {
       seqs.push(envelope.seq);
+      seqs.sort((left, right) => left - right);
+    }
   }
   const anchor = derivedAnchor(envelope, index.epoch);
   if (anchor) anchors.set(anchor.messageId, anchor);
@@ -224,7 +229,7 @@ function derivedIds(envelope: SessionEventEnvelope<unknown>): [string, number][]
   return keys;
 }
 
-function toolCallId(envelope: SessionEventEnvelope<unknown>): string | null {
+export function toolCallId(envelope: SessionEventEnvelope<unknown>): string | null {
   if (envelope.kind !== "timeline") return null;
   const item = (envelope.value as { item?: { type?: string; callId?: string } } | undefined)?.item;
   return item?.type === "tool_call" && typeof item.callId === "string" ? item.callId : null;

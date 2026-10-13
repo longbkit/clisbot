@@ -14,6 +14,8 @@ import {
   type TimelineProjectionEntry,
   type TimelineSeqRange,
 } from "../timeline-projection.js";
+import { selectSourceRanges } from "./source-range-selection.js";
+import { ToolRowProjection, projectionRowBytes } from "./tool-row-projection.js";
 import { SESSION_STORAGE_LIMITS } from "./paged-journal.js";
 import type { SessionEventState, SessionEventStream } from "./session-event-log.js";
 
@@ -38,6 +40,10 @@ class ProjectionBudget {
       throw new Error("Projected history exceeds its read memory budget");
     this.bytes += bytes;
     activeBytes += bytes;
+  }
+  releaseBytes(bytes: number): void {
+    activeBytes -= bytes;
+    this.bytes -= bytes;
   }
   release(): void {
     activeBytes -= this.bytes;
@@ -191,62 +197,6 @@ function containingRange(
   return entry.sourceSeqRanges.find((range) => range.startSeq <= seq && range.endSeq >= seq);
 }
 
-/** Follow direct canonical-to-display references, never a tool's min/max envelope. */
-function selectSourceRanges(
-  entries: readonly TimelineProjectionEntry[],
-  state: SessionEventState,
-  direction: "tail" | "before" | "after",
-  cursor: number | undefined,
-  limit: number,
-): ProjectedTimelinePageSelection | null {
-  const bySeq = new Map<number, TimelineProjectionEntry>();
-  for (const entry of entries)
-    for (const range of entry.sourceSeqRanges)
-      for (let seq = range.startSeq; seq <= range.endSeq; seq += 1) bySeq.set(seq, entry);
-  const forward = direction === "after";
-  const minSeq = Math.max(1, state.minSeq);
-  const boundary = forward
-    ? Math.max(minSeq, (cursor ?? state.minSeq - 1) + 1)
-    : Math.min(
-        state.maxSeq,
-        direction === "before" ? (cursor ?? state.maxSeq + 1) - 1 : state.maxSeq,
-      );
-  let seq = boundary;
-  const selected = new Map<number, TimelineProjectionEntry>();
-  while (seq >= minSeq && seq <= state.maxSeq && selected.size < limit) {
-    const entry = bySeq.get(seq);
-    const range = entry ? containingRange(entry, seq) : undefined;
-    if (!entry || !range) return null;
-    selected.set(entry.seqStart, entry);
-    seq = forward ? range.endSeq + 1 : range.startSeq - 1;
-  }
-  if (!selected.size)
-    return {
-      pagingMode: "source_ranges",
-      entries: [],
-      contextEntries: [],
-      startSeq: null,
-      endSeq: null,
-      hasOlder: false,
-      hasNewer: false,
-    };
-  const startSeq = forward ? boundary : seq + 1;
-  const endSeq = forward ? seq - 1 : boundary;
-  const page: TimelineProjectionEntry[] = [];
-  const contextEntries: TimelineProjectionEntry[] = [];
-  for (const [, entry] of [...selected].sort(([left], [right]) => left - right))
-    (entry.seqStart < startSeq ? contextEntries : page).push(entry);
-  return {
-    pagingMode: "source_ranges",
-    entries: page,
-    contextEntries,
-    startSeq,
-    endSeq,
-    hasOlder: startSeq > state.minSeq,
-    hasNewer: endSeq < state.maxSeq,
-  };
-}
-
 /**
  * Projection is logic, not layout: entries are derived from canonical rows on every read.
  * Nothing about the projected view is persisted, so nothing about it can go stale or corrupt.
@@ -259,18 +209,39 @@ export class ProjectedTimeline {
     start: number,
     end: number,
     budget: ProjectionBudget,
+    compactTools = false,
   ): Promise<AgentTimelineRow[]> {
     const rows: AgentTimelineRow[] = [];
-    for (let seq = start; seq <= end; seq += READ_PAGE_ROWS) {
-      const page = await this.source.read(seq, Math.min(end, seq + READ_PAGE_ROWS - 1));
-      let bytes = 0;
-      for (const entry of page) {
-        bytes += JSON.stringify(entry.value).length * 2;
-        rows.push(entry.value);
+    const tools = compactTools ? new ToolRowProjection() : undefined;
+    for (let seq = start; seq <= end; ) {
+      const { page, endSeq } = await this.readPage(seq, end);
+      seq = endSeq + 1;
+      if (tools) rows.push(...tools.append(page, budget));
+      else {
+        budget.reserve(projectionRowBytes(page));
+        rows.push(...page);
       }
-      budget.reserve(bytes);
     }
-    return rows;
+    if (tools) rows.push(...tools.getRows());
+    return rows.sort((left, right) => left.seq - right.seq);
+  }
+
+  private async readPage(start: number, end: number) {
+    let endSeq = Math.min(end, start + READ_PAGE_ROWS - 1);
+    while (true) {
+      try {
+        const page = (await this.source.read(start, endSeq)).map((entry) => entry.value);
+        return { page, endSeq };
+      } catch (error) {
+        if (
+          endSeq === start ||
+          !(error instanceof Error) ||
+          error.message !== "Session page exceeds byte budget; request a smaller page"
+        )
+          throw error;
+        endSeq = start + Math.floor((endSeq - start) / 2);
+      }
+    }
   }
 
   private async readRows(
@@ -304,23 +275,26 @@ export class ProjectedTimeline {
     rows: AgentTimelineRow[],
     state: SessionEventState,
     budget: ProjectionBudget,
+    windowEnd: number,
   ): Promise<boolean> {
     while (rows[0] && rows[0].seq > state.minSeq && mergesWithNeighbour(rows[0])) {
       const from = Math.max(state.minSeq, rows[0].seq - MERGE_STEP_ROWS);
       const step = await this.readRange(from, rows[0].seq - 1, budget);
       if (!step.length) break;
       const boundary = textBoundaries([...step, rows[0]!]).at(-1);
+      budget.releaseBytes(projectionRowBytes(step.slice(0, boundary ?? 0)));
       rows.unshift(...step.slice(boundary ?? 0));
       if (rows.length > MAX_WINDOW_ROWS) return false;
       if (boundary !== undefined) break;
     }
     let last = rows.at(-1);
-    while (last && last.seq < state.maxSeq && mergesWithNeighbour(last)) {
+    while (last && last.seq >= windowEnd && last.seq < state.maxSeq && mergesWithNeighbour(last)) {
       const to = Math.min(state.maxSeq, last.seq + MERGE_STEP_ROWS);
       const step = await this.readRange(last.seq + 1, to, budget);
       if (!step.length) break;
       const boundary = textBoundaries([...rows, ...step]).find((index) => index >= rows.length);
       const count = boundary === undefined ? step.length : boundary - rows.length;
+      budget.releaseBytes(projectionRowBytes(step.slice(count)));
       rows.push(...step.slice(0, count));
       if (rows.length > MAX_WINDOW_ROWS) return false;
       if (boundary !== undefined) break;
@@ -347,6 +321,80 @@ export class ProjectedTimeline {
     return true;
   }
 
+  /** Re-read each selected lifecycle in source order and discard superseded payloads.
+   * Starting from its first occurrence preserves partial details and reused call IDs. */
+  private async completeToolRows(
+    rows: AgentTimelineRow[],
+    budget: ProjectionBudget,
+    knownEntries: readonly TimelineProjectionEntry[],
+  ): Promise<void> {
+    const selected = rows.filter((row) => row.item.type === "tool_call");
+    const callIds = new Set(
+      selected.map((row) => {
+        if (row.item.type !== "tool_call") throw new Error("Expected tool row");
+        return row.item.callId;
+      }),
+    );
+    budget.releaseBytes(projectionRowBytes(selected));
+    rows.splice(0, rows.length, ...rows.filter((row) => row.item.type !== "tool_call"));
+    const tools = new ToolRowProjection();
+    const missing = new Set<string>();
+    for (const callId of callIds) {
+      const known = knownEntries.filter(
+        (entry) => entry.item.type === "tool_call" && entry.item.callId === callId,
+      );
+      if (known.length) {
+        // These payloads already belong to the retained page and its budget.
+        for (const entry of known) rows.push({ ...entry, seq: entry.seqStart });
+      } else missing.add(callId);
+    }
+    await this.readToolRows(missing, tools, budget);
+    rows.push(...tools.getRows());
+    // A certified window must not hide a real tool row as an empty seq if its index drifts.
+    const covered = rows.flatMap((row) =>
+      "sourceSeqRanges" in row
+        ? (row as AgentTimelineRow & TimelineProjectionEntry).sourceSeqRanges
+        : [{ startSeq: row.seq, endSeq: row.seq }],
+    );
+    for (const row of selected) {
+      const ranges =
+        "sourceSeqRanges" in row
+          ? (row as AgentTimelineRow & TimelineProjectionEntry).sourceSeqRanges
+          : [{ startSeq: row.seq, endSeq: row.seq }];
+      for (const range of ranges)
+        for (let seq = range.startSeq; seq <= range.endSeq; seq++)
+          if (!covered.some((part) => part.startSeq <= seq && seq <= part.endSeq))
+            throw new Error("Incomplete tool occurrence index");
+    }
+    rows.sort((left, right) => left.seq - right.seq);
+  }
+
+  private async readToolRows(
+    callIds: ReadonlySet<string>,
+    tools: ToolRowProjection,
+    budget: ProjectionBudget,
+  ): Promise<void> {
+    const occurrences = new Set<number>();
+    for (const id of callIds)
+      for (const seq of (await this.source.owner.toolOccurrences(id)).seqs) occurrences.add(seq);
+    const seqs = [...occurrences].sort((left, right) => left - right);
+    for (let position = 0; position < seqs.length; ) {
+      let last = position;
+      while (
+        last + 1 < seqs.length &&
+        seqs[last + 1] === seqs[last]! + 1 &&
+        last - position + 1 < READ_PAGE_ROWS
+      )
+        last++;
+      const { page, endSeq } = await this.readPage(seqs[position]!, seqs[last]!);
+      while (position < seqs.length && seqs[position]! <= endSeq) position++;
+      tools.append(
+        page.filter((row) => row.item.type === "tool_call" && callIds.has(row.item.callId)),
+        budget,
+      );
+    }
+  }
+
   /**
    * A page needs only the rows that can reach it. Projecting that set gives the same
    * entries as projecting everything — with a bounded read. `null` means the window
@@ -358,14 +406,18 @@ export class ProjectedTimeline {
     direction: "tail" | "before" | "after",
     cursorSeq: number | undefined,
     budget: ProjectionBudget,
+    compactTools = false,
+    knownEntries: readonly TimelineProjectionEntry[] = [],
   ): Promise<AgentTimelineRow[] | null> {
     const { start, end } = this.windowBounds(state, span, direction, cursorSeq);
     if (end < start) return [];
-    const rows = await this.readRange(start, end, budget);
-    if (!(await this.extendMerges(rows, state, budget))) return null;
+    const rows = await this.readRange(start, end, budget, compactTools);
+    if (!(await this.extendMerges(rows, state, budget, end))) return null;
     // Plugin identities have no occurrence index; preserve their whole-history merge.
     if (rows.some((row) => row.item.type === "plugin")) return null;
-    return (await this.pullToolRows(rows, budget)) ? rows : null;
+    if (!compactTools) return (await this.pullToolRows(rows, budget)) ? rows : null;
+    await this.completeToolRows(rows, budget, knownEntries);
+    return rows;
   }
 
   /** Widens until the page cannot be truncated by its own window, then gives up on bounding. */
@@ -416,30 +468,47 @@ export class ProjectedTimeline {
     limit: number,
     budget: ProjectionBudget,
   ): Promise<ProjectedTimelinePageSelection> {
-    const select = (rows: AgentTimelineRow[]) =>
-      selectSourceRanges(
-        projectTimelineRows({ rows, mode: "projected" }),
+    const entries = new Map<number, TimelineProjectionEntry>();
+    const visited = new Set<number>();
+    const readRanges: { startSeq: number; endSeq: number }[] = [];
+    let nextDirection = direction;
+    let nextCursor = cursorSeq;
+    while (true) {
+      let rows = await this.windowRows(
         state,
-        direction,
-        cursorSeq,
-        limit,
+        Math.max(MERGE_STEP_ROWS, limit * 2),
+        nextDirection,
+        nextCursor,
+        budget,
+        true,
+        [...entries.values()],
       );
-    for (
-      let span = Math.max(MERGE_STEP_ROWS, limit * 2);
-      ;
-      span = Math.min(span * 2, MAX_WINDOW_ROWS)
-    ) {
+      const bounds = this.windowBounds(
+        state,
+        Math.max(MERGE_STEP_ROWS, limit * 2),
+        nextDirection,
+        nextCursor,
+      );
+      readRanges.push({ startSeq: bounds.start, endSeq: bounds.end });
+      // Plugin identities still need the whole-history projection until they have an index.
+      if (!rows) {
+        entries.clear();
+        budget.release();
+        rows = await this.readRows(state, budget);
+        readRanges.push({ startSeq: state.minSeq, endSeq: state.maxSeq });
+      }
+      for (const entry of projectTimelineRows({ rows, mode: "projected" }))
+        entries.set(entry.seqStart, entry);
+      const retained = [...entries.values()];
       budget.release();
-      const rows = await this.windowRows(state, span, direction, cursorSeq, budget);
-      if (!rows) break;
-      const page = select(rows);
-      if (page) return page;
-      if (span === MAX_WINDOW_ROWS) break;
+      budget.reserve(JSON.stringify(retained).length * 2);
+      const page = selectSourceRanges(retained, state, direction, cursorSeq, limit, readRanges);
+      if (!("missingSeq" in page)) return page;
+      if (visited.has(page.missingSeq)) throw new Error("Invalid projected source reference");
+      visited.add(page.missingSeq);
+      nextDirection = direction === "after" ? "after" : "before";
+      nextCursor = page.missingSeq + (nextDirection === "after" ? -1 : 1);
     }
-    budget.release();
-    const page = select(await this.readRows(state, budget));
-    if (!page) throw new Error("Invalid projected source reference");
-    return page;
   }
 
   /** A large entry travels as a preview plus a descriptor; the client pages the rest by id. */
@@ -550,7 +619,7 @@ export class ProjectedTimeline {
     try {
       const anchor = descriptorAnchor(id, state);
       if (anchor !== undefined) {
-        let rows = await this.windowRows(state, 1, "after", anchor - 1, budget);
+        let rows = await this.windowRows(state, 1, "after", anchor - 1, budget, true);
         if (!rows) {
           budget.release();
           rows = await this.readRows(state, budget);

@@ -122,7 +122,10 @@ export function mergeToolCallItems(
 
 function makeCanonicalEntries(rows: readonly AgentTimelineRow[]): WorkingEntry[] {
   return rows.map((row) => {
-    if ("seqStart" in row) return { ...(row as ProjectedTimelineRow) };
+    if ("seqStart" in row) {
+      const { seq: _seq, ...entry } = row as ProjectedTimelineRow;
+      return entry;
+    }
     return {
       item: row.item,
       timestamp: row.timestamp,

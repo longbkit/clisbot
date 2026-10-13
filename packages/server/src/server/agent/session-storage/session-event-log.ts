@@ -1,14 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createDurableDirectory, writeDurableFile } from "./durable-file.js";
+import { createDurableDirectory, writeDurableFile, syncDirectory } from "./durable-file.js";
 import {
   SESSION_STORAGE_LIMITS,
   type JournalEntry,
   type JournalOperation,
 } from "./paged-journal.js";
 import {
-  TOOL_OCCURRENCE_LIMIT,
   absorbEnvelope,
   absorbLine,
   checkpointDue,
@@ -23,6 +22,8 @@ import {
   type SessionEventIndex,
   type SessionMessageAnchor,
 } from "./session-event-index.js";
+import { scanSessionEventLines, SessionIndexScanLimitError } from "./session-event-scan.js";
+import { upgradeToolIndex } from "./session-event-index-upgrade.js";
 import { withSessionLogWriteIo } from "./session-storage-io.js";
 
 export { AMBIGUOUS_ID, messagePreview, type SessionMessageAnchor } from "./session-event-index.js";
@@ -59,9 +60,17 @@ export class SessionEventLog {
   readonly directory: string;
   private readonly stem: string;
   private index: SessionEventIndex | null = null;
+  private loading: Promise<SessionEventIndex> | null = null;
   private tail: Promise<unknown> = Promise.resolve();
   private removed = false;
   private busy = 0;
+  private dirty = false;
+  private failedScan: {
+    size: number;
+    mtimeMs: number;
+    ctimeMs: number;
+    error: SessionIndexScanLimitError;
+  } | null = null;
   private pendingRows = 0;
   private pendingBytes = 0;
   /** Size of the last checkpoint, which sets how much tail the next one waits for. */
@@ -154,15 +163,49 @@ export class SessionEventLog {
 
   async flush(): Promise<void> {
     await this.tail.catch(() => undefined);
-    if (this.pendingRows || this.pendingBytes)
+    if (this.dirty || this.pendingRows || this.pendingBytes)
       await this.exclusive(async () => {
         const index = await this.load();
-        if (this.pendingRows || this.pendingBytes) await this.save(index);
+        if (this.dirty || this.pendingRows || this.pendingBytes) await this.save(index);
       });
   }
 
   private async load(): Promise<SessionEventIndex> {
+    if (this.removed) throw new Error("Session log is deleted");
     if (this.index) return this.index;
+    this.loading ??= this.loadCheckedIndex().finally(() => {
+      this.loading = null;
+    });
+    return this.loading;
+  }
+
+  /** Do not let polling one unreadable oversized row monopolize the global scan gate. */
+  private async loadCheckedIndex(): Promise<SessionEventIndex> {
+    const stat = await fs.stat(this.eventPath).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    });
+    const failed = this.failedScan;
+    if (
+      failed &&
+      stat &&
+      failed.size === stat.size &&
+      failed.mtimeMs === stat.mtimeMs &&
+      failed.ctimeMs === stat.ctimeMs
+    )
+      throw failed.error;
+    this.failedScan = null;
+    try {
+      return await this.loadIndex();
+    } catch (error) {
+      if (stat && error instanceof SessionIndexScanLimitError)
+        this.failedScan = { size: stat.size, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, error };
+      throw error;
+    }
+  }
+
+  private async loadIndex(): Promise<SessionEventIndex> {
+    if (this.removed) throw new Error("Session log is deleted");
     await createDurableDirectory(this.directory);
     let parsed: unknown;
     try {
@@ -174,76 +217,88 @@ export class SessionEventLog {
     if (!isIndex(parsed)) return this.rebuild();
     const index: SessionEventIndex = parsed;
     ensureSeqRanges(index);
-    this.index = index;
     const size = await fs.stat(this.eventPath).then(
       (stat) => stat.size,
       () => 0,
     );
     if (size < index.scannedBytes) return this.rebuild();
+    const upgraded = await upgradeToolIndex(index, this.eventPath);
     if (size > index.scannedBytes) await this.catchUp(index, size);
+    if (upgraded) await this.installDerived(index);
+    this.index = index;
     return index;
   }
 
-  /** Folds in whatever was appended after the last checkpoint. Bounded by that gap. */
+  /** Scan only the uncheckpointed tail, with the same bounded reader used by rebuilds. */
   private async catchUp(index: SessionEventIndex, size: number): Promise<void> {
-    const handle = await fs.open(this.eventPath, "r");
-    let text: string;
-    try {
-      const buffer = Buffer.alloc(size - index.scannedBytes);
-      await handle.read(buffer, 0, buffer.length, index.scannedBytes);
-      text = buffer.toString("utf8");
-    } finally {
-      await handle.close();
-    }
     const anchors = new Map(index.anchors.map((anchor) => [anchor.messageId, anchor]));
-    let offset = index.scannedBytes;
-    for (const line of text.split("\n")) {
-      if (line) absorbLine(index, anchors, line, offset);
-      offset += Buffer.byteLength(line) + 1;
-    }
+    for await (const { line, offset, length } of scanSessionEventLines(
+      this.eventPath,
+      index.scannedBytes,
+      size,
+    ))
+      if (line) absorbLine(index, anchors, line, offset, length);
     index.anchors = [...anchors.values()].sort((left, right) => left.seq - right.seq);
     markScanned(index, size);
   }
 
-  /** Reconstructs pointers, anchors, id lookups and the operation order from the log alone. */
+  /** Reconstruct derived pointers without retaining journal payloads in memory. */
   private async rebuild(): Promise<SessionEventIndex> {
     const index = emptyIndex();
-    let text: string;
+    let size = 0;
     try {
-      text = await fs.readFile(this.eventPath, "utf8");
+      size = (await fs.stat(this.eventPath)).size;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      await this.save(index);
-      return index;
     }
-    const anchors = new Map<string, SessionMessageAnchor>();
-    let offset = 0;
-    for (const line of text.split("\n")) {
-      const length = Buffer.byteLength(line) + 1;
-      if (line) absorbLine(index, anchors, line, offset);
-      offset += length;
-    }
-    index.anchors = [...anchors.values()].sort((left, right) => left.seq - right.seq);
-    markScanned(index, offset === 0 ? 0 : Buffer.byteLength(text));
-    await this.save(index);
+    await this.catchUp(index, size);
+    await this.installDerived(index);
     return index;
   }
 
+  /** A derived checkpoint failure must not discard the fully loaded in-memory index. */
+  private async installDerived(index: SessionEventIndex): Promise<void> {
+    try {
+      await this.save(index);
+    } catch (error) {
+      this.dirty = true;
+      this.index = index;
+      this.reportCheckpointFailure(error);
+    }
+  }
+
+  private reportCheckpointFailure(error: unknown): void {
+    process.emitWarning(
+      `Session index checkpoint failed for ${this.indexPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { code: "SESSION_INDEX_CHECKPOINT" },
+    );
+  }
+
   private async save(index: SessionEventIndex): Promise<void> {
+    const text = JSON.stringify(index);
+    await withSessionLogWriteIo(() => writeDurableFile(this.indexPath, text));
     this.index = index;
+    this.dirty = false;
     this.pendingRows = 0;
     this.pendingBytes = 0;
-    const text = JSON.stringify(index);
     this.saved = { pointers: Object.keys(index.pointers).length, bytes: Buffer.byteLength(text) };
-    await withSessionLogWriteIo(() => writeDurableFile(this.indexPath, text));
   }
 
   /** Checkpoints only when the unwritten tail is large enough to be worth rescanning. */
   private async checkpoint(index: SessionEventIndex, rows: number, bytes: number): Promise<void> {
     this.pendingRows += rows;
     this.pendingBytes += bytes;
-    if (checkpointDue({ rows: this.pendingRows, bytes: this.pendingBytes }, this.saved))
-      await this.save(index);
+    if (checkpointDue({ rows: this.pendingRows, bytes: this.pendingBytes }, this.saved)) {
+      try {
+        await this.save(index);
+      } catch (error) {
+        // The journal is already fsynced. A derived-file failure cannot revoke admission.
+        this.dirty = true;
+        this.pendingRows = 0;
+        this.pendingBytes = 0;
+        this.reportCheckpointFailure(error);
+      }
+    }
   }
 
   async state(kind: SessionEventKind): Promise<SessionEventState> {
@@ -297,9 +352,19 @@ export class SessionEventLog {
 
   /** Returns the offset the first line landed at. */
   private async appendLines(lines: readonly Buffer[]): Promise<number> {
-    const handle = await fs.open(this.eventPath, "a", 0o600);
+    const handle = await fs.open(this.eventPath, "a+", 0o600);
     try {
-      const start = (await handle.stat()).size;
+      let start = (await handle.stat()).size;
+      if (start) {
+        const last = Buffer.allocUnsafe(1);
+        await handle.read(last, 0, 1, start - 1);
+        if (last[0] !== 10) {
+          const separator = await handle.write(Buffer.from("\n"));
+          if (separator.bytesWritten !== 1)
+            throw new Error("Session log separator write was short");
+          start++;
+        }
+      }
       const expected = lines.reduce((total, line) => total + line.length, 0);
       const { bytesWritten } = await handle.writev(lines);
       if (bytesWritten !== expected) throw new Error("Session log append was short");
@@ -369,9 +434,12 @@ export class SessionEventLog {
       const written = entries.map(
         (entry) => `${JSON.stringify({ kind, epoch, ...structuredClone(entry) })}\n`,
       );
-      await withSessionLogWriteIo(() =>
-        writeDurableFile(this.eventPath, [...kept, ...written].join("")),
-      );
+      // Invalidate old offsets durably before the journal can change (even at the same size).
+      await withSessionLogWriteIo(async () => {
+        await fs.rm(this.indexPath, { force: true });
+        await syncDirectory(this.directory);
+        await writeDurableFile(this.eventPath, [...kept, ...written].join(""));
+      });
       const index = emptyIndex(epoch);
       index.operationOrder = previous.operationOrder;
       index.revision = previous.revision + 1;
@@ -387,6 +455,8 @@ export class SessionEventLog {
       for (const anchor of rewritten) anchor.epoch = epoch;
       index.anchors = rewritten;
       markScanned(index, offset);
+      this.index = index;
+      this.dirty = true;
       await this.save(index);
       return epoch;
     });
@@ -399,7 +469,7 @@ export class SessionEventLog {
   /** Every canonical seq that carries this tool call, so a page can complete its lifecycle merge. */
   async toolOccurrences(callId: string): Promise<{ seqs: readonly number[]; complete: boolean }> {
     const seqs = (await this.lease(() => this.load())).tools[callId] ?? [];
-    return { seqs, complete: seqs.length < TOOL_OCCURRENCE_LIMIT };
+    return { seqs: [...seqs], complete: true };
   }
 
   async lookupId(namespace: string, id: string): Promise<number | undefined> {
@@ -451,6 +521,7 @@ export class SessionEventLog {
   async remove(): Promise<void> {
     return this.exclusive(async () => {
       this.removed = true;
+      await this.loading?.catch(() => undefined);
       this.index = null;
       await fs.rm(this.eventPath, { force: true });
       await fs.rm(this.indexPath, { force: true });

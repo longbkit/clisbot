@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +6,8 @@ import { PagedJournal, SESSION_STORAGE_LIMITS } from "./paged-journal.js";
 import { FileAgentTimelineStore } from "./file-agent-timeline-store.js";
 import { AgentStorage } from "../agent-storage.js";
 import { createTestLogger } from "../../../test-utils/test-logger.js";
+import { SessionEventLog } from "./session-event-log.js";
+import { scanSessionEventLines, INDEX_SCAN_LINE_BYTES } from "./session-event-scan.js";
 import { rollbackSessionLayout } from "./layout.js";
 
 const roots: string[] = [];
@@ -15,6 +17,8 @@ async function temporary(): Promise<string> {
   return root;
 }
 afterEach(async () => {
+  vi.restoreAllMocks();
+  SessionEventLog.forgetAll();
   await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
 });
 
@@ -140,6 +144,402 @@ describe("durable paged journal", () => {
 });
 
 describe("file timeline", () => {
+  it("keeps a completed upgrade usable after checkpoint failure without rescanning", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    const rows = Array.from({ length: 300 }, (_, index) => ({
+      seq: index + 1,
+      value: { seq: index + 1, item: { type: "tool_call", callId: "child" } },
+    }));
+    await log.append("timeline", rows);
+    await log.flush();
+    const indexPath = path.join(directory, "events.index.json");
+    const old = JSON.parse(await fs.readFile(indexPath, "utf8"));
+    old.version = 2;
+    old.tools.child = old.tools.child.slice(0, 256);
+    const saved = JSON.stringify(old);
+    await fs.writeFile(indexPath, saved);
+    SessionEventLog.forget(directory);
+    const restored = SessionEventLog.for(directory);
+    const rename = vi
+      .spyOn(fs, "rename")
+      .mockRejectedValueOnce(new Error("simulated rename failure"));
+    const failed = await Promise.allSettled([
+      restored.state("timeline"),
+      restored.state("permission"),
+    ]);
+    expect(failed.map((result) => result.status)).toEqual(["fulfilled", "fulfilled"]);
+    expect(await fs.readFile(indexPath, "utf8")).toBe(saved);
+    expect((await fs.readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    rename.mockRestore();
+    const open = fs.open.bind(fs);
+    let scans = 0;
+    vi.spyOn(fs, "open").mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+      if (String(args[0]) === path.join(directory, "events.jsonl") && args[1] === "r") scans++;
+      return open(...args);
+    });
+    await Promise.all([
+      restored.state("timeline"),
+      restored.state("permission"),
+      restored.append("timeline", [{ seq: 301, value: { ...rows[0]!.value, seq: 301 } }]),
+    ]);
+    expect(scans).toBe(0);
+    await restored.flush();
+    SessionEventLog.forget(directory);
+    const cold = SessionEventLog.for(directory);
+    expect((await cold.state("timeline")).maxSeq).toBe(301);
+    expect((await cold.toolOccurrences("child")).seqs).toEqual(
+      Array.from({ length: 301 }, (_, i) => i + 1),
+    );
+    expect(scans).toBe(0);
+  });
+
+  it("separates a torn tail from a new append and survives index loss", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    await log.append("timeline", [{ seq: 1, value: "first" }]);
+    await log.flush();
+    await fs.appendFile(
+      path.join(directory, "events.jsonl"),
+      '{"kind":"timeline","seq":2,"value":',
+    );
+    SessionEventLog.forget(directory);
+    await SessionEventLog.for(directory).append("timeline", [{ seq: 3, value: "third" }]);
+    await fs.rm(path.join(directory, "events.index.json"));
+    SessionEventLog.forget(directory);
+    expect(await SessionEventLog.for(directory).read("timeline", 1, 3)).toEqual([
+      { seq: 1, value: "first" },
+      { seq: 3, value: "third" },
+    ]);
+  });
+
+  it("keeps replacement pointers usable after an index save failure", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    await log.append("timeline", [{ seq: 1, value: "old" }]);
+    await log.flush();
+    const rename = fs.rename.bind(fs);
+    const fail = vi
+      .spyOn(fs, "rename")
+      .mockImplementation(async (...args: Parameters<typeof fs.rename>) => {
+        if (String(args[1]).endsWith("events.index.json")) throw new Error("checkpoint failed");
+        return rename(...args);
+      });
+    await expect(log.replace("timeline", [{ seq: 1, value: "new value" }])).rejects.toThrow(
+      "checkpoint failed",
+    );
+    expect(await log.read("timeline", 1, 1)).toEqual([{ seq: 1, value: "new value" }]);
+    fail.mockRestore();
+    SessionEventLog.forget(directory);
+    expect(await SessionEventLog.for(directory).read("timeline", 1, 1)).toEqual([
+      { seq: 1, value: "new value" },
+    ]);
+  });
+
+  it("indexes an old row over the page limit while keeping neighbours readable", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    await log.append("timeline", [
+      { seq: 1, value: "before" },
+      { seq: 2, value: "x".repeat(9 * 1024 * 1024) },
+      { seq: 3, value: "after" },
+    ]);
+    await fs.rm(path.join(directory, "events.index.json"), { force: true });
+    SessionEventLog.forget(directory);
+    const cold = SessionEventLog.for(directory);
+    expect((await cold.state("timeline")).maxSeq).toBe(3);
+    expect(await cold.read("timeline", 3, 3)).toEqual([{ seq: 3, value: "after" }]);
+    await expect(cold.read("timeline", 2, 2)).rejects.toThrow("byte budget");
+  });
+
+  it("does not recreate a removed log after a concurrent cold load", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    await Promise.allSettled([log.state("timeline"), log.remove()]);
+    await expect(log.state("timeline")).rejects.toThrow("deleted");
+    expect(await fs.readdir(directory)).toEqual([]);
+  });
+
+  it("streams lazily and releases the scanner gate on early return and oversized-line failure", async () => {
+    const directory = await temporary();
+    const journal = path.join(directory, "scan.jsonl");
+    const text = "first\n" + "x".repeat(INDEX_SCAN_LINE_BYTES + 1);
+    await fs.writeFile(journal, text);
+    const open = fs.open.bind(fs);
+    let readBytes = 0;
+    const spy = vi
+      .spyOn(fs, "open")
+      .mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+        const handle = await open(...args);
+        const read = handle.read.bind(handle);
+        async function trackedRead(...readArgs: Parameters<typeof read>) {
+          const result = await read(...readArgs);
+          readBytes += result.bytesRead;
+          return result;
+        }
+        vi.spyOn(handle, "read").mockImplementation(trackedRead);
+        return handle;
+      });
+    const scan = scanSessionEventLines(journal, 0, Buffer.byteLength(text));
+    expect((await scan.next()).value?.line).toBe("first");
+    expect(readBytes).toBe(64 * 1024);
+    await scan.return(undefined);
+    spy.mockRestore();
+    const all = async () => {
+      for await (const _line of scanSessionEventLines(journal, 0, Buffer.byteLength(text))) {
+        /* consume */
+      }
+    };
+    await expect(all()).rejects.toThrow("index scan byte budget");
+    const final = scanSessionEventLines(journal, 0, 5);
+    expect((await final.next()).value).toEqual({ line: "first", offset: 0, length: 5 });
+    await final.return(undefined);
+  });
+
+  it("preserves a complete final JSON record without newline when appending", async () => {
+    const directory = await temporary();
+    const journal = path.join(directory, "events.jsonl");
+    const line = JSON.stringify({ kind: "timeline", epoch: "old", seq: 1, value: "complete" });
+    await fs.writeFile(journal, line);
+    const log = SessionEventLog.for(directory);
+    await log.append("timeline", [{ seq: 2, value: "next" }]);
+    await fs.rm(path.join(directory, "events.index.json"), { force: true });
+    SessionEventLog.forget(directory);
+    expect(await SessionEventLog.for(directory).read("timeline", 1, 2)).toEqual([
+      { seq: 1, value: "complete" },
+      { seq: 2, value: "next" },
+    ]);
+  });
+
+  it("keeps durable appends successful and backs off persistent checkpoint failures", async () => {
+    const directory = await temporary();
+    const rename = fs.rename.bind(fs);
+    let attempts = 0;
+    vi.spyOn(process, "emitWarning").mockImplementation(() => undefined);
+    const failure = vi
+      .spyOn(fs, "rename")
+      .mockImplementation(async (...args: Parameters<typeof fs.rename>) => {
+        if (String(args[1]).endsWith("events.index.json")) {
+          attempts++;
+          throw new Error("persistent checkpoint failure");
+        }
+        return rename(...args);
+      });
+    const log = SessionEventLog.for(directory);
+    for (let seq = 1; seq <= 130; seq++)
+      await expect(log.append("timeline", [{ seq, value: seq }])).resolves.toBeUndefined();
+    expect(attempts).toBeLessThanOrEqual(4);
+    SessionEventLog.forget(directory);
+    const cold = SessionEventLog.for(directory);
+    expect((await cold.state("timeline")).maxSeq).toBe(130);
+    expect(await cold.read("timeline", 130, 130)).toEqual([{ seq: 130, value: 130 }]);
+    await expect(cold.flush()).rejects.toThrow("persistent checkpoint failure");
+    failure.mockRestore();
+    await expect(cold.flush()).resolves.toBeUndefined();
+  });
+
+  it("caches oversized-row scan failure until the journal changes", async () => {
+    const directory = await temporary();
+    const journal = path.join(directory, "events.jsonl");
+    await fs.writeFile(journal, "x".repeat(INDEX_SCAN_LINE_BYTES + 1));
+    const open = fs.open.bind(fs);
+    let scans = 0;
+    vi.spyOn(fs, "open").mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+      if (String(args[0]) === journal && args[1] === "r") scans++;
+      return open(...args);
+    });
+    const log = SessionEventLog.for(directory);
+    await expect(log.state("timeline")).rejects.toThrow(`${journal} at byte 0`);
+    await expect(log.state("timeline")).rejects.toThrow("index scan byte budget");
+    expect(scans).toBe(1);
+    await fs.writeFile(
+      journal,
+      JSON.stringify({ kind: "timeline", epoch: "repaired", seq: 1, value: "ok" }) + "\n",
+    );
+    expect((await log.state("timeline")).maxSeq).toBe(1);
+    expect(scans).toBe(2);
+  });
+
+  it("upgrades complete v2 lists without scanning the journal body", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    await log.append("timeline", [
+      { seq: 1, value: { seq: 1, item: { type: "tool_call", callId: "short" } } },
+    ]);
+    await log.flush();
+    const indexPath = path.join(directory, "events.index.json");
+    const saved = JSON.parse(await fs.readFile(indexPath, "utf8"));
+    saved.version = 2;
+    await fs.writeFile(indexPath, JSON.stringify(saved));
+    SessionEventLog.forget(directory);
+    const open = fs.open.bind(fs);
+    vi.spyOn(fs, "open").mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+      if (String(args[0]) === path.join(directory, "events.jsonl"))
+        throw new Error("Unnecessary journal read");
+      return open(...args);
+    });
+    expect((await SessionEventLog.for(directory).state("timeline")).maxSeq).toBe(1);
+    expect(JSON.parse(await fs.readFile(indexPath, "utf8"))).toEqual({ ...saved, version: 3 });
+  });
+
+  it("streams a journal over 100 MiB for upgrade, rebuild and uncheckpointed-tail recovery", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    const text = "界".repeat(24_000);
+    for (let start = 1; start <= 1500; start += 16) {
+      await log.append(
+        "timeline",
+        Array.from({ length: Math.min(16, 1501 - start) }, (_, i) => ({
+          seq: start + i,
+          value: {
+            seq: start + i,
+            timestamp: "2026-10-13",
+            item: {
+              type: "tool_call",
+              callId: "long",
+              name: "Sub-agent",
+              status: "running",
+              detail: { type: "unknown", input: {}, output: text },
+              error: null,
+            },
+          },
+        })),
+      );
+    }
+    await log.flush();
+    const journal = path.join(directory, "events.jsonl");
+    const size = (await fs.stat(journal)).size;
+    expect(size).toBeGreaterThan(100 * 1024 * 1024);
+    const indexPath = path.join(directory, "events.index.json");
+    const saved = JSON.parse(await fs.readFile(indexPath, "utf8"));
+    saved.version = 2;
+    saved.tools.long = saved.tools.long.slice(0, 256);
+    saved.summary = { retained: true };
+    saved.ids["repair:external"] = 17;
+    saved.revision = 9;
+    saved.operationOrder = 77;
+    await fs.writeFile(indexPath, JSON.stringify(saved));
+    const readFile = fs.readFile.bind(fs);
+    vi.spyOn(fs, "readFile").mockImplementation((...args: Parameters<typeof fs.readFile>) => {
+      if (String(args[0]) === journal) throw new Error("Whole-journal read forbidden");
+      return readFile(...args);
+    });
+    const open = fs.open.bind(fs);
+    let maxRead = 0;
+    vi.spyOn(fs, "open").mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+      const handle = await open(...args);
+      if (String(args[0]) === journal) {
+        const read = handle.read.bind(handle);
+        handle.read = (async (...readArgs: Parameters<typeof handle.read>) => {
+          const result = await read(...readArgs);
+          maxRead = Math.max(maxRead, result.bytesRead);
+          return result;
+        }) as typeof handle.read;
+      }
+      return handle;
+    });
+    for (const mode of ["upgrade", "rebuild", "tail"] as const) {
+      if (mode === "rebuild") await fs.rm(indexPath);
+      if (mode === "tail")
+        await fs.writeFile(
+          indexPath,
+          JSON.stringify({
+            ...saved,
+            version: 3,
+            scannedBytes: 0,
+            pointers: {},
+            tools: {},
+            ids: {},
+            anchors: [],
+          }),
+        );
+      SessionEventLog.forget(directory);
+      const restored = SessionEventLog.for(directory);
+      expect((await restored.state("timeline")).maxSeq).toBe(1500);
+      expect((await restored.toolOccurrences("long")).seqs).toEqual(
+        Array.from({ length: 1500 }, (_, i) => i + 1),
+      );
+      if (mode === "upgrade") {
+        expect(await restored.readSummary()).toEqual({ retained: true });
+        expect(await restored.lookupId("repair", "external")).toBe(17);
+        expect(await restored.state("timeline")).toMatchObject({ revision: 9, operationOrder: 77 });
+      }
+      expect(maxRead).toBeLessThanOrEqual(64 * 1024);
+      const last = await restored.read<{ item: { detail: { output: string } } }>(
+        "timeline",
+        1500,
+        1500,
+      );
+      expect(last[0]!.value.item.detail.output).toBe(text);
+      maxRead = 0;
+    }
+    expect((await fs.stat(journal)).size).toBe(size);
+  });
+
+  it("rebuilds old tool indexes without changing ledgers, message anchors or canonical bytes", async () => {
+    const directory = await temporary();
+    const log = SessionEventLog.for(directory);
+    const rows = Array.from({ length: 300 }, (_, index) => ({
+      seq: index + 2,
+      timestamp: "2026-10-13",
+      turnId: "turn",
+      item: {
+        type: "tool_call",
+        callId: "child",
+        name: "Sub-agent",
+        status: "running",
+        detail: { type: "unknown", input: {}, output: String(index) },
+        error: null,
+      },
+    }));
+    await log.append("timeline", [
+      {
+        seq: 1,
+        value: {
+          seq: 1,
+          timestamp: "2026-10-13",
+          item: { type: "user_message", messageId: "prompt", text: "main" },
+        },
+      },
+      ...rows.map((value) => ({ seq: value.seq, value })),
+    ]);
+    await log.append("submission", [{ seq: 1, value: { id: "submission", status: "committed" } }]);
+    await log.append("permission", [{ seq: 1, value: { id: "permission", response: "allow" } }]);
+    // A rewrite must not add a duplicate occurrence or change which value is returned.
+    const revised = { ...rows[0]!, item: { ...rows[0]!.item, status: "completed" } };
+    await log.append("timeline", [{ seq: revised.seq, value: revised }]);
+    await log.flush();
+    const canonical = await fs.readFile(path.join(directory, "events.jsonl"));
+    const epoch = (await log.state("timeline")).epoch;
+    const indexPath = path.join(directory, "events.index.json");
+    const oldIndex = JSON.parse(await fs.readFile(indexPath, "utf8"));
+    oldIndex.version = 2;
+    oldIndex.tools.child = oldIndex.tools.child.slice(0, 256);
+    await fs.writeFile(indexPath, JSON.stringify(oldIndex));
+    SessionEventLog.forget(directory);
+    const restored = SessionEventLog.for(directory);
+    expect((await restored.state("timeline")).epoch).toBe(epoch);
+    expect(await restored.toolOccurrences("child")).toEqual({
+      seqs: rows.map((row) => row.seq),
+      complete: true,
+    });
+    expect(await restored.read("timeline", 2, 2)).toEqual([{ seq: 2, value: revised }]);
+    expect(await restored.read("submission", 1, 1)).toEqual([
+      { seq: 1, value: { id: "submission", status: "committed" } },
+    ]);
+    expect(await restored.read("permission", 1, 1)).toEqual([
+      { seq: 1, value: { id: "permission", response: "allow" } },
+    ]);
+    expect(await restored.anchors()).toEqual(oldIndex.anchors);
+    expect(await fs.readFile(path.join(directory, "events.jsonl"))).toEqual(canonical);
+    await restored.append("timeline", [{ seq: 302, value: { ...rows[0]!, seq: 302 } }]);
+    expect((await restored.toolOccurrences("child")).seqs).toEqual([
+      ...rows.map((row) => row.seq),
+      302,
+    ]);
+    SessionEventLog.forget(directory);
+  });
+
   it("writes lightweight user-message anchors for fast jump without scanning the journal", async () => {
     const directory = await temporary();
     const store = new FileAgentTimelineStore(async () => directory);
@@ -176,7 +576,7 @@ describe("file timeline", () => {
       version: number;
       anchors: Array<{ messageId: string; preview: string; epoch: string; seq: number }>;
     };
-    expect(index.version).toBe(2);
+    expect(index.version).toBe(3);
     expect(
       index.anchors.map(({ messageId, preview, seq }) => ({ messageId, preview, seq })),
     ).toEqual([

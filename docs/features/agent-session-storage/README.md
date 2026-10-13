@@ -67,7 +67,7 @@ line in file order wins.
 
 ```jsonc
 {
-  "version": 2,
+  "version": 3,
   "epoch": "217f5d67-…",
   "scannedBytes": 1015, // log bytes already folded in; the tail past this is rescanned on load
   "operationOrder": 2, // shared counter across submissions and permissions
@@ -110,8 +110,32 @@ only the number of returned entries. Keep a history larger than the projection b
 regression coverage, including text continuations without message IDs, forward/backward
 cursors, and a tool updated long after it started. A page must not claim an unread gap as
 loaded. The source-range path reads a cursor window and its merge dependencies; plugin
-identities without an occurrence index and overflowing tool occurrence indexes still require
-the full-projection fallback and remain subject to the read budget.
+identities without an occurrence index still require the full-projection fallback and remain
+subject to the read budget. Tool indexes retain every occurrence: a long-running subagent
+can emit hundreds of updates, and truncating those pointers makes small pages fall back to
+reading the entire session. Version 3 upgrades a valid v2 checkpoint in place: preserve pointers, anchors, IDs,
+summary, epoch and revision; scan only when an old tool list reached the 256-entry cap,
+and replace only those lists. The canonical log and document descriptors do not change. Regression coverage includes the
+255/256/257 boundary and 509 updates, deferred payloads/ranges, and restart after upgrade.
+Source-range reads fold tool snapshots incrementally and retain their source ranges; the
+32 MiB budget limits retained data, not cumulative bytes read across successive pages.
+A tail containing only repeated subagent updates must still reach earlier main-session
+messages. Child journals remain scoped to their own directories, even when call IDs match
+ones in the parent. Legacy contiguous-envelope reads retain their existing behavior and may still fall back
+on a full read. Source-range paging seeks the next unread interval rather than widening a
+window past 8192 rows. Completed tool entries are reused within a request; dense updates
+across selected tools are read together, without reading unrelated gaps.
+
+Index upgrades, missing-index rebuilds and uncheckpointed-tail recovery stream JSONL in
+64 KiB chunks. Scans are serialized process-wide and retain at most one line, capped at
+16 MiB (the page reader still rejects a single row over 8 MiB). Larger lines fail explicitly with their path and offset; that failure is cached until the
+journal changes. No row is silently discarded to satisfy a memory limit. Index pointers still scale with
+record count. Concurrent cold callers share one load. A checkpoint write failure keeps
+the completed index usable in memory and dirty for retry. Checkpoint retries follow the
+normal checkpoint interval; a derived-file error does not reject an already durable append.
+Explicit flush reports persistent write failures. Replacing a journal invalidates old on-disk pointers before its rewrite.
+Tests cover a journal over 100 MiB, 8300 trailing updates, 9000 interleaved tool updates,
+sparse pages, torn tails, checkpoint failures and restart.
 
 ### Deferred document lookup
 
@@ -125,7 +149,7 @@ No descriptor cache is needed, including across daemon restarts.
 
 Legacy SHA-256 descriptors remain readable by scanning projected pages and releasing each
 page's read budget before advancing. This can scan the session but does not retain all its
-rows at once. The plugin/overflow fallback limits above still apply. Regression coverage
+rows at once. The plugin fallback limits above still apply. Regression coverage
 must fetch a deferred entry and then read every payload/range page on a session larger
 than 32 MiB, including after restart, stale/invalid descriptors, and legacy IDs.
 

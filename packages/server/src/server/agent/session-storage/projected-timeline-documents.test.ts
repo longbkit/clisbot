@@ -4,6 +4,9 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { AgentTimelineRow } from "../agent-timeline-store-types.js";
+import { ProviderSubagentPersistence } from "../provider-subagents/persistence.js";
+import { projectTimelineRows } from "../timeline-projection.js";
+import { ProjectedTimeline } from "./projected-timeline.js";
 import { FileAgentTimelineStore } from "./file-agent-timeline-store.js";
 import { SessionEventLog, SessionEventStream } from "./session-event-log.js";
 
@@ -61,6 +64,68 @@ function trackReads() {
 }
 
 describe("projected timeline documents", () => {
+  it("batches 9000 interleaved subagent updates and preserves all main entries", async () => {
+    const rows = Array.from({ length: 50 }, (_, i) => message(i + 1, 16));
+    for (let i = 0; i < 9000; i++) {
+      const row = tool(rows.length + 1, "x".repeat(2200));
+      if (row.item.type === "tool_call") row.item.callId = `child-${i % 3}`;
+      rows.push(row);
+    }
+    const { store } = await fixture(rows);
+    const read = vi.spyOn(SessionEventStream.prototype, "read");
+    const page = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      limit: 40,
+    });
+    expect(page.entries).toEqual(projectTimelineRows({ rows, mode: "projected" }).slice(-40));
+    expect(read.mock.calls.length).toBeLessThan(65);
+  }, 30_000);
+
+  it("pages across certified empty seqs without treating tool envelopes as read", async () => {
+    const rows = [message(1, 10), message(3, 10), tool(100), message(120, 10), tool(300)];
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "timeline-gap-"));
+    directories.push(directory);
+    const log = SessionEventLog.for(directory);
+    await log.append(
+      "timeline",
+      rows.map((value) => ({ seq: value.seq, value })),
+    );
+    const timeline = new ProjectedTimeline(log.stream<AgentTimelineRow>("timeline"));
+    const expected = projectTimelineRows({ rows, mode: "projected" });
+    const tail = await timeline.fetch({ pagingMode: "source_ranges", limit: 40 });
+    expect(tail.entries).toEqual(expected);
+    const forward = await timeline.fetch({
+      pagingMode: "source_ranges",
+      direction: "after",
+      cursor: { epoch: tail.epoch, seq: 1 },
+      limit: 40,
+    });
+    expect(forward.entries).toEqual(expected.slice(1));
+  });
+
+  it("keeps reused callIds in turns a, b, a separate and detects missing tool pointers", async () => {
+    const rows = [tool(1, "a1"), tool(2, "a2"), tool(3, "b"), tool(4, "a3")];
+    rows[0]!.turnId = rows[1]!.turnId = rows[3]!.turnId = "a";
+    rows[2]!.turnId = "b";
+    const { directory, store } = await fixture(rows);
+    expect(
+      (await store.fetchProjectedCommitted("a", { pagingMode: "source_ranges", limit: 40 }))
+        .entries,
+    ).toEqual(projectTimelineRows({ rows, mode: "projected" }));
+    await SessionEventLog.for(directory).flush();
+    const indexPath = path.join(directory, "events.index.json");
+    const index = JSON.parse(await fs.readFile(indexPath, "utf8"));
+    index.tools.ancient = [1, 2, 3];
+    await fs.writeFile(indexPath, JSON.stringify(index));
+    SessionEventLog.forget(directory);
+    const timeline = new ProjectedTimeline(
+      SessionEventLog.for(directory).stream<AgentTimelineRow>("timeline"),
+    );
+    await expect(timeline.fetch({ pagingMode: "source_ranges", limit: 40 })).rejects.toThrow(
+      "Incomplete tool occurrence index",
+    );
+  });
+
   it("pages a merged payload after restart without reading the oversized history", async () => {
     const rows = Array.from({ length: 1_500 }, (_, index) => message(index + 1));
     rows[1498] = message(1499, 40_000);
@@ -166,6 +231,179 @@ describe("projected timeline documents", () => {
     ).toContain('"type":"tool_call"');
     expect(reads.bytes()).toBeLessThan(2 * 1024 * 1024);
   });
+
+  it("reaches main messages across more than 8192 trailing subagent updates", async () => {
+    const rows = Array.from({ length: 50 }, (_, index) => message(index + 1, 16));
+    for (let index = 0; index < 8300; index++) rows.push(tool(rows.length + 1, "x".repeat(2200)));
+    const { store } = await fixture(rows);
+    const expected = projectTimelineRows({ rows, mode: "projected" });
+    const page = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      limit: 40,
+    });
+    expect(
+      [...page.entries, ...page.contextEntries!].sort((a, b) => a.seqStart - b.seqStart),
+    ).toEqual(expected.slice(-40));
+    const older = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      direction: "before",
+      limit: 40,
+      cursor: { epoch: page.epoch, seq: page.startSeq! },
+    });
+    expect(older.entries).toEqual(expected.slice(0, 11));
+    const forward = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      direction: "after",
+      limit: 40,
+      cursor: { epoch: page.epoch, seq: older.endSeq! },
+    });
+    expect(
+      [...forward.entries, ...forward.contextEntries!].sort((a, b) => a.seqStart - b.seqStart),
+    ).toEqual(expected.slice(-40));
+  });
+
+  it("folds large repeated tool snapshots without retaining every historical payload", async () => {
+    const rows = Array.from({ length: 600 }, (_, index) =>
+      index % 2 === 0 ? tool(index + 1, "x".repeat(70_000)) : message(index + 1, 16),
+    );
+    const { store } = await fixture(rows);
+    const expected = projectTimelineRows({ rows, mode: "projected" });
+    for (const direction of ["tail", "before", "after"] as const) {
+      const page = await store.fetchProjectedCommitted("a", {
+        pagingMode: "source_ranges",
+        direction,
+        limit: 200,
+      });
+      for (const entry of [...page.entries, ...page.contextEntries!])
+        expect(entry).toEqual(expected.find((value) => value.seqStart === entry.seqStart));
+      expect(page.entries.length + page.contextEntries!.length).toBe(200);
+    }
+  });
+
+  it("finds main messages behind a tail of subagent updates and isolates child journals", async () => {
+    const rows = Array.from({ length: 1_200 }, (_, index) => message(index + 1));
+    // The last 900 canonical rows contain only updates for three tools.
+    for (let index = 0; index < 900; index++) {
+      const row = tool(rows.length + 1, `update-${index}`);
+      if (row.item.type !== "tool_call") throw new Error("Expected tool fixture");
+      row.item.callId = `child-${index % 3}`;
+      rows.push(row);
+    }
+    const { directory, store } = await fixture(rows);
+    const children = new ProviderSubagentPersistence(async () => directory);
+    const childRows = Array.from({ length: 300 }, (_, index) => tool(index + 1, "child only"));
+    for (const row of childRows) {
+      if (row.item.type !== "tool_call") throw new Error("Expected tool fixture");
+      row.item.callId = "child-0";
+    }
+    await children.timelines.bulkInsert(JSON.stringify(["a", "child-0"]), childRows);
+    const expected = projectTimelineRows({ rows, mode: "projected" });
+    const page = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      limit: 40,
+    });
+    expect(
+      [...page.entries, ...page.contextEntries!].sort((a, b) => a.seqStart - b.seqStart),
+    ).toEqual(expected.slice(-40));
+    expect(page.entries.filter((entry) => entry.item.type === "assistant_message")).toHaveLength(
+      37,
+    );
+    const older = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      direction: "before",
+      limit: 40,
+      cursor: { epoch: page.epoch, seq: page.startSeq! },
+    });
+    expect(older.entries).toEqual(expected.slice(-80, -40));
+    const newer = await store.fetchProjectedCommitted("a", {
+      pagingMode: "source_ranges",
+      direction: "after",
+      limit: 40,
+      cursor: { epoch: page.epoch, seq: older.endSeq! },
+    });
+    expect(
+      [...newer.entries, ...newer.contextEntries!].sort((a, b) => a.seqStart - b.seqStart),
+    ).toEqual(expected.slice(-40));
+    const childPage = await children.fetchProjected("a", "child-0", {
+      pagingMode: "source_ranges",
+      limit: 40,
+    });
+    expect([...childPage.entries, ...childPage.contextEntries!]).toEqual(
+      projectTimelineRows({ rows: childRows, mode: "projected" }),
+    );
+    expect(childPage.epoch).not.toBe(page.epoch);
+    SessionEventLog.forget(await children.directory("a", "child-0"));
+  });
+
+  it.each([255, 256, 257, 509])(
+    "loads %i tool updates from a legacy truncated index after restart",
+    async (count) => {
+      const rows = Array.from({ length: 1_500 }, (_, index) => message(index + 1));
+      const seqs = [...Array.from({ length: count - 1 }, (_, index) => index * 2 + 1), 1500];
+      for (const seq of seqs) rows[seq - 1] = tool(seq, seq === 1500 ? "z".repeat(70_000) : null);
+      const { directory } = await fixture(rows);
+      await SessionEventLog.flushAll();
+      const indexPath = path.join(directory, "events.index.json");
+      const index = JSON.parse(await fs.readFile(indexPath, "utf8"));
+      index.version = 2;
+      index.tools.ancient = seqs.slice(0, 256);
+      await fs.writeFile(indexPath, JSON.stringify(index));
+      SessionEventLog.forget(directory);
+      const store = new FileAgentTimelineStore(async () => directory);
+      const reads = trackReads();
+      const page = await store.fetchProjectedCommitted("a", {
+        pagingMode: "source_ranges",
+        limit: 40,
+        allowDeferredPayloads: true,
+      });
+      const entry = page.contextEntries!.find((item) => item.seqStart === 1)!;
+      expect(page.entries.length + page.contextEntries!.length).toBe(40);
+      expect(entry.sourceSeqRangesRef?.count).toBe(count);
+      expect(entry.deferredPayload).toBeDefined();
+      expect(reads.bytes()).toBeLessThan(6 * 1024 * 1024);
+      SessionEventLog.forget(directory);
+      const restarted = new FileAgentTimelineStore(async () => directory);
+      const ranges = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const part = await restarted.readProjectedSourceRanges("a", {
+          epoch: page.epoch,
+          id: entry.sourceSeqRangesRef!.id,
+          offset,
+        });
+        ranges.push(...part.ranges);
+        offset = part.nextOffset;
+      }
+      expect(ranges).toEqual(seqs.map((seq) => ({ startSeq: seq, endSeq: seq })));
+      let text = "";
+      offset = 0;
+      while (offset !== null) {
+        const part = await restarted.readProjectedPayload("a", {
+          epoch: page.epoch,
+          id: entry.deferredPayload!.id,
+          offset,
+        });
+        text += part.text;
+        offset = part.nextOffset;
+      }
+      expect(JSON.parse(text)).toEqual(rows.at(-1)!.item);
+      const older = await restarted.fetchProjectedCommitted("a", {
+        pagingMode: "source_ranges",
+        direction: "before",
+        cursor: { epoch: page.epoch, seq: page.startSeq! },
+        limit: 40,
+      });
+      expect(older.endSeq).toBe(page.startSeq! - 1);
+      const forward = await restarted.fetchProjectedCommitted("a", {
+        pagingMode: "source_ranges",
+        direction: "after",
+        cursor: { epoch: page.epoch, seq: 0 },
+        limit: 1,
+        allowDeferredPayloads: true,
+      });
+      expect(forward.entries[0]!.sourceSeqRangesRef).toEqual(entry.sourceSeqRangesRef);
+    },
+  );
 
   it.each([
     { count: 1100, size: 16384 },
