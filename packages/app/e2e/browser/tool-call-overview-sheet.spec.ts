@@ -1,5 +1,7 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
+import { openSettings } from "../support/helpers/app";
+import { openSettingsSection } from "../support/helpers/settings";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
@@ -117,6 +119,23 @@ async function holdStreamAfterFirstCompletedToolCall(page: Page, agentId: string
 
   return {
     waitForFirstCompleted: () => firstCompleted,
+    injectToolCall(callId: string, command: string, status: "running" | "failed" | "completed") {
+      if (!firstCompletedMessage || !sendToPage) throw new Error("First call must have completed");
+      const envelope = JSON.parse(
+        cloneToolCallWithId(firstCompletedMessage, callId, ++sequenceOffset),
+      );
+      const item = envelope.message.payload.event.item;
+      item.name = "bash";
+      item.status = status;
+      item.error = status === "failed" ? "QA command failed: exit 1" : null;
+      item.detail = {
+        type: "shell",
+        command,
+        output: status === "running" ? undefined : "Isolated QA output",
+        exitCode: status === "failed" ? 1 : 0,
+      };
+      sendToPage(JSON.stringify(envelope));
+    },
     release(extraCompletedCalls = 0) {
       isHolding = false;
       if (extraCompletedCalls > 0 && (!firstCallId || !firstCompletedMessage)) {
@@ -127,11 +146,11 @@ async function holdStreamAfterFirstCompletedToolCall(page: Page, agentId: string
           cloneToolCallWithId(
             firstCompletedMessage as WebSocketMessage,
             `${firstCallId}:${index}`,
-            index + 1,
+            sequenceOffset + index + 1,
           ),
         );
       }
-      sequenceOffset = extraCompletedCalls;
+      sequenceOffset += extraCompletedCalls;
       for (const message of heldMessages.splice(0)) {
         sendToPage?.(shiftTimelineSequence(message, sequenceOffset));
       }
@@ -144,6 +163,10 @@ async function configureOverviewToolCalls(page: Page): Promise<void> {
     localStorage.setItem(
       "@clisbot:app-settings",
       JSON.stringify({ toolCallDetailLevel: "overview" }),
+    );
+    localStorage.setItem(
+      "@clisbot:settings-migrations",
+      JSON.stringify({ applied: ["summary-with-latest-call-default"] }),
     );
   });
 }
@@ -278,3 +301,118 @@ test("keeps overview tool calls inline on desktop", async ({ page }) => {
     await agent.cleanup();
   }
 });
+
+// Renderer QA with a real isolated daemon and explicitly controlled tool events.
+// The transport gate gives each live state a deterministic observation point.
+for (const layout of ["desktop", "phone-web"] as const) {
+  test.describe(`latest-call ${layout}`, () => {
+    test.use({ hasTouch: layout === "phone-web" });
+    test(`summary with latest call ${layout}: preview, streaming, history and errors`, async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(120_000);
+      if (layout === "phone-web") await page.setViewportSize({ width: 390, height: 844 });
+      const agent = await seedMockAgentWorkspace({
+        repoPrefix: "latest-call-qa-",
+        title: "Latest call QA",
+        model: "ten-second-stream",
+      });
+      const press = (locator: Locator) =>
+        layout === "phone-web" ? locator.tap() : locator.click();
+      const command =
+        "npm run typecheck --workspace=@clisbot/app -- --pretty false && npm run lint -- packages/app/src/tool-calls/detail-level/latest-call/view.tsx";
+      const capture = async (name: string) => {
+        const path = testInfo.outputPath(`${layout}-${name}.png`);
+        await page.screenshot({ path });
+        await testInfo.attach(`${layout}-${name}`, { path, contentType: "image/png" });
+      };
+      try {
+        const gate = await holdStreamAfterFirstCompletedToolCall(page, agent.agentId);
+        await openOverviewAgent(page, agent);
+        expect(
+          await page.evaluate(
+            () =>
+              JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "null")
+                .toolCallDetailLevel,
+          ),
+        ).toBe("summary-with-latest-call");
+        await agent.client.sendAgentMessage(
+          agent.agentId,
+          "Exercise latest tool preview and preserve intermediate content.",
+        );
+        await gate.waitForFirstCompleted();
+        const group = page.getByTestId("tool-call-group").first();
+        await expect(group).toContainText("1 tool call");
+        await expect(group).toContainText("conversation-list.tsx");
+        await capture("initial-preview");
+        gate.injectToolCall("qa-long-command", command, "running");
+        await expect(group).toContainText("2 tool calls");
+        await expect(group).toContainText("npm run typecheck");
+        await expect(group.getByTestId("tool-call-badge")).toHaveCount(0);
+        await expect(group.locator('[style*="clisbot-toolcall-shimmer"]').first()).toBeVisible();
+        await capture("live-long-command");
+        await press(group.getByRole("button"));
+        const history = layout === "desktop" ? group : page.getByTestId("tool-call-group-sheet");
+        await expect(history.getByTestId("tool-call-badge")).toHaveCount(2);
+        await capture("expanded-history");
+        gate.injectToolCall("qa-long-command", command, "failed");
+        await expect(group).toContainText("1 failed");
+        await expect(history.getByTestId("tool-call-badge")).toHaveCount(2);
+        await press(history.getByTestId("tool-call-badge").last().getByRole("button").first());
+        await expect(
+          page.getByText("QA command failed: exit 1", { exact: true }).first(),
+        ).toBeVisible();
+        await page
+          .getByText("QA command failed: exit 1", { exact: true })
+          .first()
+          .scrollIntoViewIfNeeded();
+        await capture("error-details");
+        if (layout === "phone-web") {
+          await press(page.getByTestId("tool-call-sheet-close"));
+          await expect(page.getByTestId("tool-call-group-sheet")).toBeVisible();
+          await press(page.getByTestId("tool-call-group-sheet-close"));
+        } else {
+          await group.getByRole("button").first().click();
+        }
+        await expect(group.getByTestId("tool-call-badge")).toHaveCount(0);
+        await expect(group.locator('[style*="clisbot-toolcall-shimmer"]')).toHaveCount(0);
+        await capture("collapsed-error");
+        gate.release();
+        await expect(page.getByTestId("tool-call-group")).toHaveCount(2);
+        await expect(page.getByTestId("tool-call-group").last()).toContainText(
+          "simulate-stream-burst.mjs",
+        );
+        await agent.client.waitForAgentUpsert(
+          agent.agentId,
+          (snapshot) => snapshot.status === "idle",
+          30_000,
+        );
+        await expect(
+          page.getByTestId("tool-call-group").last().locator('[style*="clisbot-toolcall-shimmer"]'),
+        ).toHaveCount(0);
+        await capture("settled");
+        // Compare the same canonical settled timeline, rather than assuming how many
+        // mock-provider cycles fit into its timed stream.
+        const showInMode = async (selection: string) => {
+          if (layout === "phone-web") await page.setViewportSize({ width: 1280, height: 800 });
+          await openSettings(page);
+          await openSettingsSection(page, "chat");
+          await page.getByRole("button", { name: /^Tool call display:/ }).click();
+          await page.getByRole("menuitem", { name: selection, exact: true }).click();
+          await openOverviewAgent(page, agent);
+          if (layout === "phone-web") await page.setViewportSize({ width: 390, height: 844 });
+          await expect(page.getByText(/Let me make a small adjustment/).first()).toBeVisible();
+          await page.getByTestId("tool-call-group").last().scrollIntoViewIfNeeded();
+        };
+        await showInMode("Summary");
+        const overviewGroupCount = await page.getByTestId("tool-call-group").count();
+        await capture("comparison-overview");
+        await showInMode("Summary with latest call");
+        await expect(page.getByTestId("tool-call-group")).toHaveCount(overviewGroupCount);
+        await capture("comparison-latest-call");
+      } finally {
+        await agent.cleanup();
+      }
+    });
+  });
+}
