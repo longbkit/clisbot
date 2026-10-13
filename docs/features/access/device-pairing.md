@@ -755,7 +755,9 @@ that Host. Opening this invitation deliberately authorizes the browser; a loopba
 never gains owner authority. The Bot's Connect channel action then starts/reuses Hub on that
 Host without feature flags or a daemon restart.
 
-Start Hub reads the selected connection's structured `localHubStartStatus`. The form preserves
+Start Hub reads the selected connection's structured `localHubStartStatus`. Managed Access
+blocks app startup only when it is enforced by actual membership, per
+[Managed Access](../../guides/user-guide/hosts/managed-access.md#starting-a-local-hub-before-enrollment). The form preserves
 `managed_access`, `device_pairing_required`, `owner_required` and `launcher_unavailable`, and
 separately identifies checking, older unknown capability, offline Host and a locked Hub edit.
 It offers one relevant recovery action. Managed Access stays unchanged; owner denial opens

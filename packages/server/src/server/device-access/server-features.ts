@@ -32,11 +32,10 @@ export function buildDeviceAccessServerFeatures(options: {
 export function getHubLocalStartStatus(options: {
   hasDeviceAuthority: boolean;
   hasLocalHubLauncher: boolean;
-  managedAccessMode: "off" | "external";
+  managedAccessRequired: boolean;
   canStartLocalHub: boolean;
 }): HubLocalStartStatus {
-  if (options.managedAccessMode === "external")
-    return { status: "blocked", reason: "managed_access" };
+  if (options.managedAccessRequired) return { status: "blocked", reason: "managed_access" };
   if (!options.hasDeviceAuthority) return { status: "blocked", reason: "device_pairing_required" };
   if (!options.canStartLocalHub) return { status: "blocked", reason: "owner_required" };
   if (!options.hasLocalHubLauncher) return { status: "blocked", reason: "launcher_unavailable" };

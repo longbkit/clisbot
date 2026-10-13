@@ -2296,7 +2296,7 @@ export class VoiceAssistantWebSocketServer {
     return getHubLocalStartStatus({
       hasDeviceAuthority: Boolean(this.credentialSource?.deviceAuthority),
       hasLocalHubLauncher: Boolean(this.daemonRuntimeConfig?.startLocalHub),
-      managedAccessMode: this.managedAccess.mode,
+      managedAccessRequired: this.managedAccessEnforced(),
       canStartLocalHub: session.canStartLocalHub(),
     });
   }

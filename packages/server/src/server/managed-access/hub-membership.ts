@@ -23,8 +23,8 @@ export function homeRequiresTickets(clisbotHome: string): boolean {
   let raw: string;
   try {
     raw = readFileSync(path.join(clisbotHome, HUB_RELATIONSHIP_FILE_NAME), "utf8");
-  } catch {
-    return false;
+  } catch (error) {
+    return !(error && typeof error === "object" && "code" in error && error.code === "ENOENT");
   }
   try {
     const record: unknown = JSON.parse(raw);
@@ -35,4 +35,12 @@ export function homeRequiresTickets(clisbotHome: string): boolean {
   } catch {
     return true;
   }
+}
+
+/** Launch and outside-daemon preflight use the same default and relationship rule. */
+export function homeManagedAccessRequired(
+  home: string,
+  mode: "off" | "external" = "external",
+): boolean {
+  return mode === "external" && homeRequiresTickets(home);
 }

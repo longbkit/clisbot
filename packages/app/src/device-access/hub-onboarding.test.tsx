@@ -1,5 +1,14 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { useCallback, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { i18n } from "@/i18n/i18next";
@@ -9,6 +18,14 @@ import { HubConnectionSettings, HubOverviewSettings, HubLoginPolicySettings } fr
 import { HubPicker } from "./hub-picker";
 import { PairedDeviceList } from "./device-list";
 import { isHubSwitchLocked } from "./hub-edit-lock";
+
+function render(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return rtlRender(ui, { wrapper: Wrapper });
+}
 
 // The assertions read the English copy.
 beforeEach(() => i18n.changeLanguage("en"));

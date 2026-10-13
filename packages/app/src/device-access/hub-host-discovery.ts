@@ -23,7 +23,11 @@ export type HostHubCheck =
 async function checkHost(host: HostProfile): Promise<HostHubCheck> {
   const client = getHostRuntimeStore().getSnapshot(host.serverId)?.client;
   if (!client) throw new Error("Host disconnected");
-  if (!client.getLastServerInfoMessage()?.features?.hubDiscovery) return { kind: "unsupported" };
+  if (
+    !client.getLastServerInfoMessage()?.features?.hubDiscovery &&
+    !client.getLastServerInfoMessage()?.features?.hubRelationship
+  )
+    return { kind: "unsupported" };
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const { status } = await Promise.race([

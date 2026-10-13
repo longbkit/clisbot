@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { hubStartAvailability, hubStartReason } from "./hub-start-availability";
+import {
+  hubStartAvailability,
+  hubStartReason,
+  reconcileLegacyHubStartStatus,
+} from "./hub-start-availability";
 
 describe("Hub startup guidance", () => {
   it.each([
@@ -36,5 +40,37 @@ describe("Hub startup guidance", () => {
     expect(hubStartAvailability({ ...input, locked: true })).toEqual({ status: "locked" });
     expect(hubStartAvailability({ ...input, selected: false })).toEqual({ status: "no_host" });
     expect(hubStartAvailability(input)).toEqual({ status: "ready" });
+  });
+});
+
+it("does not confuse the unenrolled external default with managed membership or grant startup from a legacy report", () => {
+  const input = {
+    reported: { status: "blocked", reason: "managed_access" } as const,
+    devicePairing: false,
+    failed: false,
+  };
+  expect(
+    reconcileLegacyHubStartStatus({
+      ...input,
+      membership: { state: "not_connected", hubOrigin: null },
+    }),
+  ).toEqual({ status: "blocked", reason: "device_pairing_required" });
+  expect(
+    reconcileLegacyHubStartStatus({
+      ...input,
+      devicePairing: true,
+      membership: { state: "not_connected", hubOrigin: null },
+    }),
+  ).toEqual({ status: "unknown" });
+  for (const state of ["connected", "revoked", "disconnecting", "unknown"])
+    expect(
+      reconcileLegacyHubStartStatus({
+        ...input,
+        membership: { state, hubOrigin: "https://fixture.invalid" },
+      }),
+    ).toEqual(input.reported);
+  expect(reconcileLegacyHubStartStatus(input)).toEqual({ status: "checking" });
+  expect(reconcileLegacyHubStartStatus({ ...input, failed: true })).toEqual({
+    status: "check_failed",
   });
 });

@@ -1,3 +1,4 @@
+import { homeManagedAccessRequired } from "../managed-access/hub-membership.js";
 import { z } from "zod";
 import { HubDeviceOfferSchema } from "@clisbot/protocol/device-pairing-offer";
 import { HubLocalStartOptionsSchema, type HubLocalStartResult } from "@clisbot/protocol/hub-local";
@@ -22,9 +23,7 @@ export async function startHostLocalHub(
 ): Promise<HubLocalStartResult> {
   const options = HubLocalStartOptionsSchema.parse(rawOptions);
   const config = readPersistedConfig(home, { defaultsIfMissing: true });
-  if (!config.features?.devicePairing) throw new Error("Protected device access is required");
-  if (config.daemon?.managedAccess?.mode !== "off")
-    throw new Error("Start a Hub using the Host's local CLI while managed access is enabled");
+  assertHostLocalHubStartPolicy(home, config);
   if (active.has(home)) throw new Error("A Hub is already starting on this Host; wait and retry");
   active.add(home);
   const args = [
@@ -58,4 +57,17 @@ export async function startHostLocalHub(
   } finally {
     active.delete(home);
   }
+}
+
+/** Shared launch preflight; the session separately requires independent owner authority. */
+export function assertHostLocalHubStartPolicy(
+  home: string,
+  config: {
+    features?: { devicePairing?: boolean };
+    daemon?: { managedAccess?: { mode?: "off" | "external" } };
+  },
+): void {
+  if (!config.features?.devicePairing) throw new Error("Protected device access is required");
+  if (homeManagedAccessRequired(home, config.daemon?.managedAccess?.mode))
+    throw new Error("Start a Hub using the Host's local CLI while managed access is enabled");
 }

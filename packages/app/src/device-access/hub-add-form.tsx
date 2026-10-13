@@ -1,4 +1,8 @@
-import { hubStartReason, type HubStartAvailability } from "./hub-start-availability";
+import {
+  hubStartReasonKey,
+  hubStartRecoveryReason,
+  type HubStartAvailability,
+} from "./hub-start-availability";
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -65,16 +69,18 @@ function StartHubForm(props: HubAddFormProps) {
           <Alert
             variant="info"
             title={t("hub.connection.startHelp.title", { host: props.startHostLabel })}
-            description={t(
-              `hub.connection.startHelp.reasons.${hubStartReason(props.startAvailability)}`,
-            )}
+            description={t(hubStartReasonKey(props.startAvailability))}
           />
           <Text style={styles.hint}>
-            {t(`hub.connection.startRecovery.steps.${hubStartReason(props.startAvailability)}`)}
+            {t(
+              `hub.connection.startRecovery.steps.${hubStartRecoveryReason(props.startAvailability)}`,
+            )}
           </Text>
           {props.startAvailability.status !== "locked" ? (
             <Button variant="outline" onPress={props.recoverStart} disabled={props.busy}>
-              {t(`hub.connection.startRecovery.actions.${hubStartReason(props.startAvailability)}`)}
+              {t(
+                `hub.connection.startRecovery.actions.${hubStartRecoveryReason(props.startAvailability)}`,
+              )}
             </Button>
           ) : null}
         </View>

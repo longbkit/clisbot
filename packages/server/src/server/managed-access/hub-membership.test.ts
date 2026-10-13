@@ -1,9 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../config.js";
-import { HUB_RELATIONSHIP_FILE_NAME, homeRequiresTickets } from "./hub-membership.js";
+import {
+  HUB_RELATIONSHIP_FILE_NAME,
+  homeRequiresTickets,
+  homeManagedAccessRequired,
+} from "./hub-membership.js";
 
 let home: string;
 
@@ -42,4 +46,19 @@ describe("Managed Access in a Clisbot home", () => {
     saveRelationship("{");
     expect(homeRequiresTickets(home)).toBe(true);
   });
+});
+
+it("does not infer enrollment from the default external mode and retains every closed relationship", () => {
+  expect(homeManagedAccessRequired(home)).toBe(false);
+  for (const state of ["active", "revoked", "disconnecting", "unknown"]) {
+    saveRelationship(JSON.stringify({ state }));
+    expect(homeManagedAccessRequired(home)).toBe(true);
+  }
+  saveRelationship("{");
+  expect(homeManagedAccessRequired(home)).toBe(true);
+  expect(homeManagedAccessRequired(home, "off")).toBe(false);
+});
+it("fails closed on a membership path that exists but cannot be read as a file", () => {
+  mkdirSync(path.join(home, HUB_RELATIONSHIP_FILE_NAME));
+  expect(homeManagedAccessRequired(home)).toBe(true);
 });

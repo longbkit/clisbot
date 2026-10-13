@@ -51,3 +51,16 @@ The CLI follows the same path as the app: when the daemon asks for a ticket, the
 The Owner turns it off with the same switch. Back in `off`, the Hub's Member/Project limits no longer protect ordinary paired sessions. In this mode, revoking Access on the Hub does not replace revoking old trusted paths.
 
 The app shows the switch only to the Owner. But **a Daemon Administrator has backend authority over daemon configuration**, including Managed Access; hiding the switch does not narrow that authority. See [Administrator scope](../access/daemon-administrator.md).
+
+## Starting a local Hub before enrollment
+
+The startup status and launch preflight use **whether tickets are currently required**, not
+just the configured word `external`. An unenrolled Host does not need a ticket, but starting
+Hub from the app still requires protected pairing and the Host's independent owner authority.
+An active, revoked, disconnecting or unreadable membership stays closed in external mode.
+
+Older Host startup diagnostics can incorrectly label an unenrolled Host as managed. The app
+checks that same Host's membership before explaining the refusal; this never grants permission
+to launch. A missing protected-pairing capability needs a planned Host update/setup, not a
+connection to an imaginary organization Hub. Fresh personal Bot onboarding prepares protected
+serving itself; existing Host policy and running processes are preserved.

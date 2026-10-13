@@ -118,8 +118,9 @@ export function HubConnectionSettings({
     fixedHostId ? "start" : initialHubIntent(params.hubIntent),
   );
   const [hostId, setHostId] = useState(fixedHostId ?? hosts[0]?.serverId ?? "");
+  const [discoveryAttempt, setDiscoveryAttempt] = useState(0);
   const selectedId = selectedStartHostId(hosts, hostId, fixedHostId);
-  const reportedStart = useHubStartStatus(selectedId, localServerId);
+  const reportedStart = useHubStartStatus(selectedId, localServerId, discoveryAttempt);
   const startAvailability = hubStartAvailability({
     selected: hosts.some((host) => host.serverId === selectedId),
     connected: connectedIds.includes(selectedId),
@@ -135,7 +136,6 @@ export function HubConnectionSettings({
   const [busy, setBusy] = useState(false);
   const unavailableActions = locked || busy;
   usePublicHubTarget(router, setBusy, setError);
-  const [discoveryAttempt, setDiscoveryAttempt] = useState(0);
   const retryDiscovery = useCallback(() => setDiscoveryAttempt((value) => value + 1), []);
   const { checks, detected, state: discovery } = useHubHostDiscovery(hosts, discoveryAttempt);
   const connectHost = useCallback(

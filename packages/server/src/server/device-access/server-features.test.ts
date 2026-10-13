@@ -4,12 +4,12 @@ import { buildDeviceAccessServerFeatures, getHubLocalStartStatus } from "./serve
 const ready = {
   hasDeviceAuthority: true,
   hasLocalHubLauncher: true,
-  managedAccessMode: "off" as const,
+  managedAccessRequired: false,
   canStartLocalHub: true,
 };
 
 test.each([
-  [{ ...ready, managedAccessMode: "external" as const }, "managed_access"],
+  [{ ...ready, managedAccessRequired: true }, "managed_access"],
   [{ ...ready, hasDeviceAuthority: false, hasLocalHubLauncher: false }, "device_pairing_required"],
   [{ ...ready, canStartLocalHub: false }, "owner_required"],
   [{ ...ready, hasLocalHubLauncher: false }, "launcher_unavailable"],
@@ -36,9 +36,18 @@ test("owner eligibility changes when authority is removed and when managed acces
     status: "blocked",
     reason: "owner_required",
   });
-  expect(getHubLocalStartStatus({ ...ready, managedAccessMode: "external" })).toEqual({
+  expect(getHubLocalStartStatus({ ...ready, managedAccessRequired: true })).toEqual({
     status: "blocked",
     reason: "managed_access",
   });
   expect(getHubLocalStartStatus(ready)).toEqual({ status: "ready" });
+});
+
+test("unenrolled external default is not a managed Host or an owner denial", () => {
+  expect(getHubLocalStartStatus({ ...ready, managedAccessRequired: false })).toEqual({
+    status: "ready",
+  });
+  expect(
+    getHubLocalStartStatus({ ...ready, managedAccessRequired: false, hasDeviceAuthority: false }),
+  ).toEqual({ status: "blocked", reason: "device_pairing_required" });
 });

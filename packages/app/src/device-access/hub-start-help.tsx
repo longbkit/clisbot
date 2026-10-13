@@ -57,8 +57,14 @@ function HubStartHelpSheet({
   if (status.status === "blocked") reason = status.reason;
   if (!online) reason = "offline";
   const title = t("hub.connection.startHelp.title", { host: host.label });
-  const description = t(`hub.connection.startHelp.reasons.${reason}`);
-  const steps = t(`hub.connection.startHelp.steps.${reason}`);
+  const description = t(
+    reason === "check_failed"
+      ? "hub.connection.inventory.failed"
+      : `hub.connection.startHelp.reasons.${reason}`,
+  );
+  const steps = t(
+    `hub.connection.startHelp.steps.${reason === "check_failed" || reason === "checking" ? "ready" : reason}`,
+  );
   const header = useMemo(() => ({ title, subtitle: host.serverId }), [title, host.serverId]);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(false);
