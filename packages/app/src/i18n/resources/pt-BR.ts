@@ -35,6 +35,7 @@ export const ptBR: TranslationResources = {
     back: "Voltar",
     loading: "Carregando...",
     actions: {
+      save: "Salvar",
       back: "Voltar",
       cancel: "Cancelar",
       close: "Fechar",
@@ -128,6 +129,8 @@ export const ptBR: TranslationResources = {
     input: {
       accessibilityLabel: "Enviar mensagem ao agente...",
       terminalAccessibilityLabel: "Terminal prompt",
+      fullscreen: "Tela cheia",
+      exitFullscreen: "Sair da tela cheia",
       focusHint: "{{shortcut}} para focar",
       addAttachment: "Adicionar anexo",
       interruptAgent: "Interromper agente",
@@ -1185,6 +1188,7 @@ export const ptBR: TranslationResources = {
       done: "Concluído",
     },
     display: {
+      showBackground: "Mostrar espaços em segundo plano",
       trigger: "Preferências de exibição",
       heading: "Exibição",
       grouping: {
@@ -2134,6 +2138,17 @@ export const ptBR: TranslationResources = {
     accessibility: "Janela de contexto {{percentage}}% usada",
   },
   review: {
+    feedback: {
+      send: "Enviar comentários ({{count}})",
+      sending: "Enviando comentários ({{count}})",
+      chooseAgent: "Escolher um agente",
+      sent: "Comentários enviados para {{recipient}}",
+      "no-agents": "Abra uma aba de agente neste espaço de trabalho para enviar comentários.",
+      disconnected: "Conecte-se ao host para enviar comentários.",
+      "no-context": "Os comentários salvos não correspondem mais a este diff.",
+      failed: "Falha ao enviar comentários. Tente novamente.",
+      prompt: "Por favor, atenda a esta revisão de código.",
+    },
     comment: {
       add: "Adicionar comentário de revisão",
       edit: "Editar comentário de revisão",

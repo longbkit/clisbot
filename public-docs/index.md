@@ -8,7 +8,7 @@ category: Getting started
 
 # Getting started
 
-Clisbot runs your coding agents on your machine and gives you a mobile, desktop, web, and CLI client to drive them from anywhere. Install it with the desktop app, the CLI, or Docker.
+Clisbot is an agentic development environment for running coding agents, editing files, reviewing changes, and testing your work. Agents run on your machines; desktop, mobile, web, and CLI clients let you work from anywhere. Choose how to install it below.
 
 ## Desktop app (recommended)
 

@@ -64,6 +64,7 @@ export function SidebarModelProvider({
 }) {
   const { t } = useTranslation();
   const list = useSidebarWorkspacesList({ enabled: active });
+  const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
   const channelFilters = useSidebarViewStore((state) => state.channelFilters);
@@ -119,11 +120,18 @@ export function SidebarModelProvider({
       projectFilters: resolvedProjectFilters,
     });
     const filtered = filterWorkspacesByLabels({
-      workspaces: byProject,
+      workspaces: byProject.filter((workspace) => showBackground || !workspace.background),
       ...labelFilter,
     }).filter((workspace) => matchesSessionMetadata(workspace, userFilters, channelFilters));
     return new Map(filtered.map((workspace) => [workspace.workspaceKey, workspace]));
-  }, [labelFilter, userFilters, channelFilters, resolvedProjectFilters, workspaceEntriesByKey]);
+  }, [
+    showBackground,
+    labelFilter,
+    userFilters,
+    channelFilters,
+    resolvedProjectFilters,
+    workspaceEntriesByKey,
+  ]);
   const visibleWorkspaceKeys = useMemo(
     () => new Set(filteredWorkspaceEntriesByKey.keys()),
     [filteredWorkspaceEntriesByKey],
@@ -138,16 +146,19 @@ export function SidebarModelProvider({
       const included = new Set(resolvedProjectFilters);
       projects = projects.filter((project) => included.has(project.viewKey));
     }
-    if (hasActiveLabelFilter || hasMetadataFilter) {
+    if (hasActiveLabelFilter || hasMetadataFilter || !showBackground) {
       projects = projects.flatMap((project) => {
         const workspaces = project.workspaces.filter((workspace) =>
           visibleWorkspaceKeys.has(workspace.workspaceKey),
         );
-        return workspaces.length > 0 ? [{ ...project, workspaces }] : [];
+        return workspaces.length > 0 || (!hasActiveLabelFilter && project.workspaces.length === 0)
+          ? [{ ...project, workspaces }]
+          : [];
       });
     }
     return projects;
   }, [
+    showBackground,
     hasActiveLabelFilter,
     hasMetadataFilter,
     hasActiveProjectFilter,

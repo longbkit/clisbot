@@ -22,6 +22,8 @@ export interface SidebarDisplayPreferences {
   clearUserFilters: () => void;
   toggleChannelFilter: (key: string) => void;
   clearChannelFilters: () => void;
+  showBackground: boolean;
+  toggleBackground: () => void;
   grouping: SidebarGroupMode;
   setGrouping: (mode: SidebarGroupMode) => void;
   titleSource: WorkspaceTitleSource;
@@ -60,6 +62,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
   const clearUserFilters = useSidebarViewStore((state) => state.clearUserFilters);
   const toggleChannelFilter = useSidebarViewStore((state) => state.toggleChannelFilter);
   const clearChannelFilters = useSidebarViewStore((state) => state.clearChannelFilters);
+  const showBackground = useSidebarViewStore((state) => state.showBackground);
+  const toggleBackground = useSidebarViewStore((state) => state.toggleBackground);
   const grouping = useSidebarViewStore((state) => state.groupMode);
   const setGrouping = useSidebarViewStore((state) => state.setGroupMode);
   const hostFilters = useSidebarViewStore((state) => state.hostFilters);
@@ -122,6 +126,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       clearUserFilters,
       toggleChannelFilter,
       clearChannelFilters,
+      showBackground,
+      toggleBackground,
       grouping,
       setGrouping,
       titleSource: workspaceTitleSource,
@@ -149,6 +155,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       clearUserFilters,
       toggleChannelFilter,
       clearChannelFilters,
+      showBackground,
+      toggleBackground,
       grouping,
       setGrouping,
       workspaceTitleSource,

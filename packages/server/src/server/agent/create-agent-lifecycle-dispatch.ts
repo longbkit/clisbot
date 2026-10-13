@@ -7,13 +7,11 @@ import { archiveByScope, type ActiveWorkspaceRef } from "../workspace-archive-se
 import type {
   CreateClisbotWorktreeWorkflowFn,
   CreateClisbotWorktreeWorkflowResult,
+  CreateClisbotWorktreeSetupContinuationInput,
+  NormalizedGitOptions,
 } from "../worktree-session.js";
 import type { WorkspaceGitService } from "../workspace-git-service.js";
-import type {
-  CreateAgentWorktreeTarget,
-  FirstAgentContext,
-  SessionOutboundMessage,
-} from "../messages.js";
+import type { FirstAgentContext, SessionOutboundMessage } from "../messages.js";
 import type { AgentManager, AgentSubscriber, SubscribeOptions } from "./agent-manager.js";
 import type { AgentStorage } from "./agent-storage.js";
 
@@ -59,18 +57,34 @@ export class CreateAgentLifecycleDispatch {
 
   async createWorktreeForRequest(input: {
     cwd: string;
-    target: CreateAgentWorktreeTarget | undefined;
+    target: NormalizedGitOptions | null;
     firstAgentContext: FirstAgentContext;
-    hasLegacyGitOptions: boolean;
+    setupContinuation?: CreateClisbotWorktreeSetupContinuationInput;
+    background?: boolean;
+    callerWorkspaceId?: string;
   }): Promise<CreateClisbotWorktreeWorkflowResult | null> {
-    if (input.target && input.hasLegacyGitOptions) {
-      throw new Error("create_agent_request worktree cannot be combined with git options");
-    }
-    if (!input.target) {
-      return null;
-    }
-
-    return this.createWorktreeForTarget(input.cwd, input.target, input.firstAgentContext);
+    const target = input.target;
+    if (!target?.createWorktree) return null;
+    return this.dependencies.createClisbotWorktreeWorkflow(
+      {
+        cwd: input.cwd,
+        background: input.background,
+        callerWorkspaceId: input.callerWorkspaceId,
+        firstAgentContext: input.firstAgentContext,
+        worktreeSlug: target.worktreeSlug,
+        refName: target.refName,
+        action: target.action,
+        checkoutSource: target.checkoutSource,
+        githubPrNumber: target.githubPrNumber,
+        runSetup: false,
+        clisbotHome: this.dependencies.clisbotHome,
+        worktreesRoot: this.dependencies.worktreesRoot,
+      },
+      {
+        ...(target.baseBranch ? { resolveDefaultBranch: async () => target.baseBranch! } : {}),
+        setupContinuation: input.setupContinuation,
+      },
+    );
   }
 
   registerAutoArchiveIfRequested(input: {
@@ -109,47 +123,6 @@ export class CreateAgentLifecycleDispatch {
         "Failed to clean up worktree after create_agent_request failed",
       );
     });
-  }
-
-  private async createWorktreeForTarget(
-    cwd: string,
-    target: CreateAgentWorktreeTarget,
-    firstAgentContext: FirstAgentContext,
-  ): Promise<CreateClisbotWorktreeWorkflowResult> {
-    const baseInput = {
-      cwd,
-      firstAgentContext,
-      runSetup: false,
-      clisbotHome: this.dependencies.clisbotHome,
-      worktreesRoot: this.dependencies.worktreesRoot,
-    } as const;
-
-    switch (target.mode) {
-      case "branch-off":
-        return this.dependencies.createClisbotWorktreeWorkflow(
-          {
-            ...baseInput,
-            worktreeSlug: target.newBranch,
-            action: "branch-off",
-            ...(target.base ? { refName: target.base } : {}),
-          },
-          target.base ? { resolveDefaultBranch: async () => target.base! } : undefined,
-        );
-      case "checkout-branch":
-        return this.dependencies.createClisbotWorktreeWorkflow({
-          ...baseInput,
-          action: "checkout",
-          refName: target.branch,
-        });
-      case "checkout-pr":
-        return this.dependencies.createClisbotWorktreeWorkflow({
-          ...baseInput,
-          action: "checkout",
-          githubPrNumber: target.prNumber,
-        });
-      default:
-        throw new Error("Unsupported create_agent_request worktree target");
-    }
   }
 
   private registerAutoArchiveOnTerminalState(

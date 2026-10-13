@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement, type ReactNode } from "react";
+import { type ReactElement, type ReactNode } from "react";
 import { Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,7 +8,7 @@ import { isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   iconButtonChromeFrameStyle,
-  iconButtonChromeStyle,
+  useIconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 
 interface HeaderToggleButtonState {
@@ -48,17 +48,11 @@ export function HeaderToggleButton({
       ? ({ "aria-expanded": expandedState } as Record<string, boolean>)
       : null;
 
-  const combinedStyle = useMemo(
-    () =>
-      ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) =>
-        iconButtonChromeStyle({
-          size: "large",
-          state: { hovered: Boolean(hovered), pressed },
-          disabled: Boolean(disabled),
-          style: [style, compact && styles.mobileTouchTarget],
-        }),
-    [compact, disabled, style],
-  );
+  const combinedStyle = useIconButtonChromeStyle({
+    size: "large",
+    disabled: Boolean(disabled),
+    style: [style, compact && styles.mobileTouchTarget],
+  });
 
   return (
     <Tooltip delayDuration={tooltipDelayDuration} enabledOnDesktop enabledOnMobile={false}>

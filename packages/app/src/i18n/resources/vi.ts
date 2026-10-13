@@ -33,6 +33,7 @@ export const vi: TranslationResources = {
     back: "Quay lại",
     loading: "Đang tải...",
     actions: {
+      save: "Lưu",
       back: "Quay lại",
       cancel: "Hủy",
       close: "Đóng",
@@ -127,6 +128,8 @@ export const vi: TranslationResources = {
     },
     input: {
       accessibilityLabel: "Nhắn cho agent...",
+      fullscreen: "Toàn màn hình",
+      exitFullscreen: "Thoát toàn màn hình",
       terminalAccessibilityLabel: "Prompt terminal",
       focusHint: "{{shortcut}} để nhập",
       addAttachment: "Thêm đính kèm",
@@ -443,6 +446,7 @@ export const vi: TranslationResources = {
   },
   sidebar: {
     display: {
+      showBackground: "Hiện tác vụ nền",
       trigger: "Tùy chọn hiển thị",
       heading: "Hiển thị",
       grouping: {
@@ -2016,6 +2020,17 @@ export const vi: TranslationResources = {
     },
   },
   review: {
+    feedback: {
+      send: "Gửi phản hồi ({{count}})",
+      sending: "Đang gửi phản hồi ({{count}})",
+      chooseAgent: "Chọn một agent",
+      sent: "Đã gửi phản hồi đến {{recipient}}",
+      "no-agents": "Mở một tab agent trong workspace này để gửi phản hồi.",
+      disconnected: "Kết nối tới host để gửi phản hồi.",
+      "no-context": "Các bình luận đã lưu không còn khớp với bản diff này.",
+      failed: "Không thể gửi phản hồi. Hãy thử lại.",
+      prompt: "Hãy xử lý các nhận xét review code này.",
+    },
     comment: {
       add: "Thêm bình luận review",
       edit: "Sửa bình luận review",

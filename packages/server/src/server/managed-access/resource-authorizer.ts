@@ -739,10 +739,18 @@ export class ManagedResourceAuthorizer {
       : "resource_not_found";
   }
 
+  private async allowsCaller(message: SessionInboundMessage): Promise<boolean> {
+    const [callerAgentId] = stringValuesProperty(message, "callerAgentId");
+    return callerAgentId === undefined || this.allowsAgent(callerAgentId);
+  }
+
   async allowsInbound(message: SessionInboundMessage): Promise<boolean> {
     if (!this.isRestricted()) return true;
     await this.ready();
 
+    // Caller provenance and workspace inheritance may read another agent before
+    // a creation handler returns early based on its destination Project.
+    if (!(await this.allowsCaller(message))) return false;
     if (message.type.startsWith("workspace.label.")) return false;
 
     const management = await this.allowsManagementInbound(message);
@@ -798,7 +806,6 @@ export class ManagedResourceAuthorizer {
     for (const cwd of stringValuesProperty(message, "cwd")) {
       checks.push(this.allowsCwd(cwd, "project.use"));
     }
-    if (checks.length === 0) return true;
     return (await Promise.all(checks)).every(Boolean);
   }
 

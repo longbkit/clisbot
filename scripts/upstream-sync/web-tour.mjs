@@ -62,7 +62,10 @@ await visit(desktop, "/settings/general", "settings-general-language");
 await visit(desktop, "/settings/appearance", "settings-appearance");
 await visit(desktop, "/settings/sidebar", "settings-sidebar");
 await visit(desktop, "/", "create-bot", (page) =>
-  page.getByText("Create a bot", { exact: true }).first().click(),
+  page
+    .getByRole("button", { name: /^Create (?:a )?bot$/ })
+    .first()
+    .click(),
 );
 await visit(desktop, "/", "add-connection", async (page) => {
   await page.getByTestId("sidebar-hosts-trigger").click();

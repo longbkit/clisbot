@@ -115,7 +115,6 @@ describe("BotSessions", () => {
         cwd: "/bots/alpha",
         workspaceId: "wks_alpha",
         labels: { [BOT_ID_LABEL]: "bot_a", [CHAT_ID_LABEL]: "cht_1" },
-        background: true,
         notifyOnFinish: false,
         promptFailure: "throw",
       },

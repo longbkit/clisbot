@@ -394,6 +394,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     pushNotifications: options.pushNotifications ?? asPushNotifications(),
     clisbotHome: options.clisbotHome ?? "/tmp/clisbot-home",
     agentManager: asAgentManager({
+      getAgent: () => null,
       listAgents: vi.fn(() => []),
       listProviderSubagentActivity: vi.fn(() => []),
       subscribe: vi.fn(() => () => {}),
@@ -5430,6 +5431,7 @@ test("unions viewed timelines across socket sources and removes detached sources
   const session = createSessionForTest({
     messages,
     agentManager: {
+      getAgent: (id: string) => ({ id, internal: false }),
       subscribe: vi.fn((listener: (event: AgentManagerEvent) => void) => {
         agentEventListeners.push(listener);
         return () => {};
@@ -5537,6 +5539,7 @@ test("keeps selective delivery scoped per socket when a retained session also ha
     messages,
     targetedMessages,
     agentManager: {
+      getAgent: (id: string) => ({ id, internal: false }),
       subscribe: vi.fn((listener: (event: AgentManagerEvent) => void) => {
         agentEventListeners.push(listener);
         return () => {};

@@ -40,6 +40,7 @@ import {
   type ActiveWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { density, densityFontSize, densityIconBox } from "@/styles/density";
 import type { Theme } from "@/styles/theme";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
@@ -81,11 +82,7 @@ import {
   type SidebarWorkspacePlacement,
 } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
-import {
-  hasActiveSidebarLabelFilter,
-  useSidebarViewStore,
-  type SidebarGroupMode,
-} from "@/stores/sidebar-view-store";
+import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { useShowShortcutBadges } from "@/hooks/use-show-shortcut-badges";
 import {
   ContextMenu,
@@ -136,6 +133,7 @@ import {
   SidebarWorkspaceTrailingContent,
   useSidebarWorkspaceTrailing,
 } from "@/components/sidebar/workspace-trailing";
+import { DensityIcon } from "@/components/ui/density-icon";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Shortcut } from "@/components/ui/shortcut";
@@ -901,9 +899,10 @@ function NewWorkspaceGhostRow({
       {({ hovered, pressed }) => (
         <>
           <View style={styles.newWorkspaceGhostIconSlot}>
-            <ThemedPlus
-              size={14}
-              uniProps={hovered || pressed ? foregroundColorMapping : foregroundMutedColorMapping}
+            <DensityIcon
+              icon={Plus}
+              size="sm"
+              color={hovered || pressed ? "foreground" : "foregroundMuted"}
             />
           </View>
           <Text
@@ -2035,12 +2034,6 @@ export function SidebarWorkspaceList({
   const onToggleWorkspacePin = useSidebarWorkspacePinController();
   const getPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.getPinnedWorkspaceOrder);
   const setPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.setPinnedWorkspaceOrder);
-  const hasActiveLabelFilter = useSidebarViewStore(
-    (state) =>
-      hasActiveSidebarLabelFilter(state.labelFilter) ||
-      state.userFilters.length > 0 ||
-      state.channelFilters.length > 0,
-  );
   const handlePinnedWorkspaceReorder = useCallback(
     (reorderedWorkspaces: SidebarWorkspacePlacement[]) => {
       const reorderedWorkspaceKeys = reorderedWorkspaces.map((workspace) => workspace.workspaceKey);
@@ -2072,11 +2065,10 @@ export function SidebarWorkspaceList({
   // this whole subtree, which unmounted the header — and the header is where the display menu's
   // trigger lives, so filtering the last row away closed the menu you were filtering from.
   //
-  // Only the label filter can get here. The project filter resolves against the projects it can
-  // see and falls back to "all projects" when nothing matches, so it either keeps at least one
-  // project or is not applied at all — it can narrow this list but never empty it.
-  const sidebarFilterEmpty =
-    hasActiveLabelFilter && hasProjectsBeforeFilter && projects.length === 0;
+  // Background visibility can also hide the last project. Keep the header mounted
+  // whenever a local filter empties an otherwise populated directory, so users can
+  // reach the display menu to reveal their work again.
+  const sidebarFilterEmpty = hasProjectsBeforeFilter && projects.length === 0;
 
   // Project mode is the one that keeps its project headers; every other grouping mode is a flat
   // list of grouped rows, so a new mode lands in the grouped branch rather than silently in this
@@ -2671,7 +2663,7 @@ const styles = StyleSheet.create((theme) => ({
   // the step in reads as belonging to that project. Padding rather than margin, so the hover and
   // pressed fills stay the same box as every other row in the sidebar.
   newWorkspaceGhostRow: {
-    minHeight: 36,
+    minHeight: density.rowHeight,
     marginBottom: theme.spacing[0.5],
     paddingVertical: theme.spacing[2],
     paddingLeft: theme.spacing[4],
@@ -2691,27 +2683,27 @@ const styles = StyleSheet.create((theme) => ({
   // The width of a workspace row's status slot, so the label lands on the same rail as the
   // titles above it.
   newWorkspaceGhostIconSlot: {
-    width: theme.iconSize.md,
-    height: theme.iconSize.md,
+    width: densityIconBox("md"),
+    height: densityIconBox("md"),
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   newWorkspaceGhostText: {
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.base,
+    fontSize: densityFontSize(theme, "base"),
     minWidth: 0,
     flexShrink: 1,
   },
   newWorkspaceGhostTextHovered: {
-    fontSize: theme.fontSize.base,
+    fontSize: densityFontSize(theme, "base"),
     minWidth: 0,
     flexShrink: 1,
     color: theme.colors.foreground,
   },
   projectRow: {
     position: "relative",
-    minHeight: 36,
+    minHeight: density.rowHeight,
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
     borderRadius: theme.borderRadius.lg,
@@ -2752,7 +2744,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   projectTitle: {
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.base,
+    fontSize: densityFontSize(theme, "base"),
     fontWeight: "400",
     minWidth: 0,
     flexShrink: 1,
@@ -2833,7 +2825,7 @@ const styles = StyleSheet.create((theme) => ({
     right: theme.spacing[2],
   },
   workspaceRow: {
-    minHeight: 36,
+    minHeight: density.rowHeight,
     marginBottom: theme.spacing[0.5],
     paddingVertical: theme.spacing[2],
     paddingLeft: theme.spacing[2],

@@ -2,6 +2,13 @@
   "paseo": {
     "repository": "https://github.com/getpaseo/paseo",
     "tag": "v0.11.1",
-    "commit": "ab10a6694ccf068959d1a6b67b6c915e21a9fe91"
+    "commit": "ab10a6694ccf068959d1a6b67b6c915e21a9fe91",
+    "reviewedMainSnapshot": {
+      "ref": "refs/heads/main",
+      "commit": "337e81a9c6d4551dbcede5930c21408776d06b1b",
+      "transformedCommit": "ec8988c04f1d3ca4402df9b67fe5f384b5ba70ec",
+      "fetchedAt": "2026-10-13T11:48:03Z",
+      "audit": "docs/audits/2026-10-13-upstream-paseo/README.md"
+    }
   }
 }

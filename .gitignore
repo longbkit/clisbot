@@ -129,3 +129,6 @@ app.json
 # Private release accounts, signing references and operation history.
 /.local/release-operations/
 /packages/app/credentials.json
+
+# Project-local Serena configuration and memories.
+.serena/

@@ -4,7 +4,7 @@ Clisbot proxies HTTP traffic to services running inside your workspaces. Localho
 
 ## How it works
 
-When a `clisbot.json` script of `"type": "service"` starts, Clisbot assigns it a local port and registers a route in the service proxy. Incoming requests whose `Host` header matches the script's generated hostname are forwarded to that port.
+When a `clisbot.json` script of `"type": "service"` starts, Clisbot assigns it a local port and registers a route in the service proxy. Incoming requests whose `Host` header matches the script's generated hostname are forwarded to that port. HTTP requests, WebSocket upgrades, and service health checks select the reachable IPv4 or IPv6 loopback address. Services can bind to `127.0.0.1` or `::1` without changing their proxy URL.
 
 The generated hostname is built from the script name, branch, and project:
 

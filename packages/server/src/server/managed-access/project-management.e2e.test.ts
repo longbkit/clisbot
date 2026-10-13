@@ -1,3 +1,5 @@
+import { CreationService } from "../creation/index.js";
+import { MessageReceipts } from "../message-receipts/index.js";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -81,6 +83,8 @@ async function fixture() {
       },
       logger,
       clisbotHome: daemon.clisbotHome,
+      creationService: new CreationService(path.join(root, "creation-receipts"), logger),
+      messageReceipts: new MessageReceipts(path.join(root, "message-receipts")),
       onMessage: (message) => messages.push(message),
       downloadTokenStore: createStub<SessionOptions["downloadTokenStore"]>({}),
       pushNotifications: createStub<SessionOptions["pushNotifications"]>({}),

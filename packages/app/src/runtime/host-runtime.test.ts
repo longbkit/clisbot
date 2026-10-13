@@ -60,6 +60,9 @@ it("requests the managed connection credential through desktop main without a we
 });
 
 class FakeDaemonClient {
+  supportsBackgroundWorkspaces(): boolean {
+    return false;
+  }
   private state: ConnectionState = { status: "idle" };
   private listeners = new Set<(status: ConnectionState) => void>();
   private error: string | null = null;

@@ -105,6 +105,8 @@ const PersistedWorkspaceRecordSchema = z.object({
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
+  // Public discovery visibility. Contents retain their ordinary lifecycle.
+  background: z.boolean().optional().default(false),
 });
 
 export type PersistedProjectRecord = z.infer<typeof PersistedProjectRecordSchema>;
@@ -687,10 +689,13 @@ export function createPersistedWorkspaceRecord(input: {
   pinnedAt?: string | null;
   labels?: string[];
   untrustedSource?: UntrustedWorkspaceSource;
+  background?: boolean;
 }): PersistedWorkspaceRecord {
   const identity = currentSessionOperationIdentity();
+  const { background, ...rest } = input;
   return PersistedWorkspaceRecordSchema.parse({
-    ...input,
+    ...rest,
+    background: background ?? false,
     createdBy: identity?.actor,
     participantActors: identity?.actor ? [identity.actor] : undefined,
     channels: identity?.channel ? [identity.channel] : undefined,

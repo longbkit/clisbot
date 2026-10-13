@@ -211,3 +211,16 @@ describe("grouped search results", () => {
     expect(groupAndLimitComboboxOptions([], 50)).toEqual([]);
   });
 });
+
+describe("search-only option text", () => {
+  it("finds hidden search text while keeping title matches first", () => {
+    const bodyMatch = { id: "pr:7", label: "Fix parsing", searchText: "Release notes for 2024" };
+    const titleMatch = { id: "pr:8", label: "2024 release" };
+    expect(filterAndRankComboboxOptions([bodyMatch, titleMatch], "2024")).toEqual([
+      titleMatch,
+      bodyMatch,
+    ]);
+    expect(filterAndRankComboboxOptions([bodyMatch], "unrelated")).toEqual([]);
+    expect(filterAndRankComboboxOptions([bodyMatch], "parsing 2024")).toEqual([bodyMatch]);
+  });
+});
