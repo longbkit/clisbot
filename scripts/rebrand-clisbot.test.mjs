@@ -584,3 +584,23 @@ function put(root, path, content) {
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, content);
 }
+
+test("recognizes the October 13 upstream agentic development introduction", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-latest-readme-"));
+  git(root, "init", "-q");
+  put(
+    root,
+    "README.md",
+    '<h1 align="center">Paseo</h1>\n\n<p align="center">One interface for agents.</p>\n\nPaseo is an open source agentic development environment for desktop, mobile, web, and CLI. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.\n\n- **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code through the same interface. Pick the right model for each job.\n\n## Plugins\n\nPlugin docs.\n\n## License\n\nApache-2.0\n',
+  );
+  git(root, "add", "-A");
+  execFileSync("node", [script, "--root", root, "--apply"]);
+  const contents = readFileSync(join(root, "README.md"), "utf8");
+  assert.match(contents, /<!-- clisbot:intro:start -->/);
+  assert.doesNotMatch(contents, /open source agentic development environment/);
+  git(root, "add", "-A");
+  const result = JSON.parse(
+    execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }),
+  );
+  assert.equal(result.changedFiles, 0);
+});
