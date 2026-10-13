@@ -220,7 +220,9 @@ async function searchCandidates(input: SearchInput): Promise<RankedEntry[]> {
   // does not exist falls back to matching the typed path against the whole tree.
   const typedParent = await resolveTypedParent(input);
   if (!typedParent) return searchTree(input);
-  if (isInsideExcludedPath(typedParent.resolvedPath, input)) return searchChildren(input);
+  // Completing children of a named parent does not require a recursive tree scan.
+  if (isInsideExcludedPath(typedParent.resolvedPath, input) || input.maxEntriesScanned === 0)
+    return searchChildren(input);
   return searchTree(input, typedParent);
 }
 

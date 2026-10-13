@@ -2490,6 +2490,8 @@ function lunaOption(launchDefaults: RouteBotOption["bot"]["launchDefaults"]): Ro
       workspaceId: "workspace-luna",
       cwd: LUNA_FOLDER,
       kind: "personal",
+      owner: { kind: "user", id: "owner" },
+      isOwner: true,
       launchDefaults,
     },
   };
@@ -2578,17 +2580,19 @@ describe("Start or continue a Bot", { timeout: 20_000 }, () => {
     expect(adapters.confirm.mock.calls[0]![0].message).toContain("Bot · Luna");
   });
 
-  it("asks for a Bot before saving when the requested one is not on offer", async () => {
+  it("blocks activation when the requested Bot and its owner are not on offer", async () => {
     adapters.botOptions = [];
     renderConnectBot(vi.fn());
     expect(await screen.findByText("Add Route", {}, { timeout: 10_000 })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Connection"), {
       target: { value: "account:slack:support" },
     });
-    expect(screen.getByText("Choose a Bot.")).toBeTruthy();
+    expect((screen.getByLabelText("Bot") as HTMLSelectElement).value).toBe("");
+    expect(screen.getAllByText("Pick at least one person.")).toHaveLength(2);
     expect(
       (screen.getByRole("button", { name: "Activate Route" }) as HTMLButtonElement).disabled,
     ).toBe(true);
+    expect(adapters.put).not.toHaveBeenCalled();
   });
 
   it("offers a Bot beside an Agent on Add Route and still starts on an Agent", async () => {

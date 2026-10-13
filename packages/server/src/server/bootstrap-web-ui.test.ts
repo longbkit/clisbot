@@ -155,6 +155,7 @@ describe("daemon web UI bootstrap", () => {
         port: daemonHandle.port,
         headers: { host: "clisbot.example.test", "x-forwarded-proto": "https" },
       }),
+      "https:",
     );
     const httpHint = readInjectedConnectionHint(
       await fetchDaemonWebUi({
@@ -167,6 +168,7 @@ describe("daemon web UI bootstrap", () => {
         port: daemonHandle.port,
         headers: { host: "[::1]", "x-forwarded-proto": "https" },
       }),
+      "https:",
     );
 
     expect(httpsHint.listen).toBe("clisbot.example.test:443");

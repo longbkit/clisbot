@@ -37,6 +37,8 @@ Object.assign(env, {
   CLISBOT_USAGE_REPORTING: "0",
   CLISBOT_DICTATION_ENABLED: "false",
   CLISBOT_VOICE_MODE_ENABLED: "false",
+  // Never probe or change the operator's Tailscale mappings from an isolated test.
+  CLISBOT_TAILSCALE_BIN: resolvePath(taskHome, "tailscale-not-installed"),
   // This test drives the self-hosted web UI, which personal serving starts only when it is on.
   CLISBOT_WEB_UI_ENABLED: "true",
 });
@@ -54,8 +56,15 @@ const cli = async (args, overrides = {}) => {
   child.stderr.on("data", (data) => {
     stderr += data;
   });
-  const [code] = await once(child, "close");
-  if (code !== 0) throw new Error(`CLI failed: ${stderr}`);
+  const [code, signal] = await once(child, "close");
+  if (code !== 0) {
+    let structuredError = "";
+    try {
+      const result = JSON.parse(stdout);
+      structuredError = JSON.stringify({ code: result.code, message: result.message });
+    } catch {}
+    throw new Error(`CLI failed (${code ?? signal}): ${stderr} ${structuredError}`);
+  }
   return stdout;
 };
 const factory = (url, options) =>
@@ -94,9 +103,10 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
     ]),
   );
   assert(parseDevicePairingOfferFromUrl(onboarded.url)?.pairing);
-  // Managed daemon launches discard deployment environment overrides. Persist the
-  // web UI choice so Start Hub's CLI child uses the same gateway as onboarding.
-  await cli(["daemon", "config", "set", "features.webUi.enabled", "true", "--home", taskHome]);
+  assert.equal(onboarded.gateway, null);
+  await assert.rejects(readFile(resolvePath(taskHome, "gateway-local.json")));
+  const web = JSON.parse(await cli(["web", "start", "--home", taskHome, "--json"]));
+  assert.equal(web.running, true);
   assert.equal(parseDevicePairingOfferFromUrl(onboarded.url).hub, undefined);
   await assert.rejects(readFile(resolvePath(taskHome, "hub-local.json")));
   const daemonOnlyInstance = await readDaemonInstance(taskHome);
@@ -108,7 +118,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
     invitationToken: daemonOnlyOffer.pairing.token,
   };
   daemon = new DaemonClient({
-    url: `${onboarded.origin.replace(/^http/, "ws")}/ws`,
+    url: `${web.origin.replace(/^http/, "ws")}/ws`,
     clientId: "serve-live-phone",
     deviceAccess: daemonAccess,
     e2ee: {
@@ -124,33 +134,28 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   const gatewayBeforeStart = JSON.parse(
     await readFile(resolvePath(taskHome, "gateway-local.json"), "utf8"),
   );
-  const startedHub = await daemon.startLocalHub({
-    transport: testServeFallback ? "tailscale" : "local",
-    label: "My phone",
-  });
   if (testServeFallback) {
-    assert.equal(startedHub.transport, "relay");
-    assert.equal(startedHub.tailscaleState, "unavailable");
-    assert.match(startedHub.networkGuidance, /using encrypted relay/);
-    assert.deepEqual(
-      JSON.parse(await readFile(resolvePath(taskHome, "gateway-local.json"), "utf8")).config
-        .origins,
-      [],
+    await assert.rejects(
+      daemon.startLocalHub({ transport: "tailscale", label: "My phone" }),
+      /Tailscale/,
     );
+    assert.equal((await daemon.getDaemonConfig()).config.relay.enabled, false);
     console.log(
-      "Tailscale ready but Serve refused: relay fallback completed without daemon/gateway restart or false advertised origin.",
+      "Tailscale failure asks for repair or an explicit transport choice; relay stays off.",
     );
   }
+  const startedHub = await daemon.startLocalHub({ transport: "local", label: "My phone" });
   const initialHubState = JSON.parse(
     await readFile(resolvePath(taskHome, "hub-local.json"), "utf8"),
   );
   const result = {
     ...onboarded,
     url: startedHub.url,
-    origin: startedHub.origin,
+    origin: web.origin,
+    gateway: web.origin,
     hub: initialHubState.url,
   };
-  assert.equal(result.origin, onboarded.gateway);
+  assert.equal(startedHub.origin, initialHubState.url);
   assert.equal((await readDaemonInstance(taskHome)).pid, daemonOnlyInstance.pid);
   assert.equal(
     JSON.parse(await readFile(resolvePath(taskHome, "gateway-local.json"), "utf8")).pid,
@@ -241,8 +246,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   const hosts = (await inventory.json()).daemons;
   assert.equal(hosts.length, 1);
   assert.equal(hosts[0].connectionOffer.v, 5);
-  if (testServeFallback) assert(hosts[0].connectionOffer.relay);
-  else assert.equal(hosts[0].connectionOffer.relay, undefined);
+  assert.equal(hosts[0].connectionOffer.relay, undefined);
   assert.equal(hosts[0].connectionOffer.direct.endpoint, offer.direct.endpoint);
   const reopened = JSON.parse(
     await cli([
@@ -334,7 +338,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   const repeated = JSON.parse(
     await cli(["hub", "start", "--personal", "--transport", "local", "--home", taskHome, "--json"]),
   );
-  assert.equal(repeated.gateway, result.gateway);
+  assert.equal(repeated.gateway, null);
   assert.equal(repeated.hub, result.hub);
   if (process.env.RUN_SERVE_BROWSER === "1") {
     const { chromium } = await import("playwright");
@@ -347,7 +351,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
         console.log("Page error:", error.message.replace(/#offer=[^\s]+/g, "#offer=[private]"));
       });
       // Pairing links open the official app; this test loads the self-hosted copy instead.
-      await page.goto(`${repeated.origin}/${new URL(repeated.url).hash}`);
+      await page.goto(`${web.origin}/${new URL(repeated.url).hash}`);
       await page
         .getByText("Personal Hub access; no account login required", {
           exact: true,
@@ -788,7 +792,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
         page.on("pageerror", (error) => failures.push(error.message));
         await page.route("https://app.clisbot.com/**", async (route) => {
           const source = new URL(route.request().url());
-          const assetResponse = await fetch(`${relayed.gateway}${source.pathname}${source.search}`);
+          const assetResponse = await fetch(`${web.origin}${source.pathname}${source.search}`);
           await route.fulfill({
             status: assetResponse.status,
             headers: {
@@ -909,15 +913,16 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
   );
   assert.equal((await readDaemonInstance(taskHome)).pid, after.pid);
   console.log("Hub device revocation closed managed daemon access without restarting daemon.");
+  const relayBeforeLocal = (await operator.getDaemonConfig()).config.relay.enabled;
   const localAgain = JSON.parse(
     await cli(["hub", "start", "--personal", "--transport", "local", "--home", taskHome, "--json"]),
   );
   const localOffer = parseDevicePairingOfferFromUrl(localAgain.url);
-  assert.equal(localAgain.relayEnabled, true);
-  assert(localOffer.relay);
+  assert.equal(localAgain.relayEnabled, relayBeforeLocal);
+  assert.equal(Boolean(localOffer.relay), relayBeforeLocal);
   assert.equal(localOffer.hub.relay, undefined);
   assert.equal(localOffer.hub.hubId, offer.hub.hubId);
-  assert.equal((await operator.getDaemonConfig()).config.relay.enabled, true);
+  assert.equal((await operator.getDaemonConfig()).config.relay.enabled, relayBeforeLocal);
   assert.equal((await readDaemonInstance(taskHome)).pid, after.pid);
   console.log(
     "Choosing local keeps existing daemon relay connections; Hub relay is reconfigured independently, retaining identity and daemon PID.",

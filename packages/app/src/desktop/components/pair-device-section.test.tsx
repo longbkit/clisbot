@@ -21,7 +21,10 @@ vi.mock("@/device-access/pairing-offer", () => ({
   pairingLinkRoutes: () => [],
 }));
 vi.mock("@/hooks/use-daemon-config", () => ({ useDaemonConfig: () => ({ patchConfig: vi.fn() }) }));
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("react-i18next", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-i18next")>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock("@/data/query", () => ({
   useFetchQuery: ({ queryKey }: { queryKey: string[] }) => ({
     data: queryKey[0] === "daemon-pairing-offer-qr" ? "<svg />" : state.offer,

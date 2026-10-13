@@ -36,6 +36,7 @@ Object.assign(env, {
   CLISBOT_WEB_UI_ENABLED: "true",
   CLISBOT_DICTATION_ENABLED: "false",
   CLISBOT_VOICE_MODE_ENABLED: "false",
+  CLISBOT_TAILSCALE_BIN: path.join(home, "tailscale-not-installed"),
   npm_config_prefix: prefix,
 });
 
@@ -243,6 +244,7 @@ try {
   const initial = await readDaemonInstance(home);
   const offer = parseDevicePairingOfferFromUrl(onboard.url);
   assert(offer?.pairing && !offer.hub);
+  assert.equal(onboard.gateway, null);
   daemon = new DaemonClient({
     url: `${onboard.origin.replace(/^http/, "ws")}/ws`,
     clientId: "v2-install-smoke",
@@ -258,7 +260,10 @@ try {
   });
   await daemon.connect();
   const started = await daemon.startLocalHub({ transport: "local", label: "V2 installed smoke" });
-  const webApp = await fetch(`${onboard.origin}/`);
+  // Onboarding starts only the Host; local web is an explicit, independent service.
+  const web = JSON.parse(await cli(["web", "start", "--json"]));
+  assert.equal(web.running, true);
+  const webApp = await fetch(`${web.origin}/`);
   assert(webApp.ok, `Installed shared app returned HTTP ${webApp.status}`);
   assert.match(await webApp.text(), /<html/iu);
   assert.equal((await fetch(`${started.origin}/api/auth/clisbot/device/identity`)).status, 200);
