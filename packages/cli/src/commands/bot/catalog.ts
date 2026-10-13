@@ -34,7 +34,7 @@ export async function readBotCatalog(home: string) {
       };
       return {
         manifest: hydrateBotReference({ ...projection, name: bot.name }, bot),
-        hasChannel: Boolean(reference),
+        hasChannel: Boolean(reference?.account),
       };
     });
   } finally {

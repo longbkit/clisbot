@@ -28,6 +28,7 @@ import {
   ProjectGitFetchResponseSchema,
 } from "./project-git.js";
 export * from "./project-git.js";
+import { LocalWebRequestSchema, LocalWebResponseSchema } from "./local-web.js";
 import { DeviceProofSchema, DeviceCredentialSchema } from "./device-access.js";
 import { DevicePairingOfferSchema } from "./device-pairing-offer.js";
 import { DaemonDevicesRequestSchema, DaemonDevicesResponseSchema } from "./daemon-devices.js";
@@ -3373,6 +3374,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferRequestSchema,
   DaemonDevicesRequestSchema,
   HubLocalStartRequestSchema,
+  LocalWebRequestSchema,
   DaemonTailscaleStatusRequestSchema,
   DaemonTailscaleSetupRequestSchema,
   DaemonConfigReloadRequestSchema,
@@ -3733,6 +3735,7 @@ export const ServerInfoStatusPayloadSchema = z
         devicePairing: z.boolean().optional(),
         // COMPAT(localHubStart): absent on upstream/legacy or unauthorized sessions.
         localHubStart: z.boolean().optional(),
+        localWeb: z.boolean().optional(),
         // COMPAT(localHubStartStatus): older Hosts cannot explain startup eligibility; review 2027-04-10.
         localHubStartStatus: z.boolean().optional(),
         // COMPAT(hostTailscale): added in v0.10.3, remove after 2027-04-06. Absent on
@@ -7304,6 +7307,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferResponseSchema,
   DaemonDevicesResponseSchema,
   HubLocalStartResponseSchema,
+  LocalWebResponseSchema,
   DaemonTailscaleStatusResponseSchema,
   DaemonTailscaleSetupResponseSchema,
   DaemonConfigReloadResponseSchema,

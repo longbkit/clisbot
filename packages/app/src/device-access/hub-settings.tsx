@@ -94,7 +94,10 @@ function usePublicHubTarget(
   }, [router, setBusy, setError, t]);
 }
 
-export function HubConnectionSettings() {
+export function HubConnectionSettings({
+  startOnHost: fixedHostId,
+  onConnected,
+}: { startOnHost?: string; onConnected?: () => void } = {}) {
   const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const params = useLocalSearchParams<{ hubIntent?: string }>();
@@ -103,16 +106,20 @@ export function HubConnectionSettings() {
   const hostIds = useMemo(() => allHosts.map((host) => host.serverId), [allHosts]);
   const connectedIds = useHostRuntimeConnectedServerIds(hostIds);
   const hosts = useMemo(
-    () => allHosts.filter((host) => connectedIds.includes(host.serverId)),
-    [allHosts, connectedIds],
+    () =>
+      allHosts.filter(
+        (host) =>
+          connectedIds.includes(host.serverId) && (!fixedHostId || host.serverId === fixedHostId),
+      ),
+    [allHosts, connectedIds, fixedHostId],
   );
   const localServerId = useLocalDaemonServerId();
   const router = useRouter();
   const locked = useHubSwitchLocked();
   const [intent, setIntent] = useState<"add" | "start" | "connect" | null>(
-    initialHubIntent(params.hubIntent),
+    fixedHostId ? "start" : initialHubIntent(params.hubIntent),
   );
-  const [hostId, setHostId] = useState(hosts[0]?.serverId ?? "");
+  const [hostId, setHostId] = useState(fixedHostId ?? hosts[0]?.serverId ?? "");
   const canStartHub = useHubStartSupport(hosts, hostId, localServerId);
   const [link, setLink] = useState("");
   const [label, setLabel] = useState(suggestedDeviceLabel);
@@ -131,6 +138,13 @@ export function HubConnectionSettings() {
   const available = detected.filter(
     (hub) => !registry.profiles.some((profile) => matchesSavedHub(hub, profile)),
   );
+  const navigateAfterConnect = useCallback(
+    (href: Parameters<typeof router.push>[0]) => {
+      if (onConnected) onConnected();
+      else router.push(href);
+    },
+    [onConnected, router],
+  );
   const connectInput = useCallback(
     async (input: string, started?: { relay: boolean; reason?: string }) => {
       setBusy(true);
@@ -141,7 +155,7 @@ export function HubConnectionSettings() {
           parseHubPairingOfferFromUrl(input)?.hub ?? parseDevicePairingOfferFromUrl(input)?.hub;
         if (offer) {
           await pairHub(offer, label);
-          router.push({
+          navigateAfterConnect({
             pathname: "/settings/hub/[hubSection]",
             params: {
               hubSection: "overview",
@@ -162,7 +176,7 @@ export function HubConnectionSettings() {
         const accountHub = await discoverAccountHub(configuration.origin);
         if (accountHub) {
           await saveDiscoveredHub(accountHub);
-          router.push("/settings/hub/account");
+          navigateAfterConnect("/settings/hub/account");
           setIntent(null);
           setLink("");
           return;
@@ -184,7 +198,7 @@ export function HubConnectionSettings() {
           setupStatus: identity.setupStatus,
           ...(identity.relay ? { relay: identity.relay } : {}),
         });
-        router.push("/settings/hub/account");
+        navigateAfterConnect("/settings/hub/account");
         setIntent(null);
         setLink("");
       } catch (caught) {
@@ -195,7 +209,7 @@ export function HubConnectionSettings() {
         setBusy(false);
       }
     },
-    [label, router, t],
+    [label, navigateAfterConnect, t],
   );
   const start = useCallback(async () => {
     setBusy(true);

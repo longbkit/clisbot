@@ -2,7 +2,11 @@
 // running Hub's channel control-plane routes (implementation doc §1.4, §3.2).
 
 import { z } from "zod";
-import { controlPlaneRequest, type ControlPlaneTarget } from "../control-plane.js";
+import {
+  channelOnboardingPath,
+  controlPlaneRequest,
+  type ControlPlaneTarget,
+} from "../control-plane.js";
 import { requestHub } from "../hub/hub-client/internal/transport.js";
 
 const channelAddResultSchema = z
@@ -17,6 +21,7 @@ const channelAddResultSchema = z
     owner: z
       .object({
         ready: z.boolean(),
+        destination: z.string().url().optional(),
         command: z.string().optional(),
         expiresAt: z.string().datetime().optional(),
       })
@@ -62,6 +67,9 @@ export type ChannelAccount = z.infer<typeof channelAccountSchema>;
 export type ChannelStatusAccount = z.infer<typeof channelStatusAccountSchema>;
 
 export interface ChannelSetupInput {
+  botId?: string;
+  ownerMemberId?: string;
+  ownerOrganizationId?: string;
   update?: boolean;
   name: string;
   daemonId: string;
@@ -128,7 +136,7 @@ export function addChannel(
     requestHub({
       origin: target.origin,
       ...(target.apiKey === undefined ? {} : { apiKey: target.apiKey }),
-      path: "/api/v1/channels",
+      path: channelOnboardingPath(target),
       method: "POST",
       body: input,
       successStatus: 200,
@@ -189,7 +197,7 @@ export function channelStatus(target: ControlPlaneTarget): Promise<ChannelStatus
     const response = await requestHub({
       origin: target.origin,
       ...(target.apiKey === undefined ? {} : { apiKey: target.apiKey }),
-      path: "/api/v1/channels/status",
+      path: `${channelOnboardingPath(target)}/status`,
       method: "GET",
       successStatus: 200,
       schema: channelStatusResponseSchema,

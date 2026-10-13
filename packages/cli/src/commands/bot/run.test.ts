@@ -61,7 +61,7 @@ describe("daemon-owned Bot onboarding", () => {
         }),
       );
       const disk = JSON.parse(
-        await readFile(path.join(f.home, "bots/personal-assistant.json"), "utf8"),
+        await readFile(path.join(f.home, "bot-connections/bot_1234567890123456.json"), "utf8"),
       );
       expect(disk).toMatchObject({
         version: 2,

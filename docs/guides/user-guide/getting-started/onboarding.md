@@ -15,8 +15,6 @@ You end up with a personal bot on Codex, a workspace seeded from templates, and 
 ```dotenv
 SLACK_APP_TOKEN='xapp-...'
 SLACK_BOT_TOKEN='xoxb-...'
-OWNER_EMAIL='you@example.com'
-INITIAL_OWNER_PASSWORD='replace-with-a-password-at-least-12-characters'
 ```
 
 The CLI does not load `.env` itself. Load a file you trust into the shell before running:
@@ -42,25 +40,27 @@ The `clisbot` function uses the build you made, so you do not call a global inst
 ## 2. Onboard
 
 ```bash
-CLISBOT_WEB_UI_ENABLED=true clisbot hub init \
+clisbot bot start \
   --home "$HOME/.clisbot-dev-01" \
   --bot-type personal \
   --provider codex \
   --slack-app-token '${SLACK_APP_TOKEN}' \
   --slack-bot-token '${SLACK_BOT_TOKEN}' \
-  --owner-email "$OWNER_EMAIL" \
-  --owner-password '${INITIAL_OWNER_PASSWORD}'
+  --bot-name "Personal Assistant"
 ```
 
-Keep the quotes as shown: the CLI reads `${ENV_VAR}` itself for **tokens/passwords**; the email uses `"$OWNER_EMAIL"` so the shell expands it. Do not post tokens or output containing link codes in public chats.
+Keep the quotes as shown: the CLI reads `${ENV_VAR}` itself for **tokens/passwords**. Do not post tokens or output containing link codes in public chats.
 
-The command starts the daemon and Hub if needed, creates the workspace + templates + initial agent, saves the Slack Connection and the owner access configuration. You do not export a file, edit it and deploy it.
+The command reuses or starts the Host and a personal backend Hub if needed, creates the Bot home and templates, saves the Slack Connection and the owner access configuration. You do not export a file, edit it and deploy it.
+
+To create a Bot without channels or Hub, use `clisbot bot start --bot-name "Sandbox Assistant" --provider codex`.
+Optional local web: `clisbot web start`; stopping web preserves Bot and Hub.
 
 ## 3. Finish linking the owner
 
 If the output shows **ACTION REQUIRED**, send the printed `/link ...` command to the bot privately from your Slack account. The code is **single-use and valid for 10 minutes**; the output shows the expiry time. Then DM the bot with your requests; in channels the bot has joined, use `@mention`.
 
-If you know the owner's Slack Member ID for sure, add `--owner-identity YOUR_SLACK_MEMBER_ID` at init to skip the link step. The bot token does not prove who the owner is. A linked identity is kept; nobody else gains owner rights on their own.
+If you know the owner's Slack Member ID for sure, add `--owner-identity YOUR_SLACK_MEMBER_ID` at start to skip the link step. The bot token does not prove who the owner is. A linked identity is kept; nobody else gains owner rights on their own.
 
 **READY** means the owner is linked and the Slack connection has started. If you still see `SETUP INCOMPLETE`, follow the output's instructions; check the provider if the bot receives messages but cannot run them.
 
@@ -80,22 +80,22 @@ Onboarding uses the Markdown set from `clisbot main`: the `default` layer, `cust
 ## Run again, check, stop
 
 ```bash
-clisbot bot start --home "$HOME/.clisbot-dev-01"
-clisbot bot status personal-assistant --home "$HOME/.clisbot-dev-01"
+clisbot bot start "Personal Assistant" --home "$HOME/.clisbot-dev-01"
+clisbot bot status "Personal Assistant" --home "$HOME/.clisbot-dev-01"
 clisbot bot stop --home "$HOME/.clisbot-dev-01"
 ```
 
 - **Saved automatically**; this flow has no `--persist` flag and does not need one. Running again needs no token/password; it reuses the saved bot, workspace and Connection. `hub init` also resumes the saved bot.
-- Omitting `--bot-name` selects `personal-assistant`; a team bot uses `--bot-type team`, and a bot with another name needs the exact `--bot-name`.
-- Omitting `--owner-email` works only when the organization has exactly one owner. A new home with no account: pass email/password as above or finish Account setup at the Hub URL.
+- A positional name or ID selects an existing Bot. Use `--bot-name` to create one. Channel flags are optional; omit them to keep a saved attachment.
+- A fresh channel setup creates a personal Hub owner automatically. Existing account/team Hubs retain their policy; complete sign-in/setup there when needed.
 - `bot stop` stops **the Hub and every bot sharing that Hub home**; the daemon keeps running and data is kept. Stop the daemon too with `clisbot daemon stop --home "$HOME/.clisbot-dev-01"`.
 
 ## Open the app, configuration and variants
 
-- The **Hub URL** in the output is for Account setup and configuration. The **daemon URL** serves the Clisbot web app when the web UI is on and web assets exist. Init does not start an Expo dev server or configure Tailscale/a reverse proxy.
+- The **Hub URL** is the channel backend. Use `clisbot web start` for a browser UI, or connect the published/native app directly to the Host. Tailscale is preferred by default; output reports the actual route and fallback reason.
 - Change configuration through the UI/API. A restart does not overwrite templates or the owner password.
 - Telegram: replace the two Slack flags with `--telegram-bot-token '${TELEGRAM_BOT_TOKEN}'`; the owner identity is the Telegram user ID. Load this variable into the shell first.
-- Workspace only, no chat yet: `clisbot hub init --home "$HOME/.clisbot-dev-01" --provider codex`; add channels later.
+- Workspace only, no chat yet: `clisbot bot start --bot-name "Sandbox Assistant" --home "$HOME/.clisbot-dev-01" --provider codex`; add channels later.
 - To try a fresh install, pick **a different, unused home**, for example `~/.clisbot-dev-02`; do not delete the old home.
 
 ## Use an existing Hub or join an organization by invitation

@@ -1,3 +1,5 @@
+import { AccountFileSchema } from "../config/schema.js";
+import { telegramOwnerDestination } from "./owner-destination.js";
 import { TRUSTED_REQUEST_ORIGIN_HEADER } from "../../http/request-origin.js";
 import { deployRevision } from "./configuration.js";
 export {
@@ -41,6 +43,7 @@ import {
   validateOnboardingTarget,
   ChannelOnboardingSchema,
   prepareChannelOnboarding,
+  onboardingOwner,
   configureOnboardingRoute,
   linkOnboardingOwner,
   type OnboardingServices,
@@ -318,18 +321,20 @@ function authorized(request: Request, completionTokenSecret: string | undefined)
   );
 }
 
-async function handleAddChannel(
+export async function handleAddChannel(
   database: Database,
   request: Request,
   options: ChannelControlPlaneOpsOptions,
+  organizationId?: string,
 ): Promise<Response> {
-  if (request.method === "PUT") return handlePrepareOnboarding(database, request, options);
+  if (request.method === "PUT")
+    return handlePrepareOnboarding(database, request, options, organizationId);
   const body = await parseJsonBody(request, channelAddBodySchema);
   if (body.setup && !apiFirstOnboardingEnabled()) return controlPlaneAbsent(request);
   if (body.account.includes("/") || body.account.includes("\0")) {
     throw invalidRequest("the account id must not contain '/'");
   }
-  const snapshot = await loadSnapshot(database);
+  const snapshot = await loadSnapshot(database, organizationId);
   if (body.setup)
     await validateOnboardingTarget(
       database,
@@ -351,7 +356,15 @@ async function handleAddChannel(
   });
   if (connection === undefined) throw invalidRequest("the channel connection does not exist");
   let files = upsertAccountFile(snapshot.files, body.channel, body.account, connectionId);
-  if (body.setup) files = configureOnboardingRoute(files, body.channel, body.account, body.setup);
+  if (body.setup && options.onboarding) {
+    const owner = await onboardingOwner(
+      options.onboarding,
+      snapshot.organizationId,
+      body.setup.ownerEmail,
+      body.setup.ownerMemberId,
+    );
+    files = configureOnboardingRoute(files, body.channel, body.account, body.setup, owner.id);
+  }
   await deployRevision(database, snapshot, files, {
     expectedRevisionId: snapshot.revision?.id ?? null,
   });
@@ -364,7 +377,21 @@ async function handleAddChannel(
           body.setup,
         )
       : undefined;
-  return channelInstallationResponse(options.supervisor, body, connectionId, owner);
+  const accountFile = AccountFileSchema.parse(
+    load(
+      files.find(
+        (file) => file.path === `${CHANNELS_DIRECTORY}/${body.channel}/${body.account}.yml`,
+      )!.content,
+    ),
+  );
+  return channelInstallationResponse(
+    options.supervisor,
+    body,
+    connectionId,
+    owner,
+    connection.botToken,
+    typeof accountFile.config?.["apiRoot"] === "string" ? accountFile.config["apiRoot"] : undefined,
+  );
 }
 
 async function channelInstallationResponse(
@@ -372,15 +399,23 @@ async function channelInstallationResponse(
   body: { channel: string; account: string },
   connectionId: string,
   owner: { ready: boolean; command?: string; expiresAt?: string } | undefined,
+  botToken?: string,
+  apiRoot?: string,
 ): Promise<Response> {
   const start = await startAccount(supervisor, body.channel, body.account);
+  const destination =
+    owner?.command && body.channel === "telegram" && botToken && start.transport === "started"
+      ? await telegramOwnerDestination(botToken, apiRoot)
+      : undefined;
   return Response.json(
     {
       channel: body.channel,
       account: body.account,
       installed: start.installed,
       revision: true,
-      ...(owner ? { owner, connectionId } : {}),
+      ...(owner
+        ? { owner: { ...owner, ...(destination ? { destination } : {}) }, connectionId }
+        : {}),
       transport: start.transport,
       ...(start.detail === undefined ? {} : { detail: start.detail }),
     },
@@ -635,7 +670,7 @@ async function handleListChannels(
   return Response.json({ accounts }, { status: 200 });
 }
 
-function handleChannelStatus(supervisor: ChannelSupervisor | null): Promise<Response> {
+export function handleChannelStatus(supervisor: ChannelSupervisor | null): Promise<Response> {
   if (supervisor === null) {
     return Promise.resolve(Response.json({ accounts: [] }, { status: 200 }));
   }
@@ -752,9 +787,12 @@ async function handleEditUser(
   );
 }
 
-async function loadSnapshot(database: Database): Promise<ChannelControlPlaneSnapshot> {
+async function loadSnapshot(
+  database: Database,
+  organizationId?: string,
+): Promise<ChannelControlPlaneSnapshot> {
   try {
-    return await loadChannelControlPlane(database);
+    return await loadChannelControlPlane(database, organizationId);
   } catch (error) {
     if (error instanceof ChannelControlPlaneError) {
       throw new ControlPlaneHttpError(
@@ -871,6 +909,7 @@ async function handlePrepareOnboarding(
   database: Database,
   request: Request,
   options: ChannelControlPlaneOpsOptions,
+  organizationId?: string,
 ): Promise<Response> {
   if (!apiFirstOnboardingEnabled()) return controlPlaneAbsent(request);
   const input = await parseJsonBody(
@@ -880,7 +919,12 @@ async function handlePrepareOnboarding(
   if (!options.onboarding) throw conflict("Local onboarding services are unavailable");
   try {
     return Response.json(
-      await prepareChannelOnboarding(database, options.onboarding, input.ownerEmail),
+      await prepareChannelOnboarding(
+        database,
+        options.onboarding,
+        input.ownerEmail,
+        organizationId,
+      ),
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {

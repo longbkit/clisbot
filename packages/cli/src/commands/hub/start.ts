@@ -2,6 +2,9 @@
 // (implementation doc §3.2: the `daemon start` pattern applied to the Hub's bin
 // entry; binds loopback :6870 and writes hub-local.json).
 
+import { updateLocalWebHub } from "../serve/web.js";
+import { resolveLocalHubHome } from "./local-hub.js";
+import { waitForOnboardingHub } from "../bot/local-runtime.js";
 import { Command } from "commander";
 import chalk from "chalk";
 import { getErrorMessage } from "../../utils/errors.js";
@@ -53,6 +56,8 @@ export function startCommand(): Command {
             process.exit(startLocalHubForeground(options));
           }
           const startup = await startLocalHubDetached(options);
+          await waitForOnboardingHub(startup.url, resolveLocalHubHome(options));
+          await updateLocalWebHub(resolveLocalHubHome(options), startup.url);
           console.log(chalk.green(`Hub starting in background (PID ${startup.pid ?? "unknown"}).`));
           console.log(chalk.dim(`URL: ${startup.url}`));
           console.log(chalk.dim(`Logs: ${startup.logPath}`));

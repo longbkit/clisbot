@@ -16,7 +16,16 @@ import { AccountFileSchema } from "../config/schema.js";
 
 export const ChannelOnboardingSchema = z
   .object({
-    name: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .refine((value) => !value.includes("/") && !value.includes("\\") && !value.includes("\0")),
+    botId: z
+      .string()
+      .regex(/^bot_[0-9a-f]{16}$/)
+      .optional(),
     update: z.boolean().optional(),
     daemonId: z.string().uuid(),
     projectId: z.string().min(1),
@@ -25,6 +34,8 @@ export const ChannelOnboardingSchema = z
     model: z.string().min(1).optional(),
     mode: z.string().min(1).optional(),
     ownerEmail: z.string().email().optional(),
+    ownerMemberId: z.string().min(1).optional(),
+    ownerOrganizationId: z.string().min(1).optional(),
     ownerIdentity: z.string().min(1).optional(),
   })
   .strict();
@@ -40,12 +51,13 @@ export async function onboardingOwner(
   services: OnboardingServices,
   organizationId: string,
   email?: string,
+  memberId?: string,
 ) {
   const result = await services.runtime.query<{ id: string; user_id: string; email: string }>(
     `select m.id, m.user_id, u.email from member m join "user" u on u.id = m.user_id
-     where m.organization_id = $1 and m.role = 'owner'
-       and ($2::text is null or lower(u.email) = lower($2))`,
-    [organizationId, email ?? null],
+     where m.organization_id = $1 and (($3::text is not null and m.id = $3)
+       or ($3::text is null and m.role = 'owner' and ($2::text is null or lower(u.email) = lower($2))))`,
+    [organizationId, email ?? null, memberId ?? null],
   );
   if (result.rows.length !== 1) {
     throw conflict(
@@ -59,8 +71,11 @@ export async function prepareChannelOnboarding(
   database: Database,
   services: OnboardingServices,
   email?: string,
+  organizationId?: string,
 ) {
-  const organizations = await database.listOrganizationsForOperator();
+  const organizations = (await database.listOrganizationsForOperator()).filter(
+    (org) => !organizationId || org.id === organizationId,
+  );
   if (organizations.length !== 1)
     throw conflict(
       "Finish Account setup on the local Hub first; onboarding requires one organization.",
@@ -84,8 +99,21 @@ export function configureOnboardingRoute(
   channel: string,
   accountId: string,
   input: ChannelOnboarding,
+  ownerMemberId: string,
 ): HubBundleFile[] {
-  const key = `bot-${input.name}`;
+  const legacyKey = `bot-${input.name}`;
+  const resource = load(
+    files.find((file) => file.path === CHANNEL_RESOURCE_PATH)?.content ?? "{}",
+  ) as { environments?: Record<string, { daemon?: string; projectId?: string; cwd?: string }> };
+  const legacy = resource?.environments?.[legacyKey];
+  // COMPAT(onboarding-resource-id): reuse an old mapping only in the same Host/home scope.
+  // Its customized routes stay untouched; a display-name match on another Host never adopts it.
+  const sameHome =
+    legacy?.daemon === input.daemonId &&
+    legacy.projectId === input.projectId &&
+    legacy.cwd === input.cwd;
+  const authoritativeKey = input.botId ? `bot-${input.botId}` : legacyKey;
+  const key = sameHome ? legacyKey : authoritativeKey;
   const resourceFile = configureOnboardingResources(files, key, input);
   const accountPath = `${CHANNELS_DIRECTORY}/${channel}/${accountId}.yml`;
   const account = AccountFileSchema.parse(
@@ -94,7 +122,7 @@ export function configureOnboardingRoute(
   const retained = (account.routes ?? []).filter(
     (route) => route.agent !== key || route.environment !== key,
   );
-  // One Route per Where: Members in DMs answer without a mention; Members in
+  // One Route per Where: this Bot owner in DMs answers without a mention; in
   // every group chat (threads and topics belong to their room) need one.
   const wheres = [{ dm: true }, { groups: "all" as const }];
   if (retained.length === (account.routes ?? []).length)
@@ -103,7 +131,7 @@ export function configureOnboardingRoute(
       ...wheres.map((where) => ({
         audience: [
           {
-            who: { roles: ["member" as const] },
+            who: { members: [ownerMemberId] },
             where,
             interaction: { requireMention: where.dm !== true },
           },
@@ -157,7 +185,12 @@ export async function linkOnboardingOwner(
   connectionId: string,
   input: ChannelOnboarding,
 ): Promise<{ ready: boolean; command?: string; expiresAt?: string }> {
-  const owner = await onboardingOwner(services, organizationId, input.ownerEmail);
+  const owner = await onboardingOwner(
+    services,
+    organizationId,
+    input.ownerEmail,
+    input.ownerMemberId,
+  );
   const realm = await services.access.channelIdentityRealm(organizationId, connectionId);
   const identities = (await services.access.listChannelIdentities(organizationId)).filter(
     (identity) => identity.identityRealm === realm,
@@ -173,6 +206,15 @@ export async function linkOnboardingOwner(
       "This channel identity already belongs to another Member. Update verified identities in Hub before assigning it to this owner.",
     );
   }
+  const verifiedOwner = identities.filter((identity) => identity.memberId === owner.id);
+  if (
+    input.ownerIdentity &&
+    verifiedOwner.length &&
+    !verifiedOwner.some((identity) => identity.externalSubjectId === input.ownerIdentity)
+  )
+    throw conflict(
+      "The owner already has a verified channel identity. Replace it explicitly in Hub identity administration; retry does not replace the owner.",
+    );
   if (input.ownerIdentity) {
     await services.access.bindChannelIdentity({
       organizationId,
@@ -201,11 +243,16 @@ export async function configureOnboardingSlack(
   services: OnboardingServices,
   request: Request,
   organizationId: string,
-  input: { botToken: string; appToken: string; ownerEmail?: string },
+  input: { botToken: string; appToken: string; ownerEmail?: string; ownerMemberId?: string },
 ): Promise<string> {
   const configure = services.providerApplications?.configureLocalSlackSocket;
   if (!configure) throw conflict("Slack setup is unavailable on this Hub");
-  const owner = await onboardingOwner(services, organizationId, input.ownerEmail);
+  const owner = await onboardingOwner(
+    services,
+    organizationId,
+    input.ownerEmail,
+    input.ownerMemberId,
+  );
   const result = await configure(request, { userId: owner.user_id, organizationId }, input);
   const connections = (await database.organizationConnectionUsage(organizationId)).slack;
   const connection = connections.find(
@@ -223,7 +270,11 @@ export async function validateOnboardingTarget(
   input: ChannelOnboarding,
 ): Promise<void> {
   if (!services) throw conflict("Local onboarding services are unavailable");
-  await onboardingOwner(services, organizationId, input.ownerEmail);
+  if (input.ownerOrganizationId && input.ownerOrganizationId !== organizationId)
+    throw conflict(
+      "This Bot owner belongs to a different Hub organization. Select the Bot's own Hub before linking.",
+    );
+  await onboardingOwner(services, organizationId, input.ownerEmail, input.ownerMemberId);
   const daemon = await database.findDaemonForOrganization(organizationId, input.daemonId);
   if (!daemon || daemon.status !== "active")
     throw invalidRequest("The onboarding daemon is not enrolled in this organization");

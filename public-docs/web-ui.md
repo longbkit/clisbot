@@ -8,68 +8,56 @@ category: Getting started
 
 # Self-hosting the web UI
 
-Clisbot's daemon can serve the browser web app itself, from the same address it already uses for the API. You don't need the hosted app at [app.clisbot.com](https://app.clisbot.com): point a browser at your own daemon and you get the full UI, connected to your own agents, on infrastructure you control.
+Local web is an optional browser UI for your Host. Bots and channel connections work without
+it; the published app at [app.clisbot.com](https://app.clisbot.com) and native/Desktop apps can
+connect directly or through relay.
 
-This is useful when you want to:
+The matching browser UI is bundled with Clisbot. Its serving process is independent of the
+Host and Hub, so enabling or stopping it preserves your agents and channel connections.
 
-- Run the whole UI on your own machine or server.
-- Put it behind your own reverse proxy, HTTPS, or tunnel.
-- Keep the setup self-hosted end to end, with no dependency on the hosted web app.
-
-The web app ships inside the daemon package, so the UI you serve always matches your daemon version. There's no separate build to keep in sync and no UI-vs-daemon version skew to manage.
-
-## Enable it
-
-The bundled web UI is off by default. Save the setting, then start the daemon:
+## Start, check, stop
 
 ```bash
-clisbot daemon config set features.webUi.enabled true
-clisbot daemon start
+clisbot web start
+clisbot web status
+clisbot web stop
 ```
 
-Or run a foreground deployment with an environment variable:
+Start reuses your Host and any running Hub. It starts no Hub for Bot-only use. Open the actual
+loopback URL printed by the command; an occupied preferred port selects an available one.
+Tailscale is preferred: when available, the command also prints a private HTTPS URL. Without
+Tailscale, loopback still works. Relay carries backend traffic, not these static web pages.
 
-```bash
-CLISBOT_WEB_UI_ENABLED=true clisbot daemon run
-```
-
-Or persist it in `config.json` so it survives restarts:
-
-```json
-{
-  "features": {
-    "webUi": {
-      "enabled": true
-    }
-  }
-}
-```
-
-Then open the daemon's address in a browser:
-
-```
-http://localhost:6868/
-```
-
-If your daemon doesn't recognize `--web-ui`, update it, the flag was added with the bundled web UI.
+Web start saves your choice. Clisbot daemon start and personal serving restore enabled web;
+reboot restoration needs an installed OS service. Web stop clears the choice and stops only
+the web process. The Host's **Local web UI** controls use the same lifecycle.
 
 ## How the connection works
 
-The page is served from the same origin as the daemon's API and WebSocket. When you open it, the app automatically connects back to that same origin, so you usually skip the "Add Host" step entirely, open `http://localhost:6868/` and you're looking at your agents.
+The browser sees the UI, Host API/WebSocket and running Hub API/WebSocket on the same origin.
+Adding Hub after web starts updates routing without restarting either backend. Hub retains
+its canonical identity, OAuth issuer and existing grants when web is enabled or disabled.
+Sign-in uses exact trusted origins; opening web grants no new Host or Hub authority.
 
-The same HTTP server keeps serving the API (`/api/*`), MCP (`/mcp/*`), service-proxy routes, and the WebSocket upgrade. Only the static files are new. To point the served UI at a _different_ daemon, add that daemon as a host from the UI as usual.
+Existing deployments that deliberately serve UI inside the daemon remain supported through
+`features.webUi.enabled` or `CLISBOT_WEB_UI_ENABLED=true`. The separate `web` commands are
+the normal personal workflow and do not require daemon web/proxy flags or a daemon restart.
 
 ## Topologies
 
 Three common ways to run it, in order of exposure:
 
-- **Same machine.** Daemon and browser on one box. Open `http://localhost:6868/`. Nothing else to configure.
+- **Same machine.** Run `clisbot web start` and open its printed loopback URL.
 - **Private network (LAN or VPN).** Reach the daemon from other devices on a network you trust, a home LAN or a [Tailscale](https://tailscale.com) tailnet. Follow the [Connectivity guide](/docs/connectivity#tailscale) for the complete direct setup.
 - **Public reverse proxy or tunnel.** Expose the UI on a domain over HTTPS, terminating TLS at a reverse proxy or a tunnel. This is the full self-hosted setup.
 
 The rest of this page builds from local to public. **Verify a direct connection works before you add a proxy in front of it**, it isolates daemon problems from proxy problems.
 
-## Exposing beyond localhost
+## Existing daemon-hosted deployments
+
+The remaining examples apply to the explicit legacy daemon-hosted UI (`features.webUi.enabled`), not the independent `web` process. For normal private access, use the Tailscale URL printed by `web start`; it manages only its own Serve mapping.
+
+### Exposing beyond localhost
 
 By default the daemon listens on `127.0.0.1:6868`, reachable only from the same machine. To reach it from other devices, bind it to a network interface:
 
@@ -223,7 +211,7 @@ For the full threat model, relay encryption, and DNS-rebinding details, see [Sec
 
 ## Troubleshooting
 
-- **Blank page or 404 at `/`.** The web UI isn't enabled. Start the daemon with `--web-ui` and confirm with `clisbot daemon status` that it's the daemon you're hitting.
+- **Blank page or 404 at `/`.** Run `clisbot web start`, check `clisbot web status`, and use the printed URL. For an explicit legacy deployment, check its daemon web UI configuration.
 - **Page loads but never connects.** The proxy isn't forwarding the WebSocket upgrade, or it's stripping the `Host` header. Check the upgrade headers in your proxy config.
 - **Connects, then output freezes.** Response buffering is on, or read timeouts are too short. Disable buffering and raise the timeouts.
 - **"Mixed content" / connection blocked over HTTPS.** The app fell back to `ws://`. Either the proxy isn't sending `X-Forwarded-Proto: https`, or the daemon doesn't trust the proxy address. Forward the header and configure `daemon.trustedProxies` if the proxy is not loopback.

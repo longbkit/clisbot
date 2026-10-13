@@ -258,7 +258,7 @@ describe("startLocalHubDetached", () => {
     const recorded = readHubStateFile(home);
     expect(recorded?.instanceId).toBeTruthy();
     expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_INSTANCE_ID).toBe(recorded?.instanceId);
-    expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_APP_URL).toBe("http://127.0.0.1:6868");
+    expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_APP_URL).toBe("http://127.0.0.1:7123");
   });
 
   test("keeps the selected port across stop and restart without treating a stopped PID as live", async () => {
@@ -346,7 +346,7 @@ describe("startLocalHubDetached", () => {
     expect(launch?.options?.detached).toBe(true);
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6870");
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_APP_URL).toBe(
-      "http://127.0.0.1:6868",
+      "http://127.0.0.1:6870",
     );
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.CLISBOT_HUB_BIND).toBe("127.0.0.1");
     expect(

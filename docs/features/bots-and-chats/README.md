@@ -25,6 +25,8 @@ things the daemon already has and adds nothing else at runtime:
 | Launch defaults    | Agent controls with the shape of an Agent profile                                                           |
 | Sessions           | Ordinary agent sessions created in the bot's Workspace                                                      |
 
+CLI onboarding and restart-reference ownership are maintained in [API-first onboarding](../../audits/2026-09-06-api-first-onboarding.md#current-flow). `bot start` can create a channel-free Bot; a positional name or ID selects an existing Bot. **Connect to a channel…** remains available before Hub setup and guides setup on the Bot’s Host.
+
 The Hub's Channel account is not a Bot and keeps its glossary entry. A Route can start a Bot
 (D15); the account stays the credential and audience owner.
 

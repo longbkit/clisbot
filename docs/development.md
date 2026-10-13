@@ -466,7 +466,9 @@ so the port may already be bound. `portScript` takes precedence when both values
 
 > The user-facing guide for this feature (enabling it, reverse proxy, TLS, tunnels, security) lives at [public-docs/web-ui.md](../public-docs/web-ui.md). This section is the contributor/build reference: how the artifact is produced, bundled, and excluded from desktop packaging.
 
-The daemon can optionally serve the browser web client from the same HTTP server. This is disabled by default.
+The normal optional UI is `clisbot web start` / `web status` / `web stop`, served by an independent gateway. It reuses Host/Hub and preserves their processes. See [device pairing](features/access/device-pairing.md#optional-local-web) for lifecycle and same-origin admission.
+
+Explicit existing deployments can still serve the browser client inside the daemon. This is disabled by default.
 
 Enable it in persistent configuration:
 

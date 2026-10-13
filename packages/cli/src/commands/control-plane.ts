@@ -10,6 +10,7 @@ import { resolveLocalHubState } from "./hub/local-hub.js";
 
 export interface ControlPlaneTarget {
   origin: string;
+  organizationId?: string;
   apiKey?: string;
   source: "local" | "remote";
 }
@@ -130,4 +131,11 @@ export function addControlPlaneTargetOptions(command: Command): Command {
     .option("--hub <origin>", "Hub origin to target (default: the local Hub from hub-local.json)")
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)")
     .option("--api-key <secret>", "Hub API key for a remote --hub origin");
+}
+
+/** Account-authenticated onboarding uses the management authority surface. Legacy operator verbs retain their endpoint. */
+export function channelOnboardingPath(target: ControlPlaneTarget): string {
+  return target.organizationId
+    ? `/api/management/v1/organizations/${encodeURIComponent(target.organizationId)}/channel-onboarding`
+    : "/api/v1/channels";
 }

@@ -329,7 +329,10 @@ Local-only `start`, `daemon run`, `config`, `onboard`, and `set-password` reject
 ## Hub
 
 ```bash
-clisbot hub start --personal     # Start a personal Hub on this machine (no account sign-in)
+clisbot hub start --personal     # Channel backend; Tailscale by default
+clisbot web start                # Optional local UI; reuses Host and Hub
+clisbot web status
+clisbot web stop                 # Preserves Host, Bot and Hub
 clisbot hub stop                 # Stop the local Hub; the daemon keeps running
 clisbot hub pair                 # Pair a device with the personal Hub
 clisbot hub devices              # List, label and revoke paired Hub devices

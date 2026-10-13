@@ -1,3 +1,4 @@
+import { localWebOrigins } from "./http/local-web-origins.js";
 import { HubDeviceAuthorityStore } from "./device-access/store.js";
 import { randomBytes } from "node:crypto";
 import { isIP } from "node:net";
@@ -337,6 +338,7 @@ function createProductionAuthServer(
     : undefined;
   const googleIdToken = deviceAccess ? readGoogleIdTokenConfig(process.env) : undefined;
   return createAuthServer({
+    trustedBrowserOrigins: localWebOrigins,
     ...(deviceAccess ? { deviceAccess } : {}),
     ...(googleIdToken ? { googleIdToken } : {}),
     database,
@@ -537,6 +539,7 @@ async function main(): Promise<void> {
         ? {}
         : { trustedProxyAddresses: config.trustedProxyAddresses }),
       ...(canonicalRequestOrigin === undefined ? {} : { canonicalRequestOrigin }),
+      trustedBrowserOrigins: localWebOrigins,
     },
   );
   const deviceIngress = await startDeviceIngress(

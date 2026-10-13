@@ -115,6 +115,7 @@ interface AuthServerOptions {
   entitlements: EntitlementsService;
   secret: string;
   baseURL: string;
+  trustedBrowserOrigins?: () => readonly string[];
   policy?: InstanceAuthPolicy;
   trustedClientIpHeader?: string;
   /** How a new organization is provisioned. Defaults to unlimited (self-hosted); the composition
@@ -267,6 +268,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
   const oauthProducts = oauthProductSession(options.database);
   const auth = betterAuth({
     baseURL: options.baseURL,
+    trustedOrigins: () => [oauthOrigin, ...(options.trustedBrowserOrigins?.() ?? [])],
     secret: options.secret,
     ...(options.trustedClientIpHeader === undefined
       ? {}

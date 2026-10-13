@@ -9,7 +9,7 @@ import { addJsonOption } from "../../utils/command-options.js";
 import { getErrorMessage } from "../../utils/errors.js";
 import { DEFAULT_KILL_TIMEOUT_MS, DEFAULT_STOP_TIMEOUT_MS, stopLocalHub } from "./local-hub.js";
 import { resolveLocalHubHome } from "./local-hub.js";
-import { stopGateway } from "../serve/gateway-launch.js";
+import { stopLocalWeb, updateLocalWebHub } from "../serve/web.js";
 import { removeTailscaleServe } from "../serve/tailscale.js";
 import type {
   CommandError,
@@ -77,7 +77,7 @@ export async function runStopCommand(
     if (options.web && options.tailscale) throw new Error("Choose either --web or --tailscale");
     if (options.web || options.tailscale) {
       const selectedHome = resolveLocalHubHome({ home });
-      if (options.web) await stopGateway(selectedHome);
+      if (options.web) await stopLocalWeb(selectedHome);
       else await removeTailscaleServe(selectedHome);
       return {
         type: "single",
@@ -95,6 +95,7 @@ export async function runStopCommand(
       };
     }
     const result = await stopLocalHub({ home, force, timeoutMs, killTimeoutMs });
+    await updateLocalWebHub(result.home, null);
     return {
       type: "single",
       data: {

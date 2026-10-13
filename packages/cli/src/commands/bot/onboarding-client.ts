@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
-import type { ControlPlaneTarget } from "../control-plane.js";
+import { channelOnboardingPath, type ControlPlaneTarget } from "../control-plane.js";
 import { requestHub } from "../hub/hub-client/internal/transport.js";
 import { DEFAULT_HUB_CONNECTION_PERMISSIONS } from "../hub/permissions.js";
 
@@ -24,7 +24,7 @@ export async function connectOnboardingDaemon(
   }
   const setup = await requestHub({
     origin: target.origin,
-    path: "/api/v1/channels",
+    path: channelOnboardingPath(target),
     method: "PUT",
     ...(target.apiKey ? { apiKey: target.apiKey } : {}),
     body: ownerEmail ? { ownerEmail } : {},

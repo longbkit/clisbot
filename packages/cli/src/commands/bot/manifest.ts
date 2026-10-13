@@ -75,43 +75,63 @@ export function botNameFromPath(filePath: string): string | null {
   return name.length > 0 ? name : null;
 }
 
-/** Read one bot's manifest; null when the file is absent or unparseable. */
-export async function readBotManifest(home: string, name: string): Promise<BotManifest | null> {
-  try {
-    const raw = await readFile(botManifestPath(home, name), "utf8");
-    return parseBotManifest(JSON.parse(raw));
-  } catch {
-    return null;
-  }
+/** Restart references live separately from daemon-owned Bot records. Legacy name files remain readable. */
+export function botConnectionPath(home: string, botId: string): string {
+  if (!/^bot_[0-9a-f]{16}$/.test(botId)) throw new Error("Invalid Bot ID for channel reference");
+  return path.join(home, "bot-connections", `${botId}.json`);
 }
 
-/** Every bot in the home, by manifest; an absent directory means no bots. */
-export async function readBotManifests(home: string): Promise<BotManifest[]> {
-  const directory = botDirectory(home);
+export async function readBotManifest(home: string, selector: string): Promise<BotManifest | null> {
+  const manifests = await readBotManifests(home);
+  const exact = manifests.find((manifest) => manifest.botId === selector);
+  if (exact) return exact;
+  const named = manifests.filter((manifest) => manifest.name === selector);
+  if (named.length > 1) throw new Error("That Bot name is ambiguous. Use the exact Bot ID.");
+  return named[0] ?? null;
+}
+
+async function referencesIn(directory: string): Promise<BotManifest[]> {
   let entries: string[];
   try {
     entries = await readdir(directory);
   } catch {
     return [];
   }
-  const manifests = await Promise.all(
-    entries.map(async (entry) => {
-      const name = botNameFromPath(entry);
-      if (name === null) return null;
-      try {
-        const raw = await readFile(path.join(directory, entry), "utf8");
-        return parseBotManifest(JSON.parse(raw));
-      } catch {
-        return null;
-      }
-    }),
+  const records = await Promise.all(
+    entries
+      .filter((entry) => entry.endsWith(".json"))
+      .map(async (entry) => {
+        try {
+          return parseBotManifest(JSON.parse(await readFile(path.join(directory, entry), "utf8")));
+        } catch {
+          return null;
+        }
+      }),
   );
-  return manifests.filter((manifest): manifest is BotManifest => manifest !== null);
+  return records.filter((record): record is BotManifest => record !== null);
+}
+
+export async function readBotManifests(home: string): Promise<BotManifest[]> {
+  const [current, legacy] = await Promise.all([
+    referencesIn(path.join(home, "bot-connections")),
+    referencesIn(botDirectory(home)),
+  ]);
+  const ids = new Set(current.map((record) => record.botId));
+  const adoptedNames = new Set(current.map((record) => record.name));
+  return [
+    ...current,
+    ...legacy.filter((record) =>
+      record.botId ? !ids.has(record.botId) : !adoptedNames.has(record.name),
+    ),
+  ];
 }
 
 /** Atomically write a bot manifest (tmp + rename), 0600, creating the dir. */
 export async function writeBotManifest(home: string, manifest: BotManifest): Promise<void> {
-  const target = botManifestPath(home, manifest.name);
+  const target =
+    manifest.version === 2
+      ? botConnectionPath(home, manifest.botId ?? "")
+      : botManifestPath(home, manifest.name);
   await mkdir(path.dirname(target), { recursive: true, mode: MANIFEST_DIR_MODE });
   const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
   try {
@@ -132,7 +152,12 @@ export async function writeBotManifest(home: string, manifest: BotManifest): Pro
 
 /** Remove a bot's manifest file (best-effort; absence is not an error). */
 export async function removeBotManifest(home: string, name: string): Promise<void> {
-  await rm(botManifestPath(home, name), { force: true });
+  const reference = await readBotManifest(home, name);
+  if (reference?.version === 2 && reference.botId)
+    await rm(botConnectionPath(home, reference.botId), { force: true });
+  // Delete only a parsed CLI reference, never a daemon-owned Bot JSON record.
+  const legacy = (await referencesIn(botDirectory(home))).find((record) => record.name === name);
+  if (legacy) await rm(botManifestPath(home, legacy.name), { force: true });
 }
 
 const REQUIRED_STRING_FIELDS = [

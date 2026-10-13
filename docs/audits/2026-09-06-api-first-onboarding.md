@@ -35,9 +35,8 @@ Existing workspaces are still preserved unless overwrite is requested.
 CLI composes daemon workspace/agent operations and Hub resource APIs. The Hub
 owns encrypted Connections, Channel configuration revisions and Member identity
 verification. The existing direct Channel–Agent execution model creates and
-resumes sessions per conversation, using the seeded workspace; the locally
-created initial agent is available in the app and is not falsely advertised as
-the agent to which every channel conversation is bound.
+resumes sessions per conversation, using the Bot home. Bot creation starts no idle
+agent session; the app creates sessions when the user starts a Chat.
 
 Owner access reuses Member authorization. A bot token identifies the bot, not its
 human owner. Reuse a linked owner identity; a local operator may explicitly
@@ -79,28 +78,40 @@ configuration updates. The normal flow calls the resource API directly.
 
 ## Current flow
 
-1. Resolve the shared home and explicit workspace, then start the daemon and local Hub.
-2. Create/reuse the daemon Workspace and its Project. Seed the bundled instruction files
-   into the daemon-returned directory before creating the initial assistant agent.
-3. For channel setup, select the existing owner or bootstrap the initial owner from
-   explicitly supplied email/password. The authenticated local operator endpoint issues
-   a short-lived enrollment token; the daemon stores its own relationship credential.
-4. Verify supplied channel credentials and persist the Connection with the existing
-   encrypted credential store. Configure named agent/environment resources and member
-   routes in an organization-owned Channel revision, retaining unrelated routes. Slack
-   channel replies start a thread under the request; Telegram retains its native topic/group context.
-5. Reuse the owner's verified channel identity, accept an explicit local-operator assertion,
-   or print a one-time linking command. Start the account and report actual transport state.
+1. Validate the name, launch defaults and credential inputs before provisioning. Start or reuse
+   the Host; Bot-only creation needs no Hub, channel credentials or channel owner.
+2. Create a daemon-owned Bot, or select an existing Bot by exact ID or unique Host-local
+   display name/slug. The Host owns its immutable home, identity, history and launch defaults.
+3. Only when a channel is requested, reuse the selected Hub. A fresh local setup starts
+   a personal backend and initializes its key, owner and organization. Existing data with
+   a missing or malformed key requires recovery. An already selected remote Hub is never
+   replaced by a competing local Hub. The CLI reuses its saved login and the authenticated
+   management onboarding API; missing login or insufficient rights gives actionable guidance.
+4. Enroll the Host with real authority, persist the encrypted Connection and deploy its
+   Channel revision. New routes name the owner's exact Member ID: DMs need no mention;
+   groups require a mention. Replies in a group remain visible to everyone there.
+5. Reuse a verified owner in the same identity realm or issue a single-use 10-minute
+   `/link` code. Prefer private DM. The owner confirmed on 2026-10-13 that an addressed
+   group command remains supported. Normal execution stays closed until the owner is linked;
+   retry renews pending codes and invalidates old ones without replacing a verified owner.
+6. Report local Bot, Hub, channel transport and owner readiness separately. A failed channel
+   step retains the Bot checkpoint. Repeat starts reuse the Connection and customized routes.
 
-Bare `hub init` provides the seeded workspace and app agent without requiring a channel.
-With channel flags, it uses the same orchestration as `bot start`. A checkpoint before
-Channel installation retains daemon IDs after failure. A successful installation stores
-only the Connection ID in the manifest, allowing later starts without resupplying tokens.
-The human-readable and JSON results both preserve actionable error messages.
-Normal restarts retain existing route policy and agent/environment edits made through
-the Hub API. Explicit runtime flags update the selected runtime resources; seeding is
-not a recurring enforcement of defaults. A verified identity belonging to another
-Member is not silently reassigned during onboarding.
+`bot start --bot-name "Sandbox Assistant" --provider codex` creates a Bot without a Hub.
+`bot start "Sandbox Assistant"` selects an existing Bot; an unknown selector never creates
+one. Channel flags are optional and omission never unlinks a saved Connection. The existing
+`hub init` alias remains supported for seeded assistant setup. Explicit overwrite backs up
+user files; ordinary retry preserves them.
+
+New resource mappings use the stable Bot ID. Legacy name-based mappings are adopted only
+when Host, Project and home all match. Their customized routes are retained; inspect **Who**
+and replace broad old Member rules with the intended exact owner before channel use. There
+is no reliable provenance on historical routes, so startup does not silently rewrite them.
+
+Channel setup starts no local UI or proxy and changes no running daemon web configuration.
+Tailscale is preferred/default; its direct Host and Hub routes are independent. The existing
+unavailable-Tailscale fallback policy reports the actual transport and reason. Optional local
+web lifecycle and transport admission are owned by [device pairing](../features/access/device-pairing.md).
 
 ## Legacy retained deliberately
 
@@ -259,3 +270,21 @@ login, and real signed OAuth JWT rejection after reset followed by successful
 fresh OAuth authorization. CLI, server library, and full Hub builds, Hub node/start/e2e
 typechecks, and scoped lint passed. No live user password or master-secret
 configuration was changed during implementation.
+
+## Restart reference ownership
+
+New channel references are `$CLISBOT_HOME/bot-connections/{botId}.json`, version 2.
+They contain the stable Bot ID, display-name cache, channel/account, Connection ID and
+credential durability markers, never secrets or daemon-owned homes/sessions. Display names
+can collide or change without overwriting another Bot's attachment. Legacy references under
+`bots/{name}.json` remain readable; adopted references take precedence without deleting the
+legacy files. The daemon's `bots/{botId}.json` remains its exclusive record.
+
+The authenticated remote counterpart is `/api/management/v1/organizations/{organizationId}/channel-onboarding`
+(PUT preflight/enrollment, POST connection/setup, GET `/status`). It composes the same channel
+owners as OS-local onboarding. Cookie/OAuth access uses live organization capabilities; saved
+CLI/API credentials require configuration scope and their approving Member's current
+manage-resources authority. Tenant mismatch, role loss, revoked credentials and owner realm
+mismatch fail closed. An organization Admin does not become a generated route's audience:
+new Who rules still name the Bot's exact owner Member, derived from daemon authorship when
+available, or the personal local owner. Existing customized routes retain their policy.

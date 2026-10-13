@@ -24,6 +24,15 @@ export function createGateway(config: GatewayConfig): Server {
   const app = express();
   const server = createServer(app);
   let hub = config.hubOrigin ? createHubHttpProxy(config.hubOrigin) : undefined;
+  const makeWeb = () =>
+    createWebUiMiddleware({
+      enabled: true,
+      distDir: config.webDirectory,
+      hubEnabled: Boolean(hub),
+      label: "Clisbot",
+      logger: pino(),
+    });
+  let web = makeWeb();
   const daemon = createFixedHttpProxy(
     config.daemonOrigin,
     (path) => !isHubHttpPath(path) && /^(\/api(?:\/|$)|\/mcp(?:\/|$)|\/public(?:\/|$))/.test(path),
@@ -35,6 +44,7 @@ export function createGateway(config: GatewayConfig): Server {
       response.status(403).json({ error: "invalid_host" });
       return;
     }
+    sanitizeProxyHeaders(request);
     next();
   });
   app.get("/api/gateway/health", (_request, response) =>
@@ -70,6 +80,7 @@ export function createGateway(config: GatewayConfig): Server {
     if (value.origins !== undefined) config.origins = value.origins as string[];
     hub = config.hubOrigin ? createHubHttpProxy(config.hubOrigin) : undefined;
     ({ hosts, origins } = gatewayPolicies(config));
+    web = makeWeb();
     response.json({
       instanceId: config.instanceId,
       hubOrigin: config.hubOrigin,
@@ -78,15 +89,7 @@ export function createGateway(config: GatewayConfig): Server {
   });
   app.use((request, response, next) => (hub ? hub.middleware(request, response, next) : next()));
   app.use(daemon.middleware);
-  app.use(
-    createWebUiMiddleware({
-      enabled: true,
-      distDir: config.webDirectory,
-      hubEnabled: false,
-      label: "Clisbot",
-      logger: pino(),
-    }),
-  );
+  app.use((request, response, next) => web(request, response, next));
   app.use((_request, response) => response.status(404).json({ error: "not_found" }));
   server.on("upgrade", (request, socket, head) => {
     if (
@@ -96,11 +99,22 @@ export function createGateway(config: GatewayConfig): Server {
       socket.destroy();
       return;
     }
+    sanitizeProxyHeaders(request);
     if (hub?.handlesUpgrade(request)) hub.upgrade(request, socket, head);
     else if (daemon.handlesUpgrade(request)) daemon.upgrade(request, socket, head);
     else socket.destroy();
   });
   return server;
+
+  function sanitizeProxyHeaders(request: import("node:http").IncomingMessage) {
+    const host = request.headers.host!;
+    const publicOrigin = config.origins.find((origin) => new URL(origin).host === host);
+    request.headers["x-forwarded-host"] = host;
+    request.headers["x-forwarded-proto"] = publicOrigin
+      ? new URL(publicOrigin).protocol.slice(0, -1)
+      : "http";
+    delete request.headers["x-clisbot-trusted-request-origin"];
+  }
 }
 
 function isLoopbackOrigin(value: unknown): value is string {

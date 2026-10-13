@@ -355,7 +355,9 @@ starting Hub from the app preserves the existing web address and other homes' Se
 ```mermaid
 flowchart TB
   App[Mobile / desktop / browser] -->|HTTPS + encrypted WebSocket| TS[Tailscale Serve or public reverse proxy]
-  TS --> Gateway[Gateway process · loopback 6880 · only with a public route or web UI on]
+  TS --> Hub[Hub API process · loopback 6870]
+  TS --> Daemon[Daemon process · loopback 6868]
+  App --> Gateway[Optional local web process · loopback 6880]
   Gateway -.->|static files, when the web UI is on| Web[Bundled web UI]
   Gateway -->|fixed Hub namespaces / device socket| Hub[Hub API process · loopback 6870]
   Gateway -->|daemon HTTP namespaces / ws| Daemon[Daemon process · loopback 6868]
@@ -365,14 +367,16 @@ flowchart TB
   Daemon -->|private enrollment and outbound relationship| Hub
 ```
 
-Web and gateway are **one Node.js process**: Express serves fixed HTTP/WS proxies and, when
+Tailscale connects directly to the independent Host and Hub backends. Channel use
+starts no gateway. Optional web and its gateway are **one Node.js process**: Express serves fixed HTTP/WS proxies and, when
 the web UI is on, the existing built Expo web assets. The implementation lives in
 `packages/cli/src/commands/serve`; forwarding/static adapters reuse `@clisbot/server` and
 namespace contracts from `@clisbot/protocol`. No new gateway framework/package is required.
 Hub retains its own HTTP server, embedded database option and encrypted ingress. The new
 `@clisbot/device-access` package contains portable signed proofs and backend authority/persistence.
 
-Hub/gateway crash or reconfiguration can disconnect clients while those services recover.
+Hub/gateway crash can disconnect clients while those services recover. Adding or removing
+optional web never restarts Hub or changes its canonical OAuth issuer/audience.
 It does not restart the daemon or its agents. A Hub outage can prevent new managed tickets;
 existing managed sessions remain bounded by their lease. Process separation does not reserve
 CPU/RAM at the OS level. Static assets and Hub tunnel requests do not use the daemon event loop.
@@ -383,14 +387,57 @@ WS Origin, preserves forwarded Host/Origin and E2EE subprotocols, and never gran
 CLI updates the daemon's hostname/Origin policy through local configuration plus live reload.
 Launch overrides that prevent the update produce an actionable error, with daemon preserved.
 
+## Optional local web
+
+`clisbot web start`, `web status` and `web stop` own the local UI/gateway independently.
+Start reuses the Host and a running Hub; Bot-only web starts no Hub. The matching UI is
+bundled in the installed package. In a source checkout the command prepares missing assets
+automatically. It reports the actual selected loopback port, plus a Tailscale HTTPS URL only
+when its own Serve mapping succeeds. Relay transports backend traffic, not static pages.
+
+The gateway forwards fixed Host and Hub HTTP/WS namespaces. Hub-before-web and
+web-before-Hub use operator-authenticated hot target updates, preserving both backend PIDs.
+Explicit Hub stop records `stoppedAt`; saved-service startup honors it and does not
+resurrect that Hub. A later explicit channel/Hub start may resume it.
+
+Web stop clears `web-intent.json`, removes only `web-serving/tailscale-serve.json`'s mapping,
+and stops only the gateway supervisor. Hub stop removes its live gateway target while leaving
+web available. Existing `hub stop --web` is retained as an alias to web stop.
+
+`web-intent.json` records enablement, asset directory and actual port. CLI daemon start, installed daemon/Desktop startup and
+personal serving restore enabled web once; crash recovery belongs to the gateway supervisor.
+Reboot restoration requires an installed Clisbot OS service. No OS service is installed by
+web start. Do not infer reboot persistence from a running supervisor.
+
+`web-origins.json` is an OS-owned, bounded exact allowlist for the optional gateway's loopback
+and private Tailscale browser origins. Hub reads it at request time. The gateway overwrites
+forwarded authority/protocol headers after validating Host, strips incoming internal origin
+metadata, and validates WS Origin. Hub honors alternate request metadata only from configured
+trusted proxies and an exact allowed web origin. Same-origin cookie sign-in uses this transport
+origin; Hub canonical URL, OAuth issuer/audience and first-party callback registration remain
+unchanged. Stopping web removes that admission, preserving OAuth grants and direct Hub routes.
+The published app uses its existing bearer/device direct or relay transports without local web.
+
+The app's **Local web UI** controls operate on the explicit Host using the same CLI coordinator.
+`features.localWeb` gates the additive `daemon.web.request`/`.response` RPC. It requires the
+Host's independent owner authority; Managed Access is not a bypass. Older Hosts show upgrade
+or local CLI guidance. A remote device opens only the reported private HTTPS URL, never its own
+loopback address.
+
 ## Starting and stopping
+
+**Tailscale is the preferred and default transport.** Omit `--transport` for the
+normal personal setup; CLI and Desktop Start Hub both select Tailscale. Use
+`--transport relay` only when deliberately choosing relay. The launcher can fall
+back to relay when Tailscale is unavailable; check the reported transport and
+network guidance rather than treating relay as the default setup.
 
 From an installed version containing these changes:
 
 ```sh
 clisbot                                  # existing onboarding; Hub remains optional
 clisbot daemon start --home /path/to/home
-clisbot hub start --personal --transport tailscale --home /path/to/home
+clisbot hub start --personal --home /path/to/home # Tailscale by default
 clisbot hub start --personal --transport relay --home /path/to/home
 clisbot hub start --personal --transport local --home /path/to/home
 clisbot hub start --personal --transport https --public-url https://home.example.com
@@ -690,3 +737,12 @@ changes small during upstream sync; the feature helpers, authority package and s
 carry the fork-specific behavior. Do not enable protected pairing on an existing deployment until
 clients are upgraded and a safe daemon restart is scheduled. Full monorepo suites, signing and public releases are separate from the scoped validation recorded
 in the implementation tracker.
+
+## Backend account entry
+
+Account Hubs retain the existing first-party OAuth browser login and authenticated server
+functions even when the inherited dashboard is disabled. Plain dashboard URLs stay closed;
+OAuth entry, CLI approval and their packaged browser assets are necessary authentication
+surfaces. Public/native clients need no optional local web process. Browser-origin admission
+and account/organization authorization remain enforced by their domain owners. Adding web
+never changes the canonical Hub URL, OAuth issuer/audience or callback registration.

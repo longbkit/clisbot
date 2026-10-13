@@ -3251,6 +3251,19 @@ export class Session {
         return this.daemonSession.handleGetPairingOfferRequest(msg);
       case "daemon.devices.request":
         return this.daemonSession.handleDevicesRequest(msg);
+      case "daemon.web.request":
+        if (!this.canStartLocalHub()) {
+          this.emit({
+            type: "rpc_error",
+            payload: {
+              requestId: msg.requestId,
+              requestType: msg.type,
+              error: "Local web requires this Host's independent owner credential",
+            },
+          });
+          return undefined;
+        }
+        return this.daemonSession.handleLocalWebRequest(msg);
       case "hub.local.start.request":
         if (!this.canStartLocalHub()) {
           this.emit({

@@ -2,6 +2,15 @@
 // The local manifest contains only restart metadata; the daemon owns identity and files.
 
 import { hydrateBotReference, listDaemonBots, provisionDaemonBot } from "./daemon-bot.js";
+import { updateLocalWebHub } from "../serve/web.js";
+import { editPersistedConfig } from "@clisbot/server/configuration";
+import { startPersonalHub } from "../serve/index.js";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { PrivateHubCredentialStore } from "../hub/credentials.js";
+import { HubHttpClient } from "../hub/hub-client/index.js";
+import { resolveHubCredential } from "../hub/authority.js";
+import { normalizeHubOrigin } from "../hub/origin.js";
 import { ownerBootstrapEnvironment } from "./owner-bootstrap.js";
 import { botRestartCommand } from "./start-output.js";
 import {
@@ -14,7 +23,7 @@ import {
 import type { BotTemplateResult } from "@clisbot/protocol/bots/rpc-schemas";
 type WorkspaceTemplateResult = BotTemplateResult & { directory: string; backupDirectory?: string };
 import { connectOnboardingDaemon, isOnboardingEnabled } from "./onboarding-client.js";
-import { configureLocalHubWebUi, localWebUiOrigin } from "../hub/web-ui.js";
+
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandError } from "../../output/index.js";
@@ -37,6 +46,7 @@ import { resolveTcpHostFromListen, startLocalDaemonDetached } from "../daemon/lo
 import { readDaemonInstance, daemonLogPath } from "@clisbot/server/daemon-control";
 import { assertBotName, readBotManifest, writeBotManifest, type BotManifest } from "./manifest.js";
 import {
+  buildAssistantPlan,
   buildBotManifest,
   buildBotStartPlan,
   planUnchanged,
@@ -61,12 +71,12 @@ export interface BotStartReport {
   agentTitle: string;
   provider: string;
   model?: string;
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "-";
   account: string;
   workspacePath: string;
   workspaceId: string;
-  credential: "persisted";
-  hub: "started" | "already-running";
+  credential: "persisted" | "not-required";
+  hub: "started" | "already-running" | "not-required";
   /** The Hub's loopback URL (the one-screen state: hub port). */
   hubUrl: string;
   /** The Hub's recorded PID (the one-screen state: hub pid). */
@@ -81,6 +91,7 @@ export interface BotStartReport {
   routeNote: string;
   ownerReady?: boolean;
   ownerLinkCommand?: string;
+  ownerLinkDestination?: string;
   ownerLinkExpiresAt?: string;
   ownerLinkRenewCommand?: string;
   template?: WorkspaceTemplateResult;
@@ -126,9 +137,50 @@ export async function runBotStart(
   input: BotStartInput,
   deps: BotStartDeps,
 ): Promise<BotStartReport> {
+  const requestedOptions = { ...input.options };
+  if (input.options.selector) {
+    await deps.ensureDaemonUp(input.home, input.env);
+    await deps.waitDaemonUp(input.home);
+    const client = await deps.openDaemon(
+      await deps.daemonHost(input.home, input.env),
+      deps.daemonPassword(input.home),
+    );
+    try {
+      const bot = selectExistingBot(await listDaemonBots(client), input.options.selector);
+      const reference = await deps.readManifest(input.home, bot.id);
+      input = {
+        ...input,
+        options: resumeBotOptions(
+          input.options,
+          hydrateBotReference(
+            reference ?? {
+              version: 2,
+              name: bot.name,
+              botId: bot.id,
+              botType: bot.kind,
+              provider: bot.launch.provider,
+              workspacePath: bot.cwd,
+              workspaceId: bot.workspaceId,
+              agentId: "",
+              agentTitle: bot.name,
+              channel: "telegram",
+              account: "",
+              credentials: {},
+              createdAt: bot.createdAt,
+              updatedAt: bot.updatedAt,
+            },
+            bot,
+          ),
+        ),
+      };
+      input.options.existingBotId = bot.id;
+    } finally {
+      await deps.closeDaemon(client);
+    }
+  }
   const name = input.options.botName ?? `${input.options.botType ?? "personal"}-assistant`;
   assertBotName(name);
-  let saved = await deps.readManifest(input.home, name);
+  let saved = await deps.readManifest(input.home, input.options.existingBotId ?? name);
   if (saved?.version === 2) {
     await deps.ensureDaemonUp(input.home, input.env);
     await deps.waitDaemonUp(input.home);
@@ -145,12 +197,30 @@ export async function runBotStart(
     }
   }
   const options = resumeBotOptions(input.options, saved);
+  if (!hasChannelOptions(options))
+    return startChannelFreeBot({ ...input, options }, deps, requestedOptions);
   const plan = buildBotStartPlan(options, input.home);
   assertBotName(plan.name);
+  // Resolve every secret before creating any durable resources. Values stay in memory.
+  const credential = plan.credential;
+  if (!("connectionId" in credential)) {
+    if (credential.channel === "telegram") resolveTokenSecret(credential.input, input.env);
+    else {
+      resolveTokenSecret(credential.botToken, input.env);
+      resolveTokenSecret(credential.appToken, input.env);
+    }
+  }
 
   const existing = saved;
-  const reused = existing !== null && planUnchanged(existing, plan);
+  const reused =
+    Boolean(options.existingBotId) || (existing !== null && planUnchanged(existing, plan));
 
+  if (reused)
+    plan.updateLaunch = [
+      requestedOptions.provider,
+      requestedOptions.model,
+      requestedOptions.mode,
+    ].some((value) => value !== undefined);
   input = { ...input, env: ownerBootstrapEnvironment(options, input.env) };
   const infrastructure = await ensureInfrastructure(input, deps);
   const client = await deps.openDaemon(
@@ -158,7 +228,15 @@ export async function runBotStart(
     deps.daemonPassword(input.home),
   );
   try {
-    const ids = await resolveAssistantResources(client, deps, plan, existing, reused, input.env);
+    const ids = await resolveAssistantResources(
+      client,
+      deps,
+      plan,
+      existing,
+      reused,
+      input.env,
+      options.existingBotId,
+    );
     const template = ids.template;
     // Keep the local assistant available even if Account setup or Channel installation needs a retry.
     await writeRecordedManifest(input.home, deps, plan, existing, ids);
@@ -174,16 +252,27 @@ export async function runBotStart(
             ids,
             onboarding,
             input.options.ownerIdentity,
-            shouldUpdateRuntime(input.options, reused),
+            shouldUpdateRuntime(requestedOptions, reused),
           )
         : undefined,
     );
-    await recordInstalledConnection(input.home, deps, plan, installed, Boolean(onboarding));
+    await recordInstalledConnection(
+      input.home,
+      deps,
+      plan,
+      installed,
+      Boolean(onboarding),
+      ids.botId,
+    );
     const channel = await verifyChannelInstalled(deps, plan);
     return withOnboardingStatus(
       {
         ...buildReport(plan, ids, reused, infrastructure, channel),
-        ownerLinkRenewCommand: botRestartCommand(input.home, plan.name, onboarding?.ownerEmail),
+        ownerLinkRenewCommand: botRestartCommand(
+          input.home,
+          ids.botId ?? plan.name,
+          onboarding?.ownerEmail,
+        ),
       },
       installed,
       template,
@@ -200,10 +289,11 @@ async function resolveAssistantResources(
   existing: BotManifest | null,
   reused: boolean,
   env: NodeJS.ProcessEnv,
+  selectedBotId?: string,
 ) {
   void reused;
   void env;
-  return deps.provisionBot(client, plan, existing?.botId);
+  return deps.provisionBot(client, plan, existing?.botId ?? selectedBotId);
 }
 
 async function recordInstalledConnection(
@@ -212,17 +302,16 @@ async function recordInstalledConnection(
   plan: BotStartPlan,
   installed: ChannelAddResult,
   onboarding: boolean,
+  botId?: string,
 ): Promise<void> {
-  const recorded = await deps.readManifest(home, plan.name);
+  const recorded = await deps.readManifest(home, botId ?? plan.name);
   if (!recorded)
     throw new Error("The onboarding checkpoint disappeared; rerun setup before proceeding.");
   await deps.writeManifest(home, {
     ...recorded,
     ...(installed.connectionId ? { connectionId: installed.connectionId } : {}),
     credentials: { [`${plan.channel}:${plan.account}`]: { persisted: true } },
-    routeNote: onboarding
-      ? "Member routes are configured for the seeded workspace"
-      : recorded.routeNote,
+    routeNote: onboarding ? "Owner-only routes are configured for this Bot" : recorded.routeNote,
   });
 }
 
@@ -275,13 +364,23 @@ function shouldUpdateRuntime(options: BotStartOptions, reused: boolean): boolean
 
 function channelSetup(
   plan: BotStartPlan,
-  ids: { projectId: string; workspacePath: string },
+  ids: {
+    botId?: string;
+    ownerMemberId?: string;
+    ownerOrganizationId?: string;
+    projectId: string;
+    workspacePath: string;
+  },
   onboarding: { daemonId: string; ownerEmail: string },
   ownerIdentity?: string,
   update = false,
 ): import("../channels/client.js").ChannelSetupInput {
   return {
     name: plan.name,
+    ...(ids.botId ? { botId: ids.botId } : {}),
+    ...(ids.ownerMemberId
+      ? { ownerMemberId: ids.ownerMemberId, ownerOrganizationId: ids.ownerOrganizationId }
+      : {}),
     update,
     daemonId: onboarding.daemonId,
     projectId: ids.projectId,
@@ -299,7 +398,6 @@ function withOnboardingStatus(
   installed: ChannelAddResult,
   template?: WorkspaceTemplateResult,
 ): BotStartReport {
-  if (!template) return report;
   let nextStep = "Check bot status; the channel is not ready yet";
   if (installed.owner?.command)
     nextStep =
@@ -308,11 +406,14 @@ function withOnboardingStatus(
     nextStep = buildNextStep(report.channel);
   return {
     ...report,
-    template,
+    ...(template ? { template } : {}),
     nextStep,
-    routeNote: "Member routes are configured for the seeded workspace",
+    routeNote: report.reused
+      ? "Existing route policy preserved; review Who in Channels"
+      : "New defaults admit this Bot owner only",
     ownerReady: installed.owner?.ready === true,
     ...(installed.owner?.command ? { ownerLinkCommand: installed.owner.command } : {}),
+    ...(installed.owner?.destination ? { ownerLinkDestination: installed.owner.destination } : {}),
     ...(installed.owner?.expiresAt ? { ownerLinkExpiresAt: installed.owner.expiresAt } : {}),
   };
 }
@@ -345,6 +446,8 @@ async function ensureInfrastructure(
   await deps.waitDaemonUp(input.home);
   const hub = await deps.ensureHubUp(input.home, input.env);
   await deps.waitHubReady(hub.url);
+  if (/^http:\/\/(127\.0\.0\.1|localhost):/.test(hub.url))
+    await updateLocalWebHub(input.home, hub.url);
   const hubPid = String(resolveHubPid(input.home) ?? "-");
   return {
     hub: hub.hub,
@@ -476,7 +579,7 @@ function buildReport(
   };
 }
 
-function buildNextStep(channel: "slack" | "telegram"): string {
+function buildNextStep(channel: "slack" | "telegram" | "-"): string {
   return channel === "slack"
     ? "DM the bot, or mention it in your Slack channel"
     : "DM the bot, or mention it in your Telegram group";
@@ -484,31 +587,76 @@ function buildNextStep(channel: "slack" | "telegram"): string {
 
 /** The real boundary implementations, wired to the shared home + env. */
 export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotStartDeps {
+  let target: ControlPlaneTarget | undefined;
+  const selectedTarget = () => target ?? localControlPlaneTarget(home, env);
+
   const ensureHubUp: BotStartDeps["ensureHubUp"] = async (_home, childEnv) => {
     const state = resolveLocalHubState({ home }, childEnv);
+    const credentials = new PrivateHubCredentialStore({ ...env, CLISBOT_HOME: home });
+    const client = await openVerifiedDaemon(
+      home,
+      await daemonHostFor(home),
+      readDaemonPasswordFile(home),
+    );
+    let selected: string | undefined;
+    try {
+      selected =
+        (await client.getHubStatus()).status.hubOrigin ??
+        env.CLISBOT_HUB_URL ??
+        credentials.active()?.origin;
+    } finally {
+      await client.close();
+    }
+    if (
+      selected &&
+      (!state.state || normalizeHubOrigin(selected) !== normalizeHubOrigin(state.state.url))
+    ) {
+      const origin = normalizeHubOrigin(selected);
+      const apiKey = resolveHubCredential({ origin, options: {}, env, credentials });
+      const identity = await new HubHttpClient().describeCredential(origin, apiKey);
+      target = { origin, apiKey, organizationId: identity.organization.id, source: "remote" };
+      return { hub: "already-running", url: origin };
+    }
     if (state.running) return { hub: "already-running", url: state.state?.url ?? "" };
-    const started = await startLocalHubDetached({ home }, undefined, childEnv);
+    const dataDirectory =
+      state.state?.dataDirectory ??
+      childEnv.CLISBOT_HUB_DATA_DIR ??
+      (existsSync(path.join(home, "PG_VERSION")) ? home : path.join(home, "hub"));
+    const fresh = !existsSync(path.join(dataDirectory, "PG_VERSION"));
+    if ((fresh || state.state?.personalComposition) && !childEnv.CLISBOT_BOOTSTRAP_OWNER_PASSWORD) {
+      const result = await startPersonalHub({ home, json: true });
+      console.error(
+        `Clisbot Hub manages channel connections. Transport: ${result.transport}; Hub: ${result.origin}`,
+      );
+      return { hub: "started", url: result.hub };
+    }
+    const started = await startLocalHubDetached(
+      { home, initMasterKey: fresh, personal: fresh },
+      undefined,
+      { ...childEnv, CLISBOT_HUB_DATA_DIR: dataDirectory },
+    );
     return { hub: "started", url: started.url };
   };
   return {
     ensureHubUp,
-    waitHubReady: (url) => waitForOnboardingHub(url, home),
-    ensureDaemonUp: async (_home, childEnv) => {
+    waitHubReady: async (url) => {
+      if (!target?.organizationId) return waitForOnboardingHub(url, home);
+      // Credential identity was authenticated above; management setup checks live authority.
+    },
+    ensureDaemonUp: async (_home, _childEnv) => {
+      const fresh = !existsSync(path.join(home, "config.json"));
       if (isOnboardingEnabled(env)) await assertLocalOnboardingAccess(home, env);
       const state = await readDaemonInstance(home);
       const listen =
         state?.listen ??
         (isOnboardingEnabled(env) ? await onboardingDaemonListen(home, env) : undefined);
-      if (isOnboardingEnabled(env) && listen) {
-        const uiEnv = { ...childEnv, CLISBOT_LISTEN: listen };
-        const hub = await ensureHubUp(home, {
-          ...childEnv,
-          CLISBOT_HUB_APP_URL: localWebUiOrigin(home, uiEnv),
-        });
-        await waitForOnboardingHub(hub.url, home);
-        configureLocalHubWebUi(home, hub.url, { running: Boolean(state), listen });
-      }
       if (state) return { daemon: "already-running" };
+      if (fresh) {
+        editPersistedConfig(home, "features.devicePairing", { value: true });
+        editPersistedConfig(home, "daemon.managedAccess.mode", { value: "off" });
+        editPersistedConfig(home, "features.personalServing", { value: true });
+      }
+      if (listen) editPersistedConfig(home, "daemon.listen", { value: listen });
       await startLocalDaemonDetached({ home, ...(listen ? { listen } : {}) });
       return { daemon: "started" };
     },
@@ -517,11 +665,10 @@ export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotSta
     daemonPassword: () => readDaemonPasswordFile(home),
     openDaemon: (host, password) => openVerifiedDaemon(home, host, password),
     closeDaemon: (client) => client.close().catch(() => undefined),
-    prepareOnboarding: (client, email) =>
-      connectOnboardingDaemon(localControlPlaneTarget(home, env), client, email),
+    prepareOnboarding: (client, email) => connectOnboardingDaemon(selectedTarget(), client, email),
     provisionBot: provisionDaemonBot,
-    addChannel: (input) => addChannel(localControlPlaneTarget(home, env), input),
-    channelStatus: () => channelStatus(localControlPlaneTarget(home, env)),
+    addChannel: (input) => addChannel(selectedTarget(), input),
+    channelStatus: () => channelStatus(selectedTarget()),
     readManifest: (h, name) => readBotManifest(h, name),
     writeManifest: (h, manifest) => writeBotManifest(h, manifest),
   };
@@ -618,4 +765,69 @@ function daemonHostWithPassword(host: string | undefined, password?: string): st
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function hasChannelOptions(options: BotStartOptions): boolean {
+  return [
+    options.slackConnectionId,
+    options.slackBotToken,
+    options.slackAppToken,
+    options.telegramConnectionId,
+    options.telegramBotToken,
+  ].some((value) => value !== undefined);
+}
+
+export function selectExistingBot(
+  bots: import("@clisbot/protocol/bots/types").BotPayload[],
+  selector: string,
+) {
+  const exact = bots.find((bot) => bot.id === selector);
+  if (exact) return exact;
+  const matches = bots.filter((bot) => bot.name === selector || bot.slug === selector);
+  if (matches.length !== 1)
+    throw new Error(
+      matches.length
+        ? "That Bot name is ambiguous on this Host. Select its exact Bot ID."
+        : "No existing Bot matches that name or ID on this Host. Use --bot-name to create a Bot.",
+    );
+  return matches[0]!;
+}
+
+async function startChannelFreeBot(
+  input: BotStartInput,
+  deps: BotStartDeps,
+  requested: BotStartOptions,
+): Promise<BotStartReport> {
+  const plan = buildAssistantPlan(input.options, input.home);
+  if (input.options.existingBotId)
+    plan.updateLaunch = [requested.provider, requested.model, requested.mode].some(
+      (value) => value !== undefined,
+    );
+  assertBotName(plan.name);
+  const daemon = await deps.ensureDaemonUp(input.home, input.env);
+  await deps.waitDaemonUp(input.home);
+  const host = await deps.daemonHost(input.home, input.env);
+  const client = await deps.openDaemon(host, deps.daemonPassword(input.home));
+  try {
+    const ids = await deps.provisionBot(client, plan, input.options.existingBotId);
+    return {
+      ...ids,
+      name: plan.name,
+      provider: plan.provider,
+      model: plan.model,
+      reused: Boolean(input.options.existingBotId),
+      channel: "-",
+      account: "-",
+      credential: "not-required",
+      hub: "not-required",
+      hubUrl: "Not required",
+      hubPid: "-",
+      daemon: daemon.daemon,
+      daemonHost: host ?? "unknown",
+      routeNote: "No channel attached",
+      nextStep: "Open the Bot in the app, or use Connect to a channel…",
+    };
+  } finally {
+    await deps.closeDaemon(client);
+  }
 }

@@ -2,7 +2,7 @@ import { writeServiceFile } from "../../utils/service-files.js";
 import { withServiceLaunchLock } from "../../utils/service-launch-lock.js";
 import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import { selectLocalPort } from "./local-port.js";
-import { localWebUiOrigin } from "./web-ui.js";
+
 import { serviceSupervisorArguments } from "../serve/service-process.js";
 import { requestServiceShutdown } from "../serve/service-control.js";
 import { nodeEntrypointArguments } from "../../utils/node-entrypoint.js";
@@ -450,9 +450,10 @@ function buildChildEnv(
   const env: NodeJS.ProcessEnv = {
     ...inherited,
     CLISBOT_HOME: home,
+    CLISBOT_HUB_LOCAL_WEB_ORIGINS_FILE: path.join(home, "web-origins.json"),
     PORT: String(port),
     CLISBOT_HUB_BIND: FORK_HUB_BIND,
-    CLISBOT_HUB_APP_URL: localWebUiOrigin(home, inherited),
+    CLISBOT_HUB_APP_URL: inherited.CLISBOT_HUB_APP_URL ?? `http://${FORK_HUB_BIND}:${port}`,
     CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER:
       inherited.CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER ?? "x-clisbot-proxy-client-ip",
     CLISBOT_HUB_TRUSTED_PROXY_ADDRESSES:
@@ -476,8 +477,6 @@ function buildChildEnv(
     delete env.SLACK_BOT_TOKEN;
   }
   if (
-    !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY) &&
-    !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE) &&
     !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY) &&
     !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE)
   ) {
@@ -598,6 +597,7 @@ async function startLocalHubUnlocked(
     startedAt: new Date().toISOString(),
     ...(instanceId ? { instanceId } : {}),
     dataDirectory: environment.CLISBOT_HUB_DATA_DIR ?? home,
+    appOrigin: environment.CLISBOT_HUB_APP_URL,
     ...(controlFile ? { controlFile } : {}),
     ...(options.personal
       ? {

@@ -75,6 +75,7 @@ function HubSectionContent({
   if (section === "sign-in") return <HubLoginPolicySettings />;
   if (section === "account") return <HubAccountSettings />;
   if (section === "hosts") return <HostsSettings />;
+  if (section === "channels" && !hub.enabled) return <ChannelsSettingsRoute />;
   return (
     <SignedInHubSettings
       key={JSON.stringify([hub.origin, hub.signedIn?.account.id, hub.signedIn?.organization.id])}

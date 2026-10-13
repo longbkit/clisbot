@@ -28,7 +28,7 @@ The CLI starts the Host, then prints a QR code and a **pairing link**. A link wo
 
 Later, including when you need a new link or after rebooting, run `clisbot` again. It reuses the running Host (or starts it again if stopped) and prints a new link. On a relay machine, run `clisbot --relay` so the CLI does not ask how to connect again.
 
-To run without prompts, including the first launch: `clisbot --relay --voice disable`. Without an interactive terminal, `clisbot` also skips prompts and keeps your saved voice setting (off on a fresh setup).
+Tailscale is preferred and selected by default. For non-interactive setup, use `clisbot --voice disable`; no `--relay` flag is needed. If Tailscale is unavailable, this mode falls back to relay and reports why. It keeps your saved voice setting when omitted (off on a fresh setup).
 
 ## Open on the web or a phone
 

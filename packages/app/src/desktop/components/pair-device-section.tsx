@@ -1,3 +1,4 @@
+import { LocalWebSettings } from "@/device-access/local-web-settings";
 import { useCallback } from "react";
 import { Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
@@ -84,6 +85,7 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
 
   return (
     <View testID="pair-device-content" style={styles.content}>
+      <LocalWebSettings serverId={serverId} />
       {tailscale.supported && !isDisconnected ? (
         <HostRoutes
           tailscale={tailscale}

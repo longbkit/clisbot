@@ -37,7 +37,10 @@ export async function prepareHub(
       home,
       ...(port ? { port } : {}),
       initMasterKey: !existsSync(path.join(dataDirectory, "PG_VERSION")),
-      personal: true,
+      personal:
+        !existsSync(path.join(dataDirectory, "PG_VERSION")) ||
+        existing.state?.personalComposition === true,
+      devicePairing: true,
       supervise: true,
     },
     undefined,

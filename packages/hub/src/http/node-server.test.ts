@@ -62,6 +62,30 @@ describe("trusted request origin metadata", () => {
     );
   });
 
+  it("admits only the OS-selected local web origin without changing the canonical issuer", async () => {
+    const options = {
+      canonicalRequestOrigin: "https://hub.example.test",
+      trustedClientIpHeader: "fly-client-ip",
+      trustedBrowserOrigins: () => ["http://127.0.0.1:6880"],
+    };
+    assert.equal(
+      await observedOrigin(options, {
+        host: "backend:3000",
+        "x-forwarded-host": "127.0.0.1:6880",
+        "x-forwarded-proto": "http",
+      }),
+      "http://127.0.0.1:6880",
+    );
+    assert.equal(
+      await observedOrigin(options, {
+        host: "backend:3000",
+        "x-forwarded-host": "attacker.example.test",
+        "x-forwarded-proto": "https",
+      }),
+      "https://hub.example.test",
+    );
+  });
+
   it("rejects a non-HTTP or credential-bearing configured public URL at startup", () => {
     const handler = () => new Response("ok");
     assert.throws(
@@ -355,7 +379,11 @@ function closeServer(server: ReturnType<typeof createFetchServer>): Promise<void
 }
 
 async function observedOrigin(
-  options: { trustedClientIpHeader?: string; canonicalRequestOrigin?: string },
+  options: {
+    trustedClientIpHeader?: string;
+    canonicalRequestOrigin?: string;
+    trustedBrowserOrigins?: () => readonly string[];
+  },
   headers: Record<string, string>,
 ): Promise<string> {
   const server = createFetchServer(

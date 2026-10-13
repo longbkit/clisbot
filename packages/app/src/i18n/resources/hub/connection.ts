@@ -1,6 +1,13 @@
 // Hub › Hubs list, Overview, Connection, Paired devices, Sign-in policy, Add or start a Hub.
 // `en` is the source; every locale carries the same keys (resources.test.ts checks it).
 const en = {
+  localWeb: {
+    title: "Local web UI",
+    enable: "Enable",
+    disable: "Disable",
+    open: "Open",
+    failed: "Local web could not be updated. Check this Host’s gateway log.",
+  },
   startHelp: {
     action: "How to start",
     title: "Start Hub on {{host}}",
@@ -452,6 +459,13 @@ const en = {
 } as const;
 
 const ar = {
+  localWeb: {
+    title: "واجهة الويب المحلية",
+    enable: "تفعيل",
+    disable: "تعطيل",
+    open: "فتح",
+    failed: "تعذر تحديث الويب المحلي. تحقق من سجل البوابة لهذا المضيف.",
+  },
   startHelp: {
     action: "كيفية التشغيل",
     title: "تشغيل Hub على {{host}}",
@@ -895,6 +909,14 @@ const ar = {
 };
 
 const es = {
+  localWeb: {
+    title: "Interfaz web local",
+    enable: "Activar",
+    disable: "Desactivar",
+    open: "Abrir",
+    failed:
+      "No se pudo actualizar la web local. Revisa el registro de la puerta de enlace de este Host.",
+  },
   startHelp: {
     action: "Cómo iniciar",
     title: "Iniciar Hub en {{host}}",
@@ -1365,6 +1387,14 @@ const es = {
 };
 
 const fr = {
+  localWeb: {
+    title: "Interface web locale",
+    enable: "Activer",
+    disable: "Désactiver",
+    open: "Ouvrir",
+    failed:
+      "Impossible de mettre à jour le web local. Consultez le journal de la passerelle de cet hôte.",
+  },
   startHelp: {
     action: "Comment démarrer",
     title: "Démarrer un Hub sur {{host}}",
@@ -1832,6 +1862,13 @@ const fr = {
 };
 
 const ja = {
+  localWeb: {
+    title: "ローカル Web UI",
+    enable: "有効にする",
+    disable: "無効にする",
+    open: "開く",
+    failed: "ローカル Web を更新できませんでした。このホストのゲートウェイログを確認してください。",
+  },
   startHelp: {
     action: "起動方法",
     title: "{{host}} で Hub を起動",
@@ -2295,6 +2332,13 @@ const ja = {
 };
 
 const ko = {
+  localWeb: {
+    title: "로컬 웹 UI",
+    enable: "활성화",
+    disable: "비활성화",
+    open: "열기",
+    failed: "로컬 웹을 업데이트하지 못했습니다. 이 호스트의 게이트웨이 로그를 확인하세요.",
+  },
   startHelp: {
     action: "시작 방법",
     title: "{{host}}에서 Hub 시작",
@@ -2742,6 +2786,13 @@ const ko = {
 };
 
 const ptBR = {
+  localWeb: {
+    title: "Interface web local",
+    enable: "Ativar",
+    disable: "Desativar",
+    open: "Abrir",
+    failed: "Não foi possível atualizar a web local. Verifique o log do gateway deste Host.",
+  },
   startHelp: {
     action: "Como iniciar",
     title: "Iniciar Hub em {{host}}",
@@ -3204,6 +3255,13 @@ const ptBR = {
 };
 
 const ru = {
+  localWeb: {
+    title: "Локальный веб-интерфейс",
+    enable: "Включить",
+    disable: "Выключить",
+    open: "Открыть",
+    failed: "Не удалось обновить локальный веб-интерфейс. Проверьте журнал шлюза этого хоста.",
+  },
   startHelp: {
     action: "Как запустить",
     title: "Запустить Hub на {{host}}",
@@ -3669,6 +3727,13 @@ const ru = {
 };
 
 const vi = {
+  localWeb: {
+    title: "Giao diện web cục bộ",
+    enable: "Bật",
+    disable: "Tắt",
+    open: "Mở",
+    failed: "Không thể cập nhật web cục bộ. Kiểm tra nhật ký gateway của Host này.",
+  },
   startHelp: {
     action: "Cách khởi động",
     title: "Khởi động Hub trên {{host}}",
@@ -4124,6 +4189,13 @@ const vi = {
 };
 
 const zhCN = {
+  localWeb: {
+    title: "本地 Web 界面",
+    enable: "启用",
+    disable: "禁用",
+    open: "打开",
+    failed: "无法更新本地 Web。请检查此主机的网关日志。",
+  },
   startHelp: {
     action: "如何启动",
     title: "在 {{host}} 上启动 Hub",

@@ -2317,6 +2317,7 @@ export class VoiceAssistantWebSocketServer {
       quickChatRoot: quickChatsRoot(this.clisbotHome),
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
       features: {
+        localWeb: localWebAvailable(this.daemonRuntimeConfig, () => session.canStartLocalHub()),
         quickStarts: true,
         quickChat: session.canUseQuickChat(),
         ...buildDeviceAccessServerFeatures({
@@ -3879,4 +3880,11 @@ function extractRequestInfoFromUnknownWsInbound(
   }
 
   return null;
+}
+
+function localWebAvailable(
+  config: Pick<DaemonRuntimeConfig, "localWeb"> | undefined,
+  owner: () => boolean,
+): boolean {
+  return Boolean(config?.localWeb) && owner();
 }

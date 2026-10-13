@@ -21,6 +21,9 @@ export interface DaemonRuntimeConfig {
   appBaseUrl?: string;
   desktopManaged?: boolean;
   devicePairingEnabled?: boolean;
+  localWeb?(
+    action: "start" | "status" | "stop",
+  ): Promise<import("@clisbot/protocol/local-web").LocalWebStatus>;
   startLocalHub?(
     options: import("@clisbot/protocol/hub-local").HubLocalStartOptions,
   ): Promise<import("@clisbot/protocol/hub-local").HubLocalStartResult>;
@@ -80,6 +83,29 @@ export interface DaemonSessionOptions {
  * construction and the outbound channel.
  */
 export class DaemonSession {
+  async handleLocalWebRequest(
+    msg: Extract<SessionInboundMessage, { type: "daemon.web.request" }>,
+  ): Promise<void> {
+    try {
+      if (!this.daemonRuntimeConfig?.localWeb)
+        throw new Error("Update this Host to control local web");
+      const status = await this.daemonRuntimeConfig.localWeb(msg.action);
+      this.host.emit({
+        type: "daemon.web.response",
+        payload: { requestId: msg.requestId, ...status },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: msg.requestId,
+          requestType: msg.type,
+          error: error instanceof Error ? error.message : "Local web operation failed",
+        },
+      });
+    }
+  }
+
   async handleLocalHubStartRequest(
     msg: Extract<SessionInboundMessage, { type: "hub.local.start.request" }>,
   ): Promise<void> {

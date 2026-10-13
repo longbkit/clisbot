@@ -37,6 +37,7 @@ import { addAttachOptions, runAttachCommand } from "./commands/agent/attach.js";
 import { addImportOptions, runImportCommand } from "./commands/agent/import.js";
 import { withOutput } from "./output/index.js";
 import { runCloneCommand } from "./commands/clone.js";
+import { createWebCommand } from "./commands/web/index.js";
 import { onboardCommand } from "./commands/onboard.js";
 import {
   addDaemonHostOption,
@@ -135,6 +136,7 @@ export function createCli(): Command {
   // Daemon commands
   program.addCommand(createDaemonCommand());
   program.addCommand(createHubCommand());
+  program.addCommand(createWebCommand());
   // COMPAT(clisbot-control-plane): channel control-plane verbs (implementation doc §3.2).
   program.addCommand(createChannelsCommand());
   program.addCommand(createUsersCommand());

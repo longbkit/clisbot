@@ -1,11 +1,14 @@
 import { useCallback, useMemo } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { CONNECT_BOT_PARAMS } from "../navigation";
+import { buildConnectBotToChannelRoute, CONNECT_BOT_PARAMS } from "../navigation";
+import { useHubAccount } from "../account-provider";
+import { HubConnectionSettings } from "@/device-access/hub-settings";
 import { ChannelSettings } from "./channel-settings";
 
 /** Channels, opened on Add Route for a Bot when "Connect to a channel…" sent the user here. */
 export function ChannelsSettingsRoute() {
   const router = useRouter();
+  const hub = useHubAccount();
   const params = useLocalSearchParams<{
     [CONNECT_BOT_PARAMS.bot]?: string;
     [CONNECT_BOT_PARAMS.host]?: string;
@@ -28,5 +31,11 @@ export function ChannelsSettingsRoute() {
       }),
     [router],
   );
+  const returnToBot = useCallback(() => {
+    if (connectBot)
+      router.replace(buildConnectBotToChannelRoute(connectBot.serverId, connectBot.botId));
+  }, [connectBot, router]);
+  if (connectBot && !hub.enabled)
+    return <HubConnectionSettings startOnHost={connectBot.serverId} onConnected={returnToBot} />;
   return <ChannelSettings connectBot={connectBot} onConnectBotOpened={clearConnectBot} />;
 }

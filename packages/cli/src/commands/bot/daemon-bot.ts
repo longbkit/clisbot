@@ -23,6 +23,7 @@ export async function listDaemonBots(client: DaemonClient): Promise<BotPayload[]
 export function hydrateBotReference(reference: BotManifest, bot: BotPayload): BotManifest {
   return {
     ...reference,
+    name: bot.name,
     botId: bot.id,
     botType: bot.kind,
     provider: bot.launch.provider,
@@ -43,20 +44,20 @@ export async function provisionDaemonBot(
 ) {
   assertBotsEnabled(client);
   const existing = await resolveExistingBot(client, plan, botId);
-  const launch = {
-    provider: plan.provider,
-    ...(plan.model ? { model: plan.model } : {}),
-    ...(plan.mode ? { modeId: plan.mode } : {}),
-  };
-  const result = existing
-    ? await client.updateBot({ botId: existing.id, launch })
-    : await client.createBot({
-        name: plan.name,
-        kind: plan.botType,
-        ...(plan.workspacePath ? { path: plan.workspacePath } : {}),
-        launch,
-        template: { overwrite: plan.overwriteTemplate },
-      });
+  const launch = botLaunch(plan);
+  const reuse =
+    existing && plan.updateLaunch === false ? { bot: existing, error: null } : undefined;
+  const result =
+    reuse ??
+    (existing
+      ? await client.updateBot({ botId: existing.id, launch })
+      : await client.createBot({
+          name: plan.name,
+          kind: plan.botType,
+          ...(plan.workspacePath ? { path: plan.workspacePath } : {}),
+          launch,
+          template: { overwrite: plan.overwriteTemplate },
+        }));
   if (result.error || !result.bot) throw new Error(result.error ?? "Bot creation failed");
   if ("reused" in result && result.reused) {
     const updated = await client.updateBot({ botId: result.bot.id, launch });
@@ -64,16 +65,27 @@ export async function provisionDaemonBot(
     result.bot = updated.bot;
   }
   const bot = result.bot;
-  const seed = existing
-    ? await client.seedBotTemplate({ botId: bot.id, overwrite: plan.overwriteTemplate })
-    : result;
+  const seed =
+    existing && (plan.overwriteTemplate || plan.updateLaunch !== false)
+      ? await client.seedBotTemplate({ botId: bot.id, overwrite: plan.overwriteTemplate })
+      : result;
   if (seed.error) throw new Error(seed.error);
   const parsedTemplate = BotTemplateResultSchema.safeParse(
     "template" in seed ? seed.template : undefined,
   );
   const template = parsedTemplate.success ? parsedTemplate.data : undefined;
+  return botProvisionResult(bot, template);
+}
+
+function botProvisionResult(
+  bot: BotPayload,
+  template: NonNullable<ReturnType<typeof BotTemplateResultSchema.safeParse>["data"]> | undefined,
+) {
   return {
     botId: bot.id,
+    ...(bot.owner.memberId
+      ? { ownerMemberId: bot.owner.memberId, ownerOrganizationId: bot.owner.organizationId }
+      : {}),
     agentId: "",
     agentTitle: bot.name,
     workspacePath: bot.cwd,
@@ -94,4 +106,12 @@ async function resolveExistingBot(client: DaemonClient, plan: AssistantPlan, bot
   if (existing && existing.kind !== plan.botType)
     throw new Error("A Bot kind cannot change; create another Bot with the desired kind.");
   return existing;
+}
+
+function botLaunch(plan: AssistantPlan) {
+  return {
+    provider: plan.provider,
+    ...(plan.model ? { model: plan.model } : {}),
+    ...(plan.mode ? { modeId: plan.mode } : {}),
+  };
 }

@@ -5759,6 +5759,19 @@ export class DaemonClient {
     });
   }
 
+  async controlLocalWeb(
+    action: "start" | "status" | "stop",
+  ): Promise<import("@clisbot/protocol/local-web").LocalWebStatus> {
+    if (!this.lastServerInfoMessage?.features?.localWeb)
+      throw new Error("Update this Host or use its local CLI to control web");
+    const { requestId: _requestId, ...status } = await this.sendCorrelatedSessionRequest({
+      message: { type: "daemon.web.request", action },
+      responseType: "daemon.web.response",
+      timeout: 120_000,
+    });
+    return status;
+  }
+
   async startLocalHub(
     options: import("@clisbot/protocol/hub-local").HubLocalStartOptions = {},
   ): Promise<import("@clisbot/protocol/hub-local").HubLocalStartResult> {

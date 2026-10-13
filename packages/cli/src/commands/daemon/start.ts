@@ -1,3 +1,4 @@
+import { resumeLocalServices } from "../serve/resume.js";
 import { addLocalDaemonOptions } from "../../utils/command-options.js";
 import { Command } from "commander";
 import { daemonLogPath } from "@clisbot/server/daemon-control";
@@ -15,6 +16,7 @@ export async function runStart(options: CommandOptions, _command: Command) {
   if (options.daemonTarget.kind !== "instance") throw new Error("Start requires a local home");
   const home = options.daemonTarget.home;
   const result = await launchLocalDaemon({ home, timeoutMs: parseTimeoutMs(options.timeout) });
+  await resumeLocalServices(home);
   const data = {
     action: result.spawned ? "started" : "already_running",
     home,

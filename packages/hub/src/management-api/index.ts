@@ -1,3 +1,4 @@
+import { accountChannelOnboarding } from "./channel-onboarding.js";
 import { ChannelAccessStore, type ChannelPairingRecord } from "../db/channel-access.js";
 import { channelTestPreview, CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
 import {
@@ -460,16 +461,49 @@ export class ManagementApi {
     }
   }
 
+  private channelOnboarding(
+    request: Request,
+    organizationId: string,
+    suffix?: string,
+  ): Promise<Response> {
+    return accountChannelOnboarding(
+      {
+        database: this.options.database,
+        runtime: this.options.runtime,
+        auth: this.options.auth,
+        ...(this.options.credentials ? { credentials: this.options.credentials } : {}),
+        operations: {
+          database: this.options.database,
+          completionTokenSecret: undefined,
+          supervisor: this.options.channelSupervisor,
+          channelReplyServer: null,
+          onboarding: {
+            runtime: this.options.runtime,
+            access: this.options.access,
+            ...(this.options.providerApplications
+              ? { providerApplications: this.options.providerApplications }
+              : {}),
+          },
+        },
+      },
+      request,
+      organizationId,
+      suffix,
+    );
+  }
+
   private async dispatch(request: Request, requestId: string): Promise<Response> {
     const method = request.method.toUpperCase();
     const segments = managementSegments(request);
     if (isCliAccessTicketRequest(request, segments)) {
       return this.cliAccessTickets.handle(request, segments[1]!, segments[3]!);
     }
-    if (segments[0] !== "organizations" || segments[1] === undefined) {
+    if (!isOrganizationPath(segments)) {
       return problem(requestId, 404, "not_found", "No management resource matches this path.");
     }
-    const organizationId = segments[1];
+    const organizationId = segments[1]!;
+    if (isChannelOnboardingPath(segments))
+      return this.channelOnboarding(request, organizationId, segments[3]);
     const access = await this.organizationAccess(request, organizationId);
     const resource = segments[2];
 
@@ -2190,4 +2224,11 @@ function configuredChannelTestTarget(
         id === input.conversationId || (input.threadId !== undefined && id === input.threadId),
     ),
   );
+}
+
+function isOrganizationPath(segments: string[]): boolean {
+  return segments[0] === "organizations" && segments[1] !== undefined;
+}
+function isChannelOnboardingPath(segments: string[]): boolean {
+  return segments[2] === "channel-onboarding" && segments.length <= 4;
 }

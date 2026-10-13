@@ -26,6 +26,7 @@ interface FetchServerOptions {
   trustedProxyAddresses?: readonly string[];
   /** Explicit public URL whose origin is authoritative over proxy request metadata. */
   canonicalRequestOrigin?: string;
+  trustedBrowserOrigins?: () => readonly string[];
   /** Test and embedded adapters may terminate TLS directly; production normally uses its proxy. */
   tls?: { key: string; cert: string };
   logger?: Pick<Logger, "warn" | "error">;
@@ -259,6 +260,14 @@ function requestHeaders(incoming: IncomingMessage): Headers {
 }
 
 function requestOrigin(incoming: IncomingMessage, options: FetchServerOptions): string {
+  if (options.trustedClientIpHeader && isTrustedProxy(incoming, options)) {
+    const protocol = firstForwardedValue(incoming.headers["x-forwarded-proto"]);
+    const host = firstForwardedValue(incoming.headers["x-forwarded-host"]);
+    if (protocol && host) {
+      const origin = validatedOrigin(protocol, host);
+      if (options.trustedBrowserOrigins?.().includes(origin)) return origin;
+    }
+  }
   if (options.canonicalRequestOrigin !== undefined) return options.canonicalRequestOrigin;
   const directProtocol = Reflect.get(incoming.socket, "encrypted") === true ? "https" : "http";
   const directHost = incoming.headers.host;

@@ -1,5 +1,6 @@
 import { createDaemonDeviceAuthority, createDeviceRuntimeAccess } from "./device-access/runtime.js";
 import { fenceQuickChatsFromGit } from "./quick-chats/quick-chat-folders.js";
+import { controlHostLocalWeb, resumeHostLocalServices } from "./hub/local-web.js";
 import { startHostLocalHub } from "./hub/local-start.js";
 import { localCliEntrypoint } from "./local-cli.js";
 import { readHostTailscale, setUpHostTailscale } from "./network/host-tailscale.js";
@@ -2069,6 +2070,9 @@ export async function createClisbotDaemon(
                 desktopManaged: config.desktopManaged === true,
                 devicePairingEnabled: config.devicePairingEnabled,
                 devices: createDeviceRuntimeAccess(deviceAuthority, () => wsServer),
+                localWeb: localCliEntrypoint()
+                  ? (action) => controlHostLocalWeb(config.clisbotHome, action)
+                  : undefined,
                 startLocalHub:
                   config.devicePairingEnabled && localCliEntrypoint()
                     ? (options) => startHostLocalHub(config.clisbotHome, options)
@@ -2231,6 +2235,8 @@ export async function createClisbotDaemon(
     }
   };
 
+  scheduleSavedLocalServices(config.clisbotHome, logger);
+
   return {
     config,
     agentManager,
@@ -2269,4 +2275,14 @@ async function closeAllAgents(logger: Logger, agentManager: AgentManager): Promi
       }
     }),
   );
+}
+
+function scheduleSavedLocalServices(home: string, logger: Pick<Logger, "warn">): void {
+  if (!localCliEntrypoint()) return;
+  const timer = setTimeout(() => {
+    void resumeHostLocalServices(home).catch((error: unknown) =>
+      logger.warn({ err: error }, "Saved local services could not resume"),
+    );
+  }, 1000);
+  timer.unref();
 }

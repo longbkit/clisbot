@@ -18,37 +18,40 @@ export function onboardingInitCommand(): Command {
       "Initialize a seeded assistant workspace and configure any supplied channel credentials",
     )
     .action(
-      withOutput<BotStartReport | AssistantInitReport, []>(async (options, command) => {
-        const input = extractBotStartOptions(options);
-        const home = resolveBotHome(options);
-        const name = input.botName ?? `${input.botType ?? "personal"}-assistant`;
-        assertBotName(name);
-        const saved = await readBotManifest(home, name);
-        if (
-          input.telegramConnectionId ||
-          input.telegramBotToken ||
-          input.slackConnectionId ||
-          input.slackBotToken ||
-          input.slackAppToken ||
-          saved
-        ) {
-          return runStartCommand(
-            {
-              ...options,
-              ...(!saved && !input.provider ? { provider: "codex" } : {}),
-              ...(!saved && !input.botName && !input.workspace && !input.cwd
-                ? { workspace: path.join(home, "workspaces", "default") }
-                : {}),
-            },
-            command,
-          );
-        }
-        return {
-          type: "single",
-          data: await initializeAssistantWorkspace(input, home),
-          schema: initSchema,
-        };
-      }),
+      withOutput<BotStartReport | AssistantInitReport, [string | undefined]>(
+        async (selector, options, command) => {
+          const input = extractBotStartOptions(options);
+          const home = resolveBotHome(options);
+          const name = input.botName ?? `${input.botType ?? "personal"}-assistant`;
+          assertBotName(name);
+          const saved = await readBotManifest(home, name);
+          if (
+            input.telegramConnectionId ||
+            input.telegramBotToken ||
+            input.slackConnectionId ||
+            input.slackBotToken ||
+            input.slackAppToken ||
+            saved
+          ) {
+            return runStartCommand(
+              selector,
+              {
+                ...options,
+                ...(!saved && !input.provider ? { provider: "codex" } : {}),
+                ...(!saved && !input.botName && !input.workspace && !input.cwd
+                  ? { workspace: path.join(home, "workspaces", "default") }
+                  : {}),
+              },
+              command,
+            );
+          }
+          return {
+            type: "single",
+            data: await initializeAssistantWorkspace(input, home),
+            schema: initSchema,
+          };
+        },
+      ),
     );
 }
 

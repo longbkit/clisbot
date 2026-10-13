@@ -15,6 +15,8 @@ export type BotChannel = (typeof BOT_CHANNELS)[number];
 
 /** The operator-supplied flags, in commander's camelCase shape. */
 export interface BotStartOptions {
+  selector?: string;
+  existingBotId?: string;
   provider?: string;
   model?: string;
   mode?: string;
@@ -40,6 +42,7 @@ export interface BotStartOptions {
 
 /** The fully-resolved bot bundle, ready for side effects. */
 export interface BotStartPlan {
+  updateLaunch?: boolean;
   overwriteTemplate?: boolean;
   name: string;
   botType: BotType;
@@ -78,6 +81,7 @@ export type AssistantPlan = Pick<
   | "isolation"
   | "agentTitle"
   | "overwriteTemplate"
+  | "updateLaunch"
 >;
 
 export function buildAssistantPlan(options: BotStartOptions, home: string): AssistantPlan {

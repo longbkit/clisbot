@@ -9,7 +9,7 @@ export function botRestartCommand(home: string, name: string, ownerEmail?: strin
   const entry = process.argv[1];
   const executable = entry && /[\\/]bin[\\/]clisbot$/.test(entry) ? quote(entry) : "clisbot";
   return (
-    `${executable} bot start --home ${quote(home)} --bot-name ${quote(name)}` +
+    `${executable} bot start ${quote(name)} --home ${quote(home)}` +
     (ownerEmail ? ` --owner-email ${quote(ownerEmail)}` : "")
   );
 }
@@ -20,7 +20,8 @@ export function renderBotStart(
 ): string {
   if (result.type !== "single") return "";
   const bot = result.data;
-  const ready = bot.ownerReady === true && bot.channelTransport === "started";
+  const ready =
+    bot.channel === "-" || (bot.ownerReady === true && bot.channelTransport === "started");
   const heading = `Bot ${bot.name} — ${ready ? "READY" : "SETUP INCOMPLETE"}`;
   const color = ready ? chalk.green : chalk.yellow;
   const lines = [options.noColor ? heading : color.bold(heading)];
@@ -29,7 +30,7 @@ export function renderBotStart(
   if (bot.template?.backupDirectory)
     lines.push("", `Template backup: ${bot.template.backupDirectory}`);
   if (ready || bot.ownerReady !== false) lines.push("", `Next: ${bot.nextStep}.`);
-  if (bot.channelTransport !== "started")
+  if (bot.channel !== "-" && bot.channelTransport !== "started")
     lines.push("", "Channel is not ready yet. Check bot status before sending a request.");
   return lines.join("\n");
 }
@@ -42,7 +43,7 @@ function renderOwnerLink(bot: BotStartReport, options: OutputOptions): string[] 
   ];
   if (bot.ownerLinkCommand)
     lines.push(
-      `Send this command privately to the bot in ${bot.channel === "slack" ? "Slack" : "Telegram"}:`,
+      `Prefer sending this command privately to ${bot.ownerLinkDestination ?? `the bot in ${bot.channel === "slack" ? "Slack" : "Telegram"}`}:`,
       "",
       `  ${bot.ownerLinkCommand}`,
       "",
@@ -90,7 +91,10 @@ function renderSummary(bot: BotStartReport, options: OutputOptions): string {
     { label: "Daemon", value: `${bot.daemonHost} (${bot.daemon})` },
     { label: "Agent", value: bot.agentTitle },
     { label: bot.botId ? "Bot ID" : "Agent ID", value: bot.botId ?? bot.agentId },
-    { label: "Credentials", value: "Stored in Hub" },
+    {
+      label: "Credentials",
+      value: bot.credential === "not-required" ? "Not required" : "Stored in Hub",
+    },
   ];
   if (template)
     rows.push({

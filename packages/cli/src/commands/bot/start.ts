@@ -1,12 +1,14 @@
 // Thin command/output layer for daemon-owned Bot and channel onboarding.
 
+import { text, password, select, isCancel } from "@clack/prompts";
+import { readBotCatalog } from "./catalog.js";
 import { Command, Option } from "commander";
 import { renderBotStart } from "./start-output.js";
 import type { CommandOptions, OutputSchema, SingleResult } from "../../output/index.js";
 import { withOutput } from "../../output/index.js";
 import { addJsonOption } from "../../utils/command-options.js";
 import { resolveBotHome } from "./home.js";
-import { createBotStartDeps, runBotStart, type BotStartReport } from "./run.js";
+import { createBotStartDeps, runBotStart, hasChannelOptions, type BotStartReport } from "./run.js";
 import type { BotStartOptions } from "./plan.js";
 
 /** Pick the bot-specific flags out of commander's camelCase option bag. */
@@ -39,12 +41,45 @@ export function extractBotStartOptions(options: CommandOptions): BotStartOptions
 }
 
 export async function runStartCommand(
+  selector: string | undefined,
   options: CommandOptions,
   _command: Command,
 ): Promise<SingleResult<BotStartReport>> {
   const home = resolveBotHome(options);
+  let input: BotStartOptions = { ...extractBotStartOptions(options), selector };
+  if (process.stdin.isTTY && !options.json) {
+    if (!input.selector && !input.botName) {
+      const catalog = await readBotCatalog(home).catch(() => []);
+      const selected = await select({
+        message: "Create or select a Bot",
+        options: [
+          { value: "create", label: "Create a Bot" },
+          ...catalog.map(({ manifest }) => ({ value: manifest.botId!, label: manifest.name })),
+        ],
+      });
+      if (isCancel(selected)) throw new Error("Bot setup cancelled");
+      if (selected !== "create") input.selector = selected;
+      else {
+        const name = await text({ message: "Bot name", defaultValue: "Personal Assistant" });
+        if (isCancel(name)) throw new Error("Bot setup cancelled");
+        input.botName = name;
+      }
+    }
+    if (!input.provider && !input.selector) {
+      const provider = await select({
+        message: "Agent provider",
+        options: ["codex", "claude", "copilot", "opencode", "pi", "omp"].map((value) => ({
+          value,
+          label: value,
+        })),
+      });
+      if (isCancel(provider)) throw new Error("Bot setup cancelled");
+      input.provider = provider;
+    }
+    if (!input.selector && !hasChannelOptions(input)) input = await promptChannelOptions(input);
+  }
   const report = await runBotStart(
-    { options: extractBotStartOptions(options), home, env: process.env },
+    { options: input, home, env: process.env },
     createBotStartDeps(home, process.env),
   );
   return { type: "single", data: report, schema: botStartSchema };
@@ -70,7 +105,9 @@ export type BotStartCommandResult = SingleResult<BotStartReport>;
 
 export function startCommand(): Command {
   const command = addJsonOption(
-    new Command("start").description("Create a Bot on the daemon and connect a channel account"),
+    new Command("start")
+      .argument("[selector]", "Existing Bot ID or unique Host-local name/slug")
+      .description("Create or select a Bot; optionally connect a channel"),
   )
     .option(
       "--provider <provider>",
@@ -125,4 +162,27 @@ export function startCommand(): Command {
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)");
   command.action(withOutput(runStartCommand));
   return command;
+}
+
+async function promptChannelOptions(input: BotStartOptions): Promise<BotStartOptions> {
+  const channel = await select({
+    message: "Connect a channel now?",
+    options: [
+      { value: "skip", label: "Skip — use the Bot in the app" },
+      { value: "telegram", label: "Telegram" },
+      { value: "slack", label: "Slack" },
+    ],
+  });
+  if (isCancel(channel)) throw new Error("Bot setup cancelled");
+  if (channel === "skip") return input;
+  const token = await password({
+    message: `${channel === "telegram" ? "Telegram" : "Slack"} bot token (or \${ENV_VAR} / secret-file path)`,
+  });
+  if (isCancel(token)) throw new Error("Bot setup cancelled");
+  if (channel === "telegram") return { ...input, telegramBotToken: token };
+  const appToken = await password({
+    message: "Slack Socket Mode app token (or ${ENV_VAR} / secret-file path)",
+  });
+  if (isCancel(appToken)) throw new Error("Bot setup cancelled");
+  return { ...input, slackBotToken: token, slackAppToken: appToken };
 }

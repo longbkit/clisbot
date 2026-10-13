@@ -1,3 +1,4 @@
+import { readWebIntent, updateLocalWebHub } from "./web.js";
 import { select, isCancel } from "@clack/prompts";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -145,23 +146,39 @@ async function launchServices(
   await configureDaemonRelay(home, relay);
   const plan = await hubLaunchPlan(options, home, network);
   const hubAppOrigin = plan.appOrigin;
-  let hub = await prepareHub(home, hubAppOrigin, relay, plan.hubPort);
+  const hub = await prepareHub(home, hubAppOrigin, relay, plan.hubPort);
   // The gateway takes the port the plan reserved, so its origin is the one Hub was given.
   const serving = plan.gatewayPort ? { ...options, webPort: plan.gatewayPort } : options;
-  const exposed = await exposeServices(serving, home, network, daemon.origin, hub);
-  // Without a public route the app reaches Hub on its own loopback port.
-  const origin = exposed.origin ?? hub;
-  if (origin !== hubAppOrigin) {
-    // The public route changed or failed after Hub was prepared. Reconfigure only Hub's
-    // browser origin; gateway targets change without closing daemon sockets.
-    hub = await prepareHub(home, origin, relay, new URL(hub).port);
-    if (exposed.gateway)
-      await launchGateway(
-        home,
-        gatewayConfig(home, daemon.origin, hub, exposed.origin ? [exposed.origin] : []),
-        Number(new URL(exposed.gateway).port),
+  let origin = hubAppOrigin;
+  if (network.tailscale && network.transport === "tailscale") {
+    const hubServingHome = path.join(home, "hub-serving");
+    mkdirSync(hubServingHome, { recursive: true, mode: 0o700 });
+    try {
+      origin = await mapTailscale(
+        { ...options, httpsPort: undefined },
+        hubServingHome,
+        {
+          dnsName: network.tailscale.dnsName,
+          port: plan.hubHttpsPort ?? network.tailscale.port + 1,
+        },
+        hub,
       );
+    } catch (error) {
+      if (process.stdin.isTTY && !options.json) throw error;
+      fallBackToRelay(options, network, error);
+      origin = hub;
+    }
   }
+  const exposed = await exposeServices(serving, home, network, daemon.origin, hub);
+  if (network.transport === "https") origin = exposed.origin ?? hub;
+  if (exposed.gateway)
+    await launchGateway(
+      home,
+      gatewayConfig(home, daemon.origin, hub, exposed.origin ? [exposed.origin] : []),
+      Number(new URL(exposed.gateway).port),
+    );
+  // Optional web is a transport, never Hub's OAuth identity or lifecycle owner.
+  await updateLocalWebHub(home, hub);
   await configureServingAdmission(home, servingOrigins(exposed));
   const enrollment = await enrollPersonalDaemon(home, hub);
   const hubOffer = await localHubPairingOffer({
@@ -207,16 +224,34 @@ async function hubLaunchPlan(
   options: PersonalServingOptions,
   home: string,
   network: Awaited<ReturnType<typeof servingNetwork>>,
-): Promise<{ appOrigin: string; hubPort: string | undefined; gatewayPort?: string }> {
-  if (network.origin) return { appOrigin: network.origin, hubPort: options.port };
-  if (enabledWebDirectory(home)) {
-    const running = runningGateway(home)?.origin;
-    if (running) return { appOrigin: running, hubPort: options.port };
-    const gatewayPort = String(await selectLocalPort(port(options.webPort ?? "6880"), true));
-    return { appOrigin: `http://127.0.0.1:${gatewayPort}`, hubPort: options.port, gatewayPort };
+): Promise<{
+  appOrigin: string;
+  hubPort: string | undefined;
+  gatewayPort?: string;
+  hubHttpsPort?: number;
+}> {
+  const existing = resolveLocalHubState({ home }).state;
+  const loopback = await hubLoopbackOrigin(home, options.port);
+  let hubHttpsPort: number | undefined;
+  if (network.tailscale) {
+    const servingHome = path.join(home, "hub-serving");
+    mkdirSync(servingHome, { recursive: true, mode: 0o700 });
+    hubHttpsPort = await selectTailscaleServePort({
+      home: servingHome,
+      dnsName: network.tailscale.dnsName,
+      preferred:
+        readTailscaleServePort(servingHome, network.tailscale.dnsName) ??
+        network.tailscale.port + 1,
+      fixed: false,
+      target: loopback,
+    });
   }
-  const appOrigin = await hubLoopbackOrigin(home, options.port);
-  return { appOrigin, hubPort: new URL(appOrigin).port };
+  let freshOrigin = loopback;
+  if (hubHttpsPort && network.tailscale)
+    freshOrigin = new URL(`https://${network.tailscale.dnsName}:${hubHttpsPort}`).origin;
+  else if (network.transport === "https") freshOrigin = network.origin!;
+  const appOrigin = existing?.appOrigin ?? freshOrigin;
+  return { appOrigin, hubPort: new URL(loopback).port, ...(hubHttpsPort ? { hubHttpsPort } : {}) };
 }
 
 /** The gateway this home is running, if any; a repeat start reuses its port and web files. */
@@ -242,6 +277,8 @@ function servingOrigins(exposed: { gateway: string | null; origin: string | null
 
 /** The web UI directory when the person turned the web UI on (config or `CLISBOT_WEB_UI_ENABLED`). */
 function enabledWebDirectory(home: string): string | null {
+  const intent = readWebIntent(home);
+  if (intent?.enabled) return intent.directory;
   const webUi = loadConfig(home, { env: { ...process.env, CLISBOT_HOME: home } }).webUi;
   return webUi?.enabled ? (webUi.distDir ?? null) : null;
 }
@@ -417,7 +454,22 @@ async function exposeServices(
   const loopback = { endpoint: new URL(daemonOrigin).host, useTls: false };
   // A gateway fronts a public route, or the self-hosted web UI the person turned on.
   const webUi = enabledWebDirectory(home) !== null;
-  if (!network.origin && !webUi) return persistDirect(options, home, network, null, null, loopback);
+  if (network.transport !== "https") {
+    if (network.tailscale) {
+      try {
+        const origin = await mapTailscale(options, home, network.tailscale, daemonOrigin);
+        const url = new URL(origin);
+        return persistDirect(options, home, network, null, origin, {
+          endpoint: url.host,
+          useTls: true,
+        });
+      } catch (error) {
+        if (process.stdin.isTTY && !options.json) throw error;
+        fallBackToRelay(options, network, error);
+      }
+    }
+    return persistDirect(options, home, network, null, null, loopback);
+  }
   let gateway = await launchGateway(
     home,
     gatewayConfig(home, daemonOrigin, hub, network.origin ? [network.origin] : []),

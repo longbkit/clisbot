@@ -1,3 +1,4 @@
+import { browserAsset } from "./server/browser-assets.js";
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
@@ -27,6 +28,8 @@ export { stopProductionRuntime };
 
 const fetch = async (request: Request) => {
   if (!isHubRequestEnabled(request)) return Response.json({ error: "not_found" }, { status: 404 });
+  const asset = await browserAsset(request);
+  if (asset) return asset;
   if (!hasApplication()) await startProductionRuntime();
   return startFetch(request);
 };
