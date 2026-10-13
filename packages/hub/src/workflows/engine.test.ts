@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { describe, it, vi } from "vitest";
+import { describe, it, vi, expect } from "vitest";
 import {
   compileHubConfig,
   compiledConfigurationHash,
@@ -30,6 +30,50 @@ import { createLogger } from "../logger.js";
 import { assertOneFailure, FailureLogStream } from "../test-utils/failure-logs.js";
 
 describe("durable multi-step workflow engine", () => {
+  it("does not let a late idle check replace the accepted-work polling cadence", async () => {
+    const fixture = await workflowFixture();
+    let releaseIdle!: (delay: number) => void;
+    const lateIdle = new Promise<number>((resolve) => {
+      releaseIdle = resolve;
+    });
+    let idleStarted!: () => void;
+    const firstCheck = new Promise<void>((resolve) => {
+      idleStarted = resolve;
+    });
+    let checks = 0;
+    const { handler, engine } = createDurableWorkflowHandler({
+      database: fixture.database,
+      entitlements: fixture.entitlements,
+      providers: [providerMatch(fixture.configuration, fixture.revisionId)],
+      nextPollDelay: async () => {
+        checks++;
+        if (checks === 1) {
+          idleStarted();
+          return lateIdle;
+        }
+        return 250;
+      },
+      dispatchLaunchMachineIntent: async (intent) => ({
+        execution: await fixture.database.findAgentExecutionByWorkflowStepRunId(
+          intent.workflowStepRunId!,
+        ),
+      }),
+    });
+    try {
+      engine.start();
+      await firstCheck;
+      await handler(fixture.trigger("wake"));
+      await engine.processAvailable();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(checks).toBeGreaterThanOrEqual(2);
+      releaseIdle(5000);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(checks).toBeGreaterThanOrEqual(3);
+    } finally {
+      releaseIdle(5000);
+      await engine.stop();
+    }
+  });
   it("wakes accepted work immediately while the embedded worker is backed off", async () => {
     const fixture = await workflowFixture();
     let idleReady!: () => void;

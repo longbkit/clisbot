@@ -107,6 +107,7 @@ export class DurableWorkflowEngine {
   private terminalNotificationRecoveryRequested = false;
   private stopped = false;
   private started = false;
+  private pollGeneration = 0;
   private processingRequested = false;
 
   constructor(private readonly options: DurableWorkflowEngineOptions) {
@@ -124,24 +125,26 @@ export class DurableWorkflowEngine {
   }
 
   private startProcessing(): void {
+    const generation = ++this.pollGeneration;
     if (this.workerTimer) clearTimeout(this.workerTimer);
     this.workerTimer = undefined;
     void this.processAvailable().then(
-      () => this.scheduleNextPoll(),
+      () => this.scheduleNextPoll(generation),
       (error: unknown) => {
         this.report(error, "workflow.worker.recover");
-        this.schedulePoll(this.workerIntervalMs);
+        if (generation === this.pollGeneration) this.schedulePoll(this.workerIntervalMs);
       },
     );
   }
 
-  private async scheduleNextPoll(): Promise<void> {
+  private async scheduleNextPoll(generation: number): Promise<void> {
     try {
       const delay = (await this.options.nextPollDelay?.()) ?? this.workerIntervalMs;
-      this.schedulePoll(Math.max(this.workerIntervalMs, Math.min(delay, 5000)));
+      if (generation === this.pollGeneration)
+        this.schedulePoll(Math.max(this.workerIntervalMs, Math.min(delay, 5000)));
     } catch (error) {
       this.report(error, "workflow.worker.next_poll");
-      this.schedulePoll(this.workerIntervalMs);
+      if (generation === this.pollGeneration) this.schedulePoll(this.workerIntervalMs);
     }
   }
 
