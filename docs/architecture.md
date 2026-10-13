@@ -508,3 +508,20 @@ the Desktop updater.
 1. **Local daemon** (default): `clisbot daemon start` on `127.0.0.1:6868`
 2. **Managed desktop**: Electron uses the server package’s local-instance lifecycle capability for sanitized launch, published readiness, and captured-PID stop. Only a matching `{pid, startedAt}` from a spawn in the current Desktop session authorizes automatic stop or binary replacement. Preexisting instances, including legacy `desktopManaged` records, are attach-only. Keep-running survivors attach in the next session. Explicit attached Stop requires a confirmation naming the captured home/PID. Ordinary Restart uses the worker RPC on every app platform.
 3. **Remote + relay**: Daemon behind firewall, relay bridges with E2E encryption
+
+## Hub backend startup and idle work
+
+The packaged Hub starts the native HTTP adapter in `packages/hub/src/server/backend-handler.ts`.
+It delegates backend requests to the existing auth, management, public API and Hub operation
+owners. Account authorization HTML and server functions load the inherited TanStack build on
+first browser use; backend startup does not import that browser graph. Optional local web is a
+separate gateway; see [device pairing and serving](features/access/device-pairing.md).
+
+Provider registrations load their integration modules when a configured application activates.
+Stripe loads only when billing is configured. Supported integrations remain available.
+
+An embedded Hub has one database owner. Its workflow worker backs off to five seconds only
+when there are no wakeups, active runs or pending terminal notifications. Acceptance and daemon
+completion wake processing immediately; active work retains the 250 ms cadence. PostgreSQL
+keeps the existing cadence because other processes can enqueue work. Durable recovery, leases
+and deadlines remain authoritative; no storage migration is involved.

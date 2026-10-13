@@ -1,3 +1,4 @@
+import { embeddedWorkflowNextPoll } from "./workflows/idle-poll.js";
 import { automationMemberIdentity } from "./managed-access/automation-session-identity.js";
 import { createExecutionCapabilityServer } from "./execution-capabilities/server.js";
 import { OutputExecutorRegistry } from "./execution-capabilities/outputs.js";
@@ -301,6 +302,9 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
   };
   const { handler: workflowDispatcher, engine: workflowEngine } = createDispatcherWithEngine({
     ...dispatcherOptions,
+    ...(options.databaseRuntime && options.databaseRuntime.connectionLimit === undefined
+      ? { nextPollDelay: () => embeddedWorkflowNextPoll(options.databaseRuntime!) }
+      : {}),
     ...(durableDispatchHandler === undefined
       ? {}
       : { dispatchLaunchMachineIntent: durableDispatchHandler }),

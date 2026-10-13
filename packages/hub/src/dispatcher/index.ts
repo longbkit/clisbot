@@ -21,6 +21,7 @@ export interface DispatcherOptions {
   configurationRevisionId?: string;
   leaseMs?: number;
   workerIntervalMs?: number;
+  nextPollDelay?: DurableWorkflowEngineOptions["nextPollDelay"];
   now?: () => Date;
   onWorkflowDeadlineExceeded?: DurableWorkflowEngineOptions["onWorkflowDeadlineExceeded"];
   onWorkflowRunAccepted?: DurableWorkflowEngineOptions["onWorkflowRunAccepted"];
@@ -39,6 +40,7 @@ export function createDispatcherWithEngine(options: DispatcherOptions): {
   engine: DurableWorkflowEngine;
 } {
   const engineOptions: DurableWorkflowEngineOptions = {
+    ...(options.nextPollDelay ? { nextPollDelay: options.nextPollDelay } : {}),
     database: options.database,
     entitlements: options.entitlements,
     ...(options.providers === undefined ? {} : { providers: options.providers }),

@@ -20,7 +20,7 @@ import { logger } from "./logger.js";
 import { reportFailure } from "./failures/index.js";
 import { installProcessFailureHandlers } from "./failures/process.js";
 import { createFetchServer } from "./http/node-server.js";
-import { loadBuiltStartServer } from "./server/build.js";
+import { createBackendServer } from "./server/backend-handler.js";
 import { publicAppOrigin } from "./server/backend.js";
 import { createAuthServer } from "./auth/server.js";
 import { HubDeviceAccess } from "./device-access/index.js";
@@ -33,13 +33,8 @@ import { loadServiceKey } from "@clisbot/device-access/service-key";
 import { mountHubDeviceIngress } from "./device-access/ingress.js";
 import { startApplication, stopApplication, type ApplicationRuntime } from "./server/runtime.js";
 import { createApplicationRuntime } from "./application-runtime.js";
-import {
-  composeBilling,
-  createStripeBillingClient,
-  createStripeCatalogSource,
-  readBillingConfig,
-  type BillingRuntime,
-} from "./billing/index.js";
+import { readBillingConfig } from "./billing/config.js";
+import type { BillingRuntime } from "./billing/index.js";
 import { composeEntitlements, type ComposedEntitlements } from "./auth/entitlements.js";
 import { readInstanceAuthPolicy } from "./auth/instance-policy.js";
 import { createRuntimeConfiguration } from "./runtime-configuration/index.js";
@@ -132,14 +127,16 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     resources.own(() => entitlements.close());
     const billingConfig = readBillingConfig();
     const invitationMailer = composeInvitationMailer();
+    const billingModule =
+      billingConfig === undefined ? undefined : await import("./billing/index.js");
     const billing =
-      billingConfig === undefined
+      billingConfig === undefined || billingModule === undefined
         ? null
-        : composeBilling({
+        : billingModule.composeBilling({
             config: billingConfig,
             database,
-            catalogSource: createStripeCatalogSource(billingConfig.stripeSecretKey),
-            billingClient: createStripeBillingClient(billingConfig.stripeSecretKey),
+            catalogSource: billingModule.createStripeCatalogSource(billingConfig.stripeSecretKey),
+            billingClient: billingModule.createStripeBillingClient(billingConfig.stripeSecretKey),
             seatUsage: entitlements.seatUsage,
           });
     // Sync on boot, per the plan. A Stripe outage here must not block the whole instance from
@@ -517,7 +514,7 @@ async function main(): Promise<void> {
   // process entry (implementation doc §4.5 / plan §14.8). No-op unless the operator
   // set a CLISBOT_* var or left the fork defaults unset.
   applyClisbotEnvDefaults();
-  const build = await loadBuiltStartServer();
+  const build = await createBackendServer();
   await build.startProductionRuntime();
   const config = loadRuntimeConfig();
   const port = readPort();

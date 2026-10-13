@@ -86,6 +86,8 @@ export interface DurableWorkflowEngineOptions {
   configurationRevisionId?: string;
   leaseMs?: number;
   workerIntervalMs?: number;
+  /** Embedded idle backoff; active/due work retains the normal cadence. */
+  nextPollDelay?: () => Promise<number>;
   now?: () => Date;
   onWorkflowDeadlineExceeded?: (recovery: WorkflowDeadlineRecovery) => Promise<void>;
   onWorkflowRunAccepted?: (run: AcceptedTriggerRunRecord) => Promise<JsonValue | null | void>;
@@ -104,6 +106,8 @@ export class DurableWorkflowEngine {
   private terminalNotificationProcessing: Promise<void> | undefined;
   private terminalNotificationRecoveryRequested = false;
   private stopped = false;
+  private started = false;
+  private processingRequested = false;
 
   constructor(private readonly options: DurableWorkflowEngineOptions) {
     this.logger = options.logger ?? defaultLogger;
@@ -114,21 +118,44 @@ export class DurableWorkflowEngine {
 
   start(): void {
     this.stopped = false;
-    if (this.workerTimer !== undefined) return;
-    this.workerTimer = setInterval(() => this.startProcessing(), this.workerIntervalMs);
-    this.workerTimer.unref();
+    if (this.started) return;
+    this.started = true;
     this.startProcessing();
   }
 
   private startProcessing(): void {
-    void this.processAvailable().catch((error: unknown) => {
-      this.report(error, "workflow.worker.recover");
-    });
+    if (this.workerTimer) clearTimeout(this.workerTimer);
+    this.workerTimer = undefined;
+    void this.processAvailable().then(
+      () => this.scheduleNextPoll(),
+      (error: unknown) => {
+        this.report(error, "workflow.worker.recover");
+        this.schedulePoll(this.workerIntervalMs);
+      },
+    );
+  }
+
+  private async scheduleNextPoll(): Promise<void> {
+    try {
+      const delay = (await this.options.nextPollDelay?.()) ?? this.workerIntervalMs;
+      this.schedulePoll(Math.max(this.workerIntervalMs, Math.min(delay, 5000)));
+    } catch (error) {
+      this.report(error, "workflow.worker.next_poll");
+      this.schedulePoll(this.workerIntervalMs);
+    }
+  }
+
+  private schedulePoll(delay: number): void {
+    if (this.stopped || !this.started) return;
+    if (this.workerTimer) clearTimeout(this.workerTimer);
+    this.workerTimer = setTimeout(() => this.startProcessing(), delay);
+    this.workerTimer.unref();
   }
 
   async stop(): Promise<void> {
     this.stopped = true;
-    if (this.workerTimer !== undefined) clearInterval(this.workerTimer);
+    this.started = false;
+    if (this.workerTimer !== undefined) clearTimeout(this.workerTimer);
     this.workerTimer = undefined;
     await this.processing;
     await this.terminalNotificationProcessing;
@@ -242,16 +269,27 @@ export class DurableWorkflowEngine {
       acceptedCount: matches.filter(isAcceptedTriggerProviderMatch).length,
       rejectedCount: matches.filter((match) => match.invocation.status === "rejected").length,
     });
+    if (this.started) this.startProcessing();
     return { providerEventReceiptId: trigger.providerEventReceiptId };
   }
 
   async processAvailable(): Promise<void> {
     if (this.options.database === null || this.stopped) return;
-    if (this.processing !== undefined) return this.processing;
-    this.processing = this.processAvailableImpl().finally(() => {
+    if (this.processing !== undefined) {
+      this.processingRequested = true;
+      return this.processing;
+    }
+    this.processing = this.drainRequestedProcessing().finally(() => {
       this.processing = undefined;
     });
     return this.processing;
+  }
+
+  private async drainRequestedProcessing(): Promise<void> {
+    do {
+      this.processingRequested = false;
+      await this.processAvailableImpl();
+    } while (this.processingRequested && !this.stopped);
   }
 
   private async processAvailableImpl(): Promise<void> {

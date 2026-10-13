@@ -5,14 +5,10 @@ import type { Database } from "../../db/types.js";
 import { outputContextProvider, replyOutputTool } from "../../execution-capabilities/outputs.js";
 import { logger } from "../../logger.js";
 import { reportFailure } from "../../failures/index.js";
-import { createDiscordRegistration } from "../../providers/discord/index.js";
-import { createGitHubRegistration } from "../../providers/github/index.js";
-import { createLinearRegistration } from "../../providers/linear/index.js";
 import type {
   ProviderRegistration,
   TriggerProviderResources,
 } from "../../providers/registration.js";
-import { createSlackRegistration } from "../../providers/slack/index.js";
 import type { TriggerHandler, TriggerProvider, TriggerSource } from "../../triggers/index.js";
 import type {
   Provider,
@@ -145,7 +141,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       activateConfiguration: boolean;
     },
   ): Promise<ProviderRuntimeCandidate> {
-    const registration = this.build(
+    const registration = await this.build(
       provider,
       configuration,
       callbackOrigin,
@@ -231,7 +227,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     if (handler !== undefined && active.acceptingEvents) await startSources(active, handler);
   }
 
-  private build(
+  private async build(
     provider: Provider,
     configuration: ProviderApplicationConfiguration,
     callbackOrigin: string,
@@ -240,7 +236,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       expectedConfigurationVersion: number | undefined;
       activateConfiguration: boolean;
     },
-  ): ProviderRegistration {
+  ): Promise<ProviderRegistration> {
     if (this.options.registrationFactory !== undefined) {
       return this.options.registrationFactory(
         this.customRegistrationInput(
@@ -261,9 +257,11 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       ...(this.options.fetch === undefined ? {} : { fetch: this.options.fetch }),
     };
     if (provider === "github" && configuration.provider === "github") {
+      const { createGitHubRegistration } = await import("../../providers/github/index.js");
       return createGitHubRegistration({ ...shared, configuration });
     }
     if (provider === "slack" && configuration.provider === "slack") {
+      const { createSlackRegistration } = await import("../../providers/slack/index.js");
       return createSlackRegistration({
         ...shared,
         configuration,
@@ -277,6 +275,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       });
     }
     if (provider === "discord" && configuration.provider === "discord") {
+      const { createDiscordRegistration } = await import("../../providers/discord/index.js");
       return createDiscordRegistration({
         ...shared,
         configuration: {
@@ -287,6 +286,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       });
     }
     if (provider === "linear" && configuration.provider === "linear") {
+      const { createLinearRegistration } = await import("../../providers/linear/index.js");
       return createLinearRegistration({
         ...shared,
         configuration,
@@ -669,7 +669,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     try {
       const configuration = parseProviderApplicationConfiguration(snapshot.configurationSnapshot);
       if (configuration.provider !== provider) return firstActive(slot);
-      const registration = this.build(
+      const registration = await this.build(
         provider,
         configuration,
         snapshot.callbackOrigin,

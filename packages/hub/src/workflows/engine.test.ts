@@ -30,6 +30,46 @@ import { createLogger } from "../logger.js";
 import { assertOneFailure, FailureLogStream } from "../test-utils/failure-logs.js";
 
 describe("durable multi-step workflow engine", () => {
+  it("wakes accepted work immediately while the embedded worker is backed off", async () => {
+    const fixture = await workflowFixture();
+    let idleReady!: () => void;
+    const idle = new Promise<void>((resolve) => {
+      idleReady = resolve;
+    });
+    const intents: LaunchMachineIntent[] = [];
+    const { handler, engine } = createDurableWorkflowHandler({
+      database: fixture.database,
+      entitlements: fixture.entitlements,
+      providers: [providerMatch(fixture.configuration, fixture.revisionId)],
+      nextPollDelay: async () => {
+        idleReady();
+        return 5000;
+      },
+      dispatchLaunchMachineIntent: async (intent) => {
+        intents.push(intent);
+        return {
+          execution: await fixture.database.findAgentExecutionByWorkflowStepRunId(
+            intent.workflowStepRunId!,
+          ),
+        };
+      },
+    });
+    try {
+      engine.start();
+      await idle;
+      const started = Date.now();
+      await handler(fixture.trigger("wake from idle"));
+      await engine.processAvailable();
+      assert.ok(intents.length > 0);
+      assert.ok(
+        Date.now() - started < 1000,
+        "accepted work must not wait for the five-second idle poll",
+      );
+    } finally {
+      await engine.stop();
+    }
+  });
+
   it.each(["github", "discord"] as const)(
     "materializes one reusable environment from each %s execution identity before persistence",
     async (providerName) => {
