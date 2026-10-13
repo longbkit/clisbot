@@ -100,6 +100,9 @@ The image runs the daemon and serves the bundled web UI. It does not bundle agen
 - [Connectivity](/docs/connectivity), connect through the relay or Tailscale.
 - [Docker](/docs/docker), run the daemon and bundled web UI in a container.
 - [Workspaces](/docs/workspaces), the project, workspace, and session model Clisbot is built around.
+- [Bots and Group chats](/docs/bots-and-chats), give recurring work a persona or discuss it with several specialist Bots.
+- [Managed access](/docs/hub/managed-access), share Hosts and Projects with Members and Teams.
+- [Channel commands](/docs/hub/channels/commands), choose Projects/Workspaces and control sessions from chat.
 - [Providers](/docs/providers), what a provider is and how Clisbot wraps existing CLIs.
 - [Orchestration](/docs/orchestration), let one agent delegate work to other providers and models.
 - [Plugins](/docs/plugins), add trusted local surfaces, sidebar actions, daemon behavior, and composer attachments.

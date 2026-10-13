@@ -8,7 +8,7 @@ category: Hub
 
 # Discord
 
-Discord connects over the gateway, so it needs no public address. Inbound is limited to new messages today: slash commands, interaction callbacks, and inbound reactions are not routed yet.
+Discord connects over the gateway, so it needs no public address. Inbound handles new messages and the native `/clisbot` command. Component callbacks and inbound reactions are not routed.
 
 Hub also uses Discord as an [event trigger provider](/docs/hub/triggers/discord). That is a different resource. A Discord **Channel account** carries its own bot token, and the two appear side by side in the Connections list under the same provider name, told apart by id.
 
@@ -27,16 +27,16 @@ Hub also uses Discord as an [event trigger provider](/docs/hub/triggers/discord)
 ## Add it to Hub
 
 ```sh
-umask 077 && printf '%s' '<bot token>' > /tmp/discord-token
-clisbot channels add discord --account main --secret-file /tmp/discord-token
-rm /tmp/discord-token
+clisbot channels add discord --account main --secret-file <token-file>
 ```
 
-Hub probes the token against `GET /users/@me` before storing it. In the app, use **Channels → Connections → Add Connection**.
+Save the raw token in a private file using an editor (`chmod 600 <token-file>`), outside your repository and shell history. Hub probes it against `GET /users/@me` before storing it. In the app, use **Channels → Connections → Add Connection**.
 
 ## Conversations it handles
 
 Direct messages, guild text channels, and threads. A Discord thread is itself a channel id, so a Route targets it the same way it targets a channel.
+
+Use [Channel slash commands](/docs/hub/channels/commands) with a bot mention, or native `/clisbot` with its `command` text option (for example `workspace list`). Its acknowledgement is private; command output returns to the conversation.
 
 Mention detection accepts an explicit `<@id>` mention or a reply to one of the bot's own messages. Own-message and bot-authored traffic is filtered. Admission is keyed on the Discord message id, so a gateway `RESUME` redelivery is dropped rather than replayed.
 
@@ -48,7 +48,7 @@ Text with Discord markdown, chunking, and mention rewriting; files of any type, 
 
 ## Limits
 
-- **Slash commands and interaction callbacks are not routed.** The code to register and dispatch them is present but nothing wires it, so a button click does not reach Hub.
+- **Component callbacks are not routed.** A button click does not reach Hub; native `/clisbot` command interactions are handled separately.
 - **Inbound reactions, edits, deletes, and attachments are not routed.** The gateway transport normalizes new messages only, and inbound media is not downloaded.
 - **No voice.** Voice messages and voice channels are omitted; asking `send` for a voice message fails loudly.
 - **No Activities.** They need a public endpoint Hub does not expose.

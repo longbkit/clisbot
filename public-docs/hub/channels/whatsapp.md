@@ -41,7 +41,7 @@ The login's auth state — its credentials and the Signal session keys — is a 
 
 ## Conversations it handles
 
-Direct chats and groups. The agent receives the text and the images, videos, documents, audio and stickers people send, up to 50 MB each. A shared location, contact cards, and the ad a message answers arrive as labeled JSON blocks after the text, so the agent reads coordinates, names and phone numbers as fields.
+Direct chats and groups. The agent receives the text and the images, videos, documents, audio and stickers people send, up to the account's configured download limit (50 MB by default). A shared location, contact cards, and the ad a message answers arrive as labeled JSON blocks after the text, so the agent reads coordinates, names and phone numbers as fields.
 
 In a group, a message addresses the account when it @mentions the account's number or replies to one of the account's own messages. A direct message always addresses it. Whether an unaddressed group message reaches the agent is the Route's Rule, not the channel's.
 
@@ -50,6 +50,8 @@ When a message replies to (quotes) another, the agent reads the quoted text firs
 Answers do not quote by default. A message-tool `send` that names `replyTo` quotes that message. Set `replyToMode` in the account's `config:` to `first` (the answer's first message quotes the message it answers) or `all` (every message of a long answer does). Useful in busy groups.
 
 There are no threads. The agent answers in the same chat.
+
+Use [Channel slash commands](/docs/hub/channels/commands#channel-invocation) for session controls, Project/Workspace selection and this channel's invocation forms.
 
 ## What the agent can do
 

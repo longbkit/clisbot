@@ -2,13 +2,15 @@
 title: Hub workflows
 description: Build ordered Hub workflows with prompts, routing, outputs, and provider authority.
 nav: Workflows
-order: 64
+order: 66
 category: Hub
 ---
 
 # Hub workflows
 
-A workflow file contains one trigger and the ordered steps it starts. Files are discovered from `.clisbot/workflows/*.yml`.
+An Automation contains ordered Workflow steps. Create and edit them in [Automations](/docs/hub/automations). **Edit YAML** exposes a self-contained document.
+
+The examples below use the supported legacy repository bundle format: `.clisbot/hub.yml` defines named targets and Agents; `.clisbot/workflows/*.yml` supplies triggers and steps. See [Repository bundles](/docs/hub/configuration#repository-bundles) before using the CLI.
 
 ## Your first workflow
 
@@ -39,7 +41,7 @@ steps:
       - { type: slack.reply, max: 1, required: true }
 ```
 
-Hub removes the mention and declared input headers before exposing the remaining text as `${{ clisbot.prompt }}`. The reply capability is explicit beside the Slack trigger. Discord uses `discord.reply`; GitHub uses a step-scoped [`github` block](/docs/hub/github), not `hub.reply`.
+Hub removes the mention and declared input headers before exposing the remaining text as `${{ clisbot.prompt }}`. The reply capability is explicit beside the Slack trigger. Discord uses `discord.reply`; GitHub issue/PR replies use `github.reply`; a step-scoped [`github` block](/docs/hub/github) separately grants `gh` authority.
 
 ## Choose where a step runs
 
@@ -87,7 +89,6 @@ Or provide one complete static inline configuration:
 ```yaml
 agent:
   provider: claude
-  mode: full-access
 ```
 
 For dynamic routing, select complete named agents from a finite expression:
@@ -240,7 +241,7 @@ allow_outputs:
     required: true
 ```
 
-`max` defaults to `1`. `required: true` prevents successful completion until the capability has been emitted. Keep Slack and Discord reply types in their own provider workflow files.
+`max` defaults to `1` for an explicit grant. `required: true` prevents successful completion until that output has been emitted. Grant only the reply type available to the input: Slack, Telegram, Discord, GitHub issue/PR, or Linear. Single-`run` direct-event documents supply an optional native reply when no explicit grant is authored; define a budget when needed.
 
 ## Deadlines
 

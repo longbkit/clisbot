@@ -42,7 +42,9 @@ With a custom root, Clisbot keeps the same hashed layout under that directory:
 
 ## Create a worktree-backed workspace
 
-The examples below use the current directory as the source checkout. Pass `--path ~/dev/my-app` to create the workspace from another checkout.
+From a Hub channel, [`/workspace new`](/docs/hub/channels/commands#create-the-workspace-before-starting-an-agent) creates a worktree Workspace; [`/worktree`](/docs/hub/channels/commands#inspect-git-and-refresh-branches) inspects Git without selecting or creating one.
+
+The CLI examples use the current checkout. Pass `--path ~/dev/my-app` for another.
 
 Branch off from a base branch:
 

@@ -417,6 +417,11 @@
   margin-bottom: 1rem;
 }
 
+.docs-prose :not(pre) > code,
+.docs-prose a {
+  overflow-wrap: anywhere;
+}
+
 .docs-prose a {
   color: var(--color-foreground);
   font-weight: 500;

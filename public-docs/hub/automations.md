@@ -2,6 +2,7 @@
 title: Automations in the Clisbot app
 description: Configure event and conversation inputs from one Automation.
 nav: Automations
+order: 69
 category: Hub
 ---
 
@@ -49,7 +50,7 @@ Connection; “when mentioned” is configured as a Route condition. Adding a Ch
 does not automatically remove or convert an existing direct event.
 
 **Parameters** declares typed values supplied by a caller; it is separate from input sources.
-Configure the Host, Project, Agent controls, instruction and outputs, then save the Automation.
+Configure the Host, Project, Agent controls, instruction and outputs, then save the Automation. Use a Host enrolled with `hub.execute`; execution also respects your [Managed access](/docs/hub/managed-access).
 Mode uses the Provider default when omitted; Pi exposes no selectable Modes.
 
 ## Saving and retrying
@@ -68,7 +69,7 @@ resolving failures; local drafts and retry checkpoints do not survive reloading 
 ## Manage existing work
 
 **Overview** summarizes work and sources. **Configuration** uses the same Add input flow as
-creation. Its Inputs section embeds the shared Route editor. Editing an existing Route there
+creation. Use [Channel commands](/docs/hub/channels/commands) for status, opening the bound session and stopping supported runs. Its Inputs section embeds the shared Route editor. Editing an existing Route there
 updates the canonical Channel configuration immediately. The same Routes appear in Channels
 settings. **Runs** and **Revisions** show execution results and saved definitions.
 
@@ -82,10 +83,9 @@ outbound delivery only; it does not prove the complete input → Automation → 
 
 ## Direct Agent conversations and advanced definitions
 
-Channels continues to support **Start or continue an Agent**, without a Workflow run. Adding
+Channels continues to support **Start or continue an Agent** and **Start or continue a Bot**, without a Workflow run. Adding
 Automation inputs does not change existing direct-Agent Routes. **Continue the same Agent** on
-an Automation reuses a compatible Agent for the conversation, while each request still creates
-an Automation run.
+an Automation applies to Route-driven Channel requests and reuses a compatible Agent for that conversation. Other event runs create a new Agent; each request still creates an Automation run.
 
 The YAML editor has a fixed-height, scrollable code area shared with Channels. New definitions
 use YAML syntax; older JSON-formatted definitions are displayed as YAML, without changing the

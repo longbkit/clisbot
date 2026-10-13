@@ -5,8 +5,8 @@ import { pageMeta } from "~/meta";
 export const Route = createFileRoute("/")({
   head: () =>
     pageMeta(
-      "Clisbot – Run Claude Code, Codex, Copilot, OpenCode from anywhere",
-      "Open source app for Claude Code, Codex, OpenCode, Pi, and 30+ more coding agents. Run many agents in parallel on your machines. Editor, terminals, diffs, pull requests, and a browser in one window. One download on desktop. The full app on iOS and Android.",
+      "Clisbot – AI agents, Bots, and team workflows",
+      "Work with AI agents and specialist Bots on your machines from desktop, mobile, and chat channels. Connect eight channel integrations through Clisbot Hub, share Hosts and Projects with Managed access, and bring multiple Bots into one Chat.",
       "/",
     ),
   component: Home,
@@ -15,18 +15,21 @@ export const Route = createFileRoute("/")({
 function Home() {
   return (
     <LandingPage
+      showHubAndBots
       title={
         <>
-          The control plane
+          Your AI agents,
           <br />
-          for coding agents
+          connected to your work.
         </>
       }
       subtitle={
         <>
-          Run many coding agents at once, on your machines.
+          Build, research, and work with specialist Bots on your machines.
           <br />
-          Desktop and mobile. Open source.
+          Desktop, mobile, and your team&rsquo;s chat channels.
+          <br />
+          Open source. Your agents run where you choose.
         </>
       }
     />

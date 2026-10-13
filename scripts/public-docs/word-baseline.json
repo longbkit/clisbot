@@ -1,5 +1,6 @@
 {
   "agent-profiles.md": 393,
+  "bots-and-chats.md": 651,
   "browser-tools.md": 503,
   "browser-when.md": 158,
   "browser.md": 646,
@@ -14,6 +15,7 @@
   "hub/activity.md": 484,
   "hub/api.md": 1557,
   "hub/automations.md": 1196,
+  "hub/channels/commands.md": 2034,
   "hub/channels/discord.md": 674,
   "hub/channels/feishu.md": 764,
   "hub/channels/googlechat.md": 897,
@@ -30,6 +32,7 @@
   "hub/faq.md": 495,
   "hub/github.md": 344,
   "hub/index.md": 297,
+  "hub/managed-access.md": 728,
   "hub/quickstart.md": 1509,
   "hub/security.md": 1058,
   "hub/self-hosting/discord-app.md": 203,

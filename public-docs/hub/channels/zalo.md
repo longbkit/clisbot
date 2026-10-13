@@ -18,25 +18,23 @@ This is the **Official Account bot**. [Zalo Personal](/docs/hub/channels/zalouse
 2. In **Zalo Bot Creator** (`bot.zaloplatforms.com`), create a bot for that OA and copy its token. That token is the whole credential — no app id, no OAuth, no signing key.
 3. Follow the bot from a personal Zalo account, and add it to a group if you want the group cases.
 
-Polling needs nothing else. Webhook mode additionally needs a public HTTPS endpoint and a secret you choose, 8 to 256 characters.
+Use **Bot API polling**; it needs no public URL. Hub does not support the webhook transport.
 
 ## Add it to Hub
 
 ```sh
-umask 077 && printf '%s' '<bot token>' > /tmp/zalo-token
-clisbot channels add zalo --account main --secret-file /tmp/zalo-token
-rm /tmp/zalo-token
+clisbot channels add zalo --account main --secret-file <token-file>
 ```
 
-For webhook mode the file is JSON with `botToken` and `webhookSecret`. Hub probes the token with `getMe` before storing it.
-
-Polling is the default and the mode to run first. Hub refuses to compile a webhook transport until the account carries both a public URL and a secret: Zalo signs every delivery, and a delivery Hub cannot verify is refused rather than trusted.
+Save the raw token or JSON with `botToken` in a private file using an editor (`chmod 600 <token-file>`). Keep it outside the repository and shell history. Hub probes it with `getMe` before storing it. Webhook configurations are refused even when a URL and secret are supplied.
 
 ## Conversations it handles
 
 Direct chats and groups. A DM always counts as addressed to the bot; a group message counts when it names the bot, matched against the bot's account name and any aliases the account lists.
 
 Inbound covers text messages, a leading `/verb` as a command, and images. An image is downloaded into the account's media directory and folded into the turn as an attachment; a failed or oversized download still tells the agent an image arrived. Stickers and unsupported message types are logged and start no turn.
+
+Use [Channel slash commands](/docs/hub/channels/commands#channel-invocation) for session controls, Project/Workspace selection and this channel's invocation forms.
 
 ## What the agent can do
 
@@ -55,7 +53,7 @@ Polling has no cursor to hold back: the API returns at most one update and never
 
 ## Verified live
 
-Nothing yet, but nothing is blocking it. Polling E2E is runnable with a bot token and a human Zalo account to send from. Webhook E2E needs the public endpoint.
+No live message loop is recorded. Polling validation needs a bot token and a human Zalo sender; webhook transport is unsupported.
 
 ## Troubleshooting
 
@@ -63,6 +61,6 @@ Nothing yet, but nothing is blocking it. Polling E2E is runnable with a bot toke
 
 **An image the agent sent never arrived.** The URL must be public HTTPS and must pass the outbound host guard. A local path cannot work — see the upload limit.
 
-**Webhook deliveries are refused.** The `x-bot-api-secret-token` header did not match. The secret is compared in constant time before the body is read.
+**Webhook configuration is refused.** Hub supports polling only; a webhook secret does not enable the transport.
 
 **The agent says an action is unsupported.** It probably is. Check the limits above before treating it as a bug.

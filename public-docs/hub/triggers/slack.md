@@ -8,6 +8,8 @@ category: Hub
 
 # Slack triggers
 
+For conversations, configure a [Channel Route](/docs/hub/channels) targeting an Agent, Bot or Automation. This page covers the direct-mention event input and legacy Workflow format; it does not describe Channel slash commands.
+
 `slack.mention` fires when the bot is mentioned in a channel where it is present. Direct messages, slash commands, and interactive components do not produce this trigger.
 
 `.clisbot/workflows/slack-help.yml`:
@@ -34,7 +36,7 @@ steps:
       - { type: slack.reply, max: 1, required: true }
 ```
 
-Slack filters use IDs, not display names or Hub connection slugs. `from_users` matches the author, `workspace` the team, and `channels` the channel. `pattern` is a required prefix after the mention; `contains` is its legacy alias and has the same prefix behavior. All filters must pass.
+Use stable Slack IDs for these filters, not display names. `from_users` matches the author, `workspace` the team, and `channels` the channel. `pattern` is a required prefix after the mention; `contains` is its legacy alias and has the same prefix behavior. All filters must pass.
 
 The reply posts in the triggering thread. A root message gets a thread; a threaded message stays there. `slack.reply` grants `hub.reply`, but does not add reply instructions to the prompt.
 
@@ -54,4 +56,4 @@ Hub consumes consecutive declared headers and exposes the remainder as `${{ clis
 | `from_users` | Your avatar → **Profile** → **⋮** → **Copy member ID**. Member IDs start with `U`.          |
 | `channels`   | Channel name → **About**. The channel ID is at the bottom of the panel and starts with `C`. |
 
-[Guided setup](/docs/hub/quickstart) fills `workspace` from the Slack app you connected and asks you for your member ID, so a generated starter already carries both.
+Set these filters in the direct-event definition. New Slack Automation inputs use Routes; select the conversation and audience in [Automations](/docs/hub/automations).

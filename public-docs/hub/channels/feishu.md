@@ -8,9 +8,9 @@ category: Hub
 
 # Feishu / Lark
 
-Feishu is the channel with the largest tool surface. Beyond messaging, the agent gets fourteen `feishu_*` tools for documents, wikis, Drive, permissions, and Bitable.
+Beyond messaging, Feishu offers fourteen `feishu_*` tools for documents, wikis, Drive, permissions, and Bitable.
 
-The long-connection transport needs no public address, which makes it the mode to start with.
+Use the supported long-connection transport; it needs no public address.
 
 ## What you need
 
@@ -18,7 +18,7 @@ The long-connection transport needs no public address, which makes it the mode t
 2. Copy the **App ID** (`cli_…`) and **App Secret**.
 3. Grant the app scopes. Messaging needs `im:message`, `im:message.group_at_msg`, `im:message:send_as_bot`, `im:chat:readonly`, and `im:resource`. Each tool family needs its own: `docx:document`, `drive:drive`, `wiki:wiki`, `bitable:app`.
 4. Add the Connection to Hub (below), so the bot holds its long connection open.
-5. Under **Events & Callbacks**, set the subscription mode to **Receive events through persistent connection**. The console only saves it while a client is connected, which is why the Connection comes first; **Verify** shows **Connected**. Then **Add Events**: **Message received** (`im.message.receive_v1`), **Bot added to group** (`im.chat.member.bot.added_v1`) and **Bot removed from group** (`im.chat.member.bot.deleted_v1`). The webhook alternative is [not supported yet](/docs/hub/channels#the-seven-channels).
+5. Under **Events & Callbacks**, set the subscription mode to **Receive events through persistent connection**. The console only saves it while a client is connected, which is why the Connection comes first; **Verify** shows **Connected**. Then **Add Events**: **Message received** (`im.message.receive_v1`), **Bot added to group** (`im.chat.member.bot.added_v1`) and **Bot removed from group** (`im.chat.member.bot.deleted_v1`). The webhook alternative is [not supported yet](/docs/hub/channels#the-eight-channels).
 6. Under **Version Management & Release**, create and publish a version. Nothing above reaches the bot until a version with it is released.
 7. Add the bot to the chats it should answer in.
 
@@ -36,7 +36,7 @@ The secret file is JSON:
 }
 ```
 
-Add `verificationToken` and `encryptKey` when you intend to use the webhook transport.
+The long connection needs the App ID and secret. Hub refuses webhook mode even if its verification token and encrypt key are supplied.
 
 ```sh
 clisbot channels add feishu --account main --secret-file ./feishu-app.json
@@ -47,6 +47,8 @@ Hub exchanges the pair for a tenant access token before storing it, so a wrong s
 ## Conversations it handles
 
 Group chats, DMs, and group DMs, with message threads. Inbound covers messages, card clicks as callbacks, and member events.
+
+Use [Channel slash commands](/docs/hub/channels/commands#channel-invocation) for session controls, Project/Workspace selection and this channel's invocation forms.
 
 ## What the agent can do
 
@@ -70,7 +72,7 @@ Channel tools, registered on the agent's MCP server and authorized per call:
 
 - **No media in or out.** Inbound attachments are not downloaded and there is no upload path.
 - **No delete, no sticker, no streaming card.** Card clicks arrive inbound, but Hub renders no Lark card of its own, so approval prompts are not native.
-- **The webhook transport has never run in production.** It is unit-tested against a real local HTTP listener and nothing else.
+- **No channel webhook transport.** Hub supports the long connection only.
 
 ## Verified live
 
@@ -86,6 +88,6 @@ Nothing. The tool factories and the send path are driven against a faked Lark SD
 
 **The log says `Incorrect domain name` (code 1000040351).** The Connection's domain is the other platform from the app's. Add the Connection again with the right **Domain**. A Connection saved before Hub kept the domain with it falls back to `feishu`, so a Lark app added that way needs saving again.
 
-**Webhook requests are rejected.** The encrypt key signs every inbound request; a missing or wrong `encryptKey` makes every delivery unverifiable, and an unverifiable request is refused rather than trusted.
+**Webhook configuration is rejected.** Choose the long connection; providing webhook secrets does not enable this transport.
 
 **A `feishu_perm` call says the tool does not exist.** It is off by default. Enable it on the account.

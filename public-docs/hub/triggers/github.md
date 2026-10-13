@@ -8,7 +8,7 @@ category: Hub
 
 # GitHub triggers
 
-Use semantic GitHub events to start a workflow from one GitHub action. Add the workflow below to a repository whose `.clisbot/hub.yml` defines the `dev` environment and `codex` agent, then activate the bundle.
+Use semantic GitHub events to start an Automation from one GitHub action. These examples use the supported legacy repository bundle format; use [Automations](/docs/hub/automations) for the app editor. Add the workflow below to a repository whose `.clisbot/hub.yml` defines the `dev` environment and `codex` agent, then activate the bundle.
 
 ## Triage new issues
 
@@ -138,7 +138,7 @@ steps:
 
 Use `github.issue_comment_created` for an issue discussion and `github.pull_request_comment_created` for a pull-request conversation. A comment on a changed line is a diff comment, covered by the legacy `github.pull_request_review_comment` event.
 
-For `github.issue_comment_created`, `github.pull_request_comment_created`, `github.issue_comment`, and `github.pull_request_review_comment`, Hub reacts with 👀 when it accepts the delivery, 🚀 when the agent starts, 👍 on completion, and 👎 on failure.
+For `github.issue_comment_created`, `github.pull_request_comment_created`, `github.issue_comment`, and `github.pull_request_review_comment`, Hub reacts with 👀 when it accepts the delivery, 👍 on completion, and 👎 on failure.
 
 ## Start work when an issue becomes ready
 
@@ -190,7 +190,7 @@ Choose `github.issue_comment_created` for a comment on an issue and `github.pull
 
 ## Filter GitHub events
 
-Every externally sourced workflow needs a non-empty `from_users` allowlist. GitHub filters compose with AND: the repository, connection, sender, content, changed label, and required current labels must all match.
+Every externally sourced GitHub Workflow needs a non-empty `from_users` allowlist. GitHub filters compose with AND: the repository, connection, sender, content, changed label, and required current labels must all match.
 
 `contains` and `pattern` inspect the title plus body for issue and pull-request events. For comment events, they inspect the comment body. `contains` is a substring match; `pattern` matches the start.
 
@@ -202,4 +202,8 @@ The [configuration reference](/docs/hub/configuration/hub-yml#github-events-and-
 
 Existing workflows keep their behavior with `github.issues`, `github.issue_comment`, `github.pull_request_review`, `github.pull_request_review_comment`, and `github.push`. Prefer the semantic events above for new workflows. A semantic workflow and a legacy workflow can both match the same delivery, so they start separate runs.
 
-A GitHub trigger grants no token. Authority is the `github` block on the step that needs it. GitHub has no `hub.reply` capability; the agent acts through `gh` within the declared connection, repositories, and permissions.
+## Replies
+
+For an issue or pull-request target, `github.reply` grants `hub.reply` to post a conversation comment. Push events have no issue/PR reply target. Single-`run` event definitions provide an optional native reply unless an explicit output budget is authored; multistep Workflows declare `allow_outputs` on the responding step.
+
+A trigger grants no `gh` token. The [`github` block](/docs/hub/github) separately gives the step scoped repository and permission authority for labels, reviews, commits and other `gh` operations. Prompt the Agent to call the intended tool and `hub.finish_execution` when done.
