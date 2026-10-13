@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.1-beta.1 - 2026-10-13
+
+### Added
+
+- Added channel commands to select Projects and workspaces, inspect Git branches and worktrees, and create workspaces from branches or pull requests
+- Added Show more and View all controls for Bots and group chats in the sidebar
+
+### Fixed
+
+- Fixed long subagent activity hiding earlier conversation history or exhausting the history read budget
+- Fixed large session-index upgrades loading the entire journal into memory, and checkpoint failures reporting durable messages as unsaved
+- Fixed Command Center updates resetting the position of a manually scrolled result list
+
+Paseo baseline remains `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`.
+
 ## 2.1.0 - 2026-10-13
 
 ### Added
