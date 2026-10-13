@@ -740,7 +740,9 @@ async function openDaemonWithRetry(
     try {
       return await connectToDaemon({
         target:
-          target === undefined ? { kind: "instance", home } : { kind: "endpoint", host: target },
+          target === undefined || password === undefined
+            ? { kind: "instance", home }
+            : { kind: "endpoint", host: target },
       });
     } catch (error) {
       lastError = error;
