@@ -86,6 +86,16 @@ Confirmed findings required integration fixes:
   run-start acknowledgement; the unchanged rejection assertion and added state,
   in-flight and notification-cleanup checks pass.
 
+Independent parent review found **APP-1 (P2)**: upstream empty-project preservation
+considered labels but omitted the fork user/channel metadata filter. A truly empty
+Project survived a user filter, obscuring zero-result state. The focused real-browser
+fixture reproduces this (expected 0 headers, received 1), then the narrow guard adds
+`!hasMetadataFilter`. The fixture also checks no-filter and selected-Project-only
+preservation, user/channel filters with background shown/hidden, and zero-result
+recovery. The rebuilt production-browser case passes; the three affected sidebar unit files
+pass 19 tests. Normal revision hooks and independent acceptance are recorded in
+the CTO evidence.
+
 The compact header preserves Home back navigation, managed Shell/profile access,
 focused heartbeat controls, copy-path behavior and sidebar theme subscription.
 A helper regression was corrected to accept the existing Home back control as

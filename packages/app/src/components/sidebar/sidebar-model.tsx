@@ -138,8 +138,8 @@ export function SidebarModelProvider({
   );
   // The two filters prune differently on purpose. The project filter is a membership test on the
   // project itself, so a project you filtered TO survives even with no workspaces — it still owns
-  // a header row you can create your first workspace under. The label filter can only ask about
-  // workspaces, so a project it empties has nothing left to show.
+  // a header row you can create your first workspace under. Label and user/channel metadata
+  // filters only ask about workspaces, so a project they empty has nothing left to show.
   const filteredProjects = useMemo(() => {
     let projects = list.projects;
     if (hasActiveProjectFilter) {
@@ -151,7 +151,8 @@ export function SidebarModelProvider({
         const workspaces = project.workspaces.filter((workspace) =>
           visibleWorkspaceKeys.has(workspace.workspaceKey),
         );
-        return workspaces.length > 0 || (!hasActiveLabelFilter && project.workspaces.length === 0)
+        return workspaces.length > 0 ||
+          (!hasActiveLabelFilter && !hasMetadataFilter && project.workspaces.length === 0)
           ? [{ ...project, workspaces }]
           : [];
       });
