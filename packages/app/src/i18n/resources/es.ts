@@ -2297,6 +2297,7 @@ export const es: TranslationResources = {
         label: "Visualización de llamadas a herramientas",
         description: "Cómo aparecen las llamadas a herramientas en la cronología",
         options: {
+          "summary-with-latest-call": "Resumen con la última llamada",
           overview: "Resumen",
           detailed: "Detalle completo",
         },

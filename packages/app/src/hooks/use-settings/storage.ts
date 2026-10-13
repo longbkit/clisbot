@@ -35,6 +35,12 @@ import { z } from "zod";
 import { APP_SETTINGS_KEY, LEGACY_SETTINGS_KEY } from "./keys";
 import { migrateAppSettings } from "./migrations";
 
+import {
+  DEFAULT_TOOL_CALL_DETAIL_LEVEL,
+  TOOL_CALL_DETAIL_LEVELS,
+  type ToolCallDetailLevel,
+} from "./tool-call-detail-level";
+
 export { APP_SETTINGS_KEY } from "./keys";
 export const APP_SETTINGS_QUERY_KEY = ["app-settings"];
 
@@ -45,7 +51,11 @@ export type WorkspaceTitleSource = "title" | "branch";
 export type PullRequestOpenLocation = "main" | "side" | "explorer";
 /** What a sidebar workspace row shows in the space to the right of its title. */
 export type SidebarWorkspaceTrailing = "diff" | "timestamp" | "none";
-export type ToolCallDetailLevel = "overview" | "detailed";
+export {
+  DEFAULT_TOOL_CALL_DETAIL_LEVEL,
+  TOOL_CALL_DETAIL_LEVELS,
+  type ToolCallDetailLevel,
+} from "./tool-call-detail-level";
 
 const ThemePreferenceSchema = z.enum([
   ...THEME_OPTIONS.map((option) => option.name),
@@ -167,7 +177,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarFooterItems: [],
   usage: DEFAULT_USAGE_PREFERENCES,
   autoExpandReasoning: false,
-  toolCallDetailLevel: "detailed",
+  toolCallDetailLevel: DEFAULT_TOOL_CALL_DETAIL_LEVEL,
   chatOutlineEnabled: true,
   vimKeybindings: false,
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
@@ -270,10 +280,10 @@ const StoredAppSettingsSchema = z
     usage: UsagePreferencesSchema,
     autoExpandReasoning: z.boolean().catch(false),
     toolCallDetailLevel: z
-      .enum(["overview", "detailed"])
+      .enum(TOOL_CALL_DETAIL_LEVELS)
       .or(z.literal("concise").transform(() => "overview" as const))
       .optional()
-      .catch("detailed"),
+      .catch(DEFAULT_TOOL_CALL_DETAIL_LEVEL),
     // COMPAT(compactToolCalls): migrated in v0.1.105, remove after 2027-01-12.
     compactToolCalls: z.boolean().optional().catch(undefined),
     chatOutlineEnabled: z.boolean().catch(true),
@@ -322,8 +332,13 @@ const StoredAppSettingsSchema = z
       (isChecksHiddenByLegacyRowItem(stored.sidebarRowItems)
         ? "none"
         : DEFAULT_SIDEBAR_CHECKS_DISPLAY);
-    const toolCallDetailLevel =
-      stored.toolCallDetailLevel ?? (stored.compactToolCalls ? "overview" : "detailed");
+    let toolCallDetailLevel = stored.toolCallDetailLevel;
+    if (toolCallDetailLevel === undefined) {
+      toolCallDetailLevel = DEFAULT_TOOL_CALL_DETAIL_LEVEL;
+      if (stored.compactToolCalls !== undefined) {
+        toolCallDetailLevel = stored.compactToolCalls ? "overview" : "detailed";
+      }
+    }
     return {
       ...stored,
       openInSidePane,

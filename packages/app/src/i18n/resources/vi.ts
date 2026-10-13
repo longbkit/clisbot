@@ -2316,6 +2316,7 @@ export const vi: TranslationResources = {
         label: "Hiển thị lệnh gọi công cụ",
         description: "Cách lệnh gọi công cụ hiện trên dòng thời gian",
         options: {
+          "summary-with-latest-call": "Tóm tắt kèm lệnh cuối",
           overview: "Tóm tắt",
           detailed: "Đầy đủ chi tiết",
         },

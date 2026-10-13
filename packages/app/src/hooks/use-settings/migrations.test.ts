@@ -45,7 +45,7 @@ describe("migrateAppSettings", () => {
 
     expect(result.sendBehavior).toBe("steer");
     expect(storedSendBehavior(storage)).toBe("steer");
-    expect(appliedIds(storage)).toEqual(["steer-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "summary-with-latest-call-default"]);
   });
 
   it("leaves interrupt alone once the migration has run", async () => {
@@ -64,7 +64,7 @@ describe("migrateAppSettings", () => {
 
     expect(result.sendBehavior).toBe("queue");
     expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
-    expect(appliedIds(storage)).toEqual(["steer-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "summary-with-latest-call-default"]);
   });
 
   it("marks itself applied on a fresh install without rewriting settings", async () => {
@@ -73,7 +73,7 @@ describe("migrateAppSettings", () => {
     await migrateAppSettings(settingsWith("steer"), storage);
 
     expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
-    expect(appliedIds(storage)).toEqual(["steer-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "summary-with-latest-call-default"]);
   });
 
   it("keeps unknown migration ids written by a newer client", async () => {
@@ -83,7 +83,11 @@ describe("migrateAppSettings", () => {
 
     await migrateAppSettings(settingsWith("interrupt"), storage);
 
-    expect(appliedIds(storage)).toEqual(["some-later-migration", "steer-default"]);
+    expect(appliedIds(storage)).toEqual([
+      "some-later-migration",
+      "steer-default",
+      "summary-with-latest-call-default",
+    ]);
   });
 
   it("migrates every mobile 15px content preference to 16px", async () => {
@@ -94,7 +98,11 @@ describe("migrateAppSettings", () => {
 
     expect(result.contentFontSize).toBe(16);
     expect(storedContentFontSize(storage)).toBe(16);
-    expect(appliedIds(storage)).toEqual(["steer-default", "mobile-content-16"]);
+    expect(appliedIds(storage)).toEqual([
+      "steer-default",
+      "mobile-content-16",
+      "summary-with-latest-call-default",
+    ]);
   });
 
   it("leaves a 15px web content preference unchanged", async () => {
@@ -105,7 +113,7 @@ describe("migrateAppSettings", () => {
 
     expect(result.contentFontSize).toBe(15);
     expect(storedContentFontSize(storage)).toBeUndefined();
-    expect(appliedIds(storage)).toEqual(["steer-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "summary-with-latest-call-default"]);
   });
 
   it("lets a mobile user choose 15px after the default migration ran", async () => {
@@ -144,6 +152,56 @@ describe("migrateAppSettings", () => {
     const result = await migrateAppSettings(settingsWith("steer"), recovered);
 
     expect(result.sendBehavior).toBe("steer");
-    expect(appliedIds(recovered)).toEqual(["steer-default"]);
+    expect(appliedIds(recovered)).toEqual(["steer-default", "summary-with-latest-call-default"]);
   });
+});
+
+describe("latest-call default migration", () => {
+  it.each(["overview", "detailed", "summary-with-latest-call"] as const)(
+    "upgrades %s once, then preserves manual choices",
+    async (level) => {
+      const storage = createInMemoryKeyValueStorage();
+      const initial = { ...DEFAULT_CLIENT_SETTINGS, toolCallDetailLevel: level };
+      const upgraded = await migrateAppSettings(initial, storage);
+      expect(upgraded.toolCallDetailLevel).toBe("summary-with-latest-call");
+      expect(appliedIds(storage)).toContain("summary-with-latest-call-default");
+      for (const selection of ["overview", "detailed"] as const) {
+        const selected = { ...upgraded, toolCallDetailLevel: selection };
+        expect((await migrateAppSettings(selected, storage)).toolCallDetailLevel).toBe(selection);
+      }
+    },
+  );
+
+  it("does not mark a failed preference write and retries after a failed marker write", async () => {
+    const initial = { ...DEFAULT_CLIENT_SETTINGS, toolCallDetailLevel: "overview" as const };
+    const failedSettings = createFailingWriteStorage(APP_SETTINGS_KEY);
+    await expect(migrateAppSettings(initial, failedSettings)).rejects.toThrow();
+    expect(appliedIds(failedSettings)).toEqual([]);
+    const failedMarker = createFailingWriteStorage(SETTINGS_MIGRATIONS_KEY);
+    await expect(migrateAppSettings(initial, failedMarker)).rejects.toThrow();
+    const landed = JSON.parse(failedMarker.entries.get(APP_SETTINGS_KEY) ?? "null");
+    expect(landed.toolCallDetailLevel).toBe("summary-with-latest-call");
+    const recovered = createInMemoryKeyValueStorage(Object.fromEntries(failedMarker.entries));
+    expect((await migrateAppSettings(landed, recovered)).toolCallDetailLevel).toBe(
+      "summary-with-latest-call",
+    );
+    expect(appliedIds(recovered)).toContain("summary-with-latest-call-default");
+  });
+});
+
+it("writes the upgraded display preference before its migration marker", async () => {
+  const memory = createInMemoryKeyValueStorage();
+  const writes: string[] = [];
+  const storage = {
+    ...memory,
+    async setItem(key: string, value: string) {
+      writes.push(key);
+      await memory.setItem(key, value);
+    },
+  };
+  await migrateAppSettings(
+    { ...DEFAULT_CLIENT_SETTINGS, toolCallDetailLevel: "detailed" },
+    storage,
+  );
+  expect(writes).toEqual([APP_SETTINGS_KEY, SETTINGS_MIGRATIONS_KEY]);
 });

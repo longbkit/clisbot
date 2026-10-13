@@ -2380,6 +2380,7 @@ export const en = {
         label: "Tool call display",
         description: "How tool calls appear in the timeline",
         options: {
+          "summary-with-latest-call": "Summary with latest call",
           overview: "Summary",
           detailed: "Full detail",
         },

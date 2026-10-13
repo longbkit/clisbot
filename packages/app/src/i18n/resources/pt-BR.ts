@@ -2280,6 +2280,7 @@ export const ptBR: TranslationResources = {
         label: "Exibição de chamadas de ferramentas",
         description: "Como as chamadas de ferramentas aparecem na linha do tempo",
         options: {
+          "summary-with-latest-call": "Resumo com a última chamada",
           overview: "Resumo",
           detailed: "Detalhes completos",
         },

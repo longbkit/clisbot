@@ -818,3 +818,21 @@ describe("translation resources", () => {
     expect(en.startup.logs.loadFailed).toBe("Unable to load daemon logs: {{message}}");
   });
 });
+
+it("keeps the existing tool display labels and adds the exact latest-call labels", () => {
+  expect(en.settings.general.toolCallDetail.options).toEqual({
+    overview: "Summary",
+    detailed: "Full detail",
+    "summary-with-latest-call": "Summary with latest call",
+  });
+  expect(vi.settings.general.toolCallDetail.options).toEqual({
+    overview: "Tóm tắt",
+    detailed: "Đầy đủ chi tiết",
+    "summary-with-latest-call": "Tóm tắt kèm lệnh cuối",
+  });
+  for (const resource of [ar, es, fr, ja, ko, ptBR, ru, zhCN]) {
+    expect(
+      resource.settings.general.toolCallDetail.options["summary-with-latest-call"].length,
+    ).toBeGreaterThan(0);
+  }
+});

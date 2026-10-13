@@ -7,12 +7,13 @@ import {
   type GroupedToolCalls,
 } from "./grouping";
 import { buildOverviewGroup, type OverviewToolCallGroup } from "./overview/model";
+import { buildLatestCallGroup, type LatestCallToolCallGroup } from "./latest-call/model";
 
 export type { ToolCallDetailLevel } from "@/hooks/use-settings/storage";
-export type ToolCallDetailGroup = OverviewToolCallGroup;
+export type ToolCallDetailGroup = OverviewToolCallGroup | LatestCallToolCallGroup;
 
 export interface PreparedToolCallHistory {
-  mode: "overview";
+  mode: Exclude<ToolCallDetailLevel, "detailed">;
   grouped: GroupedHistory<ToolCallDetailGroup>;
 }
 
@@ -46,10 +47,10 @@ export function prepareToolCallHistory(
     return null;
   }
   return {
-    mode: "overview",
-    grouped: prepareGroupedHistory({
+    mode: level,
+    grouped: prepareGroupedHistory<ToolCallDetailGroup>({
       tail: visibleToolCallItems(tail),
-      buildGroup: buildOverviewGroup,
+      buildGroup: level === "overview" ? buildOverviewGroup : buildLatestCallGroup,
     }),
   };
 }
@@ -76,6 +77,6 @@ export function projectToolCallDetailLevel(input: {
     history: input.preparedHistory.grouped,
     head: visibleToolCallItems(input.head),
     isTurnActive: input.isTurnActive,
-    buildGroup: buildOverviewGroup,
+    buildGroup: input.level === "overview" ? buildOverviewGroup : buildLatestCallGroup,
   });
 }

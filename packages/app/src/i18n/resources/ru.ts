@@ -2282,6 +2282,7 @@ export const ru: TranslationResources = {
         label: "Отображение вызовов инструментов",
         description: "Как вызовы инструментов отображаются на временной шкале",
         options: {
+          "summary-with-latest-call": "Сводка с последним вызовом",
           overview: "Сводка",
           detailed: "Все подробности",
         },
