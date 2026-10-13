@@ -62,6 +62,7 @@ export function startCommand(): Command {
           console.log(chalk.dim(`URL: ${startup.url}`));
           console.log(chalk.dim(`Logs: ${startup.logPath}`));
         } catch (err) {
+          if (options.json) throw err;
           exitWithError(getErrorMessage(err));
         }
       }),

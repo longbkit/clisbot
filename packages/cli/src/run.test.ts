@@ -81,6 +81,37 @@ describe("runCli", () => {
     ).toEqual(["node", "clisbot", "onboard", "--no-relay"]);
   });
 
+  it.each([
+    ["--home", "/tmp/new home"],
+    ["--voice", "disable"],
+    ["--home=/tmp/new-home", "--voice=disable", "--json"],
+    ["--home", "status", "--relay"],
+    ["--json", "--no-relay"],
+  ])("routes root onboarding options %j", (...argv) => {
+    expect(createCliParseArgv({ argv, cwd: process.cwd() })).toEqual([
+      "clisbot",
+      "clisbot",
+      "onboard",
+      ...argv,
+    ]);
+  });
+
+  it.each([
+    ["--help"],
+    ["--version"],
+    ["--home", "/tmp/test", "--help"],
+    ["--home", "/tmp/test", "daemon", "status"],
+    ["--json", "ls"],
+    ["--unknown"],
+    ["unknown-command"],
+  ])("preserves commands, help and invalid options %j", (...argv) => {
+    expect(createCliParseArgv({ argv, cwd: process.cwd() })).toEqual([
+      "clisbot",
+      "clisbot",
+      ...argv,
+    ]);
+  });
+
   it("preserves known CLI command argv", () => {
     expect(
       createCliParseArgv({

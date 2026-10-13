@@ -48,12 +48,12 @@ clisbot
 
 `clisbot` asks whether to enable voice, then picks a connection:
 
-- Signed in to Tailscale: it uses Tailscale. If Tailscale Serve cannot expose the daemon, it falls back to the encrypted relay.
-- No Tailscale: choose **Use encrypted relay** to connect from anywhere, or **Use this machine only**.
+- Signed in to Tailscale: it uses Tailscale. If Serve fails, it explains how to fix it and prints a command to choose relay. No automatic switch.
+- No Tailscale: choose **Use Clisbot hosted relay** to connect from anywhere, or **Use this machine only**.
 
 It starts the daemon in the background and prints a QR code and a pairing link. Each link pairs one device and expires after 5 minutes.
 
-Run `clisbot` again for a new pairing link or after reboot; it reuses or starts the Host. Tailscale is preferred by default, with relay fallback. For non-interactive setup use `clisbot --voice disable`; choose `--relay` only to request relay explicitly. Stop the Host with `clisbot daemon stop`.
+Run `clisbot` again for a new pairing link or after reboot; it reuses or starts the Host. Tailscale is preferred by default; successful transport choices are remembered. For non-interactive setup use `clisbot --voice disable`; choose `--relay` for Clisbot’s end-to-end encrypted hosted relay, currently provided free of charge. Use `clisbot --home /path/to/home` for separate state. Stop the Host with `clisbot daemon stop`.
 
 For a Bot, run `clisbot bot start`: skip channels to use it in the app, or connect one to start Hub automatically. See [Hub & Channel connect](/docs/hub/quickstart). Local web is optional: `clisbot web start`. See [Web UI](/docs/web-ui).
 

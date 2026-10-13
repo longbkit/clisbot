@@ -173,3 +173,30 @@ test("selects the next free HTTPS port unless the person chose one", async () =>
   expect(await select(false, 8446)).toBe(8446);
   await expect(select(true)).rejects.toThrow("Choose another --https-port");
 });
+
+test("searches beyond ten occupied ports without modifying existing mappings", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-tailscale-crowded-"));
+  homes.push(home);
+  const calls: string[][] = [];
+  const run = async (args: string[]) => {
+    calls.push(args);
+    return JSON.stringify({
+      TCP: Object.fromEntries(
+        Array.from({ length: 11 }, (_, index) => [String(8443 + index), { HTTPS: true }]),
+      ),
+    });
+  };
+  expect(
+    await selectTailscaleServePort(
+      {
+        home,
+        dnsName: "host.tail123.ts.net",
+        preferred: 8443,
+        fixed: false,
+        target: "http://127.0.0.1:6880",
+      },
+      run,
+    ),
+  ).toBe(8454);
+  expect(calls).toEqual([["serve", "status", "--json"]]);
+});

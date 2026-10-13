@@ -8,7 +8,7 @@ category: Getting started
 
 # Connectivity
 
-Your Clisbot app connects to the daemon running on your computer or server. Pick the way that fits:
+Connect to your Host using:
 
 | Way                             | Use it when                                   | You set up                                       |
 | ------------------------------- | --------------------------------------------- | ------------------------------------------------ |
@@ -27,7 +27,7 @@ Tailscale puts your devices on one private network, your tailnet, so your phone 
 1. Install [Tailscale](https://tailscale.com/download) on the daemon machine and sign in.
 2. Install the Tailscale app on your phone from the App Store or Google Play, and sign in to the same tailnet.
 
-On a new setup, `clisbot` then uses Tailscale on its own and keeps the relay as a fallback. Clisbot Desktop waits for you to select **Set up**.
+`clisbot` prefers Tailscale. On failure, check sign-in and Serve, then retry; non-interactive runs also stop without switching routes. Desktop waits for **Set up**.
 
 ### Set up Tailscale from Clisbot Desktop
 
@@ -54,7 +54,7 @@ Run on the daemon machine:
 clisbot daemon pair --transport tailscale
 ```
 
-Clisbot maps the daemon through Tailscale Serve and prints a QR code and pairing link. Add `--https-port <port>` to use another HTTPS port.
+Clisbot finds an unused Serve port and prints a pairing link/QR. Tailscale usually offers lower latency through direct connections. Alternatively, choose `clisbot onboard --relay`: Clisbot’s end-to-end encrypted hosted relay, currently free. Keep the same `--home`. Successful choices are remembered; `--transport tailscale` switches back.
 
 ### Connect without pairing
 

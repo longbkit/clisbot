@@ -26,11 +26,28 @@ export function createCliParseArgv(input: {
   }
 
   const nodeArgv = input.nodeArgv ?? ["clisbot", "clisbot"];
-  const isOnboardRootFlag = invocation.argv[0] === "--relay" || invocation.argv[0] === "--no-relay";
+  const onboard = program.commands.find((command) => command.name() === "onboard")!;
+  // Only option-only invocations imply onboarding. Values can themselves be command names.
+  const options = [...program.options, ...onboard.options];
+  let optionOnly = true;
+  for (let index = 0; index < invocation.argv.length; index += 1) {
+    const argument = invocation.argv[index]!;
+    const flag = argument.split("=", 1)[0]!;
+    if (["--help", "-h", "--version", "-v"].includes(flag)) {
+      optionOnly = false;
+      break;
+    }
+    const option = options.find((candidate) => candidate.long === flag || candidate.short === flag);
+    if (!option) {
+      optionOnly = false;
+      break;
+    }
+    if (option.required && !argument.includes("=")) index += 1;
+  }
   let cliArgv = invocation.argv;
   if (invocation.argv.length === 0) {
     cliArgv = ["onboard"];
-  } else if (isOnboardRootFlag) {
+  } else if (optionOnly) {
     cliArgv = ["onboard", ...invocation.argv];
   }
   return [...nodeArgv, ...cliArgv];

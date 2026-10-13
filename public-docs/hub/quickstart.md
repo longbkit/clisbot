@@ -45,7 +45,7 @@ clisbot bot start "Sandbox Assistant" \
 
 The selector accepts a Bot ID or unique Host-local name/slug. It reuses that Bot's provider and workspace. To create and connect in one command, replace the selector with `--bot-name "Sandbox Assistant" --provider codex`.
 
-Channel setup starts the Hub backend when needed. A fresh personal setup needs no Hub-mode flag, account sign-in, web UI, proxy command or manual daemon restart. Tailscale is preferred by default, with relay fallback; read the reported route and recovery guidance. Existing account/team Hubs keep their access policy.
+Channel setup starts the Hub backend when needed. A fresh personal setup needs no Hub-mode flag, account sign-in, web UI, proxy command or manual daemon restart. Tailscale is preferred by default. If unavailable, follow the repair guidance or explicitly choose relay with the printed command. Existing account/team Hubs keep their access policy.
 
 Token flags accept a literal, quoted environment reference or private secret-file path. Credentials are encrypted in a Connection; saved Bot references contain no token. Existing Connections use `--slack-connection-id` or `--telegram-connection-id`.
 

@@ -419,7 +419,7 @@ clisbot bot start "Sandbox Assistant" --telegram-bot-token '${TELEGRAM_BOT_TOKEN
 clisbot bot status "Sandbox Assistant"
 ```
 
-Bot-only use needs no Hub. Channels start the personal backend automatically, preferring Tailscale with relay fallback. New routes are owner-only; follow the printed verification step. See [Hub quickstart](/docs/hub/quickstart). The earlier `hub deploy` and `hub projects` commands exist only with `CLISBOT_ONBOARDING_ENABLED=0`.
+Bot-only use needs no Hub. Channels start the personal backend automatically, preferring Tailscale; relay requires an explicit choice. New routes are owner-only; follow the printed verification step. See [Hub quickstart](/docs/hub/quickstart). The earlier `hub deploy` and `hub projects` commands exist only with `CLISBOT_ONBOARDING_ENABLED=0`.
 
 `connect <url>` is the Host onboarding command. Approve the Host, organization and requested permissions in the browser; the command enrolls it and waits for the connection, including in non-TTY/JSON mode. It creates no CLI credential. Use a scoped API key explicitly for unattended enrollment.
 

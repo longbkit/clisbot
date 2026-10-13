@@ -254,16 +254,17 @@ async function initializePersonalHome(clisbotHome: string): Promise<void> {
   if (existsSync(path.join(clisbotHome, "config.json"))) return;
   editPersistedConfig(clisbotHome, "features.personalServing", { value: true });
   editPersistedConfig(clisbotHome, "features.devicePairing", { value: true });
+  editPersistedConfig(clisbotHome, "daemon.relay.enabled", { value: false });
   editPersistedConfig(clisbotHome, "daemon.managedAccess.mode", { value: "off" });
   editPersistedConfig(clisbotHome, "daemon.listen", {
     value: `127.0.0.1:${await selectLocalPort(6868, true)}`,
   });
 }
 
-function personalOnboardTransport(options: OnboardOptions): string {
+function personalOnboardTransport(options: OnboardOptions): string | undefined {
   if (options.relay === false) return options.transport ?? "local";
   if (options.relay === true) return options.transport ?? "relay";
-  return options.transport ?? "tailscale";
+  return options.transport;
 }
 
 function onboardingUsesRichUi(options: OnboardOptions): boolean {

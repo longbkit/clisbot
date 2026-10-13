@@ -29,8 +29,6 @@ function isOwnHandler(
   return proxy === target || (record?.authority === authority && proxy === record.target);
 }
 
-const AUTOMATIC_PORT_CANDIDATES = 10;
-
 /**
  * The HTTPS port to map: the preferred one when it is free or already reaches this home's
  * gateway, otherwise the next free port. An explicit `--https-port` is never replaced.
@@ -44,8 +42,7 @@ export async function selectTailscaleServePort(
     Web?: Record<string, { Handlers?: Record<string, { Proxy?: string }> }>;
   };
   const record = readServeRecord(options.home);
-  const count = options.fixed ? 1 : AUTOMATIC_PORT_CANDIDATES;
-  const last = Math.min(options.preferred + count - 1, 65535);
+  const last = options.fixed ? options.preferred : 65535;
   for (let port = options.preferred; port <= last; port += 1) {
     const authority = `${options.dnsName}:${port}`;
     const web = status.Web?.[authority];
