@@ -19,6 +19,7 @@ Paste the credentials into Hub and choose **Verify and save**. Then choose **Add
 One Discord application and gateway connection serves every organization and server connected to this Hub. Keep the Hub process running; events that arrive while it is stopped are missed.
 
 Now write a [Discord trigger](/docs/hub/triggers/discord).
+For interactive agent conversations, follow the separate [Discord channel guide](/docs/hub/channels/discord).
 
 ## Configure from environment
 

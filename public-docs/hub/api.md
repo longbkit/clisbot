@@ -23,7 +23,7 @@ Every Hub serves its own reference on its origin:
 
 **Host onboarding uses `clisbot hub connect <origin>` and does not require CLI login.** Use `clisbot hub login [origin]` only for deliberate CLI API administration after understanding its authority. After browser approval, Clisbot stores a durable, revocable organization credential under `CLISBOT_HOME` for that exact origin. Without an explicit origin, the CLI uses `CLISBOT_HUB_URL`, then the active stored login; with neither it stops and asks for a Hub URL.
 
-For automation, create an organization API key from the Hub dashboard under **API keys**. Both credential types are bearer tokens:
+For automation, create an organization API key from the Hub dashboard under **Configuration → API keys**. Both credential types are bearer tokens:
 
 ```http
 Authorization: Bearer clisbot_pk_...
@@ -67,17 +67,21 @@ A valid key without the scope required by an endpoint returns `403` in the same 
 
 ## Trigger validation and installation
 
-`clisbot hub deploy --dry-run` validates each `.clisbot/triggers/*.yml` file through `POST /api/v1/triggers/validate`. `clisbot hub deploy` validates all files first, then installs each through `POST /api/v1/triggers/install`.
+For the legacy CLI surface (`CLISBOT_ONBOARDING_ENABLED=0`), `clisbot hub deploy --dry-run` validates each `.clisbot/triggers/*.yml` file through `POST /api/v1/triggers/validate`. `clisbot hub deploy` validates all files first, then installs each through `POST /api/v1/triggers/install`.
 
-Both endpoints accept one self-contained document:
+Both endpoints accept one self-contained Automation document: single-`run` shorthand or a Workflow with `environments` and `steps`.
+
+With `configuration:validate`, `GET /api/v1/triggers` lists active definitions; `GET /api/v1/configuration-resources` lists target/Connection resources and `GET /api/v1/setup-resources` supplies provider-native identifiers for filters.
+
+Example request:
 
 ```json
 {
-  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, model: gpt-5, mode: full-access }\n  prompt: Complete the task and call hub.finish_execution.\n  max_runtime: 1h\n  idle_timeout: 5m\n"
+  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, mode: full-access }\n  prompt: Complete the task and call hub.finish_execution.\n  max_runtime: 1h\n  idle_timeout: 5m\n"
 }
 ```
 
-Use a daemon slug and agent runtime available in your organization. Both operations ask the named daemon to check the agent, so it has to be connected and hold `hub.execute`; an agent it cannot run is a field issue rather than a failed first run. See [Saving checks the agent against the daemon](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon). Validation requires `configuration:validate` and returns `200` with `{ "name": "manual-task", "valid": true }`.
+Use a daemon slug and agent runtime available in your organization. Both operations compile YAML and resolve organization resources. The target must be enrolled with `hub.execute`; use Agent controls offered by that Host and verify an actual run. Saving alone does not prove provider startup. See [Saving checks the agent against the daemon](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon). Validation requires `configuration:validate` and returns `200` with `{ "name": "manual-task", "valid": true }`.
 
 Installation requires `configuration:install`. It creates or updates the organization's trigger by the YAML `name` and returns `201`:
 
@@ -95,7 +99,7 @@ Invalid YAML or an unknown organization resource returns `422` with field issues
 
 ## Project list
 
-`GET /api/v1/projects` returns active projects in the bearer credential's organization. `clisbot hub projects` renders the projects as a table. With `--json`, it returns `{ "origin": "...", "projects": [...] }` so even an empty result records the resolved Hub.
+`GET /api/v1/projects` returns active projects in the bearer credential's organization. `clisbot hub projects` (legacy CLI surface) renders the projects as a table. With `--json`, it returns `{ "origin": "...", "projects": [...] }` so even an empty result records the resolved Hub.
 
 ```json
 {
@@ -185,7 +189,7 @@ curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/configurations/instal
   --data @configuration-install.json
 ```
 
-`clisbot hub deploy -p <project>` selects this legacy endpoint with the discovered local bundle. The command uses an exact-origin stored login when flags and environment credentials are absent. See [Repository bundles](/docs/hub/configuration#repository-bundles).
+`clisbot hub deploy -p <project>` (with `CLISBOT_ONBOARDING_ENABLED=0`) selects this legacy endpoint with the discovered local bundle. The command uses an exact-origin stored login when flags and environment credentials are absent. See [Repository bundles](/docs/hub/configuration#repository-bundles).
 
 ## Manual run dispatch
 

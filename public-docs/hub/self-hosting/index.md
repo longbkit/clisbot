@@ -25,7 +25,7 @@ For the daemon, web UI and Hub together, use the shared Docker image with
 
 Save that key in your deployment secrets and reuse it across restarts. You can
 instead mount a secret and set `CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE` to its
-absolute path. Set exactly one key source.
+absolute path outside the Hub data directory. Set exactly one key source.
 
 Follow the [quickstart](/docs/hub/quickstart) to create your assistant and connect Slack over Socket Mode or Telegram without a public server.
 
@@ -213,4 +213,4 @@ Keep one machine running. Hub holds Slack Socket Mode and Discord gateway connec
 
 Pull the new image or source and deploy it. Migrations are forward-only. Back up the embedded data directory or PostgreSQL database first; it contains accounts, app credentials, configuration revisions, connections, and execution history.
 
-The first start of Hub 2.0.0 or later re-seals every stored credential in a format older builds cannot read. After that start, rolling back to an older build makes every stored credential unreadable unless you restore the backup taken before the upgrade. Right after that upgrade, the app's Hub requests fail for up to 5 minutes, until its current access token expires and it fetches a new one. An agent run that received an attachment download link before the upgrade cannot open it afterwards; send its trigger again.
+Hub re-seals legacy credential envelopes at startup. Builds that cannot read the resulting format need the pre-upgrade database backup to roll back. Review startup logs for re-seal failures and retain the credential key with your backup. If an upgrade changes token or attachment-link signing, reconnect the app and request fresh attachment links; do not infer that old credentials remain compatible.

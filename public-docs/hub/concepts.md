@@ -24,11 +24,12 @@ Slack / Telegram / … message      GitHub / Slack / Discord event
 ## The pieces
 
 - An **organization** owns everything below: Members, Connections, Routes, Automations, and connected daemons.
-- A **daemon** is a connected machine running the Clisbot daemon. A daemon **Project** is a folder on it with its Workspaces. Hub has no Project of its own.
+- A **Host** is your app's connection to a machine; its **daemon** runs agents. A **Project** is a selected root on that Host, containing Workspaces. Hub has no Project of its own.
+- A **Bot** is a durable persona with a home Project/Workspace. A **Chat** is your conversation with same-Host Bots. See [Bots and Group chats](/docs/bots-and-chats).
 - A **Connection** holds one credential: a Slack workspace installation, a bot token, a QR login.
 - A **Route** sends a Connection's messages to a direct agent, a Bot, or an Automation. Its **Rules** say where and from whom a message gets in. Each conversation keeps its own session.
 - An **Automation** is a trigger and a workflow. The **trigger** says which provider event can start it; the **workflow** runs ordered **steps**, each one agent execution on an **environment**: a daemon, its working directory, and an optional worktree.
-- A **Member** signs in to the Hub. **People & access** grants Members and Teams the daemons and Projects they may use.
+- A **Member** signs in to Hub. **People & access** grants Members and Teams Host/Project access.
 
 You edit all of it in the app's Hub settings (**Channels**, **Automations**, **People & access**, **Hosts**) or through the [Hub API](/docs/hub/api). Exported YAML is an optional portability format.
 
@@ -44,23 +45,23 @@ You edit all of it in the app's Hub settings (**Channels**, **Automations**, **P
 ## From event to agent
 
 1. A provider sends an event to Hub. GitHub and Slack use webhooks; Discord uses its gateway connection; manual runs use the Hub API.
-2. Hub verifies the event and evaluates triggers and their filters, including the required `from_users` allowlist.
+2. Hub verifies the event and evaluates triggers and their filters, including sender allowlists where required.
 3. A matching trigger creates a workflow run from the active revision.
 4. Each step whose `if` condition holds starts on its daemon. The next step sees the completed step's output.
 5. Hub records replies, structured output, status, and completion.
 
-Complete configurations are in [Workflows](/docs/hub/workflows).
+Configure this in [Workflows](/docs/hub/workflows).
 
 ## Saving a change
 
-When you save, Hub validates the change and resolves its references: connections and their filters, the daemon slug or ID, step ids, expressions, output schemas, durations, and named agents. If validation fails, Hub keeps the previous active revision and shows the error.
+Current app/API Automation saves validate fields and compile the definition; they do not test the target daemon's live provider/model availability. An offline target can be saved and fail at dispatch. The legacy configuration-bundle installer separately validates named agents against the daemon. See [Automations](/docs/hub/automations) and [Configuration](/docs/hub/configuration).
 
 ## Managed access
 
-A daemon in managed access accepts a session only with a Hub access ticket, so a Member reaches exactly what they were granted. Your own daemons on a personal Hub keep managed access off.
+After Hub enrollment, an `external` Managed access daemon requires Hub tickets for app connections and checks Host/Project grants. In `off` mode, ordinary paired sessions have owner rights. See [Managed access](/docs/hub/managed-access) for Team sharing, Agent limits and exceptions.
 
 ## Security boundaries
 
-Routes admit only the senders their Rules allow. Triggers require a non-empty `from_users` allowlist. Anyone who can change Routes or Automations can choose which connections, daemons, and agent capabilities they use, so grant that carefully.
+Routes admit only the senders their Rules allow. Event inputs use [trigger filters](/docs/hub/triggers#filters). Anyone who can change Routes or Automations can choose which connections, daemons, and agent capabilities they use, so grant that carefully.
 
 These controls do not sandbox the agent or make input safe. See [Hub security](/docs/hub/security). A step holds GitHub authority only when it declares a [`github` block](/docs/hub/github).

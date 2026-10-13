@@ -22,15 +22,15 @@ Yes. The app keeps every Hub you add, plus the daemons you connect directly, and
 
 ## Who can talk to my agent from Slack or Telegram?
 
-Only senders a Route's Rules let in. Before any Route exists, the bot answers `/status` and `/me` with the sender's ID, so you can name people in a Rule. See [Channels](/docs/hub/channels).
+Only senders a Route's Rules let in. With public commands enabled, `/me` gives your sender ID and `/status` gives conversation/thread IDs even before a Route exists. Use them to configure a Rule. Group `/me` can request a DM. See [Channel commands](/docs/hub/channels/commands).
 
 ## Can teammates use my daemon?
 
-Yes, on a team Hub. Grant a Member or Team the daemon or its Projects in **People & access**. A daemon in managed access accepts their sessions only with a Hub access ticket.
+Yes. Grant Members or Teams Host/Project access in **People & access**, and require Managed access on that Host. Ordinary paired sessions in `off` mode have owner rights. See [Managed access](/docs/hub/managed-access).
 
 ## Can one organization connect several Slack workspaces or GitHub organizations?
 
-Yes. Connections belong to the organization and there is no limit on how many you add.
+Yes. Connections belong to the organization. Add separate installations for the Slack workspaces or GitHub accounts you need.
 
 ## Where does configuration live?
 
@@ -38,21 +38,19 @@ In Hub. Edit Routes in **Channels** and Automations in **Automations** in the ap
 
 ## Who can trigger an Automation?
 
-Only the users listed in its trigger's `from_users`. It is required and cannot be empty.
+Channel inputs use Route Rules. Direct events use sender filters, with exceptions for manual and project-scout inputs. See [trigger filters](/docs/hub/triggers#filters) and review the input before enabling it.
 
 ## What happens if the daemon is offline?
 
-An Automation's dispatch fails and the event is recorded as failed. Nothing is queued, so trigger it again once the daemon is back.
+An Automation's dispatch fails and its run records the error; trigger it again once the daemon is back. Channel messages have separate [durable ingress handling](/docs/hub/activity); this is not an Automation retry queue.
 
 ## Does logging out disconnect my daemon?
 
 No. The stored CLI login is a human organization credential; the enrolled daemon has its own relationship credential. Interactive `clisbot hub logout` offers to disconnect a daemon related to the same Hub. Declining is normal, and JSON or noninteractive logout never disconnects unless you pass `--disconnect-daemon`.
 
-## Can an Automation reply in Slack or Discord?
+## Can an Automation reply in Slack, Discord or GitHub?
 
-Yes. Put `allow_outputs` on the step and tell the agent to call `hub.reply` in the prompt. See [Tell the agent which tool to call](/docs/hub/workflows#tell-the-agent-which-tool-to-call). A Route's agent replies in the same conversation without this.
-
-GitHub has no reply capability; give the step a [`github` block](/docs/hub/github) and the agent acts through the `gh` CLI.
+Yes. Native replies use `hub.reply`; GitHub replies comment on the triggering issue/PR. Trigger documents can add optional reply grants by default; review `allow_outputs` and tell the agent to call the tool. A step's [`github` block](/docs/hub/github) separately grants `git`/`gh` authority. See [Workflows](/docs/hub/workflows).
 
 ## Can I use it without GitHub?
 

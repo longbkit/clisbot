@@ -8,46 +8,38 @@ category: Hub
 
 # Hub activity
 
-Every event Hub accepts is recorded, whether or not it ran anything. That record is how you debug a trigger.
+Use the view for the path you configured: a Channel Route or an Automation event.
 
 ## Where to look
 
-**Project → Activity** lists routed trigger runs and their execution state.
+In the app, **Channels → Activity** lists messages evaluated against Routes. Filter by Connection, Route and outcome; open an event for its reason and recovery actions. A test reply checks outbound delivery only and does not appear as an inbound Route run.
 
-**Connections → Known unrouted events** is the organization-level view of accepted provider events that did not start a configured trigger. Hub records one of four bounded reasons:
+**Automations → your Automation → Runs** shows Workflow results. The Hub dashboard's **Activity** lists organization trigger runs; **Connections → Known unrouted events** records accepted provider events that matched no Workflow:
 
-| Reason                      | Meaning                                                      |
-| --------------------------- | ------------------------------------------------------------ |
-| `no_project_route`          | No project route is configured for the event                 |
-| `no_trigger_for_source`     | No configured trigger handles that event source              |
-| `trigger_filters_rejected`  | A trigger handles the source, but its filters rejected it    |
-| `configuration_unavailable` | A relevant configuration or connection could not be resolved |
+| Reason                      | Meaning                                                       |
+| --------------------------- | ------------------------------------------------------------- |
+| `no_workflow_route`         | No Workflow route is configured for this event.               |
+| `no_trigger_for_source`     | No configured trigger handles the source.                     |
+| `trigger_filters_rejected`  | The source matched, but filters rejected the event.           |
+| `configuration_unavailable` | A relevant configuration or Connection could not be resolved. |
 
 ## Nothing happened when I mentioned the bot
 
-Work down this list.
-
-1. **Is the event in the project's Activity?** If not, check **Connections → Known unrouted events** and use its reason to distinguish routing, source, filter, and configuration failures.
-2. **Is the event anywhere at all?** If not, the event never reached Hub. Check the provider's own delivery log: GitHub's App → Advanced → Recent Deliveries, or Slack's Event Subscriptions page. Then check that the app is subscribed to that event type.
-3. **Is your user in `from_users`?** This is the most common cause. GitHub uses your login; Slack and Discord use the user ID, not the display name. See [find your Slack IDs](/docs/hub/triggers/slack#find-your-slack-ids) and [find your Discord IDs](/docs/hub/triggers/discord#find-your-discord-ids).
-4. **Did the invocation match?** On GitHub, `contains` must appear in the comment body. On Slack and Discord the bot must be mentioned, and `pattern` or its legacy `contains` alias must prefix the text after the mention.
-5. **Is the configuration you think is active actually active?** The Configuration tab shows the active revision and the last sync attempt. A failed push leaves the old revision serving.
-6. **Is the daemon connected?** An offline daemon fails dispatch with `daemon_not_connected`.
-7. **Did it run and stop early?** Compare the execution with the step's authored `idle_timeout` and `max_runtime`, and the workflow's `max_runtime`. All three limits are explicit in the workflow.
-8. **Did it run, but deliver nothing?** Check the step's prompt. An agent that is not told to call `hub.reply` and `hub.finish_execution` can answer in its own transcript and never report back. See [Tell the agent which tool to call](/docs/hub/workflows#tell-the-agent-which-tool-to-call).
+1. **Which path is configured?** For a Route, check its Rules: Where, Who and message conditions. For a direct event, check `from_users`, resource and content filters. GitHub uses logins; prefer stable Slack/Discord user IDs. See [Channels](/docs/hub/channels) or [Triggers](/docs/hub/triggers).
+2. **Did Hub receive it?** Look in Channel activity, Automation Runs or Known unrouted events. If absent, check Connection status and the provider delivery log. GitHub exposes App → Advanced → Recent Deliveries; Slack's direct-event path uses Event Subscriptions.
+3. **Is the intended revision active?** A failed save or sync leaves the old revision serving. Check configuration and errors before recreating anything.
+4. **Is the Host connected?** Confirm the target and its Hub relationship has `hub.execute`. A provider event dispatch can fail with `daemon_not_connected`.
+5. **Did it stop early?** Compare the run with its step's `idle_timeout`, `max_runtime`, and Workflow deadline. Inspect author-access rejection separately from provider startup failure.
+6. **Did it run without replying?** Check both the input's reply settings and the responding step's output grant. The prompt must name `hub.reply` and `hub.finish_execution`. See [Workflow instructions](/docs/hub/workflows#tell-the-agent-which-tool-to-call).
 
 ## Sync failures
 
-The Configuration tab shows the latest sync state:
+Repository-backed Configuration shows the last sync attempt. **Fetch failed** means the file is absent at that commit or the App cannot read it. **Invalid** means YAML or resource resolution failed. **Superseded push ignored** means a newer commit already moved the branch head.
 
-| State                   | What to do                                                               |
-| ----------------------- | ------------------------------------------------------------------------ |
-| Fetch failed            | The file is missing at that commit, or the App can't read the repository |
-| Invalid                 | Validation failed, or the config names something unreachable             |
-| Superseded push ignored | A newer commit already moved the branch head; nothing is wrong           |
+Check renamed Hosts, unavailable Connection slugs and repository installation coverage. See [Repository bundles](/docs/hub/configuration#repository-bundles).
 
-"Names something unreachable" is usually a repository the installation doesn't cover, a daemon that was renamed, or a connection slug that no longer exists. See [How Hub works](/docs/hub/concepts).
+## Recovery and retries
 
-## Nothing is retried
+Channels have a durable **Ingress queue**. Retryable failures and busy Routes can wait for another attempt; retries are bounded. Inspect waiting work and **Dead letters** before sending a duplicate request. An Organization Admin or the Connection's Admin can resubmit its dead letters after fixing the cause.
 
-Hub does not queue events. A dispatch that fails because the daemon was offline stays failed, so trigger it again once the daemon is back.
+This queue does not promise replay for every external Automation event. A failed direct-event run may need a fresh invocation after the Host returns. Check its final state and any earlier side effects first.
