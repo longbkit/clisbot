@@ -22,7 +22,7 @@ Firebase project: **clisbot-analytics**, Spark plan, linked to that same propert
 Website and web app share a stream to preserve browser journeys. `surface`
 distinguishes `website` and `app`. Native app streams share the property but
 have SDK-managed app-instance IDs. Electron has a random installation ID
-created only after consent; a session expires after 30 minutes of inactivity.
+created when analytics is enabled; a session expires after 30 minutes of inactivity.
 Anonymous identities are **not** merged across devices. There is no official
 native Electron Analytics SDK: Measurement Protocol reports manually supplied
 events, without the complete native SDK attribution/install lifecycle.
@@ -31,7 +31,7 @@ GA4 event-scoped custom dimensions **Surface** (`surface`) and **Client platform
 
 | App event   | Data                                       | Adapter behavior                                                           |
 | ----------- | ------------------------------------------ | -------------------------------------------------------------------------- |
-| app_open    | surface, platform, version where available | Startup/foreground after consent                                           |
+| app_open    | surface, platform, version where available | Startup/foreground while analytics is enabled                              |
 | screen_view | Allowlisted screen enum                    | Native screen_view; web/Electron page_view with a synthetic public URL     |
 | engagement  | Active usage duration                      | Native/web SDKs own duration; Electron sends a bounded 30-second heartbeat |
 
