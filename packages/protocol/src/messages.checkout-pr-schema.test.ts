@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  BranchSuggestionsRequestSchema,
   CheckoutGithubGetCheckDetailsRequestSchema,
   CheckoutGithubGetCheckDetailsResponseSchema,
   CheckoutGithubSetAutoMergeRequestSchema,
@@ -811,4 +812,13 @@ describe("checkout PR schemas", () => {
       providerRemoval: true,
     });
   });
+});
+
+test("branch paging accepts old requests and optional nonnegative offsets", () => {
+  const old = { type: "branch_suggestions_request", cwd: "/repo", requestId: "branches" };
+  expect(BranchSuggestionsRequestSchema.parse(old)).not.toHaveProperty("offset");
+  expect(BranchSuggestionsRequestSchema.parse({ ...old, offset: 200, limit: 200 }).offset).toBe(
+    200,
+  );
+  expect(BranchSuggestionsRequestSchema.safeParse({ ...old, offset: -1 }).success).toBe(false);
 });

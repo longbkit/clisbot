@@ -1,0 +1,1 @@
+ALTER TABLE "channel_conversation_selections" ADD COLUMN "selected_placement" jsonb;

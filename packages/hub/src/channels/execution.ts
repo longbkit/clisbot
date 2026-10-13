@@ -13,6 +13,7 @@ import {
 // so the orchestration layer delivers each event here via `onStreamEvent` —
 // the one shared consumer that fans out to the relay and the approval engine
 // (§4-S3 one code path: relay and approvals are two handlers on one stream).
+import { ChannelPlacementRefusedError, storedPlacementTarget } from "./placement-selection.js";
 import { randomUUID, createHash } from "node:crypto";
 import { ingressAttempt } from "./ingress/attempt.js";
 import type { AgentExecutionRecord, ThreadBindingRecord } from "../db/types.js";
@@ -622,10 +623,19 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         store: channelStore,
         resolveConfig: (context, capability) =>
           commandDispatcher!.resolveConfig(context, capability),
-        issueCapability: (context) => {
+        authorizeFork: (context) => commandDispatcher!.authorizeFork(context),
+        synchronizePlacement: (agent, context) =>
+          commandDispatcher!.synchronizePlacement(agent, context),
+        resolveAgentTarget: (agent, context) => commandDispatcher!.agentTarget(agent, context),
+        resolveSourceConfig: (context, capability) =>
+          commandDispatcher!.resolveSourceConfig(context, capability),
+        issueCapability: (context, config) => {
           if (!deps.replyCapabilities || context.route.target.kind !== "agent")
             throw new Error("Channel reply capability is unavailable");
-          const target = deps.resolveAgentAccessTarget(context.route.target);
+          const routeTarget = deps.resolveAgentAccessTarget(context.route.target);
+          const target = config?.projectId
+            ? { ...routeTarget, projectId: config.projectId, projectRoot: config.cwd }
+            : routeTarget;
           const token = deps.replyCapabilities.issue({
             organizationId: deps.organizationId,
             channelRevisionId: deps.channelRevisionId ?? null,
@@ -693,6 +703,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         clock,
         store: channelStore,
         daemon: daemonConnection,
+        authorizePlacement: (input) => commandDispatcher!.authorizeConfiguration(input),
         detachAgent: detachChannelAgent,
         onSlowStart: (message, account, route) =>
           void postWaitNotice(message, account, route, "starting").catch(() => undefined),
@@ -1370,6 +1381,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       );
     } catch (error) {
       executionLimiter?.complete(executionLease);
+      if (error instanceof ChannelPlacementRefusedError)
+        return refusePlacement(message, account, route, error);
       // The message is retried; a Host that is away can stay away, so say so.
       if (isHostNotConnected(error)) {
         await postWaitNotice(message, account, route, "host-away").catch(() => undefined);
@@ -1397,6 +1410,27 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     }
     return recordChannelActivity(message, account, route, {
       result: dispatched,
+      limitDecision: "allowed",
+    });
+  }
+
+  async function refusePlacement(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    error: ChannelPlacementRefusedError,
+  ): Promise<PlaneInboundResult> {
+    const response = await deps.post({
+      channel: channelName(account),
+      accountId: account.accountId,
+      ...commandReplyAddress(message, route.defaults),
+      text: `Could not start a session: ${error.message}`,
+    });
+    if (!response.ok) throw new Error(response.error ?? "Placement refusal reply failed.");
+    return recordChannelActivity(message, account, route, {
+      result: result(false, { kind: "ignored", reason: error.message }),
+      outcome: "denied",
+      outcomeDetail: error.message,
       limitDecision: "allowed",
     });
   }
@@ -1717,10 +1751,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (!commandDispatcher)
       return result(false, { kind: "command", handled: false, detail: "plane not started" });
     const agentId = await conversationAgentFor(message, account, route);
-    const accessTarget =
-      route.target.kind === "workflow"
-        ? await workflowAccessTarget(message, route, agentId)
-        : undefined;
+    const accessTarget = await commandAccessTarget(message, account, route, agentId);
     const limited = LIMITED_COMMANDS.has(command.name)
       ? await admitExecution(message, account, route, use?.allowed === true ? use.rules : undefined)
       : { lease: undefined };
@@ -1748,6 +1779,16 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     } finally {
       if (!leased) executionLimiter?.complete(lease);
     }
+  }
+
+  async function commandAccessTarget(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    agentId?: string,
+  ) {
+    if (route.target.kind === "workflow") return workflowAccessTarget(message, route, agentId);
+    return storedPlacementTarget((await bindingForInbound(message, account))?.route);
   }
 
   async function workflowAccessTarget(
@@ -2236,7 +2277,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       account,
       route,
       ...(route.target.kind === "agent"
-        ? { accessTarget: deps.resolveAgentAccessTarget(route.target) }
+        ? {
+            accessTarget:
+              storedPlacementTarget(binding.route) ?? deps.resolveAgentAccessTarget(route.target),
+          }
         : {}),
       // The approval card's `inlineButtons` dm/group gate decides on the
       // binding's stored route summary's kind (thread → channel, topic →

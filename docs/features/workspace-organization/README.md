@@ -98,3 +98,13 @@ Finding or creating a workspace by ticket, channel, or user + day/week; recogniz
 Measure the benefit in time spent finding earlier work and in workspaces not created twice.
 
 Evidence: [creating a session from a slash command](../../../packages/hub/src/channels/commands-lifecycle.ts#L180), [the daemon accepting a workspace ID](../../../packages/protocol/src/messages.ts#L1653).
+
+## Explicit channel placement
+
+The [slash command reference](../slash-commands/README.md#project-workspace-and-branch-discovery)
+defines `/project`, `/workspace` and `/branch`. An explicit Workspace takes
+precedence over organization and source inheritance. `/fork` never inherits a
+Workspace from another Project; `/side` always uses the source placement.
+A Route worktree target is left to the daemon, rather than pre-creating a local
+Workspace that would conflict with it. The `workspace.commands` toggle controls
+explicit choices separately from `workspace.organize`.

@@ -59,6 +59,15 @@ it("persists account commands and independent selection axes across restart", as
         selectedBy: "U2",
       }),
     ]);
+    const placement = {
+      projectId: "prj_a",
+      projectRoot: "/repo",
+      workspaceId: "wks_a",
+      daemonReference: "host",
+      routePosition: 0,
+      routeFingerprint: "stamp",
+    };
+    await store.setConversationSelection(key, { selectedPlacement: placement, selectedBy: "U1" });
     const claimed = await Promise.all([
       store.beginCommand(key, "message-pending", "fork"),
       store.beginCommand(key, "message-pending", "fork"),
@@ -96,6 +105,7 @@ it("persists account commands and independent selection axes across restart", as
       updatedBy: "slack:U2",
     });
     expect(await store.findConversationSelection(key)).toMatchObject({
+      selectedPlacement: placement,
       selectedProvider: "codex",
       selectedModel: "model-a",
       selectedThinkingOption: "high",
@@ -111,6 +121,28 @@ it("persists account commands and independent selection axes across restart", as
       selectedMode: "default",
       selectedFeatureValues: { fast: true },
     });
+    const otherThread = { ...key, externalThreadId: "other" };
+    await store.setConversationSelection(otherThread, {
+      selectedProvider: "claude",
+      selectedBy: "U2",
+    });
+    await store.clearConversationConfiguration(key);
+    expect(await store.findConversationSelection(key)).toMatchObject({
+      selectedPlacement: placement,
+      selectedProvider: null,
+      selectedModel: null,
+      selectedThinkingOption: null,
+      selectedMode: null,
+      selectedFeatureValues: null,
+    });
+    expect((await store.findConversationSelection(otherThread))?.selectedProvider).toBe("claude");
+    await runtime.close();
+    ({ runtime } = await embeddedDatabaseRuntime(root));
+    store = new ChannelAccessStore(runtime.drizzle());
+    expect((await store.findConversationSelection(key))?.selectedPlacement).toEqual(placement);
+    await store.setConversationSelection(key, { selectedPlacement: null, selectedBy: "U1" });
+    expect((await store.findConversationSelection(key))?.selectedPlacement).toBeUndefined();
+    expect((await store.findConversationSelection(key))?.selectedModel).toBeNull();
     expect(await store.removeCommand(account, "review")).toBe(true);
     expect(await store.listCommands(account)).toEqual([]);
   } finally {

@@ -14,6 +14,13 @@ import { join } from "path";
 import { win32 } from "node:path";
 import { tmpdir } from "os";
 import pino from "pino";
+import {
+  countGitStatus,
+  fetchProjectGitRemote,
+  inspectProjectGitWorktree,
+  listProjectGitBranches,
+  listProjectGitWorktrees,
+} from "../server/project-git.js";
 import { base64EncryptedWireByteLength } from "@clisbot/relay";
 import {
   __resetCheckoutShortstatCacheForTests,
@@ -270,6 +277,106 @@ describe("checkout git utilities", () => {
     await expect(getCheckoutDiff(nonGitDir, { mode: "uncommitted" })).rejects.toBeInstanceOf(
       NotGitRepoError,
     );
+  });
+  it("inspects all remote namespaces with commit metadata without fetching", async () => {
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoDir,
+      encoding: "utf8",
+    }).trim();
+    for (const remote of ["origin", "upstream"])
+      execFileSync("git", ["update-ref", `refs/remotes/${remote}/main`, head], { cwd: repoDir });
+    execFileSync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"], {
+      cwd: repoDir,
+    });
+    const branches = await listProjectGitBranches(repoDir);
+    expect(branches.map((b) => b.name).sort()).toEqual(["main", "origin/main", "upstream/main"]);
+    expect(
+      branches.every(
+        (b) =>
+          b.commit.hash === head &&
+          b.commit.author === "Test" &&
+          Number.isFinite(Date.parse(b.commit.committedAt)),
+      ),
+    ).toBe(true);
+  });
+  it("inspects external and locked Git worktrees and counts all untracked files without changing them", async () => {
+    const tree = join(tempDir, "outside-clisbot");
+    execFileSync("git", ["worktree", "add", "-b", "worktree-test", tree], { cwd: repoDir });
+    execFileSync("git", ["worktree", "lock", tree], { cwd: repoDir });
+    for (let i = 0; i < 7; i++) writeFileSync(join(tree, `untracked ${i}.txt`), "new");
+    const before = execFileSync(
+      "git",
+      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      { cwd: tree },
+    );
+    const trees = await listProjectGitWorktrees(repoDir);
+    expect(trees.find((w) => w.path === realpathSync(tree))).toMatchObject({
+      branch: "worktree-test",
+      locked: true,
+      commit: { author: "Test" },
+    });
+    const result = await inspectProjectGitWorktree(repoDir, tree);
+    expect(result.status).toEqual({
+      tracked: 0,
+      untracked: 7,
+      staged: 0,
+      unstaged: 0,
+      conflicts: 0,
+    });
+    expect(
+      execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+        cwd: tree,
+      }),
+    ).toEqual(before);
+    await expect(inspectProjectGitWorktree(repoDir, tempDir)).rejects.toThrow("not a worktree");
+  });
+  it("counts rename records once and distinguishes tracked changes, conflicts and untracked paths", () => {
+    expect(countGitStatus("R  new file\0old file\0 M dirty\0?? untracked\0UU conflict\0")).toEqual({
+      tracked: 3,
+      untracked: 1,
+      staged: 1,
+      unstaged: 1,
+      conflicts: 1,
+    });
+  });
+  it("fetches only remote branch refs and preserves local branches, tags, HEAD and dirty files", async () => {
+    const { remoteDir } = setupRemoteTrackingMain(repoDir, tempDir);
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoDir,
+      encoding: "utf8",
+    }).trim();
+    execFileSync("git", ["--git-dir", remoteDir, "update-ref", "refs/heads/remote-only", head]);
+    execFileSync("git", ["--git-dir", remoteDir, "update-ref", "refs/tags/remote-tag", head]);
+    execFileSync("git", ["config", "remote.origin.fetch", "+refs/heads/*:refs/heads/*"], {
+      cwd: repoDir,
+    });
+    writeFileSync(join(repoDir, "file.txt"), "dirty tracked file\n");
+    writeFileSync(join(repoDir, "untracked.txt"), "untracked\n");
+    const refs = execFileSync("git", ["for-each-ref", "refs/heads", "refs/tags"], { cwd: repoDir });
+    const status = execFileSync(
+      "git",
+      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      { cwd: repoDir },
+    );
+    await fetchProjectGitRemote(repoDir, "origin");
+    expect(
+      execFileSync("git", ["rev-parse", "refs/remotes/origin/remote-only"], {
+        cwd: repoDir,
+        encoding: "utf8",
+      }).trim(),
+    ).toBe(head);
+    expect(
+      execFileSync("git", ["for-each-ref", "refs/heads", "refs/tags"], { cwd: repoDir }),
+    ).toEqual(refs);
+    expect(
+      execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+        cwd: repoDir,
+      }),
+    ).toEqual(status);
+    expect(
+      execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir, encoding: "utf8" }).trim(),
+    ).toBe(head);
+    await expect(fetchProjectGitRemote(repoDir, "--all")).rejects.toThrow("configured");
   });
 
   it("creates a pull request via the given adapter without resolving a repo slug in the shell", async () => {
@@ -2517,6 +2624,20 @@ const x = 1;
     expect(branches).toHaveLength(1);
     expect(branches[0]?.name.toLowerCase()).toContain("feature/");
     expect(branches[0]?.committerDate).toEqual(expect.any(Number));
+  });
+
+  it("paginates more than 200 matching branches without repeating or truncating the tail", async () => {
+    const commands =
+      Array.from(
+        { length: 211 },
+        (_, i) => `create refs/heads/paged/${i.toString().padStart(3, "0")} HEAD`,
+      ).join("\n") + "\n";
+    execFileSync("git", ["update-ref", "--stdin"], { cwd: repoDir, input: commands });
+    const first = await listBranchSuggestions(repoDir, { query: "paged/", limit: 200 });
+    const tail = await listBranchSuggestions(repoDir, { query: "paged/", limit: 200, offset: 200 });
+    expect(first).toHaveLength(200);
+    expect(tail).toHaveLength(11);
+    expect(new Set([...first, ...tail].map((b) => b.name)).size).toBe(211);
   });
 
   it("disables GitHub features when gh is unavailable", async () => {

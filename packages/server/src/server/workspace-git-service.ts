@@ -297,6 +297,7 @@ export type WorkspaceGitReadOptions =
     };
 
 export interface WorkspaceGitBranchSuggestionsOptions {
+  offset?: number;
   query?: string;
   limit?: number;
 }
@@ -871,7 +872,13 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     const normalizedCwd = resolve(cwd);
     const query = options?.query ?? "";
     const limit = options?.limit;
-    const key = JSON.stringify(["branch-suggestions", normalizedCwd, query, limit ?? null]);
+    const key = JSON.stringify([
+      "branch-suggestions",
+      normalizedCwd,
+      query,
+      limit ?? null,
+      options?.offset ?? 0,
+    ]);
     return this.readAuxiliaryCache(this.branchSuggestionsCache, key, readOptions, () =>
       this.deps.listBranchSuggestions(normalizedCwd, options),
     );

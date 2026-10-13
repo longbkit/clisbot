@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { ProjectGitInspectRequestSchema, ProjectGitFetchRequestSchema } from "./project-git.js";
 import {
   FileExplorerRequestSchema,
   ClisbotWorktreeArchiveRequestSchema,
@@ -25,6 +26,46 @@ function workspaceDescriptor(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+test("validates additive Project Git RPCs and bounded discovery pages", () => {
+  expect(
+    SessionInboundMessageSchema.safeParse({
+      type: "project.git.inspect.request",
+      projectId: "prj",
+      kind: "worktrees",
+      limit: 200,
+      requestId: "read",
+    }).success,
+  ).toBe(true);
+  expect(
+    ProjectGitInspectRequestSchema.safeParse({
+      type: "project.git.inspect.request",
+      projectId: "prj",
+      kind: "worktrees",
+      limit: 201,
+      requestId: "read",
+    }).success,
+  ).toBe(false);
+  expect(
+    ProjectGitFetchRequestSchema.safeParse({
+      type: "project.git.fetch.request",
+      projectId: "prj",
+      remote: "origin",
+      requestId: "fetch",
+    }).success,
+  ).toBe(true);
+  expect(
+    SessionOutboundMessageSchema.safeParse({
+      type: "project.git.fetch.response",
+      payload: {
+        projectId: "prj",
+        remote: "origin",
+        requestId: "fetch",
+        error: null,
+        fetchedAt: "2026-10-12T00:00:00Z",
+      },
+    }).success,
+  ).toBe(true);
+});
 
 function fetchWorkspacesResponse(workspace: Record<string, unknown>) {
   return {

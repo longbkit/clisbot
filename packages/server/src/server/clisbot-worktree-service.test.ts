@@ -1360,3 +1360,33 @@ function createGitHubPrRemoteRepo(): { tempDir: string; repoDir: string } {
   execFileSync("git", ["fetch", "origin"], { cwd: repoDir, stdio: "pipe" });
   return { tempDir, repoDir };
 }
+
+test("preserves an explicitly chosen branch when the first Agent supplies naming context", async () => {
+  const { repoDir, tempDir } = createGitRepo();
+  cleanupPaths.push(tempDir);
+  const created = await createClisbotWorktree(
+    {
+      cwd: repoDir,
+      branchName: "fix/login",
+      worktreeSlug: "random-slug",
+      runSetup: false,
+      clisbotHome: path.join(tempDir, ".clisbot"),
+    },
+    createDeps(),
+  );
+  const generate = vi.fn(async () => "generated-title");
+  expect(
+    await attemptFirstAgentBranchAutoName({
+      cwd: created.worktree.worktreePath,
+      firstAgentContext: { prompt: "Fix login" },
+      generateBranchNameFromContext: generate,
+    }),
+  ).toEqual({ attempted: false, renamed: false, branchName: null });
+  expect(generate).not.toHaveBeenCalled();
+  expect(
+    execFileSync("git", ["branch", "--show-current"], {
+      cwd: created.worktree.worktreePath,
+      encoding: "utf8",
+    }).trim(),
+  ).toBe("fix/login");
+});

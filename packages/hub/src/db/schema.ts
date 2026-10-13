@@ -2079,6 +2079,10 @@ export const channelConversationSelections = pgTable(
     selectedThinkingOption: text("selected_thinking_option"),
     selectedMode: text("selected_mode"),
     selectedFeatureValues: jsonb("selected_feature_values").$type<Record<string, unknown>>(),
+    selectedPlacement:
+      jsonb("selected_placement").$type<
+        import("../channels/placement-selection.js").ChannelPlacementSelection
+      >(),
     /** Who switched, for the activity trail. */
     selectedBy: text("selected_by").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

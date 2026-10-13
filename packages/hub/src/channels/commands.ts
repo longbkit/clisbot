@@ -60,6 +60,43 @@ export interface ApprovalCommand {
  */
 export const CHANNEL_COMMANDS = [
   {
+    name: "project",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/project [list|search <text>|<id-or-name>|clear] [--page N]",
+    description: "show the current Project; list, search or select the next Project",
+  },
+  {
+    name: "workspace",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage:
+      "/workspace [list [--worktree]|search <text>|show <id>|<id>|clear|new [base] [--branch name] [--name title]|new --local]",
+    description: "show the current Workspace; list, search, select or create the next Workspace",
+  },
+  {
+    name: "branch",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/branch [list|search <text>|fetch [remote]] [--page N]",
+    description: "show current branch; discover branches or fetch a configured remote",
+  },
+  {
+    name: "worktree",
+    aliases: [],
+    args: true,
+    access: "chat",
+    directOnly: true,
+    usage: "/worktree [list|search <text>|show <path-or-workspace-id>] [--page N]",
+    description: "inspect Git worktrees, status and latest commit",
+  },
+  {
     name: "status",
     aliases: ["state"],
     args: false,
@@ -157,7 +194,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: true,
     usage: "/agent [list|search <text>|name]",
-    description: "list or apply an agent profile",
+    description: "show current configuration; list or apply an agent profile",
   },
   {
     name: "provider",
@@ -166,7 +203,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: true,
     usage: "/provider [list|search <text>|id]",
-    description: "list or switch provider",
+    description: "show current provider; list, search or switch provider",
   },
   {
     name: "model",
@@ -175,7 +212,7 @@ export const CHANNEL_COMMANDS = [
     access: "agent.interact",
     directOnly: true,
     usage: "/model [list|search <text>|id]",
-    description: "list or set this provider's model",
+    description: "show current model; list, search or set this provider's model",
   },
   {
     name: "effort",
@@ -183,8 +220,8 @@ export const CHANNEL_COMMANDS = [
     args: true,
     access: "agent.interact",
     directOnly: true,
-    usage: "/effort [list|id]",
-    description: "list or set this model's thinking option",
+    usage: "/effort [list|search <text>|id]",
+    description: "show current effort; list or set this model's thinking option",
   },
   {
     name: "permission",
@@ -192,7 +229,7 @@ export const CHANNEL_COMMANDS = [
     args: true,
     access: "agent.interact",
     directOnly: true,
-    usage: "/permission [mode]",
+    usage: "/permission [list|search <text>|mode]",
     description: "list or set the provider's mode",
   },
   {
@@ -448,13 +485,14 @@ export function parseChannelTextCommand(text: string): ChannelTextCommand | null
   if (match === null || match[1] === undefined) return null;
   const name = COMMAND_ALIASES.get(match[1].toLowerCase());
   if (name === undefined) return null;
+  // The closed alias registry has already validated this discriminant.
   const argument = match[2]?.trim();
-  if (argument === undefined || argument === "") return { name };
+  if (argument === undefined || argument === "") return { name } as ChannelTextCommand;
   // An argument on a no-argument verb is prose ("stop doing that"), not a
   // command; only `/agent` and `/model` carry one.
   if (!channelCommandSpec(name).args) return null;
   if (name === "followup" && parseFollowUpArguments(argument) === null) return null;
-  return { name, value: argument };
+  return { name, value: argument } as ChannelTextCommand;
 }
 
 /** The help text is generated from the same registry as parsing and gating. */

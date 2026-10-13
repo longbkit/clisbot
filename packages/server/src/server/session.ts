@@ -1,4 +1,5 @@
 import { quickStartOwnerForActor } from "./quick-starts/identity.js";
+import { handleProjectGitRequest } from "./session/project-git.js";
 import { filterInboxCandidates } from "./quick-starts/inbox-filter.js";
 import { mkdir as mkdirQuickChat } from "node:fs/promises";
 import { allocateQuickChatFolder, quickChatsRoot } from "./quick-chats/quick-chat-folders.js";
@@ -3310,6 +3311,15 @@ export class Session {
   // eslint-disable-next-line complexity
   private dispatchCheckoutMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     switch (msg.type) {
+      case "project.git.inspect.request":
+      case "project.git.fetch.request":
+        return handleProjectGitRequest(
+          {
+            projectRoot: async (id) => (await this.projectRegistry.get(id))?.rootPath,
+            emit: (reply) => this.emit(reply),
+          },
+          msg,
+        );
       case "checkout_status_request":
         return this.checkoutSession.handleStatusRequest(msg);
       case "checkout.commits.list.request":

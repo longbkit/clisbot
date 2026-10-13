@@ -101,13 +101,15 @@ matching approval privilege.
 | See / set mode (permission) | `/permission`, `/permission plan`                        |
 
 An **agent profile** is a saved bundle (provider + model + mode + thinking);
-`/agent <name>` applies one in a single step, and `/agent` lists the profiles you
+`/agent <name>` applies one in a single step, and `/agent list` lists the profiles you
 may use. `/provider`, `/model`, and `/effort` tune one axis at a time, and
-`/permission` sets the mode. A bare command shows the menu.
+`/permission` sets the mode. A bare command shows the current configuration and
+any different selection for the next session. Add `list` or `search <text>` to
+discover options; reading the current configuration does not change it.
 
 These three nest — a provider has its own models, and each model its own effort
-levels — so the bot keeps them unambiguous: `/model` lists only the current
-provider's models, `/effort` only the current model's levels, look-alike names show
+levels — so the bot keeps them unambiguous: `/model list` lists only the current
+provider's models, `/effort list` only the current model's levels, look-alike names show
 as `provider/model`, and every change confirms the full setup ("Provider: codex ·
 Model: … · Effort: …"). You can't accidentally pick another provider's model.
 
@@ -252,3 +254,58 @@ these fixes works and reaches the same command:
 If a bare word isn't recognized, prefix it with `/` (or `\` on Slack) and send it
 on its own line — commands match the whole message, so extra text around them
 makes them ordinary prompts to the agent instead.
+
+## Choose where the next session runs
+
+Use `/project list` or `/project search payments` to find a Project on this bot's
+Host, then `/project <project-id>`. Use `/workspace list` to choose an existing
+Workspace, `/workspace list --worktree` for only worktrees, or `/branch list` to find
+local and remote-tracking branches (`origin/main`, `upstream/main`, etc.). Workspace
+lists and searches put recent activity first; branches use latest commit first.
+Every list/search shows up to 10 results; add `--page 2` for the next page.
+Project and Workspace search also matches the final folder name, without matching
+parent folders. `/project` and `/workspace` by themselves show Current session
+and Next session, with Project/Workspace names and IDs and the Host name/ID.
+Workspace information includes its branch and full path; an uncreated Workspace
+is identified as new, with no invented name or worktree path.
+
+`/workspace new main` creates a worktree from `main`, with automatic naming.
+`/workspace new main --branch fix/login --name "Fix login"` preserves that branch
+and titles the Workspace. `/workspace new --local` uses the Project's existing
+checkout. Creation happens immediately; the Agent starts on `/new <message>` or
+the next accepted prompt after `/new`.
+
+Selections apply to everyone sharing this thread/conversation, and the running
+session keeps its location. `/project clear` returns to the Route default;
+`/workspace clear` keeps the Project. A mentioned `/project` can be the first
+interaction when a direct Route already serves the conversation.
+
+## Inspect Git worktrees and refresh branches
+
+| You want                                                                      | Type                                    |
+| ----------------------------------------------------------------------------- | --------------------------------------- |
+| Inspect this session's worktree (or chosen/default checkout before a session) | `/worktree`                             |
+| List Git worktrees, including checkouts not registered as Workspaces          | `/worktree list`                        |
+| Find a worktree by branch, final folder or Workspace name/ID                  | `/worktree search login --page 2`       |
+| Inspect a specific worktree without selecting it                              | `/worktree show <path-or-workspace-id>` |
+| Find local and remote branch refs with commit metadata                        | `/branch search origin/`                |
+| Refresh refs from `origin`                                                    | `/branch fetch`                         |
+| Refresh refs from another configured remote                                   | `/branch fetch upstream`                |
+
+Worktree replies show the Project, Host, registered Workspace (if any), branch,
+full path, file status counts and latest commit hash/date/author. `show` also shows
+the commit subject. Lists use latest commit first and 10 results per page; dirty
+files do not change the order. Status excludes ignored files and does not show file
+names or diffs. Use `/workspace` to create or choose where the next session runs.
+
+Bare `/worktree` identifies the running session's Workspace, or the chosen/configured
+Workspace before a session. With neither it says Current session is None and
+shows the Project root with no Workspace selected. The primary checkout is
+`Kind: local (Project root)`; a separate Git worktree is `Kind: worktree`.
+Several Workspaces can share one checkout. List/show by path reports the count
+in that case; `show <workspace-id>` shows the exact Workspace you requested.
+
+Branch lists show short commit hash, committed date in UTC and author. They use
+the refs already on the Host. Fetch is explicit, uses the Host's Git credentials
+and needs command approval permission for this Project. It updates remote branch
+refs while preserving local branches, tags, HEAD and working files.

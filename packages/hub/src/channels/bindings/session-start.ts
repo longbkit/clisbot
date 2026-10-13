@@ -2,6 +2,7 @@
 // the create it guards, and what becomes of the marker when that create fails.
 // `BindingEngine` decides *whether* a session starts; this module makes the
 // start recoverable.
+import { placementTarget } from "../placement-selection.js";
 import { ChannelThreadBindingConflictError, type ChannelStore } from "../../db/channels.js";
 import type { ThreadBindingRecord } from "../../db/types.js";
 import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js";
@@ -31,6 +32,7 @@ export interface SessionStart {
   key: ThreadKey;
   executionId: string;
   message: InboundMessage;
+  selectedPlacement?: import("../placement-selection.js").ChannelPlacementSelection | null;
 }
 
 /**
@@ -43,6 +45,21 @@ export async function recordSessionMarker(
   start: SessionStart,
 ): Promise<ThreadBindingRecord | undefined> {
   const { account, route, key, message } = start;
+  if (context.authorizePlacement) {
+    const chosen = await context.store.access.findConversationSelection({
+      organizationId: context.organizationId,
+      channel: account.channel as SupportedChannelName,
+      accountId: account.accountId,
+      ...key,
+    });
+    start.selectedPlacement =
+      route.defaults.workspace?.commands === false ? null : (chosen?.selectedPlacement ?? null);
+  }
+  const defaultPlacement =
+    route.target.kind === "agent" ? context.resolveAgentAccessTarget?.(route.target) : undefined;
+  const placement = start.selectedPlacement
+    ? placementTarget(start.selectedPlacement)
+    : defaultPlacement;
   try {
     await context.store.recordPendingThreadBinding({
       organizationId: context.organizationId,
@@ -52,12 +69,18 @@ export async function recordSessionMarker(
       externalThreadId: key.externalThreadId,
       pendingExecutionId: start.executionId,
       initiator: message.senderIdentity,
-      route: bindingSummary(
-        route,
-        message.conversation,
-        { revisionId: context.channelRevisionId ?? null, position: routePosition(account, route) },
-        message.conversationLabel,
-      ),
+      route: {
+        ...(placement ? { placement } : {}),
+        ...bindingSummary(
+          route,
+          message.conversation,
+          {
+            revisionId: context.channelRevisionId ?? null,
+            position: routePosition(account, route),
+          },
+          message.conversationLabel,
+        ),
+      },
     });
     return undefined;
   } catch (error) {
@@ -79,9 +102,9 @@ export async function recordSessionMarker(
  * Create the marked session and resolve its marker. A create that did not
  * confirm keeps the marker, because the daemon may hold the Agent anyway and
  * the marker is the way back to it; a create that never reached the daemon has
- * nothing to recover, so its marker is released. Either way the failure is
- * rethrown: the durable ingress retries the message instead of completing it
- * unanswered.
+ * nothing to recover, so its marker is released. The failure is rethrown:
+ * the plane answers a refused placement, while durable ingress retries a
+ * transport failure instead of completing it unanswered.
  */
 export async function createMarkedSession(
   context: SessionStartContext,
@@ -93,7 +116,15 @@ export async function createMarkedSession(
     tellSender: () => context.onSlowStart?.(message, account, route),
   });
   try {
-    const created = await createRouteSession(context, account, route, key, executionId, message);
+    const created = await createRouteSession(
+      context,
+      account,
+      route,
+      key,
+      executionId,
+      message,
+      start.selectedPlacement,
+    );
     await context.store.resolvePendingThreadBinding({
       organizationId: context.organizationId,
       accountId: account.accountId,

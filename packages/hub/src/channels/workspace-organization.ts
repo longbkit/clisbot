@@ -55,6 +55,8 @@ export interface SessionWorkspaceInput {
   organize: boolean | undefined;
   /** The session this one continues — `/side` and `/fork` inherit its workspace. */
   sourceAgentId?: string | undefined;
+  workspaceId?: string | undefined;
+  worktree?: boolean;
   /** The route environment's directory, backing a newly created workspace. */
   cwd: string;
   projectId?: string | undefined;
@@ -75,9 +77,10 @@ export async function resolveSessionWorkspaceId(
   daemon: DaemonConnection,
   input: SessionWorkspaceInput,
 ): Promise<string | undefined> {
-  if (input.organize === false) return undefined;
+  if (input.workspaceId) return input.workspaceId;
+  if (input.worktree || input.organize === false) return undefined;
   if (input.sourceAgentId !== undefined) {
-    return await inheritSourceWorkspaceId(daemon, input.sourceAgentId, input.logger);
+    return await inheritSourceWorkspaceId(daemon, input.sourceAgentId, input.logger, input);
   }
   return await createWorkspaceForFirstRequest(daemon, input);
 }
@@ -87,9 +90,12 @@ async function inheritSourceWorkspaceId(
   daemon: DaemonConnection,
   sourceAgentId: string,
   logger?: PlaneLogger,
+  input?: SessionWorkspaceInput,
 ): Promise<string | undefined> {
   try {
     const source = (await daemon.listAgents()).find((agent) => agent.id === sourceAgentId);
+    if (source && input?.projectId && source.projectId !== input.projectId)
+      return await createWorkspaceForFirstRequest(daemon, input);
     if (source?.workspaceId === undefined) {
       logger?.warn("channel workspace organization: source session reports no workspace", {
         agentId: sourceAgentId,

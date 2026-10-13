@@ -23,6 +23,7 @@ import {
   SLACK_THREAD_TS_PATTERN,
   type InboundConversationDetail,
   type InboundMessage,
+  type ChannelAgentAccessTarget,
 } from "../plane/types.js";
 
 export interface StoredRouteSummary {
@@ -36,6 +37,8 @@ export interface StoredRouteSummary {
     visibility?: "public" | "private";
   };
   target: CompiledRoute["target"];
+  /** Actual Project authority, frozen independently from next-session choices. */
+  placement?: ChannelAgentAccessTarget;
   bindingKey: EffectiveDefaults["bindingKey"];
   replyAnchor: EffectiveDefaults["replyAnchor"];
   /** Human label observed at admission; display-only and never an access key. */

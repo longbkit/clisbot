@@ -489,6 +489,67 @@ describe("a pre-0079 database collapses Channel identities into realms", () => {
   }, 180_000);
 });
 
+it("upgrades a 0090 database without changing conversation configuration", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hub-migration-0091-"));
+  const dataDirectory = join(root, "pgdata");
+  let bundle: DatabaseRuntimeBundle | undefined;
+  const key = {
+    organizationId: "placement-upgrade",
+    channel: "slack" as const,
+    accountId: "work",
+    externalConversationId: "C-UPGRADE",
+    externalThreadId: "thread",
+  };
+  try {
+    const migrations = readMigrationFiles({ migrationsFolder: runtimeFile("drizzle") });
+    await seedBeforeMigration(dataDirectory, migrations, "0091_", async (client) => {
+      await client.exec(`
+        insert into organization (id, name, slug)
+          values ('placement-upgrade', 'Upgrade', 'placement-upgrade');
+        insert into channel_conversation_selections
+          (organization_id, channel, account_id, external_conversation_id,
+           external_thread_id, selected_agent, selected_provider, selected_model,
+           selected_thinking_option, selected_mode, selected_feature_values, selected_by)
+          values ('placement-upgrade', 'slack', 'work', 'C-UPGRADE', 'thread',
+                  'worker', 'codex', 'saved-model', 'high', 'default', '{"fast":true}', 'U1');
+      `);
+    });
+    bundle = await embeddedDatabaseRuntime(dataDirectory);
+    await bundle.runtime.migrate();
+    let access = new ChannelStore(bundle.runtime).access;
+    const selection = await access.findConversationSelection(key);
+    assert.equal(selection?.selectedAgent, "worker");
+    assert.equal(selection?.selectedProvider, "codex");
+    assert.equal(selection?.selectedModel, "saved-model");
+    assert.equal(selection?.selectedThinkingOption, "high");
+    assert.equal(selection?.selectedMode, "default");
+    assert.deepEqual(selection?.selectedFeatureValues, { fast: true });
+    assert.equal(selection?.selectedBy, "U1");
+    assert.equal(selection?.selectedPlacement, undefined);
+    const placement = {
+      projectId: "project-b",
+      projectRoot: "/b",
+      workspaceId: "workspace-b",
+      daemonReference: "host",
+      routePosition: 0,
+      routeFingerprint: "stamp",
+    };
+    await access.setConversationSelection(key, { selectedPlacement: placement, selectedBy: "U2" });
+    const count = await appliedMigrationCount(bundle.runtime);
+    await bundle.runtime.migrate();
+    assert.equal(await appliedMigrationCount(bundle.runtime), count);
+    await bundle.runtime.close();
+    bundle = undefined;
+    bundle = await embeddedDatabaseRuntime(dataDirectory);
+    access = new ChannelStore(bundle.runtime).access;
+    assert.deepEqual((await access.findConversationSelection(key))?.selectedPlacement, placement);
+    assert.equal((await access.findConversationSelection(key))?.selectedModel, "saved-model");
+  } finally {
+    await bundle?.runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+}, 60_000);
+
 /** Replay every migration before the one tagged `prefix` against a raw client,
  * run `seed` on the result, then close it so the production runtime can reopen
  * the same directory. Returns how many ran. */

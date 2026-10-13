@@ -21,6 +21,13 @@ import {
   ImageAttachmentSchema,
 } from "./agent-attachments.js";
 import { SessionOperationIdentitySchema } from "./session-operation.js";
+import {
+  ProjectGitInspectRequestSchema,
+  ProjectGitInspectResponseSchema,
+  ProjectGitFetchRequestSchema,
+  ProjectGitFetchResponseSchema,
+} from "./project-git.js";
+export * from "./project-git.js";
 import { DeviceProofSchema, DeviceCredentialSchema } from "./device-access.js";
 import { DevicePairingOfferSchema } from "./device-pairing-offer.js";
 import { DaemonDevicesRequestSchema, DaemonDevicesResponseSchema } from "./daemon-devices.js";
@@ -2465,6 +2472,8 @@ export const StashListRequestSchema = z.object({
 
 export const BranchSuggestionsRequestSchema = z.object({
   type: z.literal("branch_suggestions_request"),
+  // COMPAT(branchSuggestionPaging): optional until supported peers negotiate this feature; review 2027-04-11.
+  offset: z.number().int().nonnegative().optional(),
   cwd: z.string(),
   query: z.string().optional(),
   limit: z.number().int().min(1).max(200).optional(),
@@ -3465,6 +3474,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   StashListRequestSchema,
   ValidateBranchRequestSchema,
   BranchSuggestionsRequestSchema,
+  ProjectGitInspectRequestSchema,
+  ProjectGitFetchRequestSchema,
   ForgeSearchRequestSchema,
   GitHubSearchRequestSchema,
   DirectorySuggestionsRequestSchema,
@@ -3839,6 +3850,10 @@ export const ServerInfoStatusPayloadSchema = z
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
         workspaceMultiplicity: z.boolean().optional(),
+        // COMPAT(branchSuggestionPaging): optional capability for branch offsets; review 2027-04-11.
+        branchSuggestionPaging: z.boolean().optional(),
+        // COMPAT(projectGitCommands): additive Git inspection/fetch; review 2027-04-12.
+        projectGitCommands: z.boolean().optional(),
         // COMPAT(projectRemove): added in v0.1.97, drop the gate when floor >= v0.1.97.
         projectRemove: z.boolean().optional(),
         // COMPAT(projectAdd): added in v0.1.97, drop the gate when floor >= v0.1.97.
@@ -7352,6 +7367,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   StashListResponseSchema,
   ValidateBranchResponseSchema,
   BranchSuggestionsResponseSchema,
+  ProjectGitInspectResponseSchema,
+  ProjectGitFetchResponseSchema,
   ForgeSearchResponseSchema,
   GitHubSearchResponseSchema,
   DirectorySuggestionsResponseSchema,

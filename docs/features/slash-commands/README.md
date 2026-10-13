@@ -48,6 +48,122 @@ group:
 
 The per-command **Requires** columns below repeat this at the row level.
 
+### Project, Workspace and Git discovery
+
+These commands are singular, like `/provider` and `/model`. They require a
+matching direct Route and its admission rules; a mention does not bootstrap an
+unserved topic. They work before the first Agent exists.
+
+A bare `/project`, `/workspace` or `/branch` shows the current session's location
+and the next session's selection/default, without listing or changing anything.
+Use `list` or `search` explicitly for discovery. The same rule applies to the
+configuration commands `/agent`, `/provider`, `/model`, `/effort` and `/permission`.
+
+| Command                                                            | Meaning                                                                                   | Requires                                              |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `/project`                                                         | Current/next Project and Workspace, with Host name and ID                                 | `project.use` on each visible Project                 |
+| `/project list [--page N]`                                         | Projects on the serving Host                                                              | `project.use` on each visible Project                 |
+| `/project search <text> [--page N]`                                | Search names, IDs and final directory names                                               | `project.use`                                         |
+| `/project <id-or-exact-name>`                                      | Select the next session's Project; clear Workspace selection                              | `project.use`, `agent.create` and configuration grant |
+| `/project clear`                                                   | Clear both placement choices; return to Route default                                     | Destination `agent.create` and grant                  |
+| `/workspace`                                                       | Current/next Workspace, Project and Host, with branch and path                            | `project.use`                                         |
+| `/workspace list [--worktree] [--page N]`                          | Registered Workspaces in the selected/default Project                                     | `project.use`                                         |
+| `/workspace search <text> [--worktree] [--page N]`                 | Search Workspace names, IDs, branches and final directory names                           | `project.use`                                         |
+| `/workspace show <id-or-exact-name>`                               | Details without selecting                                                                 | `project.use`                                         |
+| `/workspace <id-or-exact-name>`                                    | Select an existing Workspace for the next session                                         | Destination `agent.create` and grant                  |
+| `/workspace clear`                                                 | Clear Workspace choice, retain Project                                                    | Destination `agent.create` and grant                  |
+| `/workspace new [base-ref] [--branch name] [--name "title"]`       | Create and select a new worktree Workspace immediately                                    | `workspace.create`, `agent.create` and grant          |
+| `/workspace new --local [--name "title"]`                          | Create a Workspace using the Project's existing checkout                                  | Same as above                                         |
+| `/branch`                                                          | Current/next location, branch, status and latest commit                                   | `project.use`                                         |
+| `/branch list [--page N]` · `/branch search <text> [--page N]`     | Local and all remote-tracking branches with latest commit                                 | `project.use`                                         |
+| `/branch fetch [remote]`                                           | Fetch one configured remote's branch refs; default `origin`                               | `approval.command` in the selected/default Project    |
+| `/worktree`                                                        | Inspect the current session's Git worktree, or selected/default checkout before a session | `project.use`                                         |
+| `/worktree list [--page N]` · `/worktree search <text> [--page N]` | Git worktrees including the primary checkout and unregistered worktrees                   | `project.use`                                         |
+| `/worktree show <path-or-workspace-id>`                            | Inspect one worktree without selecting it                                                 | `project.use`                                         |
+
+List and search show **10 results per page**, with counts and complete next/previous
+commands. Authorization precedes search and pagination; inaccessible Projects
+never contribute to counts. Project ordering is name then ID. Workspace ordering
+is daemon `activityAt` descending (fall back to `createdAt`), then ID; branch
+ordering is latest commit time then name. Search matches all space-separated
+terms case-insensitively. Project and Workspace search includes the final directory
+name, handling either Host path separator and trailing separators; parent directory
+names do not contribute matches. Project results show the matching folder name.
+Git worktrees are ordered by latest commit time, then path; uncommitted edits do
+not change that ordering. Worktree search matches branch, final folder name and
+any registered Workspace name/ID. Only the displayed page reads live status.
+Exact names must be unique; use IDs when names repeat.
+Invalid pages return an error, without silently selecting another page.
+
+Replies separate **Current session** and **Next session**, include human names and
+stable IDs, and show the Host name/ID once. Workspace details include branch and
+full path. A future Workspace has no fabricated name, ID or worktree path before
+creation. Revoked/expired choices are identified without disclosing inaccessible
+Project/Workspace metadata. Reply content belongs to the shared Hub dispatcher;
+each channel vertical renders its CommonMark, handles escaping/chunking and keeps
+a text fallback. These commands do not require channel-native cards or controls.
+
+A worktree's random directory slug, Git branch and Workspace title are distinct.
+Omit `--branch` to keep automatic naming; an explicit branch is preserved. Omit
+the base to use the daemon's default branch resolver. Only daemon-registered
+Workspaces are selectable; raw external Git worktrees are not imported.
+
+`/worktree` is read-only Git inspection. It includes Host and Project name/ID,
+Workspace name/ID by the bound session or explicit selection, branch, full path, status counts and latest
+commit (short hash, committed date in UTC, author). `show` also includes the commit
+subject. Status counts tracked, staged, unstaged, conflicting and untracked files;
+ignored files are excluded. An inaccessible/prunable worktree reports unavailable
+status. Creation and next-session selection stay under `/workspace`.
+
+Bare `/worktree` uses the running Agent's Workspace ID; before a session it uses
+the selected/configured Workspace ID. With neither, it says Current session is
+None and inspects the Project root without assigning another Workspace's name or
+ID. Replies distinguish `local (Project root)` from `worktree`. Multiple registered
+Workspaces can share a Git checkout; list/show by path reports their count rather
+than choosing one. Use `show <workspace-id>` to inspect a specific association.
+
+Branch results keep namespaces distinct (`main`, `origin/main`, `upstream/main`)
+and include short commit hash, committed date in UTC and author. List/search uses
+refs already on the Host; it never fetches implicitly. `/branch fetch [remote]`
+uses that Host's configured Git credentials and updates only remote branch refs;
+it does not change local branches, tags, HEAD or working files, prune refs or
+fetch submodules. Fetch is bounded and requires an explicit request and command
+approval authority. Retried deliveries share the existing command receipt.
+
+Choices persist across `/new` and restarts and follow the Route's binding scope
+(thread/topic or whole conversation), shared by its participants. Selection leaves
+the running session intact. `/new`/the first prompt applies the choice; `/fork`
+uses an explicit destination Workspace, or creates in the destination Project
+when it differs from the source. `/side` stays in the source Workspace. `/quick`
+uses the next-session choice without rebinding. `/resume` checks the actual
+session's Project and synchronizes the next choice after successful attachment.
+
+The Hub stores the next choice separately from the binding's captured Project
+for current-session authorization. It verifies the Route position/fingerprint,
+Host, Project, Workspace and configuration authority before use. The placement
+fingerprint excludes provider/model defaults, whose grants are checked again
+before creation. An inherited worktree configuration also needs `workspace.create`
+in an explicitly selected Project. A refused or stale choice answers in the
+conversation and releases an unbound session's pending marker, before any
+Workspace/Agent creation; it does not retry the same prompt automatically.
+`/project clear` or re-selection recovers. Host/RPC failures retain durable retry.
+Workspace create uses
+both a durable command receipt and the daemon's idempotency key.
+
+`workspace.commands: false` at any defaults layer disables these commands and
+ignores staged placement for future sessions; bound session authority remains
+captured. Absence is enabled and does not change existing compiled fingerprints.
+The combined design incorporates the Project authorization/provenance proposal
+from [#21](https://github.com/longbkit/clisbot/pull/21) and Workspace placement
+proposal from [#23](https://github.com/longbkit/clisbot/pull/23), implemented
+against the current Route + Rules model.
+
+Workspace commands need Host `workspaceMultiplicity`; Git discovery/fetch needs
+`projectGitCommands`. Older Hosts get an update message. The daemon owns Git
+execution and validates the exact Project and worktree membership; the shared Hub
+commands own search, pagination and reply formatting. No new package dependency
+or schema migration is required.
+
 ### Session controls and approvals
 
 | Command                                 | Does                                                                                                                                                   | Requires                |
@@ -56,7 +172,7 @@ The per-command **Requires** columns below repeat this at the row level.
 | `/stop`                                 | Stop the running turn.                                                                                                                                 | channel.use             |
 | `/new`                                  | Clear the binding; the next message starts fresh. `/new <message>` starts immediately.                                                                 | channel.use             |
 | `/agent [<name>]`                       | Switch the conversation's agent. Apply an **agent profile** bounded by the caller's configuration grant ([below](#agent-profiles-and-the-route-menu)). | agent.interact + grant² |
-| `/model [<name>]`                       | Bare: show the model menu. `/model <name>`: switch this conversation's model.                                                                          | agent.interact + grant² |
+| `/model [<name>]`                       | Bare: current/next configuration. Add `list` or `search` to discover; `<name>` switches the model.                                                     | agent.interact + grant² |
 | `/help`                                 | This command list.                                                                                                                                     | — (public)              |
 | `/approve [id] [answer]` · `/deny [id]` | Answer the newest open approval, or the one named by `<id>`.                                                                                           | approval authority¹     |
 
@@ -82,26 +198,26 @@ conversations outside a narrower list. A Guest never holds it. See
 Implementation and verification notes are in [implementation-plan.md](implementation-plan.md).
 `•` = applies on that route kind.
 
-| Command                                                                                                   | Does                                                                                                           | Requires                                         | Direct | Automation |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :----: | :--------: |
-| `/cowork` (`/open`, `/app`)                                                                               | Reply with both links to the bound session ([below](#session-links)).                                          | agent.interact                                   |   •    |     •      |
-| `/me`                                                                                                     | Your channel ID, and your access here ([below](#what-status-and-me-show)).                                     | — (public)                                       |   •    |     •      |
-| `/followup [status\|auto\|mention-only\|pause\|resume]`, `/followup route [auto [minutes]\|mention-only]` | Show or change whether messages need a mention, here or on the whole route ([below](#follow-up)).              | channel.use; `route` changes need channel.manage |   •    |     •      |
-| `/resume <id>`                                                                                            | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create                                     |   •    |     —      |
-| `/steer <message>`                                                                                        | Admit `<message>` into the running turn.                                                                       | channel.use                                      |   •    |     —      |
-| `/queue <message>`                                                                                        | Hold `<message>` until the current turn ends.                                                                  | channel.use                                      |   •    |     —      |
-| `/provider [list]` · `/provider search <kw>` · `/provider <id>`                                           | Show/find providers you may use; stage one (reset model+effort to its defaults; `/new` or `/fork` applies it). | agent.interact + grant²                          |   •    |     —      |
-| `/model [list]` · `/model search <kw>`                                                                    | Extend the shipped `/model` with list/search of the **current provider's** models.                             | agent.interact + grant²                          |   •    |     —      |
-| `/effort [list]` · `/effort <id>`                                                                         | List the **current model's** effort levels; set one (live).                                                    | agent.interact + grant²                          |   •    |     —      |
-| `/permission [<mode>]` (`/mode`)                                                                          | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                  | agent.interact                                   |   •    |     —      |
-| `/skill [list]` · `/skill search <kw>` · `/skill <name>`                                                  | List/search skills; run one on the agent.                                                                      | channel.use                                      |   •    |     —      |
-| `/command [list]` · `/command search <kw>`                                                                | List/search dynamic commands.                                                                                  | channel.use                                      |   •    |     —      |
-| `/command add <name> <prompt>` · `/command remove <name>`                                                 | Create or remove a dynamic command.                                                                            | approval.config                                  |   •    |     —      |
-| `/fork [message]`                                                                                         | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | channel.use                                      |   •    |     —      |
-| `/side <message>`                                                                                         | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | channel.use                                      |   •    |     —      |
-| `/quick <message>`                                                                                        | One-off question in a fresh, unrelated session; binding unchanged.                                             | channel.use                                      |   •    |     —      |
-| `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.  | channel.use                                      |   •    |     —      |
-| `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                      | channel.manage³                                  |   •    |     —      |
+| Command                                                                                                   | Does                                                                                                                 | Requires                                         | Direct | Automation |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :----: | :--------: |
+| `/cowork` (`/open`, `/app`)                                                                               | Reply with both links to the bound session ([below](#session-links)).                                                | agent.interact                                   |   •    |     •      |
+| `/me`                                                                                                     | Your channel ID, and your access here ([below](#what-status-and-me-show)).                                           | — (public)                                       |   •    |     •      |
+| `/followup [status\|auto\|mention-only\|pause\|resume]`, `/followup route [auto [minutes]\|mention-only]` | Show or change whether messages need a mention, here or on the whole route ([below](#follow-up)).                    | channel.use; `route` changes need channel.manage |   •    |     •      |
+| `/resume <id>`                                                                                            | Bind an existing session `<id>` here, replacing the current binding.                                                 | agent.create                                     |   •    |     —      |
+| `/steer <message>`                                                                                        | Admit `<message>` into the running turn.                                                                             | channel.use                                      |   •    |     —      |
+| `/queue <message>`                                                                                        | Hold `<message>` until the current turn ends.                                                                        | channel.use                                      |   •    |     —      |
+| `/provider` · `/provider list` · `/provider search <kw>` · `/provider <id>`                               | Bare: current/next configuration. List/find providers; stage one (reset model+effort; `/new` or `/fork` applies it). | agent.interact + grant²                          |   •    |     —      |
+| `/model` · `/model list` · `/model search <kw>` · `/model <id>`                                           | Bare: current/next configuration. List/search the current provider's models; set one live.                           | agent.interact + grant²                          |   •    |     —      |
+| `/effort` · `/effort list` · `/effort <id>`                                                               | Bare: current configuration. List the current model's effort levels; set one live.                                   | agent.interact + grant²                          |   •    |     —      |
+| `/permission [<mode>]` (`/mode`)                                                                          | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                        | agent.interact                                   |   •    |     —      |
+| `/skill [list]` · `/skill search <kw>` · `/skill <name>`                                                  | List/search skills; run one on the agent.                                                                            | channel.use                                      |   •    |     —      |
+| `/command [list]` · `/command search <kw>`                                                                | List/search dynamic commands.                                                                                        | channel.use                                      |   •    |     —      |
+| `/command add <name> <prompt>` · `/command remove <name>`                                                 | Create or remove a dynamic command.                                                                                  | approval.config                                  |   •    |     —      |
+| `/fork [message]`                                                                                         | Fork this conversation into a new session (carries context) and continue here (rebinds).                             | channel.use                                      |   •    |     —      |
+| `/side <message>`                                                                                         | One-off question in a new session seeded with this conversation's context; binding unchanged.                        | channel.use                                      |   •    |     —      |
+| `/quick <message>`                                                                                        | One-off question in a fresh, unrelated session; binding unchanged.                                                   | channel.use                                      |   •    |     —      |
+| `/routedefault`                                                                                           | Show the Route serving this conversation, its default, and this conversation's configuration when it differs.        | channel.use                                      |   •    |     —      |
+| `/promoteroutedefault` · `/promoteroutedefault undo`                                                      | Make this conversation's configuration the serving Route's default; undo its last change.                            | channel.manage³                                  |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -433,8 +549,9 @@ which one served this message. That Route is the one changed, and `/routedefault
   checking all of them would refuse a Connection manager whose own Route is
   within their grants whenever another account uses a Project they lack. A Hub UI
   save still checks every Route.
-- **What happens to the conversation.** Its own selection is cleared, since the
-  Route now says the same thing. Its behavior does not change.
+- **What happens to the conversation.** Its provider/model configuration selection
+  is cleared, since the Route now says the same thing. Project/Workspace placement
+  stays selected. Its behavior does not change.
 - **What happens to running sessions.** Nothing. The default is not part of the
   Route target, so bindings keep their sessions, and only the next session a
   Route starts uses the new value. The supervisor adopts a revision that differs

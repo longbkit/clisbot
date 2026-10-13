@@ -6,6 +6,7 @@
 
 export interface AgentSnapshot {
   id: string;
+  /** Derived from the daemon's separate Project placement, absent on raw snapshots. */
   projectId?: string;
   workspaceId?: string;
   /** Raw wire value: null means the live mode has not been resolved. */
@@ -103,6 +104,7 @@ export type AgentPermissionResponse =
     };
 
 export interface CreateAgentConfig {
+  workspaceId?: string;
   provider: string;
   cwd: string;
   /** Stable daemon Project placement; sent beside, not inside, session config. */
@@ -141,6 +143,7 @@ export interface AgentProfile {
 }
 export interface DaemonServerInfo {
   serverId: string;
+  hostname?: string | null;
   features?: Record<string, boolean | undefined>;
 }
 export interface ProviderModel {
@@ -193,7 +196,37 @@ export interface FirstAgentContext {
   attachments?: TextAttachment[];
 }
 
+export interface ProjectSnapshot {
+  projectId: string;
+  projectDisplayName: string;
+  projectRootPath: string;
+  projectKind: string;
+}
+export interface WorkspaceSnapshot extends ProjectSnapshot {
+  id: string;
+  name: string;
+  workspaceDirectory: string;
+  workspaceKind: string;
+  branch?: string;
+  activityAt: string | null;
+  createdAt?: string;
+}
+export interface BranchSnapshot {
+  name: string;
+  committerDate: number;
+  source?: "local" | "remote";
+  remote?: string | undefined;
+  commit?: import("@clisbot/protocol/messages").GitCommitSummary;
+  hasLocal?: boolean;
+  hasRemote?: boolean;
+}
+
 export interface CreateWorkspaceInput {
+  kind?: "directory" | "worktree";
+  baseRef?: string;
+  branchName?: string;
+  title?: string;
+  idempotencyKey?: string;
   /** Existing directory backing the workspace (the route environment's cwd). */
   cwd: string;
   projectId?: string;

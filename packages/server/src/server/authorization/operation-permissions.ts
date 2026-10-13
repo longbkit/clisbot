@@ -23,6 +23,8 @@ const INBOUND_PERMISSION = {
   "chat.discussion.stop.request": "workspace.write",
 
   "channel.file.read.request": "hub.execute",
+  "project.git.inspect.request": "workspace.read",
+  "project.git.fetch.request": "workspace.write",
   abort_request: "workspace.write",
   "agent.config.apply.request": ["workspace.write", "hub.execute"],
   "agent.detach.request": "workspace.write",
@@ -339,6 +341,8 @@ const OUTBOUND_PERMISSION = {
   assistant_chunk: "workspace.read",
   audio_output: "workspace.write",
   branch_suggestions_response: "workspace.read",
+  "project.git.inspect.response": "workspace.read",
+  "project.git.fetch.response": "workspace.write",
   "browser.automation.execute.request": "workspace.write",
   cancel_agent_response: ["workspace.write", "hub.execute"],
   capture_terminal_response: "workspace.read",
