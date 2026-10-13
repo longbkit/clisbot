@@ -1,6 +1,6 @@
 ---
 title: Self-hosting the web UI
-description: Serve the Clisbot web app from your own daemon and reach it over your own LAN, VPN, reverse proxy, or tunnel.
+description: Start an optional local web UI independently of your Host and Hub, with protected access.
 nav: Web UI
 order: 6
 category: Getting started

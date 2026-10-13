@@ -106,9 +106,9 @@ For voice philosophy, architecture, and complete local/OpenAI setup examples, se
 
 ## Bundled web UI
 
-The daemon can serve the browser web client from the same HTTP server. This is enabled in the official Docker image and disabled by default for normal CLI and desktop-managed daemons.
+For personal use, run `clisbot web start`. The independent UI process reuses the Host and any Hub; no daemon web flag or restart is needed. See [Web UI](/docs/web-ui) for status, pairing and stopping it.
 
-Enable it from the CLI:
+The settings below control the older daemon-hosted UI, used by the official Docker image and disabled by default for CLI/Desktop daemons. To configure that deployment:
 
 ```bash
 clisbot daemon config set features.webUi.enabled true

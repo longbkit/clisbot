@@ -387,7 +387,7 @@ Every daemon-connected CLI command accepts global `--home` or `--host`, before o
 
 Local-only `start`, `daemon run`, `config`, `onboard`, and `set-password` reject explicit `--host` and ignore `CLISBOT_HOST`. Endpoint operations retain TCP, Unix socket, Windows pipe, SSH, and pairing-offer transports. A host-side CLI controlling a container needs `--host` or `CLISBOT_HOST`.
 
-## Hub
+## Hub & Channel connect
 
 ```bash
 clisbot hub start --personal     # Channel backend; Tailscale by default
@@ -397,7 +397,7 @@ clisbot web stop                 # Preserves Host, Bot and Hub
 clisbot hub stop                 # Stop the local Hub; the daemon keeps running
 clisbot hub pair                 # Pair a device with the personal Hub
 clisbot hub devices              # List, label and revoke paired Hub devices
-clisbot hub init                 # Create an assistant Bot here and connect any supplied channel
+clisbot hub init                 # Legacy workspace-and-Hub bootstrap
 clisbot hub connect [url]        # Add this Host to a Hub with one browser approval (no login)
 clisbot hub status               # Show the current Hub relationship
 clisbot hub permissions list     # Show what this Hub may do on this daemon
@@ -411,7 +411,15 @@ clisbot channels ls              # List channel Connections and their state
 clisbot bot list                 # List Bots with their live channel status
 ```
 
-`init` seeds a Bot with starter instructions on this daemon. Pass `--telegram-bot-token`, or `--slack-bot-token` with `--slack-app-token`, to connect that channel too. See [Hub quickstart](/docs/hub/quickstart). The earlier `hub deploy` and `hub projects` commands exist only with `CLISBOT_ONBOARDING_ENABLED=0`.
+`clisbot bot start` creates/selects a Bot; channels are optional:
+
+```sh
+clisbot bot start --bot-name "Sandbox Assistant" --provider codex
+clisbot bot start "Sandbox Assistant" --telegram-bot-token '${TELEGRAM_BOT_TOKEN}'
+clisbot bot status "Sandbox Assistant"
+```
+
+Bot-only use needs no Hub. Channels start the personal backend automatically, preferring Tailscale with relay fallback. New routes are owner-only; follow the printed verification step. See [Hub quickstart](/docs/hub/quickstart). The earlier `hub deploy` and `hub projects` commands exist only with `CLISBOT_ONBOARDING_ENABLED=0`.
 
 `connect <url>` is the Host onboarding command. Approve the Host, organization and requested permissions in the browser; the command enrolls it and waits for the connection, including in non-TTY/JSON mode. It creates no CLI credential. Use a scoped API key explicitly for unattended enrollment.
 
@@ -419,9 +427,9 @@ clisbot bot list                 # List Bots with their live channel status
 
 Interactive logout checks the same-origin daemon relationship and asks whether to disconnect before deleting the login. Declining removes only the login. JSON and noninteractive logout never prompt or disconnect implicitly; `--disconnect-daemon` is the explicit automation path, and `--force` applies to that daemon disconnection. If a requested disconnection fails, the login is preserved.
 
-Every command resolves and normalizes its destination before Hub or daemon work. Origin precedence is an explicit command origin or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login origin. There is no hosted default: with none of these, the command stops and asks for a Hub URL. Credential precedence is `--api-key <secret>`, then `CLISBOT_HUB_API_KEY`, then a stored login for the exact resolved origin. A stored credential is never sent to a different origin. API keys passed through flags or the environment are not stored.
+For remote Hub administration, origin precedence is the command origin or `--hub`, then `CLISBOT_HUB_URL`, then the stored login origin. There is no hosted default: with none of these, the command stops and asks for a Hub URL. Credential precedence is `--api-key <secret>`, then `CLISBOT_HUB_API_KEY`, then a stored login for the exact resolved origin. A stored credential is never sent to a different origin. API keys passed through flags or the environment are not stored.
 
-Human output reports the resolved destination before each action. JSON output keeps stdout machine-readable and includes the normalized Hub origin.
+Human output reports the destination; JSON includes the normalized Hub origin.
 
 See [Daemons in Hub](/docs/hub/daemons), [Hub configuration](/docs/hub/configuration), and the [Hub public API](/docs/hub/api).
 

@@ -19,13 +19,13 @@ Your daemons keep running agents where they always did. Hub decides who may use 
 
 ## Personal Hub or team Hub
 
-|          | Personal Hub                                                                   | Team Hub                                                                         |
-| -------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| Runs on  | One of your own machines                                                       | A server your team operates                                                      |
-| Sign-in  | None. Your devices pair with a QR code                                         | Members sign in with an account                                                  |
-| To start | **Settings → Hubs → Add Hub → Start a Hub**, or `clisbot hub start --personal` | [Self-hosting](/docs/hub/self-hosting); machines join with `clisbot hub connect` |
+|          | Personal Hub                                                         | Team Hub                                                                         |
+| -------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Runs on  | One of your own machines                                             | A server your team operates                                                      |
+| Sign-in  | None. Your devices pair with a QR code                               | Members sign in with an account                                                  |
+| To start | Bot **Connect to a channel…**, or `clisbot bot start` with a channel | [Self-hosting](/docs/hub/self-hosting); machines join with `clisbot hub connect` |
 
-Clisbot does not run a hosted Hub. Every Hub is one you or your team operates.
+Bot-only use needs no Hub. [Channel setup](/docs/hub/quickstart) starts the personal backend automatically; local web remains optional. Clisbot does not run a hosted Hub.
 
 ## Several Hubs at once
 

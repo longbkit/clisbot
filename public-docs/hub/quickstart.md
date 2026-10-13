@@ -1,6 +1,6 @@
 ---
 title: Hub quickstart
-description: Create a seeded assistant workspace and connect Slack or Telegram through Hub APIs.
+description: Create a Bot, connect Slack or Telegram with automatic Hub setup, and verify owner access.
 nav: Quickstart
 order: 61
 category: Hub
@@ -8,78 +8,83 @@ category: Hub
 
 # Hub quickstart
 
-`clisbot hub init` creates a local assistant workspace with starter instructions and an initial agent you can open in the app. Supply channel credentials to also enroll the daemon, configure a Connection and member routes, and prepare owner access. Configuration is updated through APIs.
+A Bot runs on your Host. **Hub & Channel connect** adds Slack or Telegram; creating a Bot for the app needs no Hub. These commands run on the Host machine with an installed, signed-in agent provider. The examples use Codex.
 
-You need Clisbot installed and an available agent provider on the daemon. The examples use Codex; select another configured provider with `--provider`.
-
-## Create your assistant workspace
+## Create a Bot
 
 ```sh
-clisbot hub init --provider codex
+clisbot bot start
 ```
 
-The command starts the local daemon and Hub as needed. Its default directory is `<Clisbot home>/workspaces/default`, regardless of the directory from which you run it. Home resolution is `--home`, then `CLISBOT_HOME`, then `CLISBOT_HOME`, then `~/.clisbot`. `~` in a configured home is expanded. Use `--workspace /absolute/path` to select another directory.
-
-The daemon owns the **Project** and **Workspace**. Hub has no Project to create or select. For worktree isolation, templates are written into the actual worktree directory returned by the daemon.
-
-The personal or team template (`--kind personal|team`) creates missing `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `IDENTITY.md`, `BOOTSTRAP.md`, and `TOOLS.md` before creating the agent. Existing files and symlinks are preserved by default and counted in the result. The OS home root cannot be used as the seed destination. Team assistants default to `<Clisbot home>/workspaces/team` so they do not share the personal assistant’s files. Choose an explicit separate workspace for any other assistants that must not share context. Existing saved workspace paths are preserved.
-
-## Configure the owner and a channel
-
-Open the local Hub address printed by the command and finish Account setup. For a fresh unattended installation, supply `--owner-email` and `--owner-password '${INITIAL_OWNER_PASSWORD}'` to the first command; set the password in that environment variable beforehand. `--organization-name` optionally names the initial organization. Existing accounts and passwords are preserved.
-
-For Telegram:
+Choose a new or existing Bot. For a new Bot, choose its provider, then **Skip — use the Bot in the app** or select a channel. To name a new Bot explicitly:
 
 ```sh
-clisbot hub init --provider codex \
+clisbot bot start --bot-name "Sandbox Assistant" --provider codex
+```
+
+Choose **Skip** when asked about a channel. Without channel options, non-interactive execution creates only the Bot and starts the Host as needed. No Hub or web UI is started.
+
+The Host owns the Bot, Project and directory Workspace. The default Bot home is under `daemon.bots.root/<slug>`; use `--workspace /absolute/path` when creating it to choose another directory. Existing Bots retain their home. `--kind personal|team` selects starter instructions, preserving existing files. Clisbot home resolves from `--home`, then `CLISBOT_HOME`, then `~/.clisbot`.
+
+## Connect that Bot to a channel
+
+Choose one channel. Load its token variables into your shell, then run:
+
+```sh
+# Telegram
+clisbot bot start "Sandbox Assistant" \
   --telegram-bot-token '${TELEGRAM_BOT_TOKEN}' \
-  --owner-email you@example.com \
   --owner-identity YOUR_TELEGRAM_USER_ID
-```
 
-For Slack Socket Mode:
-
-```sh
-clisbot hub init --provider codex \
+# Or Slack Socket Mode
+clisbot bot start "Sandbox Assistant" \
   --slack-app-token '${SLACK_APP_TOKEN}' \
   --slack-bot-token '${SLACK_BOT_TOKEN}' \
-  --owner-email you@example.com \
   --owner-identity YOUR_SLACK_MEMBER_ID
 ```
 
-Token flags accept a literal, a quoted environment reference, or a private secret-file path. Slack verifies both tokens through its existing Application setup and stores an encrypted Connection. Existing Connections can be selected with `--slack-connection-id` or `--telegram-connection-id`.
+The selector accepts a Bot ID or unique Host-local name/slug. It reuses that Bot's provider and workspace. To create and connect in one command, replace the selector with `--bot-name "Sandbox Assistant" --provider codex`.
 
-`--owner-identity` is the human provider user ID explicitly asserted by the local operator. A bot token identifies the bot, not its human owner. If the owner already has a verified identity on this Connection, it is reused. Otherwise omit the flag and send the private, one-time linking command printed by onboarding to the bot from the owner's account. Codes expire after 10 minutes; the CLI shows the exact expiry and remaining time. No manual route or permission grant is then needed. Lost or expired codes cannot be retrieved in plaintext: rerun `bot start` using the renewal command printed in the result to issue a new code without channel tokens. Issuing a new code invalidates the previous one. `bot status personal-assistant` also prints the recovery command.
+Channel setup starts the Hub backend when needed. A fresh personal setup needs no Hub-mode flag, account sign-in, web UI, proxy command or manual daemon restart. Tailscale is preferred by default, with relay fallback; read the reported route and recovery guidance. Existing account/team Hubs keep their access policy.
 
-When the owner is linked and transport is started, DM the bot or mention it in a group/channel it has joined. Group/channel routes require a mention. Slack channel replies use a thread under the request. Other senders do not acquire owner access. A pending transport or pending identity link is reported explicitly.
+Token flags accept a literal, quoted environment reference or private secret-file path. Credentials are encrypted in a Connection; saved Bot references contain no token. Existing Connections use `--slack-connection-id` or `--telegram-connection-id`.
 
-## Run again and update configuration
+### Verify the owner
+
+New DM and group routes admit only the Bot owner; groups require a mention. Existing route policies are preserved. `--owner-identity` is the human channel user ID verified by the local operator, not the bot's ID. Remote Admin access does not authorize binding arbitrary identities.
+
+You may omit the owner identity. Setup then reports pending verification and, when authorized, prints a one-time `/link` command. Send that exact command from the owner's channel account to the bot in a DM or supported group conversation. Ordinary prompts do not run until ownership is verified; the first sender does not become owner. For another owner's Bot, follow the sign-in/verification guidance instead.
+
+Codes expire after ten minutes. For a lost or expired code, rerun the printed renewal command or `clisbot bot start "Sandbox Assistant"`; this reuses the saved Connection without tokens and invalidates the previous code. `clisbot bot status "Sandbox Assistant"` shows status and recovery guidance. Once transport and owner verification are ready, DM the bot or mention it in a group it has joined.
+
+## Connect from the app or optional local web
+
+In the published web, Desktop or mobile app, open the Bot's **Connect to a channel…** action. It remains available without Hub and guides setup on the selected Host, preserving the Bot selection. Starting Hub requires that Host's independent Owner access; Hub account access alone is insufficient. Follow the reported pairing, update or managed-Host recovery step.
+
+For a local browser UI:
 
 ```sh
-clisbot bot start --bot-name personal-assistant
+clisbot web start
+clisbot web status
+clisbot web stop
 ```
 
-The saved manifest reuses the workspace, initial agent, and encrypted Connection; it contains no channel token. `hub init` also resumes a saved bot. A failed channel install retains the daemon resource IDs for retry. Existing user files and unrelated routes are preserved.
+Open the printed Owner pairing link when required. Web can start before or after Hub; it shares the browser origin for backend requests without changing Hub's identity. Stopping web leaves Host, Bot and Hub running. See [Web UI](/docs/web-ui) for access and deployment details.
 
-Channel conversations create or resume their own agent sessions against the configured workspace. They are not all attached to the initial agent visible in the app.
+## Resume and recover
 
-Use the Hub configuration UI or its resource APIs to change configuration. Export is optional backup/portability; editing exported files and deploying a Hub Project is not part of this flow. `CLISBOT_ONBOARDING_ENABLED=0` restores the inherited CLI setup surface for rollback; apply the same setting to the CLI and Hub.
+```sh
+clisbot bot start "Sandbox Assistant"
+clisbot bot status "Sandbox Assistant"
+```
 
-## Multiple local homes
+The saved Bot and Connection are reused. Channel failure retains the Bot for retry; each channel conversation gets its own session in the Bot workspace. Configuration belongs in the UI/API, not an exported Hub Project. `hub init` remains a legacy workspace-and-Hub bootstrap path; prefer `bot start` for the optional-channel flow.
 
-Each home starts its own daemon and Hub. On first setup, if a default loopback port is occupied,
-onboarding selects another available port and prints the actual addresses. Background Hub
-restarts retain the selected port and fail if another process has since taken it. An explicit `CLISBOT_LISTEN` or `hub start --port`
-choice must be free. A supervisor PID alone does not mean the daemon is ready;
-startup failures point to the selected home's logs rather than contacting another
-home's server. An existing connection to a different Hub must be disconnected
-explicitly before enrolling the daemon into the local Hub.
+Use `--home /path/to/home` consistently for separate installations. Each home owns its Host and optional Hub. Fresh setup selects available default ports and reports actual addresses; explicit ports must be free. Startup failures point to that home's logs.
 
-A home with `daemon.managedAccess.mode: external` is an existing managed installation,
-not a fresh onboarding target. CLI onboarding stops before opening an unticketed TCP
-connection. The Hub owner password does not replace the daemon access ticket. Use
-an empty home for a fresh test, or use authenticated local socket/pipe recovery to
-manage the existing installation. Stopping processes preserves this access policy.
+`managedAccess.mode: external` alone does not prove enrollment. Actual Hub enrollment or retained managed-access state determines whether tickets are required. Existing managed Hosts keep their policy: use authorized access or the operator's Hub; do not clear enrollment or disable protection to bypass a startup check. A genuinely empty home can prepare personal Owner access, while an existing unprotected Host needs a planned pairing migration. See [Web UI](/docs/web-ui).
+
+The following password operations apply to account-based Hubs, not normal personal device pairing.
 
 ## Change an existing owner's password
 
@@ -169,10 +174,10 @@ the recovery secret or ask them to perform recovery on your behalf.
 ## Explicitly replace the seed template
 
 ```sh
-clisbot hub init --home "$HOME/.clisbot-dev-01" --overwrite-template
+clisbot bot start "Sandbox Assistant" --home "$HOME/.clisbot-dev-01" --overwrite-template
 ```
 
-This replaces the nine bundled template files, including `USER.md`, `MEMORY.md`,
+This replaces bundled template files, including `USER.md`, `MEMORY.md`,
 and `BOOTSTRAP.md`, with the selected personal/team defaults. Before each replacement,
 the original is retained in a private `.clisbot-template-backup-*` directory inside
 the workspace; the result prints that directory and the number replaced. Symlinks,

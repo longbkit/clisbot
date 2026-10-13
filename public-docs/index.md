@@ -53,9 +53,9 @@ clisbot
 
 It starts the daemon in the background and prints a QR code and a pairing link. Each link pairs one device and expires after 5 minutes.
 
-Run `clisbot` again whenever you need a new link or after a reboot. It reuses the running daemon, or starts it if it stopped. On a relay setup, run `clisbot --relay` so it does not ask for the connection again. For a first launch without prompts, use `clisbot --relay --voice disable`. Without an interactive terminal it skips prompts and keeps the saved voice setting (off on a fresh setup). Stop the daemon with `clisbot daemon stop`.
+Run `clisbot` again for a new pairing link or after reboot; it reuses or starts the Host. Tailscale is preferred by default, with relay fallback. For non-interactive setup use `clisbot --voice disable`; choose `--relay` only to request relay explicitly. Stop the Host with `clisbot daemon stop`.
 
-The daemon can also serve the browser web app itself. See [Self-hosting the web UI](/docs/web-ui).
+For a Bot, run `clisbot bot start`: skip channels to use it in the app, or connect one to start Hub automatically. See [Hub & Channel connect](/docs/hub/quickstart). Local web is optional: `clisbot web start`. See [Web UI](/docs/web-ui).
 
 Configuration and local state live under `CLISBOT_HOME` (defaults to `~/.clisbot`). Upgrading from Clisbot 0.1.x? See [Upgrade to v2](/docs/upgrade-v2).
 
