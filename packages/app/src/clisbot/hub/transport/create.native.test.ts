@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { createHash, randomBytes } from "node:crypto";
+import * as WebBrowser from "expo-web-browser";
 import { createHubTransport } from "./create.native";
 import { oauthCredentialKey } from "./oauth-credentials";
 vi.mock("@/device-access/secret-storage", () =>
@@ -15,8 +17,25 @@ vi.mock("expo-secure-store", () => ({
     secrets.set(key, value);
   },
 }));
-vi.mock("expo-crypto", () => ({}));
-vi.mock("expo-web-browser", () => ({}));
+vi.mock("expo-crypto", () => ({
+  getRandomBytes: (size: number) => randomBytes(size),
+  CryptoDigestAlgorithm: { SHA256: "sha256" },
+  digest: async (_algorithm: string, input: Uint8Array) =>
+    createHash("sha256").update(input).digest(),
+}));
+vi.mock("expo-linking", () => ({ createURL: () => "clisbot://hub-auth/callback" }));
+vi.mock("expo-web-browser", () => ({
+  openAuthSessionAsync: vi.fn(async (url: string) => {
+    const authorization = new URL(url);
+    const callback = new URL(authorization.searchParams.get("redirect_uri")!);
+    callback.search = new URLSearchParams({
+      code: "one-use-code",
+      state: authorization.searchParams.get("state")!,
+      iss: authorization.origin,
+    }).toString();
+    return { type: "success", url: callback.href };
+  }),
+}));
 const work = "https://work.vexere.net";
 const collision = "https://49ob81c.attacker.test";
 const fetch = vi.fn();
@@ -41,6 +60,23 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetch);
 });
 afterEach(() => vi.unstubAllGlobals());
+
+test("native sign-in encodes PKCE with the Metro polyfill and connects using the grant", async () => {
+  const transport = createHubTransport({ origin: work });
+  await transport.signIn?.();
+  const authorization = new URL(vi.mocked(WebBrowser.openAuthSessionAsync).mock.calls.at(-1)![0]);
+  const body = fetch.mock.calls[0]![1].body as URLSearchParams;
+  expect(body.get("resource")).toBe(work);
+  expect(body.get("redirect_uri")).toBe("clisbot://hub-auth/callback");
+  expect(authorization.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  expect(body.get("code_verifier")).toMatch(/^[A-Za-z0-9_-]{64}$/);
+  expect(createHash("sha256").update(body.get("code_verifier")!).digest("base64url")).toBe(
+    authorization.searchParams.get("code_challenge"),
+  );
+  expect(await (await transport.request("/api/auth/clisbot/state")).json()).toEqual({
+    authorization: `Bearer access:${work}`,
+  });
+});
 
 test("neither colliding Hub reuses the ambiguous legacy native token", async () => {
   secrets.set("clisbot.hub.3b133fb1.refresh", "legacy-work-secret");

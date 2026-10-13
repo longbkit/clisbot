@@ -1,4 +1,3 @@
-import { Buffer } from "buffer";
 import * as Crypto from "expo-crypto";
 import { oauthCredentialKey, parseOAuthCredential } from "./oauth-credentials";
 import { readSecret, writeSecret, deleteSecret, lockSecret } from "@/device-access/secret-storage";
@@ -6,6 +5,7 @@ import { i18n } from "@/i18n/i18next";
 import type { HubRequestInput, HubTransport } from "./contract";
 import {
   authorizationCodeFromCallback,
+  encodeBase64Url,
   oauthAuthorizeUrl,
   OAuthTokenResponseSchema,
   tokenRequestBody,
@@ -42,17 +42,17 @@ export class BrowserOAuthHubTransport implements HubTransport {
       throw new Error(i18n.t("hub.account.signIn.officialWebRequired"));
     const popup = window.open("about:blank", "_blank", "popup,width=560,height=760");
     if (!popup) throw new Error(i18n.t("hub.account.signIn.allowPopups"));
-    const verifier = Buffer.from(Crypto.getRandomBytes(48)).toString("base64url");
-    const state = Buffer.from(Crypto.getRandomBytes(32)).toString("base64url");
+    const verifier = encodeBase64Url(Crypto.getRandomBytes(48));
+    const state = encodeBase64Url(Crypto.getRandomBytes(32));
     const waiting = waitForCallback(popup, state);
     // Install the receiver before navigating. The callback contains a one-use PKCE code only.
     try {
-      const challenge = Buffer.from(
+      const challenge = encodeBase64Url(
         await Crypto.digest(
           Crypto.CryptoDigestAlgorithm.SHA256,
           new TextEncoder().encode(verifier),
         ),
-      ).toString("base64url");
+      );
       popup.location.href = oauthAuthorizeUrl({
         origin: this.origin,
         redirectUri: CALLBACK,

@@ -195,6 +195,9 @@ const TEAM_AUTH_MUTATION_PATHS = new Set([
 ]);
 
 export function createAuthServer(options: AuthServerOptions): AuthServer {
+  // Hub clients and discovery identify the resource by origin. Startup serializes
+  // baseURL with a trailing slash, which is a different OAuth audience string.
+  const oauthOrigin = new URL(options.baseURL).origin;
   const database = options.database.drizzle();
   const passwordRecovery = new MasterPasswordReset(
     options.database,
@@ -299,13 +302,13 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     plugins: [
       clisbotOrganizationPlugin(),
       jwt({
-        jwt: { issuer: options.baseURL, audience: options.baseURL },
+        jwt: { issuer: oauthOrigin, audience: oauthOrigin },
       }),
       oauthProvider({
         loginPage: "/",
         consentPage: "/",
         scopes: [...HUB_AUTHORIZATION_SCOPES],
-        validAudiences: [options.baseURL],
+        validAudiences: [oauthOrigin],
         cachedTrustedClients: new Set([CLISBOT_CLIENT_ID]),
         grantTypes: ["authorization_code", "refresh_token"],
         accessTokenExpiresIn: 300,
@@ -369,8 +372,8 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           // The resource client defaults to /jwks; Hub auth is mounted under /api/auth.
           jwksUrl: new URL("/api/auth/jwks", options.baseURL).href,
           verifyOptions: {
-            audience: options.baseURL,
-            issuer: options.baseURL,
+            audience: oauthOrigin,
+            issuer: oauthOrigin,
           },
           scopes: [HUB_ACCESS_SCOPE],
         });

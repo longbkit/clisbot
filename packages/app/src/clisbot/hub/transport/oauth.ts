@@ -1,8 +1,18 @@
 import { z } from "zod";
+import { Buffer } from "buffer";
 import { i18n } from "@/i18n/i18next";
 
 export const CLISBOT_CLIENT_ID = "clisbot-client";
 export const HUB_ACCESS_SCOPE = "hub:access";
+
+/** Metro's Buffer supports base64, but not Node's base64url encoding name. */
+export function encodeBase64Url(bytes: Uint8Array | ArrayBuffer): string {
+  return Buffer.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
 
 export const OAuthTokenResponseSchema = z.object({
   access_token: z.string().min(1),

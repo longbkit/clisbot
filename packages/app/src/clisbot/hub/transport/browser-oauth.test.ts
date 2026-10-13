@@ -1,3 +1,4 @@
+import { Buffer as AppBuffer } from "buffer";
 import { createHash, randomBytes } from "node:crypto";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { BrowserOAuthHubTransport } from "./browser-oauth";
@@ -24,6 +25,9 @@ vi.mock("expo-crypto", () => ({
 }));
 
 const callback = "https://app.clisbot.com/hub-auth-callback";
+test("uses Metro Buffer without Node-only encodings", () => {
+  expect(() => AppBuffer.from([255]).toString("base64url")).toThrow("Unknown encoding");
+});
 const windows: { location: { href: string }; close: ReturnType<typeof vi.fn>; closed: boolean }[] =
   [];
 const channels: TestChannel[] = [];

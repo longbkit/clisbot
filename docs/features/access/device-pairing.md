@@ -22,6 +22,11 @@ does not require enabling `CLISBOT_HUB_DEVICE_PAIRING` or migrating those record
 - **Add Hub:** the app first reads public `/api/auth/clisbot/connection`. A Hub without protected
   device admission advertises `{ authentication: "oauth", issuer: "<Hub origin>" }`. The issuer
   must exactly match the entered origin. Older/protected Hubs fall back to device discovery.
+- **OAuth resource identity:** discovery, token `resource`, JWT issuer/audience and bearer
+  verification use the Hub's URL origin, without a trailing slash. The runtime's serialized
+  application base URL may end in `/`; it must not become a different OAuth resource string.
+  Web/native PKCE uses unpadded base64url bytes via the app's Buffer polyfill, not Node-only
+  encoding names. The browser may separately require local-network permission for private routes.
 - **Sign in from app:** web, native and desktop open that Hub's existing OAuth authorization
   endpoint. The Hub reuses its browser session or presents its own login, including its own
   Google configuration. Clisbot receives a one-use authorization code with PKCE and checks
@@ -72,6 +77,9 @@ login, cookie reuse, PKCE exchange, refresh and re-login against the real auth/d
 with Google's remote token response simulated. App tests cover mixed account/paired inventory,
 issuer isolation, reload, sign-out and callback rejection. This does not certify a production
 Google consent round trip; verify that after deploying the Hub and app.
+
+The [2026-10-13 follow-up](../../audits/2026-10-13-remote-hub-auth-followup.md) records the
+production failures, regression coverage and pending deployment validation for these boundaries.
 
 ## Decisions
 

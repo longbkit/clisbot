@@ -1,4 +1,3 @@
-import { Buffer } from "buffer";
 import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import { readSecret, writeSecret, deleteSecret, lockSecret } from "@/device-access/secret-storage";
@@ -8,6 +7,7 @@ import type { HubConfiguration } from "../config";
 import type { HubRequestInput, HubTransport } from "./contract";
 import {
   authorizationCodeFromCallback,
+  encodeBase64Url,
   oauthAuthorizeUrl,
   OAuthTokenResponseSchema,
   CLISBOT_CLIENT_ID,
@@ -52,13 +52,13 @@ class NativeHubTransport implements HubTransport {
     _input?: { email: string; password: string },
     context?: { invitationId?: string },
   ): Promise<void> {
-    const verifier = Buffer.from(Crypto.getRandomBytes(48)).toString("base64url");
+    const verifier = encodeBase64Url(Crypto.getRandomBytes(48));
     const challengeBytes = await Crypto.digest(
       Crypto.CryptoDigestAlgorithm.SHA256,
       new TextEncoder().encode(verifier),
     );
-    const challenge = Buffer.from(challengeBytes).toString("base64url");
-    const state = Buffer.from(Crypto.getRandomBytes(32)).toString("base64url");
+    const challenge = encodeBase64Url(challengeBytes);
+    const state = encodeBase64Url(Crypto.getRandomBytes(32));
     const redirectUri = Linking.createURL("hub-auth/callback");
     const result = await WebBrowser.openAuthSessionAsync(
       oauthAuthorizeUrl({

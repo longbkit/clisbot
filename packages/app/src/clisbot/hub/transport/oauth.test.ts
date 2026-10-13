@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import {
   authorizationCodeFromCallback,
+  encodeBase64Url,
   HUB_ACCESS_SCOPE,
   oauthAuthorizeUrl,
   CLISBOT_CLIENT_ID,
@@ -8,6 +10,16 @@ import {
 } from "./oauth";
 
 describe("Hub OAuth client contract", () => {
+  it("encodes S256 PKCE bytes with URL-safe characters and no padding", () => {
+    // RFC 7636 Appendix B's verifier and expected S256 challenge.
+    const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+    const digest = new Uint8Array(createHash("sha256").update(verifier).digest());
+    for (const bytes of [digest, digest.buffer]) {
+      expect(encodeBase64Url(bytes)).toBe("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+    expect(encodeBase64Url(new Uint8Array([251, 255]))).toBe("-_8");
+  });
+
   it("builds a public-client authorization request with S256 PKCE", () => {
     const url = new URL(
       oauthAuthorizeUrl({

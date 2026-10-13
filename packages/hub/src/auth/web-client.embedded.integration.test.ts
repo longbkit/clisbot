@@ -11,6 +11,7 @@ import { composeEntitlements } from "./entitlements.js";
 import { createDatabase } from "../db/pg.js";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntime } from "../db/runtime/index.js";
+import { createRuntimeConfiguration } from "../runtime-configuration/index.js";
 import {
   HUB_WEB_CLIENT_CALLBACK,
   HUB_WEB_CLIENT_ORIGIN,
@@ -41,11 +42,22 @@ beforeAll(async () => {
   runtime = bundle.runtime;
   await runtime.migrate();
   const database = createDatabase(runtime, bundle.locks, createTestCredentialCipher());
+  // Exercise the same URL serialization as Hub startup: a bare origin becomes
+  // a base URL with a trailing slash, while OAuth clients send the origin.
+  const configuration = createRuntimeConfiguration({
+    database: runtime,
+    environment: { appUrl: origin },
+    effectivePort: address.port,
+    randomBytes,
+    credentialCipher: createTestCredentialCipher(),
+  });
+  const baseURL = await configuration.publicUrl();
+  expect(baseURL).toBe(`${origin}/`);
   auth = createAuthServer({
     database: runtime,
     locks: bundle.locks,
     entitlements: composeEntitlements(database, runtime).service,
-    baseURL: origin,
+    baseURL,
     secret: "web-client-test-secret-at-least-32-characters",
     google: { clientId: "this-hubs-google-client", clientSecret: "this-hubs-google-secret" },
   });
@@ -255,6 +267,58 @@ it("sends signed-out users to this Hub and refuses an unregistered callback", as
   expect(error.origin).toBe(origin);
   expect(error.searchParams.get("error")).toBeTruthy();
   expect(error.searchParams.has("code")).toBe(false);
+});
+
+it.each(["http://127.0.0.1:49152/hub-auth/callback", "clisbot://hub-auth/callback"])(
+  "exchanges and refreshes a PKCE grant for %s",
+  async (redirectUri) => {
+    const { response, verifier } = await authorize(redirectUri);
+    const callback = new URL(response.headers.get("location")!);
+    expect(callback.searchParams.get("iss")).toBe(origin);
+    const body = {
+      grant_type: "authorization_code",
+      code: callback.searchParams.get("code")!,
+      code_verifier: verifier,
+      redirect_uri: redirectUri,
+    };
+    const exchanged = await token(body);
+    expect(exchanged.status).toBe(200);
+    const credentials = z
+      .object({ access_token: z.string(), refresh_token: z.string() })
+      .parse(await exchanged.json());
+    expect(
+      await (await appRequest(credentials.access_token, "/api/auth/clisbot/state")).json(),
+    ).toMatchObject({ status: "active" });
+    expect((await token(body)).status).toBe(401);
+    const refreshed = await token({
+      grant_type: "refresh_token",
+      refresh_token: credentials.refresh_token,
+    });
+    expect(refreshed.status).toBe(200);
+    const renewed = z.object({ access_token: z.string() }).parse(await refreshed.json());
+    expect(
+      await (await appRequest(renewed.access_token, "/api/auth/clisbot/state")).json(),
+    ).toMatchObject({ status: "active" });
+  },
+);
+
+it.each([
+  { resource: "https://other-hub.example.test" },
+  { resource: "https://other-hub.example.test/" },
+  { code_verifier: "wrong-verifier" },
+  { redirect_uri: "clisbot://hub-auth/callback" },
+])("still rejects an invalid grant field: %j", async (override) => {
+  const { response, verifier } = await authorize();
+  const callback = new URL(response.headers.get("location")!);
+  const rejected = await token({
+    grant_type: "authorization_code",
+    code: callback.searchParams.get("code")!,
+    code_verifier: verifier,
+    redirect_uri: HUB_WEB_CLIENT_CALLBACK,
+    ...override,
+  });
+  expect(rejected.status).toBe("code_verifier" in override ? 401 : 400);
+  expect(await rejected.json()).toMatchObject({ error: "invalid_request" });
 });
 
 async function appCredentials() {
