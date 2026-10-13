@@ -58,9 +58,8 @@ import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
-import { SidebarMenuToggle } from "@/components/headers/menu-header";
+import { MenuHeader } from "@/components/headers/menu-header";
 import { HomeHeader } from "@/clisbot/home/home-header";
-import { ScreenHeader } from "@/components/headers/screen-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
@@ -1872,7 +1871,7 @@ export function NewWorkspaceScreen({
     [terminalComposerValue],
   );
   const terminalTextReplacement = useMemo(
-    () => ({ key: launchFocusKey, text: terminalComposerValue }),
+    () => ({ kind: "replace" as const, key: launchFocusKey, text: terminalComposerValue }),
     [launchFocusKey, terminalComposerValue],
   );
 
@@ -2848,7 +2847,6 @@ export function NewWorkspaceScreen({
     },
   });
 
-  const screenHeaderLeft = useMemo(() => <SidebarMenuToggle />, []);
   const importSession = useImportSession({ serverId: selectedServerId });
 
   const composer = useMemo(
@@ -2963,7 +2961,7 @@ export function NewWorkspaceScreen({
   if (!focused) return null;
   return (
     <FileDropZone style={styles.container}>
-      <StartScreenHeader home={home} left={screenHeaderLeft} />
+      <StartScreenHeader home={home} />
       <View style={styles.content}>
         {HOME_V2_ENABLED ? (
           <HomeStartLayout
@@ -3008,9 +3006,9 @@ function startPicker<T>(home: T, legacy: T): T {
   return HOME_V2_ENABLED ? home : legacy;
 }
 
-function StartScreenHeader({ home, left }: { home: boolean; left: ReactNode }) {
+function StartScreenHeader({ home }: { home: boolean }) {
   if (HOME_V2_ENABLED && home) return <HomeHeader />;
-  return <ScreenHeader left={left} borderless />;
+  return <MenuHeader borderless />;
 }
 
 function startTitle(home: boolean, t: TFunction): string {

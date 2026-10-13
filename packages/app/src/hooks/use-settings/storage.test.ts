@@ -804,17 +804,19 @@ describe("appearance settings", () => {
     expect(result.contentFontSize).toBe(DEFAULT_UI_BASE_FONT_SIZE);
     expect(result.codeFontSize).toBe(DEFAULT_CODE_FONT_SIZE);
     expect(result.syntaxTheme).toBe("one");
-    expect(result.toolCallDetailLevel).toBe("detailed");
+    expect(result.toolCallDetailLevel).toBe("summary-with-latest-call");
   });
 
-  it("migrates the enabled compact tool call preference to overview", async () => {
+  it("upgrades the legacy compact tool call preference to the new default", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({
         [APP_SETTINGS_KEY]: JSON.stringify({ compactToolCalls: true }),
       }),
     });
 
-    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe("overview");
+    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(
+      "summary-with-latest-call",
+    );
   });
 
   it("clears settings with an unrecognized tool call detail level", async () => {
@@ -824,7 +826,9 @@ describe("appearance settings", () => {
       }),
     });
 
-    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe("detailed");
+    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(
+      "summary-with-latest-call",
+    );
   });
 
   it("migrates a switched-off checks row item to the hidden checks display", async () => {
@@ -1117,5 +1121,49 @@ describe("content max width", () => {
     expect((await load(100_000)).contentMaxWidth).toBe(4000);
     expect((await load(10)).contentMaxWidth).toBe(600);
     expect((await load("wide")).contentMaxWidth).toBeNull();
+  });
+});
+
+describe("latest-call settings across loads", () => {
+  it.each([
+    {},
+    { toolCallDetailLevel: "overview" },
+    { toolCallDetailLevel: "detailed" },
+    { toolCallDetailLevel: "concise" },
+    { compactToolCalls: true },
+    { compactToolCalls: false },
+    { toolCallDetailLevel: "invalid" },
+    { toolCallDetailLevel: "summary-with-latest-call" },
+  ])("upgrades %j and preserves subsequent selections and unrelated fields", async (preference) => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          ...preference,
+          theme: "dark",
+          futureSetting: { enabled: true },
+          sidebarRowItems: { futureRow: false },
+          toolCallDisplay: "hidden",
+        }),
+      }),
+    });
+    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(
+      "summary-with-latest-call",
+    );
+    const queryClient = new QueryClient();
+    for (const selection of ["overview", "detailed", "summary-with-latest-call"] as const) {
+      await saveAppSettings({ queryClient, deps, updates: { toolCallDetailLevel: selection } });
+      expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(selection);
+      expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toMatchObject({
+        theme: "dark",
+        futureSetting: { enabled: true },
+        sidebarRowItems: { futureRow: false },
+        toolCallDisplay: "hidden",
+      });
+    }
+  });
+  it("uses the new default on a fresh install", async () => {
+    expect((await loadAppSettingsFromStorage(makeDeps())).toolCallDetailLevel).toBe(
+      "summary-with-latest-call",
+    );
   });
 });

@@ -10,10 +10,7 @@ import {
 import { isNative } from "@/constants/platform";
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
 
-const TOOL_CALL_DETAIL_LEVELS: readonly AppSettings["toolCallDetailLevel"][] = [
-  "detailed",
-  "overview",
-];
+import { TOOL_CALL_DETAIL_LEVELS } from "@/hooks/use-settings/storage";
 
 export function ChatSection() {
   const { t } = useTranslation();

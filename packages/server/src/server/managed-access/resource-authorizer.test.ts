@@ -1214,3 +1214,32 @@ describe("Project creation and Add project folder search", () => {
     expect(visible.map((entry) => entry.path)).toEqual(["/free/app", "/free", "/"]);
   });
 });
+
+describe("managed caller provenance", () => {
+  it.each(["agent-a", "agent-b", "missing-agent"])(
+    "checks caller %s before creation can inherit workspace state or provenance",
+    async (callerAgentId) => {
+      const authorizer = createHarness(["project.use", "agent.create", "workspace.create"]);
+      const expected = callerAgentId === "agent-a";
+      await expect(
+        authorizer.allowsInbound({
+          type: "create_agent_request",
+          requestId: "caller-agent",
+          projectId: "project-a",
+          workspaceId: "workspace-a",
+          callerAgentId,
+          config: { provider: "codex", cwd: "/work/a", model: "gpt-5.6", thinkingOptionId: "high" },
+          labels: {},
+        }),
+      ).resolves.toBe(expected);
+      await expect(
+        authorizer.allowsInbound({
+          type: "workspace.create.request",
+          requestId: "caller-workspace",
+          callerAgentId,
+          source: { kind: "directory", projectId: "project-a", path: "/work/a" },
+        }),
+      ).resolves.toBe(expected);
+    },
+  );
+});

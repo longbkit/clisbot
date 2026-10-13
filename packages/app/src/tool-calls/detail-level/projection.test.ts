@@ -63,7 +63,7 @@ function project(input: {
 }
 
 describe("tool call detail-level projection", () => {
-  it.each(["detailed", "overview"] as const)(
+  it.each(["detailed", "overview", "summary-with-latest-call"] as const)(
     "keeps pending approval tools out of %s presentation without removing their canonical position",
     (level) => {
       const pending = toolCall(
@@ -482,5 +482,91 @@ describe("tool call detail-level projection", () => {
     expect(result.head).toEqual([singleCall, plan, speak]);
     expect(result.groupsByHostId.get(singleCall.id)?.run.calls).toEqual([singleCall]);
     expect(result.groupsByHostId.size).toBe(1);
+  });
+});
+
+describe("summary with latest call", () => {
+  const level = "summary-with-latest-call" as const;
+  it("replaces the latest preview while retaining history and stable host across live updates", () => {
+    const first = toolCall("1", { type: "shell", command: "first" });
+    const running = toolCall(
+      "2",
+      { type: "shell", command: "long command" },
+      { status: "running" },
+    );
+    const single = project({ level, tail: [first], isTurnActive: true });
+    expect(single.groupsByHostId.get("1")).toMatchObject({
+      mode: level,
+      run: { calls: [first], latest: first },
+      isLoading: false,
+      failedCount: 0,
+    });
+    const live = project({ level, tail: [first], head: [running], isTurnActive: true });
+    expect(live.tail.map((item) => item.id)).toEqual(["1"]);
+    expect(live.head).toEqual([]);
+    expect(live.historyGroupUpdatesByHostId.get("1")).toMatchObject({
+      run: { calls: [first, running], latest: running, isSealed: false },
+      isLoading: true,
+      failedCount: 0,
+    });
+    const failed = toolCall("2", { type: "shell", command: "long command" }, { status: "failed" });
+    const ended = project({ level, tail: [first, failed] });
+    expect(ended.groupsByHostId.get("1")).toMatchObject({
+      run: { calls: [first, failed], latest: failed, isSealed: true },
+      isLoading: false,
+      failedCount: 1,
+    });
+  });
+  it("uses exactly the overview grouping and keeps non-tool content and turn boundaries in place", () => {
+    const first = toolCall("1", { type: "shell", command: "first" });
+    const second = toolCall("2", { type: "shell", command: "second" });
+    const text = assistant("intermediate text");
+    const reasoning = {
+      kind: "thought",
+      status: "ready",
+      id: "reasoning",
+      text: "thinking",
+      timestamp: new Date(),
+    } satisfies StreamItem;
+    const prompt = {
+      kind: "user_message",
+      id: "prompt",
+      text: "next turn",
+      attachments: [
+        {
+          type: "text",
+          mimeType: "text/plain",
+          title: "Attached context",
+          text: "Preserve this attachment",
+        },
+      ],
+      timestamp: new Date(),
+    } satisfies StreamItem;
+    const later = toolCall("3", { type: "shell", command: "next-turn" });
+    const tail = [first, second, text, reasoning, prompt, later];
+    const overview = project({ level: "overview", tail });
+    const latest = project({ level, tail });
+    expect(latest.tail).toEqual(overview.tail);
+    expect(latest.head).toEqual(overview.head);
+    expect(latest.groupsByHostId.size).toBe(overview.groupsByHostId.size);
+    expect(latest.tail).toEqual([
+      expect.objectContaining({ id: first.id }),
+      text,
+      reasoning,
+      prompt,
+      later,
+    ]);
+    for (const id of [first.id, later.id]) {
+      expect(latest.groupsByHostId.get(id)?.run).toEqual(overview.groupsByHostId.get(id)?.run);
+    }
+  });
+  it("reports errors and loading independently when parallel calls finish out of order", () => {
+    const running = toolCall("1", { type: "shell", command: "slow" }, { status: "running" });
+    const failed = toolCall("2", { type: "read", filePath: "/repo/missing" }, { status: "failed" });
+    expect(project({ level, head: [running, failed] }).groupsByHostId.get("1")).toMatchObject({
+      isLoading: true,
+      failedCount: 1,
+      run: { latest: failed },
+    });
   });
 });

@@ -163,6 +163,10 @@ test("measures an overview heading that becomes loading after its idle mount", a
       "@clisbot:app-settings",
       JSON.stringify({ toolCallDetailLevel: "overview" }),
     );
+    localStorage.setItem(
+      "@clisbot:settings-migrations",
+      JSON.stringify({ applied: ["summary-with-latest-call-default"] }),
+    );
   });
   const agent = await seedMockAgentWorkspace({
     repoPrefix: "tool-call-shimmer-",

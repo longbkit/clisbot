@@ -137,7 +137,6 @@ export class BotSessions {
         cwd: bot.cwd,
         workspaceId: bot.workspaceId,
         labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
-        background: true,
         notifyOnFinish: false,
         promptFailure: "throw",
       }),

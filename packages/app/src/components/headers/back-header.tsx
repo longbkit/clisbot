@@ -6,6 +6,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ArrowLeft } from "lucide-react-native";
 import { ScreenHeader } from "./screen-header";
 import { ScreenTitle } from "./screen-title";
+import { CompactHeader } from "./compact-header";
+import { useIsCompactFormFactor } from "@/constants/layout";
 
 interface BackHeaderProps {
   title?: string;
@@ -19,6 +21,29 @@ function goBack(): void {
 }
 
 export function BackHeader({ title, titleAccessory, rightContent, onBack }: BackHeaderProps) {
+  const isCompact = useIsCompactFormFactor();
+  if (isCompact) {
+    return (
+      <CompactHeader
+        navigation="back"
+        title={title}
+        titleAccessory={titleAccessory}
+        onBack={onBack}
+        actions={rightContent}
+      />
+    );
+  }
+  return (
+    <DesktopBackHeader
+      title={title}
+      titleAccessory={titleAccessory}
+      rightContent={rightContent}
+      onBack={onBack}
+    />
+  );
+}
+
+function DesktopBackHeader({ title, titleAccessory, rightContent, onBack }: BackHeaderProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const handleBack = useCallback(() => {
@@ -56,10 +81,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
   backButton: {
-    padding: {
-      xs: theme.spacing[3],
-      md: theme.spacing[2],
-    },
+    padding: theme.spacing[2],
     borderRadius: theme.borderRadius.lg,
   },
 }));

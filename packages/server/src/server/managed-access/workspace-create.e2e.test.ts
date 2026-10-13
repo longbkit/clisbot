@@ -1,3 +1,5 @@
+import { CreationService } from "../creation/index.js";
+import { MessageReceipts } from "../message-receipts/index.js";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -75,6 +77,8 @@ test("Project authority creates a real worktree then an Agent without Project ad
     },
     logger,
     clisbotHome: daemon.clisbotHome,
+    creationService: new CreationService(path.join(root, "creation-receipts"), logger),
+    messageReceipts: new MessageReceipts(path.join(root, "message-receipts")),
     onMessage: (message) => messages.push(message),
     downloadTokenStore: createStub<SessionOptions["downloadTokenStore"]>({}),
     pushNotifications: createStub<SessionOptions["pushNotifications"]>({}),

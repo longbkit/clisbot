@@ -52,6 +52,8 @@ const readmeSections = new Map([
         "Run agents in parallel on your own machines. Ship from your phone or your desk.",
       upstreamIntro:
         "Clisbot is a desktop, mobile, web, and CLI app for coding agents. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.",
+      latestUpstreamIntro:
+        "Clisbot is an open source agentic development environment for desktop, mobile, web, and CLI. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.",
       intermediateIntro:
         "Your AI coworker for projects and a personal bot for everyday life. Bring Clisbot into the chat apps and conversation channels you use, from your laptop or on the go.",
       previousProviderBullet:
@@ -624,6 +626,7 @@ function replaceReadmeIntro(path, config, input) {
     `${config.previousCoworkIntro}\n\n${config.previousBotIntro}`,
     config.previousIntro,
     config.upstreamIntro,
+    config.latestUpstreamIntro,
     config.intermediateIntro,
     config.previousBotIntro,
   ]

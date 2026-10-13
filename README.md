@@ -47,7 +47,7 @@
 
 - **Parallel agents:** Run many agents at once, each in its own worktree.
 - **Built-in orchestration:** Agents in Clisbot can create worktrees, launch other agents, and talk to them, across providers.
-- **Full IDE:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
+- **Complete development workflow:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
 - **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
 - **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 38 ACP catalog presets including Grok. Pick the model for each task.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.

@@ -478,7 +478,6 @@ function ProviderApplicationSheet({
       footer={footer}
       onClose={close}
       desktopMaxWidth={520}
-      sizeContentToCurrentSnapPoint
     >
       <View style={styles.form}>
         {state.mode === "create" ? (

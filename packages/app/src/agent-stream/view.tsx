@@ -83,6 +83,7 @@ import { ToolCallDetailsContent } from "@/components/tool-call-details";
 import { QuestionFormCard } from "@/components/question-form-card";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { createStreamPresentation, getStreamItemMessageId } from "./presentation";
+import { LatestCallToolCallGroupView } from "@/tool-calls/detail-level/latest-call/view";
 import { OverviewToolCallGroupView } from "@/tool-calls/detail-level/overview/view";
 import { type AgentStreamRenderModel, buildAgentStreamRenderModel } from "./model";
 import { resolveStreamRenderStrategy } from "./strategy-resolver";
@@ -952,6 +953,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                 detail={data.detail}
                 cwd={context.cwd}
                 metadata={data.metadata}
+                agentMessage={data.agentMessage}
                 isLastInSequence={isLastInSequence}
                 onOpenFilePath={handleToolCallOpenFile}
                 maxDetailHeight={maxDetailHeight}
@@ -1004,28 +1006,31 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           return renderSingleToolCallItem(item, layoutItem.isLastInToolSequence);
         }
         const expanded = expandedToolCallGroupIds.has(group.run.id);
-        return (
-          <OverviewToolCallGroupView
-            group={group}
-            expanded={expanded}
-            isLastInSequence={layoutItem.isLastInToolSequence}
-            onExpandedChange={setToolCallGroupExpanded}
-          >
-            {expanded
-              ? group.run.calls.map((call, index) => (
-                  <React.Fragment key={call.id}>
-                    {renderSingleToolCallItem(
-                      call,
-                      index === group.run.calls.length - 1,
-                      GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
-                    )}
-                  </React.Fragment>
-                ))
-              : null}
-          </OverviewToolCallGroupView>
+        const children = expanded
+          ? group.run.calls.map((call, index) => (
+              <React.Fragment key={call.id}>
+                {renderSingleToolCallItem(
+                  call,
+                  index === group.run.calls.length - 1,
+                  GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
+                )}
+              </React.Fragment>
+            ))
+          : null;
+        const props = {
+          expanded,
+          isLastInSequence: layoutItem.isLastInToolSequence,
+          onExpandedChange: setToolCallGroupExpanded,
+          children,
+        };
+        return group.mode === "overview" ? (
+          <OverviewToolCallGroupView group={group} {...props} />
+        ) : (
+          <LatestCallToolCallGroupView group={group} cwd={context.cwd} {...props} />
         );
       },
       [
+        context.cwd,
         expandedToolCallGroupIds,
         getToolCallGroup,
         renderSingleToolCallItem,

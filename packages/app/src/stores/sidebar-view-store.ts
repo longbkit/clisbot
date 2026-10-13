@@ -81,6 +81,7 @@ export type SidebarGroupModeUsage = Partial<Record<SidebarGroupMode, number>>;
 interface SidebarViewStoreState {
   groupMode: SidebarGroupMode;
   groupModeUsage: SidebarGroupModeUsage;
+  showBackground: boolean;
   // Empty means "all hosts". A non-empty list pins the sidebar to those hosts.
   hostFilters: string[];
   /**
@@ -101,6 +102,7 @@ interface SidebarViewStoreState {
   clearUserFilters: () => void;
   toggleChannelFilter: (key: string) => void;
   clearChannelFilters: () => void;
+  toggleBackground: () => void;
   setGroupMode: (mode: SidebarGroupMode) => void;
   toggleHostFilter: (serverId: string) => void;
   pinHostFilter: (serverId: string) => void;
@@ -117,6 +119,7 @@ interface SidebarViewStoreState {
 interface SidebarViewPersistedState {
   groupMode: SidebarGroupMode;
   groupModeUsage?: SidebarGroupModeUsage;
+  showBackground: boolean;
   hostFilters: string[];
   projectFilters: string[];
   labelFilter: SidebarLabelFilter;
@@ -137,6 +140,7 @@ const SidebarLabelFilterSchema = z.object({
   labels: z.array(z.string()),
 });
 const SidebarViewPersistedStateSchema = z.strictObject({
+  showBackground: z.boolean().optional(),
   groupMode: PersistedSidebarGroupModeSchema.optional(),
   groupModeUsage: z.record(z.string(), z.number()).optional(),
   hostFilters: z.array(z.string()).optional(),
@@ -178,6 +182,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   const result = SidebarViewPersistedStateSchema.safeParse(persistedState);
   if (!result.success) {
     return {
+      showBackground: false,
       groupMode: "project",
       hostFilters: [],
       projectFilters: [],
@@ -191,6 +196,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   const legacyGroupMode = readLegacyGroupMode(state);
   if (legacyGroupMode) {
     return {
+      showBackground: false,
       groupMode: legacyGroupMode,
       hostFilters: [],
       projectFilters: [],
@@ -201,6 +207,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   }
 
   return {
+    showBackground: state.showBackground ?? false,
     // The retired `label` mode reads as project, as it always has.
     groupMode: !state.groupMode || state.groupMode === "label" ? "project" : state.groupMode,
     hostFilters: readHostFilters(state),
@@ -241,11 +248,13 @@ export function createSidebarViewStorage(
 export const useSidebarViewStore = create<SidebarViewStoreState>()(
   persist(
     (set) => ({
+      showBackground: false,
       groupMode: "project",
       groupModeUsage: {},
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
+      toggleBackground: () => set((state) => ({ showBackground: !state.showBackground })),
       userFilters: [],
       channelFilters: [],
       toggleUserFilter: (key) =>
@@ -320,6 +329,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
         SidebarViewPersistedStateSchema,
       ),
       partialize: (state) => ({
+        showBackground: state.showBackground ?? false,
         groupMode: state.groupMode,
         groupModeUsage: state.groupModeUsage,
         hostFilters: state.hostFilters,

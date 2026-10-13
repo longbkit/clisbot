@@ -142,6 +142,7 @@ export function toAgentPayload(
     persistence: projectPersistenceHandleForWire(agent.persistence),
     title: options?.title ?? null,
     labels: agent.labels,
+    ...(agent.internal ? { internal: true } : {}),
   };
 
   const usage = sanitizeUsage(agent.lastUsage);
@@ -251,7 +252,9 @@ export function buildStoredAgentPayload(
     attentionReason: record.attentionReason ?? null,
     attentionTimestamp: record.attentionTimestamp ?? null,
     archivedAt: record.archivedAt ?? null,
+    ...(record.internal ? { internal: true } : {}),
     labels: normalizeLabels(record.labels),
+    ...(typeof record.lastError === "string" ? { lastError: record.lastError } : {}),
     ...(providerAvailable ? {} : { providerUnavailable: true }),
   };
 }

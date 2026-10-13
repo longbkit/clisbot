@@ -18,6 +18,6 @@ node "$repo/scripts/rebrand-clisbot.mjs" --root "$target" --apply \
   --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807 ||
   echo "normalized-base: rename reported ignored destinations (expected); continuing" >&2
 node "$repo/scripts/branding/apply.mjs" --root "$target" --apply >/dev/null
-(cd "$target" && "$repo/node_modules/.bin/oxfmt" . >/dev/null)
+npm --prefix "$repo" run format:files -- "$target" >/dev/null
 git -c core.excludesFile=/dev/null -C "$target" add -A
 echo "normalized base ready: $target"

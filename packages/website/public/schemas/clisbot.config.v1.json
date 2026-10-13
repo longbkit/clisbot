@@ -44,6 +44,7 @@
           ]
         },
         "trustedProxies": {
+          "description": "Express trusted proxy setting for X-Forwarded-* headers. Defaults to [\"loopback\"]. Use true only when the final trusted proxy overwrites client-supplied forwarded headers.",
           "anyOf": [
             {
               "type": "boolean",
@@ -224,12 +225,15 @@
           "type": "object",
           "properties": {
             "enabled": {
+              "description": "Compatibility shim. false suppresses optional service proxy listen/public layers only; localhost proxying remains enabled.",
               "type": "boolean"
             },
             "listen": {
+              "description": "Optional service-only listener address. Presence enables the standalone service proxy listener.",
               "type": "string"
             },
             "publicBaseUrl": {
+              "description": "Optional public base URL for service host aliases.",
               "type": "string",
               "format": "uri"
             }
@@ -265,6 +269,15 @@
             },
             "root": {
               "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "connectors": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -338,6 +351,22 @@
         }
       },
       "additionalProperties": false
+    },
+    "pluginRegistries": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "authorization": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["authorization"]
+      }
     },
     "pluginsEnabled": {
       "type": "boolean"
@@ -431,6 +460,13 @@
                 "additionalProperties": {
                   "type": "string"
                 }
+              },
+              "options": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
               },
               "params": {
                 "type": "object",
@@ -643,6 +679,12 @@
     "features": {
       "type": "object",
       "properties": {
+        "devicePairing": {
+          "type": "boolean"
+        },
+        "personalServing": {
+          "type": "boolean"
+        },
         "agentSessionStorage": {
           "type": "boolean"
         },
@@ -757,6 +799,10 @@
             "distDir": {
               "type": "string",
               "minLength": 1
+            },
+            "hubProxyUrl": {
+              "type": "string",
+              "format": "uri"
             }
           },
           "additionalProperties": false

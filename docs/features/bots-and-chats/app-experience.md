@@ -163,6 +163,21 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   Nested files show their directory on the secondary line to distinguish duplicate filenames.
   Tab-type icons distinguish Messages, documents and changes without changing their names.
 
+### Agent session tool calls
+
+In an agent session, **Settings → Chat → Tool call display** offers **Summary**, **Full detail**,
+and **Summary with latest call** (**Tóm tắt kèm lệnh cuối** in Vietnamese). Summary keeps the
+aggregate activity description; Full detail shows individual calls. Summary with latest call
+shows a compact bar with the latest call's readable preview, a count, running shimmer and failure
+count. Expand it to inspect every call, inline on desktop or in a sheet on compact screens.
+It uses the same grouping as Summary, adding the latest call preview. Assistant text, reasoning,
+attachments and prompts stay in chronological order.
+
+Summary with latest call is the default for new installs. The first upgrade also switches existing
+preferences to it once, because stored defaults could not be distinguished from deliberate choices.
+After that upgrade, selecting Summary or Full detail sticks. This preference belongs to this app
+installation; it does not change the Bot or Group settings below.
+
 ### Tool calls
 
 A Bot's running turn can call dozens of tools. How a conversation shows them is a setting with

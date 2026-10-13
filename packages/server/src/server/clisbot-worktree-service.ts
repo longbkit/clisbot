@@ -33,6 +33,8 @@ export interface CreateClisbotWorktreeInput extends CreateWorktreeCoreInput {
   workspaceId?: string;
   projectId?: string;
   title?: string;
+  background?: boolean;
+  callerWorkspaceId?: string;
 }
 
 export interface CreateClisbotWorktreeResult {
@@ -101,6 +103,8 @@ async function createClisbotWorktreeWithPriority(
       baseBranch: createdWorktree.worktree.comparisonBaseRef,
       title: input.title?.trim() || resolveFirstAgentPromptTitle(input.firstAgentContext),
       expectsInitialAgent: Boolean(input.firstAgentContext),
+      background: input.background,
+      callerWorkspaceId: input.callerWorkspaceId,
       ...(createdWorktree.intent.kind === "checkout-change-request" &&
       createdWorktree.intent.headRepository
         ? {

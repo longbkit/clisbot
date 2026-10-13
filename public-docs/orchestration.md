@@ -48,12 +48,12 @@ See the [MCP reference](/docs/mcp) for tool configuration and the full catalog. 
 Agents with shell access can also use the Clisbot CLI. This route does not require enabling tool injection. With Clisbot installed, a running host, and Codex configured:
 
 ```bash
-clisbot run --provider codex --background \
+clisbot run --provider codex --no-wait \
   "Review this branch without changing files"
 clisbot ls -a
 ```
 
-The first command starts a worker and returns immediately; the second lists agents from active workspaces, including archived agents. When a Clisbot agent runs the command, the worker becomes its subagent in the same workspace. From your own terminal, it starts in a new local workspace.
+The first command starts a worker and returns immediately; the second lists archived and background agents as well. When a Clisbot agent runs the command, the worker becomes its subagent in the same workspace. From your own terminal, it starts in a new local workspace.
 
 See the [CLI reference](/docs/cli) for follow-ups, output, worktrees, and remote hosts.
 

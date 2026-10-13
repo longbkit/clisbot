@@ -65,6 +65,8 @@ linux:
   extraResources:
     - from: bin/clisbot
       to: bin/clisbot
+    - from: assets/icon.png
+      to: icon.png
   target:
     - AppImage
     - deb

@@ -3,9 +3,16 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { gotoAppShell } from "../support/helpers/app";
-import { seedWorkspace } from "../support/helpers/seed-client";
+import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
-import { closeSidebarDisplayPreferences } from "../support/helpers/sidebar";
+import {
+  closeSidebarDisplayPreferences,
+  selectSidebarGrouping,
+  openSidebarProjectFilter,
+  toggleProjectFilter,
+  selectAllProjectsFilter,
+} from "../support/helpers/sidebar";
+import { createTempGitRepo } from "../support/helpers/workspace";
 import { describeCompactTimeAgo } from "../../src/utils/time";
 
 // This is the app's rendered Show/Hide + user/channel filter + compact-time contract, not
@@ -391,6 +398,17 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     const b = await seedMeta("ui-meta-user-b-", "meta-b");
     const c = await seedMeta("ui-meta-user-c-", "meta-c");
     cleanups.push(a.cleanup, b.cleanup, c.cleanup);
+    const emptyRepo = await createTempGitRepo("ui-meta-empty-");
+    const emptyClient = await connectSeedClient();
+    const { project: emptyProject, error: emptyError } = await emptyClient.addProject(
+      emptyRepo.path,
+    );
+    expect(emptyError).toBeNull();
+    expect(emptyProject).not.toBeNull();
+    cleanups.push(async () => {
+      await emptyClient.close();
+      await emptyRepo.cleanup();
+    });
 
     const serverId = getServerId();
     const ids = {
@@ -405,6 +423,31 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     await expect(row(page, serverId, a.workspaceId)).toBeVisible({ timeout: 30_000 });
     await expect(row(page, serverId, b.workspaceId)).toBeVisible();
     await expect(row(page, serverId, c.workspaceId)).toBeVisible();
+
+    await selectSidebarGrouping(page, "project");
+    await closeSidebarDisplayPreferences(page);
+    const emptyHeader = page
+      .locator('[data-testid^="sidebar-project-row-"]')
+      .filter({ has: page.getByText(emptyProject!.projectDisplayName, { exact: true }) });
+    await expect(emptyHeader).toBeVisible();
+    // Hiding background workspaces also preserves truly empty projects.
+    const toggleBackground = async () => {
+      await page.getByTestId("sidebar-display-preferences-menu").click();
+      await settleOpenMenu(page);
+      await page.getByRole("menuitem", { name: "Show background", exact: true }).click();
+      await closeSidebarDisplayPreferences(page);
+    };
+    await toggleBackground();
+    await expect(emptyHeader).toBeVisible();
+    await toggleBackground();
+    // Selecting the empty project alone preserves its creation header.
+    await openSidebarProjectFilter(page);
+    await toggleProjectFilter(page, emptyProject!.projectKey!);
+    await closeSidebarDisplayPreferences(page);
+    await expect(emptyHeader).toBeVisible();
+    await openSidebarProjectFilter(page);
+    await selectAllProjectsFilter(page);
+    await closeSidebarDisplayPreferences(page);
 
     const openUserFilter = () => openSub(page, "sidebar-display-user-filter");
     const optionFor = (actor: Actor) =>
@@ -428,6 +471,11 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     await openUserFilter();
     await optionFor(alice).click();
     await closeSidebarDisplayPreferences(page);
+    await expect(emptyHeader).toHaveCount(0);
+    await toggleBackground();
+    await expect(emptyHeader).toHaveCount(0);
+    await toggleBackground();
+    await expect(emptyHeader).toHaveCount(0);
     await expect(row(page, serverId, a.workspaceId)).toBeVisible();
     await expect(row(page, serverId, b.workspaceId)).toHaveCount(0, { timeout: 10_000 });
     await expect(row(page, serverId, c.workspaceId)).toHaveCount(0);
@@ -465,6 +513,17 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     const b = await seedMeta("ui-meta-chan-b-", "meta-b");
     const c = await seedMeta("ui-meta-chan-c-", "meta-c");
     cleanups.push(a.cleanup, b.cleanup, c.cleanup);
+    const emptyRepo = await createTempGitRepo("ui-meta-empty-");
+    const emptyClient = await connectSeedClient();
+    const { project: emptyProject, error: emptyError } = await emptyClient.addProject(
+      emptyRepo.path,
+    );
+    expect(emptyError).toBeNull();
+    expect(emptyProject).not.toBeNull();
+    cleanups.push(async () => {
+      await emptyClient.close();
+      await emptyRepo.cleanup();
+    });
 
     const serverId = getServerId();
     const ids = {
@@ -479,6 +538,31 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     await expect(row(page, serverId, a.workspaceId)).toBeVisible({ timeout: 30_000 });
 
     const openChannelFilter = () => openSub(page, "sidebar-display-channel-filter");
+    await selectSidebarGrouping(page, "project");
+    await closeSidebarDisplayPreferences(page);
+    const emptyHeader = page
+      .locator('[data-testid^="sidebar-project-row-"]')
+      .filter({ has: page.getByText(emptyProject!.projectDisplayName, { exact: true }) });
+    await expect(emptyHeader).toBeVisible();
+    // Hiding background workspaces also preserves truly empty projects.
+    const toggleBackground = async () => {
+      await page.getByTestId("sidebar-display-preferences-menu").click();
+      await settleOpenMenu(page);
+      await page.getByRole("menuitem", { name: "Show background", exact: true }).click();
+      await closeSidebarDisplayPreferences(page);
+    };
+    await toggleBackground();
+    await expect(emptyHeader).toBeVisible();
+    await toggleBackground();
+    // Selecting the empty project alone preserves its creation header.
+    await openSidebarProjectFilter(page);
+    await toggleProjectFilter(page, emptyProject!.projectKey!);
+    await closeSidebarDisplayPreferences(page);
+    await expect(emptyHeader).toBeVisible();
+    await openSidebarProjectFilter(page);
+    await selectAllProjectsFilter(page);
+    await closeSidebarDisplayPreferences(page);
+
     const openUserFilter = () => openSub(page, "sidebar-display-user-filter");
     const channelOption = (channel: Channel) =>
       page.getByRole("menuitem", {
@@ -504,6 +588,11 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
       page.getByTestId("sidebar-display-channel-filter").getByTestId("menu-sub-indicator"),
     ).toBeVisible();
     await closeSidebarDisplayPreferences(page);
+
+    await expect(emptyHeader).toHaveCount(0);
+    await toggleBackground();
+    await expect(emptyHeader).toHaveCount(0);
+    await toggleBackground();
 
     // AND-across: keep channel "Random" and add user "Alice". The two filters both live in the
     // persisted view state, so opening them in two separate menu passes applies them at once. No
@@ -539,5 +628,6 @@ test.describe("Sidebar session-metadata Show/Hide, filters, compact time", () =>
     await page.getByText("Clear filter", { exact: true }).click();
     await closeSidebarDisplayPreferences(page);
     await expect(row(page, serverId, a.workspaceId)).toBeVisible({ timeout: 15_000 });
+    await expect(emptyHeader).toBeVisible();
   });
 });

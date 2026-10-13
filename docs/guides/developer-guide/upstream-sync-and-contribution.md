@@ -12,6 +12,8 @@ procedure, past merges) is in the
 [sync history](../../audits/2026-10-09-upstream-sync-history.md). Past merge
 audits: [v0.10.2](../../audits/2026-09-30-clisbot-branding/merge-v0.10.2.md),
 [v0.11.1](../../audits/2026-09-30-clisbot-branding/merge-v0.11.1.md).
+The owner-authorized pinned-main integration is recorded in the
+[2026-10-13 audit](../../audits/2026-10-13-upstream-paseo/README.md).
 
 ## The three repos
 

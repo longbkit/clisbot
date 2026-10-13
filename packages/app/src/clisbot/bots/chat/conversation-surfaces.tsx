@@ -8,7 +8,7 @@ import {
   NativeExplorerSidebarDock,
 } from "@/components/compact-explorer-sidebar";
 import { WorkspacePanelHost } from "@/screens/workspace/workspace-panel-host";
-import { MobileWorkspaceTabSwitcher } from "@/screens/workspace/workspace-screen";
+import { MobileWorkspaceTabSwitcher } from "@/screens/workspace/compact-workspace-header";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import type { useConversationLayout } from "./use-conversation-layout";
 import type { useConversationTabs } from "./use-conversation-tabs";
@@ -102,8 +102,6 @@ function ConversationSwitcher({
       {...clipboardActions}
       tabs={mainTabs}
       activeTabKey={active?.key ?? ""}
-      activeTab={active}
-      tabByKey={new Map(mainTabs.map((tab) => [tab.key, tab]))}
       tabSwitcherOptions={mainTabs.map((tab) => {
         let label = t("bots.chat.common.changes");
         if (tab.kind === "conversation") label = t("bots.chat.common.messages");

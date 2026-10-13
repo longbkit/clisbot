@@ -153,7 +153,6 @@ export function ConfirmationProvider({
               ? CONFIRMATION_SNAP_POINTS
               : DETAILED_CONFIRMATION_SNAP_POINTS
           }
-          sizeContentToCurrentSnapPoint
           testID="app-confirmation"
           footer={footer}
         >

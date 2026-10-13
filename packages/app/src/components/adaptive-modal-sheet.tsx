@@ -13,22 +13,16 @@ import {
   useGlobalWebOverlayLayer,
   useWebOverlayRegistration,
 } from "../lib/overlay-root";
-import {
-  KEYBOARD_STATUS,
-  useBottomSheetInternal,
-  type BottomSheetBackgroundProps,
-} from "@gorhom/bottom-sheet";
-import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import { type BottomSheetBackgroundProps } from "@gorhom/bottom-sheet";
+import Animated from "react-native-reanimated";
 import { ArrowLeft, Search, X } from "lucide-react-native";
 import {
   IsolatedBottomSheetModal,
+  SheetVisibleFrame,
   type ContextBridge,
   useIsolatedBottomSheetVisibility,
 } from "@/components/ui/isolated-bottom-sheet-modal";
-import {
-  getBottomSheetVisibleContentHeight,
-  getCompactSheetSafeAreaPadding,
-} from "@/components/adaptive-modal-sheet-layout";
+import { getCompactSheetSafeAreaPadding } from "@/components/adaptive-modal-sheet-layout";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { isWeb } from "@/constants/platform";
 import { useKeyboardVisibility } from "@/hooks/use-keyboard-visibility";
@@ -221,10 +215,6 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minHeight: 0,
   },
-  bottomSheetVisibleContent: {
-    minHeight: 0,
-    overflow: "hidden",
-  },
   bottomSheetVisibleScroll: {
     flex: 1,
     minHeight: 0,
@@ -275,40 +265,6 @@ function SheetBackground({ style }: BottomSheetBackgroundProps) {
  */
 function SheetContent({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
   return <View style={[styles.sheetContent, style]}>{children}</View>;
-}
-
-function BottomSheetVisibleContent({ children }: { children: ReactNode }) {
-  const { animatedDetentsState, animatedKeyboardState, animatedLayoutState, animatedPosition } =
-    useBottomSheetInternal();
-  const visibleContentStyle = useAnimatedStyle(() => {
-    const { containerHeight, handleHeight } = animatedLayoutState.get();
-    if (containerHeight < 0 || handleHeight < 0) {
-      return { height: 0 };
-    }
-
-    const initialDetentPosition = animatedDetentsState.get().detents?.[0];
-    const contentPosition =
-      initialDetentPosition == null
-        ? animatedPosition.get()
-        : Math.min(animatedPosition.get(), initialDetentPosition);
-
-    const keyboardState = animatedKeyboardState.get();
-    return {
-      height: getBottomSheetVisibleContentHeight({
-        containerHeight,
-        contentPosition,
-        handleHeight,
-        keyboardHeight: keyboardState.heightWithinContainer,
-        isKeyboardVisible: keyboardState.status === KEYBOARD_STATUS.SHOWN,
-      }),
-    };
-  }, [animatedDetentsState, animatedKeyboardState, animatedLayoutState, animatedPosition]);
-
-  return (
-    <Animated.View style={[styles.bottomSheetVisibleContent, visibleContentStyle]}>
-      {children}
-    </Animated.View>
-  );
 }
 
 export function SheetHeaderView({
@@ -490,8 +446,6 @@ export interface AdaptiveModalSheetProps {
   bodyStyle?: StyleProp<ViewStyle>;
   /** Layout intent for the sheet body, composed over the sheet's own content inset. */
   contentStyle?: StyleProp<ViewStyle>;
-  /** Size compact sheet content to the live snap height instead of its largest snap point. */
-  sizeContentToCurrentSnapPoint?: boolean;
   /** Re-establishes caller-owned contexts inside the native or compact sheet portal. */
   contextBridge?: ContextBridge | null;
 }
@@ -513,7 +467,6 @@ export function AdaptiveModalSheet({
   compactPresentation,
   contentStyle,
   bodyStyle,
-  sizeContentToCurrentSnapPoint = true,
   contextBridge = null,
 }: AdaptiveModalSheetProps) {
   const { theme } = useUnistyles();
@@ -543,11 +496,15 @@ export function AdaptiveModalSheet({
     () => ({ paddingBottom: compactSafeAreaPadding.footerPaddingBottom ?? 0 }),
     [compactSafeAreaPadding.footerPaddingBottom],
   );
-  const footerView = footer ? (
-    <View style={footerClearanceStyle}>
-      <View style={[styles.footer, footerContainerStyle]}>{footer}</View>
-    </View>
-  ) : null;
+  const footerView = useMemo(
+    () =>
+      footer ? (
+        <View style={footerClearanceStyle}>
+          <View style={[styles.footer, footerContainerStyle]}>{footer}</View>
+        </View>
+      ) : null,
+    [footer, footerClearanceStyle, footerContainerStyle],
+  );
   const handleIndicatorStyle = useMemo(
     () => ({ backgroundColor: theme.colors.palette.zinc[600] }),
     [theme.colors.palette.zinc],
@@ -652,7 +609,6 @@ export function AdaptiveModalSheet({
             </View>
           )}
         </View>
-        {footerView}
       </>
     );
 
@@ -676,11 +632,7 @@ export function AdaptiveModalSheet({
         accessible={false}
         presentation={presentation}
       >
-        {sizeContentToCurrentSnapPoint ? (
-          <BottomSheetVisibleContent>{sheetContent}</BottomSheetVisibleContent>
-        ) : (
-          sheetContent
-        )}
+        <SheetVisibleFrame footer={footerView}>{sheetContent}</SheetVisibleFrame>
       </IsolatedBottomSheetModal>
     );
   }

@@ -64,6 +64,7 @@ export function SidebarModelProvider({
 }) {
   const { t } = useTranslation();
   const list = useSidebarWorkspacesList({ enabled: active });
+  const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
   const channelFilters = useSidebarViewStore((state) => state.channelFilters);
@@ -119,35 +120,46 @@ export function SidebarModelProvider({
       projectFilters: resolvedProjectFilters,
     });
     const filtered = filterWorkspacesByLabels({
-      workspaces: byProject,
+      workspaces: byProject.filter((workspace) => showBackground || !workspace.background),
       ...labelFilter,
     }).filter((workspace) => matchesSessionMetadata(workspace, userFilters, channelFilters));
     return new Map(filtered.map((workspace) => [workspace.workspaceKey, workspace]));
-  }, [labelFilter, userFilters, channelFilters, resolvedProjectFilters, workspaceEntriesByKey]);
+  }, [
+    showBackground,
+    labelFilter,
+    userFilters,
+    channelFilters,
+    resolvedProjectFilters,
+    workspaceEntriesByKey,
+  ]);
   const visibleWorkspaceKeys = useMemo(
     () => new Set(filteredWorkspaceEntriesByKey.keys()),
     [filteredWorkspaceEntriesByKey],
   );
   // The two filters prune differently on purpose. The project filter is a membership test on the
   // project itself, so a project you filtered TO survives even with no workspaces — it still owns
-  // a header row you can create your first workspace under. The label filter can only ask about
-  // workspaces, so a project it empties has nothing left to show.
+  // a header row you can create your first workspace under. Label and user/channel metadata
+  // filters only ask about workspaces, so a project they empty has nothing left to show.
   const filteredProjects = useMemo(() => {
     let projects = list.projects;
     if (hasActiveProjectFilter) {
       const included = new Set(resolvedProjectFilters);
       projects = projects.filter((project) => included.has(project.viewKey));
     }
-    if (hasActiveLabelFilter || hasMetadataFilter) {
+    if (hasActiveLabelFilter || hasMetadataFilter || !showBackground) {
       projects = projects.flatMap((project) => {
         const workspaces = project.workspaces.filter((workspace) =>
           visibleWorkspaceKeys.has(workspace.workspaceKey),
         );
-        return workspaces.length > 0 ? [{ ...project, workspaces }] : [];
+        return workspaces.length > 0 ||
+          (!hasActiveLabelFilter && !hasMetadataFilter && project.workspaces.length === 0)
+          ? [{ ...project, workspaces }]
+          : [];
       });
     }
     return projects;
   }, [
+    showBackground,
     hasActiveLabelFilter,
     hasMetadataFilter,
     hasActiveProjectFilter,
