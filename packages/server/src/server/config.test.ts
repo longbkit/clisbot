@@ -6,10 +6,32 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { loadConfig, resolveBundledWebUiDistDir, resolveConfigFromPersisted } from "./config.js";
 import { loadPersistedConfig } from "./persisted-config.js";
+import { createPublishedConnectionOffer } from "./device-access/connection-offer.js";
 
 const roots: string[] = [];
 
 describe("server config", () => {
+  test.each([true, false])(
+    "publishes the deployment direct endpoint with TLS=%s",
+    async (useTls) => {
+      const config = resolveConfigFromPersisted(
+        "/tmp/clisbot-direct-endpoint-test",
+        { version: 1 },
+        {
+          env: {
+            CLISBOT_DIRECT_ENDPOINT: "direct.example:443",
+            CLISBOT_DIRECT_USE_TLS: String(useTls),
+          },
+        },
+      );
+      const offer = await createPublishedConnectionOffer(config, true, "test-server", "test-key");
+      expect(offer?.direct).toEqual({ endpoint: "direct.example:443", useTls });
+      expect(offer?.relay).toEqual({ endpoint: "relay.clisbot.com:443", useTls: true });
+      expect(config.configReload?.overrideControlledPaths).toContain("daemon.direct.endpoint");
+      expect(config.configReload?.overrideControlledPaths).toContain("daemon.direct.useTls");
+    },
+  );
+
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
