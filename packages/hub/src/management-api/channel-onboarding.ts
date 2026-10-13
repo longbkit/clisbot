@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Database } from "../db/types.js";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
@@ -34,7 +35,12 @@ export async function accountChannelOnboarding(
     const allowed = new Set(
       snapshot.controlPlane.accounts.map((account) => `${account.channel}:${account.accountId}`),
     );
-    const body = await (await handleChannelStatus(options.operations.supervisor)).json();
+    const raw: unknown = await (await handleChannelStatus(options.operations.supervisor)).json();
+    const body = z
+      .object({
+        accounts: z.array(z.object({ channel: z.string(), account: z.string() }).passthrough()),
+      })
+      .parse(raw);
     return Response.json({
       accounts: body.accounts.filter((account: { channel: string; account: string }) =>
         allowed.has(`${account.channel}:${account.account}`),

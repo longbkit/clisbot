@@ -207,6 +207,20 @@ describe("readDaemonPasswordFile", () => {
 });
 
 describe("local Hub credential master key", () => {
+  test("retains the legacy key when correcting an existing implicit data directory", async () => {
+    const home = await createHome();
+    const legacy = resolveLocalHubMasterKeyFile(home, { initialize: true });
+    const nested = path.join(home, "hub");
+    fs.mkdirSync(nested);
+    writeFileSync(path.join(nested, "PG_VERSION"), "16");
+    expect(resolveLocalHubMasterKeyFile(home, { hubDataDirectory: nested })).toBe(legacy);
+    const primary = localHubMasterKeyPath(home, nested);
+    expect(fs.existsSync(primary)).toBe(false);
+    writeFileSync(primary, "malformed");
+    expect(() => resolveLocalHubMasterKeyFile(home, { hubDataDirectory: nested })).toThrow(
+      /malformed/,
+    );
+  });
   test("creates one stable private key outside the Hub data directory", async () => {
     const home = await createHome();
     const keyPath = localHubMasterKeyPath(home);
@@ -545,4 +559,19 @@ describe("resolveLocalHubState", () => {
     expect(stale.running).toBe(false);
     expect(stale.staleStateFile).toBe(true);
   });
+});
+
+test("reads old implicit Hub data-directory metadata against the DB marker without changing its key", async () => {
+  const home = await createHome();
+  const nested = path.join(home, "hub");
+  await mkdir(nested);
+  writeFileSync(path.join(nested, "PG_VERSION"), "16");
+  writeHubState(home, 1234);
+  const statePath = path.join(home, "hub-local.json");
+  const original = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  writeFileSync(statePath, JSON.stringify({ ...original, dataDirectory: home }));
+  expect(readHubStateFile(home)?.dataDirectory).toBe(nested);
+  expect(JSON.parse(fs.readFileSync(statePath, "utf8")).dataDirectory).toBe(home);
+  writeFileSync(path.join(home, "PG_VERSION"), "16");
+  expect(readHubStateFile(home)?.dataDirectory).toBe(home);
 });

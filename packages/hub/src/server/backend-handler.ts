@@ -133,8 +133,7 @@ const patterns: [string, RegExp, Endpoint][] = [
   [
     "GET",
     /^\/api\/integrations\/(github|slack|discord|linear)\/callback$/,
-    (_r, q, s) =>
-      handleConnections(q, `${s[2]}Callback` as Parameters<typeof handleConnections>[1]),
+    (_r, q, s) => providerCallback(q, s[2]!),
   ],
   ["GET", /^\/api\/integrations\/github\/setup$/, (_r, q) => handleConnections(q, "githubSetup")],
   [
@@ -142,7 +141,7 @@ const patterns: [string, RegExp, Endpoint][] = [
     /^\/test\/(trigger|smoke)$/,
     (r, q, s) =>
       r.testTriggerRoutes
-        ? r.operations.handleManualTrigger(q, s[1] as "trigger" | "smoke")
+        ? r.operations.handleManualTrigger(q, s[1] === "smoke" ? "smoke" : "trigger")
         : notFound(),
   ],
 ];
@@ -171,4 +170,15 @@ function decodeSegment(segment: string): string {
 }
 function notFound(): Response {
   return Response.json({ error: "not_found" }, { status: 404 });
+}
+
+function providerCallback(request: Request, provider: string): Promise<Response> | Response {
+  const operations: Record<string, Parameters<typeof handleConnections>[1]> = {
+    github: "githubCallback",
+    slack: "slackCallback",
+    discord: "discordCallback",
+    linear: "linearCallback",
+  };
+  const operation = operations[provider];
+  return operation ? handleConnections(request, operation) : notFound();
 }

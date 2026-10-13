@@ -214,7 +214,9 @@ export function readHubStateFile(home: string): HubStateRecord | null {
       startedAt,
       ...(typeof parsed.instanceId === "string" ? { instanceId: parsed.instanceId } : {}),
       ...(typeof parsed.stoppedAt === "string" ? { stoppedAt: parsed.stoppedAt } : {}),
-      ...(typeof parsed.dataDirectory === "string" ? { dataDirectory: parsed.dataDirectory } : {}),
+      ...(typeof parsed.dataDirectory === "string"
+        ? { dataDirectory: effectiveHubDataDirectory(home, parsed.dataDirectory, true) }
+        : {}),
       ...(typeof parsed.controlFile === "string" ? { controlFile: parsed.controlFile } : {}),
       ...(parsed.personalComposition === true ? { personalComposition: true } : {}),
       ...(typeof parsed.appOrigin === "string" ? { appOrigin: parsed.appOrigin } : {}),
@@ -410,6 +412,17 @@ export function resolveLocalHubMasterKeyFile(
   } catch (error) {
     if (readNodeErrnoCode(error) !== "ENOENT") throw error;
   }
+  // Older implicit launches stored the database under home/hub but recorded
+  // home as the data directory. Correcting that metadata must retain its key.
+  const legacyKeyPath = localHubMasterKeyPath(home);
+  if (
+    keyPath !== legacyKeyPath &&
+    options.hubDataDirectory === path.join(home, "hub") &&
+    existsSync(path.join(home, "hub", "PG_VERSION")) &&
+    existsSync(legacyKeyPath)
+  ) {
+    return resolveLocalHubMasterKeyFile(home);
+  }
   if (options.initialize !== true) {
     throw new Error(
       [
@@ -596,7 +609,7 @@ async function startLocalHubUnlocked(
     pid: child.pid ?? 0,
     startedAt: new Date().toISOString(),
     ...(instanceId ? { instanceId } : {}),
-    dataDirectory: environment.CLISBOT_HUB_DATA_DIR ?? home,
+    dataDirectory: effectiveHubDataDirectory(home, environment.CLISBOT_HUB_DATA_DIR),
     appOrigin: environment.CLISBOT_HUB_APP_URL,
     ...(controlFile ? { controlFile } : {}),
     ...(options.personal
@@ -736,4 +749,21 @@ function recordHubStopped(local: LocalHubState): void {
   } else {
     removeHubStateFile(local.home);
   }
+}
+
+/** Match Hub's nested-home resolver; older CLI state incorrectly named an implicit data dir as home. */
+function effectiveHubDataDirectory(home: string, requested?: string, legacyState = false): string {
+  const nested = path.join(home, "hub");
+  if (requested) {
+    if (
+      legacyState &&
+      requested === home &&
+      !existsSync(path.join(home, "PG_VERSION")) &&
+      existsSync(path.join(nested, "PG_VERSION"))
+    )
+      return nested;
+    return requested;
+  }
+  if (existsSync(path.join(nested, "PG_VERSION"))) return nested;
+  return existsSync(path.join(home, "PG_VERSION")) ? home : nested;
 }

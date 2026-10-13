@@ -1,3 +1,5 @@
+import path from "node:path";
+import { existsSync } from "node:fs";
 import { renderPairingQr } from "@clisbot/server/gateway-adapters";
 import { Command } from "commander";
 import { readFile } from "node:fs/promises";
@@ -13,7 +15,10 @@ export async function localHubDeviceRequest(
 ): Promise<unknown> {
   const local = resolveLocalHubState({ home });
   if (!local.running || !local.state) throw new Error("Start the local Hub first");
-  const dataDir = local.state.dataDirectory ?? process.env.CLISBOT_HUB_DATA_DIR ?? home;
+  const dataDir =
+    local.state.dataDirectory ??
+    process.env.CLISBOT_HUB_DATA_DIR ??
+    (existsSync(path.join(home, "PG_VERSION")) ? home : path.join(home, "hub"));
   const credential = (await readFile(localControlCredentialPath(dataDir), "utf8")).trim();
   const response = await fetch(new URL(`/api/auth/clisbot/device${apiPath}`, local.state.url), {
     method,
