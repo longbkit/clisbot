@@ -2,15 +2,15 @@
 title: Hub triggers
 description: How Hub matches an inbound event to a trigger: events, filters, and the allowlist that gates every execution.
 nav: Triggers
-order: 66
+order: 68
 category: Hub
 ---
 
 # Triggers
 
-A trigger says which provider event can start a workflow. The [Hub workflows](/docs/hub/workflows) page covers the steps, inputs, routing, prompts, and deadlines that run after a match.
+A trigger says which provider event can start an Automation. Conversation Routes are a separate way in; see [Channels](/docs/hub/channels) and [Automations](/docs/hub/automations). The [Hub workflows](/docs/hub/workflows) page covers the steps, inputs, routing, prompts, and deadlines that run after a match.
 
-`.clisbot/workflows/github-issue.yml`:
+Example in the legacy [repository bundle](/docs/hub/configuration#repository-bundles) format, with a named `dev` environment and `codex` Agent:
 
 ```yaml
 name: triage-issue
@@ -36,7 +36,7 @@ Field-by-field detail is in the [configuration reference](/docs/hub/configuratio
 
 When you create or edit a trigger in the Hub dashboard, choose the daemon and enter its working directory first. Hub does not prefill the directory: it is a path on that machine, it has to exist, and only you know which repository the agent should work in. Hub then asks that daemon for its available providers, models, execution modes, and thinking options. The suggested model and mode are the daemon's defaults.
 
-Only daemons that were granted `hub.execute` are offered as targets, and only Claude, Codex, and OpenCode are offered as providers. Hub preapproves its own tools on every run because nobody is at the keyboard to approve them, and those are the providers whose daemon contract accepts that.
+Use a Host enrolled with `hub.execute` and Agent controls it offers. Managed access further restricts the Hosts, Projects and Agent configurations a Member can delegate. Modes and tool support depend on the Provider; saving a definition does not make unsupported controls available.
 
 Changing the daemon or working directory reloads the choices. If an existing trigger names a model, mode, or thinking option that the daemon no longer reports, Hub marks that value unavailable without replacing it. You can keep the authored value, choose a current value, or switch to YAML editing.
 
@@ -44,46 +44,15 @@ If the daemon is offline or needs a newer Clisbot version, the agent selectors s
 
 ## Saving checks the agent against the daemon
 
-Saving a trigger asks the target daemon to validate the agent it would launch: the provider, model, mode, thinking option, and provider-native options, and every named agent a choice can select. A value the daemon does not offer is refused at save, naming the field, instead of failing on the first run.
+The app's Agent selectors read the selected Host's current provider configuration. Automation saves compile the YAML, resolve resources, and check your authority to delegate them. A saved revision does not prove provider startup or tool execution; send a real request and check its run and reply.
 
-```text
-run.agent.mode: Mode 'default' is not available for provider 'opencode'
-```
-
-The check needs the daemon connected. A new trigger, or a change of daemon, working directory, or agent, cannot be saved while its daemon is offline; the refusal names the daemon. Editing the prompt, filters, or limits of an existing trigger saves either way.
-
-The same checks run wherever a trigger is authored: the dashboard form, its YAML mode, `POST /api/v1/triggers/install`, `clisbot hub init`, and `clisbot hub deploy`.
+Legacy repository bundles validate named Agent configurations against the connected daemon during validation and activation. Keep the Host current and use its offered model, mode, thinking and provider options. See [Configuration](/docs/hub/configuration).
 
 ## Continue the same agent
 
-Dashboard triggers default to **Same conversation**. Messages in the same Slack or Discord thread, events on the same GitHub issue or pull request, and events on the same Linear issue continue the existing agent in that project. An event without a conversation starts a new agent.
+For Automation requests through a Channel Route, enable **Continue the same Agent** to reuse a compatible Agent for that conversation. Each request still creates a run. Other events start new Agents; changes to targets or authority can also require a new Agent.
 
-If the agent is busy, the new prompt steers its current work. Each arrival keeps its own output limits and completion status. If a reusable workspace is archived, Hub asks Clisbot to restore it before sending the prompt.
-
-Choose **Custom key** to group arrivals by an input, or **New agent** to keep them separate. A self-contained trigger document can express the same choice:
-
-```yaml
-name: support
-on:
-  slack.mention:
-    filters:
-      from_users: [U01234567]
-run:
-  target:
-    daemon: laptop
-    cwd: /Users/you/code/support
-  agent:
-    provider: codex
-  continuation:
-    mode: conversation
-  max_runtime: 30m
-  idle_timeout: 5m
-  prompt: Handle this request and call finish_execution when complete.
-```
-
-The [continuation reference](/docs/hub/configuration/hub-yml#agent-continuation) covers keys and agent reuse. The run detail shows whether each arrival created, continued, or restored an agent.
-
-Hub includes an `executionId` in each prompt. When using a continuing agent, pass that ID to `reply` and `finish_execution`. These tools act on that arrival's destination and contract; an old or unrelated execution ID is rejected.
+The [continuation reference](/docs/hub/configuration/hub-yml#agent-continuation) documents `reuse: binding` and earlier-step reuse. The former `run.continuation` field is unsupported.
 
 ## Events
 
@@ -109,21 +78,21 @@ Each provider page documents its events and the data they expose:
 
 ## Filters
 
-`filters` is required, and `from_users` must be present and non-empty. A trigger without it is rejected at validation.
+Direct external events require non-empty `filters.from_users`. `manual.run` is exempt; self-contained documents default its actor filter to `*`. Linear project-scout events require a Project filter instead. Channel Routes use Rules for their audience.
 
-The allowlist is what keeps a stranger's comment on a public issue from starting an agent on your machine. There is no default, because a safe default differs per repository.
+The allowlist is what keeps a stranger's comment on a public issue from starting an agent on your machine. Use specific trusted senders; `*` admits any sender.
 
 An allowlist is one layer of defense. It does not make a permitted account trustworthy after compromise or make prompt injection harmless. See [Hub security](/docs/hub/security) before choosing the daemon, working directory, provider policy, and outputs for an external trigger.
 
 | Filter       | Applies to                | Matches                                                              |
 | ------------ | ------------------------- | -------------------------------------------------------------------- |
-| `from_users` | all                       | GitHub: login. Slack and Discord: **user id**, not display name      |
+| `from_users` | all                       | GitHub: login. Slack/Discord: prefer stable **user ID**              |
 | `repo`       | GitHub                    | `owner/name`                                                         |
 | `workspace`  | Slack                     | Team id, `T01234567`                                                 |
 | `guild`      | Discord                   | Guild id                                                             |
 | `channels`   | Slack, Discord            | Channel ids                                                          |
 | `contains`   | all                       | GitHub substring; Slack and Discord invocation prefix                |
-| `pattern`    | all                       | Invocation prefix                                                    |
+| `pattern`    | all                       | Prefix of invocation text                                            |
 | `connection` | all                       | A connection slug, when the organization has several                 |
 | `label`      | GitHub label-added events | The label added by this delivery, case-insensitively                 |
 | `labels`     | GitHub                    | Every listed current issue or pull-request label, case-insensitively |
@@ -134,13 +103,7 @@ All conditions must pass. There is no `any` mode.
 
 `repo`, `workspace`, and `guild` are resolved to immutable ids when the configuration activates, along with the connection that owns them. Naming a resource the organization has no connection for fails activation, so you find out on push rather than when someone comments.
 
-Omit the resource filter and the trigger listens to every connection of that provider in the organization. To pin it to one:
-
-```yaml
-filters:
-  connection: acme-github
-  from_users: [alice]
-```
+Omit the resource filter and the trigger listens to every connection of that provider in the organization. Pin a self-contained document with `on.<event>.connection`; legacy Workflow files use `filters.connection`.
 
 See [How Hub works](/docs/hub/concepts) for what activation compiles.
 
@@ -150,11 +113,11 @@ Both run. Triggers are not ordered and do not shadow each other, in one configur
 
 ## Replying
 
-Put `allow_outputs` on the step that should reply. The reply capabilities are `slack.reply` and `discord.reply`.
+Put `allow_outputs` on the step that should reply. Use the input’s reply capability: `slack.reply`, `telegram.reply`, `discord.reply`, `github.reply`, or `linear.reply`.
 
 - Set `max` when a step needs more than one update.
 - Set `required: true` when the step must emit at least one reply before it can finish. A required type must be registered and available for the execution context.
 
-GitHub has no reply capability; a step with a [`github` block](/docs/hub/github) comments through `gh` instead. The [output capability reference](/docs/hub/configuration/hub-yml#output-capabilities) has the contract.
+GitHub replies post a comment on the triggering issue/PR; push events have no reply target. A [`github` block](/docs/hub/github) separately grants `gh` authority. Single-`run` direct-event documents add an optional native reply unless you author an explicit grant. The [output capability reference](/docs/hub/configuration/hub-yml#output-capabilities) has the contract.
 
 The declaration grants the `hub.reply` tool; the prompt has to tell the agent to call it. See [Tell the agent which tool to call](/docs/hub/workflows#tell-the-agent-which-tool-to-call).

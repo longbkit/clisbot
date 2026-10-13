@@ -8,9 +8,9 @@ category: Hub
 
 # Hub configuration
 
-Each Automation is one trigger document in YAML. Create one in the app under **Hub settings → Automations → New Automation**, and open **Edit YAML** to see or change the full document. Scripts install the same YAML through the [Hub API](/docs/hub/api#trigger-validation-and-installation).
+Each Automation is one trigger document in YAML. Create one in the app under **Automations → New Automation**, and open **Edit YAML** to see or change the full document. Scripts install the same YAML through the [Hub API](/docs/hub/api#trigger-validation-and-installation).
 
-Saving validates the document against Hub and asks the named daemon to check the agent. A failed save keeps the active revision. Channel Routes are configured under **Channels** instead; see [Channels](/docs/hub/channels).
+Saving validates YAML, resolves Hub resources, and checks your authority to delegate the target. Select Agent controls that the Host actually offers; a saved definition does not prove the provider can start. A failed save keeps the active revision. Channel Routes are configured under **Channels** instead; see [Channels](/docs/hub/channels).
 
 ## Example
 
@@ -31,10 +31,6 @@ run:
     cwd: /Users/you/code/your-repo
   agent:
     provider: codex
-    model: gpt-5
-    mode: full-access
-  continuation:
-    mode: conversation
   max_runtime: 90m
   idle_timeout: 10m
   prompt: |
@@ -49,28 +45,11 @@ run:
       required: true
 ```
 
-`connection` is the app connection's slug in your organization. `target.daemon` is the connected daemon's slug and `target.cwd` is an absolute directory on it. `agent` contains the provider, model, and execution mode the daemon offers. The mode is required.
+`connection` is the app connection's slug in your organization. `target.daemon` is the connected daemon's slug and `target.cwd` is an absolute directory on it. `agent` contains the provider, model, and execution mode the daemon offers. Omit model or mode to use the Provider default; Pi has no selectable Modes.
 
-`continuation.mode: conversation` keeps follow-ups in the same provider conversation on the same agent. The prompt asks the agent to reply and then call `hub.finish_execution`; replying alone does not finish the execution.
+For Route-driven reuse, enable **Continue the same Agent**; see [Agent continuation](/docs/hub/configuration/hub-yml#agent-continuation). The prompt asks the agent to reply and then call `hub.finish_execution`; replying alone does not finish the execution.
 
-A Discord trigger uses `discord.mention`, a Discord user ID, and `discord.reply`. A GitHub trigger uses `github.issue_comment` with a repository filter and has no reply output; give the step a [`github` block](/docs/hub/github) instead. Read [Hub security](/docs/hub/security) before widening `from_users` or the agent's authority.
-
-## Startup timeout
-
-Hub waits up to **two minutes** for agent startup, including worktree creation, provider startup, and initial prompt acceptance. For a slower machine, set `run.startup_timeout`:
-
-```yaml
-name: inspect
-on:
-  manual.run: {}
-run:
-  target: { daemon: devbox, cwd: /workspace/project }
-  agent: { provider: codex, mode: full-access }
-  startup_timeout: 5m
-  prompt: Inspect this repository and summarize its current state.
-```
-
-Use a positive duration in `ms`, `s`, `m`, or `h`, up to `24h`. Omitting the field uses `2m`. The existing `max_runtime` and `idle_timeout` limits still apply during startup and can expire sooner. This setting changes Hub's waiting budget; provider-specific timeouts remain in effect.
+A Discord trigger uses `discord.mention`, a Discord user ID, and `discord.reply`. A GitHub trigger uses `github.issue_comment` with a repository filter and `github.reply` for issue/PR comments. A [`github` block](/docs/hub/github) separately grants `gh` authority. Read [Hub security](/docs/hub/security) before widening `from_users` or the agent's authority.
 
 ## Repository bundles
 

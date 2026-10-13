@@ -1,6 +1,6 @@
 ---
 title: Hub
-description: The layer above your daemons. Chat with agents from Slack and Telegram, share daemons with your team, and run automations.
+description: Connect eight messaging integrations, share Hosts and Projects with your team, and run automations on your machines.
 nav: Overview
 order: 60
 category: Hub
@@ -10,12 +10,12 @@ category: Hub
 
 A daemon runs agents on one machine, for you. Clisbot Hub is the layer above your daemons. Connect your daemons to it, and it gives them what they cannot do on their own:
 
-- **Channels.** Talk to your agents in [Slack, Telegram, and other chat platforms](/docs/hub/channels), answering in the same conversation.
-- **Managed access.** Share daemons and their projects with your team. Each member gets only what you grant.
+- **Channels.** Connect [eight integrations](/docs/hub/channels): Slack, Telegram, Discord, Google Chat, Feishu/Lark, Zalo Official Bot, Zalo Personal and WhatsApp. Setup and capabilities vary by channel.
+- **Managed access.** Grant [Members and Teams access](/docs/hub/managed-access) to Hosts or Projects, with allowed Agent configurations.
 - **Automations.** Start agents from activity in GitHub, Slack, and Discord.
 - **Activity.** A record of everything that arrived, what it matched, and what ran.
 
-Your daemons keep running agents where they always did. Hub decides who may use them and when to ask them.
+Use your personal channels to continue work away from your desk, or share selected Projects with a team. Your daemons run the agents; Hub routes requests and access. [Bots and Group chats](/docs/bots-and-chats) also work without Hub.
 
 ## Personal Hub or team Hub
 
@@ -39,16 +39,8 @@ The Clisbot app keeps every Hub you add beside the daemons you connect directly.
 
 Daemons from both Hubs appear together in the app. **Settings → Hubs** chooses which Hub's settings you see. Each daemon belongs to one Hub.
 
-## Reading order
+## Start here
 
-1. [Quickstart](/docs/hub/quickstart)
-2. [How it works](/docs/hub/concepts)
-3. [Daemons](/docs/hub/daemons)
-4. [Channels](/docs/hub/channels)
-5. [Triggers](/docs/hub/triggers)
-6. [Workflows](/docs/hub/workflows)
-7. [GitHub access](/docs/hub/github)
-8. [Configuration](/docs/hub/configuration)
-9. [Security](/docs/hub/security)
+[Quickstart](/docs/hub/quickstart) → [How it works](/docs/hub/concepts) → [Enroll a daemon](/docs/hub/daemons).
 
-If a Route or workflow accepts requests from GitHub, Slack, Discord, or the API, read [Hub security](/docs/hub/security) before giving an agent access to a working directory or output capability.
+Then choose [Channels and commands](/docs/hub/channels), [Managed access](/docs/hub/managed-access), or [Automations](/docs/hub/automations). Read [Hub security](/docs/hub/security) before giving external requests agent authority.

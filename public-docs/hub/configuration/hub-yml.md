@@ -8,7 +8,9 @@ category: Hub
 
 # Hub configuration reference
 
-Hub accepts YAML in this layout:
+Start with [Automations](/docs/hub/automations) in the app. The YAML editor accepts a self-contained Workflow: `on` is an event map, `environments` is a list of named targets, and `steps` contains ordered Agent executions. A single-`run` shorthand is shown in [Configuration](/docs/hub/configuration).
+
+The following layout is the supported **legacy repository bundle** format:
 
 ```text
 .clisbot/
@@ -90,17 +92,18 @@ An environment is a complete named object. A step selects its name; objects are 
 
 Each agent is one complete provider configuration:
 
-| Field              | Required | Notes                                                                  |
-| ------------------ | -------- | ---------------------------------------------------------------------- |
-| `provider`         | yes      | Provider ID. Hub runs unattended, so `claude`, `codex`, or `opencode`. |
-| `model`            | no       | Provider model ID.                                                     |
-| `mode`             | no       | Clisbot mode ID.                                                       |
-| `thinkingOptionId` | no       | Provider thinking option.                                              |
-| `options`          | no       | JSON-safe provider-native options, preserving names and nesting.       |
+| Field              | Required | Notes                                                                          |
+| ------------------ | -------- | ------------------------------------------------------------------------------ |
+| `provider`         | yes      | Provider ID offered by the target Host; capabilities remain Provider-specific. |
+| `model`            | no       | Provider model ID.                                                             |
+| `mode`             | no       | Clisbot mode ID.                                                               |
+| `thinkingOptionId` | no       | Provider thinking option.                                                      |
+| `options`          | no       | JSON-safe provider-native options, preserving names and nesting.               |
+| `featureValues`    | no       | Provider feature values offered by the Host.                                   |
 
 A named selection preserves the complete object, including structured options. Named agents have no parent, patch, or per-step override.
 
-Hub passes `model`, `mode`, `thinkingOptionId`, and `options` to the Clisbot daemon without renaming or flattening provider fields. The selected daemon validates them against its current provider schema when the trigger is saved or deployed, so a value it does not offer is refused then rather than at the first run; Hub does not translate provider-native options. See [Saving checks the agent against the daemon](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon).
+Hub passes `model`, `mode`, `thinkingOptionId`, and `options` to the Clisbot daemon without renaming or flattening provider fields. Legacy bundle validation checks named agents against the selected daemon. App Automation saves check resources and delegation; use controls available on the Host and verify an actual run. Hub does not translate provider-native options. See [Saving checks the agent against the daemon](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon).
 
 ## Workflow files
 
@@ -188,21 +191,20 @@ An environment or dynamic named-agent expression must have a finite set of possi
 
 ### Steps
 
-| Field             | Required | Notes                                                                                                                |
-| ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `id`              | yes      | Unique within the workflow.                                                                                          |
-| `environment`     | yes      | Literal environment name or finite expression resolving to one.                                                      |
-| `max_runtime`     | yes      | Step hard limit.                                                                                                     |
-| `idle_timeout`    | yes      | Idle limit no longer than `max_runtime`.                                                                             |
-| `startup_timeout` | no       | Step startup waiting budget. See [startup timeout](/docs/hub/configuration#startup-timeout) for defaults and limits. |
-| `agent`           | yes      | Named agent, finite expression selecting a named agent, or complete static inline agent.                             |
-| `prompt`          | yes      | Ordered `text` and `include` blocks.                                                                                 |
-| `if`              | no       | Expression deciding whether the step runs.                                                                           |
-| `env`             | no       | Environment variables from connection values.                                                                        |
-| `output.schema`   | no       | JSON Schema for structured step output.                                                                              |
-| `allow_outputs`   | no       | Provider output capabilities with optional `max` and `required`.                                                     |
-| `auto_archive`    | no       | Archive the agent after the step ends.                                                                               |
-| `github`          | no       | Explicit GitHub authority for this step.                                                                             |
+| Field           | Required | Notes                                                                                    |
+| --------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `id`            | yes      | Unique within the workflow.                                                              |
+| `environment`   | yes      | Literal environment name or finite expression resolving to one.                          |
+| `max_runtime`   | yes      | Step hard limit.                                                                         |
+| `idle_timeout`  | yes      | Idle limit no longer than `max_runtime`.                                                 |
+| `agent`         | yes      | Named agent, finite expression selecting a named agent, or complete static inline agent. |
+| `prompt`        | yes      | Ordered `text` and `include` blocks.                                                     |
+| `if`            | no       | Expression deciding whether the step runs.                                               |
+| `env`           | no       | Environment variables from connection values.                                            |
+| `output.schema` | no       | JSON Schema for structured step output.                                                  |
+| `allow_outputs` | no       | Provider output capabilities with optional `max` and `required`.                         |
+| `auto_archive`  | no       | Archive the agent after the step ends.                                                   |
+| `github`        | no       | Explicit GitHub authority for this step.                                                 |
 
 An inline agent is static and complete:
 
@@ -245,7 +247,7 @@ allow_outputs:
     required: true
 ```
 
-Slack workflows use `slack.reply`; Discord workflows use `discord.reply`. The declaration grants `hub.reply`, and the prompt must tell the agent to call it. GitHub has no reply output; use an explicit [`github` block](/docs/hub/github).
+Use `slack.reply`, `telegram.reply`, `discord.reply`, or `github.reply` for the matching input. GitHub replies require an issue/PR target. The declaration grants `hub.reply`; tell the Agent to call it. A [`github` block](/docs/hub/github) separately grants `gh` authority.
 
 Every step receives `hub.finish_execution`. The prompt must tell the agent when to call it; Hub does not append completion or reply instructions. If `output.schema` is present, `hub.finish_execution` requires an `output` value that matches the schema. If an `allow_outputs` entry is `required: true`, the agent must emit that output before finishing. `max` defaults to `1`.
 
@@ -259,24 +261,10 @@ See [Workflows](/docs/hub/workflows) for complete routing examples.
 
 ## Agent continuation
 
-Self-contained dashboard trigger documents accept `run.continuation`:
+**Continue the same Agent** applies to Automation runs invoked by a Route on a Connection. Each request still creates a run. Other events start a new Agent.
 
-| Value                                                      | Behavior                                                                                                                |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `{mode: conversation}`                                     | Default. Reuse the project's agent for the event's conversation; create a new agent when the event has no conversation. |
-| `{mode: key, key: "support-${{ clisbot.inputs.ticket }}"}` | Reuse the project's agent for the evaluated custom key.                                                                 |
-| `{mode: new}`                                              | Create a new agent for each arrival.                                                                                    |
+Use `run.reuse: binding` in single-`run` YAML, or `reuse: binding` on a Workflow step, to reuse a compatible Agent in that Channel conversation. Omit `reuse` to start a new Agent. A later step can use `reuse: steps.<earlier-id>` to reuse that step's Agent.
 
-Keys use the existing expression syntax and must resolve to a non-empty string of at most 512 characters. Custom keys and provider conversation identities occupy separate namespaces. The same key in different projects does not share an agent.
+Reuse needs matching target, Agent controls, environment variables and output authority. Incompatible settings or a worktree target start a new Agent. Runs for the same Channel binding wait behind earlier running work.
 
-An existing session keeps its daemon, agent configuration, target, environment, and tool contracts. Changing those settings for the same key fails with an explanation; choose a different key or **New agent**. Prompts and output destinations belong to each arrival and may change. A worktree branch is chosen when the session is first created and reused on later arrivals.
-
-A follow-up steers the active agent without extending its runtime deadline or credential expiry. With a `run.github` grant or connection token in `run.env`, follow-ups share the active agent’s credentials. Once all requests finish, Hub revokes leased tokens; the next arrival starts a new agent with fresh credentials. Agents without temporary credentials can be reused after completion.
-
-### Upgrading
-
-Upgrade the connected Clisbot daemons before enabling the new Hub version. Hub requires the daemon's ordinary agent RPC and request receipt capabilities; an older host produces an actionable dispatch error.
-
-Hub's database migration adds sessions and nullable execution associations. Existing executions retain their saved launch contract and execution-specific MCP endpoint until they finish. New arrivals for existing self-contained trigger documents use the conversation default. Historical agents are not backfilled into sessions.
-
-Legacy multi-step workflow bundles keep their existing behavior. Converting one to a self-contained trigger writes `mode: new` explicitly; change it in the editor when ready to reuse agents.
+`run.continuation` and `startup_timeout` are not accepted configuration fields. Use the editor's current YAML rather than copying an older definition. See [Automations](/docs/hub/automations) for the user flow.

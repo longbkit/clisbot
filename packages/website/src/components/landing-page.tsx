@@ -95,14 +95,16 @@ import { FAQItem } from "~/components/faq-item";
 import { SiteFooter } from "~/components/site-footer";
 import { SponsorSection, SponsorsSection } from "~/components/sponsorship";
 import { SiteHeader } from "~/components/site-header";
+import { HubAndBots } from "~/components/hub-and-bots";
 import "~/styles.css";
 
 interface LandingPageProps {
   title: React.ReactNode;
   subtitle: React.ReactNode;
+  showHubAndBots?: boolean;
 }
 
-export function LandingPage({ title, subtitle }: LandingPageProps) {
+export function LandingPage({ title, subtitle, showHubAndBots = false }: LandingPageProps) {
   return (
     <CursorFieldProvider>
       {/* Hero section with background image */}
@@ -135,6 +137,14 @@ export function LandingPage({ title, subtitle }: LandingPageProps) {
           <div className="space-y-24">
             <MultiProviderSection />
             <TurnkeySection />
+            {showHubAndBots && (
+              <FeatureSection
+                title="From your workspace to your team's conversations"
+                description="Connect channels through Hub, share Projects with Managed access, and work with specialist Bots in one Chat."
+              >
+                <HubAndBots />
+              </FeatureSection>
+            )}
             <AutomationSection />
             <ExtensibleSection />
             <FAQ />
@@ -322,7 +332,8 @@ function TurnkeySection() {
             <div className="space-y-0.5">
               <h3 className="text-xl font-medium text-white/90">Desktop app</h3>
               <p className="max-w-lg text-sm leading-relaxed text-white/50">
-                The one click experience, download the app and it just works, no server required
+                The app includes the local daemon. Install and sign in to an agent provider to start
+                working.
               </p>
             </div>
           </div>
@@ -765,7 +776,7 @@ const PRINCIPLES: ReadonlyArray<{
   {
     icon: Merge,
     title: "Unified",
-    description: "Every coding agent, used the same way. Switch providers any time.",
+    description: "Work with supported agent providers and specialist Bots through one app.",
   },
   {
     icon: Blocks,
@@ -1065,9 +1076,10 @@ function FAQ() {
           credentials. Voice is local-first by default and can optionally use cloud speech providers
           if you configure them.
         </FAQItem>
-        <FAQItem question="Does my code leave my machine?">
-          Clisbot doesn&apos;t send your code anywhere. Agents run locally and talk to their own
-          APIs as they normally would. For remote access, you can use the optional{" "}
+        <FAQItem question="Where do my agents and files run?">
+          Agents and working files live on your chosen Host. Agents send requests to their own
+          providers; channel replies and files you send through Hub also leave that Host. Review
+          your provider and channel settings. For remote app access, you can use the optional{" "}
           <a href="/docs/security" className="underline hover:text-white/80">
             end-to-end encrypted relay
           </a>

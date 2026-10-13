@@ -2,7 +2,7 @@
 title: GitHub access
 description: Grant one workflow step a scoped GitHub token and git setup.
 nav: GitHub access
-order: 65
+order: 67
 category: Hub
 ---
 
@@ -37,13 +37,13 @@ steps:
           ${{ clisbot.prompt }}
 ```
 
-The agent can use `git` and `gh` within the declared repositories and permissions. See [agent continuation](/docs/hub/configuration/hub-yml#agent-continuation) for the token lifecycle when requests continue an agent.
+The agent uses `git` and `gh` within the declared repositories and permissions. GitHub issue/PR triggers also support `hub.reply` for comments without a step `github` token. That native reply has its own output grant; see [GitHub triggers](/docs/hub/triggers/github).
 
 ## Fields
 
 | Field          | Notes                                                                                                                                  |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `connection`   | Project GitHub connection slug.                                                                                                        |
+| `connection`   | GitHub connection slug in the Hub organization.                                                                                        |
 | `repositories` | Repositories the token can reach. On a GitHub-triggered run, this defaults to the triggering repository. Required for other providers. |
 | `permissions`  | Installation-token permissions such as `contents`, `pull_requests`, and `issues`. Defaults to `contents: read`.                        |
 | `duration`     | Positive token lifetime up to `1h`. Defaults to `1h`, GitHub's maximum.                                                                |
@@ -54,7 +54,7 @@ Requested authority cannot exceed the GitHub App installation. Activation and di
 
 Hub supplies `GH_TOKEN` and process-scoped git configuration through environment variables:
 
-- Commits use the App bot login as `user.name` and `<app-id>+<bot-login>@users.noreply.github.com` as `user.email`.
+- Commits use the App bot login as `user.name` and `<bot-user-id>+<bot-login>@users.noreply.github.com` as `user.email`.
 - `git@github.com:` and `ssh://git@github.com/` remotes are rewritten to HTTPS.
 - `gh auth git-credential` handles GitHub credentials for the step.
 - User-global and system git configuration are ignored, and terminal credential prompts are disabled.

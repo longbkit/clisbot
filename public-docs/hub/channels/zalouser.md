@@ -57,6 +57,8 @@ Direct chats and groups. Inbound covers messages, a leading `/verb` as a command
 
 There are no threads. Zalo Personal has none, so a reply is a plain message on the conversation.
 
+Use [Channel slash commands](/docs/hub/channels/commands#channel-invocation) for session controls, Project/Workspace selection and this channel's invocation forms.
+
 ## What the agent can do
 
 Text rendered into Zalo's native style ranges — Zalo takes styled ranges rather than markdown — chunked at 2000 characters with the styles sliced per chunk; native file upload up to 100 MB per file, where an audio file becomes a voice message; and links.
@@ -67,7 +69,7 @@ One channel tool, `zalouser`, with seven actions: `send`, `image`, `link`, `frie
 
 ## Limits
 
-- **No threads, edits, deletes, pins, polls, or buttons.** The platform has none.
+- **No threads, edits, deletes, pins, polls, or buttons in this integration.**
 - **No inbound media download.** Attachments arrive as message content, not as agent attachments.
 - **Typing, delivered, and seen are wired but not driven.** Hub's streaming producer does not know this channel.
 - **The push socket has no acknowledgement and no cursor.** A message the server pushed is gone if the process drops it. Hub retries admission five times and then drops it loudly.

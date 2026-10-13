@@ -50,7 +50,7 @@ The workspace is the product concept; a git worktree is one way to isolate its f
 
 For a desktop walkthrough from starting parallel agents to reviewing and testing their changes, see [Run parallel tasks](/docs/parallel-development).
 
-You can create a workspace in the app or from the CLI:
+Create a workspace in the app or CLI. From a Hub channel, use [`/project` and `/workspace`](/docs/hub/channels/commands#choose-a-project-and-workspace) to choose where the next session runs or create a Workspace before starting its Agent:
 
 ```bash
 clisbot workspace create --isolation local --path ~/dev/my-app --title main

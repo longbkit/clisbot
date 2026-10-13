@@ -2,7 +2,7 @@
 title: Daemons in Hub
 description: Enroll a machine with Hub, reference it from configuration, and understand what Hub owns once it is connected.
 nav: Daemons
-order: 63
+order: 64
 category: Hub
 ---
 
@@ -46,14 +46,11 @@ The dialog changes the shared Hub name and reports name conflicts inline. Daemon
 access alone does not grant organization configuration authority. Hosts following the shared name
 update without reconnecting; a local name chosen in Host Appearance stays personal to that app.
 
-With Managed Access enabled, creating a new Project requires Daemon Administrator or Owner
-authority. To let a Member create Workspaces or Git worktrees in one existing Project, assign
-**Developer** or **Full access** on that Project, with the allowed Agent configuration. These
-presets include the explicit `workspace.create` privilege for new grants. Existing assignments
-must be reviewed and saved with the preset again to gain it. The Member then opens that Project,
-chooses **New workspace**, and selects **New worktree** for Git isolation. This does not permit
-creating new Projects or managing other Projects. Update the daemon before granting the new
-privilege; older daemons reject unknown Project privileges.
+For team use, check the Host's **Managed access** setting, then grant Members or Teams the
+Host or Projects they need. Creating Projects needs **Full access on the Host** within its
+folder policy, or Owner/Administrator authority. **Developer** on an existing Project creates
+Workspaces/worktrees there. See [Managed access](/docs/hub/managed-access) for levels,
+Agent limits and reviewing older grants.
 
 For unattended setup, inject an organization API key restricted to `daemons:enroll` without storing it:
 
@@ -138,7 +135,7 @@ If Hub loses the create response, or the daemon restarts mid-execution, Hub rese
 | Offline           | Enrolled but not currently connected           |
 | Revoked           | Access removed from Hub                        |
 
-An Automation event that arrives while a daemon is offline fails dispatch with `daemon_not_connected`. Nothing is queued for later. The run shows in the Automation's **Runs**, and the trigger has to fire again. An offline daemon also blocks saving a trigger that changes its target or agent, because Hub checks that agent against it; see [Saving checks the agent against the daemon](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon).
+An Automation event that arrives while a daemon is offline fails dispatch with `daemon_not_connected`. Its run shows in **Runs**; the trigger must fire again. This differs from the channel's [durable ingress queue](/docs/hub/activity). Current app/API [Automation saves](/docs/hub/automations) do not check live provider/model availability. The legacy configuration-bundle installer checks named agents against the daemon and can refuse activation while it is offline.
 
 Revoking from **Daemons → Revoke daemon** ends the relationship from Hub's side. The daemon keeps running your local agents.
 

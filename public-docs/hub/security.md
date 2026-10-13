@@ -18,14 +18,16 @@ The host, provider credentials, filesystem, network, and resulting actions remai
 
 ## Choose daemon authority
 
-Connecting a daemon does not grant Hub permission to run agents. Grant `hub.execute` when you want
-Hub automations to use it. This permission allows Hub to create and continue agents, inspect their
+`hub connect` requests `hub.execute` and supporting daemon/workspace permissions by default;
+review them before browser approval. An enrollment with no permissions gives identity and
+presence only. `hub.execute` lets Hub create and continue agents, inspect their
 state and timelines, configure their model, thinking, and provider permission mode, and archive or
-restore workspaces on that daemon. Provider modes can include bypassing approval prompts. It also applies to existing
+restore workspaces on that daemon. Provider modes can bypass approval prompts. It also applies to existing
 agents and workspaces; it is not an isolation boundary around Hub-created work.
 
 Daemon administration, terminal control, and daemon credential permission management require separate permissions.
 You can revoke `hub.execute` without granting Hub the ability to change its own permissions.
+See [daemon enrollment](/docs/hub/daemons) and [Managed access](/docs/hub/managed-access) for the separate human-access boundary.
 
 ## Treat requests as untrusted
 
@@ -57,7 +59,7 @@ prompt:
 
 ## Channel ingress
 
-A channel account that receives over a webhook publishes an endpoint on the public internet, and an accepted request runs an agent turn under whatever identity its body claims. Every webhook channel therefore requires its shared secret before Hub will start the account — Telegram (`webhookSecret`, echoed in `X-Telegram-Bot-Api-Secret-Token`), Zalo (`webhookSecret`), Feishu (encrypt key), Google Chat (bearer JWT). Hub will not serve an unauthenticated endpoint, so a start that fails for a missing secret is the guard, not a bug. Prefer polling or a long connection where the channel offers one; it needs no public URL at all.
+Use only transports listed as supported in the [channel guides](/docs/hub/channels). Webhook-backed Automation integrations, such as GitHub or Slack Apps, are separate from channel-account transport support. Configure their required signature secrets and public HTTPS endpoints through [Apps](/docs/hub/self-hosting). Outbound transports such as Socket Mode, polling or gateway need no public inbound endpoint when the integration supports them.
 
 Inbound attachments are downloaded to a per-account directory under Hub's data directory and handed to the agent as absolute paths, so the sender chooses both the bytes and the size. Downloads stop at the channel's ceiling and the partial file is removed. Treat that directory as untrusted content the agent can read: keep it outside any `cwd` you point a workflow at.
 
@@ -73,6 +75,7 @@ Keep secrets and unrelated repositories outside the selected `cwd`. Use a dedica
 
 - Put `slack.reply` only in a Slack workflow step that replies.
 - Put `discord.reply` only in a Discord workflow step that replies.
+- Put `github.reply` only on a GitHub issue/PR step that comments.
 - Put a [`github` block](/docs/hub/github) only on a step that needs GitHub.
 - Give classifiers no reply or repository authority.
 
@@ -83,7 +86,7 @@ allow_outputs:
   - { type: discord.reply, max: 1, required: true }
 ```
 
-The declaration grants `hub.reply`; the prompt must tell the agent to call it. GitHub has no reply abstraction.
+The declaration grants `hub.reply`; the prompt must tell the agent to call it. [Trigger documents](/docs/hub/triggers) can also receive optional native reply grants by default; review their effective output authority.
 
 ## Use a finite classifier boundary
 
@@ -155,7 +158,6 @@ agents:
       web_search: disabled
   codex-worker:
     provider: codex
-    model: gpt-5.5
     thinkingOptionId: xhigh
     options:
       approval_policy: never

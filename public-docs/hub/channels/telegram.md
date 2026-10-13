@@ -1,6 +1,6 @@
 ---
 title: Telegram channel
-description: Run an agent in Telegram DMs, groups, and forum topics over Bot API polling or a webhook.
+description: Run an agent in Telegram DMs, groups, and forum topics over Bot API polling.
 nav: Telegram
 order: 83
 category: Hub
@@ -8,44 +8,39 @@ category: Hub
 
 # Telegram
 
-Telegram needs no public address, no app review, and no workspace admin. A BotFather token is the whole credential, which makes it the fastest channel to get running.
+Telegram needs no public address, no app review, and no workspace admin. A BotFather token is the whole credential, Use that token with Bot API polling.
 
 ## What you need
 
 1. Message [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the token it gives you.
 2. Decide whether the bot reads every group message or only the ones addressed to it. BotFather's `/setprivacy` controls this. With privacy mode **on** (Telegram's default) a group message reaches the bot only when it mentions the bot or replies to it. Turn it **off** if you want a Route that answers everything in a group.
-3. Add the bot to the group or forum you want it in. In a forum, add it to the topics it should watch.
+3. Add the bot to the group or forum. Choose the topics it should answer with the Route's Rules.
 
-Write the token to a file — it never goes in a command line:
-
-```sh
-umask 077 && printf '%s' '123456:ABC-…' > /tmp/telegram-token
-```
-
-The file may also be JSON with a `botToken` key.
+Save the token in a private file using an editor, outside your repository, and restrict it to your user (`chmod 600 <token-file>`). Do not put it in shell history. The file can contain the raw token or JSON with a `botToken` key.
 
 ## Add it to Hub
 
 ```sh
-clisbot channels add telegram --account main --secret-file /tmp/telegram-token
-rm /tmp/telegram-token
+clisbot channels add telegram --account main --secret-file <token-file>
 ```
 
 Hub probes the token with `getMe` before storing it, encrypts it into a Connection, and starts the account. `clisbot channels ls` shows the transport state.
 
 In the app: **Channels → Connections → Add Connection**, pick Telegram, paste the token into the credential form, then finish the Route.
 
-Polling is the default and needs nothing else. The webhook transport needs a public HTTPS URL and a secret token, and Hub refuses to compile it until you supply both.
+**Polling is the supported transport** and needs no public URL. Hub refuses webhook configurations even if a URL and secret are supplied.
 
 ## Conversations it handles
 
 Direct messages, basic groups, supergroups, and forum topics. A forum topic is addressed by its thread id, and a Route can target one topic without touching the rest of the forum. A reply lands in the same topic it came from.
 
-Inbound covers messages, `/commands` (including `/command@yourbot` in a group), button and select callbacks, message edits, reactions, poll answers, member joins and leaves, topic events, and media groups. Photos, documents, voice, video, video notes, and location arrive as attachments within the account's size cap.
+Inbound covers messages, `/commands` (including `/command@yourbot` in a group), button and select callbacks, message edits, reactions, poll answers, member joins and leaves, topic events, and media groups. Photos, documents, voice, video, video notes, and location arrive as attachments within the account's size cap and the 20 MB inbound download limit.
+
+Use [Channel slash commands](/docs/hub/channels/commands#channel-invocation) for session controls, Project/Workspace selection and this channel's invocation forms.
 
 ## What the agent can do
 
-Message tool actions: `send`, `poll`, `react`, `edit`, `delete`, `sticker`, `sticker-search`, `topic-create`, `topic-edit`.
+Message tool actions: `send`, `poll`, `react`, `edit`, `delete`, `sticker`, `sticker-search`, `topic-create`, `topic-edit`, `emoji-list`, subject to account action settings.
 
 Replies are written in markdown and rendered before they are posted. By default the account posts native rich blocks: headings stay headings, lists and blockquotes stay lists and blockquotes, fenced code keeps its language, and a markdown table becomes a real Telegram table. Charts have no Telegram primitive and always degrade to text. Long answers split into ordered chunks.
 
@@ -60,7 +55,7 @@ Buttons and select menus are inline keyboards; an approval prompt is an inline k
 - No group DMs — Telegram has no such conversation.
 - Inside a forum topic the agent can only `edit`, `react` to or `delete` a message the bot itself observed there: the message it is answering, a message it received in that topic, or one it sent there. A message id it did not observe is refused, and the refusal says so.
 - Sticker vision is unavailable: the agent is told a sticker arrived, not what it depicts.
-- The webhook transport is wired but has never run against a public URL.
+- Webhook transport is unavailable in Hub; use polling.
 - Bot API rate limits apply per chat; sends are throttled rather than dropped.
 
 ## Verified live

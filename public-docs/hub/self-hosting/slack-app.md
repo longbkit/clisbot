@@ -15,7 +15,7 @@ Slack can reach Hub in two ways:
 | Socket Mode | No                    | Local, personal, and single-process Hub |
 | Webhooks    | Yes                   | Public server deployments               |
 
-Socket Mode is the default in browser setup. Both transports produce the same `slack.mention` triggers and thread replies.
+Socket Mode is the default in browser setup. Both transports serve `slack.mention` Automation triggers. [Channel Routes](/docs/hub/channels/slack) use a separate transport catalog; use their supported setup for interactive chat.
 
 ## Set up Socket Mode
 

@@ -1,6 +1,6 @@
 ---
 title: Slack channel
-description: Run an agent in Slack channels, threads, and DMs over Socket Mode or the Events API.
+description: Run an agent in Slack channels, threads, and DMs over Socket Mode.
 nav: Slack
 order: 82
 category: Hub
@@ -8,23 +8,22 @@ category: Hub
 
 # Slack
 
-Slack is the most complete channel: rich Block Kit replies, tables and charts, buttons, approval prompts, reactions, pins, files both ways, and slash commands.
+Slack supports: rich Block Kit replies, tables and charts, buttons, approval prompts, reactions, pins, files both ways, and slash commands.
 
 ## What you need
 
 A Slack app installed in the workspace, saved in Hub as a **Connection**. [Slack for Hub](/docs/hub/self-hosting/slack-app) covers creating it from the manifest Hub generates and pasting the two tokens. The channel reuses that same Connection — there is no second Slack credential.
 
-| Credential     | Looks like | Needed for                                        |
-| -------------- | ---------- | ------------------------------------------------- |
-| Bot token      | `xoxb-…`   | Everything.                                       |
-| App token      | `xapp-…`   | Socket Mode. Needs the `connections:write` scope. |
-| Signing secret | —          | The Events API webhook transport only.            |
+| Credential | Looks like | Needed for                                        |
+| ---------- | ---------- | ------------------------------------------------- |
+| Bot token  | `xoxb-…`   | Everything.                                       |
+| App token  | `xapp-…`   | Socket Mode. Needs the `connections:write` scope. |
 
-Socket Mode needs no public address and is the transport to start with. The Events API webhook needs Hub reachable at a public HTTPS URL.
+Channel Routes use **Socket Mode**, which needs no public address. Hub refuses the channel Events API webhook transport. Slack event triggers are a separate integration; their HTTP setup does not enable channel webhooks.
 
 ### Scopes
 
-Hub's manifest asks for the scopes it verifies at install: `app_mentions:read`, `channels:history`, `chat:write`, `files:read`, `groups:history`, `reactions:write`, `users:read`, plus the optional `assistant:write` for the thread typing indicator.
+Hub's manifest asks for the scopes it verifies at install: `app_mentions:read`, `channels:history`, `chat:write`, `files:read`, `groups:history`, `reactions:write`, `users:read`, plus optional `assistant:write` for thread typing and `im:history`/`mpim:history` for DM/group-DM message events.
 
 Those cover mentions, replies, history reads, and reactions. The other message-tool actions call Slack methods with their own scope requirements, and Slack answers `missing_scope` when one is absent:
 
@@ -38,7 +37,7 @@ Those cover mentions, replies, history reads, and reactions. The other message-t
 | `emoji-list`               | `emoji.list`                                                 | `emoji:read`                                           |
 | `read` in a DM or group DM | `conversations.history`, `conversations.replies`             | `im:history`, `mpim:history` beside the channel scopes |
 
-Add the ones you want in the app's **OAuth & Permissions** page and reinstall. Adding a scope you do not use costs nothing; the action fails loudly when it is missing.
+Add the ones you want in the app's **OAuth & Permissions** page and reinstall. Grant the scopes for actions you need; a missing scope produces a visible error.
 
 Invite the bot to every channel it should watch:
 
@@ -48,7 +47,7 @@ Invite the bot to every channel it should watch:
 
 ## Add it to Hub
 
-Slack installs from an existing Connection, so create the Connection first under **Apps → Slack**, then:
+Reuse an installed Slack Connection:
 
 ```sh
 clisbot channels add slack --account main --connection-id <connection-uuid>
@@ -63,6 +62,8 @@ In the app, open **Channels → Connections → Add Connection** and connect Sla
 Public and private channels, threads under them, direct messages, and group DMs. A reply to a channel message opens a thread under that message; a reply inside a thread stays there.
 
 Inbound covers mentions, message edits and deletes, reactions, slash commands, and interactive component clicks (buttons and selects). Files attached to an inbound message are downloaded and handed to the agent as attachments.
+
+Use [Channel slash commands](/docs/hub/channels/commands#channel-invocation) for session controls, Project/Workspace selection and this channel's invocation forms.
 
 ## What the agent can do
 
@@ -99,7 +100,7 @@ The running record with message timestamps is `docs/tests/channels/p0-live-scena
 
 ## Troubleshooting
 
-**The account never leaves `starting` or reports `failed`.** `clisbot channels status` prints the detail. A bad or revoked bot token shows as a Slack `invalid_auth`; an app token without `connections:write` fails the Socket Mode open. A loaded host that cannot answer `auth.test` inside the 15 s start budget logs an error naming the budget and retries once before the account fails.
+**The account never leaves `starting` or reports `failed`.** `clisbot channels status` prints the detail. A bad or revoked bot token shows as a Slack `invalid_auth`; an app token without `connections:write` fails the Socket Mode open. A channel runtime that cannot answer `auth.test` inside the 15 s start budget logs an error naming the budget and retries once before the account fails.
 
 **An action returns `missing_scope`.** Add the scope from the table above and reinstall the app. The action names the method it called.
 
@@ -107,4 +108,4 @@ The running record with message timestamps is `docs/tests/channels/p0-live-scena
 
 **A message from another bot is ignored.** Bot-authored traffic is admitted only when the message mentions the bot explicitly.
 
-**Replies stop after a Hub restart.** Check `clisbot channels status` first; if the account is running, the conversation may be holding an agent session created before the restart. Start a fresh one with `/new`.
+**Replies stop after a Hub restart.** Check `clisbot channels status` and `/status`, then ask the operator to check the Host connection and account error. Use `/new` only when you want a fresh session.

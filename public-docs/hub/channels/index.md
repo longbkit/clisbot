@@ -1,8 +1,8 @@
 ---
 title: Hub channels
-description: The eight chat platforms a Hub can run an agent in, what each one can do, and which capabilities have live evidence.
+description: The eight channel integrations a Hub can run an agent in, what each one can do, and which capabilities have live evidence.
 nav: Channels
-order: 81
+order: 63
 category: Hub
 ---
 
@@ -22,31 +22,31 @@ Slack / Telegram / Discord / Google Chat / Feishu / Zalo / WhatsApp
 Three resources make that work, and they are separate on purpose:
 
 - A **Connection** owns the credential — one Slack workspace installation, one bot token, one Zalo account you logged in to. Hub encrypts it and never shows it again. A bot has one Connection: adding a second one for a bot Hub already holds is refused and names the Connection that has it, since two would both run the bot and split its messages.
-- A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization. Adding a Connection adds its account, so the bot runs at once: before any Route it answers `/status` and `/me` with the sender's ID and remembers who wrote, which is how you find the people to name in a Rule. Nobody reaches an agent until a Route lets them in.
+- A **Channel account** is the behaviour attached to that Connection: transport settings, ordered Routes, access, reply synchronization. Adding a Connection adds its account, so the bot runs at once: before any Route it answers `/status` with chat IDs and `/me` with the sender's ID (use a DM where group IDs are private) and remembers who wrote, which is how you find the people to name in a Rule. Nobody reaches an agent until a Route lets them in.
 - A **Route** is where a message goes — a direct agent, a Bot, or an Automation — and its **Rules** are the ways in. The first Route with a Rule that lets the message in wins; a sender no Route admits is refused.
 
 [How Hub works](/docs/hub/concepts) covers the resource model. This section covers the platforms.
 
 ## The eight channels
 
-| Channel                                      | Credential                              | Inbound transport                  | Needs a public HTTPS URL |
-| -------------------------------------------- | --------------------------------------- | ---------------------------------- | ------------------------ |
-| [Slack](/docs/hub/channels/slack)            | Bot token + app token                   | Socket Mode, or Events API webhook | Webhook only             |
-| [Telegram](/docs/hub/channels/telegram)      | Bot token                               | Bot API polling, or webhook        | Webhook only             |
-| [Discord](/docs/hub/channels/discord)        | Bot token                               | Gateway                            | No                       |
-| [Google Chat](/docs/hub/channels/googlechat) | Service-account JSON + subscription     | Cloud Pub/Sub                      | No                       |
-| [Feishu / Lark](/docs/hub/channels/feishu)   | App ID + app secret (+ webhook secrets) | Long connection, or webhook        | Webhook only             |
-| [Zalo Official Bot](/docs/hub/channels/zalo) | Bot token                               | Bot API polling, or webhook        | Webhook only             |
-| [Zalo Personal](/docs/hub/channels/zalouser) | A QR login to a personal account        | Push socket                        | No                       |
-| [WhatsApp](/docs/hub/channels/whatsapp)      | A QR login                              | WhatsApp Web socket                | No                       |
+| Channel                                      | Credential                          | Inbound transport   | Needs a public HTTPS URL |
+| -------------------------------------------- | ----------------------------------- | ------------------- | ------------------------ |
+| [Slack](/docs/hub/channels/slack)            | Bot token + app token               | Socket Mode         | No                       |
+| [Telegram](/docs/hub/channels/telegram)      | Bot token                           | Bot API polling     | No                       |
+| [Discord](/docs/hub/channels/discord)        | Bot token                           | Gateway             | No                       |
+| [Google Chat](/docs/hub/channels/googlechat) | Service-account JSON + subscription | Cloud Pub/Sub       | No                       |
+| [Feishu / Lark](/docs/hub/channels/feishu)   | App ID + app secret                 | Long connection     | No                       |
+| [Zalo Official Bot](/docs/hub/channels/zalo) | Bot token                           | Bot API polling     | No                       |
+| [Zalo Personal](/docs/hub/channels/zalouser) | A QR login to a personal account    | Push socket         | No                       |
+| [WhatsApp](/docs/hub/channels/whatsapp)      | A QR login                          | WhatsApp Web socket | No                       |
 
-**Webhook transports are not supported yet.** Each one is ported but none has run end to end against its platform, so the app labels them "Not supported yet" under Channel Integrations and offers no way to pick one. Use the other transport in the table; every channel has one that needs no public URL.
+**Channel webhook transports are not supported.** Hub refuses Slack Events API, Telegram, Google Chat HTTP, Feishu and Zalo webhook configurations even when credentials are supplied. Use the supported transport in the table; none needs a public URL. Provider event triggers are separate integrations.
 
 Zalo Personal and WhatsApp are the odd ones: there is no token to paste. You log in to each by scanning a QR code with a phone, and the session ends from time to time, so you log in again. Everything that account can do, a human on that account can do. Read their pages before you use them.
 
 ## Capability matrix
 
-What each vertical implements. A blank cell means the platform or the vertical has no such thing; footnoted cells work with a restriction.
+Integration capabilities, subject to each page's direction, settings and limits. A cell does not promise both inbound and outbound support or live verification. A blank cell means this integration does not provide the capability.
 
 | Capability            | Slack | Telegram | Discord | Google Chat | Feishu | Zalo Bot | Zalo Personal | WhatsApp |
 | --------------------- | ----- | -------- | ------- | ----------- | ------ | -------- | ------------- | -------- |
@@ -55,8 +55,8 @@ What each vertical implements. A blank cell means the platform or the vertical h
 | Mentions              | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
 | Rich formatting       | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
 | Long-message chunking | ✅    | ✅       | ✅      | ✅          | ✅     | ✅       | ✅            | ✅       |
-| Media                 | ✅    | ✅       | ✅      |             |        | ¹        | ✅            | ✅       |
-| File attachments      | ✅    | ✅       | ✅      |             |        |          | ✅            | ✅       |
+| Media                 | ✅    | ✅       | ⁷       |             |        | ¹        | ⁷             | ✅       |
+| File attachments      | ✅    | ✅       | ⁷       |             |        |          | ⁷             | ✅       |
 | Reactions             | ✅    | ✅       | ²       |             | ✅     |          | ✅            | ✅       |
 | Edit messages         | ✅    | ✅       | ✅      | ✅          | ✅     |          |               |          |
 | Delete messages       | ✅    | ✅       | ✅      | ✅          |        |          |               |          |
@@ -66,40 +66,31 @@ What each vertical implements. A blank cell means the platform or the vertical h
 | Location              |       | ✅       |         |             |        |          |               | ✅       |
 | Polls                 | ✅    | ✅       | ✅      |             |        |          |               | ✅       |
 | Forum topics          |       | ✅       |         |             |        |          |               |          |
-| Tables and charts     | ✅    | ✅       | ✅      |             |        |          |               |          |
-| Buttons               | ✅    | ✅       | ✅      | ³           | ⁴      |          |               |          |
-| Select menus          | ✅    | ✅       | ✅      | ³           | ⁴      |          |               |          |
+| Tables and charts     | ✅    | ⁹        | ✅      |             |        |          |               |          |
+| Buttons               | ✅    | ✅       | ⁸       | ³           | ⁴      |          |               |          |
+| Select menus          | ✅    | ✅       | ⁸       | ³           | ⁴      |          |               |          |
 | Approval prompts      | ✅    | ✅       |         |             |        |          |               | ⁶        |
-| Native commands       | ✅    | ✅       | ⁵       |             |        |          |               |          |
+| Native commands       | ✅    | ✅       | ✅      | ⁵           |        |          |               |          |
 | Group DMs             | ✅    |          |         |             | ✅     |          |               |          |
 | Emoji discovery       | ✅    | ✅       | ✅      |             |        |          |               |          |
 
-¹ Inbound images only; the Zalo Bot API has no upload endpoint.
+¹ Inbound images and outbound images by public HTTPS link; no upload endpoint.
 ² Outbound reactions only; inbound reaction events are not wired yet.
 ³ Card clicks arrive inbound; Hub renders no card of its own.
 ⁴ Card clicks arrive inbound; Hub renders no Lark card of its own.
-⁵ Slash commands and interaction callbacks are not wired yet.
+⁵ The operator registers `/clisbot` in the Google Chat app console; its command normalization is implemented but not verified live.
 ⁶ Answered by reacting to the prompt (👍, 👎, 1️⃣–4️⃣); WhatsApp has no buttons.
+⁷ Outbound only; inbound attachments are not downloaded.
+⁸ Outbound components render, but their clicks are not routed to Hub.
+⁹ Native tables; charts fall back to text.
 
-The same matrix appears per account under **Channels → Channel Integrations** in the Clisbot app, where a claimed capability shows as **Not verified** until the account has actually exercised it. The catalog is a claim; a green check in the app means evidence.
+In the app, **Channels → Channel Integrations → What it supports** describes the integration. A Connection's Status describes its runtime health. There is no per-Connection capability verification state; dated live evidence is listed separately below.
 
 ## Commands in a conversation
 
-The same verbs work on every channel, with or without a leading `/`, and with or without a mention in front. An addressed `@bot /new` and a Telegram-style `/new@yourbot` both normalize to the same command.
+Use [Channel slash commands](/docs/hub/channels/commands) to choose a Project or Workspace, inspect Git, start or fork a session, change its configuration, answer approvals, and open the same work in the app. Start with `/help` or `@bot /help` in a group.
 
-| Command                | What it does                                                                           |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| `/new`, `/reset`       | Start a fresh agent session for this conversation.                                     |
-| `/stop`, `/cancel`     | Stop what the agent is doing.                                                          |
-| `/status`, `/state`    | This chat's IDs and whether you can talk here; the session for an admitted Hub Member. |
-| `/help`                | List the commands.                                                                     |
-| `/agent <name>`        | Switch this conversation to another agent.                                             |
-| `/model <name>`        | Switch this conversation to another model.                                             |
-| `/approve`, `/deny`    | Answer a pending permission request.                                                   |
-| `/routedefault`        | Show the route serving this conversation and its default.                              |
-| `/promoteroutedefault` | Make this conversation's setup that route's default; `undo` reverts its last change.   |
-
-Approve and deny also arrive as button presses where the platform has buttons.
+Commands act on this conversation's session. Outside a DM, name the bot even when ordinary messages need no mention; a Telegram `/status@yourbot` and an addressed `@bot /status` reach the same command. Native `/clisbot` is another entry point where configured. The guide covers channel-specific spellings and permissions.
 
 ### Permission requests
 
@@ -132,21 +123,7 @@ routes:
 `questions:` is also a `defaults:` leaf, inherited organization → account →
 route.
 
-`/agent` and `/model` only offer what the route lists:
-
-```yaml
-routes:
-  - audience: [{ who: { roles: [member] }, where: { conversations: [C0APP] } }]
-    agent: worker
-    environment: repo
-    agents: [reviewer] # plus `worker`, the route's own — always offered
-    models: [gpt-5.6-luna, claude-sonnet-4.6]
-```
-
-A route that lists neither refuses both commands. A bare `/model` prints the
-menu. Switching ends the running session, because an agent's model is fixed when
-it starts; the next message opens a session on the new choice, and the choice
-outlives `/new`.
+Configuration commands offer only profiles, providers, models and effort allowed by your own Access grants. A bare `/model` shows current/next configuration; `/model list` discovers choices. Same-provider model changes apply live; a different provider is staged until `/new` or `/fork`. See [Choose an Agent configuration](/docs/hub/channels/commands#choose-an-agent-configuration).
 
 ## Route defaults
 
@@ -208,20 +185,11 @@ inherited organization → account → route.
 
 ## Where a conversation's work lands
 
-Each conversation gets its own workspace on the daemon, named from the first
-message it sends — `Fix the flaky login test`, not `repo`, `repo`, `repo`.
-Commands that continue that work (`/fork`, `/side`) open their session in the
-same workspace; commands that start something else (`/new`, `/quick`) open a new
-one. Renaming a workspace yourself is safe: automatic naming never overwrites a
-name you set.
+Without an explicit location choice, Hub gives each new channel session a Workspace named from its first message. `/fork` and `/side` continue in the source Workspace; `/new` and `/quick` start another. Renaming a Workspace yourself preserves its name.
 
-Turn it off per organization, account, or route and the daemon places and names
-sessions as it did before:
+Use `/project` and `/workspace` to choose where the next session runs, `/workspace new` to create it before the Agent starts, and `/branch` or `/worktree` to inspect Git. Choices are shared within the conversation's binding scope. See [Choose a Project and Workspace](/docs/hub/channels/commands#choose-a-project-and-workspace) for examples, permissions and `/new`/`/fork` behavior.
 
-```yaml
-defaults:
-  workspace: { organize: false }
-```
+An operator can disable automatic organization with `defaults.workspace.organize: false`; sessions then use the Host's placement and naming behavior.
 
 ## Editing a route while conversations are running
 
@@ -332,8 +300,9 @@ Connection Admin can change who may talk to a route they could not publish.
 The bot token and every credential in the account's settings are never shown
 to a Connection Admin and survive their saves unchanged.
 
-Commands never need a mention. Each Rule's `requireMention` decides when a
-plain message wakes the agent.
+Outside a DM, commands must address this bot. Each Rule's `requireMention`
+and follow-up window decide when an ordinary message wakes the agent; they
+do not remove command addressing.
 
 ### Routes open to Anyone
 
@@ -343,8 +312,7 @@ needed, a follow-up window that lets anyone talk without a mention, output
 beyond the final answer, permission requests accepted automatically, Fast mode, or a
 mode that runs tools without asking. The app lists them before you confirm a
 save. New routes start from the safe side: a mention in groups, final answers
-only, and permission requests put to authorized members (someone let in as
-Anyone can never approve one).
+only, and permission requests put to authorized members (chat admission alone grants no approval authority).
 
 A route takes its audience only as a list of rules. A file that still carries a
 route `match:`, a one-value `audience: { kind: … }` or an account `fallback:`
@@ -418,9 +386,9 @@ defaults:
     deniedReply: "Ask an operator for access." # omit to refuse silently
 ```
 
-Omit the whole `access:` block and nothing is gated by it — the Hub's own roles
-decide, exactly as they did before the block existed. Add one leaf and the gate
-runs in front of them: both have to allow.
+Omit `access:` and the Route's Rules still decide who may talk. Add a leaf and
+this sender gate runs before the Rules: both must allow. Personal Host/Project
+Access is checked separately when a command needs it.
 
 A refused sender never reaches an agent. The refusal is recorded in channel
 activity with its reason (`dm_policy_not_allowlisted`, `group_policy_disabled`,
@@ -452,11 +420,11 @@ one account does not admit them on another, and never on another organization's.
 
 A Route's **Reply method** decides what reaches the conversation:
 
-| Reply method      | What the user sees                                                                                                                             |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hybrid            | The agent's answer as text, plus the files, reactions and edits it sends with its `message` tool. The default for a new Route open to members. |
-| Text forward      | The agent's answer as text. The agent cannot send files or act on messages.                                                                    |
-| Channel tool only | Only what the agent sends with its `message` tool, including short progress updates on long work.                                              |
+| Reply method      | What the user sees                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hybrid            | The agent's answer as text, plus the files, reactions and edits it sends with its `message` tool. The default for a new Route, including Anyone routes. |
+| Text forward      | The agent's answer as text. The agent cannot send files or act on messages.                                                                             |
+| Channel tool only | Only what the agent sends with its `message` tool, including short progress updates on long work.                                                       |
 
 The Clisbot app shows the same answer the conversation got on the first two. On
 **Channel tool only**, the agent's own messages stay in the app and the
@@ -475,10 +443,11 @@ text — one file or many, any type, in the order it names them. Each file becom
 its own post in the same conversation, so a reply that says "here is the report"
 and attaches it arrives as two messages, not one.
 
-A file has to live under the Project the session is bound to. A path outside it
-is refused and the agent is told why; the same goes for a file over the
-channel's upload cap (Telegram 50 MB, Slack 250 MB, Discord 10 MB), which posts
-a visible notice in place of the file rather than dropping it silently.
+Local files are read from the Agent's Host using the permissions of the Host user
+running it, including readable paths outside the Project and symlinks. They are
+not confined to the Project root. An older Host asks you to update for file
+transfer. Files over the upload cap (Telegram 50 MB, Slack 250 MB, Discord 10 MB,
+Zalo Personal 100 MB, WhatsApp 50 MB) produce a visible notice.
 
 Channels with no upload endpoint — Google Chat, Feishu, Zalo Bot — refuse the
 attachment by name. See each channel's page.
@@ -498,7 +467,7 @@ clisbot channels rm <channel> --account <id> --yes
 
 `status` adds the pin, integrity, and load-trace columns to what `ls` shows, and is the first thing to run when an account is not behaving.
 
-`rm` drops the account from the channel configuration and stops its transport. It refuses without `--yes`. The Connection holding the credential stays — another account can be using it — and `rm` prints its id so you can retire it from the app.
+`rm` drops the account from the channel configuration and stops its transport. It refuses without `--yes`. The Connection holding the credential stays, and `rm` prints its id so you can retire it from the app.
 
 `ls` also answers to `list`, the name it shipped under.
 
@@ -508,16 +477,16 @@ All four accept `--hub <origin>` to target a Hub other than the local one (with 
 
 A capability is only "verified live" when a message from a real account on the real platform reached an agent and the agent's answer came back to the same conversation, read back through the platform's own API.
 
-| Channel           | Live evidence                                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| Slack             | Yes — mention → reply in thread, long chunked replies, outbound files (2026-09-07).                            |
-| Telegram          | Yes — mention → reply, forum topics, files in and out, edit and poll actions, `/new` and `/stop` (2026-09-07). |
-| Discord           | No. Tested against a simulated platform only; needs a bot token and a test guild.                              |
-| Google Chat       | Yes, DMs over Cloud Pub/Sub (2026-10-06). Spaces, cards and the HTTP endpoint are not verified.                |
-| Feishu / Lark     | No. Tested against a faked Lark SDK client only; needs Lark app credentials.                                   |
-| Zalo Official Bot | No. Polling E2E is runnable with a bot token and a human sender; not yet run.                                  |
-| Zalo Personal     | No. Needs a human to scan a QR code.                                                                           |
-| WhatsApp          | No. Needs a human to scan a QR code with a spare number.                                                       |
+| Channel           | Live evidence                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Slack             | Recorded — mention → reply in thread, long chunked replies, outbound files (2026-09-07).                            |
+| Telegram          | Recorded — mention → reply, forum topics, files in and out, edit and poll actions, `/new` and `/stop` (2026-09-07). |
+| Discord           | No. Tested against a simulated platform only; needs a bot token and a test guild.                                   |
+| Google Chat       | Recorded, DMs over Cloud Pub/Sub (2026-10-06). Spaces, cards and the HTTP endpoint are not verified.                |
+| Feishu / Lark     | No. Tested against a faked Lark SDK client only; needs Lark app credentials.                                        |
+| Zalo Official Bot | No. Polling E2E is runnable with a bot token and a human sender; not yet run.                                       |
+| Zalo Personal     | No. Needs a human to scan a QR code.                                                                                |
+| WhatsApp          | No message loop. QR start/poll/cancel recorded 2026-10-06; scan and messages need a spare number.                   |
 
 Each channel page carries its own per-capability line. The running record of what passed and what failed, with message ids, is `docs/tests/channels/p0-live-scenarios.md` in the repository.
 

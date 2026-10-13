@@ -1,6 +1,6 @@
 ---
 title: Hub quickstart
-description: Create a seeded assistant workspace and connect Slack or Telegram through Hub APIs.
+description: Create a seeded Bot on your Host and connect Slack or Telegram through Hub APIs.
 nav: Quickstart
 order: 61
 category: Hub
@@ -8,7 +8,7 @@ category: Hub
 
 # Hub quickstart
 
-`clisbot hub init` creates a local assistant workspace with starter instructions and an initial agent you can open in the app. Supply channel credentials to also enroll the daemon, configure a Connection and member routes, and prepare owner access. Configuration is updated through APIs.
+`clisbot hub init` creates a Bot with starter instructions in its own Project/Workspace. Open it under **Bots** in the app; its first message starts an agent session. Supply channel credentials to also enroll the daemon, configure a Connection and member Routes, and prepare owner access.
 
 You need Clisbot installed and an available agent provider on the daemon. The examples use Codex; select another configured provider with `--provider`.
 
@@ -18,15 +18,15 @@ You need Clisbot installed and an available agent provider on the daemon. The ex
 clisbot hub init --provider codex
 ```
 
-The command starts the local daemon and Hub as needed. Its default directory is `<Clisbot home>/workspaces/default`, regardless of the directory from which you run it. Home resolution is `--home`, then `CLISBOT_HOME`, then `CLISBOT_HOME`, then `~/.clisbot`. `~` in a configured home is expanded. Use `--workspace /absolute/path` to select another directory.
+The command starts the local daemon and Hub as needed. Without a Bot name or explicit path, it uses `<Clisbot home>/workspaces/default`. A named Bot uses the daemon's configured Bot root and slug. Home resolution is `--home`, then `CLISBOT_HOME`, then `~/.clisbot`. `~` in a configured home is expanded. Use `--workspace /absolute/path` to select another directory.
 
-The daemon owns the **Project** and **Workspace**. Hub has no Project to create or select. For worktree isolation, templates are written into the actual worktree directory returned by the daemon.
+The daemon owns the **Bot**, **Project** and **Workspace**. Bot homes use directory Workspaces; `--new-workspace` is unsupported. Hub has no Project to create or select.
 
-The personal or team template (`--kind personal|team`) creates missing `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `IDENTITY.md`, `BOOTSTRAP.md`, and `TOOLS.md` before creating the agent. Existing files and symlinks are preserved by default and counted in the result. The OS home root cannot be used as the seed destination. Team assistants default to `<Clisbot home>/workspaces/team` so they do not share the personal assistant’s files. Choose an explicit separate workspace for any other assistants that must not share context. Existing saved workspace paths are preserved.
+The personal or team template (`--kind personal|team`) seeds instructions and memory on the Host. Existing files and symlinks are preserved and counted in the result; the OS home root cannot be a seed destination. Choose a distinct Bot name or explicit workspace for assistants that must not share context. Changing kind alone does not select a separate home. See [Bots and Group chats](/docs/bots-and-chats) for templates, sharing and session visibility.
 
 ## Configure the owner and a channel
 
-Open the local Hub address printed by the command and finish Account setup. For a fresh unattended installation, supply `--owner-email` and `--owner-password '${INITIAL_OWNER_PASSWORD}'` to the first command; set the password in that environment variable beforehand. `--organization-name` optionally names the initial organization. Existing accounts and passwords are preserved.
+Open the **App** URL printed by the command and finish Account setup; the Hub backend URL serves APIs. For a fresh unattended installation, supply `--owner-email` and `--owner-password '${INITIAL_OWNER_PASSWORD}'`; set that environment variable beforehand. `--organization-name` optionally names the initial organization. Existing accounts and passwords are preserved.
 
 For Telegram:
 
@@ -59,9 +59,9 @@ When the owner is linked and transport is started, DM the bot or mention it in a
 clisbot bot start --bot-name personal-assistant
 ```
 
-The saved manifest reuses the workspace, initial agent, and encrypted Connection; it contains no channel token. `hub init` also resumes a saved bot. A failed channel install retains the daemon resource IDs for retry. Existing user files and unrelated routes are preserved.
+The local manifest retains Bot/channel restart references, without channel tokens. The daemon owns the Bot, Workspace and sessions. `hub init` also resumes a saved Bot. A failed channel install retains the Bot reference for retry. Existing user files and unrelated Routes are preserved.
 
-Channel conversations create or resume their own agent sessions against the configured workspace. They are not all attached to the initial agent visible in the app.
+Each channel conversation creates or resumes its own agent session in the Bot's Workspace. It does not reuse your app Chat's session.
 
 Use the Hub configuration UI or its resource APIs to change configuration. Export is optional backup/portability; editing exported files and deploying a Hub Project is not part of this flow. `CLISBOT_ONBOARDING_ENABLED=0` restores the inherited CLI setup surface for rollback; apply the same setting to the CLI and Hub.
 
@@ -75,11 +75,11 @@ startup failures point to the selected home's logs rather than contacting anothe
 home's server. An existing connection to a different Hub must be disconnected
 explicitly before enrolling the daemon into the local Hub.
 
-A home with `daemon.managedAccess.mode: external` is an existing managed installation,
-not a fresh onboarding target. CLI onboarding stops before opening an unticketed TCP
-connection. The Hub owner password does not replace the daemon access ticket. Use
-an empty home for a fresh test, or use authenticated local socket/pipe recovery to
-manage the existing installation. Stopping processes preserves this access policy.
+An enrolled home in `external` Managed access already requires Hub tickets. CLI
+onboarding stops before opening an unticketed TCP connection there; the Hub owner
+password does not replace a daemon ticket. Use an empty home for a fresh test, or
+authenticated local socket/pipe recovery for the existing installation. A fresh,
+unenrolled daemon can use the ordinary onboarding flow even with `external` set.
 
 ## Change an existing owner's password
 
