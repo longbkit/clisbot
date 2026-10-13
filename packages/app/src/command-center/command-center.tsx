@@ -590,14 +590,16 @@ export function CommandCenter() {
     onClose: state.close,
   });
 
+  const activeRowIndex = state.activeId ? state.rowIndexByResultId.get(state.activeId) : undefined;
+  const rowTop = activeRowIndex === undefined ? null : state.offsets[activeRowIndex];
+  const rowBottom =
+    activeRowIndex === undefined || rowTop === null
+      ? null
+      : rowTop + state.rows[activeRowIndex].height;
   const revealActiveResult = useCallback(() => {
-    if (!state.open || !state.activeId) return;
-    const index = state.rowIndexByResultId.get(state.activeId);
-    if (index === undefined) return;
+    if (!state.open || !state.activeId || rowTop === null || rowBottom === null) return;
     const { offset, visibleLength } = scrollMetricsRef.current;
     if (visibleLength <= 0) return;
-    const rowTop = state.offsets[index];
-    const rowBottom = rowTop + state.rows[index].height;
     let nextOffset: number | null = null;
     if (rowTop < offset) nextOffset = rowTop;
     if (rowBottom > offset + visibleLength) nextOffset = rowBottom - visibleLength;
@@ -606,14 +608,9 @@ export function CommandCenter() {
     const boundedOffset = Math.max(0, nextOffset);
     scrollMetricsRef.current.offset = boundedOffset;
     ref?.scrollToOffset({ offset: boundedOffset, animated: false });
-  }, [
-    showBottomSheet,
-    state.activeId,
-    state.offsets,
-    state.open,
-    state.rowIndexByResultId,
-    state.rows,
-  ]);
+  }, [showBottomSheet, state.activeId, state.open, rowTop, rowBottom]);
+  // Directory updates rebuild rows during live turns. Reveal only when the active
+  // result or its bounds change, so metadata refreshes do not undo manual scrolling.
   useEffect(() => {
     if (!state.open) {
       scrollMetricsRef.current = { offset: 0, visibleLength: 0 };
