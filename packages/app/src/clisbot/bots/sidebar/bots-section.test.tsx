@@ -67,6 +67,7 @@ vi.mock("@/components/ui/tooltip", () => ({
 }));
 vi.mock("lucide-react-native", () => ({
   ChevronDown: () => <i />,
+  ChevronUp: () => <i />,
   MessageCircle: () => <i />,
   ChevronRight: () => <i />,
   Bot: () => <i />,
@@ -188,10 +189,7 @@ vi.mock("@/stores/sidebar-collapsed-sections-store", () => ({
   ) => select({ collapsedWorkspaceGroupKeys: new Set(), toggleWorkspaceGroupCollapsed: () => {} }),
 }));
 
-vi.mock("@/components/adaptive-modal-sheet", () => ({ AdaptiveModalSheet: () => null }));
-
 vi.mock("@/components/ui/form-field", () => ({ FormTextInput: () => <input /> }));
-vi.mock("@/components/ui/scroll-view", () => ({ FlatList: () => null }));
 
 vi.mock("./directory-controls", () => ({ DirectoryControls: () => null }));
 vi.mock("@/components/ui/loading-spinner", () => ({ LoadingSpinner: () => null }));
@@ -199,6 +197,87 @@ vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onPress }: { children: React.ReactNode; onPress?: () => void }) => (
     <button type="button" onClick={onPress}>
       {children}
+    </button>
+  ),
+}));
+
+vi.mock("@/components/adaptive-modal-sheet", () => ({
+  AdaptiveModalSheet: ({
+    visible,
+    children,
+    onClose,
+  }: {
+    visible: boolean;
+    children: ReactNode;
+    onClose: () => void;
+  }) =>
+    visible ? (
+      <div role="dialog">
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+        {children}
+      </div>
+    ) : null,
+}));
+vi.mock("@/components/ui/scroll-view", () => ({
+  FlatList: ({
+    data,
+    renderItem,
+  }: {
+    data: { key: string }[];
+    renderItem: (row: { item: { key: string } }) => ReactNode;
+  }) => (
+    <>
+      {data.map((item) => (
+        <React.Fragment key={item.key}>{renderItem({ item })}</React.Fragment>
+      ))}
+    </>
+  ),
+}));
+
+it("expands bots in place, keeps the selected bot on collapse, and opens the full directory", () => {
+  const bots = Array.from({ length: 7 }, (_, index) => bot(String(index)));
+  const onPressBot = vi.fn();
+  render(
+    <BotsSection
+      bots={bots}
+      directoryBots={[...bots, bot("other-host")]}
+      selectedBotKey="host-a:6"
+      onPressBot={onPressBot}
+      onCreateBot={vi.fn()}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Bot 6" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Bot 5" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+  expect(screen.getByRole("button", { name: "Bot 5" })).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+  expect(screen.getByRole("button", { name: "Bot 6" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Bot 5" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "View all (8)" }));
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "Bot other-host" }),
+  );
+  expect(onPressBot).toHaveBeenCalledWith(expect.objectContaining({ botId: "other-host" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+it("omits the bot footer when every matching bot fits", () => {
+  render(
+    <BotsSection
+      bots={Array.from({ length: 5 }, (_, index) => bot(String(index)))}
+      onPressBot={vi.fn()}
+      onCreateBot={vi.fn()}
+    />,
+  );
+  expect(screen.queryByTestId("sidebar-bots-footer")).toBeNull();
+});
+
+vi.mock("@/components/sidebar/sidebar-group-toggle-row", () => ({
+  SidebarGroupToggleRow: ({ expanded, onPress }: { expanded: boolean; onPress: () => void }) => (
+    <button type="button" onClick={onPress}>
+      {expanded ? "Show less" : "Show more"}
     </button>
   ),
 }));

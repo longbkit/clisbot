@@ -57,8 +57,13 @@ accessible catalog and scope identity by Host and resource. An inaccessible reso
 rendered from stale pin metadata.
 
 The Bots section shows up to five recent bots matching its Host filter, with pins shown separately
-above it. Show **View all bots** only when this recent list leaves matching, unpinned bots out;
-omit the row for empty lists and when every matching bot is already shown.
+above it. When more than five matching, unpinned bots exist, show a two-button footer:
+**Show more / Show less** on the left, using the Projects toggle, and **View all (count)**
+on the right. Expansion shows all matching, unpinned bots in place and preserves the selected
+bot when collapsed. View all opens the existing directory and counts its full accessible catalog.
+Group chats use the same five-row limit and footer; View all opens a scrollable sheet of all
+accessible group chats, including pinned chats and other Hosts. Both footers remain available
+while expanded and are omitted when the section has at most five matching, unpinned rows.
 
 The Bots directory filters the accessible catalog by Host and sorts by Recent or Name. Mine and
 Shared with me use the optional, session-projected `BotPayload.isOwner` value, never `canConfigure`

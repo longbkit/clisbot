@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "@/i18n/i18next";
 import { ChatsSection, type ChatsSidebarChat } from "./chats-section";
@@ -199,3 +199,68 @@ vi.mock("@/stores/sidebar-collapsed-sections-store", () => ({
     }) => unknown,
   ) => select({ collapsedWorkspaceGroupKeys: new Set(), toggleWorkspaceGroupCollapsed: () => {} }),
 }));
+
+vi.mock("@/components/adaptive-modal-sheet", () => ({
+  AdaptiveModalSheet: ({
+    visible,
+    children,
+    onClose,
+  }: {
+    visible: boolean;
+    children: ReactNode;
+    onClose: () => void;
+  }) =>
+    visible ? (
+      <div role="dialog">
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+        {children}
+      </div>
+    ) : null,
+}));
+vi.mock("@/components/ui/scroll-view", () => ({
+  FlatList: ({
+    data,
+    renderItem,
+  }: {
+    data: { key: string }[];
+    renderItem: (row: { item: { key: string } }) => ReactNode;
+  }) => (
+    <>
+      {data.map((item) => (
+        <React.Fragment key={item.key}>{renderItem({ item })}</React.Fragment>
+      ))}
+    </>
+  ),
+}));
+
+it("opens all group chats separately, then closes the sheet before navigation", () => {
+  const chats = Array.from({ length: 7 }, (_, index) => chat(index));
+  const close = vi.fn();
+  render(
+    <ChatsSection
+      chats={chats}
+      directoryChats={[...chats, chat(8)]}
+      onCreateChat={vi.fn()}
+      onBeforeNavigate={close}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "View all (8)" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getAllByRole("button", { name: /^Chat / })).toHaveLength(8);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Chat 8" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(close).toHaveBeenCalledOnce();
+  expect(env.push).toHaveBeenCalledWith("/h/host-a/chat/chat-8");
+  expect(close.mock.invocationCallOrder[0]).toBeLessThan(env.push.mock.invocationCallOrder[0]!);
+});
+it("omits the chat footer when every matching chat fits", () => {
+  render(
+    <ChatsSection
+      chats={Array.from({ length: 5 }, (_, index) => chat(index))}
+      onCreateChat={vi.fn()}
+    />,
+  );
+  expect(screen.queryByTestId("sidebar-chats-footer")).toBeNull();
+});

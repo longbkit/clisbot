@@ -7,7 +7,9 @@ import { usePathname, useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
-import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
+import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
+import { FlatList } from "@/components/ui/scroll-view";
+import { SectionFooter } from "./section-footer";
 import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import { buildHostChatRoute, parseChatRouteFromPathname } from "../routes";
 import { BotsSidebarRow, sidebarMarkSize } from "./row";
@@ -40,6 +42,7 @@ export interface ChatsSidebarChat {
 interface ChatsSectionProps {
   /** Newest first; the caller sorts (`sortChatsNewestFirst`). */
   chats: readonly ChatsSidebarChat[];
+  directoryChats?: readonly ChatsSidebarChat[];
   /** Runs before the route push, as `AutomationSidebarItem` does; the compact sidebar closes here. */
   onBeforeNavigate?: () => void;
   onCreateChat: () => void;
@@ -50,6 +53,7 @@ interface ChatsSectionProps {
 /** The Chats section: recent chats, the current one filled, capped with a toggle row. */
 export const ChatsSection = memo(function ChatsSection({
   chats,
+  directoryChats = chats,
   onBeforeNavigate,
   onCreateChat,
   canCreateChat = true,
@@ -60,10 +64,14 @@ export const ChatsSection = memo(function ChatsSection({
   const pathname = usePathname();
   const current = useMemo(() => parseChatRouteFromPathname(pathname), [pathname]);
   const [expanded, setExpanded] = useState(false);
+  const [directory, setDirectory] = useState(false);
+  const openDirectory = useCallback(() => setDirectory(true), []);
+  const closeDirectory = useCallback(() => setDirectory(false), []);
   const toggleExpanded = useCallback(() => setExpanded((value) => !value), []);
   const visible = expanded ? chats : chats.slice(0, RECENT_CHATS_LIMIT);
   const openChat = useCallback(
     (chat: ChatsSidebarChat) => {
+      setDirectory(false);
       onBeforeNavigate?.();
       router.push(buildHostChatRoute(chat.serverId, chat.chatId));
     },
@@ -100,17 +108,66 @@ export const ChatsSection = memo(function ChatsSection({
             />
           ))}
           {chats.length > RECENT_CHATS_LIMIT ? (
-            <SidebarGroupToggleRow
+            <SectionFooter
               expanded={expanded}
-              onPress={toggleExpanded}
-              testID="sidebar-chats-toggle"
+              onToggle={toggleExpanded}
+              count={directoryChats.length}
+              onViewAll={openDirectory}
+              testID="sidebar-chats-footer"
             />
           ) : null}
         </>
       ) : null}
+      <ChatDirectory
+        visible={directory}
+        chats={directoryChats}
+        current={current}
+        onClose={closeDirectory}
+        onPress={openChat}
+      />
     </View>
   );
 });
+
+function ChatDirectory({
+  visible,
+  chats,
+  current,
+  onClose,
+  onPress,
+}: {
+  visible: boolean;
+  chats: readonly ChatsSidebarChat[];
+  current: { serverId: string; chatId: string } | null;
+  onClose: () => void;
+  onPress: (chat: ChatsSidebarChat) => void;
+}) {
+  const { t } = useTranslation();
+  const header = useMemo(() => ({ title: t("bots.workspace.shared.groupChats") }), [t]);
+  const renderItem = useCallback(
+    ({ item }: { item: ChatsSidebarChat }) => (
+      <ChatRow
+        chat={item}
+        selected={current?.serverId === item.serverId && current.chatId === item.chatId}
+        onPress={onPress}
+      />
+    ),
+    [current, onPress],
+  );
+  return (
+    <AdaptiveModalSheet visible={visible} onClose={onClose} header={header} scrollable={false}>
+      <View style={hintStyles.directory}>
+        <FlatList
+          data={chats}
+          keyExtractor={chatKey}
+          renderItem={renderItem}
+          style={hintStyles.list}
+        />
+      </View>
+    </AdaptiveModalSheet>
+  );
+}
+const chatKey = (chat: ChatsSidebarChat) => chat.key;
 
 const ChatRow = memo(function ChatRow({
   chat,
@@ -166,6 +223,8 @@ const ChatRow = memo(function ChatRow({
 const chatsDisplayMenu = <SectionDisplayMenu section="chats" />;
 
 const hintStyles = StyleSheet.create((theme) => ({
+  directory: { minHeight: 280, maxHeight: 520, flexShrink: 1 },
+  list: { flexGrow: 0, flexShrink: 1 },
   hint: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,

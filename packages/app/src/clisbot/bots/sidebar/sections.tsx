@@ -55,6 +55,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }
         </Text>
       ) : null}
       <ChatsSection
+        directoryChats={projectGroupSidebar(chatRows, hosts.length > 1)}
         chats={filterByHost(
           projectGroupSidebar(chatRows, hosts.length > 1),
           hostFilters.chats,

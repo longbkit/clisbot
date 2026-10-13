@@ -25,6 +25,7 @@ import type { BotLaunch } from "./display/row-detail";
 import { useBotRowDetail } from "./display/use-row-detail";
 import { SectionDisplayMenu } from "./display/section-display-menu";
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
+import { SectionFooter } from "./section-footer";
 
 export interface BotsSidebarBot {
   /** `${serverId}:${botId}`, unique across hosts. */
@@ -80,8 +81,9 @@ export const BotsSection = memo(function BotsSection({
   const openDirectory = useCallback(() => setDirectory(true), []);
   const closeDirectory = useCallback(() => setDirectory(false), []);
   const [collapsed, toggleCollapsed] = useSectionCollapsed("bots");
-  const visibleBots = recentSidebarBots(bots, selectedBotKey);
-  const hasMoreBots = bots.length > visibleBots.length;
+  const [expanded, setExpanded] = useState(false);
+  const toggleExpanded = useCallback(() => setExpanded((value) => !value), []);
+  const visibleBots = recentSidebarBots(bots, selectedBotKey, expanded ? bots.length : 5);
   const showFirstBot = canCreateBot && !loading && !loadError && directoryBots.length === 0;
   return (
     <View testID="sidebar-bots-section">
@@ -108,16 +110,14 @@ export const BotsSection = memo(function BotsSection({
               onOpenMenu={onOpenBotMenu}
             />
           ))}
-          {hasMoreBots ? (
-            <Pressable
-              style={directoryStyles.link}
-              onPress={openDirectory}
-              accessibilityRole="button"
-            >
-              <Text style={directoryStyles.text}>
-                {t("bots.workspace.sidebar.viewAllBots", { count: directoryBots.length })}
-              </Text>
-            </Pressable>
+          {bots.length > 5 ? (
+            <SectionFooter
+              expanded={expanded}
+              onToggle={toggleExpanded}
+              count={directoryBots.length}
+              onViewAll={openDirectory}
+              testID="sidebar-bots-footer"
+            />
           ) : null}
         </>
       ) : null}
