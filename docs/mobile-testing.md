@@ -151,13 +151,27 @@ actual tab bounds before accepting a run. Repetition pacing and host dispatch ti
 never interaction-latency samples. Report total catalog size, loaded rows, open tabs and retained
 screens separately; a large catalog does not imply five hundred mounted rows.
 
+Close any Agent Device session on that emulator before the capture's `uiautomator dump` step.
+Android permits one UiAutomation service at a time; the separate dump helper fails with
+`already registered` while Agent Device holds it. The capture labels the hierarchy unavailable
+without discarding its completed trace/video. During Agent Device QA, use its snapshots directly.
+
 Android FrameTimeline owns frame durations and jank. Native touch-up and JS press/route-commit
-markers separate JS input delay from route commitment; a route commit alone does not establish
+markers separate JS input delay from route commitment. Use `MotionEvent.eventTime`, mapped by
+Perfetto's MONOTONIC clock snapshots, for the UP origin; the Window.Callback marker occurs after
+native queueing. The analyzer rejects missing or unstable mappings. A route commit alone does not establish
 visible or usable content. The 50ms timer probe measures JS event-loop gaps, not native FPS. Row
 probes count render attempts and layout-effect commits, not React Profiler `actualDuration`.
 Preserve raw samples, define the measurement window and percentiles, inspect presented content,
 and label unavailable latency/profiler metrics. Record shared-host load and memory pressure;
 overloaded emulator runs cannot establish physical-device performance.
+
+Inspect the exported loss/overrun/discard counters too, including `stats.severity='data_loss'`
+and per-buffer statistics. Unattributed service discards require an explicit coverage caveat.
+Kernel ftrace overruns make JS gap, render and
+derivation observations partial; do not call their counts complete or treat missing markers as
+zero work. Validate all native input/press/commit markers and the separately buffered FrameTimeline
+and clock-qualified video before accepting native latency/frame metrics.
 
 `visual-latency.py --run <run> --references <folder>` pairs the encoded native video frames with
 Android screenrecord's Winscope elapsed-time metadata and four stable content references (`nav.png`,
@@ -166,6 +180,11 @@ and content thresholds. Report unmatched interactions as censored, rather than d
 This measures the first recorded frame showing the selected tab and cached content, not the display's
 physical scan-out or fresh network readiness. Perfetto's emulator prediction/buffer-stuffing flags
 must be separated from App Deadline Missed and frames exceeding the 60 Hz budget.
+
+The [CTO-019 native audit](audits/2026-10-15-native-mobile-tab-switching.md) records the 500-session
+before/after comparison, bounded peer-tab history, retained-state QA and unrun platforms. Use
+`--count 0` for a 65-second idle capture; it keeps the native recording window and samples memory
+at its end, without assigning latency to an automation wait.
 
 ## Maestro compatibility
 

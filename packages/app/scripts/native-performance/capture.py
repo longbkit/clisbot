@@ -44,6 +44,10 @@ try:
         adb('shell', 'input', 'tap', str(x), str(args.y))
         steps.append({'index': index, 'tab': ['Home', 'Chat', 'Inbox', 'Automations'][tab], 'host_dispatch_start_ns': before, 'host_dispatch_end_ns': time.monotonic_ns()})
         time.sleep(args.interval)
+    if args.count == 0:
+        # An idle capture still spans the native recording; sample memory at its end.
+        time.sleep(60)
+        time.sleep(3)
     save('gfxinfo.txt', ['shell', 'dumpsys', 'gfxinfo', args.package, 'framestats'])
     save('meminfo-after.txt', ['shell', 'dumpsys', 'meminfo', args.package])
     trace.wait(timeout=60)

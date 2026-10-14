@@ -22,6 +22,7 @@ version, real_elapsed_offset, count = struct.unpack_from('<IqI', video_bytes, po
 if version != 2:
     raise RuntimeError('Unsupported native frame-clock metadata')
 clock = struct.unpack_from('<' + 'Q' * count, video_bytes, position + len(magic) + 16)
+clock_offset = json.loads((args.run / 'summary.json').read_text())['monotonic_to_trace_offset_ns']
 footer = [r[552:584, :, :].astype(np.float32) for r in reference]
 body = [r[45:540, :210, :].astype(np.float32) for r in reference]
 body_masks = [np.min(candidate, axis=2) < 160 for candidate in body]
@@ -37,7 +38,7 @@ while True:
     image = cv2.resize(frame, (270, 600), interpolation=cv2.INTER_AREA).astype(np.float32)
     footer_errors = [float(np.mean(np.abs(image[552:584] - candidate))) for candidate in footer]
     body_errors = [float(np.mean(np.abs(image[45:540, :210] - candidate)[mask])) for candidate, mask in zip(body, body_masks)]
-    frames.append({'ts': clock[index], 'footer_errors': footer_errors, 'body_errors': body_errors})
+    frames.append({'ts': clock[index]+clock_offset, 'footer_errors': footer_errors, 'body_errors': body_errors})
     index += 1
 video.release()
 if index != count:
