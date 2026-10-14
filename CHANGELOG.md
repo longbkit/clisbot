@@ -1,19 +1,53 @@
 # Changelog
 
-## 2.1.1-beta.1 - 2026-10-13
+## 2.1.1 - 2026-10-14
 
 ### Added
 
 - Added channel commands to select Projects and workspaces, inspect Git branches and worktrees, and create workspaces from branches or pull requests
 - Added Show more and View all controls for Bots and group chats in the sidebar
+- Added optional local web UI commands with `clisbot web start`, `stop` and `status`
+- Added visibility controls for background workspaces ([#5039](https://github.com/getpaseo/paseo/pull/5039) by [@gpambrozio](https://github.com/gpambrozio), [@marvin-ambrozio](https://github.com/marvin-ambrozio))
+- Added account usage reports to the CLI ([#6474](https://github.com/getpaseo/paseo/pull/6474))
+
+### Changed
+
+- Changed Bot creation to work without a channel or Hub
+- Changed channel setup to start the personal Hub backend automatically on the selected Host
+- Changed CLI onboarding to prefer Tailscale and require an explicit choice for encrypted relay
+- Changed the default tool-call display to Summary with latest call
+- Reduced idle Hub workflow polling
+- Added sender identities to agent messages and completion notifications ([#6373](https://github.com/getpaseo/paseo/pull/6373))
 
 ### Fixed
 
+- Fixed remote Hub sign-in failing during the OAuth credential exchange
 - Fixed long subagent activity hiding earlier conversation history or exhausting the history read budget
-- Fixed large session-index upgrades loading the entire journal into memory, and checkpoint failures reporting durable messages as unsaved
+- Fixed large session-index upgrades loading the entire journal into memory
+- Fixed checkpoint failures reporting durable messages as unsaved
 - Fixed Command Center updates resetting the position of a manually scrolled result list
+- Fixed Tailscale port selection failing after the first ten ports were occupied
+- Fixed pairing QR codes overflowing compact screens ([#6758](https://github.com/getpaseo/paseo/pull/6758) by [@fdkevin0](https://github.com/fdkevin0))
+- Fixed schedules stopping after a failed run-history write ([#6334](https://github.com/getpaseo/paseo/pull/6334))
+- Fixed duplicate scheduled runs skipping the next cron occurrence ([#6532](https://github.com/getpaseo/paseo/pull/6532) by [@keithpk](https://github.com/keithpk))
+- Fixed canceled child tasks being reported as completed ([#6660](https://github.com/getpaseo/paseo/pull/6660) by [@Mar-garet](https://github.com/Mar-garet))
+- Fixed remote permission commands reporting success before the Host applied the response ([#6607](https://github.com/getpaseo/paseo/pull/6607) by [@budivoogt](https://github.com/budivoogt))
+- Fixed CJK terminal text changing after returning to a workspace ([#6452](https://github.com/getpaseo/paseo/pull/6452) by [@jasonhnd](https://github.com/jasonhnd), [@liujin0506](https://github.com/liujin0506), [@seob717](https://github.com/seob717))
+- Fixed assistant links to filenames containing spaces or non-ASCII characters ([#6520](https://github.com/getpaseo/paseo/pull/6520) by [@apple-ouyang](https://github.com/apple-ouyang), [@dengjiawen](https://github.com/dengjiawen), [@sunshinehomeyu-blip](https://github.com/sunshinehomeyu-blip))
+- Fixed missing local images in Markdown file previews ([#6750](https://github.com/getpaseo/paseo/pull/6750) by [@apple-ouyang](https://github.com/apple-ouyang))
+- Fixed Markdown previews swallowing text that only resembles HTML ([#6370](https://github.com/getpaseo/paseo/pull/6370) by [@gengjiawen](https://github.com/gengjiawen))
+- Fixed blank diff bodies with custom Git color or external-diff settings ([#6536](https://github.com/getpaseo/paseo/pull/6536), [#6562](https://github.com/getpaseo/paseo/pull/6562) by [@Mar-garet](https://github.com/Mar-garet))
+- Fixed renamed files showing every line as added in Changes ([#6559](https://github.com/getpaseo/paseo/pull/6559))
+- Fixed Changes staying on a spinner after the first edit to a clean workspace ([#6745](https://github.com/getpaseo/paseo/pull/6745))
+- Fixed canceled HTTP downloads retaining open files ([#6567](https://github.com/getpaseo/paseo/pull/6567) by [@Mar-garet](https://github.com/Mar-garet))
+- Fixed valid long filenames failing to save ([#6658](https://github.com/getpaseo/paseo/pull/6658) by [@Mar-garet](https://github.com/Mar-garet))
+- Fixed duplicated folders retaining relative symlinks to the original folder ([#6771](https://github.com/getpaseo/paseo/pull/6771) by [@Mar-garet](https://github.com/Mar-garet))
+- Fixed OpenCode v2 screenshot results failing to reach agents ([#6330](https://github.com/getpaseo/paseo/pull/6330))
+- Fixed native startup failing before navigator initialization ([#6734](https://github.com/getpaseo/paseo/pull/6734) by [@panrafal](https://github.com/panrafal))
+- Fixed clipped iOS chat and Markdown text ([#6445](https://github.com/getpaseo/paseo/pull/6445))
+- Fixed Linux desktop windows remaining hidden after the renderer loaded ([#6726](https://github.com/getpaseo/paseo/pull/6726) by [@mistop](https://github.com/mistop))
 
-Paseo baseline remains `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`.
+Paseo provenance: `v0.11.1` at `ab10a6694ccf068959d1a6b67b6c915e21a9fe91`, plus reviewed main snapshot `337e81a9c6d4551dbcede5930c21408776d06b1b`.
 
 ## 2.1.0 - 2026-10-13
 
