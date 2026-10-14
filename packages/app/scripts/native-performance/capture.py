@@ -52,9 +52,12 @@ try:
         raise RuntimeError('Native capture failed; inspect logs')
     adb('pull', trace_path, str(args.output / 'trace.pftrace'))
     adb('pull', '/sdcard/cto019.mp4', str(args.output / 'video.mp4'))
-    save('hierarchy-command.txt', ['shell', 'uiautomator', 'dump', '/sdcard/cto019.xml'])
-    adb('pull', '/sdcard/cto019.xml', str(args.output / 'hierarchy.xml'))
     subprocess.run(base + ['exec-out', 'screencap', '-p'], check=True, stdout=(args.output / 'end.png').open('wb'))
+    try:
+        save('hierarchy-command.txt', ['shell', 'uiautomator', 'dump', '/sdcard/cto019.xml'])
+        adb('pull', '/sdcard/cto019.xml', str(args.output / 'hierarchy.xml'))
+    except subprocess.CalledProcessError as error:
+        (args.output / 'hierarchy-unavailable.txt').write_text(str(error) + '\n')
 finally:
     for process in (trace, video):
         if process.poll() is None:

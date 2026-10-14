@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import math
+from collections import Counter
 import subprocess
 from pathlib import Path
 
@@ -53,12 +54,13 @@ for press in presses:
     latencies.append({'path': path, 'input_ts': native_input, 'press_ts': ts, 'commit_ts': int(commit['ts']), 'input_to_press_ms': (ts-native_input)/1e6, 'input_to_route_commit_ms': (int(commit['ts'])-native_input)/1e6})
 (args.run / 'latencies.json').write_text(json.dumps(latencies, indent=2)+'\n')
 window_start = min(inputs) if inputs else 0
-window_end = max(inputs)+1_000_000_000 if inputs else 0
+window_end = max(inputs)+2_500_000_000 if inputs else 0
 sample_frames = [f for f in frames if window_start <= int(f['ts']) <= window_end]
 gaps = []
 for marker in markers:
     if marker['name'].startswith('clisbot.js.loop|gapMs=') and window_start <= int(marker['ts']) <= window_end:
         gaps.append(float(marker['name'].split('gapMs=')[1]))
 summary = {'window_ns': [window_start,window_end], 'route_commit_latency': stats([m['input_to_route_commit_ms'] for m in latencies]), 'input_to_js_press': stats([m['input_to_press_ms'] for m in latencies]), 'native_frame_duration': stats([int(f['dur'])/1e6 for f in sample_frames]), 'native_jank': {'n': len(sample_frames), 'janky': sum(f['jank_type'] != 'None' for f in sample_frames)}, 'js_event_loop_gap': stats(gaps), 'js_gap_over_100ms': sum(g>100 for g in gaps), 'tap_to_first_visible_feedback': 'unavailable until video analysis', 'tap_to_usable_content': 'unavailable until target-specific content validation', 'react_per_component_commits': 'unavailable in release renderer'}
+summary['native_jank'].update(app_deadline_missed=sum('App Deadline Missed' in f['jank_type'] for f in sample_frames), over_display_budget=sum(int(f['dur']) > 1e9/60 for f in sample_frames), types=dict(Counter(f['jank_type'] for f in sample_frames)))
 (args.run / 'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
 print(json.dumps(summary,indent=2))

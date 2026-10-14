@@ -49,7 +49,7 @@ results = []
 for step_index, latency in enumerate(latencies):
     target = paths.index(latency['path'])
     start = latency['input_ts']
-    end = latencies[step_index + 1]['input_ts'] if step_index + 1 < len(latencies) else start + 2_000_000_000
+    end = latencies[step_index + 1]['input_ts'] if step_index + 1 < len(latencies) else start + 2_500_000_000
     window = [frame for frame in frames if start <= frame['ts'] < end]
     feedback = next((frame for frame in window if int(np.argmin(frame['footer_errors'])) == target and frame['footer_errors'][target] < 3), None)
     usable = next((frame for frame in window if int(np.argmin(frame['footer_errors'])) == target and int(np.argmin(frame['body_errors'])) == target and frame['body_errors'][target] < 18), None)

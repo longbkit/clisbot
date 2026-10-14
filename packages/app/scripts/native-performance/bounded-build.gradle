@@ -1,7 +1,9 @@
 // Gradle's worker limit does not cap Ninja. These pools change build concurrency only.
 gradle.beforeProject { project ->
     project.plugins.withId("com.facebook.react") {
-        project.react.extraPackagerArgs.addAll(["--max-workers", "1"])
+        project.afterEvaluate {
+            project.extensions.getByName("react").getExtraPackagerArgs().addAll(["--max-workers", "1"])
+        }
     }
     ["com.android.application", "com.android.library"].each { pluginId ->
         project.plugins.withId(pluginId) {

@@ -111,7 +111,7 @@ npm run build:app-deps
 cd packages/app
 APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 npx expo prebuild --platform android --clean
 cd android
-APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 ./gradlew assembleRelease \
+APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 ./gradlew :app:assembleRelease \
   -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=1 \
   -Dorg.gradle.parallel=false --init-script ../scripts/native-performance/bounded-build.gradle
 ```
@@ -140,12 +140,12 @@ After warming Home, Chat, Inbox and Automations, use the tab bar's native bounds
 ```bash
 python3 packages/app/scripts/native-performance/capture.py \
   --serial emulator-5580 --output /tmp/clisbot-native-run/baseline-500 \
-  --config packages/app/scripts/native-performance/capture.cfg --y 2200
+  --config packages/app/scripts/native-performance/capture.cfg --y 2250
 python3 packages/app/scripts/native-performance/analyze.py \
   --processor /path/to/trace_processor --run /tmp/clisbot-native-run/baseline-500
 ```
 
-The capture expects the documented 1080-pixel-wide emulator and records forty paced switches,
+The capture expects a 1080×2400 emulator and records twenty switches at 2.5-second intervals,
 Perfetto, video, native frame stats, memory and the final hierarchy. Validate the recording and
 actual tab bounds before accepting a run. Repetition pacing and host dispatch timestamps are
 never interaction-latency samples. Report total catalog size, loaded rows, open tabs and retained
@@ -158,6 +158,14 @@ probes count render attempts and layout-effect commits, not React Profiler `actu
 Preserve raw samples, define the measurement window and percentiles, inspect presented content,
 and label unavailable latency/profiler metrics. Record shared-host load and memory pressure;
 overloaded emulator runs cannot establish physical-device performance.
+
+`visual-latency.py --run <run> --references <folder>` pairs the encoded native video frames with
+Android screenrecord's Winscope elapsed-time metadata and four stable content references (`nav.png`,
+`chat.png`, `inbox.png`, `automations.png`). Inspect the matched frames before accepting its footer
+and content thresholds. Report unmatched interactions as censored, rather than dropping slow samples.
+This measures the first recorded frame showing the selected tab and cached content, not the display's
+physical scan-out or fresh network readiness. Perfetto's emulator prediction/buffer-stuffing flags
+must be separated from App Deadline Missed and frames exceeding the 60 Hz budget.
 
 ## Maestro compatibility
 

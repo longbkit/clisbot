@@ -14,6 +14,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, MessageSquare, Inbox, CalendarClock, ArrowLeft } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { isWeb } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
 import type { Theme } from "@/styles/theme";
@@ -21,6 +22,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { activityBucket } from "./activity";
 import { startNativeInputTracing, traceInstant } from "@/performance/native-trace";
+import { navigateHomeTab, returnToHomeTab } from "./home-tab-navigation";
 const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
 export function rememberChatReturn(path: string) {
   useReturn.setState({ path });
@@ -34,6 +36,16 @@ const entries = [
 ];
 export function isHomeTabPath(path: string) {
   return entries.some((entry) => entry.path === path);
+}
+/** All peer-tab entry points share the native stack policy; browser history stays ordinary. */
+export function useNavigateHomeTab() {
+  const router = useRouter();
+  const compact = useIsCompactFormFactor();
+  const nativeTab = HOME_V2_ENABLED && compact && !isWeb;
+  return useCallback(
+    (href: Href) => navigateHomeTab({ router, href, nativeTab }),
+    [nativeTab, router],
+  );
 }
 /** A Home V2 phone tab page: the tab bar is its navigation, so its header has no leading button. */
 export function useIsMobileTabPage() {
@@ -53,7 +65,7 @@ function Tab({
   selected: boolean;
   count?: number;
 }) {
-  const router = useRouter();
+  const navigate = useNavigateHomeTab();
   const state = useMemo(() => ({ selected }), [selected]);
   const open = useCallback(
     (event: GestureResponderEvent) => {
@@ -61,13 +73,14 @@ function Tab({
         path: entry.path,
         eventMs: String(event.nativeEvent.timestamp),
       });
+      if (selected && !isWeb) return;
       if (entry.path === "/chat") {
         rememberChatReturn("/chat");
         usePanelStore.getState().showMobileAgentList();
       } else usePanelStore.getState().showMobileAgent();
-      router.navigate(entry.path as Href);
+      navigate(entry.path as Href);
     },
-    [entry.path, router],
+    [entry.path, navigate, selected],
   );
   return (
     <Pressable accessibilityRole="tab" accessibilityState={state} style={styles.tab} onPress={open}>
@@ -85,10 +98,11 @@ function Tab({
 }
 /**
  * Android Back. A conversation returns to its entry surface; a tab other than Home goes Home; Home
- * leaves the app. Switching tabs pushes routes, so the router's own Back would bounce between tabs.
+ * leaves the app. Peer tabs replace their route; detail returns dismiss to the existing entry page.
  */
 function useMobileHardwareBack(path: string, compact: boolean) {
   const router = useRouter();
+  const navigate = useNavigateHomeTab();
   const returnPath = useReturn((s) => s.path);
   const detail = isChatDetail(path);
   const tab = isHomeTabPath(path);
@@ -105,11 +119,12 @@ function useMobileHardwareBack(path: string, compact: boolean) {
         return true;
       }
       panels.showMobileAgent();
-      router.navigate((detail ? returnPath : HOME_TAB_PATH) as Href);
+      if (detail) returnToHomeTab({ router, href: returnPath as Href, nativeTab: !isWeb });
+      else navigate(HOME_TAB_PATH as Href);
       return true;
     });
     return () => listener.remove();
-  }, [compact, detail, path, returnPath, router, tab]);
+  }, [compact, detail, navigate, path, returnPath, router, tab]);
 }
 export function MobileHomeTabs() {
   const compact = useIsCompactFormFactor();
@@ -149,8 +164,8 @@ export function MobileBack() {
   const target = useReturn((s) => s.path);
   const back = useCallback(() => {
     usePanelStore.getState().showMobileAgent();
-    router.navigate(target as Href);
-  }, [router, target]);
+    returnToHomeTab({ router, href: target as Href, nativeTab: compact && !isWeb });
+  }, [compact, router, target]);
   if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
   return (
     <Pressable

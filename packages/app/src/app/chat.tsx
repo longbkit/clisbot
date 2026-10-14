@@ -1,11 +1,14 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
-import { useRouter, type Href } from "expo-router";
 import { Button } from "@/components/ui/button";
 import { useIsFocused } from "@react-navigation/native";
 import { usePanelStore } from "@/stores/panel-store";
 import { useIsMobilePanelActive } from "@/mobile-panels/provider";
-import { HOME_TAB_PATH, rememberChatReturn } from "@/clisbot/home/mobile-navigation";
+import {
+  HOME_TAB_PATH,
+  rememberChatReturn,
+  useNavigateHomeTab,
+} from "@/clisbot/home/mobile-navigation";
 /** Chat is the existing conversation sidebar, with no second list or navigation owner. */
 export default function ChatTab() {
   const focused = useIsFocused();
@@ -32,7 +35,7 @@ export default function ChatTab() {
  * settles this route has lost focus.
  */
 function useLeaveWhenSidebarCloses(focused: boolean) {
-  const router = useRouter();
+  const navigate = useNavigateHomeTab();
   const open = useIsMobilePanelActive("agent-list");
   const closed = useIsMobilePanelActive("agent");
   const wasOpen = useRef(false);
@@ -44,9 +47,9 @@ function useLeaveWhenSidebarCloses(focused: boolean) {
     if (open) wasOpen.current = true;
     else if (closed && wasOpen.current) {
       wasOpen.current = false;
-      router.navigate(HOME_TAB_PATH as Href);
+      navigate(HOME_TAB_PATH);
     }
-  }, [closed, focused, open, router]);
+  }, [closed, focused, navigate, open]);
 }
 
 const fill = { flex: 1, alignItems: "center", justifyContent: "center" } as const;

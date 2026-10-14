@@ -1,0 +1,69 @@
+import {
+  CommonActions,
+  StackActions,
+  StackRouter,
+  type StackActionType,
+} from "@react-navigation/routers";
+import type { Href } from "expo-router";
+import { describe, expect, it } from "vitest";
+import { navigateHomeTab, returnToHomeTab } from "./home-tab-navigation";
+
+// Exercise the installed navigation reducer: navigate without getId retains a fresh native
+// stack page on each cycle. No React trees or app state owners are mocked.
+function navigation() {
+  const stack = StackRouter({ initialRouteName: "open-project" });
+  const options = {
+    routeNames: ["open-project", "chat", "sessions", "schedules", "detail"],
+    routeParamList: {},
+    routeGetIdList: {},
+  };
+  let state = stack.getInitialState(options);
+  const dispatch = (action: StackActionType | ReturnType<typeof CommonActions.navigate>) => {
+    const next = stack.getStateForAction(state, action, options);
+    if (!next) throw new Error("Unhandled navigation action");
+    state = stack.getRehydratedState(next, options);
+  };
+  const name = (href: Href) => String(href).replace(/^\//, "");
+  return {
+    state: () => state,
+    pushDetail: () => dispatch(StackActions.push("detail")),
+    router: {
+      navigate: (href: Href) => dispatch(CommonActions.navigate(name(href))),
+      replace: (href: Href) => dispatch(StackActions.replace(name(href))),
+      dismissTo: (href: Href) => dispatch(StackActions.popTo(name(href))),
+    },
+  };
+}
+
+describe("Home tab stack ownership", () => {
+  it("bounds repeated native peer-tab visits without changing browser navigation", () => {
+    const native = navigation();
+    const web = navigation();
+    for (let index = 0; index < 100; index++) {
+      const href = ["/chat", "/sessions", "/schedules", "/open-project"][index % 4] as Href;
+      navigateHomeTab({ router: native.router, href, nativeTab: true });
+      navigateHomeTab({ router: web.router, href, nativeTab: false });
+      expect(native.state().routes).toHaveLength(1);
+      expect(native.state().routes[0].name).toBe(String(href).slice(1));
+    }
+    expect(web.state().routes).toHaveLength(101);
+  });
+
+  it("returns a detail to the same Inbox entry", () => {
+    const nav = navigation();
+    navigateHomeTab({ router: nav.router, href: "/sessions", nativeTab: true });
+    const inbox = nav.state().routes[0];
+    nav.pushDetail();
+    returnToHomeTab({ router: nav.router, href: "/sessions", nativeTab: true });
+    expect(nav.state().routes).toHaveLength(1);
+    expect(nav.state().routes[0].key).toBe(inbox.key);
+  });
+
+  it("replaces a cold detail when the entry tab is absent", () => {
+    const nav = navigation();
+    nav.router.replace("/detail");
+    returnToHomeTab({ router: nav.router, href: "/chat", nativeTab: true });
+    expect(nav.state().routes).toHaveLength(1);
+    expect(nav.state().routes[0].name).toBe("chat");
+  });
+});
