@@ -1,6 +1,13 @@
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
-import { View, Text, Pressable, BackHandler, type PressableStateCallbackType } from "react-native";
-import { useCallback, useEffect, useMemo } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  BackHandler,
+  type PressableStateCallbackType,
+  type GestureResponderEvent,
+} from "react-native";
+import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -13,6 +20,7 @@ import type { Theme } from "@/styles/theme";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { activityBucket } from "./activity";
+import { startNativeInputTracing, traceInstant } from "@/performance/native-trace";
 const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
 export function rememberChatReturn(path: string) {
   useReturn.setState({ path });
@@ -47,13 +55,20 @@ function Tab({
 }) {
   const router = useRouter();
   const state = useMemo(() => ({ selected }), [selected]);
-  const open = useCallback(() => {
-    if (entry.path === "/chat") {
-      rememberChatReturn("/chat");
-      usePanelStore.getState().showMobileAgentList();
-    } else usePanelStore.getState().showMobileAgent();
-    router.navigate(entry.path as Href);
-  }, [entry.path, router]);
+  const open = useCallback(
+    (event: GestureResponderEvent) => {
+      traceInstant("clisbot.tab.press", {
+        path: entry.path,
+        eventMs: String(event.nativeEvent.timestamp),
+      });
+      if (entry.path === "/chat") {
+        rememberChatReturn("/chat");
+        usePanelStore.getState().showMobileAgentList();
+      } else usePanelStore.getState().showMobileAgent();
+      router.navigate(entry.path as Href);
+    },
+    [entry.path, router],
+  );
   return (
     <Pressable accessibilityRole="tab" accessibilityState={state} style={styles.tab} onPress={open}>
       <View>
@@ -100,6 +115,10 @@ export function MobileHomeTabs() {
   const compact = useIsCompactFormFactor();
   const path = usePathname();
   const insets = useSafeAreaInsets();
+  useEffect(startNativeInputTracing, []);
+  useLayoutEffect(() => {
+    traceInstant("clisbot.route.commit", { path });
+  }, [path]);
   useMobileHardwareBack(path, compact);
   const inset = useMemo(() => ({ paddingBottom: Math.max(insets.bottom, 6) }), [insets.bottom]);
   // Reads what Home and the sidebar already loaded; the tab bar never starts its own fetch.

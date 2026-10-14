@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/session-store";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
 import type { Agent } from "@/stores/session-store";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
+import { nativePerformanceTrace } from "@/performance/native-trace";
 
 export interface AggregatedAgent extends AgentDirectoryEntry {
   serverId: string;
@@ -62,6 +63,8 @@ export function useAggregatedAgents(options?: {
   const prevSortedRef = useRef<AggregatedAgent[]>([]);
 
   const result = useMemo(() => {
+    const tracing = nativePerformanceTrace.isEnabled();
+    if (tracing) nativePerformanceTrace.beginSection("clisbot.agents.derive");
     // runtimeVersion is referenced so the memo recomputes when runtime state changes.
     void runtimeVersion;
     const allAgents: AggregatedAgent[] = [];
@@ -151,6 +154,7 @@ export function useAggregatedAgents(options?: {
     const isInitialLoad = isLoading && !hasAnyData;
     const isRevalidating = isLoading && hasAnyData;
 
+    if (tracing) nativePerformanceTrace.endSection();
     return {
       agents: stableAgents,
       isLoading,

@@ -1,0 +1,15 @@
+// Gradle's worker limit does not cap Ninja. These pools change build concurrency only.
+gradle.beforeProject { project ->
+    project.plugins.withId("com.facebook.react") {
+        project.react.extraPackagerArgs.addAll(["--max-workers", "1"])
+    }
+    ["com.android.application", "com.android.library"].each { pluginId ->
+        project.plugins.withId(pluginId) {
+            project.android.defaultConfig.externalNativeBuild.cmake.arguments(
+                "-DCMAKE_JOB_POOLS=cto_compile=1;cto_link=1",
+                "-DCMAKE_JOB_POOL_COMPILE=cto_compile",
+                "-DCMAKE_JOB_POOL_LINK=cto_link"
+            )
+        }
+    }
+}

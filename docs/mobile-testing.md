@@ -96,6 +96,69 @@ adb shell pm disable-user --user 0 com.google.android.calendar
 
 When replay diverges, read its ranked selector suggestions. Edit the script deliberately and rerun it from the beginning. `--update` is retained for compatibility but no longer rewrites scripts.
 
+## Native switching performance
+
+Use a release/profileable build on a dedicated emulator with synthetic data. A phone-sized browser
+viewport and a Metro development bundle cannot establish native frame performance. Keep the device,
+display refresh rate, dataset, renderer, network schedule and diagnostic probes fixed across revisions.
+The [native panel constraints](mobile-panels.md) still apply during profiling.
+
+The reusable harness lives in `packages/app/scripts/native-performance/`. Build the development
+package identity in release mode so the APK stays separate from production:
+
+```bash
+npm run build:app-deps
+cd packages/app
+APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 npx expo prebuild --platform android --clean
+cd android
+APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 ./gradlew assembleRelease \
+  -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=1 \
+  -Dorg.gradle.parallel=false --init-script ../scripts/native-performance/bounded-build.gradle
+```
+
+The init script limits C++ compile/link pools and Metro transforms as well as Gradle workers.
+Gradle's worker limit alone left Ninja launching fourteen compilers on a shared host. These limits
+change build concurrency, not the runtime's renderer, optimization or animation flags.
+
+From the repository root, start the fixture in a fresh evidence directory:
+
+```bash
+CTO019_EVIDENCE=/tmp/clisbot-native-run node --import tsx \
+  packages/app/scripts/native-performance/fixture.mts
+```
+
+`environment/fixture.json` records the dynamically allocated daemon/control ports. Reverse the
+daemon port through the task emulator and connect the app to that endpoint. Validate one route
+before scaling. The control endpoint `/seed?count=100` (then `500`) creates distinct directory
+workspaces and mock sessions; `/stream?index=0` starts a deterministic mock turn. The first two
+sessions have short and long synthetic histories. The fixture explicitly disables pairing and
+relay and substitutes Tailscale; it proves this configured performance case, not fresh onboarding.
+Stop only this fixture PID when finished; its synthetic home stays inspectable.
+
+After warming Home, Chat, Inbox and Automations, use the tab bar's native bounds for `--y`:
+
+```bash
+python3 packages/app/scripts/native-performance/capture.py \
+  --serial emulator-5580 --output /tmp/clisbot-native-run/baseline-500 \
+  --config packages/app/scripts/native-performance/capture.cfg --y 2200
+python3 packages/app/scripts/native-performance/analyze.py \
+  --processor /path/to/trace_processor --run /tmp/clisbot-native-run/baseline-500
+```
+
+The capture expects the documented 1080-pixel-wide emulator and records forty paced switches,
+Perfetto, video, native frame stats, memory and the final hierarchy. Validate the recording and
+actual tab bounds before accepting a run. Repetition pacing and host dispatch timestamps are
+never interaction-latency samples. Report total catalog size, loaded rows, open tabs and retained
+screens separately; a large catalog does not imply five hundred mounted rows.
+
+Android FrameTimeline owns frame durations and jank. Native touch-up and JS press/route-commit
+markers separate JS input delay from route commitment; a route commit alone does not establish
+visible or usable content. The 50ms timer probe measures JS event-loop gaps, not native FPS. Row
+probes count render attempts and layout-effect commits, not React Profiler `actualDuration`.
+Preserve raw samples, define the measurement window and percentiles, inspect presented content,
+and label unavailable latency/profiler metrics. Record shared-host load and memory pressure;
+overloaded emulator runs cannot establish physical-device performance.
+
 ## Maestro compatibility
 
 Existing Maestro flows live in `packages/app/maestro/`. Agent Device can execute its supported subset with `agent-device test <path> --maestro`, which provides a migration path while `.ad` coverage replaces these flows.
