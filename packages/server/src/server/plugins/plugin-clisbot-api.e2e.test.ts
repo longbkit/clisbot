@@ -53,6 +53,10 @@ test.each(["React Native", "native"])(
     const api = sdk.createClisbotApi(client);
     try {
       await client.connect();
+      // The connection can own an agent-storage listener independently of this SDK scope.
+      const baseline = await client.collectDiagnostics();
+      const baselineProducers = baseline.diagnostic.match(/Producer listeners: (\d+)/)?.[1];
+      expect(baselineProducers).toBeDefined();
       const snapshot = await api.providers.waitForReady({ cwd: daemon.staticDir });
       expect(snapshot.entries.length).toBeGreaterThan(0);
       expect(snapshot.entries.every((entry) => entry.status !== "loading")).toBe(true);
@@ -62,7 +66,7 @@ test.each(["React Native", "native"])(
       await canceled;
       const { diagnostic } = await client.collectDiagnostics();
       expect(diagnostic).toContain("Source registrations: 0");
-      expect(diagnostic).toContain("Producer listeners: 0");
+      expect(diagnostic.match(/Producer listeners: (\d+)/)?.[1]).toBe(baselineProducers);
       expect(() => api.providers.waitForReady()).toThrow("disposed");
     } finally {
       await api.dispose();

@@ -33,6 +33,7 @@ Object.assign(env, {
   CLISBOT_USAGE_REPORTING: "0",
   CLISBOT_DICTATION_ENABLED: "false",
   CLISBOT_VOICE_MODE_ENABLED: "false",
+  CLISBOT_TAILSCALE_BIN: path.join(home, "tailscale-not-installed"),
   CLISBOT_WEB_UI_ENABLED: "true",
 });
 async function run(command, args, options = {}) {
@@ -139,8 +140,7 @@ console.log(JSON.stringify(names.map(name => require.resolve(name))));
   const onboard = JSON.parse(
     await cli(["onboard", "--transport", "local", "--voice", "disable", "--json"]),
   );
-  // Start Hub is delegated to a managed CLI child, which reads persisted config.
-  await cli(["daemon", "config", "set", "features.webUi.enabled", "true"]);
+  assert.equal(onboard.gateway, null);
   const initial = await readDaemonInstance(home);
   const offer = parseDevicePairingOfferFromUrl(onboard.url);
   assert(offer?.pairing && !offer.hub);
@@ -161,14 +161,16 @@ console.log(JSON.stringify(names.map(name => require.resolve(name))));
   assert.equal(daemon.getLastServerInfoMessage().features.localHubStart, true);
   const started = await daemon.startLocalHub({ transport: "local", label: "Artifact phone" });
   assert(started.hub?.pairing);
-  assert.equal(started.origin, onboard.origin);
+  assert.notEqual(started.origin, onboard.origin);
   assert.equal((await readDaemonInstance(home)).pid, initial.pid);
   assert.equal((await fetch(`${started.origin}/api/auth/clisbot/device/identity`)).status, 200);
-  assert((await fetch(`${started.origin}/`)).ok);
+  const web = JSON.parse(await cli(["web", "start", "--json"]));
+  assert.equal(web.running, true);
+  assert((await fetch(`${web.origin}/`)).ok);
   assert.equal((await daemon.devices()).devices.length, 1);
   completed = true;
   console.log(
-    "PASS: npm artifact CLI started/reused daemon and gateway, paired device, delegated explicit Start Hub to installed CLI, booted actual packaged Hub migrations/assets and retained daemon PID/socket.",
+    "PASS: npm artifacts paired the daemon, started packaged Hub and optional web independently, and retained daemon PID/socket.",
   );
 } finally {
   await daemon?.close();

@@ -284,7 +284,7 @@ else { console.error('Fixture Serve permission denied'); process.exit(1); }
               "-NoProfile",
               "-NonInteractive",
               "-Command",
-              `Get-CimInstance Win32_Process -Filter 'ParentProcessId = ${pid}' | Select-Object -ExpandProperty ProcessId | ConvertTo-Json -Compress`,
+              `Get-CimInstance Win32_Process -Filter 'ParentProcessId = ${pid}' | Where-Object { $_.ExecutablePath -eq '${process.execPath.replaceAll("'", "''")}' } | Select-Object -ExpandProperty ProcessId | ConvertTo-Json -Compress`,
             ],
             { windowsHide: true },
           )
