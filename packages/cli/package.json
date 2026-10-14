@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/cli",
-  "version": "2.1.1-beta.1",
+  "version": "2.1.1",
   "description": "Clisbot CLI - control your AI coding agents from the command line",
   "bin": {
     "clisbot": "bin/clisbot"
@@ -30,11 +30,11 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.0",
-    "@clisbot/client": "2.1.1-beta.1",
-    "@clisbot/device-access": "2.1.1-beta.1",
-    "@clisbot/hub": "2.1.1-beta.1",
-    "@clisbot/protocol": "2.1.1-beta.1",
-    "@clisbot/server": "2.1.1-beta.1",
+    "@clisbot/client": "2.1.1",
+    "@clisbot/device-access": "2.1.1",
+    "@clisbot/hub": "2.1.1",
+    "@clisbot/protocol": "2.1.1",
+    "@clisbot/server": "2.1.1",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "express": "^4.21.2",

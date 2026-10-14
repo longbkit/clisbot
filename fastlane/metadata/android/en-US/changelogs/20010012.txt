@@ -1,0 +1,8 @@
+Paseo provenance: v0.11.1 at ab10a6694ccf068959d1a6b67b6c915e21a9fe91, plus reviewed main snapshot 337e81a9c6d4551dbcede5930c21408776d06b1b.
+
+Added
+- Added channel commands to select Projects and workspaces, inspect Git branches and worktrees, and create workspaces from branches or pull requests
+- Added Show more and View all controls for Bots and group chats in the sidebar
+- Added optional local web UI commands with clisbot web start, stop and status
+
+Full notes: https://clisbot.com/changelog
