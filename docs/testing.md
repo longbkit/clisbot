@@ -260,6 +260,8 @@ Required matrix legs are declared as statically named jobs. Their shared steps u
 
 The smallest meaningful contract wins over package ownership. Tiny structural invariants such as daemon launch supervision run unconditionally in the always-running routing job instead of maintaining a transitive file list; this check reads source entrypoints and builds no product. Routed integration contracts use stable domain directories. Browser changes select the required Playwright shards; desktop changes select the existing required desktop jobs, with renderer and real-Electron coverage together in the Ubuntu leg. Packaging runs on main in the Desktop Packages, Docker, and Nix workflows. CLI-side Hub changes select one focused test inside the existing required server jobs. The CLI source suite runs once in the third required CLI job; only the separate local E2E runner is sharded, and that runner owns its dependency build. Repository scripts and the shared Vitest configuration run every PR contract because they are cross-cutting toolchain inputs.
 
+The Nix trace retains the native `extract-zip` binding selected by its own loader, including libc and universal-binary choices. Foreign prebuilds must not enter the runtime closure: an unused musl binary can make GNU `auto-patchelf` fail. Check the traced binding and extraction from the retained package files locally, then require the Linux Nix build and daemon smoke to pass in CI.
+
 ## Agent authentication in tests
 
 Agent providers handle their own auth. Do not add auth checks, environment variable gates, or conditional skips to tests. If auth fails, report it.

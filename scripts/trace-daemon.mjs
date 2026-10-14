@@ -218,9 +218,32 @@ for (const pattern of additionalInputs) {
   }
 }
 
+// extract-zip ships every native target in one package. Use its own loader to
+// retain the binding this Node runtime selects; foreign musl binaries make
+// auto-patchelf reject an otherwise valid glibc Nix closure.
+const zipNativeFiles = new Map();
+for (const file of expanded) {
+  if (/(?:^|\/)@electron-internal\/extract-zip\/index\.[^/]+\.node$/.test(file)) {
+    zipNativeFiles.set(path.dirname(file), new Set());
+  }
+}
+const runtimeRequire = createRequire(import.meta.url);
+for (const [directory, selected] of zipNativeFiles) {
+  const absoluteDirectory = path.resolve(REPO_ROOT, directory);
+  await import(pathToFileURL(path.join(absoluteDirectory, "index.js")).href);
+  for (const file of Object.keys(runtimeRequire.cache)) {
+    if (path.dirname(file) === absoluteDirectory && file.endsWith(".node")) {
+      selected.add(path.relative(REPO_ROOT, file));
+    }
+  }
+  if (selected.size === 0) throw new Error(`No extract-zip native binding loaded: ${directory}`);
+}
+
 // Emit sorted, deduplicated.
 for (const p of [...expanded].sort()) {
   const sharpPackage = p.match(/(?:^|\/)node_modules\/@img\/(sharp-[^/]+)(?:\/|$)/)?.[1];
   if (sharpPackage && !sharpPackages.has(sharpPackage)) continue;
+  const zipBindings = zipNativeFiles.get(path.dirname(p));
+  if (zipBindings && p.endsWith(".node") && !zipBindings.has(p)) continue;
   console.log(p);
 }
