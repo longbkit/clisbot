@@ -10,7 +10,7 @@ export const DEFAULT_ROOM_INSTRUCTIONS = [
 /** Rounds a group discussion may run when the chat sets no `rounds.max`; a guard rail. */
 export const DEFAULT_CHAT_ROUNDS_MAX = 5;
 
-/** The reply a group bot gives when it has nothing to add; it is silence, never a transcript line. */
+/** A Bot with nothing to add: silence in direct and group Chats, never a transcript line. */
 export const PASS_REPLY = "PASS";
 
 /**
@@ -18,6 +18,27 @@ export const PASS_REPLY = "PASS";
  * prompt). It is silence in a direct chat and in a group, never a transcript line.
  */
 export const HEARTBEAT_ACK_REPLY = "HEARTBEAT_OK";
+
+export const SILENT_BOT_REPLIES = [PASS_REPLY, HEARTBEAT_ACK_REPLY] as const;
+
+/** Exact complete Bot replies only; user text and ordinary agent sessions keep these words. */
+export function isSilentBotReply(text: string | null | undefined): boolean {
+  return SILENT_BOT_REPLIES.some((marker) => text?.trim() === marker);
+}
+
+/** Withhold a streaming prefix until it becomes a marker or diverges into a real reply. */
+export function mayBecomeSilentBotReply(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed !== "" && SILENT_BOT_REPLIES.some((marker) => marker.startsWith(trimmed));
+}
+
+/** Codex's timeline separator is framing, not part of the Bot's answer. */
+export function stripAssistantMessageBoundary(text: string): string {
+  const boundary = "\n\n---\n\n";
+  let reply = text;
+  while (reply.startsWith(boundary)) reply = reply.slice(boundary.length);
+  return reply;
+}
 
 /** Exactly `HEARTBEAT_OK` once trimmed; a reply that only mentions it is a reply. */
 export function isHeartbeatAck(text: string | null | undefined): boolean {
@@ -27,5 +48,5 @@ export function isHeartbeatAck(text: string | null | undefined): boolean {
 /** A group turn that chose silence: no text, or exactly `PASS` or `HEARTBEAT_OK`. */
 export function isSilentReply(text: string | null | undefined): boolean {
   const trimmed = text?.trim() ?? "";
-  return trimmed === "" || trimmed === PASS_REPLY || trimmed === HEARTBEAT_ACK_REPLY;
+  return trimmed === "" || isSilentBotReply(trimmed);
 }

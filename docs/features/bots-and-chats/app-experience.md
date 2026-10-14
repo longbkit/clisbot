@@ -201,6 +201,12 @@ advertises `server_info.features.chatToolDisplay`.
 
 Approvals, notices and errors are visible in every display.
 
+Both exact Bot silence markers (`PASS`, `HEARTBEAT_OK`) hide in direct and group Messages.
+Streaming prefixes wait until the reply diverges into meaningful text; a completed silent turn
+leaves no message or successful tool tail. Failed calls and pending approvals remain available.
+User-authored markers, code/examples and ordinary agent sessions keep their text. See
+[Silent Bot replies](silent-replies.md) for timeline framing, history and regression coverage.
+
 ## Responsive controls and compatibility
 
 Desktop retains its compact workspace header and tab styling. Mobile uses the existing responsive

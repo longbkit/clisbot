@@ -122,6 +122,11 @@ A transcript line: message id, time, sender (`user`, `bot`, or `system`), final 
 the `agentId` and timeline item id it came from. Tool calls and progress stay in the bot's
 `events.jsonl`; the chat screen streams them from the session timeline while the turn runs.
 
+Exact trimmed `PASS` and `HEARTBEAT_OK` Bot replies are silent in direct and group Chats.
+The daemon records completion without appending a message, and the app hides older persisted
+marker lines and their unreferenced timeline tail. User markers and ordinary agent sessions remain
+visible. [Silent Bot replies](silent-replies.md) owns the complete matching and streaming contract.
+
 User identity fields live directly on `sender`, like an agent timeline user message:
 `{ kind: "user", id, displayName, hubOrigin, organizationId, memberId, ... }`.
 Bot senders use `{ kind: "bot", botId }`; system notices use `{ kind: "system" }`.

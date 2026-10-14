@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PendingPermission } from "@/types/shared";
-import type { StreamItem } from "@/types/stream";
+import { applyStreamEvent, type StreamItem } from "@/types/stream";
 import type { ChatMessage, ChatMessageSender } from "../data/contracts";
 import { buildChatRenderModel, type ChatLiveHead } from "./render-model";
 
@@ -258,7 +258,7 @@ describe("silence markers", () => {
   });
   const botLine = (text: string, botId = "a") => ({ ...line({ kind: "bot", botId }, 9), text });
 
-  it("a direct chat hides an exact HEARTBEAT_OK line but keeps PASS and replies naming it", () => {
+  it("a direct chat hides exact marker lines but keeps replies naming them", () => {
     const transcript = [
       { ...line(user, 1), text: "check in" },
       botLine(" HEARTBEAT_OK\n"),
@@ -268,9 +268,18 @@ describe("silence markers", () => {
     const rows = buildChatRenderModel(transcript, new Map()).rows;
     expect(rows.map((row) => ("line" in row ? row.line.text : row.kind))).toEqual([
       "check in",
-      "PASS",
       "It said HEARTBEAT_OK.",
     ]);
+  });
+
+  it("a direct chat hides the completed Codex boundary marker in its unreferenced tail", () => {
+    const rows = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([
+        ["a", head("agent-a", [userItem("u", 2), reply("r", 4, "\n\n---\n\nHEARTBEAT_OK")])],
+      ]),
+    ).rows;
+    expect(rows.map((row) => row.kind)).toEqual(["user"]);
   });
 
   it("a group hides persisted PASS and HEARTBEAT_OK lines, never a user's", () => {
@@ -314,5 +323,162 @@ describe("silence markers", () => {
       ]),
     ).rows;
     expect(rows.map((row) => row.kind)).toEqual(["user"]);
+  });
+
+  it.each(["PASS", "HEARTBEAT_OK"])(
+    "assembles live %s deltas, then releases a longer reply",
+    (marker) => {
+      let stream = { tail: [] as StreamItem[], head: [] as StreamItem[] };
+      const projected = (turnActive: boolean) =>
+        buildChatRenderModel(
+          [],
+          new Map([
+            [
+              "a",
+              {
+                ...head("agent-a", stream.tail, { turnActive }),
+                streamingItems: stream.head,
+              },
+            ],
+          ]),
+        ).rows;
+      const send = (text: string) => {
+        stream = applyStreamEvent({
+          ...stream,
+          timestamp: new Date(3),
+          event: {
+            type: "timeline",
+            provider: "codex",
+            turnId: "t1",
+            item: {
+              type: "assistant_message",
+              messageId: "message-1",
+              text,
+            },
+          },
+        });
+      };
+      send("\n\n---\n\n");
+      for (const char of marker) {
+        send(char);
+        expect(projected(true)).toMatchObject([{ kind: "live", inProgress: true, items: [] }]);
+      }
+      expect(stream.head).toMatchObject([
+        { messageId: "message-1", text: `\n\n---\n\n${marker}`, turnId: "t1" },
+      ]);
+      const ended = applyStreamEvent({
+        ...stream,
+        timestamp: new Date(4),
+        event: { type: "turn_completed", provider: "codex", turnId: "t1" },
+      });
+      expect(buildChatRenderModel([], new Map([["a", head("agent-a", ended.tail)]])).rows).toEqual(
+        [],
+      );
+      send(" means idle; the build is red.");
+      expect(projected(true)).toMatchObject([
+        { items: [{ text: `\n\n---\n\n${marker} means idle; the build is red.` }] },
+      ]);
+      stream = applyStreamEvent({
+        ...stream,
+        timestamp: new Date(4),
+        event: { type: "turn_completed", provider: "codex", turnId: "t1" },
+      });
+      expect(projected(false)).toMatchObject([
+        { kind: "live", inProgress: false, items: [{ id: "message-1" }] },
+      ]);
+    },
+  );
+
+  it.each([false, true])(
+    "preserves user markers, quotes, code, mentions and longer Bot replies (group=%s)",
+    (group) => {
+      const kept = [
+        "PASS",
+        " HEARTBEAT_OK\n",
+        "`PASS`",
+        "```text\nHEARTBEAT_OK\n```",
+        "> HEARTBEAT_OK",
+        "@PASS please check",
+        "PASSING the tests",
+        "HEARTBEAT_OK but one warning",
+      ];
+      const transcript = [
+        ...kept.slice(0, 2).map((text) => Object.assign(line(user, 1), { text })),
+        ...kept.slice(2).map((text) => botLine(text)),
+        botLine(" PASS \n"),
+        botLine(" HEARTBEAT_OK\n"),
+        { ...line({ kind: "system" }, 10), text: "PASS" },
+      ];
+      expect(
+        buildChatRenderModel(transcript, new Map(), { group }).rows.map((row) =>
+          "line" in row ? row.line.text : row.kind,
+        ),
+      ).toEqual([...kept, "PASS"]);
+      expect(transcript.at(-3)?.text).toBe(" PASS \n");
+    },
+  );
+
+  it("does not hide one marker message inside a longer contiguous answer or join different turns", () => {
+    const items = [
+      { ...reply("r1", 2, "PASS"), messageId: "m1", turnId: "t1" },
+      { ...reply("r2", 3, "but see this failure"), messageId: "m2", turnId: "t1" },
+      { ...reply("r3", 4, "HEARTBEAT_OK"), messageId: "m3", turnId: "t2" },
+    ];
+    const rows = buildChatRenderModel(
+      [],
+      new Map([["a", head("agent-a", items, { turnActive: true })]]),
+    ).rows;
+    expect(rows).toMatchObject([{ items: [{ id: "r1" }, { id: "r2" }] }]);
+    const ended = buildChatRenderModel([], new Map([["a", head("agent-a", items)]])).rows;
+    expect(ended).toMatchObject([{ items: [{ id: "r1" }, { id: "r2" }] }]);
+  });
+
+  it("silent direct completion preserves notifications, failed tools and pending approvals", () => {
+    const failed = tool("failed", 3);
+    if (failed.kind !== "tool_call") throw new Error("expected tool");
+    failed.payload.data.status = "failed";
+    failed.payload.data.error = "read failed";
+    const notice: StreamItem = {
+      kind: "notification",
+      sourceType: "error",
+      id: "error",
+      level: "error",
+      message: "provider failed",
+      timestamp: new Date(5),
+    };
+    const rows = buildChatRenderModel(
+      [line(user, 1)],
+      new Map([
+        [
+          "a",
+          head(
+            "agent-a",
+            [userItem("u", 2), failed, tool("ok", 3), reply("r", 4, "PASS"), notice],
+            { permissions: [permission("agent-a")] },
+          ),
+        ],
+      ]),
+    ).rows;
+    expect(rows[1]).toMatchObject({
+      kind: "live",
+      inProgress: false,
+      items: [{ id: "failed" }, { id: "error" }],
+      permissions: [{ agentId: "agent-a" }],
+    });
+  });
+
+  it("a canceled incomplete marker is readable and a canceled tool is never hidden by silence", () => {
+    const partial = reply("partial", 3, "HEARTBEAT_");
+    expect(
+      buildChatRenderModel([], new Map([["a", head("agent-a", [partial])]])).rows,
+    ).toMatchObject([{ items: [{ text: "HEARTBEAT_" }] }]);
+    const canceled = tool("canceled", 2);
+    if (canceled.kind !== "tool_call" || canceled.payload.source !== "agent")
+      throw new Error("expected agent tool");
+    canceled.payload.data.status = "canceled";
+    expect(
+      buildChatRenderModel([], new Map([["a", head("agent-a", [canceled, reply("r", 3, "PASS")])]]))
+        .rows,
+    ).toMatchObject([{ items: [{ id: "canceled" }] }]);
   });
 });

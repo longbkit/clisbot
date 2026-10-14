@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { DEFAULT_ROOM_INSTRUCTIONS } from "@clisbot/protocol/chats/room";
 import {
   isHeartbeatAck,
+  isSilentBotReply,
   isSilentReply,
   renderRoomContract,
   renderRoomUpdate,
@@ -114,4 +115,22 @@ test("isSilentReply accepts no text, blank text, PASS and HEARTBEAT_OK only", ()
   expect(isSilentReply(" PASS \n")).toBe(true);
   expect(isSilentReply("PASS, but one note")).toBe(false);
   expect(isSilentReply("Agreed.")).toBe(false);
+});
+
+test("the direct and group Bot marker contract excludes no-text, examples and longer answers", () => {
+  for (const marker of ["PASS", "HEARTBEAT_OK"])
+    expect(isSilentBotReply(` ${marker}\n`)).toBe(true);
+  for (const text of [
+    null,
+    undefined,
+    "",
+    "  ",
+    "PASSING",
+    "PASS — one note",
+    "`HEARTBEAT_OK`",
+    "```\nPASS\n```",
+    "@PASS",
+    "heartbeat_ok",
+  ])
+    expect(isSilentBotReply(text)).toBe(false);
 });

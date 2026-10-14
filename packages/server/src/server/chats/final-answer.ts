@@ -3,6 +3,7 @@
 // of `assistant_message` items. Shared by the turn tracker (live events) and the
 // restart reconciliation (durable rows) so both write the same bot line.
 import type { AgentTimelineItem } from "../agent/agent-sdk-types.js";
+import { stripAssistantMessageBoundary } from "@clisbot/protocol/chats/room";
 
 export interface TimelineReference {
   epoch: string;
@@ -23,8 +24,6 @@ export interface FinalAnswer {
   turnId: string | undefined;
 }
 
-/** The Codex boundary marker prefixed to the first delta of a new assistant message. */
-const ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN = "\n\n---\n\n";
 /** The daemon's own copy of a failure, appended as an assistant message; never a reply. */
 const SYSTEM_ERROR_PREFIX = "[System Error]";
 
@@ -64,8 +63,6 @@ function lastAssistantRun(items: readonly AnsweredItem[]): AnsweredItem[] {
 }
 
 function cleanAssistantText(text: string): string {
-  let result = text;
-  while (result.startsWith(ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN))
-    result = result.slice(ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN.length);
+  const result = stripAssistantMessageBoundary(text);
   return result.startsWith(SYSTEM_ERROR_PREFIX) ? "" : result;
 }
