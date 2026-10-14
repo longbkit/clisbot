@@ -156,7 +156,13 @@ Android permits one UiAutomation service at a time; the separate dump helper fai
 `already registered` while Agent Device holds it. The capture labels the hierarchy unavailable
 without discarding its completed trace/video. During Agent Device QA, use its snapshots directly.
 
-Android FrameTimeline owns frame durations and jank. Native touch-up and JS press/route-commit
+Android FrameTimeline owns frame durations and jank.
+Duration distributions and display-budget comparisons use only rows with `dur > 0`. Report
+raw, eligible and invalid/nonpositive counts separately. Jank flags retain all windowed raw
+rows, including invalid durations; their denominator is independent of duration eligibility.
+For corrections to existing captures, `analyze.py --reuse-exports` reads the original CSV
+exports without rewriting them; preserve superseded summaries as provenance.
+Native touch-up and JS press/route-commit
 markers separate JS input delay from route commitment. Use `MotionEvent.eventTime`, mapped by
 Perfetto's MONOTONIC clock snapshots, for the UP origin; the Window.Callback marker occurs after
 native queueing. The analyzer rejects missing or unstable mappings. A route commit alone does not establish

@@ -13,9 +13,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--processor', required=True)
 parser.add_argument('--run', required=True, type=Path)
 parser.add_argument('--package', default='com.clisbot.app.dev')
+parser.add_argument('--reuse-exports', action='store_true', help='Read existing CSV exports without querying or rewriting them.')
 args = parser.parse_args()
 
 def query(name, sql):
+    if args.reuse_exports:
+        with (args.run / (name + '.csv')).open() as exported:
+            return list(csv.DictReader(exported))
     result = subprocess.run([args.processor, str(args.run / 'trace.pftrace'), '-Q', sql], check=True, capture_output=True, text=True)
     (args.run / (name + '.csv')).write_text(result.stdout)
     (args.run / (name + '-query.log')).write_text(result.stderr)
@@ -68,12 +72,19 @@ for press in presses:
 window_start = min(inputs) if inputs else 0
 window_end = max(inputs)+2_500_000_000 if inputs else 0
 sample_frames = [f for f in frames if window_start <= int(f['ts']) <= window_end]
+duration_frames = [f for f in sample_frames if int(f['dur']) > 0]
+duration_stats = stats([int(f['dur'])/1e6 for f in duration_frames])
+duration_stats.update(raw_n=len(sample_frames), eligible_n=len(duration_frames),
+    invalid_n=len(sample_frames)-len(duration_frames),
+    negative_n=sum(int(f['dur']) < 0 for f in sample_frames),
+    zero_n=sum(int(f['dur']) == 0 for f in sample_frames),
+    population='Windowed FrameTimeline rows with dur > 0; nonpositive durations excluded.')
 gaps = []
 for marker in markers:
     if marker['name'].startswith('clisbot.js.loop|gapMs=') and window_start <= int(marker['ts']) <= window_end:
         gaps.append(float(marker['name'].split('gapMs=')[1]))
-summary = {'window_ns': [window_start,window_end], 'route_commit_latency': stats([m['input_to_route_commit_ms'] for m in latencies]), 'input_to_js_press': stats([m['input_to_press_ms'] for m in latencies]), 'native_frame_duration': stats([int(f['dur'])/1e6 for f in sample_frames]), 'native_jank': {'n': len(sample_frames), 'janky': sum(f['jank_type'] != 'None' for f in sample_frames)}, 'js_event_loop_gap': stats(gaps), 'js_gap_over_100ms': sum(g>100 for g in gaps), 'tap_to_first_visible_feedback': 'unavailable until video analysis', 'tap_to_usable_content': 'unavailable until target-specific content validation', 'react_per_component_commits': 'unavailable in release renderer'}
-summary['native_jank'].update(app_deadline_missed=sum('App Deadline Missed' in f['jank_type'] for f in sample_frames), over_display_budget=sum(int(f['dur']) > 1e9/60 for f in sample_frames), types=dict(Counter(f['jank_type'] for f in sample_frames)))
+summary = {'window_ns': [window_start,window_end], 'route_commit_latency': stats([m['input_to_route_commit_ms'] for m in latencies]), 'input_to_js_press': stats([m['input_to_press_ms'] for m in latencies]), 'native_frame_duration': duration_stats, 'native_jank': {'n': len(sample_frames), 'population': 'All windowed raw FrameTimeline rows, including nonpositive durations; flags are independent of duration eligibility.', 'janky': sum(f['jank_type'] != 'None' for f in sample_frames)}, 'js_event_loop_gap': stats(gaps), 'js_gap_over_100ms': sum(g>100 for g in gaps), 'tap_to_first_visible_feedback': 'unavailable until video analysis', 'tap_to_usable_content': 'unavailable until target-specific content validation', 'react_per_component_commits': 'unavailable in release renderer'}
+summary['native_jank'].update(app_deadline_missed=sum('App Deadline Missed' in f['jank_type'] for f in sample_frames), over_display_budget=sum(int(f['dur']) > 1e9/60 for f in duration_frames), over_display_budget_eligible_n=len(duration_frames), types=dict(Counter(f['jank_type'] for f in sample_frames)))
 summary['monotonic_to_trace_offset_ns'] = clock_offset
 summary['input_to_window_dispatch'] = stats([m['input_to_window_dispatch_ms'] for m in latencies])
 summary['trace_loss_counters'] = loss

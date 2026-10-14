@@ -10,8 +10,10 @@ The test used 500 distinct sessions/workspaces, short 10-item and long 400-item 
 | -------------------------------------------- | -----------------: | ----------------: |
 | Touch-UP → visible feedback p50 / p95        | 339.56 / 1336.86ms | 189.64 / 466.06ms |
 | Touch-UP → cached viewport content p50 / p95 | 426.99 / 1429.12ms | 270.95 / 569.65ms |
-| Native FrameTimeline duration p95            |            46.65ms |           28.76ms |
-| App Deadline Missed / native samples         |          123 / 790 |          83 / 814 |
+| Eligible Native FrameTimeline duration p95   |            46.68ms |           28.76ms |
+| Duration eligible / raw rows                 |          789 / 790 |         813 / 814 |
+| Invalid/nonpositive duration rows            |                  1 |                 1 |
+| App Deadline Missed / raw jank population    |          123 / 790 |          83 / 814 |
 | Recorded JS timer-gap p95 (partial coverage) |           126.06ms |           93.00ms |
 | Recorded derivation wall time (partial)      |          7050.78ms |          395.95ms |
 | View objects after third loop                |             23,560 |               748 |
@@ -24,3 +26,5 @@ Same-session draft/model and pixel anchor survive Back/reopen and chat/file/term
 Use the maintained [native profiling protocol](../mobile-testing.md#native-switching-performance) and [navigation ownership rules](../expo-router.md). The final artifact report identifies exact commits, commands, limitations, raw evidence and cleanup for independent Atlas acceptance. Frozen stable 2.1.1, owner environments, canonical main and external messaging were untouched.
 
 Five paired captures have kernel ftrace overruns. All six also report unattributed service-discard counters; no loss, overwrite or discard counters are recorded for the separate FrameTimeline buffer. All 60 input/press/commit samples per revision and timestamped native videos remain present. Frame/jank results describe the recorded samples. JS gaps, render counts and derivation wall-time totals have partial coverage; exact complete counts/totals are unavailable. Do not infer missing work as zero or promote the recorded derivation reduction to a complete CPU measurement. See [Perfetto's buffer-loss guidance](https://perfetto.dev/docs/concepts/buffers) and the artifact's full-buffer-health exports.
+
+Independent review found one `dur=-1` row in the first paired run of each revision. Duration distributions and display-budget comparisons now require `dur > 0`; pooled eligible counts are 789/813, with exact p95 46.6767834/28.7644752 ms. Jank flags retain the full raw 790/814 population, including those invalid durations. Over-budget counts remain 163/109, with eligible denominators 789/813. The narrow harness correction reaggregated the existing captures, preserving raw traces, videos and CSVs; no runtime change or new native run was needed.
