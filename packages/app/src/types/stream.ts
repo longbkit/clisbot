@@ -810,6 +810,7 @@ export function isAgentToolCallItem(item: StreamItem): item is AgentToolCallItem
 type NotificationLevel = "info" | "warning" | "error";
 
 export interface NotificationItem {
+  heartbeatRun?: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
   kind: "notification";
   sourceType: "error" | "notification";
   id: string;
@@ -1603,6 +1604,7 @@ function reduceTimelineEvent(
         timestamp,
         level: item.level,
         message: item.message,
+        ...(item.heartbeatRun ? { heartbeatRun: item.heartbeatRun } : {}),
       };
       return finalizeActiveThoughts(appendNotification(state, notification));
     }

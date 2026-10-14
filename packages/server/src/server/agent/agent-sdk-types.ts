@@ -197,6 +197,11 @@ export type AgentPromptContentBlock =
 export type AgentPromptInput = string | AgentPromptContentBlock[];
 
 export interface AgentRunOptions {
+  /** Daemon-owned presentation metadata, emitted only for this accepted turn. */
+  heartbeatRun?: {
+    metadata: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
+    message: string;
+  };
   /** Daemon-owned admission snapshot; never forwarded to providers. */
   sessionIdentity?: import("./session-authorship.js").SessionOperationIdentity;
   sessionReceivedAt?: string;
@@ -409,6 +414,7 @@ export type AgentTimelineItem =
       type: "notification";
       level: "info" | "warning" | "error";
       message: string;
+      heartbeatRun?: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
     }
   | CompactionTimelineItem
   | PluginTimelineItem;

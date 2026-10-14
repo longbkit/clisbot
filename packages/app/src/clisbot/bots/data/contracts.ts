@@ -37,7 +37,7 @@ export type ChatPayload = Pick<WireChat, "id" | "kind" | "rules" | "createdAt" |
 };
 export type ChatMessage = Pick<
   ChatMessagePayload,
-  "id" | "seq" | "at" | "sender" | "text" | "images" | "attachments" | "scheduleRun"
+  "id" | "seq" | "at" | "sender" | "text" | "images" | "attachments" | "scheduleRun" | "inReplyTo"
 > & {
   agentId?: string;
   timelineItemId?: string;

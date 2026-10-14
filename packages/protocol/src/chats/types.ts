@@ -7,6 +7,7 @@ import { AgentAttachmentSchema, ImageAttachmentSchema } from "../agent-attachmen
 import { z } from "zod";
 import { SessionActorSchema } from "../session-authorship.js";
 import { ChatDisplaySchema } from "./tool-display.js";
+import { HeartbeatRunSchema } from "../schedule/heartbeat-notice.js";
 
 /** What a busy bot does with a new message: steer the running turn or wait for it. */
 export const ChatWhenBusySchema = z.enum(["steer", "queue"]);
@@ -113,7 +114,7 @@ export const ChatMessagePayloadSchema = z.object({
    * Set only by the daemon on a heartbeat run it posts (never from a client), so a client can
    * draw the line as the run marker; the sender name alone could be any user's.
    */
-  scheduleRun: z.object({ scheduleId: z.string(), run: z.number().int().positive() }).optional(),
+  scheduleRun: HeartbeatRunSchema.optional(),
 });
 export type ChatMessagePayload = z.infer<typeof ChatMessagePayloadSchema>;
 

@@ -3361,6 +3361,7 @@ export class AgentManager {
           { type: "turn_started", provider: agent.provider, turnId },
           { timestamp: turnStartedAt.toISOString() },
         );
+        this.recordHeartbeatRun(agentId, agent.provider, turnId, options?.heartbeatRun);
         const stagedSubmittedPromptEcho = options?.clientMessageId
           ? pendingRun.stagedEvents.find(
               (event): event is Extract<AgentStreamEvent, { type: "timeline" }> =>
@@ -6049,6 +6050,26 @@ export class AgentManager {
     }
   }
 
+  /** Presentation only, owned by this accepted turn; never the next manual prompt. */
+  private recordHeartbeatRun(
+    agentId: string,
+    provider: AgentProvider,
+    turnId: string,
+    run?: AgentRunOptions["heartbeatRun"],
+  ): void {
+    if (!run) return;
+    try {
+      this.recordAndDispatchTimelineItem(
+        agentId,
+        { type: "notification", level: "info", message: run.message, heartbeatRun: run.metadata },
+        provider,
+        turnId,
+      );
+    } catch (error) {
+      this.logger.warn({ err: error, agentId, turnId }, "heartbeat.notice_failed");
+    }
+  }
+
   private recordAndDispatchTimelineItem(
     agentId: string,
     item: AgentTimelineItem,
@@ -6130,12 +6151,15 @@ export class AgentManager {
   }
   private providerRunOptions<T extends AgentRunOptions>(
     options?: T,
-  ): Omit<T, "sessionIdentity" | "sessionSubmission" | "sessionReceivedAt"> | undefined {
+  ):
+    | Omit<T, "sessionIdentity" | "sessionSubmission" | "sessionReceivedAt" | "heartbeatRun">
+    | undefined {
     if (!options) return undefined;
     const {
       sessionIdentity: _identity,
       sessionSubmission: _submission,
       sessionReceivedAt: _receivedAt,
+      heartbeatRun: _heartbeatRun,
       ...providerOptions
     } = options;
     return providerOptions;

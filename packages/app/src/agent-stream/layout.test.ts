@@ -549,6 +549,36 @@ describe("layoutStream", () => {
 });
 
 for (const platform of ["web", "android"] as const) {
+  it(`${platform} keeps adjacent heartbeat runs and a manual reply in separate footers`, () => {
+    const notice = (id: string, turnId: string, run: number): StreamItem => ({
+      kind: "notification",
+      sourceType: "notification",
+      id,
+      turnId,
+      timestamp: timestamp(run),
+      level: "info",
+      message: `Heartbeat · CI · run ${run}`,
+      heartbeatRun: { scheduleId: "ci", run, maxRuns: null },
+    });
+    const first = assistantMessage("heartbeat-first", 2, undefined, "run-one");
+    const second = assistantMessage("heartbeat-second", 4, undefined, "run-two");
+    const manual = assistantMessage("manual", 6, undefined, "manual-turn");
+    const layout = layoutFor({
+      platform,
+      tail: [
+        notice("first-notice", "run-one", 1),
+        first,
+        notice("second-notice", "run-two", 3),
+        second,
+        { ...userMessage("manual-input", 5), turnId: "manual-turn" },
+        manual,
+      ],
+      timingIds: [first.id, second.id, manual.id],
+    });
+    expect(footerAssistantIds(layout).sort()).toEqual([first.id, second.id, manual.id].sort());
+    expect(findLayoutItem(layout, first.id).isFirstInResponseGroup).toBe(true);
+    expect(findLayoutItem(layout, second.id).isFirstInResponseGroup).toBe(true);
+  });
   it(`${platform} marks the first displayed item of each response as the response group start`, () => {
     const prompt = userMessage("prompt", 1);
     const firstAssistant = assistantMessage("assistant-1", 2);

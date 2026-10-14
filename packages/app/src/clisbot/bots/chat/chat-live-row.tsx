@@ -5,6 +5,7 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useMemo, type ReactNode } from "react";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { RunningTurnFooter } from "@/agent-stream/turn-footer";
+import { HeartbeatRunFooter } from "@/clisbot/heartbeats/heartbeat-run-footer";
 import { ACTOR_AVATAR_SIZE } from "@/clisbot/session-storage/actor-metrics";
 import { BotFace } from "./bot-face";
 import { renderLiveItem } from "./chat-live-item";
@@ -73,6 +74,13 @@ export const ChatLiveRow = memo(function ChatLiveRow({
     [bot.avatar, bot.botId, bot.name],
   );
   const showWorking = row.inProgress && row.permissions.length === 0;
+  const metadata = useMemo(
+    () =>
+      row.heartbeatRun && row.items.some((item) => item.kind === "assistant_message") ? (
+        <HeartbeatRunFooter serverId={serverId} run={row.heartbeatRun} />
+      ) : null,
+    [row.heartbeatRun, row.items, serverId],
+  );
   const hasContent =
     row.permissions.length > 0 ||
     showWorking ||
@@ -90,7 +98,9 @@ export const ChatLiveRow = memo(function ChatLiveRow({
           client={client}
         />
       ))}
-      {showWorking ? <RunningTurnFooter inFlightTurnStartedAt={row.startedAt ?? null} /> : null}
+      {showWorking ? (
+        <RunningTurnFooter inFlightTurnStartedAt={row.startedAt ?? null} metadata={metadata} />
+      ) : null}
     </ActorResponseRow>
   );
 });

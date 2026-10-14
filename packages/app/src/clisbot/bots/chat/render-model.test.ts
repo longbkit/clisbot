@@ -25,7 +25,11 @@ const user = { kind: "user" } as const;
 const botA = { kind: "bot", botId: "a" } as const;
 const botB = { kind: "bot", botId: "b" } as const;
 
-function assistant(id: string, at: number, messageId?: string): StreamItem {
+function assistant(
+  id: string,
+  at: number,
+  messageId?: string,
+): Extract<StreamItem, { kind: "assistant_message" }> {
   return { kind: "assistant_message", id, text: id, timestamp: new Date(at), messageId };
 }
 
@@ -93,7 +97,7 @@ describe("buildChatRenderModel", () => {
     expect(rows[2]).toMatchObject({ opensGroup: true });
   });
 
-  it("a heartbeat run is a marker, not a user line, and reopens the next group", () => {
+  it("a heartbeat input has no row; a lookalike user stays visible", () => {
     const name = "Heartbeat · Standup · run 2 of 5";
     const heartbeat = { kind: "user", id: "sch_1", displayName: name } as const;
     const run = { ...line(heartbeat, 2), scheduleRun: { scheduleId: "sch_1", run: 2 } };
@@ -103,10 +107,102 @@ describe("buildChatRenderModel", () => {
       [line(user, 1), run, line(user, 3), lookalike],
       new Map(),
     ).rows;
-    expect(rows.map((row) => row.kind)).toEqual(["user", "heartbeat", "user", "user"]);
-    expect(rows[1]).toMatchObject({ label: "Heartbeat · Standup · run 2 of 5" });
-    expect(rows[2]).toMatchObject({ opensGroup: true });
+    expect(rows.map((row) => row.kind)).toEqual(["user", "user", "user"]);
+    expect(rows[1]).toMatchObject({ opensGroup: false });
   });
+
+  it("keeps heartbeat-prefixed errors and warnings beside a silent Bot turn", () => {
+    const notices: StreamItem[] = [
+      {
+        kind: "notification",
+        sourceType: "error",
+        id: "failure",
+        timestamp: new Date(2),
+        level: "error",
+        message: "Heartbeat · CI · run 2 of 5",
+      },
+      {
+        kind: "notification",
+        sourceType: "notification",
+        id: "warning",
+        timestamp: new Date(3),
+        level: "warning",
+        message: "Heartbeat · CI · run 2 of 5",
+      },
+      {
+        kind: "notification",
+        sourceType: "notification",
+        id: "run",
+        timestamp: new Date(4),
+        level: "info",
+        message: "Heartbeat · CI · run 2 of 5",
+      },
+    ];
+    const rows = buildChatRenderModel(
+      [],
+      new Map([["a", head("agent-a", [...notices, { ...assistant("silent", 5), text: "PASS" }])]]),
+    ).rows;
+    expect(rows).toMatchObject([{ kind: "live", items: [{ id: "failure" }, { id: "warning" }] }]);
+  });
+
+  for (const group of [false, true]) {
+    it(`binds ${group ? "group" : "DM"} run counters by reply/input ID and preserves silence`, () => {
+      const source = {
+        ...line(user, 1),
+        scheduleRun: { scheduleId: "schedule-a", run: 2, maxRuns: 5, name: "Saved name" },
+      };
+      const unrelated = {
+        ...line(user, 2),
+        scheduleRun: { scheduleId: "schedule-b", run: 9, maxRuns: null, name: null },
+      };
+      const reply = { ...line(botA, 3), inReplyTo: source.id };
+      const manual = { ...line(botA, 5), inReplyTo: line(user, 4).id };
+      const silent = { ...line(botA, 6), text: "PASS", inReplyTo: unrelated.id };
+      const rows = buildChatRenderModel(
+        [source, unrelated, reply, line(user, 4), manual, silent],
+        new Map(),
+        { group },
+      ).rows;
+      expect(rows).toHaveLength(3);
+      expect(rows[0]).toMatchObject({ kind: "bot", heartbeatRun: source.scheduleRun });
+      expect(rows[2]).not.toHaveProperty("heartbeatRun");
+      const legacy = {
+        ...source,
+        sender: { kind: "user", displayName: "Heartbeat · Old name · run 2 of 8" } as const,
+        scheduleRun: { scheduleId: "schedule-a", run: 2 },
+      };
+      expect(buildChatRenderModel([legacy, reply], new Map(), { group }).rows[0]).toMatchObject({
+        heartbeatRun: { scheduleId: "schedule-a", run: 2, maxRuns: 8 },
+      });
+      const prompt = {
+        ...userItem("prompt", 2),
+        clientMessageId: source.id,
+        turnId: "heartbeat-turn",
+      };
+      const partial = {
+        ...assistant("partial", 3),
+        text: "Meaningful partial",
+        turnId: "heartbeat-turn",
+      };
+      const heads = new Map([["a", head("agent-a", [prompt, partial], { turnActive: true })]]);
+      expect(buildChatRenderModel([source], heads, { group }).rows[0]).toMatchObject({
+        kind: "live",
+        heartbeatRun: source.scheduleRun,
+      });
+      // A steer/manual prompt in the same provider turn changes the triggering input identity.
+      const manualPrompt = { ...prompt, clientMessageId: "manual-input" };
+      const manualHeads = new Map([
+        ["a", head("agent-a", [manualPrompt, partial], { turnActive: true })],
+      ]);
+      expect(buildChatRenderModel([source], manualHeads, { group }).rows[0]).toMatchObject({
+        heartbeatRun: undefined,
+      });
+      const silentHeads = new Map([
+        ["a", head("agent-a", [prompt, { ...partial, text: "HEARTBEAT_OK" }])],
+      ]);
+      expect(buildChatRenderModel([source], silentHeads, { group }).rows).toEqual([]);
+    });
+  }
 
   it("keeps a turn's lines together but gives a later turn from the same bot its own group", () => {
     const turn = (at: number, turnId: string) => ({

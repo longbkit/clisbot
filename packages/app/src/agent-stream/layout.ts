@@ -1,4 +1,5 @@
 import { sessionParticipantKey } from "@clisbot/protocol/session-authorship";
+import { isHeartbeatRunNotification } from "@clisbot/protocol/schedule/heartbeat-notice";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getAssistantBlockSpacing, getGapBetweenStreamItems } from "./spacing";
@@ -205,6 +206,8 @@ const RESPONSE_GROUP_KINDS = new Set<StreamItem["kind"]>([
 ]);
 
 export function isResponseGroupItem(item: StreamItem | null | undefined): item is StreamItem {
+  // Hidden heartbeat notices must not own the response's face/name.
+  if (item?.kind === "notification" && isHeartbeatRunNotification(item)) return false;
   return item !== null && item !== undefined && RESPONSE_GROUP_KINDS.has(item.kind);
 }
 

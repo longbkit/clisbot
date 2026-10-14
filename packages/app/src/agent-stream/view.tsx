@@ -16,8 +16,11 @@ import {
 import { AgentFace } from "@/clisbot/session-storage/actor";
 import { HeartbeatCard } from "@/clisbot/heartbeats/heartbeat-created-card";
 import { heartbeatIdFromToolCall } from "@/clisbot/heartbeats/heartbeat-tool-call";
-import { HeartbeatRunMarker } from "@/clisbot/heartbeats/heartbeat-run-marker";
-import { isHeartbeatRunNotice } from "@clisbot/protocol/schedule/heartbeat-notice";
+import {
+  useHeartbeatTurnFooterMetadata,
+  HeartbeatCompletedTurnFooterRow,
+} from "@/clisbot/heartbeats/heartbeat-run-footer";
+import { isHeartbeatRunNotification } from "@clisbot/protocol/schedule/heartbeat-notice";
 import { ActorGutterInset, ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
@@ -93,7 +96,6 @@ import { useChatOutline } from "@/agent-stream/chat-outline/use-chat-outline";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import {
-  CompletedTurnFooterRow,
   TurnFooter,
   TURN_FOOTER_BOTTOM_SPACING,
   type AssistantTurnForkHandler,
@@ -200,6 +202,7 @@ function renderStreamItemWithTurnFooter(input: {
   supportsTimelineCursor: boolean;
   onForkAssistantTurn?: AssistantTurnForkHandler;
   actor: { name: string; opensGroup: boolean } | null;
+  serverId: string;
 }): ReactNode {
   if (!input.content) {
     return null;
@@ -210,7 +213,8 @@ function renderStreamItemWithTurnFooter(input: {
     // The footer renders outside the item wrapper, so it takes the gutter on
     // its own to stay on the response's left edge.
     <ActorGutterInset enabled={input.actor !== null}>
-      <CompletedTurnFooterRow
+      <HeartbeatCompletedTurnFooterRow
+        serverId={input.serverId}
         strategy={input.strategy}
         items={footerHost.items}
         timing={footerHost.timing}
@@ -1098,9 +1102,9 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             return renderToolCallItem(layoutItem, item);
 
           case "notification":
-            // Clisbot Heartbeats: the daemon's run line draws as a marker.
-            if (isHeartbeatRunNotice(item.message)) {
-              return <HeartbeatRunMarker message={item.message} />;
+            // Run metadata belongs beside the response time, not in a separator row.
+            if (isHeartbeatRunNotification(item)) {
+              return null;
             }
             return <Notification level={item.level} message={item.message} />;
 
@@ -1146,6 +1150,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         return renderStreamItemWithTurnFooter({
           content: renderStreamItemContent(layoutItem),
           layoutItem,
+          serverId: resolvedServerId,
           strategy: streamRenderStrategy,
           supportsTimelineCursor: supportsAgentForkContextCursor,
           onForkAssistantTurn: readOnly ? undefined : handleForkAssistantTurn,
@@ -1158,6 +1163,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       },
       [
         handleForkAssistantTurn,
+        resolvedServerId,
         readOnly,
         renderStreamItemContent,
         sessionStorageReadable,
@@ -1181,35 +1187,41 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         }),
       [client, pendingPermissionItems, resolvedServerId],
     );
-    const turnFooterNode = useMemo(
-      () =>
-        isTurnActive || bottomTurnFooterHost ? (
-          // The live turn's footer renders outside the item rows, so it takes
-          // the gutter on its own to stay on the response's left edge.
-          <ActorGutterInset enabled={sessionStorageReadable}>
-            <TurnFooter
-              isRunning={isTurnActive}
-              inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
-              host={bottomTurnFooterHost}
-              strategy={streamRenderStrategy}
-              supportsTimelineCursor={supportsAgentForkContextCursor}
-              onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
-              onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
-            />
-          </ActorGutterInset>
-        ) : null,
-      [
-        handleForkAssistantTurn,
-        handleForkInFlightTurn,
-        readOnly,
-        sessionStorageReadable,
-        isTurnActive,
-        baseRenderModel.turnTiming.runningStartedAt,
-        bottomTurnFooterHost,
-        streamRenderStrategy,
-        supportsAgentForkContextCursor,
-      ],
-    );
+    const footerMetadata = useHeartbeatTurnFooterMetadata({
+      serverId: resolvedServerId,
+      isTurnActive,
+      turnTiming: baseRenderModel.turnTiming,
+      host: bottomTurnFooterHost,
+    });
+    const turnFooterNode = useMemo(() => {
+      return isTurnActive || bottomTurnFooterHost ? (
+        // The live turn's footer renders outside the item rows, so it takes
+        // the gutter on its own to stay on the response's left edge.
+        <ActorGutterInset enabled={sessionStorageReadable}>
+          <TurnFooter
+            isRunning={isTurnActive}
+            inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
+            host={bottomTurnFooterHost}
+            metadata={footerMetadata}
+            strategy={streamRenderStrategy}
+            supportsTimelineCursor={supportsAgentForkContextCursor}
+            onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
+            onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
+          />
+        </ActorGutterInset>
+      ) : null;
+    }, [
+      handleForkAssistantTurn,
+      handleForkInFlightTurn,
+      readOnly,
+      sessionStorageReadable,
+      isTurnActive,
+      baseRenderModel.turnTiming.runningStartedAt,
+      footerMetadata,
+      bottomTurnFooterHost,
+      streamRenderStrategy,
+      supportsAgentForkContextCursor,
+    ]);
     const renderModel = useMemo<AgentStreamRenderModel>(() => {
       return {
         ...baseRenderModel,

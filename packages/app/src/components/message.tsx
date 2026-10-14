@@ -57,6 +57,7 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ICON_SIZE, SPACING, type Theme } from "@/styles/theme";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { ResponseFooter } from "./response-footer";
 import Animated, {
   Easing,
   cancelAnimation,
@@ -724,6 +725,8 @@ interface AssistantTurnFooterProps {
   completedAt?: Date;
   durationMs?: number | null;
   onFork?: (target: AssistantForkTarget) => Promise<void> | void;
+  metadata?: ReactNode;
+  revealed?: boolean;
 }
 
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
@@ -768,6 +771,8 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   completedAt,
   durationMs,
   onFork,
+  metadata,
+  revealed,
 }: AssistantTurnFooterProps) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
@@ -819,7 +824,7 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   const canFork = Boolean(onFork);
 
   return (
-    <View style={assistantTurnFooterStylesheet.container}>
+    <ResponseFooter style={assistantTurnFooterStylesheet.container} revealed={revealed}>
       <TurnCopyButton
         getContent={getContent}
         containerStyle={assistantTurnFooterStylesheet.copyButton}
@@ -845,7 +850,8 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
           </View>
         </Pressable>
       ) : null}
-    </View>
+      {metadata}
+    </ResponseFooter>
   );
 });
 

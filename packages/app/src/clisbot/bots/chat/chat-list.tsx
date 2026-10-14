@@ -1,5 +1,4 @@
 import { useStableEvent } from "@/hooks/use-stable-event";
-import { HeartbeatRunMarker } from "@/clisbot/heartbeats/heartbeat-run-marker";
 import { useChatTurnHeartbeats } from "@/clisbot/heartbeats/use-chat-turn-heartbeats";
 import { useChatKeyboardDismiss } from "./use-chat-keyboard-dismiss";
 import { useChatScrollPosition } from "./use-chat-scroll-position";
@@ -147,8 +146,6 @@ function ChatRowView({
       );
     case "system":
       return <ChatSystemRow row={row} />;
-    case "heartbeat":
-      return <HeartbeatRunMarker message={row.label} />;
     case "live":
       return (
         <BotWorkspaceContext serverId={serverId} bot={botIdentity(bots, row.botId)}>

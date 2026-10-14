@@ -114,7 +114,7 @@ export interface ScheduledLineInput {
   text: string;
   messageId: string;
   actor: SessionActor;
-  scheduleRun: { scheduleId: string; run: number };
+  scheduleRun: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
 }
 
 export type ScheduledLineResult =

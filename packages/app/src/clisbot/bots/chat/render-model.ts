@@ -7,6 +7,8 @@ import {
   stripAssistantMessageBoundary,
 } from "@clisbot/protocol/chats/room";
 import type { ChatMessage } from "../data/contracts";
+import type { HeartbeatRun } from "@clisbot/protocol/schedule/heartbeat-notice";
+import { isHeartbeatRunNotification } from "@clisbot/protocol/schedule/heartbeat-notice";
 
 /**
  * One bot's in-progress work in a chat: its session's stream tail and head, whether the turn is
@@ -25,10 +27,15 @@ export interface ChatLiveHead {
 
 export type ChatRenderRow =
   | { kind: "user"; key: string; line: ChatMessage; opensGroup: boolean }
-  | { kind: "bot"; key: string; line: ChatMessage; botId: string; opensGroup: boolean }
+  | {
+      kind: "bot";
+      key: string;
+      line: ChatMessage;
+      botId: string;
+      opensGroup: boolean;
+      heartbeatRun?: HeartbeatRun;
+    }
   | { kind: "system"; key: string; line: ChatMessage }
-  /** A heartbeat run posted into the chat: a marker, not a message from the user. */
-  | { kind: "heartbeat"; key: string; line: ChatMessage; label: string }
   | {
       kind: "live";
       key: string;
@@ -40,6 +47,7 @@ export type ChatRenderRow =
       inProgress: boolean;
       startedAt?: Date | null;
       opensGroup: boolean;
+      heartbeatRun?: HeartbeatRun;
     };
 
 export interface ChatRenderModel {
@@ -50,7 +58,7 @@ export interface ChatRenderModel {
 export function chatRowSender(row: ChatRenderRow | undefined): string | null {
   if (!row) return null;
   if (row.kind === "user") return "user";
-  if (row.kind === "system" || row.kind === "heartbeat") return null;
+  if (row.kind === "system") return null;
   return `bot:${row.botId}`;
 }
 
@@ -128,10 +136,6 @@ function withoutSilence(
 function transcriptRow(line: ChatMessage, previous: ChatRenderRow | undefined): ChatRenderRow {
   const key = `line:${line.id}`;
   if (line.sender.kind === "system") return { kind: "system", key, line };
-  // Only the daemon sets `scheduleRun`; a sender name alone could be any user's.
-  if (line.scheduleRun && line.sender.kind === "user") {
-    return { kind: "heartbeat", key, line, label: line.sender.displayName ?? "" };
-  }
   if (line.sender.kind === "user") {
     return { kind: "user", key, line, opensGroup: senderOf(previous) !== "user" };
   }
@@ -184,6 +188,7 @@ function unreferencedItems(
   const lastLine = lines[lines.length - 1];
   const cutoff = lastReferencedIndex < 0 && lastLine ? Date.parse(lastLine.at) : Number.NaN;
   return items.filter((item, index) => {
+    if (item.kind === "notification" && isHeartbeatRunNotification(item)) return false;
     const cursor = item.timelineCursor;
     if (
       cursor &&
@@ -265,6 +270,8 @@ function liveRow(
     inProgress: head.turnActive,
     startedAt: head.startedAt ?? null,
     opensGroup: senderOf(previous) !== `bot:${botId}`,
+    // The canonical scheduled input ID identifies the running turn. Never use proximity.
+    heartbeatRun: heartbeatForLiveTurn(transcript, completeHead.items),
   };
 }
 
@@ -279,14 +286,48 @@ export function buildChatRenderModel(
 ): ChatRenderModel {
   const rows: ChatRenderRow[] = [];
   const group = options.group === true;
+  const runsByMessageId = new Map(
+    transcript
+      .filter((line) => line.sender.kind === "user" && line.scheduleRun)
+      .map((line) => [line.id, heartbeatSnapshot(line)]),
+  );
   for (const line of transcript) {
+    if (line.sender.kind === "user" && line.scheduleRun) continue;
     // A silent reply persisted before the daemon dropped it (or by an older one) stays hidden.
     if (line.sender.kind === "bot" && isSilentBotText(line.text, group)) continue;
-    rows.push(transcriptRow(line, rows[rows.length - 1]));
+    const row = transcriptRow(line, rows[rows.length - 1]);
+    if (row.kind === "bot" && line.inReplyTo) {
+      const run = runsByMessageId.get(line.inReplyTo);
+      if (run) row.heartbeatRun = run;
+    }
+    rows.push(row);
   }
   for (const [botId, head] of liveHeadsByBot) {
     const row = liveRow(transcript, botId, head, rows[rows.length - 1], group);
     if (row) rows.push(row);
   }
   return { rows };
+}
+
+/** Older Chat runs have identity/run but only a formatted display snapshot of their total/name. */
+function heartbeatSnapshot(source: ChatMessage): HeartbeatRun | undefined {
+  if (!source.scheduleRun || source.sender.kind !== "user") return undefined;
+  const snapshot = source.scheduleRun;
+  if (snapshot.maxRuns !== undefined) return snapshot;
+  const legacy = /^Heartbeat · (.*) · run (\d+)(?: of (\d+))?$/u.exec(
+    source.sender.displayName ?? "",
+  );
+  if (!legacy || Number(legacy[2]) !== snapshot.run) return snapshot;
+  // A legacy title can be a prompt fallback, so it cannot establish a heartbeat name.
+  return { ...snapshot, maxRuns: legacy[3] ? Number(legacy[3]) : null };
+}
+
+function heartbeatForLiveTurn(transcript: readonly ChatMessage[], items: readonly StreamItem[]) {
+  const prompt = items.findLast((item) => item.kind === "user_message");
+  if (prompt?.kind !== "user_message" || !prompt.turnId || prompt.turnId !== items.at(-1)?.turnId)
+    return undefined;
+  const source = transcript.find(
+    (line) => line.id === (prompt.clientMessageId ?? prompt.messageId),
+  );
+  return source?.sender.kind === "user" ? heartbeatSnapshot(source) : undefined;
 }

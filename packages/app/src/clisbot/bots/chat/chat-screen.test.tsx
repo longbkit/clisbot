@@ -1,7 +1,7 @@
 vi.mock("./use-chat-message-images", () => ({ useChatMessageImages: () => [] }));
 vi.mock("@/components/retained-panel", () => ({ useRetainedPanelActive: () => true }));
 vi.mock("@/clisbot/heartbeats/heartbeat-created-card", () => ({ HeartbeatCard: () => null }));
-vi.mock("@/clisbot/heartbeats/heartbeat-run-marker", () => ({ HeartbeatRunMarker: () => null }));
+vi.mock("@/clisbot/heartbeats/heartbeat-run-footer", () => ({ HeartbeatRunFooter: () => null }));
 vi.mock("@/clisbot/heartbeats/use-chat-turn-heartbeats", () => ({
   useChatTurnHeartbeats: () => new Map(),
 }));
