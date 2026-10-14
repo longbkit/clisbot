@@ -1013,6 +1013,9 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
       markUpwardInputEvidence();
       if (scrollContainer.scrollTop <= USER_SCROLL_DELTA_EPSILON) {
         rearmHistoryStartFromUserIntent();
+      } else {
+        // A pending layout can pin the bottom before native scroll is delivered.
+        stopFollowingOutputFromUserIntent();
       }
     };
     const handleWheel = (event: WheelEvent) => {
@@ -1149,6 +1152,7 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
     isActive,
     markUpwardInputEvidence,
     rearmHistoryStartFromUserIntent,
+    stopFollowingOutputFromUserIntent,
   ]);
 
   useEffect(() => {

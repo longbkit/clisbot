@@ -59,6 +59,7 @@ So arrival sets a _target_ and the reveal rate is derived from the backlog inste
   stale. A new field on `StreamLayoutItem` must be added to `areLayoutItemsEquivalent`, or sharing
   silently stops.
 
+- **Upward viewport input cancels bottom-following before native scroll arrives.** A streamed layout or delayed history can commit between the input and its scroll event. Waiting for that event lets the queued bottom pin override the gesture. Nested scrollers, zoom gestures and input already at the top do not detach the viewport.
 - **A shrinking reading row must not move the following text past the reader.** When wheel input enters the lower edge of an image placeholder and its intrinsic height arrives, preserve the distance to that edge if the old reading offset no longer fits. The virtualizer projects the same correction before layout commits; rows that still contain the reading offset keep it unchanged.
 
 ## Measuring

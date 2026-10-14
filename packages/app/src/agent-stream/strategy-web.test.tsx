@@ -980,6 +980,17 @@ describe("createWebStreamStrategy", () => {
     act(() => {
       scrollContainer.dispatchEvent(new WheelEvent("wheel", { deltaY: -900 }));
     });
+    // Layout may commit before the browser reports the wheel's native scroll.
+    // Upward user intent must already have cancelled any pending bottom pin.
+    Object.defineProperty(scrollContainer, "scrollHeight", { configurable: true, value: 2531 });
+    act(() => {
+      root?.render(strategy.render({ ...renderInput, isAuthoritativeHistoryReady: true }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
+
     scrollContainer.scrollTop = 91;
     act(() => {
       scrollContainer.dispatchEvent(new Event("scroll"));
