@@ -3,6 +3,7 @@ import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-au
 import type { AgentPermissionResponse } from "./agent-sdk-types.js";
 import { PendingEventBudget } from "./session-storage/pending-event-budget.js";
 import { PermissionResponseAdmission } from "./permission-response-journal.js";
+import { PermissionResponseNotDeliveredError } from "./permission-response-not-delivered-error.js";
 function harness() {
   const records = new Map<string, AgentPermissionResponseRecord>();
   const writes: AgentPermissionResponseRecord[] = [];
@@ -40,6 +41,60 @@ function params() {
   };
 }
 describe("durable permission admission", () => {
+  it("releases a definitively rejected response for retry with its original ID", async () => {
+    const h = harness();
+    const p = params();
+    p.forward.mockRejectedValueOnce(new PermissionResponseNotDeliveredError("Turn changed"));
+    await expect(h.admission.respond(p)).rejects.toThrow("Turn changed");
+    expect(h.records.get(p.responseId)?.status).toBe("failed");
+    await h.admission.respond(p);
+    expect(h.records.get(p.responseId)?.status).toBe("applied");
+    expect(p.forward).toHaveBeenCalledTimes(2);
+    expect(p.applied).toHaveBeenCalledOnce();
+  });
+  it("allows dismissal after proven rejection without replaying the rejected answer", async () => {
+    const h = harness();
+    const p = params();
+    p.forward.mockRejectedValueOnce(new PermissionResponseNotDeliveredError("Turn changed"));
+    await expect(h.admission.respond(p)).rejects.toThrow("Turn changed");
+    const dismiss = { ...p, responseId: "dismiss", response: { behavior: "deny" as const } };
+    await h.admission.respond(dismiss);
+    expect(h.records.get(p.responseId)?.status).toBe("failed");
+    expect(h.records.get("dismiss")?.response).toEqual({ behavior: "deny" });
+    expect(p.forward.mock.calls.map(([response]) => response)).toEqual([
+      { behavior: "allow" },
+      { behavior: "deny" },
+    ]);
+  });
+  it("does not release admission if recording definitive failure fails", async () => {
+    const h = harness();
+    const p = params();
+    const append = h.journal.appendPermissionResponse.getMockImplementation()!;
+    h.journal.appendPermissionResponse.mockImplementation(async (agentId, record) => {
+      if (record.status === "failed") throw new Error("ENOSPC");
+      await append(agentId, record);
+    });
+    p.forward.mockRejectedValueOnce(new PermissionResponseNotDeliveredError("Turn changed"));
+    await expect(h.admission.respond(p)).rejects.toThrow("ENOSPC");
+    await expect(
+      h.admission.respond({ ...p, responseId: "dismiss", response: { behavior: "deny" } }),
+    ).rejects.toThrow("already has an accepted response");
+    expect(h.records.get(p.responseId)?.status).toBe("pending");
+    expect(p.forward).toHaveBeenCalledOnce();
+  });
+  it("does not retry a failed response against a reused request generation after restart", async () => {
+    const h = harness();
+    const p = params();
+    let current = { ...request, metadata: { clisbotPermissionGeneration: "old" } };
+    const getPendingRequest = () => current;
+    p.forward.mockRejectedValueOnce(new PermissionResponseNotDeliveredError("Turn changed"));
+    await expect(h.admission.respond({ ...p, getPendingRequest })).rejects.toThrow("Turn changed");
+    current = { ...request, metadata: { clisbotPermissionGeneration: "new" } };
+    await expect(
+      new PermissionResponseAdmission(h.journal).respond({ ...p, getPendingRequest }),
+    ).rejects.toThrow("generation changed");
+    expect(p.forward).toHaveBeenCalledOnce();
+  });
   it("durably records pending before forwarding and applied only after acknowledgement", async () => {
     const h = harness();
     const p = params();

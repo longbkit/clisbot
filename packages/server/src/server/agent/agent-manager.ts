@@ -3912,12 +3912,18 @@ export class AgentManager {
     },
   ): Promise<AgentPermissionResult | void> {
     context = context ? structuredClone(context) : undefined;
+    const reconcile = () => {
+      // A client can miss the original resolution. Every retry must receive current owner state,
+      // including a different response rejected by admission; never replay or clear the request.
+      const agent = this.agents.get(agentId);
+      if (agent) this.emitState(agent, { persist: false });
+    };
     if (this.permissionResponseAdmission) {
       const request = this.requireAgent(agentId).pendingPermissions.get(requestId);
       const anchor = request
         ? await this.committedPermissionToolAnchor(agentId, request)
         : undefined;
-      return this.permissionResponseAdmission.respond({
+      const operation = this.permissionResponseAdmission.respond({
         ...anchor,
         agentId,
         requestId,
@@ -3944,9 +3950,10 @@ export class AgentManager {
           this.emitState(agent, { persist: false });
         },
       });
+      return operation.finally(reconcile);
     }
     // Daemons without durable session storage retain direct provider forwarding.
-    return this.respondToPermissionNow(agentId, requestId, response);
+    return this.respondToPermissionNow(agentId, requestId, response).finally(reconcile);
   }
 
   private async respondToPermissionNow(

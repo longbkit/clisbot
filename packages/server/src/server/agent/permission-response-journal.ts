@@ -5,6 +5,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "./agent-sdk-types.js";
+import { PermissionResponseNotDeliveredError } from "./permission-response-not-delivered-error.js";
 import type {
   AgentPermissionResponseRecord,
   SessionActor,
@@ -21,6 +22,28 @@ export interface PermissionResponseJournal {
     record: AgentPermissionResponseRecord,
     identity?: { channel?: SessionChannelReference },
   ): Promise<void>;
+}
+
+interface PermissionResponseIdentity {
+  requestId: string;
+  requestGeneration?: string;
+  response: AgentPermissionResponse;
+  respondedBy?: SessionActor;
+}
+
+function validateRetryIdentity(
+  existing: AgentPermissionResponseRecord,
+  identity: PermissionResponseIdentity,
+): void {
+  if (
+    (identity.requestGeneration !== undefined &&
+      existing.request.metadata?.clisbotPermissionGeneration !== identity.requestGeneration) ||
+    existing.request.id !== identity.requestId ||
+    !isDeepStrictEqual(existing.response, identity.response) ||
+    !isDeepStrictEqual(existing.respondedBy, identity.respondedBy)
+  ) {
+    throw new Error("Permission response ID already belongs to a different response or actor");
+  }
 }
 
 /** Serializes admission against the current live request, never a reusable provider request ID. */
@@ -91,20 +114,9 @@ export class PermissionResponseAdmission {
         const id = params.responseId ?? randomUUID();
         const existing = await this.journal.readPermissionResponse(params.agentId, id);
         if (existing) {
-          if (
-            (params.requestGeneration !== undefined &&
-              existing.request.metadata?.clisbotPermissionGeneration !==
-                params.requestGeneration) ||
-            existing.request.id !== params.requestId ||
-            !isDeepStrictEqual(existing.response, response) ||
-            !isDeepStrictEqual(existing.respondedBy, respondedBy)
-          ) {
-            throw new Error(
-              "Permission response ID already belongs to a different response or actor",
-            );
-          }
+          validateRetryIdentity(existing, { ...params, response, respondedBy });
           // Pending means unconfirmed, including after restart. Never automatically forward again.
-          return undefined;
+          if (existing.status !== "failed") return undefined;
         }
         const request = params.getPendingRequest();
         if (!request) throw new Error("Permission request is no longer pending");
@@ -115,6 +127,13 @@ export class PermissionResponseAdmission {
           throw new Error("Permission request generation changed before response admission");
         if (request !== observedRequest || !requestSnapshot) {
           throw new Error("Permission request changed before response admission");
+        }
+        if (
+          existing &&
+          existing.request.metadata?.clisbotPermissionGeneration !==
+            request.metadata?.clisbotPermissionGeneration
+        ) {
+          throw new Error("Permission request generation changed before response admission");
         }
         if (this.acceptedRequests.has(request))
           throw new Error("Permission request already has an accepted response");
@@ -141,8 +160,21 @@ export class PermissionResponseAdmission {
           });
           throw new Error(error);
         }
-        // A thrown transport/adapter error does not prove non-delivery. Keep pending.
-        const result = await params.forward(structuredClone(record.response));
+        let result: Result;
+        try {
+          result = await params.forward(structuredClone(record.response));
+        } catch (error) {
+          // Release only after durable proof of non-delivery. An ordinary error may follow dispatch.
+          if (error instanceof PermissionResponseNotDeliveredError) {
+            await this.journal.appendPermissionResponse(params.agentId, {
+              ...record,
+              status: "failed",
+              error: error.message,
+            });
+            this.acceptedRequests.delete(request);
+          }
+          throw error;
+        }
         const applied = { ...record, status: "applied" as const };
         await this.journal.appendPermissionResponse(params.agentId, applied);
         await params.applied(applied);

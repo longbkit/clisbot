@@ -111,6 +111,7 @@ import {
   MODE_APPLIES_NEXT_TURN_NOTICE,
   THINKING_APPLIES_NEXT_TURN_NOTICE,
 } from "../provider-notices.js";
+import { PermissionResponseNotDeliveredError } from "../permission-response-not-delivered-error.js";
 import type { WorkspaceGitService } from "../../workspace-git-service.js";
 import {
   applyCodexToolPolicy,
@@ -4818,7 +4819,9 @@ export class CodexAppServerAgentSession implements AgentSession {
         clientMessageId: randomUUID(),
       });
       if (result.status !== "accepted") {
-        throw new Error("The active Codex turn changed. Retry sending your answer.");
+        throw new PermissionResponseNotDeliveredError(
+          "The active Codex turn changed. Retry sending your answer.",
+        );
       }
       followUpPrompt = undefined;
     }
