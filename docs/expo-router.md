@@ -125,8 +125,10 @@ Do not collapse this topology with a catch-all, `getId`, or
 ## Agent Targets
 
 Home's compact native Home/Chat/Inbox/Automations surfaces are peer tabs in the existing root
-stack. Their shared `home-tab-navigation` policy replaces the current page, and detail Back
-uses `dismissTo` for the entry tab. Ordinary `navigate` with the installed native stack retains a
+stack. Their shared `home-tab-navigation` policy replaces the current peer page. Detail Back
+keeps ordinary navigation to its entry surface: the host route underneath owns retained workspace
+and tab state. Dismissing to an absent entry would replace that host and discard its deck. Ordinary
+`navigate` with the installed native stack retains a
 new page on each cycle; it does not unwind previously visited peers. Do not restore it for tab-bar,
 Home activity or Chat-close entry points. Browser and desktop entry points keep ordinary history.
 Workspace deck retention, route topology and connection ownership stay with their existing owners.

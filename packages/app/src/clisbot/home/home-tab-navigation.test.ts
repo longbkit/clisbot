@@ -6,7 +6,7 @@ import {
 } from "@react-navigation/routers";
 import type { Href } from "expo-router";
 import { describe, expect, it } from "vitest";
-import { navigateHomeTab, returnToHomeTab } from "./home-tab-navigation";
+import { navigateHomeTab } from "./home-tab-navigation";
 
 // Exercise the installed navigation reducer: navigate without getId retains a fresh native
 // stack page on each cycle. No React trees or app state owners are mocked.
@@ -49,21 +49,20 @@ describe("Home tab stack ownership", () => {
     expect(web.state().routes).toHaveLength(101);
   });
 
-  it("returns a detail to the same Inbox entry", () => {
-    const nav = navigation();
-    navigateHomeTab({ router: nav.router, href: "/sessions", nativeTab: true });
-    const inbox = nav.state().routes[0];
-    nav.pushDetail();
-    returnToHomeTab({ router: nav.router, href: "/sessions", nativeTab: true });
-    expect(nav.state().routes).toHaveLength(1);
-    expect(nav.state().routes[0].key).toBe(inbox.key);
-  });
-
-  it("replaces a cold detail when the entry tab is absent", () => {
+  it("bounds peer visits above the retained workspace route across repeated detail returns", () => {
     const nav = navigation();
     nav.router.replace("/detail");
-    returnToHomeTab({ router: nav.router, href: "/chat", nativeTab: true });
-    expect(nav.state().routes).toHaveLength(1);
-    expect(nav.state().routes[0].name).toBe("chat");
+    const workspace = nav.state().routes[0];
+    for (let index = 0; index < 100; index++) {
+      // The workspace navigation owner dismisses back to its mounted host. Detail Back
+      // then navigates to the entry page, keeping that host's retained deck underneath.
+      nav.router.dismissTo("/detail");
+      nav.router.navigate("/sessions");
+      navigateHomeTab({ router: nav.router, href: "/chat", nativeTab: true });
+      navigateHomeTab({ router: nav.router, href: "/open-project", nativeTab: true });
+      expect(nav.state().routes).toHaveLength(2);
+      expect(nav.state().routes[0].key).toBe(workspace.key);
+      expect(nav.state().routes[1].name).toBe("open-project");
+    }
   });
 });

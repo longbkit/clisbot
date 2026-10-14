@@ -18,8 +18,8 @@ tab bar. Tab pages have no header button and no edge swipe; every other page (co
 detail, and New workspace, Connectors or Bot settings opened from Chat) hides the tabs and leads
 with Back to its entry surface. Android Back follows the same model: a conversation returns to
 its entry surface, a tab other than Home goes Home, and Home leaves the app. Native peer-tab
-visits replace the current page rather than accumulate hidden stack pages; returning from a detail
-dismisses to its entry page, or replaces a cold detail when the entry is absent. The Home activity
+visits replace the current peer page rather than accumulate hidden stack pages. Detail Back keeps
+its existing navigation so the host underneath preserves workspace and tab state. The Home activity
 links and Chat's close-to-Home path use that same policy. Browser navigation keeps its history.
 Chat drops the Home, Inbox
 and Automations rows the tab bar already has; its account row stays pinned while New workspace,

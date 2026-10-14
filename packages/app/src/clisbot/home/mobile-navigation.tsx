@@ -22,7 +22,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { activityBucket } from "./activity";
 import { startNativeInputTracing, traceInstant } from "@/performance/native-trace";
-import { navigateHomeTab, returnToHomeTab } from "./home-tab-navigation";
+import { navigateHomeTab } from "./home-tab-navigation";
 const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
 export function rememberChatReturn(path: string) {
   useReturn.setState({ path });
@@ -98,7 +98,7 @@ function Tab({
 }
 /**
  * Android Back. A conversation returns to its entry surface; a tab other than Home goes Home; Home
- * leaves the app. Peer tabs replace their route; detail returns dismiss to the existing entry page.
+ * leaves the app. Peer tabs replace their route; details keep the existing workspace return path.
  */
 function useMobileHardwareBack(path: string, compact: boolean) {
   const router = useRouter();
@@ -119,7 +119,7 @@ function useMobileHardwareBack(path: string, compact: boolean) {
         return true;
       }
       panels.showMobileAgent();
-      if (detail) returnToHomeTab({ router, href: returnPath as Href, nativeTab: !isWeb });
+      if (detail) router.navigate(returnPath as Href);
       else navigate(HOME_TAB_PATH as Href);
       return true;
     });
@@ -164,8 +164,9 @@ export function MobileBack() {
   const target = useReturn((s) => s.path);
   const back = useCallback(() => {
     usePanelStore.getState().showMobileAgent();
-    returnToHomeTab({ router, href: target as Href, nativeTab: compact && !isWeb });
-  }, [compact, router, target]);
+    // Keep the host route underneath the entry page: it owns retained workspace/tab state.
+    router.navigate(target as Href);
+  }, [router, target]);
   if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
   return (
     <Pressable
