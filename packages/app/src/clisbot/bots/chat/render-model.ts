@@ -314,6 +314,9 @@ function heartbeatSnapshot(source: ChatMessage): HeartbeatRun | undefined {
   if (!source.scheduleRun || source.sender.kind !== "user") return undefined;
   const snapshot = source.scheduleRun;
   if (snapshot.maxRuns !== undefined) return snapshot;
+  // COMPAT(heartbeatChatTotal): introduced 2026-10-14 on v2.1.1 source (unreleased CTO023).
+  // Remove this display-name reader once all supported producers supply maxRuns and persisted
+  // Chat records lacking it have been migrated or explicitly retired from history support.
   const legacy = /^Heartbeat · (.*) · run (\d+)(?: of (\d+))?$/u.exec(
     source.sender.displayName ?? "",
   );

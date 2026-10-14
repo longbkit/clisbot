@@ -37,6 +37,9 @@ export function isHeartbeatRunNotification(input: {
   message: string;
   heartbeatRun?: HeartbeatRun;
 }): boolean {
+  // COMPAT(heartbeatTextNotice): introduced 2026-10-14 on v2.1.1 source (unreleased CTO023).
+  // Remove the text-only alternative once all supported producers supply heartbeatRun and
+  // persisted notices lacking it have been migrated or explicitly retired from history support.
   return (
     input.sourceType !== "error" &&
     input.level === "info" &&

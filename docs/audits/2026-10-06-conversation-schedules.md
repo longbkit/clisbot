@@ -191,6 +191,19 @@ The composer was the first idea and was dropped: its control row is full.
   their separator is omitted, with no guessed footer link. Deleted/unavailable
   schedules retain their counter and open the canonical sheet's load-failure
   state. Silent Bot replies create no completed footer or separator.
+  The historical readers are tagged `COMPAT(heartbeatChatTotal)` and
+  `COMPAT(heartbeatTextNotice)` at their removal sites, per
+  [protocol compatibility](../protocol-compatibility.md#every-shim-is-tagged-and-dated).
+  Both were introduced on 2026-10-14 in local CTO023 commit `49e676842`, on
+  version `2.1.1` source; CTO023 is unreleased and the frozen `v2.1.1` release
+  does not contain them. Remove each reader only after all supported producers
+  supply its structured field and persisted records missing that field have
+  been migrated or explicitly retired from history support. No such migration
+  is implemented here. A daemon upgrade or elapsed time alone cannot retire
+  saved history. Migration must preserve Chat's recorded schedule ID/run and cannot
+  invent schedule/turn identity for text-only notices. The notice formatter
+  remains the readable content for older clients; this removal condition
+  concerns the text-only classification fallback, not that formatter.
 - **The Chat ⏱ follows a Bot across `/new`**: its group lists the heartbeats of
   every session that Bot has had in the Chat (`clisbot.chat-id` and
   `clisbot.bot-id` labels), so a heartbeat still on the earlier session stays
