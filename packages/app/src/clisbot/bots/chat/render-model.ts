@@ -6,6 +6,7 @@ import {
   mayBecomeSilentBotReply,
   stripAssistantMessageBoundary,
 } from "@clisbot/protocol/chats/room";
+import { splitLiveInputBoundaries } from "./live-input-boundaries";
 import type { ChatMessage } from "../data/contracts";
 import type { HeartbeatRun } from "@clisbot/protocol/schedule/heartbeat-notice";
 import { isHeartbeatRunNotification } from "@clisbot/protocol/schedule/heartbeat-notice";
@@ -45,6 +46,8 @@ export type ChatRenderRow =
       permissions: PendingPermission[];
       /** The turn is still running; false when only unreferenced tail items remain. */
       inProgress: boolean;
+      /** Prefix segments retain native activity but only the trailing row owns the loader. */
+      showWorkingIndicator?: boolean;
       startedAt?: Date | null;
       opensGroup: boolean;
       heartbeatRun?: HeartbeatRun;
@@ -253,7 +256,7 @@ function liveRow(
   head: ChatLiveHead,
   previous: ChatRenderRow | undefined,
   group: boolean,
-): ChatRenderRow | null {
+): Extract<ChatRenderRow, { kind: "live" }> | null {
   const completeHead = { ...head, items: chatLiveItems(head) };
   const tail = group ? groupTurnItems(completeHead) : directTurnItems(completeHead);
   const unreferenced = unreferencedItems(tail, linesFromAgent(transcript, botId, head.agentId));
@@ -275,9 +278,55 @@ function liveRow(
   };
 }
 
+/** Whole-turn filtering precedes placement; metadata is bound afresh to each segment's input. */
+function livePlacement(
+  transcript: readonly ChatMessage[],
+  liveHeadsByBot: ReadonlyMap<string, ChatLiveHead>,
+  group: boolean,
+) {
+  const beforeLine = new Map<string, Extract<ChatRenderRow, { kind: "live" }>[]>();
+  const trailing: Extract<ChatRenderRow, { kind: "live" }>[] = [];
+  const inputIds = new Set(
+    transcript.filter((line) => line.sender.kind === "user").map((line) => line.id),
+  );
+  for (const [botId, head] of liveHeadsByBot) {
+    // Keep accepted reference/notice/silence filtering on the whole projection first.
+    // One silence marker can straddle an input boundary.
+    const row = liveRow(transcript, botId, head, undefined, group);
+    if (!row) continue;
+    if (!group && head.turnActive) {
+      const split = splitLiveInputBoundaries(chatLiveItems(head), inputIds);
+      const visibleIds = new Set(row.items.map((item) => item.id));
+      for (const segment of split.before) {
+        const items = segment.items.filter((item) => visibleIds.has(item.id));
+        if (!items.length) continue;
+        const before = beforeLine.get(segment.messageId) ?? [];
+        before.push({
+          kind: "live",
+          key: `live:${botId}:before:${segment.messageId}`,
+          botId,
+          agentId: head.agentId,
+          items,
+          permissions: [],
+          inProgress: head.turnActive,
+          showWorkingIndicator: false,
+          opensGroup: true,
+          heartbeatRun: heartbeatForLiveTurn(transcript, segment.items),
+        });
+        beforeLine.set(segment.messageId, before);
+      }
+      row.items = split.trailing.filter((item) => visibleIds.has(item.id));
+      row.heartbeatRun = heartbeatForLiveTurn(transcript, split.trailing);
+    }
+    // Group discussion retains its existing floor/last-prompt semantics.
+    trailing.push(row);
+  }
+  return { beforeLine, trailing };
+}
+
 /**
- * Transcript lines in order, then one live row per bot with unfinished work, in the order the
- * heads were given. Dedupe is by referenced timeline item id, never by text (README D5).
+ * Transcript seq remains authoritative. Running DM work is placed before its next exact
+ * canonical input; only the trailing segment owns pending approvals and the running footer. Dedupe is by referenced timeline item id, never by text (README D5).
  */
 export function buildChatRenderModel(
   transcript: readonly ChatMessage[],
@@ -291,20 +340,24 @@ export function buildChatRenderModel(
       .filter((line) => line.sender.kind === "user" && line.scheduleRun)
       .map((line) => [line.id, heartbeatSnapshot(line)]),
   );
+  const { beforeLine, trailing } = livePlacement(transcript, liveHeadsByBot, group);
   for (const line of transcript) {
+    for (const row of beforeLine.get(line.id) ?? []) {
+      row.opensGroup = senderOf(rows.at(-1)) !== `bot:${row.botId}`;
+      rows.push(row);
+    }
     if (line.sender.kind === "user" && line.scheduleRun) continue;
-    // A silent reply persisted before the daemon dropped it (or by an older one) stays hidden.
     if (line.sender.kind === "bot" && isSilentBotText(line.text, group)) continue;
-    const row = transcriptRow(line, rows[rows.length - 1]);
+    const row = transcriptRow(line, rows.at(-1));
     if (row.kind === "bot" && line.inReplyTo) {
       const run = runsByMessageId.get(line.inReplyTo);
       if (run) row.heartbeatRun = run;
     }
     rows.push(row);
   }
-  for (const [botId, head] of liveHeadsByBot) {
-    const row = liveRow(transcript, botId, head, rows[rows.length - 1], group);
-    if (row) rows.push(row);
+  for (const row of trailing) {
+    row.opensGroup = senderOf(rows.at(-1)) !== `bot:${row.botId}`;
+    rows.push(row);
   }
   return { rows };
 }

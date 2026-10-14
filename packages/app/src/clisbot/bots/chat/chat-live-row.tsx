@@ -5,6 +5,7 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useMemo, type ReactNode } from "react";
 import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { RunningTurnFooter } from "@/agent-stream/turn-footer";
+import { ResponseFooter } from "@/components/response-footer";
 import { HeartbeatRunFooter } from "@/clisbot/heartbeats/heartbeat-run-footer";
 import { ACTOR_AVATAR_SIZE } from "@/clisbot/session-storage/actor-metrics";
 import { BotFace } from "./bot-face";
@@ -73,7 +74,8 @@ export const ChatLiveRow = memo(function ChatLiveRow({
     ),
     [bot.avatar, bot.botId, bot.name],
   );
-  const showWorking = row.inProgress && row.permissions.length === 0;
+  const showWorking =
+    row.inProgress && row.showWorkingIndicator !== false && row.permissions.length === 0;
   const metadata = useMemo(
     () =>
       row.heartbeatRun && row.items.some((item) => item.kind === "assistant_message") ? (
@@ -98,6 +100,9 @@ export const ChatLiveRow = memo(function ChatLiveRow({
           client={client}
         />
       ))}
+      {row.showWorkingIndicator === false && metadata ? (
+        <ResponseFooter>{metadata}</ResponseFooter>
+      ) : null}
       {showWorking ? (
         <RunningTurnFooter inFlightTurnStartedAt={row.startedAt ?? null} metadata={metadata} />
       ) : null}
