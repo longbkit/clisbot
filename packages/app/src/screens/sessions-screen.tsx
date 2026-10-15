@@ -20,6 +20,8 @@ import type { TFunction } from "i18next";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { AgentList } from "@/components/agent-list";
 import { SearchField } from "@/components/ui/search-field";
 import { HostFilter } from "@/components/hosts/host-filter";
@@ -44,18 +46,20 @@ function SessionHostErrorsBanner({
   errors,
   connecting = [],
   t,
+  testID = "sessions-host-errors",
 }: {
   errors: AgentHistoryHostError[];
   connecting?: readonly AgentHistoryHostError[];
   t: TFunction;
+  testID?: string;
 }): ReactElement {
   return (
     <View style={styles.errorsBannerWrap}>
-      <View style={styles.errorsBanner} testID="sessions-host-errors">
+      <View style={styles.errorsBanner} testID={testID}>
         {errors.map((error) =>
           connecting.includes(error) ? (
             <Text key={error.serverId} style={styles.connectingText}>
-              {error.serverName}: connecting… its sessions appear once it answers.
+              {error.serverName}: connecting… showing saved sessions when available.
             </Text>
           ) : (
             <Text key={error.serverId} style={styles.errorsBannerText}>
@@ -90,17 +94,78 @@ function isConnecting(status: string | undefined): boolean {
 function HostBanners({
   errors,
   t,
+  loading,
+  refreshing,
+  onRetry,
 }: {
   errors: AgentHistoryHostError[];
   t: TFunction;
+  loading: boolean;
+  refreshing: boolean;
+  onRetry: () => void;
 }): ReactElement {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const openDetails = useCallback(() => setDetailsOpen(true), []);
+  const closeDetails = useCallback(() => setDetailsOpen(false), []);
   const statuses = useHostRuntimeConnectionStatuses(
     useMemo(() => errors.map((error) => error.serverId), [errors]),
   );
   const connecting = HOME_V2_ENABLED
     ? errors.filter((error) => isConnecting(statuses.get(error.serverId)))
     : [];
-  return <SessionHostErrorsBanner errors={errors} connecting={connecting} t={t} />;
+  const sheetHeader = useMemo(() => ({ title: t("sessions.title") }), [t]);
+  const sheetFooter = useMemo(
+    () => (
+      <Button variant="outline" onPress={onRetry} disabled={loading || refreshing}>
+        Try again
+      </Button>
+    ),
+    [loading, onRetry, refreshing],
+  );
+  if (!HOME_V2_ENABLED) return <SessionHostErrorsBanner errors={errors} t={t} />;
+  let message = t("sessions.title");
+  if (refreshing) message = "Refreshing history…";
+  if (loading) message = "Loading history…";
+  if (errors.length)
+    message = errors
+      .map((error) =>
+        connecting.includes(error)
+          ? `${error.serverName}: connecting…`
+          : t("sessions.hostLoadFailed", { host: error.serverName }),
+      )
+      .join("; ");
+  return (
+    <>
+      <View style={styles.historyStatus}>
+        <Text
+          testID={errors.length ? "sessions-host-errors" : undefined}
+          style={[styles.historyStatusText, errors.length > 0 && styles.errorsBannerText]}
+          numberOfLines={1}
+          accessibilityLabel={message}
+        >
+          {message}
+        </Text>
+        {errors.length > 0 ? (
+          <Button variant="ghost" size="xs" onPress={openDetails}>
+            Details
+          </Button>
+        ) : null}
+      </View>
+      <AdaptiveModalSheet
+        visible={detailsOpen}
+        onClose={closeDetails}
+        header={sheetHeader}
+        footer={sheetFooter}
+      >
+        <SessionHostErrorsBanner
+          errors={errors}
+          connecting={connecting}
+          t={t}
+          testID="sessions-host-error-details"
+        />
+      </AdaptiveModalSheet>
+    </>
+  );
 }
 
 /** Search, Host and (in Inbox) the type/date pills, on one wrapping row. */
@@ -183,6 +248,7 @@ function SessionsScreenContent() {
     hasMore,
     isInitialLoad,
     isLoadingMore,
+    isRevalidating,
     isError,
     isSearchSupported,
     isSearchTruncated,
@@ -231,7 +297,7 @@ function SessionsScreenContent() {
     isSearching,
     isAllHosts: selectedHost === ALL_HOSTS_OPTION_ID,
   });
-  const showLoadError = isError && agents.length === 0;
+  const showLoadError = (isError || hostErrors.length > 0) && inboxAgents.length === 0;
 
   const handleBack = useCallback(() => {
     router.navigate(buildOpenProjectRoute());
@@ -320,7 +386,15 @@ function SessionsScreenContent() {
           extra={HOME_V2_ENABLED ? filters.view : null}
           t={t}
         />
-        {hostErrors.length > 0 ? <HostBanners errors={hostErrors} t={t} /> : null}
+        {HOME_V2_ENABLED || hostErrors.length > 0 ? (
+          <HostBanners
+            errors={hostErrors}
+            t={t}
+            loading={isInitialLoad}
+            refreshing={isRevalidating || isManualRefresh}
+            onRetry={handleRefresh}
+          />
+        ) : null}
         {isInitialLoad ? (
           <View style={styles.loadingContainer}>
             <LoadingSpinner size="large" color={theme.colors.foregroundMuted} />
@@ -329,7 +403,7 @@ function SessionsScreenContent() {
         {!isInitialLoad && showLoadError ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Unable to load sessions</Text>
-            <Button variant="ghost" onPress={handleRefresh}>
+            <Button variant="ghost" onPress={handleRefresh} disabled={isManualRefresh}>
               Try again
             </Button>
           </View>
@@ -355,6 +429,18 @@ function SessionsScreenContent() {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  historyStatus: {
+    minHeight: MIN_TOUCH_TARGET_SIZE,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    paddingHorizontal: { xs: theme.spacing[3], md: theme.spacing[6] },
+  },
+  historyStatusText: {
+    flex: 1,
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface0,

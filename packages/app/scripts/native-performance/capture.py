@@ -14,6 +14,7 @@ parser.add_argument('--y', required=True, type=int)
 parser.add_argument('--count', default=20, type=int)
 parser.add_argument('--interval', default=2.5, type=float)
 parser.add_argument('--package', default='com.clisbot.app.dev')
+parser.add_argument('--cold-start', action='store_true', help='Restart the app inside the trace, retaining saved app data; wait for visible mobile tabs before measured taps.')
 parser.add_argument('--tabs', nargs='+', choices=['Home', 'Chat', 'Inbox', 'Automations'], default=['Home', 'Chat', 'Inbox', 'Automations'])
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=False)
@@ -25,6 +26,8 @@ def adb(*command):
 def save(name, command):
     (args.output / name).write_text(adb(*command))
 
+if args.cold_start:
+    adb('shell', 'am', 'force-stop', args.package)
 save('meminfo-before.txt', ['shell', 'dumpsys', 'meminfo', args.package])
 save('device.txt', ['shell', 'getprop', 'ro.build.fingerprint'])
 adb('shell', 'dumpsys', 'gfxinfo', args.package, 'reset')
@@ -36,8 +39,24 @@ video_log = (args.output / 'screenrecord.log').open('w')
 video = subprocess.Popen(base + ['shell', 'screenrecord', '--size', '540x1200', '--time-limit', '65', '--bit-rate', '4000000', '/sdcard/cto019.mp4'], stdout=video_log, stderr=subprocess.STDOUT)
 host_load_before = os.getloadavg()
 steps = []
+startup = None
 try:
-    time.sleep(2)
+    if args.cold_start:
+        started = time.monotonic_ns()
+        adb('shell', 'am', 'start', '-W', '-n', args.package + '/.MainActivity')
+        deadline = time.monotonic() + 20
+        while True:
+            adb('shell', 'uiautomator', 'dump', '/sdcard/native-perf-ready.xml')
+            hierarchy = adb('shell', 'cat', '/sdcard/native-perf-ready.xml')
+            if 'resource-id="home-mobile-tabs"' in hierarchy:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Mobile tabs did not become ready after cold start; no scored taps')
+            time.sleep(.5)
+        startup = {'host_start_ns': started, 'host_tabs_ready_ns': time.monotonic_ns(), 'readiness_probe': 'UIAutomator presence in fresh process; startup duration is not a responsiveness sample'}
+        save('meminfo-ready.txt', ['shell', 'dumpsys', 'meminfo', args.package])
+    else:
+        time.sleep(2)
     for index in range(args.count):
         tab = args.tabs[(index + 1) % len(args.tabs)]
         x = {'Home': 135, 'Chat': 405, 'Inbox': 675, 'Automations': 945}[tab]
@@ -69,5 +88,5 @@ finally:
             process.terminate()
     trace_log.close()
     video_log.close()
-    (args.output / 'steps.json').write_text(json.dumps({'parameters': vars(args) | {'output': str(args.output), 'config': str(args.config)}, 'steps': steps, 'host_load_before': host_load_before, 'host_load_after': os.getloadavg()}, indent=2) + '\n')
+    (args.output / 'steps.json').write_text(json.dumps({'parameters': vars(args) | {'output': str(args.output), 'config': str(args.config)}, 'startup': startup, 'steps': steps, 'host_load_before': host_load_before, 'host_load_after': os.getloadavg()}, indent=2) + '\n')
 print(str(args.output))

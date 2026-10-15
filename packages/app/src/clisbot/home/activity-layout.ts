@@ -1,6 +1,10 @@
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { activitySections } from "./activity";
 
+// Hermes creates a platform collator for each localeCompare call. Reuse the same default
+// collation while sorting a directory burst instead of creating thousands of ICU objects.
+const identityCollator = new Intl.Collator();
+
 /** Home remembers placement only. Every row's contents still come from the live directory. */
 export interface ActivityLayoutSection {
   key: string;
@@ -16,7 +20,9 @@ export function activityLayout(
   previous: ActivityLayoutSection[] = [],
 ): ActivityLayoutSection[] {
   // Equal timestamps must not inherit the order in which independent Hosts answered.
-  const ordered = [...agents].sort((a, b) => activityKey(a).localeCompare(activityKey(b)));
+  const ordered = [...agents].sort((a, b) =>
+    identityCollator.compare(activityKey(a), activityKey(b)),
+  );
   return activitySections(ordered, now).map((section) => {
     let keys = section.agents.map(activityKey);
     if (section.key === "active" || section.key === "needs") {

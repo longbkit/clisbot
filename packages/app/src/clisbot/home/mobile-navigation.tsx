@@ -1,6 +1,13 @@
 import { HeaderBackButton } from "@/components/headers/header-back-button";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
-import { View, Text, Pressable, BackHandler, type GestureResponderEvent } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  BackHandler,
+  type GestureResponderEvent,
+  type PressableStateCallbackType,
+} from "react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
@@ -50,6 +57,9 @@ export function useIsMobileTabPage() {
 function isChatDetail(path: string) {
   return path.startsWith("/h/") && (path.includes("/workspace/") || path.includes("/chat/"));
 }
+function tabStyle({ pressed }: PressableStateCallbackType) {
+  return [styles.tab, pressed && styles.tabPressed];
+}
 function Tab({
   entry,
   selected,
@@ -77,7 +87,7 @@ function Tab({
     [entry.path, navigate, selected],
   );
   return (
-    <Pressable accessibilityRole="tab" accessibilityState={state} style={styles.tab} onPress={open}>
+    <Pressable accessibilityRole="tab" accessibilityState={state} style={tabStyle} onPress={open}>
       <View>
         <TabGlyph Icon={entry.Icon} uniProps={selected ? selectedGlyph : mutedGlyph} />
         {count ? (
@@ -179,6 +189,7 @@ const styles = StyleSheet.create((t) => ({
     gap: t.spacing[1],
     minHeight: MIN_TOUCH_TARGET_SIZE,
   },
+  tabPressed: { backgroundColor: t.colors.interactionHighlight },
   count: { position: "absolute", top: -t.spacing[2], left: t.spacing[3] },
   text: { color: t.colors.foregroundMuted, fontSize: t.fontSize.sm },
   selected: { color: t.colors.foreground, fontWeight: t.fontWeight.medium },

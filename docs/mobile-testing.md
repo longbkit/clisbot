@@ -136,6 +136,14 @@ sessions have short and long synthetic histories. The fixture explicitly disable
 relay and substitutes Tailscale; it proves this configured performance case, not fresh onboarding.
 Stop only this fixture PID when finished; its synthetic home stays inspectable.
 
+For controlled mock-only measurements, set `CLISBOT_NATIVE_PERF_MOCK_ONLY=1`. Supplying a mock
+client alone adds it to the provider registry but still discovers installed real CLIs. The opt-in
+disables other providers so their discovery processes do not compete with the emulator. Record
+this fixture setting on both sides of a comparison; changing it is a harness/environment repair,
+not evidence of a product speedup. Preserve previous adverse measurements and qualify their
+environment separately. Bind the fixture source hash, actual delayed responses and acknowledged
+update counts as well as the APK/source.
+
 After warming Home, Chat, Inbox and Automations, use the tab bar's native bounds for `--y`:
 
 ```bash

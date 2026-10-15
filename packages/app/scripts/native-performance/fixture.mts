@@ -4,6 +4,10 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { createTestClisbotDaemon } from "../../../server/src/server/test-utils/clisbot-daemon.ts";
 import { MockLoadTestAgentClient } from "../../../server/src/server/agent/providers/mock-load-test-agent.ts";
+import {
+  AGENT_PROVIDER_DEFINITIONS,
+  DEV_AGENT_PROVIDER_DEFINITIONS,
+} from "@clisbot/protocol/provider-manifest";
 import type { SeedDaemonClient } from "../../e2e/support/helpers/seed-client.ts";
 
 // The app package's test helpers are CommonJS; the daemon bootstrap is ESM.
@@ -50,6 +54,18 @@ async function startFixture(root: string): Promise<Fixture> {
       ? { agentSessionStorage: true }
       : {}),
     agentClients: { mock: new MockLoadTestAgentClient() },
+    // Supplying a mock client adds it to the registry; it does not disable installed CLIs.
+    // Opt in for controlled runs so real provider discovery cannot compete with the device.
+    ...(process.env.CLISBOT_NATIVE_PERF_MOCK_ONLY === "1"
+      ? {
+          providerOverrides: Object.fromEntries(
+            [...AGENT_PROVIDER_DEFINITIONS, ...DEV_AGENT_PROVIDER_DEFINITIONS].map(({ id }) => [
+              id,
+              { enabled: id === "mock" },
+            ]),
+          ),
+        }
+      : {}),
     clisbotHomeRoot: path.join(root, "environment/home"),
     cleanup: false,
     mcpEnabled: false,
@@ -65,7 +81,14 @@ async function startFixture(root: string): Promise<Fixture> {
   await writeFile(path.join(projectRoot, "fixture.txt"), "Synthetic native tab benchmark\n");
   const { project, error } = await client.addProject(projectRoot);
   if (error || !project) throw new Error(error ?? "No project");
-  return { root, projectRoot, projectId: project.projectId, daemon, client, records: [] };
+  return {
+    root,
+    projectRoot,
+    projectId: project.projectId,
+    daemon,
+    client,
+    records: [],
+  };
 }
 
 async function addHistory(fixture: Fixture, record: SessionRecord, index: number) {

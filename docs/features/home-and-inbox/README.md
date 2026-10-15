@@ -129,6 +129,18 @@ through a version counter the React Compiler dropped, so a Host that connected a
 `/sessions` link stayed "Could not load history" and was never searched; it now depends on the
 connection statuses themselves.
 
+History query membership follows registered/selected Hosts, independently of transport readiness.
+Disconnect does not change a typed search or replace its accepted query. Partial refresh retains
+already loaded pages only for unavailable/failed members from that same query cache; successful
+authoritative results replace that Host's rows, including an empty result. Removed Hosts are
+excluded from projection. Recovery invalidates the existing history/archive query roots. Inbox
+reserves its status line, with the full per-Host errors and manual retry in Details, so errors do
+not push the reading viewport down. Retry attempts unavailable connections through the runtime.
+Home's deterministic activity identity ordering reuses a default `Intl.Collator`: locale/case/
+numeric semantics and accepted placement stay the same, without per-comparison ICU construction
+on Hermes. Mobile tabs acknowledge a held press with the shared interaction highlight; only the
+committed route owns their selected state.
+
 ## Quick start ownership and persistence
 
 The daemon owns `$CLISBOT_HOME/quick-starts/catalog.json`, an atomic schemaVersion 1 JSON

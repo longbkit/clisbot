@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   DaemonClient,
   FetchAgentHistoryEntry,
@@ -6,6 +6,14 @@ import type {
 } from "@clisbot/client/internal/daemon-client";
 import type { AgentHistoryClient, AgentHistoryHost } from "./use-agent-history";
 import { allAgentHistoryQueryKey } from "./agent-history-query-key";
+
+// These tests exercise the page/cache boundary. The live runtime and its UI bootstrap
+// are exercised by the browser journey, not imported into this pure Node test.
+vi.mock("@/runtime/host-runtime", () => ({
+  getHostRuntimeStore: vi.fn(),
+  useHostRuntimeConnectionStatuses: vi.fn(),
+  useHosts: vi.fn(),
+}));
 
 (
   globalThis as unknown as {
@@ -643,5 +651,54 @@ describe("fetchAgentHistoryPage", () => {
         cursorByServerId: null,
       }),
     ).rejects.toThrow("No connected hosts could load agent history");
+  });
+});
+
+describe("accepted history through a Host refresh failure", () => {
+  it("retains a failed Host's loaded pages while accepting another Host's empty result", async () => {
+    const { retainUnavailableHostHistory } = await import("./use-agent-history");
+    const host = (serverId: string, ids: string[]) => ({
+      serverId,
+      serverLabel: serverId,
+      client: createClient([
+        historyPayload({
+          entries: ids.map((id) =>
+            historyEntry({
+              id,
+              cwd: `/${serverId}`,
+              updatedAt: "2026-10-16T00:00:00Z",
+            }),
+          ),
+        }),
+      ]),
+    });
+    const first = await fetchAgentHistoryBatch({
+      hosts: [host("a", ["a-old"]), host("b", ["b-first"])],
+      cursorByServerId: null,
+    });
+    const second = await fetchAgentHistoryBatch({
+      hosts: [host("b", ["b-next"])],
+      cursorByServerId: { b: "b-next" },
+    });
+    const emptyA = await fetchAgentHistoryBatch({
+      hosts: [host("a", [])],
+      cursorByServerId: null,
+    });
+    const retained = retainUnavailableHostHistory({
+      page: emptyA,
+      cursorByServerId: null,
+      accepted: { pages: [first, second], pageParams: [null, { b: "b-next" }] },
+      unavailableHostIds: new Set(["b"]),
+    });
+    expect(retained.agents.map((agent) => agent.id)).toEqual(["b-first", "b-next"]);
+    // Successful authoritative empty results clear the old rows; retention is failure-only.
+    expect(
+      retainUnavailableHostHistory({
+        page: emptyA,
+        cursorByServerId: null,
+        accepted: { pages: [retained], pageParams: [null] },
+        unavailableHostIds: new Set(),
+      }),
+    ).toBe(emptyA);
   });
 });

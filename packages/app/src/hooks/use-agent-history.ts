@@ -3,7 +3,7 @@ import type {
   FetchAgentHistoryOptions,
   FetchAgentHistoryPageInfo,
 } from "@clisbot/client/internal/daemon-client";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
@@ -74,6 +74,36 @@ interface AgentHistoryBatchPage {
 }
 
 type AgentHistoryCursorByServerId = Record<string, string | null>;
+
+/** Keep accepted pages only for the members this request could not revalidate. The existing
+ * query cache supplies them, so another search/filter/Host selection cannot donate results. */
+export function retainUnavailableHostHistory(input: {
+  page: AgentHistoryBatchPage;
+  cursorByServerId: AgentHistoryCursorByServerId | null;
+  accepted?: InfiniteData<AgentHistoryBatchPage, AgentHistoryCursorByServerId | null>;
+  unavailableHostIds: ReadonlySet<string>;
+}): AgentHistoryBatchPage {
+  if (!input.accepted || !input.unavailableHostIds.size) return input.page;
+  const retained: AggregatedAgent[] = [];
+  for (const serverId of input.unavailableHostIds) {
+    if (input.cursorByServerId && !Object.hasOwn(input.cursorByServerId, serverId)) continue;
+    const cursor = input.cursorByServerId?.[serverId];
+    const matchingPages = input.accepted.pages.filter(
+      (_, index) => input.accepted?.pageParams[index]?.[serverId] === cursor,
+    );
+    // A first-page failure keeps every already loaded page of that Host. A later-page
+    // failure uses its accepted cursor page, or the accepted tail if a fresh cursor changed.
+    const pages =
+      input.cursorByServerId && matchingPages.length ? matchingPages : input.accepted.pages;
+    for (const page of pages)
+      retained.push(...page.agents.filter((agent) => agent.serverId === serverId));
+  }
+  if (!retained.length) return input.page;
+  return {
+    ...input.page,
+    agents: sortByLatestActivity([...input.page.agents, ...retained]),
+  };
+}
 
 export async function fetchAgentHistoryPage(input: {
   client: AgentHistoryClient;
@@ -231,6 +261,7 @@ export function useAgentHistory(options: {
   const { t } = useTranslation();
   const daemons = useHosts();
   const runtime = getHostRuntimeStore();
+  const queryClient = useQueryClient();
   const serverId = useMemo(() => {
     const value = options.serverId;
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -264,18 +295,17 @@ export function useAgentHistory(options: {
 
     return { targetHosts: hosts, unreachableHosts: unreachable };
   }, [daemons, runtime, connectionStatuses, candidateServerIds]);
-  const targetServerIds = useMemo(() => targetHosts.map((host) => host.serverId), [targetHosts]);
   // One gate, checked before the field is offered: a fleet where any host
   // predates search has no search, rather than a list that silently omits that
   // host's sessions.
   const isSearchSupported = useSessionStore(
     useCallback(
       (state) =>
-        targetServerIds.length > 0 &&
-        targetServerIds.every(
+        candidateServerIds.length > 0 &&
+        candidateServerIds.every(
           (id) => state.sessions[id]?.serverInfo?.features?.agentHistorySearch === true,
         ),
-      [targetServerIds],
+      [candidateServerIds],
     ),
   );
   const search = useMemo(() => {
@@ -284,11 +314,11 @@ export function useAgentHistory(options: {
   }, [isSearchSupported, options.search]);
   const queryKey = useMemo(
     () => [
-      ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(targetServerIds)),
+      ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(candidateServerIds)),
       search,
       options.activityFilter,
     ],
-    [search, serverId, targetServerIds, options.activityFilter],
+    [search, serverId, candidateServerIds, options.activityFilter],
   );
   const serverLabelById = useMemo(
     () => new Map(daemons.map((daemon) => [daemon.serverId, daemon.label])),
@@ -311,11 +341,22 @@ export function useAgentHistory(options: {
       if (targetHosts.length === 0) {
         throw new Error(t("workspace.terminal.hostDisconnected"));
       }
-      return fetchAgentHistoryBatch({
+      const page = await fetchAgentHistoryBatch({
         hosts: targetHosts,
         cursorByServerId: pageParam,
         ...(search ? { search } : {}),
         ...(options.activityFilter ? { activityFilter: options.activityFilter } : {}),
+      });
+      const registered = new Set(runtime.getHosts().map((host) => host.serverId));
+      return retainUnavailableHostHistory({
+        page,
+        cursorByServerId: pageParam,
+        accepted: queryClient.getQueryData(queryKey),
+        unavailableHostIds: new Set(
+          [...unreachableHosts, ...page.hostErrors]
+            .map((host) => host.serverId)
+            .filter((id) => registered.has(id)),
+        ),
       });
     },
   });
@@ -331,11 +372,14 @@ export function useAgentHistory(options: {
   } = historyQuery;
 
   const refreshAll = useCallback(async () => {
-    if (!enabled || targetHosts.length === 0) {
-      return;
-    }
-    await refetch();
-  }, [enabled, refetch, targetHosts.length]);
+    if (!enabled) return;
+    // A manual retry must also attempt unavailable Hosts, rather than silently return
+    // when none is online. Their shared connection owner publishes progress/failure.
+    await Promise.allSettled([
+      ...unreachableHosts.map((host) => runtime.restartHostConnection(host.serverId)),
+      ...(targetHosts.length > 0 ? [refetch()] : []),
+    ]);
+  }, [enabled, refetch, targetHosts.length, unreachableHosts, runtime]);
 
   const loadMore = useCallback(() => {
     if (!enabled || targetHosts.length === 0 || !hasNextPage || isFetchingNextPage) {
@@ -346,8 +390,16 @@ export function useAgentHistory(options: {
 
   const agents = useMemo(() => {
     const pages = data?.pages ?? [];
-    const historyAgents = pages.flatMap((page) => page.agents);
-    const labelledAgents = historyAgents.map((agent) =>
+    // Retained failed pages can overlap a newly paginated page. Prefer the fresh first
+    // occurrence, and never project a Host that the registry has actually removed.
+    const historyAgents = new Map<string, AggregatedAgent>();
+    for (const page of pages)
+      for (const agent of page.agents) {
+        const key = `${agent.serverId}:${agent.id}`;
+        if (serverLabelById.has(agent.serverId) && !historyAgents.has(key))
+          historyAgents.set(key, agent);
+      }
+    const labelledAgents = [...historyAgents.values()].map((agent) =>
       Object.assign({}, agent, {
         serverLabel: serverLabelById.get(agent.serverId) ?? agent.serverLabel,
       }),
@@ -358,8 +410,20 @@ export function useAgentHistory(options: {
   const isRevalidating = isFetching && !isFetchingNextPage && agents.length > 0;
   const isSearchTruncated = Boolean(search && data?.pages.some((page) => page.isSearchTruncated));
   const hostErrors = useMemo(
-    () => collectAgentHistoryHostErrors({ pages: data?.pages ?? [], unreachableHosts }),
-    [data?.pages, unreachableHosts],
+    () =>
+      collectAgentHistoryHostErrors({
+        pages: data?.pages ?? [],
+        unreachableHosts: [
+          ...unreachableHosts,
+          ...(isError
+            ? targetHosts.map((host) => ({
+                serverId: host.serverId,
+                serverName: host.serverLabel,
+              }))
+            : []),
+        ],
+      }),
+    [data?.pages, unreachableHosts, isError, targetHosts],
   );
 
   return {

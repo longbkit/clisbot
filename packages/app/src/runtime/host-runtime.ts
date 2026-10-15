@@ -82,6 +82,7 @@ import type { TurnLivenessTransition } from "@/timeline/turn-liveness";
 import { useWorkspaceSetupStore } from "@/stores/workspace-setup-store";
 import { invalidateCheckoutGitQueriesForServer } from "@/git/query-keys";
 import { queryClient } from "@/data/query-client";
+import { agentHistoryQueryKey, allAgentHistoryQueryRootKey } from "@/hooks/agent-history-query-key";
 import {
   hostRequiresSessionAdmission,
   resolveHostAccessTicket,
@@ -2839,6 +2840,10 @@ export class HostRuntimeStore {
       snapshot.connectionStatus === "online" && previousStatus !== "online";
     if (didTransitionOnline) {
       useSessionStore.getState().bumpHistorySyncGeneration(serverId);
+      // Availability no longer changes history membership/query identity. Recovery uses the
+      // same invalidation roots as archive/restore actions to revalidate accepted history.
+      void queryClient.invalidateQueries({ queryKey: agentHistoryQueryKey(serverId) });
+      void queryClient.invalidateQueries({ queryKey: allAgentHistoryQueryRootKey() });
       // Checkout git data is push-driven; pushes emitted while disconnected are gone for
       // good (the daemon dedupes by snapshot fingerprint). Mark the caches stale so active
       // queries refetch now and evicted ones on their next mount.
