@@ -1,0 +1,2690 @@
+[
+  {
+    "name": "immutable input payload",
+    "schema": "content",
+    "valid": true,
+    "value": {
+      "text": "@alpha inspect this",
+      "images": [],
+      "attachments": []
+    }
+  },
+  {
+    "name": "blob payload cannot forge actor",
+    "schema": "content",
+    "valid": false,
+    "expectedKeyword": "additionalProperties",
+    "value": {
+      "text": "@alpha inspect this",
+      "images": [],
+      "attachments": [],
+      "actor": {
+        "kind": "user",
+        "id": "owner"
+      }
+    }
+  },
+  {
+    "name": "client pending identity is not Host accepted",
+    "schema": "intent",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "hostId": "srv_example",
+      "chatId": "cht_example",
+      "subjectScope": "owner-local",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "commandType": "chat.message.enqueue.request",
+      "localPayloadId": "local-payload-example",
+      "recordedAt": "2026-10-14T10:00:00.000Z",
+      "phase": "pending"
+    }
+  },
+  {
+    "name": "client unknown survives browser close",
+    "schema": "intent",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "hostId": "srv_example",
+      "chatId": "cht_example",
+      "subjectScope": "owner-local",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "commandType": "chat.message.enqueue.request",
+      "localPayloadId": "local-payload-example",
+      "recordedAt": "2026-10-14T10:00:00.000Z",
+      "phase": "unknown"
+    }
+  },
+  {
+    "name": "client intent cannot claim Host accepted",
+    "schema": "intent",
+    "valid": false,
+    "expectedKeyword": "enum",
+    "value": {
+      "recordVersion": 1,
+      "hostId": "srv_example",
+      "chatId": "cht_example",
+      "subjectScope": "owner-local",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "commandType": "chat.message.enqueue.request",
+      "localPayloadId": "local-payload-example",
+      "recordedAt": "2026-10-14T10:00:00.000Z",
+      "phase": "accepted"
+    }
+  },
+  {
+    "name": "intent missing immutable payload identity",
+    "schema": "intent",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "localPayloadId",
+    "value": {
+      "recordVersion": 1,
+      "hostId": "srv_example",
+      "chatId": "cht_example",
+      "subjectScope": "owner-local",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "commandType": "chat.message.enqueue.request",
+      "recordedAt": "2026-10-14T10:00:00.000Z",
+      "phase": "pending"
+    }
+  },
+  {
+    "name": "enqueue opaque ID",
+    "schema": "command",
+    "valid": true,
+    "value": {
+      "type": "chat.message.enqueue.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      }
+    }
+  },
+  {
+    "name": "edit text, file, mention and reply context",
+    "schema": "command",
+    "valid": true,
+    "value": {
+      "type": "chat.message.edit.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "expectedRevision": 1,
+      "expectedEntryRevision": 1,
+      "messageId": "msg-example",
+      "content": {
+        "text": "new mention @alpha",
+        "images": [
+          {
+            "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl4Kj8AAAAASUVORK5CYII=",
+            "mimeType": "image/png"
+          }
+        ],
+        "attachments": [
+          {
+            "type": "text",
+            "mimeType": "text/plain",
+            "title": "reply context",
+            "text": "quoted context",
+            "sourceSession": {
+              "agentId": "agent-example",
+              "epoch": "epoch-example",
+              "seq": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "cancel",
+    "schema": "command",
+    "valid": true,
+    "value": {
+      "type": "chat.message.cancel.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "expectedRevision": 1,
+      "expectedEntryRevision": 1,
+      "messageId": "msg-example"
+    }
+  },
+  {
+    "name": "reorder",
+    "schema": "command",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.reorder.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "expectedRevision": 1,
+      "messageIds": ["msg-example"]
+    }
+  },
+  {
+    "name": "steer exact turn",
+    "schema": "command",
+    "valid": true,
+    "value": {
+      "type": "chat.message.steer.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      },
+      "botId": "bot-example",
+      "agentId": "agent-example",
+      "expectedTurnId": "turn-example"
+    }
+  },
+  {
+    "name": "fetch",
+    "schema": "command",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.fetch.request",
+      "requestId": "request-example",
+      "chatId": "cht_example"
+    }
+  },
+  {
+    "name": "durable queued record",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable claimed",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": [],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "claimed",
+              "lease": {
+                "claimId": "claim-example",
+                "hostBootId": "boot-example",
+                "expiresAt": "2026-10-14T10:01:00.000Z",
+                "attempt": 1
+              }
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable applied",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": [],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "applied",
+              "transcript": {
+                "messageId": "msg-example",
+                "seq": 3
+              },
+              "deliveries": [
+                {
+                  "botId": "bot-example",
+                  "agentId": "agent-example",
+                  "clientMessageId": "msg-example",
+                  "disposition": "steered",
+                  "turnId": "turn-example",
+                  "submittedRow": {
+                    "epoch": "epoch-example",
+                    "seq": 2
+                  }
+                }
+              ],
+              "appliedAt": "2026-10-14T10:00:00.000Z"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable canceled",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": [],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "canceled",
+              "canceledAt": "2026-10-14T10:00:00.000Z"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable failed",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": [],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "failed",
+              "failedAt": "2026-10-14T10:00:00.000Z",
+              "code": "access_revoked",
+              "detail": "Bot Project grant revoked"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable unknown",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": [],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "unknown",
+              "claimId": "claim-example",
+              "observedAt": "2026-10-14T10:00:00.000Z",
+              "code": "provider_outcome_unknown",
+              "detail": "Provider may have accepted the input"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable journal framing, one transaction not all retained state",
+    "schema": "journal",
+    "valid": true,
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 1,
+      "value": {
+        "recordVersion": 1,
+        "chatId": "cht_example",
+        "previousRevision": 0,
+        "revision": 1,
+        "nextQueueSeq": 2,
+        "entry": {
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "revision": 1,
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "audience": {
+            "kind": "direct",
+            "botId": "bot-example"
+          },
+          "outcome": {
+            "state": "queued"
+          },
+          "contentRef": {
+            "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+            "size": 59,
+            "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+          }
+        },
+        "commandReceipt": {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        },
+        "orderedMessageIds": ["msg-example"],
+        "discussion": null
+      },
+      "operation": {
+        "order": 1,
+        "timestamp": "2026-10-14T10:00:00.000Z",
+        "actor": {
+          "kind": "user",
+          "id": "owner"
+        }
+      }
+    }
+  },
+  {
+    "name": "discussion reset transaction",
+    "schema": "journal",
+    "valid": true,
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 1,
+      "value": {
+        "recordVersion": 1,
+        "chatId": "cht_example",
+        "previousRevision": 0,
+        "revision": 1,
+        "nextQueueSeq": 2,
+        "entry": null,
+        "commandReceipt": null,
+        "orderedMessageIds": null,
+        "discussion": {
+          "value": null
+        }
+      },
+      "operation": {
+        "order": 1,
+        "timestamp": "2026-10-14T10:00:00.000Z",
+        "actor": {
+          "kind": "user",
+          "id": "owner"
+        }
+      }
+    }
+  },
+  {
+    "name": "full checkpoint is not a transaction",
+    "schema": "journal",
+    "valid": false,
+    "expectedKeyword": "additionalProperties",
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 1,
+      "value": {
+        "recordVersion": 1,
+        "snapshot": {
+          "chatId": "cht_example",
+          "revision": 1,
+          "orderedMessageIds": ["msg-example"],
+          "entries": [
+            {
+              "receipt": {
+                "messageId": "msg-example",
+                "queueSeq": 1,
+                "acceptedAt": "2026-10-14T10:00:00.000Z",
+                "acceptedRevision": 1
+              },
+              "revision": 1,
+              "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "actor": {
+                "kind": "user",
+                "id": "owner"
+              },
+              "audience": {
+                "kind": "direct",
+                "botId": "bot-example"
+              },
+              "outcome": {
+                "state": "queued"
+              },
+              "contentRef": {
+                "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+                "size": 59,
+                "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+              }
+            }
+          ]
+        },
+        "nextQueueSeq": 2,
+        "discussion": null,
+        "commandReceipts": [
+          {
+            "kind": "queue",
+            "mutationId": "mutation-example",
+            "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "recordedAt": "2026-10-14T10:00:00.000Z",
+            "commandType": "chat.message.enqueue.request",
+            "commandRef": {
+              "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+              "size": 220,
+              "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+            },
+            "result": {
+              "status": "accepted",
+              "revision": 1,
+              "receipt": {
+                "messageId": "msg-example",
+                "queueSeq": 1,
+                "acceptedAt": "2026-10-14T10:00:00.000Z",
+                "acceptedRevision": 1
+              },
+              "duplicate": false
+            }
+          }
+        ]
+      },
+      "operation": {
+        "order": 1,
+        "timestamp": "2026-10-14T10:00:00.000Z",
+        "actor": {
+          "kind": "user",
+          "id": "owner"
+        }
+      }
+    }
+  },
+  {
+    "name": "transaction missing previous revision",
+    "schema": "journal",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "previousRevision",
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 1,
+      "value": {
+        "recordVersion": 1,
+        "chatId": "cht_example",
+        "revision": 1,
+        "nextQueueSeq": 2,
+        "entry": {
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "revision": 1,
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "audience": {
+            "kind": "direct",
+            "botId": "bot-example"
+          },
+          "outcome": {
+            "state": "queued"
+          },
+          "contentRef": {
+            "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+            "size": 59,
+            "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+          }
+        },
+        "commandReceipt": {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        },
+        "orderedMessageIds": ["msg-example"],
+        "discussion": null
+      },
+      "operation": {
+        "order": 1,
+        "timestamp": "2026-10-14T10:00:00.000Z",
+        "actor": {
+          "kind": "user",
+          "id": "owner"
+        }
+      }
+    }
+  },
+  {
+    "name": "order vector exceeds proposed pending bound",
+    "schema": "journal",
+    "valid": false,
+    "expectedKeyword": "maxItems",
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 1,
+      "value": {
+        "recordVersion": 1,
+        "chatId": "cht_example",
+        "previousRevision": 0,
+        "revision": 1,
+        "nextQueueSeq": 2,
+        "entry": {
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "revision": 1,
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "audience": {
+            "kind": "direct",
+            "botId": "bot-example"
+          },
+          "outcome": {
+            "state": "queued"
+          },
+          "contentRef": {
+            "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+            "size": 59,
+            "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+          }
+        },
+        "commandReceipt": {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        },
+        "orderedMessageIds": [
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example",
+          "msg-example"
+        ],
+        "discussion": null
+      },
+      "operation": {
+        "order": 1,
+        "timestamp": "2026-10-14T10:00:00.000Z",
+        "actor": {
+          "kind": "user",
+          "id": "owner"
+        }
+      }
+    }
+  },
+  {
+    "name": "timestamp milliseconds and offset",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T17:00:00.123+07:00",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "journal value required",
+    "schema": "journal",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "value",
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 1
+    }
+  },
+  {
+    "name": "journal seq cannot be zero",
+    "schema": "journal",
+    "valid": false,
+    "expectedKeyword": "minimum",
+    "value": {
+      "kind": "chat_queue",
+      "epoch": "epoch-example",
+      "seq": 0,
+      "value": {
+        "recordVersion": 1,
+        "chatId": "cht_example",
+        "previousRevision": 0,
+        "revision": 1,
+        "nextQueueSeq": 2,
+        "entry": {
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "revision": 1,
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "audience": {
+            "kind": "direct",
+            "botId": "bot-example"
+          },
+          "outcome": {
+            "state": "queued"
+          },
+          "contentRef": {
+            "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+            "size": 59,
+            "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+          }
+        },
+        "commandReceipt": {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        },
+        "orderedMessageIds": ["msg-example"],
+        "discussion": null
+      }
+    }
+  },
+  {
+    "name": "timestamp requires seconds and milliseconds",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "pattern",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable discussion worker",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": {
+        "discussionId": "discussion-example",
+        "generation": 1,
+        "triggerMessageIds": ["msg-example"],
+        "mode": "addressed",
+        "round": 1,
+        "roundsMax": 3,
+        "spoke": false,
+        "waitingBotIds": ["bot-next"],
+        "current": {
+          "state": "running",
+          "botId": "bot-example",
+          "delivery": {
+            "botId": "bot-example",
+            "agentId": "agent-example",
+            "clientMessageId": "msg-example",
+            "disposition": "steered",
+            "turnId": "turn-example",
+            "submittedRow": {
+              "epoch": "epoch-example",
+              "seq": 2
+            }
+          }
+        }
+      },
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable group audience",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "group",
+              "mode": "addressed",
+              "botIds": ["bot-example"]
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "durable steer pending",
+    "schema": "record",
+    "valid": true,
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "steer",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.steer.request",
+          "commandRef": {
+            "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+            "size": 59,
+            "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+          },
+          "result": {
+            "status": "pending",
+            "messageId": "msg-example",
+            "lease": {
+              "claimId": "claim-example",
+              "hostBootId": "boot-example",
+              "expiresAt": "2026-10-14T10:01:00.000Z",
+              "attempt": 1
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "chat.message.enqueue.response accepted",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.enqueue.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "accepted",
+          "revision": 1,
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "duplicate": false
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.message.enqueue.response rejected",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.enqueue.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "rejected",
+          "revision": 1,
+          "error": {
+            "code": "conflict",
+            "message": "Queue changed; fetch its current revision"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.message.edit.response accepted",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.edit.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "accepted",
+          "revision": 1,
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "duplicate": false
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.message.edit.response rejected",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.edit.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "rejected",
+          "revision": 1,
+          "error": {
+            "code": "conflict",
+            "message": "Queue changed; fetch its current revision"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.message.cancel.response accepted",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.cancel.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "accepted",
+          "revision": 1,
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "duplicate": false
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.message.cancel.response rejected",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.cancel.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "rejected",
+          "revision": 1,
+          "error": {
+            "code": "conflict",
+            "message": "Queue changed; fetch its current revision"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.queue.reorder.response accepted",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.reorder.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "accepted",
+          "revision": 1,
+          "receipt": {
+            "messageId": "msg-example",
+            "queueSeq": 1,
+            "acceptedAt": "2026-10-14T10:00:00.000Z",
+            "acceptedRevision": 1
+          },
+          "duplicate": false
+        }
+      }
+    }
+  },
+  {
+    "name": "chat.queue.reorder.response rejected",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.reorder.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "rejected",
+          "revision": 1,
+          "error": {
+            "code": "conflict",
+            "message": "Queue changed; fetch its current revision"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "steer applied",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.steer.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "applied",
+          "delivery": {
+            "botId": "bot-example",
+            "agentId": "agent-example",
+            "clientMessageId": "msg-example",
+            "disposition": "steered",
+            "turnId": "turn-example",
+            "submittedRow": {
+              "epoch": "epoch-example",
+              "seq": 2
+            }
+          },
+          "transcript": {
+            "messageId": "msg-example",
+            "seq": 3
+          },
+          "duplicate": false
+        }
+      }
+    }
+  },
+  {
+    "name": "steer rejected",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.steer.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "rejected",
+          "error": {
+            "code": "unsupported",
+            "message": "This provider cannot steer this exact active turn"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "steer unknown",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.message.steer.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "unknown",
+          "messageId": "msg-example",
+          "error": {
+            "code": "outcome_unknown",
+            "message": "Do not retry provider side effects automatically"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "fetch ok",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.fetch.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "result": {
+          "status": "ok",
+          "snapshot": {
+            "chatId": "cht_example",
+            "revision": 1,
+            "orderedMessageIds": ["msg-example"],
+            "entries": [
+              {
+                "receipt": {
+                  "messageId": "msg-example",
+                  "queueSeq": 1,
+                  "acceptedAt": "2026-10-14T10:00:00.000Z",
+                  "acceptedRevision": 1
+                },
+                "revision": 1,
+                "content": {
+                  "text": "@alpha inspect this",
+                  "images": [],
+                  "attachments": []
+                },
+                "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "actor": {
+                  "kind": "user",
+                  "id": "owner"
+                },
+                "audience": {
+                  "kind": "direct",
+                  "botId": "bot-example"
+                },
+                "outcome": {
+                  "state": "queued"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "fetch rejected",
+    "schema": "response",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.fetch.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "result": {
+          "status": "rejected",
+          "error": {
+            "code": "conflict",
+            "message": "Queue changed; fetch its current revision"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "queue event",
+    "schema": "event",
+    "valid": true,
+    "value": {
+      "type": "chat.queue.updated",
+      "payload": {
+        "snapshot": {
+          "chatId": "cht_example",
+          "revision": 1,
+          "orderedMessageIds": ["msg-example"],
+          "entries": [
+            {
+              "receipt": {
+                "messageId": "msg-example",
+                "queueSeq": 1,
+                "acceptedAt": "2026-10-14T10:00:00.000Z",
+                "acceptedRevision": 1
+              },
+              "revision": 1,
+              "content": {
+                "text": "@alpha inspect this",
+                "images": [],
+                "attachments": []
+              },
+              "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "actor": {
+                "kind": "user",
+                "id": "owner"
+              },
+              "audience": {
+                "kind": "direct",
+                "botId": "bot-example"
+              },
+              "outcome": {
+                "state": "queued"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "client forges actor",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "additionalProperties",
+    "value": {
+      "type": "chat.message.enqueue.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      },
+      "actor": {
+        "kind": "user",
+        "id": "owner"
+      }
+    }
+  },
+  {
+    "name": "client forges recipient list",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "additionalProperties",
+    "value": {
+      "type": "chat.message.enqueue.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      },
+      "audience": {
+        "kind": "direct",
+        "botId": "bot-example"
+      }
+    }
+  },
+  {
+    "name": "missing messageId",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "messageId",
+    "value": {
+      "type": "chat.message.enqueue.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      }
+    }
+  },
+  {
+    "name": "empty opaque ID",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "minLength",
+    "value": {
+      "type": "chat.message.enqueue.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      }
+    }
+  },
+  {
+    "name": "unsupported operation",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "const",
+    "value": {
+      "type": "chat.message.magic.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      }
+    }
+  },
+  {
+    "name": "unsafe sequence",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "maximum",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 9007199254740992,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative revision",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "minimum",
+    "value": {
+      "type": "chat.queue.reorder.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "expectedRevision": -1,
+      "messageIds": []
+    }
+  },
+  {
+    "name": "nonintegral revision",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "type",
+    "value": {
+      "type": "chat.queue.reorder.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "expectedRevision": 1.5,
+      "messageIds": []
+    }
+  },
+  {
+    "name": "invalid RFC3339 time",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "format",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-02-30T10:00:00Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "time has no offset",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "pattern",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "queued"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid queue state",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "const",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "draft"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "claimed without lease",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "lease",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "claimed"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown without reason",
+    "schema": "record",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "code",
+    "value": {
+      "recordVersion": 1,
+      "snapshot": {
+        "chatId": "cht_example",
+        "revision": 1,
+        "orderedMessageIds": ["msg-example"],
+        "entries": [
+          {
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "revision": 1,
+            "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "audience": {
+              "kind": "direct",
+              "botId": "bot-example"
+            },
+            "outcome": {
+              "state": "unknown",
+              "claimId": "claim-example",
+              "observedAt": "2026-10-14T10:00:00.000Z"
+            },
+            "contentRef": {
+              "relativePath": "queue-content/02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943.json",
+              "size": 59,
+              "sha256": "02dfd0eecf089bf5921eca06cb0fc44b96897d5888e686bea2c0bf1adc40a943"
+            }
+          }
+        ]
+      },
+      "nextQueueSeq": 2,
+      "discussion": null,
+      "commandReceipts": [
+        {
+          "kind": "queue",
+          "mutationId": "mutation-example",
+          "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "actor": {
+            "kind": "user",
+            "id": "owner"
+          },
+          "recordedAt": "2026-10-14T10:00:00.000Z",
+          "commandType": "chat.message.enqueue.request",
+          "commandRef": {
+            "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+            "size": 220,
+            "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+          },
+          "result": {
+            "status": "accepted",
+            "revision": 1,
+            "receipt": {
+              "messageId": "msg-example",
+              "queueSeq": 1,
+              "acceptedAt": "2026-10-14T10:00:00.000Z",
+              "acceptedRevision": 1
+            },
+            "duplicate": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "steer lacks exact turn",
+    "schema": "command",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "expectedTurnId",
+    "value": {
+      "type": "chat.message.steer.request",
+      "requestId": "request-example",
+      "chatId": "cht_example",
+      "mutationId": "mutation-example",
+      "messageId": "msg-example",
+      "content": {
+        "text": "@alpha inspect this",
+        "images": [],
+        "attachments": []
+      },
+      "botId": "bot-example",
+      "agentId": "agent-example"
+    }
+  },
+  {
+    "name": "response missing settlement",
+    "schema": "response",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "result",
+    "value": {
+      "type": "chat.message.enqueue.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example"
+      }
+    }
+  },
+  {
+    "name": "event cannot carry command receipts",
+    "schema": "event",
+    "valid": false,
+    "expectedKeyword": "additionalProperties",
+    "value": {
+      "type": "chat.queue.updated",
+      "payload": {
+        "snapshot": {
+          "chatId": "cht_example",
+          "revision": 1,
+          "orderedMessageIds": ["msg-example"],
+          "entries": [
+            {
+              "receipt": {
+                "messageId": "msg-example",
+                "queueSeq": 1,
+                "acceptedAt": "2026-10-14T10:00:00.000Z",
+                "acceptedRevision": 1
+              },
+              "revision": 1,
+              "content": {
+                "text": "@alpha inspect this",
+                "images": [],
+                "attachments": []
+              },
+              "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "actor": {
+                "kind": "user",
+                "id": "owner"
+              },
+              "audience": {
+                "kind": "direct",
+                "botId": "bot-example"
+              },
+              "outcome": {
+                "state": "queued"
+              }
+            }
+          ]
+        },
+        "commandReceipts": [
+          {
+            "kind": "queue",
+            "mutationId": "mutation-example",
+            "commandDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "actor": {
+              "kind": "user",
+              "id": "owner"
+            },
+            "recordedAt": "2026-10-14T10:00:00.000Z",
+            "commandType": "chat.message.enqueue.request",
+            "commandRef": {
+              "relativePath": "queue-content/9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107.json",
+              "size": 220,
+              "sha256": "9080cec520fc9400a53902dd1a0e0d58932dd8e07b98f63c522b9e46b519a107"
+            },
+            "result": {
+              "status": "accepted",
+              "revision": 1,
+              "receipt": {
+                "messageId": "msg-example",
+                "queueSeq": 1,
+                "acceptedAt": "2026-10-14T10:00:00.000Z",
+                "acceptedRevision": 1
+              },
+              "duplicate": false
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "nullable receipt required",
+    "schema": "response",
+    "valid": false,
+    "expectedKeyword": "required",
+    "expectedProperty": "receipt",
+    "value": {
+      "type": "chat.queue.reorder.response",
+      "payload": {
+        "requestId": "request-example",
+        "chatId": "cht_example",
+        "mutationId": "mutation-example",
+        "result": {
+          "status": "accepted",
+          "revision": 1,
+          "duplicate": false
+        }
+      }
+    }
+  }
+]

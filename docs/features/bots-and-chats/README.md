@@ -2,6 +2,8 @@
 
 App interaction contract: [2026-09-27 navigation, creation and shared panes](app-experience.md).
 
+Proposed, awaiting owner decision: [Host-owned Queue / Steer — user flows and scope](queue-proposal/README.md). No Host queue implementation is included.
+
 Date: 2026-09-26. Status: implementation in progress; see [verification and remaining work](implementation.md). Names decided 2026-09-26: **Bot** and
 **Chat**, with **Bot kind** and **Transcript**, in [the glossary](../../glossary.md).
 
@@ -397,5 +399,8 @@ supersede the original sidebar layout in [plans/cli-hub-naming.md](plans/cli-hub
 
 ## Open
 
+- [Host queue ownership and exact proposed contracts](queue-proposal/README.md): CTO-021 owner
+  review before a durable queue, protocol or migration is implemented. Current session pending
+  input remains client memory; serial Chat admission does not establish durable queue parity.
 - Whether `USER.md` is shared across a user's bots once the second brain exists.
 - `git init` in bot directories for memory history and diff viewing.

@@ -1,0 +1,450 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        },
+        "required": ["data", "mimeType"]
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "forge_change_request"
+              },
+              "mimeType": {
+                "type": "string",
+                "const": "application/clisbot-forge-change-request"
+              },
+              "forge": {
+                "default": "github",
+                "type": "string"
+              },
+              "number": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "projectPath": {
+                "type": "string"
+              },
+              "baseRefName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "headRefName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["type", "mimeType", "number", "title", "url"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "forge_issue"
+              },
+              "mimeType": {
+                "type": "string",
+                "const": "application/clisbot-forge-issue"
+              },
+              "forge": {
+                "default": "github",
+                "type": "string"
+              },
+              "number": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "projectPath": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "mimeType", "number", "title", "url"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "github_pr"
+              },
+              "mimeType": {
+                "type": "string",
+                "const": "application/github-pr"
+              },
+              "number": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "baseRefName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "headRefName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["type", "mimeType", "number", "title", "url"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "github_issue"
+              },
+              "mimeType": {
+                "type": "string",
+                "const": "application/github-issue"
+              },
+              "number": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["type", "mimeType", "number", "title", "url"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "text"
+              },
+              "mimeType": {
+                "type": "string",
+                "const": "text/plain"
+              },
+              "contextKind": {
+                "type": "string"
+              },
+              "sourceSession": {
+                "type": "object",
+                "properties": {
+                  "agentId": {
+                    "type": "string"
+                  },
+                  "epoch": {
+                    "type": "string"
+                  },
+                  "seq": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["agentId", "epoch", "seq"]
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "text": {
+                "type": "string"
+              },
+              "externalResource": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "providerLabel": {
+                    "type": "string"
+                  },
+                  "resourceType": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "providerLabel",
+                  "resourceType",
+                  "id",
+                  "identifier",
+                  "title",
+                  "url"
+                ]
+              }
+            },
+            "required": ["type", "mimeType", "text"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "review"
+              },
+              "mimeType": {
+                "type": "string",
+                "const": "application/clisbot-review"
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["uncommitted", "base"]
+              },
+              "baseRef": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "comments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filePath": {
+                      "type": "string"
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": ["old", "new"]
+                    },
+                    "lineNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "body": {
+                      "type": "string"
+                    },
+                    "context": {
+                      "type": "object",
+                      "properties": {
+                        "hunkHeader": {
+                          "type": "string"
+                        },
+                        "targetLine": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "lines": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      },
+                      "required": ["hunkHeader", "targetLine", "lines"]
+                    }
+                  },
+                  "required": ["filePath", "side", "lineNumber", "body", "context"]
+                }
+              }
+            },
+            "required": ["type", "mimeType", "cwd", "mode", "comments"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "uploaded_file"
+              },
+              "id": {
+                "type": "string"
+              },
+              "fileName": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "id", "fileName", "mimeType", "size", "path"]
+          }
+        ]
+      }
+    }
+  },
+  "required": ["text", "images", "attachments"],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "oldLineNumber": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "newLineNumber": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["add", "remove", "context"]
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": ["oldLineNumber", "newLineNumber", "type", "content"]
+    }
+  },
+  "$id": "https://clisbot.com/schemas/proposals/cto-021/v1/content.schema.json",
+  "title": "PROPOSED CTO-021 v1 content; not implemented wire"
+}

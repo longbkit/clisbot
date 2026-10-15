@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.2-beta.1 - 2026-10-15
+
+### Changed
+
+- Moved heartbeat run counters beside response timing, with direct access to the heartbeat
+- Reduced retained native tab pages when switching between Home, sessions and schedules
+- Reduced activity-list date grouping cost with large session catalogs
+
+### Fixed
+
+- Fixed HEARTBEAT_OK and PASS replies appearing in Bot direct messages
+- Fixed new Bot messages appearing above earlier progress while a reply was running
+- Fixed answered permission requests remaining stuck after a response was proven undelivered
+- Fixed obsolete provider caches preventing saved Host connections when browser storage was full
+- Fixed chat bottom pinning overriding an upward scroll before layout
+
 ## 2.1.1 - 2026-10-14
 
 ### Added

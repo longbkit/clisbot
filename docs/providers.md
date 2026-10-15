@@ -176,10 +176,23 @@ remains the time the response or announcement was generated. Refresh keeps settl
 until the next result, so unchanged discovery sends freshness without another model body.
 
 The app's snapshot cache owns compact expansion and stores one body per server/hash, with separate
-directory/hash/freshness records under the same byte budget. Missing bodies share a React Query
-request; directory queries cancel superseded pulls before accepting pushes. Default SDK clients
-keep expanded entries and full updates. Only callers that own materialization opt into wire snapshots.
-Keep the full encoding for older clients; compact-snapshot support alone does not imply reference support.
+directory/hash/freshness records under a 2 MiB budget, counting the larger of UTF-8 bytes and UTF-16
+storage size. This bounds disposable catalog data; it cannot reserve capacity in every storage backend.
+Reads reuse resident catalogs; writes reconcile stored bodies and references, including other tabs.
+Missing bodies share a React Query request; directory queries cancel superseded pulls before accepting pushes.
+Default SDK clients keep expanded entries and full updates. Only callers that own materialization opt into
+wire snapshots. Keep the full encoding for older clients; compact-snapshot support alone does not imply
+reference support.
+
+Host connection saves take priority over catalog caches. Known obsolete `@paseo/provider-snapshot/v2:`
+bodies and their exact index, plus the old Clisbot v1 catalog family, are removed before catalog or
+registry writes. This check repeats because an older open tab can recreate them. A quota error permits
+one cache-only reclamation and retry; authentication, identity, history and preferences are never
+reclaimed. Catalogs can be fetched again from the Host without an AI turn. If storage still refuses a
+Host save, the operation reports an error and keeps the saved profiles and visible selection unchanged.
+Free storage for the app and retry; reconnecting alone does not persist a failed preference save.
+Preferences and quota belong to each app/browser profile and origin, not to the Hub account. Concurrent
+older tabs can keep consuming space, so close those tabs if pressure returns.
 
 Settings refresh invalidates requested providers across known targets and refreshes them in their
 actual execution context, so every connected client receives the refreshed view. Discovery shares

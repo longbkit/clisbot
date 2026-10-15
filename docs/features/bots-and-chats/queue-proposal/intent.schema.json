@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "recordVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "hostId": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "chatId": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "subjectScope": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "mutationId": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "messageId": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/__schema0"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "commandType": {
+      "type": "string",
+      "enum": [
+        "chat.message.enqueue.request",
+        "chat.message.edit.request",
+        "chat.message.cancel.request",
+        "chat.queue.reorder.request",
+        "chat.message.steer.request"
+      ]
+    },
+    "localPayloadId": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["pending", "unknown"]
+    }
+  },
+  "required": [
+    "recordVersion",
+    "hostId",
+    "chatId",
+    "subjectScope",
+    "mutationId",
+    "messageId",
+    "commandType",
+    "localPayloadId",
+    "recordedAt",
+    "phase"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "https://clisbot.com/schemas/proposals/cto-021/v1/intent.schema.json",
+  "title": "PROPOSED CTO-021 v1 intent; not implemented wire"
+}

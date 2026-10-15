@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Buffer } from "buffer";
+import { persistHostRegistry } from "@/storage/provider-cache-pressure";
 import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { compactProviderSnapshot } from "@clisbot/protocol/provider-snapshot-codec";
 import { createProviderSnapshotCache, type ProviderSnapshotCache } from "./provider-snapshot-cache";
@@ -98,7 +99,11 @@ function snapshotBytes(values: Map<string, string>): number {
     .filter(([key]) => key.startsWith(SNAPSHOT_KEY_PREFIX))
     .reduce(
       (total, [key, value]) =>
-        total + Buffer.byteLength(key, "utf8") + Buffer.byteLength(value, "utf8"),
+        total +
+        Math.max(
+          Buffer.byteLength(key, "utf8") + Buffer.byteLength(value, "utf8"),
+          2 * (key.length + value.length),
+        ),
       0,
     );
 }
@@ -295,14 +300,14 @@ describe("provider snapshot cache", () => {
     storage.values.set('@clisbot/provider-snapshot/v1:["server-1","/repo"]', "not json");
 
     await expect(cache.read("server-1", "/repo")).resolves.toBeNull();
-    expect([...storage.values.keys()].some((key) => key.startsWith(SNAPSHOT_KEY_PREFIX))).toBe(
-      false,
-    );
+    expect(
+      [...storage.values.keys()].some((storedKey) => storedKey.startsWith(SNAPSHOT_KEY_PREFIX)),
+    ).toBe(false);
   });
 
   it("evicts the oldest snapshots to keep the cache within its byte budget", async () => {
     const storage = createStorage();
-    const maxBytes = 1_000;
+    const maxBytes = 2_000;
     const cache = createProviderSnapshotCache(storage, { maxBytes });
 
     await Promise.all([
@@ -333,7 +338,6 @@ describe("provider snapshot cache", () => {
     await expect(cache.read("server-1", "/newest")).resolves.not.toBeNull();
     expect(snapshotBytes(storage.values)).toBeLessThanOrEqual(maxBytes);
     expectConsistentSnapshots(storage.values);
-    expect(storage.stats.getAllKeysCalls).toBe(1);
   });
 
   it("clears unindexed snapshots once when creating the cache index", async () => {
@@ -363,10 +367,9 @@ describe("provider snapshot cache", () => {
 
     expect(storage.values.has('@clisbot/provider-snapshot/v1:["server-1","/legacy"]')).toBe(false);
     expectConsistentSnapshots(storage.values);
-    expect(storage.stats.getAllKeysCalls).toBe(1);
   });
 
-  it("initializes the cache index once when the first read and write race", async () => {
+  it("serializes the first read and write without retaining obsolete data", async () => {
     const storage = createStorage();
     storage.values.set('@clisbot/provider-snapshot/v1:["server-1","/legacy"]', "legacy");
     const cache = createProviderSnapshotCache(storage);
@@ -382,12 +385,11 @@ describe("provider snapshot cache", () => {
 
     await expect(cache.read("server-1", "/current")).resolves.not.toBeNull();
     expectConsistentSnapshots(storage.values);
-    expect(storage.stats.getAllKeysCalls).toBe(1);
   });
 
   it("replaces an indexed snapshot without counting both versions", async () => {
     const storage = createStorage();
-    const maxBytes = 1_000;
+    const maxBytes = 2_000;
     const cache = createProviderSnapshotCache(storage, { maxBytes });
 
     await writeSnapshot(cache, {
@@ -413,7 +415,7 @@ describe("provider snapshot cache", () => {
 
   it("removes the previous value when a replacement exceeds the entire budget", async () => {
     const storage = createStorage();
-    const cache = createProviderSnapshotCache(storage, { maxBytes: 1_000 });
+    const cache = createProviderSnapshotCache(storage, { maxBytes: 2_000 });
     await writeSnapshot(cache, {
       cwd: "/repo",
       label: "cached",
@@ -447,7 +449,6 @@ describe("provider snapshot cache", () => {
     expect(storage.values.has(`${SNAPSHOT_KEY_PREFIX}legacy`)).toBe(false);
     await expect(cache.read("server-1", "/current")).resolves.not.toBeNull();
     expectConsistentSnapshots(storage.values);
-    expect(storage.stats.getAllKeysCalls).toBe(1);
   });
 
   it("measures UTF-8 bytes rather than JavaScript string length", async () => {
@@ -479,7 +480,63 @@ describe("provider snapshot cache", () => {
     expectConsistentSnapshots(storage.values);
   });
 
-  it("keeps hundreds of concurrent writes bounded without rescanning snapshots", async () => {
+  it("rehydrates a catalog after a critical registry write reclaims its persisted body", async () => {
+    const storage = createStorage();
+    const cache = createProviderSnapshotCache(storage);
+    const input = { cwd: "/repo", label: "rehydrated", generatedAt: "2026-08-02T00:00:00.000Z" };
+    await writeSnapshot(cache, input);
+    const baseSet = storage.setItem;
+    storage.setItem = async (key, value) => {
+      if (
+        key === "@clisbot:daemon-registry" &&
+        [...storage.values.keys()].some((storedKey) => storedKey.startsWith(SNAPSHOT_KEY_PREFIX))
+      ) {
+        throw new DOMException("Full", "QuotaExceededError");
+      }
+      await baseSet(key, value);
+    };
+    await persistHostRegistry(storage, "@clisbot:daemon-registry", "saved");
+    expect(snapshotBytes(storage.values)).toBe(0);
+    await expect(cache.read("server-1", "/repo")).resolves.toBeNull();
+    await writeSnapshot(cache, input);
+    const restarted = createProviderSnapshotCache(storage);
+    await expect(restarted.read("server-1", "/repo")).resolves.toMatchObject({
+      hash: "rehydrated",
+    });
+    expectConsistentSnapshots(storage.values);
+    expect(storage.values.get("@clisbot:daemon-registry")).toBe("saved");
+  });
+
+  it("reconciles another cache owner and a late legacy writer before admission", async () => {
+    const storage = createStorage();
+    const first = createProviderSnapshotCache(storage, { maxBytes: 2_000 });
+    const second = createProviderSnapshotCache(storage, { maxBytes: 2_000 });
+    await writeSnapshot(first, {
+      cwd: "/old",
+      label: "old",
+      generatedAt: "2026-08-01T00:00:00.000Z",
+    });
+    await second.read("server-1", "/old");
+    storage.values.set('@paseo/provider-snapshot/v2:["legacy","hash","late"]', "old tab cache");
+    await writeSnapshot(first, {
+      cwd: "/new",
+      label: "new",
+      generatedAt: "2026-08-02T00:00:00.000Z",
+    });
+    await writeSnapshot(second, {
+      cwd: "/newest",
+      label: "newest",
+      generatedAt: "2026-08-03T00:00:00.000Z",
+    });
+    expect(snapshotBytes(storage.values)).toBeLessThanOrEqual(2_000);
+    expect(
+      [...storage.values.keys()].some((key) => key.startsWith("@paseo/provider-snapshot/v2:")),
+    ).toBe(false);
+    expectConsistentSnapshots(storage.values);
+    await expect(first.read("server-1", "/newest")).resolves.not.toBeNull();
+  });
+
+  it("keeps hundreds of concurrent writes bounded and repeated reads scan-free", async () => {
     const storage = createStorage();
     const maxBytes = 8_000;
     const cache = createProviderSnapshotCache(storage, { maxBytes });
@@ -494,16 +551,18 @@ describe("provider snapshot cache", () => {
     await Promise.all(writes);
 
     expect(snapshotBytes(storage.values)).toBeLessThanOrEqual(maxBytes);
+    const scansAfterWrites = storage.stats.getAllKeysCalls;
     await expect(cache.read("server-1", "/repo-249")).resolves.not.toBeNull();
+    await expect(cache.read("server-1", "/repo-249")).resolves.not.toBeNull();
+    expect(storage.stats.getAllKeysCalls).toBe(scansAfterWrites);
     expectConsistentSnapshots(storage.values);
-    expect(storage.stats.getAllKeysCalls).toBe(1);
   });
 
   it.each(["before", "after"] as const)(
     "recovers when a snapshot write fails %s its side effect",
     async (timing) => {
       const storage = createStorage();
-      const cache = createProviderSnapshotCache(storage, { maxBytes: 2_000 });
+      const cache = createProviderSnapshotCache(storage, { maxBytes: 4_000 });
       await writeSnapshot(cache, {
         cwd: "/stable",
         label: "stable",
@@ -518,7 +577,7 @@ describe("provider snapshot cache", () => {
         generatedAt: "2026-08-02T00:00:00.000Z",
       });
 
-      const restarted = createProviderSnapshotCache(storage, { maxBytes: 2_000 });
+      const restarted = createProviderSnapshotCache(storage, { maxBytes: 4_000 });
       await writeSnapshot(restarted, {
         cwd: "/next",
         label: "next",
@@ -526,14 +585,14 @@ describe("provider snapshot cache", () => {
       });
       await expect(restarted.read("server-1", "/stable")).resolves.not.toBeNull();
       await expect(restarted.read("server-1", "/next")).resolves.not.toBeNull();
-      expect(snapshotBytes(storage.values)).toBeLessThanOrEqual(2_000);
+      expect(snapshotBytes(storage.values)).toBeLessThanOrEqual(4_000);
       expectConsistentSnapshots(storage.values);
     },
   );
 
   it("repairs partial eviction, stale index metadata, and preserves unrelated storage", async () => {
     const storage = createStorage();
-    const maxBytes = 1_000;
+    const maxBytes = 2_000;
     const cache = createProviderSnapshotCache(storage, { maxBytes });
     storage.values.set("@clisbot/unrelated", "keep-me");
     await writeSnapshot(cache, {
@@ -574,7 +633,7 @@ describe("provider snapshot cache", () => {
   });
 
   it("evicts before writing when storage has no temporary headroom", async () => {
-    const maxBytes = 1_000;
+    const maxBytes = 2_000;
     const storage = createStorage(maxBytes);
     const cache = createProviderSnapshotCache(storage, { maxBytes });
     await writeSnapshot(cache, {

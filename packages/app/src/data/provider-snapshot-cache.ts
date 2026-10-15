@@ -1,6 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer";
 import {
+  withProviderCacheRecovery,
+  isObsoleteProviderCatalogKey,
+} from "@/storage/provider-cache-pressure";
+import {
   normalizeAgentModelCatalog,
   type ProviderSnapshotEntry,
 } from "@clisbot/protocol/agent-types";
@@ -16,7 +20,8 @@ type SnapshotPayload = GetProvidersSnapshotResponseMessage["payload"];
 const CACHE_VERSION = 2;
 const CACHE_KEY_PREFIX = "@clisbot/provider-snapshot/v2";
 const CACHE_INDEX_KEY = "@clisbot/provider-snapshot-index/v2";
-const DEFAULT_MAX_CACHE_BYTES = 4 * 1024 * 1024;
+// Disposable catalogs leave headroom for durable app data, without assuming a browser quota.
+const DEFAULT_MAX_CACHE_BYTES = 2 * 1024 * 1024;
 
 interface ProviderSnapshotStorage {
   getItem(key: string): Promise<string | null>;
@@ -100,7 +105,11 @@ function bodyKey(serverId: string, hash: string): string {
 }
 
 function storedBytes(key: string, value: string): number {
-  return Buffer.byteLength(key, "utf8") + Buffer.byteLength(value, "utf8");
+  // Native backends count bytes; browser storage may charge UTF-16 code units.
+  return Math.max(
+    Buffer.byteLength(key, "utf8") + Buffer.byteLength(value, "utf8"),
+    2 * (key.length + value.length),
+  );
 }
 
 const CacheKeySchema = z.tuple([z.string(), z.enum(["cwd", "hash"]), z.string().nullable()]);
@@ -142,10 +151,7 @@ export function createProviderSnapshotCache(
     const allKeys = await storage.getAllKeys();
     // COMPAT(providerSnapshotCache): added in v0.7.2, remove legacy cleanup after 2027-03-06.
     const legacyKeys = allKeys.filter(
-      (key) =>
-        key.startsWith("@clisbot/provider-snapshot/v1:") ||
-        key === "@clisbot/provider-snapshot-index/v1" ||
-        key === CACHE_INDEX_KEY,
+      (key) => isObsoleteProviderCatalogKey(key) || key === CACHE_INDEX_KEY,
     );
     if (legacyKeys.length) await storage.multiRemove(legacyKeys);
     const keys = allKeys.filter((key) => key.startsWith(`${CACHE_KEY_PREFIX}:`));
@@ -220,11 +226,13 @@ export function createProviderSnapshotCache(
     return result;
   }
 
-  async function writeRecord(
+  async function writeRecordOnce(
     key: string,
     input: StoredProviderSnapshot,
     requiredBody?: { key: string; input: StoredProviderSnapshot },
   ): Promise<void> {
+    // Reconcile writes against storage, including other tabs and quota reclamation.
+    await reconcileCache();
     const currentIndex = await ensureCacheIndex();
     function prepare(recordKey: string, record: StoredProviderSnapshot) {
       const value = JSON.stringify(record);
@@ -288,6 +296,21 @@ export function createProviderSnapshotCache(
         writtenAt,
       })),
     ];
+  }
+
+  function writeRecord(
+    key: string,
+    input: StoredProviderSnapshot,
+    requiredBody?: { key: string; input: StoredProviderSnapshot },
+  ): Promise<void> {
+    return withProviderCacheRecovery(
+      storage,
+      () => writeRecordOnce(key, input, requiredBody),
+      () => {
+        index = null;
+        bodies.clear();
+      },
+    );
   }
 
   async function readRecord(key: string): Promise<StoredProviderSnapshot | null> {
