@@ -157,7 +157,7 @@ through revalidation/error, so status changes do not unmount empty copy or focus
 A first failed request instead exposes recovery without claiming the catalog is empty. Superseded
 workspace requests do not publish failures over their replacement. The compact top toolbar reserves
 the user-enabled Usage summary row before reports arrive; it remains a Usage action with no fabricated
-percent. Desktop's existing no-summary behavior and plugin contribution heights remain unchanged.
+percent. Desktop's existing no-summary behavior and plugin contribution heights remain unchanged. Sidebar Host labels use the effective selected registry scope before catalogs arrive, so a second Host response cannot add label lines to existing rows; single-Host filters and the explicit Host row-item switch still suppress labels.
 
 The three directory entity types have independent monotonic sequences and share one daemon
 generation. The daemon retains only the latest projection per entity and bounded tombstones, not an

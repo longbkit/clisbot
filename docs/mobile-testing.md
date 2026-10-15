@@ -629,3 +629,8 @@ holds the configured Usage report until the reading anchor has been measured. It
 will never delay these responses. Keep the raw request/delivery evidence before claiming injected
 latency. The focused component and owner cases are `empty-states.test.tsx`,
 `use-aggregated-agents.test.tsx`, and the “independent workspace directory” tests in the runtime owners.
+
+A staggered multi-Host loading journey must also measure a scrolled Chat row before and after the
+second Host's catalog arrives. Host labels must already occupy their row geometry for a multi-Host
+selected scope; counting only Hosts with accepted project data adds labels late and moves the reader.
+Check the single-Host filter and Host row-item-off controls with this change.

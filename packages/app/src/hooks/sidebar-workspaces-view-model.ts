@@ -477,18 +477,10 @@ export function buildSidebarProjectsFromHostProjects(input: {
   }));
 }
 
-// Host labels disambiguate which machine a workspace lives on; they only earn their
-// space once the visible sidebar spans more than one host. Counting distinct hosts
-// across the visible projects (not all connected hosts) keeps labels off when a host
-// filter pins the view to a single host.
-export function shouldShowSidebarHostLabels(projects: SidebarProjectEntry[]): boolean {
-  const serverIds = new Set<string>();
-  for (const project of projects) {
-    for (const host of project.hosts) {
-      serverIds.add(host.serverId);
-    }
-  }
-  return serverIds.size >= 2;
+// Reserve Host label geometry from the effective selected registry scope, before catalogs arrive.
+// A single-Host filter still removes redundant labels; the explicit row-item setting is a caller gate.
+export function shouldShowSidebarHostLabels(serverIds: readonly string[]): boolean {
+  return new Set(serverIds).size >= 2;
 }
 
 export function applyStoredOrdering<T>(input: {

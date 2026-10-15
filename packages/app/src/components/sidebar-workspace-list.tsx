@@ -1,3 +1,4 @@
+import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
 import { sectionRowIndent, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
 import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
@@ -2016,12 +2017,13 @@ export function SidebarWorkspaceList({
   const pathname = usePathname();
   const hosts = useHosts();
   const rowItems = useSidebarRowItems();
+  const selectedHostIds = useSidebarHostIds();
   // Host badge visibility is a lattice, not three competing switches: this gate is the global
-  // "off", `shouldShowSidebarHostLabels` is the automatic "there is only one host so it says
+  // "off", `shouldShowSidebarHostLabels` is the selected-scope "there is only one host so it says
   // nothing", and each host's own `badgeDisplay` decides name vs icon vs hidden. Turning the
   // item off here removes the badge everywhere; leaving it on defers to the per-host setting.
   const hostBadgeByServerId = useHostBadges({
-    enabled: rowItems.host && shouldShowSidebarHostLabels(projects),
+    enabled: rowItems.host && shouldShowSidebarHostLabels(selectedHostIds),
   });
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const supportsMultiplicityByServerId = useHostFeatureMap(serverIds, "workspaceMultiplicity");
