@@ -4,6 +4,7 @@ import {
   type ComposerEditingSession,
 } from "@/composer/editing-session";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import {
   View,
   Text,
@@ -1962,7 +1963,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           submitIcon={submitIcon}
           submitLabel={submitLabel}
           submitButtonTestID={submitButtonTestID}
-          buttonIconSize={buttonIconSize}
+          buttonIconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
           sendKeys={DEFAULT_SEND_KEYS}
           sendTooltipLabel={sendTooltipLabel}
         />
@@ -1986,6 +1987,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         submitLabel,
         submitButtonTestID,
         buttonIconSize,
+        isCompact,
         sendTooltipLabel,
       ],
     );
@@ -2303,7 +2305,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
   buttonRow: {
     flexShrink: 0,
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: { xs: "center", md: "flex-end" },
     justifyContent: "space-between",
     marginHorizontal: -6,
   },
@@ -2345,8 +2347,8 @@ const styles = StyleSheet.create((theme: Theme) => ({
     backgroundColor: theme.colors.destructive,
   },
   sendButton: {
-    width: 28,
-    height: 28,
+    width: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
+    height: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.accent,
     alignItems: "center",
@@ -2355,7 +2357,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
   },
   sendButtonLabeled: {
     width: "auto",
-    minWidth: 28,
+    minWidth: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.full,
   },

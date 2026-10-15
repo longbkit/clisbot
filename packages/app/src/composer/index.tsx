@@ -5,6 +5,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import {
   View,
   Pressable,
@@ -2031,7 +2032,7 @@ function ComposerContentImpl({
   const activeActionContent = useMemo(
     () => (
       <ComposerCancelButton
-        buttonIconSize={buttonIconSize}
+        buttonIconSize={isCompactFormFactor ? ICON_SIZE.lg : buttonIconSize}
         cancelButtonStyle={cancelButtonStyle}
         handleCancelAgent={handleCancelAgent}
         isConnected={isConnected}
@@ -2043,6 +2044,7 @@ function ComposerContentImpl({
     [
       agentInterruptKeys,
       buttonIconSize,
+      isCompactFormFactor,
       cancelButtonStyle,
       handleCancelAgent,
       isCancellingAgent,
@@ -2591,8 +2593,8 @@ const styles = StyleSheet.create((theme: Theme) => ({
     gap: theme.spacing[3],
   },
   cancelButton: {
-    width: 28,
-    height: 28,
+    width: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
+    height: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.palette.red[600],
     alignItems: "center",

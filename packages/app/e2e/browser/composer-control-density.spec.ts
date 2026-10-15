@@ -6,6 +6,8 @@ import {
 } from "../support/helpers/composer-control-density";
 import { clickNewChat, gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
+import { openAgentRoute } from "../support/helpers/mock-agent";
+import { composerLocator } from "../support/helpers/composer";
 
 const SETTLE_MS = 1_000;
 
@@ -91,4 +93,38 @@ test.describe("Composer control density across tab switches", () => {
       await workspace.cleanup();
     }
   });
+});
+
+test("compact primary action paints a 48px target and accepts its outer edge", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "composer-touch-target-" });
+  try {
+    const agent = await seedSettledMockAgent(workspace, "Touch target");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openAgentRoute(page, { agentId: agent.id, workspaceId: workspace.workspaceId });
+    const input = composerLocator(page);
+    await input.fill("A multiline draft\nwith a larger Send target");
+    const send = page.getByRole("button", { name: "Send message", exact: true });
+    await expect(send).toBeVisible();
+    await expect.poll(async () => (await send.boundingBox())?.width).toBe(48);
+    await expect.poll(async () => (await send.boundingBox())?.height).toBe(48);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect.poll(async () => (await send.boundingBox())?.width).toBe(28);
+    await expect.poll(async () => (await send.boundingBox())?.height).toBe(28);
+    await page.setViewportSize({ width: 360, height: 740 });
+    await expect.poll(async () => (await send.boundingBox())?.width).toBe(48);
+    const bounds = (await send.boundingBox())!;
+    // Outside the old centered 28px target, inside the new painted circle.
+    await page.mouse.click(bounds.x + 4, bounds.y + bounds.height / 2);
+    await expect(input).toHaveValue("");
+    const stop = page.getByRole("button", { name: "Stop agent", exact: true });
+    await expect(stop).toBeVisible();
+    await expect.poll(async () => (await stop.boundingBox())?.width).toBe(48);
+    await expect.poll(async () => (await stop.boundingBox())?.height).toBe(48);
+    const stopBounds = (await stop.boundingBox())!;
+    await page.mouse.click(stopBounds.x + 4, stopBounds.y + stopBounds.height / 2);
+    await expect(stop).not.toBeVisible({ timeout: 30_000 });
+  } finally {
+    await workspace.cleanup();
+  }
 });
