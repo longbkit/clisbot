@@ -61,5 +61,5 @@ export function MobileToolbar() {
   );
 }
 const styles = StyleSheet.create((theme) => ({
-  toolbar: { backgroundColor: theme.colors.surfaceSidebar },
+  toolbar: { backgroundColor: theme.colors.surface0 },
 }));

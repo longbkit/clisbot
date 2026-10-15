@@ -37,6 +37,7 @@ Recent below; New workspace does not. Each group title is the way into Inbox (ti
 chevron); there is no separate Open Inbox button. Recent groups by local Today, Yesterday and date.
 Home initially shows up to ten conversations per group; Show more reveals ten more per group
 until all loaded activity is visible. Needs you always counts the whole group. The compact toolbar opens the same cross-Host search on native and web without closing the Chat page underneath it.
+The compact toolbar and bottom navigation use the same `surface0` theme surface, including their safe-area strips.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
 
