@@ -20,6 +20,10 @@ import {
 } from "@/screens/workspace/workspace-tab-menu";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 
+// The non-header count trigger retains its existing vertical touch clearance.
+// The identity trigger already has its own 48px actual touch target.
+const TAB_SWITCHER_TRIGGER_HIT_SLOP = { top: 8, bottom: 8 } as const;
+
 function getFallbackTabOptionLabel(
   tab: WorkspaceTabDescriptor,
   labels: {
@@ -482,6 +486,7 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
           .join(". ")}
         accessibilityState={triggerAccessibilityState}
         style={triggerStyle}
+        hitSlop={children ? undefined : TAB_SWITCHER_TRIGGER_HIT_SLOP}
         onPress={handleOpenSwitcher}
       >
         {children ?? (
