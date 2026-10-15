@@ -2350,6 +2350,145 @@ describe("HostRuntimeStore", () => {
     store.syncHosts([]);
   });
 
+  it("keeps rename and connection state unchanged when the registry cannot be saved", async () => {
+    const host = makeHost({ serverId: "srv_quota" });
+    const storage = createMemoryHostRuntimeStorage();
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
+    const store = createAppearanceStore(storage);
+    const loaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
+    store.boot();
+    await loaded;
+    const before = store.getHosts();
+    storage.setItem = async () => {
+      throw new DOMException("Full", "QuotaExceededError");
+    };
+    await expect(store.renameHost(host.serverId, "not saved")).rejects.toThrow(
+      "Could not save Host connections",
+    );
+    await expect(
+      store.upsertDirectConnection({ serverId: host.serverId, endpoint: "offline:9999" }),
+    ).rejects.toThrow("Could not save Host connections");
+    expect(store.getHosts()).toEqual(before);
+    store.syncHosts([]);
+  });
+
+  it("preserves concurrent registry edits while a durable save is delayed", async () => {
+    const host = makeHost({ serverId: "srv_concurrent" });
+    const storage = createMemoryHostRuntimeStorage();
+    await storage.setItem("@clisbot:daemon-registry", JSON.stringify([host]));
+    await storage.setItem("@clisbot:e2e", "1");
+    const store = createAppearanceStore(storage);
+    const loaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
+    store.boot();
+    await loaded;
+    const firstWrite = createDeferred<void>();
+    const writeStarted = createDeferred<void>();
+    const originalSet = storage.setItem;
+    let writes = 0;
+    storage.setItem = async (key, value) => {
+      if (key === "@clisbot:daemon-registry" && ++writes === 1) {
+        writeStarted.resolve();
+        await firstWrite.promise;
+      }
+      await originalSet(key, value);
+    };
+    const rename = store.renameHost(host.serverId, "saved name");
+    await writeStarted.promise;
+    const color = store.setHostColor(host.serverId, "teal");
+    expect(store.getHosts()[0]?.label).toBe(host.label);
+    firstWrite.resolve();
+    await Promise.all([rename, color]);
+    expect(store.getHosts()[0]).toMatchObject({
+      label: "saved name",
+      appearance: { color: "teal" },
+    });
+    expect(JSON.parse((await storage.getItem("@clisbot:daemon-registry"))!)[0]).toMatchObject({
+      label: "saved name",
+      appearance: { color: "teal" },
+    });
+    store.syncHosts([]);
+  });
+
+  it("does not resurrect managed access when removal overlaps a delayed Host rename", async () => {
+    const overlapManagement: HubHostManagement = {
+      kind: "hub",
+      hubOrigin: "https://fixture.test",
+      organizationId: "fixture",
+      daemonId: "fixture-daemon",
+      manualConnectionIds: ["direct:lan:6868"],
+    };
+    const host = makeHost({ serverId: "srv_overlap", management: overlapManagement });
+    const storage = createMemoryHostRuntimeStorage({
+      "@clisbot:daemon-registry": JSON.stringify([host]),
+      "@clisbot:e2e": "1",
+    });
+    const store = createPairingStore({ storage });
+    vi.spyOn(store, "restartHostConnection").mockResolvedValue();
+    const loaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
+    store.boot();
+    await loaded;
+    const held = createDeferred<void>();
+    const started = createDeferred<void>();
+    const originalSet = storage.setItem;
+    let writes = 0;
+    storage.setItem = async (key, value) => {
+      if (key === "@clisbot:daemon-registry" && ++writes === 1) {
+        started.resolve();
+        await held.promise;
+      }
+      await originalSet(key, value);
+    };
+    const rename = store.renameHost(host.serverId, "saved name");
+    await started.promise;
+    const removal = store.removeManagedHost(overlapManagement);
+    held.resolve();
+    await Promise.all([rename, removal]);
+    expect(store.getHosts()[0]).not.toHaveProperty("management");
+    expect(store.getHosts()[0]?.label).toBe("saved name");
+    expect(JSON.parse((await storage.getItem("@clisbot:daemon-registry"))!)[0]).not.toHaveProperty(
+      "management",
+    );
+    store.syncHosts([]);
+  });
+
+  it("keeps a proved new server identity when an older registry mutation finishes late", async () => {
+    const host = makeHost({ serverId: "srv_old" });
+    const storage = createMemoryHostRuntimeStorage({
+      "@clisbot:daemon-registry": JSON.stringify([host]),
+      "@clisbot:e2e": "1",
+    });
+    const store = createPairingStore({ storage });
+    const loaded = onceHostListMatches(store, () => store.isHostRegistryLoaded());
+    store.boot();
+    await loaded;
+    const held = createDeferred<void>();
+    const started = createDeferred<void>();
+    const originalSet = storage.setItem;
+    let writes = 0;
+    storage.setItem = async (key, value) => {
+      if (key === "@clisbot:daemon-registry" && ++writes === 1) {
+        started.resolve();
+        await held.promise;
+      }
+      await originalSet(key, value);
+    };
+    const rename = store.renameHost(host.serverId, "stale rename");
+    const rejected = expect(rename).rejects.toThrow("Host registry changed while saving");
+    await started.promise;
+    store.reconcileServerId("srv_old", "srv_proved");
+    expect(store.getHosts()[0]?.serverId).toBe("srv_proved");
+    held.resolve();
+    await rejected;
+    expect(store.getHosts().map((currentHost) => currentHost.serverId)).toEqual(["srv_proved"]);
+    await vi.waitFor(async () =>
+      expect(JSON.parse((await storage.getItem("@clisbot:daemon-registry"))!)[0]?.serverId).toBe(
+        "srv_proved",
+      ),
+    );
+    store.syncHosts([]);
+  });
+
   it("serializes overlapping host appearance writes", async () => {
     const host = makeHost({ serverId: "srv_appearance" });
     const storage = createMemoryHostRuntimeStorage();
@@ -2372,8 +2511,7 @@ describe("HostRuntimeStore", () => {
 
     const color = store.setHostColor("srv_appearance", "teal");
     const display = store.setHostBadgeDisplay("srv_appearance", "icon");
-    await Promise.resolve();
-    expect(writeCount).toBe(1);
+    await vi.waitFor(() => expect(writeCount).toBe(1));
 
     firstWrite.resolve();
     await Promise.all([color, display]);
@@ -3877,6 +4015,7 @@ describe("HostRuntimeStore", () => {
 
   it("renameHost updates label in memory", async () => {
     const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
       deps: {
         createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
         connectToDaemon: async ({ host }) => ({
@@ -3897,9 +4036,7 @@ describe("HostRuntimeStore", () => {
     });
     expect(store.getHosts().find((h) => h.serverId === "srv_rename")?.label).toBe("old name");
 
-    // persistHosts may throw in test env (no AsyncStorage/window), but the
-    // in-memory state should still be updated by setHostsAndSync.
-    await store.renameHost("srv_rename", "new name").catch(() => undefined);
+    await store.renameHost("srv_rename", "new name");
 
     const renamed = store.getHosts().find((h) => h.serverId === "srv_rename");
     expect(renamed?.label).toBe("new name");

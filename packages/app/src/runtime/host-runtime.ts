@@ -1,6 +1,7 @@
 import { hubOnlyPairingTarget } from "@/device-access/pairing-target";
 import { useSyncExternalStore, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { persistHostRegistry, type ProviderCacheStorage } from "@/storage/provider-cache-pressure";
 import equal from "fast-deep-equal/es6";
 import {
   DaemonClient,
@@ -296,7 +297,7 @@ export interface HostRuntimeControllerDeps {
   }) => () => void;
 }
 
-export interface HostRuntimeStorage {
+export interface HostRuntimeStorage extends ProviderCacheStorage {
   getItem: (key: string) => Promise<string | null>;
   setItem: (key: string, value: string) => Promise<void>;
   removeItem: (key: string) => Promise<void>;
@@ -1677,7 +1678,7 @@ export class HostRuntimeStore {
   private hostListVersion = 0;
   private hostRegistryLoaded = false;
   private hosts: HostProfile[] = [];
-  private hostAppearanceMutationTail: Promise<void> = Promise.resolve();
+  private hostRegistryMutationTail: Promise<void> = Promise.resolve();
   private hostRegistryStatus: HostRegistryStatus = "loading";
   private deps: HostRuntimeControllerDeps;
   private lastConnectionStatusByServer = new Map<string, HostRuntimeConnectionStatus>();
@@ -2328,41 +2329,43 @@ export class HostRuntimeStore {
     management: HubHostManagement;
     label?: string;
   }): Promise<HostProfile | null> {
-    const existing = this.hosts.find((host) => host.serverId === input.offer.serverId);
-    if (
-      existing &&
-      (!provesOfferedDaemon(existing, input.offer) ||
-        (existing.management && !sameHubManagement(existing.management, input.management)))
-    )
-      return null;
-    const connections = offerConnections(input.offer);
-    const now = new Date().toISOString();
-    const management = withManualConnections(input.management, existing);
-    const profile: HostProfile = {
-      serverId: input.offer.serverId,
-      label: input.label ?? input.offer.serverId,
-      appearance: defaultHostAppearance(),
-      lifecycle: {},
-      createdAt: now,
-      ...existing,
-      devicePairing: {
-        backendId: input.offer.serverId,
-        daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
-      },
-      management,
-      connections: [
-        ...connections,
-        ...(existing?.connections ?? []).filter(
-          (old) => !connections.some((next) => next.id === old.id),
-        ),
-      ],
-      preferredConnectionId: connections[0]!.id,
-      updatedAt: now,
-    };
-    const next = [...this.hosts.filter((host) => host.serverId !== profile.serverId), profile];
-    await this.persistHosts(next);
-    this.setHostsAndSync(next);
-    return profile;
+    return this.withHostRegistryMutation(async () => {
+      const existing = this.hosts.find((host) => host.serverId === input.offer.serverId);
+      if (
+        existing &&
+        (!provesOfferedDaemon(existing, input.offer) ||
+          (existing.management && !sameHubManagement(existing.management, input.management)))
+      )
+        return null;
+      const connections = offerConnections(input.offer);
+      const now = new Date().toISOString();
+      const management = withManualConnections(input.management, existing);
+      const profile: HostProfile = {
+        serverId: input.offer.serverId,
+        label: input.label ?? input.offer.serverId,
+        appearance: defaultHostAppearance(),
+        lifecycle: {},
+        createdAt: now,
+        ...existing,
+        devicePairing: {
+          backendId: input.offer.serverId,
+          daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
+        },
+        management,
+        connections: [
+          ...connections,
+          ...(existing?.connections ?? []).filter(
+            (old) => !connections.some((next) => next.id === old.id),
+          ),
+        ],
+        preferredConnectionId: connections[0]!.id,
+        updatedAt: now,
+      };
+      const next = [...this.hosts.filter((host) => host.serverId !== profile.serverId), profile];
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+      return profile;
+    });
   }
 
   private async upsertDevicePairingOffer(
@@ -2370,28 +2373,30 @@ export class HostRuntimeStore {
     label?: string,
     deviceLabel?: string,
   ): Promise<HostProfile> {
-    if (offer.managedAccessMode === "external")
-      throw new Error(
-        "Pair the Hub for this managed Host, then sign in to load your granted Hosts",
-      );
-    const existing = this.hosts.find((host) => host.serverId === offer.serverId);
-    const profile = devicePairedHost({ offer, existing, label });
-    const hostname = await pairDaemon(offer, profile, deviceLabel);
-    if (!label && !existing && hostname) profile.label = hostname;
-    const next = [...this.hosts.filter((host) => host.serverId !== profile.serverId), profile];
-    await this.persistHosts(next);
-    this.setHostsAndSync(next);
-    if (offer.hub) {
-      try {
-        await pairHub(offer.hub, deviceLabel);
-      } catch (error) {
+    return this.withHostRegistryMutation(async () => {
+      if (offer.managedAccessMode === "external")
         throw new Error(
-          `Daemon paired and saved. Hub pairing needs a retry with the same link: ${error instanceof Error ? error.message : String(error)}`,
-          { cause: error },
+          "Pair the Hub for this managed Host, then sign in to load your granted Hosts",
         );
+      const existing = this.hosts.find((host) => host.serverId === offer.serverId);
+      const profile = devicePairedHost({ offer, existing, label });
+      const hostname = await pairDaemon(offer, profile, deviceLabel);
+      if (!label && !existing && hostname) profile.label = hostname;
+      const next = [...this.hosts.filter((host) => host.serverId !== profile.serverId), profile];
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+      if (offer.hub) {
+        try {
+          await pairHub(offer.hub, deviceLabel);
+        } catch (error) {
+          throw new Error(
+            `Daemon paired and saved. Hub pairing needs a retry with the same link: ${error instanceof Error ? error.message : String(error)}`,
+            { cause: error },
+          );
+        }
       }
-    }
-    return profile;
+      return profile;
+    });
   }
 
   private async probeAndUpsertOffer(
@@ -2441,12 +2446,14 @@ export class HostRuntimeStore {
     serverId: string,
     apply: (host: HostProfile) => HostProfile,
   ): Promise<void> {
-    const updatedAt = new Date().toISOString();
-    const next = this.hosts.map((host) =>
-      host.serverId === serverId ? { ...apply(host), updatedAt } : host,
-    );
-    this.setHostsAndSync(next);
-    await this.persistHosts();
+    return this.withHostRegistryMutation(async () => {
+      const updatedAt = new Date().toISOString();
+      const next = this.hosts.map((host) =>
+        host.serverId === serverId ? { ...apply(host), updatedAt } : host,
+      );
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+    });
   }
 
   async renameHost(serverId: string, label: string): Promise<void> {
@@ -2478,88 +2485,104 @@ export class HostRuntimeStore {
     serverId: string,
     apply: (host: HostProfile) => HostProfile,
   ): Promise<void> {
-    const update = this.hostAppearanceMutationTail.then(() =>
-      this.applyHostAppearance(serverId, apply),
+    return this.applyHostAppearance(serverId, apply);
+  }
+
+  private withHostRegistryMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const mutation = this.hostRegistryMutationTail.then(operation);
+    this.hostRegistryMutationTail = mutation.then(
+      () => undefined,
+      () => undefined,
     );
-    this.hostAppearanceMutationTail = update.catch(() => undefined);
-    return update;
+    return mutation;
   }
 
   private async applyHostAppearance(
     serverId: string,
     apply: (host: HostProfile) => HostProfile,
   ): Promise<void> {
-    const updatedAt = new Date().toISOString();
-    const next = this.hosts.map((host) =>
-      host.serverId === serverId ? { ...apply(host), updatedAt } : host,
-    );
-    await this.persistHosts(next);
-    this.setHostsAndSync(next);
+    return this.withHostRegistryMutation(async () => {
+      const updatedAt = new Date().toISOString();
+      const next = this.hosts.map((host) =>
+        host.serverId === serverId ? { ...apply(host), updatedAt } : host,
+      );
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+    });
   }
 
   async removeHost(serverId: string): Promise<void> {
+    return this.withHostRegistryMutation(() => this.applyHostRemoval(serverId));
+  }
+
+  private async applyHostRemoval(serverId: string): Promise<void> {
     await this.revokePushNotifications({ client: this.getClient(serverId), serverId });
     const remaining = this.hosts.filter((daemon) => daemon.serverId !== serverId);
+    await this.persistHosts(remaining);
     this.setHostsAndSync(remaining);
-    await this.persistHosts();
   }
 
   async removeManagedHost(management: HubHostManagement, reason = "unspecified"): Promise<boolean> {
-    const host = this.hosts.find(
-      (candidate) =>
-        candidate.management?.kind === "hub" && sameHubManagement(candidate.management, management),
-    );
-    if (!host) return false;
-    recordHostDiagnostic("managed-host-removed", {
-      reason,
-      serverId: host.serverId,
-      daemonId: management.daemonId,
-      label: host.label,
-      stack: diagnosticStack(),
-    });
-    const manualConnectionIds = host.management?.manualConnectionIds;
-    if (manualConnectionIds === undefined) {
-      await this.removeHost(host.serverId);
+    return this.withHostRegistryMutation(async () => {
+      const host = this.hosts.find(
+        (candidate) =>
+          candidate.management?.kind === "hub" &&
+          sameHubManagement(candidate.management, management),
+      );
+      if (!host) return false;
+      recordHostDiagnostic("managed-host-removed", {
+        reason,
+        serverId: host.serverId,
+        daemonId: management.daemonId,
+        label: host.label,
+        stack: diagnosticStack(),
+      });
+      const manualConnectionIds = host.management?.manualConnectionIds;
+      if (manualConnectionIds === undefined) {
+        await this.applyHostRemoval(host.serverId);
+        return true;
+      }
+      const next = this.hosts.map((candidate) =>
+        candidate === host ? restoreManualHost(host, manualConnectionIds) : candidate,
+      );
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+      // A revoked managed client stops reconnecting; the restored Host needs a fresh one.
+      await this.restartHostConnection(host.serverId);
       return true;
-    }
-    const next = this.hosts.map((candidate) =>
-      candidate === host ? restoreManualHost(host, manualConnectionIds) : candidate,
-    );
-    await this.persistHosts(next);
-    this.setHostsAndSync(next);
-    // A revoked managed client stops reconnecting; the restored Host needs a fresh one.
-    await this.restartHostConnection(host.serverId);
-    return true;
+    });
   }
 
   async removeConnection(serverId: string, connectionId: string): Promise<void> {
-    const host = this.hosts.find((candidate) => candidate.serverId === serverId);
-    if (host?.connections.length === 1 && host.connections[0]?.id === connectionId) {
-      await this.removeHost(serverId);
-      return;
-    }
-    const now = new Date().toISOString();
-    const next = this.hosts
-      .map((daemon) => {
-        if (daemon.serverId !== serverId) return daemon;
-        const remaining = daemon.connections.filter((conn) => conn.id !== connectionId);
-        if (remaining.length === 0) {
-          return null;
-        }
-        const preferred =
-          daemon.preferredConnectionId === connectionId
-            ? (remaining[0]?.id ?? null)
-            : daemon.preferredConnectionId;
-        return {
-          ...daemon,
-          connections: remaining,
-          preferredConnectionId: preferred,
-          updatedAt: now,
-        } satisfies HostProfile;
-      })
-      .filter((entry): entry is HostProfile => entry !== null);
-    this.setHostsAndSync(next);
-    await this.persistHosts();
+    return this.withHostRegistryMutation(async () => {
+      const host = this.hosts.find((candidate) => candidate.serverId === serverId);
+      if (host?.connections.length === 1 && host.connections[0]?.id === connectionId) {
+        await this.applyHostRemoval(serverId);
+        return;
+      }
+      const now = new Date().toISOString();
+      const next = this.hosts
+        .map((daemon) => {
+          if (daemon.serverId !== serverId) return daemon;
+          const remaining = daemon.connections.filter((conn) => conn.id !== connectionId);
+          if (remaining.length === 0) {
+            return null;
+          }
+          const preferred =
+            daemon.preferredConnectionId === connectionId
+              ? (remaining[0]?.id ?? null)
+              : daemon.preferredConnectionId;
+          return {
+            ...daemon,
+            connections: remaining,
+            preferredConnectionId: preferred,
+            updatedAt: now,
+          } satisfies HostProfile;
+        })
+        .filter((entry): entry is HostProfile => entry !== null);
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+    });
   }
 
   private async upsertHostConnection(input: {
@@ -2570,37 +2593,37 @@ export class HostRuntimeStore {
     management?: HubHostManagement;
     existingClient?: DaemonClient;
   }): Promise<HostProfile> {
-    const now = new Date().toISOString();
-    const next = upsertHostConnectionInProfiles({
-      profiles: this.hosts,
-      serverId: input.serverId,
-      label: input.label,
-      connection: input.connection,
-      ...(input.management ? { management: input.management } : {}),
-      password: input.password,
-      now,
+    return this.withHostRegistryMutation(async () => {
+      const now = new Date().toISOString();
+      const next = upsertHostConnectionInProfiles({
+        profiles: this.hosts,
+        serverId: input.serverId,
+        label: input.label,
+        connection: input.connection,
+        ...(input.management ? { management: input.management } : {}),
+        password: input.password,
+        now,
+      });
+      await this.persistHosts(next);
+      this.setHostsAndSync(next, {
+        initialConnectionByServerId: input.existingClient
+          ? new Map([
+              [
+                input.serverId,
+                {
+                  connectionId: input.connection.id,
+                  existingClient: input.existingClient,
+                },
+              ],
+            ])
+          : undefined,
+      });
+      const profile = next.find((daemon) => daemon.serverId === input.serverId);
+      if (!profile) {
+        throw new Error(`Host ${input.serverId} was not inserted`);
+      }
+      return profile;
     });
-    this.setHostsAndSync(next, {
-      initialConnectionByServerId: input.existingClient
-        ? new Map([
-            [
-              input.serverId,
-              {
-                connectionId: input.connection.id,
-                existingClient: input.existingClient,
-              },
-            ],
-          ])
-        : undefined,
-    });
-    void this.persistHosts().catch((error) =>
-      console.error("[HostRuntime] Failed to persist host registry", error),
-    );
-    const profile = next.find((daemon) => daemon.serverId === input.serverId);
-    if (!profile) {
-      throw new Error(`Host ${input.serverId} was not inserted`);
-    }
-    return profile;
   }
 
   private setHostsAndSync(
@@ -2618,7 +2641,13 @@ export class HostRuntimeStore {
   }
 
   private async persistHosts(hosts = this.hosts): Promise<void> {
-    await this.storage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(hosts));
+    const expectedHosts = this.hosts;
+    await persistHostRegistry(this.storage, REGISTRY_STORAGE_KEY, JSON.stringify(hosts));
+    // Proved identity reconciliation remains synchronous. Its authoritative save is
+    // already queued; a delayed user edit must not reinstall its stale profile.
+    if (hosts !== expectedHosts && this.hosts !== expectedHosts) {
+      throw new Error("Host registry changed while saving. Retry the change on the current Host.");
+    }
   }
 
   private emitHostList(): void {
