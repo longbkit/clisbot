@@ -13,6 +13,7 @@ import {
   ConversationHeader,
   ConversationBotSelector,
   ConversationBotChooser,
+  type ConversationHeadingRenderer,
 } from "./conversation-header";
 import { ConversationContextProviders } from "./conversation-context-providers";
 import { ConversationTabsContext } from "./conversation-tabs-context";
@@ -71,13 +72,14 @@ export function ConversationWorkspace({
     () => (bots.length > 1 ? <ConversationBotSelector project={project} /> : null),
     [bots.length, project],
   );
-  const header = () => (
+  const header = (renderHeading?: ConversationHeadingRenderer) => (
     <ConversationHeader
       {...{ serverId, title, project, singlePanel, selector, headerActions, openExplorer, group }}
       headingActions={headingActions}
       avatar={avatar}
       memberCount={bots.length}
       tabCount={state.mainTabs.length}
+      renderHeading={renderHeading}
     />
   );
   const surface = { serverId, focused, state, actions, header };

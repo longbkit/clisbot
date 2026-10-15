@@ -2,7 +2,7 @@ import { useConversationProjectContext } from "./conversation-project-context";
 import { rememberCoworkOrigin } from "./cowork-return";
 import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { botsSessionScope } from "../data/session-scope";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { View, Text } from "react-native";
 import { useTranslation } from "react-i18next";
 import { PanelsTopLeft } from "lucide-react-native";
@@ -19,12 +19,15 @@ export function ParticipantActions({
   participants,
   workspaceByBotId,
   group = false,
+  renderTrigger,
 }: {
   serverId: string;
   chatId?: string;
   participants: readonly ChatParticipantPayload[];
   workspaceByBotId?: ReadonlyMap<string, string>;
   group?: boolean;
+  /** A compact header can expose the same action from its existing options menu. */
+  renderTrigger?: (onPress: () => void) => ReactNode;
 }) {
   const { t } = useTranslation();
   const project = useConversationProjectContext();
@@ -60,12 +63,16 @@ export function ParticipantActions({
   }, [group, participants, serverId, remember, project?.botId]);
   return (
     <>
-      <ChatHeaderAction
-        label={t("bots.chat.common.openInCowork")}
-        text={t("bots.chat.cowork.text")}
-        icon={PanelsTopLeft}
-        onPress={open}
-      />
+      {renderTrigger ? (
+        renderTrigger(open)
+      ) : (
+        <ChatHeaderAction
+          label={t("bots.chat.common.openInCowork")}
+          text={t("bots.chat.cowork.text")}
+          icon={PanelsTopLeft}
+          onPress={open}
+        />
+      )}
       <AdaptiveModalSheet visible={visible} onClose={close} header={header}>
         <View style={styles.body}>
           {participants.map((participant) => (

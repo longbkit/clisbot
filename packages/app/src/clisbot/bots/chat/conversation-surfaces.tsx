@@ -1,4 +1,4 @@
-import { useState, useMemo, type ComponentProps, type ReactNode } from "react";
+import { useState, useMemo, useCallback, type ComponentProps, type ReactNode } from "react";
 import { View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,8 @@ import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import type { useConversationLayout } from "./use-conversation-layout";
 import type { useConversationTabs } from "./use-conversation-tabs";
 import type { useConversationProject } from "./use-conversation-project";
+import type { ConversationHeadingRenderer } from "./conversation-header";
+import { ConversationHeading } from "./conversation-heading";
 const noop = () => {};
 const EMPTY_CLOSING = new Set<string>();
 const fill = { flex: 1, minHeight: 0, minWidth: 0 } as const;
@@ -26,7 +28,7 @@ interface SurfaceProps {
   focused: boolean;
   state: TabState;
   actions: TabActions;
-  header: () => ReactNode;
+  header: (renderHeading?: ConversationHeadingRenderer) => ReactNode;
 }
 const clipboardActions = {
   onCopyResumeCommand: noop,
@@ -74,7 +76,10 @@ function ConversationSwitcher({
   serverId,
   state,
   actions,
-}: Pick<SurfaceProps, "serverId" | "state" | "actions">) {
+  identityLabel,
+  renderTrigger,
+}: Pick<SurfaceProps, "serverId" | "state" | "actions"> &
+  Pick<ComponentProps<typeof MobileWorkspaceTabSwitcher>, "identityLabel" | "renderTrigger">) {
   const { t } = useTranslation();
   const { mainTabs, active } = state;
   const closeActions = useMemo(
@@ -100,6 +105,8 @@ function ConversationSwitcher({
   return (
     <MobileWorkspaceTabSwitcher
       {...clipboardActions}
+      identityLabel={identityLabel}
+      renderTrigger={renderTrigger}
       tabs={mainTabs}
       activeTabKey={active?.key ?? ""}
       tabSwitcherOptions={mainTabs.map((tab) => {
@@ -113,6 +120,26 @@ function ConversationSwitcher({
       onSelectSwitcherTab={actions.selectTab}
       onCloseTab={actions.closeTab}
       {...closeActions}
+    />
+  );
+}
+function ConversationIdentitySwitcher({
+  heading,
+  ...surface
+}: Pick<SurfaceProps, "serverId" | "state" | "actions"> & {
+  heading: ComponentProps<typeof ConversationHeading>;
+}) {
+  const renderTrigger = useCallback(
+    ({ onPress, expanded }: { onPress: () => void; expanded: boolean }) => (
+      <ConversationHeading {...heading} onPress={onPress} expanded={expanded} />
+    ),
+    [heading],
+  );
+  return (
+    <ConversationSwitcher
+      {...surface}
+      identityLabel={heading.title}
+      renderTrigger={renderTrigger}
     />
   );
 }
@@ -131,6 +158,17 @@ export function MobileConversationSurface({
   compact: boolean;
 }) {
   const { width } = useWindowDimensions();
+  const renderHeading = useCallback<ConversationHeadingRenderer>(
+    (heading) => (
+      <ConversationIdentitySwitcher
+        serverId={serverId}
+        state={state}
+        actions={actions}
+        heading={heading}
+      />
+    ),
+    [serverId, state, actions],
+  );
   const explorer =
     project.source && project.cwd && focused
       ? {
@@ -145,8 +183,10 @@ export function MobileConversationSurface({
   return (
     <View style={[fill, { flexDirection: "row" }]}>
       <View style={fill}>
-        {header()}
-        <ConversationSwitcher serverId={serverId} state={state} actions={actions} />
+        {header(compact ? renderHeading : undefined)}
+        {!compact ? (
+          <ConversationSwitcher serverId={serverId} state={state} actions={actions} />
+        ) : null}
         <View style={fill}>
           <WorkspacePanelHost
             paneId="conversation-mobile"

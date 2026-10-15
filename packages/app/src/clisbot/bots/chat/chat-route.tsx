@@ -5,6 +5,7 @@ import { ConversationWorkspace } from "./conversation-workspace";
 import { useChatVisibility } from "./use-chat-visibility";
 import { useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { botsSessionScope, scopedTranscriptKey } from "../data/session-scope";
 import { useIsFocused } from "@react-navigation/native";
 import { useChatLiveHeads } from "./use-chat-live-heads";
@@ -99,7 +100,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const working = group && [...heads.values()].some((head) => head.turnActive);
   // Clisbot Connectors: the Chat's own tools off list, for the composer's Tools chip.
   const chatTools = useChatToolsValue({ serverId, chat, bots: identities, group, client });
-  const headingActions = useChatHeadingActions({ chat, serverId, botRows });
+  const headingActions = useChatHeadingActions({ chat, serverId, botRows, workspaceByBotId });
   // Clisbot: a direct chat shows tool calls as its Bot says, a group as the group says.
   const directBot = !group ? botRows.find((b) => b.id === chat?.participants[0]?.botId) : undefined;
   const toolDisplay = conversationToolDisplay(chat, group, directBot);
@@ -220,21 +221,24 @@ function useChatHeaderOptions({
   working: boolean;
   setError: (value: string | null) => void;
 }) {
+  const compact = useIsCompactFormFactor();
   return useMemo(
     () =>
       chat ? (
         <View style={styles.actions}>
           <StopAllAction serverId={serverId} chatId={chatId} working={working} onError={setError} />
-          <ParticipantActions
-            workspaceByBotId={workspaceByBotId}
-            chatId={chatId}
-            serverId={serverId}
-            participants={chat.participants}
-            group={isGroupChat(chat)}
-          />
+          {!compact ? (
+            <ParticipantActions
+              workspaceByBotId={workspaceByBotId}
+              chatId={chatId}
+              serverId={serverId}
+              participants={chat.participants}
+              group={isGroupChat(chat)}
+            />
+          ) : null}
         </View>
       ) : null,
-    [chat, chatId, serverId, workspaceByBotId, working, setError],
+    [chat, chatId, serverId, workspaceByBotId, working, setError, compact],
   );
 }
 
@@ -243,20 +247,27 @@ function useChatHeadingActions({
   chat,
   serverId,
   botRows,
+  workspaceByBotId,
 }: {
   chat: ChatPayload | null;
   serverId: string;
   botRows: ChatIdentities["botRows"];
+  workspaceByBotId: ChatIdentities["workspaceByBotId"];
 }) {
   return useMemo(
     () =>
       chat ? (
         <>
-          <ChatOptions serverId={serverId} chat={chat} bots={botRows} />
+          <ChatOptions
+            serverId={serverId}
+            chat={chat}
+            bots={botRows}
+            workspaceByBotId={workspaceByBotId}
+          />
           <ChatHeartbeatsButton serverId={serverId} chat={chat} />
         </>
       ) : null,
-    [botRows, chat, serverId],
+    [botRows, chat, serverId, workspaceByBotId],
   );
 }
 

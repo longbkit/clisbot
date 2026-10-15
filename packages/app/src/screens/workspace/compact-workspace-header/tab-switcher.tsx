@@ -134,6 +134,8 @@ function getFallbackTabOptionDescription(
 interface MobileWorkspaceTabSwitcherProps {
   /** Header identity replaces the count trigger; other existing surfaces keep their trigger. */
   children?: ReactNode;
+  /** Identities with an independent subtitle action keep their triggers as siblings. */
+  renderTrigger?: (props: { onPress: () => void; expanded: boolean }) => ReactNode;
   identityLabel?: string;
   workspaceDirectory?: string | null;
   tabSwitcherOptions?: ComboboxOption[];
@@ -287,6 +289,7 @@ function MobileWorkspaceTabOption({
 
 export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
   children,
+  renderTrigger,
   identityLabel,
   tabs,
   activeTabKey,
@@ -474,27 +477,37 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
 
   return (
     <>
-      <Pressable
-        ref={anchorRef}
-        testID="workspace-tab-switcher-trigger"
-        accessibilityRole="button"
-        accessibilityLabel={[
-          identityLabel,
-          t("workspace.tabs.switcher.trigger", { count: tabs.length }),
-        ]
-          .filter(Boolean)
-          .join(". ")}
-        accessibilityState={triggerAccessibilityState}
-        style={triggerStyle}
-        hitSlop={children ? undefined : TAB_SWITCHER_TRIGGER_HIT_SLOP}
-        onPress={handleOpenSwitcher}
-      >
-        {children ?? (
-          <View style={styles.tabCountBadge}>
-            <Text style={styles.tabCountText}>{tabs.length}</Text>
-          </View>
-        )}
-      </Pressable>
+      {renderTrigger ? (
+        <View
+          ref={anchorRef}
+          style={styles.identityContainer}
+          testID="workspace-tab-switcher-trigger"
+        >
+          {renderTrigger({ onPress: handleOpenSwitcher, expanded: isOpen })}
+        </View>
+      ) : (
+        <Pressable
+          ref={anchorRef}
+          testID="workspace-tab-switcher-trigger"
+          accessibilityRole="button"
+          accessibilityLabel={[
+            identityLabel,
+            t("workspace.tabs.switcher.trigger", { count: tabs.length }),
+          ]
+            .filter(Boolean)
+            .join(". ")}
+          accessibilityState={triggerAccessibilityState}
+          style={triggerStyle}
+          hitSlop={children ? undefined : TAB_SWITCHER_TRIGGER_HIT_SLOP}
+          onPress={handleOpenSwitcher}
+        >
+          {children ?? (
+            <View style={styles.tabCountBadge}>
+              <Text style={styles.tabCountText}>{tabs.length}</Text>
+            </View>
+          )}
+        </Pressable>
+      )}
 
       <Combobox
         options={tabSwitcherOptions}
@@ -514,6 +527,7 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
 });
 
 const styles = StyleSheet.create((theme) => ({
+  identityContainer: { minWidth: 0, flexShrink: 1 },
   tabSwitcherFooter: {
     flexDirection: "row",
     gap: theme.spacing[3],

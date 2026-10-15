@@ -1,5 +1,6 @@
 import { useChatOptionsState } from "./chat-options-context";
 import { Ellipsis } from "lucide-react-native";
+import { ParticipantActions } from "./participant-actions";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -27,11 +28,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import type { MenuTriggerState } from "@/components/ui/menu";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   iconButtonChromeGlyphSize,
-  iconButtonChromeStyle,
+  useIconButtonChromeStyle,
   extraMutedIconColorMapping,
 } from "@/components/ui/icon-button-chrome";
 import { useConversationProjectContext } from "./conversation-project-context";
@@ -42,11 +42,14 @@ export function ChatOptions({
   serverId,
   chat,
   bots,
+  workspaceByBotId,
 }: {
   serverId: string;
   chat: ChatPayload;
   bots: BotPayload[];
+  workspaceByBotId?: ReadonlyMap<string, string>;
 }) {
+  const compact = useIsCompactFormFactor();
   const active = useRetainedPanelActive();
   const { setVisible } = useChatOptionsState();
   const [detail, setDetail] = useState<ChatOptionsDetail>(null);
@@ -76,15 +79,39 @@ export function ChatOptions({
     archive: membership.archive,
   });
   const busy = membership.busy || !membership.connected;
-  return (
-    <>
+  const renderCompactMenu = useCallback(
+    (onOpenCowork: () => void) => (
       <ChatOptionsMenu
         group={group}
         actions={actions}
         onAction={runAction}
         onOpenProject={openProject}
+        onOpenCowork={onOpenCowork}
         archiveDisabled={busy}
       />
+    ),
+    [group, actions, runAction, openProject, busy],
+  );
+  return (
+    <>
+      {compact ? (
+        <ParticipantActions
+          serverId={serverId}
+          chatId={chat.id}
+          participants={chat.participants}
+          workspaceByBotId={workspaceByBotId}
+          group={group}
+          renderTrigger={renderCompactMenu}
+        />
+      ) : (
+        <ChatOptionsMenu
+          group={group}
+          actions={actions}
+          onAction={runAction}
+          onOpenProject={openProject}
+          archiveDisabled={busy}
+        />
+      )}
       <ChatOptionsDetailsSheet
         active={active}
         detail={detail}
@@ -111,20 +138,21 @@ function ChatOptionsMenu({
   onAction,
   onOpenProject,
   archiveDisabled,
+  onOpenCowork,
 }: {
   group: boolean;
   actions: readonly ChatResourceAction[];
   onAction: (id: ChatResourceActionId) => void;
   onOpenProject: () => void;
   archiveDisabled: boolean;
+  onOpenCowork?: () => void;
 }) {
   const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
-  const triggerStyle = useCallback(
-    (state: MenuTriggerState) =>
-      iconButtonChromeStyle({ size: "large", state, style: compact && styles.touchTarget }),
-    [compact],
-  );
+  const triggerStyle = useIconButtonChromeStyle({
+    size: "large",
+    style: compact && styles.touchTarget,
+  });
   const { visible, setVisible } = useChatOptionsState();
   const project = useConversationProjectContext();
   const { pages, tabCount } = useChatOptionsPages(group);
@@ -158,6 +186,11 @@ function ChatOptionsMenu({
           {t("bots.chat.options.switchTab")}
         </DropdownMenuSubTrigger>
         <DropdownMenuSeparator />
+        {onOpenCowork ? (
+          <DropdownMenuItem onSelect={onOpenCowork} leading={SWITCH_TAB_ICON}>
+            {t("bots.chat.common.openInCowork")}
+          </DropdownMenuItem>
+        ) : null}
         {middle.map((action) => (
           <ResourceActionItem key={action.id} action={action} onSelect={onAction} />
         ))}

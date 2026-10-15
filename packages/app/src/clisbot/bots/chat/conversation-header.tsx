@@ -1,10 +1,13 @@
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ComponentProps, type ReactNode } from "react";
 import { View, Text } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { PanelRight } from "lucide-react-native";
 import { SidebarMenuToggle } from "@/components/headers/menu-header";
 import { ScreenHeader } from "@/components/headers/screen-header";
+import { CompactHeader } from "@/components/headers/compact-header";
+import { HomeHeaderNavigation } from "@/clisbot/home/header-navigation";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { useHosts } from "@/runtime/host-runtime";
 import { ConversationHeading } from "./conversation-heading";
 import { Combobox } from "@/components/ui/combobox";
@@ -14,6 +17,9 @@ import { ChatHeaderAction } from "./header-action";
 import type { useConversationProject } from "./use-conversation-project";
 import type { ChatBotIdentity } from "./chat-rows";
 type Project = ReturnType<typeof useConversationProject>;
+export type ConversationHeadingRenderer = (
+  props: ComponentProps<typeof ConversationHeading>,
+) => ReactNode;
 export function ConversationHeader({
   serverId,
   avatar,
@@ -27,6 +33,7 @@ export function ConversationHeader({
   group,
   memberCount,
   tabCount,
+  renderHeading,
 }: {
   serverId: string;
   avatar: ReactNode;
@@ -40,7 +47,9 @@ export function ConversationHeader({
   group: boolean;
   memberCount: number;
   tabCount: number;
+  renderHeading?: ConversationHeadingRenderer;
 }) {
+  const compact = useIsCompactFormFactor();
   const { t } = useTranslation();
   const hosts = useHosts();
   const hostName =
@@ -76,17 +85,30 @@ export function ConversationHeader({
       t,
     ],
   );
+  const heading = useMemo(() => {
+    const props = { avatar, title, group, memberCount, hostName, tabCount };
+    return renderHeading ? renderHeading(props) : <ConversationHeading {...props} />;
+  }, [avatar, title, group, memberCount, hostName, tabCount, renderHeading]);
+  const renderTitle = useCallback(() => heading, [heading]);
+  const navigationContent = useMemo(() => <HomeHeaderNavigation />, []);
+  if (compact)
+    return (
+      <CompactHeader
+        navigation="menu"
+        navigationContent={navigationContent}
+        renderTitle={renderTitle}
+        actions={
+          <>
+            {headingActions}
+            {right}
+          </>
+        }
+      />
+    );
   const left = (
     <>
       <SidebarMenuToggle />
-      <ConversationHeading
-        avatar={avatar}
-        title={title}
-        group={group}
-        memberCount={memberCount}
-        hostName={hostName}
-        tabCount={tabCount}
-      />
+      {heading}
       {headingActions ? <View style={styles.headingActions}>{headingActions}</View> : null}
     </>
   );
@@ -137,7 +159,7 @@ export function ConversationBotChooser({
   );
 }
 const styles = StyleSheet.create((theme) => ({
-  actions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  actions: { flexDirection: "row", alignItems: "center", gap: { xs: 0, md: 4 } },
   headingActions: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 },
   botSelector: {
     minHeight: { xs: 48, md: 32 },

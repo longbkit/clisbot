@@ -26,6 +26,8 @@ export function ConversationHeading({
   memberCount,
   hostName,
   tabCount,
+  onPress,
+  expanded,
 }: {
   /** The conversation's mark, the same one its sidebar row shows. */
   avatar: ReactNode;
@@ -34,13 +36,20 @@ export function ConversationHeading({
   memberCount: number;
   hostName: string;
   tabCount: number;
+  /** Compact conversation identities open the existing tab sheet instead of Chat options. */
+  onPress?: () => void;
+  expanded?: boolean;
 }) {
   const { t } = useTranslation();
   const { visible, setVisible } = useChatOptionsState();
-  const open = useCallback(() => setVisible(true), [setVisible]);
+  const openOptions = useCallback(() => setVisible(true), [setVisible]);
+  const open = onPress ?? openOptions;
+  const isExpanded = expanded ?? visible;
   const toolActivity = useChatToolActivityHeader();
   const summary = conversationHeaderSummary(group, memberCount, hostName, tabCount);
-  const accessibilityLabel = t("bots.chat.header.accessibilityLabel", { title, ...summary });
+  const accessibilityLabel = onPress
+    ? `${title}. ${t("workspace.tabs.switcher.trigger", { count: tabCount })}`
+    : t("bots.chat.header.accessibilityLabel", { title, ...summary });
   // Clisbot: the `header` tool call display takes the subtitle while a Bot's turn used tools.
   if (toolActivity?.activities.length)
     return (
@@ -48,7 +57,7 @@ export function ConversationHeading({
         avatar={avatar}
         title={title}
         accessibilityLabel={accessibilityLabel}
-        expanded={visible}
+        expanded={isExpanded}
         open={open}
       >
         <ChatToolActivityHeaderLine header={toolActivity} context={summary.context} />
@@ -60,7 +69,7 @@ export function ConversationHeading({
       style={styles.heading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      aria-expanded={visible}
+      aria-expanded={isExpanded}
       testID="conversation-header-details"
     >
       {avatar}

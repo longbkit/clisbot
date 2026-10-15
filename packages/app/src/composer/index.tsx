@@ -5,7 +5,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import { composerActionGeometry } from "./action-geometry";
 import {
   View,
   Pressable,
@@ -253,18 +253,18 @@ function resolveCheckoutRemoteUrl(
 
 function buildCancelButtonStyle(isConnected: boolean, isCancellingAgent: boolean): object[] {
   const disabled = !isConnected || isCancellingAgent ? styles.buttonDisabled : undefined;
-  return [styles.cancelButton, disabled].filter((value): value is object => Boolean(value));
+  return [composerActionGeometry.target, styles.cancelButton, disabled].filter(
+    (value): value is object => Boolean(value),
+  );
 }
 
 function buildRealtimeVoiceButtonStyle(
-  hovered: boolean | undefined,
   voiceButtonDisabled: boolean,
   reserveLeadingSpace: boolean,
 ): object[] {
-  const hoveredStyle = hovered ? styles.iconButtonHovered : undefined;
   const disabledStyle = voiceButtonDisabled ? styles.buttonDisabled : undefined;
   const reserveStyle = reserveLeadingSpace ? styles.realtimeVoiceButtonCompactReserve : undefined;
-  return [styles.realtimeVoiceButton, reserveStyle, hoveredStyle, disabledStyle].filter(
+  return [composerActionGeometry.target, reserveStyle, disabledStyle].filter(
     (value): value is object => Boolean(value),
   );
 }
@@ -1114,7 +1114,12 @@ function ComposerCancelButton({
         accessibilityRole="button"
         style={cancelButtonStyle}
       >
-        {icon}
+        <View
+          testID="composer-stop-face"
+          style={[composerActionGeometry.face, composerActionGeometry.stop]}
+        >
+          {icon}
+        </View>
       </TooltipTrigger>
       <TooltipContent side="top" align="center" offset={8}>
         <View style={styles.tooltipRow}>
@@ -1181,11 +1186,23 @@ function ComposerVoiceModeButton({
   const shortcutNode = voiceToggleKeys ? <Shortcut chord={voiceToggleKeys} /> : null;
   const renderTriggerContent = useCallback(
     ({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => {
-      if (isVoiceSwitching) {
-        return <LoadingSpinner size="small" color="white" />;
-      }
       const colorMapping = hovered ? iconForegroundMapping : iconForegroundMutedMapping;
-      return <ThemedAudioLines size={buttonIconSize} uniProps={colorMapping} />;
+      return (
+        <View
+          testID="composer-realtime-voice-face"
+          style={[
+            composerActionGeometry.face,
+            composerActionGeometry.neutral,
+            hovered && composerActionGeometry.hovered,
+          ]}
+        >
+          {isVoiceSwitching ? (
+            <LoadingSpinner size="small" color="white" />
+          ) : (
+            <ThemedAudioLines size={buttonIconSize} uniProps={colorMapping} />
+          )}
+        </View>
+      );
     },
     [buttonIconSize, isVoiceSwitching],
   );
@@ -2024,8 +2041,7 @@ function ComposerContentImpl({
   const isVoiceSwitching = voice?.isVoiceSwitching ?? false;
   const voiceButtonDisabled = !isConnected || isVoiceSwitching;
   const realtimeVoiceButtonStyle = useCallback(
-    (state: PressableStateCallbackType & { hovered?: boolean }) =>
-      buildRealtimeVoiceButtonStyle(state.hovered, voiceButtonDisabled, isCompactLayout),
+    () => buildRealtimeVoiceButtonStyle(voiceButtonDisabled, isCompactLayout),
     [isCompactLayout, voiceButtonDisabled],
   );
 
@@ -2063,7 +2079,7 @@ function ComposerContentImpl({
         hasSendableContent={hasSendableContent}
         isCompact={isCompactLayout}
         showVoice={mode.showVoice && realtimeVoiceEnabled}
-        buttonIconSize={buttonIconSize}
+        buttonIconSize={isCompactFormFactor ? ICON_SIZE.lg : buttonIconSize}
         handleToggleRealtimeVoice={handleToggleRealtimeVoice}
         isConnected={isConnected}
         isVoiceSwitching={isVoiceSwitching}
@@ -2076,6 +2092,7 @@ function ComposerContentImpl({
       pendingSessionReason,
       realtimeVoiceEnabled,
       buttonIconSize,
+      isCompactFormFactor,
       handleToggleRealtimeVoice,
       hasAgent,
       hasSendableContent,
@@ -2593,13 +2610,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
     gap: theme.spacing[3],
   },
   cancelButton: {
-    width: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
-    height: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.palette.red[600],
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: theme.spacing[1],
+    marginLeft: { xs: 0, md: theme.spacing[1] },
   },
   rightControls: {
     flexDirection: "row",
@@ -2613,15 +2624,8 @@ const styles = StyleSheet.create((theme: Theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
-  realtimeVoiceButton: {
-    width: 28,
-    height: 28,
-    borderRadius: theme.borderRadius.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   realtimeVoiceButtonCompactReserve: {
-    marginLeft: theme.spacing[1],
+    marginLeft: { xs: 0, md: theme.spacing[1] },
   },
   realtimeVoiceButtonActive: {
     backgroundColor: theme.colors.palette.green[600],

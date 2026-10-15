@@ -5,6 +5,7 @@ import {
 } from "@/composer/editing-session";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import { composerActionGeometry } from "@/composer/action-geometry";
 import {
   View,
   Text,
@@ -808,12 +809,21 @@ function SendButtonTooltip({
         testID={submitButtonTestID}
         style={sendButtonCombinedStyle}
       >
-        <SendButtonContent
-          isSubmitLoading={isSubmitLoading}
-          submitIcon={submitIcon}
-          submitLabel={submitLabel}
-          buttonIconSize={buttonIconSize}
-        />
+        <View
+          testID="composer-send-face"
+          style={[
+            composerActionGeometry.face,
+            composerActionGeometry.primary,
+            submitLabel ? styles.sendFaceLabeled : undefined,
+          ]}
+        >
+          <SendButtonContent
+            isSubmitLoading={isSubmitLoading}
+            submitIcon={submitIcon}
+            submitLabel={submitLabel}
+            buttonIconSize={buttonIconSize}
+          />
+        </View>
       </TooltipTrigger>
       <TooltipContent side="top" align="center" offset={8}>
         <SendTooltipBody label={sendTooltipLabel} sendKeys={sendKeys} />
@@ -1863,13 +1873,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
 
     const voiceButtonStyle = useCallback(
-      ({ hovered }: { hovered?: boolean }) => [
-        styles.voiceButton,
-        Boolean(hovered) && !isDictating && styles.iconButtonHovered,
-        !isDictationStartEnabled && styles.buttonDisabled,
-        isDictating && styles.voiceButtonRecording,
-      ],
-      [isDictating, isDictationStartEnabled],
+      () => [composerActionGeometry.target, !isDictationStartEnabled && styles.buttonDisabled],
+      [isDictationStartEnabled],
     );
 
     const handleRealtimeVoiceStop = useCallback(() => {
@@ -1906,6 +1911,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
     const sendButtonCombinedStyle = useMemo(
       () => [
+        composerActionGeometry.target,
         styles.sendButton,
         submitLabel ? styles.sendButtonLabeled : undefined,
         isSendButtonDisabled && styles.buttonDisabled,
@@ -1930,14 +1936,24 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 
     const renderVoiceButtonIcon = useCallback(
       ({ hovered }: { hovered?: boolean }) => (
-        <VoiceButtonIcon
-          hovered={Boolean(hovered)}
-          isDictating={isDictating}
-          isMutedRealtime={Boolean(isRealtimeVoiceForCurrentAgent && voice?.isMuted)}
-          buttonIconSize={buttonIconSize}
-        />
+        <View
+          testID="composer-dictation-face"
+          style={[
+            composerActionGeometry.face,
+            composerActionGeometry.neutral,
+            hovered && composerActionGeometry.hovered,
+            isDictating && composerActionGeometry.recording,
+          ]}
+        >
+          <VoiceButtonIcon
+            hovered={Boolean(hovered)}
+            isDictating={isDictating}
+            isMutedRealtime={Boolean(isRealtimeVoiceForCurrentAgent && voice?.isMuted)}
+            buttonIconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
+          />
+        </View>
       ),
-      [isDictating, isRealtimeVoiceForCurrentAgent, voice?.isMuted, buttonIconSize],
+      [isDictating, isRealtimeVoiceForCurrentAgent, voice?.isMuted, buttonIconSize, isCompact],
     );
 
     const sendButton = useMemo(
@@ -2336,28 +2352,17 @@ const styles = StyleSheet.create((theme: Theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
-  voiceButton: {
-    width: 28,
-    height: 28,
-    borderRadius: theme.borderRadius.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  voiceButtonRecording: {
-    backgroundColor: theme.colors.destructive,
-  },
   sendButton: {
-    width: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
-    height: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: theme.spacing[1],
+    marginLeft: { xs: 0, md: theme.spacing[1] },
   },
   sendButtonLabeled: {
     width: "auto",
     minWidth: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
+    paddingHorizontal: { xs: theme.spacing[1.5], md: 0 },
+  },
+  sendFaceLabeled: {
+    width: "auto",
+    minWidth: { xs: 36, md: 28 },
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.full,
   },

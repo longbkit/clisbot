@@ -176,3 +176,58 @@ it("without tool activity the header keeps the Host subtitle", () => {
   expect(screen.getByText("Long MacBook")).toBeTruthy();
   expect(screen.queryByText(/Tool activity/)).toBeNull();
 });
+
+it("a compact identity opens its tab sheet while the overflow keeps Chat options", () => {
+  const openTabs = vi.fn();
+  render(
+    <ChatOptionsProvider>
+      <ConversationHeading
+        avatar={TEAM_MARK}
+        title="Team"
+        group
+        memberCount={2}
+        hostName="Mac"
+        tabCount={2}
+        onPress={openTabs}
+        expanded
+      />
+      <OptionsTrigger />
+    </ChatOptionsProvider>,
+  );
+  const identity = screen.getByRole("button", { name: "Team. Switch tabs (2 open)" });
+  fireEvent.click(identity);
+  expect(openTabs).toHaveBeenCalledOnce();
+  expect(identity.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "More options" }));
+  expect(screen.getByRole("dialog")).toBeTruthy();
+});
+
+it("compact tool activity remains a separate trigger from the tab identity", () => {
+  const openTabs = vi.fn();
+  render(
+    <ChatOptionsProvider>
+      <ChatToolActivityHeaderContext.Provider value={WITH_ACTIVITY}>
+        <ConversationHeading
+          avatar={TEAM_MARK}
+          title="CTO"
+          group={false}
+          memberCount={1}
+          hostName="Mac"
+          tabCount={1}
+          onPress={openTabs}
+        />
+      </ChatToolActivityHeaderContext.Provider>
+    </ChatOptionsProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Tool activity under Mac" }));
+  expect(openTabs).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "CTO. Switch tabs (1 open)" }));
+  expect(openTabs).toHaveBeenCalledOnce();
+  expect(
+    screen
+      .getByRole("button", { name: "Tool activity under Mac" })
+      .closest("button")
+      ?.querySelector("button"),
+  ).toBeNull();
+});

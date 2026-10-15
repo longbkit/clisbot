@@ -1,11 +1,11 @@
-import { useCallback, type ComponentType } from "react";
-import { Pressable, View, Text, type PressableStateCallbackType } from "react-native";
+import { type ComponentType } from "react";
+import { Pressable, View, Text } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { LucideProps } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   iconButtonChromeGlyphSize,
-  iconButtonChromeStyle,
+  useIconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type { Theme } from "@/styles/theme";
@@ -45,20 +45,15 @@ export function ChatHeaderAction({
 }) {
   const compact = useIsCompactFormFactor();
   const showText = Boolean(text) && !compact;
-  const buttonStyle = useCallback(
-    (state: PressableStateCallbackType) =>
-      iconButtonChromeStyle({
-        size: "large",
-        state,
-        disabled,
-        style: [
-          compact && styles.touchTarget,
-          showText && styles.withText,
-          trailingEdge && styles.trailingEdge,
-        ],
-      }),
-    [compact, disabled, showText, trailingEdge],
-  );
+  const buttonStyle = useIconButtonChromeStyle({
+    size: "large",
+    disabled,
+    style: [
+      compact && styles.touchTarget,
+      showText && styles.withText,
+      trailingEdge && styles.trailingEdge,
+    ],
+  });
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>
