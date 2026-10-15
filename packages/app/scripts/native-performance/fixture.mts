@@ -9,7 +9,7 @@ import type { SeedDaemonClient } from "../../e2e/support/helpers/seed-client.ts"
 // The app package's test helpers are CommonJS; the daemon bootstrap is ESM.
 const clientLoader: typeof import("../../e2e/support/helpers/daemon-client-loader.ts") =
   createRequire(import.meta.url)("../../e2e/support/helpers/daemon-client-loader.ts");
-const serverId = "srv_cto019_native";
+const serverId = process.env.CLISBOT_NATIVE_PERF_SERVER_ID ?? "srv_cto019_native";
 interface SessionRecord {
   agentId: string;
   workspaceId: string;

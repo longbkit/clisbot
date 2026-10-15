@@ -1,18 +1,12 @@
+import { HeaderBackButton } from "@/components/headers/header-back-button";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
-import {
-  View,
-  Text,
-  Pressable,
-  BackHandler,
-  type PressableStateCallbackType,
-  type GestureResponderEvent,
-} from "react-native";
+import { View, Text, Pressable, BackHandler, type GestureResponderEvent } from "react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, MessageSquare, Inbox, CalendarClock, ArrowLeft } from "lucide-react-native";
+import { Home, MessageSquare, Inbox, CalendarClock } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isWeb } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
@@ -168,23 +162,8 @@ export function MobileBack() {
     router.navigate(target as Href);
   }, [router, target]);
   if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      testID="chat-back"
-      onPress={back}
-      style={backStyle}
-    >
-      <BackGlyph size={22} />
-    </Pressable>
-  );
+  return <HeaderBackButton onBack={back} testID="chat-back" />;
 }
-// The same hover and press fill as the other header buttons.
-const backStyle = ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
-  styles.back,
-  (hovered || pressed) && styles.backHighlighted,
-];
 const styles = StyleSheet.create((t) => ({
   tabs: {
     flexDirection: "row",
@@ -203,14 +182,6 @@ const styles = StyleSheet.create((t) => ({
   count: { position: "absolute", top: -t.spacing[2], left: t.spacing[3] },
   text: { color: t.colors.foregroundMuted, fontSize: t.fontSize.sm },
   selected: { color: t.colors.foreground, fontWeight: t.fontWeight.medium },
-  back: {
-    minWidth: MIN_TOUCH_TARGET_SIZE,
-    minHeight: MIN_TOUCH_TARGET_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: t.borderRadius.md,
-  },
-  backHighlighted: { backgroundColor: t.colors.interactionHighlight },
 }));
 
 function Glyph({ Icon, color }: { Icon: typeof Home; color?: string }) {
@@ -219,6 +190,3 @@ function Glyph({ Icon, color }: { Icon: typeof Home; color?: string }) {
 const TabGlyph = withUnistyles(Glyph);
 const mutedGlyph = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const selectedGlyph = (theme: Theme) => ({ color: theme.colors.foreground });
-const BackGlyph = withUnistyles(ArrowLeft, (theme) => ({
-  color: theme.colors.foreground,
-}));

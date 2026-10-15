@@ -109,6 +109,13 @@ only use local param fallback during cold mount (`/` or empty pathname), or a
 hidden workspace can overwrite the remembered workspace before Settings or
 History returns.
 
+Settings root Back follows its existing navigation entry before consulting remembered workspace
+selection. A saved session is a cold-link fallback, not the origin of Settings opened from Home
+or Chat. On web, screen Back uses browser history when present: Back/Forward may reconstruct a
+different navigator stack while the browser still holds the actual entry. Native keeps stack Back. Settings detail
+Back still resolves its explicit parent; do not change native peer-tab replacement or workspace
+retention to repair a Settings return.
+
 Plugin settings use the distinct `settings/hosts/[serverId]/plugins/[pluginId]/[screenId]` leaf;
 Back returns to that host's Plugins page.
 

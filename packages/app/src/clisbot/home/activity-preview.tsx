@@ -1,3 +1,5 @@
+import { ActivityPlaceholder } from "./activity-placeholder";
+import { DirectoryStatus } from "@/components/directory-status";
 import { useCallback } from "react";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { View, Text } from "react-native";
@@ -13,7 +15,8 @@ import { ActivityRow } from "./activity-row";
 import { SectionLink } from "./section-link";
 /** Live row contents in a layout that stays still while the user reads. */
 export function HomeActivity() {
-  const { agents, isInitialLoad, accepted, needs, limit, showMore, openInbox } = useHomeActivity();
+  const { agents, isInitialLoad, directoryHealth, accepted, needs, limit, showMore, openInbox } =
+    useHomeActivity();
   const showHost = useHosts().length > 1;
   const openAgent = useCallback((row: AggregatedAgent) => {
     rememberChatReturn("/open-project");
@@ -31,8 +34,9 @@ export function HomeActivity() {
   const live = new Map(agents.map((agent) => [activityKey(agent), agent]));
   return (
     <View style={styles.container} testID="home-activity">
-      {isInitialLoad ? <Text style={styles.muted}>Loading activity…</Text> : null}
-      {!isInitialLoad && !accepted.length ? (
+      <DirectoryStatus health={directoryHealth} label="Activity" inset={false} />
+      {isInitialLoad ? <ActivityPlaceholder /> : null}
+      {!isInitialLoad && directoryHealth.status === "ready" && !accepted.length ? (
         <Text style={styles.muted}>Your conversations will appear here.</Text>
       ) : null}
       {sections.map((section) => (

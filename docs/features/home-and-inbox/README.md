@@ -21,22 +21,31 @@ its entry surface, a tab other than Home goes Home, and Home leaves the app. Nat
 visits replace the current peer page rather than accumulate hidden stack pages. Detail Back keeps
 its existing navigation so the host underneath preserves workspace and tab state. The Home activity
 links and Chat's close-to-Home path use that same policy. Browser navigation keeps its history.
-Chat drops the Home, Inbox
-and Automations rows the tab bar already has; its account row stays pinned while New workspace,
-Connectors and the lists scroll together. Its footer stays on one line, mirrored so New sits at
-the right edge under the thumb: Settings, Help, Hosts, Usage, Search, New, with Search reduced
-to its icon when its label does not fit whole. Settings and the aggregate Automations screen
-(`/schedules`) are unchanged.
+Compact Home and Chat share the sidebar action toolbar at the top: Settings, Help, Hosts,
+Usage, Search and New. It reads the same visibility/order preferences and uses the same action
+controls as the desktop footer. Search shrinks to its icon when its label does not fit whole.
+There is one visible copy: Home replaces its title/Search header, and Chat replaces its account/Hub
+header and bottom action row. Account and Hub management remain in Settings. Chat's New workspace,
+Connectors and conversation lists scroll below the toolbar. Desktop keeps its account header and
+footer placement. Settings Back returns to the actual entry (Home, Chat or a conversation), even
+when a different workspace was remembered; only a cold Settings deep link without history uses the
+remembered workspace fallback.
 
 Home and New workspace share the existing creation composer, including Host, provider/model,
 effort, permission mode, attachments and launch options. Home adds Needs you, Active and
 Recent below; New workspace does not. Each group title is the way into Inbox (title, count,
 chevron); there is no separate Open Inbox button. Recent groups by local Today, Yesterday and date.
 Home initially shows up to ten conversations per group; Show more reveals ten more per group
-until all loaded activity is visible. Needs you always counts the whole group. The mobile Home
-header has a Search icon that opens the same cross-Host search as the sidebar, on native and web.
+until all loaded activity is visible. Needs you always counts the whole group. The compact toolbar opens the same cross-Host search on native and web without closing the Chat page underneath it.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
+
+Home reserves scaled activity rows during the first directory load. Home and Chat keep their
+accepted catalog visible during refresh or transient disconnect; a connection change alone must
+not remove and reinsert rows or reset the list's viewport. A reserved status line distinguishes
+loading, refreshing and unavailable data, with Retry for a directory failure and Host details for
+connection recovery. Empty copy appears only after readiness; loading does not claim Up to date.
+Host removal and access revocation still clear the owning replica immediately.
 
 Home keeps placement separate from live conversation data. Active and Needs you retain their
 order within a run/group; streaming timestamps cannot reorder them. Recent is chronological when

@@ -129,7 +129,8 @@ CTO019_EVIDENCE=/tmp/clisbot-native-run node --import tsx \
 
 `environment/fixture.json` records the dynamically allocated daemon/control ports. Reverse the
 daemon port through the task emulator and connect the app to that endpoint. Validate one route
-before scaling. The control endpoint `/seed?count=100` (then `500`) creates distinct directory
+before scaling. Set `CLISBOT_NATIVE_PERF_SERVER_ID` when running a second isolated Host; its default preserves the
+original harness identity. The control endpoint `/seed?count=100` (then `500`) creates distinct directory
 workspaces and mock sessions; `/stream?index=0` starts a deterministic mock turn. The first two
 sessions have short and long synthetic histories. The fixture explicitly disables pairing and
 relay and substitutes Tailscale; it proves this configured performance case, not fresh onboarding.
@@ -144,6 +145,11 @@ python3 packages/app/scripts/native-performance/capture.py \
 python3 packages/app/scripts/native-performance/analyze.py \
   --processor /path/to/trace_processor --run /tmp/clisbot-native-run/baseline-500
 ```
+
+Pass `--tabs Home Chat` to target those two peers while retaining the same trace/input/video
+pipeline; the default still visits all four tabs. A loading regression needs a recorded network/update
+schedule during the capture (first directory pages, reconnect and live updates), plus evidence that
+existing rows, focus and drafts survive. A warm static catalog proves only warm switching.
 
 The capture expects a 1080×2400 emulator and records twenty switches at 2.5-second intervals,
 Perfetto, video, native frame stats, memory and the final hierarchy. Validate the recording and

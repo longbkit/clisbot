@@ -1,4 +1,5 @@
-import { useMemo, useCallback, useEffect, useSyncExternalStore } from "react";
+import { useDirectoryHealth, type DirectoryHealth } from "./use-directory-health";
+import { useMemo, useCallback, useEffect } from "react";
 import { useShallow } from "zustand/shallow";
 import { useSessionStore } from "@/stores/session-store";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
@@ -18,6 +19,7 @@ export interface AggregatedAgentsResult {
   isInitialLoad: boolean;
   isRevalidating: boolean;
   refreshAll: () => void;
+  directoryHealth: DirectoryHealth;
 }
 
 export function useAggregatedAgents(options?: {
@@ -34,20 +36,8 @@ export function useAggregatedAgents(options?: {
     const releases = serverIds.map((serverId) => runtime.acquireDirectoryDemand(serverId));
     return () => releases.forEach((release) => release());
   }, [demand, runtime, serverIds]);
-  const subscribeRuntime = useCallback(
-    (onStoreChange: () => void) => runtime.subscribeAll(onStoreChange),
-    [runtime],
-  );
-  const getLoadingSnapshot = useCallback(
-    () =>
-      daemons.some((daemon) => {
-        const status =
-          runtime.getSnapshot(daemon.serverId)?.agentDirectoryStatus ?? "initial_loading";
-        return status === "initial_loading" || status === "revalidating";
-      }),
-    [daemons, runtime],
-  );
-  const isLoading = useSyncExternalStore(subscribeRuntime, getLoadingSnapshot, getLoadingSnapshot);
+  const directoryHealth = useDirectoryHealth();
+  const isLoading = directoryHealth.status === "loading" || directoryHealth.status === "refreshing";
 
   const sessionAgents = useSessionStore(
     useShallow((state) => {
@@ -75,9 +65,11 @@ export function useAggregatedAgents(options?: {
 
   return {
     ...result,
+    directoryHealth,
     isLoading,
-    isInitialLoad: isLoading && result.agents.length === 0,
-    isRevalidating: isLoading && result.agents.length > 0,
+    isInitialLoad: directoryHealth.status === "loading" && result.agents.length === 0,
+    isRevalidating:
+      directoryHealth.status === "refreshing" || (isLoading && result.agents.length > 0),
     refreshAll,
   };
 }

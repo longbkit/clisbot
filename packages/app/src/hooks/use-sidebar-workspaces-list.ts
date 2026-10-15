@@ -9,12 +9,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
 import { useHostProjects } from "@/projects/host-projects";
-import {
-  getHostRuntimeStore,
-  useHostRegistryLoaded,
-  useHostRuntimeConnectedServerIds,
-  useHosts,
-} from "@/runtime/host-runtime";
+import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
 import { useHostRuntimeUnreachableServerIds } from "@/runtime/unreachable-hosts";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
@@ -112,7 +107,6 @@ export function useSidebarWorkspacesList(options?: {
   const allHosts = useHosts();
   const hostRegistryLoaded = useHostRegistryLoaded();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
-  const connectedServerIds = useHostRuntimeConnectedServerIds(allServerIds);
   const unreachableServerIds = useHostRuntimeUnreachableServerIds(allServerIds);
 
   const storeHostFilters = useSidebarViewStore((state) => state.hostFilters);
@@ -148,9 +142,9 @@ export function useSidebarWorkspacesList(options?: {
 
   const persistedProjectOrder = useSidebarOrderStore((state) => state.projectOrder ?? EMPTY_ORDER);
 
-  const directoryServerIds = useWorkspaceDirectoryServerIds(
-    serverIds.filter((serverId) => connectedServerIds.includes(serverId)),
-  );
+  // Connection loss does not invalidate accepted directory rows. Host removal/revocation clears
+  // the owning replica; filtering on transport state blanked the list and lost its scroll anchor.
+  const directoryServerIds = useWorkspaceDirectoryServerIds(serverIds);
 
   const hostProjects = useHostProjects(directoryServerIds);
   const botProjectKeys = useSidebarBotProjectKeys();

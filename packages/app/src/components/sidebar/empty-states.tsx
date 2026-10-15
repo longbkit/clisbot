@@ -1,3 +1,6 @@
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { useDirectoryHealth } from "@/hooks/use-directory-health";
 import { type ReactNode } from "react";
 import { Import, Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -78,6 +81,9 @@ export function SidebarProjectEmptyState({
   onImportSession?: () => void;
 }) {
   const { t } = useTranslation();
+  const compact = useIsCompactFormFactor();
+  const health = useDirectoryHealth();
+  if (HOME_V2_ENABLED && compact && health.status !== "ready") return null;
 
   return (
     <SidebarEmptyStateCard

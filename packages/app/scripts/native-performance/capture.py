@@ -14,6 +14,7 @@ parser.add_argument('--y', required=True, type=int)
 parser.add_argument('--count', default=20, type=int)
 parser.add_argument('--interval', default=2.5, type=float)
 parser.add_argument('--package', default='com.clisbot.app.dev')
+parser.add_argument('--tabs', nargs='+', choices=['Home', 'Chat', 'Inbox', 'Automations'], default=['Home', 'Chat', 'Inbox', 'Automations'])
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=False)
 base = ['adb', '-s', args.serial]
@@ -38,11 +39,11 @@ steps = []
 try:
     time.sleep(2)
     for index in range(args.count):
-        tab = (index + 1) % 4
-        x = [135, 405, 675, 945][tab]
+        tab = args.tabs[(index + 1) % len(args.tabs)]
+        x = {'Home': 135, 'Chat': 405, 'Inbox': 675, 'Automations': 945}[tab]
         before = time.monotonic_ns()
         adb('shell', 'input', 'tap', str(x), str(args.y))
-        steps.append({'index': index, 'tab': ['Home', 'Chat', 'Inbox', 'Automations'][tab], 'host_dispatch_start_ns': before, 'host_dispatch_end_ns': time.monotonic_ns()})
+        steps.append({'index': index, 'tab': tab, 'host_dispatch_start_ns': before, 'host_dispatch_end_ns': time.monotonic_ns()})
         time.sleep(args.interval)
     if args.count == 0:
         # An idle capture still spans the native recording; sample memory at its end.

@@ -1,6 +1,10 @@
 import type { ProjectDescriptor, WorkspaceDescriptor } from "@/stores/session-store";
 import { projectDisplayNameFromProjectId } from "@/utils/project-display-name";
 
+// localeCompare with options constructs a collator for every comparison in a loading burst.
+const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const idCollator = new Intl.Collator(undefined, { sensitivity: "base" });
+
 export interface WorkspaceStructureHostPlacement {
   serverId: string;
   projectId: string;
@@ -105,10 +109,8 @@ export function buildWorkspaceStructureProjects(input: {
     }))
     .sort(
       (left, right) =>
-        left.projectName.localeCompare(right.projectName, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }) || left.viewKey.localeCompare(right.viewKey),
+        nameCollator.compare(left.projectName, right.projectName) ||
+        left.viewKey.localeCompare(right.viewKey),
     );
 }
 
@@ -201,9 +203,7 @@ function compareWorkspaceStructureItems(
   right: { workspaceId: string; workspaceName: string },
 ): number {
   return (
-    left.workspaceName.localeCompare(right.workspaceName, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }) || left.workspaceId.localeCompare(right.workspaceId, undefined, { sensitivity: "base" })
+    nameCollator.compare(left.workspaceName, right.workspaceName) ||
+    idCollator.compare(left.workspaceId, right.workspaceId)
   );
 }

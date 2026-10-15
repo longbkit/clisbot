@@ -1,3 +1,4 @@
+import { isWeb } from "@/constants/platform";
 import { router, type Href } from "expo-router";
 import { navigateToLastWorkspace } from "@/stores/navigation-active-workspace-store";
 import {
@@ -10,6 +11,7 @@ import {
   type SettingsSectionSlug,
 } from "@/utils/host-routes";
 import type { HubSectionSlug } from "@/clisbot/hub/navigation";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 
 export type SettingsView =
   | { kind: "plugin"; serverId: string; pluginId: string; screenId: string }
@@ -29,6 +31,15 @@ export function openProjectSettings(serverId: string, projectId: string): void {
 
 export function returnFromSettings(view: SettingsView): void {
   if (view.kind === "root") {
+    // Forward may restore a different native-stack shape; browser history still owns its entry.
+    if (HOME_V2_ENABLED && isWeb && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    if (HOME_V2_ENABLED && router.canGoBack()) {
+      router.back();
+      return;
+    }
     if (!navigateToLastWorkspace()) {
       router.replace(buildOpenProjectRoute());
     }

@@ -1,24 +1,13 @@
-import { useCallback, useMemo, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
+import { useMemo, type ReactNode } from "react";
 import { Text, View } from "react-native";
-import { router } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
+import { StyleSheet } from "react-native-unistyles";
+import { HeaderBackButton } from "./header-back-button";
 import { SidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
-import {
-  IconButtonChromeProvider,
-  iconButtonChromeGlyphSize,
-  mutedIconColorMapping,
-} from "@/components/ui/icon-button-chrome";
+import { IconButtonChromeProvider } from "@/components/ui/icon-button-chrome";
 import { HEADER_INNER_HEIGHT_MOBILE, HEADER_TOP_PADDING_MOBILE } from "@/constants/layout";
-import type { ShortcutKey } from "@/utils/format-shortcut";
-
-const ThemedArrowLeft = withUnistyles(ArrowLeft);
 
 const ISLAND_PADDING = 7;
-const NO_SHORTCUT: ShortcutKey[] = [];
 
 interface CompactHeaderProps {
   /** The leading island: the sidebar menu, or a back button. */
@@ -64,7 +53,7 @@ export function CompactHeader({
   let leadingNavigation = navigationContent;
   if (leadingNavigation === undefined) {
     leadingNavigation =
-      navigation === "menu" ? <SidebarMenuToggle /> : <BackButton onBack={onBack} />;
+      navigation === "menu" ? <SidebarMenuToggle /> : <HeaderBackButton onBack={onBack} />;
   }
 
   return (
@@ -112,34 +101,6 @@ function CompactHeaderTitle({
       </View>
       {subtitle}
     </>
-  );
-}
-
-function BackButton({ onBack }: { onBack?: () => void }) {
-  const { t } = useTranslation();
-  const handlePress = useCallback(() => {
-    if (onBack) {
-      onBack();
-      return;
-    }
-    router.back();
-  }, [onBack]);
-  return (
-    <HeaderToggleButton
-      onPress={handlePress}
-      tooltipLabel={t("common.actions.back")}
-      tooltipKeys={NO_SHORTCUT}
-      tooltipSide="right"
-      testID="header-back-button"
-      accessibilityRole="button"
-      accessibilityLabel={t("common.actions.back")}
-    >
-      <ThemedArrowLeft
-        size={iconButtonChromeGlyphSize("large")}
-        strokeWidth={1.5}
-        uniProps={mutedIconColorMapping}
-      />
-    </HeaderToggleButton>
   );
 }
 

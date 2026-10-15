@@ -1,3 +1,4 @@
+import { createMockIdleAgent } from "../support/helpers/archive-tab";
 import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { test, expect } from "../support/fixtures";
 import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
@@ -198,7 +199,6 @@ test.describe("Settings — compact master-detail", () => {
     withWorkspace,
   }) => {
     const workspace = await withWorkspace({ prefix: "host-picker-settings-back-" });
-    const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
     await openWorkspace(page, workspace);
     await openMobileAgentSidebar(page);
@@ -215,8 +215,7 @@ test.describe("Settings — compact master-detail", () => {
     await expectCompactSettingsList(page);
 
     await goBackInSettings(page);
-    // Settings returns to the last workspace, from the sliding sidebar or the Chat tab alike.
-    await expectAppRoute(page, workspaceRoute);
+    await expectAppRoute(page, "/chat");
   });
 
   test("All hosts settings opens the compact Hosts list without Hub sign-in", async ({
@@ -224,7 +223,6 @@ test.describe("Settings — compact master-detail", () => {
     withWorkspace,
   }, testInfo) => {
     const workspace = await withWorkspace({ prefix: "all-hosts-settings-back-" });
-    const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
     await openWorkspace(page, workspace);
     await openMobileAgentSidebar(page);
     await page.getByTestId("sidebar-hosts-trigger").click();
@@ -249,7 +247,7 @@ test.describe("Settings — compact master-detail", () => {
       page.getByTestId("settings-hosts").getByLabel("1 online out of 1 Hosts"),
     ).toHaveText("1/1");
     await goBackInSettings(page);
-    await expectAppRoute(page, workspaceRoute);
+    await expectAppRoute(page, "/chat");
   });
 
   test("switching the host picker on the settings list scopes host rows without navigating", async ({
@@ -299,4 +297,63 @@ test.describe("Settings — compact master-detail", () => {
     await expectAppRoute(page, buildWelcomeRoute({ stay: true }));
     await expect(page.getByTestId("welcome-direct-connection")).toBeVisible();
   });
+});
+
+test.describe("Settings entry history on phones", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  for (const entry of ["Home", "Chat", "Session"] as const) {
+    test(`keeps the ${entry} Settings entry with a saved workspace`, async ({
+      page,
+      withWorkspace,
+      e2eWorkerClient,
+    }) => {
+      const workspace = await withWorkspace({ prefix: "settings-entry-" });
+      await createMockIdleAgent(e2eWorkerClient, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Saved Settings conversation",
+      });
+      await openWorkspace(page, workspace);
+      const workspaceUrl = new URL(page.url()).pathname;
+      if (entry !== "Session") {
+        await page.getByTestId("chat-back").filter({ visible: true }).click();
+        await page.getByRole("tab", { name: entry, exact: true }).click();
+        await expectAppRoute(page, entry === "Home" ? "/open-project" : "/chat");
+      }
+      const entryUrl = new URL(page.url()).pathname;
+      if (entry === "Session") {
+        await expect(
+          page.getByTestId("message-input-root").filter({ visible: true }),
+        ).toBeVisible();
+        await page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }).click();
+        await page.getByTestId("workspace-header-edit-terminal-profiles").click();
+        await expectAppRoute(page, buildSettingsHostSectionRoute(getServerId(), "terminals"));
+        await page.getByTestId("header-back-button").filter({ visible: true }).click();
+      } else {
+        const toolbar = page.getByTestId("mobile-toolbar").filter({ visible: true });
+        await expect(toolbar).toBeVisible();
+        await expect(
+          page.getByTestId("sidebar-footer-bottom-line").filter({ visible: true }),
+        ).toHaveCount(1);
+        await toolbar.getByTestId("sidebar-settings").click();
+      }
+      await expectAppRoute(page, buildSettingsRoute());
+      await page.getByTestId("header-back-button").filter({ visible: true }).click();
+      await expectAppRoute(page, entryUrl);
+      if (entry !== "Session") {
+        await page
+          .getByTestId("mobile-toolbar")
+          .filter({ visible: true })
+          .getByTestId("sidebar-settings")
+          .click();
+        await page.goBack();
+        await expectAppRoute(page, entryUrl);
+        await page.goForward();
+        await expectAppRoute(page, buildSettingsRoute());
+        await page.getByTestId("header-back-button").filter({ visible: true }).click();
+        await expectAppRoute(page, entryUrl);
+      } else await expectAppRoute(page, workspaceUrl);
+    });
+  }
 });

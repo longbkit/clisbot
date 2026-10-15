@@ -11,7 +11,7 @@ import { activityBucket } from "./activity";
 import { visibleActivityLayout } from "./activity-layout";
 
 function useHomeActivityState() {
-  const { agents, isInitialLoad } = useAggregatedAgents();
+  const { agents, isInitialLoad, directoryHealth } = useAggregatedAgents();
   const { automatic, apply } = useActivityViewport();
   const day = useLocalDay();
   const { accepted, next, pending, accept } = useActivityLayout(agents, day, automatic);
@@ -25,8 +25,30 @@ function useHomeActivityState() {
   }, [apply, accept, next, limit]);
   const needs = agents.filter((agent) => activityBucket(agent) === "needs").length;
   return useMemo(
-    () => ({ agents, isInitialLoad, accepted, pending, needs, limit, showMore, update, openInbox }),
-    [agents, isInitialLoad, accepted, pending, needs, limit, showMore, update, openInbox],
+    () => ({
+      agents,
+      isInitialLoad,
+      directoryHealth,
+      accepted,
+      pending,
+      needs,
+      limit,
+      showMore,
+      update,
+      openInbox,
+    }),
+    [
+      agents,
+      isInitialLoad,
+      directoryHealth,
+      accepted,
+      pending,
+      needs,
+      limit,
+      showMore,
+      update,
+      openInbox,
+    ],
   );
 }
 const Context = createContext<ReturnType<typeof useHomeActivityState> | null>(null);
@@ -42,7 +64,15 @@ export function useHomeActivity() {
 
 /** A reserved rail outside the scroller: updates and urgent work remain reachable while reading. */
 export function ActivityUpdates() {
-  const { pending, needs, update, openInbox } = useHomeActivity();
+  const { pending, needs, update, openInbox, directoryHealth } = useHomeActivity();
+  const labels = {
+    loading: "Loading activity…",
+    refreshing: "Refreshing activity…",
+    unavailable: "Refresh unavailable",
+    ready: "Up to date",
+  };
+  let updateLabel = labels[directoryHealth.status];
+  if (pending) updateLabel = `Show ${pending} ${pending === 1 ? "update" : "updates"}`;
   return (
     <View style={styles.rail} testID="home-activity-updates">
       <Button
@@ -52,7 +82,7 @@ export function ActivityUpdates() {
         disabled={!pending}
         testID="home-activity-apply"
       >
-        {pending ? `Show ${pending} ${pending === 1 ? "update" : "updates"}` : "Up to date"}
+        {updateLabel}
       </Button>
       <Button size="sm" variant="ghost" onPress={openInbox} testID="home-activity-needs">
         {`Needs you ${needs}`}
