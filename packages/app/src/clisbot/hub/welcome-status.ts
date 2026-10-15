@@ -8,6 +8,7 @@ import {
 /** What the Welcome card offers: sign-in, instance setup, or a signed-in status line. */
 export type HubWelcomeCard =
   | { kind: "hidden" }
+  | { kind: "chooseHub" }
   | { kind: "signedOut" }
   | { kind: "setupRequired" }
   | { kind: "status"; view: HubWelcomeStatusView };
@@ -40,7 +41,9 @@ export interface HubWelcomeCardInput {
 }
 
 export function resolveHubWelcomeCard(input: HubWelcomeCardInput): HubWelcomeCard {
-  if (!input.enabled || input.loading || input.status === null) return { kind: "hidden" };
+  // No account target yet: the universal app still offers the existing Hubs selector.
+  if (!input.enabled) return { kind: "chooseHub" };
+  if (input.loading || input.status === null) return { kind: "hidden" };
   if (input.status === "signedOut") return { kind: "signedOut" };
   if (input.status === "instanceSetupRequired") return { kind: "setupRequired" };
   if (input.status !== "active") {

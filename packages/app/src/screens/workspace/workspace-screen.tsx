@@ -3381,6 +3381,56 @@ function WorkspaceScreenContent({
     () => ({ serverId: normalizedServerId, workspaceId: normalizedWorkspaceId }),
     [normalizedServerId, normalizedWorkspaceId],
   );
+  const renderCompactWorkspaceIdentity = useCallback(
+    (identity: ReactNode) => (
+      <MobileWorkspaceTabSwitcher
+        identityLabel={workspaceHeaderTitle}
+        workspaceDirectory={workspaceDirectory}
+        tabs={tabs}
+        activeTabKey={activeTabKey}
+        normalizedServerId={normalizedServerId}
+        normalizedWorkspaceId={normalizedWorkspaceId}
+        onSelectSwitcherTab={handleSelectSwitcherTab}
+        createTerminalDisabled={createTerminalDisabled}
+        onCreateDraftTab={handleCreateDraftTab}
+        onCreateTerminal={handleCreateTerminal}
+        onCopyResumeCommand={handleCopyResumeCommand}
+        onCopyAgentId={handleCopyAgentId}
+        onCopyTerminalId={handleCopyTerminalId}
+        onCopyFilePath={handleCopyFilePath}
+        onReloadAgent={handleReloadAgent}
+        onRenameTab={handleRenameTab}
+        onCloseTab={handleCloseTabById}
+        onCloseTabsAbove={handleCloseTabsToLeft}
+        onCloseTabsBelow={handleCloseTabsToRight}
+        onCloseOtherTabs={handleCloseOtherTabs}
+      >
+        {identity}
+      </MobileWorkspaceTabSwitcher>
+    ),
+    [
+      workspaceHeaderTitle,
+      workspaceDirectory,
+      tabs,
+      activeTabKey,
+      normalizedServerId,
+      normalizedWorkspaceId,
+      handleSelectSwitcherTab,
+      createTerminalDisabled,
+      handleCreateDraftTab,
+      handleCreateTerminal,
+      handleCopyResumeCommand,
+      handleCopyAgentId,
+      handleCopyTerminalId,
+      handleCopyFilePath,
+      handleReloadAgent,
+      handleRenameTab,
+      handleCloseTabById,
+      handleCloseTabsToLeft,
+      handleCloseTabsToRight,
+      handleCloseOtherTabs,
+    ],
+  );
   const compactWorkspaceHeader = useMemo(
     () =>
       isMobile ? (
@@ -3393,28 +3443,8 @@ function WorkspaceScreenContent({
           onToggleExplorer={handleToggleExplorerSidebar}
           explorerToggleLabel={explorerSidebarToggleLabel}
           explorerToggleAccessibilityState={explorerSidebarToggleAccessibilityState}
+          renderTitle={renderCompactWorkspaceIdentity}
         >
-          <MobileWorkspaceTabSwitcher
-            workspaceDirectory={workspaceDirectory}
-            tabs={tabs}
-            activeTabKey={activeTabKey}
-            normalizedServerId={normalizedServerId}
-            normalizedWorkspaceId={normalizedWorkspaceId}
-            onSelectSwitcherTab={handleSelectSwitcherTab}
-            createTerminalDisabled={createTerminalDisabled}
-            onCreateDraftTab={handleCreateDraftTab}
-            onCreateTerminal={handleCreateTerminal}
-            onCopyResumeCommand={handleCopyResumeCommand}
-            onCopyAgentId={handleCopyAgentId}
-            onCopyTerminalId={handleCopyTerminalId}
-            onCopyFilePath={handleCopyFilePath}
-            onReloadAgent={handleReloadAgent}
-            onRenameTab={handleRenameTab}
-            onCloseTab={handleCloseTabById}
-            onCloseTabsAbove={handleCloseTabsToLeft}
-            onCloseTabsBelow={handleCloseTabsToRight}
-            onCloseOtherTabs={handleCloseOtherTabs}
-          />
           <WorkspaceHeartbeatsButton
             serverId={normalizedServerId}
             workspaceId={normalizedWorkspaceId}
@@ -3440,32 +3470,19 @@ function WorkspaceScreenContent({
         </CompactWorkspaceHeader>
       ) : null,
     [
+      renderCompactWorkspaceIdentity,
       workspaceHeaderRef,
-      activeTabKey,
       canOpenImportSheet,
       createTerminalDisabled,
       currentBranchName,
       focusedPaneAgentId,
       explorerSidebarToggleAccessibilityState,
       explorerSidebarToggleLabel,
-      handleCloseOtherTabs,
-      handleCloseTabById,
-      handleCloseTabsToLeft,
-      handleCloseTabsToRight,
-      handleCopyAgentId,
       handleCopyBranchName,
-      handleCopyFilePath,
-      handleCopyResumeCommand,
-      handleCopyTerminalId,
       handleCopyWorkspacePath,
       handleCreateBrowserTab,
-      handleCreateDraftTab,
-      handleCreateTerminal,
       handleCreateTerminalWithProfile,
       handleOpenSetupTab,
-      handleReloadAgent,
-      handleRenameTab,
-      handleSelectSwitcherTab,
       handleToggleExplorerSidebar,
       isMobile,
       isWorkspaceHeaderLoading,
@@ -3475,7 +3492,6 @@ function WorkspaceScreenContent({
       openImportSheet,
       showCreateBrowserTab,
       showWorkspaceSetup,
-      tabs,
       workspaceDirectory,
       workspaceHeaderSubtitle,
       workspaceHeaderTitle,

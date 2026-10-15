@@ -26,6 +26,7 @@ async function openNamedWorkspace(page: Page, names: typeof labels.long) {
     });
     await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: agent.id });
     await expect(page.getByTestId("workspace-header-title")).toHaveText(names.title);
+    await expect(page.getByTestId("workspace-tab-switcher-trigger")).toContainText(names.title);
     await expect(page.getByTestId("workspace-header-subtitle")).toHaveText(names.project);
     await expect(
       page.getByTestId(`host-badge-${getServerId()}`).filter({ visible: true }),
@@ -59,16 +60,14 @@ async function expectHeaderContentsFit(page: Page, info: TestInfo, long: boolean
     expect(bounds.badge).not.toBeNull();
     expect(bounds.icon).not.toBeNull();
     expect(bounds.trigger).not.toBeNull();
-    // 12px outside margin, 48px touch target + 14px island padding, 8px title gap.
-    expect(bounds.title!.x).toBe(82);
-    expect(bounds.project!.x).toBe(bounds.title!.x);
-    expect(bounds.trigger!.width).toBe(32);
-    expect(bounds.trigger!.height).toBe(32);
-    // The action frame starts 7px inside its island; preserve the 8px gap before it.
-    const contentRight = bounds.trigger!.x - 15;
+    // Identity owns the tab-list trigger; Back and the useful actions stay outside it.
+    expect(bounds.trigger!.width).toBeGreaterThanOrEqual(48);
+    expect(bounds.trigger!.height).toBeGreaterThanOrEqual(48);
     for (const box of [bounds.title!, bounds.project!, bounds.badge!, bounds.icon!]) {
-      expect(box.x + box.width).toBeLessThanOrEqual(contentRight + 1);
+      expect(box.x).toBeGreaterThanOrEqual(bounds.trigger!.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(bounds.trigger!.x + bounds.trigger!.width + 1);
     }
+    expect(bounds.project!.x).toBe(bounds.title!.x);
     expect(bounds.project!.width).toBeGreaterThan(20);
     expect(bounds.icon!.width).toBe(12);
     expect(bounds.badge!.x).toBeGreaterThan(bounds.project!.x + bounds.project!.width);

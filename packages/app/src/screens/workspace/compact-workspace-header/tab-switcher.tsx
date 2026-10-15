@@ -1,6 +1,6 @@
 import { useConversationSourceLabelsBridge } from "@/clisbot/bots/chat/conversation-source-labels";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Keyboard, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { SquarePen, SquareTerminal } from "lucide-react-native";
@@ -19,9 +19,6 @@ import {
   type WorkspaceTabMenuLabels,
 } from "@/screens/workspace/workspace-tab-menu";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
-
-// The trigger draws at 32pt beside its island neighbours, so only vertical slop is free.
-const TAB_SWITCHER_TRIGGER_HIT_SLOP = { top: 8, bottom: 8 } as const;
 
 function getFallbackTabOptionLabel(
   tab: WorkspaceTabDescriptor,
@@ -131,6 +128,9 @@ function getFallbackTabOptionDescription(
 }
 
 interface MobileWorkspaceTabSwitcherProps {
+  /** Header identity replaces the count trigger; other existing surfaces keep their trigger. */
+  children?: ReactNode;
+  identityLabel?: string;
   workspaceDirectory?: string | null;
   tabSwitcherOptions?: ComboboxOption[];
   tabs: WorkspaceTabDescriptor[];
@@ -282,6 +282,8 @@ function MobileWorkspaceTabOption({
 }
 
 export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
+  children,
+  identityLabel,
   tabs,
   activeTabKey,
   normalizedServerId,
@@ -334,8 +336,12 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
   );
 
   const tabByKey = useMemo(() => new Map(tabs.map((tab) => [tab.key, tab])), [tabs]);
-  const triggerStyle = useIconButtonChromeStyle({ size: "large" });
+  const triggerStyle = useIconButtonChromeStyle({
+    size: "large",
+    style: children ? styles.identityTrigger : undefined,
+  });
   const [isOpen, setIsOpen] = useState(false);
+  const triggerAccessibilityState = useMemo(() => ({ expanded: isOpen }), [isOpen]);
   const anchorRef = useRef<View>(null);
   const tabIndexByKey = useMemo(() => {
     const map = new Map<string, number>();
@@ -468,14 +474,21 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
         ref={anchorRef}
         testID="workspace-tab-switcher-trigger"
         accessibilityRole="button"
-        accessibilityLabel={t("workspace.tabs.switcher.trigger", { count: tabs.length })}
-        hitSlop={TAB_SWITCHER_TRIGGER_HIT_SLOP}
+        accessibilityLabel={[
+          identityLabel,
+          t("workspace.tabs.switcher.trigger", { count: tabs.length }),
+        ]
+          .filter(Boolean)
+          .join(". ")}
+        accessibilityState={triggerAccessibilityState}
         style={triggerStyle}
         onPress={handleOpenSwitcher}
       >
-        <View style={styles.tabCountBadge}>
-          <Text style={styles.tabCountText}>{tabs.length}</Text>
-        </View>
+        {children ?? (
+          <View style={styles.tabCountBadge}>
+            <Text style={styles.tabCountText}>{tabs.length}</Text>
+          </View>
+        )}
       </Pressable>
 
       <Combobox
@@ -526,5 +539,10 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
     fontVariant: ["tabular-nums"],
+  },
+  identityTrigger: {
+    width: "auto",
+    alignItems: "stretch",
+    justifyContent: "center",
   },
 }));

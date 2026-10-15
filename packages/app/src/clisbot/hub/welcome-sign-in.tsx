@@ -77,6 +77,7 @@ export function HubWelcomeSignIn() {
           <HubWelcomeSignInActions
             hub={hub}
             setupRequired={card.kind === "setupRequired"}
+            chooseHub={card.kind === "chooseHub"}
             onAttempt={setAttempted}
           />
         )}
@@ -190,21 +191,17 @@ function actionLabel(action: HubWelcomeAction, t: ReturnType<typeof useTranslati
 
 /**
  * Names the Hosts a user connects themselves, so they read as a second source beside managed
- * Hosts rather than a fallback. Absent when this build has no Hub: one unlabelled list needs no
- * heading.
+ * Hosts rather than a fallback. Both sources remain available before choosing a Hub.
  */
 export function WelcomeOwnComputerLabel() {
-  const hub = useHubAccount();
   const { t } = useTranslation();
-  if (!hub.enabled) return null;
   return <Text style={styles.sectionLabel}>{t("onboarding.groups.ownComputer")}</Text>;
 }
 
 /** Reuse the Hubs add flow so Welcome offers the same start and connect choices. */
-function AddAnotherHubRow() {
-  const { t } = useTranslation();
+function useAddHub() {
   const router = useRouter();
-  const addHub = useCallback(
+  return useCallback(
     () =>
       router.push({
         pathname: "/settings/hub/[hubSection]",
@@ -212,6 +209,11 @@ function AddAnotherHubRow() {
       }),
     [router],
   );
+}
+
+function AddAnotherHubRow() {
+  const { t } = useTranslation();
+  const addHub = useAddHub();
   return (
     <View style={styles.addHubRow}>
       <Button size="sm" variant="ghost" onPress={addHub}>
@@ -224,15 +226,18 @@ function AddAnotherHubRow() {
 function HubWelcomeSignInActions({
   hub,
   setupRequired,
+  chooseHub,
   onAttempt,
 }: {
   hub: HubAccount;
   setupRequired: boolean;
+  chooseHub: boolean;
   onAttempt: (attempted: boolean) => void;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
   const openAccount = useCallback(() => router.push(buildHubSettingsRoute("account")), [router]);
+  const addHub = useAddHub();
   const startGoogle = hub.signInWithGoogle;
   const googleSignIn = hub.state?.status === "signedOut" && hub.state.googleSignIn === true;
   // A failed start is already shown through `hub.error`.
@@ -253,22 +258,28 @@ function HubWelcomeSignInActions({
         <ExternalLink href={HUB_DOCS_URL} label={t("hub.account.welcome.whatIsHub")} />
       </View>
       {/* Native and desktop clients sign in on the Hub page they open, which offers every method. */}
-      {hub.signInKind === "system-browser" ? (
-        <Button onPress={signInThroughBrowser}>{t("hub.account.welcome.signIn")}</Button>
-      ) : (
-        <>
-          {googleSignIn && startGoogle !== undefined ? (
-            <Button onPress={continueWithGoogle}>
-              {t("hub.account.welcome.continueWithGoogle")}
+      {chooseHub ? (
+        <Button variant="secondary" onPress={addHub}>
+          {t("hub.connection.add.connectExisting")}
+        </Button>
+      ) : null}
+      {!chooseHub &&
+        (hub.signInKind === "system-browser" ? (
+          <Button onPress={signInThroughBrowser}>{t("hub.account.welcome.signIn")}</Button>
+        ) : (
+          <>
+            {googleSignIn && startGoogle !== undefined ? (
+              <Button onPress={continueWithGoogle}>
+                {t("hub.account.welcome.continueWithGoogle")}
+              </Button>
+            ) : null}
+            <Button variant={googleSignIn ? "ghost" : "secondary"} onPress={openAccount}>
+              {googleSignIn
+                ? t("hub.account.welcome.useEmailAndPassword")
+                : t("hub.account.welcome.signIn")}
             </Button>
-          ) : null}
-          <Button variant={googleSignIn ? "ghost" : "secondary"} onPress={openAccount}>
-            {googleSignIn
-              ? t("hub.account.welcome.useEmailAndPassword")
-              : t("hub.account.welcome.signIn")}
-          </Button>
-        </>
-      )}
+          </>
+        ))}
     </>
   );
 }

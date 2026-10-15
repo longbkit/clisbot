@@ -39,11 +39,14 @@ const failure = { label: "mac-b", message: "access ticket refused" };
 
 describe("Welcome Hub card", () => {
   it.each([
-    ["Hub is off", { enabled: false }],
     ["the account state is still loading", { loading: true }],
     ["the account state is unknown", { status: null }],
   ] as const)("shows nothing while %s", (_case, overrides) => {
     expect(resolveHubWelcomeCard(input(overrides)).kind).toBe("hidden");
+  });
+
+  it("offers Hub selection when there is no configured or saved target", () => {
+    expect(resolveHubWelcomeCard(input({ enabled: false, status: null })).kind).toBe("chooseHub");
   });
 
   it("offers sign-in and instance setup by account status", () => {

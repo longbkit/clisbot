@@ -19,7 +19,9 @@ interface CompactWorkspaceHeaderProps {
   onToggleExplorer: () => void;
   explorerToggleLabel: string;
   explorerToggleAccessibilityState: { expanded: boolean };
-  /** Tab switcher and workspace menu, before the explorer toggle. */
+  /** Existing tab-list owner wraps only the session identity. */
+  renderTitle: (identity: ReactNode) => ReactNode;
+  /** Useful actions before the explorer toggle. */
   children: ReactNode;
 }
 
@@ -33,6 +35,7 @@ export function CompactWorkspaceHeader({
   explorerToggleLabel,
   explorerToggleAccessibilityState,
   children,
+  renderTitle,
   serverId,
 }: CompactWorkspaceHeaderProps) {
   const navigationContent = useMemo(() => <HomeHeaderNavigation />, []);
@@ -67,6 +70,7 @@ export function CompactWorkspaceHeader({
       navigationContent={navigationContent}
       title={title}
       titleTestID="workspace-header-title"
+      renderTitle={renderTitle}
       subtitle={projectRow}
       loading={isLoading}
       actions={actions}

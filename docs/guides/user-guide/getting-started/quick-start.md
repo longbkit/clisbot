@@ -46,5 +46,5 @@ Each device needs its own link. Closing the terminal does not stop the Host; sto
 
 ## Use your organization's existing Hub
 
-- **Members:** accept the email invitation, then in the app choose the **Clisbot Hub** tile on the Welcome screen (or **Settings → Account**) to sign in. Hosts you have access to appear in **Settings → Hosts**.
+- **Members:** accept the email invitation, then use the **Clisbot Hub** section below the personal Host choices on Welcome. If you have no Hub saved, choose **Connect existing Hub**, then **Connect existing Hub** in Hubs and enter your organization’s Hub URL. Sign in on the selected Hub; pairing a personal Host first is not required. A saved or configured Hub offers sign-in directly. Hosts you have access to appear in **Settings → Hosts**.
 - **Add a machine to the Hub:** start the Host on that machine first, then run `clisbot hub connect https://hub.example.com` and open the printed URL. An organization Owner/Admin approves it; see [Manage Hosts](../hosts/connect-and-manage.md).

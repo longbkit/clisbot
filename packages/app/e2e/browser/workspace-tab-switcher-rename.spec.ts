@@ -96,7 +96,9 @@ test.describe("Workspace session rename (compact tab switcher)", () => {
       await expect(page.getByText(renamed, { exact: true })).toBeVisible({
         timeout: 15_000,
       });
-      await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("1");
+      await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveAccessibleName(
+        /Switch tabs \(1 open\)/,
+      );
       await expect.poll(() => fetchAgentTitle(session.client, session.agentId)).toBe(renamed);
       await expect(page.getByRole("button", { name: "Bottom sheet backdrop" })).toHaveCount(1);
       await expect(page.getByText("Rename agent", { exact: true })).toBeHidden();
@@ -116,15 +118,21 @@ test("switcher footer creates tabs and returns to the existing chat", async ({
   });
   try {
     await openAgentRoute(page, session);
-    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("1");
+    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveAccessibleName(
+      /Switch tabs \(1 open\)/,
+    );
 
     await createTabFromSwitcher(page, "New terminal");
-    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("2");
+    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveAccessibleName(
+      /Switch tabs \(2 open\)/,
+    );
     await expect(page.getByTestId("terminal-surface").filter({ visible: true })).toHaveCount(1);
     await captureScreen(page, testInfo, "compact-terminal-header");
 
     await createTabFromSwitcher(page, "New agent");
-    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("3");
+    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveAccessibleName(
+      /Switch tabs \(3 open\)/,
+    );
     await expect(
       page.getByRole("textbox", { name: "Message agent..." }).filter({ visible: true }),
     ).toHaveCount(1);
@@ -135,7 +143,9 @@ test("switcher footer creates tabs and returns to the existing chat", async ({
     await captureScreen(page, testInfo, "switcher-three-tabs");
     await page.getByText("Existing chat", { exact: true }).click();
     await expect(page.getByRole("button", { name: "Bottom sheet backdrop" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("3");
+    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveAccessibleName(
+      /Switch tabs \(3 open\)/,
+    );
 
     await openTabSwitcher(page);
     await expect(page.getByText("Existing chat", { exact: true })).toBeVisible();
@@ -144,6 +154,15 @@ test("switcher footer creates tabs and returns to the existing chat", async ({
       .click({ position: { x: 10, y: 10 } });
     await expect(page.getByRole("button", { name: "Bottom sheet backdrop" })).toHaveCount(0);
     await captureScreen(page, testInfo, "returned-chat-header");
+    // The identity area is the same switcher owner; tab actions still close the other tabs.
+    await openTabSwitcher(page);
+    const menuBase = `workspace-tab-menu-agent_${session.agentId}`;
+    await page.getByTestId(`${menuBase}-trigger`).click();
+    await page.getByTestId(`${menuBase}-close-others`).click();
+    await page.getByRole("button", { name: "Close", exact: true }).last().click();
+    await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveAccessibleName(
+      /Switch tabs \(1 open\)/,
+    );
   } finally {
     await session.cleanup();
   }

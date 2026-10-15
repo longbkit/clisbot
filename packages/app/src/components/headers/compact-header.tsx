@@ -17,6 +17,8 @@ interface CompactHeaderProps {
   title?: string;
   titleAccessory?: ReactNode;
   titleTestID?: string;
+  /** Optional identity-area interaction; navigation and actions remain separate siblings. */
+  renderTitle?: (identity: ReactNode) => ReactNode;
   /** A line under the title. */
   subtitle?: ReactNode;
   /** Show a placeholder instead of the title while it loads. */
@@ -36,6 +38,7 @@ export function CompactHeader({
   title,
   titleAccessory,
   titleTestID,
+  renderTitle,
   subtitle,
   loading = false,
   actions,
@@ -52,20 +55,22 @@ export function CompactHeader({
       navigation === "menu" ? <SidebarMenuToggle /> : <HeaderBackButton onBack={onBack} />;
   }
 
+  const identity = (
+    <CompactHeaderTitle
+      loading={loading}
+      title={title}
+      titleAccessory={titleAccessory}
+      titleTestID={titleTestID}
+      subtitle={subtitle}
+    />
+  );
+
   return (
     <IconButtonChromeProvider value="compact-header">
       <View style={rootStyle} testID="compact-header">
         <View style={styles.row}>
           <View style={styles.controls}>{leadingNavigation}</View>
-          <View style={styles.titleGroup}>
-            <CompactHeaderTitle
-              loading={loading}
-              title={title}
-              titleAccessory={titleAccessory}
-              titleTestID={titleTestID}
-              subtitle={subtitle}
-            />
-          </View>
+          <View style={styles.titleGroup}>{renderTitle ? renderTitle(identity) : identity}</View>
           {actions ? <View style={styles.controls}>{actions}</View> : null}
         </View>
       </View>
@@ -108,7 +113,7 @@ const styles = StyleSheet.create((theme) => ({
     borderBottomColor: theme.colors.border,
   },
   row: {
-    height: HEADER_INNER_HEIGHT_MOBILE,
+    minHeight: HEADER_INNER_HEIGHT_MOBILE,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],

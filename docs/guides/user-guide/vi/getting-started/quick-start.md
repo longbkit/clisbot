@@ -46,5 +46,5 @@ Mỗi thiết bị cần một link riêng. Đóng terminal không dừng Host; 
 
 ## Dùng Hub có sẵn của tổ chức
 
-- **Thành viên:** nhận lời mời qua email, rồi trong app chọn ô **Clisbot Hub** ở màn Welcome (hoặc **Settings → Account**) để đăng nhập. Host được cấp quyền hiện ở **Settings → Hosts**.
+- **Thành viên:** nhận lời mời qua email, rồi dùng phần **Clisbot Hub** bên dưới các cách kết nối Host cá nhân ở màn Welcome. Nếu chưa lưu Hub nào, chọn **Kết nối Hub có sẵn**, chọn tiếp thao tác đó trong Hubs và nhập URL Hub của tổ chức. Đăng nhập vào Hub đã chọn; không cần ghép nối Host cá nhân trước. Hub đã lưu hoặc cấu hình sẵn hiển thị thao tác đăng nhập trực tiếp. Host được cấp quyền hiện ở **Settings → Hosts**.
 - **Thêm máy vào Hub:** máy đó chạy Host trước, rồi chạy `clisbot hub connect https://hub.example.com` và mở URL được in ra. Owner/Admin của tổ chức duyệt; xem [Quản lý Hosts](../hosts/connect-and-manage.md).

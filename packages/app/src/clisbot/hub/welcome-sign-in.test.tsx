@@ -6,7 +6,7 @@ import {
   hubHostSynchronizationKey,
   setHubHostSynchronizationFailure,
 } from "./host-synchronization-status";
-import { HubWelcomeSignIn } from "./welcome-sign-in";
+import { HubWelcomeSignIn, WelcomeOwnComputerLabel } from "./welcome-sign-in";
 
 const env = vi.hoisted(() => ({
   hub: {} as Record<string, unknown>,
@@ -149,10 +149,24 @@ describe("Hub sign-in on Welcome", () => {
     );
   });
 
-  it("shows nothing at all when this build has no Hub", () => {
-    env.hub = hubWith({ enabled: false });
-    render(<HubWelcomeSignIn />);
-    expect(screen.queryByText("Clisbot Hub")).toBeNull();
+  it("offers the existing Hub selector with no target or paired Host", () => {
+    env.hub = hubWith({ enabled: false, origin: null, state: null });
+    render(
+      <>
+        <WelcomeOwnComputerLabel />
+        <HubWelcomeSignIn />
+      </>,
+    );
+    expect(screen.getByText("Clisbot Hub")).toBeTruthy();
+    expect(screen.getByText("Your own computer")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Connect existing Hub" }));
+    expect(env.push).toHaveBeenCalledWith({
+      pathname: "/settings/hub/[hubSection]",
+      params: { hubSection: "hubs", hubIntent: "add" },
+    });
+    expect(env.hub.signIn).not.toHaveBeenCalled();
+    expect(env.hub.signInWithGoogle).not.toHaveBeenCalled();
+    expect(env.replace).not.toHaveBeenCalled();
   });
 
   it("keeps the card after sign-in, naming the account and what its Hosts are doing", () => {
