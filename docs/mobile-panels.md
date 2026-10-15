@@ -129,6 +129,9 @@ definition, no longer eligible to begin.
   and use the retained-panel active signal to stop timers, polling, and other genuine background work.
   Hidden chat content is suspended on web only, through `retained-chat-content.web.tsx`, where DOM
   nodes carry no Fabric ownership; the native file keeps the chat live.
+- Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
+  identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden
+  derivation work does not change the native workspace/tab retention limits or visibility ownership.
 
 ## Tests
 

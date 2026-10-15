@@ -3,6 +3,8 @@
  * the header button, its quick list, the detail sheet, and the card shown when one is created.
  */
 const en = {
+  runDetails: "Heartbeat: {{name}}, run {{counter}}. Open details",
+  untitledRun: "Untitled heartbeat",
   button: "Heartbeats",
   thisSession: "This session",
   otherSessions: "Other sessions in this workspace",
@@ -101,6 +103,8 @@ const en = {
 export type HeartbeatsResources = typeof en;
 
 const ar: HeartbeatsResources = {
+  runDetails: "نبضة: {{name}}، التشغيل {{counter}}. فتح التفاصيل",
+  untitledRun: "نبضة بدون عنوان",
   button: "نبضات Heartbeat",
   thisSession: "هذه الجلسة",
   otherSessions: "جلسات أخرى في مساحة العمل هذه",
@@ -196,6 +200,8 @@ const ar: HeartbeatsResources = {
 };
 
 const es: HeartbeatsResources = {
+  runDetails: "Heartbeat: {{name}}, ejecución {{counter}}. Abrir detalles",
+  untitledRun: "Heartbeat sin título",
   button: "Heartbeats",
   thisSession: "Esta sesión",
   otherSessions: "Otras sesiones de este espacio de trabajo",
@@ -293,6 +299,8 @@ const es: HeartbeatsResources = {
 };
 
 const fr: HeartbeatsResources = {
+  runDetails: "Heartbeat : {{name}}, exécution {{counter}}. Ouvrir les détails",
+  untitledRun: "Heartbeat sans titre",
   button: "Heartbeats",
   thisSession: "Cette session",
   otherSessions: "Autres sessions de cet espace de travail",
@@ -390,6 +398,8 @@ const fr: HeartbeatsResources = {
 };
 
 const ja: HeartbeatsResources = {
+  runDetails: "ハートビート: {{name}}、実行 {{counter}}。詳細を開く",
+  untitledRun: "無題のハートビート",
   button: "ハートビート",
   thisSession: "このセッション",
   otherSessions: "このワークスペースの他のセッション",
@@ -488,6 +498,8 @@ const ja: HeartbeatsResources = {
 };
 
 const ko: HeartbeatsResources = {
+  runDetails: "하트비트: {{name}}, 실행 {{counter}}. 상세 열기",
+  untitledRun: "제목 없는 하트비트",
   button: "하트비트",
   thisSession: "이 세션",
   otherSessions: "이 워크스페이스의 다른 세션",
@@ -584,6 +596,8 @@ const ko: HeartbeatsResources = {
 };
 
 const ptBR: HeartbeatsResources = {
+  runDetails: "Heartbeat: {{name}}, execução {{counter}}. Abrir detalhes",
+  untitledRun: "Heartbeat sem título",
   button: "Heartbeats",
   thisSession: "Esta sessão",
   otherSessions: "Outras sessões deste workspace",
@@ -682,6 +696,8 @@ const ptBR: HeartbeatsResources = {
 };
 
 const ru: HeartbeatsResources = {
+  runDetails: "Heartbeat: {{name}}, запуск {{counter}}. Открыть сведения",
+  untitledRun: "Heartbeat без названия",
   button: "Heartbeat",
   thisSession: "Эта сессия",
   otherSessions: "Другие сессии этого рабочего пространства",
@@ -777,6 +793,8 @@ const ru: HeartbeatsResources = {
 };
 
 const vi: HeartbeatsResources = {
+  runDetails: "Heartbeat: {{name}}, lượt {{counter}}. Mở chi tiết",
+  untitledRun: "Heartbeat chưa đặt tên",
   button: "Heartbeat",
   thisSession: "Session này",
   otherSessions: "Các session khác trong workspace này",
@@ -872,6 +890,8 @@ const vi: HeartbeatsResources = {
 };
 
 const zhCN: HeartbeatsResources = {
+  runDetails: "心跳：{{name}}，运行 {{counter}}。打开详情",
+  untitledRun: "未命名心跳",
   button: "心跳",
   thisSession: "此会话",
   otherSessions: "此工作区的其他会话",

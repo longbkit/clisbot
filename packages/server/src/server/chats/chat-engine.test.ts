@@ -465,7 +465,7 @@ describe("ChatEngine", () => {
     expect((await h.lines("cht_1")).at(-1)?.text).toBe("⚠️ Alpha finished without a reply.");
   });
 
-  test("HEARTBEAT_OK is silence in a direct chat; PASS and a reply naming the marker are replies", async () => {
+  test("both markers are silence in a direct chat; a reply naming them is a reply", async () => {
     const h = await harness();
     await h.store.create({ id: "cht_1", botIds: [alpha.id] });
     await h.engine.send({ chatId: "cht_1", text: "check in", messageId: "m1" });
@@ -484,7 +484,6 @@ describe("ChatEngine", () => {
     expect((await h.lines("cht_1")).map((line) => line.text)).toEqual([
       "check in",
       "did the tests pass?",
-      "PASS",
       "and the heartbeat?",
       "It answered HEARTBEAT_OK at 9:00.",
     ]);

@@ -5,7 +5,7 @@ import { resolveChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { describeToolCall } from "@/tool-calls/detail-level/grouping";
 import type { StreamItem, ThoughtItem, ToolCallItem } from "@/types/stream";
-import type { ChatLiveHead } from "./render-model";
+import { chatLiveItems, type ChatLiveHead } from "./render-model";
 
 export type ToolActivityItem = ToolCallItem | ThoughtItem;
 
@@ -60,8 +60,9 @@ export function toolActivityOf(
 
 /** The items after the head's last prompt: its running turn, or the one that just ended. */
 function latestTurnItems(head: ChatLiveHead): readonly StreamItem[] {
-  const lastPrompt = head.items.findLastIndex((item) => item.kind === "user_message");
-  return head.items.slice(lastPrompt + 1);
+  const items = chatLiveItems(head);
+  const lastPrompt = items.findLastIndex((item) => item.kind === "user_message");
+  return items.slice(lastPrompt + 1);
 }
 
 function latestAt(activity: ToolActivity): number {

@@ -139,6 +139,14 @@ checkpoint share one storage transaction. See
 for the storage shape and [timeline-sync.md](timeline-sync.md#client-replica-lifetime) for timeline
 resume behavior.
 
+Cross-Host activity surfaces use `useAggregatedAgents`. Its runtime snapshot is the primitive
+directory-loading state, not the Host runtime's version counter; workspace, transport and timeline
+notifications must not invalidate an unchanged agent catalog. Each consumer keeps a bounded
+projection cache keyed by Host and agent, using the directory owner's immutable entries. Unchanged
+directory fields preserve row and sorted-array identity; Host labels, permissions, attention, turns,
+archive state and activity order still update. Dropped sources leave the cache. See
+[native profiling](mobile-testing.md#native-switching-performance) before widening this subscription.
+
 The three directory entity types have independent monotonic sequences and share one daemon
 generation. The daemon retains only the latest projection per entity and bounded tombstones, not an
 event log. A missing, expired, or previous-generation cursor receives a full snapshot. Projects are

@@ -18,6 +18,8 @@ export function continuesTurn(previous: StreamItem | null, next: StreamItem | nu
  */
 export function continuesResponse(previous: StreamItem | null, next: StreamItem | null): boolean {
   if (!previous || !next) return false;
+  // A heartbeat is its own response even when its system prompt is hidden.
+  if (next.kind === "notification" && next.heartbeatRun) return false;
   return continuesTurn(previous, next) || next.kind !== "user_message";
 }
 

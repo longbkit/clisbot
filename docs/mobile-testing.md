@@ -96,6 +96,102 @@ adb shell pm disable-user --user 0 com.google.android.calendar
 
 When replay diverges, read its ranked selector suggestions. Edit the script deliberately and rerun it from the beginning. `--update` is retained for compatibility but no longer rewrites scripts.
 
+## Native switching performance
+
+Use a release/profileable build on a dedicated emulator with synthetic data. A phone-sized browser
+viewport and a Metro development bundle cannot establish native frame performance. Keep the device,
+display refresh rate, dataset, renderer, network schedule and diagnostic probes fixed across revisions.
+The [native panel constraints](mobile-panels.md) still apply during profiling.
+
+The reusable harness lives in `packages/app/scripts/native-performance/`. Build the development
+package identity in release mode so the APK stays separate from production:
+
+```bash
+npm run build:app-deps
+cd packages/app
+APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 npx expo prebuild --platform android --clean
+cd android
+APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 ./gradlew :app:assembleRelease \
+  -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=1 \
+  -Dorg.gradle.parallel=false --init-script ../scripts/native-performance/bounded-build.gradle
+```
+
+The init script limits C++ compile/link pools and Metro transforms as well as Gradle workers.
+Gradle's worker limit alone left Ninja launching fourteen compilers on a shared host. These limits
+change build concurrency, not the runtime's renderer, optimization or animation flags.
+
+From the repository root, start the fixture in a fresh evidence directory:
+
+```bash
+CTO019_EVIDENCE=/tmp/clisbot-native-run node --import tsx \
+  packages/app/scripts/native-performance/fixture.mts
+```
+
+`environment/fixture.json` records the dynamically allocated daemon/control ports. Reverse the
+daemon port through the task emulator and connect the app to that endpoint. Validate one route
+before scaling. The control endpoint `/seed?count=100` (then `500`) creates distinct directory
+workspaces and mock sessions; `/stream?index=0` starts a deterministic mock turn. The first two
+sessions have short and long synthetic histories. The fixture explicitly disables pairing and
+relay and substitutes Tailscale; it proves this configured performance case, not fresh onboarding.
+Stop only this fixture PID when finished; its synthetic home stays inspectable.
+
+After warming Home, Chat, Inbox and Automations, use the tab bar's native bounds for `--y`:
+
+```bash
+python3 packages/app/scripts/native-performance/capture.py \
+  --serial emulator-5580 --output /tmp/clisbot-native-run/baseline-500 \
+  --config packages/app/scripts/native-performance/capture.cfg --y 2250
+python3 packages/app/scripts/native-performance/analyze.py \
+  --processor /path/to/trace_processor --run /tmp/clisbot-native-run/baseline-500
+```
+
+The capture expects a 1080×2400 emulator and records twenty switches at 2.5-second intervals,
+Perfetto, video, native frame stats, memory and the final hierarchy. Validate the recording and
+actual tab bounds before accepting a run. Repetition pacing and host dispatch timestamps are
+never interaction-latency samples. Report total catalog size, loaded rows, open tabs and retained
+screens separately; a large catalog does not imply five hundred mounted rows.
+
+Close any Agent Device session on that emulator before the capture's `uiautomator dump` step.
+Android permits one UiAutomation service at a time; the separate dump helper fails with
+`already registered` while Agent Device holds it. The capture labels the hierarchy unavailable
+without discarding its completed trace/video. During Agent Device QA, use its snapshots directly.
+
+Android FrameTimeline owns frame durations and jank.
+Duration distributions and display-budget comparisons use only rows with `dur > 0`. Report
+raw, eligible and invalid/nonpositive counts separately. Jank flags retain all windowed raw
+rows, including invalid durations; their denominator is independent of duration eligibility.
+For corrections to existing captures, `analyze.py --reuse-exports` reads the original CSV
+exports without rewriting them; preserve superseded summaries as provenance.
+Native touch-up and JS press/route-commit
+markers separate JS input delay from route commitment. Use `MotionEvent.eventTime`, mapped by
+Perfetto's MONOTONIC clock snapshots, for the UP origin; the Window.Callback marker occurs after
+native queueing. The analyzer rejects missing or unstable mappings. A route commit alone does not establish
+visible or usable content. The 50ms timer probe measures JS event-loop gaps, not native FPS. Row
+probes count render attempts and layout-effect commits, not React Profiler `actualDuration`.
+Preserve raw samples, define the measurement window and percentiles, inspect presented content,
+and label unavailable latency/profiler metrics. Record shared-host load and memory pressure;
+overloaded emulator runs cannot establish physical-device performance.
+
+Inspect the exported loss/overrun/discard counters too, including `stats.severity='data_loss'`
+and per-buffer statistics. Unattributed service discards require an explicit coverage caveat.
+Kernel ftrace overruns make JS gap, render and
+derivation observations partial; do not call their counts complete or treat missing markers as
+zero work. Validate all native input/press/commit markers and the separately buffered FrameTimeline
+and clock-qualified video before accepting native latency/frame metrics.
+
+`visual-latency.py --run <run> --references <folder>` pairs the encoded native video frames with
+Android screenrecord's Winscope elapsed-time metadata and four stable content references (`nav.png`,
+`chat.png`, `inbox.png`, `automations.png`). Inspect the matched frames before accepting its footer
+and content thresholds. Report unmatched interactions as censored, rather than dropping slow samples.
+This measures the first recorded frame showing the selected tab and cached content, not the display's
+physical scan-out or fresh network readiness. Perfetto's emulator prediction/buffer-stuffing flags
+must be separated from App Deadline Missed and frames exceeding the 60 Hz budget.
+
+The [CTO-019 native audit](audits/2026-10-15-native-mobile-tab-switching.md) records the 500-session
+before/after comparison, bounded peer-tab history, retained-state QA and unrun platforms. Use
+`--count 0` for a 65-second idle capture; it keeps the native recording window and samples memory
+at its end, without assigning latency to an automation wait.
+
 ## Maestro compatibility
 
 Existing Maestro flows live in `packages/app/maestro/`. Agent Device can execute its supported subset with `agent-device test <path> --maestro`, which provides a migration path while `.ad` coverage replaces these flows.

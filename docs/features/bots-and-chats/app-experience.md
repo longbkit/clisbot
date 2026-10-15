@@ -127,6 +127,15 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   clock time). The daemon records when the turn started in `reply.startedAt`; a line without it,
   from an older daemon or recovered after a restart, shows the clock time only. Fork is not offered
   on a chat line yet.
+- A heartbeat run adds a small clock and its saved `run/total` beside that footer's
+  time. Desktop row hover reveals it; touch/compact layouts keep it tappable,
+  and keyboard focus reveals it. A recorded heartbeat name is the tooltip;
+  press opens its exact schedule in the shared detail sheet. The scheduled
+  input has no separate marker row. Association uses `inReplyTo` (completed)
+  or canonical input-message/turn IDs (streaming), so a later manual reply
+  never inherits the prior run. Silence remains absent; created-heartbeat
+  cards above replies are unchanged. See the conversation-schedules decision
+  for historical records and unknown totals.
 - Messages is the fixed conversation tab. Keep the current ChatScreen/ChatComposer, tool sheets,
   approvals and dictation. The composer is outside the scrolling message list. Attachments use the
   existing upload/image pipeline and canonical chat submission. The selected bot's current session
@@ -200,6 +209,12 @@ advertises `server_info.features.chatToolDisplay`.
   one section per Bot and turn. It opens on press, not hover, so touch and keyboard reach it.
 
 Approvals, notices and errors are visible in every display.
+
+Both exact Bot silence markers (`PASS`, `HEARTBEAT_OK`) hide in direct and group Messages.
+Streaming prefixes wait until the reply diverges into meaningful text; a completed silent turn
+leaves no message or successful tool tail. Failed calls and pending approvals remain available.
+User-authored markers, code/examples and ordinary agent sessions keep their text. See
+[Silent Bot replies](silent-replies.md) for timeline framing, history and regression coverage.
 
 ## Responsive controls and compatibility
 

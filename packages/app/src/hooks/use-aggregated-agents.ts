@@ -1,10 +1,11 @@
-import { useMemo, useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import equal from "fast-deep-equal";
+import { useMemo, useCallback, useEffect, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/shallow";
 import { useSessionStore } from "@/stores/session-store";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
 import type { Agent } from "@/stores/session-store";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
+import { createAggregatedAgentProjector } from "./aggregated-agent-projector";
+import { nativePerformanceTrace } from "@/performance/native-trace";
 
 export interface AggregatedAgent extends AgentDirectoryEntry {
   serverId: string;
@@ -33,11 +34,20 @@ export function useAggregatedAgents(options?: {
     const releases = serverIds.map((serverId) => runtime.acquireDirectoryDemand(serverId));
     return () => releases.forEach((release) => release());
   }, [demand, runtime, serverIds]);
-  const runtimeVersion = useSyncExternalStore(
-    (onStoreChange) => runtime.subscribeAll(onStoreChange),
-    () => runtime.getVersion(),
-    () => runtime.getVersion(),
+  const subscribeRuntime = useCallback(
+    (onStoreChange: () => void) => runtime.subscribeAll(onStoreChange),
+    [runtime],
   );
+  const getLoadingSnapshot = useCallback(
+    () =>
+      daemons.some((daemon) => {
+        const status =
+          runtime.getSnapshot(daemon.serverId)?.agentDirectoryStatus ?? "initial_loading";
+        return status === "initial_loading" || status === "revalidating";
+      }),
+    [daemons, runtime],
+  );
+  const isLoading = useSyncExternalStore(subscribeRuntime, getLoadingSnapshot, getLoadingSnapshot);
 
   const sessionAgents = useSessionStore(
     useShallow((state) => {
@@ -54,113 +64,20 @@ export function useAggregatedAgents(options?: {
     for (const serverId of serverIds) void runtime.refreshDirectories(serverId);
   }, [demand, runtime, serverIds]);
 
-  // Keyed by "serverId:agentId" — reuse the previous AggregatedAgent object when
-  // none of its fields changed, so downstream memo/shallow comparisons can bail early.
-  const prevAgentsRef = useRef<Map<string, AggregatedAgent>>(new Map());
-  // Preserved sorted array — returned as-is when every element kept its identity
-  // and order, so callers using reference equality skip re-renders entirely.
-  const prevSortedRef = useRef<AggregatedAgent[]>([]);
-
+  const projectAgents = useMemo(createAggregatedAgentProjector, []);
   const result = useMemo(() => {
-    // runtimeVersion is referenced so the memo recomputes when runtime state changes.
-    void runtimeVersion;
-    const allAgents: AggregatedAgent[] = [];
-    const serverLabelById = new Map(
-      daemons.map((daemon) => [daemon.serverId, daemon.label] as const),
-    );
-
-    // Derive agent directory from all sessions
-    for (const [serverId, agents] of Object.entries(sessionAgents)) {
-      if (!agents || agents.size === 0) {
-        continue;
-      }
-      const serverLabel = serverLabelById.get(serverId) ?? serverId;
-      for (const agent of agents.values()) {
-        if (!includeArchived && agent.archivedAt) {
-          continue;
-        }
-        const nextAgent: AggregatedAgent = {
-          id: agent.id,
-          serverId,
-          serverLabel,
-          title: agent.title ?? null,
-          status: agent.status,
-          turn: agent.turn,
-          lastActivityAt: agent.lastActivityAt,
-          cwd: agent.cwd,
-          workspaceId: agent.workspaceId,
-          provider: agent.provider,
-          pendingPermissionCount: agent.pendingPermissions.length,
-          requiresAttention: agent.requiresAttention,
-          attentionReason: agent.attentionReason,
-          attentionTimestamp: agent.attentionTimestamp,
-          archivedAt: agent.archivedAt,
-          createdAt: agent.createdAt,
-          labels: agent.labels,
-          projectPlacement: agent.projectPlacement,
-        };
-        const cacheKey = `${serverId}:${agent.id}`;
-        const prev = prevAgentsRef.current.get(cacheKey);
-        // Preserve object identity when fields are unchanged so callers can use
-        // reference equality (useShallow, memo) to skip re-renders.
-        allAgents.push(prev !== undefined && equal(prev, nextAgent) ? prev : nextAgent);
-      }
-    }
-
-    // Sort by: running agents first, then by most recent activity
-    allAgents.sort((left, right) => {
-      const leftRunning = left.turn.phase === "open";
-      const rightRunning = right.turn.phase === "open";
-      if (leftRunning && !rightRunning) {
-        return -1;
-      }
-      if (!leftRunning && rightRunning) {
-        return 1;
-      }
-      const leftTime = left.lastActivityAt.getTime();
-      const rightTime = right.lastActivityAt.getTime();
-      return rightTime - leftTime;
-    });
-
-    // Update the identity cache for the next render pass.
-    const nextCache = new Map<string, AggregatedAgent>();
-    for (const agent of allAgents) {
-      nextCache.set(`${agent.serverId}:${agent.id}`, agent);
-    }
-    prevAgentsRef.current = nextCache;
-
-    // If every element kept its reference identity and the order is the same,
-    // return the previous array so downstream reference comparisons can bail.
-    const prevSorted = prevSortedRef.current;
-    const stableAgents =
-      allAgents.length === prevSorted.length &&
-      allAgents.every((agent, i) => agent === prevSorted[i])
-        ? prevSorted
-        : allAgents;
-    prevSortedRef.current = stableAgents;
-
-    // Check if we have any cached data
-    const hasAnyData = stableAgents.length > 0;
-
-    // Align list loading with the runtime directory-sync machine.
-    const isLoading = daemons.some((daemon) => {
-      const status =
-        runtime.getSnapshot(daemon.serverId)?.agentDirectoryStatus ?? "initial_loading";
-      return status === "initial_loading" || status === "revalidating";
-    });
-    const isInitialLoad = isLoading && !hasAnyData;
-    const isRevalidating = isLoading && hasAnyData;
-
-    return {
-      agents: stableAgents,
-      isLoading,
-      isInitialLoad,
-      isRevalidating,
-    };
-  }, [daemons, includeArchived, runtime, runtimeVersion, sessionAgents]);
+    const tracing = nativePerformanceTrace.isEnabled();
+    if (tracing) nativePerformanceTrace.beginSection("clisbot.agents.derive");
+    const agents = projectAgents({ sessionAgents, hosts: daemons, includeArchived });
+    if (tracing) nativePerformanceTrace.endSection();
+    return { agents };
+  }, [daemons, includeArchived, projectAgents, sessionAgents]);
 
   return {
     ...result,
+    isLoading,
+    isInitialLoad: isLoading && result.agents.length === 0,
+    isRevalidating: isLoading && result.agents.length > 0,
     refreshAll,
   };
 }

@@ -9,6 +9,7 @@ import {
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import type { AgentStreamEvent } from "../agent-sdk-types.js";
 import { AgentManager } from "../agent-manager.js";
+import { PermissionResponseNotDeliveredError } from "../permission-response-not-delivered-error.js";
 
 const questionItem = {
   type: "agentMessage",
@@ -19,10 +20,15 @@ const questionItem = {
   questions: [{ title: "Which color?", options: ["Blue", "Green"] }],
 };
 
-async function setup(metadata?: Record<string, unknown>, rejectSteer = false) {
+async function setup(
+  metadata?: Record<string, unknown>,
+  rejectSteer: boolean | "definitive" = false,
+) {
   const appServer = createFakeCodexAppServer({
     "turn/interrupt": () => ({}),
     "turn/steer": () => {
+      if (rejectSteer === "definitive")
+        return { __jsonRpcError: { code: -32600, message: "no active turn to steer" } };
       if (rejectSteer) return { __jsonRpcError: { code: -32000, message: "Delivery failed" } };
       return { turnId: "native-turn" };
     },
@@ -74,6 +80,31 @@ async function setup(metadata?: Record<string, unknown>, rejectSteer = false) {
 }
 
 const answer = { behavior: "allow" as const, updatedInput: { answers: { "Question 1": "Green" } } };
+
+test("classifies only definitive async answer rejection as safe to retry", async () => {
+  for (const rejection of ["definitive", true] as const) {
+    const { session, ask, allowAnswers } = await setup(undefined, rejection);
+    try {
+      await ask();
+      const [permission] = session.getPendingPermissions();
+      const failure = await session
+        .respondToPermission(permission.id, answer)
+        .catch((error: unknown) => error);
+      expect(failure instanceof PermissionResponseNotDeliveredError).toBe(
+        rejection === "definitive",
+      );
+      expect(session.getPendingPermissions()).toHaveLength(1);
+      allowAnswers();
+      await session.respondToPermission(permission.id, answer);
+      expect(session.getPendingPermissions()).toEqual([]);
+      expect(session.describePersistence()?.metadata?.asyncQuestions).toEqual([
+        expect.objectContaining({ resolution: ["Green"] }),
+      ]);
+    } finally {
+      await session.close();
+    }
+  }
+});
 
 async function setupRewind(fail = false) {
   const records = [

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useLayoutEffect, useMemo } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import { HighlightedText } from "@/components/ui/highlighted-text";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { activityBucket, isUnreadReply } from "./activity";
+import { traceInstant } from "@/performance/native-trace";
 
 /** Why a conversation sits in Needs you, in the words the row shows. */
 export function activityStatus(
@@ -62,6 +63,10 @@ export function ActivityRow({
   /** The held Home section may lag the live status until the reader applies updates. */
   homeBucket?: string;
 }) {
+  traceInstant("clisbot.activity.row.render");
+  useLayoutEffect(() => {
+    traceInstant("clisbot.activity.row.commit", { bucket: homeBucket ?? "inbox" });
+  });
   const { t } = useTranslation();
   const title = agent.title || t("agentList.fallbackTitle");
   const context = activityContext(agent, showHost);

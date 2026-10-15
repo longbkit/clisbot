@@ -1061,10 +1061,24 @@ export class ScheduleService {
       if (this.agentManager.hasInFlightRun(agent.id)) {
         throw new Error(`Agent ${agent.id} already has an active run`);
       }
-      await this.markHeartbeatRun(schedule, agent.id);
       await startAgentRun(this.agentManager, agent.id, wrappedPrompt, this.logger, {
         replaceRunning: true,
         activeTurnBehavior: "steer",
+        runOptions: {
+          heartbeatRun: {
+            message: formatHeartbeatRunNotice({
+              title: scheduleTitle(schedule),
+              run: countCompletedRuns(schedule) + 1,
+              maxRuns: schedule.maxRuns,
+            }),
+            metadata: {
+              scheduleId: schedule.id,
+              name: schedule.name,
+              run: countCompletedRuns(schedule) + 1,
+              maxRuns: schedule.maxRuns,
+            },
+          },
+        },
       });
       const waitResult = await this.agentManager.waitForAgentEvent(agent.id, {
         waitForActive: true,
@@ -1203,27 +1217,6 @@ export class ScheduleService {
     );
     if (result.status === "gone") throw new ScheduleTargetGoneError(result.reason);
     return { agentId: result.agentId ?? target.agentId, output: null };
-  }
-
-  /**
-   * The session's timeline gets a line before each heartbeat run, so its reply reads as a run and
-   * not as the agent talking on its own. A failed write never stops the run.
-   */
-  private async markHeartbeatRun(schedule: StoredSchedule, agentId: string): Promise<void> {
-    const notice = formatHeartbeatRunNotice({
-      title: scheduleTitle(schedule),
-      run: countCompletedRuns(schedule) + 1,
-      maxRuns: schedule.maxRuns,
-    });
-    try {
-      await this.agentManager.appendTimelineItem(agentId, {
-        type: "notification",
-        level: "info",
-        message: notice,
-      });
-    } catch (error) {
-      this.logger.warn({ err: error, agentId, scheduleId: schedule.id }, "heartbeat.notice_failed");
-    }
   }
 
   /** The workspace a `new-agent` run uses: the configured existing one, or a fresh one. */

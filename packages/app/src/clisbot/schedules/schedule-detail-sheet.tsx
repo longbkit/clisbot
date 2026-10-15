@@ -52,8 +52,7 @@ export interface ScheduleDetailSheetProps {
  */
 export function ScheduleDetailSheet(props: ScheduleDetailSheetProps): ReactElement {
   const { t } = useTranslation();
-  const detail = useScheduleDetail(props.serverId, props.scheduleId);
-  const schedule = detail.data;
+  const { data: schedule, isError } = useScheduleDetail(props.serverId, props.scheduleId);
   const { draft, setDraft, version } = useDraft(schedule);
   const patch = schedule && draft ? scheduleDraftPatch(schedule, draft) : null;
   const cadenceError =
@@ -67,12 +66,13 @@ export function ScheduleDetailSheet(props: ScheduleDetailSheetProps): ReactEleme
       ) : undefined,
     [draft, props, schedule, submittable],
   );
+  const unloadedTitle = isError ? t("common.errors.error") : t("heartbeats.detail.loading");
   const header = useMemo<SheetHeader>(
     () => ({
-      title: schedule ? resolveScheduleTitle(schedule) : t("heartbeats.detail.loading"),
+      title: schedule ? resolveScheduleTitle(schedule) : unloadedTitle,
       actions: schedule ? <ScheduleStatusBadge schedule={schedule} /> : undefined,
     }),
-    [schedule, t],
+    [schedule, unloadedTitle],
   );
   return (
     <AdaptiveModalSheet
@@ -94,7 +94,7 @@ export function ScheduleDetailSheet(props: ScheduleDetailSheetProps): ReactEleme
         />
       ) : (
         <Text style={styles.muted}>
-          {detail.isError ? t("heartbeats.detail.loadFailed") : t("heartbeats.detail.loading")}
+          {isError ? t("heartbeats.detail.loadFailed") : t("heartbeats.detail.loading")}
         </Text>
       )}
     </AdaptiveModalSheet>

@@ -169,12 +169,41 @@ The composer was the first idea and was dropped: its control row is full.
 - **When an agent creates a heartbeat**, its `create_heartbeat` call renders as a
   card in the timeline (`heartbeat-created-card.tsx`): name, status, cadence and
   next run, the prompt, and Run now, Pause and Edit.
-- **Each run is marked** in the session's timeline. The daemon drops the
-  `<clisbot-system>` prompt it sends (`agent-manager.ts`), so before the prompt
-  it appends a `notification` item, **Heartbeat · name · run N of M**
-  (`protocol/src/schedule/heartbeat-notice.ts`), which the app draws as a marker
-  (`heartbeat-run-marker.tsx`). A heartbeat through its Chat gets the same
-  marker from its transcript line.
+- **Each run uses compact response-footer metadata** (2026-10-14, CTO023): a
+  small clock and `N/M` beside elapsed time, revealed with the desktop footer,
+  always available on touch/compact layouts and revealed on keyboard focus.
+  A saved name appears in the tooltip; pressing opens that schedule directly in
+  `ScheduleDetailSheet`. Unlimited runs show `N/∞`; an unknown historical total
+  shows `N/?`. The counter is this run's snapshot, even after the schedule changes.
+  Heartbeat-created cards remain separate.
+  The hidden system prompt is unchanged. `ScheduleService` passes presentation
+  metadata to `AgentManager`, which persists the notification with the accepted
+  canonical turn ID before staged output. Failed startup creates no notice to
+  attach to a later manual turn. Its existing formatted text remains compatible
+  with older clients. The optional `heartbeatRun` snapshot carries schedule ID,
+  run, total and name; it is stripped before provider dispatch.
+  A Chat's `scheduleRun` carries the same snapshot. Completed replies resolve
+  their exact `inReplyTo` input ID; live replies resolve the canonical prompt's
+  message ID and matching turn ID. No nearest-message/title identity inference.
+  Old Chat records retain their saved schedule ID and run; a valid historical
+  formatted counter can supply the total, but a title fallback cannot establish
+  a name. Old ordinary text-only notices have no safe schedule/turn identity:
+  their separator is omitted, with no guessed footer link. Deleted/unavailable
+  schedules retain their counter and open the canonical sheet's load-failure
+  state. Silent Bot replies create no completed footer or separator.
+  The historical readers are tagged `COMPAT(heartbeatChatTotal)` and
+  `COMPAT(heartbeatTextNotice)` at their removal sites, per
+  [protocol compatibility](../protocol-compatibility.md#every-shim-is-tagged-and-dated).
+  Both were introduced on 2026-10-14 in local CTO023 commit `49e676842`, on
+  version `2.1.1` source; CTO023 is unreleased and the frozen `v2.1.1` release
+  does not contain them. Remove each reader only after all supported producers
+  supply its structured field and persisted records missing that field have
+  been migrated or explicitly retired from history support. No such migration
+  is implemented here. A daemon upgrade or elapsed time alone cannot retire
+  saved history. Migration must preserve Chat's recorded schedule ID/run and cannot
+  invent schedule/turn identity for text-only notices. The notice formatter
+  remains the readable content for older clients; this removal condition
+  concerns the text-only classification fallback, not that formatter.
 - **The Chat ⏱ follows a Bot across `/new`**: its group lists the heartbeats of
   every session that Bot has had in the Chat (`clisbot.chat-id` and
   `clisbot.bot-id` labels), so a heartbeat still on the earlier session stays

@@ -86,12 +86,14 @@ rules included: a members-only update would never teach them `PASS`.
 In a group, a turn whose final text is empty, exactly `PASS` or exactly `HEARTBEAT_OK` (trimmed)
 appends nothing to the transcript, forwards nothing and wakes no one to discuss it. Failures still
 end in a `system` line: silence is the bot's choice, a failed delivery is not. A direct chat has no
-room contract, so a turn there without text still gets the "finished without a reply" notice, and
-`PASS` there is an answer. `HEARTBEAT_OK` is the Bot templates' heartbeat reply for "nothing needs
-attention", so it is silence in a direct chat too. A reply that only mentions a marker is a reply.
+room contract, so a turn there without text still gets the "finished without a reply" notice.
+Both exact markers are silence in a direct chat too. Long superseded the earlier direct-chat
+`PASS` exemption on 2026-10-14. A reply that only mentions a marker is a reply.
 The app hides the same exact markers when an older daemon persisted them, and never shows a
 running reply while it still spells one (`packages/protocol/src/chats/room.ts`,
-`clisbot/bots/chat/render-model.ts`).
+`clisbot/bots/chat/render-model.ts`). Timeline replies remove the provider's assistant-message
+boundary before checking the complete assistant run; they never join different turns. See
+[Silent Bot replies](../silent-replies.md) for the DM tail bypass, streaming and history contract.
 
 ### Turns in rounds
 

@@ -18,6 +18,7 @@ import { ACTOR_AVATAR_SIZE } from "@/clisbot/session-storage/actor-metrics";
 import { BotFace } from "./bot-face";
 import type { ChatRenderRow } from "./render-model";
 import { HeartbeatCard } from "@/clisbot/heartbeats/heartbeat-created-card";
+import { HeartbeatRunFooter } from "@/clisbot/heartbeats/heartbeat-run-footer";
 
 /** What the chat needs to draw a participant; the screen builds it from the bot records. */
 export interface ChatBotIdentity {
@@ -127,7 +128,12 @@ export const ChatBotRow = memo(function ChatBotRow({
           // The footer below owns the gap, as a user message's time row does.
           spacing="compactBottom"
         />
-        <BotLineFooter line={row.line} text={copyText} visible={hovered || compact || isNative} />
+        <BotLineFooter
+          row={row}
+          serverId={serverId}
+          text={copyText}
+          visible={hovered || compact || isNative}
+        />
       </ActorResponseRow>
     </View>
   );
@@ -138,30 +144,44 @@ export const ChatBotRow = memo(function ChatBotRow({
  * its turn's start (hover shows the clock time), the clock time otherwise.
  */
 function BotLineFooter({
-  line,
+  row,
+  serverId,
   text,
   visible,
 }: {
-  line: Extract<ChatRenderRow, { kind: "bot" }>["line"];
+  row: Extract<ChatRenderRow, { kind: "bot" }>;
+  serverId: string;
   text: string;
   /** Hidden keeps its height, so a line does not shift when the pointer moves over it. */
   visible: boolean;
 }) {
+  const line = row.line;
+  const [focused, setFocused] = useState(false);
+  const revealed = visible || focused;
   const getContent = useCallback(() => text, [text]);
   const completedAt = useMemo(() => new Date(line.at), [line.at]);
   const startedAt = line.reply?.startedAt ? Date.parse(line.reply.startedAt) : Number.NaN;
   const durationMs = Number.isFinite(startedAt)
     ? Math.max(0, completedAt.getTime() - startedAt)
     : null;
+  const metadata = useMemo(
+    () =>
+      row.heartbeatRun ? (
+        <HeartbeatRunFooter serverId={serverId} run={row.heartbeatRun} onFocusChange={setFocused} />
+      ) : null,
+    [row.heartbeatRun, serverId],
+  );
   return (
     <View
-      style={[styles.footer, !visible && styles.footerHidden]}
-      pointerEvents={visible ? "auto" : "none"}
+      style={[styles.footer, !revealed && styles.footerHidden]}
+      pointerEvents={revealed ? "auto" : "none"}
     >
       <AssistantTurnFooter
         getContent={getContent}
         completedAt={completedAt}
         durationMs={durationMs}
+        revealed={revealed}
+        metadata={metadata}
       />
     </View>
   );

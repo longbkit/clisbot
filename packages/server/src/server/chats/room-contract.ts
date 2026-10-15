@@ -6,11 +6,12 @@ import { createHash } from "node:crypto";
 import {
   DEFAULT_ROOM_INSTRUCTIONS,
   isHeartbeatAck,
+  isSilentBotReply,
   isSilentReply,
   PASS_REPLY,
 } from "@clisbot/protocol/chats/room";
 
-export { isHeartbeatAck, isSilentReply, PASS_REPLY };
+export { isHeartbeatAck, isSilentBotReply, isSilentReply, PASS_REPLY };
 
 export interface RoomMember {
   slug: string;

@@ -17,6 +17,7 @@ function sameHeads(
       head.turnActive !== other.turnActive ||
       head.startedAt?.getTime() !== other.startedAt?.getTime() ||
       head.items !== other.items ||
+      head.streamingItems !== other.streamingItems ||
       head.permissions.length !== other.permissions.length
     )
       return false;
@@ -40,6 +41,7 @@ export function useChatLiveHeads(
         heads.set(participant.botId, {
           agentId: participant.agentId,
           items: session?.agentStreamTail?.get(participant.agentId) ?? EMPTY_ITEMS,
+          streamingItems: session?.agentStreamHead?.get(participant.agentId) ?? EMPTY_ITEMS,
           turnActive: turn.isActive,
           startedAt: turn.startedAt,
           permissions: [...(session?.pendingPermissions?.values() ?? [])].filter(

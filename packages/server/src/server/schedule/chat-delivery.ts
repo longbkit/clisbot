@@ -18,7 +18,7 @@ export interface ScheduleChatPost {
   /** One per run, so a retried post is a duplicate and not a second line. */
   messageId: string;
   actor: SessionActor;
-  scheduleRun: { scheduleId: string; run: number };
+  scheduleRun: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
 }
 
 export type ScheduleChatPostResult =
@@ -63,7 +63,12 @@ export function chatHeartbeatPost(input: {
     ...(input.target.mentionBotIds ? { mentionBotIds: input.target.mentionBotIds } : {}),
     text: input.schedule.prompt,
     messageId: `schedule-${input.schedule.id}-${input.runId}`,
-    scheduleRun: { scheduleId: input.schedule.id, run: input.run },
+    scheduleRun: {
+      scheduleId: input.schedule.id,
+      run: input.run,
+      maxRuns: input.schedule.maxRuns,
+      name: input.schedule.name ?? null,
+    },
     // The sender name is the run marker the app draws in place of a user bubble, and the line
     // the Bot reads before the text.
     actor: {

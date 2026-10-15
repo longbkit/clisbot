@@ -114,6 +114,26 @@ Permission requests are notification checkpoints, not the end of that subscripti
 The permission notification includes the normalized request plus the child and request IDs, so the caller can inspect it and respond without fetching agent status.
 A watched child that closes before its finish event also notifies the caller so delegated work cannot disappear silently during archive or workspace teardown.
 
+## Permission response recovery
+
+The daemon owns pending permissions and questions. Every completed response attempt publishes
+the current agent snapshot, including a retry or rejected competing response. A client that
+missed a resolution therefore converges on the daemon's pending set without forwarding another
+answer, hiding a card locally, or clearing unrelated authorization.
+
+With durable session storage, response admission records `pending` before forwarding and
+`applied` after acknowledgement. A timeout, disconnect, invalid acknowledgement, or ordinary
+adapter error remains unconfirmed and must not be replayed automatically. Only a typed
+`PermissionResponseNotDeliveredError` proves that the response did not take effect: admission
+durably records `failed` before releasing its lock. The same logical response ID can then retry
+with the same answer, actor, and request generation, or the still-pending request can receive a
+new response. A failed status write leaves the lock in place.
+
+Codex async questions use this proof when steer admission returns unavailable, including the
+explicit active-turn rejection. They stay pending until a later answer or dismissal succeeds;
+Clisbot does not start a replacement turn as a fallback. Applied answers, unknown outcomes,
+other pending requests, and reused request generations retain their existing protection.
+
 ## Provider-managed child agents
 
 Some providers can create their own child sessions inside one provider runtime. OMP's task tool reports these with `child_session` events; `AgentManager` imports the live provider handle, stamps `clisbot.parent-agent-id`, and surfaces the result as a normal subagent in the parent's subagents track.

@@ -22,6 +22,63 @@ function assistant(id: string, timestamp: Date): StreamItem {
 }
 
 describe("deriveStreamTurnTiming", () => {
+  it("associates the saved heartbeat counter only with its exact canonical turn", () => {
+    const at = new Date("2026-10-14T00:00:00Z");
+    const notice: StreamItem = {
+      kind: "notification",
+      sourceType: "notification",
+      id: "run",
+      turnId: "heartbeat-turn",
+      timestamp: at,
+      level: "info",
+      message: "Heartbeat · Check CI · run 2 of 5",
+      heartbeatRun: { scheduleId: "ci", name: "Check CI", run: 2, maxRuns: 5 },
+    };
+    const reply = {
+      ...assistant("heartbeat-reply", new Date(at.getTime() + 7000)),
+      turnId: "heartbeat-turn",
+    };
+    const manual = {
+      ...assistant("manual-reply", new Date(at.getTime() + 14000)),
+      turnId: "manual-turn",
+    };
+    const tail = [
+      notice,
+      reply,
+      { ...user("manual", new Date(at.getTime() + 10000)), turnId: "manual-turn" },
+    ];
+    const active = deriveStreamTurnTiming({
+      isTurnActive: true,
+      activeTurnStartedAt: at,
+      tail,
+      head: [manual],
+    });
+    assert.deepEqual(active.byAssistantId.get(reply.id)?.heartbeatRun, notice.heartbeatRun);
+    assert.equal(active.byAssistantId.get(reply.id)?.durationMs, 7000);
+    assert.equal(active.runningHeartbeatRun, undefined);
+    const completed = deriveStreamTurnTiming({
+      isTurnActive: false,
+      activeTurnStartedAt: null,
+      tail,
+      head: [manual],
+    });
+    assert.equal(completed.byAssistantId.get(manual.id)?.heartbeatRun, undefined);
+    const live = deriveStreamTurnTiming({
+      isTurnActive: true,
+      activeTurnStartedAt: at,
+      tail: [notice],
+      head: [reply],
+    });
+    assert.deepEqual(live.runningHeartbeatRun, notice.heartbeatRun);
+    // A legacy text-only notice has neither identity nor a safe next-turn association.
+    const legacy = deriveStreamTurnTiming({
+      isTurnActive: false,
+      activeTurnStartedAt: null,
+      tail: [{ ...notice, heartbeatRun: undefined, turnId: undefined }, manual],
+      head: [],
+    });
+    assert.equal(legacy.byAssistantId.get(manual.id)?.heartbeatRun, undefined);
+  });
   it("starts elapsed time from the submitted prompt", () => {
     const submittedAt = new Date("2026-05-15T00:00:00.000Z");
 

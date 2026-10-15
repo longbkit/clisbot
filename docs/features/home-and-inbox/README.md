@@ -17,8 +17,11 @@ has no sidebar to open or close: Chat is a tab page that shows the conversation 
 tab bar. Tab pages have no header button and no edge swipe; every other page (conversation
 detail, and New workspace, Connectors or Bot settings opened from Chat) hides the tabs and leads
 with Back to its entry surface. Android Back follows the same model: a conversation returns to
-its entry surface, a tab other than Home goes Home, and Home leaves the app (switching tabs
-pushes routes, so the router's own Back would bounce between tabs). Chat drops the Home, Inbox
+its entry surface, a tab other than Home goes Home, and Home leaves the app. Native peer-tab
+visits replace the current peer page rather than accumulate hidden stack pages. Detail Back keeps
+its existing navigation so the host underneath preserves workspace and tab state. The Home activity
+links and Chat's close-to-Home path use that same policy. Browser navigation keeps its history.
+Chat drops the Home, Inbox
 and Automations rows the tab bar already has; its account row stays pinned while New workspace,
 Connectors and the lists scroll together. Its footer stays on one line, mirrored so New sits at
 the right edge under the thumb: Settings, Help, Hosts, Usage, Search, New, with Search reduced

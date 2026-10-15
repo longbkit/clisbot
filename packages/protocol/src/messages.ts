@@ -1,3 +1,4 @@
+import { HeartbeatRunSchema } from "./schedule/heartbeat-notice.js";
 import {
   QuickStartListRequestSchema,
   QuickStartListResponseSchema,
@@ -817,6 +818,7 @@ export const AgentTimelineItemPayloadSchema: z.ZodType<AgentTimelineItem, unknow
     type: z.literal("notification"),
     level: z.enum(["info", "warning", "error"]),
     message: z.string(),
+    heartbeatRun: HeartbeatRunSchema.optional(),
   }),
   z.object({
     type: z.literal("compaction"),

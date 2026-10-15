@@ -753,11 +753,16 @@ describe("ScheduleService", () => {
     expect(steerOrReplace.mock.calls[0]).toEqual([
       agent.id,
       expect.stringContaining(`Schedule fired (id=${schedule.id}, run=`),
-      undefined,
+      expect.objectContaining({
+        heartbeatRun: {
+          message: expect.stringContaining("Heartbeat · "),
+          metadata: { scheduleId: schedule.id, name: null, run: 1, maxRuns: null },
+        },
+      }),
     ]);
   });
 
-  test("marks each heartbeat run in the session's timeline before the prompt", async () => {
+  test("binds heartbeat metadata to the accepted turn before its assistant output", async () => {
     const manager = new AgentManager({
       logger: createTestLogger(),
       clients: createTestAgentClients(),
@@ -765,15 +770,6 @@ describe("ScheduleService", () => {
     });
     const agent = await manager.createAgent({ provider: "claude", cwd: tempDir }, undefined, {
       workspaceId: undefined,
-    });
-    const order: string[] = [];
-    vi.spyOn(manager, "appendTimelineItem").mockImplementation(async (_agentId, item) => {
-      order.push(item.type === "notification" ? item.message : item.type);
-      return { seq: 1, epoch: "e" };
-    });
-    vi.spyOn(manager, "steerOrReplaceActiveTurn").mockImplementation(async () => {
-      order.push("prompt");
-      return undefined as never;
     });
     const service = createScheduleService({
       clisbotHome: tempDir,
@@ -791,9 +787,29 @@ describe("ScheduleService", () => {
       maxRuns: 20,
     });
 
-    await service.runOnce(schedule.id).catch(() => undefined);
-
-    expect(order.slice(0, 2)).toEqual(["Heartbeat · Check CI · run 1 of 20", "prompt"]);
+    await service.runOnce(schedule.id);
+    const rows = await manager.getTimelineRows(agent.id);
+    const notice = rows.find((row) => row.item.type === "notification");
+    expect(notice?.item).toEqual({
+      type: "notification",
+      level: "info",
+      message: "Heartbeat · Check CI · run 1 of 20",
+      heartbeatRun: { scheduleId: schedule.id, name: "Check CI", run: 1, maxRuns: 20 },
+    });
+    const reply = rows.find((row) => row.item.type === "assistant_message");
+    expect(notice?.turnId).toBeTruthy();
+    expect(reply?.turnId).toBe(notice?.turnId);
+    expect(reply!.seq).toBeGreaterThan(notice!.seq);
+    for await (const _ of manager.streamAgent(agent.id, "Manual next turn")) {
+      /* drain */
+    }
+    const manual = (await manager.getTimelineRows(agent.id)).findLast(
+      (row) => row.item.type === "assistant_message",
+    );
+    expect(manual?.turnId).not.toBe(notice?.turnId);
+    expect(
+      manager.getTimeline(agent.id).filter((item) => item.type === "notification"),
+    ).toHaveLength(1);
   });
 
   test("titles scheduled new agents from the schedule prompt", async () => {
@@ -3848,7 +3864,7 @@ describe("ScheduleService", () => {
       text: "standup",
       messageId: `schedule-${schedule.id}-${first.runs[0]!.id}`,
       actor: { kind: "automation", id: schedule.id, displayName: "Heartbeat · Standup · run 1" },
-      scheduleRun: { scheduleId: schedule.id, run: 1 },
+      scheduleRun: { scheduleId: schedule.id, run: 1, maxRuns: null, name: "Standup" },
     });
     expect(first.runs[0]).toMatchObject({ status: "succeeded", agentId });
 

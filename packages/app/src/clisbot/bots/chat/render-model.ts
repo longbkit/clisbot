@@ -1,21 +1,26 @@
 import type { PendingPermission } from "@/types/shared";
-import type { StreamItem } from "@/types/stream";
+import { flushHeadToTail, type StreamItem } from "@/types/stream";
 import {
-  HEARTBEAT_ACK_REPLY,
-  isHeartbeatAck,
+  isSilentBotReply,
   isSilentReply,
-  PASS_REPLY,
+  mayBecomeSilentBotReply,
+  stripAssistantMessageBoundary,
 } from "@clisbot/protocol/chats/room";
+import { splitLiveInputBoundaries } from "./live-input-boundaries";
 import type { ChatMessage } from "../data/contracts";
+import type { HeartbeatRun } from "@clisbot/protocol/schedule/heartbeat-notice";
+import { isHeartbeatRunNotification } from "@clisbot/protocol/schedule/heartbeat-notice";
 
 /**
- * One bot's in-progress work in a chat: its session's stream tail, whether the turn is
+ * One bot's in-progress work in a chat: its session's stream tail and head, whether the turn is
  * running, and the approvals it is waiting on. The screen builds this from store selectors;
  * nothing here reads React or the store (plans/app.md §4 "Render model").
  */
 export interface ChatLiveHead {
   agentId: string;
   items: readonly StreamItem[];
+  /** Uncommitted streaming items, kept separate so unrelated store updates stay a no-op. */
+  streamingItems?: readonly StreamItem[];
   turnActive: boolean;
   startedAt?: Date | null;
   permissions: readonly PendingPermission[];
@@ -23,10 +28,15 @@ export interface ChatLiveHead {
 
 export type ChatRenderRow =
   | { kind: "user"; key: string; line: ChatMessage; opensGroup: boolean }
-  | { kind: "bot"; key: string; line: ChatMessage; botId: string; opensGroup: boolean }
+  | {
+      kind: "bot";
+      key: string;
+      line: ChatMessage;
+      botId: string;
+      opensGroup: boolean;
+      heartbeatRun?: HeartbeatRun;
+    }
   | { kind: "system"; key: string; line: ChatMessage }
-  /** A heartbeat run posted into the chat: a marker, not a message from the user. */
-  | { kind: "heartbeat"; key: string; line: ChatMessage; label: string }
   | {
       kind: "live";
       key: string;
@@ -36,8 +46,11 @@ export type ChatRenderRow =
       permissions: PendingPermission[];
       /** The turn is still running; false when only unreferenced tail items remain. */
       inProgress: boolean;
+      /** Prefix segments retain native activity but only the trailing row owns the loader. */
+      showWorkingIndicator?: boolean;
       startedAt?: Date | null;
       opensGroup: boolean;
+      heartbeatRun?: HeartbeatRun;
     };
 
 export interface ChatRenderModel {
@@ -48,30 +61,56 @@ export interface ChatRenderModel {
 export function chatRowSender(row: ChatRenderRow | undefined): string | null {
   if (!row) return null;
   if (row.kind === "user") return "user";
-  if (row.kind === "system" || row.kind === "heartbeat") return null;
+  if (row.kind === "system") return null;
   return `bot:${row.botId}`;
 }
 
 const senderOf = chatRowSender;
 
 /**
- * A Bot reply that is silence, never a message: exactly `PASS` or `HEARTBEAT_OK` in a group, and
- * exactly `HEARTBEAT_OK` in a direct chat, where `PASS` can be a real answer. Matching is on the
- * trimmed text, so a reply that only mentions a marker still shows.
+ * Direct and group Chats share the exact Bot markers. Only a group also treats no text as
+ * silence; direct Chats retain their reply-less-turn notice.
  */
 export function isSilentBotText(text: string, group: boolean): boolean {
-  return group ? isSilentReply(text) : isHeartbeatAck(text);
+  return group ? isSilentReply(text) : isSilentBotReply(text);
 }
 
-/** A still-streaming reply that so far spells the start of a silence marker. */
-function mayBecomeSilent(text: string, group: boolean): boolean {
-  const trimmed = text.trim();
-  const markers = group ? [PASS_REPLY, HEARTBEAT_ACK_REPLY] : [HEARTBEAT_ACK_REPLY];
-  return trimmed !== "" && markers.some((marker) => marker.startsWith(trimmed));
+/** The same head/tail handoff used by the session timeline, without changing stored history. */
+export function chatLiveItems(head: ChatLiveHead): readonly StreamItem[] {
+  return head.streamingItems?.length
+    ? flushHeadToTail([...head.items], [...head.streamingItems])
+    : head.items;
+}
+
+/** Projected assistant messages in one contiguous run; never join different turns. */
+function assistantRunText(items: readonly StreamItem[], start: number, end: number): string {
+  let text = "";
+  let messageId: string | undefined;
+  for (const item of items.slice(start, end)) {
+    if (item.kind !== "assistant_message") continue;
+    const part = stripAssistantMessageBoundary(item.text);
+    if (!part) continue;
+    if (text && messageId !== item.messageId) text += "\n\n";
+    text += part;
+    messageId = item.messageId;
+  }
+  return text;
+}
+
+function assistantRunStart(items: readonly StreamItem[], end: number): number {
+  let start = end;
+  const turnId = items[end - 1]?.turnId;
+  while (
+    start > 0 &&
+    items[start - 1]?.kind === "assistant_message" &&
+    items[start - 1]?.turnId === turnId
+  )
+    start -= 1;
+  return start;
 }
 
 /**
- * The live items without silence: a finished silent reply, and the running turn's last reply
+ * The live items without silence: a finished silent reply, and the running turn's last assistant run
  * while it still spells a marker's start, so `HEARTBEAT_OK` never flashes on screen.
  */
 function withoutSilence(
@@ -79,21 +118,27 @@ function withoutSilence(
   group: boolean,
   turnActive: boolean,
 ): StreamItem[] {
-  const last = items.findLastIndex((item) => item.kind === "assistant_message");
-  return items.filter((item, index) => {
-    if (item.kind !== "assistant_message") return true;
-    if (isSilentBotText(item.text, group)) return false;
-    return !(turnActive && index === last && mayBecomeSilent(item.text, group));
-  });
+  const visible: StreamItem[] = [];
+  let end = items.length;
+  while (end > 0) {
+    if (items[end - 1]?.kind !== "assistant_message") {
+      visible.push(items[--end]!);
+      continue;
+    }
+    const start = assistantRunStart(items, end);
+    const text = assistantRunText(items, start, end);
+    const pending =
+      turnActive && end === items.length && (text.trim() === "" || mayBecomeSilentBotReply(text));
+    if (!isSilentBotText(text, group) && !pending)
+      visible.push(...items.slice(start, end).toReversed());
+    end = start;
+  }
+  return visible.toReversed();
 }
 
 function transcriptRow(line: ChatMessage, previous: ChatRenderRow | undefined): ChatRenderRow {
   const key = `line:${line.id}`;
   if (line.sender.kind === "system") return { kind: "system", key, line };
-  // Only the daemon sets `scheduleRun`; a sender name alone could be any user's.
-  if (line.scheduleRun && line.sender.kind === "user") {
-    return { kind: "heartbeat", key, line, label: line.sender.displayName ?? "" };
-  }
   if (line.sender.kind === "user") {
     return { kind: "user", key, line, opensGroup: senderOf(previous) !== "user" };
   }
@@ -146,6 +191,7 @@ function unreferencedItems(
   const lastLine = lines[lines.length - 1];
   const cutoff = lastReferencedIndex < 0 && lastLine ? Date.parse(lastLine.at) : Number.NaN;
   return items.filter((item, index) => {
+    if (item.kind === "notification" && isHeartbeatRunNotification(item)) return false;
     const cursor = item.timelineCursor;
     if (
       cursor &&
@@ -177,16 +223,31 @@ function groupTurnItems(head: ChatLiveHead): readonly StreamItem[] {
 
 /**
  * A direct chat's tail, less a finished turn that ended in silence: a heartbeat run answered
- * `HEARTBEAT_OK` writes no line, so its tool calls must not linger below the transcript.
+ * `PASS` or `HEARTBEAT_OK` writes no line, so successful tool calls must not linger below the
+ * transcript. Notices, failed tools and approvals remain visible.
  */
 function directTurnItems(head: ChatLiveHead): readonly StreamItem[] {
   if (head.turnActive) return head.items;
   const lastPrompt = head.items.findLastIndex((item) => item.kind === "user_message");
-  const reply = head.items
-    .slice(lastPrompt + 1)
-    .findLast((item) => item.kind === "assistant_message");
-  const silent = reply?.kind === "assistant_message" && isSilentBotText(reply.text, false);
-  return silent ? head.items.slice(0, lastPrompt + 1) : head.items;
+  const lastReply = head.items.findLastIndex((item) => item.kind === "assistant_message");
+  if (lastReply <= lastPrompt) return head.items;
+  const text = assistantRunText(
+    head.items,
+    assistantRunStart(head.items, lastReply + 1),
+    lastReply + 1,
+  );
+  if (!isSilentBotReply(text)) return head.items;
+  const replyTurnId = head.items[lastReply]?.turnId;
+  return head.items.filter(
+    (item, index) =>
+      index <= lastPrompt ||
+      item.kind === "notification" ||
+      (replyTurnId !== undefined && item.turnId !== undefined && item.turnId !== replyTurnId) ||
+      (item.kind === "tool_call" &&
+        (item.payload.data.status === "failed" ||
+          item.payload.data.status === "canceled" ||
+          item.payload.data.error != null)),
+  );
 }
 
 function liveRow(
@@ -195,8 +256,9 @@ function liveRow(
   head: ChatLiveHead,
   previous: ChatRenderRow | undefined,
   group: boolean,
-): ChatRenderRow | null {
-  const tail = group ? groupTurnItems(head) : directTurnItems(head);
+): Extract<ChatRenderRow, { kind: "live" }> | null {
+  const completeHead = { ...head, items: chatLiveItems(head) };
+  const tail = group ? groupTurnItems(completeHead) : directTurnItems(completeHead);
   const unreferenced = unreferencedItems(tail, linesFromAgent(transcript, botId, head.agentId));
   const items = withoutSilence(unreferenced, group, head.turnActive);
   const permissions = [...head.permissions];
@@ -211,12 +273,60 @@ function liveRow(
     inProgress: head.turnActive,
     startedAt: head.startedAt ?? null,
     opensGroup: senderOf(previous) !== `bot:${botId}`,
+    // The canonical scheduled input ID identifies the running turn. Never use proximity.
+    heartbeatRun: heartbeatForLiveTurn(transcript, completeHead.items),
   };
 }
 
+/** Whole-turn filtering precedes placement; metadata is bound afresh to each segment's input. */
+function livePlacement(
+  transcript: readonly ChatMessage[],
+  liveHeadsByBot: ReadonlyMap<string, ChatLiveHead>,
+  group: boolean,
+) {
+  const beforeLine = new Map<string, Extract<ChatRenderRow, { kind: "live" }>[]>();
+  const trailing: Extract<ChatRenderRow, { kind: "live" }>[] = [];
+  const inputIds = new Set(
+    transcript.filter((line) => line.sender.kind === "user").map((line) => line.id),
+  );
+  for (const [botId, head] of liveHeadsByBot) {
+    // Keep accepted reference/notice/silence filtering on the whole projection first.
+    // One silence marker can straddle an input boundary.
+    const row = liveRow(transcript, botId, head, undefined, group);
+    if (!row) continue;
+    if (!group && head.turnActive) {
+      const split = splitLiveInputBoundaries(chatLiveItems(head), inputIds);
+      const visibleIds = new Set(row.items.map((item) => item.id));
+      for (const segment of split.before) {
+        const items = segment.items.filter((item) => visibleIds.has(item.id));
+        if (!items.length) continue;
+        const before = beforeLine.get(segment.messageId) ?? [];
+        before.push({
+          kind: "live",
+          key: `live:${botId}:before:${segment.messageId}`,
+          botId,
+          agentId: head.agentId,
+          items,
+          permissions: [],
+          inProgress: head.turnActive,
+          showWorkingIndicator: false,
+          opensGroup: true,
+          heartbeatRun: heartbeatForLiveTurn(transcript, segment.items),
+        });
+        beforeLine.set(segment.messageId, before);
+      }
+      row.items = split.trailing.filter((item) => visibleIds.has(item.id));
+      row.heartbeatRun = heartbeatForLiveTurn(transcript, split.trailing);
+    }
+    // Group discussion retains its existing floor/last-prompt semantics.
+    trailing.push(row);
+  }
+  return { beforeLine, trailing };
+}
+
 /**
- * Transcript lines in order, then one live row per bot with unfinished work, in the order the
- * heads were given. Dedupe is by referenced timeline item id, never by text (README D5).
+ * Transcript seq remains authoritative. Running DM work is placed before its next exact
+ * canonical input; only the trailing segment owns pending approvals and the running footer. Dedupe is by referenced timeline item id, never by text (README D5).
  */
 export function buildChatRenderModel(
   transcript: readonly ChatMessage[],
@@ -225,14 +335,55 @@ export function buildChatRenderModel(
 ): ChatRenderModel {
   const rows: ChatRenderRow[] = [];
   const group = options.group === true;
+  const runsByMessageId = new Map(
+    transcript
+      .filter((line) => line.sender.kind === "user" && line.scheduleRun)
+      .map((line) => [line.id, heartbeatSnapshot(line)]),
+  );
+  const { beforeLine, trailing } = livePlacement(transcript, liveHeadsByBot, group);
   for (const line of transcript) {
-    // A silent reply persisted before the daemon dropped it (or by an older one) stays hidden.
+    for (const row of beforeLine.get(line.id) ?? []) {
+      row.opensGroup = senderOf(rows.at(-1)) !== `bot:${row.botId}`;
+      rows.push(row);
+    }
+    if (line.sender.kind === "user" && line.scheduleRun) continue;
     if (line.sender.kind === "bot" && isSilentBotText(line.text, group)) continue;
-    rows.push(transcriptRow(line, rows[rows.length - 1]));
+    const row = transcriptRow(line, rows.at(-1));
+    if (row.kind === "bot" && line.inReplyTo) {
+      const run = runsByMessageId.get(line.inReplyTo);
+      if (run) row.heartbeatRun = run;
+    }
+    rows.push(row);
   }
-  for (const [botId, head] of liveHeadsByBot) {
-    const row = liveRow(transcript, botId, head, rows[rows.length - 1], group);
-    if (row) rows.push(row);
+  for (const row of trailing) {
+    row.opensGroup = senderOf(rows.at(-1)) !== `bot:${row.botId}`;
+    rows.push(row);
   }
   return { rows };
+}
+
+/** Older Chat runs have identity/run but only a formatted display snapshot of their total/name. */
+function heartbeatSnapshot(source: ChatMessage): HeartbeatRun | undefined {
+  if (!source.scheduleRun || source.sender.kind !== "user") return undefined;
+  const snapshot = source.scheduleRun;
+  if (snapshot.maxRuns !== undefined) return snapshot;
+  // COMPAT(heartbeatChatTotal): introduced 2026-10-14 on v2.1.1 source (unreleased CTO023).
+  // Remove this display-name reader once all supported producers supply maxRuns and persisted
+  // Chat records lacking it have been migrated or explicitly retired from history support.
+  const legacy = /^Heartbeat · (.*) · run (\d+)(?: of (\d+))?$/u.exec(
+    source.sender.displayName ?? "",
+  );
+  if (!legacy || Number(legacy[2]) !== snapshot.run) return snapshot;
+  // A legacy title can be a prompt fallback, so it cannot establish a heartbeat name.
+  return { ...snapshot, maxRuns: legacy[3] ? Number(legacy[3]) : null };
+}
+
+function heartbeatForLiveTurn(transcript: readonly ChatMessage[], items: readonly StreamItem[]) {
+  const prompt = items.findLast((item) => item.kind === "user_message");
+  if (prompt?.kind !== "user_message" || !prompt.turnId || prompt.turnId !== items.at(-1)?.turnId)
+    return undefined;
+  const source = transcript.find(
+    (line) => line.id === (prompt.clientMessageId ?? prompt.messageId),
+  );
+  return source?.sender.kind === "user" ? heartbeatSnapshot(source) : undefined;
 }

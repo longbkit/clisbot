@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { useRouter } from "expo-router";
+import { useNavigateHomeTab } from "./mobile-navigation";
 import { Button } from "@/components/ui/button";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useActivityViewport } from "./activity-viewport";
@@ -17,8 +17,8 @@ function useHomeActivityState() {
   const { accepted, next, pending, accept } = useActivityLayout(agents, day, automatic);
   const [limit, setLimit] = useState(10);
   const showMore = useCallback(() => setLimit((current) => current + 10), []);
-  const router = useRouter();
-  const openInbox = useCallback(() => router.navigate("/sessions"), [router]);
+  const navigate = useNavigateHomeTab();
+  const openInbox = useCallback(() => navigate("/sessions"), [navigate]);
   const update = useCallback(() => {
     const visible = visibleActivityLayout(next, limit);
     void apply(accept, new Set(visible.flatMap((section) => section.keys)));

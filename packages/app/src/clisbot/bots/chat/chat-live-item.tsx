@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AssistantMessage, Notification, ToolCall } from "@/components/message";
 import type { StreamItem } from "@/types/stream";
 import type { ChatBotIdentity } from "./chat-rows";
+import { isHeartbeatRunNotification } from "@clisbot/protocol/schedule/heartbeat-notice";
 
 /** The compact detail level of the cowork view: text streams, thoughts and tools fold. */
 export function renderLiveItem(
@@ -66,6 +67,7 @@ export function renderLiveItem(
         />
       );
     case "notification":
+      if (isHeartbeatRunNotification(item)) return null;
       return <Notification key={item.id} level={item.level} message={item.message} />;
     default:
       return null;

@@ -392,6 +392,7 @@ export type AgentTimelineItem =
       type: "notification";
       level: "info" | "warning" | "error";
       message: string;
+      heartbeatRun?: import("./schedule/heartbeat-notice.js").HeartbeatRun;
     }
   | CompactionTimelineItem
   | PluginTimelineItem;
