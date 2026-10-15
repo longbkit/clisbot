@@ -4,7 +4,6 @@ import { Text } from "react-native";
 import { router } from "expo-router";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ChevronRight, Clock, Pause, Play, Plus } from "lucide-react-native";
-import type { MenuTriggerState } from "@/components/ui/menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +16,7 @@ import {
 import {
   extraMutedIconColorMapping,
   iconButtonChromeGlyphSize,
-  iconButtonChromeStyle,
+  useIconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 import { ScheduleFormSheet } from "@/components/schedules/schedule-form-sheet";
 import { useToast } from "@/contexts/toast-context";
@@ -95,15 +94,10 @@ export function HeartbeatsMenu({
   const handleOpenChange = useCallback((open: boolean) => open && refetch(), [refetch]);
   const closeDetail = useCallback(() => setDetailId(null), []);
   const closeCreate = useCallback(() => setCreateFor(null), []);
-  const triggerStyle = useCallback(
-    (state: MenuTriggerState) =>
-      iconButtonChromeStyle({
-        size: "large",
-        state,
-        style: count > 0 ? styles.withCount : undefined,
-      }),
-    [count],
-  );
+  const triggerStyle = useIconButtonChromeStyle({
+    size: "large",
+    style: count > 0 ? styles.withCount : undefined,
+  });
   if (!canManage) return null;
   return (
     <>

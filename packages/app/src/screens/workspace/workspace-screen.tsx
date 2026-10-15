@@ -31,7 +31,7 @@ import { SidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { FloatingHeaderLayout } from "@/components/floating-header";
-import { StreamTopOverlayProvider, supportsStreamTopOverlay } from "@/agent-stream/top-overlay";
+import { StreamTopOverlayProvider } from "@/agent-stream/top-overlay";
 import {
   CompactWorkspaceHeader,
   MobileWorkspaceTabSwitcher,
@@ -866,10 +866,6 @@ function WorkspaceDocumentTitleEffectSlot({
       )}
     </WorkspaceTabPresentationResolver>
   );
-}
-
-function floatsHeaderOverContent(activeTab: WorkspaceTabDescriptor | null): boolean {
-  return supportsStreamTopOverlay && activeTab?.kind === "agent";
 }
 
 function shouldShowWorkspaceScreenHeader(input: {
@@ -3577,7 +3573,9 @@ function WorkspaceScreenContent({
     <View style={styles.centerColumn}>
       <FloatingHeaderLayout
         header={compactWorkspaceHeader}
-        floating={floatsHeaderOverContent(activeTabDescriptor)}
+        // Keep a separate viewport: padding on an inverted list only clears its first
+        // item, and cannot prevent scrolled/streaming text moving behind controls.
+        floating={false}
       >
         {(topOverlayInset) => (
           <StreamTopOverlayProvider value={topOverlayInset}>

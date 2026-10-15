@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
+import { HEADER_CONTROL_HEIGHT, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { ICON_SIZE } from "@/styles/theme";
 
 export { extraMutedIconColorMapping, mutedIconColorMapping } from "@/components/ui/icon-color";
@@ -35,7 +35,7 @@ interface IconButtonChromeOptions {
   style?: StyleProp<ViewStyle>;
 }
 
-const IconButtonChromeContext = createContext<"default" | "header-island">("default");
+const IconButtonChromeContext = createContext<"default" | "compact-header">("default");
 
 /** A container owns the chrome of its icon actions, including custom menu and badge triggers. */
 export const IconButtonChromeProvider = IconButtonChromeContext.Provider;
@@ -53,11 +53,11 @@ export function useIconButtonChromeStyle({
   return useCallback(
     (state: IconButtonChromeState) =>
       iconButtonChromeStyle({
-        size: scope === "header-island" ? "large" : size,
+        size: scope === "compact-header" ? "large" : size,
         compact,
         disabled,
-        round: scope === "header-island" || round,
-        style,
+        round,
+        style: [style, scope === "compact-header" && styles.compactHeaderTarget],
         state: { ...state, active: active || state.active },
       }),
     [scope, size, compact, disabled, round, style, active],
@@ -117,6 +117,10 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 0,
     outlineWidth: 0,
     outlineColor: "transparent",
+  },
+  compactHeaderTarget: {
+    minWidth: MIN_TOUCH_TARGET_SIZE,
+    minHeight: MIN_TOUCH_TARGET_SIZE,
   },
   small: {
     width: SMALL_ICON_BUTTON_SIZE,

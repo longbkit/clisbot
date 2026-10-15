@@ -7,10 +7,8 @@ import { SidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
 import { IconButtonChromeProvider } from "@/components/ui/icon-button-chrome";
 import { HEADER_INNER_HEIGHT_MOBILE, HEADER_TOP_PADDING_MOBILE } from "@/constants/layout";
 
-const ISLAND_PADDING = 7;
-
 interface CompactHeaderProps {
-  /** The leading island: the sidebar menu, or a back button. */
+  /** The leading control: the sidebar menu, or a back button. */
   navigation: "menu" | "back";
   /** Surface-owned navigation override; generic headers do not import application runtimes. */
   navigationContent?: ReactNode;
@@ -23,15 +21,13 @@ interface CompactHeaderProps {
   subtitle?: ReactNode;
   /** Show a placeholder instead of the title while it loads. */
   loading?: boolean;
-  /** Icon actions inherit the island chrome through the shared button primitives. */
+  /** Icon actions inherit the compact touch target through the shared button primitives. */
   actions?: ReactNode;
 }
 
 /**
- * The phone header: the navigation button and the screen's actions sit in islands, with the title
- * left-aligned between them. It has no background of its own, so it reads the same in flow and floating
- * over content (see `FloatingHeaderLayout`). Its height matches the old flat header, so anything
- * offset by the header height still lines up.
+ * Shared phone header. Its safe area and controls occupy a flat, opaque row above the
+ * content viewport; touch targets fit inside the row without extra island padding.
  */
 export function CompactHeader({
   navigation,
@@ -57,10 +53,10 @@ export function CompactHeader({
   }
 
   return (
-    <IconButtonChromeProvider value="header-island">
-      <View style={rootStyle}>
+    <IconButtonChromeProvider value="compact-header">
+      <View style={rootStyle} testID="compact-header">
         <View style={styles.row}>
-          <View style={styles.island}>{leadingNavigation}</View>
+          <View style={styles.controls}>{leadingNavigation}</View>
           <View style={styles.titleGroup}>
             <CompactHeaderTitle
               loading={loading}
@@ -70,7 +66,7 @@ export function CompactHeader({
               subtitle={subtitle}
             />
           </View>
-          {actions ? <View style={styles.island}>{actions}</View> : null}
+          {actions ? <View style={styles.controls}>{actions}</View> : null}
         </View>
       </View>
     </IconButtonChromeProvider>
@@ -106,7 +102,10 @@ function CompactHeaderTitle({
 
 const styles = StyleSheet.create((theme) => ({
   root: {
-    paddingHorizontal: theme.spacing[3],
+    paddingHorizontal: theme.spacing[2],
+    backgroundColor: theme.colors.surface0,
+    borderBottomWidth: theme.borderWidth[1],
+    borderBottomColor: theme.colors.border,
   },
   row: {
     height: HEADER_INNER_HEIGHT_MOBILE,
@@ -120,13 +119,9 @@ const styles = StyleSheet.create((theme) => ({
     // Both title lines receive the remaining width; text alignment does not size the slot.
     alignItems: "stretch",
   },
-  island: {
+  controls: {
     flexDirection: "row",
     alignItems: "center",
-    padding: ISLAND_PADDING,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface2,
-    ...theme.shadow.sm,
   },
   titleRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
   title: {

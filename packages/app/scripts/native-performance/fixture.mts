@@ -45,6 +45,10 @@ async function startFixture(root: string): Promise<Fixture> {
   await prepareEnvironment(root);
   const daemon = await createTestClisbotDaemon({
     isDev: true,
+    // Opt in only for durable session-history QA; existing tab benchmarks keep their fixture.
+    ...(process.env.CLISBOT_NATIVE_PERF_SESSION_STORAGE === "1"
+      ? { agentSessionStorage: true }
+      : {}),
     agentClients: { mock: new MockLoadTestAgentClient() },
     clisbotHomeRoot: path.join(root, "environment/home"),
     cleanup: false,

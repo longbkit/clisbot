@@ -85,6 +85,13 @@ Header and toolbar controls use `interactionHighlight` for hovered, pressed, ope
 backgrounds. It is a translucent semantic fill so the same control works over the main surface and
 the sidebar. Apply it as `backgroundColor`; setting `opacity` on the control also fades its content.
 
+Compact headers use the shared `CompactHeader` flat `surface0` row, including the top safe area,
+with one bottom border. Back and each useful action have separate 48px minimum touch targets;
+do not wrap them in additional padded islands. Workspace transcripts occupy the viewport below
+that row on web and native. An inverted list's first-item padding cannot protect scrolled text
+from an overlay header, so the compact workspace header stays in flow when streaming or using
+the keyboard. Session identity and actions remain in the header; Home/Chat use their shared toolbar.
+
 Header glyphs are one size and one stroke: `iconButtonChromeGlyphSize("large")` (16pt) at stroke 1.5, as the sidebar and Explorer toggles draw them. A header button with a label (Cowork, Stop all) keeps that glyph and a `fontSize.base` label, with a little more padding on the label side. The first control pulls onto the left rail and the last onto the right rail by the same `spacing[2]`, so the two panel toggles mirror each other (`packages/app/src/clisbot/bots/chat/header-action.tsx`).
 
 `destructive` is filled with `destructive`. It only appears inside a confirm. The button on the page is `outline`; the destructive button is the confirm button inside the dialog.
