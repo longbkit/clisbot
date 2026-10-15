@@ -45,15 +45,22 @@ export function activitySections(
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   const recent = take(sorted.filter((a) => activityBucket(a) === "recent"));
   if (recent.length) sections.push({ key: "recent", title: "Recent", agents: [] });
+  let dateFormatter: Intl.DateTimeFormat | undefined;
   for (const agent of recent) {
     const date = agent.lastActivityAt;
-    let title = date.toLocaleDateString(undefined, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    let title: string;
     if (date >= today) title = "Today";
     else if (date >= yesterday) title = "Yesterday";
+    else if (Number.isNaN(date.getTime())) title = date.toLocaleDateString();
+    else {
+      // Construct once per grouping pass, rather than once for every older conversation.
+      dateFormatter ??= new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+      title = dateFormatter.format(date);
+    }
     let section = sections.find((s) => s.key === `date:${title}`);
     if (!section) {
       section = { key: `date:${title}`, title, agents: [] };
