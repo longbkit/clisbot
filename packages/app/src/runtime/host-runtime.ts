@@ -154,13 +154,15 @@ export type ActiveConnection =
   | { type: "remoteSsh"; endpoint: string; display: string }
   | { type: "relay"; endpoint: string; display: "relay" };
 
-export type HostRuntimeAgentDirectoryStatus =
+export type HostRuntimeDirectoryStatus =
   | "idle"
   | "initial_loading"
   | "revalidating"
   | "ready"
   | "error_before_first_success"
   | "error_after_ready";
+
+export type HostRuntimeAgentDirectoryStatus = HostRuntimeDirectoryStatus;
 
 export interface HostRuntimeSnapshot {
   serverId: string;
@@ -174,6 +176,9 @@ export interface HostRuntimeSnapshot {
   agentDirectoryStatus: HostRuntimeAgentDirectoryStatus;
   agentDirectoryError: string | null;
   hasEverLoadedAgentDirectory: boolean;
+  workspaceDirectoryStatus: HostRuntimeDirectoryStatus;
+  workspaceDirectoryError: string | null;
+  hasEverLoadedWorkspaceDirectory: boolean;
   probeByConnectionId: Map<string, ConnectionProbeState>;
   clientGeneration: number;
   connectionEpoch: number;
@@ -789,6 +794,9 @@ export class HostRuntimeController {
       agentDirectoryStatus: "idle",
       agentDirectoryError: null,
       hasEverLoadedAgentDirectory: false,
+      workspaceDirectoryStatus: "idle",
+      workspaceDirectoryError: null,
+      hasEverLoadedWorkspaceDirectory: false,
       probeByConnectionId: new Map(),
       clientGeneration: 0,
     };
@@ -928,6 +936,32 @@ export class HostRuntimeController {
     this.updateSnapshot({
       agentDirectoryStatus: this.snapshot.hasEverLoadedAgentDirectory ? "ready" : "idle",
       agentDirectoryError: null,
+    });
+  }
+
+  markWorkspaceDirectorySyncLoading(): void {
+    this.updateSnapshot({
+      workspaceDirectoryStatus: this.snapshot.hasEverLoadedWorkspaceDirectory
+        ? "revalidating"
+        : "initial_loading",
+      workspaceDirectoryError: null,
+    });
+  }
+
+  markWorkspaceDirectorySyncReady(): void {
+    this.updateSnapshot({
+      workspaceDirectoryStatus: "ready",
+      workspaceDirectoryError: null,
+      hasEverLoadedWorkspaceDirectory: true,
+    });
+  }
+
+  markWorkspaceDirectorySyncError(error: string): void {
+    this.updateSnapshot({
+      workspaceDirectoryStatus: this.snapshot.hasEverLoadedWorkspaceDirectory
+        ? "error_after_ready"
+        : "error_before_first_success",
+      workspaceDirectoryError: error,
     });
   }
 
@@ -1973,6 +2007,9 @@ export class HostRuntimeStore {
         markAgentLoading: () => controller.markAgentDirectorySyncLoading(),
         markAgentReady: () => controller.markAgentDirectorySyncReady(),
         markAgentError: (error) => controller.markAgentDirectorySyncError(error),
+        markWorkspaceLoading: () => controller.markWorkspaceDirectorySyncLoading(),
+        markWorkspaceReady: () => controller.markWorkspaceDirectorySyncReady(),
+        markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
       },
       this.replicaCache,
     );
@@ -2710,6 +2747,9 @@ export class HostRuntimeStore {
           markAgentLoading: () => controller.markAgentDirectorySyncLoading(),
           markAgentReady: () => controller.markAgentDirectorySyncReady(),
           markAgentError: (error) => controller.markAgentDirectorySyncError(error),
+          markWorkspaceLoading: () => controller.markWorkspaceDirectorySyncLoading(),
+          markWorkspaceReady: () => controller.markWorkspaceDirectorySyncReady(),
+          markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
         },
         this.replicaCache,
       );

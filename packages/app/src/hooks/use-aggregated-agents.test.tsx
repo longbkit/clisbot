@@ -34,6 +34,7 @@ vi.mock("@/performance/native-trace", () => ({
   nativePerformanceTrace: { isEnabled: () => false },
 }));
 import { useAggregatedAgents } from "./use-aggregated-agents";
+import { useDirectoryHealth } from "./use-directory-health";
 
 beforeEach(() => {
   state.snapshot = {
@@ -73,6 +74,7 @@ describe("directory loading while connecting", () => {
     });
     expect(result.current.isInitialLoad).toBe(false);
     expect(result.current.directoryHealth).toEqual({
+      hasAcceptedResult: false,
       status: "unavailable",
       serverId: "host-a",
       message: "Host A: Synthetic catalog failure",
@@ -93,5 +95,40 @@ describe("directory loading while connecting", () => {
     });
     expect(result.current.isInitialLoad).toBe(false);
     expect(result.current.isRevalidating).toBe(true);
+  });
+});
+
+describe("workspace directory health independent of agents", () => {
+  it("keeps Chat loading after agents are ready while workspace metadata is pending", () => {
+    Object.assign(state.snapshot, {
+      connectionStatus: "online",
+      agentDirectoryStatus: "ready",
+      hasEverLoadedAgentDirectory: true,
+      workspaceDirectoryStatus: "initial_loading",
+      hasEverLoadedWorkspaceDirectory: false,
+    });
+    const { result } = renderHook(() => ({
+      home: useDirectoryHealth(),
+      chat: useDirectoryHealth(undefined, "workspaces"),
+    }));
+    expect(result.current.home.status).toBe("ready");
+    expect(result.current.chat.status).toBe("loading");
+  });
+  it("surfaces workspace errors with ready agents and retains accepted workspace readiness", () => {
+    Object.assign(state.snapshot, {
+      connectionStatus: "online",
+      agentDirectoryStatus: "ready",
+      hasEverLoadedAgentDirectory: true,
+      workspaceDirectoryStatus: "error_after_ready",
+      workspaceDirectoryError: "Workspace directory failed",
+      hasEverLoadedWorkspaceDirectory: true,
+    });
+    const { result } = renderHook(() => useDirectoryHealth(undefined, "workspaces"));
+    expect(result.current.status).toBe("unavailable");
+    expect(result.current.hasAcceptedResult).toBe(true);
+    expect(result.current).toMatchObject({
+      recovery: "retry",
+      message: "Host A: Workspace directory failed",
+    });
   });
 });

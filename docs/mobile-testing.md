@@ -620,3 +620,12 @@ xcrun simctl ui booted appearance light    # set light
 ```
 
 Expo dev server logs are in the tmux pane running `npm run dev`. Daemon logs are at `$CLISBOT_HOME/daemon.log` (see [development.md](development.md)).
+
+For compact directory regressions, `e2e/browser/mobile-directory-loading.spec.ts` holds or rejects
+only the real daemon's workspace request while agents complete, checks Retry, preserves accepted-empty
+Home text and Chat card/focused actions through reconnect, excludes an unrelated offline Host, and
+holds the configured Usage report until the reading anchor has been measured. Its control intercepts
+`envelope.message.type` inside the WebSocket `session` envelope; a delay keyed only to outer `type`
+will never delay these responses. Keep the raw request/delivery evidence before claiming injected
+latency. The focused component and owner cases are `empty-states.test.tsx`,
+`use-aggregated-agents.test.tsx`, and the “independent workspace directory” tests in the runtime owners.

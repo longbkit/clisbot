@@ -36,7 +36,7 @@ export function HomeActivity() {
     <View style={styles.container} testID="home-activity">
       <DirectoryStatus health={directoryHealth} label="Activity" inset={false} />
       {isInitialLoad ? <ActivityPlaceholder /> : null}
-      {!isInitialLoad && directoryHealth.status === "ready" && !accepted.length ? (
+      {!isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length ? (
         <Text style={styles.muted}>Your conversations will appear here.</Text>
       ) : null}
       {sections.map((section) => (

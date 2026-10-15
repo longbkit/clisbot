@@ -1,3 +1,4 @@
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import {
   createContext,
   Fragment,
@@ -49,13 +50,31 @@ export function useHasUsageSummary(): boolean {
  * while no summary window has data, since the footer's Usage icon already opens Usage.
  * Pressing it opens the Usage modal.
  */
-export function UsageSidebarItem() {
+export function UsageSidebarItem({ reserveSpace = false }: { reserveSpace?: boolean } = {}) {
   const { t } = useTranslation();
   const label = t(builtinSidebarNavLabelKey("usage"));
   const openUsage = useOpenSidebarUsage();
   const sources = useUsageSummary();
-  if (sources.length === 0) return null;
-  return <PinnedUsageTrigger label={label} sources={sources} onPress={openUsage} />;
+  if (sources.length === 0)
+    return reserveSpace ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        onPress={openUsage}
+        style={[styles.trigger, styles.touchTrigger]}
+        testID="sidebar-usage"
+      >
+        <Text style={styles.percent}>{label}</Text>
+      </Pressable>
+    ) : null;
+  return (
+    <PinnedUsageTrigger
+      label={label}
+      sources={sources}
+      onPress={openUsage}
+      touchTarget={reserveSpace}
+    />
+  );
 }
 
 const OpenSidebarUsageContext = createContext<(() => void) | null>(null);
@@ -112,11 +131,20 @@ function PinnedUsageTrigger({
   label,
   sources,
   onPress,
+  touchTarget = false,
 }: {
+  touchTarget?: boolean;
   label: string;
   sources: readonly PinnedUsageSource[];
   onPress: () => void;
 }) {
+  const style = useCallback(
+    (state: PressableStateCallbackType & { hovered?: boolean }) => [
+      triggerStyle(state),
+      touchTarget && styles.touchTrigger,
+    ],
+    [touchTarget],
+  );
   const [available, setAvailable] = useState<number | null>(null);
   const [labelsWidth, setLabelsWidth] = useState<number | null>(null);
   const [percentsWidth, setPercentsWidth] = useState<number | null>(null);
@@ -140,7 +168,7 @@ function PinnedUsageTrigger({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={pinnedUsageLabel(label, sources)}
-      style={triggerStyle}
+      style={style}
       testID="sidebar-usage"
     >
       <View style={styles.line} onLayout={handleAvailableLayout}>
@@ -228,6 +256,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[2],
     borderRadius: theme.borderRadius.lg,
   },
+  touchTrigger: { height: MIN_TOUCH_TARGET_SIZE, minHeight: MIN_TOUCH_TARGET_SIZE },
   triggerHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
   },

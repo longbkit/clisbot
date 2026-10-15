@@ -6,12 +6,16 @@ import {
   type HostRuntimeAgentDirectoryStatus,
 } from "@/runtime/host-runtime";
 
-export type DirectoryHealth =
+export type DirectoryHealth = { hasAcceptedResult: boolean } & (
   | { status: "loading" | "refreshing" | "ready"; message: null; serverId: null }
-  | { status: "unavailable"; message: string; serverId: string; recovery: "retry" | "connection" };
+  | { status: "unavailable"; message: string; serverId: string; recovery: "retry" | "connection" }
+);
 
 /** Observe transport/directory readiness, never the runtime's unrelated notification version. */
-export function useDirectoryHealth(serverIds?: readonly string[]): DirectoryHealth {
+export function useDirectoryHealth(
+  serverIds?: readonly string[],
+  kind: "agents" | "workspaces" = "agents",
+): DirectoryHealth {
   const hosts = useHosts();
   const runtime = getHostRuntimeStore();
   const selected = useMemo(
@@ -28,13 +32,24 @@ export function useDirectoryHealth(serverIds?: readonly string[]): DirectoryHeal
             serverId: host.serverId,
             label: host.label,
             connection: snapshot?.connectionStatus ?? "connecting",
-            directory: snapshot?.agentDirectoryStatus ?? "idle",
-            loaded: snapshot?.hasEverLoadedAgentDirectory ?? false,
-            error: snapshot?.agentDirectoryError ?? snapshot?.lastError ?? null,
+            directory:
+              (kind === "agents"
+                ? snapshot?.agentDirectoryStatus
+                : snapshot?.workspaceDirectoryStatus) ?? "idle",
+            loaded:
+              (kind === "agents"
+                ? snapshot?.hasEverLoadedAgentDirectory
+                : snapshot?.hasEverLoadedWorkspaceDirectory) ?? false,
+            error:
+              (kind === "agents"
+                ? snapshot?.agentDirectoryError
+                : snapshot?.workspaceDirectoryError) ??
+              snapshot?.lastError ??
+              null,
           };
         }),
       ),
-    [runtime, selected],
+    [runtime, selected, kind],
   );
   const snapshot = useSyncExternalStore(subscribe, read, read);
   return useMemo(() => projectHealth(JSON.parse(snapshot)), [snapshot]);
@@ -50,11 +65,13 @@ interface DirectoryHostHealth {
 }
 
 function projectHealth(hosts: DirectoryHostHealth[]): DirectoryHealth {
+  const hasAcceptedResult = hosts.every((host) => host.loaded);
   const failed = hosts.find(
     (host) => host.error || host.connection === "offline" || host.connection === "error",
   );
   if (failed)
     return {
+      hasAcceptedResult,
       status: "unavailable",
       serverId: failed.serverId,
       recovery: failed.connection === "online" ? "retry" : "connection",
@@ -69,9 +86,10 @@ function projectHealth(hosts: DirectoryHostHealth[]): DirectoryHealth {
   );
   if (pending.length)
     return {
+      hasAcceptedResult,
       status: pending.some((host) => !host.loaded) ? "loading" : "refreshing",
       message: null,
       serverId: null,
     };
-  return { status: "ready", message: null, serverId: null };
+  return { hasAcceptedResult, status: "ready", message: null, serverId: null };
 }

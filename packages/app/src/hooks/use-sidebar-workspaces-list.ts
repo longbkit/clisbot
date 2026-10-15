@@ -1,8 +1,10 @@
+import { useDirectoryHealth } from "./use-directory-health";
+import { useSidebarHostIds } from "./use-sidebar-host-ids";
 import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
 import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
 import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
 import { quickChatProjectKeys, useQuickChatRoots } from "@/clisbot/quick-chats/quick-chat-projects";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -10,7 +12,6 @@ import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
 import { useHostProjects } from "@/projects/host-projects";
 import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
-import { useHostRuntimeUnreachableServerIds } from "@/runtime/unreachable-hosts";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
@@ -18,7 +19,6 @@ import {
   computeSidebarOrderUpdates,
   createSidebarWorkspaceEntry,
   deriveProjectStatusBucket,
-  deriveSidebarLoadingState,
   type ProjectStatusSession,
   type SidebarProjectEntry,
   type SidebarWorkspaceEntry,
@@ -107,26 +107,12 @@ export function useSidebarWorkspacesList(options?: {
   const allHosts = useHosts();
   const hostRegistryLoaded = useHostRegistryLoaded();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
-  const unreachableServerIds = useHostRuntimeUnreachableServerIds(allServerIds);
 
-  const storeHostFilters = useSidebarViewStore((state) => state.hostFilters);
-  const hostFilters = options?.hostFilters ?? storeHostFilters;
   const reconcileHostFilters = useSidebarViewStore((state) => state.reconcileHostFilters);
   const isActive = options?.enabled !== false;
 
-  const serverIds = useMemo(() => {
-    if (hostFilters.length === 0) {
-      return allServerIds;
-    }
-    const selected = new Set(hostFilters);
-    const matched = allServerIds.filter((id) => selected.has(id));
-    // Registry has settled but none of the pinned hosts still exist — fall back to every
-    // host rather than leaving the sidebar empty.
-    if (hostRegistryLoaded && matched.length === 0) {
-      return allServerIds;
-    }
-    return matched;
-  }, [allServerIds, hostFilters, hostRegistryLoaded]);
+  const serverIds = useSidebarHostIds(options?.hostFilters);
+  const health = useDirectoryHealth(serverIds, "workspaces");
   useEffect(() => {
     if (!isActive) return;
     const releases = serverIds.map((serverId) => runtime.acquireDirectoryDemand(serverId));
@@ -142,8 +128,8 @@ export function useSidebarWorkspacesList(options?: {
 
   const persistedProjectOrder = useSidebarOrderStore((state) => state.projectOrder ?? EMPTY_ORDER);
 
-  // Connection loss does not invalidate accepted directory rows. Host removal/revocation clears
-  // the owning replica; filtering on transport state blanked the list and lost its scroll anchor.
+  // Connection loss does not invalidate accepted directory rows. Registry removal and directory
+  // tombstones still remove rows through their owners; transport filtering lost the scroll anchor.
   const directoryServerIds = useWorkspaceDirectoryServerIds(serverIds);
 
   const hostProjects = useHostProjects(directoryServerIds);
@@ -201,21 +187,12 @@ export function useSidebarWorkspacesList(options?: {
     }
   }, [isActive, runtime, serverIds]);
 
-  const [hasSettled, setHasSettled] = useState(false);
-  const loadingState = deriveSidebarLoadingState({
-    isActive,
-    serverIds,
-    hydratedServerIds: directoryServerIds,
-    unreachableServerIds,
-    hasProjects: projects.length > 0,
-    hasSettled,
-  });
-  // A Host that retries its connection flips back to `connecting`; showing the skeleton again
-  // would unmount the sidebar sections (and any sheet they own, such as Create a bot).
-  const settledNow = isActive && serverIds.length > 0 && !loadingState.isLoading;
-  useEffect(() => {
-    if (settledNow) setHasSettled(true);
-  }, [settledNow]);
+  const isLoading = isActive && (health.status === "loading" || health.status === "refreshing");
+  const loadingState = {
+    isLoading,
+    isInitialLoad: isLoading && !health.hasAcceptedResult && projects.length === 0,
+    isRevalidating: isLoading && (health.hasAcceptedResult || projects.length > 0),
+  };
 
   return {
     workspacePlacements,

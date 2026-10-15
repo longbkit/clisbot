@@ -74,6 +74,9 @@ describe("app diagnostics report", () => {
       lastError: null,
       lastOnlineAt: "2026-06-25T00:00:00.000Z",
       agentDirectoryStatus: "ready",
+      workspaceDirectoryStatus: "ready",
+      workspaceDirectoryError: null,
+      hasEverLoadedWorkspaceDirectory: true,
       agentDirectoryError: null,
       hasEverLoadedAgentDirectory: true,
       probeByConnectionId: new Map([

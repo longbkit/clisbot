@@ -5,7 +5,7 @@ import {
   type ReplicaSqliteConnection,
   type SqliteValue,
 } from "@/runtime/replica-cache/row-store-sqlite";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   DaemonClient,
   WorkspaceLabelListPayload,
@@ -37,6 +37,7 @@ class FakeDirectoryClient {
     return false;
   }
 
+  workspaceError: Error | null = null;
   supportsWorkspaceLabels = false;
   listWorkspaceLabelsCalls = 0;
   fetchAgentsCalls = 0;
@@ -112,6 +113,7 @@ class FakeDirectoryClient {
 
   async fetchWorkspaces(options?: unknown): Promise<WorkspaceFetchResult> {
     this.fetchWorkspacesCalls += 1;
+    if (this.workspaceError) throw this.workspaceError;
     this.lastWorkspaceOptions = options;
     if (this.pendingWorkspaceFetch) {
       const pending = this.pendingWorkspaceFetch;
@@ -190,7 +192,10 @@ const serverIds = new Set<string>();
 
 function createDirectory(
   serverId: string,
-  options?: { workspaceLabels?: boolean },
+  options?: {
+    workspaceLabels?: boolean;
+    callbacks?: Partial<ConstructorParameters<typeof DirectorySync>[1]>;
+  },
 ): {
   client: FakeDirectoryClient;
   directory: DirectorySync;
@@ -203,6 +208,10 @@ function createDirectory(
     markAgentLoading: () => undefined,
     markAgentReady: () => undefined,
     markAgentError: () => undefined,
+    markWorkspaceLoading: () => undefined,
+    markWorkspaceReady: () => undefined,
+    markWorkspaceError: () => undefined,
+    ...options?.callbacks,
   });
   directory.connectionChanged({
     client: client as unknown as DaemonClient,
@@ -304,6 +313,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -360,6 +372,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => cachedAgent,
@@ -398,6 +413,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -572,6 +590,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -654,6 +675,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -714,6 +738,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -777,6 +804,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -864,6 +894,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: () => agentRead,
@@ -909,6 +942,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: () => agentRead,
@@ -961,6 +997,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -1086,6 +1125,9 @@ describe("DirectorySync session readiness", () => {
         markAgentLoading: () => undefined,
         markAgentReady: () => undefined,
         markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
       },
       {
         readAgent: async () => undefined,
@@ -1416,6 +1458,9 @@ it("fills every cached workspace beneath live updates received during the SQLite
       markAgentLoading: () => {},
       markAgentReady: () => {},
       markAgentError: () => {},
+      markWorkspaceLoading: () => undefined,
+      markWorkspaceReady: () => undefined,
+      markWorkspaceError: () => undefined,
     },
     cache,
   );
@@ -1627,6 +1672,7 @@ it.each(["before", "during", "before-metadata", "damaged"] as const)(
         options?: Parameters<DaemonClient["fetchWorkspaces"]>[0],
       ): Promise<WorkspaceFetchResult> {
         this.fetchWorkspacesCalls += 1;
+        if (this.workspaceError) throw this.workspaceError;
         this.lastWorkspaceOptions = options;
         this.workspaceSyncRequests.push(options?.sync);
         const changes = options?.sync?.generation === "g" && options.sync.afterSeq === 7;
@@ -1662,6 +1708,9 @@ it.each(["before", "during", "before-metadata", "damaged"] as const)(
       markAgentLoading: () => {},
       markAgentReady: () => {},
       markAgentError: () => {},
+      markWorkspaceLoading: () => undefined,
+      markWorkspaceReady: () => undefined,
+      markWorkspaceError: () => undefined,
     };
     const directory = new DirectorySync(serverId, callbacks, cache);
     const publishServerInfo = () => {
@@ -1757,3 +1806,45 @@ it.each(["before", "during", "before-metadata", "damaged"] as const)(
     }
   },
 );
+
+describe("independent workspace directory lifecycle", () => {
+  it("publishes workspace pending and failure independently after agents succeed, then retries", async () => {
+    const callbacks = {
+      markAgentReady: vi.fn(),
+      markWorkspaceLoading: vi.fn(),
+      markWorkspaceReady: vi.fn(),
+      markWorkspaceError: vi.fn(),
+    };
+    const serverId = "workspace-lifecycle";
+    const { client, directory } = createDirectory(serverId, { callbacks });
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, client as unknown as DaemonClient, 1);
+    store.updateSessionServerInfo(serverId, {
+      serverId,
+      hostname: null,
+      version: "test",
+      features: { workspaceMultiplicity: true },
+    });
+    const release = client.holdWorkspaceFetch();
+    const pending = directory.refreshAll();
+    await expect.poll(() => callbacks.markAgentReady.mock.calls.length).toBe(1);
+    expect(callbacks.markWorkspaceLoading).toHaveBeenCalledTimes(1);
+    expect(callbacks.markWorkspaceReady).not.toHaveBeenCalled();
+    release({
+      requestId: "held-workspace",
+      entries: [],
+      emptyProjects: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    await pending;
+    expect(callbacks.markWorkspaceReady).toHaveBeenCalledTimes(1);
+    client.workspaceError = new Error("Synthetic workspace failure");
+    await expect(directory.refreshAll()).rejects.toThrow("Synthetic workspace failure");
+    expect(callbacks.markAgentReady).toHaveBeenCalledTimes(2);
+    expect(callbacks.markWorkspaceError).toHaveBeenCalledWith("Synthetic workspace failure");
+    client.workspaceError = null;
+    await directory.refreshAll();
+    expect(callbacks.markWorkspaceReady).toHaveBeenCalledTimes(2);
+    directory.dispose();
+  });
+});

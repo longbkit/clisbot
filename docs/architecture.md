@@ -146,8 +146,18 @@ projection cache keyed by Host and agent, using the directory owner's immutable 
 directory fields preserve row and sorted-array identity; Host labels, permissions, attention, turns,
 archive state and activity order still update. Dropped sources leave the cache. See
 [native profiling](mobile-testing.md#native-switching-performance) before widening this subscription. Accepted workspace directory rows remain in the sidebar during transient
-transport loss; Host removal/revocation clears the replica. Display sorting reuses numeric collators
+transport loss; registry removal and directory tombstones still remove their rows. Managed revocation retains the existing runtime policy, including manual-profile restoration for adopted Hosts. Display sorting reuses numeric collators
 so a loading burst does not construct one for every comparison.
+
+`DirectorySync` publishes agent and workspace/project request readiness independently into the
+Host controller snapshot. `useDirectoryHealth` selects the relevant lifecycle: Home reads agents;
+Chat's list, status and empty card share `useSidebarHostIds` and workspace readiness. Agent success
+cannot complete a pending or failed workspace request. A successful empty result remains accepted
+through revalidation/error, so status changes do not unmount empty copy or focused creation actions.
+A first failed request instead exposes recovery without claiming the catalog is empty. Superseded
+workspace requests do not publish failures over their replacement. The compact top toolbar reserves
+the user-enabled Usage summary row before reports arrive; it remains a Usage action with no fabricated
+percent. Desktop's existing no-summary behavior and plugin contribution heights remain unchanged.
 
 The three directory entity types have independent monotonic sequences and share one daemon
 generation. The daemon retains only the latest projection per entity and bounded tombstones, not an

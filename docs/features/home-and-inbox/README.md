@@ -44,8 +44,8 @@ Home reserves scaled activity rows during the first directory load. Home and Cha
 accepted catalog visible during refresh or transient disconnect; a connection change alone must
 not remove and reinsert rows or reset the list's viewport. A reserved status line distinguishes
 loading, refreshing and unavailable data, with Retry for a directory failure and Host details for
-connection recovery. Empty copy appears only after readiness; loading does not claim Up to date.
-Host removal and access revocation still clear the owning replica immediately.
+connection recovery. First-load empty copy appears only after the relevant directory succeeds; accepted-empty copy and creation actions stay mounted through refresh/error. Home reads agent readiness; Chat reads workspace/project readiness and applies its selected Host scope consistently. Loading does not claim Up to date. A configured Usage summary reserves its top-toolbar row before reports arrive, preserving the reading anchor.
+Registry removal and authoritative directory tombstones still remove their rows through the existing owners. Managed revocation removes fully managed Hosts; an adopted Host with saved manual connections follows the runtime’s existing manual-profile restoration path.
 
 Home keeps placement separate from live conversation data. Active and Needs you retain their
 order within a run/group; streaming timestamps cannot reorder them. Recent is chronological when

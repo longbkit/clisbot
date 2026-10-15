@@ -5031,3 +5031,30 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
     expect(store.getHosts()).toHaveLength(0);
   });
 });
+
+describe("independent workspace directory readiness", () => {
+  it("retains accepted workspace readiness through refresh/failure without changing agent state", () => {
+    const controller = new HostRuntimeController({ host: makeHost(), deps: makeDeps({}, []) });
+    controller.markAgentDirectorySyncReady();
+    controller.markWorkspaceDirectorySyncLoading();
+    expect(controller.getSnapshot()).toMatchObject({
+      agentDirectoryStatus: "ready",
+      workspaceDirectoryStatus: "initial_loading",
+      hasEverLoadedWorkspaceDirectory: false,
+    });
+    controller.markWorkspaceDirectorySyncError("first failed");
+    expect(controller.getSnapshot().workspaceDirectoryStatus).toBe("error_before_first_success");
+    controller.markWorkspaceDirectorySyncReady();
+    controller.markWorkspaceDirectorySyncLoading();
+    expect(controller.getSnapshot().workspaceDirectoryStatus).toBe("revalidating");
+    controller.markWorkspaceDirectorySyncError("refresh failed");
+    expect(controller.getSnapshot()).toMatchObject({
+      agentDirectoryStatus: "ready",
+      workspaceDirectoryStatus: "error_after_ready",
+      workspaceDirectoryError: "refresh failed",
+      hasEverLoadedWorkspaceDirectory: true,
+    });
+    controller.markWorkspaceDirectorySyncLoading();
+    expect(controller.getSnapshot().workspaceDirectoryError).toBe(null);
+  });
+});

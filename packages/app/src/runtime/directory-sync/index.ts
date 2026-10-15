@@ -169,6 +169,9 @@ export class DirectorySync {
       markAgentLoading: () => void;
       markAgentReady: () => void;
       markAgentError: (error: string) => void;
+      markWorkspaceLoading: () => void;
+      markWorkspaceReady: () => void;
+      markWorkspaceError: (error: string) => void;
     },
     private readonly checkpoints?: DirectoryCheckpointStorage,
   ) {
@@ -506,6 +509,7 @@ export class DirectorySync {
         touchedProjectIds: new Set(),
       };
     });
+    this.callbacks.markWorkspaceLoading();
     try {
       await this.waitForSessionMetadata(client, source);
       const serverInfo = useSessionStore.getState().sessions[this.serverId]?.serverInfo;
@@ -527,9 +531,17 @@ export class DirectorySync {
           transaction.snapshot.syncModes?.workspaces;
       }
       this.completeWorkspaceRefresh(client, source, transaction);
+      this.callbacks.markWorkspaceReady();
     } catch (error) {
       const deltas = this.workspaceTransactions.fail(transaction);
       if (deltas) for (const delta of deltas) this.applyWorkspaceDelta(delta);
+      if (
+        deltas &&
+        this.isCurrent(client, source) &&
+        !(error instanceof DirectoryRefreshSupersededError)
+      ) {
+        this.callbacks.markWorkspaceError(error instanceof Error ? error.message : String(error));
+      }
       throw error;
     }
   }

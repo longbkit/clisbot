@@ -67,7 +67,7 @@ export function SidebarFooter(props: SidebarFooterProps) {
             </>
           )}
         </View>
-        {props.top ? <SidebarFooterRows onBeforeNavigate={props.onBeforeNavigate} /> : null}
+        {props.top ? <SidebarFooterRows stable onBeforeNavigate={props.onBeforeNavigate} /> : null}
       </View>
     </UsageSidebarRoot>
   );
@@ -181,32 +181,41 @@ function SidebarFooterControls({
 
 /**
  * The footer rows in the user's `sidebarFooterItems` order: the Usage item and plugin rows. The
- * Usage item is left out while it has no summary to show.
+ * Desktop omits Usage without a summary. The compact top toolbar reserves its configured row
+ * and keeps the Usage action available before reports arrive. Plugin contributions keep their own height.
  */
-function SidebarFooterRows({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
+function SidebarFooterRows({
+  onBeforeNavigate,
+  stable = false,
+}: {
+  onBeforeNavigate?: () => void;
+  stable?: boolean;
+}) {
   const { items } = useSidebarNavItems("footer");
   const hasUsageSummary = useHasUsageSummary();
   const rowsRef = useRef<View | null>(null);
   const visibleItems = items.filter(
-    (item) => item.visible && (item.kind === "plugin" || hasUsageSummary),
+    (item) => item.visible && (item.kind === "plugin" || stable || hasUsageSummary),
   );
   if (visibleItems.length === 0) return null;
   return (
     <>
       <View ref={rowsRef} collapsable={false} style={styles.footerRows}>
-        {visibleItems.map((item) =>
-          item.kind === "plugin" ? (
-            <PluginSidebarItem
-              key={item.key}
-              group={item.group}
-              section="footer"
-              fallbackAnchorRef={rowsRef}
-              onBeforeNavigate={onBeforeNavigate}
-            />
-          ) : (
-            <UsageSidebarItem key={item.key} />
-          ),
-        )}
+        {visibleItems.map((item) => (
+          <View key={item.key} style={stable && item.kind !== "plugin" && styles.stableUsageRow}>
+            {item.kind === "plugin" ? (
+              <PluginSidebarItem
+                key={item.key}
+                group={item.group}
+                section="footer"
+                fallbackAnchorRef={rowsRef}
+                onBeforeNavigate={onBeforeNavigate}
+              />
+            ) : (
+              <UsageSidebarItem key={item.key} reserveSpace={stable} />
+            )}
+          </View>
+        ))}
       </View>
       <SidebarSeparator testID="sidebar-footer-separator" />
     </>
@@ -250,6 +259,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: SPACING[touchTarget ? 2 : 1],
   }),
   // Usage and plugin rows sit above the footer's icon line, spaced like the header nav rows.
+  stableUsageRow: { height: MIN_TOUCH_TARGET_SIZE, justifyContent: "center" },
   footerRows: {
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[1.5],
