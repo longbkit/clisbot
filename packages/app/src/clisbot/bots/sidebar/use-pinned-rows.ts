@@ -55,10 +55,13 @@ export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void)
   const hosts = useHosts();
   const hostIds = useMemo(() => hosts.map((h) => h.serverId), [hosts]);
   const metadata = usePinMetadata(hostIds);
-  const { bots, chats } = useBotCatalog();
+  const { bots, chats, hosts: catalogHosts, connectionStatuses } = useBotCatalog();
+  const catalogHostIds = useMemo(() => catalogHosts.map((host) => host.serverId), [catalogHosts]);
+  const unavailableBots = useUnavailableCatalogHosts(catalogHostIds, connectionStatuses, bots);
+  const unavailableChats = useUnavailableCatalogHosts(catalogHostIds, connectionStatuses, chats);
   const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : EMPTY_ROWS;
   const chatRows = chats.loadState.status === "loaded" ? chats.loadState.data : EMPTY_ROWS;
-  const { pins } = useResourcePins(chatRows);
+  const { pins, toggle } = useResourcePins(chatRows);
   const { openBot, error } = useBotSidebarActions(
     chatRows,
     onBeforeNavigate,
@@ -75,8 +78,51 @@ export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void)
         metadata,
         workspaceEntries: allWorkspaceEntriesByKey,
         nativeOrder,
+        catalogHostIds,
+        unavailableBots,
+        unavailableChats,
       }),
-    [pins, botRows, chatRows, hostIds, metadata, allWorkspaceEntriesByKey, nativeOrder],
+    [
+      pins,
+      botRows,
+      chatRows,
+      hostIds,
+      metadata,
+      allWorkspaceEntriesByKey,
+      nativeOrder,
+      catalogHostIds,
+      unavailableBots,
+      unavailableChats,
+    ],
   );
-  return { rows, error, chats: chatRows, openBot };
+  return { rows, error, chats: chatRows, openBot, toggle };
+}
+
+function useUnavailableCatalogHosts(
+  hosts: readonly string[],
+  statuses: ReadonlyMap<string, string>,
+  catalog: {
+    loadState: { status: string };
+    isError: boolean;
+    hostErrors: readonly { serverId: string }[];
+  },
+) {
+  const {
+    loadState: { status },
+    isError,
+    hostErrors,
+  } = catalog;
+  return useMemo(
+    () =>
+      new Set(
+        hosts.filter(
+          (id) =>
+            statuses.get(id) !== "online" ||
+            status !== "loaded" ||
+            isError ||
+            hostErrors.some((error) => error.serverId === id),
+        ),
+      ),
+    [hosts, statuses, status, isError, hostErrors],
+  );
 }

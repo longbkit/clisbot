@@ -1,5 +1,10 @@
 import { useCallback, useMemo } from "react";
-import { canonicalPin, normalizePins, type PinChat } from "./pin-identity";
+import {
+  canonicalPin,
+  normalizePins,
+  createPinIdentityCatalog,
+  type PinChat,
+} from "./pin-identity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, type StateStorage } from "zustand/middleware";
@@ -83,17 +88,22 @@ export function useResourcePins(chats: readonly PinChat[] = EMPTY_CHATS) {
   const scope = useResourcePrincipalScope();
   const stored = useResourcePinsStore((state) => state.scopes[scope] ?? EMPTY);
   const update = useResourcePinsStore((state) => state.toggle);
-  const pins = useMemo(() => normalizePins(stored, chats), [stored, chats]);
+  const identify = useMemo(createPinIdentityCatalog, []);
+  const identityChats = useMemo(
+    () => identify(scope, stored, chats),
+    [identify, scope, stored, chats],
+  );
+  const pins = useMemo(() => normalizePins(stored, identityChats), [stored, identityChats]);
   const toggle = useCallback(
-    (pin: ResourcePin) => update(scope, pin, chats),
-    [scope, update, chats],
+    (pin: ResourcePin) => update(scope, pin, identityChats),
+    [scope, update, identityChats],
   );
   const isPinned = useCallback(
     (pin: ResourcePin) => {
-      const key = pinKey(canonicalPin(pin, chats));
+      const key = pinKey(canonicalPin(pin, identityChats));
       return pins.some((item) => pinKey(item) === key);
     },
-    [pins, chats],
+    [pins, identityChats],
   );
   return { pins, toggle, isPinned };
 }

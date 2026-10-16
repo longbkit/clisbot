@@ -60,6 +60,7 @@ export const vi: TranslationResources = {
       noOptionsMatchSearch: "Không có lựa chọn nào khớp với tìm kiếm.",
     },
     states: {
+      unavailable: "Không khả dụng",
       loading: "Đang tải...",
       starting: "Đang khởi động...",
       copied: "Đã sao chép",

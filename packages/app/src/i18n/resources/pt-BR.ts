@@ -62,6 +62,7 @@ export const ptBR: TranslationResources = {
       noOptionsMatchSearch: "Nenhuma opção corresponde à sua busca.",
     },
     states: {
+      unavailable: "Indisponível",
       loading: "Carregando...",
       starting: "Iniciando...",
       copied: "Copiado",

@@ -63,6 +63,7 @@ export const es: TranslationResources = {
       noOptionsMatchSearch: "Ninguna opción coincide con su búsqueda.",
     },
     states: {
+      unavailable: "No disponible",
       loading: "Cargando...",
       starting: "A partir de...",
       copied: "Copiado",

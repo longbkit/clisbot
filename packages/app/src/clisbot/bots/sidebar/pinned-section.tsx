@@ -1,3 +1,5 @@
+import { UnavailablePinRow } from "./unavailable-pin-row";
+import type { ResourcePin } from "./pins";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { Text, View } from "react-native";
@@ -17,9 +19,9 @@ export function FusionPinnedSection({
   renderWorkspacePin,
 }: {
   onBeforeNavigate?: (destination?: string) => void;
-  renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" }>) => ReactNode;
+  renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" | "unavailable" }>) => ReactNode;
 }) {
-  const { rows, error, chats, openBot: openPinnedBot } = usePinnedRows(onBeforeNavigate);
+  const { rows, error, chats, openBot: openPinnedBot, toggle } = usePinnedRows(onBeforeNavigate);
   const menu = useSidebarPinMenu(onBeforeNavigate, chats);
   const { t } = useTranslation();
   const router = useRouter();
@@ -63,7 +65,7 @@ export function FusionPinnedSection({
       {!collapsed
         ? visibleItems.map((row) => (
             <View key={row.key} testID={`sidebar-pin-${row.key}`}>
-              {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin)}
+              {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin, toggle)}
             </View>
           ))
         : null}
@@ -91,8 +93,10 @@ function renderPin(
   openBot: (bot: { serverId: string; botId: string }) => void,
   openChat: (chat: { serverId: string; chatId: string }) => void,
   menu: ReturnType<typeof useSidebarPinMenu>,
-  renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" }>) => ReactNode,
+  renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" | "unavailable" }>) => ReactNode,
+  onUnpin: (pin: ResourcePin) => void,
 ) {
+  if (row.kind === "unavailable") return <UnavailablePinRow pin={row.pin} onUnpin={onUnpin} />;
   if (row.kind === "bot")
     return (
       <BotRow

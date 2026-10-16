@@ -26,9 +26,11 @@ interface BotsSidebarRowProps {
   /** A running session behind the row; drawn as a dot beside the title. */
   active?: boolean;
   statusBucket?: SidebarStateBucket;
+  statusLabel?: string;
+  disabled?: boolean;
   selected: boolean;
   testID: string;
-  onPress: () => void;
+  onPress?: () => void;
   /** Menu replaces the trailing metadata on hover/focus; touch keeps it visible. */
   onOpenMenu?: (anchor: Rect) => void;
   menuLabel?: string;
@@ -42,6 +44,8 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
   trailing,
   active = false,
   statusBucket,
+  statusLabel: labelOverride,
+  disabled = false,
   selected,
   testID,
   onPress,
@@ -50,14 +54,14 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
 }: BotsSidebarRowProps) {
   const { t } = useTranslation();
   const bucket = statusBucket ?? (active ? "running" : "done");
-  const statusLabel = getStatusBucketLabel(bucket, t);
+  const statusLabel = labelOverride ?? getStatusBucketLabel(bucket, t);
   const compact = useIsCompactFormFactor() || isNative;
   const [rowHovered, setRowHovered] = useState(false);
   const [menuFocused, setMenuFocused] = useState(false);
   const menuVisible = Boolean(onOpenMenu && (rowHovered || menuFocused || compact));
   const handleHoverIn = useCallback(() => setRowHovered(true), []);
   const handleHoverOut = useCallback(() => setRowHovered(false), []);
-  const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const accessibilityState = useMemo(() => ({ selected, disabled }), [selected, disabled]);
   const rowStyle = useCallback(
     ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
@@ -81,6 +85,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
         accessibilityState={accessibilityState}
         aria-selected={selected}
         onPress={onPress}
+        disabled={disabled}
         style={rowStyle}
         testID={`${testID}-press`}
       >

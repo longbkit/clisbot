@@ -180,6 +180,15 @@ resolve against accepted workspace authority, not display filters. Pin rendering
 sidebar's existing accepted entry map and Host metadata; it does not acquire another directory
 or build another full sidebar projection.
 
+A temporarily unavailable Bot/chat pin keeps a generic typed row and a local Unpin action. No
+previous-admission name, avatar, status or private menu action appears while disconnected or
+awaiting the current catalog. A successful authoritative catalog with no matching resource hides
+that row; removed Hosts and principal changes do not expose another scope's pins. The existing
+pin identity owner remembers only already-proved DM/Bot alias IDs for still-persisted pins within
+the same principal, so disconnect does not duplicate a known alias and offline Unpin removes both.
+That identity memory is not a catalog or an access grant; a new admission still revalidates all
+private presentation. Unknown aliases are never guessed.
+
 New bot reuses the saved agent-creation provider, model, permission and thinking defaults. Late
 preference hydration must preserve fields the user already changed; editing a Bot uses its saved
 launch configuration instead of creation defaults.

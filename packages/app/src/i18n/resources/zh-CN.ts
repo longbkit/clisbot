@@ -61,6 +61,7 @@ export const zhCN: TranslationResources = {
       noOptionsMatchSearch: "没有匹配搜索的选项。",
     },
     states: {
+      unavailable: "不可用",
       loading: "加载中...",
       starting: "正在开始...",
       copied: "已复制",

@@ -58,6 +58,7 @@ export const en = {
       noOptionsMatchSearch: "No options match your search.",
     },
     states: {
+      unavailable: "Unavailable",
       loading: "Loading...",
       starting: "Starting...",
       copied: "Copied",

@@ -102,5 +102,5 @@ export function useBotCatalog() {
     });
     return () => cleanups.forEach((cleanup) => cleanup());
   }, [ids, connectionKey]);
-  return { hosts: featureHosts, bots, chats };
+  return { hosts: featureHosts, bots, chats, connectionStatuses: statuses };
 }

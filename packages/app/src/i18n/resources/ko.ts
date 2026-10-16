@@ -61,6 +61,7 @@ export const ko: TranslationResources = {
       noOptionsMatchSearch: "검색과 일치하는 옵션이 없습니다.",
     },
     states: {
+      unavailable: "사용할 수 없음",
       loading: "불러오는 중...",
       starting: "시작 중...",
       copied: "복사됨",

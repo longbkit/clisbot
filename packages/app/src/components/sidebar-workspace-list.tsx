@@ -2044,7 +2044,7 @@ function WorkspaceResourcePin({
   hostBadgeByServerId,
   onToggleWorkspacePin,
 }: {
-  row: Exclude<PinRow, { kind: "bot" | "chat" }>;
+  row: Exclude<PinRow, { kind: "bot" | "chat" | "unavailable" }>;
   onWorkspacePress?: (destination?: string) => void;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
@@ -2212,7 +2212,7 @@ export function SidebarWorkspaceList({
   // list of grouped rows, so a new mode lands in the grouped branch rather than silently in this
   // one's `else`.
   const renderWorkspacePin = useCallback(
-    (row: Exclude<PinRow, { kind: "bot" | "chat" }>) => (
+    (row: Exclude<PinRow, { kind: "bot" | "chat" | "unavailable" }>) => (
       <WorkspaceResourcePin
         row={row}
         onWorkspacePress={onWorkspacePress}

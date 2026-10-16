@@ -25,6 +25,7 @@ interface PinRowBase {
 }
 export type PinRow = PinRowBase &
   (
+    | { kind: "unavailable"; pin: ResourcePin }
     | { kind: "bot"; bot: BotsSidebarBot }
     | { kind: "chat"; chat: ChatsSidebarChat }
     | { kind: "project"; project: SidebarProjectEntry }
@@ -48,6 +49,9 @@ interface PinnedRowInput {
   metadata: Record<string, PinMetadata>;
   workspaceEntries: ReadonlyMap<string, SidebarWorkspaceEntry>;
   nativeOrder: readonly string[];
+  catalogHostIds: readonly string[];
+  unavailableBots: ReadonlySet<string>;
+  unavailableChats: ReadonlySet<string>;
 }
 function pinnedWorkspace(input: PinnedRowInput, serverId: string, workspaceId: string) {
   const accepted = input.workspaceEntries.get(`${serverId}:${workspaceId}`);
@@ -111,21 +115,31 @@ function pinnedSession(pin: ResourcePin, input: PinnedRowInput): PinRow | null {
 export function buildPinnedRows(input: PinnedRowInput): PinRow[] {
   const bots = projectBotSidebar(input.bots, input.chats, input.hostIds.length > 1);
   const chats = projectGroupSidebar(input.chats, input.hostIds.length > 1);
-  const resources = input.pins.flatMap<PinRow>((pin) => {
-    if (pin.kind === "project" || pin.kind === "session") {
-      const row = pin.kind === "project" ? pinnedProject(pin, input) : pinnedSession(pin, input);
-      return row ? [row] : [];
-    }
-    const target = resolvePinTarget(pin, { ...input, projects: [], agents: {} });
-    if (!target) return [];
-    const base = { key: pinKey(pin), ...target };
-    if (pin.kind === "bot") {
-      const bot = bots.find((b) => b.serverId === pin.serverId && b.botId === pin.id);
-      return bot ? [{ ...base, kind: "bot", bot }] : [];
-    }
-    const chat = chats.find((c) => c.serverId === pin.serverId && c.chatId === pin.id);
-    return chat ? [{ ...base, kind: "chat", chat }] : [];
-  });
+  const resources = input.pins
+    .filter((pin) => input.hostIds.includes(pin.serverId))
+    .flatMap<PinRow>((pin) => {
+      if (pin.kind === "project" || pin.kind === "session") {
+        const row = pin.kind === "project" ? pinnedProject(pin, input) : pinnedSession(pin, input);
+        return row ? [row] : [];
+      }
+      if (!input.catalogHostIds.includes(pin.serverId)) return [];
+      const unavailable = pin.kind === "bot" ? input.unavailableBots : input.unavailableChats;
+      if (unavailable.has(pin.serverId))
+        return [{ key: pinKey(pin), kind: "unavailable", pin, title: "", route: "" }];
+      const target = resolvePinTarget(pin, { ...input, projects: [], agents: {} });
+      if (!target) return [];
+      const base = { key: pinKey(pin), ...target };
+      if (pin.kind === "bot") {
+        const bot = bots.find((b) => b.serverId === pin.serverId && b.botId === pin.id);
+        return bot ? [{ ...base, kind: "bot", bot }] : [];
+      }
+      const chat = chats.find((c) => c.serverId === pin.serverId && c.chatId === pin.id);
+      return chat ? [{ ...base, kind: "chat", chat }] : [];
+    });
+  return [...resources, ...pinnedWorkspaces(input)];
+}
+
+function pinnedWorkspaces(input: PinnedRowInput): PinRow[] {
   const workspaces = input.hostIds.flatMap((serverId) =>
     [...(input.metadata[serverId]?.workspaces?.values() ?? [])].flatMap((w) => {
       const entry = w.pinnedAt ? pinnedWorkspace(input, serverId, w.id) : null;
@@ -137,14 +151,11 @@ export function buildPinnedRows(input: PinnedRowInput): PinRow[] {
       bi = input.nativeOrder.indexOf(b.workspaceKey);
     return (ai < 0 ? Infinity : ai) - (bi < 0 ? Infinity : bi);
   });
-  return [
-    ...resources,
-    ...workspaces.map((workspace) => ({
-      key: workspace.workspaceKey,
-      kind: "workspace" as const,
-      workspace,
-      title: workspace.name,
-      route: buildHostWorkspaceRoute(workspace.serverId, workspace.workspaceId),
-    })),
-  ];
+  return workspaces.map((workspace) => ({
+    key: workspace.workspaceKey,
+    kind: "workspace" as const,
+    workspace,
+    title: workspace.name,
+    route: buildHostWorkspaceRoute(workspace.serverId, workspace.workspaceId),
+  }));
 }

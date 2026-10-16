@@ -28,3 +28,41 @@ export function normalizePins(
     return [resolved];
   });
 }
+
+/** Remember only aliases already proved for persisted pins; never catalog metadata or authority. */
+export function createPinIdentityCatalog() {
+  let principal: string | null = null;
+  let aliases = new Map<string, PinChat>();
+  return (
+    scope: string,
+    pins: readonly ResourcePin[],
+    chats: readonly PinChat[],
+  ): readonly PinChat[] => {
+    if (scope !== principal) {
+      aliases.clear();
+      principal = scope;
+    }
+    const next = new Map<string, PinChat>();
+    for (const pin of pins) {
+      if (pin.kind !== "chat") continue;
+      const key = JSON.stringify([pin.serverId, pin.id]);
+      const current = chats.find((chat) => chat.serverId === pin.serverId && chat.id === pin.id);
+      const canonical = canonicalPin(pin, chats);
+      if (canonical.kind === "bot")
+        next.set(key, {
+          serverId: pin.serverId,
+          id: pin.id,
+          kind: "direct",
+          participants: [{ botId: canonical.id, agentId: null }],
+        });
+      else if (!current && aliases.has(key)) next.set(key, aliases.get(key)!);
+    }
+    aliases = next;
+    return [
+      ...chats,
+      ...[...aliases.values()].filter(
+        (alias) => !chats.some((chat) => chat.serverId === alias.serverId && chat.id === alias.id),
+      ),
+    ];
+  };
+}

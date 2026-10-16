@@ -61,6 +61,7 @@ export const ar: TranslationResources = {
       noOptionsMatchSearch: "لا توجد خيارات تطابق بحثك.",
     },
     states: {
+      unavailable: "غير متاح",
       loading: "تحميل...",
       starting: "جارٍ البدء...",
       copied: "منقول",

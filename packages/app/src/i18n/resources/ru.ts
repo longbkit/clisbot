@@ -63,6 +63,7 @@ export const ru: TranslationResources = {
       noOptionsMatchSearch: "Нет вариантов, соответствующих вашему запросу.",
     },
     states: {
+      unavailable: "Недоступно",
       loading: "Загрузка...",
       starting: "Начало...",
       copied: "Скопировано",
