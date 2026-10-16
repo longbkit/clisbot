@@ -38,3 +38,19 @@ export function filterWorkspacesByProjects(input: {
 }
 
 const EMPTY_PROJECT_FILTERS: readonly string[] = [];
+
+/** A retained, inactive entry map is not an accepted filtered-empty result for new placements. */
+export function shouldAwaitSidebarEntryProjection(input: {
+  entriesEnabled: boolean;
+  directoryInitialLoading: boolean;
+  placements: readonly Pick<SidebarWorkspaceEntry, "workspaceKey">[];
+  entries: ReadonlyMap<string, unknown>;
+  hasVisibleProjects: boolean;
+}): boolean {
+  return (
+    !input.hasVisibleProjects &&
+    (input.directoryInitialLoading ||
+      (!input.entriesEnabled &&
+        input.placements.some((placement) => !input.entries.has(placement.workspaceKey))))
+  );
+}

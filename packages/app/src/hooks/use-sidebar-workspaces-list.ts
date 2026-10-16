@@ -187,10 +187,12 @@ export function useSidebarWorkspacesList(options?: {
     }
   }, [isActive, runtime, serverIds]);
 
-  const isLoading = isActive && (health.status === "loading" || health.status === "refreshing");
+  // Read pending state independently of demand activation: the first visible retained frame
+  // can precede activation, and must not claim a ready empty directory.
+  const isLoading = health.status === "loading" || health.status === "refreshing";
   const loadingState = {
     isLoading,
-    isInitialLoad: isLoading && !health.hasAcceptedResult && projects.length === 0,
+    isInitialLoad: isLoading && !health.hasAcceptedResult,
     isRevalidating: isLoading && (health.hasAcceptedResult || projects.length > 0),
   };
 

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
-import { filterWorkspacesByProjects, resolveActiveProjectFilters } from "./sidebar-project-filter";
+import {
+  filterWorkspacesByProjects,
+  resolveActiveProjectFilters,
+  shouldAwaitSidebarEntryProjection,
+} from "./sidebar-project-filter";
 
 function workspace(workspaceId: string, projectViewKey: string): SidebarWorkspaceEntry {
   return {
@@ -79,5 +83,53 @@ describe("filterWorkspacesByProjects", () => {
 
   test("keeps nothing for a project with no workspaces", () => {
     expect(filtered(["gamma"])).toEqual([]);
+  });
+});
+
+describe("first retained entry projection", () => {
+  test("does not mistake unhydrated entries for a filtered-empty catalog", () => {
+    const placements = [{ workspaceKey: "host-a:one" }, { workspaceKey: "host-b:two" }];
+    const pending = {
+      entriesEnabled: false,
+      directoryInitialLoading: false,
+      placements,
+      entries: new Map<string, unknown>(),
+      hasVisibleProjects: false,
+    };
+    expect(shouldAwaitSidebarEntryProjection(pending)).toBe(true);
+    // Project refs can arrive before the first workspace directory, even while active.
+    expect(
+      shouldAwaitSidebarEntryProjection({
+        ...pending,
+        entriesEnabled: true,
+        directoryInitialLoading: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAwaitSidebarEntryProjection({
+        ...pending,
+        placements: [],
+        directoryInitialLoading: true,
+      }),
+    ).toBe(true);
+    // An unrelated retained Host cannot establish the selected scope's empty result.
+    expect(
+      shouldAwaitSidebarEntryProjection({
+        ...pending,
+        placements: [placements[1]],
+        entries: new Map([["host-a:one", {}]]),
+      }),
+    ).toBe(true);
+    // Once enabled, the real projection owns removals and empty results.
+    expect(shouldAwaitSidebarEntryProjection({ ...pending, entriesEnabled: true })).toBe(false);
+    expect(shouldAwaitSidebarEntryProjection({ ...pending, placements: [] })).toBe(false);
+    // Preserve visible partial content and accepted filter-empty actions during refresh.
+    expect(shouldAwaitSidebarEntryProjection({ ...pending, hasVisibleProjects: true })).toBe(false);
+    expect(
+      shouldAwaitSidebarEntryProjection({
+        ...pending,
+        entries: new Map(placements.map(({ workspaceKey }) => [workspaceKey, {}])),
+      }),
+    ).toBe(false);
   });
 });

@@ -25,7 +25,11 @@ import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 import { buildSidebarProjection } from "./sidebar-projection";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { filterWorkspacesByLabels } from "./sidebar-labels";
-import { filterWorkspacesByProjects, resolveActiveProjectFilters } from "./sidebar-project-filter";
+import {
+  filterWorkspacesByProjects,
+  resolveActiveProjectFilters,
+  shouldAwaitSidebarEntryProjection,
+} from "./sidebar-project-filter";
 import {
   hasAuthoritativeWorkspaceLabelCatalog,
   useWorkspaceLabelProjection,
@@ -110,9 +114,10 @@ export function SidebarModelProvider({
   // for a filter that does not need it costs a retained-but-inactive sidebar real work.
   const needsWorkspaceEntries =
     groupMode !== "project" || hasActiveLabelFilter || hasMetadataFilter;
+  const entriesEnabled = active !== false || needsWorkspaceEntries;
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
-    active !== false || needsWorkspaceEntries,
+    entriesEnabled,
   );
   const filteredWorkspaceEntriesByKey = useMemo(() => {
     const byProject = filterWorkspacesByProjects({
@@ -167,6 +172,16 @@ export function SidebarModelProvider({
     list.projects,
     visibleWorkspaceKeys,
   ]);
+  // Activation hydrates the existing collection subscription. Until then, an absent retained
+  // entry cannot truthfully establish that background/metadata filtering matched no workspaces.
+  // Keep visible partial content, accepted empty results, and authoritative active removals.
+  const awaitingEntryProjection = shouldAwaitSidebarEntryProjection({
+    entriesEnabled,
+    directoryInitialLoading: list.isInitialLoad,
+    placements: list.workspacePlacements,
+    entries: workspaceEntriesByKey,
+    hasVisibleProjects: filteredProjects.length > 0,
+  });
   const pinnedKeys = usePinnedSidebarKeys(filteredProjects);
   const projectionInput = useMemo(
     () => ({
@@ -209,6 +224,8 @@ export function SidebarModelProvider({
   const value = useMemo(
     () => ({
       ...list,
+      isLoading: list.isLoading || awaitingEntryProjection,
+      isInitialLoad: awaitingEntryProjection,
       metadataRecoveryNotice,
       projects: filteredProjects,
       allProjects: list.projects,
@@ -224,6 +241,7 @@ export function SidebarModelProvider({
       shortcutModel: statusView.shortcutModel,
     }),
     [
+      awaitingEntryProjection,
       metadataRecoveryNotice,
       resolvedProjectFilters,
       collapsedProjectKeys,

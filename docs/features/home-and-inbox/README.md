@@ -246,3 +246,10 @@ startup/deep-link precedence, activity date grouping and existing history pagina
 exercise daemon synchronization, reload, two fresh worktree starts from one template, mobile tabs and
 Back, plus New workspace draft/isolation/background creation regressions. Native results and exact commands are in [verification.md](verification.md); Android must not be inferred
 from web viewport tests.
+
+A retained inactive sidebar may have directory placements before its entry projection has ever
+hydrated. When that missing projection would otherwise show a filtered-empty card, the shared
+model exposes the existing first-load placeholder until activation hydrates it or the first
+workspace directory settles. Project references alone do not establish a ready workspace list. It does not
+start another inactive subscription, replace visible partial rows, suppress accepted filter-empty
+actions, or delay authoritative removals from the active projection.
