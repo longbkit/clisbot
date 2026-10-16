@@ -3,13 +3,16 @@ import React from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FlatListProps, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import type { ChatRenderRow } from "./render-model";
 const state = vi.hoisted(() => ({
+  platform: { OS: "web" },
   props: {} as FlatListProps<unknown>,
   scroll: vi.fn(),
   drag: vi.fn(),
   dismiss: { onScroll: vi.fn(), onScrollBeginDrag: vi.fn(), onScrollEndDrag: vi.fn() },
 }));
 vi.mock("react-native", () => ({
+  Platform: state.platform,
   FlatList: (props: FlatListProps<unknown>) => {
     state.props = props;
     return null;
@@ -35,6 +38,30 @@ vi.mock("./chat-rows", () => ({
 }));
 import { ChatList } from "./chat-list";
 afterEach(cleanup);
+it.each(["android", "ios", "web"])("keeps the existing list and data owner on %s", (platform) => {
+  state.platform.OS = platform;
+  const rows: ChatRenderRow[] = [
+    {
+      kind: "live",
+      key: "live",
+      botId: "bot",
+      agentId: "agent",
+      items: [],
+      permissions: [],
+      inProgress: true,
+      opensGroup: true,
+    },
+  ];
+  // Row construction/viewport filling is exercised separately against installed
+  // VirtualizedList; this assertion only protects the platform and owner wiring.
+  render(<ChatList rows={rows} bots={new Map()} serverId="host" />);
+  expect(state.props.initialNumToRender).toBe(platform === "web" ? undefined : 2);
+  expect(state.props.maxToRenderPerBatch).toBe(platform === "web" ? undefined : 2);
+  expect(state.props.data?.[0]).toBe(rows[0]);
+  expect(state.props.inverted).toBe(true);
+  expect(state.props.maintainVisibleContentPosition).toEqual({ minIndexForVisible: 0 });
+  state.platform.OS = "web";
+});
 it("forwards native scroll lifecycle to keyboard dismissal without losing reading-position tracking", () => {
   render(<ChatList rows={[]} bots={new Map()} serverId="host" />);
   const event = {

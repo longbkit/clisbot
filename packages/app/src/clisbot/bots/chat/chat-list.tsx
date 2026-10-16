@@ -6,7 +6,7 @@ import { useChatScrollPosition } from "./use-chat-scroll-position";
 import { usePinchZoomPassthrough } from "./use-pinch-zoom-passthrough";
 import { BotWorkspaceContext } from "./bot-workspace-context";
 import { memo, useCallback, useMemo } from "react";
-import { FlatList, View, type ListRenderItemInfo } from "react-native";
+import { FlatList, Platform, View, type ListRenderItemInfo } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ChatLiveRow } from "./chat-live-row";
 import {
@@ -35,6 +35,9 @@ interface ChatListProps {
 
 const NO_MEMBERS: readonly MentionMember[] = [];
 const MAINTAIN_VISIBLE_POSITION = { minIndexForVisible: 0 } as const;
+// A reply can fill the viewport. Measure two rows before constructing more native
+// history; VirtualizedList still fills the measured viewport before limiting overscan.
+const NATIVE_ROW_BATCH_SIZE = 2;
 
 function keyExtractor(row: ChatRenderRow): string {
   return row.key;
@@ -102,6 +105,8 @@ export const ChatList = memo(function ChatList({
       onScrollEndDrag={keyboardDismiss.onScrollEndDrag}
       scrollEventThrottle={16}
       inverted
+      initialNumToRender={Platform.OS === "web" ? undefined : NATIVE_ROW_BATCH_SIZE}
+      maxToRenderPerBatch={Platform.OS === "web" ? undefined : NATIVE_ROW_BATCH_SIZE}
       data={data}
       keyExtractor={keyExtractor}
       renderItem={renderItem}

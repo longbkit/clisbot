@@ -143,6 +143,17 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   never enter the ordinary agent message queue. Before a first session exists, voice remains visible
   with an explanation; attachments and dictation are already usable. Hosts without the
   `bots` capability (README D10) cannot silently accept and discard attachment payloads.
+- Native Bot history starts with two rows and uses two-row overscan batches in the existing
+  inverted FlatList. A long reply can fill a phone viewport; constructing ten full replies before
+  measuring them unnecessarily delays presentation. This is a construction budget, not a data or
+  visible-row limit: after measurement, VirtualizedList fills the visible range even when it needs
+  more than two short rows, then adds overscan in smaller batches. An initially short row can
+  therefore still cause a larger measured fill. Web/Electron keep the existing list defaults.
+  Full text, row keys, live heads, older pages, cursor/authority, maintained visible position and
+  per-chat saved offsets remain owned by the same components. No height parsing/cache or batching
+  timer is added. One large reply and native commit can still block; the policy alone does not
+  establish responsive Back or a latency budget. Android runtime evidence and iOS gaps belong in
+  the task's measurement report.
 - Opening an artifact does not navigate to cowork. Desktop uses the existing ordinary side-pane
   opener: create a right split on first open; reuse the remembered pane for subsequent opens; reveal
   an already-open file without overriding a tab the user moved. Explorer is a separate dock.
