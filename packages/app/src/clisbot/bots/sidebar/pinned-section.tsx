@@ -1,43 +1,50 @@
-import type { Rect } from "@/components/ui/anchor";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
-import { Text } from "react-native";
+import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useState, useMemo, useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { usePathname, useRouter } from "expo-router";
-import { Bot, Folder, Hash, Pin, MessageSquare } from "lucide-react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { PinOptionsMenu } from "./pin-options";
-import { pinAction } from "../chat/chat-resource-actions";
-
-const UNPIN_ACTIONS = [pinAction(true)];
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
-import { BotsSidebarRow } from "./row";
+import { BotRow } from "./bots-section";
+import { ChatRow } from "./chats-section";
+import { useSidebarPinMenu } from "./use-section-actions";
 import { usePinnedRows, type PinRow } from "./use-pinned-rows";
-const Icons = {
-  bot: withUnistyles(Bot),
-  chat: withUnistyles(Hash),
-  project: withUnistyles(Folder),
-  session: withUnistyles(MessageSquare),
-  workspace: withUnistyles(Pin),
-};
 
 export function FusionPinnedSection({
   onBeforeNavigate,
+  renderWorkspacePin,
 }: {
   onBeforeNavigate?: (destination?: string) => void;
+  renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" }>) => ReactNode;
 }) {
-  const { rows, error } = usePinnedRows(onBeforeNavigate);
+  const { rows, error, chats, openBot: openPinnedBot } = usePinnedRows(onBeforeNavigate);
+  const menu = useSidebarPinMenu(onBeforeNavigate, chats);
   const { t } = useTranslation();
-  const { visibleItems, expanded, canToggle, toggleExpanded } = useLimitedSidebarGroup(rows);
-  const [menu, setMenu] = useState<(PinRow & { anchor: Rect }) | null>(null);
+  const router = useRouter();
   const pathname = usePathname();
+  const { visibleItems, expanded, canToggle, toggleExpanded } = useLimitedSidebarGroup(rows);
   const [collapsed, toggleCollapsed] = useSectionCollapsed("pinned");
-  const closeMenu = useCallback(() => setMenu(null), []);
-  const removePin = useCallback(() => {
-    menu?.remove();
-    closeMenu();
-  }, [menu, closeMenu]);
+  const openChat = useCallback(
+    (chat: { serverId: string; chatId: string }) => {
+      const row = rows.find(
+        (r) =>
+          r.kind === "chat" && r.chat.serverId === chat.serverId && r.chat.chatId === chat.chatId,
+      );
+      if (row) {
+        onBeforeNavigate?.(row.route);
+        router.push(row.route as import("expo-router").Href);
+      }
+    },
+    [onBeforeNavigate, router, rows],
+  );
+  const openBot = useCallback(
+    (bot: { serverId: string; botId: string }) => {
+      void openPinnedBot(bot.serverId, bot.botId);
+    },
+    [openPinnedBot],
+  );
   if (rows.length === 0 && !error) return null;
   return (
     <>
@@ -48,20 +55,16 @@ export function FusionPinnedSection({
         collapsed={collapsed}
         onToggle={toggleCollapsed}
       />
-      {error ? (
+      {error || menu.error ? (
         <Text accessibilityRole="alert" style={styles.error}>
-          {error}
+          {error || menu.error}
         </Text>
       ) : null}
       {!collapsed
         ? visibleItems.map((row) => (
-            <PinnedRow
-              key={row.key}
-              row={row}
-              selected={row.route === pathname}
-              onBeforeNavigate={onBeforeNavigate}
-              onOpenMenu={setMenu}
-            />
+            <View key={row.key} testID={`sidebar-pin-${row.key}`}>
+              {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin)}
+            </View>
           ))
         : null}
       {!collapsed && canToggle ? (
@@ -72,54 +75,43 @@ export function FusionPinnedSection({
         />
       ) : null}
       <PinOptionsMenu
-        anchor={menu?.anchor}
-        visible={menu !== null}
-        title={menu?.title ?? t("bots.workspace.sidebar.pinnedItem")}
-        actions={UNPIN_ACTIONS}
-        onSelect={removePin}
-        onClose={closeMenu}
+        anchor={menu.menu?.anchor}
+        visible={menu.menu !== null}
+        title={t("bots.workspace.sidebar.pinnedItemOptions")}
+        actions={menu.actions}
+        onSelect={menu.selectAction}
+        onClose={menu.closeMenu}
       />
     </>
   );
 }
-
-const pinColor = (theme: import("@/styles/theme").Theme) => ({
-  color: theme.colors.foregroundMuted,
-});
-function PinnedRow({
-  row,
-  selected,
-  onBeforeNavigate,
-  onOpenMenu,
-}: {
-  row: PinRow;
-  selected: boolean;
-  onBeforeNavigate?: (destination?: string) => void;
-  onOpenMenu: (row: PinRow & { anchor: Rect }) => void;
-}) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const Icon = Icons[row.kind];
-  const leading = useMemo(() => <Icon size={16} uniProps={pinColor} />, [Icon]);
-  const open = useCallback(() => {
-    if (row.open) row.open();
-    else {
-      onBeforeNavigate?.(row.route);
-      router.push(row.route as import("expo-router").Href);
-    }
-  }, [row, onBeforeNavigate, router]);
-  const menu = useCallback((anchor: Rect) => onOpenMenu({ ...row, anchor }), [row, onOpenMenu]);
-  return (
-    <BotsSidebarRow
-      testID={`sidebar-pin-${row.key}`}
-      title={row.title}
-      selected={selected}
-      leading={leading}
-      onPress={open}
-      onOpenMenu={menu}
-      menuLabel={t("bots.workspace.sidebar.pinnedItemOptions")}
-    />
-  );
+function renderPin(
+  row: PinRow,
+  pathname: string,
+  openBot: (bot: { serverId: string; botId: string }) => void,
+  openChat: (chat: { serverId: string; chatId: string }) => void,
+  menu: ReturnType<typeof useSidebarPinMenu>,
+  renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" }>) => ReactNode,
+) {
+  if (row.kind === "bot")
+    return (
+      <BotRow
+        bot={row.bot}
+        selected={row.route === pathname}
+        onPress={openBot}
+        onOpenMenu={menu.onBotMenu}
+      />
+    );
+  if (row.kind === "chat")
+    return (
+      <ChatRow
+        chat={row.chat}
+        selected={row.route === pathname}
+        onPress={openChat}
+        onOpenMenu={menu.onChatMenu}
+      />
+    );
+  return renderWorkspacePin(row);
 }
 
 const styles = StyleSheet.create((theme) => ({

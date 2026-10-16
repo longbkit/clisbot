@@ -22,8 +22,7 @@ import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
 import type { Theme } from "@/styles/theme";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
-import { activityBucket } from "./activity";
+import { useInboxActivity, useInboxActivityLabel, InboxActivityIndicator } from "./inbox-activity";
 import { startNativeInputTracing, traceInstant } from "@/performance/native-trace";
 import { navigateHomeTab } from "./home-tab-navigation";
 const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
@@ -74,6 +73,7 @@ function Tab({
   const navigate = useNavigateHomeTab();
   const router = useRouter();
   const state = useMemo(() => ({ selected }), [selected]);
+  const inboxLabel = useInboxActivityLabel();
   const open = useCallback(
     (event: GestureResponderEvent) => {
       traceInstant("clisbot.tab.press", {
@@ -103,7 +103,13 @@ function Tab({
     [entry.path, navigate, router, selected],
   );
   return (
-    <Pressable accessibilityRole="tab" accessibilityState={state} style={tabStyle} onPress={open}>
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={state}
+      accessibilityLabel={entry.path === "/sessions" ? inboxLabel : entry.name}
+      style={tabStyle}
+      onPress={open}
+    >
       <View>
         <TabGlyph Icon={entry.Icon} uniProps={selected ? selectedGlyph : mutedGlyph} />
         {count ? (
@@ -112,7 +118,10 @@ function Tab({
           </View>
         ) : null}
       </View>
-      <Text style={[styles.text, selected && styles.selected]}>{entry.name}</Text>
+      <View style={styles.label}>
+        <Text style={[styles.text, selected && styles.selected]}>{entry.name}</Text>
+        {entry.path === "/sessions" ? <InboxActivityIndicator /> : null}
+      </View>
     </Pressable>
   );
 }
@@ -181,8 +190,7 @@ function MobileTabBar({ path }: { path: string }) {
   const insets = useSafeAreaInsets();
   const inset = useMemo(() => ({ paddingBottom: Math.max(insets.bottom, 6) }), [insets.bottom]);
   // Reads what Home and the sidebar already loaded; the tab bar never starts its own fetch.
-  const { agents } = useAggregatedAgents({ demand: false });
-  const needsCount = agents.filter((agent) => activityBucket(agent) === "needs").length;
+  const { needs: needsCount } = useInboxActivity();
   if (!HOME_V2_ENABLED || !compact) return null;
   return (
     <View style={[styles.tabs, inset]} testID="home-mobile-tabs">
@@ -232,6 +240,7 @@ const styles = StyleSheet.create((t) => ({
   tabPressed: { backgroundColor: t.colors.interactionHighlight },
   count: { position: "absolute", top: -t.spacing[2], left: t.spacing[3] },
   text: { color: t.colors.foregroundMuted, fontSize: t.fontSize.sm },
+  label: { flexDirection: "row", alignItems: "center", gap: t.spacing[1] },
   selected: { color: t.colors.foreground, fontWeight: t.fontWeight.medium },
 }));
 

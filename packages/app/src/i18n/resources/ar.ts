@@ -6,6 +6,12 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const ar: TranslationResources = {
+  inboxActivity: {
+    counts: "{{active}} جلسات نشطة، {{needs}} تحتاج إليك، {{unread}} ردود غير مقروءة",
+    lastKnown: "آخر نشاط معروف؛ المضيف غير متاح",
+    partial: "نشاط جزئي؛ أحد المضيفين غير متاح",
+    loading: "جارٍ تحميل النشاط",
+  },
   paneFind: {
     connectionFailure: "تعذر البحث في هذه المحادثة. تحقق من الاتصال بالمضيف وأعد المحاولة.",
     historyChangedFailure: "تغيّرت المحادثة أثناء البحث. أعد البحث.",

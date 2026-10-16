@@ -1,3 +1,7 @@
+import { SidebarStatusDot } from "@/components/agent-status-dot";
+import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
+import { getStatusBucketLabel } from "@/hooks/sidebar-status-view-model";
+import { useTranslation } from "react-i18next";
 import type { Rect } from "@/components/ui/anchor";
 import { memo, useRef, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
@@ -21,6 +25,7 @@ interface BotsSidebarRowProps {
   trailing?: string | null;
   /** A running session behind the row; drawn as a dot beside the title. */
   active?: boolean;
+  statusBucket?: SidebarStateBucket;
   selected: boolean;
   testID: string;
   onPress: () => void;
@@ -36,12 +41,16 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
   subtitle,
   trailing,
   active = false,
+  statusBucket,
   selected,
   testID,
   onPress,
   onOpenMenu,
   menuLabel,
 }: BotsSidebarRowProps) {
+  const { t } = useTranslation();
+  const bucket = statusBucket ?? (active ? "running" : "done");
+  const statusLabel = getStatusBucketLabel(bucket, t);
   const compact = useIsCompactFormFactor() || isNative;
   const [rowHovered, setRowHovered] = useState(false);
   const [menuFocused, setMenuFocused] = useState(false);
@@ -68,7 +77,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
     >
       <Pressable
         accessibilityRole={isWeb ? undefined : "button"}
-        accessibilityLabel={title}
+        accessibilityLabel={`${title}, ${statusLabel}`}
         accessibilityState={accessibilityState}
         aria-selected={selected}
         onPress={onPress}
@@ -81,7 +90,9 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
             <Text style={selected ? styles.titleSelected : styles.title} numberOfLines={1}>
               {title}
             </Text>
-            {active ? <View style={styles.activeDot} testID={`${testID}-active`} /> : null}
+            <View testID={`${testID}-status-${bucket}`}>
+              <SidebarStatusDot bucket={bucket} />
+            </View>
           </View>
           {subtitle ? (
             <Text style={styles.subtitle} numberOfLines={1}>
@@ -241,13 +252,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     fontVariant: ["tabular-nums"],
     lineHeight: TITLE_LINE_HEIGHT,
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.statusDotRunning,
-    flexShrink: 0,
   },
   kebabContainer: {
     position: "absolute",

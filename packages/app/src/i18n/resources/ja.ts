@@ -6,6 +6,12 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const ja: TranslationResources = {
+  inboxActivity: {
+    counts: "実行中のセッション {{active}} 件、対応が必要 {{needs}} 件、未読の返信 {{unread}} 件",
+    lastKnown: "最後に確認したアクティビティ（Host に接続できません）",
+    partial: "一部のアクティビティ（接続できない Host があります）",
+    loading: "アクティビティを読み込み中",
+  },
   paneFind: {
     connectionFailure:
       "このチャットを検索できませんでした。ホストへの接続を確認して再試行してください。",

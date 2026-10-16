@@ -37,6 +37,8 @@ import {
 
 interface SidebarModel extends SidebarWorkspacesListResult {
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
+  /** Accepted entries before display filters; pins retain their Host/workspace action identity. */
+  allWorkspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   /**
    * Every project the sidebar could show, before any filter narrows it.
    *
@@ -232,6 +234,7 @@ export function SidebarModelProvider({
       resolvedProjectFilters,
       hasProjectsBeforeFilter: list.projects.length > 0,
       workspaceEntriesByKey: filteredWorkspaceEntriesByKey,
+      allWorkspaceEntriesByKey: workspaceEntriesByKey,
       groupMode,
       workspaceGroups: statusView.workspaceGroups,
       projectIconTargets: projection.projectIconTargets,
@@ -253,6 +256,7 @@ export function SidebarModelProvider({
       statusView.shortcutModel,
       toggleProjectCollapsed,
       filteredWorkspaceEntriesByKey,
+      workspaceEntriesByKey,
     ],
   );
 

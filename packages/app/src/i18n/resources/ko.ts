@@ -6,6 +6,12 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const ko: TranslationResources = {
+  inboxActivity: {
+    counts: "진행 중인 세션 {{active}}개, 조치 필요 {{needs}}개, 읽지 않은 답변 {{unread}}개",
+    lastKnown: "마지막으로 확인한 활동; Host에 연결할 수 없음",
+    partial: "일부 활동; 연결할 수 없는 Host가 있음",
+    loading: "활동을 불러오는 중",
+  },
   paneFind: {
     connectionFailure: "이 채팅을 검색할 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
     historyChangedFailure: "검색 중에 채팅이 변경되었습니다. 다시 검색하세요.",

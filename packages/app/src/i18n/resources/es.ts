@@ -6,6 +6,13 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const es: TranslationResources = {
+  inboxActivity: {
+    counts:
+      "{{active}} sesiones activas, {{needs}} requieren tu atención, {{unread}} respuestas sin leer",
+    lastKnown: "Última actividad conocida; Host no disponible",
+    partial: "Actividad parcial; un Host no está disponible",
+    loading: "La actividad se está cargando",
+  },
   paneFind: {
     connectionFailure:
       "No se pudo buscar en este chat. Comprueba la conexión con el host y vuelve a intentarlo.",

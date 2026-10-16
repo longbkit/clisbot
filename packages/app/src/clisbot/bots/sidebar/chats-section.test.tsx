@@ -75,7 +75,7 @@ vi.mock("@/components/ui/tooltip", () => ({
   TooltipContent: () => null,
 }));
 vi.mock("@/stores/session-store", () => ({
-  useSessionStore: () => false,
+  useSessionStore: () => "done",
   selectAgentTurnPresentation: () => ({ isActive: false }),
 }));
 vi.mock("lucide-react-native", () => ({
@@ -137,7 +137,7 @@ describe("ChatsSection", () => {
     render(
       <ChatsSection onCreateChat={vi.fn()} chats={[chat(1), chat(2)]} onBeforeNavigate={close} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Chat 1" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Chat 1,/ }));
     expect(close).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
     expect(env.push).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
     expect(close.mock.invocationCallOrder[0]).toBeLessThan(env.push.mock.invocationCallOrder[0]!);
@@ -147,10 +147,10 @@ describe("ChatsSection", () => {
     render(
       <ChatsSection onCreateChat={vi.fn()} chats={[chat(1, { hostName: "Host A" }), chat(2)]} />,
     );
-    expect(screen.getByRole("button", { name: "Chat 2" }).getAttribute("aria-selected")).toBe(
+    expect(screen.getByRole("button", { name: /^Chat 2,/ }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(screen.getByRole("button", { name: "Chat 1" }).getAttribute("aria-selected")).toBe(
+    expect(screen.getByRole("button", { name: /^Chat 1,/ }).getAttribute("aria-selected")).toBe(
       "false",
     );
     expect(screen.getAllByText("2m")).toHaveLength(2);
@@ -164,11 +164,11 @@ describe("ChatsSection", () => {
         chats={[1, 2, 3, 4, 5, 6, 7].map((index) => chat(index))}
       />,
     );
-    expect(screen.queryByRole("button", { name: "Chat 6" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Chat 6,/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show more" }));
-    expect(screen.getByRole("button", { name: "Chat 7" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Chat 7,/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
-    expect(screen.queryByRole("button", { name: "Chat 7" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Chat 7,/ })).toBeNull();
   });
 
   it("offers the menu only when a handler is given", () => {
@@ -249,7 +249,7 @@ it("opens all group chats separately, then closes the sheet before navigation", 
   fireEvent.click(screen.getByRole("button", { name: "View all (8)" }));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getAllByRole("button", { name: /^Chat / })).toHaveLength(8);
-  fireEvent.click(within(dialog).getByRole("button", { name: "Chat 8" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Chat 8,/ }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(close).toHaveBeenCalledOnce();
   expect(env.push).toHaveBeenCalledWith("/h/host-a/chat/chat-8");

@@ -141,6 +141,16 @@ are merged into unfiltered results; filtered searches only include matching daem
 Search, Host and the Type/Date pills share one filter row; on a phone search takes its own line,
 with a separate wrapping row for the pills. Both rows retain their height above the conversation list.
 
+The upper Inbox navigation row and compact Inbox tab share one passive activity summary. Its
+status mark uses the existing collapsed-status precedence; its count is the number of sessions
+in Home's Active bucket (running or initializing, excluding Needs you and archived sessions),
+deduplicated by Host/session identity rather than pin representations. The compact tab's existing
+Needs you badge remains separate; unread finished replies remain Recent. Accessible names state
+all three counts. Disconnected Hosts retain accepted last-known activity with an unavailable
+mark; an incomplete catalog displays an unknown count (`—`, or a known lower bound with `+`),
+never a fabricated empty or ready state. This lifts the existing passive aggregate observer out
+of the tab bar into a shared provider; it adds no directory demand or second aggregate observer.
+
 Home and Inbox draw a conversation with one row (`clisbot/home/activity-row.tsx`): title, then
 project · workspace · branch · Host, then why it needs you (Needs approval, Failed, Needs you, or
 Archived) and its time. A finished reply nobody has read is not Needs you: it stays in Recent with

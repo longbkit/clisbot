@@ -231,7 +231,7 @@
         ]
       }
     },
-    // useUnistyles burn-down: 74 files total; the 68 files below still enforce the raw-query ban.
+    // useUnistyles burn-down: 73 files total; the 67 files below still enforce the raw-query ban.
     {
       "files": [
         "packages/app/src/app/_layout.tsx",
@@ -240,7 +240,6 @@
         "packages/app/src/components/add-host-method-modal.tsx",
         "packages/app/src/components/add-host-modal.tsx",
         "packages/app/src/components/agent-list.tsx",
-        "packages/app/src/components/agent-status-dot.tsx",
         "packages/app/src/components/attachment-lightbox.tsx",
         "packages/app/src/desktop/browser/pane/index.electron.tsx",
         "packages/app/src/desktop/browser/pane/index.tsx",

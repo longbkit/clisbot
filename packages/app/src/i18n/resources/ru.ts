@@ -6,6 +6,13 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const ru: TranslationResources = {
+  inboxActivity: {
+    counts:
+      "Активных сеансов: {{active}}, требуют внимания: {{needs}}, непрочитанных ответов: {{unread}}",
+    lastKnown: "Последняя известная активность; Host недоступен",
+    partial: "Неполная активность; один из Host недоступен",
+    loading: "Активность загружается",
+  },
   paneFind: {
     connectionFailure:
       "Не удалось выполнить поиск в чате. Проверьте подключение к хосту и повторите попытку.",

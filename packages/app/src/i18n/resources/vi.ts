@@ -6,6 +6,12 @@ import { hub } from "./hub";
 import { pluginSettings } from "./plugin-settings";
 
 export const vi: TranslationResources = {
+  inboxActivity: {
+    counts: "{{active}} phiên đang chạy, {{needs}} cần bạn xử lý, {{unread}} phản hồi chưa đọc",
+    lastKnown: "Hoạt động gần nhất; Host không khả dụng",
+    partial: "Hoạt động chưa đầy đủ; một Host không khả dụng",
+    loading: "Đang tải hoạt động",
+  },
   paneFind: {
     connectionFailure:
       "Không thể tìm trong cuộc trò chuyện này. Kiểm tra kết nối tới host rồi thử lại.",

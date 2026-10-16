@@ -1,3 +1,6 @@
+import type { PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
+import { StatusSessionRow } from "@/components/sidebar/sidebar-status-list";
+import { resolveSidebarProjectIconTargets } from "@/utils/sidebar-project-row-model";
 import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
@@ -1693,6 +1696,7 @@ function ProjectBlock({
   shortcutIndexByWorkspaceKey,
   parentGestureRef,
   onToggleCollapsed,
+  onPinnedPress,
   onWorkspacePress,
   onWorkspaceReorder,
   onWorktreeCreated,
@@ -1718,6 +1722,7 @@ function ProjectBlock({
   shortcutIndexByWorkspaceKey: Map<string, number>;
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
   onToggleCollapsed: (projectViewKey: string) => void;
+  onPinnedPress?: () => void;
   onWorkspacePress?: (destination?: string) => void;
   onWorkspaceReorder: (projectViewKey: string, workspaces: SidebarWorkspacePlacement[]) => void;
   onWorktreeCreated?: (workspaceId: string) => void;
@@ -1887,8 +1892,9 @@ function ProjectBlock({
   }, [isRemovingProject, displayName, t, toast, project.hosts]);
 
   const handleToggleCollapsed = useCallback(() => {
-    onToggleCollapsed(project.viewKey);
-  }, [onToggleCollapsed, project.viewKey]);
+    if (onPinnedPress) onPinnedPress();
+    else onToggleCollapsed(project.viewKey);
+  }, [onPinnedPress, onToggleCollapsed, project.viewKey]);
 
   let projectChildren = null;
   if (!collapsed) {
@@ -1942,7 +1948,7 @@ function ProjectBlock({
         iconDataUri={iconDataUri}
         statusBucket={aggregateStatusBucket}
         selected={false}
-        chevron={rowModel.chevron}
+        chevron={onPinnedPress ? null : rowModel.chevron}
         onPress={handleToggleCollapsed}
         worktreeTarget={
           rowModel.trailingAction.kind === "new_workspace" ? rowModel.trailingAction.target : null
@@ -1987,6 +1993,7 @@ function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlo
     previous.onToggleWorkspacePin === next.onToggleWorkspacePin &&
     previous.parentGestureRef === next.parentGestureRef &&
     previous.onToggleCollapsed === next.onToggleCollapsed &&
+    previous.onPinnedPress === next.onPinnedPress &&
     previous.onWorkspacePress === next.onWorkspacePress &&
     previous.onWorkspaceReorder === next.onWorkspaceReorder &&
     previous.onWorktreeCreated === next.onWorktreeCreated &&
@@ -2027,6 +2034,98 @@ function areProjectBlockSelectionsEqual(
 }
 
 const MemoProjectBlock = memo(ProjectBlock, areProjectBlockPropsEqual);
+
+/** Pins reuse the ordinary row owners, including their permission gates and menu mutations. */
+function WorkspaceResourcePin({
+  row,
+  onWorkspacePress,
+  supportsPinningByServerId,
+  supportsMultiplicityByServerId,
+  hostBadgeByServerId,
+  onToggleWorkspacePin,
+}: {
+  row: Exclude<PinRow, { kind: "bot" | "chat" }>;
+  onWorkspacePress?: (destination?: string) => void;
+  supportsPinningByServerId: ReadonlyMap<string, boolean>;
+  supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
+  hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
+  onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+}) {
+  const activeWorkspaceSelection = useSidebarWorkspaceSelection();
+  const icons = useProjectIcons({
+    projects: useMemo(
+      () => (row.kind === "project" ? resolveSidebarProjectIconTargets([row.project]) : []),
+      [row],
+    ),
+  });
+  const sessionItem = useMemo(
+    () =>
+      row.kind === "session"
+        ? { kind: "session" as const, key: row.key, workspace: row.workspace, session: row.session }
+        : null,
+    [row],
+  );
+  const openProject = useCallback(() => {
+    onWorkspacePress?.(row.route);
+    router.push(row.route as Href);
+  }, [onWorkspacePress, row.route]);
+  if (row.kind === "project")
+    return (
+      <MemoProjectBlock
+        project={row.project}
+        workspaceEntriesByKey={EMPTY_PIN_ENTRIES}
+        collapsed
+        displayName={row.project.projectName}
+        iconDataUri={icons.get(row.project.viewKey) ?? null}
+        selectionEnabled
+        showShortcutBadges={false}
+        shortcutIndexByWorkspaceKey={EMPTY_PIN_SHORTCUTS}
+        onToggleCollapsed={noop}
+        onPinnedPress={openProject}
+        onWorkspacePress={onWorkspacePress}
+        onWorkspaceReorder={noop}
+        drag={noop}
+        isDragging={false}
+        useNestable={false}
+        creatingWorkspaceIds={EMPTY_PIN_CREATING}
+        activeWorkspaceSelection={activeWorkspaceSelection}
+        hostBadgeByServerId={hostBadgeByServerId}
+        supportsMultiplicityByServerId={supportsMultiplicityByServerId}
+        supportsPinningByServerId={supportsPinningByServerId}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+      />
+    );
+  if (row.kind === "session" && sessionItem)
+    return (
+      <StatusSessionRow
+        item={sessionItem}
+        inGroup={false}
+        shortcutNumber={null}
+        showShortcutBadge={false}
+        canPin={supportsPinningByServerId.get(row.workspace.serverId) === true}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        onWorkspacePress={onWorkspacePress}
+      />
+    );
+  return (
+    <MemoWorkspaceRowItem
+      workspace={row.workspace}
+      workspaceEntry={row.workspace}
+      hostBadge={hostBadgeByServerId.get(row.workspace.serverId)}
+      shortcutNumber={null}
+      showShortcutBadge={false}
+      canCopyBranchName={row.workspace.projectKind === "git"}
+      canPin={supportsPinningByServerId.get(row.workspace.serverId) === true}
+      onToggleWorkspacePin={onToggleWorkspacePin}
+      selectionEnabled
+      activeWorkspaceSelection={activeWorkspaceSelection}
+      onWorkspacePress={onWorkspacePress}
+    />
+  );
+}
+const EMPTY_PIN_ENTRIES = new Map<string, SidebarWorkspaceEntry>();
+const EMPTY_PIN_SHORTCUTS = new Map<string, number>();
+const EMPTY_PIN_CREATING = new Set<string>();
 
 export function SidebarWorkspaceList({
   workspaceGroups,
@@ -2112,9 +2211,33 @@ export function SidebarWorkspaceList({
   // Project mode is the one that keeps its project headers; every other grouping mode is a flat
   // list of grouped rows, so a new mode lands in the grouped branch rather than silently in this
   // one's `else`.
+  const renderWorkspacePin = useCallback(
+    (row: Exclude<PinRow, { kind: "bot" | "chat" }>) => (
+      <WorkspaceResourcePin
+        row={row}
+        onWorkspacePress={onWorkspacePress}
+        supportsPinningByServerId={supportsPinningByServerId}
+        supportsMultiplicityByServerId={supportsMultiplicityByServerId}
+        hostBadgeByServerId={hostBadgeByServerId}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+      />
+    ),
+    [
+      onWorkspacePress,
+      supportsPinningByServerId,
+      supportsMultiplicityByServerId,
+      hostBadgeByServerId,
+      onToggleWorkspacePin,
+    ],
+  );
   const leading = (
     <>
-      {fusion ? <FusionPinnedSection onBeforeNavigate={onWorkspacePress} /> : null}
+      {fusion ? (
+        <FusionPinnedSection
+          onBeforeNavigate={onWorkspacePress}
+          renderWorkspacePin={renderWorkspacePin}
+        />
+      ) : null}
       {listLeadingComponent}
     </>
   );

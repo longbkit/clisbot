@@ -4,6 +4,12 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const en = {
+  inboxActivity: {
+    counts: "Active sessions: {{active}}, need you: {{needs}}, unread replies: {{unread}}",
+    lastKnown: "Last known activity; Host unavailable",
+    partial: "Partial activity; a Host is unavailable",
+    loading: "Activity is still loading",
+  },
   paneFind: {
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
     historyChangedFailure: "The chat changed while searching. Search again.",

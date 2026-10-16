@@ -648,7 +648,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
  * the Session grouping's flat list. It carries that
  * row's menu and a shortcut number of its own; pressing it opens the workspace on the session.
  */
-const StatusSessionRow = memo(function StatusSessionRow({
+export const StatusSessionRow = memo(function StatusSessionRow({
   item,
   inGroup,
   shortcutNumber,

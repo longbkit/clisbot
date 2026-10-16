@@ -1,3 +1,4 @@
+import { InboxActivityProvider } from "@/clisbot/home/inbox-activity";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { profileNativeRegion } from "@/utils/render-profiler";
 import { MobileHomeTabs } from "@/clisbot/home/mobile-navigation";
@@ -953,7 +954,9 @@ function RuntimeProviders({ children }: { children: ReactNode }) {
     <HostRuntimeBootstrapProvider>
       <PushNotificationRouter />
       <SidebarCalloutProvider>
-        <ProvidersWrapper>{children}</ProvidersWrapper>
+        <ProvidersWrapper>
+          <InboxActivityProvider>{children}</InboxActivityProvider>
+        </ProvidersWrapper>
       </SidebarCalloutProvider>
     </HostRuntimeBootstrapProvider>
   );

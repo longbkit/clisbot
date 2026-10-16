@@ -86,7 +86,7 @@ vi.mock("../chat/bot-face", () => ({
   BotFace: ({ name }: { name: string }) => <b>{name.charAt(0)}</b>,
 }));
 vi.mock("@/stores/session-store", () => ({
-  useSessionStore: () => false,
+  useSessionStore: () => "done",
   selectAgentTurnPresentation: () => ({ isActive: false }),
 }));
 vi.mock("@/hooks/use-time-ago", () => ({ useCompactTimeAgo: () => "2m" }));
@@ -114,14 +114,14 @@ describe("BotsSection", () => {
         onCreateBot={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: "Bot a" }).getAttribute("aria-selected")).toBe(
+    expect(screen.getByRole("button", { name: /^Bot a,/ }).getAttribute("aria-selected")).toBe(
       "false",
     );
-    expect(screen.getByRole("button", { name: "Bot b" }).getAttribute("aria-selected")).toBe(
+    expect(screen.getByRole("button", { name: /^Bot b,/ }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(screen.getByTestId("sidebar-bot-a-active")).toBeTruthy();
-    expect(screen.queryByTestId("sidebar-bot-b-active")).toBeNull();
+    expect(screen.getByTestId("sidebar-bot-a-status-running")).toBeTruthy();
+    expect(screen.queryByTestId("sidebar-bot-b-status-running")).toBeNull();
     expect(screen.getByText("Host A")).toBeTruthy();
   });
 
@@ -136,7 +136,7 @@ describe("BotsSection", () => {
         onCreateBot={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Bot a" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Bot a,/ }));
     expect(onPressBot).toHaveBeenCalledWith(expect.objectContaining({ botId: "a" }));
     fireEvent.click(screen.getByRole("button", { name: "Bot options" }));
     expect(onOpenBotMenu).toHaveBeenCalledWith(expect.objectContaining({ botId: "a" }), {
@@ -248,17 +248,17 @@ it("expands bots in place, keeps the selected bot on collapse, and opens the ful
       onCreateBot={vi.fn()}
     />,
   );
-  expect(screen.getByRole("button", { name: "Bot 6" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Bot 5" })).toBeNull();
+  expect(screen.getByRole("button", { name: /^Bot 6,/ })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Bot 5,/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show more" }));
-  expect(screen.getByRole("button", { name: "Bot 5" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Bot 5,/ })).toBeTruthy();
   expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show less" }));
-  expect(screen.getByRole("button", { name: "Bot 6" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Bot 5" })).toBeNull();
+  expect(screen.getByRole("button", { name: /^Bot 6,/ })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Bot 5,/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "View all (8)" }));
   fireEvent.click(
-    within(screen.getByRole("dialog")).getByRole("button", { name: "Bot other-host" }),
+    within(screen.getByRole("dialog")).getByRole("button", { name: /^Bot other-host,/ }),
   );
   expect(onPressBot).toHaveBeenCalledWith(expect.objectContaining({ botId: "other-host" }));
   expect(screen.queryByRole("dialog")).toBeNull();

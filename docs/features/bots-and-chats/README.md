@@ -171,6 +171,15 @@ Pinning a DM or its Bot represents the same sidebar item. Existing duplicate pin
 when the chat catalog loads; unpinning either surface removes the known aliases. Unknown/offline
 pins stay intact, and Host/account scopes remain separate. A one-bot group retains its own pin.
 
+Pinned items render through the ordinary Bot, group, project, workspace and session row owners:
+marks, metadata, live status and permission-gated actions remain the same, including unpin. Bot
+activity follows the user's DM; group activity collapses its participating sessions with the
+existing approval/error/running/unread precedence. Project pin actions stay on the pinned Host,
+even when another Host has the same project ID or the ordinary list is filtered. Session pins
+resolve against accepted workspace authority, not display filters. Pin rendering reads the
+sidebar's existing accepted entry map and Host metadata; it does not acquire another directory
+or build another full sidebar projection.
+
 New bot reuses the saved agent-creation provider, model, permission and thinking defaults. Late
 preference hydration must preserve fields the user already changed; editing a Bot uses its saved
 launch configuration instead of creation defaults.

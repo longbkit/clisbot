@@ -1,7 +1,8 @@
+import { selectChatStatusBucket } from "./row-status";
 import type { Rect } from "@/components/ui/anchor";
 import { ChatAvatar } from "../chat/chat-avatar";
 import type { GroupMarkMember } from "../chat/group-mark";
-import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
+import { useSessionStore } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "expo-router";
 import { Text, View } from "react-native";
@@ -169,7 +170,7 @@ function ChatDirectory({
 }
 const chatKey = (chat: ChatsSidebarChat) => chat.key;
 
-const ChatRow = memo(function ChatRow({
+export const ChatRow = memo(function ChatRow({
   chat,
   selected,
   onPress,
@@ -180,11 +181,8 @@ const ChatRow = memo(function ChatRow({
   onPress: (chat: ChatsSidebarChat) => void;
   onOpenMenu?: (chat: ChatsSidebarChat, anchor: Rect) => void;
 }) {
-  const active = useSessionStore(
-    (state) =>
-      chat.agentIds?.some(
-        (id) => selectAgentTurnPresentation(state.sessions[chat.serverId], id).isActive,
-      ) ?? false,
+  const statusBucket = useSessionStore((state) =>
+    selectChatStatusBucket(state.sessions[chat.serverId], chat.agentIds ?? []),
   );
   const updatedAt = useMemo(() => new Date(chat.updatedAt), [chat.updatedAt]);
   const timeAgo = useCompactTimeAgo(updatedAt);
@@ -210,7 +208,7 @@ const ChatRow = memo(function ChatRow({
       title={chat.title}
       subtitle={detail}
       trailing={timeAgo}
-      active={chat.active ?? active}
+      statusBucket={chat.active ? "running" : statusBucket}
       selected={selected}
       testID={`sidebar-chat-${chat.chatId}`}
       onPress={handlePress}

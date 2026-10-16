@@ -6,6 +6,12 @@ import { connectors } from "./connectors";
 import { hub } from "./hub";
 
 export const zhCN: TranslationResources = {
+  inboxActivity: {
+    counts: "{{active}} 个活跃会话，{{needs}} 个需要处理，{{unread}} 条未读回复",
+    lastKnown: "上次已知活动；Host 不可用",
+    partial: "部分活动；某个 Host 不可用",
+    loading: "正在加载活动",
+  },
   paneFind: {
     connectionFailure: "无法搜索此聊天。请检查主机连接后重试。",
     historyChangedFailure: "搜索期间聊天已更改。请重新搜索。",

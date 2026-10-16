@@ -3,101 +3,80 @@ import { useStoreWithEqualityFn } from "zustand/traditional";
 import { shallow } from "zustand/shallow";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSessionStore } from "@/stores/session-store";
-import { useSidebarWorkspacesList } from "@/hooks/use-sidebar-workspaces-list";
-import { useSidebarWorkspacePinController } from "@/hooks/use-sidebar-workspace-pin";
-import { buildHostWorkspaceRoute } from "@/utils/host-routes";
+import { useHosts } from "@/runtime/host-runtime";
+import { useSidebarModel } from "@/components/sidebar/sidebar-model";
 import { useBotCatalog } from "../data/runtime";
 import { useBotSidebarActions } from "./use-sidebar-actions";
-import { useResourcePins, pinKey, type ResourcePin } from "./pins";
-import { resolvePinTarget } from "./pin-target";
-export interface PinRow {
-  key: string;
-  kind: ResourcePin["kind"] | "workspace";
-  title: string;
-  route: string;
-  open?: () => void;
-  remove: () => void;
-}
+import { useResourcePins } from "./pins";
+import { buildPinnedRows } from "./pinned-row-model";
+export type { PinRow } from "./pinned-row-model";
+const EMPTY_ROWS = [] as const;
 type Session = ReturnType<typeof useSessionStore.getState>["sessions"][string];
 function usePinMetadata(hostIds: string[]) {
+  // Existing accepted Host maps only. Pins neither acquire another directory demand nor repeat
+  // the sidebar's complete structure/activity projection. Timeline deltas keep these refs stable.
   const maps = useStoreWithEqualityFn(
     useSessionStore,
     (state) =>
-      hostIds.flatMap((id) => [state.sessions[id]?.agents, state.sessions[id]?.workspaces]),
+      hostIds.flatMap((id) => {
+        const s = state.sessions[id];
+        return [
+          s?.agents,
+          s?.workspaces,
+          s?.projects,
+          s?.workspaceAgentActivity,
+          s?.messageSubmissions,
+        ];
+      }),
     shallow,
   );
-  return {
-    agents: Object.fromEntries(
-      hostIds.map((id, index) => [id, maps[index * 2] as Session["agents"] | undefined]),
-    ),
-    workspaces: Object.fromEntries(
-      hostIds.map((id, index) => [id, maps[index * 2 + 1] as Session["workspaces"] | undefined]),
-    ),
-  };
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        hostIds.map((id, i) => [
+          id,
+          {
+            agents: maps[i * 5] as Session["agents"] | undefined,
+            workspaces: maps[i * 5 + 1] as Session["workspaces"] | undefined,
+            projects: maps[i * 5 + 2] as Session["projects"] | undefined,
+            workspaceAgentActivity: maps[i * 5 + 3] as
+              | Session["workspaceAgentActivity"]
+              | undefined,
+            messageSubmissions: maps[i * 5 + 4] as Session["messageSubmissions"] | undefined,
+          },
+        ]),
+      ),
+    [hostIds, maps],
+  );
 }
-export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void): {
-  rows: PinRow[];
-  error: string | null;
-} {
-  const { projects } = useSidebarWorkspacesList({ hostFilters: [] });
+
+export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void) {
+  const { allWorkspaceEntriesByKey } = useSidebarModel();
+  const hosts = useHosts();
+  const hostIds = useMemo(() => hosts.map((h) => h.serverId), [hosts]);
+  const metadata = usePinMetadata(hostIds);
   const { bots, chats } = useBotCatalog();
-  const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : [];
-  const chatRows = chats.loadState.status === "loaded" ? chats.loadState.data : [];
-  const { pins, toggle } = useResourcePins(chatRows);
+  const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : EMPTY_ROWS;
+  const chatRows = chats.loadState.status === "loaded" ? chats.loadState.data : EMPTY_ROWS;
+  const { pins } = useResourcePins(chatRows);
   const { openBot, error } = useBotSidebarActions(
     chatRows,
     onBeforeNavigate,
     chats.loadState.status === "loaded",
   );
-  const hostIds = useMemo(
-    () => [...new Set(projects.flatMap((p) => p.hosts.map((h) => h.serverId)))],
-    [projects],
-  );
-  const metadata = usePinMetadata(hostIds);
-  const unpinWorkspace = useSidebarWorkspacePinController();
   const nativeOrder = useSidebarOrderStore((state) => state.pinnedWorkspaceOrder);
-  const rows = pins.flatMap<PinRow>((pin) => {
-    const target = resolvePinTarget(pin, {
-      bots: botRows,
-      chats: chatRows,
-      projects,
-      agents: metadata.agents,
-    });
-    if (!target) return [];
-    return [
-      {
-        ...target,
-        key: pinKey(pin),
-        kind: pin.kind,
-        remove: () => toggle(pin),
-        ...(pin.kind === "bot" ? { open: () => void openBot(pin.serverId, pin.id) } : {}),
-      },
-    ];
-  });
-  const workspaces = projects
-    .flatMap((p) => p.workspaces)
-    .flatMap((w) => {
-      const descriptor = metadata.workspaces[w.serverId]?.get(w.workspaceId);
-      return descriptor?.pinnedAt
-        ? [{ ...w, name: descriptor.name, pinnedAt: descriptor.pinnedAt }]
-        : [];
-    });
-  workspaces.sort((a, b) => {
-    const ai = nativeOrder.indexOf(a.workspaceKey),
-      bi = nativeOrder.indexOf(b.workspaceKey);
-    return (ai < 0 ? Infinity : ai) - (bi < 0 ? Infinity : bi);
-  });
-  return {
-    error,
-    rows: [
-      ...rows,
-      ...workspaces.map((w) => ({
-        key: w.workspaceKey,
-        kind: "workspace" as const,
-        title: w.name,
-        route: buildHostWorkspaceRoute(w.serverId, w.workspaceId),
-        remove: () => unpinWorkspace(w),
-      })),
-    ],
-  };
+  const rows = useMemo(
+    () =>
+      buildPinnedRows({
+        pins,
+        bots: botRows,
+        chats: chatRows,
+        hostIds,
+        metadata,
+        workspaceEntries: allWorkspaceEntriesByKey,
+        nativeOrder,
+      }),
+    [pins, botRows, chatRows, hostIds, metadata, allWorkspaceEntriesByKey, nativeOrder],
+  );
+  return { rows, error, chats: chatRows, openBot };
 }

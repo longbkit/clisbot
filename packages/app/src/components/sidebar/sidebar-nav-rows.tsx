@@ -1,3 +1,4 @@
+import { InboxActivityIndicator, useInboxActivityLabel } from "@/clisbot/home/inbox-activity";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
@@ -172,7 +173,10 @@ function SidebarAddProjectRow({ onBeforeNavigate }: SidebarNavRowProps) {
   );
 }
 
+const inboxActivityAccessory = <InboxActivityIndicator />;
+
 function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
+  const activityLabel = useInboxActivityLabel();
   const { t } = useTranslation();
   const pathname = usePathname();
   const handlePress = useCallback(() => {
@@ -186,6 +190,8 @@ function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
       label={HOME_V2_ENABLED ? "Inbox" : t(builtinSidebarNavLabelKey("history"))}
       onPress={handlePress}
       isActive={pathname.includes("/sessions")}
+      trailing={HOME_V2_ENABLED ? inboxActivityAccessory : undefined}
+      accessibilityLabel={HOME_V2_ENABLED ? activityLabel : undefined}
       testID="sidebar-sessions"
       variant="compact"
     />

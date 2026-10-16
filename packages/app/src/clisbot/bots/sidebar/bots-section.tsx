@@ -1,3 +1,4 @@
+import { selectChatStatusBucket } from "./row-status";
 import type { Rect } from "@/components/ui/anchor";
 import { DirectoryControls } from "./directory-controls";
 import {
@@ -11,7 +12,7 @@ import { FormTextInput } from "@/components/ui/form-field";
 import { FlatList } from "@/components/ui/scroll-view";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
+import { useSessionStore } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -137,7 +138,7 @@ export const BotsSection = memo(function BotsSection({
   );
 });
 
-const BotRow = memo(function BotRow({
+export const BotRow = memo(function BotRow({
   bot,
   selected,
   onPress,
@@ -148,10 +149,8 @@ const BotRow = memo(function BotRow({
   onPress: (bot: BotsSidebarBot) => void;
   onOpenMenu?: (bot: BotsSidebarBot, anchor: Rect) => void;
 }) {
-  const active = useSessionStore((state) =>
-    bot.agentId
-      ? selectAgentTurnPresentation(state.sessions[bot.serverId], bot.agentId).isActive
-      : false,
+  const statusBucket = useSessionStore((state) =>
+    selectChatStatusBucket(state.sessions[bot.serverId], bot.agentId ? [bot.agentId] : []),
   );
   const updatedAt = useMemo(
     () => (bot.updatedAt ? new Date(bot.updatedAt) : null),
@@ -175,7 +174,7 @@ const BotRow = memo(function BotRow({
       leading={face}
       title={bot.name}
       subtitle={detail}
-      active={bot.active ?? active}
+      statusBucket={bot.active ? "running" : statusBucket}
       trailing={bot.updatedAt ? timeAgo : null}
       selected={selected}
       testID={`sidebar-bot-${bot.botId}`}
