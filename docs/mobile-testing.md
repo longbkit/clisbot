@@ -193,6 +193,26 @@ derivation observations partial; do not call their counts complete or treat miss
 zero work. Validate all native input/press/commit markers and the separately buffered FrameTimeline
 and clock-qualified video before accepting native latency/frame metrics.
 
+For disposable synthetic Android JS-callsite diagnosis, the existing native trace module exposes
+one-shot Hermes sampling only when **both** `CLISBOT_PROFILE_BUILD=1` and
+`APP_VARIANT=development` were present at native compilation, and the running package is
+`com.clisbot.app.dev`. Place the exact target workspace key in its external-files
+`cto029-hermes.arm` after warming the intended session. The accepted row callback consumes this
+file before navigation, enables the installed Hermes sampler, and a native worker synchronously
+dumps `cto029-entry.cpuprofile` after two seconds. `cto029-hermes-result.json` acknowledges only
+successful dump return or an explicit error. Never invoke RN 0.81.5's misregistered wrapper
+`disable()`. An external controller must enforce a hard deadline independent of JS and force-stop
+**only this synthetic app process**, without clearing data, immediately after acknowledgment or
+on failure/timeout. A file killed during dumping is unavailable, not a complete profile. This
+process-termination contract makes this unsuitable for the everyday app or unsaved real work.
+
+Validate nonempty samples, the expected RN JS thread and bundle frames before interpretation:
+the global dump selects the first registered Hermes profiler. Preserve raw output; symbolicate
+a copy using this exact diagnostic APK's composed release source map. Report leaf/inclusive
+sample counts, interval boundaries and unresolved frames. Samples diagnose executing callsites,
+not scheduling delay, visible presentation or latency acceptance. Headless and windowed runs
+are different environments and cannot establish a cross-environment speedup.
+
 `visual-latency.py --run <run> --references <folder>` pairs the encoded native video frames with
 Android screenrecord's Winscope elapsed-time metadata and four stable content references (`nav.png`,
 `chat.png`, `inbox.png`, `automations.png`). Inspect the matched frames before accepting its footer

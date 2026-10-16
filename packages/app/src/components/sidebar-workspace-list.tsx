@@ -1,7 +1,7 @@
 import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
-import { traceInstant } from "@/performance/native-trace";
+import { startArmedHermesSampling, traceInstant } from "@/performance/native-trace";
 import { sectionRowIndent, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
 import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
@@ -1189,6 +1189,7 @@ function WorkspaceRowInner({
         eventMs: String(event.nativeEvent.timestamp),
         workspaceKey: workspace.workspaceKey,
       });
+      startArmedHermesSampling(workspace.workspaceKey);
       onPress();
     },
     [interaction.didLongPressRef, onPress, workspace.workspaceKey],

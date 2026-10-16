@@ -6,6 +6,7 @@ interface ClisbotNativeTraceModule {
   beginSection(name: string): void;
   endSection(): void;
   startInputTracing(): void;
+  startArmedHermesSampling(workspaceKey: string): boolean;
 }
 
 const traceModule = requireOptionalNativeModule<ClisbotNativeTraceModule>("ClisbotNativeTrace");
@@ -36,6 +37,11 @@ export function traceInstant(name: string, args?: Record<string, string>): void 
   }
   nativePerformanceTrace.beginSection(name, args);
   nativePerformanceTrace.endSection();
+}
+
+/** One-shot synthetic Android diagnostic; the external controller owns process termination. */
+export function startArmedHermesSampling(workspaceKey: string): void {
+  if (nativePerformanceTrace.isEnabled()) traceModule?.startArmedHermesSampling(workspaceKey);
 }
 
 export function startNativeInputTracing(): (() => void) | undefined {
