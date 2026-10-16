@@ -10,6 +10,10 @@ useCoreDependencies()
 useExpoPublishing()
 useDefaultAndroidSdkVersions()
 
+dependencies {
+  implementation "com.facebook.react:react-android"
+}
+
 android {
   namespace "sh.clisbot.trace"
   buildFeatures { buildConfig true }
