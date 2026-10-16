@@ -39,10 +39,14 @@ Home initially shows up to ten conversations per group; Show more reveals ten mo
 until all loaded activity is visible. Needs you always counts the whole group. The compact toolbar opens the same cross-Host search on native and web without closing the Chat page underneath it.
 The compact toolbar and bottom navigation use the same `surface0` theme surface, including their safe-area strips.
 Choosing a workspace/session, Quick chat or Bot conversation from Chat keeps the outgoing list
-visible until the destination route commits, rather than exposing the underlying Browse conversations
-page. An overlay opened over an existing detail still closes on selection, including a different
-agent tab in the same workspace (no pathname change). Closure observes current committed navigation;
-there is no asynchronous data-readiness completion that can dismiss a later surface.
+visible until its destination commits on web or the actual focused native leaf reports
+`transitionEnd(closing: false)` (native `onAppear`). A parent navigator appearing cannot close it.
+Rows pass their known destination into the existing before-navigation callback before Expo queues
+its dispatch, so an older route still current during that queue cannot complete a newer selection.
+The pending close belongs to the current compact panel generation; Back/cancellation or a new panel
+selection invalidates it. An overlay over an already presented detail still closes on selection,
+including a different agent tab in the same workspace (no new native appearance or pathname change).
+Catalog readiness and network responses never own this closure.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
 

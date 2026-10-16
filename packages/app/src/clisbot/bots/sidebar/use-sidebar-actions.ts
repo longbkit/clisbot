@@ -9,7 +9,7 @@ import type { ChatPayload } from "../data/contracts";
 import { directChatForBot } from "./sidebar-model";
 export function useBotSidebarActions(
   chatRows: readonly HostTagged<ChatPayload>[],
-  onBeforeNavigate?: () => void,
+  onBeforeNavigate?: (destination?: string) => void,
   chatsLoaded = true,
 ) {
   const router = useRouter();
@@ -18,7 +18,7 @@ export function useBotSidebarActions(
   const opening = useRef(false);
   const navigate = useCallback(
     (serverId: string, chatId: string) => {
-      onBeforeNavigate?.();
+      onBeforeNavigate?.(buildHostChatRoute(serverId, chatId));
       router.push(buildHostChatRoute(serverId, chatId));
     },
     [onBeforeNavigate, router],

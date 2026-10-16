@@ -35,7 +35,7 @@ function usePinMetadata(hostIds: string[]) {
     ),
   };
 }
-export function usePinnedRows(onBeforeNavigate?: () => void): {
+export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void): {
   rows: PinRow[];
   error: string | null;
 } {

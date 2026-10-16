@@ -132,13 +132,13 @@ describe("ChatsSection", () => {
     expect(screen.getByRole("button", { name: "Create group chat" })).toBeTruthy();
   });
 
-  it("closes the compact sidebar first, then opens the chat route", () => {
+  it("admits the requested chat destination before queuing navigation", () => {
     const close = vi.fn();
     render(
       <ChatsSection onCreateChat={vi.fn()} chats={[chat(1), chat(2)]} onBeforeNavigate={close} />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Chat 1" }));
-    expect(close).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
     expect(env.push).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
     expect(close.mock.invocationCallOrder[0]).toBeLessThan(env.push.mock.invocationCallOrder[0]!);
   });

@@ -49,10 +49,13 @@ it("rechecks the authoritative private chat list before creating from a stale em
     chats: [{ id: "existing", kind: "direct", participants: [{ botId: "bot" }] }],
     error: null,
   });
-  const { result } = renderHook(() => useBotSidebarActions([]));
+  const admit = vi.fn();
+  const { result } = renderHook(() => useBotSidebarActions([], admit));
   await act(async () => {
     await result.current.openBot("host", "bot");
   });
   expect(env.createChat).not.toHaveBeenCalled();
+  expect(admit).toHaveBeenCalledWith("/h/host/chat/existing");
+  expect(admit.mock.invocationCallOrder[0]).toBeLessThan(env.push.mock.invocationCallOrder[0]!);
   expect(env.push).toHaveBeenCalledWith("/h/host/chat/existing");
 });

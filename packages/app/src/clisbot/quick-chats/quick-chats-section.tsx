@@ -1,3 +1,4 @@
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { memo, useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { useStoreWithEqualityFn } from "zustand/traditional";
@@ -31,7 +32,11 @@ interface QuickChatRow {
  * Quick chats are kept out of Projects (their folder is an implementation detail) but stay one tap
  * away here, newest first across every Host.
  */
-export function QuickChatsSection({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
+export function QuickChatsSection({
+  onBeforeNavigate,
+}: {
+  onBeforeNavigate?: (destination?: string) => void;
+}) {
   const chats = useQuickChatRows();
   const selection = useActiveWorkspaceSelection();
   const [collapsed, toggleCollapsed] = useSectionCollapsed("quickChats");
@@ -39,7 +44,7 @@ export function QuickChatsSection({ onBeforeNavigate }: { onBeforeNavigate?: () 
   const toggleExpanded = useCallback(() => setExpanded((value) => !value), []);
   const open = useCallback(
     (chat: QuickChatRow) => {
-      onBeforeNavigate?.();
+      onBeforeNavigate?.(buildHostWorkspaceRoute(chat.serverId, chat.workspaceId));
       navigateToWorkspace({ serverId: chat.serverId, workspaceId: chat.workspaceId });
     },
     [onBeforeNavigate],

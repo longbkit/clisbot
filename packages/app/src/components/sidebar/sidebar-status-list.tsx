@@ -1,3 +1,4 @@
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import {
@@ -137,7 +138,7 @@ interface StatusWorkspaceListProps {
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndexByWorkspaceKey: Map<string, number>;
   showShortcutBadges: boolean;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
@@ -313,7 +314,7 @@ function StatusGroupList({
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndex: Map<string, number>;
   showShortcutBadges: boolean;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
@@ -353,7 +354,7 @@ function StatusGroupRows({
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndex: Map<string, number>;
   showShortcutBadges: boolean;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
@@ -590,7 +591,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
    * are a flat list under their own header and sit flush.
    */
   inStatusGroup?: boolean;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   drag?: () => void;
   isDragging?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
@@ -602,7 +603,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
 
   const handlePress = useCallback(() => {
     if (!workspace.serverId) return;
-    onWorkspacePress?.();
+    onWorkspacePress?.(buildHostWorkspaceRoute(workspace.serverId, workspace.workspaceId));
     navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId });
   }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
   const handleRowPress = useWorkspaceSessionsRowPress({
@@ -663,7 +664,7 @@ const StatusSessionRow = memo(function StatusSessionRow({
   showShortcutBadge: boolean;
   canPin: boolean;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
 }) {
   const { workspace } = item;
   const activeWorkspaceSelection = useActiveWorkspaceSelection();

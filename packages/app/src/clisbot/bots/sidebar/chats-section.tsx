@@ -44,7 +44,7 @@ interface ChatsSectionProps {
   chats: readonly ChatsSidebarChat[];
   directoryChats?: readonly ChatsSidebarChat[];
   /** Runs before the route push, as `AutomationSidebarItem` does; the compact sidebar closes here. */
-  onBeforeNavigate?: () => void;
+  onBeforeNavigate?: (destination?: string) => void;
   onCreateChat: () => void;
   canCreateChat?: boolean;
   onOpenChatMenu?: (chat: ChatsSidebarChat, anchor: Rect) => void;
@@ -72,7 +72,7 @@ export const ChatsSection = memo(function ChatsSection({
   const openChat = useCallback(
     (chat: ChatsSidebarChat) => {
       setDirectory(false);
-      onBeforeNavigate?.();
+      onBeforeNavigate?.(buildHostChatRoute(chat.serverId, chat.chatId));
       router.push(buildHostChatRoute(chat.serverId, chat.chatId));
     },
     [onBeforeNavigate, router],

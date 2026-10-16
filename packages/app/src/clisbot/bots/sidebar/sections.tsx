@@ -23,12 +23,16 @@ const BOT_CREATE_CONTENT_STYLE = { padding: 0 };
 export function BotsAndChatsSidebarSections({
   onBeforeNavigate,
 }: {
-  onBeforeNavigate?: () => void;
+  onBeforeNavigate?: (destination?: string) => void;
 }) {
   const hosts = useBotsFeatureHosts();
   return hosts.length ? <EnabledSections onBeforeNavigate={onBeforeNavigate} /> : null;
 }
-function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
+function EnabledSections({
+  onBeforeNavigate,
+}: {
+  onBeforeNavigate?: (destination?: string) => void;
+}) {
   const { hosts, bots, chats, botRows, chatRows, directoryHosts } = useSidebarCatalog();
   const { t } = useTranslation();
   const directoryStatus = directoryLoadStatus(bots, t("bots.workspace.sidebar.partialFailure"));

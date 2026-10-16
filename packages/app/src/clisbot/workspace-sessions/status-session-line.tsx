@@ -41,7 +41,7 @@ interface StatusSessionLineProps {
   shortcutNumber: number | null;
   showShortcutBadge: boolean;
   /** The same hook a workspace press fires — closes the compact sidebar, for one. */
-  onPress?: () => void;
+  onPress?: (destination?: string) => void;
 }
 
 /**

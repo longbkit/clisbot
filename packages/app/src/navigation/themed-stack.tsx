@@ -1,3 +1,4 @@
+import { useChatListScreenListeners } from "@/clisbot/home/use-chat-list-navigation";
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Stack } from "expo-router";
 import { isValidElement, type ReactElement, type ReactNode, useCallback, useMemo } from "react";
@@ -24,6 +25,7 @@ function ThemedStackBase({
   screenOptions,
   nestedNavigatorScreens,
 }: ThemedStackBaseProps) {
+  const screenListeners = useChatListScreenListeners();
   const themedScreenOptions = useMemo<NativeStackNavigationOptions>(
     () => ({
       ...screenOptions,
@@ -42,7 +44,11 @@ function ThemedStackBase({
   );
 
   return (
-    <Stack screenOptions={themedScreenOptions} screenLayout={screenLayout}>
+    <Stack
+      screenOptions={themedScreenOptions}
+      screenLayout={screenLayout}
+      screenListeners={screenListeners}
+    >
       {children}
     </Stack>
   );

@@ -1,3 +1,4 @@
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import {
   lazy,
   memo,
@@ -59,7 +60,7 @@ interface WorkspaceSessionListProps {
   /** Mirrors the workspace row's own indent: status-grouped rows sit on their header's rail. */
   indented: boolean;
   /** The same hook a workspace press fires — closes the compact sidebar, for one. */
-  onSessionPress?: () => void;
+  onSessionPress?: (destination?: string) => void;
 }
 
 /**
@@ -150,7 +151,7 @@ export interface WorkspaceSessionRowProps {
    * menu. See `SessionLineTrailing`.
    */
   renderActions?: (input: SessionLineActionsInput) => ReactNode;
-  onPress?: () => void;
+  onPress?: (destination?: string) => void;
 }
 
 export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
@@ -177,7 +178,7 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   const wide = placement === "statusGroup" || placement === "topLevel";
   const titleRef = useRef<Text>(null);
   const handlePress = useCallback(() => {
-    onPress?.();
+    onPress?.(buildHostWorkspaceRoute(serverId, workspaceId));
     navigateToAgent({ serverId, workspaceId, agentId: agent.id });
   }, [onPress, serverId, workspaceId, agent.id]);
   const accessibilityState = useMemo(() => ({ selected }), [selected]);

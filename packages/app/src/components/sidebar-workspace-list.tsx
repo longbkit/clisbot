@@ -1,3 +1,4 @@
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
 import { traceInstant } from "@/performance/native-trace";
 import { sectionRowIndent, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
@@ -245,7 +246,7 @@ interface SidebarWorkspaceListProps {
   groupMode: SidebarGroupMode;
   isRefreshing?: boolean;
   onRefresh?: () => void;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   onAddProject?: () => void;
   onImportSession?: () => void;
   listLeadingComponent?: ReactElement | null;
@@ -268,7 +269,7 @@ interface ProjectHeaderRowProps {
   onPress: () => void;
   worktreeTarget: SidebarProjectHostTarget | null;
   isProjectActive?: boolean;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   onWorktreeCreated?: (workspaceId: string) => void;
   shortcutNumber?: number | null;
   showShortcutBadge?: boolean;
@@ -865,7 +866,7 @@ function NewWorkspaceGhostRow({
   project: SidebarProjectEntry;
   displayName: string;
   worktreeTarget: SidebarProjectHostTarget;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
 }) {
   const { t } = useTranslation();
   const handlePress = useCallback(() => {
@@ -1477,7 +1478,7 @@ interface WorkspaceRowItemProps {
   isCreating?: boolean;
   selectionEnabled: boolean;
   activeWorkspaceSelection: ActiveWorkspaceSelection | null;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   drag?: () => void;
   isDragging?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
@@ -1507,7 +1508,7 @@ function WorkspaceRowItem({
     if (!workspace.serverId) {
       return;
     }
-    onWorkspacePress?.();
+    onWorkspacePress?.(buildHostWorkspaceRoute(workspace.serverId, workspace.workspaceId));
     navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId });
   }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
 
@@ -1693,7 +1694,7 @@ function ProjectBlock({
   shortcutIndexByWorkspaceKey: Map<string, number>;
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
   onToggleCollapsed: (projectViewKey: string) => void;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   onWorkspaceReorder: (projectViewKey: string, workspaces: SidebarWorkspacePlacement[]) => void;
   onWorktreeCreated?: (workspaceId: string) => void;
   drag: () => void;
@@ -2171,7 +2172,7 @@ function SidebarGroupedModeList({
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
   shortcutIndexByWorkspaceKey: Map<string, number>;
-  onWorkspacePress?: () => void;
+  onWorkspacePress?: (destination?: string) => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;

@@ -22,7 +22,11 @@ const Icons = {
   workspace: withUnistyles(Pin),
 };
 
-export function FusionPinnedSection({ onBeforeNavigate }: { onBeforeNavigate?: () => void }) {
+export function FusionPinnedSection({
+  onBeforeNavigate,
+}: {
+  onBeforeNavigate?: (destination?: string) => void;
+}) {
   const { rows, error } = usePinnedRows(onBeforeNavigate);
   const { t } = useTranslation();
   const { visibleItems, expanded, canToggle, toggleExpanded } = useLimitedSidebarGroup(rows);
@@ -90,7 +94,7 @@ function PinnedRow({
 }: {
   row: PinRow;
   selected: boolean;
-  onBeforeNavigate?: () => void;
+  onBeforeNavigate?: (destination?: string) => void;
   onOpenMenu: (row: PinRow & { anchor: Rect }) => void;
 }) {
   const router = useRouter();
@@ -100,7 +104,7 @@ function PinnedRow({
   const open = useCallback(() => {
     if (row.open) row.open();
     else {
-      onBeforeNavigate?.();
+      onBeforeNavigate?.(row.route);
       router.push(row.route as import("expo-router").Href);
     }
   }, [row, onBeforeNavigate, router]);
