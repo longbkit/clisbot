@@ -84,10 +84,13 @@ export function useChatListNavigation(
   const path = usePathname();
   const previousPath = useRef(path);
   const cancelPending = useRef<(() => void) | undefined>(undefined);
+  // Destinations this owner already dispatched: Expo may commit one after a newer row was admitted.
+  const dispatched = useRef(new Set<string>());
   useLayoutEffect(() => {
     if (HOME_V2_ENABLED && !isNative && previousPath.current === "/chat" && path !== "/chat")
       closeList();
     if (path === "/chat" && previousPath.current !== "/chat") cancelPending.current?.();
+    if (path === "/chat") dispatched.current.clear();
     previousPath.current = path;
   }, [closeList, path]);
   useLayoutEffect(() => () => cancelPending.current?.(), []);
@@ -109,13 +112,20 @@ export function useChatListNavigation(
         });
         if (!go) return false;
         const id = nativePresentation.getPendingSnapshot()?.id;
+        const requested = destination.split(/[?#]/, 1)[0]!;
         setTimeout(() => {
+          if (id === undefined) return;
+          // A newer global route (Settings, a Home tab) committed while this push waited. Only
+          // Chat itself or an earlier admission's own destination may have landed since.
+          const current = previousPath.current;
+          if (current !== committedPath && !dispatched.current.has(current)) {
+            if (nativePresentation.getPendingSnapshot()?.id === id) nativePresentation.cancel();
+            return;
+          }
           // Back, a newer row or another panel generation may have replaced this admission.
-          if (
-            id !== undefined &&
-            nativePresentation.dispatch(id, usePanelStore.getState().mobilePanel)
-          )
-            go();
+          if (!nativePresentation.dispatch(id, usePanelStore.getState().mobilePanel)) return;
+          dispatched.current.add(requested);
+          go();
         }, 0);
         return true;
       }

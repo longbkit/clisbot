@@ -509,3 +509,41 @@ it("leaves dispatch to the caller on web and for non-departing native presses", 
   expect(view.result.current("/h/host-a/chat/a", go)).toBe(false);
   expect(go).not.toHaveBeenCalled();
 });
+it("a newer global route committed before the queued dispatch wins over the stale row", () => {
+  vi.useFakeTimers();
+  try {
+    route.native = true;
+    const view = renderHook(() => useChatListNavigation(vi.fn()));
+    const go = vi.fn();
+    act(() => void view.result.current("/h/host-a/chat/a", go));
+    route.path = "/settings";
+    view.rerender();
+    act(() => vi.runAllTimers());
+    expect(go).not.toHaveBeenCalled();
+    expect(nativePresentation.getPendingSnapshot()).toBeNull();
+  } finally {
+    nativePresentation.cancel();
+    vi.useRealTimers();
+  }
+});
+it("an earlier admission's own late commit does not cancel the newer queued row", () => {
+  vi.useFakeTimers();
+  try {
+    route.native = true;
+    const view = renderHook(() => useChatListNavigation(vi.fn()));
+    const goA = vi.fn();
+    const goB = vi.fn();
+    act(() => void view.result.current("/h/host-a/chat/a", goA));
+    act(() => vi.runAllTimers());
+    expect(goA).toHaveBeenCalledOnce();
+    act(() => void view.result.current("/h/host-a/chat/b", goB));
+    route.path = "/h/host-a/chat/a";
+    view.rerender();
+    act(() => vi.runAllTimers());
+    expect(goB).toHaveBeenCalledOnce();
+    expect(nativePresentation.getPendingSnapshot()?.destination).toBe("/h/host-a/chat/b");
+  } finally {
+    nativePresentation.cancel();
+    vi.useRealTimers();
+  }
+});
