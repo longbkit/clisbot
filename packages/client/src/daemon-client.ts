@@ -443,6 +443,8 @@ export interface DaemonClientConfig {
 }
 
 export interface DaemonClientTrace {
+  /** Optional profile-only opaque correlation; never include raw identity in trace output. */
+  correlate?(kind: "host" | "agent" | "request", value: string): string | undefined;
   isEnabled(): boolean;
   beginSection(name: string, args?: Record<string, string>): void;
   endSection(): void;
@@ -1844,6 +1846,16 @@ export class DaemonClient {
     return true;
   }
 
+  private traceTimeline(phase: string, agentId: string, requestId: string): void {
+    const trace = this.config.trace;
+    if (!trace?.isEnabled() || !trace.correlate) return;
+    const host = trace.correlate("host", this.lastServerInfoMessage?.serverId ?? this.config.url);
+    const agent = trace.correlate("agent", agentId);
+    const request = trace.correlate("request", requestId);
+    if (host && agent && request)
+      this.traceInstant(`clisbot.timeline.${phase}`, { host, agent, request });
+  }
+
   private endTraceSection(isOpen: boolean): void {
     if (isOpen) {
       this.config.trace?.endSection();
@@ -1931,6 +1943,9 @@ export class DaemonClient {
   private sendSessionMessageOrThrow(message: SessionInboundMessage): Promise<void> {
     return this.sendWhenConnected(() => {
       const payload = SessionInboundMessageSchema.parse(message);
+      if (payload.type === "fetch_agent_timeline_request") {
+        this.traceTimeline("send", payload.agentId, payload.requestId);
+      }
       this.sendJsonMessage("session", payload.type, { type: "session", message: payload });
     }, message);
   }
@@ -3747,6 +3762,7 @@ export class DaemonClient {
     options: FetchAgentTimelineOptions = {},
   ): Promise<FetchAgentTimelinePayload> {
     const resolvedRequestId = this.createRequestId(options.requestId);
+    this.traceTimeline("invoke", agentId, resolvedRequestId);
     // COMPAT(agentSessionStorageRead): options from a cached view must not opt an old host in.
     const storageReadable = this.lastServerInfoMessage?.features?.agentSessionStorageRead === true;
     const message = SessionInboundMessageSchema.parse({
@@ -3781,6 +3797,7 @@ export class DaemonClient {
       },
     });
 
+    this.traceTimeline("resolved", agentId, resolvedRequestId);
     if (payload.error) {
       throw new Error(payload.error);
     }
@@ -7132,6 +7149,10 @@ export class DaemonClient {
       envelopeType: "session",
       messageType: parsed.data.message.type,
     });
+    if (parsed.data.message.type === "fetch_agent_timeline_response") {
+      const { agentId, requestId } = parsed.data.message.payload;
+      this.traceTimeline("response", agentId, requestId);
+    }
     this.handleSessionMessage(parsed.data.message);
     const msgType = parsed.data.message.type;
     this.runtimeMetrics?.recordMessage(msgType, bytes, perfNow() - startMs);

@@ -33,6 +33,8 @@ class MemoryStorage implements ReplicaRowStore {
   cleanups = 0;
   nextWriteFailure: Error | null = null;
   persistentWriteFailure: Error | null = null;
+  writeGate: Promise<void> | null = null;
+  onWrite: (() => void) | null = null;
   readGate: Promise<void> | null = null;
   onRead: (() => void) | null = null;
   /** Throws once a read goes past this count, so a non-terminating read loop fails the test. */
@@ -79,6 +81,8 @@ class MemoryStorage implements ReplicaRowStore {
 
   async apply(changes: ReplicaRowChanges): Promise<void> {
     this.writes += 1;
+    this.onWrite?.();
+    await this.writeGate;
     if (this.persistentWriteFailure) throw this.persistentWriteFailure;
     if (this.nextWriteFailure) {
       const error = this.nextWriteFailure;
@@ -959,4 +963,128 @@ it("retains semantic agent messages across disk-cache reconstruction", async () 
   writer.commitTimeline(SERVER_ID, "agent-1", value);
   await writer.flush();
   expect(await createCache(storage).readTimeline(SERVER_ID, "agent-1")).toEqual(value);
+});
+
+describe("selected reads during drained in-flight persistence", () => {
+  async function holdWrite(storage: MemoryStorage, cache: ReplicaCache, change: () => void) {
+    const entered = deferred();
+    const release = deferred();
+    storage.onWrite = entered.resolve;
+    storage.writeGate = release.promise;
+    change();
+    const writing = cache.flush();
+    await entered.promise;
+    return {
+      writing,
+      release: () => {
+        storage.writeGate = null;
+        release.resolve();
+      },
+    };
+  }
+
+  it("currently serializes an unrelated stored timeline read behind another Host write", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    cache.setHosts([SERVER_ID, "other-host"]);
+    cache.commitTimeline(SERVER_ID, "agent-1", timeline("Selected"));
+    await cache.flush();
+    const held = await holdWrite(storage, cache, () => {
+      cache.commitTimeline("other-host", "agent-1", timeline("Unrelated"));
+    });
+    const readsBefore = storage.reads.length;
+    let settled = false;
+    const reading = cache.readTimeline(SERVER_ID, "agent-1").then((value) => {
+      settled = true;
+      return value;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(settled).toBe(false);
+    expect(storage.reads).toHaveLength(readsBefore);
+    held.release();
+    await held.writing;
+    expect((await reading)?.items).toEqual([timelineItem("Selected")]);
+  });
+
+  it("waits for a drained same-row replacement rather than returning the old row", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    cache.commitTimeline(SERVER_ID, "agent-1", timeline("Old"));
+    await cache.flush();
+    const held = await holdWrite(storage, cache, () =>
+      cache.commitTimeline(SERVER_ID, "agent-1", timeline("New")),
+    );
+    const reading = cache.readTimeline(SERVER_ID, "agent-1");
+    held.release();
+    await held.writing;
+    expect((await reading)?.items).toEqual([timelineItem("New")]);
+  });
+
+  it("does not expose a directory row deleted by an in-flight transaction", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    commitDirectory(cache, SERVER_ID, directory());
+    await cache.flush();
+    const held = await holdWrite(storage, cache, () => deleteDirectory(cache, SERVER_ID));
+    const reading = cache.readAgent(SERVER_ID, "agent-1");
+    held.release();
+    await held.writing;
+    expect(await reading).toBeUndefined();
+  });
+
+  it.each(["remove", "rename"] as const)(
+    "rechecks Host %s during an in-flight write",
+    async (operation) => {
+      const storage = new MemoryStorage();
+      const cache = createCache(storage);
+      cache.commitTimeline(SERVER_ID, "agent-1", timeline("Old"));
+      await cache.flush();
+      const held = await holdWrite(storage, cache, () =>
+        cache.commitTimeline(SERVER_ID, "agent-1", timeline("New")),
+      );
+      const reading = cache.readTimeline(SERVER_ID, "agent-1");
+      if (operation === "remove") cache.setHosts([]);
+      else cache.reconcileServerId(SERVER_ID, "renamed-host");
+      held.release();
+      await held.writing;
+      expect(await reading).toBeUndefined();
+      if (operation === "rename")
+        expect((await cache.readTimeline("renamed-host", "agent-1"))?.items).toEqual([
+          timelineItem("New"),
+        ]);
+    },
+  );
+
+  it("fails closed when the drained selected replacement fails to persist", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    cache.commitTimeline(SERVER_ID, "agent-1", timeline("Old"));
+    await cache.flush();
+    const held = await holdWrite(storage, cache, () =>
+      cache.commitTimeline(SERVER_ID, "agent-1", timeline("New")),
+    );
+    const reading = cache.readTimeline(SERVER_ID, "agent-1");
+    storage.persistentWriteFailure = new Error("disk unavailable");
+    held.release();
+    await held.writing;
+    expect(await reading).toBeUndefined();
+    storage.persistentWriteFailure = null;
+    await cache.flush();
+  });
+
+  it("does not return a selected timeline evicted by another Host's global quota write", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage, 1800);
+    cache.setHosts([SERVER_ID, "other-host"]);
+    cache.commitTimeline(SERVER_ID, "agent-1", timeline("x".repeat(1000)));
+    await cache.flush();
+    expect(await cache.readTimeline(SERVER_ID, "agent-1")).toBeDefined();
+    const held = await holdWrite(storage, cache, () =>
+      cache.commitTimeline("other-host", "agent-1", timeline("y".repeat(1000))),
+    );
+    const reading = cache.readTimeline(SERVER_ID, "agent-1");
+    held.release();
+    await held.writing;
+    expect(await reading).toBeUndefined();
+  });
 });

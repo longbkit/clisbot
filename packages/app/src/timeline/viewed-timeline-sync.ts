@@ -1,3 +1,4 @@
+import { traceTimelinePhase } from "@/performance/timeline-trace";
 import {
   TimelineDirectionalPrefetch,
   type AdjacentTimelineRequest,
@@ -48,10 +49,12 @@ async function prepareCachedTimeline(input: {
   const before = useSessionStore.getState().sessions[input.serverId];
   const beforeTimeline = selectAgentTimelineState(before, input.agentId);
   if (beforeTimeline.status === "synced") return undefined;
+  traceTimelinePhase("prepare.read", input.serverId, input.agentId);
   const [stored] = await Promise.all([
     input.storage.readTimeline(input.serverId, input.agentId),
     input.prepareAgent(input.agentId),
   ]);
+  traceTimelinePhase("prepare.readDone", input.serverId, input.agentId);
   if (!stored) return undefined;
   const session = useSessionStore.getState().sessions[input.serverId];
   const currentTimeline = selectAgentTimelineState(session, input.agentId);
@@ -69,6 +72,7 @@ async function prepareCachedTimeline(input: {
     currentTimeline.status === "painted"
       ? [...currentTimeline.items, ...(currentHead ?? [])]
       : (currentHead ?? []);
+  traceTimelinePhase("prepare.merge", input.serverId, input.agentId);
   const replacement = replaceWithCanonicalStream({
     canonical: stored.items,
     previousTail: [],
@@ -83,6 +87,7 @@ async function prepareCachedTimeline(input: {
       endSeq: null,
     },
   });
+  traceTimelinePhase("prepare.publish", input.serverId, input.agentId);
   useSessionStore.getState().applyAgentTimelineResponseState(input.serverId, input.agentId, {
     items: replacement.tail,
     head: replacement.head,
@@ -92,6 +97,7 @@ async function prepareCachedTimeline(input: {
     synchronized: false,
     acknowledgedClientMessageIds: replacement.acknowledgedClientMessageIds,
   });
+  traceTimelinePhase("prepare.published", input.serverId, input.agentId);
   return stored;
 }
 
@@ -115,7 +121,9 @@ class TimelineReplicaOwner implements TimelineReplica {
   async prepare(agentId: string): Promise<void> {
     const existing = this.preparations.get(agentId);
     if (existing) return existing;
+    traceTimelinePhase("prepare.begin", this.serverId, agentId);
     const preparation = this.load(agentId).finally(() => {
+      traceTimelinePhase("prepare.end", this.serverId, agentId);
       if (this.preparations.get(agentId) === preparation) {
         this.preparations.delete(agentId);
       }
@@ -531,7 +539,9 @@ export function createViewedTimelineOwner(input: {
     },
     prepare: async (agentId) => {
       await input.replica.prepare(agentId);
+      traceTimelinePhase("retention.begin", input.serverId, agentId);
       retention.prepare(agentId);
+      traceTimelinePhase("retention.end", input.serverId, agentId);
     },
     readCursor: (agentId) => input.replica.readCursor(agentId) ?? input.ports.readCursor(agentId),
     readLatestObserved: (agentId) => deferredLatest.get(agentId),
@@ -613,6 +623,7 @@ export function createViewedTimelineOwner(input: {
         return;
       if (!speculative) prefetch.cursorChanged(receivedPayload.agentId);
       const payload = consumeForcedTimelineTailReplacement(receivedPayload, forcedTailReplacements);
+      traceTimelinePhase("response.apply", input.serverId, payload.agentId);
       const accepted = applyAuthoritativeTimelineResponse({
         serverId: input.serverId,
         payload,
@@ -621,6 +632,7 @@ export function createViewedTimelineOwner(input: {
         drainQueuedAgentMessage: input.drainQueuedAgentMessage,
         admit: (page, result) => retention.admit(page, result),
       });
+      traceTimelinePhase("response.applied", input.serverId, payload.agentId);
       if (accepted) {
         input.replica.timelineUpdated(payload.agentId);
         const target = deferredLatest.get(payload.agentId);

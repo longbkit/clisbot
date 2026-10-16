@@ -1,3 +1,4 @@
+import { traceTimelinePhase } from "@/performance/timeline-trace";
 import { SessionActorSchema, SessionAuthorshipShape } from "@clisbot/protocol/session-authorship";
 import { copySessionMetadata } from "@/clisbot/session-storage/directory";
 import { z } from "zod";
@@ -1005,9 +1006,12 @@ export class ReplicaCache {
     const row = rows[0];
     if (!row) return undefined;
     try {
+      traceTimelinePhase("cache.decode", serverId, agentId);
       const stored = parseStoredPayload(StoredTimelineSchema, row.payload);
       if (stored.agentId !== agentId) return undefined;
-      return deserializeTimeline(stored) ?? undefined;
+      const timeline = deserializeTimeline(stored) ?? undefined;
+      traceTimelinePhase("cache.decoded", serverId, agentId);
+      return timeline;
     } catch {
       await this.deleteInvalidRow(row);
       return undefined;
@@ -1020,16 +1024,24 @@ export class ReplicaCache {
     ids?: readonly string[],
   ): Promise<ReplicaRow[]> {
     if (!this.activeServerIds.has(serverId)) return [];
+    const agentId = kinds.length === 1 && kinds[0] === "timeline" ? ids?.[0] : undefined;
     try {
+      if (agentId) traceTimelinePhase("cache.open", serverId, agentId);
       await this.prepareStore();
+      if (agentId) traceTimelinePhase("cache.openDone", serverId, agentId);
       while (this.activeServerIds.has(serverId)) {
         // A read may only answer from rows the store already holds, so it waits for this host's
         // accepted commits to land. A store that rejects them will keep rejecting them: fail closed
         // rather than re-attempt the write on every pass. A write rejected for another host leaves
         // this host's stored rows readable.
-        if (!(await this.syncPending()) && this.hasPendingHostChanges(serverId)) return [];
+        if (agentId) traceTimelinePhase("cache.queue", serverId, agentId);
+        const persisted = await this.syncPending();
+        if (agentId) traceTimelinePhase("cache.queueDone", serverId, agentId);
+        if (!persisted && this.hasPendingHostChanges(serverId)) return [];
         const revision = this.hostRevisions.get(serverId) ?? 0;
+        if (agentId) traceTimelinePhase("cache.store", serverId, agentId);
         const rows = await this.rowStore.read(serverId, kinds, ids);
+        if (agentId) traceTimelinePhase("cache.storeDone", serverId, agentId);
         if (this.canReadHostRevision(serverId, revision)) return rows;
       }
       return [];
@@ -1244,10 +1256,14 @@ export class ReplicaCache {
         try {
           await this.prepareStore();
           await this.ensureStoredIndex();
+          traceTimelinePhase("persist.materialize", "replica-write-queue");
           const changes = this.materializePendingChanges(pending);
+          traceTimelinePhase("persist.materialized", "replica-write-queue");
           const { changes: boundedChanges, evicted } = await this.fitChangesToBudget(changes);
+          traceTimelinePhase("persist.budgeted", "replica-write-queue");
           if (boundedChanges.upserts.length > 0 || boundedChanges.deletes.length > 0) {
             await this.rowStore.apply(boundedChanges);
+            traceTimelinePhase("persist.stored", "replica-write-queue");
             this.applyStoredChanges(boundedChanges);
           }
           for (const serverId of pending.baselines) {

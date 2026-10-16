@@ -3614,6 +3614,8 @@ function WorkspaceScreenContent({
         {(topOverlayInset) => (
           <StreamTopOverlayProvider value={topOverlayInset}>
             <WorkspaceEntryContent
+              serverId={normalizedServerId}
+              agentId={focusedPaneAgentId ?? undefined}
               key={`${normalizedServerId}:${normalizedWorkspaceId}`}
               nativeCompact={isNative}
               focused={isRouteFocused}

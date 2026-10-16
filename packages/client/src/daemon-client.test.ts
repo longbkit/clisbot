@@ -8444,3 +8444,71 @@ test.each([false, true])(
     await send;
   },
 );
+
+test.each([true, false])(
+  "correlates timeline phases without exporting identities when enabled=%s",
+  async (enabled) => {
+    const mock = createMockTransport();
+    const recorder = createTraceRecorder();
+    const aliases = new Map<string, string>();
+    const correlate = vi.fn((kind: string, value: string) => {
+      const key = `${kind}:${value}`;
+      if (!aliases.has(key)) aliases.set(key, `opaque${aliases.size + 1}`);
+      return aliases.get(key)!;
+    });
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "trace_correlation_test",
+      transportFactory: () => mock.transport,
+      reconnect: { enabled: false },
+      trace: { ...recorder.trace, isEnabled: () => enabled, correlate },
+    });
+    clients.push(client);
+    const connecting = client.connect();
+    mock.triggerOpen();
+    await connecting;
+    const result = client.fetchAgentTimeline("private-agent", { requestId: "private-request" });
+    mock.triggerMessage(
+      wrapSessionMessage({
+        type: "fetch_agent_timeline_response",
+        payload: {
+          requestId: "private-request",
+          agentId: "private-agent",
+          agent: null,
+          direction: "tail",
+          projection: "projected",
+          epoch: "e",
+          reset: false,
+          staleCursor: false,
+          gap: false,
+          window: { minSeq: 0, maxSeq: 0, nextSeq: 1 },
+          startCursor: null,
+          endCursor: null,
+          hasOlder: false,
+          hasNewer: false,
+          entries: [],
+          error: null,
+        },
+      }),
+    );
+    await result;
+    const phases = recorder.records.filter((record) =>
+      record.name?.startsWith("clisbot.timeline."),
+    );
+    expect(phases.map((record) => record.name)).toEqual(
+      enabled
+        ? [
+            "clisbot.timeline.invoke",
+            "clisbot.timeline.send",
+            "clisbot.timeline.response",
+            "clisbot.timeline.resolved",
+          ]
+        : [],
+    );
+    if (enabled) {
+      expect(new Set(phases.map((record) => record.args?.request)).size).toBe(1);
+      expect(new Set(phases.map((record) => record.args?.agent)).size).toBe(1);
+      expect(JSON.stringify(phases)).not.toContain("private-");
+    } else expect(correlate).not.toHaveBeenCalled();
+  },
+);

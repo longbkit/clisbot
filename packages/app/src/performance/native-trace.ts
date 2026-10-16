@@ -21,7 +21,22 @@ export function exportNativeRenderProfile(kind: "reset" | "snapshot", payload: s
   return isSyntheticReactProfileBuild && traceModule?.exportRenderProfile(kind, payload) === true;
 }
 
+const identities = new Map<string, string>();
+
+/** Bounded per-process diagnostic aliases. Raw values are never exported. */
+function correlate(kind: "host" | "agent" | "request", value: string): string | undefined {
+  if (!isProfileBuild || !traceModule) return undefined;
+  const key = `${kind}:${value}`;
+  const existing = identities.get(key);
+  if (existing) return existing;
+  if (identities.size >= 4096) return undefined;
+  const token = `${kind[0]}${identities.size + 1}`;
+  identities.set(key, token);
+  return token;
+}
+
 export const nativePerformanceTrace: DaemonClientTrace = {
+  correlate,
   isEnabled() {
     return isProfileBuild && traceModule !== null;
   },
@@ -65,4 +80,18 @@ export function startNativeInputTracing(): (() => void) | undefined {
     previous = now;
   }, 50);
   return () => clearInterval(timer);
+}
+
+/** Scalar profile-only phases; safe across awaits, unlike nested native sections. */
+export function traceTimelinePhase(
+  phase: string,
+  serverId: string,
+  agentId?: string,
+  extra?: Record<string, string>,
+): void {
+  if (!nativePerformanceTrace.isEnabled()) return;
+  const host = correlate("host", serverId);
+  const agent = agentId ? correlate("agent", agentId) : undefined;
+  if (!host || (agentId && !agent)) return;
+  traceInstant(`clisbot.timeline.${phase}`, { host, ...(agent ? { agent } : {}), ...extra });
 }

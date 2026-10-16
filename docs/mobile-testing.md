@@ -213,6 +213,17 @@ sample counts, interval boundaries and unresolved frames. Samples diagnose execu
 not scheduling delay, visible presentation or latency acceptance. Headless and windowed runs
 are different environments and cannot establish a cross-environment speedup.
 
+The same profile-only trace can correlate selected timeline admission without recording content or
+private identifiers. Per-process opaque Host/agent/request aliases are capped at4096; exhausted
+aliases suppress correlated events instead of reusing an identity. Native `clisbot.timeline.*`
+markers distinguish cache queue/store/decode, cached merge/publication, retention preparation,
+client invocation/send/parsed-response/resolution and React body commits. The ordinary web/Node
+hook is a no-op; disabled native profiling allocates no aliases. Async phases use separate instant
+markers, not an open native section across awaits. Pair exact opaque request tokens and validate
+the packaged client dist against its clean source/build before interpreting. Body commit is a
+React layout-effect observation, not native presentation or readable content. These markers add
+overhead and do not by themselves establish a performance improvement or a network duration.
+
 For subtree attribution, the installed RN package also includes `ReactFabric-profiling.js`.
 Plain `React.Profiler` in the normal production renderer does not provide render durations.
 The explicit combination `APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 CLISBOT_REACT_PROFILE=1`
