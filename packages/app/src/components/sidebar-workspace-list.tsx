@@ -1165,6 +1165,7 @@ function WorkspaceRowInner({
   const interaction = useLongPressDragInteraction({
     drag,
     menuController,
+    traceKey: workspace.workspaceKey,
   });
   const {
     role: _dragRole,
@@ -1175,6 +1176,11 @@ function WorkspaceRowInner({
 
   const handlePress = useCallback(
     (event: GestureResponderEvent) => {
+      traceInstant("clisbot.workspace.pressEnter", {
+        eventMs: String(event.nativeEvent.timestamp),
+        guard: String(interaction.didLongPressRef.current),
+        key: workspace.workspaceKey,
+      });
       if (interaction.didLongPressRef.current) {
         interaction.didLongPressRef.current = false;
         return;
@@ -1198,10 +1204,26 @@ function WorkspaceRowInner({
     },
     [interaction, workspace.workspaceKey],
   );
-  const handleWorkspacePressOut = useCallback(() => {
-    setIsPressed(false);
-    interaction.handlePressOut();
-  }, [interaction]);
+  const handleWorkspacePressOut = useCallback(
+    (event: GestureResponderEvent) => {
+      traceInstant("clisbot.workspace.pressOut", {
+        eventMs: String(event.nativeEvent.timestamp),
+        key: workspace.workspaceKey,
+      });
+      setIsPressed(false);
+      interaction.handlePressOut();
+    },
+    [interaction, workspace.workspaceKey],
+  );
+  const handleWorkspaceTouchCancel = useCallback(
+    (event: GestureResponderEvent) => {
+      traceInstant("clisbot.workspace.cancel", {
+        eventMs: String(event.nativeEvent.timestamp),
+        key: workspace.workspaceKey,
+      });
+    },
+    [workspace.workspaceKey],
+  );
 
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
 
@@ -1258,6 +1280,7 @@ function WorkspaceRowInner({
               highlightStyle={styles.workspaceRowPressed}
               onPressIn={handleWorkspacePressIn}
               onTouchMove={interaction.handleTouchMove}
+              onTouchCancel={handleWorkspaceTouchCancel}
               onPressOut={handleWorkspacePressOut}
               onPress={handlePress}
               testID={`sidebar-workspace-row-${workspace.workspaceKey}`}

@@ -4,12 +4,26 @@ import * as Haptics from "expo-haptics";
 import { isWeb as platformIsWeb } from "@/constants/platform";
 import { decideLongPressMove } from "@/utils/sidebar-gesture-arbitration";
 import type { useContextMenu } from "@/components/ui/context-menu";
+import { traceInstant } from "@/performance/native-trace";
 
 export function useLongPressDragInteraction(input: {
   drag: () => void;
   menuController: ReturnType<typeof useContextMenu> | null;
+  traceKey?: string;
 }) {
-  const { drag, menuController } = input;
+  const { drag, menuController, traceKey } = input;
+  const pressEventTimeRef = useRef<number | null>(null);
+  const trace = useCallback(
+    (phase: string) => {
+      if (traceKey)
+        traceInstant("clisbot.row.interaction", {
+          phase,
+          pressMs: String(pressEventTimeRef.current),
+          key: traceKey,
+        });
+    },
+    [traceKey],
+  );
   const didLongPressRef = useRef(false);
   const dragArmedRef = useRef(false);
   const dragActivatedRef = useRef(false);
@@ -46,7 +60,8 @@ export function useLongPressDragInteraction(input: {
     menuController.setOpen(true);
     menuOpenedRef.current = true;
     didLongPressRef.current = true;
-  }, [menuController]);
+    trace("menu-open");
+  }, [menuController, trace]);
 
   const handleLongPress = useCallback(() => {
     // Manual timers own long-press behavior on mobile.
@@ -87,6 +102,7 @@ export function useLongPressDragInteraction(input: {
       dragArmedRef.current = true;
       dragActivatedRef.current = true;
       didLongPressRef.current = true;
+      trace("drag-timer-fire");
       void Haptics.selectionAsync().catch(() => {});
       drag();
     }, DRAG_ARM_DELAY_MS);
@@ -113,7 +129,7 @@ export function useLongPressDragInteraction(input: {
       void Haptics.selectionAsync().catch(() => {});
       openContextMenuAtStartPoint();
     }, CONTEXT_MENU_DELAY_MS);
-  }, [clearTimers, drag, menuController, openContextMenuAtStartPoint]);
+  }, [clearTimers, drag, menuController, openContextMenuAtStartPoint, trace]);
 
   const handleDragIntent = useCallback(
     (_details: { dx: number; dy: number; distance: number }) => {
@@ -122,31 +138,36 @@ export function useLongPressDragInteraction(input: {
       }
       didStartDragRef.current = true;
       didLongPressRef.current = true;
+      trace("drag-intent");
       clearTimers();
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     },
-    [clearTimers],
+    [clearTimers, trace],
   );
 
   const handleScrollIntent = useCallback(
     (_details: { dx: number; dy: number; distance: number }) => {
       scrollIntentRef.current = true;
       didLongPressRef.current = true;
+      trace("scroll-intent");
       clearTimers();
     },
-    [clearTimers],
+    [clearTimers, trace],
   );
 
   const handleSwipeIntent = useCallback(
     (_details: { dx: number; dy: number; distance: number }) => {
       didLongPressRef.current = true;
+      trace("swipe-intent");
       clearTimers();
     },
-    [clearTimers],
+    [clearTimers, trace],
   );
 
   const handlePressIn = useCallback(
     (event: GestureResponderEvent) => {
+      pressEventTimeRef.current = event.nativeEvent.timestamp;
+      trace("press-in-reset");
       didLongPressRef.current = false;
       dragArmedRef.current = false;
       dragActivatedRef.current = false;
@@ -163,7 +184,7 @@ export function useLongPressDragInteraction(input: {
       };
       armTimers();
     },
-    [armTimers],
+    [armTimers, trace],
   );
 
   const handleTouchMove = useCallback(
@@ -210,12 +231,13 @@ export function useLongPressDragInteraction(input: {
   );
 
   const handlePressOut = useCallback(() => {
+    trace("press-out");
     clearTimers();
     dragArmedRef.current = false;
     dragActivatedRef.current = false;
     touchStartRef.current = null;
     touchCurrentRef.current = null;
-  }, [clearTimers]);
+  }, [clearTimers, trace]);
 
   return {
     didLongPressRef,

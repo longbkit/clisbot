@@ -1437,6 +1437,13 @@ function WorkspaceScreenContent({
     }
   }, [normalizedServerId, visibleAgentIds]);
   useLayoutEffect(() => {
+    traceInstant("clisbot.workspace.visibleDemand", {
+      focused: String(isRouteFocused),
+      key: persistenceKey ?? "none",
+      count: String(visibleAgentIds.length),
+    });
+  }, [isRouteFocused, persistenceKey, visibleAgentIds]);
+  useLayoutEffect(() => {
     if (!persistenceKey || !viewedTimelineSync) {
       return;
     }

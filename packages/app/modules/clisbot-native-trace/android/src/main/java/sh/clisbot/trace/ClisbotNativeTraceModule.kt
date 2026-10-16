@@ -31,8 +31,14 @@ class ClisbotNativeTraceModule : Module() {
         originalCallback = original
         window.callback = object : Window.Callback by original {
           override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-            if (event.actionMasked == MotionEvent.ACTION_UP) {
-              Trace.beginSection("clisbot.input.up|eventMs=${event.eventTime}")
+            val action = when (event.actionMasked) {
+              MotionEvent.ACTION_DOWN -> "down"
+              MotionEvent.ACTION_UP -> "up"
+              MotionEvent.ACTION_CANCEL -> "cancel"
+              else -> null
+            }
+            if (action != null) {
+              Trace.beginSection("clisbot.input.$action|eventMs=${event.eventTime};downMs=${event.downTime};x=${event.x.toInt()};y=${event.y.toInt()}")
               Trace.endSection()
             }
             return original.dispatchTouchEvent(event)

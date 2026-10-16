@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { StyleSheet, View } from "react-native";
-import { useGlobalSearchParams, useLocalSearchParams, useRootNavigationState } from "expo-router";
+import {
+  useGlobalSearchParams,
+  useLocalSearchParams,
+  usePathname,
+  useRootNavigationState,
+} from "expo-router";
+import { nativePerformanceTrace, traceInstant } from "@/performance/native-trace";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { RetainedPanel } from "@/components/retained-panel";
 import {
@@ -195,6 +201,14 @@ function HostWorkspaceRouteContent() {
 
 function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
   const activeSelection = useActiveWorkspaceSelection();
+  const pathname = usePathname();
+  const route = useRoute();
+  const localParams = useLocalSearchParams<{
+    serverId?: string | string[];
+    workspaceId?: string | string[];
+  }>();
+  const parsedKey = activeSelection ? getWorkspaceSelectionKey(activeSelection) : "none";
+  const localKey = `${getParamValue(localParams.serverId)}:${getParamValue(localParams.workspaceId)}`;
   const [retainedSelections, setRetainedSelections] = useState<RetainedWorkspaceSelection[]>(() =>
     activeSelection ? [{ selection: activeSelection, inactiveSince: null }] : [],
   );
@@ -226,6 +240,17 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
     () => resolveWorkspaceDeckEntries({ selections: renderedSelections, activeSelection }),
     [activeSelection, renderedSelections],
   );
+  const entryProjection = renderedEntries
+    .map(({ selection, active }) => `${getWorkspaceSelectionKey(selection)}=${active}`)
+    .join(",");
+  useLayoutEffect(() => {
+    if (!nativePerformanceTrace.isEnabled()) return;
+    // Separate compact records avoid Android Trace's127-character section-name truncation.
+    traceInstant("clisbot.deck.path", { path: pathname });
+    traceInstant("clisbot.deck.selection", { parsed: parsedKey, local: localKey });
+    traceInstant("clisbot.deck.route", { key: route.key });
+    traceInstant("clisbot.deck.entries", { entries: entryProjection });
+  }, [entryProjection, localKey, parsedKey, pathname, route.key]);
 
   useLayoutEffect(() => {
     if (!areRetainedWorkspaceSelectionListsEqual(retainedSelections, nextRetainedSelections)) {
