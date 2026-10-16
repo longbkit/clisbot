@@ -9,6 +9,7 @@ const route = vi.hoisted(() => ({
   panel: { target: "agent-list", revision: 1 },
 }));
 const navigation = vi.hoisted(() => ({ getCurrentRoute: vi.fn() }));
+vi.mock("@/performance/native-trace", () => ({ traceInstant: vi.fn() }));
 vi.mock("@/constants/platform", () => ({
   get isNative() {
     return route.native;
@@ -111,7 +112,7 @@ it("waits for the actual requested native leaf, independently from JS path commi
     close = vi.fn();
   owner.begin(panel, destination(), close);
   expect(close).not.toHaveBeenCalled();
-  owner.transitionStart(event(), leaf());
+  owner.transitionStart(event(), leaf(), panel);
   owner.transitionEnd(event(), leaf(), panel);
   expect(close).toHaveBeenCalledTimes(1);
 });
@@ -121,7 +122,7 @@ it.each(["parent", "closing", "wrong-leaf", "same-key-wrong-identity", "new-pane
     const owner = createChatListPresentation(),
       close = vi.fn();
     const cancel = owner.begin(panel, destination(), close);
-    owner.transitionStart(event(), leaf());
+    owner.transitionStart(event(), leaf(), panel);
     if (variant === "canceled") cancel();
     let end = event();
     if (variant === "parent") end = { ...event(), target: "host-parent" };
@@ -196,7 +197,7 @@ it.each(["direct-chat", "group-chat"])(
     const chat = { key: id, name: "chat/[chatId]", params: { serverId: "host-a", chatId: id } };
     const appear = { target: id, data: { closing: false } };
     owner.begin(panel, `/h/host-a/chat/${id}`, close);
-    owner.transitionStart(appear, chat);
+    owner.transitionStart(appear, chat, panel);
     owner.transitionEnd(appear, chat, panel);
     expect(close).toHaveBeenCalledTimes(1);
   },
@@ -237,12 +238,12 @@ it("keeps the newest peer-tab intent when an earlier Home appearance arrives", (
   const homeEvent = { target: home.key, data: { closing: false } };
   const inboxEvent = { target: inbox.key, data: { closing: false } };
   owner.begin(panel, "/open-project", close);
-  owner.transitionStart(homeEvent, home);
+  owner.transitionStart(homeEvent, home, panel);
   owner.begin(panel, "/sessions", close);
   expect(owner.getPendingDestination()).toBe("/sessions");
   owner.transitionEnd(homeEvent, home, panel);
   expect(close).not.toHaveBeenCalled();
-  owner.transitionStart(inboxEvent, inbox);
+  owner.transitionStart(inboxEvent, inbox, panel);
   owner.transitionEnd(inboxEvent, inbox, panel);
   expect(close).toHaveBeenCalledOnce();
 });
@@ -252,10 +253,135 @@ it("cancels a peer departure before late Home appearance without hiding Chat", (
   const home = { key: "home", name: "open-project" };
   const appear = { target: home.key, data: { closing: false } };
   owner.begin(panel, "/open-project", close);
-  owner.transitionStart(appear, home);
+  owner.transitionStart(appear, home, panel);
   owner.returnToList();
   owner.transitionEnd(appear, home, panel);
   expect(close).not.toHaveBeenCalled();
   owner.didReturnToList();
   expect(owner.getPendingDestination()).toBeNull();
+});
+
+it.each(["commit-first", "appear-first"])(
+  "joins actual native visibility with the owning leaf commit: %s",
+  (order) => {
+    const owner = createChatListPresentation(),
+      close = vi.fn();
+    owner.begin(panel, destination(), close);
+    if (order === "commit-first") owner.commitLeaf(leaf(), panel);
+    else owner.transitionEnd(event(), leaf(), panel);
+    expect(close).not.toHaveBeenCalled();
+    if (order === "commit-first") owner.transitionEnd(event(), leaf(), panel);
+    else owner.commitLeaf(leaf(), panel);
+    expect(close).toHaveBeenCalledOnce();
+  },
+);
+it("completes re-entry when the same native view commits B without another appearance", () => {
+  const owner = createChatListPresentation(),
+    closeA = vi.fn(),
+    closeB = vi.fn();
+  const a = leaf(),
+    b = { ...leaf("workspace-b"), key: a.key };
+  owner.commitLeaf(a, panel);
+  owner.begin(panel, destination(), closeA);
+  owner.transitionEnd(event(), a, panel);
+  owner.returnToList();
+  const nextPanel = { ...panel, revision: 3 };
+  owner.begin(nextPanel, destination("workspace-b"), closeB);
+  // Expo can still publish A while B dispatch is queued; it cannot certify B.
+  owner.commitLeaf(a, nextPanel);
+  expect(closeB).not.toHaveBeenCalled();
+  owner.commitLeaf(b, nextPanel);
+  expect(closeB).toHaveBeenCalledOnce();
+});
+it.each(["new-native-key", "disappeared", "parent-only", "back", "new-panel", "newer-C"])(
+  "never substitutes JS commit for an absent/wrong native destination: %s",
+  (variant) => {
+    const owner = createChatListPresentation(),
+      close = vi.fn();
+    const a = leaf(),
+      b = { ...leaf("workspace-b"), key: a.key };
+    owner.commitLeaf(a, panel);
+    if (variant === "parent-only")
+      owner.transitionEnd({ target: "host-parent", data: { closing: false } }, a, panel);
+    else owner.transitionEnd(event(), a, panel);
+    if (variant === "disappeared") {
+      owner.transitionStart({ ...event(), data: { closing: true } }, a, panel);
+      owner.transitionEnd({ ...event(), data: { closing: true } }, a, panel);
+    }
+    owner.begin(panel, destination("workspace-b"), close);
+    if (variant === "back") owner.returnToList();
+    if (variant === "newer-C") owner.begin(panel, destination("workspace-c"), close);
+    owner.commitLeaf(
+      variant === "new-native-key" ? leaf("workspace-b") : b,
+      variant === "new-panel" ? { ...panel, revision: 3 } : panel,
+    );
+    expect(close).not.toHaveBeenCalled();
+  },
+);
+it("drops a hidden owning leaf and ignores late old appearance until the new focused leaf commits", () => {
+  const owner = createChatListPresentation(),
+    close = vi.fn();
+  const a = leaf(),
+    b = { ...leaf("workspace-b"), key: a.key };
+  const leave = owner.commitLeaf(a, panel);
+  owner.transitionEnd(event(), a, panel);
+  leave();
+  owner.begin(panel, destination("workspace-b"), close);
+  owner.transitionEnd(event(), a, panel);
+  expect(close).not.toHaveBeenCalled();
+  owner.commitLeaf(b, panel);
+  expect(close).toHaveBeenCalledOnce();
+});
+it.each(["reversal-start", "full-disappearance"])(
+  "blocks B while closing and completes only on the native reversal/appearance: %s",
+  (variant) => {
+    const owner = createChatListPresentation(),
+      close = vi.fn();
+    const a = leaf(),
+      b = { ...leaf("workspace-b"), key: a.key };
+    const closing = { ...event(), data: { closing: true } };
+    owner.commitLeaf(a, panel);
+    owner.transitionEnd(event(), a, panel);
+    owner.transitionStart(closing, a, panel);
+    owner.begin(panel, destination("workspace-b"), close);
+    owner.commitLeaf(b, panel);
+    expect(close).not.toHaveBeenCalled();
+    if (variant === "full-disappearance") owner.transitionEnd(closing, a, panel);
+    owner.transitionStart(event(), b, panel);
+    if (variant === "full-disappearance") {
+      expect(close).not.toHaveBeenCalled();
+      owner.transitionEnd(event(), b, panel);
+    }
+    // Reversal with no DID_DISAPPEAR need not emit another DID_APPEAR on Android.
+    expect(close).toHaveBeenCalledOnce();
+  },
+);
+it("late closing end cannot erase a newer acknowledged appearance", () => {
+  const owner = createChatListPresentation(),
+    close = vi.fn();
+  const a = leaf(),
+    b = { ...leaf("workspace-b"), key: a.key };
+  const closing = { ...event(), data: { closing: true } };
+  owner.commitLeaf(a, panel);
+  owner.transitionEnd(event(), a, panel);
+  owner.transitionStart(closing, a, panel);
+  owner.transitionStart(event(), a, panel);
+  owner.transitionEnd(event(), a, panel);
+  owner.transitionEnd(closing, a, panel);
+  owner.begin(panel, destination("workspace-b"), close);
+  owner.commitLeaf(b, panel);
+  expect(close).toHaveBeenCalledOnce();
+});
+it("late opening end cannot certify a native screen in a newer closing phase", () => {
+  const owner = createChatListPresentation(),
+    close = vi.fn();
+  const a = leaf(),
+    b = { ...leaf("workspace-b"), key: a.key };
+  owner.commitLeaf(a, panel);
+  owner.transitionStart(event(), a, panel);
+  owner.transitionStart({ ...event(), data: { closing: true } }, a, panel);
+  owner.begin(panel, destination("workspace-b"), close);
+  owner.transitionEnd(event(), a, panel);
+  owner.commitLeaf(b, panel);
+  expect(close).not.toHaveBeenCalled();
 });

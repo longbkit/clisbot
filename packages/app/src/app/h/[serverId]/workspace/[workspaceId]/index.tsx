@@ -7,6 +7,7 @@ import {
   usePathname,
   useRootNavigationState,
 } from "expo-router";
+import { useChatListPresentedLeaf } from "@/clisbot/home/use-chat-list-navigation";
 import { nativePerformanceTrace, traceInstant } from "@/performance/native-trace";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { RetainedPanel } from "@/components/retained-panel";
@@ -205,6 +206,7 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
   const pathname = usePathname();
   const route = useRoute();
   const isRouteFocused = useIsFocused();
+  useChatListPresentedLeaf(route, isRouteFocused);
   // Expo's LocalRouteParamsContext is this leaf's route.params (Route.js), not the
   // globally published selection. useIsFocused binds that identity to the actual native leaf.
   const localParams = useLocalSearchParams<{

@@ -51,6 +51,26 @@ export function createChatListPresentation() {
     for (const listener of listeners) listener();
   };
   const appearing = new Map<string, { revision: number; identity: string }>();
+  // Native visibility belongs to the screen key, not its changing workspace params.
+  // A Back/re-entry can update the same native screen without another onAppear.
+  const visibility = new Map<
+    string,
+    { shown: boolean; phase: "opening" | "presented" | "closing" }
+  >();
+  let committedLeaf: PresentedRoute | undefined;
+  function complete(current: PresentedRoute, panel: MobilePanelSelection) {
+    if (
+      !isPending(panel) ||
+      !pending ||
+      pending.returning ||
+      destinationPath(current) !== pending.destination
+    )
+      return;
+    const { close } = pending;
+    pending = null;
+    publish();
+    close();
+  }
   function cancel() {
     if (!pending) return;
     pending = null;
@@ -101,10 +121,32 @@ export function createChatListPresentation() {
       };
     },
     isPending,
-    transitionStart(event: TransitionEvent, current: PresentedRoute | undefined) {
+    commitLeaf(current: PresentedRoute, panel: MobilePanelSelection) {
+      committedLeaf = current;
+      const native = visibility.get(current.key);
+      if (native?.shown && native.phase !== "closing") complete(current, panel);
+      return () => {
+        if (committedLeaf === current) committedLeaf = undefined;
+      };
+    },
+    transitionStart(
+      event: TransitionEvent,
+      current: PresentedRoute | undefined,
+      panel: MobilePanelSelection,
+    ) {
       if (!event.target) return;
       appearing.delete(event.target);
-      if (event.data.closing || !pending || current?.key !== event.target) return;
+      const previous = visibility.get(event.target);
+      visibility.set(event.target, {
+        shown: previous?.shown ?? false,
+        phase: event.data.closing ? "closing" : "opening",
+      });
+      if (event.data.closing) return;
+      // Android independently deduplicates DID_APPEAR and WILL_APPEAR. Reversing
+      // WILL_DISAPPEAR without DID_DISAPPEAR can emit WILL_APPEAR but no new
+      // DID_APPEAR: the same already-shown view never actually disappeared.
+      if (previous?.shown && committedLeaf?.key === event.target) complete(committedLeaf, panel);
+      if (!pending || current?.key !== event.target) return;
       appearing.set(event.target, {
         revision: pending.panel.revision,
         identity: routeIdentity(current),
@@ -115,24 +157,36 @@ export function createChatListPresentation() {
       current: PresentedRoute | undefined,
       panel: MobilePanelSelection,
     ) {
-      if (!isPending(panel) || !event.target) return;
+      if (!event.target) return;
+      if (event.data.closing) {
+        // Only the current closing phase may revoke visibility. An old closing
+        // end after a newer opening/appearance cannot undo that newer phase.
+        if (visibility.get(event.target)?.phase === "closing") {
+          visibility.delete(event.target);
+          appearing.delete(event.target);
+        }
+        return;
+      }
+      if (visibility.get(event.target)?.phase === "closing") return;
       const started = appearing.get(event.target);
       appearing.delete(event.target);
+      // The focused owning leaf's committed params are independent of Expo's lagging
+      // global route publication. Parent appearances never certify this leaf's key.
+      const ownLeaf = committedLeaf?.key === event.target ? committedLeaf : undefined;
+      if (ownLeaf || current?.key === event.target)
+        visibility.set(event.target, { shown: true, phase: "presented" });
+      if (ownLeaf) {
+        complete(ownLeaf, panel);
+        return;
+      }
       if (
-        event.data.closing ||
-        !pending ||
-        pending.returning ||
         !started ||
         current?.key !== event.target ||
         started.revision !== panel.revision ||
-        started.identity !== routeIdentity(current) ||
-        destinationPath(current) !== pending.destination
+        started.identity !== routeIdentity(current)
       )
         return;
-      const { close } = pending;
-      pending = null;
-      publish();
-      close();
+      complete(current, panel);
     },
   };
 }

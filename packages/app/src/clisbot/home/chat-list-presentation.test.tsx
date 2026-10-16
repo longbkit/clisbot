@@ -177,7 +177,11 @@ it("keeps the actual Chat footer and unchanged selection projection while native
   expect(screen.queryByTestId("expanded-session")).toBeNull();
   expect(rowRenders).toBe(initialRenders); // No selected-row/context fanout before presentation.
   act(() => {
-    nativePresentation.transitionStart(appear, leaf);
+    nativePresentation.transitionStart(
+      appear,
+      leaf,
+      env.panel as { target: "agent-list"; revision: number },
+    );
     nativePresentation.transitionEnd(
       appear,
       leaf,
@@ -268,7 +272,11 @@ it.each([path, "/h/host/workspace"])(
     expect(nativePresentation.getPendingRevision()).toBe(1);
     expect(screen.getByTestId("home-mobile-tabs")).toBeTruthy();
     act(() => {
-      nativePresentation.transitionStart(appear, leaf);
+      nativePresentation.transitionStart(
+        appear,
+        leaf,
+        env.panel as { target: "agent-list"; revision: number },
+      );
       nativePresentation.transitionEnd(
         appear,
         leaf,
@@ -324,7 +332,11 @@ it.each(["selected Chat", "hardware Back"])(
     const home = { key: "home", name: "open-project" };
     const homeAppear = { target: home.key, data: { closing: false } };
     act(() => {
-      nativePresentation.transitionStart(homeAppear, home);
+      nativePresentation.transitionStart(
+        homeAppear,
+        home,
+        env.panel as { target: "agent-list"; revision: number },
+      );
       nativePresentation.transitionEnd(
         appear,
         home,

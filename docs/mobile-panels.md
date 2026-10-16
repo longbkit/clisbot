@@ -23,7 +23,14 @@ Native Chat departures (including Home/Inbox/Automations) keep the outgoing pane
 requested focused native leaf appears. A queued newer destination or return to Chat invalidates
 an older completion; peer returns retain replace semantics while detail returns preserve the Host
 deck. Admission callbacks read the latest committed path without changing row callback identity
-on every partial/full route commit.
+on every partial/full route commit. The owning focused workspace leaf commits its local identity
+separately from the global path. Native visibility is keyed by the actual screen: params-only
+re-entry may reuse an already presented view. A closing start blocks that acknowledgment; a
+subsequent opening start can reverse it only if no actual disappearance occurred. Android
+`react-native-screens` deduplicates `DID_APPEAR` separately from `WILL_APPEAR`, so that
+reversal need not emit another appearance end. A first/unpresented screen still waits for its
+actual appearance; parent, stale phase, canceled intent and changed panel generation cannot
+complete the destination.
 
 Native compact workspace entry keeps its existing header/Back surface separate from first pane
 materialization. The body waits for the existing outgoing Chat presentation boundary, then React
