@@ -4,3 +4,9 @@ export const traceConversationPhase: (
   key: string,
   extra?: Record<string, string>,
 ) => void = () => undefined;
+
+export const traceConversationFetch: (
+  key: string,
+  direction: "tail" | "before" | "after",
+) => ((payload: { lines: readonly unknown[]; error: string | null }) => void) | undefined = () =>
+  undefined;

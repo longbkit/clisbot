@@ -77,6 +77,29 @@ export function traceConversationPhase(
   if (conversation) traceInstant(`clisbot.chat.${phase}`, { conversation, ...extra });
 }
 
+let conversationFetchSequence = 0;
+/** Profile-only RPC/payload accounting. No identifiers or message contents enter trace output. */
+export function traceConversationFetch(key: string, direction: "tail" | "before" | "after") {
+  if (!nativePerformanceTrace.isEnabled()) return undefined;
+  const conversation = correlate("route", key);
+  const request = correlate("request", `chat-fetch:${++conversationFetchSequence}`);
+  if (!conversation || !request) return undefined;
+  traceInstant("clisbot.chat.fetch.invoke", { conversation, request, direction });
+  return (payload: { lines: readonly unknown[]; error: string | null }) => {
+    traceInstant("clisbot.chat.payload.begin", { conversation, request });
+    // Size of the canonical decoded RPC payload serialized as UTF-8, not encrypted frame bytes.
+    // The two markers expose this diagnostic-only encoding overhead separately.
+    const bytes = new TextEncoder().encode(JSON.stringify(payload)).byteLength;
+    traceInstant("clisbot.chat.fetch.response", {
+      conversation,
+      request,
+      rows: String(payload.lines.length),
+      bytes: String(bytes),
+      error: String(Boolean(payload.error)),
+    });
+  };
+}
+
 /** One-shot synthetic Android diagnostic; the external controller owns process termination. */
 export function startArmedHermesSampling(workspaceKey: string): void {
   if (nativePerformanceTrace.isEnabled()) traceModule?.startArmedHermesSampling(workspaceKey);

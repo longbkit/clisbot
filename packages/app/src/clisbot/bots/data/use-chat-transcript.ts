@@ -1,17 +1,15 @@
 import { DaemonConnectionError } from "@clisbot/client/internal/daemon-client";
-import { traceConversationPhase } from "@/performance/conversation-trace";
 import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
-import { i18n } from "@/i18n/i18next";
 import { toErrorMessage } from "@/utils/error-messages";
 import type { BotsRuntime } from "./client";
-import type { ChatTranscriptPage } from "./contracts";
+import { fetchTranscriptPage, refreshChatTranscript } from "./transcript-refresh";
 import { chatTranscriptQueryKey } from "./query-keys";
 import { selectTranscript, useTranscriptStore, type ChatTranscript } from "./transcript-store";
 
-export const TRANSCRIPT_PAGE_SIZE = 50;
+export { TRANSCRIPT_PAGE_SIZE } from "./transcript-refresh";
 
 export type ChatTranscriptLoadState =
   | { status: "connecting" }
@@ -27,25 +25,10 @@ export interface UseChatTranscriptResult {
   isLoadingOlder: boolean;
 }
 
-async function fetchPage(
-  runtime: BotsRuntime,
-  input: { serverId: string; chatId: string; beforeSeq?: number },
-): Promise<ChatTranscriptPage> {
-  const client = runtime.getClient(input.serverId);
-  if (!client) throw new Error(i18n.t("bots.workspace.errors.hostNotConnected"));
-  const page = await client.chatTranscriptFetch({
-    chatId: input.chatId,
-    beforeSeq: input.beforeSeq,
-    limit: TRANSCRIPT_PAGE_SIZE,
-  });
-  if (page.error) throw new Error(page.error);
-  return { messages: page.messages, hasOlder: page.hasOlder };
-}
-
 /**
- * The newest transcript page through react-query (so a reload refetches), merged into the
- * transcript store, which `chat.transcript.appended` also feeds. Older pages bypass the query:
- * they only ever extend the store.
+ * The initial tail and same-admission deltas through react-query (reload still revalidates),
+ * merged into the transcript store, which `chat.transcript.appended` also feeds. Older pages
+ * bypass the query: they only ever extend the store.
  */
 export function useChatTranscriptQuery(input: {
   serverId: string;
@@ -66,13 +49,7 @@ export function useChatTranscriptQuery(input: {
       connectionStatus,
       botsSessionScope(snapshot),
     ],
-    queryFn: async () => {
-      traceConversationPhase("transcript.request", key);
-      const page = await fetchPage(runtime, { serverId, chatId });
-      traceConversationPhase("transcript.response", key, { rows: String(page.messages.length) });
-      useTranscriptStore.getState().replacePage(key, page);
-      return page;
-    },
+    queryFn: () => refreshChatTranscript(runtime, { serverId, chatId, key }),
     dataShape: "value",
     staleTimeMs: 0,
     enabled: online,
@@ -84,7 +61,7 @@ export function useChatTranscriptQuery(input: {
     if (isLoadingOlder || !current.hasOlder || !oldest) return;
     setLoadingOlder(true);
     try {
-      const page = await fetchPage(runtime, { serverId, chatId, beforeSeq: oldest.seq });
+      const page = await fetchTranscriptPage(runtime, { serverId, chatId, beforeSeq: oldest.seq });
       useTranscriptStore.getState().prependOlder(key, page.messages, page.hasOlder);
     } finally {
       setLoadingOlder(false);

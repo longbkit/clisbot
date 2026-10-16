@@ -48,6 +48,8 @@ export type ChatMessage = Pick<
 export interface ChatTranscriptPage {
   messages: ChatMessage[];
   hasOlder: boolean;
+  /** Present on canonical fetch responses; a delta must prove it reached the current tail. */
+  hasNewer?: boolean;
 }
 export function botView(bot: WireBot): BotPayload {
   return { ...bot, launchDefaults: bot.launch };

@@ -1,1 +1,1 @@
-export { traceConversationPhase } from "./native-trace";
+export { traceConversationFetch, traceConversationPhase } from "./native-trace";

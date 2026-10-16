@@ -7,6 +7,7 @@ export interface BotsClient {
   chatTranscriptFetch(input: {
     chatId: string;
     beforeSeq?: number;
+    afterSeq?: number;
     limit?: number;
   }): Promise<ChatTranscriptPage & { error?: string }>;
 }
@@ -15,6 +16,7 @@ export interface BotsRuntimeSnapshot {
   connectionStatus: string;
   clientGeneration?: number;
   connectionEpoch?: number;
+  authFailureReason?: string | null;
 }
 
 /** Same shape as `ScheduleRuntime`: connectivity is read at fetch time, per host. */

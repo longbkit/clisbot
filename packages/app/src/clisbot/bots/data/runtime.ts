@@ -1,4 +1,5 @@
 import { createCatalogEventFeeds } from "./catalog-event-feeds";
+import { traceConversationFetch } from "@/performance/conversation-trace";
 import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
 import { useEffect, useMemo } from "react";
 import { getHostRuntimeStore, useHostRuntimeConnectionStatuses } from "@/runtime/host-runtime";
@@ -24,16 +25,31 @@ export const botsRuntime: BotsRuntime = {
         const r = await client.listChats();
         return { chats: r.chats.map(chatView), error: r.error ?? undefined };
       },
-      async chatTranscriptFetch({ chatId, beforeSeq, limit }) {
+      async chatTranscriptFetch({ chatId, beforeSeq, afterSeq, limit }) {
+        let direction: "before" | "after" | "tail" = "tail";
+        let cursor: { seq: number } | undefined;
+        if (beforeSeq !== undefined) {
+          direction = "before";
+          cursor = { seq: beforeSeq };
+        } else if (afterSeq !== undefined) {
+          direction = "after";
+          cursor = { seq: afterSeq };
+        }
+        const traceResponse = traceConversationFetch(
+          scopedTranscriptKey(id, chatId, getHostRuntimeStore().getSnapshot(id)),
+          direction,
+        );
         const r = await client.fetchChatTranscript({
           chatId,
-          direction: beforeSeq === undefined ? "tail" : "before",
-          cursor: beforeSeq === undefined ? undefined : { seq: beforeSeq },
+          direction,
+          cursor,
           limit,
         });
+        traceResponse?.(r);
         return {
           messages: r.lines.map(messageView),
           hasOlder: r.hasOlder,
+          hasNewer: r.hasNewer,
           error: r.error ?? undefined,
         };
       },

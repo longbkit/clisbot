@@ -11,8 +11,18 @@ export interface ChatTranscript {
   hasOlder: boolean;
 }
 
+/** Object identity is the read admission: clear/recreate and a newer read invalidate it. */
+export interface TranscriptRead {
+  readonly afterSeq?: number;
+}
+
 interface TranscriptStoreState {
   transcripts: Record<string, ChatTranscript>;
+  /** Fetch coverage, independent of live pushes and of the view's selected transcript. */
+  reads: Record<string, TranscriptRead>;
+  beginRead: (key: string) => TranscriptRead;
+  acceptsRead: (key: string, read: TranscriptRead) => boolean;
+  acceptRead: (key: string, read: TranscriptRead, page: ChatTranscript, delta: boolean) => void;
   /** Replaces the loaded window (first page, reload). */
   replacePage: (key: string, page: ChatTranscript) => void;
   /** Older lines reached at the top; duplicates by id are dropped. */
@@ -45,23 +55,53 @@ export function mergeTranscriptMessages(
   return [...byId.values()].sort((a, b) => a.seq - b.seq);
 }
 
-export const useTranscriptStore = create<TranscriptStoreState>()((set) => ({
+function tailWindow(current: ChatTranscript | undefined, page: ChatTranscript): ChatTranscript {
+  return {
+    // Keep pushes newer than the fetched window, including pushes arriving during first load.
+    messages: mergeTranscriptMessages(
+      page.messages,
+      (current?.messages ?? []).filter((line) => line.seq > (page.messages.at(-1)?.seq ?? 0)),
+    ),
+    hasOlder: page.hasOlder,
+  };
+}
+
+export const useTranscriptStore = create<TranscriptStoreState>()((set, get) => ({
   transcripts: {},
+  reads: {},
+  beginRead: (key) => {
+    const state = get();
+    const read = { afterSeq: state.transcripts[key] ? state.reads[key]?.afterSeq : undefined };
+    set({ reads: { ...state.reads, [key]: read } });
+    return read;
+  },
+  acceptsRead: (key, read) => get().reads[key] === read,
+  acceptRead: (key, read, page, delta) =>
+    set((state) => {
+      if (state.reads[key] !== read) return state;
+      const current = state.transcripts[key];
+      let transcript: ChatTranscript;
+      if (delta) {
+        if (!current || read.afterSeq === undefined) return state;
+        const messages = mergeTranscriptMessages(current.messages, page.messages);
+        transcript = messages === current.messages ? current : { ...current, messages };
+      } else {
+        transcript = tailWindow(current, page);
+      }
+      const afterSeq = page.messages.at(-1)?.seq ?? (delta ? read.afterSeq : 0);
+      if (transcript === current && afterSeq === read.afterSeq) return state;
+      return {
+        reads: { ...state.reads, [key]: { afterSeq } },
+        transcripts:
+          transcript === current ? state.transcripts : { ...state.transcripts, [key]: transcript },
+      };
+    }),
   replacePage: (key, page) =>
     set((state) => ({
+      reads: { ...state.reads, [key]: { afterSeq: page.messages.at(-1)?.seq ?? 0 } },
       transcripts: {
         ...state.transcripts,
-        [key]: {
-          // A push may arrive while the page RPC is in flight. Keep only lines newer than
-          // the fetched window, rather than dropping an already acknowledged live answer.
-          messages: mergeTranscriptMessages(
-            page.messages,
-            (state.transcripts[key]?.messages ?? []).filter(
-              (line) => line.seq > (page.messages.at(-1)?.seq ?? 0),
-            ),
-          ),
-          hasOlder: page.hasOlder,
-        },
+        [key]: tailWindow(state.transcripts[key], page),
       },
     })),
   prependOlder: (key, messages, hasOlder) =>
@@ -84,7 +124,8 @@ export const useTranscriptStore = create<TranscriptStoreState>()((set) => ({
   clear: (key) =>
     set((state) => {
       const { [key]: _removed, ...transcripts } = state.transcripts;
-      return { transcripts };
+      const { [key]: _read, ...reads } = state.reads;
+      return { transcripts, reads };
     }),
 }));
 

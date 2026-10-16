@@ -172,6 +172,23 @@ rejected before applying updates. Transcript appends and query invalidations run
 feed, not once per mounted sidebar/detail consumer. Fetch-query refresh and authority
 boundaries remain unchanged; this is not a longer stale-time policy or route keepalive.
 
+Same-admission transcript refresh uses the existing `after` sequence contract after an
+accepted tail, including cursor `0` for an accepted empty transcript. The fetched-through
+cursor belongs to the existing transcript store and advances only after an authoritative
+fetch; live pushes and older-page loads cannot advance it past unseen lines. A complete
+contiguous delta preserves loaded older pages and newer live pushes. An empty delta keeps
+the transcript and message-array identities. Each read has an identity ticket, so a newer
+read or clear/recreate rejects late results; admission changes still require a fresh tail.
+Errors leave fetch coverage unchanged and retain the existing fail-closed route policy.
+
+Refresh remains bounded to 50 lines. An incomplete/noncontiguous delta falls back once to
+the existing tail replacement with truthful `hasOlder`; this may reset loaded older pages,
+rather than joining disjoint windows or draining an unbounded backlog. No wire contract,
+cryptography, stale-time, authority check, or provider turn changes. Native profile builds
+can correlate each transcript RPC with its serialized decoded UTF-8 payload size; this is
+not encrypted wire size, and the accounting markers expose its diagnostic encoding cost.
+Production, web and Electron do not activate that accounting.
+
 ## Order of work
 
 Server first, app second, CLI third; the Hub marker rides with the server tasks. Each numbered
