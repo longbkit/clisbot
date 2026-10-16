@@ -10,6 +10,7 @@ export function WorkspaceEntryContent({
   children,
   serverId,
   agentId,
+  awaitChatDeparture = true,
 }: {
   nativeCompact: boolean;
   focused: boolean;
@@ -17,9 +18,16 @@ export function WorkspaceEntryContent({
   children: ReactNode;
   serverId?: string;
   agentId?: string;
+  /**
+   * Wait for the outgoing Chat panel before preparing. A body whose first commit is cheap enough
+   * to finish during the presentation handshake starts at once instead: waiting puts its whole
+   * render after the reveal, where late responses keep restarting it.
+   */
+  awaitChatDeparture?: boolean;
 }) {
   return nativeCompact ? (
     <NativeWorkspaceEntryContent
+      awaitChatDeparture={awaitChatDeparture}
       focused={focused}
       placeholder={placeholder}
       serverId={serverId}
@@ -38,15 +46,17 @@ function NativeWorkspaceEntryContent({
   children,
   serverId,
   agentId,
+  awaitChatDeparture,
 }: {
   focused: boolean;
   placeholder: ReactNode;
   children: ReactNode;
   serverId?: string;
   agentId?: string;
+  awaitChatDeparture: boolean;
 }) {
   const departing = useIsChatListDeparting();
-  const prepared = useDeferredValue(focused && !departing, false);
+  const prepared = useDeferredValue(focused && !(awaitChatDeparture && departing), false);
   const committed = useRef(false);
   useLayoutEffect(() => {
     if (focused && prepared) committed.current = true;

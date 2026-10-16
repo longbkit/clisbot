@@ -271,12 +271,13 @@ function ChatRouteBody({
           {error ?? failure?.message}
         </Text>
       ) : null}
-      {/* Native compact entry shows its header/Back first; the transcript body waits for the
-          outgoing Chat presentation, then renders at deferred priority so Back stays usable. */}
+      {/* Native compact entry shows its header/Back first; the transcript body then renders at
+          deferred priority during the presentation handshake, so Back can interrupt it. */}
       <WorkspaceEntryContent
         nativeCompact={isNative && compact}
         focused={focused}
         placeholder={CHAT_BODY_PREPARING}
+        awaitChatDeparture={false}
       >
         <ChatBodyPrepared conversation={conversation} />
         {children}

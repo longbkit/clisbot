@@ -160,9 +160,9 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   source-size-bounded LRU, so reopening a chat skips parsing replies it already showed; streaming
   output is always parsed fresh. The trees are the markdown package's own output and are read, never
   mutated, by the renderer.
-- On a native phone the conversation's header/Back renders first; the transcript body waits for the
-  outgoing Chat presentation and then renders at deferred priority through the same entry boundary
-  as workspaces ([mobile panels](../../mobile-panels.md)). Metadata/transcript requests start with the
+- On a native phone the conversation's header/Back renders first; the transcript body then renders
+  at deferred priority through the same entry boundary as workspaces, without waiting for the
+  outgoing Chat panel ([mobile panels](../../mobile-panels.md)). A Back tap can interrupt that render. Metadata/transcript requests start with the
   route, not the body, and a centered loading indicator stands in until the body commits.
 - Opening an artifact does not navigate to cowork. Desktop uses the existing ordinary side-pane
   opener: create a right split on first open; reuse the remembered pane for subsequent opens; reveal
