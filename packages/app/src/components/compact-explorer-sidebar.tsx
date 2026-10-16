@@ -1,3 +1,4 @@
+import { profileNativeRegion } from "@/utils/render-profiler";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
@@ -146,17 +147,20 @@ export function CompactExplorerSidebar({
         panelStyle={mobileSidebarStyle}
       >
         {contextControls}
-        <ExplorerSidebarContent
-          activeTab={explorerTab}
-          onTabPress={handleTabPress}
-          onClose={handleHeaderClose}
-          serverId={serverId}
-          workspaceId={workspaceId}
-          workspaceRoot={workspaceRoot}
-          isGit={isGit}
-          isOpen={isActive}
-          onOpenFile={onOpenFile}
-        />
+        {profileNativeRegion(
+          "Explorer",
+          <ExplorerSidebarContent
+            activeTab={explorerTab}
+            onTabPress={handleTabPress}
+            onClose={handleHeaderClose}
+            serverId={serverId}
+            workspaceId={workspaceId}
+            workspaceRoot={workspaceRoot}
+            isGit={isGit}
+            isOpen={isActive}
+            onOpenFile={onOpenFile}
+          />,
+        )}
       </MobilePanelOverlay>
     </RetainedPanelActivity>
   );
@@ -259,17 +263,20 @@ export function NativeExplorerSidebarDock({
             testID="native-explorer-sidebar-resize-handle"
           />
           {contextControls}
-          <ExplorerSidebarContent
-            activeTab={explorerTab}
-            onTabPress={handleTabPress}
-            onClose={showMobileAgent}
-            serverId={serverId}
-            workspaceId={workspaceId}
-            workspaceRoot={workspaceRoot}
-            isGit={isGit}
-            isOpen={isOpen}
-            onOpenFile={onOpenFile}
-          />
+          {profileNativeRegion(
+            "ExplorerDock",
+            <ExplorerSidebarContent
+              activeTab={explorerTab}
+              onTabPress={handleTabPress}
+              onClose={showMobileAgent}
+              serverId={serverId}
+              workspaceId={workspaceId}
+              workspaceRoot={workspaceRoot}
+              isGit={isGit}
+              isOpen={isOpen}
+              onOpenFile={onOpenFile}
+            />,
+          )}
         </View>
       </Animated.View>
     </RetainedPanelActivity>

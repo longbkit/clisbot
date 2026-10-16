@@ -1,15 +1,25 @@
 import type { DaemonClientTrace } from "@clisbot/client/internal/daemon-client";
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { isProfileBuild } from "@/constants/build-profile";
+import { isProfileBuild, isSyntheticReactProfileBuild } from "@/constants/build-profile";
 
 interface ClisbotNativeTraceModule {
   beginSection(name: string): void;
   endSection(): void;
   startInputTracing(): void;
   startArmedHermesSampling(workspaceKey: string): boolean;
+  consumeRenderProfileCommand(): "reset" | "export" | null;
+  exportRenderProfile(kind: "reset" | "snapshot", payload: string): boolean;
 }
 
 const traceModule = requireOptionalNativeModule<ClisbotNativeTraceModule>("ClisbotNativeTrace");
+
+export function consumeRenderProfileCommand() {
+  return isSyntheticReactProfileBuild ? traceModule?.consumeRenderProfileCommand() : null;
+}
+
+export function exportNativeRenderProfile(kind: "reset" | "snapshot", payload: string) {
+  return isSyntheticReactProfileBuild && traceModule?.exportRenderProfile(kind, payload) === true;
+}
 
 export const nativePerformanceTrace: DaemonClientTrace = {
   isEnabled() {

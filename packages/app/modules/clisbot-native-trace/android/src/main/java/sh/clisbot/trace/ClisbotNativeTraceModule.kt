@@ -71,6 +71,39 @@ class ClisbotNativeTraceModule : Module() {
       startArmedHermesSampling(workspaceKey)
     }
 
+    // Fixed paths and commands, available only in the disposable profiling renderer build.
+    Function("consumeRenderProfileCommand") {
+      val context = appContext.reactContext
+      if (!BuildConfig.SYNTHETIC_REACT_PROFILE || context?.packageName != "com.clisbot.app.dev") null
+      else {
+        val commandFile = File(context.getExternalFilesDir(null), "cto029-react-profile.command")
+        if (!commandFile.isFile) null
+        else {
+          val command = if (commandFile.length() <= 32) commandFile.readText().trim() else ""
+          if (!commandFile.delete() || command !in setOf("reset", "export")) null else command
+        }
+      }
+    }
+
+    Function("exportRenderProfile") { kind: String, payload: String ->
+      val context = appContext.reactContext
+      if (!BuildConfig.SYNTHETIC_REACT_PROFILE || context?.packageName != "com.clisbot.app.dev" ||
+          kind !in setOf("reset", "snapshot") || payload.length > 1_000_000) false
+      else {
+        val directory = context.getExternalFilesDir(null)
+        if (directory == null) false
+        else {
+          val result = JSONObject().put("pid", android.os.Process.myPid())
+            .put("nativeElapsedNs", SystemClock.elapsedRealtimeNanos())
+            .put("kind", kind).put("data", JSONObject(payload))
+          val destination = File(directory, "cto029-react-profile-$kind.json")
+          val temporary = File(directory, "cto029-react-profile-$kind.tmp")
+          temporary.writeText(result.toString())
+          temporary.renameTo(destination)
+        }
+      }
+    }
+
     // Installed only by a profile build. Keep dispatch behavior and navigator ownership intact.
     Function("startInputTracing") {
       appContext.currentActivity?.runOnUiThread {

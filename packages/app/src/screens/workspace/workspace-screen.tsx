@@ -203,7 +203,7 @@ import {
   type WorkspaceFileLocation,
   type WorkspaceFileOpenRequest,
 } from "@/workspace/file-open";
-import { RenderProfile } from "@/utils/render-profiler";
+import { RenderProfile, profileNativeRegion } from "@/utils/render-profiler";
 import { useWorkspaceCheckoutStatus } from "@/screens/workspace/use-workspace-checkout-status";
 import { useHasPullRequest, usePullRequestAutoAdd } from "@/panels/pull-request";
 
@@ -409,13 +409,14 @@ export const WorkspaceScreen = memo(function WorkspaceScreen({
       traceInstant("clisbot.workspace.unmount", { serverId, workspaceId });
     };
   }, [serverId, workspaceId]);
-  return (
+  return profileNativeRegion(
+    `WorkspaceEntry:${workspaceId}`,
     <WorkspaceScreenContent
       serverId={serverId}
       workspaceId={workspaceId}
       isRouteFocused={isRouteFocused ?? navigationFocused}
       recoveryRequested={recoveryRequested ?? false}
-    />
+    />,
   );
 });
 

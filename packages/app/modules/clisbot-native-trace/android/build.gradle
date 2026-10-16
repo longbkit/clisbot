@@ -19,5 +19,6 @@ android {
   buildFeatures { buildConfig true }
   defaultConfig {
     buildConfigField "boolean", "SYNTHETIC_HERMES_SAMPLING", (System.getenv("CLISBOT_PROFILE_BUILD") == "1" && System.getenv("APP_VARIANT") == "development").toString()
+    buildConfigField "boolean", "SYNTHETIC_REACT_PROFILE", (System.getenv("CLISBOT_PROFILE_BUILD") == "1" && System.getenv("APP_VARIANT") == "development" && System.getenv("CLISBOT_REACT_PROFILE") == "1").toString()
   }
 }

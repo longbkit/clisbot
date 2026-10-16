@@ -213,6 +213,29 @@ sample counts, interval boundaries and unresolved frames. Samples diagnose execu
 not scheduling delay, visible presentation or latency acceptance. Headless and windowed runs
 are different environments and cannot establish a cross-environment speedup.
 
+For subtree attribution, the installed RN package also includes `ReactFabric-profiling.js`.
+Plain `React.Profiler` in the normal production renderer does not provide render durations.
+The explicit combination `APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 CLISBOT_REACT_PROFILE=1`
+selects that installed optimized profiling renderer on Android only, with a separate Metro cache
+version. Ordinary production, web and Electron resolution stays unchanged; do not edit `node_modules`.
+The existing `RenderProfile` collector then records at most 4096 samples and bounded render reasons,
+including coarse root, navigator, sidebar, Home and workspace/explorer regions. Nested durations
+overlap: these are inclusive render wall times, not additive self CPU or native presentation times.
+
+Only this diagnostic package (`com.clisbot.app.dev`) can consume external-files commands from
+`cto029-react-profile.command`: `reset` clears the collector and acknowledges in
+`cto029-react-profile-reset.json`; `export` atomically writes `cto029-react-profile-snapshot.json`.
+Both export functions are also gated at native compilation. A 500ms diagnostic poll stops collecting
+after 120 seconds; the external controller must enforce its own hard deadline and force-stop the
+synthetic app on completion/failure. Clear old command/acknowledgment files before each attempt.
+Validate nonempty on-device `onRender` data and the exact profiling renderer's packaged source-map
+binding. Correlate React start/commit times with the recorded `clisbot.react.render` JS-clock fields,
+native export elapsed clock, Perfetto clock snapshots and actual presented video frames.
+`commitTime` is not a screen appearing. This renderer and instrumentation change overhead: use them
+to locate work, never to claim a speedup against the ordinary production renderer. If combining with
+the Hermes sampler, export before its dump acknowledgment and preserve the immediate process-stop
+contract above; missing export is unavailable, not permission to leave sampling running.
+
 `visual-latency.py --run <run> --references <folder>` pairs the encoded native video frames with
 Android screenrecord's Winscope elapsed-time metadata and four stable content references (`nav.png`,
 `chat.png`, `inbox.png`, `automations.png`). Inspect the matched frames before accepting its footer

@@ -1,6 +1,10 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { resolve } = require("metro-resolver");
 const path = require("path");
+const {
+  isSyntheticReactProfileBuild,
+  isFabricProductionRenderer,
+} = require("./scripts/native-performance/react-profile-config.cjs");
 
 const projectRoot = __dirname;
 const appNodeModulesRoot = path.resolve(projectRoot, "node_modules");
@@ -16,6 +20,9 @@ const customWebPlatform = (process.env.CLISBOT_WEB_PLATFORM ?? "")
   .toLowerCase();
 
 const config = getDefaultConfig(projectRoot);
+if (isSyntheticReactProfileBuild()) {
+  config.cacheVersion = `${config.cacheVersion ?? ""}:clisbot-native-react-profile`;
+}
 const defaultResolveRequest = config.resolver.resolveRequest ?? resolve;
 
 // Keep app exports deterministic across dev machines and CI. Metro's Watchman
@@ -79,7 +86,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return resolveWithCustomWebOverlay(context, fdroidModuleOverrides[moduleName], platform);
   }
 
-  return resolveWithCustomWebOverlay(context, moduleName, platform);
+  const resolution = resolveWithCustomWebOverlay(context, moduleName, platform);
+  if (
+    platform === "android" &&
+    isSyntheticReactProfileBuild() &&
+    isFabricProductionRenderer(resolution)
+  ) {
+    return {
+      ...resolution,
+      filePath: resolution.filePath.replace("-prod.js", "-profiling.js"),
+    };
+  }
+  return resolution;
 };
 
 if (process.env.CLISBOT_SERVE_SIM_PREVIEW === "1") {

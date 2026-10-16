@@ -1,4 +1,5 @@
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { profileNativeRegion } from "@/utils/render-profiler";
 import { MobileHomeTabs } from "@/clisbot/home/mobile-navigation";
 import { OfferLinkListener } from "@/device-access/offer-link-listener";
 import { ComposerEditingSessionsProvider } from "@/composer/editing-session";
@@ -543,12 +544,13 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     hasTopLeftWindowControls,
     sidebarControlsEnabled: chromeEnabled && !isWorkspaceFocusModeEnabled,
   });
-  const sidebarChrome = (
+  const sidebarChrome = profileNativeRegion(
+    "Sidebar",
     <SidebarChrome
       mounted={isCompactLayout ? chromeEnabled : desktopSidebarMounted}
       visible={isCompactLayout ? chromeEnabled : desktopSidebarVisible}
       keyboardShortcutsEnabled={keyboardShortcutsEnabled}
-    />
+    />,
   );
   let themedSidebarChrome = sidebarChrome;
   if (isWeb) {
@@ -567,12 +569,12 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
           presentation={explorerSidebarPresentation === "dock" ? "dock" : "overlay"}
         >
           <WindowChromeRegion corners={chromeEnabled ? "both" : appChromeLayout.contentCorners}>
-            <View style={flexStyle}>{children}</View>
+            <View style={flexStyle}>{profileNativeRegion("Navigator", children)}</View>
           </WindowChromeRegion>
         </CompactExplorerSidebarHost>
       ) : (
         <WindowChromeRegion corners={appChromeLayout.contentCorners}>
-          <View style={flexStyle}>{children}</View>
+          <View style={flexStyle}>{profileNativeRegion("Navigator", children)}</View>
         </WindowChromeRegion>
       )}
     </View>

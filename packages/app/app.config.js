@@ -11,6 +11,9 @@ const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
 const isProfileBuild = process.env.CLISBOT_PROFILE_BUILD === "1";
+const {
+  isSyntheticReactProfileBuild,
+} = require("./scripts/native-performance/react-profile-config.cjs");
 
 function resolveHubOrigin(value) {
   if (typeof value !== "string" || value.trim().length === 0) return undefined;
@@ -232,6 +235,7 @@ export default {
     extra: {
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
+      reactProfile: isSyntheticReactProfileBuild(),
       productAnalytics: {
         enabled: analyticsEnabled,
         nativeConfigured: firebaseConfigured,

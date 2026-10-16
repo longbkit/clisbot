@@ -1,4 +1,4 @@
-import { useCallback, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { ExpoRoot } from "expo-router";
 import Head from "expo-router/head";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +6,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { queryClient } from "@/data/query-client";
 import { I18nProvider } from "@/i18n/provider";
 import { RootErrorBoundary } from "@/components/root-error-boundary";
+import { isSyntheticReactProfileBuild } from "@/constants/build-profile";
+import { RenderProfile, startNativeRenderProfileControl } from "@/utils/render-profiler";
 
 // Keep Expo's platform filtering, route root, and lazy import configuration.
 const { ctx: context } = require("expo-router/_ctx") as {
@@ -13,7 +15,17 @@ const { ctx: context } = require("expo-router/_ctx") as {
 };
 
 export function RootApp() {
+  if (isSyntheticReactProfileBuild) return <ProfiledRootApp />;
   return <RootRouter context={context} />;
+}
+
+function ProfiledRootApp() {
+  useEffect(startNativeRenderProfileControl, []);
+  return (
+    <RenderProfile id="AppRoot">
+      <RootRouter context={context} />
+    </RenderProfile>
+  );
 }
 
 export function RootRouter({ context: routes }: Pick<ComponentProps<typeof ExpoRoot>, "context">) {
