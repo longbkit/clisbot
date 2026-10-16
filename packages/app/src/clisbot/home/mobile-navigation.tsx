@@ -141,25 +141,40 @@ export function MobileHomeTabs() {
   const compact = useIsCompactFormFactor();
   const path = usePathname();
   const departing = useIsChatListDeparting();
-  const visiblePath = !isHomeTabPath(path) && departing ? "/chat" : path;
-  const insets = useSafeAreaInsets();
   useEffect(startNativeInputTracing, []);
   useLayoutEffect(() => {
     traceInstant("clisbot.route.commit", { path });
   }, [path]);
   useMobileHardwareBack(path, compact, departing);
+  // Chat's bar belongs to the actual list panel. Keeping it outside that panel leaves a
+  // footer on the destination between its UI-thread close and the settled JS notification.
+  if (path === "/chat" || !isHomeTabPath(path)) return null;
+  return <MobileTabBar path={path} />;
+}
+
+/** Visual-only: the retained sidebar must not install another Back/tracing owner. */
+export function MobileChatPanelTabs() {
+  const path = usePathname();
+  const departing = useIsChatListDeparting();
+  if (path !== "/chat" && (isHomeTabPath(path) || !departing)) return null;
+  return <MobileTabBar path="/chat" />;
+}
+
+function MobileTabBar({ path }: { path: string }) {
+  const compact = useIsCompactFormFactor();
+  const insets = useSafeAreaInsets();
   const inset = useMemo(() => ({ paddingBottom: Math.max(insets.bottom, 6) }), [insets.bottom]);
   // Reads what Home and the sidebar already loaded; the tab bar never starts its own fetch.
   const { agents } = useAggregatedAgents({ demand: false });
   const needsCount = agents.filter((agent) => activityBucket(agent) === "needs").length;
-  if (!HOME_V2_ENABLED || !compact || !isHomeTabPath(visiblePath)) return null;
+  if (!HOME_V2_ENABLED || !compact) return null;
   return (
     <View style={[styles.tabs, inset]} testID="home-mobile-tabs">
       {entries.map((entry) => (
         <Tab
           key={entry.path}
           entry={entry}
-          selected={visiblePath === entry.path}
+          selected={path === entry.path}
           count={entry.path === "/sessions" ? needsCount : undefined}
         />
       ))}

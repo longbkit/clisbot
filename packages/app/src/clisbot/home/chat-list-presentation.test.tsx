@@ -6,6 +6,7 @@ const env = vi.hoisted(() => ({
   path: "/chat",
   compact: true,
   listActive: true,
+  panelVisible: true,
   selection: null as { serverId: string; workspaceId: string } | null,
   panel: { target: "agent-list", revision: 1 },
   listeners: new Set<() => void>(),
@@ -89,7 +90,8 @@ vi.mock("react-native", () => ({
   },
 }));
 import { nativePresentation } from "./chat-list-presentation";
-import { MobileHomeTabs } from "./mobile-navigation";
+import { MobileChatPanelTabs, MobileHomeTabs } from "./mobile-navigation";
+import { startNativeInputTracing } from "@/performance/native-trace";
 import {
   WorkspaceSessionsAutoCollapseProvider,
   useSidebarWorkspaceSelection,
@@ -117,8 +119,13 @@ const row = <Row />;
 function Page() {
   return (
     <>
-      <MobileHomeTabs />
-      <WorkspaceSessionsAutoCollapseProvider>{row}</WorkspaceSessionsAutoCollapseProvider>
+      <div data-testid="root-footer-owner">
+        <MobileHomeTabs />
+      </div>
+      <div data-testid="native-list-panel" hidden={!env.panelVisible}>
+        <MobileChatPanelTabs />
+        <WorkspaceSessionsAutoCollapseProvider>{row}</WorkspaceSessionsAutoCollapseProvider>
+      </div>
     </>
   );
 }
@@ -127,6 +134,7 @@ beforeEach(() => {
   env.path = "/chat";
   env.compact = true;
   env.listActive = true;
+  env.panelVisible = true;
   env.selection = null;
   env.panel = { target: "agent-list", revision: 1 };
   rowRenders = 0;
@@ -170,10 +178,36 @@ it("keeps the actual Chat footer and unchanged selection projection while native
   expect(screen.getByTestId("home-mobile-tabs")).toBeTruthy();
   expect(screen.queryByTestId("expanded-session")).toBeNull();
   expect(rowRenders).toBe(initialRenders);
+  // Native panel visibility changes before its scheduleOnRN settled activity arrives.
+  env.panelVisible = false;
+  view.rerender(<Page />);
+  expect(
+    screen
+      .getByTestId("home-mobile-tabs")
+      .closest("[data-testid=native-list-panel]")
+      ?.hasAttribute("hidden"),
+  ).toBe(true);
+  expect(screen.getByTestId("root-footer-owner").children).toHaveLength(0);
+  expect(screen.queryByTestId("expanded-session")).toBeNull();
   env.listActive = false;
   view.rerender(<Page />);
   expect(screen.queryByTestId("home-mobile-tabs")).toBeNull();
   expect(screen.getByTestId("expanded-session").textContent).toBe("a");
+});
+it("keeps peer footer rendering at root and Back/input tracing in one root owner", () => {
+  env.path = "/open-project";
+  const view = render(<Page />);
+  expect(
+    screen.getByTestId("home-mobile-tabs").closest("[data-testid=root-footer-owner]"),
+  ).toBeTruthy();
+  expect(
+    screen.getByTestId("native-list-panel").querySelector("[data-testid=home-mobile-tabs]"),
+  ).toBeNull();
+  env.path = "/chat";
+  view.rerender(<Page />);
+  expect(screen.getAllByTestId("home-mobile-tabs")).toHaveLength(1);
+  expect(screen.getByTestId("root-footer-owner").children).toHaveLength(0);
+  expect(startNativeInputTracing).toHaveBeenCalledOnce();
 });
 it("preserves selection for an already presented workspace overlay", () => {
   env.path = path;

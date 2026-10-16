@@ -49,7 +49,10 @@ including a different agent tab in the same workspace (no new native appearance 
 Catalog readiness and network responses never own this closure. During that native departure the same
 intent keeps Chat’s footer/inset and outgoing sidebar selection projection, so the JS route commit
 cannot resize the list or auto-expand the incoming workspace before it appears. Catalog changes
-still apply. Hardware Back cancels entry and retains this outgoing projection until Chat commits;
+still apply. Chat's visual tab bar lives inside that same list panel, so its UI-thread hide also
+hides the bar without waiting for the later JS settled notification or resizing the detail.
+Other peer-tab bars remain at root; hardware Back, input tracing and route markers have one root
+owner, independent of the retained sidebar's visual bar. Hardware Back cancels entry and retains this outgoing projection until Chat commits;
 an old destination appearance cannot close the returning list. Desktop selection and ordinary
 already-presented workspace overlays keep their existing behavior.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,

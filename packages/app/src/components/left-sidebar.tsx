@@ -1,4 +1,5 @@
 import { MobileToolbar } from "@/clisbot/home/mobile-toolbar";
+import { MobileChatPanelTabs } from "@/clisbot/home/mobile-navigation";
 import { SidebarDirectoryStatus } from "@/components/sidebar/sidebar-directory-status";
 import { SidebarFooter } from "@/components/sidebar/sidebar-footer";
 import { IconTooltipContent } from "@/components/sidebar/sidebar-footer-controls";
@@ -407,7 +408,9 @@ function MobileSidebar({
           />
         )}
 
-        {HOME_V2_ENABLED ? null : (
+        {HOME_V2_ENABLED ? (
+          <MobileChatPanelTabs />
+        ) : (
           <SidebarFooter
             handleOpenProject={handleOpenProject}
             handleImportSession={handleImportSession}
