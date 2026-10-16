@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   epoch: 1,
   authFailure: false,
   key: [] as unknown[],
+  fetching: false,
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeSnapshot: () => ({
@@ -23,7 +24,12 @@ vi.mock("@/runtime/host-runtime", () => ({
 vi.mock("@/data/query", () => ({
   useFetchQuery: (options: { queryKey: unknown[] }) => {
     state.key = options.queryKey;
-    return { data: state.data, error: state.error, isError: state.error !== null };
+    return {
+      data: state.data,
+      error: state.error,
+      isError: state.error !== null,
+      isFetching: state.fetching,
+    };
   },
 }));
 import { useChatTranscriptQuery } from "./use-chat-transcript";
@@ -34,6 +40,7 @@ afterEach(() => {
   state.data = undefined;
   state.epoch = 1;
   state.authFailure = false;
+  state.fetching = false;
 });
 it("retains an accepted page only for a typed transport error, not a first-load failure", () => {
   state.error = new DaemonConnectionError("Timeout", "DAEMON_REQUEST_TIMEOUT");
@@ -78,4 +85,18 @@ it("does not treat connection-lost or a rejected admission as a recoverable refr
   state.authFailure = true;
   hook.rerender();
   expect(hook.result.current.loadState).toMatchObject({ retainAccepted: false });
+});
+
+it("reports an active refresh independently of already loaded content", () => {
+  state.data = { messages: [], hasOlder: false };
+  state.fetching = true;
+  const hook = renderHook(() =>
+    useChatTranscriptQuery({ serverId: "host", chatId: "chat", runtime }),
+  );
+  expect(hook.result.current.loadState.status).toBe("loaded");
+  expect(hook.result.current.isFetching).toBe(true);
+  state.fetching = false;
+  hook.rerender();
+  expect(hook.result.current.loadState.status).toBe("loaded");
+  expect(hook.result.current.isFetching).toBe(false);
 });

@@ -20,7 +20,9 @@ import { useCallback, useLayoutEffect, useMemo, type ReactNode } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View, Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import type { Theme } from "@/styles/theme";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import {
@@ -35,6 +37,8 @@ import { ChatScreen } from "./chat-screen";
 import { conversationToolDisplay } from "./tool-activity";
 import { useChatToolActivityHeaderValue } from "./use-chat-tool-activity-header";
 import { ChatToolActivityHeaderContext } from "./tool-activity-context";
+const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
+const loadingColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const EMPTY_PARTICIPANTS: ChatPayload["participants"] = [];
 
 export default function ChatRoute() {
@@ -204,14 +208,23 @@ function ChatRouteBody({
   const { t } = useTranslation();
   const failure = transcript.loadState.status === "error" ? transcript.loadState : null;
   const blocked = failure && !failure.retainAccepted ? failure.message : null;
-  if (!chat || blocked)
+  if (!chat || blocked) {
+    const pending = !error && !blocked && online;
     return (
-      <Text accessibilityRole={error || blocked ? "alert" : undefined}>
-        {blocked ??
-          error ??
-          (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
-      </Text>
+      <View style={styles.body}>
+        <View style={styles.centeredLoading} pointerEvents="none">
+          {pending ? <ThemedLoadingSpinner size="large" uniProps={loadingColor} /> : null}
+          <Text accessibilityRole={error || blocked ? "alert" : undefined}>
+            {blocked ??
+              error ??
+              (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
+          </Text>
+        </View>
+      </View>
     );
+  }
+  const initialLoading =
+    transcript.loadState.status === "loading" && transcript.transcript.messages.length === 0;
   return (
     <View style={styles.body}>
       {error || failure ? (
@@ -219,10 +232,24 @@ function ChatRouteBody({
           {error ?? failure?.message}
         </Text>
       ) : null}
-      {transcript.loadState.status === "loading" && transcript.transcript.messages.length === 0 ? (
-        <Text>{t("bots.chat.route.loading")}</Text>
-      ) : null}
       {children}
+      <ChatLoadingProgress initial={initialLoading} fetching={transcript.isFetching} />
+    </View>
+  );
+}
+
+function ChatLoadingProgress({ initial, fetching }: { initial: boolean; fetching: boolean }) {
+  const { t } = useTranslation();
+  if (!initial && !fetching) return null;
+  return (
+    <View
+      testID={initial ? "chat-initial-loading" : "chat-refresh-loading"}
+      style={initial ? styles.centeredLoading : styles.refreshLoading}
+      pointerEvents="none"
+      accessibilityRole="progressbar"
+      accessibilityLabel={t("bots.chat.route.loading")}
+    >
+      <ThemedLoadingSpinner size={initial ? "large" : "small"} uniProps={loadingColor} />
     </View>
   );
 }
@@ -333,7 +360,25 @@ type ChatIdentities = ReturnType<typeof useChatIdentities>;
 
 const styles = StyleSheet.create((theme) => ({
   root: { flex: 1, backgroundColor: theme.colors.surface0 },
-  body: { flex: 1 },
+  body: { flex: 1, minHeight: 0 },
+  centeredLoading: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing[2],
+  },
+  refreshLoading: {
+    position: "absolute",
+    top: theme.spacing[2],
+    right: theme.spacing[2],
+    padding: theme.spacing[1],
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface0,
+  },
   actions: {
     flexDirection: "row",
     alignItems: "center",

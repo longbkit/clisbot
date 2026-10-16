@@ -189,6 +189,13 @@ can correlate each transcript RPC with its serialized decoded UTF-8 payload size
 not encrypted wire size, and the accounting markers expose its diagnostic encoding cost.
 Production, web and Electron do not activate that accounting.
 
+Initial metadata/transcript loading uses the shared centered spinner inside the retained
+conversation workspace, leaving Back outside the body. An active fetch with accepted content
+shows a small pointer-transparent progress indicator without replacing the ChatScreen,
+composer or loaded rows. `isFetching` remains separate from loaded/error state. This is visual
+feedback, not off-thread execution: receive/decrypt/decode still runs on the existing JS path,
+and native interaction acceptance must measure actual input delivery separately.
+
 ## Order of work
 
 Server first, app second, CLI third; the Hub marker rides with the server tasks. Each numbered

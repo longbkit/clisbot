@@ -23,6 +23,8 @@ export interface UseChatTranscriptResult {
   /** Fetches the page before the oldest held line; a no-op while one is in flight. */
   loadOlder: () => Promise<void>;
   isLoadingOlder: boolean;
+  /** A request may be active while accepted content remains loaded. */
+  isFetching: boolean;
 }
 
 /**
@@ -83,5 +85,5 @@ export function useChatTranscriptQuery(input: {
       };
     return query.data ? { status: "loaded" } : { status: "loading" };
   }, [online, query.data, query.error, query.isError, snapshot?.authFailureReason]);
-  return { transcript, loadState, loadOlder, isLoadingOlder };
+  return { transcript, loadState, loadOlder, isLoadingOlder, isFetching: query.isFetching };
 }

@@ -7,13 +7,46 @@ const state = vi.hoisted(() => ({
   error: null as string | null,
   transcriptError: null as string | null,
   retainAccepted: false,
+  fetching: false,
+  empty: false,
   online: true,
   epoch: 1,
   authFailure: false,
   workspaceMounts: 0,
 }));
-vi.mock("react-native", () => ({ View: "div", Text: "span" }));
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("react-native", () => ({
+  View: ({
+    children,
+    testID,
+    pointerEvents,
+    accessibilityRole,
+    accessibilityLabel,
+    ...rest
+  }: React.PropsWithChildren<{
+    testID?: string;
+    pointerEvents?: string;
+    accessibilityRole?: string;
+    accessibilityLabel?: string;
+  }>) => (
+    <div
+      {...rest}
+      data-testid={testID}
+      data-pointer-events={pointerEvents}
+      role={accessibilityRole}
+      aria-label={accessibilityLabel}
+    >
+      {children}
+    </div>
+  ),
+  Text: "span",
+}));
+vi.mock("@/components/ui/loading-spinner", () => ({
+  LoadingSpinner: () => <i data-testid="spinner" />,
+}));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: () => ({}) },
+  withUnistyles: (component: unknown) => component,
+}));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ serverId: "host", chatId: "chat" }),
@@ -56,11 +89,12 @@ vi.mock("./use-chat-record", () => ({
 }));
 vi.mock("../data/use-chat-transcript", () => ({
   useChatTranscriptQuery: () => ({
-    transcript: { messages: [{ id: "accepted-message" }] },
+    transcript: { messages: state.empty ? [] : [{ id: "accepted-message" }] },
     loadState: state.transcriptError
       ? { status: "error", message: state.transcriptError, retainAccepted: state.retainAccepted }
       : { status: "loading" },
     loadOlder: async () => {},
+    isFetching: state.fetching,
   }),
 }));
 vi.mock("./use-chat-visibility", () => ({ useChatVisibility: () => {} }));
@@ -103,6 +137,8 @@ afterEach(() => {
   state.error = null;
   state.transcriptError = null;
   state.retainAccepted = false;
+  state.fetching = false;
+  state.empty = false;
   state.online = true;
   state.epoch = 1;
   state.authFailure = false;
@@ -112,6 +148,7 @@ it("keeps the same conversation chrome through metadata loading, accepted conten
   const view = render(<ChatRoute />);
   const back = screen.getByRole("button", { name: "Back" });
   expect(screen.getByText("bots.chat.route.loading")).toBeTruthy();
+  expect(screen.getByTestId("spinner")).toBeTruthy();
   state.chat = { id: "chat", participants: [], title: "Accepted" };
   view.rerender(<ChatRoute />);
   expect(screen.getByText("accepted-message")).toBeTruthy();
@@ -158,4 +195,28 @@ it("hides accepted metadata/body on explicit current-admission authentication fa
   expect(screen.queryByText("accepted-message")).toBeNull();
   expect(screen.getByText("Authentication failed")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+});
+
+it("shows non-intercepting initial and refresh progress without replacing the accepted body or Back", () => {
+  state.chat = { id: "chat", participants: [], title: "Accepted" };
+  state.empty = true;
+  state.fetching = true;
+  const view = render(<ChatRoute />);
+  const back = screen.getByRole("button", { name: "Back" });
+  expect(screen.getByTestId("chat-initial-loading").getAttribute("data-pointer-events")).toBe(
+    "none",
+  );
+  state.empty = false;
+  view.rerender(<ChatRoute />);
+  const body = screen.getByText("accepted-message");
+  expect(screen.getByTestId("chat-refresh-loading").getAttribute("data-pointer-events")).toBe(
+    "none",
+  );
+  expect(screen.queryByTestId("chat-initial-loading")).toBeNull();
+  state.fetching = false;
+  view.rerender(<ChatRoute />);
+  expect(screen.queryByTestId("chat-refresh-loading")).toBeNull();
+  expect(screen.getByText("accepted-message")).toBe(body);
+  expect(screen.getByRole("button", { name: "Back" })).toBe(back);
+  expect(state.workspaceMounts).toBe(1);
 });
