@@ -5,6 +5,13 @@ export interface PresentedRoute {
   name: string;
   params?: object;
 }
+export interface PendingChatIntent {
+  readonly id: number;
+  readonly revision: number;
+  readonly destination: string;
+  readonly returning: boolean;
+}
+
 export interface TransitionEvent {
   target?: string;
   data: { closing: boolean };
@@ -40,14 +47,25 @@ function destinationPath(route: PresentedRoute): string {
 /** One outgoing Chat intent, bound to the requested destination BEFORE Expo queues dispatch. */
 export function createChatListPresentation() {
   interface Intent {
+    id: number;
     panel: MobilePanelSelection;
     destination: string;
     close: () => void;
     returning?: boolean;
   }
   let pending: Intent | null = null;
+  let nextIntent = 0;
+  let snapshot: PendingChatIntent | null = null;
   const listeners = new Set<() => void>();
   const publish = () => {
+    snapshot = pending
+      ? {
+          id: pending.id,
+          revision: pending.panel.revision,
+          destination: pending.destination,
+          returning: !!pending.returning,
+        }
+      : null;
     for (const listener of listeners) listener();
   };
   const appearing = new Map<string, { revision: number; identity: string }>();
@@ -90,11 +108,18 @@ export function createChatListPresentation() {
     didReturnToList() {
       if (pending?.returning) cancel();
     },
-    returnToList() {
-      if (!pending) return;
+    returnToList(expectedIntent?: number) {
+      if (!pending || (expectedIntent !== undefined && pending.id !== expectedIntent)) return false;
       pending.returning = true;
       appearing.clear();
-      // Keep the outgoing projection until /chat commits or its panel generation changes.
+      publish();
+      return true;
+    },
+    getPendingSnapshot() {
+      return snapshot;
+    },
+    isLatestIntent(id: number) {
+      return nextIntent === id;
     },
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -111,7 +136,12 @@ export function createChatListPresentation() {
     begin(panel: MobilePanelSelection, destination: string, close: () => void) {
       if (!pending) appearing.clear();
       isPending(panel);
-      const intent: Intent = { panel, destination: destination.split(/[?#]/, 1)[0]!, close };
+      const intent: Intent = {
+        id: ++nextIntent,
+        panel,
+        destination: destination.split(/[?#]/, 1)[0]!,
+        close,
+      };
       pending = intent;
       publish();
       return () => {

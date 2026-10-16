@@ -1,6 +1,7 @@
 import {
   createClientChannel,
   type EncryptedChannel,
+  type ReceiveCodec,
   type Transport as RelayTransport,
 } from "@clisbot/relay/e2ee";
 import type {
@@ -19,10 +20,16 @@ export function createRelayE2eeTransportFactory(args: {
   baseFactory: DaemonTransportFactory;
   daemonPublicKeyB64: string;
   logger: TransportLogger;
+  selectReceiveCodec?: () => Promise<ReceiveCodec | undefined>;
 }): DaemonTransportFactory {
   return (parameters) => {
     const base = args.baseFactory(parameters);
-    return createEncryptedTransport(base, args.daemonPublicKeyB64, args.logger);
+    return createEncryptedTransport(
+      base,
+      args.daemonPublicKeyB64,
+      args.logger,
+      args.selectReceiveCodec,
+    );
   };
 }
 
@@ -37,6 +44,7 @@ export function createEncryptedTransport(
   base: DaemonTransport,
   daemonPublicKeyB64: string,
   logger: TransportLogger,
+  selectReceiveCodec?: () => Promise<ReceiveCodec | undefined>,
 ): DaemonTransport {
   let channel: EncryptedChannel | null = null;
   let opened = false;
@@ -101,12 +109,19 @@ export function createEncryptedTransport(
 
   const startHandshake = async () => {
     try {
-      channel = await createClientChannel(relayTransport, daemonPublicKeyB64, {
-        onopen: emitOpen,
-        onmessage: (data) => emitMessage(data),
-        onclose: (code, reason) => emitClose({ code, reason }),
-        onerror: (error) => emitError(error),
-      });
+      const receiveCodec = selectReceiveCodec ? await selectReceiveCodec() : undefined;
+      if (closed) return;
+      channel = await createClientChannel(
+        relayTransport,
+        daemonPublicKeyB64,
+        {
+          onopen: emitOpen,
+          onmessage: (data) => emitMessage(data),
+          onclose: (code, reason) => emitClose({ code, reason }),
+          onerror: (error) => emitError(error),
+        },
+        receiveCodec,
+      );
     } catch (error) {
       logger.warn({ err: normalizeTransportError(error) }, "relay_e2ee_handshake_failed");
       emitError(error);

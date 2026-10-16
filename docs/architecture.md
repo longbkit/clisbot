@@ -204,6 +204,15 @@ The official production relay is `relay.clisbot.com:443` with TLS. It currently 
 
 See [SECURITY.md](../SECURITY.md) for the full threat model.
 
+The app can inject an optional authenticated receive codec into the existing client transport
+before channel admission. Android uses an Expo module with a dedicated serial worker and pinned
+libsodium; protocol/key agreement/nonce admission stay in `EncryptedChannel`. Web/Node and legacy
+receive keep their established implementation. The native boundary, pinned supply, exact queue
+budgets and close/reconnect semantics are documented in the
+[receive codec owner](../packages/app/modules/clisbot-receive-codec/README.md). Copies, JSON parsing
+and React/native presentation remain separate costs; moving crypto does not establish interaction
+performance.
+
 ### Clisbot Hub
 
 The optional Hub relationship is daemon-outbound and does not use the relay. Its connection,

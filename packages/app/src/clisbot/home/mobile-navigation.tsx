@@ -88,11 +88,7 @@ function Tab({
       const pending = !isWeb && nativePresentation.isPending(panels.mobilePanel);
       if (selected && !isWeb) {
         if (entry.path === "/chat" && pending) {
-          const destination = nativePresentation.getPendingDestination();
-          nativePresentation.returnToList();
-          // Peer tabs replace; a detail return keeps the retained Host deck underneath.
-          if (destination && isHomeTabPath(destination)) navigate("/chat");
-          else router.navigate("/chat");
+          returnFromPendingChat(router, navigate);
         }
         return;
       }
@@ -129,6 +125,20 @@ function Tab({
     </Pressable>
   );
 }
+/** Shared by the pending header, selected Chat tab, and the sole hardware listener. */
+export function returnFromPendingChat(
+  router: Pick<ReturnType<typeof useRouter>, "navigate">,
+  navigate: ReturnType<typeof useNavigateHomeTab>,
+  expectedIntent?: number,
+): boolean {
+  if (!nativePresentation.isPending(usePanelStore.getState().mobilePanel)) return false;
+  const destination = nativePresentation.getPendingDestination();
+  if (!nativePresentation.returnToList(expectedIntent)) return false;
+  if (destination && isHomeTabPath(destination)) navigate("/chat");
+  else router.navigate("/chat");
+  return true;
+}
+
 /**
  * Android Back. A conversation returns to its entry surface; a tab other than Home goes Home; Home
  * leaves the app. Peer tabs replace their route; details keep the existing workspace return path.
@@ -143,13 +153,7 @@ function useMobileHardwareBack(path: string, compact: boolean, departing: boolea
     if (!HOME_V2_ENABLED || !compact || (!detail && !tab && !departing)) return;
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
       const panels = usePanelStore.getState();
-      if (nativePresentation.isPending(panels.mobilePanel)) {
-        const destination = nativePresentation.getPendingDestination();
-        nativePresentation.returnToList();
-        if (destination && isHomeTabPath(destination)) navigate("/chat");
-        else router.navigate("/chat");
-        return true;
-      }
+      if (returnFromPendingChat(router, navigate)) return true;
       if (detail && panels.mobilePanel.target !== "agent") {
         panels.showMobileAgent();
         return true;

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.22)
+project(clisbot_receive_codec)
+add_library(sodium STATIC IMPORTED)
+set_target_properties(sodium PROPERTIES IMPORTED_LOCATION "${SODIUM_ROOT}/${ANDROID_ABI}/lib/libsodium.a")
+add_library(clisbot_receive_codec SHARED ../cpp/receive.cpp)
+target_include_directories(clisbot_receive_codec PRIVATE "${SODIUM_ROOT}/${ANDROID_ABI}/include")
+target_link_libraries(clisbot_receive_codec PRIVATE sodium)
+target_link_options(clisbot_receive_codec PRIVATE "-Wl,-z,max-page-size=16384")

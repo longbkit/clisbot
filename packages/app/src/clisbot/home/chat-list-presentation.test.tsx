@@ -13,6 +13,9 @@ const env = vi.hoisted(() => ({
   navigate: vi.fn(),
   replace: vi.fn(),
   showAgent: vi.fn(),
+  showList: vi.fn(),
+  native: true,
+  pendingBack: null as (() => void) | null,
   back: null as (() => boolean) | null,
 }));
 vi.mock("@/stores/panel-store", async () => {
@@ -28,7 +31,13 @@ vi.mock("@/stores/panel-store", async () => {
         },
         () => select({ mobilePanel: env.panel }),
       ),
-    { getState: () => ({ mobilePanel: env.panel, showMobileAgent: env.showAgent }) },
+    {
+      getState: () => ({
+        mobilePanel: env.panel,
+        showMobileAgent: env.showAgent,
+        showMobileAgentList: env.showList,
+      }),
+    },
   );
   return { usePanelStore };
 });
@@ -44,7 +53,12 @@ vi.mock("@/components/headers/header-back-button", () => ({ HeaderBackButton: ()
 vi.mock("@/components/ui/status-badge", () => ({ StatusBadge: () => null }));
 vi.mock("@/mobile-panels/provider", () => ({ useIsMobilePanelActive: () => env.listActive }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
-vi.mock("@/constants/platform", () => ({ isWeb: false }));
+vi.mock("@/constants/platform", () => ({
+  isWeb: false,
+  get isNative() {
+    return env.native;
+  },
+}));
 vi.mock("./feature", () => ({ HOME_V2_ENABLED: true }));
 vi.mock("./inbox-activity", () => ({
   useInboxActivity: () => ({ needs: 0 }),
@@ -106,6 +120,18 @@ vi.mock("react-native", () => ({
     exitApp: vi.fn(),
   },
 }));
+vi.mock("@/components/headers/compact-header", () => ({
+  CompactHeader: ({ onBack }: { onBack: () => void }) => {
+    env.pendingBack = onBack;
+    return (
+      <button type="button" onClick={onBack}>
+        Pending Back
+      </button>
+    );
+  },
+}));
+vi.mock("@/components/ui/loading-spinner", () => ({ LoadingSpinner: () => <span>Loading</span> }));
+import { PendingChatPresentation } from "./pending-chat-presentation";
 import { nativePresentation } from "./chat-list-presentation";
 import { MobileChatPanelTabs, MobileHomeTabs } from "./mobile-navigation";
 import { startNativeInputTracing } from "@/performance/native-trace";
@@ -149,6 +175,7 @@ function Page() {
 beforeEach(() => {
   vi.stubGlobal("React", React);
   env.path = "/chat";
+  env.native = true;
   env.compact = true;
   env.listActive = true;
   env.panelVisible = true;
@@ -349,5 +376,178 @@ it.each(["selected Chat", "hardware Back"])(
       );
     });
     expect(env.showAgent).not.toHaveBeenCalled();
+  },
+);
+
+it("presents Back/loading on admitted intent, preserves the source draft, and cancels late appearance", () => {
+  const close = vi.fn();
+  const view = render(
+    <PendingChatPresentation>
+      <input aria-label="retained draft" defaultValue="keep" />
+    </PendingChatPresentation>,
+  );
+  const input = screen.getByLabelText("retained draft");
+  act(() => {
+    nativePresentation.begin(env.panel as { target: "agent-list"; revision: number }, path, close);
+  });
+  expect(screen.getByTestId("pending-chat-presentation")).toBeTruthy();
+  expect(screen.getByText("Loading")).toBeTruthy();
+  expect(screen.getByLabelText("retained draft")).toBe(input);
+  fireEvent.click(screen.getByRole("button", { name: "Pending Back" }));
+  expect(env.navigate).toHaveBeenCalledWith("/chat");
+  expect(screen.queryByTestId("pending-chat-presentation")).toBeNull();
+  act(() => {
+    nativePresentation.transitionStart(
+      appear,
+      leaf,
+      env.panel as { target: "agent-list"; revision: number },
+    );
+    nativePresentation.transitionEnd(
+      appear,
+      leaf,
+      env.panel as { target: "agent-list"; revision: number },
+    );
+  });
+  expect(close).not.toHaveBeenCalled();
+  view.unmount();
+});
+
+it("does not let a stale pending Back action cancel a newer same-panel intent", () => {
+  const a = nativePresentation.begin(
+    env.panel as { target: "agent-list"; revision: number },
+    path,
+    vi.fn(),
+  );
+  const first = nativePresentation.getPendingSnapshot()!;
+  nativePresentation.begin(
+    env.panel as { target: "agent-list"; revision: number },
+    "/h/host/chat/b",
+    vi.fn(),
+  );
+  const second = nativePresentation.getPendingSnapshot()!;
+  expect(second.id).not.toBe(first.id);
+  expect(nativePresentation.returnToList(first.id)).toBe(false);
+  a();
+  expect(nativePresentation.getPendingSnapshot()).toBe(second);
+  expect(second.returning).toBe(false);
+});
+
+it("keeps the final visible shell until native panel hiding and lets its Back act", () => {
+  const view = render(
+    <PendingChatPresentation>
+      <span>Source</span>
+    </PendingChatPresentation>,
+  );
+  act(() => {
+    nativePresentation.begin(env.panel as { target: "agent-list"; revision: number }, path, () => {
+      env.panel = { target: "agent", revision: 2 };
+      for (const listener of env.listeners) listener();
+    });
+  });
+  env.path = path;
+  view.rerender(
+    <PendingChatPresentation>
+      <span>Source</span>
+    </PendingChatPresentation>,
+  );
+  act(() => {
+    nativePresentation.transitionStart(
+      appear,
+      leaf,
+      env.panel as { target: "agent-list"; revision: number },
+    );
+    nativePresentation.transitionEnd(
+      appear,
+      leaf,
+      env.panel as { target: "agent-list"; revision: number },
+    );
+  });
+  expect(nativePresentation.getPendingSnapshot()).toBeNull();
+  expect(screen.getByTestId("pending-chat-presentation")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Pending Back" }));
+  expect(env.showList).toHaveBeenCalledTimes(1);
+  expect(env.navigate).toHaveBeenCalledWith("/chat");
+  env.listActive = false;
+  view.rerender(
+    <PendingChatPresentation>
+      <span>Source</span>
+    </PendingChatPresentation>,
+  );
+  expect(screen.queryByTestId("pending-chat-presentation")).toBeNull();
+});
+
+it("does not add a pending shell to web or a different overlay generation", () => {
+  env.native = false;
+  act(() => {
+    nativePresentation.begin(
+      env.panel as { target: "agent-list"; revision: number },
+      path,
+      vi.fn(),
+    );
+  });
+  const view = render(
+    <PendingChatPresentation>
+      <span>Source</span>
+    </PendingChatPresentation>,
+  );
+  expect(screen.queryByTestId("pending-chat-presentation")).toBeNull();
+  env.native = true;
+  env.panel = { target: "file-explorer", revision: 2 };
+  env.listActive = false;
+  view.rerender(
+    <PendingChatPresentation>
+      <span>Source</span>
+    </PendingChatPresentation>,
+  );
+  expect(screen.queryByTestId("pending-chat-presentation")).toBeNull();
+});
+
+it.each(["/settings", "/open-project"])(
+  "rejects a queued completed-shell Back after newer global %s commits",
+  (globalPath) => {
+    const view = render(
+      <PendingChatPresentation>
+        <span>Source</span>
+      </PendingChatPresentation>,
+    );
+    act(() => {
+      nativePresentation.begin(
+        env.panel as { target: "agent-list"; revision: number },
+        path,
+        () => {
+          env.panel = { target: "agent", revision: 2 };
+          for (const listener of env.listeners) listener();
+        },
+      );
+    });
+    env.path = path;
+    view.rerender(
+      <PendingChatPresentation>
+        <span>Source</span>
+      </PendingChatPresentation>,
+    );
+    act(() => {
+      nativePresentation.transitionStart(
+        appear,
+        leaf,
+        env.panel as { target: "agent-list"; revision: number },
+      );
+      nativePresentation.transitionEnd(
+        appear,
+        leaf,
+        env.panel as { target: "agent-list"; revision: number },
+      );
+    });
+    const queuedBack = env.pendingBack!;
+    expect(nativePresentation.getPendingSnapshot()).toBeNull();
+    env.path = globalPath;
+    view.rerender(
+      <PendingChatPresentation>
+        <span>Source</span>
+      </PendingChatPresentation>,
+    );
+    act(queuedBack);
+    expect(env.showList).not.toHaveBeenCalled();
+    expect(env.navigate).not.toHaveBeenCalled();
   },
 );

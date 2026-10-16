@@ -9,3 +9,5 @@ export {
   importSecretKey,
 } from "./crypto.js";
 export type { KeyPair, SharedKey } from "./crypto.js";
+
+export type { ReceiveCodec } from "./receive-codec.js";

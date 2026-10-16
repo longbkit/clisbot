@@ -18,6 +18,12 @@ import {
 } from "./crypto.js";
 import { arrayBufferToBase64, base64ToArrayBuffer } from "./base64.js";
 import { ChannelNonces } from "./channel-nonce.js";
+import {
+  RECEIVE_FRAME_BYTES,
+  RECEIVE_QUEUE_BYTES,
+  RECEIVE_QUEUE_FRAMES,
+  type ReceiveCodec,
+} from "./receive-codec.js";
 
 export interface Transport {
   send(data: string | ArrayBuffer): void | Promise<void>;
@@ -50,6 +56,7 @@ interface EncryptedChannelOptions {
    * (e.g., it didn't observe the daemon's `{type:"e2ee_ready"}` yet). In that case,
    * the daemon should re-send `{type:"e2ee_ready"}` without changing keys.
    */
+  receiveCodec?: ReceiveCodec;
   daemonKeyPair?: KeyPair;
   binaryCiphertext?: boolean;
 }
@@ -158,12 +165,13 @@ export async function createClientChannel(
   transport: Transport,
   daemonPublicKeyB64: string,
   events: EncryptedChannelEvents = {},
+  receiveCodec?: ReceiveCodec,
 ): Promise<EncryptedChannel> {
   const keyPair = generateKeyPair();
   const daemonPublicKey = importPublicKey(daemonPublicKeyB64);
   const sharedKey = deriveSharedKey(keyPair.secretKey, daemonPublicKey);
 
-  const channel = new EncryptedChannel(transport, sharedKey, events);
+  const channel = new EncryptedChannel(transport, sharedKey, events, { receiveCodec });
 
   // Send e2ee_hello with our public key
   const ourPublicKeyB64 = exportPublicKey(keyPair.publicKey);
@@ -346,6 +354,10 @@ export class EncryptedChannel {
   private events: EncryptedChannelEvents;
   private options: EncryptedChannelOptions;
   private pendingSends: Array<string | ArrayBuffer> = [];
+  private receiveQueue: Array<{ message: TransportMessage; bytes: number }> = [];
+  private readonly receiveLifetime = new AbortController();
+  private receiveBytes = 0;
+  private receiving = false;
   private onOpenCallbacks: Array<() => void> = [];
   private onCloseCallbacks: Array<() => void> = [];
 
@@ -361,9 +373,9 @@ export class EncryptedChannel {
     this.options = options;
 
     Object.assign(transport, {
-      onmessage: (message: TransportMessage) => this.handleMessage(message),
+      onmessage: (message: TransportMessage) => this.receive(message),
       onclose: (code: number, reason: string) => {
-        this.state = "closed";
+        this.setState("closed");
         this.events.onclose?.(code, reason);
         for (const cb of this.onCloseCallbacks) cb();
       },
@@ -375,6 +387,60 @@ export class EncryptedChannel {
 
   setState(state: ChannelState): void {
     this.state = state;
+    if (state === "closed") {
+      this.receiveLifetime.abort();
+      this.clearReceiveQueue();
+    }
+  }
+
+  private clearReceiveQueue(): void {
+    this.receiveQueue = [];
+    this.receiveBytes = 0;
+  }
+
+  private receive(message: TransportMessage): void {
+    // Legacy and default web/Node channels retain their existing receive implementation.
+    if (!this.options.receiveCodec || !this.options.binaryCiphertext || this.state !== "open") {
+      void this.handleMessage(message);
+      return;
+    }
+    const wireBytes =
+      typeof message.data === "string" ? message.data.length : message.data.byteLength;
+    const bytes = typeof message.data === "string" ? wireBytes * 2 : wireBytes;
+    if (
+      wireBytes > RECEIVE_FRAME_BYTES ||
+      this.receiveBytes + bytes > RECEIVE_QUEUE_BYTES ||
+      this.receiveQueue.length + Number(this.receiving) >= RECEIVE_QUEUE_FRAMES
+    ) {
+      this.close(1011, "Encrypted receive capacity reached; reconnect");
+      return;
+    }
+    // Binary input ownership transfers at admission; caller mutation cannot change queued MAC input.
+    this.receiveQueue.push({
+      message: {
+        ...message,
+        data: typeof message.data === "string" ? message.data : message.data.slice(0),
+      },
+      bytes,
+    });
+    this.receiveBytes += bytes;
+    if (!this.receiving) void this.drainReceiveQueue();
+  }
+
+  private async drainReceiveQueue(): Promise<void> {
+    this.receiving = true;
+    try {
+      while (this.state === "open") {
+        const entry = this.receiveQueue.shift();
+        if (!entry) break;
+        await this.handleMessage(entry.message);
+        // A close clears accounting and poisons the entire queue, including this in-flight result.
+        if (this.state === "open") this.receiveBytes -= entry.bytes;
+      }
+    } finally {
+      this.receiving = false;
+      if (this.state === "closed") this.clearReceiveQueue();
+    }
   }
 
   private async handleMessage(message: TransportMessage): Promise<void> {
@@ -436,6 +502,24 @@ export class EncryptedChannel {
           }
           // Otherwise ignore JSON parse/TextDecoder failures and fall back to
           // decoding ciphertext below.
+        }
+
+        if (this.options.binaryCiphertext && this.options.receiveCodec) {
+          const frame = message.isBinary
+            ? requireArrayBuffer(message.data)
+            : decodeTransportText(message.data);
+          const opened = await this.options.receiveCodec.open(
+            this.sharedKey,
+            frame,
+            message.isBinary,
+            this.receiveLifetime.signal,
+          );
+          if (this.state !== "open") return null;
+          // Codec must authenticate before returning this nonce. Replay authority remains here.
+          if (opened.nonce.byteLength !== 24) throw new Error("Invalid authenticated nonce");
+          this.nonces.acceptAuthenticated(opened.nonce);
+          if (this.state === "open") this.events.onmessage?.(opened.plaintext);
+          return null;
         }
 
         if (this.options.binaryCiphertext) {
@@ -543,12 +627,12 @@ export class EncryptedChannel {
   }
 
   private rejectKeyRotation(): void {
-    this.state = "closed";
+    this.setState("closed");
     this.transport.close(REHANDSHAKE_REJECTION_CODE, REHANDSHAKE_KEY_MISMATCH_CLOSE_REASON);
   }
 
   close(code = 1000, reason = "Normal closure"): void {
-    this.state = "closed";
+    this.setState("closed");
     this.transport.close(code, reason);
   }
 

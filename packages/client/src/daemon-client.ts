@@ -411,6 +411,7 @@ export interface DaemonClientConfig {
   localCredential?: () => string | undefined | Promise<string | undefined>;
   authHeader?: string;
   suppressSendErrors?: boolean;
+  selectReceiveCodec?: () => Promise<import("@clisbot/relay/e2ee").ReceiveCodec | undefined>;
   transportFactory?: DaemonTransportFactory;
   webSocketFactory?: WebSocketFactory;
   logger?: Logger;
@@ -1472,6 +1473,7 @@ export class DaemonClient {
         }
         transportFactory = createRelayE2eeTransportFactory({
           baseFactory: transportFactory,
+          selectReceiveCodec: this.config.selectReceiveCodec,
           daemonPublicKeyB64,
           logger: this.logger,
         });

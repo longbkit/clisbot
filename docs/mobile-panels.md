@@ -19,6 +19,18 @@ terminal's swipe-right and the sidebar's close button are off. If `agent-list` s
 closed while `/chat` is focused, the route goes Home rather than leave an empty page. See [Home and Inbox](features/home-and-inbox/README.md) for the page layout,
 startup, Quick starts and rollback.
 
+For native detail admission, that same outgoing panel projects the existing navigation intent as
+shared compact Back chrome and centered loading. The source list stays mounted, with its geometry
+and draft/selection intact, but is excluded from touch and accessibility while covered. No second
+route, transcript cache or loading state machine is created. The intent snapshot identifies each
+admission even when two destinations use the same panel revision. Header, hardware and selected
+Chat Back reuse the existing return branch; returning publishes immediately and late appearance
+cannot close the returned list. The last visible shell remains usable through the panel-hide
+boundary, but an old callback cannot override a newer intent, panel generation or committed global
+route. Desktop/web and peer-tab presentation are unchanged. The destination's authoritative cached
+body remains owned by its existing screen/store; a shell commit alone is not usable-content or
+Back-latency acceptance, and JS/render work can still delay input.
+
 Native Chat departures (including Home/Inbox/Automations) keep the outgoing panel until the
 requested focused native leaf appears. A queued newer destination or return to Chat invalidates
 an older completion; peer returns retain replace semantics while detail returns preserve the Host

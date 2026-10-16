@@ -1,3 +1,4 @@
+import { PendingChatPresentation } from "@/clisbot/home/pending-chat-presentation";
 import { MobileToolbar } from "@/clisbot/home/mobile-toolbar";
 import { MobileChatPanelTabs } from "@/clisbot/home/mobile-navigation";
 import { SidebarDirectoryStatus } from "@/components/sidebar/sidebar-directory-status";
@@ -352,87 +353,89 @@ function MobileSidebar({
       closeGesture={closeGesture}
       panelStyle={mobileSidebarInsetStyle}
     >
-      <View style={styles.sidebarContent} pointerEvents="auto">
-        <WindowChromeSafeArea placement="below" />
-        {HOME_V2_ENABLED ? (
-          <MobileToolbar />
-        ) : (
-          <SidebarNavGroup
-            style={styles.sidebarHeaderGroup}
-            rows={false}
-            onBeforeNavigate={closeSidebar}
-          />
-        )}
-        {HOME_V2_ENABLED ? null : (
-          <WindowChromeSafeArea
-            pointerEvents="box-none"
-            placement="inline"
-            style={styles.mobileCloseButtonRow}
-          >
-            <Pressable
-              style={styles.mobileCloseButton}
-              onPress={closeSidebar}
-              testID="sidebar-close"
-              nativeID="sidebar-close"
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={labels.closeSidebar}
-              hitSlop={8}
+      <PendingChatPresentation>
+        <View style={styles.sidebarContent} pointerEvents="auto">
+          <WindowChromeSafeArea placement="below" />
+          {HOME_V2_ENABLED ? (
+            <MobileToolbar />
+          ) : (
+            <SidebarNavGroup
+              style={styles.sidebarHeaderGroup}
+              rows={false}
+              onBeforeNavigate={closeSidebar}
+            />
+          )}
+          {HOME_V2_ENABLED ? null : (
+            <WindowChromeSafeArea
+              pointerEvents="box-none"
+              placement="inline"
+              style={styles.mobileCloseButtonRow}
             >
-              {({ hovered, pressed }) => (
-                <X
-                  size={theme.iconSize.md}
-                  color={
-                    hovered || pressed ? theme.colors.foreground : theme.colors.foregroundMuted
-                  }
-                />
-              )}
-            </Pressable>
-          </WindowChromeSafeArea>
-        )}
+              <Pressable
+                style={styles.mobileCloseButton}
+                onPress={closeSidebar}
+                testID="sidebar-close"
+                nativeID="sidebar-close"
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={labels.closeSidebar}
+                hitSlop={8}
+              >
+                {({ hovered, pressed }) => (
+                  <X
+                    size={theme.iconSize.md}
+                    color={
+                      hovered || pressed ? theme.colors.foreground : theme.colors.foregroundMuted
+                    }
+                  />
+                )}
+              </Pressable>
+            </WindowChromeSafeArea>
+          )}
 
-        <SidebarMetadataNotice />
-        {isInitialLoad && (HOME_V2_ENABLED || !hasActiveHostFilter) ? (
-          <SidebarAgentListSkeleton />
-        ) : (
-          <SidebarWorkspaceList
-            collapsedProjectKeys={collapsedProjectKeys}
-            onToggleProjectCollapsed={toggleProjectCollapsed}
-            shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-            groupMode={groupMode}
-            workspaceGroups={workspaceGroups}
-            projectIconTargets={projectIconTargets}
-            pinnedGroups={pinnedGroups}
-            projects={projects}
-            hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-            hasActiveProjectFilter={hasActiveProjectFilter}
-            workspaceEntriesByKey={workspaceEntriesByKey}
-            isRefreshing={isManualRefresh && isRevalidating}
-            onRefresh={handleRefresh}
-            onWorkspacePress={handleWorkspacePress}
-            onAddProject={handleOpenProject}
-            onImportSession={handleImportSession}
-            parentGestureRef={closeGestureRef}
-            dragGestureHostActive={active}
-            listLeadingComponent={botsAndChatsSections}
-            listHeaderComponent={workspacesSectionHeaderElement}
-          />
-        )}
+          <SidebarMetadataNotice />
+          {isInitialLoad && (HOME_V2_ENABLED || !hasActiveHostFilter) ? (
+            <SidebarAgentListSkeleton />
+          ) : (
+            <SidebarWorkspaceList
+              collapsedProjectKeys={collapsedProjectKeys}
+              onToggleProjectCollapsed={toggleProjectCollapsed}
+              shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+              groupMode={groupMode}
+              workspaceGroups={workspaceGroups}
+              projectIconTargets={projectIconTargets}
+              pinnedGroups={pinnedGroups}
+              projects={projects}
+              hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+              hasActiveProjectFilter={hasActiveProjectFilter}
+              workspaceEntriesByKey={workspaceEntriesByKey}
+              isRefreshing={isManualRefresh && isRevalidating}
+              onRefresh={handleRefresh}
+              onWorkspacePress={handleWorkspacePress}
+              onAddProject={handleOpenProject}
+              onImportSession={handleImportSession}
+              parentGestureRef={closeGestureRef}
+              dragGestureHostActive={active}
+              listLeadingComponent={botsAndChatsSections}
+              listHeaderComponent={workspacesSectionHeaderElement}
+            />
+          )}
 
-        {HOME_V2_ENABLED ? (
-          <MobileChatPanelTabs />
-        ) : (
-          <SidebarFooter
-            handleOpenProject={handleOpenProject}
-            handleImportSession={handleImportSession}
-            handleSettings={handleSettings}
-            labels={labels}
-            handleAddHost={handleAddHost}
-            handleOpenHostSettings={handleOpenHostSettings}
-            onBeforeNavigate={closeSidebar}
-          />
-        )}
-      </View>
+          {HOME_V2_ENABLED ? (
+            <MobileChatPanelTabs />
+          ) : (
+            <SidebarFooter
+              handleOpenProject={handleOpenProject}
+              handleImportSession={handleImportSession}
+              handleSettings={handleSettings}
+              labels={labels}
+              handleAddHost={handleAddHost}
+              handleOpenHostSettings={handleOpenHostSettings}
+              onBeforeNavigate={closeSidebar}
+            />
+          )}
+        </View>
+      </PendingChatPresentation>
     </MobilePanelOverlay>
   );
 }

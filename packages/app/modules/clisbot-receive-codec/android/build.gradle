@@ -1,0 +1,35 @@
+apply plugin: 'com.android.library'
+group = 'sh.clisbot.receivecodec'
+version = '0.1.0'
+apply from: new File(project(":expo-modules-core").projectDir, "ExpoModulesCorePlugin.gradle")
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()
+
+def sodiumRoot = new File(buildDir, "sodium")
+def selectedAbis = (findProperty("reactNativeArchitectures") ?: "arm64-v8a,armeabi-v7a,x86,x86_64").toString()
+android {
+  namespace "sh.clisbot.receivecodec"
+  ndkVersion rootProject.ext.ndkVersion
+  defaultConfig {
+    ndk { abiFilters(*selectedAbis.split(',')) }
+    externalNativeBuild {
+      cmake {
+        arguments "-DSODIUM_ROOT=${sodiumRoot.absolutePath}"
+        cppFlags "-std=c++17 -O2 -fexceptions"
+      }
+    }
+  }
+  externalNativeBuild { cmake { path "CMakeLists.txt" } }
+}
+dependencies { testImplementation 'junit:junit:4.13.2' }
+def prepareSodium = tasks.register("prepareSodium", Exec) {
+  inputs.files("../scripts/build-sodium.py")
+  inputs.property("abis", selectedAbis)
+  outputs.dir(sodiumRoot)
+  commandLine "python3", file("../scripts/build-sodium.py"), "--ndk", android.ndkDirectory,
+    "--output", sodiumRoot, "--abis", selectedAbis
+}
+tasks.configureEach { task ->
+  if (task.name.startsWith("configureCMake") || task.name.startsWith("buildCMake")) task.dependsOn(prepareSodium)
+}

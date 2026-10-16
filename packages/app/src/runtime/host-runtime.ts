@@ -113,6 +113,7 @@ import { projectIconCache } from "@/projects/icon-cache";
 import { nativePerformanceTrace } from "@/performance/native-trace";
 import { revokePushNotifications } from "@/push-notifications";
 import { createAppWebSocketFactory } from "./websocket-factory";
+import { selectReceiveCodec } from "./encrypted-receive";
 
 export type HostRuntimeConnectionStatus = "idle" | "connecting" | "online" | "offline" | "error";
 export type PairingNavigationTarget = "openProject" | "hostRoot" | "hostSettings";
@@ -636,6 +637,7 @@ function createDefaultDeps(
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const base = {
+        selectReceiveCodec,
         ...(host.devicePairing
           ? {
               resolveDeviceAccess: () => resolveHostDeviceAccess(host, connection),
