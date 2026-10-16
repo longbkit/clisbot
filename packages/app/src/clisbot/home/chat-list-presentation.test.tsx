@@ -82,6 +82,7 @@ vi.mock("react-native-unistyles", () => ({
   withUnistyles: (c: unknown) => c,
 }));
 vi.mock("react-native", () => ({
+  Platform: { OS: "android" },
   View: ({ children, testID }: React.PropsWithChildren<{ testID?: string }>) => (
     <div data-testid={testID}>{children}</div>
   ),

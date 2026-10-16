@@ -1,4 +1,5 @@
 import { useStableEvent } from "@/hooks/use-stable-event";
+import { profileNativeRegion } from "@/utils/render-profiler";
 import { useChatTurnHeartbeats } from "@/clisbot/heartbeats/use-chat-turn-heartbeats";
 import { useChatKeyboardDismiss } from "./use-chat-keyboard-dismiss";
 import { useChatScrollPosition } from "./use-chat-scroll-position";
@@ -76,15 +77,18 @@ export const ChatList = memo(function ChatList({
       const closesGroup = chatRowSender(next) !== chatRowSender(item);
       return (
         <View style={styles.row}>
-          <ChatRowView
-            row={item}
-            serverId={serverId}
-            bots={bots}
-            members={members}
-            closesGroup={closesGroup}
-            heartbeatIds={item.kind === "bot" ? heartbeatsByLine.get(item.line.id) : undefined}
-            toolDisplay={toolDisplay}
-          />
+          {profileNativeRegion(
+            `BotChatRow:${item.kind}`,
+            <ChatRowView
+              row={item}
+              serverId={serverId}
+              bots={bots}
+              members={members}
+              closesGroup={closesGroup}
+              heartbeatIds={item.kind === "bot" ? heartbeatsByLine.get(item.line.id) : undefined}
+              toolDisplay={toolDisplay}
+            />,
+          )}
         </View>
       );
     },

@@ -1,4 +1,5 @@
 import type { MessagePayload } from "@/composer/types";
+import { profileNativeRegion } from "@/utils/render-profiler";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { ComposerDock } from "@/composer/dock";
 import { useMemo, type ReactNode } from "react";
@@ -70,15 +71,18 @@ export function ChatScreen({
       {!hideHeader ? <MenuHeader title={title} rightContent={headerRight} /> : null}
       <ComposerDock>
         <ToolCallSheetProvider>
-          <ChatList
-            scrollKey={`${serverId}:${chatId}`}
-            rows={model.rows}
-            serverId={serverId}
-            bots={botsById}
-            members={members}
-            onReachTop={onReachTop}
-            toolDisplay={toolDisplay}
-          />
+          {profileNativeRegion(
+            "BotChatHistory",
+            <ChatList
+              scrollKey={`${serverId}:${chatId}`}
+              rows={model.rows}
+              serverId={serverId}
+              bots={botsById}
+              members={members}
+              onReachTop={onReachTop}
+              toolDisplay={toolDisplay}
+            />,
+          )}
         </ToolCallSheetProvider>
         <ChatComposer
           serverId={serverId}

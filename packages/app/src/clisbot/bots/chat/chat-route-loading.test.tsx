@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   workspaceMounts: 0,
 }));
 vi.mock("react-native", () => ({
+  Platform: { OS: "web" },
   View: ({
     children,
     testID,

@@ -1,4 +1,5 @@
 import { MenuHeader } from "@/components/headers/menu-header";
+import { profileNativeRegion } from "@/utils/render-profiler";
 import { traceConversationPhase } from "@/performance/conversation-trace";
 import { ChatToolsContext, useChatToolsValue } from "@/clisbot/connectors/chat-tools";
 import { useSessionStore } from "@/stores/session-store";
@@ -38,14 +39,17 @@ import { conversationToolDisplay } from "./tool-activity";
 import { useChatToolActivityHeaderValue } from "./use-chat-tool-activity-header";
 import { ChatToolActivityHeaderContext } from "./tool-activity-context";
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
-const loadingColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const loadingColor = (theme: Theme) => ({
+  color: theme.colors.foregroundMuted,
+});
 const EMPTY_PARTICIPANTS: ChatPayload["participants"] = [];
 
 export default function ChatRoute() {
-  return (
+  return profileNativeRegion(
+    "BotChatRoute",
     <HostRouteBootstrapBoundary>
       <Gate />
-    </HostRouteBootstrapBoundary>
+    </HostRouteBootstrapBoundary>,
   );
 }
 function Gate() {
@@ -92,7 +96,11 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     key,
     acceptedChatRecord(catalog.chats, serverId, chatId),
   );
-  const transcript = useChatTranscriptQuery({ serverId, chatId, runtime: botsRuntime });
+  const transcript = useChatTranscriptQuery({
+    serverId,
+    chatId,
+    runtime: botsRuntime,
+  });
   useChatVisibility(serverId, chatId, chat, focused);
   const heads = useChatLiveHeads(serverId, chat?.participants ?? EMPTY_PARTICIPANTS);
   const { botRows, identities, workspaceByBotId } = useChatIdentities(
@@ -119,8 +127,19 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const group = chat ? isGroupChat(chat) : false;
   const working = group && [...heads.values()].some((head) => head.turnActive);
   // Clisbot Connectors: the Chat's own tools off list, for the composer's Tools chip.
-  const chatTools = useChatToolsValue({ serverId, chat, bots: identities, group, client });
-  const headingActions = useChatHeadingActions({ chat, serverId, botRows, workspaceByBotId });
+  const chatTools = useChatToolsValue({
+    serverId,
+    chat,
+    bots: identities,
+    group,
+    client,
+  });
+  const headingActions = useChatHeadingActions({
+    chat,
+    serverId,
+    botRows,
+    workspaceByBotId,
+  });
   // Clisbot: a direct chat shows tool calls as its Bot says, a group as the group says.
   const directBot = !group ? botRows.find((b) => b.id === chat?.participants[0]?.botId) : undefined;
   const toolDisplay = conversationToolDisplay(chat, group, directBot);
@@ -158,33 +177,39 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
       {!online ? <Text style={styles.error}>{t("bots.chat.route.offline")}</Text> : null}
       <ChatToolsContext.Provider value={chatTools}>
         <ChatToolActivityHeaderContext.Provider value={toolActivityHeader}>
-          <ConversationWorkspace
-            group={group}
-            serverId={serverId}
-            chatId={chatId}
-            accessScope={principalScope}
-            title={title}
-            bots={identities}
-            headerActions={options}
-            headingActions={headingActions}
-          >
-            <ChatRouteBody chat={chat} online={online} error={error} transcript={transcript}>
-              <ChatScreen
-                hideHeader
-                serverId={serverId}
-                chatId={chatId}
-                title={title}
-                bots={identities}
-                group={group}
-                transcript={transcript.transcript.messages}
-                liveHeads={heads}
-                canSend={online && !sending}
-                onSubmitMessage={send}
-                onReachTop={reachTop}
-                toolDisplay={toolDisplay}
-              />
-            </ChatRouteBody>
-          </ConversationWorkspace>
+          {profileNativeRegion(
+            "BotConversationWorkspace",
+            <ConversationWorkspace
+              group={group}
+              serverId={serverId}
+              chatId={chatId}
+              accessScope={principalScope}
+              title={title}
+              bots={identities}
+              headerActions={options}
+              headingActions={headingActions}
+            >
+              <ChatRouteBody chat={chat} online={online} error={error} transcript={transcript}>
+                {profileNativeRegion(
+                  "BotChatScreen",
+                  <ChatScreen
+                    hideHeader
+                    serverId={serverId}
+                    chatId={chatId}
+                    title={title}
+                    bots={identities}
+                    group={group}
+                    transcript={transcript.transcript.messages}
+                    liveHeads={heads}
+                    canSend={online && !sending}
+                    onSubmitMessage={send}
+                    onReachTop={reachTop}
+                    toolDisplay={toolDisplay}
+                  />,
+                )}
+              </ChatRouteBody>
+            </ConversationWorkspace>,
+          )}
         </ChatToolActivityHeaderContext.Provider>
       </ChatToolsContext.Provider>
     </View>

@@ -242,7 +242,11 @@ The explicit combination `APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 CLISBO
 selects that installed optimized profiling renderer on Android only, with a separate Metro cache
 version. Ordinary production, web and Electron resolution stays unchanged; do not edit `node_modules`.
 The existing `RenderProfile` collector then records at most 4096 samples and bounded render reasons,
-including coarse root, navigator, sidebar, Home and workspace/explorer regions. Nested durations
+including coarse root, navigator, sidebar, Home and workspace/explorer regions. Bot conversations
+also expose route, workspace, screen, history and row-kind boundaries, while pending Chat presentation
+separates its shell from the retained list. Labels contain no Host, conversation or message identity.
+Row-kind samples may share a label within one commit; retain their separate samples rather than
+mistaking the label for a unique component. Nested durations
 overlap: these are inclusive render wall times, not additive self CPU or native presentation times.
 
 Only this diagnostic package (`com.clisbot.app.dev`) can consume external-files commands from

@@ -12,9 +12,12 @@ import { nativePresentation, type PendingChatIntent } from "./chat-list-presenta
 import { useIsChatListDeparting } from "./use-chat-list-departure";
 import { returnFromPendingChat, useNavigateHomeTab, isHomeTabPath } from "./mobile-navigation";
 import { HOME_V2_ENABLED } from "./feature";
+import { profileNativeRegion } from "@/utils/render-profiler";
 
 const Spinner = withUnistyles(LoadingSpinner);
-const spinnerColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const spinnerColor = (theme: Theme) => ({
+  color: theme.colors.foregroundMuted,
+});
 
 /** Projection of the navigation owner's admitted intent, not another route/data owner. */
 export function PendingChatPresentation({ children }: { children: ReactNode }) {
@@ -80,18 +83,21 @@ export function PendingChatPresentation({ children }: { children: ReactNode }) {
       >
         {children}
       </View>
-      {intent ? (
-        <View style={styles.pending} testID="pending-chat-presentation">
-          <CompactHeader navigation="back" onBack={back} title={t("bots.chat.route.loading")} />
-          <View
-            style={styles.loading}
-            accessibilityRole="progressbar"
-            accessibilityLabel={t("bots.chat.route.loading")}
-          >
-            <Spinner size="large" uniProps={spinnerColor} />
-          </View>
-        </View>
-      ) : null}
+      {intent
+        ? profileNativeRegion(
+            "PendingChatShell",
+            <View style={styles.pending} testID="pending-chat-presentation">
+              <CompactHeader navigation="back" onBack={back} title={t("bots.chat.route.loading")} />
+              <View
+                style={styles.loading}
+                accessibilityRole="progressbar"
+                accessibilityLabel={t("bots.chat.route.loading")}
+              >
+                <Spinner size="large" uniProps={spinnerColor} />
+              </View>
+            </View>,
+          )
+        : null}
     </View>
   );
 }
@@ -99,6 +105,9 @@ export function PendingChatPresentation({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create((theme) => ({
   root: { flex: 1 },
   covered: { flex: 1, opacity: 0 },
-  pending: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.colors.surface0 },
+  pending: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.surface0,
+  },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
 }));
