@@ -1,3 +1,4 @@
+import { useResourcePrincipalScope } from "../data/resource-principal-scope";
 import { useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { shallow } from "zustand/shallow";
@@ -8,7 +9,7 @@ import { useSidebarModel } from "@/components/sidebar/sidebar-model";
 import { useBotCatalog } from "../data/runtime";
 import { useBotSidebarActions } from "./use-sidebar-actions";
 import { useResourcePins } from "./pins";
-import { buildPinnedRows } from "./pinned-row-model";
+import { createPinnedRowsProjector } from "./pinned-row-model";
 export type { PinRow } from "./pinned-row-model";
 const EMPTY_ROWS = [] as const;
 type Session = ReturnType<typeof useSessionStore.getState>["sessions"][string];
@@ -62,6 +63,8 @@ export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void)
   const botRows = bots.loadState.status === "loaded" ? bots.loadState.data : EMPTY_ROWS;
   const chatRows = chats.loadState.status === "loaded" ? chats.loadState.data : EMPTY_ROWS;
   const { pins, toggle } = useResourcePins(chatRows);
+  const scope = useResourcePrincipalScope();
+  const projectRows = useMemo(createPinnedRowsProjector, []);
   const { openBot, error } = useBotSidebarActions(
     chatRows,
     onBeforeNavigate,
@@ -70,7 +73,7 @@ export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void)
   const nativeOrder = useSidebarOrderStore((state) => state.pinnedWorkspaceOrder);
   const rows = useMemo(
     () =>
-      buildPinnedRows({
+      projectRows(scope, {
         pins,
         bots: botRows,
         chats: chatRows,
@@ -83,6 +86,8 @@ export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void)
         unavailableChats,
       }),
     [
+      projectRows,
+      scope,
       pins,
       botRows,
       chatRows,
@@ -105,24 +110,27 @@ function useUnavailableCatalogHosts(
     loadState: { status: string };
     isError: boolean;
     hostErrors: readonly { serverId: string }[];
+    acceptedServerIds: readonly string[];
   },
 ) {
   const {
     loadState: { status },
     isError,
     hostErrors,
+    acceptedServerIds,
   } = catalog;
   return useMemo(
     () =>
       new Set(
         hosts.filter(
           (id) =>
+            !acceptedServerIds.includes(id) ||
             statuses.get(id) !== "online" ||
             status !== "loaded" ||
             isError ||
             hostErrors.some((error) => error.serverId === id),
         ),
       ),
-    [hosts, statuses, status, isError, hostErrors],
+    [hosts, statuses, status, isError, hostErrors, acceptedServerIds],
   );
 }

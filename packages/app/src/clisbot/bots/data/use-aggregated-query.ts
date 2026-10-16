@@ -14,6 +14,7 @@ import {
 import type { BotsHostInput, BotsRuntime } from "./client";
 
 const LIST_STALE_TIME_MS = 5_000;
+const EMPTY_SERVER_IDS: readonly string[] = [];
 
 export interface AggregatedQueryInput<T> {
   hosts: readonly BotsHostInput[];
@@ -28,6 +29,8 @@ export interface AggregatedQueryInput<T> {
 export interface AggregatedQueryResult<T> {
   loadState: AggregateLoadState<HostTagged<T>>;
   hostErrors: HostError[];
+  /** Hosts whose RPC succeeded in this query/admission, including authoritative empty lists. */
+  acceptedServerIds: readonly string[];
   isError: boolean;
   error: Error | null;
   refetch: () => void;
@@ -57,6 +60,10 @@ export function useAggregatedQuery<T>(input: AggregatedQueryInput<T>): Aggregate
   return {
     loadState: toAggregateLoadState(query.data),
     hostErrors: query.data?.status === "loaded" ? query.data.hostErrors : [],
+    acceptedServerIds:
+      query.data?.status === "loaded"
+        ? (query.data.acceptedServerIds ?? EMPTY_SERVER_IDS)
+        : EMPTY_SERVER_IDS,
     isError: query.isError,
     error: query.error,
     refetch: () => {

@@ -62,6 +62,7 @@ describe("fetchAggregated", () => {
     if (state.status !== "loaded") throw new Error("expected loaded");
     expect(state.data).toEqual([{ ...bot("x"), serverId: "a", serverName: "Host A" }]);
     expect(state.hostErrors).toEqual([{ serverId: "b", serverName: "Host B", message: "boom" }]);
+    expect(state.acceptedServerIds).toEqual(["a"]);
   });
 
   it("throws only when every asked host failed", async () => {
@@ -85,7 +86,20 @@ describe("fetchAggregated", () => {
       load,
       allHostsFailedMessage: "all failed",
     });
-    expect(state).toEqual({ status: "loaded", data: [], hostErrors: [] });
+    expect(state).toEqual({ status: "loaded", data: [], hostErrors: [], acceptedServerIds: [] });
     expect(toAggregateLoadState(undefined)).toEqual({ status: "loading" });
   });
+});
+
+it("distinguishes a successful empty Host from an online Host without an askable client", async () => {
+  const state = await fetchAggregated({
+    hosts: HOSTS,
+    runtime: runtime({
+      a: { status: "online", client: { botList: async () => ({ bots: [] }) } },
+      b: { status: "online" },
+    }),
+    load,
+    allHostsFailedMessage: "all failed",
+  });
+  expect(state).toEqual({ status: "loaded", data: [], hostErrors: [], acceptedServerIds: ["a"] });
 });

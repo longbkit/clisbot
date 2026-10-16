@@ -159,3 +159,28 @@ function pinnedWorkspaces(input: PinnedRowInput): PinRow[] {
     route: buildHostWorkspaceRoute(workspace.serverId, workspace.workspaceId),
   }));
 }
+
+/** Only missing identities survive a transient disconnect, never private row metadata. */
+export function createPinnedRowsProjector() {
+  let principal: string | null = null;
+  let missing = new Set<string>();
+  return (scope: string, input: PinnedRowInput): PinRow[] => {
+    if (scope !== principal) {
+      missing.clear();
+      principal = scope;
+    }
+    const rows = buildPinnedRows(input);
+    const visible = new Set(rows.map((row) => row.key));
+    const persisted = new Set(input.pins.map(pinKey));
+    missing = new Set([...missing].filter((key) => persisted.has(key)));
+    for (const pin of input.pins) {
+      if (pin.kind !== "bot" && pin.kind !== "chat") continue;
+      const unavailable = pin.kind === "bot" ? input.unavailableBots : input.unavailableChats;
+      if (!input.catalogHostIds.includes(pin.serverId) || unavailable.has(pin.serverId)) continue;
+      const key = pinKey(pin);
+      if (visible.has(key)) missing.delete(key);
+      else missing.add(key);
+    }
+    return rows.filter((row) => row.kind !== "unavailable" || !missing.has(row.key));
+  };
+}

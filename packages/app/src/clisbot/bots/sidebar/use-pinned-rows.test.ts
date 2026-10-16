@@ -16,8 +16,13 @@ const mocks = vi.hoisted(() => ({
   ]),
   catalogStatus: "loaded",
   catalogError: false,
+  scope: "owner",
+  accepted: ["mar", "saas"],
   botData: [] as HostTagged<BotPayload>[],
   chatData: [] as HostTagged<ChatPayload>[],
+}));
+vi.mock("../data/resource-principal-scope", () => ({
+  useResourcePrincipalScope: () => mocks.scope,
 }));
 vi.mock("@/components/sidebar/sidebar-model", () => ({
   useSidebarModel: () => ({ allProjects: mocks.projects, allWorkspaceEntriesByKey: new Map() }),
@@ -33,11 +38,13 @@ vi.mock("../data/runtime", () => ({
       loadState: { status: mocks.catalogStatus, data: mocks.botData },
       isError: mocks.catalogError,
       hostErrors: [],
+      acceptedServerIds: mocks.accepted,
     },
     chats: {
       loadState: { status: mocks.catalogStatus, data: mocks.chatData },
       isError: mocks.catalogError,
       hostErrors: [],
+      acceptedServerIds: mocks.accepted,
     },
   }),
 }));
@@ -105,6 +112,8 @@ beforeEach(() => {
   ]);
   mocks.catalogStatus = "loaded";
   mocks.catalogError = false;
+  mocks.scope = "owner";
+  mocks.accepted = ["mar", "saas"];
   mocks.botData = [];
   mocks.chatData = [];
   mocks.projects = ["mar", "saas"].map((serverId) => ({
@@ -291,6 +300,43 @@ it("keeps safe typed identity placeholders while offline/loading, but hides an a
   ).toEqual([]);
   mocks.catalogError = true;
   hook.rerender();
+  expect(hook.result.current.rows.filter((row) => row.kind === "unavailable")).toHaveLength(0);
+  mocks.scope = "new-principal";
+  hook.rerender();
   expect(hook.result.current.rows.filter((row) => row.kind === "unavailable")).toHaveLength(2);
+  hook.unmount();
+});
+
+it("does not resurrect authoritatively absent identities on disconnect, but accepts later current authority", () => {
+  mocks.pins = [{ kind: "bot", serverId: "saas", id: "bot" }];
+  const hook = renderHook(() => usePinnedRows());
+  expect(hook.result.current.rows.some((row) => row.key === "bot:saas:bot")).toBe(false);
+  mocks.statuses = new Map([["saas", "offline"]]);
+  hook.rerender();
+  expect(hook.result.current.rows.some((row) => row.key === "bot:saas:bot")).toBe(false);
+  mocks.statuses = new Map([["saas", "online"]]);
+  mocks.botData = [
+    { id: "bot", name: "Now accessible", serverId: "saas", serverName: "Host" },
+  ] as HostTagged<BotPayload>[];
+  hook.rerender();
+  expect(hook.result.current.rows.find((row) => row.key === "bot:saas:bot")).toMatchObject({
+    kind: "bot",
+    title: "Now accessible",
+  });
+  hook.unmount();
+});
+
+it("another Host's successful empty never establishes absence for an unasked or failed Host", () => {
+  mocks.pins = [{ kind: "bot", serverId: "saas", id: "bot" }];
+  mocks.accepted = ["mar"];
+  const hook = renderHook(() => usePinnedRows());
+  expect(hook.result.current.rows.find((row) => row.key === "bot:saas:bot")).toMatchObject({
+    kind: "unavailable",
+  });
+  mocks.statuses = new Map([["saas", "offline"]]);
+  hook.rerender();
+  expect(hook.result.current.rows.find((row) => row.key === "bot:saas:bot")).toMatchObject({
+    kind: "unavailable",
+  });
   hook.unmount();
 });

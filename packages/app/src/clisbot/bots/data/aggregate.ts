@@ -15,7 +15,12 @@ export interface HostError {
 
 export type FetchAggregatedState<T> =
   | { status: "connecting" }
-  | { status: "loaded"; data: HostTagged<T>[]; hostErrors: HostError[] };
+  | {
+      status: "loaded";
+      data: HostTagged<T>[];
+      hostErrors: HostError[];
+      acceptedServerIds: string[];
+    };
 
 export interface FetchAggregatedInput<T> {
   hosts: readonly BotsHostInput[];
@@ -52,6 +57,7 @@ export async function fetchAggregated<T>(
 
   const data: HostTagged<T>[] = [];
   const hostErrors: HostError[] = [];
+  const accepted = new Set<string>();
   await Promise.all(
     askable.map(async (host) => {
       const client = onlineClient(input, host.serverId);
@@ -59,6 +65,7 @@ export async function fetchAggregated<T>(
       try {
         const payload = await input.load(client);
         if (payload.error) throw new Error(payload.error);
+        accepted.add(host.serverId);
         for (const row of payload.rows) {
           data.push({ ...row, serverId: host.serverId, serverName: host.serverName });
         }
@@ -72,7 +79,14 @@ export async function fetchAggregated<T>(
     throw new Error(input.allHostsFailedMessage);
   }
   if (data.length === 0 && hasSettlingHost) return { status: "connecting" };
-  return { status: "loaded", data, hostErrors };
+  return {
+    status: "loaded",
+    data,
+    hostErrors,
+    acceptedServerIds: input.hosts
+      .filter((host) => accepted.has(host.serverId))
+      .map((host) => host.serverId),
+  };
 }
 
 export function toAggregateLoadState<T>(
