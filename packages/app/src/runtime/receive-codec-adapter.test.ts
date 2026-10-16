@@ -8,10 +8,14 @@ const probeResult = () => ({
 function module() {
   return {
     openText: vi.fn<NativeReceiveModule["openText"]>(async () => probeResult()),
-    openBinary: vi.fn<NativeReceiveModule["openBinary"]>(async () => ({
-      nonce: new Uint8Array(24),
-      plaintext: new Uint8Array([1, 2]),
-    })),
+    openBinary: vi.fn<NativeReceiveModule["openBinary"]>(async (_key, frame) =>
+      frame.byteLength === 54
+        ? {
+            nonce: probeResult().nonce,
+            plaintext: new TextEncoder().encode("\uFEFFcodec 😀\0"),
+          }
+        : { nonce: new Uint8Array(24), plaintext: new Uint8Array([1, 2]) },
+    ),
   };
 }
 function deferred<T>() {
@@ -28,6 +32,8 @@ it("chooses once before admission using a real known-answer open, including text
   expect(first).toBe(second);
   expect(first).toBeDefined();
   expect(native.openText).toHaveBeenCalledTimes(1);
+  expect(native.openBinary).toHaveBeenCalledTimes(1);
+  expect(native.openBinary.mock.calls[0]?.[1]).toHaveLength(54);
   expect(native.openText.mock.calls[0]?.[0]).toEqual(Uint8Array.from({ length: 32 }, (_, i) => i));
 });
 it("uses existing JS when module is unavailable or known-answer semantics differ", async () => {
@@ -85,4 +91,16 @@ it("returns binary without guessing text and rejects queue overflow before nativ
     codec.open(new Uint8Array(32), "x".repeat(32 * 1024 * 1024 + 1), false),
   ).rejects.toThrow("capacity");
   expect(native.openText).toHaveBeenCalledTimes(1);
+});
+
+it("rejects binary known-answer conversion failures before channel admission", async () => {
+  const native = module();
+  native.openBinary.mockResolvedValue({
+    nonce: probeResult().nonce,
+    plaintext: new Uint8Array([1]),
+  });
+  const select = createReceiveCodecSelector(native);
+  expect(await select()).toBeUndefined();
+  expect(await select()).toBeUndefined();
+  expect(native.openBinary).toHaveBeenCalledTimes(1);
 });

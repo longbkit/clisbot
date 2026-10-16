@@ -75,7 +75,9 @@ describe("optional ordered receive codec", () => {
     h.send(frame("later", 2));
     await vi.waitFor(() => expect(opener).toHaveBeenCalledTimes(1));
     gate.reject(new Error("worker failed"));
-    await vi.waitFor(() => expect(h.transport.close).toHaveBeenCalledWith(1011, "worker failed"));
+    await vi.waitFor(() =>
+      expect(h.transport.close).toHaveBeenCalledWith(1011, "Encrypted receive failed"),
+    );
     expect(opener).toHaveBeenCalledTimes(1);
     expect(h.deliver).not.toHaveBeenCalled();
   });
@@ -156,5 +158,24 @@ it("bounds retained text bytes across ordinary-size queued frames", async () => 
   expect(h.transport.close).toHaveBeenCalledWith(1011, expect.stringContaining("capacity"));
   gate.resolve({ nonce: new ArrayBuffer(24), plaintext: "late" });
   await gate.promise;
+  expect(h.deliver).not.toHaveBeenCalled();
+});
+
+it("closes the transport with a bounded nonprivate reason for a 124-byte codec error", async () => {
+  const h = harness({
+    open: async () => {
+      throw new Error("x".repeat(124));
+    },
+  });
+  let socketClosed = false;
+  vi.mocked(h.transport.close).mockImplementation((_code, reason) => {
+    // RN/OkHttp rejects oversized close reasons; the native wrapper swallows it.
+    if (new TextEncoder().encode(reason).byteLength <= 123) socketClosed = true;
+  });
+  h.send(frame("first", 1));
+  h.send(frame("later", 2));
+  await vi.waitFor(() => expect(h.transport.close).toHaveBeenCalled());
+  expect(socketClosed).toBe(true);
+  expect(h.transport.close).toHaveBeenCalledWith(1011, "Encrypted receive failed");
   expect(h.deliver).not.toHaveBeenCalled();
 });

@@ -633,7 +633,7 @@ describe("security review: channel resource and nonce boundaries", () => {
     await waitForAsyncDelivery();
     expect(f.messages).toHaveLength(4096);
     expect(f.receiver.isOpen()).toBe(false);
-    expect(f.received.close).toHaveBeenCalledWith(1011, expect.stringContaining("capacity"));
+    expect(f.received.close).toHaveBeenCalledWith(1011, "Encrypted receive failed");
   });
 
   it("rejects reflected ciphertext, reordered counters and queued traffic after failure", async () => {
@@ -651,7 +651,7 @@ describe("security review: channel resource and nonce boundaries", () => {
     f.sent.onmessage?.({ data: calls[0][0] as string, isBinary: false });
     await waitForAsyncDelivery();
     expect(f.sender.isOpen()).toBe(false);
-    expect(f.sent.close).toHaveBeenCalledWith(1011, "Reflected encrypted frame");
+    expect(f.sent.close).toHaveBeenCalledWith(1011, "Encrypted receive failed");
   });
 
   it.each([false, true])(

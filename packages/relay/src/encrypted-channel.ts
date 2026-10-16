@@ -552,14 +552,14 @@ export class EncryptedChannel {
         const plaintext = decodePlaintext(plaintextBytes, ciphertext.isBinary);
         this.events.onmessage?.(plaintext);
       }
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-
+    } catch {
       // Treat decryption/protocol errors as fatal so the peer can reconnect and
       // re-handshake. Emitting an error event here can cause higher-level code
       // to tear down the session without triggering a clean reconnect.
       try {
-        this.close(1011, err.message);
+        // Expo/native errors may include arbitrary or private text and exceed
+        // WebSocket's 123-byte limit. A rejected close would strand this channel.
+        this.close(1011, "Encrypted receive failed");
       } catch {
         // ignore
       }

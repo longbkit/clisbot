@@ -12,6 +12,15 @@ const CAPACITY_BYTES = 64 * 1024 * 1024;
 const CAPACITY_FRAMES = 64;
 // TweetNaCl secretbox: key 00..1f, nonce 20..37, BOM + "codec 😀\0".
 const PROBE = "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3UIDDaOUpj4jMXGjTtS4cox7i8sYiQz/1KcXK9oxI";
+// The same authenticated vector as raw bytes also verifies Expo ByteArray results.
+const BINARY_PROBE = new Uint8Array([
+  32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+  80, 128, 195, 104, 229, 41, 143, 136, 204, 92, 104, 211, 181, 46, 28, 163, 30, 226, 242, 198, 34,
+  67, 63, 245, 41, 197, 202, 246, 140, 72,
+]);
+const BINARY_PLAINTEXT = new Uint8Array([
+  239, 187, 191, 99, 111, 100, 101, 99, 32, 240, 159, 152, 128, 0,
+]);
 const INPUT_ERRORS = new Set(["ERR_CODEC_MAC", "ERR_CODEC_PROTOCOL"]);
 
 function bytesBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -92,6 +101,20 @@ export function createReceiveCodecSelector(module: NativeReceiveModule | null) {
         const nonce = new Uint8Array(opened.nonce);
         if (opened.plaintext !== "codec 😀\0" || !nonce.every((byte, i) => byte === i + 32)) {
           throw new Error("Native receive known-answer mismatch");
+        }
+        const binary = await codec.open(
+          Uint8Array.from({ length: 32 }, (_, i) => i),
+          BINARY_PROBE.buffer,
+          true,
+        );
+        const bytes = new Uint8Array(binary.plaintext as ArrayBuffer);
+        const binaryNonce = new Uint8Array(binary.nonce);
+        if (
+          bytes.length !== BINARY_PLAINTEXT.length ||
+          !bytes.every((byte, i) => byte === BINARY_PLAINTEXT[i]) ||
+          !binaryNonce.every((byte, i) => byte === i + 32)
+        ) {
+          throw new Error("Native binary receive known-answer mismatch");
         }
         return codec;
       } catch {
