@@ -1,3 +1,5 @@
+import { nativePresentation } from "./chat-list-presentation";
+import { useIsChatListDeparting } from "./use-chat-list-departure";
 import { HeaderBackButton } from "@/components/headers/header-back-button";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import {
@@ -104,16 +106,21 @@ function Tab({
  * Android Back. A conversation returns to its entry surface; a tab other than Home goes Home; Home
  * leaves the app. Peer tabs replace their route; details keep the existing workspace return path.
  */
-function useMobileHardwareBack(path: string, compact: boolean) {
+function useMobileHardwareBack(path: string, compact: boolean, departing: boolean) {
   const router = useRouter();
   const navigate = useNavigateHomeTab();
   const returnPath = useReturn((s) => s.path);
   const detail = isChatDetail(path);
   const tab = isHomeTabPath(path);
   useEffect(() => {
-    if (!HOME_V2_ENABLED || !compact || (!detail && !tab)) return;
+    if (!HOME_V2_ENABLED || !compact || (!detail && !tab && !departing)) return;
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
       const panels = usePanelStore.getState();
+      if (nativePresentation.isPending(panels.mobilePanel)) {
+        nativePresentation.returnToList();
+        router.navigate("/chat");
+        return true;
+      }
       if (detail && panels.mobilePanel.target !== "agent") {
         panels.showMobileAgent();
         return true;
@@ -128,29 +135,31 @@ function useMobileHardwareBack(path: string, compact: boolean) {
       return true;
     });
     return () => listener.remove();
-  }, [compact, detail, navigate, path, returnPath, router, tab]);
+  }, [compact, departing, detail, navigate, path, returnPath, router, tab]);
 }
 export function MobileHomeTabs() {
   const compact = useIsCompactFormFactor();
   const path = usePathname();
+  const departing = useIsChatListDeparting();
+  const visiblePath = !isHomeTabPath(path) && departing ? "/chat" : path;
   const insets = useSafeAreaInsets();
   useEffect(startNativeInputTracing, []);
   useLayoutEffect(() => {
     traceInstant("clisbot.route.commit", { path });
   }, [path]);
-  useMobileHardwareBack(path, compact);
+  useMobileHardwareBack(path, compact, departing);
   const inset = useMemo(() => ({ paddingBottom: Math.max(insets.bottom, 6) }), [insets.bottom]);
   // Reads what Home and the sidebar already loaded; the tab bar never starts its own fetch.
   const { agents } = useAggregatedAgents({ demand: false });
   const needsCount = agents.filter((agent) => activityBucket(agent) === "needs").length;
-  if (!HOME_V2_ENABLED || !compact || !isHomeTabPath(path)) return null;
+  if (!HOME_V2_ENABLED || !compact || !isHomeTabPath(visiblePath)) return null;
   return (
     <View style={[styles.tabs, inset]} testID="home-mobile-tabs">
       {entries.map((entry) => (
         <Tab
           key={entry.path}
           entry={entry}
-          selected={path === entry.path}
+          selected={visiblePath === entry.path}
           count={entry.path === "/sessions" ? needsCount : undefined}
         />
       ))}

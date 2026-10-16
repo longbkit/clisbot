@@ -1,3 +1,4 @@
+import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
@@ -38,7 +39,6 @@ import type {
   StatusSessionGroupItem,
 } from "@/clisbot/workspace-sessions/status-sessions";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
-import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { type SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { StatusBucket } from "@/hooks/sidebar-status-view-model";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
@@ -596,7 +596,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   isDragging?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
 }) {
-  const activeWorkspaceSelection = useActiveWorkspaceSelection();
+  const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const selected =
     activeWorkspaceSelection?.serverId === workspace.serverId &&
     activeWorkspaceSelection?.workspaceId === workspace.workspaceId;
@@ -667,7 +667,7 @@ const StatusSessionRow = memo(function StatusSessionRow({
   onWorkspacePress?: (destination?: string) => void;
 }) {
   const { workspace } = item;
-  const activeWorkspaceSelection = useActiveWorkspaceSelection();
+  const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const selected =
     activeWorkspaceSelection?.serverId === workspace.serverId &&
     activeWorkspaceSelection?.workspaceId === workspace.workspaceId;

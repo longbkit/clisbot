@@ -1,3 +1,4 @@
+import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
 import { traceInstant } from "@/performance/native-trace";
@@ -39,7 +40,6 @@ import { useTranslation } from "react-i18next";
 import { router, usePathname, type Href } from "expo-router";
 import {
   navigateToWorkspace,
-  useActiveWorkspaceSelection,
   type ActiveWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -2278,7 +2278,7 @@ function ProjectModeList({
     [pathname],
   );
   const selectionEnabled = isWorkspaceRoute;
-  const activeWorkspaceSelection = useActiveWorkspaceSelection();
+  const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
   const hasBotsFeature = useBotsFeatureHosts().length > 0;
   const [projectsCollapsed] = useSectionCollapsed("projects");

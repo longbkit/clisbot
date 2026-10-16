@@ -46,7 +46,12 @@ its dispatch, so an older route still current during that queue cannot complete 
 The pending close belongs to the current compact panel generation; Back/cancellation or a new panel
 selection invalidates it. An overlay over an already presented detail still closes on selection,
 including a different agent tab in the same workspace (no new native appearance or pathname change).
-Catalog readiness and network responses never own this closure.
+Catalog readiness and network responses never own this closure. During that native departure the same
+intent keeps Chat’s footer/inset and outgoing sidebar selection projection, so the JS route commit
+cannot resize the list or auto-expand the incoming workspace before it appears. Catalog changes
+still apply. Hardware Back cancels entry and retains this outgoing projection until Chat commits;
+an old destination appearance cannot close the returning list. Desktop selection and ordinary
+already-presented workspace overlays keep their existing behavior.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
 
