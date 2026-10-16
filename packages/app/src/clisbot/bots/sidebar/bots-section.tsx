@@ -53,6 +53,7 @@ interface BotsSectionProps {
   directoryBots?: readonly BotsSidebarBot[];
   directoryHosts?: readonly { serverId: string; serverName: string }[];
   loading?: boolean;
+  emptyCatalogConfirmed?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
   selectedBotKey?: string | null;
@@ -69,6 +70,7 @@ export const BotsSection = memo(function BotsSection({
   directoryBots = bots,
   directoryHosts = emptyHosts,
   loading = false,
+  emptyCatalogConfirmed = true,
   loadError = null,
   onRetry,
   selectedBotKey = null,
@@ -85,7 +87,8 @@ export const BotsSection = memo(function BotsSection({
   const [expanded, setExpanded] = useState(false);
   const toggleExpanded = useCallback(() => setExpanded((value) => !value), []);
   const visibleBots = recentSidebarBots(bots, selectedBotKey, expanded ? bots.length : 5);
-  const showFirstBot = canCreateBot && !loading && !loadError && directoryBots.length === 0;
+  const showFirstBot =
+    canCreateBot && emptyCatalogConfirmed && !loading && !loadError && directoryBots.length === 0;
   return (
     <View testID="sidebar-bots-section">
       <BotsSectionHeader

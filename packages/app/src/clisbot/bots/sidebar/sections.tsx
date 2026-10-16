@@ -74,6 +74,9 @@ function EnabledSections({
         directoryBots={projectedBots}
         directoryHosts={directoryHosts}
         loading={directoryStatus.loading}
+        emptyCatalogConfirmed={hosts.every((host) =>
+          bots.acceptedServerIds.includes(host.serverId),
+        )}
         loadError={directoryStatus.error}
         onRetry={bots.refetch}
         bots={filterByHost(projectedBots, hostFilters.bots, hostIds).filter(

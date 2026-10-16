@@ -281,3 +281,16 @@ vi.mock("@/components/sidebar/sidebar-group-toggle-row", () => ({
     </button>
   ),
 }));
+
+it("does not claim No bots yet when the current Host catalog is unavailable", () => {
+  render(
+    <BotsSection
+      bots={[]}
+      onPressBot={vi.fn()}
+      onCreateBot={vi.fn()}
+      emptyCatalogConfirmed={false}
+    />,
+  );
+  expect(screen.queryByTestId("sidebar-bots-first")).toBeNull();
+  expect(screen.getByRole("button", { name: "Create bot" })).toBeTruthy();
+});
