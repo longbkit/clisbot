@@ -17,8 +17,14 @@ export function useChatTurnHeartbeats(
   const { heartbeats } = useHostHeartbeats(serverId);
   const settled = useSettledRows(rows);
   const newestBotLine = settled.findLast((row) => row.kind === "bot")?.key ?? null;
+  // useSchedules already refreshes on mount, including the closed header's count.
+  // Mounting accepted history must not cancel/restart that same authoritative read.
+  const previousBotLine = useRef(newestBotLine);
   useEffect(() => {
-    if (newestBotLine) void queryClient.invalidateQueries({ queryKey: schedulesQueryBaseKey });
+    const changed = previousBotLine.current !== newestBotLine;
+    previousBotLine.current = newestBotLine;
+    if (changed && newestBotLine)
+      void queryClient.invalidateQueries({ queryKey: schedulesQueryBaseKey });
   }, [newestBotLine, queryClient]);
   return useMemo(() => heartbeatsByTurnLine(settled, heartbeats), [heartbeats, settled]);
 }

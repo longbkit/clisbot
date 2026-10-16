@@ -13,6 +13,18 @@ import type { WorkspaceTargetContext } from "@/workspace-tabs/model";
 import { useConversationExplorerOwner } from "./explorer-owner";
 import { withConversationSource } from "./conversation-layout";
 
+/** Explorer effects may dismiss their own Files overlay, never a newer Chat/route intent. */
+function closeOwnedExplorer(layoutKey: string): boolean {
+  const panel = usePanelStore.getState();
+  if (
+    useConversationExplorerOwner.getState().owner !== layoutKey ||
+    !selectIsCompactFileExplorerOpen(panel)
+  )
+    return false;
+  panel.showMobileAgent();
+  return true;
+}
+
 function syncExplorer(layoutKey: string, source: WorkspaceTargetContext, isGit: boolean) {
   const store = useWorkspaceLayoutStore.getState();
   const layout = store.layoutByWorkspace[layoutKey];
@@ -44,7 +56,9 @@ function syncExplorer(layoutKey: string, source: WorkspaceTargetContext, isGit: 
   store.openTab({
     workspaceKey: layoutKey,
     target: withConversationSource(
-      { kind: isGit && selectedKind === "changes_tree" ? "changes_tree" : "files" },
+      {
+        kind: isGit && selectedKind === "changes_tree" ? "changes_tree" : "files",
+      },
       source,
       layoutKey,
     ),
@@ -66,26 +80,25 @@ export function useConversationExplorer(input: {
   useEffect(() => {
     // Match WorkspaceScreen: Back dismisses the compact overlay before navigation.
     if (isWeb || !compact || !focused || !explorerOpen || !source || !cwd) return;
-    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
-      usePanelStore.getState().showMobileAgent();
-      return true;
-    });
+    const handler = BackHandler.addEventListener("hardwareBackPress", () =>
+      closeOwnedExplorer(layoutKey),
+    );
     return () => handler.remove();
-  }, [compact, focused, explorerOpen, source, cwd]);
+  }, [compact, focused, explorerOpen, source, cwd, layoutKey]);
   useEffect(() => {
     if (!focused || !singlePanel) return;
     const owner = useConversationExplorerOwner.getState();
     owner.setOwner(layoutKey);
     return () => {
+      closeOwnedExplorer(layoutKey);
       if (useConversationExplorerOwner.getState().owner === layoutKey) owner.setOwner(null);
-      usePanelStore.getState().showMobileAgent();
     };
   }, [focused, layoutKey, singlePanel]);
   useEffect(() => {
     if (!focused) return;
     const store = useWorkspaceLayoutStore.getState();
     if (!source || !cwd) {
-      if (singlePanel) usePanelStore.getState().showMobileAgent();
+      if (singlePanel) closeOwnedExplorer(layoutKey);
       else store.hideExplorerSidebar(layoutKey);
       return;
     }

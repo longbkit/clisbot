@@ -196,6 +196,19 @@ composer or loaded rows. `isFetching` remains separate from loaded/error state. 
 feedback, not off-thread execution: receive/decrypt/decode still runs on the existing JS path,
 and native interaction acceptance must measure actual input delivery separately.
 
+Conversation Explorer effects only dismiss a currently open Files overlay owned by that
+conversation. Missing project metadata must not close the outgoing Chat list; blur/unmount
+cleanup and queued hardware Back must not replace a newer list or another conversation's
+Explorer. The existing native presentation owner still controls Chat-to-detail departure.
+Desktop Explorer continues to use its existing scoped dock.
+
+The Heartbeats trigger keeps its schedule query active for the closed-button count. The shared
+query already refreshes on mount; mounting accepted transcript history does not invalidate and
+restart that same request. A later bot reply (including the first reply arriving after an empty
+mount) still invalidates schedules, and explicit menu refresh and mutation invalidation remain
+unchanged. This removes duplicate admission work without lengthening cache freshness or changing
+authority/error handling.
+
 ## Order of work
 
 Server first, app second, CLI third; the Hub marker rides with the server tasks. Each numbered
