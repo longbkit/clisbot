@@ -28,6 +28,11 @@ render a blank screen.
 
 ## Startup
 
+The root mounts favicon and macOS dock-badge synchronization only on web (including Electron).
+Its catalog/status subscriptions have no native output; effect-level native guards alone still
+leave those subscriptions and projections active. Native tab badges and notification routing
+keep their separate existing owners.
+
 With the Home extension enabled (default), a cold `/` launch opens `/open-project`. Explicit
 workspace/chat links win, and resuming from background preserves the current screen. See
 [Home and Inbox](features/home-and-inbox/README.md) for tab navigation and rollback.

@@ -688,7 +688,7 @@ function ProvidersWrapper({ children }: { children: ReactNode }) {
       <VoiceProvider>
         <DesktopWindowControlsSync />
         <HostSessionManager />
-        <FaviconStatusSync />
+        {isWeb ? <FaviconStatusSync /> : null}
         {children}
       </VoiceProvider>
     </AppearanceProvider>
