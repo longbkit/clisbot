@@ -1086,6 +1086,54 @@ describe("admitFollowUp", () => {
 // --- orphan recovery (restart/resume) --------------------------------------
 
 describe("orphan recovery (restart / resume)", () => {
+  it("keeps initializing recovery pending past TTL, then sends when ready", async () => {
+    const executionId = "execution-initializing";
+    await store.recordPendingThreadBinding({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0INITIALIZING",
+      externalThreadId: null,
+      pendingExecutionId: executionId,
+      initiator: INITIATOR,
+      route: {},
+    });
+    const surviving = snapshotOf("agent-initializing", null, channelExecutionLabels(executionId));
+    surviving.status = "initializing";
+    const { daemon, created, messages } = makeFakeDaemon([surviving]);
+    const engine = makeEngine(
+      store,
+      daemon,
+      new ManualClock(Date.now() + PENDING_MARKER_TTL_MS + 1),
+    );
+    const inbound = message({
+      conversation: {
+        ...CHANNEL_CONVERSATION,
+        id: "C0INITIALIZING",
+        rootConversationId: "C0INITIALIZING",
+      },
+    });
+    assert.deepEqual(await engine.recoverOrphans(), { rebound: 0, leftPending: 1 });
+    for (let retry = 0; retry < 2; retry++) {
+      await assert.rejects(engine.bindOrSteer(inbound, ...routed()), {
+        name: "ChannelAgentCreatePendingError",
+      });
+    }
+    assert.equal(
+      (await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0INITIALIZING", null))?.status,
+      "pending",
+    );
+    assert.deepEqual([created.length, messages.length], [0, 0]);
+    surviving.status = "idle";
+    const outcome = await engine.bindOrSteer(inbound, ...routed());
+    assert.equal(outcome.kind, "bound");
+    assert.equal(created.length, 0);
+    assert.deepEqual(
+      messages.map((sent) => sent.agentId),
+      [surviving.id],
+    );
+  });
+
   it("re-binds a surviving agent by its execution-id label and never re-creates", async () => {
     const executionId = "execution-orphan";
     await store.recordPendingThreadBinding({

@@ -213,6 +213,81 @@ test.each([false, true])(
   60000,
 );
 
+test("wire lookup sees initializing registration but prompt retries only after readiness", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "registration-wire-"));
+  const reached = deferred<void>();
+  const release = deferred<void>();
+  let sessions = 0;
+  let prompts = 0;
+  const clients = createTestAgentClients({
+    onStartTurn: (_prompt, config) => {
+      if (!config.internal) prompts++;
+    },
+  });
+  const provider = clients.codex!;
+  const create = provider.createSession.bind(provider);
+  provider.createSession = async (...args) => {
+    const session = await create(...args);
+    if (!args[0].internal) {
+      sessions++;
+      const runtimeInfo = session.getRuntimeInfo.bind(session);
+      session.getRuntimeInfo = async () => {
+        reached.resolve();
+        await release.promise;
+        return runtimeInfo();
+      };
+    }
+    return session;
+  };
+  const daemon = await createCreationDaemon({ agentClients: clients, agentSessionStorage: true });
+  const client = new DaemonClient({
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.11.1",
+  });
+  await client.connect();
+  const request = {
+    config: { provider: "codex", cwd: directory },
+    idempotencyKey: "registration-wire",
+  };
+  const creating = client.createAgent(request);
+  try {
+    await reached.promise;
+    const listed = await client.fetchAgents();
+    expect(listed.entries).toHaveLength(1);
+    const initializing = listed.entries[0].agent;
+    expect(initializing.status).toBe("initializing");
+    await expect(
+      client.sendMessage(initializing.id, "first prompt", {
+        messageId: "registration-wire-prompt",
+      }),
+    ).rejects.toThrow("is still initializing");
+    expect(prompts).toBe(0);
+    release.resolve();
+    const ready = await creating;
+    expect(ready).toMatchObject({ id: initializing.id, status: "idle" });
+    expect((await client.createAgent(request)).id).toBe(ready.id);
+    await client.sendMessage(ready.id, "first prompt", {
+      messageId: "registration-wire-prompt",
+    });
+    await client.waitForFinish(ready.id);
+    await client.sendMessage(ready.id, "first prompt", {
+      messageId: "registration-wire-prompt",
+    });
+    expect({ sessions, prompts }).toEqual({ sessions: 1, prompts: 1 });
+    expect(
+      (await client.fetchAgentTimeline(ready.id)).entries.filter(
+        (entry) => entry.item.type === "user_message" && entry.item.text === "first prompt",
+      ),
+    ).toHaveLength(1);
+  } finally {
+    release.resolve();
+    await creating.catch(() => undefined);
+    await client.close();
+    await daemon.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+}, 60000);
+
 test.each(["create_agent_request", "agent.create.request"] as const)(
   "legacy and modern agent RPCs share one creation identity (first %s)",
   async (type) => {

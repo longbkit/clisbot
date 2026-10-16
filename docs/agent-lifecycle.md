@@ -12,6 +12,17 @@ initializing → idle → running → idle (or error → closed)
 
 Each live agent in `AgentManager` carries a `lastStatus` of `initializing`, `idle`, `running`, or `error`. `closed` is the persisted, resumable state for an agent record that has no live provider runtime. State transitions persist to disk and stream to subscribed clients via WebSocket.
 
+Registration keeps an Agent `initializing` through provider setup, its first durable metadata
+write, canonical timeline initialization, and the final ready snapshot write. Lookup/list may
+show that state so recovery can retain the same execution, but prompt admission (including the
+submission ledger and out-of-band commands) rejects it before opening timeline storage or
+starting a provider turn. This rejection uses `PromptNotDeliveredError`, so the message receipt
+frees that same logical message for a later retry; ambiguous delivery still retains its receipt.
+The manager installs the provider subscription before publishing
+`idle`. This boundary is shared by creation, resume, reload, and import. Failed registration
+closes the runtime through the lifecycle owner while retaining durable identity and history;
+a close failure retains the initializing runtime for cleanup rather than authorizing a replacement.
+
 ## Runtime residency
 
 An unarchived agent may be `closed` without being deleted or archived. Closing releases its provider

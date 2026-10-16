@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
+import { PromptNotDeliveredError } from "../agent/prompt-not-delivered-error.js";
 import { MessageReceipts } from "./index.js";
 
 const directories: string[] = [];
@@ -74,4 +75,25 @@ test("failed local message preparation does not leave an ambiguous receipt", asy
   available = false;
   await requests.send(input);
   expect(sends).toBe(1);
+});
+
+test("provably undelivered readiness rejection permits one concurrent retry after reconstruction", async () => {
+  const { requests, directory } = await fixture();
+  let ready = false;
+  let deliveries = 0;
+  const input = {
+    agentId: "agent",
+    messageId: "readiness",
+    request: { text: "hello" },
+    send: async () => {
+      if (!ready) throw new PromptNotDeliveredError("Agent is still initializing");
+      deliveries++;
+    },
+  };
+  await expect(requests.send(input)).rejects.toThrow("is still initializing");
+  ready = true;
+  const reconstructed = new MessageReceipts(directory);
+  await Promise.all([reconstructed.send(input), reconstructed.send(input)]);
+  await requests.send(input);
+  expect(deliveries).toBe(1);
 });

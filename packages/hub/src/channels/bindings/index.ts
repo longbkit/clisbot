@@ -548,6 +548,9 @@ export class BindingEngine {
       await releasePendingMarker(this.context, account, key, executionId);
       return this.startSession(delivery, account, route, key, subscribe);
     }
+    // A known initializing Agent still owns this execution even beyond the TTL.
+    // Keep its marker and retry; binding/sending or starting over would race setup.
+    if (surviving.status === "initializing") throw new ChannelAgentCreatePendingError();
     // The Agent was launched with the capability its create issued; bind it now
     // that the Agent is known. Without one (a Hub restart forgot the turn) a
     // `tool` route Agent could only answer into silence, so it is replaced.
