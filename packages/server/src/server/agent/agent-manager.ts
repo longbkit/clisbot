@@ -905,6 +905,7 @@ export class AgentManager {
   private readonly backgroundTasks = new Set<Promise<void>>();
   private readonly agentRegistrationTasks = new Set<Promise<void>>();
   private readonly inFlightAgentCloses = new Map<string, Promise<void>>();
+  private readonly runtimeCloses = new WeakMap<LiveManagedAgent, Promise<boolean>>();
   private readonly reloadedSessionCloses = new WeakMap<AgentSession, Promise<void>>();
   private readonly lifecycleMutationTails = new Map<string, Promise<void>>();
   private readonly agentStreamCoalescer: AgentStreamCoalescer;
@@ -2372,11 +2373,27 @@ export class AgentManager {
   }
 
   /** Returns false when `beforeClosure` declines, which leaves the agent live and untouched. */
-  private async closeAgentRuntime(
+  private closeAgentRuntime(
     agentId: string,
     options?: { beforeClosure?: () => boolean },
   ): Promise<boolean> {
     const agent = this.requireAgent(agentId);
+    const existing = this.runtimeCloses.get(agent);
+    if (existing) return existing;
+    // Registration cleanup may already own the lifecycle lane while an external
+    // close is executing. Share the actual runtime operation, not its queued lane.
+    const operation = this.closeAgentRuntimeNow(agent, options);
+    this.runtimeCloses.set(agent, operation);
+    const clear = () => this.runtimeCloses.delete(agent);
+    void operation.then(clear, clear);
+    return operation;
+  }
+
+  private async closeAgentRuntimeNow(
+    agent: LiveManagedAgent,
+    options?: { beforeClosure?: () => boolean },
+  ): Promise<boolean> {
+    const agentId = agent.id;
     this.logger.trace(
       {
         agentId,
@@ -4583,8 +4600,8 @@ export class AgentManager {
       // No caller may start a turn until storage, timeline and provider setup agree.
       await this.persistSnapshot({ ...managed, lifecycle: "idle", activeForegroundTurnId: null });
       this.assertAgentRegistrationActive(managed);
-      managed.lifecycle = "idle";
       this.subscribeToSession(managed);
+      managed.lifecycle = "idle";
       this.emitState(managed, { persist: false });
       return { ...managed };
     } catch (error) {

@@ -22,6 +22,9 @@ The manager installs the provider subscription before publishing
 `idle`. This boundary is shared by creation, resume, reload, and import. Failed registration
 closes the runtime through the lifecycle owner while retaining durable identity and history;
 a close failure retains the initializing runtime for cleanup rather than authorizing a replacement.
+Registration remains initializing if subscription or automatic responder installation throws, including
+while its cleanup is held or rejected. Cleanup and an already executing external close share one
+close operation for that exact runtime; they do not await a close queued behind their own lifecycle lane.
 
 ## Runtime residency
 
