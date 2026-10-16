@@ -25,6 +25,14 @@ an older completion; peer returns retain replace semantics while detail returns 
 deck. Admission callbacks read the latest committed path without changing row callback identity
 on every partial/full route commit.
 
+Native compact workspace entry keeps its existing header/Back surface separate from first pane
+materialization. The body waits for the existing outgoing Chat presentation boundary, then React
+prepares it at deferred render priority. Losing focus before that first body commits abandons the
+view preparation; it does not cancel an agent turn. Once committed, panes keep the existing
+retention/draft/scroll policy across Back and reconnect. This does not defer authoritative store
+updates or guarantee that an individual native Fabric commit is interruptible. Web and desktop
+keep immediate materialization.
+
 Once native compact chrome has mounted, global screens retain it inactive instead of rebuilding
 it on Back. The shared overlay’s explicit presentation guard hides the actual host, input and
 accessibility without collapsing retained scroll ranges; close gestures and sidebar demand are

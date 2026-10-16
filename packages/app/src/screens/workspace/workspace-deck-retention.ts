@@ -1,7 +1,10 @@
 import type { ActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
-import { buildHostRootRoute } from "@/utils/host-routes";
+import { buildHostRootRoute, parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 
-/** Only the focused native workspace leaf can interpret its own transient parent pathname. */
+/**
+ * The focused native leaf owns its pane identity; Expo's global route publication may lag it.
+ * Global/other-Host paths still deactivate the leaf, and hidden leaves never acquire demand.
+ */
 export function resolveWorkspaceDeckActiveSelection(input: {
   isNative: boolean;
   isRouteFocused: boolean;
@@ -9,11 +12,14 @@ export function resolveWorkspaceDeckActiveSelection(input: {
   parsedSelection: ActiveWorkspaceSelection | null;
   localSelection: ActiveWorkspaceSelection | null;
 }): ActiveWorkspaceSelection | null {
-  if (input.parsedSelection) return input.parsedSelection;
+  if (!input.isNative) return input.parsedSelection;
   const local = input.localSelection;
-  if (!input.isNative || !input.isRouteFocused || !local?.serverId || !local.workspaceId)
-    return null;
-  return input.pathname === `${buildHostRootRoute(local.serverId)}/workspace` ? local : null;
+  if (!input.isRouteFocused || !local?.serverId || !local.workspaceId) return null;
+  const pathSelection = parseHostWorkspaceRouteFromPathname(input.pathname);
+  return input.pathname === `${buildHostRootRoute(local.serverId)}/workspace` ||
+    pathSelection?.serverId === local.serverId
+    ? local
+    : null;
 }
 
 export const WORKSPACE_DECK_MAX_MOUNTED_WORKSPACES = 10;

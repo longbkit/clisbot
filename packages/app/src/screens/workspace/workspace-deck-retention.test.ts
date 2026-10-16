@@ -78,15 +78,98 @@ describe("resolveWorkspaceDeckActiveSelection", () => {
     "/h/server",
     "/h/other/workspace",
     "/h/server/workspace/A/files",
-    "/h/server/workspace/A",
     "/h/server/workspace/",
-  ])("does not substitute local params on a different or complete path: %s", (pathname) => {
+  ])("does not substitute local params outside the owning Host workspace path: %s", (pathname) => {
     expect(resolveWorkspaceDeckActiveSelection({ ...input, pathname })).toBeNull();
   });
-  it("keeps a valid globally parsed destination authoritative even with old hidden local params", () => {
+  it("does not activate a hidden native leaf from a late full global pathname", () => {
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        isRouteFocused: false,
+        pathname: "/h/server/workspace/B",
+        parsedSelection: workspace("B"),
+      }),
+    ).toBeNull();
+  });
+  it("does not remount A inside focused native B when global A is published late", () => {
+    const currentLeaf = workspace("B");
+    const resolved = ["B", "A", "B"].map((id) =>
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        pathname: `/h/server/workspace/${id}`,
+        parsedSelection: workspace(id),
+        localSelection: currentLeaf,
+      }),
+    );
+    expect(resolved).toEqual([currentLeaf, currentLeaf, currentLeaf]);
+  });
+  it("waits for newer native C params instead of rendering global C inside outgoing B", () => {
+    const currentLeaf = workspace("B");
+    const nextLeaf = workspace("C");
+    const pathname = "/h/server/workspace/C";
+    const parsedSelection = nextLeaf;
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        pathname,
+        parsedSelection,
+        localSelection: currentLeaf,
+      }),
+    ).toBe(currentLeaf);
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        pathname,
+        parsedSelection,
+        isRouteFocused: false,
+        localSelection: currentLeaf,
+      }),
+    ).toBeNull();
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        pathname,
+        parsedSelection,
+        localSelection: nextLeaf,
+      }),
+    ).toBe(nextLeaf);
+    // C's actual leaf stays C even if global B subsequently arrives out of order.
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        pathname: "/h/server/workspace/B",
+        parsedSelection: currentLeaf,
+        localSelection: nextLeaf,
+      }),
+    ).toBe(nextLeaf);
+  });
+  it.each(["/chat", "/settings", "/sessions"])(
+    "cancels native demand on global %s before the old leaf loses focus",
+    (pathname) => {
+      expect(
+        resolveWorkspaceDeckActiveSelection({ ...input, pathname, parsedSelection: null }),
+      ).toBeNull();
+    },
+  );
+  it("does not transfer another Host's parsed workspace into the current native leaf", () => {
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        pathname: "/h/other/workspace/C",
+        parsedSelection: workspace("C", "other"),
+      }),
+    ).toBeNull();
+  });
+  it("preserves globally parsed web/desktop selection even with retained local params", () => {
     const parsedSelection = workspace("B", "other");
     expect(
-      resolveWorkspaceDeckActiveSelection({ ...input, isRouteFocused: false, parsedSelection }),
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        isNative: false,
+        isRouteFocused: false,
+        parsedSelection,
+      }),
     ).toBe(parsedSelection);
   });
   it("matches the encoded Host identity exactly", () => {

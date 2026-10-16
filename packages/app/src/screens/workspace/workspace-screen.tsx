@@ -1,3 +1,4 @@
+import { WorkspaceEntryContent } from "./workspace-entry-content";
 import { confirmPanelClose } from "@/panels/confirm-panel-close";
 import { BackToChatAction } from "@/clisbot/bots/chat/cowork-return";
 import { WorkspaceHeartbeatsButton } from "@/clisbot/heartbeats/workspace-heartbeats-button";
@@ -247,6 +248,15 @@ function buildWorkspaceFileLocation(
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+
+function WorkspaceBodyPreparing() {
+  return (
+    <View style={styles.emptyState} testID="workspace-body-preparing">
+      <ThemedLoadingSpinner uniProps={mutedColorMapping} />
+    </View>
+  );
+}
+const WORKSPACE_BODY_PREPARING = <WorkspaceBodyPreparing />;
 
 interface WorkspaceScreenProps {
   serverId: string;
@@ -3603,7 +3613,14 @@ function WorkspaceScreenContent({
       >
         {(topOverlayInset) => (
           <StreamTopOverlayProvider value={topOverlayInset}>
-            {workspacePanelContent}
+            <WorkspaceEntryContent
+              key={`${normalizedServerId}:${normalizedWorkspaceId}`}
+              nativeCompact={isNative}
+              focused={isRouteFocused}
+              placeholder={WORKSPACE_BODY_PREPARING}
+            >
+              {workspacePanelContent}
+            </WorkspaceEntryContent>
           </StreamTopOverlayProvider>
         )}
       </FloatingHeaderLayout>

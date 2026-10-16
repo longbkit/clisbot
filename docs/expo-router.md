@@ -114,6 +114,14 @@ only use local param fallback during cold mount (`/` or empty pathname), or a
 hidden workspace can overwrite the remembered workspace before Settings or
 History returns.
 
+The native workspace Deck is scoped to its actual focused leaf, rather than an app-wide active
+workspace observer. Within that leaf's Host workspace branch (full or transient parent pathname),
+its decoded local `route.params` own the pane identity. Expo can publish an older complete global
+workspace pathname after the new native params are focused; using that global workspace ID would
+remount the old pane inside the new screen. A newer native leaf's params take ownership when it
+focuses. Hidden leaves, other-Host paths and global Chat/Settings/History paths remain inactive;
+this rule does not change global parsing, remembered selection or web/desktop retention.
+
 Settings root Back follows its existing navigation entry before consulting remembered workspace
 selection. A saved session is a cold-link fallback, not the origin of Settings opened from Home
 or Chat. On web, screen Back uses browser history when present: Back/Forward may reconstruct a

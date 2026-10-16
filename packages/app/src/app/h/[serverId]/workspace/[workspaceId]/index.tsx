@@ -205,6 +205,8 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
   const pathname = usePathname();
   const route = useRoute();
   const isRouteFocused = useIsFocused();
+  // Expo's LocalRouteParamsContext is this leaf's route.params (Route.js), not the
+  // globally published selection. useIsFocused binds that identity to the actual native leaf.
   const localParams = useLocalSearchParams<{
     serverId?: string | string[];
     workspaceId?: string | string[];
