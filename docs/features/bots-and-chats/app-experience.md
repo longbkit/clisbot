@@ -160,10 +160,10 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   source-size-bounded LRU, so reopening a chat skips parsing replies it already showed; streaming
   output is always parsed fresh. The trees are the markdown package's own output and are read, never
   mutated, by the renderer.
-- On a native phone the conversation's header/Back renders first; the transcript body then renders
-  at deferred priority through the same entry boundary as workspaces, without waiting for the
-  outgoing Chat panel ([mobile panels](../../mobile-panels.md)). A Back tap can interrupt that render. Metadata/transcript requests start with the
-  route, not the body, and a centered loading indicator stands in until the body commits.
+- A Bot conversation body renders in the destination's own commit, not at deferred priority. A
+  deferred first body measured slower on the Android emulator (cached reentry body 2.4–2.6s against
+  1.4s): sync store updates and incoming frames kept restarting it. Back stays usable earlier
+  because the Chat list mounts its Back/loading shell before dispatching the route.
 - Opening an artifact does not navigate to cowork. Desktop uses the existing ordinary side-pane
   opener: create a right split on first open; reuse the remembered pane for subsequent opens; reveal
   an already-open file without overriding a tab the user moved. Explorer is a separate dock.

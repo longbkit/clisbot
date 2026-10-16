@@ -23,7 +23,7 @@ function Pane() {
   }, []);
   return <span>{draft}</span>;
 }
-function view(focused: boolean, nativeCompact = true, identity = "A", awaitChatDeparture = true) {
+function view(focused: boolean, nativeCompact = true, identity = "A") {
   return (
     <>
       <button type="button">Back</button>
@@ -32,7 +32,6 @@ function view(focused: boolean, nativeCompact = true, identity = "A", awaitChatD
         nativeCompact={nativeCompact}
         focused={focused}
         placeholder={PREPARING}
-        awaitChatDeparture={awaitChatDeparture}
       >
         <Pane />
       </WorkspaceEntryContent>
@@ -100,17 +99,6 @@ it("does not prepare an unfocused cold native leaf", async () => {
 it("leaves web/desktop materialization unchanged", async () => {
   mount();
   await act(() => root!.render(view(false, false)));
-  expect(container.textContent).toBe("Backretained draft");
-  expect(commits).toEqual(["pane"]);
-});
-it("can prepare during departure at deferred priority, still committing the shell first", async () => {
-  mount();
-  let first = "";
-  // The urgent pass commits only the shell; the deferred pass then constructs the pane.
-  flushSync(() => root!.render(view(true, true, "A", false)));
-  first = container.textContent ?? "";
-  expect(first).toBe("BackPreparing");
-  await act(async () => {});
   expect(container.textContent).toBe("Backretained draft");
   expect(commits).toEqual(["pane"]);
 });

@@ -13,9 +13,6 @@ const state = vi.hoisted(() => ({
   epoch: 1,
   authFailure: false,
   workspaceMounts: 0,
-  native: false,
-  bodyPrepared: true,
-  traced: [] as string[],
 }));
 vi.mock("react-native", () => ({
   Platform: { OS: "web" },
@@ -129,26 +126,6 @@ vi.mock("./conversation-workspace", () => ({
     );
   },
 }));
-vi.mock("@/constants/platform", () => ({
-  get isNative() {
-    return state.native;
-  },
-}));
-vi.mock("@/performance/conversation-trace", () => ({
-  traceConversationPhase: (phase: string) => state.traced.push(phase),
-}));
-// The entry boundary's deferral/presentation behavior has its own tests; here it is a switch.
-vi.mock("@/screens/workspace/workspace-entry-content", () => ({
-  WorkspaceEntryContent: ({
-    nativeCompact,
-    placeholder,
-    children,
-  }: {
-    nativeCompact: boolean;
-    placeholder: React.ReactNode;
-    children: React.ReactNode;
-  }) => (nativeCompact && !state.bodyPrepared ? placeholder : children),
-}));
 vi.mock("./chat-screen", () => ({
   ChatScreen: ({ transcript }: { transcript: { id: string }[] }) => (
     <article>{transcript[0]?.id}</article>
@@ -167,9 +144,6 @@ afterEach(() => {
   state.epoch = 1;
   state.authFailure = false;
   state.workspaceMounts = 0;
-  state.native = false;
-  state.bodyPrepared = true;
-  state.traced = [];
 });
 it("keeps the same conversation chrome through metadata loading, accepted content, refresh and transcript error", () => {
   const view = render(<ChatRoute />);
@@ -245,25 +219,5 @@ it("shows non-intercepting initial and refresh progress without replacing the ac
   expect(screen.queryByTestId("chat-refresh-loading")).toBeNull();
   expect(screen.getByText("accepted-message")).toBe(body);
   expect(screen.getByRole("button", { name: "Back" })).toBe(back);
-  expect(state.workspaceMounts).toBe(1);
-});
-
-it("keeps native header/Back with centered loading while the accepted body is still preparing", () => {
-  state.native = true;
-  state.bodyPrepared = false;
-  state.chat = { id: "chat", participants: [], title: "Accepted" };
-  const view = render(<ChatRoute />);
-  const back = screen.getByRole("button", { name: "Back" });
-  expect(screen.queryByText("accepted-message")).toBeNull();
-  expect(screen.getByTestId("chat-initial-loading").getAttribute("data-pointer-events")).toBe(
-    "none",
-  );
-  expect(state.traced).not.toContain("body.prepared");
-  state.bodyPrepared = true;
-  view.rerender(<ChatRoute />);
-  expect(screen.getByText("accepted-message")).toBeTruthy();
-  expect(screen.queryByTestId("chat-initial-loading")).toBeNull();
-  expect(screen.getByRole("button", { name: "Back" })).toBe(back);
-  expect(state.traced).toContain("body.prepared");
   expect(state.workspaceMounts).toBe(1);
 });

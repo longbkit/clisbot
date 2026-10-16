@@ -48,12 +48,9 @@ reversal need not emit another appearance end. A first/unpresented screen still 
 actual appearance; parent, stale phase, canceled intent and changed panel generation cannot
 complete the destination.
 
-Native compact workspace and Bot conversation entry keep their existing header/Back surface
-separate from first body materialization. A workspace body waits for the existing outgoing Chat
-presentation boundary, then React prepares it at deferred render priority. A Bot conversation body
-starts that deferred preparation right after the header commits: its first commit fits inside the
-presentation handshake, while waiting for the reveal measured slower because late responses kept
-restarting the deferred render. Losing focus before that first body commits abandons the
+Native compact workspace entry keeps its existing header/Back surface separate from first pane
+materialization. The body waits for the existing outgoing Chat presentation boundary, then React
+prepares it at deferred render priority. Losing focus before that first body commits abandons the
 view preparation; it does not cancel an agent turn. Once committed, panes keep the existing
 retention/draft/scroll policy across Back and reconnect. This does not defer authoritative store
 updates or guarantee that an individual native Fabric commit is interruptible. Web and desktop
