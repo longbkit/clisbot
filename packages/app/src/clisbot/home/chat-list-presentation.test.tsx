@@ -46,6 +46,11 @@ vi.mock("@/mobile-panels/provider", () => ({ useIsMobilePanelActive: () => env.l
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => env.compact }));
 vi.mock("@/constants/platform", () => ({ isWeb: false }));
 vi.mock("./feature", () => ({ HOME_V2_ENABLED: true }));
+vi.mock("./inbox-activity", () => ({
+  useInboxActivity: () => ({ needs: 0 }),
+  useInboxActivityLabel: () => "Inbox",
+  InboxActivityIndicator: () => null,
+}));
 vi.mock("@/hooks/use-aggregated-agents", () => ({ useAggregatedAgents: () => ({ agents: [] }) }));
 vi.mock("@/performance/native-trace", () => ({
   startNativeInputTracing: vi.fn(),

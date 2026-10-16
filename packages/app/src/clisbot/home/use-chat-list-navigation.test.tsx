@@ -385,3 +385,27 @@ it("late opening end cannot certify a native screen in a newer closing phase", (
   owner.commitLeaf(b, panel);
   expect(close).not.toHaveBeenCalled();
 });
+it.each(["peer", "bot"])(
+  "stale closing end preserves the newer opening record without an owning leaf: %s",
+  (variant) => {
+    const owner = createChatListPresentation(),
+      close = vi.fn();
+    const current =
+      variant === "peer"
+        ? { key: "home", name: "open-project" }
+        : {
+            key: "bot-chat",
+            name: "chat/[chatId]",
+            params: { serverId: "host-a", chatId: "direct-chat" },
+          };
+    const opening = { target: current.key, data: { closing: false } };
+    const closing = { ...opening, data: { closing: true } };
+    owner.begin(panel, variant === "peer" ? "/open-project" : "/h/host-a/chat/direct-chat", close);
+    owner.transitionStart(closing, current, panel);
+    owner.transitionStart(opening, current, panel);
+    owner.transitionEnd(closing, current, panel);
+    expect(close).not.toHaveBeenCalled();
+    owner.transitionEnd(opening, current, panel);
+    expect(close).toHaveBeenCalledOnce();
+  },
+);
