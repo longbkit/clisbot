@@ -104,6 +104,7 @@ interface SidebarLabels {
 
 interface MobileSidebarProps extends SidebarSharedProps {
   active: boolean;
+  presented: boolean;
   insetsTop: number;
   insetsBottom: number;
   closeSidebar: () => void;
@@ -114,7 +115,13 @@ interface DesktopSidebarProps extends SidebarSharedProps {
   active: boolean;
 }
 
-export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boolean }) {
+export const LeftSidebar = memo(function LeftSidebar({
+  active,
+  presented,
+}: {
+  active: boolean;
+  presented: boolean;
+}) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -239,6 +246,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
           <MobileSidebar
             {...sharedProps}
             active={active}
+            presented={presented}
             insetsTop={insets.top}
             insetsBottom={insets.bottom}
             closeSidebar={showMobileAgent}
@@ -275,6 +283,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
 
 function MobileSidebar({
   active,
+  presented,
   theme,
   workspaceGroups,
   projectIconTargets,
@@ -321,8 +330,9 @@ function MobileSidebar({
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   // Home V2 makes this the Chat tab's page: no close gesture, no X, and the tab bar below it owns
   // the bottom safe area.
-  const { gesture: closeGesture, gestureRef: closeGestureRef } =
-    useCloseAgentListGesture(!HOME_V2_ENABLED);
+  const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture(
+    presented && !HOME_V2_ENABLED,
+  );
 
   const handleWorkspacePress = handleConversationPress;
 
@@ -338,6 +348,7 @@ function MobileSidebar({
   return (
     <MobilePanelOverlay
       panel="agent-list"
+      presented={presented}
       closeGesture={closeGesture}
       panelStyle={mobileSidebarInsetStyle}
     >

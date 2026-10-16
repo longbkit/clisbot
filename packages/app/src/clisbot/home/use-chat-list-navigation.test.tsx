@@ -209,3 +209,53 @@ it("native current-workspace overlays close without requiring another appearance
   act(() => view.result.current(destination()));
   expect(close).toHaveBeenCalledTimes(1);
 });
+
+it("keeps row admission identity across path commits while reading the latest committed overlay path", () => {
+  const close = vi.fn();
+  const view = renderHook(() => useChatListNavigation(close));
+  const admit = view.result.current;
+  route.path = "/h/host-a/workspace";
+  view.rerender();
+  expect(view.result.current).toBe(admit);
+  route.path = destination();
+  view.rerender();
+  expect(view.result.current).toBe(admit);
+  close.mockClear(); // The preceding Chat departure already closed on its committed path.
+  act(() => admit(destination()));
+  expect(close).toHaveBeenCalledOnce();
+  route.path = "/chat";
+  view.rerender();
+  expect(view.result.current).toBe(admit);
+  act(() => admit(destination()));
+  expect(close).toHaveBeenCalledOnce();
+});
+it("keeps the newest peer-tab intent when an earlier Home appearance arrives", () => {
+  const owner = createChatListPresentation(),
+    close = vi.fn();
+  const home = { key: "home", name: "open-project" };
+  const inbox = { key: "inbox", name: "sessions" };
+  const homeEvent = { target: home.key, data: { closing: false } };
+  const inboxEvent = { target: inbox.key, data: { closing: false } };
+  owner.begin(panel, "/open-project", close);
+  owner.transitionStart(homeEvent, home);
+  owner.begin(panel, "/sessions", close);
+  expect(owner.getPendingDestination()).toBe("/sessions");
+  owner.transitionEnd(homeEvent, home, panel);
+  expect(close).not.toHaveBeenCalled();
+  owner.transitionStart(inboxEvent, inbox);
+  owner.transitionEnd(inboxEvent, inbox, panel);
+  expect(close).toHaveBeenCalledOnce();
+});
+it("cancels a peer departure before late Home appearance without hiding Chat", () => {
+  const owner = createChatListPresentation(),
+    close = vi.fn();
+  const home = { key: "home", name: "open-project" };
+  const appear = { target: home.key, data: { closing: false } };
+  owner.begin(panel, "/open-project", close);
+  owner.transitionStart(appear, home);
+  owner.returnToList();
+  owner.transitionEnd(appear, home, panel);
+  expect(close).not.toHaveBeenCalled();
+  owner.didReturnToList();
+  expect(owner.getPendingDestination()).toBeNull();
+});

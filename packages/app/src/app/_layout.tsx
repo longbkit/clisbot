@@ -491,7 +491,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   const isWorkspaceRoute = parseHostWorkspaceRouteFromPathname(pathname) !== null;
   const isWorkspaceFocusModeEnabled = isWorkspaceRoute && isFocusModeEnabled;
   const chromeEnabled = chromeEnabledOverride ?? daemons.length > 0;
-  const hasMountedDesktopSidebar = useLatchedBoolean(chromeEnabled);
+  const hasMountedSidebar = useLatchedBoolean(chromeEnabled);
   const toggleAgentList = isCompactLayout ? toggleMobileAgentList : toggleDesktopAgentList;
   const toggleDesktopSidebars = useCallback(() => {
     // The focused workspace owns its layout key, its checkout, and therefore the
@@ -526,7 +526,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   const appContentMinimumWidth = resolveDesktopAppContentMinimum({
     isSettingsRoute: pathname.includes("/settings"),
   });
-  const desktopSidebarMounted = hasMountedDesktopSidebar && !isWorkspaceFocusModeEnabled;
+  const desktopSidebarMounted = hasMountedSidebar && !isWorkspaceFocusModeEnabled;
   const desktopSidebarVisible = resolveDesktopSidebarVisibility({
     chromeEnabled,
     isCompactLayout,
@@ -544,10 +544,11 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     hasTopLeftWindowControls,
     sidebarControlsEnabled: chromeEnabled && !isWorkspaceFocusModeEnabled,
   });
+  const compactSidebarMounted = isNative ? hasMountedSidebar : chromeEnabled;
   const sidebarChrome = profileNativeRegion(
     "Sidebar",
     <SidebarChrome
-      mounted={isCompactLayout ? chromeEnabled : desktopSidebarMounted}
+      mounted={isCompactLayout ? compactSidebarMounted : desktopSidebarMounted}
       visible={isCompactLayout ? chromeEnabled : desktopSidebarVisible}
       keyboardShortcutsEnabled={keyboardShortcutsEnabled}
     />,
@@ -556,6 +557,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   if (isWeb) {
     themedSidebarChrome = <AppearanceStyleBoundary>{sidebarChrome}</AppearanceStyleBoundary>;
   }
+  const routedContent = <RoutedAppContent compact={isCompactLayout}>{children}</RoutedAppContent>;
   const workspaceChrome = (
     <View style={rowStyle}>
       {!isCompactLayout ? (
@@ -569,12 +571,12 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
           presentation={explorerSidebarPresentation === "dock" ? "dock" : "overlay"}
         >
           <WindowChromeRegion corners={chromeEnabled ? "both" : appChromeLayout.contentCorners}>
-            <View style={flexStyle}>{profileNativeRegion("Navigator", children)}</View>
+            {routedContent}
           </WindowChromeRegion>
         </CompactExplorerSidebarHost>
       ) : (
         <WindowChromeRegion corners={appChromeLayout.contentCorners}>
-          <View style={flexStyle}>{profileNativeRegion("Navigator", children)}</View>
+          {routedContent}
         </WindowChromeRegion>
       )}
     </View>
@@ -629,10 +631,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   );
 
   const content = isCompactLayout ? (
-    <View style={flexStyle}>
-      <MobileGestureWrapper chromeEnabled={chromeEnabled}>{surface}</MobileGestureWrapper>
-      <MobileHomeTabs />
-    </View>
+    <MobileGestureWrapper chromeEnabled={chromeEnabled}>{surface}</MobileGestureWrapper>
   ) : (
     surface
   );
@@ -641,6 +640,22 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     <ComposerEditingSessionsProvider>
       <CommandCenterProvider>{content}</CommandCenterProvider>
     </ComposerEditingSessionsProvider>
+  );
+}
+
+// The incoming native page owns its peer bar without resizing the outgoing Chat overlay.
+function RoutedAppContent({ children, compact }: { children: ReactNode; compact: boolean }) {
+  return (
+    <View style={flexStyle}>
+      {compact && isNative ? (
+        <>
+          <View style={flexStyle}>{profileNativeRegion("Navigator", children)}</View>
+          <MobileHomeTabs />
+        </>
+      ) : (
+        profileNativeRegion("Navigator", children)
+      )}
+    </View>
   );
 }
 
@@ -659,7 +674,7 @@ function SidebarChrome({
   const active = visible && (isCompactLayout ? isMobileActive : isDesktopOpen);
   return (
     <SidebarModelProvider active={active}>
-      {mounted ? <LeftSidebar active={active} /> : null}
+      {mounted ? <LeftSidebar active={active} presented={visible} /> : null}
       <WorkspaceShortcutTargetsSubscriber enabled={keyboardShortcutsEnabled} />
     </SidebarModelProvider>
   );
@@ -675,13 +690,21 @@ function MobileGestureWrapper({
   // Home V2: the phone reaches conversations through the Chat tab, not an edge swipe.
   const openGesture = useOpenAgentListGesture(chromeEnabled && !HOME_V2_ENABLED);
 
-  return (
+  const content = (
     <GestureDetector gesture={openGesture} touchAction={MOBILE_WEB_GESTURE_TOUCH_ACTION}>
       <View collapsable={false} style={layoutStyles.surfaceFill}>
         {children}
       </View>
     </GestureDetector>
   );
+  if (isWeb)
+    return (
+      <View style={flexStyle}>
+        {content}
+        <MobileHomeTabs />
+      </View>
+    );
+  return content;
 }
 
 function ProvidersWrapper({ children }: { children: ReactNode }) {

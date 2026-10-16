@@ -13,10 +13,23 @@ They are one interaction, not two independent drawers. The implementation lives 
 
 The Home extension (`HOME_V2_ENABLED`) adds Home / Chat / Inbox / Automations tabs above the
 existing panel model. Chat is a page, not a drawer: `/chat` selects `agent-list`, the switch has no
-slide, and the tab bar stays below the panel. The agent-list open and close gestures, the
+slide, and Chat’s visual tab bar belongs to that panel. Peer-page bars belong to the routed
+content column, so preparing one behind an outgoing Chat panel cannot resize its frame. The agent-list open and close gestures, the
 terminal's swipe-right and the sidebar's close button are off. If `agent-list` still settles
 closed while `/chat` is focused, the route goes Home rather than leave an empty page. See [Home and Inbox](features/home-and-inbox/README.md) for the page layout,
 startup, Quick starts and rollback.
+
+Native Chat departures (including Home/Inbox/Automations) keep the outgoing panel until the
+requested focused native leaf appears. A queued newer destination or return to Chat invalidates
+an older completion; peer returns retain replace semantics while detail returns preserve the Host
+deck. Admission callbacks read the latest committed path without changing row callback identity
+on every partial/full route commit.
+
+Once native compact chrome has mounted, global screens retain it inactive instead of rebuilding
+it on Back. The shared overlay’s explicit presentation guard hides the actual host, input and
+accessibility without collapsing retained scroll ranges; close gestures and sidebar demand are
+inactive too. Cold global screens still do not mount the sidebar. Compact web and desktop keep
+their existing mount policies.
 
 ## Ownership
 

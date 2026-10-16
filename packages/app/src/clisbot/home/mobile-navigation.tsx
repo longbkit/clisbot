@@ -72,6 +72,7 @@ function Tab({
   count?: number;
 }) {
   const navigate = useNavigateHomeTab();
+  const router = useRouter();
   const state = useMemo(() => ({ selected }), [selected]);
   const open = useCallback(
     (event: GestureResponderEvent) => {
@@ -79,14 +80,27 @@ function Tab({
         path: entry.path,
         eventMs: String(event.nativeEvent.timestamp),
       });
-      if (selected && !isWeb) return;
+      const panels = usePanelStore.getState();
+      const pending = !isWeb && nativePresentation.isPending(panels.mobilePanel);
+      if (selected && !isWeb) {
+        if (entry.path === "/chat" && pending) {
+          const destination = nativePresentation.getPendingDestination();
+          nativePresentation.returnToList();
+          // Peer tabs replace; a detail return keeps the retained Host deck underneath.
+          if (destination && isHomeTabPath(destination)) navigate("/chat");
+          else router.navigate("/chat");
+        }
+        return;
+      }
       if (entry.path === "/chat") {
         rememberChatReturn("/chat");
         usePanelStore.getState().showMobileAgentList();
-      } else usePanelStore.getState().showMobileAgent();
+      } else if (!isWeb && panels.mobilePanel.target === "agent-list") {
+        nativePresentation.begin(panels.mobilePanel, entry.path, panels.showMobileAgent);
+      } else panels.showMobileAgent();
       navigate(entry.path as Href);
     },
-    [entry.path, navigate, selected],
+    [entry.path, navigate, router, selected],
   );
   return (
     <Pressable accessibilityRole="tab" accessibilityState={state} style={tabStyle} onPress={open}>
@@ -117,8 +131,10 @@ function useMobileHardwareBack(path: string, compact: boolean, departing: boolea
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
       const panels = usePanelStore.getState();
       if (nativePresentation.isPending(panels.mobilePanel)) {
+        const destination = nativePresentation.getPendingDestination();
         nativePresentation.returnToList();
-        router.navigate("/chat");
+        if (destination && isHomeTabPath(destination)) navigate("/chat");
+        else router.navigate("/chat");
         return true;
       }
       if (detail && panels.mobilePanel.target !== "agent") {
@@ -156,7 +172,7 @@ export function MobileHomeTabs() {
 export function MobileChatPanelTabs() {
   const path = usePathname();
   const departing = useIsChatListDeparting();
-  if (path !== "/chat" && (isHomeTabPath(path) || !departing)) return null;
+  if (path !== "/chat" && !departing) return null;
   return <MobileTabBar path="/chat" />;
 }
 

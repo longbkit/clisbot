@@ -14,6 +14,7 @@ interface MobilePanelOverlayProps {
   children: ReactNode;
   closeGesture: GestureType;
   panel: OverlayPanel;
+  presented?: boolean;
   panelStyle?: ComponentProps<typeof Animated.View>["style"];
 }
 
@@ -22,10 +23,12 @@ export function MobilePanelOverlay({
   closeGesture,
   panel,
   panelStyle,
+  presented = true,
 }: MobilePanelOverlayProps) {
   const { position, windowWidth } = useMobilePanelsRuntime();
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
-  const isOpen = useIsMobilePanelActive(panel);
+  const isActive = useIsMobilePanelActive(panel);
+  const isOpen = presented && isActive;
   const isLeft = panel === "agent-list";
 
   const sidebarAnimatedStyle = useAnimatedStyle(() => {
@@ -68,8 +71,16 @@ export function MobilePanelOverlay({
     ],
     [panelStyle, positionedPanelStyle, sidebarAnimatedStyle, windowWidth],
   );
+  // Global screens hide retained native chrome without collapsing its scroll ranges.
+  // This host guard also wins over a previously settled agent-list worklet position.
+  const overlayHostStyle = useMemo(
+    () => (presented ? styles.overlay : [styles.overlay, styles.notPresented]),
+    [presented],
+  );
   let overlayPointerEvents: "auto" | "box-none" | "none";
-  if (!isWeb) {
+  if (!presented) {
+    overlayPointerEvents = "none";
+  } else if (!isWeb) {
     overlayPointerEvents = "box-none";
   } else {
     overlayPointerEvents = isOpen ? "auto" : "none";
@@ -85,7 +96,7 @@ export function MobilePanelOverlay({
         importantForAccessibility={isOpen ? "auto" : "no-hide-descendants"}
         nativeID={`${panel}-gesture-host`}
         pointerEvents={overlayPointerEvents}
-        style={styles.overlay}
+        style={overlayHostStyle}
       >
         <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
           <Pressable
@@ -117,6 +128,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
   },
+  notPresented: { opacity: 0 },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.5)",

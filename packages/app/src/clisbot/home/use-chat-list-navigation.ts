@@ -49,17 +49,21 @@ export function useChatListNavigation(closeList: () => void): (destination?: str
   return useCallback(
     (destination?: string) => {
       if (HOME_V2_ENABLED) rememberChatReturn("/chat");
+      // Read the last committed path: Expo may still have a newer intent queued for dispatch.
+      const committedPath = previousPath.current;
       const panel = usePanelStore.getState().mobilePanel;
       const departing =
-        HOME_V2_ENABLED && isNative && (path === "/chat" || nativePresentation.isPending(panel));
+        HOME_V2_ENABLED &&
+        isNative &&
+        (committedPath === "/chat" || nativePresentation.isPending(panel));
       if (departing && destination) {
         cancelPending.current = nativePresentation.begin(panel, destination, closeList);
       } else {
         cancelPending.current?.();
         // An overlay over an already presented workspace closes even for another tab in that workspace.
-        if (!HOME_V2_ENABLED || isNative || path !== "/chat") closeList();
+        if (!HOME_V2_ENABLED || isNative || committedPath !== "/chat") closeList();
       }
     },
-    [closeList, path],
+    [closeList],
   );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import React, { memo } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import React, { memo, useCallback } from "react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const env = vi.hoisted(() => ({
   path: "/chat",
@@ -11,6 +11,8 @@ const env = vi.hoisted(() => ({
   panel: { target: "agent-list", revision: 1 },
   listeners: new Set<() => void>(),
   navigate: vi.fn(),
+  replace: vi.fn(),
+  showAgent: vi.fn(),
   back: null as (() => boolean) | null,
 }));
 vi.mock("@/stores/panel-store", async () => {
@@ -26,7 +28,7 @@ vi.mock("@/stores/panel-store", async () => {
         },
         () => select({ mobilePanel: env.panel }),
       ),
-    { getState: () => ({ mobilePanel: env.panel, showMobileAgent: vi.fn() }) },
+    { getState: () => ({ mobilePanel: env.panel, showMobileAgent: env.showAgent }) },
   );
   return { usePanelStore };
 });
@@ -35,7 +37,7 @@ vi.mock("@/stores/navigation-active-workspace-store", () => ({
 }));
 vi.mock("expo-router", () => ({
   usePathname: () => env.path,
-  useRouter: () => ({ navigate: env.navigate, replace: vi.fn() }),
+  useRouter: () => ({ navigate: env.navigate, replace: env.replace }),
 }));
 vi.mock("@/components/ui/control-geometry", () => ({ MIN_TOUCH_TARGET_SIZE: 48 }));
 vi.mock("@/components/headers/header-back-button", () => ({ HeaderBackButton: () => null }));
@@ -69,14 +71,24 @@ vi.mock("react-native", () => ({
     children,
     accessibilityRole,
     accessibilityState,
+    onPress,
   }: React.PropsWithChildren<{
+    onPress?: (event: { nativeEvent: { timestamp: number } }) => void;
     accessibilityRole?: React.AriaRole;
     accessibilityState?: { selected: boolean };
-  }>) => (
-    <button type="button" role={accessibilityRole} aria-selected={accessibilityState?.selected}>
-      {children}
-    </button>
-  ),
+  }>) => {
+    const click = useCallback(() => onPress?.({ nativeEvent: { timestamp: 1 } }), [onPress]);
+    return (
+      <button
+        type="button"
+        role={accessibilityRole}
+        aria-selected={accessibilityState?.selected}
+        onClick={click}
+      >
+        {children}
+      </button>
+    );
+  },
   BackHandler: {
     addEventListener: (_: string, cb: () => boolean) => {
       env.back = cb;
@@ -289,3 +301,36 @@ it("keeps desktop selection independent of a compact departure", () => {
   expect(screen.getByTestId("expanded-session").textContent).toBe("a");
   expect(screen.queryByTestId("home-mobile-tabs")).toBeNull();
 });
+
+it.each(["selected Chat", "hardware Back"])(
+  "%s cancels a pending peer replacement without appending a hidden peer page",
+  (action) => {
+    const view = render(<Page />);
+    fireEvent.click(screen.getByRole("tab", { name: "Home" }));
+    expect(env.replace).toHaveBeenCalledWith("/open-project");
+    expect(env.showAgent).not.toHaveBeenCalled();
+    expect(nativePresentation.getPendingDestination()).toBe("/open-project");
+    env.path = "/open-project";
+    view.rerender(<Page />);
+    const list = screen.getByTestId("native-list-panel");
+    const chat = list.querySelector("[role=tab][aria-selected=true]")!;
+    expect(chat.textContent).toBe("Chat");
+    act(() => {
+      if (action === "hardware Back") expect(env.back?.()).toBe(true);
+      else fireEvent.click(chat);
+    });
+    expect(env.replace).toHaveBeenLastCalledWith("/chat");
+    expect(env.navigate).not.toHaveBeenCalled();
+    const home = { key: "home", name: "open-project" };
+    const homeAppear = { target: home.key, data: { closing: false } };
+    act(() => {
+      nativePresentation.transitionStart(homeAppear, home);
+      nativePresentation.transitionEnd(
+        appear,
+        home,
+        env.panel as { target: "agent-list"; revision: number },
+      );
+    });
+    expect(env.showAgent).not.toHaveBeenCalled();
+  },
+);

@@ -82,6 +82,9 @@ export function createChatListPresentation() {
         listeners.delete(listener);
       };
     },
+    getPendingDestination() {
+      return pending?.destination ?? null;
+    },
     getPendingRevision() {
       return pending?.panel.revision ?? null;
     },
