@@ -1,3 +1,5 @@
+import { DaemonConnectionError } from "@clisbot/client/internal/daemon-client";
+import { traceConversationPhase } from "@/performance/conversation-trace";
 import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
 import { useCallback, useMemo, useState } from "react";
 import { useFetchQuery } from "@/data/query";
@@ -14,7 +16,7 @@ export const TRANSCRIPT_PAGE_SIZE = 50;
 export type ChatTranscriptLoadState =
   | { status: "connecting" }
   | { status: "loading" }
-  | { status: "error"; message: string }
+  | { status: "error"; message: string; retainAccepted?: boolean }
   | { status: "loaded" };
 
 export interface UseChatTranscriptResult {
@@ -65,7 +67,9 @@ export function useChatTranscriptQuery(input: {
       botsSessionScope(snapshot),
     ],
     queryFn: async () => {
+      traceConversationPhase("transcript.request", key);
       const page = await fetchPage(runtime, { serverId, chatId });
+      traceConversationPhase("transcript.response", key, { rows: String(page.messages.length) });
       useTranscriptStore.getState().replacePage(key, page);
       return page;
     },
@@ -88,8 +92,19 @@ export function useChatTranscriptQuery(input: {
   }, [chatId, isLoadingOlder, key, runtime, serverId]);
   const loadState = useMemo<ChatTranscriptLoadState>(() => {
     if (!online) return { status: "connecting" };
-    if (query.isError) return { status: "error", message: toErrorMessage(query.error) };
+    if (query.isError)
+      return {
+        status: "error",
+        message: toErrorMessage(query.error),
+        // Only known transport failures may retain an already accepted page. RPC/auth,
+        // protocol and unknown errors still hide the transcript, including on refresh.
+        retainAccepted:
+          query.error instanceof DaemonConnectionError &&
+          query.error.code === "DAEMON_REQUEST_TIMEOUT" &&
+          !snapshot?.authFailureReason &&
+          query.data !== undefined,
+      };
     return query.data ? { status: "loaded" } : { status: "loading" };
-  }, [online, query.data, query.error, query.isError]);
+  }, [online, query.data, query.error, query.isError, snapshot?.authFailureReason]);
   return { transcript, loadState, loadOlder, isLoadingOlder };
 }

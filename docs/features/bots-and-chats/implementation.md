@@ -151,6 +151,27 @@ The plans were written in parallel and diverged on a few names. These are the se
 | Bot Projects in the app        | Hidden by default; device-local toggle reveals a separate collapsible Bot projects group. Settings › Projects and sharing grants remain available    | README D4 said "Projects section" without the settings nuance |
 | App flag-off                   | Behavior-equivalent, not byte-equivalent (README D10 exception)                                                                                      | —                                                             |
 
+### Conversation reentry and catalog lifetime
+
+A conversation can reuse the canonical `record` carried by its already accepted chat-list
+projection, only for the exact Host/chat and current client generation/connection epoch.
+`useChatRecord` still revalidates through the existing list RPC and guards older results
+against a newer pushed binding; authoritative absence/error clears the record and transcript.
+There is no second metadata cache. Pending/new-admission, unasked or failed Host catalogs
+cannot seed a detail. The conversation workspace/header stays mounted while metadata is
+pending or transcript loading fails, so Back remains available; unreadable/denied content
+is replaced within the body rather than replacing navigation. A typed
+`DaemonConnectionError` with `DAEMON_REQUEST_TIMEOUT` on a non-rejected admission may retain an already accepted metadata
+record/page in the same admission with a visible error; RPC/auth/protocol and unknown errors
+remain fail-closed. The route hides accepted content on the existing explicit authentication-failure snapshot, while keeping Back. New admission keys never borrow the previous page.
+
+Catalog consumers share one event reconciliation feed per actual client and admission.
+The first consumer reconciles the initial snapshot; removing a consumer does not disconnect
+others, and the last consumer releases the feed. Replacement client/epoch callbacks are
+rejected before applying updates. Transcript appends and query invalidations run once per
+feed, not once per mounted sidebar/detail consumer. Fetch-query refresh and authority
+boundaries remain unchanged; this is not a longer stale-time policy or route keepalive.
+
 ## Order of work
 
 Server first, app second, CLI third; the Hub marker rides with the server tasks. Each numbered

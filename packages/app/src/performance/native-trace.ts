@@ -67,6 +67,16 @@ export function traceInstant(name: string, args?: Record<string, string>): void 
   nativePerformanceTrace.endSection();
 }
 
+/** Conversation admission keys share the existing bounded, profile-only alias registry. */
+export function traceConversationPhase(
+  phase: string,
+  key: string,
+  extra?: Record<string, string>,
+): void {
+  const conversation = correlate("route", key);
+  if (conversation) traceInstant(`clisbot.chat.${phase}`, { conversation, ...extra });
+}
+
 /** One-shot synthetic Android diagnostic; the external controller owns process termination. */
 export function startArmedHermesSampling(workspaceKey: string): void {
   if (nativePerformanceTrace.isEnabled()) traceModule?.startArmedHermesSampling(workspaceKey);

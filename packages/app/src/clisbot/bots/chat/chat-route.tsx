@@ -1,9 +1,11 @@
+import { MenuHeader } from "@/components/headers/menu-header";
+import { traceConversationPhase } from "@/performance/conversation-trace";
 import { ChatToolsContext, useChatToolsValue } from "@/clisbot/connectors/chat-tools";
 import { useSessionStore } from "@/stores/session-store";
 import { useResourcePrincipalScope } from "../data/resource-principal-scope";
 import { ConversationWorkspace } from "./conversation-workspace";
 import { useChatVisibility } from "./use-chat-visibility";
-import { useChatRecord } from "./use-chat-record";
+import { acceptedChatRecord, useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { botsSessionScope, scopedTranscriptKey } from "../data/session-scope";
@@ -14,7 +16,7 @@ import { ChatHeartbeatsButton } from "@/clisbot/heartbeats/chat-heartbeats-butto
 import { isGroupChat } from "./chat-kind";
 import { ParticipantActions } from "./participant-actions";
 import { StopAllAction } from "./stop-all-action";
-import { useCallback, useMemo } from "react";
+import { useCallback, useLayoutEffect, useMemo, type ReactNode } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View, Text } from "react-native";
@@ -28,7 +30,7 @@ import {
 } from "@/runtime/host-runtime";
 import { useHostBotsFeature } from "../feature";
 import { botsRuntime, useBotCatalog } from "../data/runtime";
-import { useChatTranscriptQuery } from "../data/use-chat-transcript";
+import { useChatTranscriptQuery, type UseChatTranscriptResult } from "../data/use-chat-transcript";
 import { ChatScreen } from "./chat-screen";
 import { conversationToolDisplay } from "./tool-activity";
 import { useChatToolActivityHeaderValue } from "./use-chat-tool-activity-header";
@@ -51,13 +53,16 @@ function Gate() {
   const snapshot = useHostRuntimeSnapshot(serverId);
   const enabled = useHostBotsFeature(serverId);
   const status = useHostRuntimeConnectionStatus(serverId);
-  if (!enabled)
+  const unavailable =
+    status === "online" ? t("bots.chat.route.notEnabled") : t("bots.chat.common.connectingToHost");
+  if (!enabled || snapshot?.authFailureReason)
     return (
-      <Text>
-        {status === "online"
-          ? t("bots.chat.route.notEnabled")
-          : t("bots.chat.common.connectingToHost")}
-      </Text>
+      <View style={styles.root}>
+        <MenuHeader />
+        <Text accessibilityRole={snapshot?.authFailureReason ? "alert" : undefined}>
+          {snapshot?.authFailureReason ? snapshot.lastError : unavailable}
+        </Text>
+      </View>
     );
   return (
     <ChatRouteContent
@@ -75,11 +80,22 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const focused = useIsFocused();
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
-  const { chat, setChat, error, setError } = useChatRecord(client, online, chatId, key);
+  const catalog = useBotCatalog();
+  const { chat, setChat, error, setError } = useChatRecord(
+    client,
+    online,
+    chatId,
+    key,
+    acceptedChatRecord(catalog.chats, serverId, chatId),
+  );
   const transcript = useChatTranscriptQuery({ serverId, chatId, runtime: botsRuntime });
   useChatVisibility(serverId, chatId, chat, focused);
   const heads = useChatLiveHeads(serverId, chat?.participants ?? EMPTY_PARTICIPANTS);
-  const { botRows, identities, workspaceByBotId } = useChatIdentities(serverId, chat?.participants);
+  const { botRows, identities, workspaceByBotId } = useChatIdentities(
+    serverId,
+    chat?.participants,
+    catalog.bots,
+  );
   const attachmentsSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
@@ -119,23 +135,23 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     working,
     setError,
   });
-  if (transcript.loadState.status === "error")
-    return <Text accessibilityRole="alert">{transcript.loadState.message}</Text>;
-  if (!chat)
-    return (
-      <Text>
-        {error ?? (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
-      </Text>
-    );
-  const title = chat.title ?? identities.map((b) => b.name).join(", ");
+  const messageCount = transcript.transcript.messages.length;
+  const loadStatus = transcript.loadState.status;
+  useLayoutEffect(() => {
+    traceConversationPhase("body.commit", key, {
+      metadata: String(chat !== null),
+      rows: String(messageCount),
+      load: loadStatus,
+      focused: String(focused),
+      error: String(Boolean(error) || loadStatus === "error"),
+    });
+  }, [key, chat, messageCount, loadStatus, focused, error]);
+  const title = chat
+    ? (chat.title ?? identities.map((b) => b.name).join(", "))
+    : t("bots.chat.route.loading");
   return (
     <View style={styles.root}>
       {!online ? <Text style={styles.error}>{t("bots.chat.route.offline")}</Text> : null}
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
       <ChatToolsContext.Provider value={chatTools}>
         <ChatToolActivityHeaderContext.Provider value={toolActivityHeader}>
           <ConversationWorkspace
@@ -148,23 +164,65 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
             headerActions={options}
             headingActions={headingActions}
           >
-            <ChatScreen
-              hideHeader
-              serverId={serverId}
-              chatId={chatId}
-              title={title}
-              bots={identities}
-              group={group}
-              transcript={transcript.transcript.messages}
-              liveHeads={heads}
-              canSend={online && !sending}
-              onSubmitMessage={send}
-              onReachTop={reachTop}
-              toolDisplay={toolDisplay}
-            />
+            <ChatRouteBody chat={chat} online={online} error={error} transcript={transcript}>
+              <ChatScreen
+                hideHeader
+                serverId={serverId}
+                chatId={chatId}
+                title={title}
+                bots={identities}
+                group={group}
+                transcript={transcript.transcript.messages}
+                liveHeads={heads}
+                canSend={online && !sending}
+                onSubmitMessage={send}
+                onReachTop={reachTop}
+                toolDisplay={toolDisplay}
+              />
+            </ChatRouteBody>
           </ConversationWorkspace>
         </ChatToolActivityHeaderContext.Provider>
       </ChatToolsContext.Provider>
+    </View>
+  );
+}
+
+/** Keep navigation and the accepted body mounted independently of refresh status. */
+function ChatRouteBody({
+  chat,
+  online,
+  error,
+  transcript,
+  children,
+}: {
+  chat: ChatPayload | null;
+  online: boolean;
+  error: string | null;
+  transcript: UseChatTranscriptResult;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const failure = transcript.loadState.status === "error" ? transcript.loadState : null;
+  const blocked = failure && !failure.retainAccepted ? failure.message : null;
+  if (!chat || blocked)
+    return (
+      <Text accessibilityRole={error || blocked ? "alert" : undefined}>
+        {blocked ??
+          error ??
+          (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
+      </Text>
+    );
+  return (
+    <View style={styles.body}>
+      {error || failure ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {error ?? failure?.message}
+        </Text>
+      ) : null}
+      {transcript.loadState.status === "loading" && transcript.transcript.messages.length === 0 ? (
+        <Text>{t("bots.chat.route.loading")}</Text>
+      ) : null}
+      {children}
     </View>
   );
 }
@@ -173,8 +231,8 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
 function useChatIdentities(
   serverId: string,
   participants: ChatPayload["participants"] | undefined,
+  bots: ReturnType<typeof useBotCatalog>["bots"],
 ) {
-  const { bots } = useBotCatalog();
   const botRows = useMemo(
     () =>
       bots.loadState.status === "loaded"
@@ -275,6 +333,7 @@ type ChatIdentities = ReturnType<typeof useChatIdentities>;
 
 const styles = StyleSheet.create((theme) => ({
   root: { flex: 1, backgroundColor: theme.colors.surface0 },
+  body: { flex: 1 },
   actions: {
     flexDirection: "row",
     alignItems: "center",

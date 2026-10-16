@@ -34,6 +34,8 @@ export type ChatParticipant = Pick<WireChat["participants"][number], "botId" | "
 export type ChatPayload = Pick<WireChat, "id" | "kind" | "rules" | "createdAt" | "updatedAt"> & {
   title: string;
   participants: ChatParticipant[];
+  /** Canonical accepted record, shared with the detail route without another metadata cache. */
+  record?: WireChat;
 };
 export type ChatMessage = Pick<
   ChatMessagePayload,
@@ -51,7 +53,11 @@ export function botView(bot: WireBot): BotPayload {
   return { ...bot, launchDefaults: bot.launch };
 }
 export function chatView(chat: WireChat): ChatPayload {
-  return { ...chat, title: chat.title ?? chat.participants.map((p) => p.displayName).join(", ") };
+  return {
+    ...chat,
+    title: chat.title ?? chat.participants.map((p) => p.displayName).join(", "),
+    record: chat,
+  };
 }
 export function messageView(line: ChatMessagePayload): ChatMessage {
   return { ...line, agentId: line.reply?.agentId };

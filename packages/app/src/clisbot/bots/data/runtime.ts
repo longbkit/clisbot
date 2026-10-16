@@ -1,4 +1,5 @@
-import { scopedTranscriptKey } from "./session-scope";
+import { createCatalogEventFeeds } from "./catalog-event-feeds";
+import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
 import { useEffect, useMemo } from "react";
 import { getHostRuntimeStore, useHostRuntimeConnectionStatuses } from "@/runtime/host-runtime";
 import { queryClient } from "@/data/query-client";
@@ -49,6 +50,8 @@ export async function refreshBotsAndChatsNow(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["chats"] }),
   ]);
 }
+const retainCatalogEvents = createCatalogEventFeeds();
+
 export function useBotCatalog() {
   const featureHosts = useBotsFeatureHosts();
   const hosts = useMemo(
@@ -71,34 +74,39 @@ export function useBotCatalog() {
       const client = getHostRuntimeStore().getClient(serverId);
       if (!client) return [];
       const admittedSnapshot = getHostRuntimeStore().getSnapshot(serverId);
-      const feed = client.observeEvents([
-        "bot.updated",
-        "chat.updated",
-        "chat.transcript.appended",
-      ]);
-      feed.subscribe({
-        snapshot: () => {
-          refreshBotsAndChats();
-          void queryClient.invalidateQueries({ queryKey: ["chat-transcript"] });
-        },
-        update: (event) => {
-          if (event.type === "chat.transcript.appended") {
-            useTranscriptStore
-              .getState()
-              .append(
-                scopedTranscriptKey(serverId, event.payload.chatId, admittedSnapshot),
-                messageView(event.payload.line),
-              );
-            void queryClient.invalidateQueries({ queryKey: ["chats"] });
-          } else if (event.type === "chat.updated" || event.type === "bot.updated")
-            refreshBotsAndChats();
-        },
-      });
-      return [
+      const admission = `${serverId}:${botsSessionScope(admittedSnapshot)}`;
+      const release = retainCatalogEvents(
+        client,
+        admission,
         () => {
-          void feed.release().catch(() => undefined);
+          const store = getHostRuntimeStore();
+          const current = store.getSnapshot(serverId);
+          return (
+            store.getClient(serverId) === client &&
+            current?.connectionStatus === "online" &&
+            botsSessionScope(current) === botsSessionScope(admittedSnapshot)
+          );
         },
-      ];
+        {
+          snapshot: () => {
+            refreshBotsAndChats();
+            void queryClient.invalidateQueries({ queryKey: ["chat-transcript"] });
+          },
+          update: (event) => {
+            if (event.type === "chat.transcript.appended") {
+              useTranscriptStore
+                .getState()
+                .append(
+                  scopedTranscriptKey(serverId, event.payload.chatId, admittedSnapshot),
+                  messageView(event.payload.line),
+                );
+              void queryClient.invalidateQueries({ queryKey: ["chats"] });
+            } else if (event.type === "chat.updated" || event.type === "bot.updated")
+              refreshBotsAndChats();
+          },
+        },
+      );
+      return [release];
     });
     return () => cleanups.forEach((cleanup) => cleanup());
   }, [ids, connectionKey]);
