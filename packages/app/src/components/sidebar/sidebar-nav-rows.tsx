@@ -4,10 +4,12 @@ import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { ConnectorsSidebarItem } from "@/clisbot/connectors/connectors-sidebar-item";
 import { router, usePathname } from "expo-router";
 import { CalendarClock, FolderPlus, History, Home, Inbox, Plus, Search } from "lucide-react-native";
-import { memo, useCallback, useMemo, useRef, type ComponentType } from "react";
+import { memo, useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
@@ -30,6 +32,8 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
   style?: StyleProp<ViewStyle>;
   /** The phone's Chat tab drops Home, Inbox and Automations: the tab bar below already has them. */
   omitTabDestinations?: boolean;
+  /** Shares the first navigation row's height; status changes never insert another row. */
+  accessory?: ReactNode;
 }
 
 const TAB_DESTINATIONS: ReadonlySet<BuiltinSidebarNavId> = new Set(["history", "schedules"]);
@@ -37,12 +41,13 @@ const TAB_DESTINATIONS: ReadonlySet<BuiltinSidebarNavId> = new Set(["history", "
 /**
  * Top-level sidebar navigation, ordered and filtered by the user's
  * `sidebarNavItems` preference. Renders nothing — not even the bordered group
- * wrapper — when every item is hidden.
+ * wrapper — when every item is hidden and there is no status accessory.
  */
 export function SidebarNavRows({
   style,
   onBeforeNavigate,
   omitTabDestinations = false,
+  accessory,
 }: SidebarNavRowsProps) {
   const { items } = useSidebarNavItems("header");
   const visibleItems = useMemo(
@@ -64,9 +69,10 @@ export function SidebarNavRows({
       {HOME_V2_ENABLED && !omitTabDestinations ? (
         <SidebarHomeRow onBeforeNavigate={onBeforeNavigate} />
       ) : null}
-      {visibleItems.map((item) => {
+      {visibleItems.map((item, index) => {
+        let row: ReactNode;
         if (item.kind === "plugin") {
-          return (
+          row = (
             <PluginSidebarItem
               key={item.key}
               group={item.group}
@@ -75,14 +81,38 @@ export function SidebarNavRows({
               onBeforeNavigate={onBeforeNavigate}
             />
           );
+        } else {
+          const Row = BUILTIN_ROWS[item.id];
+          row = <Row key={item.key} onBeforeNavigate={onBeforeNavigate} />;
         }
-        const Row = BUILTIN_ROWS[item.id];
-        return <Row key={item.key} onBeforeNavigate={onBeforeNavigate} />;
+        return index === 0 && accessory ? (
+          <View key={item.key} style={styles.accessoryRow}>
+            <View style={styles.navigationCell}>{row}</View>
+            <View style={styles.accessoryCell}>{accessory}</View>
+          </View>
+        ) : (
+          row
+        );
       })}
+      {visibleItems.length === 0 && accessory ? (
+        <View style={styles.accessoryRow}>
+          <View style={styles.accessoryCell}>{accessory}</View>
+        </View>
+      ) : null}
       <ConnectorsSidebarItem onBeforeNavigate={onBeforeNavigate} />
     </View>
   );
 }
+
+const styles = StyleSheet.create((theme) => ({
+  accessoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: MIN_TOUCH_TARGET_SIZE,
+  },
+  navigationCell: { flex: 1, minWidth: 0 },
+  accessoryCell: { flex: 1, minWidth: 0, paddingRight: theme.spacing[2] },
+}));
 
 /** Home V2 leads the navigation with Home, a destination like Inbox rather than the brand row. */
 function SidebarHomeRow({ onBeforeNavigate }: SidebarNavRowProps) {

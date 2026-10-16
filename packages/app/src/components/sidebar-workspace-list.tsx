@@ -1,4 +1,5 @@
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
+import { traceInstant } from "@/performance/native-trace";
 import { sectionRowIndent, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { useResourcePins, pinKey } from "@/clisbot/bots/sidebar/pins";
 import { FusionPinnedSection } from "@/clisbot/bots/sidebar/pinned-section";
@@ -1171,19 +1172,30 @@ function WorkspaceRowInner({
     ...dragAttributes
   } = dragHandleProps?.attributes ?? {};
 
-  const handlePress = useCallback(() => {
-    if (interaction.didLongPressRef.current) {
-      interaction.didLongPressRef.current = false;
-      return;
-    }
-    onPress();
-  }, [interaction.didLongPressRef, onPress]);
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (interaction.didLongPressRef.current) {
+        interaction.didLongPressRef.current = false;
+        return;
+      }
+      traceInstant("clisbot.workspace.press", {
+        eventMs: String(event.nativeEvent.timestamp),
+        workspaceKey: workspace.workspaceKey,
+      });
+      onPress();
+    },
+    [interaction.didLongPressRef, onPress, workspace.workspaceKey],
+  );
   const handleWorkspacePressIn = useCallback(
     (event: GestureResponderEvent) => {
       setIsPressed(true);
+      traceInstant("clisbot.workspace.pressIn", {
+        eventMs: String(event.nativeEvent.timestamp),
+        workspaceKey: workspace.workspaceKey,
+      });
       interaction.handlePressIn(event);
     },
-    [interaction],
+    [interaction, workspace.workspaceKey],
   );
   const handleWorkspacePressOut = useCallback(() => {
     setIsPressed(false);

@@ -3,7 +3,7 @@ import { SidebarDirectoryStatus } from "@/components/sidebar/sidebar-directory-s
 import { SidebarFooter } from "@/components/sidebar/sidebar-footer";
 import { IconTooltipContent } from "@/components/sidebar/sidebar-footer-controls";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
-import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
+import { useChatListNavigation } from "@/clisbot/home/use-chat-list-navigation";
 import { BotsSectionHeader, useSectionCollapsed } from "@/clisbot/bots/sidebar/section-header";
 import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
@@ -300,10 +300,7 @@ function MobileSidebar({
   insetsBottom,
   closeSidebar,
 }: MobileSidebarProps) {
-  const handleConversationPress = useCallback(() => {
-    if (HOME_V2_ENABLED) rememberChatReturn("/chat");
-    closeSidebar();
-  }, [closeSidebar]);
+  const handleConversationPress = useChatListNavigation(closeSidebar);
   // On a phone the navigation rows scroll with the list; only the account row stays pinned.
   const botsAndChatsSections = useMemo(
     () => (
@@ -311,6 +308,7 @@ function MobileSidebar({
         <SidebarNavRows
           style={styles.mobileNavRows}
           omitTabDestinations={HOME_V2_ENABLED}
+          accessory={HOME_V2_ENABLED ? sidebarDirectoryStatusElement : undefined}
           onBeforeNavigate={closeSidebar}
         />
         <BotsAndChatsSidebarSections onBeforeNavigate={handleConversationPress} />
@@ -381,7 +379,6 @@ function MobileSidebar({
           </WindowChromeSafeArea>
         )}
 
-        {HOME_V2_ENABLED ? <SidebarDirectoryStatus /> : null}
         <SidebarMetadataNotice />
         {isInitialLoad && (HOME_V2_ENABLED || !hasActiveHostFilter) ? (
           <SidebarAgentListSkeleton />
@@ -662,6 +659,7 @@ function WorkspacesSectionHeader() {
 // Stable element so the sidebar list's listHeaderComponent prop keeps identity across
 // renders (WorkspacesSectionHeader takes no props).
 const workspacesSectionHeaderElement = <WorkspacesSectionHeader />;
+const sidebarDirectoryStatusElement = <SidebarDirectoryStatus />;
 
 // Static styles for Animated.Views — must NOT use Unistyles dynamic theme to
 // avoid the "Unable to find node on an unmounted component" crash when Unistyles

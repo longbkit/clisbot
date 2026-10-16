@@ -14,6 +14,7 @@ import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { prepareWorkspaceTab, type PrepareWorkspaceTabDeps } from "@/utils/prepare-workspace-tab";
 import type { WorkspaceTabPlacement } from "@/stores/workspace-layout-actions";
+import { traceInstant } from "@/performance/native-trace";
 
 export interface RouteSelectionInput {
   pathname: string;
@@ -86,6 +87,7 @@ export function navigateToWorkspace(
   input: NavigateToWorkspaceInput,
   deps: NavigateToWorkspaceDeps,
 ): string {
+  traceInstant("clisbot.workspace.navigation", { stage: "begin" });
   const workspaces = deps.getSessionWorkspaces(input.serverId);
   const resolvedWorkspaceId = resolveWorkspaceMapKeyByIdentity({
     workspaces,
@@ -114,6 +116,7 @@ export function navigateToWorkspace(
     }
   }
 
+  traceInstant("clisbot.workspace.navigation", { stage: "tabPrepared" });
   const route =
     input.target?.kind === "agent" && shouldDeferAgentOpen
       ? buildHostWorkspaceOpenRoute(
@@ -122,8 +125,12 @@ export function navigateToWorkspace(
           `agent:${input.target.agentId}`,
         )
       : buildHostWorkspaceRoute(input.serverId, input.workspaceId);
-  deps.rememberLastWorkspace({ serverId: input.serverId, workspaceId: input.workspaceId });
+  deps.rememberLastWorkspace({
+    serverId: input.serverId,
+    workspaceId: input.workspaceId,
+  });
   deps.navigateToRoute(route);
+  traceInstant("clisbot.workspace.navigation", { stage: "dispatched" });
   return route;
 }
 

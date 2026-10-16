@@ -38,14 +38,20 @@ chevron); there is no separate Open Inbox button. Recent groups by local Today, 
 Home initially shows up to ten conversations per group; Show more reveals ten more per group
 until all loaded activity is visible. Needs you always counts the whole group. The compact toolbar opens the same cross-Host search on native and web without closing the Chat page underneath it.
 The compact toolbar and bottom navigation use the same `surface0` theme surface, including their safe-area strips.
+Choosing a workspace/session, Quick chat or Bot conversation from Chat keeps the outgoing list
+visible until the destination route commits, rather than exposing the underlying Browse conversations
+page. An overlay opened over an existing detail still closes on selection, including a different
+agent tab in the same workspace (no pathname change). Closure observes current committed navigation;
+there is no asynchronous data-readiness completion that can dismiss a later surface.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
 
 Home reserves scaled activity rows during the first directory load. Home and Chat keep their
 accepted catalog visible during refresh or transient disconnect; a connection change alone must
-not remove and reinsert rows or reset the list's viewport. A reserved status line distinguishes
-loading, refreshing and unavailable data, with Retry for a directory failure and Host details for
-connection recovery. First-load empty copy appears only after the relevant directory succeeds; accepted-empty copy and creation actions stay mounted through refresh/error. Home reads agent readiness; Chat reads workspace/project readiness and applies its selected Host scope consistently. Loading does not claim Up to date. A configured Usage summary reserves its top-toolbar row before reports arrive, preserving the reading anchor.
+not remove and reinsert rows or reset the list's viewport. Home reserves a status line; compact Chat shares its first navigation row with loading,
+refreshing and unavailable status, with Retry for a directory failure and Host details for
+connection recovery. Healthy Chat has no redundant Conversations heading or separate status-row gap.
+The status accessory reserves the same navigation-row geometry even when header actions are hidden. First-load empty copy appears only after the relevant directory succeeds; accepted-empty copy and creation actions stay mounted through refresh/error. Home reads agent readiness; Chat reads workspace/project readiness and applies its selected Host scope consistently. Loading does not claim Up to date. A configured Usage summary reserves its top-toolbar row before reports arrive, preserving the reading anchor.
 Registry removal and authoritative directory tombstones still remove their rows through the existing owners. Managed revocation removes fully managed Hosts; an adopted Host with saved manual connections follows the runtime’s existing manual-profile restoration path.
 
 Home keeps placement separate from live conversation data. Active and Needs you retain their
