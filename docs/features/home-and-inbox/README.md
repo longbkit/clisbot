@@ -55,6 +55,11 @@ Other peer-tab bars remain at root; hardware Back, input tracing and route marke
 owner, independent of the retained sidebar's visual bar. Hardware Back cancels entry and retains this outgoing projection until Chat commits;
 an old destination appearance cannot close the returning list. Desktop selection and ordinary
 already-presented workspace overlays keep their existing behavior.
+On native, Expo can briefly publish `/h/<Host>/workspace` between complete workspace paths.
+Only the actually focused workspace leaf uses its valid local IDs for that exact same-Host
+partial path, keeping the deck active and its visible-agent demand stable. The global selection
+parser and last-workspace persistence do not accept this fallback; hidden routes, Settings and
+other global screens still clear active selection, and complete paths remain authoritative.
 The desktop window drag region stays in the header, leaving the whole Home content area scrollable,
 including blank space beside the reading column.
 

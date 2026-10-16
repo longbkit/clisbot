@@ -6,10 +6,12 @@ import {
   reconcileRetainedWorkspaceSelections,
   resolveWorkspaceDeckRetentionLimit,
   resolveWorkspaceDeckEntries,
+  resolveWorkspaceDeckActiveSelection,
   shouldKeepWorkspaceDeckEntryMounted,
   WORKSPACE_DECK_INACTIVE_TTL_MS,
   WORKSPACE_DECK_MAX_MOUNTED_WORKSPACES,
 } from "@/screens/workspace/workspace-deck-retention";
+import { buildHostRootRoute, parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 
 function workspace(workspaceId: string, serverId = "server"): ActiveWorkspaceSelection {
   return { serverId, workspaceId };
@@ -28,6 +30,77 @@ function retainedWorkspaceIds(
 ): string[] {
   return entries.map((entry) => entry.selection.workspaceId);
 }
+
+describe("resolveWorkspaceDeckActiveSelection", () => {
+  const local = workspace("A");
+  const input = {
+    isNative: true,
+    isRouteFocused: true,
+    pathname: "/h/server/workspace",
+    parsedSelection: null,
+    localSelection: local,
+  };
+  it("keeps the focused native leaf active through the recorded full/partial/full sequence", () => {
+    const entries = [local];
+    const active = [
+      "/h/server/workspace/A",
+      "/h/server/workspace",
+      "/h/server/workspace/A",
+      "/chat",
+    ].map(
+      (pathname) =>
+        resolveWorkspaceDeckEntries({
+          selections: entries,
+          activeSelection: resolveWorkspaceDeckActiveSelection({
+            ...input,
+            pathname,
+            parsedSelection: parseHostWorkspaceRouteFromPathname(pathname),
+          }),
+        })[0]?.active,
+    );
+    expect(active).toEqual([true, true, true, false]);
+  });
+  it.each([
+    { isNative: false },
+    { isRouteFocused: false },
+    { localSelection: null },
+    { localSelection: workspace("") },
+    { localSelection: workspace("A", "") },
+  ])("does not recover a partial path without its focused native local owner: %j", (change) => {
+    expect(resolveWorkspaceDeckActiveSelection({ ...input, ...change })).toBeNull();
+  });
+  it.each([
+    "/settings",
+    "/chat",
+    "/open-project",
+    "/sessions",
+    "/",
+    "/h/server",
+    "/h/other/workspace",
+    "/h/server/workspace/A/files",
+    "/h/server/workspace/A",
+    "/h/server/workspace/",
+  ])("does not substitute local params on a different or complete path: %s", (pathname) => {
+    expect(resolveWorkspaceDeckActiveSelection({ ...input, pathname })).toBeNull();
+  });
+  it("keeps a valid globally parsed destination authoritative even with old hidden local params", () => {
+    const parsedSelection = workspace("B", "other");
+    expect(
+      resolveWorkspaceDeckActiveSelection({ ...input, isRouteFocused: false, parsedSelection }),
+    ).toBe(parsedSelection);
+  });
+  it("matches the encoded Host identity exactly", () => {
+    const localSelection = workspace("A", "Host /%");
+    expect(
+      resolveWorkspaceDeckActiveSelection({
+        ...input,
+        localSelection,
+        pathname: `${buildHostRootRoute(localSelection.serverId)}/workspace`,
+      }),
+    ).toBe(localSelection);
+    expect(resolveWorkspaceDeckActiveSelection({ ...input, localSelection })).toBeNull();
+  });
+});
 
 describe("reconcileRetainedWorkspaceSelections", () => {
   it("retains only the active workspace on native", () => {

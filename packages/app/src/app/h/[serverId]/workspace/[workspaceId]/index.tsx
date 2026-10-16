@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
 import { StyleSheet, View } from "react-native";
 import {
   useGlobalSearchParams,
@@ -28,6 +28,7 @@ import {
   resolveWorkspaceDeckRetentionLimit,
   type RetainedWorkspaceSelection,
   resolveWorkspaceDeckEntries,
+  resolveWorkspaceDeckActiveSelection,
   shouldKeepWorkspaceDeckEntryMounted,
 } from "@/screens/workspace/workspace-deck-retention";
 import {
@@ -200,15 +201,32 @@ function HostWorkspaceRouteContent() {
 }
 
 function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
-  const activeSelection = useActiveWorkspaceSelection();
+  const parsedSelection = useActiveWorkspaceSelection();
   const pathname = usePathname();
   const route = useRoute();
+  const isRouteFocused = useIsFocused();
   const localParams = useLocalSearchParams<{
     serverId?: string | string[];
     workspaceId?: string | string[];
   }>();
-  const parsedKey = activeSelection ? getWorkspaceSelectionKey(activeSelection) : "none";
+  const parsedKey = parsedSelection ? getWorkspaceSelectionKey(parsedSelection) : "none";
   const localKey = `${getParamValue(localParams.serverId)}:${getParamValue(localParams.workspaceId)}`;
+  const localServerId = getParamValue(localParams.serverId);
+  const localWorkspaceValue = getParamValue(localParams.workspaceId);
+  const localWorkspaceId = localWorkspaceValue
+    ? decodeWorkspaceIdFromPathSegment(localWorkspaceValue)
+    : null;
+  const activeSelection = resolveWorkspaceDeckActiveSelection({
+    isNative,
+    isRouteFocused,
+    pathname,
+    parsedSelection,
+    localSelection:
+      localServerId && localWorkspaceId
+        ? { serverId: localServerId, workspaceId: localWorkspaceId }
+        : null,
+  });
+  const resolvedKey = activeSelection ? getWorkspaceSelectionKey(activeSelection) : "none";
   const [retainedSelections, setRetainedSelections] = useState<RetainedWorkspaceSelection[]>(() =>
     activeSelection ? [{ selection: activeSelection, inactiveSince: null }] : [],
   );
@@ -249,8 +267,9 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
     traceInstant("clisbot.deck.path", { path: pathname });
     traceInstant("clisbot.deck.selection", { parsed: parsedKey, local: localKey });
     traceInstant("clisbot.deck.route", { key: route.key });
+    traceInstant("clisbot.deck.focus", { focused: String(isRouteFocused), resolved: resolvedKey });
     traceInstant("clisbot.deck.entries", { entries: entryProjection });
-  }, [entryProjection, localKey, parsedKey, pathname, route.key]);
+  }, [entryProjection, isRouteFocused, localKey, parsedKey, pathname, resolvedKey, route.key]);
 
   useLayoutEffect(() => {
     if (!areRetainedWorkspaceSelectionListsEqual(retainedSelections, nextRetainedSelections)) {

@@ -1,4 +1,20 @@
 import type { ActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
+import { buildHostRootRoute } from "@/utils/host-routes";
+
+/** Only the focused native workspace leaf can interpret its own transient parent pathname. */
+export function resolveWorkspaceDeckActiveSelection(input: {
+  isNative: boolean;
+  isRouteFocused: boolean;
+  pathname: string;
+  parsedSelection: ActiveWorkspaceSelection | null;
+  localSelection: ActiveWorkspaceSelection | null;
+}): ActiveWorkspaceSelection | null {
+  if (input.parsedSelection) return input.parsedSelection;
+  const local = input.localSelection;
+  if (!input.isNative || !input.isRouteFocused || !local?.serverId || !local.workspaceId)
+    return null;
+  return input.pathname === `${buildHostRootRoute(local.serverId)}/workspace` ? local : null;
+}
 
 export const WORKSPACE_DECK_MAX_MOUNTED_WORKSPACES = 10;
 export const WORKSPACE_DECK_INACTIVE_TTL_MS = 10 * 60 * 1000;
