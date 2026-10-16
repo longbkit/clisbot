@@ -70,7 +70,10 @@ The UI worklet owns transient motion:
 React publishes the active panel only when the canonical target and the UI-thread position agree at
 the final anchor. Retained content never observes gesture previews, progress, or an unsettled target.
 The gesture hosts stay mounted. Native worklets own overlay opacity and pointer events while
-React owns settled panel activity and accessibility. Keep hidden native overlays laid out: collapsing
+React owns settled panel activity and accessibility. Native backdrop/panel descendants stay
+`auto` beneath that animated ancestor: they must not wait for the settled React publication to
+receive touches after the panel is already visible. The outer presentation host still blocks
+all descendants on global screens; web keeps its settled child eligibility. Keep hidden native overlays laid out: collapsing
 their scroll ranges makes Android spring retained offsets back to zero during touch cancellation or
 release. Native panel hosts and their dependent draggable lists
 also retain identity across appearance hydration and settings changes. Do not wrap those hosts in

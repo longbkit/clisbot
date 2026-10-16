@@ -58,7 +58,7 @@ function PanelHitTrace({
       presented: String(presented),
       open: String(isOpen),
       host: presented ? "box-none" : "none",
-      child: isOpen ? "auto" : "none",
+      child: !isWeb || isOpen ? "auto" : "none",
     });
   }, [isOpen, panel, presented]);
   return null;
@@ -160,6 +160,12 @@ export function MobilePanelOverlay({
     overlayPointerEvents = isOpen ? "auto" : "none";
   }
 
+  // Native visibility already gates the entire subtree on the UI thread. A second
+  // settled React gate can leave visible rows untouchable while its publication waits
+  // behind JS work. Keep descendants eligible under that ancestor; global screens
+  // still block the host, and activity/accessibility retain their settled policy.
+  const childPointerEvents = !isWeb || isOpen ? "auto" : "none";
+
   return (
     <GestureDetector gesture={closeGesture} touchAction="pan-y">
       {/* Fabric needs an always-mounted native host to attach the close handler while the
@@ -182,14 +188,14 @@ export function MobilePanelOverlay({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
             onPress={showMobileAgent}
-            pointerEvents={isOpen ? "auto" : "none"}
+            pointerEvents={childPointerEvents}
             style={StyleSheet.absoluteFillObject}
             testID={isOpen ? `${panel}-backdrop` : undefined}
           >
             <Animated.View pointerEvents="none" style={backdropStyle} />
           </Pressable>
 
-          <Animated.View pointerEvents={isOpen ? "auto" : "none"} style={combinedPanelStyle}>
+          <Animated.View pointerEvents={childPointerEvents} style={combinedPanelStyle}>
             <WindowChromeRootRegion corners="both">{children}</WindowChromeRootRegion>
           </Animated.View>
         </Animated.View>
