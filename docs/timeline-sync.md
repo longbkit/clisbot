@@ -148,11 +148,23 @@ deletion clears the transcript; list membership changes do not.
 Removing the host from the registry is the destructive boundary: it stops the runtime and clears the
 session and host-scoped setup state together.
 
-The timeline owner asks durable replica storage for an agent when that agent becomes visible. An
-accepted row paints immediately before subscription acknowledgement or timeline fetch. The stored
-range describes those exact items: `startSeq` drives older pagination and `endSeq` drives forward
-catch-up. The owner requests `after endSeq`, and requests `before startSeq` when the user loads older
-history. Code outside the owner does not distinguish cached and network timelines.
+The timeline owner asks durable replica storage for an agent when that agent becomes visible.
+Visible authoritative catch-up starts as soon as membership is acknowledged, independently of cache
+preparation: it requests `after endSeq` when a retained cursor is already available, or the ordinary
+bounded latest tail otherwise. Hidden open sessions retain cache-first scheduling and yield to visible
+catch-up. Durable storage ordering, failure and quota rules are unchanged.
+
+An accepted stored row may paint before the network response; its exact range drives older pagination
+and forward catch-up. If that range arrives while an initial tail is already in flight, the response
+uses the canonical resume merge, preserving covered older rows unless reset, epoch or gap policy
+requires replacement. A successful network snapshot, or covered partial/reset page admitted during
+the read, wins over a late cache snapshot. Coverage removed by retention cannot be repopulated by
+that older read. Coverage reference changes conservatively skip hydration even for equivalent ranges.
+Cache completion never restarts an ordinary completed/running request or bypasses network retry delay;
+it resumes an explicitly parked gap recovery after a completed request. The owner requests
+`before startSeq` when the user loads older history. Code outside the owner does not distinguish
+cached and network timelines. Sending a bounded tail rather than a small delta can increase response
+bytes; earlier request admission alone does not establish faster presentation or input responsiveness.
 
 The first resume request is bounded. If it reports more newer history, fetch one latest bounded tail
 instead of replaying every missed page. Replacing that tail also replaces its retained-page metadata;

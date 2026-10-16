@@ -345,22 +345,63 @@ test("uses a tail fetch when an agent becomes visible", async () => {
   fetch.respond({ hasNewer: false });
 });
 
-test("loads the cache before choosing the authoritative network request", async () => {
+test("starts one bounded tail while cache preparation is pending, without refetching on completion", async () => {
   const world = new TimelineWorld();
   world.cacheGate = deferred<void>();
   world.sync.setConnected(true);
   world.sync.replaceVisibleAgentIds("workspace", ["agent-a"]);
-  const membership = await world.nextMembership();
-  membership.succeed();
-  const cacheRequest = await world.nextCacheRequest();
-
-  expect(cacheRequest).toBe("agent-a");
-  expect(world.pendingFetchCount).toBe(0);
-
+  (await world.nextMembership()).succeed();
+  expect(await world.nextCacheRequest()).toBe("agent-a");
+  await expect.poll(() => world.pendingFetchCount, { timeout: 100 }).toBe(1);
+  const fetch = await world.nextFetch("agent-a");
+  expect(fetch.request).toEqual({ direction: "tail", limit: 40, projection: "projected" });
+  fetch.respond({ hasNewer: false });
+  await expect.poll(() => world.sync.getAgentTimelineStatus("agent-a")).toBe("ready");
   world.cursors.set("agent-a", { epoch: "cached-epoch", endSeq: 17 });
   world.cacheGate.resolve();
-  const fetch = await world.nextFetch("agent-a");
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  world.expectNoPendingFetch();
+  expect(world.reportedCurrent).toHaveLength(1);
+  world.sync.dispose();
+});
 
+test("resumes hidden gap recovery parked after visible success while initial cache is held", async () => {
+  const world = new TimelineWorld();
+  world.cacheGate = deferred<void>();
+  world.sync.setConnected(true);
+  world.show("pane", ["agent-a"]);
+  (await world.nextMembership()).succeed();
+  (await world.nextFetch("agent-a")).respond({ hasNewer: false });
+  await expect.poll(() => world.sync.getAgentTimelineStatus("agent-a")).toBe("ready");
+  world.show("pane", []);
+  world.sync.recoverGap("agent-a", { epoch: "epoch-agent-a", endSeq: 10 });
+  world.expectNoPendingFetch();
+  world.cacheGate.resolve();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(world.pendingFetchCount).toBe(1);
+  const recovery = await world.nextFetch("agent-a");
+  expect(recovery.request).toEqual({
+    direction: "after",
+    cursor: { epoch: "epoch-agent-a", seq: 10 },
+    limit: 40,
+    projection: "projected",
+  });
+  recovery.respond({ hasNewer: false });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  world.expectNoPendingFetch();
+  expect(world.reportedCurrent).toHaveLength(2);
+  world.sync.dispose();
+});
+
+test("uses an already available cursor without awaiting unrelated cache preparation", async () => {
+  const world = new TimelineWorld();
+  world.cacheGate = deferred<void>();
+  world.cursors.set("agent-a", { epoch: "cached-epoch", endSeq: 17 });
+  world.sync.setConnected(true);
+  world.show("workspace", ["agent-a"]);
+  (await world.nextMembership()).succeed();
+  await expect.poll(() => world.pendingFetchCount, { timeout: 100 }).toBe(1);
+  const fetch = await world.nextFetch("agent-a");
   expect(fetch.request).toEqual({
     direction: "after",
     cursor: { epoch: "cached-epoch", seq: 17 },
@@ -368,6 +409,83 @@ test("loads the cache before choosing the authoritative network request", async 
     projection: "projected",
   });
   fetch.respond({ hasNewer: false });
+  world.cacheGate.resolve();
+  world.sync.dispose();
+});
+
+test("late preparation does not bypass the authoritative request retry delay", async () => {
+  const world = new TimelineWorld();
+  world.cacheGate = deferred<void>();
+  world.sync.setConnected(true);
+  world.show("workspace", ["agent-a"]);
+  (await world.nextMembership()).succeed();
+  await expect.poll(() => world.pendingFetchCount, { timeout: 100 }).toBe(1);
+  (await world.nextFetch("agent-a")).fail("offline");
+  await world.nextError();
+  const retry = await world.nextRetry();
+  world.cacheGate.resolve();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  world.expectNoPendingFetch();
+  expect(world.sync.getAgentTimelineStatus("agent-a")).toBe("error");
+  retry();
+  (await world.nextFetch("agent-a")).respond({ hasNewer: false });
+  world.sync.dispose();
+});
+
+test("Back and newer visibility admit B without waiting for A cache or response", async () => {
+  const world = new TimelineWorld();
+  world.cacheGate = deferred<void>();
+  world.sync.setConnected(true);
+  world.show("pane", ["agent-a"]);
+  (await world.nextMembership()).succeed();
+  const a = await world.nextFetch("agent-a");
+  world.show("pane", []);
+  world.show("pane", ["agent-b"]);
+  (await world.nextMembership()).succeed();
+  const b = await world.nextFetch("agent-b");
+  b.respond({ hasNewer: false });
+  await expect.poll(() => world.sync.getAgentTimelineStatus("agent-b")).toBe("ready");
+  a.respond({ hasNewer: false });
+  await expect.poll(() => world.sync.getAgentTimelineStatus("agent-a")).toBe("ready");
+  world.cacheGate.resolve();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(world.reportedCurrent.map((entry) => entry.agentId)).toEqual(["agent-b", "agent-a"]);
+  world.expectNoPendingFetch();
+  // Open A stays subscribed by the existing contract; no provider turn is cancelled.
+  world.expectNoPendingMembership();
+  world.sync.dispose();
+});
+
+test("cache failure after authoritative success neither hides readiness nor refetches", async () => {
+  const world = new TimelineWorld();
+  world.cacheGate = deferred<void>();
+  world.sync.setConnected(true);
+  world.show("pane", ["agent-a"]);
+  (await world.nextMembership()).succeed();
+  (await world.nextFetch("agent-a")).respond({ hasNewer: false });
+  await expect.poll(() => world.sync.getAgentTimelineStatus("agent-a")).toBe("ready");
+  world.cacheGate.reject(new Error("store unavailable"));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(world.errors).toEqual(["store unavailable"]);
+  expect(world.sync.getAgentTimelineStatus("agent-a")).toBe("ready");
+  world.expectNoPendingFetch();
+  world.sync.dispose();
+});
+
+test("disposal prevents late preparation or response from restarting catch-up", async () => {
+  const world = new TimelineWorld();
+  world.cacheGate = deferred<void>();
+  world.sync.setConnected(true);
+  world.show("pane", ["agent-a"]);
+  (await world.nextMembership()).succeed();
+  const fetch = await world.nextFetch("agent-a");
+  world.sync.dispose();
+  fetch.respond({ hasNewer: true });
+  world.cacheGate.resolve();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  world.expectNoPendingFetch();
+  expect(world.reportedCurrent).toEqual([]);
+  expect(world.releasedMemberships).toEqual([["agent-a"]]);
 });
 
 test("catches up after the restored cursor when an agent becomes visible", async () => {

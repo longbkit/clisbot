@@ -16,6 +16,7 @@ import {
   useSessionStore,
   type AgentTimelineCursorState,
   type AgentTimelineState,
+  type SessionState,
 } from "@/stores/session-store";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
@@ -40,6 +41,16 @@ export interface TimelineReplicaStorage {
   commitTimeline(serverId: string, agentId: string, timeline: CachedTimeline): void;
 }
 
+function hasChangedTimelineCoverage(
+  before: SessionState | undefined,
+  current: SessionState | undefined,
+  agentId: string,
+): boolean {
+  // Reference changes conservatively reject stale hydration, including equivalent
+  // replacements and removal by retention. Live overlays without coverage still merge.
+  return current?.agentTimelineCursor.get(agentId) !== before?.agentTimelineCursor.get(agentId);
+}
+
 async function prepareCachedTimeline(input: {
   serverId: string;
   agentId: string;
@@ -60,6 +71,9 @@ async function prepareCachedTimeline(input: {
   const currentTimeline = selectAgentTimelineState(session, input.agentId);
   const currentHead = session?.agentStreamHead.get(input.agentId);
   if (currentTimeline.status === "synced") return undefined;
+  // An authoritative partial/reset page can advance coverage without being fully synced.
+  // Retention can also remove coverage. Neither transition may be undone by an older read.
+  if (hasChangedTimelineCoverage(before, session, input.agentId)) return undefined;
   if (!stored.range) {
     if (beforeTimeline.status === "painted") {
       return currentTimeline.status === "painted" && currentTimeline.items === beforeTimeline.items
@@ -962,10 +976,16 @@ export function createViewedTimelineSync(ports: ViewedTimelineSyncPorts): Viewed
       .prepare(agentId)
       .catch((error) => ports.reportError(error))
       .finally(() => {
+        if (disposed) return;
         cacheLoads.delete(agentId);
         loadedCache.add(agentId);
+        // Visible catch-up may already be running, complete, or waiting for its own retry.
+        // Finishing optional cache preparation must not restart that network lifecycle.
+        const current = catchUps.get(agentId);
         const pending = pendingCatchUps.get(agentId);
-        startCatchUp(agentId, { request: pending, supersede: Boolean(pending) });
+        if (!current || (current.status === "complete" && pending)) {
+          startCatchUp(agentId, { request: pending, supersede: Boolean(pending) });
+        }
       });
     cacheLoads.set(agentId, load);
   };
@@ -999,11 +1019,14 @@ export function createViewedTimelineSync(ports: ViewedTimelineSyncPorts): Viewed
       if (request) pendingCatchUps.set(agentId, request);
       return;
     }
-    if (!loadedCache.has(agentId)) {
+    if (!loadedCache.has(agentId) && !visibleAgentIds().includes(agentId)) {
       if (request) pendingCatchUps.set(agentId, request);
       ensureCacheLoaded(agentId);
       return;
     }
+    // An acknowledged visible session can use its current cursor, or the ordinary bounded
+    // tail when no cursor is ready. Durable preparation continues independently; hidden
+    // opened sessions retain cache-first scheduling and the existing visible priority.
     const nextRequest = request ?? planTimelineResumeFetch(ports.readCursor(agentId));
     const current = catchUps.get(agentId);
     const decision = decideCatchUp({ current, request: nextRequest, supersede });

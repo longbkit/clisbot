@@ -371,6 +371,7 @@ function deriveBootstrapTailTimelinePolicy({
   endCursor,
   isInitializing,
   hasActiveInitDeferred,
+  hasCurrentCursor,
 }: {
   direction: TimelineDirection;
   reset: boolean;
@@ -378,6 +379,7 @@ function deriveBootstrapTailTimelinePolicy({
   endCursor: { seq: number } | null;
   isInitializing: boolean;
   hasActiveInitDeferred: boolean;
+  hasCurrentCursor: boolean;
 }): {
   replace: boolean;
   catchUpCursor: { epoch: string; endSeq: number } | null;
@@ -386,7 +388,10 @@ function deriveBootstrapTailTimelinePolicy({
     return { replace: true, catchUpCursor: null };
   }
 
-  const isBootstrapTailInit = direction === "tail" && isInitializing && hasActiveInitDeferred;
+  // Cache preparation can finish after a tail request was sent. Its accepted covered
+  // window then uses the normal resume merge, including older-page continuity.
+  const isBootstrapTailInit =
+    direction === "tail" && isInitializing && hasActiveInitDeferred && !hasCurrentCursor;
   if (!isBootstrapTailInit) {
     return { replace: false, catchUpCursor: null };
   }
@@ -1474,6 +1479,7 @@ export function processTimelineResponse(
     endCursor: payload.endCursor,
     isInitializing,
     hasActiveInitDeferred,
+    hasCurrentCursor: Boolean(currentCursor),
   });
   const replace = bootstrapPolicy.replace;
   const sideEffects: TimelineReducerSideEffect[] = [];

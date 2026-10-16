@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { createInitDeferred, getInitKey, resolveInitDeferred } from "@/utils/agent-initialization";
 import { ReplicaCache } from "@/runtime/replica-cache";
 import {
   createSqliteReplicaRowStore,
@@ -6,6 +7,7 @@ import {
   type SqliteValue,
 } from "@/runtime/replica-cache/row-store-sqlite";
 import { TimelinePageRetention } from "./timeline-page-retention";
+import { TimelineRetentionOwner } from "./timeline-retention-owner";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import type { CachedTimeline } from "@/runtime/replica-cache";
@@ -16,6 +18,7 @@ import {
   createTimelineReplica,
   createViewedTimelineOwner,
   type TimelineReplicaStorage,
+  type TimelineReplica,
   type ViewedTimelineOwner,
   type ViewedTimelineOwnerPorts,
 } from "./viewed-timeline-sync";
@@ -46,12 +49,15 @@ function createOwner(
   storage: TimelineReplicaStorage,
   retentionBudget?: TimelinePageRetention,
   ports?: Partial<ViewedTimelineOwnerPorts>,
+  providedReplica?: TimelineReplica,
 ): ViewedTimelineOwner {
-  const replica = createTimelineReplica({
-    serverId: SERVER_ID,
-    storage,
-    prepareAgent: async () => undefined,
-  });
+  const replica =
+    providedReplica ??
+    createTimelineReplica({
+      serverId: SERVER_ID,
+      storage,
+      prepareAgent: async () => undefined,
+    });
   return createViewedTimelineOwner({
     retentionBudget,
     serverId: SERVER_ID,
@@ -114,7 +120,10 @@ function applySynced(agentId: string, seq: number): void {
   });
 }
 
-afterEach(() => useSessionStore.getState().clearSession(SERVER_ID));
+afterEach(() => {
+  resolveInitDeferred(getInitKey(SERVER_ID, AGENT_ID));
+  useSessionStore.getState().clearSession(SERVER_ID);
+});
 
 describe("viewed timeline persistence", () => {
   it("shares an in-flight cache preparation with the viewed owner", async () => {
@@ -143,6 +152,320 @@ describe("viewed timeline persistence", () => {
 
     expect(reads).toBe(1);
     expect(replica.readCursor(AGENT_ID)).toEqual({ epoch: "epoch-1", endSeq: 4 });
+  });
+
+  it.each(["complete", "partial", "reset"] as const)(
+    "keeps an earlier authoritative %s page when pending cache preparation finishes",
+    async (mode) => {
+      useSessionStore.getState().initializeSession(SERVER_ID, null);
+      let release!: (value: CachedTimeline) => void;
+      const held = new Promise<CachedTimeline>((resolve) => {
+        release = resolve;
+      });
+      const requests: string[] = [];
+      const never = new Promise<{ hasNewer: boolean; endCursor: null }>(() => {});
+      const budget = new TimelinePageRetention();
+      const owner = createOwner(
+        { readTimeline: () => held, commitTimeline: () => undefined },
+        budget,
+        {
+          fetchPage: async (_id, request) => {
+            requests.push(request.direction);
+            if (requests.length > 1) return never;
+            const page = retentionPage(10, 11, true);
+            page.hasNewer = mode === "partial";
+            if (mode === "reset") {
+              page.reset = true;
+              page.epoch = "epoch-2";
+              page.startCursor.epoch = page.endCursor.epoch = "epoch-2";
+            }
+            owner.applyTimelineResponse(page);
+            return { hasNewer: page.hasNewer, endCursor: page.endCursor };
+          },
+        },
+      );
+      owner.setConnected(true);
+      owner.replaceVisibleAgentIds("pane", [AGENT_ID]);
+      await expect.poll(() => requests.length, { timeout: 100 }).toBe(mode === "partial" ? 2 : 1);
+      const accepted = selectAgentTimelineState(
+        useSessionStore.getState().sessions[SERVER_ID],
+        AGENT_ID,
+      );
+      expect(
+        (accepted.status === "cold" ? [] : accepted.items).map((row) => row.timelineCursor?.seq),
+      ).toEqual([10, 11]);
+      const retainedBefore = budget.retainedBytes;
+      release(cachedTimeline());
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(
+        selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID),
+      ).toEqual(accepted);
+      expect(requests).toEqual(mode === "partial" ? ["tail", "after"] : ["tail"]);
+      expect(budget.retainedBytes).toBe(retainedBefore);
+      owner.dispose();
+      expect(budget.retainedBytes).toBe(0);
+    },
+  );
+
+  it("does not restore an old epoch over a partial authoritative reset while cache is pending", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let release!: (value: CachedTimeline) => void;
+    const held = new Promise<CachedTimeline>((resolve) => {
+      release = resolve;
+    });
+    let reads = 0;
+    const replica = createTimelineReplica({
+      serverId: SERVER_ID,
+      storage: {
+        readTimeline: async () => (++reads === 1 ? cachedTimeline() : held),
+        commitTimeline: () => undefined,
+      },
+      prepareAgent: async () => undefined,
+    });
+    await replica.prepare(AGENT_ID);
+    const pending = replica.prepare(AGENT_ID);
+    const owner = createViewedTimelineOwner({
+      serverId: SERVER_ID,
+      replica,
+      replaceDemandedAgentIds: () => undefined,
+      drainQueuedAgentMessage: () => undefined,
+      ports: {
+        observe: () => ({ ready: Promise.resolve(), release: async () => undefined }),
+        readCursor: () => undefined,
+        fetchPage: async () => ({ hasNewer: false, endCursor: null }),
+        fetchLatestTail: async () => ({ hasNewer: false, endCursor: null }),
+        reportError: () => undefined,
+        schedule: () => () => undefined,
+      },
+    });
+    const page = {
+      ...retentionPage(10, 11, true),
+      direction: "after" as const,
+      epoch: "epoch-2",
+      reset: true,
+      hasNewer: true,
+      startCursor: { epoch: "epoch-2", seq: 10 },
+      endCursor: { epoch: "epoch-2", seq: 11 },
+    };
+    owner.applyTimelineResponse(page);
+    const accepted = selectAgentTimelineState(
+      useSessionStore.getState().sessions[SERVER_ID],
+      AGENT_ID,
+    );
+    expect(accepted.status).toBe("painted");
+    expect(
+      (accepted.status === "cold" ? [] : accepted.items).map((row) => row.timelineCursor?.epoch),
+    ).toEqual(["epoch-2", "epoch-2"]);
+    release(cachedTimeline());
+    await pending;
+    expect(
+      selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID),
+    ).toEqual(accepted);
+    expect(
+      useSessionStore.getState().sessions[SERVER_ID]?.agentTimelineCursor.get(AGENT_ID)?.epoch,
+    ).toBe("epoch-2");
+    owner.dispose();
+  });
+
+  it("does not repopulate coverage evicted by the retention owner during a cache read", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let release!: (value: CachedTimeline) => void;
+    const held = new Promise<CachedTimeline>((resolve) => {
+      release = resolve;
+    });
+    let reads = 0;
+    const replica = createTimelineReplica({
+      serverId: SERVER_ID,
+      storage: {
+        readTimeline: async () => (++reads === 1 ? cachedTimeline() : held),
+        commitTimeline: () => undefined,
+      },
+      prepareAgent: async () => undefined,
+    });
+    await replica.prepare(AGENT_ID);
+    const budget = new TimelinePageRetention({
+      sessionBytes: 10000,
+      totalBytes: 10000,
+      pageMetadataBytes: 256,
+    });
+    const retention = new TimelineRetentionOwner(SERVER_ID, budget);
+    retention.prepare(AGENT_ID);
+    const pending = replica.prepare(AGENT_ID);
+    const removeOther = budget.register("other-owner", () => undefined);
+    const releaseReservation = budget.reserve("other-owner", 9900);
+    expect(releaseReservation).not.toBeNull();
+    expect(
+      useSessionStore.getState().sessions[SERVER_ID]?.agentTimelineCursor.get(AGENT_ID),
+    ).toBeUndefined();
+    expect(
+      selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID).status,
+    ).toBe("cold");
+    release(cachedTimeline());
+    await pending;
+    expect(
+      selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID).status,
+    ).toBe("cold");
+    expect(
+      useSessionStore.getState().sessions[SERVER_ID]?.agentTimelineCursor.get(AGENT_ID),
+    ).toBeUndefined();
+    releaseReservation?.();
+    retention.dispose();
+    removeOther();
+  });
+
+  it("retains accepted cache coverage when an already-sent initial tail overlaps it", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let releaseCache!: (value: CachedTimeline) => void;
+    let respond!: () => void;
+    const held = new Promise<CachedTimeline>((resolve) => {
+      releaseCache = resolve;
+    });
+    const requests: string[] = [];
+    const owner = createOwner(
+      { readTimeline: () => held, commitTimeline: () => undefined },
+      undefined,
+      {
+        fetchPage: async (_id, request) => {
+          requests.push(request.direction);
+          createInitDeferred(getInitKey(SERVER_ID, AGENT_ID), request.direction);
+          useSessionStore.getState().setInitializingAgents(SERVER_ID, new Map([[AGENT_ID, true]]));
+          return new Promise((resolve) => {
+            respond = () => {
+              const page = retentionPage(3, 6, true);
+              owner.applyTimelineResponse(page);
+              resolve({ hasNewer: false, endCursor: page.endCursor });
+            };
+          });
+        },
+      },
+    );
+    owner.setConnected(true);
+    owner.replaceVisibleAgentIds("pane", [AGENT_ID]);
+    await expect.poll(() => requests.length, { timeout: 100 }).toBe(1);
+    releaseCache({
+      ...cachedTimeline(),
+      items: [1, 2, 3, 4].map((seq) => item(`row-${seq}`, `row ${seq}`, seq)),
+    });
+    await expect
+      .poll(
+        () =>
+          selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID).status,
+      )
+      .toBe("painted");
+    respond();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const timeline = selectAgentTimelineState(
+      useSessionStore.getState().sessions[SERVER_ID],
+      AGENT_ID,
+    );
+    expect(
+      (timeline.status === "cold" ? [] : timeline.items).map((row) => row.timelineCursor?.seq),
+    ).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(timeline).toMatchObject({
+      status: "synced",
+      range: { startSeq: 1, endSeq: 6 },
+      older: "available",
+    });
+    expect(requests).toEqual(["tail"]);
+    owner.dispose();
+  });
+
+  it("paints a late durable snapshot after network failure while retaining the error", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let release!: (value: CachedTimeline) => void;
+    const held = new Promise<CachedTimeline>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    const owner = createOwner(
+      { readTimeline: () => held, commitTimeline: () => undefined },
+      undefined,
+      {
+        fetchPage: async () => {
+          calls += 1;
+          throw new Error("unreachable");
+        },
+      },
+    );
+    owner.setConnected(true);
+    owner.replaceVisibleAgentIds("pane", [AGENT_ID]);
+    await expect.poll(() => owner.getAgentTimelineStatus(AGENT_ID)).toBe("error");
+    release(cachedTimeline());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(
+      selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID),
+    ).toMatchObject({ status: "painted", items: cachedTimeline().items });
+    expect(owner.getAgentTimelineError(AGENT_ID)).toBe("unreachable");
+    expect(calls).toBe(1);
+    owner.dispose();
+  });
+
+  it("admits late A history after Back without replacing B or sending either request twice", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let releaseCache!: () => void;
+    const heldCache = new Promise<void>((resolve) => {
+      releaseCache = resolve;
+    });
+    const sends: string[] = [];
+    const applies: string[] = [];
+    const responses = new Map<string, () => void>();
+    const owner = createOwner(
+      {
+        readTimeline: async (_host, agentId) => {
+          await heldCache;
+          return { ...cachedTimeline(), agentId };
+        },
+        commitTimeline: () => undefined,
+      },
+      undefined,
+      {
+        fetchPage: async (agentId) => {
+          sends.push(agentId);
+          return new Promise((resolve) =>
+            responses.set(agentId, () => {
+              const page = { ...retentionPage(10, 11, true), agentId };
+              applies.push(agentId);
+              owner.applyTimelineResponse(page);
+              resolve({ hasNewer: false, endCursor: page.endCursor });
+            }),
+          );
+        },
+      },
+    );
+    owner.setConnected(true);
+    owner.replaceVisibleAgentIds("pane", [AGENT_ID]);
+    await expect.poll(() => sends).toEqual([AGENT_ID]);
+    owner.replaceVisibleAgentIds("pane", []);
+    owner.replaceVisibleAgentIds("pane", ["agent-b"]);
+    await expect.poll(() => sends).toEqual([AGENT_ID, "agent-b"]);
+    responses.get("agent-b")!();
+    await expect.poll(() => owner.getAgentTimelineStatus("agent-b")).toBe("ready");
+    const b = selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], "agent-b");
+    responses.get(AGENT_ID)!();
+    await expect.poll(() => owner.getAgentTimelineStatus(AGENT_ID)).toBe("ready");
+    releaseCache();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(
+      selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], "agent-b"),
+    ).toEqual(b);
+    expect(sends).toEqual([AGENT_ID, "agent-b"]);
+    expect(applies).toEqual(["agent-b", AGENT_ID]);
+    owner.dispose();
+  });
+
+  it("does not recreate a removed Host when its held cache read completes", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let release!: (value: CachedTimeline) => void;
+    const held = new Promise<CachedTimeline>((resolve) => {
+      release = resolve;
+    });
+    const owner = createOwner({ readTimeline: () => held, commitTimeline: () => undefined });
+    owner.replaceVisibleAgentIds("pane", [AGENT_ID]);
+    owner.dispose();
+    useSessionStore.getState().clearSession(SERVER_ID);
+    release(cachedTimeline());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(useSessionStore.getState().sessions[SERVER_ID]).toBeUndefined();
   });
 
   it("paints cached history without claiming authoritative synchronization", async () => {
@@ -1084,6 +1407,33 @@ function createSqliteCache() {
 }
 
 describe("SQLite baseline restoration", () => {
+  it("retries the durable read once when an earlier response commits during that read", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    const { cache, database, holdRead } = createSqliteCache();
+    cache.setHosts([SERVER_ID]);
+    cache.commitTimeline(SERVER_ID, AGENT_ID, cachedTimeline());
+    await cache.flush();
+    const replica = createTimelineReplica({
+      serverId: SERVER_ID,
+      storage: cache,
+      prepareAgent: async () => {},
+    });
+    const owner = createOwner(cache, undefined, undefined, replica);
+    let reads = 0;
+    holdRead(async () => {
+      reads += 1;
+      if (reads === 1) owner.applyTimelineResponse(retentionPage(10, 11, true));
+    });
+    await replica.prepare(AGENT_ID);
+    expect(reads).toBe(2);
+    expect(
+      selectAgentTimelineState(useSessionStore.getState().sessions[SERVER_ID], AGENT_ID),
+    ).toMatchObject({ status: "synced", range: { startSeq: 10, endSeq: 11 } });
+    await cache.flush();
+    owner.dispose();
+    database.close();
+  });
+
   it.each([false, true])(
     "keeps display-only cached history under a live event (synced=%s)",
     async (synced) => {
