@@ -26,6 +26,8 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { Theme } from "@/styles/theme";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
+import { WorkspaceEntryContent } from "@/screens/workspace/workspace-entry-content";
+import { isNative } from "@/constants/platform";
 import {
   useHostRuntimeClient,
   useHostRuntimeConnectionStatus,
@@ -189,7 +191,14 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
               headerActions={options}
               headingActions={headingActions}
             >
-              <ChatRouteBody chat={chat} online={online} error={error} transcript={transcript}>
+              <ChatRouteBody
+                chat={chat}
+                online={online}
+                error={error}
+                transcript={transcript}
+                focused={focused}
+                conversation={key}
+              >
                 {profileNativeRegion(
                   "BotChatScreen",
                   <ChatScreen
@@ -222,15 +231,20 @@ function ChatRouteBody({
   online,
   error,
   transcript,
+  focused,
+  conversation,
   children,
 }: {
   chat: ChatPayload | null;
   online: boolean;
   error: string | null;
   transcript: UseChatTranscriptResult;
+  focused: boolean;
+  conversation: string;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const compact = useIsCompactFormFactor();
   const failure = transcript.loadState.status === "error" ? transcript.loadState : null;
   const blocked = failure && !failure.retainAccepted ? failure.message : null;
   if (!chat || blocked) {
@@ -257,11 +271,29 @@ function ChatRouteBody({
           {error ?? failure?.message}
         </Text>
       ) : null}
-      {children}
+      {/* Native compact entry shows its header/Back first; the transcript body waits for the
+          outgoing Chat presentation, then renders at deferred priority so Back stays usable. */}
+      <WorkspaceEntryContent
+        nativeCompact={isNative && compact}
+        focused={focused}
+        placeholder={CHAT_BODY_PREPARING}
+      >
+        <ChatBodyPrepared conversation={conversation} />
+        {children}
+      </WorkspaceEntryContent>
       <ChatLoadingProgress initial={initialLoading} fetching={transcript.isFetching} />
     </View>
   );
 }
+
+function ChatBodyPrepared({ conversation }: { conversation: string }) {
+  useLayoutEffect(() => {
+    traceConversationPhase("body.prepared", conversation, {});
+  }, [conversation]);
+  return null;
+}
+
+const CHAT_BODY_PREPARING = <ChatLoadingProgress initial fetching={false} />;
 
 function ChatLoadingProgress({ initial, fetching }: { initial: boolean; fetching: boolean }) {
   const { t } = useTranslation();

@@ -38,6 +38,10 @@ const MAINTAIN_VISIBLE_POSITION = { minIndexForVisible: 0 } as const;
 // A reply can fill the viewport. Measure two rows before constructing more native
 // history; VirtualizedList still fills the measured viewport before limiting overscan.
 const NATIVE_ROW_BATCH_SIZE = 2;
+// Keep two screens of history on each side of the viewport instead of the default ten. Each extra
+// screen of Bot replies is markdown construction and native text layout competing with Back and
+// the first visible rows; scrolling still renders rows ahead as they approach.
+const NATIVE_WINDOW_SIZE = 5;
 
 function keyExtractor(row: ChatRenderRow): string {
   return row.key;
@@ -107,6 +111,7 @@ export const ChatList = memo(function ChatList({
       inverted
       initialNumToRender={Platform.OS === "web" ? undefined : NATIVE_ROW_BATCH_SIZE}
       maxToRenderPerBatch={Platform.OS === "web" ? undefined : NATIVE_ROW_BATCH_SIZE}
+      windowSize={Platform.OS === "web" ? undefined : NATIVE_WINDOW_SIZE}
       data={data}
       keyExtractor={keyExtractor}
       renderItem={renderItem}

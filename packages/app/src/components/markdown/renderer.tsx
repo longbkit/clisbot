@@ -29,6 +29,8 @@ import { MarkdownTableCellText } from "@/components/markdown-text-selection";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
 import { markdownNodeContainsType } from "@/utils/markdown-ast";
 import { createMarkdownParser } from "@/utils/markdown-parser";
+import { readMarkdownAst } from "@/utils/markdown-ast-cache";
+import type MarkdownItInstance from "markdown-it";
 import { createCompactMarkdownStyles, createMarkdownStyles } from "@/styles/markdown-styles";
 import type { Theme } from "@/styles/theme";
 import { openExternalUrl } from "@/utils/open-external-url";
@@ -50,7 +52,8 @@ import { MarkdownLinkText } from "./link-text";
 export type MarkdownStyles = Record<string, TextStyle & ViewStyle & { [key: string]: unknown }>;
 
 interface MarkdownWithStableRendererProps {
-  children: ReactNode;
+  /** Source text, or a tree the package's own parser produced (it renders arrays as-is). */
+  children: ReactNode | ASTNode[];
   style: ReturnType<typeof createMarkdownStyles> | ReturnType<typeof createCompactMarkdownStyles>;
   rules?: RenderRules;
   markdownit?: ReturnType<typeof MarkdownIt>;
@@ -186,6 +189,10 @@ function MarkdownFragment({
   topLevelMaxExceededItem,
 }: MarkdownRendererProps & { rules: RenderRules }) {
   const uniProps = compact ? compactMarkdownStyleMapping : markdownStyleMapping;
+  const content = useMemo(
+    () => (markdownit ? readMarkdownAst(markdownit as unknown as MarkdownItInstance, text) : text),
+    [markdownit, text],
+  );
   return (
     <ThemedMarkdown
       uniProps={uniProps}
@@ -195,7 +202,7 @@ function MarkdownFragment({
       allowedImageHandlers={allowedImageHandlers}
       topLevelMaxExceededItem={topLevelMaxExceededItem}
     >
-      {text}
+      {content}
     </ThemedMarkdown>
   );
 }

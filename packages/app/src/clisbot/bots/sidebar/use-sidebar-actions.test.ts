@@ -55,7 +55,7 @@ it("rechecks the authoritative private chat list before creating from a stale em
     await result.current.openBot("host", "bot");
   });
   expect(env.createChat).not.toHaveBeenCalled();
-  expect(admit).toHaveBeenCalledWith("/h/host/chat/existing");
+  expect(admit).toHaveBeenCalledWith("/h/host/chat/existing", expect.any(Function));
   expect(admit.mock.invocationCallOrder[0]).toBeLessThan(env.push.mock.invocationCallOrder[0]!);
   expect(env.push).toHaveBeenCalledWith("/h/host/chat/existing");
 });

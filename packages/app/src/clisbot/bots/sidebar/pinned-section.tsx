@@ -13,12 +13,13 @@ import { BotRow } from "./bots-section";
 import { ChatRow } from "./chats-section";
 import { useSidebarPinMenu } from "./use-section-actions";
 import { usePinnedRows, type PinRow } from "./use-pinned-rows";
+import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 
 export function FusionPinnedSection({
   onBeforeNavigate,
   renderWorkspacePin,
 }: {
-  onBeforeNavigate?: (destination?: string) => void;
+  onBeforeNavigate?: ChatListAdmission;
   renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" | "unavailable" }>) => ReactNode;
 }) {
   const { rows, error, chats, openBot: openPinnedBot, toggle } = usePinnedRows(onBeforeNavigate);
@@ -35,8 +36,8 @@ export function FusionPinnedSection({
           r.kind === "chat" && r.chat.serverId === chat.serverId && r.chat.chatId === chat.chatId,
       );
       if (row) {
-        onBeforeNavigate?.(row.route);
-        router.push(row.route as import("expo-router").Href);
+        const go = () => router.push(row.route as import("expo-router").Href);
+        if (!onBeforeNavigate?.(row.route, go)) go();
       }
     },
     [onBeforeNavigate, router, rows],

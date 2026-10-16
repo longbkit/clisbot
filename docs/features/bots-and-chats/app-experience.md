@@ -151,9 +151,19 @@ a synthetic chat layout identifier as the workspace identity sent to the daemon.
   therefore still cause a larger measured fill. Web/Electron keep the existing list defaults.
   Full text, row keys, live heads, older pages, cursor/authority, maintained visible position and
   per-chat saved offsets remain owned by the same components. No height parsing/cache or batching
-  timer is added. One large reply and native commit can still block; the policy alone does not
-  establish responsive Back or a latency budget. Android runtime evidence and iOS gaps belong in
-  the task's measurement report.
+  timer is added. Native history keeps two screens beyond each side of the viewport (`windowSize` 5) rather than ten: rows further away are rebuilt as scrolling approaches them, instead of every
+  reply in a long transcript being constructed in the background while the chat opens. One large
+  reply and native commit can still block; the policy alone does not establish responsive Back or a
+  latency budget. Android runtime evidence and iOS gaps belong in the task's measurement report.
+- Assistant replies share one complete and one streaming markdown-it instance instead of building
+  a pair per message mount. Completed text from the shared parser reuses its parsed tree, held in a
+  source-size-bounded LRU, so reopening a chat skips parsing replies it already showed; streaming
+  output is always parsed fresh. The trees are the markdown package's own output and are read, never
+  mutated, by the renderer.
+- On a native phone the conversation's header/Back renders first; the transcript body waits for the
+  outgoing Chat presentation and then renders at deferred priority through the same entry boundary
+  as workspaces ([mobile panels](../../mobile-panels.md)). Metadata/transcript requests start with the
+  route, not the body, and a centered loading indicator stands in until the body commits.
 - Opening an artifact does not navigate to cowork. Desktop uses the existing ordinary side-pane
   opener: create a right split on first open; reuse the remembered pane for subsequent opens; reveal
   an already-open file without overriding a tab the user moved. Explorer is a separate dock.

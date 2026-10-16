@@ -38,6 +38,7 @@ import {
   useChatListNavigation,
   useChatListScreenListeners,
 } from "./use-chat-list-navigation";
+import { nativePresentation } from "./chat-list-presentation";
 
 beforeEach(() => {
   route.path = "/chat";
@@ -430,4 +431,81 @@ it("does not invoke native sampling for web or destination-less overlay actions"
   view.rerender();
   act(() => view.result.current());
   expect(armSampling).not.toHaveBeenCalled();
+});
+
+it("mounts the native Back/loading shell before the route dispatch runs in a later task", () => {
+  vi.useFakeTimers();
+  try {
+    route.native = true;
+    const go = vi.fn();
+    const view = renderHook(() => useChatListNavigation(vi.fn()));
+    let owned: boolean | void = false;
+    act(() => {
+      owned = view.result.current("/h/host-a/chat/direct-chat", go);
+    });
+    expect(owned).toBe(true);
+    expect(go).not.toHaveBeenCalled();
+    expect(nativePresentation.getPendingSnapshot()).toMatchObject({
+      destination: "/h/host-a/chat/direct-chat",
+      returning: false,
+    });
+    act(() => vi.runAllTimers());
+    expect(go).toHaveBeenCalledOnce();
+    // The dispatched admission keeps its ordinary appearance/return lifecycle.
+    expect(nativePresentation.returnToList()).toBe(true);
+    expect(nativePresentation.getPendingSnapshot()?.returning).toBe(true);
+  } finally {
+    nativePresentation.cancel();
+    vi.useRealTimers();
+  }
+});
+it("Back or a newer row before the queued dispatch runs drops the stale route", () => {
+  vi.useFakeTimers();
+  try {
+    route.native = true;
+    const view = renderHook(() => useChatListNavigation(vi.fn()));
+    const goA = vi.fn();
+    act(() => void view.result.current("/h/host-a/chat/a", goA));
+    // Nothing left Chat yet: Back removes the admission instead of awaiting a return.
+    expect(nativePresentation.returnToList()).toBe(true);
+    expect(nativePresentation.getPendingSnapshot()).toBeNull();
+    const goB = vi.fn();
+    const goC = vi.fn();
+    act(() => void view.result.current("/h/host-a/chat/b", goB));
+    act(() => void view.result.current("/h/host-a/chat/c", goC));
+    act(() => vi.runAllTimers());
+    expect(goA).not.toHaveBeenCalled();
+    expect(goB).not.toHaveBeenCalled();
+    expect(goC).toHaveBeenCalledOnce();
+    expect(nativePresentation.getPendingSnapshot()?.destination).toBe("/h/host-a/chat/c");
+  } finally {
+    nativePresentation.cancel();
+    vi.useRealTimers();
+  }
+});
+it("a panel generation change before the queued dispatch drops it", () => {
+  vi.useFakeTimers();
+  try {
+    route.native = true;
+    const view = renderHook(() => useChatListNavigation(vi.fn()));
+    const go = vi.fn();
+    act(() => void view.result.current("/h/host-a/chat/a", go));
+    route.panel = { target: "agent-list", revision: 2 };
+    act(() => vi.runAllTimers());
+    expect(go).not.toHaveBeenCalled();
+    expect(nativePresentation.getPendingSnapshot()).toBeNull();
+  } finally {
+    nativePresentation.cancel();
+    vi.useRealTimers();
+  }
+});
+it("leaves dispatch to the caller on web and for non-departing native presses", () => {
+  const go = vi.fn();
+  const view = renderHook(() => useChatListNavigation(vi.fn()));
+  expect(view.result.current("/h/host-a/chat/a", go)).toBe(false);
+  route.native = true;
+  route.path = "/h/host-a/workspace/w";
+  view.rerender();
+  expect(view.result.current("/h/host-a/chat/a", go)).toBe(false);
+  expect(go).not.toHaveBeenCalled();
 });

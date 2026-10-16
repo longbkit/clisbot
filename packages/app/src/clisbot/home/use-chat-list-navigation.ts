@@ -66,8 +66,21 @@ export function useChatListPresentedLeaf(route: PresentedRoute, focused: boolean
   }, [focused, route]);
 }
 
-/** Keep Chat visible until its destination commits (web) or appears (native). */
-export function useChatListNavigation(closeList: () => void): (destination?: string) => void {
+/** A row's pre-navigation hook; true means it now owns the `go` route dispatch. */
+export type ChatListAdmission = (destination?: string, go?: () => void) => boolean | void;
+
+/**
+ * Keep Chat visible until its destination commits (web) or appears (native).
+ *
+ * A caller that passes its route dispatch as `go` hands it to this owner, which returns true. A
+ * native admission then runs `go` in a later JS task: React Native mounts a task's commits together
+ * at its end, and React Navigation renders the pushed screen synchronously, so dispatching in the
+ * press task would hold the Back/loading shell until the whole destination had rendered. Without
+ * `go`, or when false is returned, the caller dispatches itself as before.
+ */
+export function useChatListNavigation(
+  closeList: () => void,
+): (destination?: string, go?: () => void) => boolean {
   const path = usePathname();
   const previousPath = useRef(path);
   const cancelPending = useRef<(() => void) | undefined>(undefined);
@@ -79,7 +92,7 @@ export function useChatListNavigation(closeList: () => void): (destination?: str
   }, [closeList, path]);
   useLayoutEffect(() => () => cancelPending.current?.(), []);
   return useCallback(
-    (destination?: string) => {
+    (destination?: string, go?: () => void) => {
       // Exact route must match the external one-shot arm; production/profile-off is a no-op.
       if (isNative && destination) startArmedHermesSampling(destination);
       if (HOME_V2_ENABLED) rememberChatReturn("/chat");
@@ -91,12 +104,25 @@ export function useChatListNavigation(closeList: () => void): (destination?: str
         isNative &&
         (committedPath === "/chat" || nativePresentation.isPending(panel));
       if (departing && destination) {
-        cancelPending.current = nativePresentation.begin(panel, destination, closeList);
-      } else {
-        cancelPending.current?.();
-        // An overlay over an already presented workspace closes even for another tab in that workspace.
-        if (!HOME_V2_ENABLED || isNative || committedPath !== "/chat") closeList();
+        cancelPending.current = nativePresentation.begin(panel, destination, closeList, {
+          dispatched: !go,
+        });
+        if (!go) return false;
+        const id = nativePresentation.getPendingSnapshot()?.id;
+        setTimeout(() => {
+          // Back, a newer row or another panel generation may have replaced this admission.
+          if (
+            id !== undefined &&
+            nativePresentation.dispatch(id, usePanelStore.getState().mobilePanel)
+          )
+            go();
+        }, 0);
+        return true;
       }
+      cancelPending.current?.();
+      // An overlay over an already presented workspace closes even for another tab in that workspace.
+      if (!HOME_V2_ENABLED || isNative || committedPath !== "/chat") closeList();
+      return false;
     },
     [closeList],
   );

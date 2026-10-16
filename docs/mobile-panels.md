@@ -25,7 +25,11 @@ and draft/selection intact, but is excluded from touch and accessibility while c
 route, transcript cache or loading state machine is created. The intent snapshot identifies each
 admission even when two destinations use the same panel revision. Header, hardware and selected
 Chat Back reuse the existing return branch; returning publishes immediately and late appearance
-cannot close the returned list. The last visible shell remains usable through the panel-hide
+cannot close the returned list. A row that hands the admission its route dispatch has that dispatch
+run in a later JS task: React Native mounts all commits of a task at its end, and React Navigation
+renders a pushed screen synchronously, so dispatching in the press task held the shell until the
+whole destination had rendered. Back, a newer row or a panel change before that dispatch drops it
+and the admission with it; nothing left Chat, so no return is awaited. The last visible shell remains usable through the panel-hide
 boundary, but an old callback cannot override a newer intent, panel generation or committed global
 route. Desktop/web and peer-tab presentation are unchanged. The destination's authoritative cached
 body remains owned by its existing screen/store; a shell commit alone is not usable-content or
@@ -44,8 +48,8 @@ reversal need not emit another appearance end. A first/unpresented screen still 
 actual appearance; parent, stale phase, canceled intent and changed panel generation cannot
 complete the destination.
 
-Native compact workspace entry keeps its existing header/Back surface separate from first pane
-materialization. The body waits for the existing outgoing Chat presentation boundary, then React
+Native compact workspace and Bot conversation entry keep their existing header/Back surface
+separate from first body materialization. The body waits for the existing outgoing Chat presentation boundary, then React
 prepares it at deferred render priority. Losing focus before that first body commits abandons the
 view preparation; it does not cancel an agent turn. Once committed, panes keep the existing
 retention/draft/scroll policy across Back and reconnect. This does not defer authoritative store

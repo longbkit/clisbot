@@ -7,9 +7,10 @@ import { buildHostChatRoute } from "../routes";
 import type { HostTagged } from "../data/aggregate";
 import type { ChatPayload } from "../data/contracts";
 import { directChatForBot } from "./sidebar-model";
+import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 export function useBotSidebarActions(
   chatRows: readonly HostTagged<ChatPayload>[],
-  onBeforeNavigate?: (destination?: string) => void,
+  onBeforeNavigate?: ChatListAdmission,
   chatsLoaded = true,
 ) {
   const router = useRouter();
@@ -18,8 +19,9 @@ export function useBotSidebarActions(
   const opening = useRef(false);
   const navigate = useCallback(
     (serverId: string, chatId: string) => {
-      onBeforeNavigate?.(buildHostChatRoute(serverId, chatId));
-      router.push(buildHostChatRoute(serverId, chatId));
+      const destination = buildHostChatRoute(serverId, chatId);
+      const go = () => router.push(destination);
+      if (!onBeforeNavigate?.(destination, go)) go();
     },
     [onBeforeNavigate, router],
   );

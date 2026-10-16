@@ -16,6 +16,7 @@ import { BotsSection } from "./bots-section";
 import { ChatsSection } from "./chats-section";
 import { filterByHost, useSidebarDisplayStore } from "./display/preferences";
 import type { BotFromProject } from "../create/bot-form-model";
+import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 
 const BOT_CREATE_SNAP_POINTS = ["95%"];
 const BOT_CREATE_CONTENT_STYLE = { padding: 0 };
@@ -23,16 +24,12 @@ const BOT_CREATE_CONTENT_STYLE = { padding: 0 };
 export function BotsAndChatsSidebarSections({
   onBeforeNavigate,
 }: {
-  onBeforeNavigate?: (destination?: string) => void;
+  onBeforeNavigate?: ChatListAdmission;
 }) {
   const hosts = useBotsFeatureHosts();
   return hosts.length ? <EnabledSections onBeforeNavigate={onBeforeNavigate} /> : null;
 }
-function EnabledSections({
-  onBeforeNavigate,
-}: {
-  onBeforeNavigate?: (destination?: string) => void;
-}) {
+function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdmission }) {
   const { hosts, bots, chats, botRows, chatRows, directoryHosts } = useSidebarCatalog();
   const { t } = useTranslation();
   const directoryStatus = directoryLoadStatus(bots, t("bots.workspace.sidebar.partialFailure"));

@@ -17,6 +17,7 @@ import { BotsSidebarRow, sidebarMarkSize } from "./row";
 import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
 import { useChatRowDetail } from "./display/use-row-detail";
 import { SectionDisplayMenu } from "./display/section-display-menu";
+import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 
 /** Recent chats before "Show more" (plans/app.md §1). */
 export const RECENT_CHATS_LIMIT = 5;
@@ -45,7 +46,7 @@ interface ChatsSectionProps {
   chats: readonly ChatsSidebarChat[];
   directoryChats?: readonly ChatsSidebarChat[];
   /** Runs before the route push, as `AutomationSidebarItem` does; the compact sidebar closes here. */
-  onBeforeNavigate?: (destination?: string) => void;
+  onBeforeNavigate?: ChatListAdmission;
   onCreateChat: () => void;
   canCreateChat?: boolean;
   onOpenChatMenu?: (chat: ChatsSidebarChat, anchor: Rect) => void;
@@ -73,8 +74,9 @@ export const ChatsSection = memo(function ChatsSection({
   const openChat = useCallback(
     (chat: ChatsSidebarChat) => {
       setDirectory(false);
-      onBeforeNavigate?.(buildHostChatRoute(chat.serverId, chat.chatId));
-      router.push(buildHostChatRoute(chat.serverId, chat.chatId));
+      const destination = buildHostChatRoute(chat.serverId, chat.chatId);
+      const go = () => router.push(destination);
+      if (!onBeforeNavigate?.(destination, go)) go();
     },
     [onBeforeNavigate, router],
   );

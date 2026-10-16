@@ -138,9 +138,24 @@ describe("ChatsSection", () => {
       <ChatsSection onCreateChat={vi.fn()} chats={[chat(1), chat(2)]} onBeforeNavigate={close} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /^Chat 1,/ }));
-    expect(close).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
+    expect(close).toHaveBeenCalledWith("/h/host-a/chat/chat-1", expect.any(Function));
     expect(env.push).toHaveBeenCalledWith("/h/host-a/chat/chat-1");
     expect(close.mock.invocationCallOrder[0]).toBeLessThan(env.push.mock.invocationCallOrder[0]!);
+  });
+
+  it("leaves the route dispatch to an admission that takes ownership of it", () => {
+    let go: (() => void) | undefined;
+    const admit = vi.fn((_destination?: string, dispatch?: () => void) => {
+      go = dispatch;
+      return true;
+    });
+    render(
+      <ChatsSection onCreateChat={vi.fn()} chats={[chat(1), chat(2)]} onBeforeNavigate={admit} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Chat 1,/ }));
+    expect(env.push).not.toHaveBeenCalled();
+    go?.();
+    expect(env.push).toHaveBeenCalledExactlyOnceWith("/h/host-a/chat/chat-1");
   });
 
   it("fills only the row whose route is current and shows the time and host", () => {

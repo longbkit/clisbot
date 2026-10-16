@@ -10,6 +10,7 @@ import { useBotCatalog } from "../data/runtime";
 import { useBotSidebarActions } from "./use-sidebar-actions";
 import { useResourcePins } from "./pins";
 import { createPinnedRowsProjector } from "./pinned-row-model";
+import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 export type { PinRow } from "./pinned-row-model";
 const EMPTY_ROWS = [] as const;
 type Session = ReturnType<typeof useSessionStore.getState>["sessions"][string];
@@ -51,7 +52,7 @@ function usePinMetadata(hostIds: string[]) {
   );
 }
 
-export function usePinnedRows(onBeforeNavigate?: (destination?: string) => void) {
+export function usePinnedRows(onBeforeNavigate?: ChatListAdmission) {
   const { allWorkspaceEntriesByKey } = useSidebarModel();
   const hosts = useHosts();
   const hostIds = useMemo(() => hosts.map((h) => h.serverId), [hosts]);

@@ -52,6 +52,8 @@ export function createChatListPresentation() {
     destination: string;
     close: () => void;
     returning?: boolean;
+    /** False until the caller's queued route dispatch actually runs. */
+    dispatched: boolean;
   }
   let pending: Intent | null = null;
   let nextIntent = 0;
@@ -110,6 +112,11 @@ export function createChatListPresentation() {
     },
     returnToList(expectedIntent?: number) {
       if (!pending || (expectedIntent !== undefined && pending.id !== expectedIntent)) return false;
+      // Nothing left Chat yet: dropping the queued dispatch is the whole return.
+      if (!pending.dispatched) {
+        cancel();
+        return true;
+      }
       pending.returning = true;
       appearing.clear();
       publish();
@@ -133,7 +140,12 @@ export function createChatListPresentation() {
     getPendingRevision() {
       return pending?.panel.revision ?? null;
     },
-    begin(panel: MobilePanelSelection, destination: string, close: () => void) {
+    begin(
+      panel: MobilePanelSelection,
+      destination: string,
+      close: () => void,
+      { dispatched = true }: { dispatched?: boolean } = {},
+    ) {
       if (!pending) appearing.clear();
       isPending(panel);
       const intent: Intent = {
@@ -141,6 +153,7 @@ export function createChatListPresentation() {
         panel,
         destination: destination.split(/[?#]/, 1)[0]!,
         close,
+        dispatched,
       };
       pending = intent;
       publish();
@@ -149,6 +162,12 @@ export function createChatListPresentation() {
           cancel();
         }
       };
+    },
+    /** Claim the queued route dispatch; false once Back, a newer intent or a panel change won. */
+    dispatch(id: number, panel: MobilePanelSelection) {
+      if (!isPending(panel) || !pending || pending.id !== id || pending.dispatched) return false;
+      pending.dispatched = true;
+      return true;
     },
     isPending,
     commitLeaf(current: PresentedRoute, panel: MobilePanelSelection) {

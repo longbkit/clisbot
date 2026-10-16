@@ -84,6 +84,7 @@ import { splitMarkdownBlocks } from "@/utils/split-markdown-blocks";
 import { useRevealedText } from "@/hooks/use-revealed-text";
 import { colorMarkdownLinkChildren } from "@/components/markdown/link-children";
 import { createAssistantMarkdownParser } from "@/utils/assistant-markdown-parser";
+import { cacheMarkdownAst } from "@/utils/markdown-ast-cache";
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { getTurnDurationLabel } from "./assistant-turn-footer-label";
 import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
@@ -1643,6 +1644,11 @@ function MarkdownListView({
   );
 }
 
+// markdown-it parses through per-call state, so rows share two instances instead of building
+// (and compiling linkify for) a pair on every message mount. Completed text reuses its parsed tree.
+const ASSISTANT_MARKDOWN_PARSER = cacheMarkdownAst(createAssistantMarkdownParser());
+const STREAMING_ASSISTANT_MARKDOWN_PARSER = createAssistantMarkdownParser({ streaming: true });
+
 export const AssistantMessage = memo(function AssistantMessage({
   renderFullContent = false,
   occurrenceKey,
@@ -1656,11 +1662,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   phase,
 }: AssistantMessageProps) {
   const { t } = useTranslation();
-  const markdownParser = useMemo(createAssistantMarkdownParser, []);
-  const streamingMarkdownParser = useMemo(
-    () => createAssistantMarkdownParser({ streaming: true }),
-    [],
-  );
+  const markdownParser = ASSISTANT_MARKDOWN_PARSER;
+  const streamingMarkdownParser = STREAMING_ASSISTANT_MARKDOWN_PARSER;
   const renderedMessage = useMemo(
     () =>
       renderFullContent ? { text: message, capped: false } : capAssistantMessageForRender(message),
