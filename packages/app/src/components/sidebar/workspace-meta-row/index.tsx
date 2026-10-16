@@ -1,4 +1,3 @@
-import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
@@ -144,8 +143,11 @@ function IdentityItem({
 }) {
   const Icon = kind === "branch" ? ThemedGitBranch : ThemedFolder;
   return (
-    <View style={styles.identityItem} testID={`sidebar-workspace-${kind}`}>
-      <View style={[styles.identityIcon, leading && styles.identityIconLeading]}>
+    <View
+      style={[styles.identityItem, leading && styles.identityItemLeading]}
+      testID={`sidebar-workspace-${kind}`}
+    >
+      <View style={styles.identityIcon}>
         <Icon size={META_ICON_SIZE} uniProps={mutedMapping} />
       </View>
       <Text style={styles.identityText} numberOfLines={1}>
@@ -342,11 +344,11 @@ const styles = StyleSheet.create((theme) => ({
   identityIcon: {
     flexShrink: 0,
   },
-  // The first branch/project caption shares the title rail; its glyph belongs in the leading
-  // column. Mid-line identity facts keep their inline glyph and separator spacing.
-  identityIconLeading: {
-    position: "absolute",
-    left: -(sidebarLeadingColumnWidth(theme) / 2 + theme.spacing[2] + META_ICON_SIZE / 2),
+  // Put the first caption's glyph after its text: the title rail stays fixed and the leading
+  // column remains available for the workspace's manual session-expansion toggle.
+  identityItemLeading: {
+    flexDirection: "row-reverse",
+    justifyContent: "flex-end",
   },
   identityText: {
     color: theme.colors.foregroundMuted,

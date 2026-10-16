@@ -174,6 +174,8 @@ pins stay intact, and Host/account scopes remain separate. A one-bot group retai
 Sidebar item titles and subtitles share a fixed leading column: avatars, type glyphs and status
 marks are centered within it without shifting the text. Pinned siblings, including unavailable
 placeholders, use the same child rail; project/workspace/session nesting retains its indentation.
+The first branch/project caption keeps its text on that rail and its contextual glyph after the
+text, leaving the leading column available for the manual session-expansion control.
 
 Pinned items render through the ordinary Bot, group, project, workspace and session row owners:
 marks, metadata, live status and permission-gated actions remain the same, including unpin. Bot
