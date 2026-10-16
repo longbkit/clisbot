@@ -1,7 +1,15 @@
-import { useMemo, type ComponentProps, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { scheduleOnRN } from "react-native-worklets";
+import { nativePerformanceTrace, traceInstant } from "@/performance/native-trace";
+import { useMemo, useLayoutEffect, type ComponentProps, type ReactNode } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewProps,
+  type GestureResponderEvent,
+} from "react-native";
 import { GestureDetector, type GestureType } from "react-native-gesture-handler";
-import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useAnimatedReaction } from "react-native-reanimated";
 import { isWeb } from "@/constants/platform";
 import { WindowChromeRootRegion } from "@/utils/desktop-window";
 import { usePanelStore, type MobilePanelView } from "@/stores/panel-store";
@@ -18,6 +26,71 @@ interface MobilePanelOverlayProps {
   panelStyle?: ComponentProps<typeof Animated.View>["style"];
 }
 
+function tracePanelVisual(panel: string, visible: boolean, workletMs: number) {
+  traceInstant("clisbot.back.panelVisual", {
+    panel,
+    visible: String(visible),
+    uiMs: String(workletMs),
+  });
+}
+
+/** Diagnostic-only observer; does not participate in gesture/responder arbitration. */
+function PanelHitTrace({
+  panel,
+  presented,
+  isOpen,
+}: {
+  panel: OverlayPanel;
+  presented: boolean;
+  isOpen: boolean;
+}) {
+  const { position } = useMobilePanelsRuntime();
+  useAnimatedReaction(
+    () => (panel === "agent-list" ? position.value < 0 : position.value > 0),
+    (visible, previous) => {
+      if (visible !== previous) scheduleOnRN(tracePanelVisual, panel, visible, performance.now());
+    },
+    [panel],
+  );
+  useLayoutEffect(() => {
+    traceInstant("clisbot.back.panelCommit", {
+      panel,
+      presented: String(presented),
+      open: String(isOpen),
+      host: presented ? "box-none" : "none",
+      child: isOpen ? "auto" : "none",
+    });
+  }, [isOpen, panel, presented]);
+  return null;
+}
+
+function panelTraceProps(panel: OverlayPanel): ViewProps {
+  if (!nativePerformanceTrace.isEnabled()) return {};
+  const touch = (phase: string) => (event: GestureResponderEvent) => {
+    const e = event.nativeEvent;
+    traceInstant(`clisbot.back.overlay${phase}`, {
+      panel,
+      ms: String(e.timestamp),
+      tag: String(e.target),
+    });
+  };
+  return {
+    onTouchStart: touch("Start"),
+    onTouchEnd: touch("End"),
+    onTouchCancel: touch("Cancel"),
+    onLayout: (event) =>
+      event.currentTarget.measureInWindow((x, y, width, height) => {
+        traceInstant("clisbot.back.overlayBounds", {
+          panel,
+          x: String(x),
+          y: String(y),
+          w: String(width),
+          h: String(height),
+        });
+      }),
+  };
+}
+
 export function MobilePanelOverlay({
   children,
   closeGesture,
@@ -26,6 +99,7 @@ export function MobilePanelOverlay({
   presented = true,
 }: MobilePanelOverlayProps) {
   const { position, windowWidth } = useMobilePanelsRuntime();
+  const diagnosticProps = useMemo(() => panelTraceProps(panel), [panel]);
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
   const isActive = useIsMobilePanelActive(panel);
   const isOpen = presented && isActive;
@@ -91,6 +165,7 @@ export function MobilePanelOverlay({
       {/* Fabric needs an always-mounted native host to attach the close handler while the
           retained panel content is hidden. nativeID keeps that host registered. */}
       <View
+        {...diagnosticProps}
         accessibilityElementsHidden={!isOpen}
         collapsable={false}
         importantForAccessibility={isOpen ? "auto" : "no-hide-descendants"}
@@ -98,6 +173,9 @@ export function MobilePanelOverlay({
         pointerEvents={overlayPointerEvents}
         style={overlayHostStyle}
       >
+        {nativePerformanceTrace.isEnabled() ? (
+          <PanelHitTrace panel={panel} presented={presented} isOpen={isOpen} />
+        ) : null}
         <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
           <Pressable
             accessible={false}

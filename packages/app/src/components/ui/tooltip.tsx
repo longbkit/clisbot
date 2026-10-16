@@ -1,3 +1,4 @@
+import { nativePerformanceTrace, traceInstant } from "@/performance/native-trace";
 import {
   Children,
   cloneElement,
@@ -352,7 +353,12 @@ export function TooltipTrigger({
 
   const handlePress = useCallback(
     (e: unknown) => {
+      const traceBack =
+        (props.testID === "chat-back" || props.testID === "header-back-button") &&
+        nativePerformanceTrace.isEnabled();
+      if (traceBack) traceInstant("clisbot.back.tooltipEnter");
       if (isCallable(onPress)) onPress(e);
+      if (traceBack) traceInstant("clisbot.back.tooltipForwarded");
       if (!ctx.enabled || disabled) {
         return;
       }
@@ -363,7 +369,7 @@ export function TooltipTrigger({
       }
       close();
     },
-    [clearOpenTimer, close, ctx, disabled, onPress],
+    [clearOpenTimer, close, ctx, disabled, onPress, props.testID],
   );
 
   const triggerProps = {

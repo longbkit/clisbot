@@ -24,7 +24,10 @@ export function exportNativeRenderProfile(kind: "reset" | "snapshot", payload: s
 const identities = new Map<string, string>();
 
 /** Bounded per-process diagnostic aliases. Raw values are never exported. */
-function correlate(kind: "host" | "agent" | "request", value: string): string | undefined {
+function correlate(
+  kind: "host" | "agent" | "request" | "route",
+  value: string,
+): string | undefined {
   if (!isProfileBuild || !traceModule) return undefined;
   const key = `${kind}:${value}`;
   const existing = identities.get(key);
@@ -94,4 +97,20 @@ export function traceTimelinePhase(
   const agent = agentId ? correlate("agent", agentId) : undefined;
   if (!host || (agentId && !agent)) return;
   traceInstant(`clisbot.timeline.${phase}`, { host, ...(agent ? { agent } : {}), ...extra });
+}
+
+/** Back diagnostics export opaque route aliases, never private workspace paths. */
+export function traceBackNavigation(
+  phase: string,
+  path: string,
+  target: string,
+  panel: { target: string; revision: number },
+): void {
+  if (!nativePerformanceTrace.isEnabled()) return;
+  traceInstant(`clisbot.back.${phase}`, {
+    path: correlate("route", path) ?? "overflow",
+    to: correlate("route", target) ?? "overflow",
+    panel: panel.target,
+    rev: String(panel.revision),
+  });
 }

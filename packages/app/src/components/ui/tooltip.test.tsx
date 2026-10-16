@@ -6,6 +6,8 @@ import { Pressable, Text } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Tooltip, TooltipTrigger } from "./tooltip";
 
+import * as nativeTrace from "@/performance/native-trace";
+
 vi.mock("@/constants/platform", () => ({
   isWeb: true,
   isNative: false,
@@ -64,6 +66,7 @@ afterEach(() => {
   root = null;
   container = null;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function renderTrigger({
@@ -113,4 +116,40 @@ describe("TooltipTrigger", () => {
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+});
+
+it("forwards a Back press once before the disabled tooltip returns", () => {
+  const order: string[] = [];
+  vi.spyOn(nativeTrace.nativePerformanceTrace, "isEnabled").mockReturnValue(true);
+  vi.spyOn(nativeTrace, "traceInstant").mockImplementation((phase: string) => order.push(phase));
+  const forward = vi.fn(() => order.push("forwarded"));
+  act(() =>
+    root?.render(
+      <Tooltip enabledOnDesktop={false} enabledOnMobile={false}>
+        <TooltipTrigger testID="chat-back" onPress={forward}>
+          <Text>Back</Text>
+        </TooltipTrigger>
+      </Tooltip>,
+    ),
+  );
+  act(() =>
+    container
+      ?.querySelector('[data-testid="chat-back"]')
+      ?.dispatchEvent(new window.MouseEvent("click", { bubbles: true })),
+  );
+  expect(order).toEqual([
+    "clisbot.back.tooltipEnter",
+    "forwarded",
+    "clisbot.back.tooltipForwarded",
+  ]);
+});
+
+it("imports the optional native trace safely in the web/Node tooltip consumer", () => {
+  expect(nativeTrace.nativePerformanceTrace.isEnabled()).toBe(false);
+  expect(() =>
+    nativeTrace.traceBackNavigation("test", "/private-route", "/chat", {
+      target: "agent",
+      revision: 1,
+    }),
+  ).not.toThrow();
 });

@@ -10,7 +10,7 @@ import {
   type GestureResponderEvent,
   type PressableStateCallbackType,
 } from "react-native";
-import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -23,7 +23,11 @@ import { HOME_V2_ENABLED } from "./feature";
 import type { Theme } from "@/styles/theme";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useInboxActivity, useInboxActivityLabel, InboxActivityIndicator } from "./inbox-activity";
-import { startNativeInputTracing, traceInstant } from "@/performance/native-trace";
+import {
+  startNativeInputTracing,
+  traceInstant,
+  traceBackNavigation,
+} from "@/performance/native-trace";
 import { navigateHomeTab } from "./home-tab-navigation";
 const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
 export function rememberChatReturn(path: string) {
@@ -214,10 +218,33 @@ export function MobileBack() {
   const router = useRouter();
   const compact = useIsCompactFormFactor();
   const target = useReturn((s) => s.path);
+  const committedPath = useRef(path);
+  useLayoutEffect(() => {
+    committedPath.current = path;
+    traceBackNavigation("mobileCommit", path, target, usePanelStore.getState().mobilePanel);
+  }, [path, target]);
   const back = useCallback(() => {
+    traceBackNavigation(
+      "mobileEnter",
+      committedPath.current,
+      target,
+      usePanelStore.getState().mobilePanel,
+    );
     usePanelStore.getState().showMobileAgent();
+    traceBackNavigation(
+      "panelChanged",
+      committedPath.current,
+      target,
+      usePanelStore.getState().mobilePanel,
+    );
     // Keep the host route underneath the entry page: it owns retained workspace/tab state.
     router.navigate(target as Href);
+    traceBackNavigation(
+      "dispatchReturned",
+      committedPath.current,
+      target,
+      usePanelStore.getState().mobilePanel,
+    );
   }, [router, target]);
   if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
   return <HeaderBackButton onBack={back} testID="chat-back" />;

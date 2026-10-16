@@ -224,6 +224,16 @@ the packaged client dist against its clean source/build before interpreting. Bod
 React layout-effect observation, not native presentation or readable content. These markers add
 overhead and do not by themselves establish a performance improvement or a network duration.
 
+Profile-only `clisbot.back.*` markers follow native touch delivery through Back touch/press,
+Tooltip forwarding, HeaderBack and MobileBack panel/navigation dispatch. They add no responder
+capture or gesture arbitration. Routes use bounded opaque process aliases. Back/overlay bounds
+are measured on layout; they are not proof of the topmost native hit target at touch time. Panel
+visibility edges include a worklet timestamp, whose clock and delayed `scheduleOnRN` delivery
+must not be confused with native presentation. Pair the current exact target's pixels, bounds,
+native DOWN/UP/CANCEL and handler markers; absent handler markers alone do not prove interception.
+These observers remain inactive outside the existing local profile build. Preserve short-tap
+failures separately when a follow-up uses ordinary finger-duration input.
+
 For subtree attribution, the installed RN package also includes `ReactFabric-profiling.js`.
 Plain `React.Profiler` in the normal production renderer does not provide render durations.
 The explicit combination `APP_VARIANT=development CLISBOT_PROFILE_BUILD=1 CLISBOT_REACT_PROFILE=1`
