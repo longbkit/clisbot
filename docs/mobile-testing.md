@@ -196,9 +196,10 @@ and clock-qualified video before accepting native latency/frame metrics.
 For disposable synthetic Android JS-callsite diagnosis, the existing native trace module exposes
 one-shot Hermes sampling only when **both** `CLISBOT_PROFILE_BUILD=1` and
 `APP_VARIANT=development` were present at native compilation, and the running package is
-`com.clisbot.app.dev`. Place the exact target workspace key in its external-files
-`cto029-hermes.arm` after warming the intended session. The accepted row callback consumes this
-file before navigation, enables the installed Hermes sampler, and a native worker synchronously
+`com.clisbot.app.dev`. Place the exact target workspace key, or the exact Bot DM/group
+conversation route, in its external-files `cto029-hermes.arm` after warming that same target.
+The workspace row or native Chat-list admission callback consumes a matching file before
+navigation, enables the installed Hermes sampler, and a native worker synchronously
 dumps `cto029-entry.cpuprofile` after two seconds. `cto029-hermes-result.json` acknowledges only
 successful dump return or an explicit error. Never invoke RN 0.81.5's misregistered wrapper
 `disable()`. An external controller must enforce a hard deadline independent of JS and force-stop
@@ -208,7 +209,8 @@ process-termination contract makes this unsuitable for the everyday app or unsav
 
 Validate nonempty samples, the expected RN JS thread and bundle frames before interpretation:
 the global dump selects the first registered Hermes profiler. Preserve raw output; symbolicate
-a copy using this exact diagnostic APK's composed release source map. Report leaf/inclusive
+a copy using this exact diagnostic APK's composed release source map. For explicitly authorized
+real read-only workloads, keep arm keys, raw profiles and symbolicated content private. Report leaf/inclusive
 sample counts, interval boundaries and unresolved frames. Samples diagnose executing callsites,
 not scheduling delay, visible presentation or latency acceptance. Headless and windowed runs
 are different environments and cannot establish a cross-environment speedup.

@@ -9,7 +9,11 @@ const route = vi.hoisted(() => ({
   panel: { target: "agent-list", revision: 1 },
 }));
 const navigation = vi.hoisted(() => ({ getCurrentRoute: vi.fn() }));
-vi.mock("@/performance/native-trace", () => ({ traceInstant: vi.fn() }));
+const armSampling = vi.hoisted(() => vi.fn());
+vi.mock("@/performance/native-trace", () => ({
+  traceInstant: vi.fn(),
+  startArmedHermesSampling: armSampling,
+}));
 vi.mock("@/constants/platform", () => ({
   get isNative() {
     return route.native;
@@ -409,3 +413,21 @@ it.each(["peer", "bot"])(
     expect(close).toHaveBeenCalledOnce();
   },
 );
+
+it("offers the exact native DM admission to the existing one-shot profile gate before dispatch", () => {
+  route.native = true;
+  const close = vi.fn();
+  const dmDestination = "/h/host-a/chat/direct-chat";
+  const view = renderHook(() => useChatListNavigation(close));
+  act(() => view.result.current(dmDestination));
+  expect(armSampling).toHaveBeenCalledExactlyOnceWith(dmDestination);
+  expect(close).not.toHaveBeenCalled();
+});
+it("does not invoke native sampling for web or destination-less overlay actions", () => {
+  const view = renderHook(() => useChatListNavigation(vi.fn()));
+  act(() => view.result.current("/h/host-a/chat/direct-chat"));
+  route.native = true;
+  view.rerender();
+  act(() => view.result.current());
+  expect(armSampling).not.toHaveBeenCalled();
+});

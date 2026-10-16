@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { useNavigationContainerRef, usePathname } from "expo-router";
-import { traceInstant } from "@/performance/native-trace";
+import { startArmedHermesSampling, traceInstant } from "@/performance/native-trace";
 import { isNative } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
@@ -80,6 +80,8 @@ export function useChatListNavigation(closeList: () => void): (destination?: str
   useLayoutEffect(() => () => cancelPending.current?.(), []);
   return useCallback(
     (destination?: string) => {
+      // Exact route must match the external one-shot arm; production/profile-off is a no-op.
+      if (isNative && destination) startArmedHermesSampling(destination);
       if (HOME_V2_ENABLED) rememberChatReturn("/chat");
       // Read the last committed path: Expo may still have a newer intent queued for dispatch.
       const committedPath = previousPath.current;
