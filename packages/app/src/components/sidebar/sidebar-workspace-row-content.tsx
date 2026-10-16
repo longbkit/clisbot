@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { WorkspaceMetadataRow } from "@/clisbot/session-storage/workspace-metadata-row";
 import { WorkspaceSessionsLeadingColumn } from "@/clisbot/workspace-sessions/expand-toggle";
 import { ProjectAboveLine, useProjectAbove } from "@/clisbot/workspace-sessions/project-above";
@@ -19,7 +20,7 @@ import {
   type SidebarWorkspaceTrailing,
 } from "@/components/sidebar/workspace-trailing";
 import { useAppSettings } from "@/hooks/use-settings";
-import { density, densityFontSize, densityIconBox } from "@/styles/density";
+import { density, densityFontSize } from "@/styles/density";
 import type { Theme } from "@/styles/theme";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { getStatusDotColor } from "@/utils/status-dot-color";
@@ -493,7 +494,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   workspaceStatusDot: {
     position: "relative",
-    width: densityIconBox("md"),
+    width: sidebarLeadingColumnWidth(theme),
     height: density.rowLineHeight,
     borderRadius: theme.borderRadius.full,
     flexShrink: 0,

@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { useCallback, useMemo, type ReactElement, type ReactNode } from "react";
 import { Pressable, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -34,7 +35,8 @@ export function WorkspaceSessionsLeadingColumn(props: {
   children: ReactNode;
 }): ReactNode {
   const { visible, expansion } = useSidebarWorkspaceSessions();
-  if (!visible || expansion !== "manual") return props.children;
+  if (!visible || expansion !== "manual")
+    return <View style={styles.column}>{props.children}</View>;
   return <ManualLeadingColumn {...props} />;
 }
 
@@ -51,7 +53,7 @@ function ManualLeadingColumn({
 }): ReactNode {
   const { expanded, toggle } = useWorkspaceSessionsManualToggle(workspaceKey);
   const hasSessions = useWorkspaceHasSessions({ serverId, workspaceId });
-  if (!hasSessions) return children;
+  if (!hasSessions) return <View style={styles.column}>{children}</View>;
 
   return (
     <View style={styles.column}>
@@ -103,6 +105,7 @@ function WorkspaceSessionsExpandToggle({
 
 const styles = StyleSheet.create((theme) => ({
   column: {
+    width: sidebarLeadingColumnWidth(theme),
     alignItems: "center",
     flexShrink: 0,
   },

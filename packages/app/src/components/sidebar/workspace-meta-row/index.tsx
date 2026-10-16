@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
@@ -112,10 +113,10 @@ function MetaItemNode({
   leading: boolean;
 }): ReactNode {
   if (item.kind === "branch") {
-    return <IdentityItem kind="branch" name={item.name} />;
+    return <IdentityItem kind="branch" name={item.name} leading={leading} />;
   }
   if (item.kind === "project") {
-    return <IdentityItem kind="project" name={item.name} />;
+    return <IdentityItem kind="project" name={item.name} leading={leading} />;
   }
   if (item.kind === "host") {
     return hostBadge ? <HostBadge badge={hostBadge} /> : null;
@@ -132,11 +133,19 @@ function MetaItemNode({
   return <ServiceItem summary={item.summary} />;
 }
 
-function IdentityItem({ kind, name }: { kind: "branch" | "project"; name: string }) {
+function IdentityItem({
+  kind,
+  name,
+  leading,
+}: {
+  kind: "branch" | "project";
+  name: string;
+  leading: boolean;
+}) {
   const Icon = kind === "branch" ? ThemedGitBranch : ThemedFolder;
   return (
     <View style={styles.identityItem} testID={`sidebar-workspace-${kind}`}>
-      <View style={styles.identityIcon}>
+      <View style={[styles.identityIcon, leading && styles.identityIconLeading]}>
         <Icon size={META_ICON_SIZE} uniProps={mutedMapping} />
       </View>
       <Text style={styles.identityText} numberOfLines={1}>
@@ -332,6 +341,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   identityIcon: {
     flexShrink: 0,
+  },
+  // The first branch/project caption shares the title rail; its glyph belongs in the leading
+  // column. Mid-line identity facts keep their inline glyph and separator spacing.
+  identityIconLeading: {
+    position: "absolute",
+    left: -(sidebarLeadingColumnWidth(theme) / 2 + theme.spacing[2] + META_ICON_SIZE / 2),
   },
   identityText: {
     color: theme.colors.foregroundMuted,

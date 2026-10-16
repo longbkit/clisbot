@@ -8,7 +8,7 @@ import { useCallback, type ReactNode } from "react";
 import { usePathname, useRouter } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
 import { PinOptionsMenu } from "./pin-options";
-import { BotsSectionHeader, useSectionCollapsed } from "./section-header";
+import { BotsSectionHeader, useSectionCollapsed, sectionRowIndent } from "./section-header";
 import { BotRow } from "./bots-section";
 import { ChatRow } from "./chats-section";
 import { useSidebarPinMenu } from "./use-section-actions";
@@ -64,7 +64,15 @@ export function FusionPinnedSection({
       ) : null}
       {!collapsed
         ? visibleItems.map((row) => (
-            <View key={row.key} testID={`sidebar-pin-${row.key}`}>
+            <View
+              key={row.key}
+              testID={`sidebar-pin-${row.key}`}
+              style={
+                row.kind === "bot" || row.kind === "chat" || row.kind === "unavailable"
+                  ? undefined
+                  : styles.workspacePin
+              }
+            >
               {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin, toggle)}
             </View>
           ))
@@ -119,5 +127,6 @@ function renderPin(
 }
 
 const styles = StyleSheet.create((theme) => ({
+  workspacePin: { paddingLeft: sectionRowIndent(theme) },
   error: { color: theme.colors.foregroundMuted, padding: 8, fontSize: theme.fontSize.sm },
 }));

@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
@@ -1289,7 +1290,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   statusGroupLeadingVisualSlot: {
     position: "relative",
-    width: densityIconBox("md"),
+    width: sidebarLeadingColumnWidth(theme),
     height: densityIconBox("md"),
     flexShrink: 0,
     alignItems: "center",

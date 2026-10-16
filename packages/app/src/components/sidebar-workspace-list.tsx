@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import type { PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
 import { StatusSessionRow } from "@/components/sidebar/sidebar-status-list";
 import { resolveSidebarProjectIconTargets } from "@/utils/sidebar-project-row-model";
@@ -179,7 +180,6 @@ const workspaceKeyExtractor = (workspace: SidebarWorkspacePlacement) => workspac
 
 const projectViewKeyExtractor = (project: SidebarProjectEntry) => project.viewKey;
 
-const WORKSPACE_STATUS_DOT_WIDTH = 14;
 const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedPlus = withUnistyles(Plus);
@@ -2845,7 +2845,7 @@ const styles = StyleSheet.create((theme) => ({
   // The width of a workspace row's status slot, so the label lands on the same rail as the
   // titles above it.
   newWorkspaceGhostIconSlot: {
-    width: densityIconBox("md"),
+    width: sidebarLeadingColumnWidth(theme),
     height: densityIconBox("md"),
     alignItems: "center",
     justifyContent: "center",
@@ -3042,7 +3042,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   workspaceStatusDot: {
     position: "relative",
-    width: WORKSPACE_STATUS_DOT_WIDTH,
+    width: sidebarLeadingColumnWidth(theme),
     height: 16,
     borderRadius: theme.borderRadius.full,
     flexShrink: 0,
@@ -3083,7 +3083,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    paddingLeft: WORKSPACE_STATUS_DOT_WIDTH + theme.spacing[2],
+    paddingLeft: sidebarLeadingColumnWidth(theme) + theme.spacing[2],
   },
   workspaceCreatingText: {
     color: theme.colors.foregroundMuted,

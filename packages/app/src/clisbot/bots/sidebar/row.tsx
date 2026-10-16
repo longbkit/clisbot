@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { SidebarStatusDot } from "@/components/agent-status-dot";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { getStatusBucketLabel } from "@/hooks/sidebar-status-view-model";
@@ -210,9 +211,9 @@ const styles = StyleSheet.create((theme) => ({
   rowHovered: { backgroundColor: theme.colors.surfaceSidebarHover },
   rowSelected: { backgroundColor: theme.colors.surfaceSidebarSelected, ...theme.shadow.raised },
   rowPressed: { backgroundColor: theme.colors.surface2 },
-  // Sized by its content: an icon keeps the icon box, a Bot/Chat mark fills the two-line row.
+  // Avatar size or unavailable glyph size never changes the title rail.
   leadingSlot: {
-    minWidth: theme.iconSize.md,
+    width: sidebarLeadingColumnWidth(theme),
     minHeight: theme.iconSize.md,
     alignItems: "center",
     justifyContent: "center",

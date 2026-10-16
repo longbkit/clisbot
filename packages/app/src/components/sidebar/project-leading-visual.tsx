@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { ActivityIndicator, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -275,7 +276,7 @@ const styles = StyleSheet.create((theme) => {
     // only as tall as the icon puts it above the title and the kebab — which is why the
     // workspace status indicator shares the same `rowLineHeight`.
     projectLeadingVisualSlot: {
-      width: densityIconBox("md"),
+      width: sidebarLeadingColumnWidth(theme),
       height: density.rowLineHeight,
       flexShrink: 0,
       alignItems: "center",

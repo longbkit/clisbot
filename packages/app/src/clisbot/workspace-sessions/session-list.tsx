@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import {
   lazy,
@@ -384,14 +385,15 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 26,
     marginBottom: theme.spacing[0.5],
     paddingVertical: theme.spacing[1],
-    paddingLeft: theme.spacing[2] + theme.iconSize.md + theme.spacing[2],
+    paddingLeft: theme.spacing[2] + sidebarLeadingColumnWidth(theme) + theme.spacing[2],
     paddingRight: theme.spacing[3],
     borderRadius: theme.borderRadius.md,
     justifyContent: "center",
     userSelect: "none",
   },
   rowIndented: {
-    paddingLeft: theme.spacing[2] + theme.spacing[2] + theme.iconSize.md + theme.spacing[2],
+    paddingLeft:
+      theme.spacing[2] + theme.spacing[2] + sidebarLeadingColumnWidth(theme) + theme.spacing[2],
   },
   // A status-grouped workspace row's indent (`sidebarWorkspaceRowStyles.rowIndented`), so the
   // mark sits in the rows' leading column and the title on their title rail.
@@ -420,14 +422,14 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
   markSlot: {
-    width: theme.iconSize.sm,
+    width: sidebarLeadingColumnWidth(theme),
     height: TITLE_LINE_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   markSlotWide: {
-    width: theme.iconSize.md,
+    width: sidebarLeadingColumnWidth(theme),
   },
   title: {
     flex: 1,
@@ -441,10 +443,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Under the title, past the mark, so detail items line up with the words they describe.
   detailLine: {
-    paddingLeft: theme.iconSize.sm + theme.spacing[2],
+    paddingLeft: sidebarLeadingColumnWidth(theme) + theme.spacing[2],
   },
   detailLineWide: {
-    paddingLeft: theme.iconSize.md + theme.spacing[2],
+    paddingLeft: sidebarLeadingColumnWidth(theme) + theme.spacing[2],
   },
   detailText: {
     color: theme.colors.foregroundExtraMuted,

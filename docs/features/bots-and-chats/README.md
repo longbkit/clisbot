@@ -171,6 +171,10 @@ Pinning a DM or its Bot represents the same sidebar item. Existing duplicate pin
 when the chat catalog loads; unpinning either surface removes the known aliases. Unknown/offline
 pins stay intact, and Host/account scopes remain separate. A one-bot group retains its own pin.
 
+Sidebar item titles and subtitles share a fixed leading column: avatars, type glyphs and status
+marks are centered within it without shifting the text. Pinned siblings, including unavailable
+placeholders, use the same child rail; project/workspace/session nesting retains its indentation.
+
 Pinned items render through the ordinary Bot, group, project, workspace and session row owners:
 marks, metadata, live status and permission-gated actions remain the same, including unpin. Bot
 activity follows the user's DM; group activity collapses its participating sessions with the

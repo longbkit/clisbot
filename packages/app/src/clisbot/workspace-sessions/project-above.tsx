@@ -1,3 +1,4 @@
+import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { createContext, useContext, type ReactElement, type ReactNode } from "react";
 import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -36,7 +37,7 @@ export function ProjectAboveLine({ name }: { name: string }): ReactElement {
 const styles = StyleSheet.create((theme) => ({
   // Past the leading icon column and its gap, the inset every row title in the sidebar uses.
   line: {
-    paddingLeft: theme.iconSize.md + theme.spacing[2],
+    paddingLeft: sidebarLeadingColumnWidth(theme) + theme.spacing[2],
     color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
     lineHeight: 16,
