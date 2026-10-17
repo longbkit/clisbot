@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/protocol",
-  "version": "2.1.2-beta.1",
+  "version": "2.1.2",
   "description": "Clisbot shared protocol schemas and wire types",
   "files": [
     "dist",

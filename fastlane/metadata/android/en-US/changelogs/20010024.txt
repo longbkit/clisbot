@@ -1,0 +1,8 @@
+Paseo baseline remains the reviewed main snapshot 337e81a9c6d4551dbcede5930c21408776d06b1b recorded in 2.1.1.
+
+Changed
+- Show Back and loading feedback before opening mobile conversations, and cancel stale opens after newer navigation
+- Reuse accepted conversation history and fetch only newer messages when refreshing
+- Move Android encrypted message decoding off the JavaScript thread and reduce repeated Markdown parsing
+
+Full notes: https://clisbot.com/changelog
