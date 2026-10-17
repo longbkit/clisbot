@@ -210,6 +210,12 @@ async function verifyInstalled(manifest) {
 await verifyInstalled(path.join(globalModules, "clisbot", "package.json"));
 assert.equal(verified.size, packages.length);
 await verifyInstalledHubAuth(require.resolve("@clisbot/hub/package.json"), fixture);
+await run(process.execPath, [
+  path.join(repo, "docker/base/rootfs/usr/local/lib/clisbot-hub-smoke.mjs"),
+  path.dirname(require.resolve("@clisbot/hub/package.json")),
+  "--channels-disabled",
+]);
+console.log("PASS: installed Hub SSR and authentication (channels disabled).");
 const load = (name) => import(pathToFileURL(require.resolve(name)).href);
 const { DaemonClient } = await load("@clisbot/client/internal/daemon-client");
 const { createDeviceKey } = await load("@clisbot/device-access/proof");

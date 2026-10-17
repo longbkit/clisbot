@@ -2,8 +2,10 @@
 
 ## Bundled authentication dependencies
 
-Better Auth, its OAuth provider and their production dependencies retain their original package
-manifests and license files under node_modules. @better-auth/utils@0.4.2 declares MIT but omits
+Better Auth, its OAuth provider and their production dependencies retain their original license
+files under node_modules. Staged manifests omit optional peers outside the bundle; affected packages
+include the exact upstream manifest as package.json.upstream. Runtime files remain unchanged.
+@better-auth/utils@0.4.2 declares MIT but omits
 its license file from the npm archive; the project's upstream MIT notice is reproduced here.
 
 Source: https://github.com/better-auth/utils/blob/ef522888b7b2ff77ca13f0afb476dfae8f297862/LICENSE

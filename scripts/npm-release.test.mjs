@@ -67,7 +67,10 @@ test("a packed workspace carries hoisted bundled dependencies, nested versions a
     put(workspace, {
       name: "bundle-fixture",
       version: "1.0.0",
-      dependencies: { auth: "1.0.0" },
+      dependencies: {
+        auth: "1.0.0",
+        integration: `file:${path.join(directory, "integration-1.0.0.tgz")}`,
+      },
       bundleDependencies: ["auth"],
     });
     put(
@@ -75,8 +78,11 @@ test("a packed workspace carries hoisted bundled dependencies, nested versions a
       {
         name: "auth",
         version: "1.0.0",
+        files: ["index.js"],
         dependencies: { shared: "1.0.0", helper: "1.0.0" },
         optionalDependencies: { absent: "1.0.0" },
+        peerDependencies: { integration: "1.0.0", shared: "1.0.0" },
+        peerDependenciesMeta: { integration: { optional: true } },
       },
       "module.exports = [require('shared'), require('helper')]",
     );
@@ -95,6 +101,19 @@ test("a packed workspace carries hoisted bundled dependencies, nested versions a
       { name: "shared", version: "2.0.0" },
       "module.exports = 'hoisted'",
     );
+    put(
+      path.join(directory, "node_modules/integration"),
+      {
+        name: "integration",
+        version: "1.0.0",
+      },
+      "module.exports = 'integration works'",
+    );
+    execFileSync("npm", ["pack", "--pack-destination", directory], {
+      cwd: path.join(directory, "node_modules/integration"),
+      stdio: "pipe",
+      shell: process.platform === "win32",
+    });
     writeFileSync(
       path.join(directory, "package-lock.json"),
       JSON.stringify({ packages: lockedPackages }),
@@ -114,6 +133,41 @@ test("a packed workspace carries hoisted bundled dependencies, nested versions a
     execFileSync("tar", ["-xf", path.join(directory, pack.filename), "-C", unpacked]);
     const require = createRequire(path.join(unpacked, "package/package.json"));
     assert.deepEqual(require("auth"), ["nested", "hoisted"]);
+    const auth = JSON.parse(
+      readFileSync(path.join(unpacked, "package/node_modules/auth/package.json")),
+    );
+    const upstream = JSON.parse(
+      readFileSync(path.join(unpacked, "package/node_modules/auth/package.json.upstream")),
+    );
+    assert.deepEqual(auth.peerDependencies, { shared: "1.0.0" });
+    assert.equal(upstream.peerDependencies.integration, "1.0.0");
+    const prefix = path.join(directory, "global");
+    execFileSync(
+      "npm",
+      [
+        "install",
+        "--global",
+        "--prefix",
+        prefix,
+        "--offline",
+        "--no-audit",
+        "--no-fund",
+        path.join(directory, pack.filename),
+      ],
+      {
+        cwd: directory,
+        stdio: "pipe",
+        shell: process.platform === "win32",
+      },
+    );
+    const installed = path.join(
+      prefix,
+      process.platform === "win32" ? "node_modules" : "lib/node_modules",
+      "bundle-fixture",
+    );
+    const installedRequire = createRequire(path.join(installed, "package.json"));
+    assert.equal(installedRequire("integration"), "integration works");
+    assert.deepEqual(installedRequire("auth"), ["nested", "hoisted"]);
     writeFileSync(
       path.join(directory, "node_modules/shared/index.js"),
       "module.exports = 'updated'",
@@ -128,6 +182,17 @@ test("a packed workspace carries hoisted bundled dependencies, nested versions a
       ),
       ["nested", "updated"],
     );
+    const authManifest = path.join(directory, "node_modules/auth/package.json");
+    const requiredPeer = JSON.parse(readFileSync(authManifest));
+    delete requiredPeer.peerDependenciesMeta.integration;
+    writeFileSync(authManifest, JSON.stringify(requiredPeer));
+    await assert.rejects(
+      stageBundleDependencies(workspace, directory),
+      /Required peer integration is outside the bundle/,
+    );
+    requiredPeer.peerDependenciesMeta.integration = { optional: true };
+    writeFileSync(authManifest, JSON.stringify(requiredPeer));
+    await stageBundleDependencies(workspace, directory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -149,6 +214,38 @@ test("a missing required bundle fails before packing instead of publishing an in
       stageBundleDependencies(directory, directory),
       /Missing bundled dependency missing-auth-fixture/,
     );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("a package-local bundle preserves upstream metadata across repeated staging", async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "clisbot-bundle-local-"));
+  const auth = path.join(directory, "node_modules/auth");
+  const original = JSON.stringify({
+    name: "auth",
+    version: "1.0.0",
+    files: ["index.js"],
+    peerDependencies: { integration: "1.0.0" },
+    peerDependenciesMeta: { integration: { optional: true } },
+  });
+  try {
+    mkdirSync(auth, { recursive: true });
+    writeFileSync(path.join(auth, "package.json"), original);
+    writeFileSync(
+      path.join(directory, "package.json"),
+      JSON.stringify({ bundleDependencies: ["auth"] }),
+    );
+    writeFileSync(
+      path.join(directory, "package-lock.json"),
+      JSON.stringify({ packages: { "node_modules/auth": { version: "1.0.0" } } }),
+    );
+    await stageBundleDependencies(directory, directory);
+    const first = readFileSync(path.join(auth, "package.json"), "utf8");
+    await stageBundleDependencies(directory, directory);
+    assert.equal(readFileSync(path.join(auth, "package.json"), "utf8"), first);
+    assert.equal(readFileSync(path.join(auth, "package.json.upstream"), "utf8"), original);
+    assert.deepEqual(JSON.parse(first).files, ["index.js", "package.json.upstream"]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

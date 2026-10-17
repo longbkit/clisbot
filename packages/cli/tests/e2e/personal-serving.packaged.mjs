@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { randomBytes } from "node:crypto";
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
@@ -83,6 +83,15 @@ try {
     const link = async (dependency) => {
       if (dependency.startsWith("@clisbot/") && packages.includes(dependency.slice(9))) return;
       const target = path.join(destination, "node_modules", dependency);
+      // Bundled dependencies are already real files from the archive under test.
+      // Preserve them instead of replacing them with checkout dependencies.
+      if (
+        await lstat(target).catch((error) => {
+          if (error.code !== "ENOENT") throw error;
+          return undefined;
+        })
+      )
+        return;
       await mkdir(path.dirname(target), { recursive: true });
       await symlink(path.join(dependencies, dependency), target, "junction");
     };

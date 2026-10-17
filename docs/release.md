@@ -171,10 +171,17 @@ Hub bundles Better Auth, its OAuth provider and their installed production depen
 framework/test peer graph crashes npm 10's resolver before lifecycle scripts can
 run ([upstream fix](https://github.com/npm/cli/pull/8448)). The Hub build stages the
 locked, installed modules locally because npm pack cannot bundle workspace-hoisted
-files. Keep the original package manifests and licenses, and keep TanStack Start
+files. Staged manifests omit optional peers outside the bundle: npm otherwise
+marks those peers bundled and leaves empty directories when Hub is a global root.
+Each changed manifest ships its exact original as `package.json.upstream`; runtime
+files and licenses remain unchanged. Required peers must resolve within the bundle.
+Keep TanStack Start
 as a runtime dependency: Better Auth's cookie hook dynamically imports its server
 entry. The installed smoke rejects a missing bundle and exercises that hook plus
-password failure/retry. Do not replace these checks with a successful dry run or
+password failure/retry, and imports the installed Hub SSR build. Also run the
+Docker Hub smoke with Hub installed as a global root, with channels enabled and
+disabled; a CLI-only root can hoist peers above Hub and hide a broken bundle.
+Do not replace these checks with a successful dry run or
 an installation using checkout symlinks. See the
 [installation boundary audit](audits/2026-10-17-npm-install/README.md).
 

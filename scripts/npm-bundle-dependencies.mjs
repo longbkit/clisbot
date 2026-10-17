@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, realpath, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -27,7 +27,10 @@ export async function stageBundleDependencies(
   for (const name of manifest.bundleDependencies ?? []) await collect(name, workspace, graph);
   // Resolve the whole graph before copying so staging cannot change resolution.
   for (const [source, destination] of packages) {
-    if (source === destination) continue;
+    if (source === destination) {
+      await isolateOptionalPeers(source, destination, graph);
+      continue;
+    }
     // Only generated, non-lockfile paths are replaced. Resolving through the lock
     // above prevents a previous build's staged copy from hiding an updated module.
     await rm(destination, { recursive: true, force: true });
@@ -36,7 +39,37 @@ export async function stageBundleDependencies(
       recursive: true,
       filter: (entry) => !path.relative(source, entry).split(path.sep).includes("node_modules"),
     });
+    await isolateOptionalPeers(source, destination, graph);
   }
+}
+
+async function isolateOptionalPeers(source, destination, { packages, locked }) {
+  const upstream = path.join(source, "package.json.upstream");
+  const original = await readFile(
+    existsSync(upstream) ? upstream : path.join(source, "package.json"),
+    "utf8",
+  );
+  const pkg = JSON.parse(original);
+  const require = createRequire(path.join(source, "package.json"));
+  let changed = false;
+  for (const name of Object.keys(pkg.peerDependencies ?? {})) {
+    const peer = require.resolve
+      .paths(name)
+      ?.map((directory) => path.join(directory, name))
+      .find((directory) => locked(directory) && existsSync(path.join(directory, "package.json")));
+    if (peer && packages.has(await realpath(peer))) continue;
+    if (!pkg.peerDependenciesMeta?.[name]?.optional)
+      throw new Error(`Required peer ${name} is outside the bundle for ${pkg.name}`);
+    // npm considers peers at the bundler's level to be bundled, even when their
+    // files are absent. Leave external integrations to the host's dependencies.
+    delete pkg.peerDependencies[name];
+    delete pkg.peerDependenciesMeta[name];
+    changed = true;
+  }
+  if (!changed) return;
+  if (pkg.files) pkg.files = [...pkg.files, "package.json.upstream"];
+  await writeFile(path.join(destination, "package.json.upstream"), original);
+  await writeFile(path.join(destination, "package.json"), `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
 async function collect(name, from, graph, optional = false) {
