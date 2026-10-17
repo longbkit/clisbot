@@ -59,6 +59,8 @@ jobs:
       - name: Build web app
         working-directory: packages/app
         run: npx expo export --platform web
+        env:
+          CLISBOT_WEB_UTF8_EXPORT: "1"
 
       - name: Check Cloudflare Worker access
         working-directory: packages/app

@@ -457,6 +457,7 @@ The GitHub Release body is populated automatically by the `Release Notes Sync` w
 - The default download target only moves when you publish the final stable release tag like `v0.1.41`.
 - The public `/changelog` page renders `CHANGELOG.md` as-is, so the in-flight `-beta.N` entry shows there once it lands on `main` — that's intended, it's where beta users check what's coming. Only the **default download target** stays pinned to the latest stable; the download links read GitHub's releases API, not the changelog, so a `-beta.N` heading on top never affects them.
 - The download page's "What's new" link deep-links the **minor group** anchor (`/changelog#release-0.3`), not the exact entry: the beta entry is renamed on each beta and on promotion, so the minor group remains the durable target. A version with no entry in the bundled changelog — a tag whose changelog commit hasn't redeployed the site yet — links the plain `/changelog` instead of a dead anchor.
+- `Deploy App` exports with `CLISBOT_WEB_UTF8_EXPORT=1` to keep multilingual strings in UTF-8 within Cloudflare's 25 MiB per-asset limit. Use the same flag for a local deployment export; native and Desktop exports keep the default minifier settings.
 - The website itself is deployed by `Deploy Website` (Cloudflare Workers), which redeploys on the `release: published` event emitted when a stable draft is published and on pushes to `main` that touch `CHANGELOG.md` or `packages/website/**`. Its job condition excludes beta prereleases.
 
 ## Fixing a failed release build

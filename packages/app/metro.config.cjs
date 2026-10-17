@@ -20,6 +20,12 @@ const customWebPlatform = (process.env.CLISBOT_WEB_PLATFORM ?? "")
   .toLowerCase();
 
 const config = getDefaultConfig(projectRoot);
+// Cloudflare limits each uncompressed asset to 25 MiB. Preserve Unicode as UTF-8
+// for this web export; native and desktop packaging keep Metro's defaults.
+if (process.env.CLISBOT_WEB_UTF8_EXPORT === "1") {
+  config.transformer.minifierConfig.output.ascii_only = false;
+}
+
 if (isSyntheticReactProfileBuild()) {
   config.cacheVersion = `${config.cacheVersion ?? ""}:clisbot-native-react-profile`;
 }
