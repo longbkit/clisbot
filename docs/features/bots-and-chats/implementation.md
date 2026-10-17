@@ -26,7 +26,7 @@ the plan gets corrected in the same commit.
   follow the Bot's Project grant since 2026-10-07 (README, D16).
   Both Bot defaults and actual resumed session configuration are checked against narrowed grants.
   App query/transcript caches are scoped by client generation and connection epoch, so a new
-  admission must revalidate access before rendering old private data.
+  admission revalidates access independently of the already mounted same-owner presentation (below).
 - Fixed the pre-existing `channelFileRead` flag-off compatibility failure: publication depends on
   a persisted Hub relationship, not merely the existence of a relationship controller.
 - Hardened idempotent creation, reserved-root checks, transcript receipt lookup, synchronous turn
@@ -160,10 +160,22 @@ against a newer pushed binding; authoritative absence/error clears the record an
 There is no second metadata cache. Pending/new-admission, unasked or failed Host catalogs
 cannot seed a detail. The conversation workspace/header stays mounted while metadata is
 pending or transcript loading fails, so Back remains available; unreadable/denied content
-is replaced within the body rather than replacing navigation. A typed
-`DaemonConnectionError` with `DAEMON_REQUEST_TIMEOUT` on a non-rejected admission may retain an already accepted metadata
-record/page in the same admission with a visible error; RPC/auth/protocol and unknown errors
-remain fail-closed. The route hides accepted content on the existing explicit authentication-failure snapshot, while keeping Back. New admission keys never borrow the previous page.
+is replaced within the body rather than replacing navigation. Typed transport loss or timeout
+may retain a previously accepted record/page while the same mounted Host/chat, principal and
+client generation reconnects. The presentation key excludes the connection epoch; its last
+accepted page is a mount-local reference, never copied into a new admission's query/store.
+Queries still use a new epoch and fetch an authorized tail. An authoritative empty page replaces
+the retained page; metadata removal/archive, RPC/auth/protocol and unknown errors revoke it.
+Client replacement, principal change or route change discards this mounted presentation.
+The existing transcript read ticket also stamps the principal: a different principal clears
+that key's rows/coverage before fetching a fresh tail, even if the transport epoch is unchanged.
+Presentation checks that stamp even when a prior principal's query result remains cached;
+late refresh/older-page responses cannot expose or append another principal's rows. Optional
+callers without a principal retain the existing unscoped read contract.
+Explicit client/snapshot authentication failure hides the accepted subtree immediately, keeping
+Back. Sending and older-page reads wait for current-admission acceptance, not the retained page.
+Old epoch callbacks cannot replace current metadata. This preserves body/composer/scroll identity
+through transport reconnect without granting the old snapshot authority over the new connection.
 
 Catalog consumers share one event reconciliation feed per actual client and admission.
 The first consumer reconciles the initial snapshot; removing a consumer does not disconnect
@@ -191,10 +203,11 @@ Production, web and Electron do not activate that accounting.
 
 Initial metadata/transcript loading uses the shared centered spinner inside the retained
 conversation workspace, leaving Back outside the body. An active fetch with accepted content
-shows a small pointer-transparent progress indicator without replacing the ChatScreen,
-composer or loaded rows. `isFetching` remains separate from loaded/error state. This is visual
-feedback, not off-thread execution: receive/decrypt/decode still runs on the existing JS path,
-and native interaction acceptance must measure actual input delivery separately.
+uses the existing `TimelineSyncStatus` floating Updating/Reconnecting toast, pointer-transparent,
+without replacing ChatScreen, composer or loaded rows. Cold loading labels use the theme's muted
+foreground in light and dark mode. `isFetching` remains separate from loaded/error state. These
+presentation guarantees do not establish input latency; native interaction acceptance still
+measures actual input delivery separately.
 
 Conversation Explorer effects only dismiss a currently open Files overlay owned by that
 conversation. Missing project metadata must not close the outgoing Chat list; blur/unmount

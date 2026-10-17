@@ -26,7 +26,7 @@ export async function fetchTranscriptPage(
 /** A refresh still checks authority. Only a confirmed contiguous append-only window uses a delta. */
 export async function refreshChatTranscript(
   runtime: BotsRuntime,
-  input: { serverId: string; chatId: string; key: string },
+  input: { serverId: string; chatId: string; key: string; principalScope?: string },
 ) {
   const { serverId, chatId, key } = input;
   const currentAdmission = () => {
@@ -39,13 +39,13 @@ export async function refreshChatTranscript(
   };
   if (!currentAdmission()) throw new Error(i18n.t("bots.workspace.errors.hostNotConnected"));
   const store = useTranscriptStore.getState();
-  const read = store.beginRead(key);
+  const read = store.beginRead(key, input.principalScope);
   traceConversationPhase("transcript.request", key, {
     direction: read.afterSeq === undefined ? "tail" : "after",
   });
   let page = await fetchTranscriptPage(runtime, { serverId, chatId, afterSeq: read.afterSeq });
   if (!currentAdmission() || !store.acceptsRead(key, read))
-    return selectTranscript(useTranscriptStore.getState(), key);
+    return selectedReadTranscript(key, input.principalScope);
   let delta = read.afterSeq !== undefined;
   if (
     delta &&
@@ -60,5 +60,13 @@ export async function refreshChatTranscript(
   }
   traceConversationPhase("transcript.response", key, { rows: String(page.messages.length) });
   if (currentAdmission()) store.acceptRead(key, read, page, delta);
-  return selectTranscript(useTranscriptStore.getState(), key);
+  return selectedReadTranscript(key, input.principalScope);
+}
+
+/** A stale query must not cache a different principal's currently selected store page. */
+function selectedReadTranscript(key: string, principalScope?: string) {
+  const state = useTranscriptStore.getState();
+  return state.reads[key]?.principalScope === principalScope
+    ? selectTranscript(state, key)
+    : { messages: [], hasOlder: false };
 }

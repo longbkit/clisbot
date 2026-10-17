@@ -131,3 +131,61 @@ it("retains accepted metadata on a typed transport timeout but exposes the error
   expect(hook.result.current.chat).toBe(accepted);
   hook.unmount();
 });
+
+it("keeps accepted metadata when the active request loses transport before the offline snapshot", async () => {
+  const { DaemonConnectionError } = await import("@clisbot/client/internal/daemon-client");
+  const accepted = { id: "chat-a", participants: [] } as unknown as ChatPayload;
+  let reject!: (error: Error) => void;
+  const client = {
+    listChats: () =>
+      new Promise((_, no) => {
+        reject = no;
+      }),
+    observeEvents: () => ({ subscribe: () => {}, release: async () => {} }),
+  } as unknown as DaemonClient;
+  const hook = renderHook(() => useChatRecord(client, true, "chat-a", "epoch:1", accepted));
+  await act(async () => reject(new DaemonConnectionError("Connection lost")));
+  expect(hook.result.current.chat).toBe(accepted);
+  expect(hook.result.current.error).toContain("Connection lost");
+  hook.unmount();
+});
+
+it("revalidates metadata on reconnect and ignores an old admission response", async () => {
+  const accepted = { id: "chat-a", participants: [] } as unknown as ChatPayload;
+  const responses: Array<(value: { chats: ChatPayload[] }) => void> = [];
+  const client = {
+    listChats: () =>
+      new Promise((resolve) => {
+        responses.push(resolve);
+      }),
+    observeEvents: () => ({ subscribe: () => {}, release: async () => {} }),
+  } as unknown as DaemonClient;
+  const hook = renderHook(
+    ({ online, key }) => useChatRecord(client, online, "chat-a", key, accepted),
+    { initialProps: { online: true, key: "epoch:1" } },
+  );
+  hook.rerender({ online: false, key: "epoch:1" });
+  expect(hook.result.current.chat).toBe(accepted);
+  expect(hook.result.current.authorized).toBe(false);
+  hook.rerender({ online: true, key: "epoch:2" });
+  expect(hook.result.current.chat).toBe(accepted);
+  expect(hook.result.current.authorized).toBe(false);
+  await act(async () => responses[0]({ chats: [] }));
+  expect(hook.result.current.chat).toBe(accepted);
+  await act(async () => responses[1]({ chats: [accepted] }));
+  expect(hook.result.current.authorized).toBe(true);
+  hook.unmount();
+});
+it("does not retain metadata when connection loss carries an explicit client authentication rejection", async () => {
+  const { DaemonConnectionError } = await import("@clisbot/client/internal/daemon-client");
+  const accepted = { id: "chat-a", participants: [] } as unknown as ChatPayload;
+  const client = {
+    authFailureReason: "incorrect_password",
+    listChats: () => Promise.reject(new DaemonConnectionError("Connection lost")),
+    observeEvents: () => ({ subscribe: () => {}, release: async () => {} }),
+  } as unknown as DaemonClient;
+  const hook = renderHook(() => useChatRecord(client, true, "chat-a", "epoch:1", accepted));
+  await waitFor(() => expect(hook.result.current.chat).toBeNull());
+  expect(hook.result.current.authorized).toBe(false);
+  hook.unmount();
+});

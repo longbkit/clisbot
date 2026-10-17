@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   empty: false,
   online: true,
   epoch: 1,
+  generation: 1,
+  principal: "principal",
   authFailure: false,
   workspaceMounts: 0,
 }));
@@ -41,6 +43,9 @@ vi.mock("react-native", () => ({
   ),
   Text: "span",
 }));
+vi.mock("@/timeline/sync-status", () => ({
+  TimelineSyncStatus: ({ sync }: { sync: { status: string } }) => <aside>{sync.status}</aside>,
+}));
 vi.mock("@/components/ui/loading-spinner", () => ({
   LoadingSpinner: () => <i data-testid="spinner" />,
 }));
@@ -65,7 +70,7 @@ vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeClient: () => null,
   useHostRuntimeConnectionStatus: () => (state.online ? "online" : "offline"),
   useHostRuntimeSnapshot: () => ({
-    clientGeneration: 1,
+    clientGeneration: state.generation,
     connectionEpoch: state.epoch,
     authFailureReason: state.authFailure ? "incorrect_password" : null,
     lastError: "Authentication failed",
@@ -73,7 +78,7 @@ vi.mock("@/runtime/host-runtime", () => ({
 }));
 vi.mock("../feature", () => ({ useHostBotsFeature: () => true }));
 vi.mock("../data/resource-principal-scope", () => ({
-  useResourcePrincipalScope: () => "principal",
+  useResourcePrincipalScope: () => state.principal,
 }));
 vi.mock("../data/runtime", () => ({
   botsRuntime: {},
@@ -93,7 +98,7 @@ vi.mock("../data/use-chat-transcript", () => ({
     transcript: { messages: state.empty ? [] : [{ id: "accepted-message" }] },
     loadState: state.transcriptError
       ? { status: "error", message: state.transcriptError, retainAccepted: state.retainAccepted }
-      : { status: "loading" },
+      : { status: state.fetching || state.empty ? "loading" : "loaded" },
     loadOlder: async () => {},
     isFetching: state.fetching,
   }),
@@ -142,6 +147,8 @@ afterEach(() => {
   state.empty = false;
   state.online = true;
   state.epoch = 1;
+  state.generation = 1;
+  state.principal = "principal";
   state.authFailure = false;
   state.workspaceMounts = 0;
 });
@@ -161,7 +168,7 @@ it("keeps the same conversation chrome through metadata loading, accepted conten
   expect(screen.getByRole("button", { name: "Back" })).toBe(back);
   expect(state.workspaceMounts).toBe(1);
 });
-it("keeps navigation for unavailable/offline content and remounts the authority boundary on a new epoch", () => {
+it("keeps navigation for unavailable/offline content without remounting on a same-client epoch", () => {
   state.error = "Unavailable";
   state.online = false;
   const view = render(<ChatRoute />);
@@ -170,8 +177,8 @@ it("keeps navigation for unavailable/offline content and remounts the authority 
   expect(screen.queryByText("accepted-message")).toBeNull();
   state.epoch = 2;
   view.rerender(<ChatRoute />);
-  expect(screen.getByTestId("workspace")).not.toBe(workspace);
-  expect(state.workspaceMounts).toBe(2);
+  expect(screen.getByTestId("workspace")).toBe(workspace);
+  expect(state.workspaceMounts).toBe(1);
 });
 
 it("retains the accepted body/composer through an explicitly classified transport refresh error", () => {
@@ -182,7 +189,8 @@ it("retains the accepted body/composer through an explicitly classified transpor
   state.retainAccepted = true;
   view.rerender(<ChatRoute />);
   expect(screen.getByText("accepted-message")).toBe(body);
-  expect(screen.getByText("Connection timeout")).toBeTruthy();
+  expect(screen.queryByText("Connection timeout")).toBeNull();
+  expect(screen.getByText("catching_up")).toBeTruthy();
   expect(state.workspaceMounts).toBe(1);
 });
 
@@ -221,3 +229,37 @@ it("shows non-intercepting initial and refresh progress without replacing the ac
   expect(screen.getByRole("button", { name: "Back" })).toBe(back);
   expect(state.workspaceMounts).toBe(1);
 });
+
+it("preserves body and navigation identity through disconnect/reconnect and shows the existing floating sync status", () => {
+  state.chat = { id: "chat", participants: [], title: "Accepted" };
+  const view = render(<ChatRoute />);
+  const body = screen.getByText("accepted-message");
+  const back = screen.getByRole("button", { name: "Back" });
+  state.online = false;
+  view.rerender(<ChatRoute />);
+  expect(screen.getByText("accepted-message")).toBe(body);
+  expect(screen.getByText("reconnecting")).toBeTruthy();
+  state.online = true;
+  state.epoch++;
+  state.fetching = true;
+  view.rerender(<ChatRoute />);
+  expect(screen.getByText("accepted-message")).toBe(body);
+  expect(screen.getByRole("button", { name: "Back" })).toBe(back);
+  expect(screen.getByText("catching_up")).toBeTruthy();
+  expect(state.workspaceMounts).toBe(1);
+});
+it.each(["generation", "principal"] as const)(
+  "replaces the presentation when %s changes",
+  (field) => {
+    state.chat = { id: "chat", participants: [], title: "Accepted" };
+    const view = render(<ChatRoute />);
+    const workspace = screen.getByTestId("workspace");
+    if (field === "generation") state.generation++;
+    else state.principal = "other-principal";
+    state.chat = null;
+    state.empty = true;
+    view.rerender(<ChatRoute />);
+    expect(screen.getByTestId("workspace")).not.toBe(workspace);
+    expect(screen.queryByText("accepted-message")).toBeNull();
+  },
+);

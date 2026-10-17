@@ -1,6 +1,6 @@
 import { DaemonConnectionError } from "@clisbot/client/internal/daemon-client";
 import { botsSessionScope, scopedTranscriptKey } from "./session-scope";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { toErrorMessage } from "@/utils/error-messages";
@@ -8,6 +8,8 @@ import type { BotsRuntime } from "./client";
 import { fetchTranscriptPage, refreshChatTranscript } from "./transcript-refresh";
 import { chatTranscriptQueryKey } from "./query-keys";
 import { selectTranscript, useTranscriptStore, type ChatTranscript } from "./transcript-store";
+
+const EMPTY_PRESENTATION: ChatTranscript = { messages: [], hasOlder: false };
 
 export { TRANSCRIPT_PAGE_SIZE } from "./transcript-refresh";
 
@@ -36,6 +38,10 @@ export function useChatTranscriptQuery(input: {
   serverId: string;
   chatId: string;
   runtime: BotsRuntime;
+  /** Presentation-only retention; query/store authority stays transport-scoped. */
+  presentationScope?: string;
+  /** An authoritative metadata removal revokes even the mounted presentation. */
+  presentationAllowed?: boolean;
 }): UseChatTranscriptResult {
   const { serverId, chatId, runtime } = input;
   const snapshot = useHostRuntimeSnapshot(serverId);
@@ -45,30 +51,81 @@ export function useChatTranscriptQuery(input: {
   const transcript = useTranscriptStore(
     useCallback((state) => selectTranscript(state, key), [key]),
   );
+  const readPrincipal = useTranscriptStore(
+    useCallback((state) => state.reads[key]?.principalScope, [key]),
+  );
+  const samePrincipal = readPrincipal === input.presentationScope;
   const query = useFetchQuery({
     queryKey: [
       ...chatTranscriptQueryKey(serverId, chatId),
+      input.presentationScope,
       connectionStatus,
       botsSessionScope(snapshot),
     ],
-    queryFn: () => refreshChatTranscript(runtime, { serverId, chatId, key }),
+    queryFn: () =>
+      refreshChatTranscript(runtime, {
+        serverId,
+        chatId,
+        key,
+        principalScope: input.presentationScope,
+      }),
     dataShape: "value",
     staleTimeMs: 0,
     enabled: online,
   });
+  const owner = JSON.stringify([
+    serverId,
+    chatId,
+    input.presentationScope,
+    snapshot?.clientGeneration ?? 0,
+  ]);
+  const retained = useRef<{ owner: string; transcript: ChatTranscript } | null>(null);
+  const recoverable = query.error instanceof DaemonConnectionError && !snapshot?.authFailureReason;
+  const rejected = Boolean(snapshot?.authFailureReason) || (query.isError && !recoverable);
+  const blocked = rejected || input.presentationAllowed === false;
+  const previous =
+    !blocked && retained.current?.owner === owner ? retained.current.transcript : undefined;
+  const acceptedCurrent = query.data !== undefined && samePrincipal;
+  let presented = acceptedCurrent ? transcript : (previous ?? EMPTY_PRESENTATION);
+  if (blocked) presented = EMPTY_PRESENTATION;
+  useLayoutEffect(() => {
+    if (blocked || retained.current?.owner !== owner) retained.current = null;
+    if (rejected && useTranscriptStore.getState().transcripts[key])
+      useTranscriptStore.getState().clear(key);
+    if (!blocked && acceptedCurrent) retained.current = { owner, transcript };
+  }, [acceptedCurrent, blocked, key, owner, rejected, transcript]);
   const [isLoadingOlder, setLoadingOlder] = useState(false);
   const loadOlder = useCallback(async () => {
     const current = selectTranscript(useTranscriptStore.getState(), key);
     const oldest = current.messages[0];
-    if (isLoadingOlder || !current.hasOlder || !oldest) return;
+    if (blocked || !online || !acceptedCurrent || isLoadingOlder || !current.hasOlder || !oldest)
+      return;
     setLoadingOlder(true);
     try {
       const page = await fetchTranscriptPage(runtime, { serverId, chatId, beforeSeq: oldest.seq });
-      useTranscriptStore.getState().prependOlder(key, page.messages, page.hasOlder);
+      const latest = runtime.getSnapshot(serverId);
+      const store = useTranscriptStore.getState();
+      if (
+        latest?.connectionStatus === "online" &&
+        !latest.authFailureReason &&
+        scopedTranscriptKey(serverId, chatId, latest) === key &&
+        store.reads[key]?.principalScope === input.presentationScope
+      )
+        store.prependOlder(key, page.messages, page.hasOlder);
     } finally {
       setLoadingOlder(false);
     }
-  }, [chatId, isLoadingOlder, key, runtime, serverId]);
+  }, [
+    acceptedCurrent,
+    blocked,
+    chatId,
+    isLoadingOlder,
+    key,
+    online,
+    runtime,
+    serverId,
+    input.presentationScope,
+  ]);
   const loadState = useMemo<ChatTranscriptLoadState>(() => {
     if (!online) return { status: "connecting" };
     if (query.isError)
@@ -77,13 +134,15 @@ export function useChatTranscriptQuery(input: {
         message: toErrorMessage(query.error),
         // Only known transport failures may retain an already accepted page. RPC/auth,
         // protocol and unknown errors still hide the transcript, including on refresh.
-        retainAccepted:
-          query.error instanceof DaemonConnectionError &&
-          query.error.code === "DAEMON_REQUEST_TIMEOUT" &&
-          !snapshot?.authFailureReason &&
-          query.data !== undefined,
+        retainAccepted: recoverable && (acceptedCurrent || previous !== undefined),
       };
-    return query.data ? { status: "loaded" } : { status: "loading" };
-  }, [online, query.data, query.error, query.isError, snapshot?.authFailureReason]);
-  return { transcript, loadState, loadOlder, isLoadingOlder, isFetching: query.isFetching };
+    return acceptedCurrent ? { status: "loaded" } : { status: "loading" };
+  }, [acceptedCurrent, online, query.error, query.isError, recoverable, previous]);
+  return {
+    transcript: presented,
+    loadState,
+    loadOlder,
+    isLoadingOlder,
+    isFetching: query.isFetching,
+  };
 }

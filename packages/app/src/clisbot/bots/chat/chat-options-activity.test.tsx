@@ -7,7 +7,11 @@ interface Children {
   children?: React.ReactNode;
 }
 const state = vi.hoisted(() => ({ active: true, setVisible: vi.fn() }));
-vi.mock("react-native", () => ({ View: "div", Text: "span" }));
+vi.mock("react-native", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-native")>()),
+  View: "div",
+  Text: "span",
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   withUnistyles: () => () => null,
@@ -36,7 +40,7 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 }));
 vi.mock("@/components/ui/menu", () => ({ MenuTextField: () => null }));
 vi.mock("@/components/ui/icon-button-chrome", () => ({
-  iconButtonChromeStyle: () => ({}),
+  useIconButtonChromeStyle: () => ({}),
   iconButtonChromeGlyphSize: () => 20,
   extraMutedIconColorMapping: {},
   mutedIconColorMapping: {},
@@ -59,6 +63,13 @@ vi.mock("./use-connect-channel", () => ({
 }));
 vi.mock("./chat-options-context", () => ({
   useChatOptionsState: () => ({ visible: true, setVisible: state.setVisible }),
+}));
+vi.mock("./participant-actions", () => ({
+  ParticipantActions: ({
+    renderTrigger,
+  }: {
+    renderTrigger: (open: () => void) => React.ReactNode;
+  }) => renderTrigger(() => undefined),
 }));
 vi.mock("./group-chat-settings", () => ({
   GroupChatSettings: () => <input aria-label="Pending group name" defaultValue="Initial" />,

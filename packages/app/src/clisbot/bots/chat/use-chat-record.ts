@@ -33,13 +33,15 @@ export function useChatRecord(
   key: string,
   initialChat: ChatPayload | null = null,
 ) {
-  // The route is keyed by Host/chat/client generation/connection epoch. Reuse only the
-  // current catalog's accepted record; the existing RPC/push owner still revalidates it.
+  // Presentation survives reconnect on the same client/principal. The key still identifies
+  // each transport admission; stale responses cannot authorize the new admission.
   const [chat, setChat] = useState<ChatPayload | null>(() =>
     initialChat?.id === chatId ? initialChat : null,
   );
   const seeded = useRef(initialChat !== null);
+  const [acceptedKey, setAcceptedKey] = useState(initialChat ? key : null);
   const [error, setError] = useState<string | null>(null);
+  const [transportInterrupted, setTransportInterrupted] = useState(false);
   useEffect(() => {
     let active = true;
     let receivedUpdate = false;
@@ -53,29 +55,31 @@ export function useChatRecord(
             error: String(Boolean(r.error)),
           });
           if (!active || receivedUpdate) return undefined;
+          setTransportInterrupted(false);
           if (r.error) {
             setChat(null);
+            setAcceptedKey(null);
             setError(r.error);
             useTranscriptStore.getState().clear(key);
           } else {
-            setChat(r.chats.find((c) => c.id === chatId) ?? null);
-            if (!r.chats.some((c) => c.id === chatId)) useTranscriptStore.getState().clear(key);
-            setError(
-              r.chats.some((c) => c.id === chatId) ? null : i18n.t("bots.chat.record.unavailable"),
-            );
+            const current = r.chats.find((c) => c.id === chatId && !c.archivedAt) ?? null;
+            setChat(current);
+            setAcceptedKey(current ? key : null);
+            if (!current) useTranscriptStore.getState().clear(key);
+            setError(current ? null : i18n.t("bots.chat.record.unavailable"));
           }
           return undefined;
         })
         .catch((e) => {
           if (active && !receivedUpdate) {
-            // A request timeout on a non-rejected client is not an authoritative removal. Keep accepted
-            // metadata within this admission; all other failures remain fail-closed.
-            if (
-              !(e instanceof DaemonConnectionError) ||
-              e.code !== "DAEMON_REQUEST_TIMEOUT" ||
-              client.authFailureReason
-            )
+            // Transport loss/timeout is not an authoritative removal. Keep the accepted
+            // presentation; authentication, RPC and unknown errors still clear it.
+            const transport = e instanceof DaemonConnectionError && !client.authFailureReason;
+            setTransportInterrupted(transport);
+            if (!transport) {
               setChat(null);
+              setAcceptedKey(null);
+            }
             setError(String(e));
           }
         });
@@ -88,8 +92,12 @@ export function useChatRecord(
           // The fetch began before this push; never let its older snapshot replace a
           // newly bound agent session (or hide it with an older request failure).
           receivedUpdate = true;
-          setChat(event.payload.chat);
-          setError(null);
+          setTransportInterrupted(false);
+          const current = event.payload.chat.archivedAt ? null : event.payload.chat;
+          setChat(current);
+          setAcceptedKey(current ? key : null);
+          if (!current) useTranscriptStore.getState().clear(key);
+          setError(current ? null : i18n.t("bots.chat.record.unavailable"));
         }
       },
     });
@@ -98,5 +106,12 @@ export function useChatRecord(
       void feed?.release().catch(() => undefined);
     };
   }, [chatId, client, online, key]);
-  return { chat, setChat, error, setError };
+  return {
+    chat,
+    setChat,
+    error,
+    setError,
+    transportInterrupted,
+    authorized: online && acceptedKey === key && !client?.authFailureReason,
+  };
 }

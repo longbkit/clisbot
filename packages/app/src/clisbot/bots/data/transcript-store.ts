@@ -14,13 +14,14 @@ export interface ChatTranscript {
 /** Object identity is the read admission: clear/recreate and a newer read invalidate it. */
 export interface TranscriptRead {
   readonly afterSeq?: number;
+  readonly principalScope?: string;
 }
 
 interface TranscriptStoreState {
   transcripts: Record<string, ChatTranscript>;
   /** Fetch coverage, independent of live pushes and of the view's selected transcript. */
   reads: Record<string, TranscriptRead>;
-  beginRead: (key: string) => TranscriptRead;
+  beginRead: (key: string, principalScope?: string) => TranscriptRead;
   acceptsRead: (key: string, read: TranscriptRead) => boolean;
   acceptRead: (key: string, read: TranscriptRead, page: ChatTranscript, delta: boolean) => void;
   /** Replaces the loaded window (first page, reload). */
@@ -69,10 +70,18 @@ function tailWindow(current: ChatTranscript | undefined, page: ChatTranscript): 
 export const useTranscriptStore = create<TranscriptStoreState>()((set, get) => ({
   transcripts: {},
   reads: {},
-  beginRead: (key) => {
+  beginRead: (key, principalScope) => {
     const state = get();
-    const read = { afterSeq: state.transcripts[key] ? state.reads[key]?.afterSeq : undefined };
-    set({ reads: { ...state.reads, [key]: read } });
+    const samePrincipal = state.reads[key]?.principalScope === principalScope;
+    const read = {
+      afterSeq: samePrincipal && state.transcripts[key] ? state.reads[key]?.afterSeq : undefined,
+      principalScope,
+    };
+    const { [key]: _previous, ...withoutPrevious } = state.transcripts;
+    set({
+      reads: { ...state.reads, [key]: read },
+      transcripts: samePrincipal ? state.transcripts : withoutPrevious,
+    });
     return read;
   },
   acceptsRead: (key, read) => get().reads[key] === read,
@@ -91,7 +100,7 @@ export const useTranscriptStore = create<TranscriptStoreState>()((set, get) => (
       const afterSeq = page.messages.at(-1)?.seq ?? (delta ? read.afterSeq : 0);
       if (transcript === current && afterSeq === read.afterSeq) return state;
       return {
-        reads: { ...state.reads, [key]: { afterSeq } },
+        reads: { ...state.reads, [key]: { afterSeq, principalScope: read.principalScope } },
         transcripts:
           transcript === current ? state.transcripts : { ...state.transcripts, [key]: transcript },
       };

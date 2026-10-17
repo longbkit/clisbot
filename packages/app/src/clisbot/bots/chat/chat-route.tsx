@@ -9,7 +9,7 @@ import { useChatVisibility } from "./use-chat-visibility";
 import { acceptedChatRecord, useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { botsSessionScope, scopedTranscriptKey } from "../data/session-scope";
+import { scopedTranscriptKey } from "../data/session-scope";
 import { useIsFocused } from "@react-navigation/native";
 import { useChatLiveHeads } from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
@@ -22,6 +22,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View, Text } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { TimelineSyncStatus } from "@/timeline/sync-status";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { Theme } from "@/styles/theme";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
@@ -42,6 +43,9 @@ const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const loadingColor = (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
 });
+const keepSyncStatus = () => {};
+const UPDATING = { status: "catching_up", ui: "status" } as const;
+const RECONNECTING = { status: "reconnecting" } as const;
 const EMPTY_PARTICIPANTS: ChatPayload["participants"] = [];
 
 export default function ChatRoute() {
@@ -59,22 +63,25 @@ function Gate() {
     chatId: string;
   }>();
   const snapshot = useHostRuntimeSnapshot(serverId);
+  const principalScope = useResourcePrincipalScope();
+  const client = useHostRuntimeClient(serverId);
+  const authFailure = snapshot?.authFailureReason || client?.authFailureReason;
   const enabled = useHostBotsFeature(serverId);
   const status = useHostRuntimeConnectionStatus(serverId);
   const unavailable =
     status === "online" ? t("bots.chat.route.notEnabled") : t("bots.chat.common.connectingToHost");
-  if (!enabled || snapshot?.authFailureReason)
+  if (!enabled || authFailure)
     return (
       <View style={styles.root}>
         <MenuHeader />
-        <Text accessibilityRole={snapshot?.authFailureReason ? "alert" : undefined}>
-          {snapshot?.authFailureReason ? snapshot.lastError : unavailable}
+        <Text style={styles.loadingText} accessibilityRole={authFailure ? "alert" : undefined}>
+          {authFailure ? (snapshot?.lastError ?? unavailable) : unavailable}
         </Text>
       </View>
     );
   return (
     <ChatRouteContent
-      key={`${serverId}:${chatId}:${botsSessionScope(snapshot)}`}
+      key={JSON.stringify([serverId, chatId, principalScope, snapshot?.clientGeneration ?? 0])}
       serverId={serverId}
       chatId={chatId}
     />
@@ -89,7 +96,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
   const catalog = useBotCatalog();
-  const { chat, setChat, error, setError } = useChatRecord(
+  const { chat, setChat, error, setError, authorized, transportInterrupted } = useChatRecord(
     client,
     online,
     chatId,
@@ -100,6 +107,8 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     serverId,
     chatId,
     runtime: botsRuntime,
+    presentationScope: principalScope,
+    presentationAllowed: chat !== null,
   });
   useChatVisibility(serverId, chatId, chat, focused);
   const heads = useChatLiveHeads(serverId, chat?.participants ?? EMPTY_PARTICIPANTS);
@@ -113,7 +122,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   );
   const { send, sending } = useChatSend(
     client,
-    online,
+    online && authorized,
     chatId,
     chat,
     setChat,
@@ -174,7 +183,6 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     : t("bots.chat.route.loading");
   return (
     <View style={styles.root}>
-      {!online ? <Text style={styles.error}>{t("bots.chat.route.offline")}</Text> : null}
       <ChatToolsContext.Provider value={chatTools}>
         <ChatToolActivityHeaderContext.Provider value={toolActivityHeader}>
           {profileNativeRegion(
@@ -189,7 +197,13 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
               headerActions={options}
               headingActions={headingActions}
             >
-              <ChatRouteBody chat={chat} online={online} error={error} transcript={transcript}>
+              <ChatRouteBody
+                chat={chat}
+                online={online}
+                error={error}
+                transcript={transcript}
+                transportInterrupted={transportInterrupted}
+              >
                 {profileNativeRegion(
                   "BotChatScreen",
                   <ChatScreen
@@ -201,7 +215,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
                     group={group}
                     transcript={transcript.transcript.messages}
                     liveHeads={heads}
-                    canSend={online && !sending}
+                    canSend={online && authorized && !sending}
                     onSubmitMessage={send}
                     onReachTop={reachTop}
                     toolDisplay={toolDisplay}
@@ -222,59 +236,90 @@ function ChatRouteBody({
   online,
   error,
   transcript,
+  transportInterrupted,
   children,
 }: {
   chat: ChatPayload | null;
   online: boolean;
   error: string | null;
   transcript: UseChatTranscriptResult;
+  transportInterrupted: boolean;
   children: ReactNode;
 }) {
-  const { t } = useTranslation();
   const failure = transcript.loadState.status === "error" ? transcript.loadState : null;
   const blocked = failure && !failure.retainAccepted ? failure.message : null;
-  if (!chat || blocked) {
-    const pending = !error && !blocked && online;
-    return (
-      <View style={styles.body}>
-        <View style={styles.centeredLoading} pointerEvents="none">
-          {pending ? <ThemedLoadingSpinner size="large" uniProps={loadingColor} /> : null}
-          <Text accessibilityRole={error || blocked ? "alert" : undefined}>
-            {blocked ??
-              error ??
-              (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
-          </Text>
-        </View>
-      </View>
-    );
-  }
+  if (!chat || blocked) return <ChatEmptyBody error={blocked ?? error} online={online} />;
+  const visibleError = transportInterrupted ? null : error;
+  const visibleFailure = failure?.retainAccepted ? null : failure;
   const initialLoading =
     transcript.loadState.status === "loading" && transcript.transcript.messages.length === 0;
   return (
     <View style={styles.body}>
-      {error || failure ? (
+      {visibleError || visibleFailure ? (
         <Text accessibilityRole="alert" style={styles.error}>
-          {error ?? failure?.message}
+          {visibleError ?? visibleFailure?.message}
         </Text>
       ) : null}
       {children}
-      <ChatLoadingProgress initial={initialLoading} fetching={transcript.isFetching} />
+      <ChatLoadingProgress
+        initial={initialLoading}
+        fetching={
+          transcript.isFetching ||
+          transcript.loadState.status === "loading" ||
+          transportInterrupted ||
+          Boolean(failure?.retainAccepted)
+        }
+        online={online}
+      />
     </View>
   );
 }
 
-function ChatLoadingProgress({ initial, fetching }: { initial: boolean; fetching: boolean }) {
+function ChatEmptyBody({ error, online }: { error: string | null; online: boolean }) {
   const { t } = useTranslation();
-  if (!initial && !fetching) return null;
+  return (
+    <View style={styles.body}>
+      <View style={styles.centeredLoading} pointerEvents="none">
+        {!error && online ? <ThemedLoadingSpinner size="large" uniProps={loadingColor} /> : null}
+        <Text style={styles.loadingText} accessibilityRole={error ? "alert" : undefined}>
+          {error ??
+            (online ? t("bots.chat.route.loading") : t("bots.chat.common.connectingToHost"))}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function ChatLoadingProgress({
+  initial,
+  fetching,
+  online,
+}: {
+  initial: boolean;
+  fetching: boolean;
+  online: boolean;
+}) {
+  const { t } = useTranslation();
+  if (!initial && !fetching && online) return null;
+  if (!initial)
+    return (
+      <View testID="chat-refresh-loading" style={styles.syncStatus} pointerEvents="none">
+        <TimelineSyncStatus
+          sync={online ? UPDATING : RECONNECTING}
+          toast={null}
+          onDismiss={keepSyncStatus}
+        />
+      </View>
+    );
   return (
     <View
-      testID={initial ? "chat-initial-loading" : "chat-refresh-loading"}
-      style={initial ? styles.centeredLoading : styles.refreshLoading}
+      testID="chat-initial-loading"
+      style={styles.centeredLoading}
       pointerEvents="none"
       accessibilityRole="progressbar"
       accessibilityLabel={t("bots.chat.route.loading")}
     >
-      <ThemedLoadingSpinner size={initial ? "large" : "small"} uniProps={loadingColor} />
+      <ThemedLoadingSpinner size="large" uniProps={loadingColor} />
     </View>
   );
 }
@@ -396,14 +441,8 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     gap: theme.spacing[2],
   },
-  refreshLoading: {
-    position: "absolute",
-    top: theme.spacing[2],
-    right: theme.spacing[2],
-    padding: theme.spacing[1],
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface0,
-  },
+  loadingText: { color: theme.colors.foregroundMuted },
+  syncStatus: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 },
   actions: {
     flexDirection: "row",
     alignItems: "center",
