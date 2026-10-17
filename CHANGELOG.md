@@ -1,20 +1,35 @@
 # Changelog
 
-## 2.1.2-beta.1 - 2026-10-15
+## 2.1.2 - 2026-10-17
 
 ### Changed
 
-- Moved heartbeat run counters beside response timing, with direct access to the heartbeat
-- Reduced retained native tab pages when switching between Home, sessions and schedules
-- Reduced activity-list date grouping cost with large session catalogs
+- Show Back and loading feedback before opening mobile conversations, and cancel stale opens after newer navigation
+- Reuse accepted conversation history and fetch only newer messages when refreshing
+- Move Android encrypted message decoding off the JavaScript thread and reduce repeated Markdown parsing
+- Reduce offscreen native chat work while preserving the saved reading position
+- Reduce activity-list date grouping work with large session catalogs
+- Show pinned items with their own icons, actions and status, and summarize active sessions beside Inbox
+- Align sidebar labels and keep safe unavailable pin actions while Hosts reconnect
+- Use consistent compact conversation headers and larger composer touch targets
+- Move heartbeat run counters beside response timing, with direct access to the heartbeat
 
 ### Fixed
 
-- Fixed HEARTBEAT_OK and PASS replies appearing in Bot direct messages
-- Fixed new Bot messages appearing above earlier progress while a reply was running
-- Fixed answered permission requests remaining stuck after a response was proven undelivered
-- Fixed obsolete provider caches preventing saved Host connections when browser storage was full
-- Fixed chat bottom pinning overriding an upward scroll before layout
+- Open the first Hub connection flow directly from Welcome
+- Use the verified npm installer for Docker and document recovery from npm 10 installation failures
+- Keep an open Bot conversation visible while its Host reconnects, with a floating update status
+- Keep Host filter controls available while offline and return from Settings correctly after removing a Host
+- Fix Back and rapid session switching restoring the wrong destination or leaving the visible list untouchable
+- Fix conversation Files cleanup overriding newer navigation and duplicate heartbeat refreshes on entry
+- Fix HEARTBEAT_OK and PASS replies appearing in Bot direct messages
+- Fix new Bot messages appearing above earlier progress while a reply is running
+- Fix answered permission requests remaining stuck after a response was proven undelivered
+- Fix obsolete provider caches preventing saved Host connections when browser storage is full
+- Fix chat bottom pinning overriding an upward scroll before layout
+- Keep newly created Agents unavailable for prompts until setup and durable storage are ready, and preserve safe retry after a confirmed undelivered prompt
+
+Paseo baseline remains the reviewed main snapshot `337e81a9c6d4551dbcede5930c21408776d06b1b` recorded in 2.1.1.
 
 ## 2.1.1 - 2026-10-14
 
