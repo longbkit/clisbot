@@ -359,7 +359,8 @@ export async function holdOlderHistoryPages(
     async settleContinuedPages(maxPages) {
       // Old projected pages can merge into an existing assistant block without
       // moving the reading anchor. The owner then continues the same load until
-      // the viewport leaves the history edge; holding that response deadlocks it.
+      // the viewport leaves the history edge or the server exhausts history.
+      // Holding that response deadlocks it; exhaustion can legitimately stay at top.
       await expect
         .poll(async () => {
           const requested = gate.getRequestCount();
@@ -370,7 +371,7 @@ export async function holdOlderHistoryPages(
           await waitForTimelineGeometryToSettle(page);
           const viewport = await readTimelineViewport(page);
           return (
-            viewport.scrollTop > HISTORY_START_THRESHOLD_PX &&
+            (viewport.scrollTop > HISTORY_START_THRESHOLD_PX || gate.hasDeliveredHistoryStart()) &&
             !(await page.getByTestId("load-older-history-spinner").isVisible())
           );
         })

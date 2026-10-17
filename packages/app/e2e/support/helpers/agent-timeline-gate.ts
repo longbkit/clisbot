@@ -17,6 +17,7 @@ export interface AgentTimelineResponseGate {
 }
 
 export interface OlderTimelinePagesGate {
+  hasDeliveredHistoryStart(): boolean;
   getRequestCount(): number;
   getRepeatedEntryCount(): number;
   getOwnedEntryCountContaining(text: string): number;
@@ -356,6 +357,7 @@ export async function holdAgentOlderTimelinePages(
 ): Promise<OlderTimelinePagesGate> {
   let requestCount = 0;
   let responseCount = 0;
+  let deliveredHistoryStart = false;
   let repeatedEntryCount = 0;
   const entryKeys = new Set<string>();
   const ownedEntries = new Map<string, string>();
@@ -417,6 +419,7 @@ export async function holdAgentOlderTimelinePages(
         const pageNumber = responseCount;
         const forward = () => {
           ws.send(message);
+          if (payload.hasOlder === false && !payload.error) deliveredHistoryStart = true;
           for (const speculative of speculativeForwards.splice(0)) speculative();
         };
         if (releasedPages.has(pageNumber)) {
@@ -433,6 +436,7 @@ export async function holdAgentOlderTimelinePages(
   });
 
   return {
+    hasDeliveredHistoryStart: () => deliveredHistoryStart,
     getRequestCount: () => requestCount,
     getRepeatedEntryCount: () => repeatedEntryCount,
     getOwnedEntryCountContaining: (value) =>
