@@ -41,10 +41,7 @@ Clisbot checks sandbox availability each time it launches. AppImage and extracte
 
 For headless machines and terminal users. Requires Node.js 22.19 or newer.
 
-npm 10's `edgesOut` installation failure also affects earlier releases. Upgrade npm first:
-
 ```bash
-npm install -g npm@11.21.1
 npm install -g clisbot
 clisbot
 ```

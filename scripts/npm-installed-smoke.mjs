@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { releasePackages } from "./npm-release.mjs";
+import { verifyInstalledHubAuth } from "./npm-installed-auth-smoke.mjs";
 
 const repo = fileURLToPath(new URL("../", import.meta.url));
 const scratch = path.join(repo, ".debug", "scratch", "npm-installed-smoke");
@@ -75,6 +76,12 @@ const packs = JSON.parse(
   ]),
 );
 await writeFile(path.join(fixture, "pack-manifest.json"), JSON.stringify(packs, null, 2));
+for (const name of packages.find((pkg) => pkg.name === "@clisbot/hub").bundleDependencies) {
+  assert(
+    packs.find((pack) => pack.name === "@clisbot/hub").bundled.includes(name),
+    `Hub must ship ${name}; run the Hub build before the installed smoke`,
+  );
+}
 
 const archiveData = new Map();
 for (const pack of packs)
@@ -202,6 +209,7 @@ async function verifyInstalled(manifest) {
 }
 await verifyInstalled(path.join(globalModules, "clisbot", "package.json"));
 assert.equal(verified.size, packages.length);
+await verifyInstalledHubAuth(require.resolve("@clisbot/hub/package.json"), fixture);
 const load = (name) => import(pathToFileURL(require.resolve(name)).href);
 const { DaemonClient } = await load("@clisbot/client/internal/daemon-client");
 const { createDeviceKey } = await load("@clisbot/device-access/proof");

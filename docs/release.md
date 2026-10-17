@@ -162,10 +162,21 @@ Clisbot release version.
 The upgrade contract for legacy npm users is documented in
 [Upgrade to v2](guides/user-guide/getting-started/upgrade-v2.md). A successful
 fresh install of the real packed npm graph must exercise the legacy home,
-Project registration, pairing, shared app UI and local Hub backend using
+Project registration, pairing, shared app UI, local Hub backend and auth cookies using
 `node scripts/npm-installed-smoke.mjs` before publication.
-Use the [documented npm installer](../public-docs/index.md#cli) for this consumer
-check; Docker pins the same installer independently of the source build's npm.
+Run this consumer check with npm 10 and npm 11 on supported Node versions; the
+source build and Docker may pin their own installer independently.
+
+Hub bundles Better Auth, its OAuth provider and their installed production dependencies. Its optional
+framework/test peer graph crashes npm 10's resolver before lifecycle scripts can
+run ([upstream fix](https://github.com/npm/cli/pull/8448)). The Hub build stages the
+locked, installed modules locally because npm pack cannot bundle workspace-hoisted
+files. Keep the original package manifests and licenses, and keep TanStack Start
+as a runtime dependency: Better Auth's cookie hook dynamically imports its server
+entry. The installed smoke rejects a missing bundle and exercises that hook plus
+password failure/retry. Do not replace these checks with a successful dry run or
+an installation using checkout symlinks. See the
+[installation boundary audit](audits/2026-10-17-npm-install/README.md).
 
 ## Standard release (stable)
 
