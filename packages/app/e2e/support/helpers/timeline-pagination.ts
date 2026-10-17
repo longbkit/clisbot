@@ -59,6 +59,7 @@ interface TimelinePromptPositionSnapshot {
 interface OlderHistoryPages {
   expectRequestedPages(count: number): Promise<void>;
   expectSettledWithRequestedPages(count: number): Promise<void>;
+  settleContinuedPages(maxPages: number): Promise<void>;
   expectNoRepeatedEntries(): void;
   expectRepeatedEntries(): void;
   expectOwnedTextRendered(text: string): Promise<void>;
@@ -147,12 +148,18 @@ export async function scrollThroughOlderHistoryPages(
   page: Page,
   pageCount: number,
   history: OlderHistoryPages,
+  options: { allowContinuedPages?: boolean } = {},
 ): Promise<void> {
   for (let pageNumber = 0; pageNumber < pageCount; pageNumber += 1) {
+    const requestedPage = options.allowContinuedPages ? history.requestCount() + 1 : pageNumber + 1;
     await userScrollsTimelineToHistoryStart(page);
-    await history.expectRequestedPages(pageNumber + 1);
-    history.releasePage(pageNumber + 1);
-    await history.expectSettledWithRequestedPages(pageNumber + 1);
+    await history.expectRequestedPages(requestedPage);
+    history.releasePage(requestedPage);
+    if (options.allowContinuedPages) {
+      await history.settleContinuedPages(10);
+    } else {
+      await history.expectSettledWithRequestedPages(requestedPage);
+    }
   }
 }
 
@@ -348,6 +355,26 @@ export async function holdOlderHistoryPages(
     async expectSettledWithRequestedPages(count) {
       await waitForTimelineGeometryToSettle(page);
       expect(gate.getRequestCount()).toBe(count);
+    },
+    async settleContinuedPages(maxPages) {
+      // Old projected pages can merge into an existing assistant block without
+      // moving the reading anchor. The owner then continues the same load until
+      // the viewport leaves the history edge; holding that response deadlocks it.
+      await expect
+        .poll(async () => {
+          const requested = gate.getRequestCount();
+          expect(requested).toBeLessThanOrEqual(maxPages);
+          for (let pageNumber = 1; pageNumber <= requested; pageNumber += 1) {
+            gate.releasePage(pageNumber);
+          }
+          await waitForTimelineGeometryToSettle(page);
+          const viewport = await readTimelineViewport(page);
+          return (
+            viewport.scrollTop > HISTORY_START_THRESHOLD_PX &&
+            !(await page.getByTestId("load-older-history-spinner").isVisible())
+          );
+        })
+        .toBe(true);
     },
     expectNoRepeatedEntries() {
       expect(gate.getRepeatedEntryCount()).toBe(0);
