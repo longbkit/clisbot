@@ -1953,6 +1953,375 @@ test("flush waits for rejected session cleanup that starts after shutdown", asyn
   expect(manager.listAgents()).toEqual([]);
 });
 
+test("initializing registration rejects a prompt before opening durable storage", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-registration-readiness-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  await storage.initialize();
+  const durable = new FileAgentTimelineStore((id) => storage.getSessionDirectory(id));
+  const client = new HeldRuntimeInfoClient();
+  const agentId = "00000000-0000-4000-8000-000000000096";
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    durableTimelineStore: durable,
+    logger,
+    idFactory: () => agentId,
+  });
+  const creation = manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    await client.waitForRuntimeInfo();
+    expect(manager.getAgent(agentId)?.lifecycle).toBe("initializing");
+    expect(manager.listAgents().map((agent) => agent.id)).toEqual([agentId]);
+    expect(await storage.get(agentId)).toBeNull();
+    await expect(
+      manager.runAgent(agentId, "first prompt", {
+        clientMessageId: "registration-prompt",
+      }),
+    ).rejects.toThrow("is still initializing");
+    await expect(
+      startAgentRun(manager, agentId, "first prompt", logger, {
+        runOptions: { clientMessageId: "registration-prompt" },
+      }),
+    ).rejects.toThrow("is still initializing");
+  } finally {
+    client.finishRuntimeInfo();
+    await creation;
+    await manager.closeAgent(agentId);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test.each(["subscribe", "responder"] as const)(
+  "%s installation failure remains inadmissible while cleanup is held and after it rejects",
+  async (installation) => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-subscription-readiness-"));
+    const closeStarted = deferred<void>();
+    const closeAllowed = deferred<void>();
+    let failClose = true;
+    let providerStarts = 0;
+    class FailedSubscriptionSession extends TestAgentSession {
+      override subscribe(...args: Parameters<TestAgentSession["subscribe"]>) {
+        if (installation === "subscribe") throw new Error("subscription installation failed");
+        return super.subscribe(...args);
+      }
+      setAutomaticPermissionResponder() {
+        if (installation === "responder") throw new Error("responder installation failed");
+      }
+      override async startTurn() {
+        providerStarts++;
+        return super.startTurn();
+      }
+      override async close() {
+        closeStarted.resolve();
+        await closeAllowed.promise;
+        if (failClose) throw new Error("cleanup close rejected");
+      }
+    }
+    const storage = new AgentStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+    await storage.initialize();
+    const durable = new FileAgentTimelineStore((id) => storage.getSessionDirectory(id));
+    const ledger = vi.spyOn(durable, "writeMessageSubmission");
+    const client = new (class extends TestAgentClient {
+      override async createSession(config: AgentSessionConfig) {
+        return new FailedSubscriptionSession(config);
+      }
+    })();
+    const agentId = "00000000-0000-4000-8000-000000000090";
+    const manager = new AgentManager({
+      clients: { codex: client },
+      registry: storage,
+      durableTimelineStore: durable,
+      agentSessionStorage: true,
+      logger,
+    });
+    const creation = manager
+      .createAgent({ provider: "codex", cwd: workdir }, agentId, {
+        workspaceId: undefined,
+      })
+      .catch((error: unknown) => error);
+    async function assertInadmissible() {
+      await expect(
+        manager.admitMessageSubmission(agentId, "early prompt", {
+          clientMessageId: "subscription-readiness",
+        }),
+      ).rejects.toBeInstanceOf(PromptNotDeliveredError);
+      expect(() => manager.streamAgent(agentId, "early prompt")).toThrow("is still initializing");
+      await expect(manager.tryRunOutOfBand(agentId, "early prompt")).rejects.toBeInstanceOf(
+        PromptNotDeliveredError,
+      );
+      expect(manager.getAgent(agentId)?.lifecycle).toBe("initializing");
+      expect(manager.listAgents().map((agent) => agent.lifecycle)).toEqual(["initializing"]);
+      expect(ledger).not.toHaveBeenCalled();
+      expect(providerStarts).toBe(0);
+    }
+    try {
+      await closeStarted.promise;
+      await assertInadmissible();
+      closeAllowed.resolve();
+      expect(await creation).toMatchObject({
+        message: `${installation === "subscribe" ? "subscription" : "responder"} installation failed`,
+      });
+      await assertInadmissible();
+    } finally {
+      failClose = false;
+      closeAllowed.resolve();
+      await creation;
+      await manager.closeAgent(agentId);
+      await manager.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  },
+);
+
+test("registration failure shares the runtime close already owned by an external close", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-registration-close-owner-"));
+  const finalWrite = deferred<void>();
+  const failWrite = deferred<void>();
+  const closeStarted = deferred<void>();
+  const cleanupEntered = deferred<void>();
+  const closeAllowed = deferred<void>();
+  let closeCalls = 0;
+  let failClose = true;
+  class HeldStorage extends AgentStorage {
+    override async applySnapshot(...args: Parameters<AgentStorage["applySnapshot"]>) {
+      if (args[0].lifecycle === "idle") {
+        finalWrite.resolve();
+        await failWrite.promise;
+        throw new Error("registration write failed");
+      }
+      return super.applySnapshot(...args);
+    }
+  }
+  class HeldCloseSession extends TestAgentSession {
+    override async close() {
+      closeCalls++;
+      closeStarted.resolve();
+      await closeAllowed.promise;
+      if (failClose) throw new Error("owned close rejected");
+    }
+  }
+  const client = new (class extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig) {
+      return new HeldCloseSession(config);
+    }
+  })();
+  const storage = new HeldStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+  await storage.initialize();
+  const manager = new AgentManager({ clients: { codex: client }, registry: storage, logger });
+  // Observe entry to the cleanup seam without replacing its close behavior or scheduling.
+  const runtimeOwner = manager as unknown as { closeAgentRuntime(id: string): Promise<boolean> };
+  const closeRuntime = runtimeOwner.closeAgentRuntime.bind(manager);
+  let closeEntries = 0;
+  vi.spyOn(runtimeOwner, "closeAgentRuntime").mockImplementation((id) => {
+    closeEntries++;
+    if (closeEntries === 2) cleanupEntered.resolve();
+    return closeRuntime(id);
+  });
+  const agentId = "00000000-0000-4000-8000-000000000089";
+  const creation = manager
+    .createAgent({ provider: "codex", cwd: workdir }, agentId, {
+      workspaceId: undefined,
+    })
+    .catch((error: unknown) => error);
+  try {
+    await finalWrite.promise;
+    const closing = manager.closeAgent(agentId).catch((error: unknown) => error);
+    await closeStarted.promise;
+    failWrite.resolve();
+    await cleanupEntered.promise;
+    closeAllowed.resolve();
+    expect(await closing).toMatchObject({ message: "owned close rejected" });
+    expect(await creation).toMatchObject({ message: "registration write failed" });
+    expect(closeCalls).toBe(1);
+    expect(manager.getAgent(agentId)?.lifecycle).toBe("initializing");
+  } finally {
+    failWrite.resolve();
+    closeAllowed.resolve();
+    await creation;
+    failClose = false;
+    await manager.closeAgent(agentId);
+    await manager.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test.each(["create", "resume", "reload", "import"] as const)(
+  "%s remains initializing through final persistence and retains canonical history",
+  async (operation) => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-registration-final-"));
+    const reached = deferred<void>();
+    const release = deferred<void>();
+    let armed = false;
+    class HeldStorage extends AgentStorage {
+      override async applySnapshot(...args: Parameters<AgentStorage["applySnapshot"]>) {
+        if (armed && args[0].lifecycle === "idle") {
+          reached.resolve();
+          await release.promise;
+        }
+        return super.applySnapshot(...args);
+      }
+    }
+    const storage = new HeldStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+    await storage.initialize();
+    const durable = new FileAgentTimelineStore((id) => storage.getSessionDirectory(id));
+    class ImportClient extends TestAgentClient {
+      async importSession(input: ImportProviderSessionInput) {
+        return {
+          session: new TestAgentSession({ provider: "codex", cwd: workdir }),
+          config: { provider: "codex" as const, cwd: workdir },
+          persistence: { provider: "codex" as const, sessionId: input.providerHandleId },
+          timeline: [
+            {
+              item: { type: "user_message" as const, text: "original history" },
+              timestamp: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        };
+      }
+    }
+    const manager = new AgentManager({
+      clients: { codex: new ImportClient() },
+      registry: storage,
+      durableTimelineStore: durable,
+      logger,
+      idFactory: () => "00000000-0000-4000-8000-000000000094",
+    });
+    const config = { provider: "codex", cwd: workdir };
+    const agentId = "00000000-0000-4000-8000-000000000094";
+    if (operation === "resume" || operation === "reload") {
+      await manager.createAgent(config, agentId, { workspaceId: undefined });
+      await manager.appendTimelineItem(agentId, { type: "user_message", text: "original history" });
+      if (operation === "resume") await manager.closeAgent(agentId);
+    }
+    armed = true;
+    let registering: Promise<ManagedAgent>;
+    if (operation === "resume") {
+      registering = ensureAgentLoaded(agentId, {
+        agentManager: manager,
+        agentStorage: storage,
+        logger,
+      });
+    } else if (operation === "reload") {
+      registering = manager.reloadAgentSession(agentId);
+    } else if (operation === "import") {
+      registering = manager.importProviderSession({
+        provider: "codex",
+        cwd: workdir,
+        providerHandleId: "existing-native-thread",
+        workspaceId: "workspace",
+      });
+    } else {
+      registering = manager.createAgent(config, agentId, { workspaceId: undefined });
+    }
+    try {
+      await reached.promise;
+      expect(manager.getAgent(agentId)?.lifecycle).toBe("initializing");
+      expect(manager.listAgents().map((agent) => agent.lifecycle)).toEqual(["initializing"]);
+      await expect(
+        startAgentRun(manager, agentId, "new prompt", logger, {
+          runOptions: { clientMessageId: "held-final-write" },
+        }),
+      ).rejects.toThrow("is still initializing");
+      release.resolve();
+      await registering;
+      expect(manager.getAgent(agentId)?.lifecycle).toBe("idle");
+      expect(await storage.get(agentId)).toMatchObject({ lastStatus: "idle" });
+      const expected =
+        operation === "create" ? [] : [{ type: "user_message", text: "original history" }];
+      expect((await durable.getCommittedRows(agentId)).map((row) => row.item)).toEqual(expected);
+      await manager.runAgent(agentId, "new prompt", { clientMessageId: "held-final-write" });
+      await manager.runAgent(agentId, "new prompt", { clientMessageId: "held-final-write" });
+      expect(
+        (await durable.getCommittedRows(agentId)).filter(
+          (row) => row.item.type === "user_message" && row.item.text === "new prompt",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      release.resolve();
+      await registering.catch(() => undefined);
+      await manager.closeAgent(agentId).catch(() => undefined);
+      await manager.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  },
+);
+
+test.each(["create", "resume", "reload"] as const)(
+  "failed %s registration closes its runtime and leaves durable history retryable",
+  async (operation) => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-registration-failed-"));
+    let fail = true;
+    class FailingStorage extends AgentStorage {
+      override async applySnapshot(...args: Parameters<AgentStorage["applySnapshot"]>) {
+        if (fail && args[0].lifecycle === "idle") throw new Error("final snapshot unavailable");
+        return super.applySnapshot(...args);
+      }
+    }
+    const storage = new FailingStorage(join(workdir, "agents"), logger, { sessionLayout: true });
+    await storage.initialize();
+    const durable = new FileAgentTimelineStore((id) => storage.getSessionDirectory(id));
+    const client = new SessionRecordingAgentClient();
+    const manager = new AgentManager({
+      clients: { codex: client },
+      registry: storage,
+      durableTimelineStore: durable,
+      logger,
+    });
+    const agentId = "00000000-0000-4000-8000-000000000095";
+    try {
+      if (operation !== "create") {
+        fail = false;
+        await manager.createAgent({ provider: "codex", cwd: workdir }, agentId, {
+          workspaceId: undefined,
+        });
+        await manager.appendTimelineItem(agentId, {
+          type: "user_message",
+          text: "retained history",
+        });
+        if (operation === "resume") await manager.closeAgent(agentId);
+        fail = true;
+      }
+      let registering: Promise<ManagedAgent>;
+      if (operation === "resume") {
+        registering = ensureAgentLoaded(agentId, {
+          agentManager: manager,
+          agentStorage: storage,
+          logger,
+        });
+      } else if (operation === "reload") {
+        registering = manager.reloadAgentSession(agentId);
+      } else {
+        registering = manager.createAgent({ provider: "codex", cwd: workdir }, agentId, {
+          workspaceId: undefined,
+        });
+      }
+      await expect(registering).rejects.toThrow("final snapshot unavailable");
+      expect(manager.getAgent(agentId)).toBeNull();
+      expect(await storage.get(agentId)).toMatchObject({ id: agentId, lastStatus: "closed" });
+      fail = false;
+      const stored = await storage.get(agentId);
+      expect(stored?.persistence?.provider).toBe("codex");
+      const loaded = await ensureAgentLoaded(agentId, {
+        agentManager: manager,
+        agentStorage: storage,
+        logger,
+      });
+      expect(loaded?.id).toBe(agentId);
+      expect(manager.getAgent(agentId)?.lifecycle).toBe("idle");
+      expect((await durable.getCommittedRows(agentId)).map((row) => row.item)).toEqual(
+        operation === "create" ? [] : [{ type: "user_message", text: "retained history" }],
+      );
+    } finally {
+      fail = false;
+      await manager.closeAgent(agentId).catch(() => undefined);
+      await manager.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  },
+);
+
 test("does not persist an initializing session after shutdown closes it", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-shutdown-register-test-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);

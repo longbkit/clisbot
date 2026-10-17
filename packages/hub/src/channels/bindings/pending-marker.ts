@@ -84,7 +84,7 @@ export async function recoverOrphanMarkers(
   let rebound = 0;
   for (const marker of pending) {
     const agent = findChannelExecutionAgent(agents, marker.pendingExecutionId ?? "");
-    if (agent === undefined) continue;
+    if (agent === undefined || agent.status === "initializing") continue;
     await context.store.resolvePendingThreadBinding({
       organizationId: marker.organizationId,
       accountId: marker.accountId,

@@ -102,7 +102,10 @@ import {
 import { invokeRewindCapability, type RewindMode } from "./rewind/rewind.js";
 import { projectAgentMessage } from "./agent-messages/index.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
-import { isPromptNotDeliveredError } from "./prompt-not-delivered-error.js";
+import {
+  PromptNotDeliveredError,
+  isPromptNotDeliveredError,
+} from "./prompt-not-delivered-error.js";
 import {
   stripInternalClisbotMcpServer,
   stripRuntimeMcpServers,
@@ -902,6 +905,7 @@ export class AgentManager {
   private readonly backgroundTasks = new Set<Promise<void>>();
   private readonly agentRegistrationTasks = new Set<Promise<void>>();
   private readonly inFlightAgentCloses = new Map<string, Promise<void>>();
+  private readonly runtimeCloses = new WeakMap<LiveManagedAgent, Promise<boolean>>();
   private readonly reloadedSessionCloses = new WeakMap<AgentSession, Promise<void>>();
   private readonly lifecycleMutationTails = new Map<string, Promise<void>>();
   private readonly agentStreamCoalescer: AgentStreamCoalescer;
@@ -2369,11 +2373,27 @@ export class AgentManager {
   }
 
   /** Returns false when `beforeClosure` declines, which leaves the agent live and untouched. */
-  private async closeAgentRuntime(
+  private closeAgentRuntime(
     agentId: string,
     options?: { beforeClosure?: () => boolean },
   ): Promise<boolean> {
     const agent = this.requireAgent(agentId);
+    const existing = this.runtimeCloses.get(agent);
+    if (existing) return existing;
+    // Registration cleanup may already own the lifecycle lane while an external
+    // close is executing. Share the actual runtime operation, not its queued lane.
+    const operation = this.closeAgentRuntimeNow(agent, options);
+    this.runtimeCloses.set(agent, operation);
+    const clear = () => this.runtimeCloses.delete(agent);
+    void operation.then(clear, clear);
+    return operation;
+  }
+
+  private async closeAgentRuntimeNow(
+    agent: LiveManagedAgent,
+    options?: { beforeClosure?: () => boolean },
+  ): Promise<boolean> {
+    const agentId = agent.id;
     this.logger.trace(
       {
         agentId,
@@ -3125,7 +3145,7 @@ export class AgentManager {
     prompt: AgentPromptInput,
     options?: AgentRunOptions,
   ): Promise<boolean> {
-    const agent = this.requireSessionAgent(agentId);
+    const agent = this.requireReadySessionAgent(agentId);
     const handler = agent.session.tryHandleOutOfBand?.(prompt);
     if (!handler) {
       return false;
@@ -3281,7 +3301,7 @@ export class AgentManager {
     options?: AgentRunOptions,
   ): AsyncGenerator<AgentStreamEvent> {
     options = this.captureSessionIdentity(options);
-    const existingAgent = this.requireSessionAgent(agentId);
+    const existingAgent = this.requireReadySessionAgent(agentId);
     this.logger.trace(
       {
         agentId,
@@ -3562,7 +3582,7 @@ export class AgentManager {
     prompt: AgentPromptInput,
     options?: AgentSteerOptions,
   ): Promise<SteerResult> {
-    const agent = this.requireSessionAgent(agentId);
+    const agent = this.requireReadySessionAgent(agentId);
     const expectedTurnId = agent.activeForegroundTurnId ?? agent.activeTurnId;
     if (!expectedTurnId || !agent.session.steerActiveTurn) {
       return { status: "unavailable" };
@@ -3599,7 +3619,7 @@ export class AgentManager {
     options?: AgentSteerOptions,
   ): Promise<ActiveTurnSteerDispatchResult> {
     options = this.captureSessionIdentity(options);
-    const agent = this.requireSessionAgent(agentId);
+    const agent = this.requireReadySessionAgent(agentId);
     const expectedTurnId = agent.activeForegroundTurnId ?? agent.activeTurnId;
     if (!expectedTurnId) {
       return { status: "inactive" };
@@ -4458,7 +4478,7 @@ export class AgentManager {
       owner?: AgentOwner;
     },
   ): Promise<ManagedAgent> {
-    let registered = false;
+    let registered: ActiveManagedAgent | null = null;
     try {
       this.assertAcceptingAgentRegistrations();
       const resolvedAgentId = validateAgentId(agentId, "registerSession");
@@ -4516,7 +4536,7 @@ export class AgentManager {
 
       this.assertAcceptingAgentRegistrations();
       this.agents.set(resolvedAgentId, managed);
-      registered = true;
+      registered = managed;
       // A new session starts with every skill on, so what was sent to the last one is forgotten;
       // waiting here applies the list before the session's first prompt.
       this.appliedSkillsOff.delete(resolvedAgentId);
@@ -4570,21 +4590,35 @@ export class AgentManager {
 
       await this.refreshSessionState(managed, { emit: false });
       this.assertAgentRegistrationActive(managed);
-      managed.lifecycle = "idle";
       // Stamping now over a restored timestamp rewrote the workspace's "last used" in the
       // sidebar every time a chat was reopened, because workspace `statusEnteredAt` is
       // re-derived from persisted agent `updatedAt` on every daemon start.
       if (!options?.restoring) {
         this.touchUpdatedAt(managed);
       }
-      await this.persistSnapshot(managed);
+      // Keep lookup/list snapshots initializing while the final durable write is held.
+      // No caller may start a turn until storage, timeline and provider setup agree.
+      await this.persistSnapshot({ ...managed, lifecycle: "idle", activeForegroundTurnId: null });
       this.assertAgentRegistrationActive(managed);
-      this.emitState(managed, { persist: false });
       this.subscribeToSession(managed);
+      managed.lifecycle = "idle";
+      this.emitState(managed, { persist: false });
       return { ...managed };
     } catch (error) {
       if (!registered) {
         await this.closeUnregisteredSession(session);
+      } else if (this.agents.get(registered.id) === registered) {
+        // A failed setup must not leave an initializing runtime available to recovery.
+        // Close through the lifecycle owner, retaining any durable identity/history.
+        try {
+          // Resume/reload already hold the lifecycle lane; do not queue behind ourselves.
+          await this.closeAgentRuntime(registered.id);
+        } catch (closeError) {
+          this.logger.warn(
+            { err: closeError, agentId: registered.id },
+            "Failed to close agent after registration failure",
+          );
+        }
       }
       throw error;
     }
@@ -6117,6 +6151,7 @@ export class AgentManager {
     prompt: AgentPromptInput,
     options?: AgentRunOptions,
   ): Promise<{ options?: AgentRunOptions; duplicate: boolean }> {
+    if (this.agents.has(agentId)) this.requireReadySessionAgent(agentId);
     const captured = this.captureSessionIdentity(options);
     if (
       !this.durableTimelineStore?.writeMessageSubmission ||
@@ -7080,6 +7115,14 @@ export class AgentManager {
     const agent = this.agents.get(normalizedId);
     if (!agent) {
       throw new Error(`Unknown agent '${normalizedId}'`);
+    }
+    return agent;
+  }
+
+  private requireReadySessionAgent(id: string): ActiveManagedAgent {
+    const agent = this.requireSessionAgent(id);
+    if (agent.lifecycle === "initializing") {
+      throw new PromptNotDeliveredError(`Agent '${agent.id}' is still initializing`);
     }
     return agent;
   }
