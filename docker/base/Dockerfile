@@ -75,7 +75,10 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=source-pack /tmp/clisbot-packs /tmp/clisbot-packs
+# npm 10's optional-peer resolver crashes on this graph, including Clisbot 2.1.1.
+# Keep the tested installer version explicit; product dependencies stay unchanged.
 RUN set -eux; \
+	npm install -g npm@11.21.1; \
 	npm install -g /tmp/clisbot-packs/*.tgz; \
     rm -rf /tmp/clisbot-packs; \
     npm cache clean --force; \

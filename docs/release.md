@@ -164,6 +164,8 @@ The upgrade contract for legacy npm users is documented in
 fresh install of the real packed npm graph must exercise the legacy home,
 Project registration, pairing, shared app UI and local Hub backend using
 `node scripts/npm-installed-smoke.mjs` before publication.
+Use the [documented npm installer](../public-docs/index.md#cli) for this consumer
+check; Docker pins the same installer independently of the source build's npm.
 
 ## Standard release (stable)
 
