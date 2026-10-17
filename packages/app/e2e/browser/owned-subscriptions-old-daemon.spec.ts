@@ -95,7 +95,7 @@ test("does not repeat an assistant block when the current app paginates a normal
       page,
       "timeline-pagination-turn-19: emit 1 coalesced agent stream updates",
     );
-    await scrollThroughOlderHistoryPages(page, 3, history);
+    await scrollThroughOlderHistoryPages(page, 3, history, { allowContinuedPages: true });
 
     history.expectRepeatedEntries();
     await history.expectOwnedTextRendered("Now I have a clearer picture.");
