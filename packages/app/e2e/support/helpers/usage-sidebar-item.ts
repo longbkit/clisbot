@@ -187,11 +187,13 @@ export async function togglePin(scope: Locator, source: string, window: string) 
 }
 
 /**
- * The footer's Usage icon, which is there whether or not the Usage item is on. On a phone the
- * sidebar drawer has to be open.
+ * The visible toolbar/footer Usage icon, independently of the pinned summary item.
+ * Both controls may have the accessible name "Usage"; the icon has its own stable identity.
  */
 export async function openUsageFromIcon(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Usage", exact: true }).click({ timeout: 30_000 });
+  const icon = page.getByTestId("sidebar-usage-icon").filter({ visible: true });
+  await expect(icon).toBeVisible();
+  await icon.click({ timeout: 30_000 });
   await expect(usageModal(page)).toBeVisible();
 }
 

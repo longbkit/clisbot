@@ -137,7 +137,11 @@ import {
   type SettingsSectionSlug,
 } from "@/utils/host-routes";
 import { useLastWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
-import { returnFromSettings, type SettingsView } from "@/navigation/settings-navigation";
+import {
+  returnAfterHostRemoval,
+  returnFromSettings,
+  type SettingsView,
+} from "@/navigation/settings-navigation";
 import { isNative, isWeb } from "@/constants/platform";
 import { useFetchQuery } from "@/data/query";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
@@ -1420,13 +1424,8 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   }, [closeAddConnectionFlow, router]);
 
   const handleHostRemoved = useCallback(() => {
-    const fallback = buildSettingsSectionRoute("general");
-    if (isCompactLayout) {
-      router.replace("/settings");
-    } else {
-      router.replace(fallback);
-    }
-  }, [isCompactLayout, router]);
+    returnAfterHostRemoval(isCompactLayout);
+  }, [isCompactLayout]);
 
   const handleBackFromDetail = useCallback(() => {
     returnFromSettings(view);

@@ -108,21 +108,23 @@ test.describe("phone directory loading contracts", () => {
     await page.goto("/chat");
     await expect.poll(directory.ready).toBe(true);
     await expect.poll(directory.requests).toBeGreaterThan(0);
-    await expect(page.getByTestId("directory-status").filter({ visible: true })).toContainText(
-      "Loading conversations",
-    );
+    const status = page.getByTestId("directory-status").filter({ visible: true });
+    await expect(status).toContainText("Loading conversations");
+    await expect(
+      page.getByTestId("sidebar-display-preferences-menu").filter({ visible: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Remove Host filter / })).toBeVisible();
     await expect(
       page.getByTestId("sidebar-project-empty-state").filter({ visible: true }),
     ).toHaveCount(0);
     directory.fail();
-    const status = page.getByTestId("directory-status").filter({ visible: true });
     await expect(status).toContainText("Synthetic workspace directory failure");
     await expect(
       page.getByTestId("sidebar-project-empty-state").filter({ visible: true }),
     ).toHaveCount(0);
     directory.release();
     await status.getByRole("button", { name: "Retry", exact: true }).click();
-    await expect(status).toHaveText("Conversations");
+    await expect(status).toHaveCount(0);
     await expect(
       page.getByTestId("sidebar-project-empty-state").filter({ visible: true }),
     ).toBeVisible();
@@ -219,9 +221,8 @@ test.describe("phone directory loading contracts", () => {
     await expect(card).toBeVisible();
     await expect(card.getByRole("button", { name: "Add project", exact: true })).toBeVisible();
     await expect(card.getByRole("button", { name: "Import session", exact: true })).toBeVisible();
-    await expect(page.getByTestId("directory-status").filter({ visible: true })).toHaveText(
-      "Conversations",
-    );
+    await expect(page.getByTestId("directory-status").filter({ visible: true })).toHaveCount(0);
+    await expect(page.getByRole("progressbar", { name: "Loading...", exact: true })).toHaveCount(0);
   });
 
   for (const entry of ["Home", "Chat"] as const) {
@@ -239,6 +240,13 @@ test.describe("phone directory loading contracts", () => {
           ? page.getByText("Where would you like to start?", { exact: true })
           : page.getByTestId("sidebar-project-empty-state").filter({ visible: true });
       await expect(anchor).toBeVisible();
+      if (entry === "Chat") {
+        // Bot catalog admission is independent of workspace readiness and Usage.
+        // Its accepted-empty card must settle before measuring only the Usage update.
+        await expect(
+          page.getByTestId("sidebar-bots-first").filter({ visible: true }),
+        ).toBeVisible();
+      }
       const before = await anchor.boundingBox();
       const toolbarBefore = await toolbar.boundingBox();
       gate.resolve();

@@ -397,7 +397,7 @@ function MobileSidebar({
             )}
 
             <SidebarMetadataNotice />
-            {isInitialLoad && (HOME_V2_ENABLED || !hasActiveHostFilter) ? (
+            {isInitialLoad && !hasActiveHostFilter ? (
               <SidebarAgentListSkeleton />
             ) : (
               <SidebarWorkspaceList
@@ -583,7 +583,7 @@ function DesktopSidebar({
         </View>
 
         <SidebarMetadataNotice />
-        {isInitialLoad && (HOME_V2_ENABLED || !hasActiveHostFilter) ? (
+        {isInitialLoad && !hasActiveHostFilter ? (
           <SidebarAgentListSkeleton />
         ) : (
           <SidebarWorkspaceList

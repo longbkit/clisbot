@@ -245,3 +245,12 @@ Before landing route changes:
 - [ ] Did `useLocalSearchParams()` lose a required param? Fix the route tree.
 - [ ] Did native show a blank screen without a crash? Suspect route ownership
       before stores, themes, or rendering.
+
+### Removing a Host from compact Settings
+
+After removing a Host, dismiss its Settings detail to the existing `/settings` entry rather
+than replacing the detail with a second `/settings` history entry. Root Back then returns to
+the actual reader (which may now show Host unavailable) in one press. A cold detail without
+that parent uses the router's existing dismiss-to fallback. Wide Settings still replaces the
+removed detail with General. This reuses the Settings navigation owner; it does not redirect
+the removed Host's reader or change saved workspace selection.

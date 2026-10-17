@@ -274,7 +274,7 @@ test.describe("Settings — compact master-detail", () => {
     await openSettingsHostSection(page, secondaryServerId, "connections");
   });
 
-  test("removing the last active host leaves the reader in place with a way to welcome", async ({
+  test("removing the last active host returns to its reader entry with a way to welcome", async ({
     page,
     withWorkspace,
   }) => {
@@ -282,7 +282,13 @@ test.describe("Settings — compact master-detail", () => {
     const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
     await openWorkspace(page, workspace);
-    await openCompactSettings(page, workspaceRoute);
+    // Enter from the reader itself. Opening the compact sidebar first navigates to Chat,
+    // which would make Chat (not this reader) the correct Settings return destination.
+    await page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }).click();
+    await page.getByTestId("workspace-header-edit-terminal-profiles").click();
+    await expectAppRoute(page, buildSettingsHostSectionRoute(getServerId(), "terminals"));
+    await goBackInSettings(page);
+    await expectAppRoute(page, buildSettingsRoute());
     await openSettingsHostSection(page, getServerId(), "host");
     await removeCurrentHostFromSettings(page);
     await closeCompactSettings(page);

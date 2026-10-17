@@ -16,7 +16,7 @@ vi.mock("expo-router", () => ({ router }));
 vi.mock("@/constants/platform", () => platform);
 vi.mock("@/clisbot/home/feature", () => ({ HOME_V2_ENABLED: true }));
 vi.mock("@/stores/navigation-active-workspace-store", () => ({ navigateToLastWorkspace }));
-import { returnFromSettings } from "./settings-navigation";
+import { returnAfterHostRemoval, returnFromSettings } from "./settings-navigation";
 
 describe("Settings return navigation", () => {
   beforeEach(() => {
@@ -53,4 +53,38 @@ describe("Settings return navigation", () => {
     length.mockRestore();
     back.mockRestore();
   });
+});
+
+it("removing a compact Host detail leaves one Settings entry, so one Back reaches its reader", () => {
+  platform.isWeb = true;
+  const reader = "/h/removed/workspace/read";
+  const history = [reader, "/settings", "/settings/hosts/removed/host"];
+  router.replace.mockImplementationOnce((route) => {
+    history[history.length - 1] = route;
+  });
+  router.dismissTo.mockImplementationOnce((route) => {
+    const index = history.lastIndexOf(route);
+    if (index >= 0) history.splice(index + 1);
+    else history[history.length - 1] = route;
+  });
+  const length = vi.spyOn(window.history, "length", "get").mockReturnValue(3);
+  const back = vi.spyOn(window.history, "back").mockImplementation(() => {
+    history.pop();
+  });
+  try {
+    returnAfterHostRemoval(true);
+    expect(history.at(-1)).toBe("/settings");
+    returnFromSettings({ kind: "root" });
+    expect(history.at(-1)).toBe(reader);
+  } finally {
+    length.mockRestore();
+    back.mockRestore();
+    router.replace.mockReset();
+    router.dismissTo.mockReset();
+  }
+});
+
+it("removing a Host in wide Settings retains the General detail fallback", () => {
+  returnAfterHostRemoval(false);
+  expect(router.replace).toHaveBeenCalledWith("/settings/general");
 });

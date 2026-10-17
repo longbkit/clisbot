@@ -38,7 +38,7 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     await page.getByTestId("chat-back").filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/open-project$/);
     // Inbox establishes one return origin, then a sidebar selection must replace it.
-    await page.getByRole("tab", { name: "Inbox", exact: true }).click();
+    await page.getByRole("tab", { name: /^Inbox, / }).click();
     const activityRow = page
       .locator('[data-testid^="agent-row-"]')
       .filter({ visible: true })

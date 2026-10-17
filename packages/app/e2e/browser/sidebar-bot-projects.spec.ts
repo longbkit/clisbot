@@ -107,8 +107,11 @@ test("merges Bot projects into Projects and preserves session display options", 
     await openSidebarDisplayPage(page, "sidebar-display-show");
     await option.click();
     await closeSidebarDisplayPreferences(page);
-    await expect(botRow).toHaveCount(0);
-    await expect(pinnedBot).toHaveCount(0);
+    // Display preferences narrow Projects; Pins retain their accepted workspace and actions.
+    // Both surfaces now reuse the canonical workspace row, so a global row count includes Pins.
+    const ordinaryGroups = page.locator('[data-testid^="sidebar-status-group-rows-"]');
+    await expect(ordinaryGroups.getByTestId(botRowId)).toHaveCount(0);
+    await expect(pinnedBot.getByTestId(botRowId)).toBeVisible();
     await expect(regularSession).toBeVisible();
   } finally {
     if (botId) await client.archiveBot({ botId });

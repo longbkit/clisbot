@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Animated, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { projectIconRadius } from "@/components/project-icon-view";
@@ -57,6 +58,7 @@ function SkeletonSection({
 }
 
 export function SidebarAgentListSkeleton() {
+  const { t } = useTranslation();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -80,7 +82,11 @@ export function SidebarAgentListSkeleton() {
   }, [pulse]);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessibilityRole="progressbar"
+      accessibilityLabel={t("common.loading")}
+    >
       {SECTION_OPACITIES.map((sectionOpacity, sectionIdx) => (
         <SkeletonSection
           key={SECTION_KEYS[sectionIdx]}

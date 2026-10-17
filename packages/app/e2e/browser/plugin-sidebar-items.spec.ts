@@ -44,7 +44,7 @@ async function qaScreenshot(page: Page, name: string, area?: Locator) {
   else await page.screenshot({ path: file });
 }
 
-/** Footer rows span the bottom line, including the mirrored compact layout. */
+/** Rows span the controls: above desktop footer controls, below the compact top toolbar. */
 async function expectFooterRow(page: Page, row: Locator) {
   // Polled: on compact the drawer is still sliding in when the row first shows.
   await expect
@@ -61,12 +61,15 @@ async function expectFooterRow(page: Page, row: Locator) {
         .boundingBox())!;
       const box = (await row.boundingBox())!;
       return {
-        aboveBottomLine: box.y + box.height <= firstAction.y,
+        besideControls:
+          (page.viewportSize()?.width ?? 1440) < 768
+            ? box.y >= firstAction.y + firstAction.height
+            : box.y + box.height <= firstAction.y,
         alignedLeft: Math.abs(box.x - firstAction.x) < 1,
         alignedRight: Math.abs(box.x + box.width - (lastAction.x + lastAction.width)) < 1,
       };
     })
-    .toEqual({ aboveBottomLine: true, alignedLeft: true, alignedRight: true });
+    .toEqual({ besideControls: true, alignedLeft: true, alignedRight: true });
 }
 
 function botRow(page: Page, rowId: string): Locator {

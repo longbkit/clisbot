@@ -7,6 +7,7 @@ import {
   buildProjectsSettingsRoute,
   buildSettingsHostSectionRoute,
   buildSettingsRoute,
+  buildSettingsSectionRoute,
   type HostSectionSlug,
   type SettingsSectionSlug,
 } from "@/utils/host-routes";
@@ -50,4 +51,10 @@ export function returnFromSettings(view: SettingsView): void {
   if (view.kind === "plugin") parent = buildSettingsHostSectionRoute(view.serverId, "plugins");
   if (view.kind === "project") parent = buildProjectsSettingsRoute(view.serverId);
   router.dismissTo(parent as Href);
+}
+
+/** Removing a Host exits its detail while keeping the Settings entry as the return owner. */
+export function returnAfterHostRemoval(isCompactLayout: boolean): void {
+  if (isCompactLayout) router.dismissTo(buildSettingsRoute());
+  else router.replace(buildSettingsSectionRoute("general"));
 }

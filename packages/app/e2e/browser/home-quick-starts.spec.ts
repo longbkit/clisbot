@@ -64,7 +64,10 @@ test.describe("Home and daemon quick starts", () => {
 
       for (const width of [390, 320]) {
         await page.setViewportSize({ width, height: 844 });
-        const search = page.getByTestId("home-search");
+        const search = page
+          .getByTestId("mobile-toolbar")
+          .filter({ visible: true })
+          .getByRole("button", { name: "Search", exact: true });
         await expect(search).toBeVisible();
         await search.click();
         await page.getByTestId("command-center-input").fill("Home layout conversation 13");
@@ -76,7 +79,7 @@ test.describe("Home and daemon quick starts", () => {
         await page.keyboard.press("Escape");
         await page
           .getByTestId("home-mobile-tabs")
-          .getByRole("tab", { name: "Inbox", exact: true })
+          .getByRole("tab", { name: /^Inbox, / })
           .click();
         const input = page.getByTestId("sessions-search-input").filter({ visible: true });
         await expect(input).toBeVisible();
@@ -222,7 +225,7 @@ test.describe("Home and daemon quick starts", () => {
       await expect(page).toHaveURL(/\/chat$/);
       await expect(page.getByTestId("sidebar-home")).toHaveCount(0);
       await expect(page.getByTestId("sidebar-global-new-workspace")).toBeVisible();
-      await tabs.getByRole("tab", { name: "Inbox", exact: true }).click();
+      await tabs.getByRole("tab", { name: /^Inbox, / }).click();
       await expect(page.getByText("Inbox", { exact: true }).first()).toBeVisible();
       await tabs.getByRole("tab", { name: "Automations", exact: true }).click();
       await expect(page).toHaveURL(/\/schedules$/);

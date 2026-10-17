@@ -241,8 +241,16 @@ test("old DM transcript hides only Bot markers through reload and socket reconne
     });
     await page.reload();
     await verify();
+    const retainedScreen = await screen.elementHandle();
     await gate.drop();
-    await expect(page.getByText(/offline/i)).toBeVisible();
+    await expect(page.getByTestId("agent-reconnecting-toast")).toBeVisible();
+    await verify();
+    await expect(page.getByTestId("chat-initial-loading")).toHaveCount(0);
+    expect(await retainedScreen?.evaluate((node) => node.isConnected)).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("old-transcript-reconnecting.png"),
+      animations: "disabled",
+    });
     gate.restore();
     await expect(screen.getByRole("textbox")).toBeEditable({ timeout: 30_000 });
     await verify();

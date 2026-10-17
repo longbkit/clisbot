@@ -92,7 +92,16 @@ test.describe("Sidebar project filter", () => {
 
       await pinWorkspaceFromSidebar(page, alpha.workspaceId);
       await expect(page.getByTestId(`sidebar-pin-${serverId}:${alpha.workspaceId}`)).toBeVisible();
-      await expect(alphaRow).toHaveCount(0);
+      await expect(
+        page
+          .getByTestId("sidebar-project-list")
+          .getByTestId(`sidebar-workspace-row-${serverId}:${alpha.workspaceId}`),
+      ).toHaveCount(0);
+      await expect(
+        page
+          .getByTestId(`sidebar-pin-${serverId}:${alpha.workspaceId}`)
+          .getByTestId(`sidebar-workspace-row-${serverId}:${alpha.workspaceId}`),
+      ).toBeVisible();
 
       // The way out of the filter is still on screen.
       await expect(page.getByTestId("sidebar-display-preferences-menu")).toBeVisible();

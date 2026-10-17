@@ -23,6 +23,8 @@ The terms are in the [glossary](../../glossary.md) under **Agent sessions**.
 
 ## Settings
 
+An active Host filter keeps the Projects header, display menu and filter chips mounted while its directory is loading. Selecting an offline Host must leave a way to clear the filter; the initial-load skeleton must not replace those controls.
+
 Everything lives on one page, **Show → Agent sessions** — the first row of the Show page, in a group of its own — in the sidebar's display preferences, in four groups split by separators: the switch, expansion, Active sessions only with Full titles, and the details a line shows. There is no deeper submenu.
 
 | Item                 | Values                                                                                 | Default                                      |

@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { getServerId } from "./server-id";
 
 interface ContextMenuAnchor {
@@ -244,19 +244,54 @@ export async function selectSidebarStatusGrouping(page: Page): Promise<void> {
  * Chat tab's page ("chat", route /chat): a tab page reaches it from the tab bar, any other page goes
  * Back first. Without them it is a drawer opened from the menu ("overlay").
  */
-export async function openMobileAgentSidebar(page: Page): Promise<"chat" | "overlay"> {
-  const chatTab = page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Chat" });
-  const back = page.getByTestId("chat-back").filter({ visible: true });
-  const menu = page.getByRole("button", { name: "Open menu" }).filter({ visible: true });
-  // Decide once the header has rendered, not on its first frame.
-  await expect(chatTab.or(back).or(menu).first()).toBeVisible({ timeout: 15_000 });
-  if (!(await chatTab.isVisible()) && (await back.count())) await back.click();
-  if (await chatTab.isVisible().catch(() => false)) {
-    await chatTab.click();
-    return "chat";
+async function pressCompactBack(
+  page: Page,
+  back: Locator,
+  chatTab: Locator,
+  menu: Locator,
+): Promise<void> {
+  const previousUrl = page.url();
+  const pressed = await back.elementHandle();
+  if (!pressed) throw new Error("The visible Back control disappeared before admission");
+  try {
+    await back.click();
+    await expect
+      .poll(async () => {
+        if (page.url() !== previousUrl) return true;
+        // A compact sheet consumes Back without changing routes. Only accept that completion
+        // after the actual pressed node disappears and a next navigation control is available.
+        return (
+          !(await pressed.isVisible()) && ((await chatTab.isVisible()) || (await menu.isVisible()))
+        );
+      })
+      .toBe(true);
+  } finally {
+    await pressed.dispose();
   }
-  await menu.first().click();
-  return "overlay";
+}
+
+export async function openMobileAgentSidebar(page: Page): Promise<"chat" | "overlay"> {
+  const chatTab = page
+    .getByTestId("home-mobile-tabs")
+    .getByRole("tab", { name: "Chat", exact: true });
+  // Plugin screens use the shared HeaderBackButton; conversation pages use MobileBack.
+  // Both expose the same accessible action. Wait for each completed Back navigation before
+  // deciding which control opens Chat, rather than falling through to an absent legacy menu.
+  const back = page.getByRole("button", { name: "Back", exact: true });
+  const menu = page.getByRole("button", { name: "Open menu", exact: true });
+  for (let depth = 0; depth < 6; depth += 1) {
+    await expect(chatTab.or(back).or(menu)).toHaveCount(1, { timeout: 15_000 });
+    if (await chatTab.isVisible()) {
+      await chatTab.click();
+      return "chat";
+    }
+    if (await menu.isVisible()) {
+      await menu.click();
+      return "overlay";
+    }
+    await pressCompactBack(page, back, chatTab, menu);
+  }
+  throw new Error("Could not reach Chat through the visible Back controls");
 }
 
 /** Leaves the list: the drawer's close button, or the Home tab when the list is the Chat tab. */
@@ -274,14 +309,18 @@ export async function closeMobileAgentSidebar(page: Page): Promise<void> {
 // prevents a click from targeting a button while the panel is still moving. The footer is in the
 // list with and without the Home tabs (the Chat tab drops the Inbox row).
 export async function expectMobileAgentSidebarVisible(page: Page): Promise<void> {
-  await expect(page.getByTestId("sidebar-footer-bottom-line")).toBeInViewport({
+  await expect(
+    page.locator("#agent-list-gesture-host").getByTestId("sidebar-footer-bottom-line"),
+  ).toBeInViewport({
     ratio: 1,
     timeout: 5_000,
   });
 }
 
 export async function expectMobileAgentSidebarHidden(page: Page): Promise<void> {
-  await expect(page.getByTestId("sidebar-footer-bottom-line")).not.toBeInViewport({
+  await expect(
+    page.locator("#agent-list-gesture-host").getByTestId("sidebar-footer-bottom-line"),
+  ).not.toBeInViewport({
     timeout: 5_000,
   });
 }

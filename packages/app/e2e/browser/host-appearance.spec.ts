@@ -96,6 +96,15 @@ test("customizes a host badge and preserves its appearance after reload", async 
 
   await test.step("rename the host and use its available sidebar width", async () => {
     await expectHostBadgeName(page, { ...badge, hostName: SECONDARY_HOST_LABEL });
+    const shortLabel = page
+      .getByTestId(`sidebar-workspace-row-${badge.serverId}:${badge.workspaceId}`)
+      .getByTestId(`host-badge-${badge.serverId}`)
+      .getByText(SECONDARY_HOST_LABEL, { exact: true });
+    const shortWidths = await shortLabel.evaluate((label) => ({
+      client: label.clientWidth,
+      content: label.scrollWidth,
+    }));
+    expect(shortWidths.content).toBeLessThanOrEqual(shortWidths.client);
     await openHostAppearanceSettings(page, badge.serverId);
     await renameHostFromSettings(page, hostName);
     await leaveHostAppearanceSettings(page);
@@ -108,11 +117,22 @@ test("customizes a host badge and preserves its appearance after reload", async 
     expect(rowBox).not.toBeNull();
     expect(badgeBox!.width).toBeGreaterThan(96);
     expect(badgeBox!.x + badgeBox!.width).toBeLessThanOrEqual(rowBox!.x + rowBox!.width);
-    const widths = await hostBadge.getByText(hostName, { exact: true }).evaluate((label) => ({
-      client: label.clientWidth,
-      content: label.scrollWidth,
-    }));
-    expect(widths.content).toBeLessThanOrEqual(widths.client);
+    // The shared 32px leading column keeps every title on the same rail. HostBadge already
+    // yields to adjacent metadata and truncates long names; intrinsic text width need not fit.
+    // Assert the visible box and full accessible identity instead of undoing that alignment.
+    await expect(hostBadge).toHaveAccessibleName(hostName);
+    const label = hostBadge.getByText(hostName, { exact: true });
+    await expect(label).toHaveCSS("overflow", "hidden");
+    await expect(label).toHaveCSS("text-overflow", "ellipsis");
+    await expect(label).toHaveCSS("white-space", "nowrap");
+    const labelBox = await label.boundingBox();
+    expect(labelBox).not.toBeNull();
+    expect(labelBox!.x).toBeGreaterThanOrEqual(badgeBox!.x);
+    expect(labelBox!.x + labelBox!.width).toBeLessThanOrEqual(badgeBox!.x + badgeBox!.width);
+    await test.info().attach("renamed-host-contained", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
   });
 
   await test.step("preview a color and apply it to the sidebar badge", async () => {

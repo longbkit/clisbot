@@ -4,7 +4,7 @@ import { test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { openSessions } from "../support/helpers/archive-tab";
 import { createIdleAgent } from "../support/helpers/archive-tab";
-import { addConnectedHostAndReload, addOfflineHostAndReload } from "../support/helpers/hosts";
+import { addConnectedHostAndReload } from "../support/helpers/hosts";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
@@ -112,6 +112,8 @@ test.describe("History search across hosts", () => {
   }) => {
     const workspace = await seedWorkspace({ repoPrefix: "sessions-search-offline-" });
     const reachableTitle = `${NONCE} Bill the reachable customer`;
+    const secondaryServerId = `srv_hist_offline_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    let secondaryDaemon: Awaited<ReturnType<typeof startIsolatedHostDaemon>> | null = null;
 
     try {
       await createIdleAgent(workspace.client, {
@@ -121,12 +123,23 @@ test.describe("History search across hosts", () => {
       });
 
       await gotoAppShell(page);
-      await addOfflineHostAndReload(page, {
-        serverId: "sessions-search-unreachable",
+      secondaryDaemon = await startIsolatedHostDaemon(secondaryServerId);
+      await addConnectedHostAndReload(page, {
+        serverId: secondaryDaemon.serverId,
+        port: secondaryDaemon.port,
         label: SECONDARY_LABEL,
         primaryLabel: PRIMARY_LABEL,
       });
       await openSessions(page);
+
+      // Learn the actual Host capability before the outage. A never-connected
+      // Host correctly suppresses fleet search because its support is unknown.
+      await expect(page.getByTestId("sessions-search-input")).toBeVisible();
+      await secondaryDaemon.close();
+      await expect(page.getByTestId("sessions-host-errors")).toContainText(SECONDARY_LABEL, {
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId("sessions-search-input")).toBeVisible();
 
       // The unreachable host's sessions were never searched. Reporting only the
       // matches that were found, with no word about the host that never
@@ -138,6 +151,7 @@ test.describe("History search across hosts", () => {
       await expectChronologicalTitles(page, [reachableTitle]);
     } finally {
       await workspace.cleanup().catch(() => undefined);
+      await secondaryDaemon?.close().catch(() => undefined);
     }
   });
 });
