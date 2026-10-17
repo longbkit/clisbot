@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.3 - 2026-10-17
+
+### Fixed
+
+- Fix global installation failures on npm 10 while preserving Hub authentication and runtime dependencies
+- Keep deployed web assets within Cloudflare’s size limit without changing native or desktop bundles
+
+Paseo baseline remains the reviewed main snapshot `337e81a9c6d4551dbcede5930c21408776d06b1b` recorded in 2.1.1.
+
 ## 2.1.2 - 2026-10-17
 
 ### Changed
