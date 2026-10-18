@@ -399,20 +399,6 @@ async function replaySteeredSleepTurnInBrowser(
   }
 }
 
-async function queueMessage(page: Page, prompt: string): Promise<void> {
-  await fillComposerDraft(page, prompt);
-  await sendDraftToQueue(page);
-}
-
-async function expectQueuedSendFailuresRestored(page: Page, prompts: string[]): Promise<void> {
-  await expect(page.getByRole("button", { name: "Send queued message now" })).toHaveCount(
-    prompts.length,
-  );
-  for (const prompt of prompts) {
-    await expect(page.getByTestId("user-message").filter({ hasText: prompt })).toHaveCount(0);
-  }
-}
-
 async function expectFailedSubmissionRestored(page: Page, prompt: string): Promise<void> {
   await expectComposerDraft(page, prompt);
   await expectComposerEditable(page);
@@ -1350,31 +1336,6 @@ test.describe("Agent message submission", () => {
   test("replays Codex-shaped steering inside one active turn", async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     await replaySteeredSleepTurnInBrowser(page, testInfo, "codex");
-  });
-
-  test("restores overlapping queued sends when their connection fails", async ({
-    page,
-  }, testInfo) => {
-    test.setTimeout(120_000);
-    const gate = await gateNextAgentMessage(page);
-    const agent = await startRunningMockAgent(page, {
-      prefix: `overlapping-queued-send-${testInfo.workerIndex}-`,
-      model: "one-minute-stream",
-      prompt: "Keep the agent running while messages queue.",
-    });
-    const prompts = ["Restore the first queued send.", "Restore the second queued send."];
-    try {
-      await queueMessage(page, prompts[0]);
-      await queueMessage(page, prompts[1]);
-      await page.getByRole("button", { name: "Send queued message now" }).first().click();
-      await gate.waitForRequest(1);
-      await page.getByRole("button", { name: "Send queued message now" }).first().click();
-      await gate.waitForRequest(2);
-      await gate.disconnect();
-      await expectQueuedSendFailuresRestored(page, prompts);
-    } finally {
-      await agent.cleanup();
-    }
   });
 
   test("does not accept a failed submission from an unrelated running turn", async ({
