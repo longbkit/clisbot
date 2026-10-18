@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.1.4 - 2026-10-18
+
+### Added
+
+- Keep queued messages and their file attachments on the Host across process restarts for agent sessions, Bot direct messages and group chats
+- Choose Queue or Steer for one message by holding Send, while keeping the saved default unchanged
+- Edit, delete and send queued items through compact controls with attachment counts
+
+### Fixed
+
+- Keep pasted images available while sending, preventing attachment encoding failures after the composer clears
+
+- Preserve a queued item's position while editing, and retain the draft when the original item has already started or changed
+- Prevent duplicate queue admission during delayed acknowledgements and accidental sends when releasing a held Send button
+- Retain authorized attachment bytes after the original message or file is removed
+- Keep new-conversation creation free of queue requests until a real target exists
+- Restore client queues for older Hosts in sessions and Bot direct messages; groups without authoritative discussion status keep an explicit manual Send action
+- Allow users with provider access to view that provider's existing quota and usage reports without granting Host administration
+
+Host-backed queues require an upgraded Host. Client fallback queues remain in app memory; genuinely old group Hosts require manual delivery. Existing Usage report content is unchanged.
+
+Paseo baseline remains the reviewed main snapshot `337e81a9c6d4551dbcede5930c21408776d06b1b` recorded in 2.1.1.
+
 ## 2.1.3 - 2026-10-17
 
 ### Fixed
