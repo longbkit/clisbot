@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   },
   supported: true,
 }));
+vi.mock("./client-queue/use-client-chat-queue", () => ({
+  useClientChatQueue: () => ({ items: [] }),
+}));
 vi.mock("react-native", () => ({ View: ({ children }: { children: ReactNode }) => children }));
 vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({ dock: {} }) } }));
 vi.mock("@/constants/platform", () => ({ isNative: false }));

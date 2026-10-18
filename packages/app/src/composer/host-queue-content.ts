@@ -41,11 +41,16 @@ export async function queueItemAttachments(
   return attachments;
 }
 
-const uploads = new WeakMap<DaemonClient, WeakMap<AttachmentMetadata, UploadedFileAttachment>>();
+type QueueUploadClient = Pick<DaemonClient, "uploadFile">;
+const uploads = new WeakMap<
+  QueueUploadClient,
+  WeakMap<AttachmentMetadata, UploadedFileAttachment>
+>();
 /** Reuse ordinary upload transport; local draft bytes survive deletion/cleanup on the Host. */
 export async function uploadLocalQueueCopies(
-  client: DaemonClient | null,
+  client: QueueUploadClient | null,
   attachments: ComposerAttachment[],
+  fresh = false,
 ): Promise<ComposerAttachment[]> {
   const result: ComposerAttachment[] = [];
   for (const value of attachments) {
@@ -59,7 +64,7 @@ export async function uploadLocalQueueCopies(
       cache = new WeakMap();
       uploads.set(client, cache);
     }
-    let attachment = cache.get(value.localCopy);
+    let attachment = fresh ? undefined : cache.get(value.localCopy);
     if (!attachment) {
       const store = await getAttachmentStore();
       const data = atob(await store.encodeBase64({ attachment: value.localCopy }));

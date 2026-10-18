@@ -97,3 +97,5 @@ History/fork được copy sau authorize trước ACK. Snapshot lưu optional `f
 ### Host cũ và feature-off
 
 Session fallback về hàng chờ client hiện có; Host có capability dùng hàng chờ durable. Item client đang chờ giữ owner và không migrate tự động khi upgrade. DM/group Host cũ dùng Chat Send/rules, không có client Queue: ẩn Queue override và không thay đổi preference đã lưu. Khi capability chưa rõ/mất kết nối, giữ draft/file và item Host đã nhận; không tự chuyển sang client hay replay.
+
+Compatibility correction 2026-10-18: session + DM + group retain separate client owners on old/disabled Hosts. DM drains through ChatSend, with stable per-item messageId; accepted local rows never migrate on upgrade. Owner accepts partial automatic support only for genuinely old group wire without discussion authority: retain/edit/delete files locally and explicitly Send the item via Chat rules; never infer idle from a speaker gap or silently send Queue. Capable feature-off groups auto-drain on authoritative discussion idle. App-memory queue is lost when the app closes. See engineering.md and the numbered 36280 audit.

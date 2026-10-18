@@ -1,3 +1,4 @@
+import { uploadLocalQueueCopies } from "./host-queue-content";
 import type { SelectedFile } from "@/attachments/selected-file";
 import type { ForgeSearchItem } from "@clisbot/protocol/messages";
 import type { ActiveTurnBehavior } from "@clisbot/protocol/messages";
@@ -20,6 +21,8 @@ import type { PickedImageAttachmentInput } from "@/hooks/image-attachment-picker
 import { i18n } from "@/i18n/i18next";
 
 export interface QueuedComposerMessage {
+  state?: "queued" | "sending" | "needs_review";
+  reason?: string;
   id: string;
   text: string;
   attachments: ComposerAttachment[];
@@ -213,7 +216,8 @@ export interface DispatchComposerAgentMessageInput {
 export async function dispatchComposerAgentMessage(
   input: DispatchComposerAgentMessageInput,
 ): Promise<void> {
-  const wirePayload = splitComposerAttachmentsForSubmit(input.attachments, {
+  const retained = await uploadLocalQueueCopies(input.client, input.attachments);
+  const wirePayload = splitComposerAttachmentsForSubmit(retained, {
     format: input.attachmentSubmitFormat,
   });
   const clientMessageId = generateMessageId();

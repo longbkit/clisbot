@@ -1,3 +1,4 @@
+import { useClientChatQueue } from "./client-queue/use-client-chat-queue";
 import { useSessionStore } from "@/stores/session-store";
 import { useConversationProjectContext } from "./conversation-project-context";
 import { useRetainedPanelActive } from "@/components/retained-panel";
@@ -49,6 +50,7 @@ export const ChatComposer = memo(function ChatComposer({
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
   const active = useRetainedPanelActive();
+  const clientInputQueue = useClientChatQueue(serverId, chatId);
   const draftKey = buildChatDraftKey(serverId, chatId);
   const draft = useAgentInputDraft({ draftKey });
   const project = useConversationProjectContext();
@@ -63,6 +65,7 @@ export const ChatComposer = memo(function ChatComposer({
         workspaceId={project?.workspaceId}
         submissionTarget="conversation"
         queueChatId={chatId}
+        clientInputQueue={clientInputQueue}
         conversationBusy={busy}
         conversationHasPermission={hasPermission}
         resolveWorkspaceFilePath={resolveWorkspaceFilePath}

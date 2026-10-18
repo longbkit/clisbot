@@ -1,3 +1,4 @@
+import { ClientChatQueuePrincipalBinding } from "@/clisbot/bots/chat/client-queue/use-client-chat-queue";
 import { InboxActivityProvider } from "@/clisbot/home/inbox-activity";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { profileNativeRegion } from "@/utils/render-profiler";
@@ -1003,6 +1004,7 @@ function ClisbotHubScope({ children }: { children: ReactNode }) {
       <OfferLinkListener />
       <HubAccountProvider>
         <HubHostSynchronization />
+        <ClientChatQueuePrincipalBinding />
         {children}
       </HubAccountProvider>
     </ToastProvider>

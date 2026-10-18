@@ -17,6 +17,8 @@ interface QueuePanelActions {
   sendNow(id: string): void;
   steer(id: string): void;
   remove(id: string): void;
+  sendNowLabel?: string;
+  hideSteer?: boolean;
 }
 interface QueueEditorActions {
   save(): void;
@@ -26,6 +28,7 @@ interface QueueEditorActions {
 }
 interface HostInputQueuePanelProps extends QueuePanelActions, QueueEditorActions {
   label?: string;
+  notice?: string;
   view: { items: readonly QueuePanelItem[] };
   pending: boolean;
   editor: { stale: boolean } | null;
@@ -39,6 +42,8 @@ function QueueRow({
   steer,
   remove,
   pending,
+  sendNowLabel,
+  hideSteer,
 }: QueuePanelActions & { pending: boolean } & { item: QueuePanelItem }) {
   const { t } = useTranslation();
   const editItem = useCallback(() => edit(item.id), [edit, item.id]);
@@ -73,15 +78,17 @@ function QueueRow({
             </Button>
             {item.state === "queued" ? (
               <>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={pending}
-                  style={styles.touchAction}
-                  onPress={steerItem}
-                >
-                  {t("composer.hostQueue.steerOnce")}
-                </Button>
+                {!hideSteer ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={pending}
+                    style={styles.touchAction}
+                    onPress={steerItem}
+                  >
+                    {t("composer.hostQueue.steerOnce")}
+                  </Button>
+                ) : null}
                 <Button
                   size="xs"
                   variant="outline"
@@ -89,7 +96,7 @@ function QueueRow({
                   style={styles.touchAction}
                   onPress={sendItem}
                 >
-                  {t("composer.hostQueue.sendNow")}
+                  {sendNowLabel ?? t("composer.hostQueue.sendNow")}
                 </Button>
               </>
             ) : null}
@@ -174,6 +181,7 @@ export function HostInputQueuePanel(props: HostInputQueuePanelProps) {
   return (
     <View style={styles.track}>
       {props.label ? <Text style={styles.hint}>{props.label}</Text> : null}
+      {props.notice ? <Text style={styles.hint}>{props.notice}</Text> : null}
       {props.error ? (
         <Text accessibilityRole="alert" style={styles.hint}>
           {props.error}
@@ -188,6 +196,8 @@ export function HostInputQueuePanel(props: HostInputQueuePanelProps) {
               pending={props.pending}
               edit={props.edit}
               sendNow={props.sendNow}
+              sendNowLabel={props.sendNowLabel}
+              hideSteer={props.hideSteer}
               steer={props.steer}
               remove={props.remove}
             />

@@ -1,7 +1,5 @@
-import { resolveChatSendAction } from "./chat-send-action";
+import { sendChatInput } from "./send-chat-input";
 import type { MessagePayload } from "@/composer/types";
-import { splitComposerAttachmentsForSubmit } from "@/composer/attachments/submit";
-import { encodeImages } from "@/utils/encode-images";
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
@@ -41,22 +39,7 @@ export function useChatSend(
           }
         } else {
           const messageId = attempt.forText(JSON.stringify([text, payload.attachments]));
-          const content = splitComposerAttachmentsForSubmit(payload.attachments);
-          const images = await encodeImages(content.images);
-          const sendAction = resolveChatSendAction({
-            serverId,
-            chat,
-            behavior: payload.activeTurnBehavior,
-          });
-          const result = await client.sendChatMessage({
-            chatId,
-            text,
-            messageId,
-            ...sendAction,
-            images,
-            attachments: content.attachments,
-          });
-          if (result.error) throw new Error(result.error);
+          await sendChatInput({ client, serverId, chat, messageId, payload });
           attempt.accepted(messageId);
         }
         void client

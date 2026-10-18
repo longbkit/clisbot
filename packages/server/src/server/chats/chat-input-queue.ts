@@ -67,8 +67,8 @@ export function publishChatQueueBoundary(input: {
   publish: (chat: Awaited<ReturnType<ChatEngine["payload"]>>) => void;
   logger: Logger;
 }): void {
-  if (!input.enabled) return;
-  input.queues.wake(input.chatId);
+  // Discussion status also drives client queues when durable Host admission is disabled.
+  if (input.enabled) input.queues.wake(input.chatId);
   void input.store
     .require(input.chatId)
     .then(async (chat) => input.publish(await input.engine.payload(chat)))

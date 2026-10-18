@@ -82,6 +82,10 @@ test("local editor file survives original deletion and draft reload; retries reu
   expect(first).toEqual(retry);
   expect(uploadFile).toHaveBeenCalledTimes(1);
   expect(readFile).toHaveBeenCalledTimes(1);
+  // A queued Chat admission may outlive its original Host upload and cache entry.
+  await uploadLocalQueueCopies(client, restored, true);
+  expect(uploadFile).toHaveBeenCalledTimes(2);
+  expect(readFile).toHaveBeenCalledTimes(1);
 });
 
 test("editor copies bounded chunks and rejects incomplete reads", async () => {

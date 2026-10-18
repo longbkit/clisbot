@@ -1,3 +1,4 @@
+import { composerAttachmentIds } from "@/composer/attachment-references";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -193,11 +194,7 @@ function collectQueuedMessageAttachmentIds(
 ): void {
   for (const queue of session.queuedMessages.values()) {
     for (const queuedMessage of queue) {
-      for (const attachment of queuedMessage.attachments) {
-        if (attachment.kind === "image") {
-          referencedIds.add(attachment.metadata.id);
-        }
-      }
+      for (const id of composerAttachmentIds(queuedMessage.attachments)) referencedIds.add(id);
     }
   }
 }

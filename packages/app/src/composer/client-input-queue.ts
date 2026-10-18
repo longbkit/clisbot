@@ -63,8 +63,9 @@ function saveClientQueueEdit(
   writer.write((previous) => {
     const items = previous.get(agentId) ?? EMPTY;
     const item = items.find((value) => value.id === edit.id);
-    if (!item || JSON.stringify(item) !== edit.original) return previous;
-    const updated = { id: item.id, text: edit.text, attachments: edit.attachments };
+    if (!item || (item.state && item.state !== "queued") || JSON.stringify(item) !== edit.original)
+      return previous;
+    const updated = { ...item, text: edit.text, attachments: edit.attachments };
     const next = new Map(previous);
     next.set(
       agentId,
@@ -77,3 +78,9 @@ function saveClientQueueEdit(
   });
   return saved;
 }
+
+export type ClientInputQueue = Omit<ReturnType<typeof useClientInputQueue>, "items"> & {
+  items: QueuedComposerMessage[];
+  manualDelivery?: boolean;
+  dispatch?: (id: string, behavior: "steer" | "interrupt" | "send") => Promise<void>;
+};

@@ -1,5 +1,5 @@
 import { resolveQueueCapability } from "./queue-capability";
-import { useClientInputQueue } from "./client-input-queue";
+import { useClientInputQueue, type ClientInputQueue } from "./client-input-queue";
 import { queueEditRevision } from "./queue-edit-revision";
 import { resolveQueueSteerTarget } from "./queue-steer-target";
 import { HostInputQueuePanel } from "./host-input-queue-panel";
@@ -885,6 +885,7 @@ interface ComposerProps {
   /** Conversation submits must never enter the ordinary agent queue. */
   submissionTarget?: "agent" | "conversation";
   queueChatId?: string;
+  clientInputQueue?: ClientInputQueue;
   conversationBusy?: boolean;
   conversationHasPermission?: boolean;
   showAgentControls?: boolean;
@@ -1212,6 +1213,7 @@ const ComposerContent = memo(ComposerContentImpl);
 function ComposerContentImpl({
   submissionTarget = "agent",
   queueChatId,
+  clientInputQueue,
   conversationBusy = false,
   conversationHasPermission = false,
   showAgentControls = true,
@@ -1292,7 +1294,8 @@ function ComposerContentImpl({
   });
   const hostQueueSupported = queueServerInfo?.features?.hostInputQueue === true;
   const queueSupported = hasQueueTarget && queueCapability === "host";
-  const clientQueue = useClientInputQueue(serverId, agentId, submissionTarget === "agent");
+  const sessionClientQueue = useClientInputQueue(serverId, agentId, submissionTarget === "agent");
+  const clientQueue: ClientInputQueue = clientInputQueue ?? sessionClientQueue;
   const legacyChat = submissionTarget === "conversation" && queueCapability === "client";
   const {
     view: queueView,
@@ -1675,7 +1678,7 @@ function ComposerContentImpl({
     return false;
   });
   const activeSendBehavior = resolveActiveSendBehavior(
-    legacyChat && appSettings.sendBehavior === "queue" ? "steer" : appSettings.sendBehavior,
+    appSettings.sendBehavior,
     submissionTarget === "conversation" ? conversationHasPermission : hasPendingPermission,
   );
   const prepareQueueContent = useCallback(
@@ -1692,7 +1695,11 @@ function ComposerContentImpl({
 
   const queueMessage = useCallback(
     async (text: string, values: ComposerAttachment[]) => {
-      if (hasQueueTarget && submissionTarget === "agent" && queueCapability === "client") {
+      if (
+        hasQueueTarget &&
+        queueCapability === "client" &&
+        (submissionTarget === "agent" || clientInputQueue)
+      ) {
         clientQueue.enqueue(text, values);
       } else {
         if (!queueSupported)
@@ -1721,6 +1728,7 @@ function ComposerContentImpl({
       submissionTarget,
       queueCapability,
       clientQueue,
+      clientInputQueue,
       prepareQueueContent,
       executeQueueCommand,
       replaceUserInput,
@@ -2122,7 +2130,7 @@ function ComposerContentImpl({
     async (id: string, owner: "host" | "client" = "host") => {
       const local = owner === "client" ? clientQueue.read(id) : undefined;
       if (owner === "client") {
-        if (!local) return;
+        if (!local || local.state === "sending") return;
         if (editingSession.getQueueMutationPending()) return;
         replaceUserInput(local.text);
         setSelectedAttachments(composerWorkspaceAttachment.userAttachmentsOnly(local.attachments));
@@ -2131,7 +2139,7 @@ function ComposerContentImpl({
           id,
           revision: 0,
           original: JSON.stringify(local),
-          stale: false,
+          stale: local.state === "needs_review",
           owner: "client",
         });
         return;
@@ -2179,6 +2187,14 @@ function ComposerContentImpl({
     async (id: string, owner: "host" | "client" = "host") => {
       if (owner === "client") {
         if (!isConnected) return;
+        if (clientQueue.dispatch) {
+          try {
+            await clientQueue.dispatch(id, "send");
+          } catch (error) {
+            setSendError(String(error));
+          }
+          return;
+        }
         const result = await sendQueuedComposerMessageNow({
           agentId,
           messageId: id,
@@ -2202,6 +2218,14 @@ function ComposerContentImpl({
     async (id: string, owner: "host" | "client" = "host") => {
       if (owner === "client") {
         if (!isConnected) return;
+        if (clientQueue.dispatch) {
+          try {
+            await clientQueue.dispatch(id, "steer");
+          } catch (error) {
+            setSendError(String(error));
+          }
+          return;
+        }
         const result = await sendQueuedComposerMessageNow({
           agentId,
           messageId: id,
@@ -2696,7 +2720,8 @@ function ComposerContentImpl({
         id: item.id,
         text: item.text,
         attachments: item.attachments,
-        state: "queued" as const,
+        state: item.state ?? ("queued" as const),
+        reason: item.reason,
       })),
     }),
     [clientQueue.items],
@@ -2711,13 +2736,15 @@ function ComposerContentImpl({
     [handleEditQueuedMessage, handleSendQueuedNow, handleSteerQueuedNow, handleDeleteQueuedMessage],
   );
   let primarySubmitLabel = submitButtonAccessibilityLabel;
-  if (legacyChat) primarySubmitLabel = t("composer.input.sendMessage");
   if (queueEditor) primarySubmitLabel = t("composer.hostQueue.save");
   const queueList = (
     <>
       {clientQueue.items.length > 0 || queueEditor?.owner === "client" ? (
         <HostInputQueuePanel
           label={t("composer.hostQueue.clientQueue")}
+          notice={clientQueue.manualDelivery ? t("composer.hostQueue.manualGroup") : undefined}
+          sendNowLabel={clientQueue.dispatch ? t("composer.input.sendMessage") : undefined}
+          hideSteer={clientQueue.manualDelivery}
           view={localQueueView}
           editor={queueEditor?.owner === "client" ? queueEditor : null}
           pending={queueEditPending}
@@ -2884,7 +2911,7 @@ function ComposerContentImpl({
                   leftContent={leftContent}
                   beforeVoiceContent={beforeVoiceContent}
                   rightContent={rightContent}
-                  oneOffQueueAvailable={!legacyChat}
+                  oneOffQueueAvailable
                   onOneOffSend={
                     !hasQueueTarget || queueEditor || readOnly || isSubmitLoadingVisible
                       ? undefined
