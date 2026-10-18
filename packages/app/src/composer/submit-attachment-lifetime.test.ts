@@ -22,6 +22,13 @@ import {
 import type { ComposerAttachment } from "@/attachments/types";
 import { composerAttachmentIds } from "./attachment-references";
 import { submitAgentInput } from "./submit";
+// Keep real Desktop file storage; this app test must not require a built server.
+vi.mock("@clisbot/server/daemon-control", () => ({
+  resolveClisbotHome: () => {
+    if (!process.env.CLISBOT_HOME) throw new Error("Isolated attachment home required");
+    return process.env.CLISBOT_HOME;
+  },
+}));
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg==";
 let home: string;

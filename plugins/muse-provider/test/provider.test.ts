@@ -1435,6 +1435,7 @@ for (const usage of [
     const account = inputs[0]!;
     expect(account).toEqual({
       key: expect.stringMatching(/^[a-f0-9]{64}$/),
+      providerId: "muse",
       label: "Muse Code",
       input: { account: account.key },
     });
