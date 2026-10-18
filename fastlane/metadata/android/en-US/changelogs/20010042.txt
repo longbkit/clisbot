@@ -1,0 +1,8 @@
+Host-backed queues require an upgraded Host. Client fallback queues remain in app memory; genuinely old group Hosts require manual delivery. Existing Usage report content is unchanged.
+
+Paseo baseline remains the reviewed main snapshot 337e81a9c6d4551dbcede5930c21408776d06b1b recorded in 2.1.1.
+
+Added
+- Keep queued messages and their file attachments on the Host across process restarts for agent sessions, Bot direct messages and group chats
+
+Full notes: https://clisbot.com/changelog
