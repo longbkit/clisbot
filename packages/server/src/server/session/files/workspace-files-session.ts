@@ -417,6 +417,14 @@ export class WorkspaceFilesSession {
     });
   }
 
+  queueFileAuthority() {
+    return {
+      ownsUpload: (file: Extract<AgentAttachment, { type: "uploaded_file" }>) =>
+        this.fileUploads.ownsUploadedFile(file),
+      resolveForkSource: this.options.resolveForkSource,
+    };
+  }
+
   async attachMessageFiles(
     agentId: string,
     messageId: string,

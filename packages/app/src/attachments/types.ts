@@ -104,8 +104,9 @@ export interface WorkspaceFileComposerAttachment {
 }
 
 export type UserComposerAttachment =
+  | { kind: "agent_attachment"; attachment: AgentAttachment }
   | { kind: "image"; metadata: AttachmentMetadata }
-  | { kind: "file"; attachment: UploadedFileAttachment }
+  | { kind: "file"; attachment: UploadedFileAttachment; localCopy?: AttachmentMetadata }
   | WorkspaceFileComposerAttachment
   | PluginResourceComposerAttachment
   | { kind: "forge_issue"; item: ForgeSearchItem }

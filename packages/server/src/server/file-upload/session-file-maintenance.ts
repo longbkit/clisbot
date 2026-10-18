@@ -27,6 +27,7 @@ async function hasRecord(directory: string): Promise<boolean> {
 export async function pruneStoredSessionDrafts(input: {
   agentRoot: string;
   temporaryRoot?: string;
+  chatRoot?: string;
   stopped?: () => boolean;
   onError: (error: unknown, directory: string) => void;
 }): Promise<void> {
@@ -37,6 +38,16 @@ export async function pruneStoredSessionDrafts(input: {
       input.onError(error, input.temporaryRoot);
     }
   }
+  if (input.chatRoot)
+    for await (const directory of directories(input.chatRoot)) {
+      if (input.stopped?.()) return;
+      try {
+        await fs.access(path.join(directory, "chat.json"));
+        await pruneSessionDrafts(directory);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") input.onError(error, directory);
+      }
+    }
   for await (const cwdDirectory of directories(input.agentRoot))
     for await (const directory of directories(cwdDirectory)) {
       if (input.stopped?.()) return;
@@ -50,6 +61,7 @@ export async function pruneStoredSessionDrafts(input: {
 export function startSessionFileMaintenance(input: {
   agentRoot: string;
   temporaryRoot?: string;
+  chatRoot?: string;
   onError: (error: unknown, directory: string) => void;
   intervalMs?: number;
 }): () => Promise<void> {

@@ -71,6 +71,10 @@ export class ChatDiscussions {
 
   constructor(private readonly deps: DiscussionDependencies) {}
 
+  isActive(chatId: string): boolean {
+    return this.active.has(chatId);
+  }
+
   /**
    * Replaces any running discussion in the chat. A bot still speaking in the replaced one keeps
    * the floor: the first bot of the new one wakes when that turn ends, so one bot speaks at a time.

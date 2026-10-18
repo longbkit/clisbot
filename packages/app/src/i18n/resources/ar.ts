@@ -1,3 +1,4 @@
+import { hostQueueAr as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
@@ -126,6 +127,7 @@ export const ar: TranslationResources = {
     },
   },
   composer: {
+    hostQueue,
     placeholders: {
       desktop: "أرسل رسالة إلى الوكيل أو ضع علامة على @files أو استخدم /commands و /skills",
       mobile: "الرسالة، @files ، /commands",

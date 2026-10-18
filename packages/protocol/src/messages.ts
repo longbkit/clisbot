@@ -1,3 +1,9 @@
+import {
+  AgentQueueExecuteRequestSchema,
+  AgentQueueExecuteResponseSchema,
+  ChatQueueExecuteRequestSchema,
+  ChatQueueExecuteResponseSchema,
+} from "./input-queue.js";
 import { HeartbeatRunSchema } from "./schedule/heartbeat-notice.js";
 import {
   QuickStartListRequestSchema,
@@ -1377,6 +1383,7 @@ export const SendAgentMessageRequestSchema = z.object({
   sourceAgentId: z.string().min(1).optional(),
   messageId: z.string().optional(), // Client-provided ID for deduplication
   activeTurnBehavior: ActiveTurnBehaviorSchema.optional(),
+  expectedTurnId: z.string().optional(),
   images: z.array(ImageAttachmentSchema).optional(),
   attachments: AgentAttachmentsSchema,
 });
@@ -3382,6 +3389,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ConnectorsProjectGrantsListRequestSchema,
   ConnectorsProjectGrantSetRequestSchema,
   ConnectorsSessionAllowsSetRequestSchema,
+  AgentQueueExecuteRequestSchema,
+  ChatQueueExecuteRequestSchema,
   ChatCreateRequestSchema,
   ChatListRequestSchema,
   ChatParticipantAddRequestSchema,
@@ -3778,6 +3787,7 @@ export const ServerInfoStatusPayloadSchema = z
         agentSessionStorageRead: z.boolean().optional(),
         // COMPAT(agentRequestReceipts): added in v0.8.0; remove gate after 2027-03-05.
         agentRequestReceipts: z.boolean().optional(),
+        hostInputQueue: z.boolean().optional(),
         // COMPAT(workspaceRequestReceipts): added in v0.8.0; remove gate after 2027-03-07.
         workspaceRequestReceipts: z.boolean().optional(),
         creationLifecycle: z.boolean().optional(),
@@ -7273,6 +7283,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ConnectorsProjectGrantsListResponseSchema,
   ConnectorsProjectGrantSetResponseSchema,
   ConnectorsSessionAllowsSetResponseSchema,
+  AgentQueueExecuteResponseSchema,
+  ChatQueueExecuteResponseSchema,
   ChatCreateResponseSchema,
   ChatListResponseSchema,
   ChatParticipantAddResponseSchema,

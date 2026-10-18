@@ -1,3 +1,4 @@
+import type { QueueFileAuthority } from "../../input-queue/runtime.js";
 import type { PrepareChatMessageFiles } from "../../chats/chat-engine.js";
 import { sessionActorKey, type SessionActor } from "@clisbot/protocol/session-authorship";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
@@ -24,6 +25,7 @@ export class ChatSession {
     private readonly actor: () => SessionActor | undefined,
     private readonly emit: (message: SessionOutboundMessage) => void,
     private readonly prepareFiles?: PrepareChatMessageFiles,
+    private readonly queueFileAuthority?: QueueFileAuthority,
   ) {
     this.ready = bots.list(true).then((records) => {
       for (const bot of records) this.projects.set(bot.id, bot.projectId);
@@ -101,7 +103,7 @@ export class ChatSession {
     try {
       if ("chatId" in request && !this.allows(request.chatId))
         throw new Error("Chat not found or access denied");
-      payload = { ...(await this.dispatch(request)), error: null };
+      payload = { error: null, ...(await this.dispatch(request)) };
     } catch (error) {
       payload = {
         ...errorDefaults(request),
@@ -179,6 +181,13 @@ export class ChatSession {
         return { chat: await this.service.addParticipant(request.chatId, request.botId) };
       case "chat.participant.remove.request":
         return { chat: await this.service.removeParticipant(request.chatId, request.botId) };
+      case "chat.queue.execute.request":
+        await this.requireRun(request.chatId);
+        if (!this.queueFileAuthority) throw new Error("Queue attachment authority unavailable");
+        return {
+          chatId: request.chatId,
+          ...(await this.service.queue(request.chatId, request.command, this.queueFileAuthority)),
+        };
       case "chat.message.send.request":
         await this.requireRun(request.chatId);
         return {
@@ -215,6 +224,7 @@ export function dispatchChatMessage(
     case "chat.list.request":
     case "chat.participant.add.request":
     case "chat.participant.remove.request":
+    case "chat.queue.execute.request":
     case "chat.message.send.request":
     case "chat.transcript.fetch.request":
     case "chat.update.request":
@@ -239,6 +249,8 @@ export function dispatchChatMessage(
 
 function errorDefaults(request: Request): Record<string, unknown> {
   switch (request.type) {
+    case "chat.queue.execute.request":
+      return { chatId: request.chatId, queue: null };
     case "chat.list.request":
       return { chats: [] };
     case "chat.transcript.fetch.request":
@@ -261,8 +273,9 @@ export function createChatSession(
   actor: () => SessionActor | undefined,
   emit: (message: SessionOutboundMessage) => void,
   prepareFiles?: PrepareChatMessageFiles,
+  queueFileAuthority?: QueueFileAuthority,
 ): ChatSession | null {
   return service && bots
-    ? new ChatSession(service, bots, authority, actor, emit, prepareFiles)
+    ? new ChatSession(service, bots, authority, actor, emit, prepareFiles, queueFileAuthority)
     : null;
 }

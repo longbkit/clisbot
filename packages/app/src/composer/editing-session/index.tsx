@@ -16,9 +16,28 @@ export interface ComposerEditingHandoff {
   replacementKey: string;
 }
 
+export interface ComposerQueueEdit {
+  targetKey: string;
+  id: string;
+  revision: number;
+  original: string;
+  stale: boolean;
+}
+
 /** Editing metadata outlives a layout's input; draft text still belongs to its draft owner. */
 export class ComposerEditingSession {
   private fullscreen = false;
+  private queueEdit: ComposerQueueEdit | null = null;
+  getQueueEdit = () => this.queueEdit;
+  setQueueEdit = (
+    next:
+      | ComposerQueueEdit
+      | null
+      | ((current: ComposerQueueEdit | null) => ComposerQueueEdit | null),
+  ) => {
+    this.queueEdit = typeof next === "function" ? next(this.queueEdit) : next;
+    for (const listener of this.listeners) listener();
+  };
   private handoff: ComposerEditingHandoff | null = null;
   private listeners = new Set<() => void>();
   getFullscreen = () => this.fullscreen;
@@ -139,4 +158,10 @@ export function useComposerEditingSession(
 }
 export function useComposerFullscreen(session: ComposerEditingSession): boolean {
   return useSyncExternalStore(session.subscribe, session.getFullscreen, session.getFullscreen);
+}
+
+/** Memory-only metadata shares the existing layout/remount owner, never draft persistence. */
+export function useComposerQueueEdit(session: ComposerEditingSession) {
+  const edit = useSyncExternalStore(session.subscribe, session.getQueueEdit, session.getQueueEdit);
+  return [edit, session.setQueueEdit] as const;
 }

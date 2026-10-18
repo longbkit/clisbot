@@ -1,3 +1,4 @@
+import { buildAgentPrompt } from "../agent/prompt-attachments.js";
 import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
 // `ChatEngine`: a user line is written, then fanned out; a bot's turn end is
@@ -57,7 +58,9 @@ export type ChatPromptSender = (params: {
   agentId: string;
   prompt: AgentPromptInput;
   messageId: string;
-  activeTurnBehavior?: "steer";
+  activeTurnBehavior?: "steer" | "interrupt";
+  expectedTurnId?: string;
+  strictSteer?: boolean;
 }) => Promise<{ disposition: PromptDispatchDisposition }>;
 
 /** What the engine pushes; the Session wiring fans these out to subscribed clients. */
@@ -76,6 +79,7 @@ export interface ChatEngineDependencies {
   publisher: ChatPublisher;
   logger: Logger;
   now?: () => string;
+  onBoundary?: (chatId: string) => void;
 }
 
 export interface ChatMessageFiles {
@@ -95,6 +99,9 @@ export interface SendMessageInput extends ChatMessageFiles {
   text: string;
   messageId?: string;
   actor?: SessionActor;
+  activeTurnBehavior?: "steer" | "interrupt";
+  steerTarget?: { agentId: string; turnId: string };
+  onlyWhenIdle?: boolean;
 }
 
 export interface SendMessageResult {
@@ -148,11 +155,30 @@ export class ChatEngine implements TurnTrackerHost {
     });
   }
 
+  busy(chatId: string, ignoreAdmission = false): boolean {
+    const chat = this.deps.store.getCached(chatId);
+    return (
+      (!ignoreAdmission && this.queue.hasPending(chatId)) ||
+      this.discussions.isActive(chatId) ||
+      Boolean(
+        chat?.participants.some(
+          (p) =>
+            p.agentId &&
+            (this.finalizing.hasPending(`${chatId}:${p.botId}`) ||
+              this.deliveries.hasPending(`${chatId}:${p.botId}`) ||
+              this.deps.agentManager.getAgent(p.agentId)?.lifecycle === "running" ||
+              this.deps.agentManager.getAgent(p.agentId)?.activeTurnId),
+        ),
+      )
+    );
+  }
+
   /** Appends the user line, decides who answers, and returns before any bot is prompted. */
   send(input: SendMessageInput): Promise<SendMessageResult> {
     return this.queue.run(input.chatId, async () => {
       const chat = await this.deps.store.require(input.chatId);
       if (chat.archivedAt) throw new Error(`Chat ${chat.id} is archived`);
+      this.validateSendTarget(chat, input);
       const rules = resolveChatRules(chat.rules);
       const refusal = inputLimitError(rules, input.text);
       if (refusal) throw new Error(refusal);
@@ -179,7 +205,9 @@ export class ChatEngine implements TurnTrackerHost {
         text: input.text,
         ...(input.spokenInputAgentId ? { spokenInputAgentId: input.spokenInputAgentId } : {}),
         hop: 0,
+        ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),
       };
+      if (input.steerTarget) return this.sendSteer({ chat, input, inputLine, files });
       const discussion =
         chatKindOf(chat) === "group" && !input.spokenInputAgentId
           ? discussionOpening(await this.members(chat), rules, input.text)
@@ -192,13 +220,83 @@ export class ChatEngine implements TurnTrackerHost {
       await files
         .release?.()
         .catch((error) => this.deps.logger.warn({ error }, "Chat upload cleanup failed"));
+      if (input.activeTurnBehavior === "interrupt") await this.interruptChat(chat);
       // Every user line in a group takes the floor: it opens a discussion or ends the running one.
       if (discussion && discussion.targets.length > 0)
-        this.track(this.discussions.start(chat.id, discussion.mode, discussion.targets));
+        this.track(this.discussions.start(chat.id, discussion.mode, discussion.targets), chat.id);
       else if (discussion) this.discussions.stop(chat.id);
-      else this.track(this.fanOut(chat.id, decision, line));
+      else this.track(this.fanOut(chat.id, decision, line), chat.id);
       return { messageId: id, seq: line.seq, targets: decision.targets, duplicate: false };
     });
+  }
+
+  private validateSendTarget(chat: StoredChat, input: SendMessageInput): void {
+    if (input.onlyWhenIdle && this.busy(chat.id, true))
+      throw new Error("Chat became busy before queue handoff");
+    if (input.steerTarget) {
+      if (input.activeTurnBehavior !== "steer")
+        throw new Error("A steer target requires the Steer action");
+      const participant = chat.participants.find((p) => p.agentId === input.steerTarget!.agentId);
+      const active = participant?.agentId
+        ? this.deps.agentManager.getAgent(participant.agentId)
+        : null;
+      if (
+        !participant ||
+        !active ||
+        (active.activeForegroundTurnId ?? active.activeTurnId) !== input.steerTarget.turnId
+      )
+        throw new Error("The selected Bot turn is no longer active; draft retained");
+    } else if (input.activeTurnBehavior === "steer" && this.busy(chat.id, true)) {
+      throw new Error("Select one active Bot turn to steer, or choose Queue");
+    }
+  }
+
+  private async sendSteer({
+    chat,
+    input,
+    inputLine,
+    files,
+  }: {
+    chat: StoredChat;
+    input: SendMessageInput;
+    inputLine: TranscriptLineInput;
+    files: ChatMessageFiles & { release?: () => Promise<void> };
+  }): Promise<SendMessageResult> {
+    const target = input.steerTarget!;
+    const participant = chat.participants.find((entry) => entry.agentId === target.agentId)!;
+    this.tracker.watch(target.agentId, chat.id, participant.botId);
+    await this.tracker.dispatch(target.agentId, { messageIds: [inputLine.id], hop: 0 }, () =>
+      this.deps.sendPrompt({
+        agentId: target.agentId,
+        messageId: inputLine.id,
+        prompt: buildAgentPrompt(input.text, files.images, files.attachments),
+        activeTurnBehavior: "steer",
+        expectedTurnId: target.turnId,
+      }),
+    );
+    const line = await this.appendLine(chat.id, {
+      ...inputLine,
+      deliveryBotIds: [participant.botId],
+    });
+    await this.deps.store.markDelivered(chat.id, participant.botId, line.seq);
+    await files.release?.();
+    return {
+      messageId: inputLine.id,
+      seq: line.seq,
+      targets: [participant.botId],
+      duplicate: false,
+    };
+  }
+
+  private async interruptChat(chat: StoredChat): Promise<void> {
+    this.discussions.stop(chat.id);
+    for (const participant of chat.participants) {
+      if (
+        participant.agentId &&
+        this.deps.agentManager.getAgent(participant.agentId)?.lifecycle === "running"
+      )
+        await this.deps.agentManager.cancelAgentRun(participant.agentId);
+    }
   }
 
   /**
@@ -228,8 +326,8 @@ export class ChatEngine implements TurnTrackerHost {
         scheduleRun: input.scheduleRun,
       });
       // A group takes the floor as an addressed user line does; a direct chat has one Bot.
-      if (group) this.track(this.discussions.start(chat.id, "addressed", targets));
-      else this.track(this.fanOut(chat.id, { targets }, line));
+      if (group) this.track(this.discussions.start(chat.id, "addressed", targets), chat.id);
+      else this.track(this.fanOut(chat.id, { targets }, line), chat.id);
       return posted;
     });
   }
@@ -312,11 +410,14 @@ export class ChatEngine implements TurnTrackerHost {
     this.tracker.stop();
   }
 
-  private track(work: Promise<unknown>): void {
+  private track(work: Promise<unknown>, chatId: string): void {
     this.inFlight.add(work);
     void work
       .catch((error: unknown) => this.logger.error({ err: error }, "chat.fan_out.failed"))
-      .finally(() => this.inFlight.delete(work));
+      .finally(() => {
+        this.inFlight.delete(work);
+        this.deps.onBoundary?.(chatId);
+      });
   }
 
   /** Writes a line, publishes it, and moves the chat's `lastMessageAt`. */
@@ -516,6 +617,9 @@ export class ChatEngine implements TurnTrackerHost {
     prompt: string,
     window: TranscriptLine[],
   ): Promise<PromptDispatchDisposition> {
+    const selectedBehavior = lines.at(-1)?.activeTurnBehavior;
+    const activeTurnBehavior =
+      selectedBehavior ?? (rules.interaction.whenBusy === "steer" ? "steer" : undefined);
     this.tracker.watch(agentId, chat.id, bot.id);
     return this.tracker.dispatch(
       agentId,
@@ -528,9 +632,8 @@ export class ChatEngine implements TurnTrackerHost {
           agentId,
           prompt: agentPromptFor(agentId, prompt, lines, window),
           messageId: lines.at(-1)!.id,
-          ...(rules.interaction.whenBusy === "steer"
-            ? { activeTurnBehavior: "steer" as const }
-            : {}),
+          activeTurnBehavior,
+          ...(lines.at(-1)?.activeTurnBehavior === "steer" ? { strictSteer: true } : {}),
         }),
     );
   }
@@ -565,7 +668,7 @@ export class ChatEngine implements TurnTrackerHost {
     const work = this.finalizing.run(`${outcome.chatId}:${outcome.botId}`, () =>
       this.appendReply(outcome),
     );
-    this.track(work);
+    this.track(work, outcome.chatId);
     return work;
   }
 
@@ -596,7 +699,7 @@ export class ChatEngine implements TurnTrackerHost {
       ...replyInput,
       deliveryBotIds: decision.targets,
     });
-    this.track(this.fanOut(chat.id, decision, line));
+    this.track(this.fanOut(chat.id, decision, line), chat.id);
   }
 
   /** The outcome's chat, unless it was archived or the bot's session is no longer its own. */
@@ -628,12 +731,13 @@ export class ChatEngine implements TurnTrackerHost {
         ...botReplyLine(outcome, outcome.text!, this.now()),
         deliveryBotIds: [],
       });
-    this.track(this.discussions.turnEnded(chat.id, outcome.botId, spoke));
+    this.track(this.discussions.turnEnded(chat.id, outcome.botId, spoke), chat.id);
   }
 
   /** Stopping the bot that holds the floor ends the discussion: the user took the floor. */
   onTurnStopped(chatId: string, botId: string): void {
     this.discussions.stopIfSpeaking(chatId, botId);
+    this.deps.onBoundary?.(chatId);
   }
 
   /**
@@ -641,14 +745,14 @@ export class ChatEngine implements TurnTrackerHost {
    * ends that bot's turn in the discussion. While it holds the floor it has no newer turn.
    */
   private releaseFloor(outcome: TurnOutcome): void {
-    this.track(this.discussions.turnEnded(outcome.chatId, outcome.botId, false));
+    this.track(this.discussions.turnEnded(outcome.chatId, outcome.botId, false), outcome.chatId);
   }
 
   onTurnFailed(outcome: TurnOutcome, error: string): Promise<void> {
     const work = this.finalizing.run(`${outcome.chatId}:${outcome.botId}`, () =>
       this.appendFailure(outcome, error),
     );
-    this.track(work);
+    this.track(work, outcome.chatId);
     return work;
   }
 
@@ -661,13 +765,16 @@ export class ChatEngine implements TurnTrackerHost {
       `⚠️ ${bot?.displayName ?? outcome.botId} stopped with an error: ${errorLine(error)}`,
       this.outcomeScope(outcome),
     );
-    this.track(this.discussions.turnEnded(chat.id, outcome.botId, false));
+    this.track(this.discussions.turnEnded(chat.id, outcome.botId, false), chat.id);
   }
 
   /** The record as the app sees it. */
   async payload(chat: StoredChat): Promise<ChatPayload> {
     await this.rememberBots(chat);
-    return chatPayload(chat, (botId) => this.knownBot(botId));
+    return {
+      ...chatPayload(chat, (botId) => this.knownBot(botId)),
+      discussionActive: this.discussions.isActive(chat.id),
+    };
   }
 }
 

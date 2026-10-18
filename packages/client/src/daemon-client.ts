@@ -456,6 +456,7 @@ export interface SendMessageOptions {
   messageId?: string;
   /** What happens when the agent is mid-turn. The daemon interrupts the turn when omitted. */
   activeTurnBehavior?: ActiveTurnBehavior;
+  expectedTurnId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   attachments?: SendAgentMessageRequest["attachments"];
 }
@@ -2498,6 +2499,28 @@ export class DaemonClient {
     });
   }
 
+  executeAgentQueueCommand(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "agent.queue.execute.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"agent.queue.execute.response">({
+      message: { ...params, type: "agent.queue.execute.request" },
+    });
+  }
+
+  executeChatQueueCommand(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.queue.execute.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.queue.execute.response">({
+      message: { ...params, type: "chat.queue.execute.request" },
+    });
+  }
+
   sendChatMessage(
     params: Omit<
       Extract<SessionInboundMessage, { type: "chat.message.send.request" }>,
@@ -4056,17 +4079,23 @@ export class DaemonClient {
   // Agent Interaction
   // ============================================================================
 
-  async sendAgentMessage(
-    agentId: string,
-    text: string,
-    options?: SendMessageOptions,
-  ): Promise<void> {
+  private assertSendMessageCapabilities(options?: SendMessageOptions): void {
     if (
       options?.sourceAgentId &&
       this.lastServerInfoMessage?.features?.agentMessageProvenance !== true
     ) {
       throw new Error("Update the Clisbot host to send messages with agent provenance.");
     }
+    if (options?.expectedTurnId && this.lastServerInfoMessage?.features?.hostInputQueue !== true)
+      throw new Error("Update the Host to steer an exact active turn safely");
+  }
+
+  async sendAgentMessage(
+    agentId: string,
+    text: string,
+    options?: SendMessageOptions,
+  ): Promise<void> {
+    this.assertSendMessageCapabilities(options);
     const requestId = this.createRequestId();
     const messageId = options?.messageId ?? crypto.randomUUID();
     const message = SessionInboundMessageSchema.parse({
@@ -4077,6 +4106,7 @@ export class DaemonClient {
       sourceAgentId: options?.sourceAgentId,
       ...(messageId ? { messageId } : {}),
       ...(options?.activeTurnBehavior ? { activeTurnBehavior: options.activeTurnBehavior } : {}),
+      expectedTurnId: options?.expectedTurnId,
       ...(options?.images ? { images: options.images } : {}),
       ...(options?.attachments ? { attachments: options.attachments } : {}),
     });

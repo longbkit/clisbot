@@ -1,3 +1,4 @@
+import { hostQueueVi as hostQueue } from "./host-queue";
 import type { TranslationResources } from "./en";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
@@ -127,6 +128,7 @@ export const vi: TranslationResources = {
     },
   },
   composer: {
+    hostQueue,
     placeholders: {
       desktop: "Nhắn cho agent, gắn @file hoặc dùng /lệnh và /skill",
       mobile: "Tin nhắn, @file, /lệnh",

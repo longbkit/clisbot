@@ -1,3 +1,7 @@
+import {
+  WorkspaceComposerEditingSessionsProvider,
+  ComposerEditingScope,
+} from "@/composer/editing-session";
 import { useMemo, type ReactNode } from "react";
 import { ConversationDraftContext } from "./conversation-draft-context";
 import { buildChatDraftKey } from "./chat-composer";
@@ -28,7 +32,14 @@ export function ConversationDraftProvider({
     }),
     [serverId, chatId, layoutKey],
   );
+  const tabIds = useMemo(() => [chatId], [chatId]);
   return (
-    <ConversationDraftContext.Provider value={value}>{children}</ConversationDraftContext.Provider>
+    <WorkspaceComposerEditingSessionsProvider workspaceKey={layoutKey} tabIds={tabIds}>
+      <ComposerEditingScope tabId={chatId} targetKey={value.draftKey}>
+        <ConversationDraftContext.Provider value={value}>
+          {children}
+        </ConversationDraftContext.Provider>
+      </ComposerEditingScope>
+    </WorkspaceComposerEditingSessionsProvider>
   );
 }

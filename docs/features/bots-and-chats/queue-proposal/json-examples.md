@@ -1,93 +1,105 @@
-# JSON mẫu — đề xuất, chưa là API đang chạy
+# Shape queue tối giản trên Host
 
-Các mẫu dưới đây lấy nguyên từ [examples.json](examples.json), không phải schema rút gọn. Actor/quyền do Host suy ra từ kết nối; client không gửi để tự cấp quyền. Nội dung mẫu là dữ liệu giả.
+**Implementation candidate 2026-10-18; chưa merge/deploy.** Một `queue.json` tại [thư mục target](README.md#host-lưu-ở-file-nào). Schema production: `input-queue/input-queue-store.ts` và `input-queue/content.ts`; RPC: `protocol/src/input-queue.ts`. Ví dụ dùng ID và metadata giả.
 
-## 1. App yêu cầu Queue
-
-App tạo ID cho tin và ID cho thao tác. Retry cùng thao tác giữ nguyên các ID và nội dung; requestId chỉ là correlation của RPC.
-
-Schema: [command.schema.json](command.schema.json) · validation example: `enqueue opaque ID`.
+## Snapshot có file và ảnh
 
 ```json
 {
-  "type": "chat.message.enqueue.request",
-  "requestId": "request-example",
-  "chatId": "cht_example",
-  "mutationId": "mutation-example",
-  "messageId": "msg-example",
-  "content": {
-    "text": "@alpha inspect this",
-    "images": [],
-    "attachments": []
-  }
-}
-```
-
-## 2. Host xác nhận đã lưu
-
-`status: accepted` + receipt chỉ có sau durable commit. `queueSeq` là thứ tự nhận ban đầu; vị trí hiển thị có thể đổi khi reorder. Chưa có bằng chứng Bot đã nhận hoặc trả lời.
-
-Schema: [response.schema.json](response.schema.json) · validation example: `chat.message.enqueue.response accepted`.
-
-```json
-{
-  "type": "chat.message.enqueue.response",
-  "payload": {
-    "requestId": "request-example",
-    "chatId": "cht_example",
-    "mutationId": "mutation-example",
-    "result": {
-      "status": "accepted",
-      "revision": 1,
-      "receipt": {
-        "messageId": "msg-example",
-        "queueSeq": 1,
-        "acceptedAt": "2026-10-14T10:00:00.000Z",
-        "acceptedRevision": 1
-      },
-      "duplicate": false
-    }
-  }
-}
-```
-
-## 3. Chưa rõ provider đã nhận Steer
-
-Sau lỗi này không tự phát lại hoặc chuyển thành interrupt. Giữ nội dung, chỉ rõ chưa biết kết quả và dẫn người dùng kiểm session.
-
-Schema: [response.schema.json](response.schema.json) · validation example: `steer unknown`.
-
-```json
-{
-  "type": "chat.message.steer.response",
-  "payload": {
-    "requestId": "request-example",
-    "chatId": "cht_example",
-    "mutationId": "mutation-example",
-    "result": {
-      "status": "unknown",
-      "messageId": "msg-example",
-      "error": {
-        "code": "outcome_unknown",
-        "message": "Do not retry provider side effects automatically"
+  "version": 1,
+  "revision": 7,
+  "items": [
+    {
+      "id": "msg_01",
+      "createdAt": "2026-10-18T01:20:00.000Z",
+      "senderId": "user:user_example",
+      "state": "queued",
+      "payload": {
+        "text": "Xem ảnh lỗi và log rồi sửa giúp tôi.",
+        "attachments": [
+          {
+            "type": "uploaded_file",
+            "id": "upload_example",
+            "fileName": "app.log",
+            "mimeType": "text/plain",
+            "size": 12,
+            "path": "/fixture/target/uploads/upload_example/app.log"
+          }
+        ],
+        "files": [
+          {
+            "id": "upload_example",
+            "fileName": "app.log",
+            "mimeType": "text/plain",
+            "size": 12,
+            "relativePath": "uploads/upload_example/app.log"
+          },
+          {
+            "id": "image_example",
+            "fileName": "image.png",
+            "mimeType": "image/png",
+            "size": 24,
+            "relativePath": "uploads/image_example/image.png"
+          }
+        ],
+        "images": [
+          {
+            "id": "image_example",
+            "fileName": "image.png",
+            "mimeType": "image/png",
+            "size": 24,
+            "relativePath": "uploads/image_example/image.png"
+          }
+        ],
+        "fingerprint": "fixture_content_digest",
+        "identity": { "actor": { "kind": "user", "id": "user_example" } }
       }
     }
-  }
+  ]
 }
 ```
 
-## Schema nào dùng để review gì?
+- `version` và `revision` thuộc snapshot; thứ tự `items` là FIFO. File rỗng vẫn giữ revision.
+- `id` là logical message/submission ID, không cấp ID mới khi retry cùng input. `senderId` và `identity` do Host lấy từ operation đã xác thực; client không tự khai actor.
+- `state`: `queued`, `sending`, `needs_review`; `reason` optional trên item giải thích lỗi/unknown. Không có `editing`, draft, edit token, lease hay receipt history.
+- `payload` chứa text + wire attachment/context metadata inline. Attachment-only hợp lệ. `fingerprint` chỉ phục vụ retry của item còn pending, bị bỏ cùng item sau handoff.
+- `files` là references trong upload storage hiện có; `images` là subset cho adapter khôi phục image payload. Không có base64 trong snapshot. `relativePath` do Host tạo và kiểm theo đúng target; Windows dùng path separator của Host. `uploaded_file.path` là wire shape đã có, không mở quyền đọc path client tùy ý.
+- Text/review/issue/forge context giữ object và source metadata hiện có; mention rules dùng text khi Chat owner nhận handoff. Không giữ tiến độ Bot/round trong queue.
+- Bytes được kiểm và ghi bền vững trước snapshot ack. TTL draft giữ file còn được queue hoặc canonical message links tham chiếu. Handoff chuyển retention sang message trước khi queue bỏ item.
 
-| File                             | Mục đích                                                           |
-| -------------------------------- | ------------------------------------------------------------------ |
-| [command](command.schema.json)   | Enqueue, edit, cancel, reorder, steer và fetch                     |
-| [response](response.schema.json) | Accepted/rejected/applied/unknown và snapshot fetch                |
-| [event](event.schema.json)       | Snapshot thay đổi, gửi sau commit                                  |
-| [content](content.schema.json)   | Text, images và attachments                                        |
-| [intent](intent.schema.json)     | Client giữ ID + payload reference khi pending/unknown              |
-| [record](record.schema.json)     | State Host phục hồi từ journal, không ghi full record mỗi thao tác |
-| [journal](journal.schema.json)   | Một transaction delta cho mỗi durable frame                        |
+## Mutation trên wire
 
-Bảy schema standalone JSON Schema draft 2020-12; [contracts.mts](contracts.mts) là authoring source, JSON sinh từ [generate.mts](generate.mts). Kiểm lại bằng `node docs/features/bots-and-chats/queue-proposal/validate.mjs` từ repo root. [Phụ lục](engineering.md#invariants-ngoài-json-schema) ghi những ràng buộc schema không chứng minh: quyền, fsync, ID uniqueness, CAS và provider outcome.
+`agent.queue.execute.request` mang `agentId`; `chat.queue.execute.request` mang `chatId`. Cả hai có `requestId` và cùng `command`. Gate duy nhất là `server_info.features.hostInputQueue`.
 
-[Quay lại đề xuất để chốt](README.md).
+```json
+{
+  "action": "update",
+  "id": "msg_01",
+  "revision": 7,
+  "text": "Nội dung đã sửa",
+  "attachments": [],
+  "images": []
+}
+```
+
+Các action: `fetch`, `read_file`, `enqueue`, `update`, `move_to_end`, `delete`, `steer_now`, `send_now`, `discard`. `enqueue` có ID ổn định. Mutation item có ID và expected revision; chỉ update/move/delete item còn queued. `discard` là disposition tường minh cho `needs_review`; không Stop model. `send_now` claim rồi Interrupt theo owner hiện có, không lấy item ra ở client trước gửi.
+
+Response mang `queue: {revision, items}`, `error` và optional `errorCode: "queue_conflict"`. Fetch có thể gửi revision hiện tại; `unchanged: true` tránh đọc/gửi lại bytes ảnh. Wire view có thể hydrate ảnh; đây không phải format persistence.
+
+## Local edit và handoff
+
+Mở/hủy editor không ghi Host. Save cập nhật cùng ID tại chỗ; Move to end cập nhật và chuyển cùng ID trong một commit. Item đã started/deleted không được tạo lại. Draft giữ ở app, chỉ **Thêm thành mục mới** mới cấp ID khác ở cuối. RAM metadata theo composer editing-session owner sống qua layout remount, mất khi app process đóng.
+
+Sau durable handoff, snapshot không giữ item hay receipt:
+
+```json
+{ "version": 1, "revision": 12, "items": [] }
+```
+
+Restart đối chiếu `sending` với submission/transcript owner: có proof thì bỏ, chưa rõ thành `needs_review` và chặn FIFO. Không replay chỉ vì timeout. Không tuyên bố exactly-once hoặc chống mất điện.
+
+## Contract và fixture
+
+`contracts.mts` import schema production. `generate.mts` tạo bốn schema record/content/command/response; `validate.mjs` kiểm các ví dụ tối giản trong `examples.json`. Journal/intent/event schemas cũ đã bị thay trong candidate; Git giữ lịch sử. Không dùng 61 fixtures journal cũ làm bằng chứng cho thiết kế này.
+
+`steer_now`: `{ "action": "steer_now", "id": "msg_01", "revision": 7, "target": { "agentId": "agent_01", "turnId": "turn_01" } }`. Chỉ strict Steer đúng target, không thay lượt; giữ item nếu chưa xác nhận durable handoff. `send_now` chỉ là Interrupt and send tường minh. `read_file` có id/fileId/offset, response tối đa 64 KiB base64 cùng done; không đổi revision hoặc persist editor state.

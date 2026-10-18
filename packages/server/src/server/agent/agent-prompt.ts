@@ -24,7 +24,9 @@ export type AgentRunController = Pick<
   | "steerOrReplaceActiveTurn"
   | "streamAgent"
 > &
-  Partial<Pick<AgentManager, "admitMessageSubmission" | "reloadIfClisbotToolsSwitched">> & {
+  Partial<
+    Pick<AgentManager, "admitMessageSubmission" | "reloadIfClisbotToolsSwitched" | "steerAgentRun">
+  > & {
     reloadAgentSession(agentId: string): Promise<unknown>;
   };
 
@@ -33,6 +35,8 @@ export interface StartAgentRunOptions {
   onDispatch?: (disposition: PromptDispatchDisposition) => void;
   replaceRunning?: boolean;
   activeTurnBehavior?: ActiveTurnBehavior;
+  expectedTurnId?: string;
+  strictSteer?: boolean;
   runOptions?: AgentRunOptions;
   /** Ask the provider to deny permissions blocking this steer. */
   clearPendingPermissions?: boolean;
@@ -59,6 +63,21 @@ async function steerOrReplaceActiveRun(
   const steerOptions = options.clearPendingPermissions
     ? { ...options.runOptions, clearPendingPermissions: true }
     : options.runOptions;
+  if (options?.expectedTurnId) {
+    if (!agentManager.steerAgentRun) throw new Error("Exact turn steering is unavailable");
+    const result = await agentManager.steerAgentRun(agentId, prompt, {
+      ...steerOptions,
+      expectedTurnId: options.expectedTurnId,
+    });
+    if (result.status !== "accepted")
+      throw new Error("This provider cannot steer this active turn; choose Queue or Interrupt");
+    return { disposition: "steered" };
+  }
+  if (options.strictSteer) {
+    if (agentManager.hasInFlightRun(agentId))
+      throw new Error("Active turn identity is unavailable; wait or choose Queue");
+    return null;
+  }
   const result = await agentManager.steerOrReplaceActiveTurn(agentId, prompt, steerOptions);
   if (result.status === "steered") {
     return { disposition: "steered" };
@@ -78,7 +97,11 @@ async function startOrReplaceRun(
   iterator: AsyncGenerator<import("./agent-sdk-types.js").AgentStreamEvent>;
   replaced: boolean;
 }> {
-  const replaced = Boolean(options?.replaceRunning && agentManager.hasInFlightRun(agentId));
+  const replaced = Boolean(
+    options?.replaceRunning &&
+    !(options.strictSteer && options.activeTurnBehavior === "steer") &&
+    agentManager.hasInFlightRun(agentId),
+  );
   const iterator = replaced
     ? await agentManager.replaceAgentRun(agentId, prompt, options?.runOptions)
     : agentManager.streamAgent(agentId, prompt, options?.runOptions);
@@ -257,7 +280,10 @@ export interface SendPromptToAgentParams {
   prompt: AgentPromptInput;
   source?: AgentPromptSource;
   messageId?: string;
+  replaceRunning?: boolean;
   activeTurnBehavior?: ActiveTurnBehavior;
+  expectedTurnId?: string;
+  strictSteer?: boolean;
   runOptions?: AgentRunOptions;
   /** Optional mode to set on the agent before the run starts. */
   sessionMode?: string;
@@ -388,9 +414,11 @@ export async function sendPromptToAgent(
     : params.runOptions;
 
   return await startAgentRun(params.agentManager, params.agentId, delivery.prompt, params.logger, {
-    replaceRunning: true,
+    replaceRunning: params.replaceRunning ?? true,
     onDispatch: params.onDispatch,
     activeTurnBehavior: params.activeTurnBehavior,
+    expectedTurnId: params.expectedTurnId,
+    strictSteer: params.strictSteer,
     clearPendingPermissions: params.clearPendingPermissions,
     runOptions,
   });

@@ -1,3 +1,4 @@
+import { hostQueuePtBR as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
@@ -127,6 +128,7 @@ export const ptBR: TranslationResources = {
     },
   },
   composer: {
+    hostQueue,
     placeholders: {
       desktop: "Envie uma mensagem ao agente, marque @files ou use /commands e /skills",
       mobile: "Mensagem, @files, /commands",

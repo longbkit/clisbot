@@ -1,3 +1,4 @@
+import { AgentInputQueues } from "./input-queue/agent-runtime.js";
 import { QuickStartStore } from "./quick-starts/store.js";
 import { quickChatsRoot } from "./quick-chats/quick-chat-folders.js";
 import {
@@ -198,6 +199,7 @@ interface WebSocketServerConfig {
   getAllowedOrigins?: () => Set<string>;
   getHostnames?: () => HostnamesConfig | undefined;
   daemonStatusRpc?: boolean;
+  hostInputQueue?: boolean;
   relayConfig?: boolean;
   startPaused?: boolean;
   managedAccess?: {
@@ -651,6 +653,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly agentManager: AgentManager;
   private readonly agentStorage: AgentStorage;
   private readonly messageReceipts: MessageReceipts;
+  private readonly inputQueues: AgentInputQueues;
   private readonly creationService: CreationService;
   private readonly projectRegistry: ProjectRegistry;
   private readonly workspaceRegistry: WorkspaceRegistry;
@@ -801,6 +804,12 @@ export class VoiceAssistantWebSocketServer {
     this.agentManager = agentManager;
     this.agentStorage = agentStorage;
     this.messageReceipts = new MessageReceipts(join(clisbotHome, "agent-requests"));
+    this.inputQueues = new AgentInputQueues({
+      manager: agentManager,
+      storage: agentStorage,
+      logger: this.logger,
+      enabled: wsConfig.hostInputQueue !== false,
+    });
     this.creationService = new CreationService(
       join(clisbotHome, "creations"),
       this.logger.child({ module: "creation" }),
@@ -1255,6 +1264,7 @@ export class VoiceAssistantWebSocketServer {
 
   public async close(): Promise<void> {
     this.prepareForShutdown();
+    await this.inputQueues.stop();
     this.unsubscribeSpeechReadiness?.();
     this.unsubscribeSpeechReadiness = null;
     this.unsubscribeDaemonConfigChange?.();
@@ -1721,6 +1731,7 @@ export class VoiceAssistantWebSocketServer {
       agentManager: this.agentManager,
       agentStorage: this.agentStorage,
       messageReceipts: this.messageReceipts,
+      inputQueues: this.inputQueues,
       creationService: this.creationService,
       projectRegistry: this.projectRegistry,
       workspaceRegistry: this.workspaceRegistry,
@@ -2333,6 +2344,7 @@ export class VoiceAssistantWebSocketServer {
         usageSources: true,
         ownedSubscriptions: true,
         agentRequestReceipts: true,
+        ...(this.inputQueues.enabled ? { hostInputQueue: true } : {}),
         workspaceRequestReceipts: true,
         creationLifecycle: true,
         hubAgentRpc: true,

@@ -444,6 +444,18 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     );
   }
 
+  async readMessageSubmission(agentId: string, id: string): Promise<MessageSubmission | undefined> {
+    return this.run(
+      agentId,
+      async () =>
+        readMessageSubmission(
+          (await this.open(agentId)).stream<MessageSubmission>("submission"),
+          id,
+        ),
+      "read",
+    );
+  }
+
   async writeMessageSubmission(
     agentId: string,
     record: MessageSubmission,

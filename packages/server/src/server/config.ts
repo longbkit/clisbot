@@ -640,6 +640,10 @@ export function resolveConfigFromPersisted(
     mcpDebug: env.MCP_DEBUG === "1",
     isDev: resolveClisbotNodeEnv(env) === "development",
     agentStoragePath: path.join(clisbotHome, "agents"),
+    hostInputQueue: resolveHostInputQueueFeature(
+      env.CLISBOT_HOST_INPUT_QUEUE,
+      persisted.features?.hostInputQueue,
+    ),
     agentSessionStorage: resolveAgentSessionStorageFeature(
       env.CLISBOT_AGENT_SESSION_STORAGE,
       persisted.features,
@@ -689,6 +693,15 @@ export function resolveConfigFromPersisted(
       startupPersisted: persisted,
     },
   };
+}
+
+function resolveHostInputQueueFeature(
+  environment: string | undefined,
+  configured: boolean | undefined,
+): boolean {
+  if (environment === "0") return false;
+  if (environment === "1") return true;
+  return configured !== false;
 }
 
 function resolveAgentSessionStorageFeature(
@@ -750,6 +763,7 @@ function resolveCoreDaemonOverridePaths(
   if (cli?.listen !== undefined || env.CLISBOT_LISTEN !== undefined) {
     paths.push("daemon.listen");
   }
+  if (env.CLISBOT_HOST_INPUT_QUEUE !== undefined) paths.push("features.hostInputQueue");
   if (cli?.mcpEnabled !== undefined) paths.push("daemon.mcp.enabled");
   if (cli?.mcpInjectIntoAgents !== undefined) paths.push("daemon.mcp.injectIntoAgents");
   // Hostname sources append instead of replacing one another, so a launch value

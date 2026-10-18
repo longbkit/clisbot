@@ -1,3 +1,4 @@
+import { AgentAttachmentSchema } from "@clisbot/protocol/agent-attachments";
 import {
   NEW_WORKSPACE_PICKER_ATTACHMENT_OWNER,
   type AttachmentMetadata,
@@ -95,7 +96,12 @@ export const UserComposerAttachmentSchema: z.ZodType<UserComposerAttachment> = z
   "kind",
   [
     z.strictObject({ kind: z.literal("image"), metadata: AttachmentMetadataSchema }),
-    z.strictObject({ kind: z.literal("file"), attachment: UploadedFileSchema }),
+    z.strictObject({
+      kind: z.literal("file"),
+      attachment: UploadedFileSchema,
+      localCopy: AttachmentMetadataSchema.optional(),
+    }),
+    z.strictObject({ kind: z.literal("agent_attachment"), attachment: AgentAttachmentSchema }),
     z.strictObject({
       kind: z.literal("workspace_file"),
       path: z.string(),
@@ -218,6 +224,8 @@ export function collectReferencedAttachmentIdsFromState(state: DraftStoreState):
     for (const attachment of draftRecord.input.attachments) {
       if (attachment.kind === "image") {
         referencedIds.add(attachment.metadata.id);
+      } else if (attachment.kind === "file" && attachment.localCopy) {
+        referencedIds.add(attachment.localCopy.id);
       }
     }
   }
@@ -227,6 +235,8 @@ export function collectReferencedAttachmentIdsFromState(state: DraftStoreState):
     for (const attachment of modalRecord.input.attachments) {
       if (attachment.kind === "image") {
         referencedIds.add(attachment.metadata.id);
+      } else if (attachment.kind === "file" && attachment.localCopy) {
+        referencedIds.add(attachment.localCopy.id);
       }
     }
   }

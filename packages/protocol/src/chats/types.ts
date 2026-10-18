@@ -106,6 +106,7 @@ export const ChatMessagePayloadSchema = z.object({
   attachments: z.array(AgentAttachmentSchema).optional(),
   reply: ChatMessageReplySchema.optional(),
   inReplyTo: z.string().optional(),
+  activeTurnBehavior: z.enum(["steer", "interrupt"]).optional(),
   /** Accepted target snapshot, persisted before dispatch for restart recovery. */
   deliveryBotIds: z.array(z.string()).optional(),
   /** 0 for a user line; a bot line answering a hop-n line is hop n+1. */
@@ -135,6 +136,7 @@ export const ChatPayloadSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
   participants: z.array(ChatParticipantPayloadSchema),
+  discussionActive: z.boolean().optional(),
   rules: ChatRulesSchema,
   createdBy: SessionActorSchema.optional(),
   createdAt: z.string(),

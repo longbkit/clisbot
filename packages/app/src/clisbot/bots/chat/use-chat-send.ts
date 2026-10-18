@@ -1,3 +1,4 @@
+import { resolveChatSendAction } from "./chat-send-action";
 import type { MessagePayload } from "@/composer/types";
 import { splitComposerAttachmentsForSubmit } from "@/composer/attachments/submit";
 import { encodeImages } from "@/utils/encode-images";
@@ -18,6 +19,7 @@ export function useChatSend(
   setChat: Dispatch<SetStateAction<ChatPayload | null>>,
   setError: Dispatch<SetStateAction<string | null>>,
   attachmentsSupported = false,
+  serverId?: string,
 ) {
   const { t } = useTranslation();
   const [sending, setSending] = useState(false);
@@ -41,10 +43,16 @@ export function useChatSend(
           const messageId = attempt.forText(JSON.stringify([text, payload.attachments]));
           const content = splitComposerAttachmentsForSubmit(payload.attachments);
           const images = await encodeImages(content.images);
+          const sendAction = resolveChatSendAction({
+            serverId,
+            chat,
+            behavior: payload.activeTurnBehavior,
+          });
           const result = await client.sendChatMessage({
             chatId,
             text,
             messageId,
+            ...sendAction,
             images,
             attachments: content.attachments,
           });
@@ -71,7 +79,7 @@ export function useChatSend(
         setSending(false);
       }
     },
-    [client, online, chat, chatId, setChat, setError, attachmentsSupported, t],
+    [client, online, chat, chatId, setChat, setError, attachmentsSupported, serverId, t],
   );
   return { send, sending };
 }

@@ -150,3 +150,4 @@ It is separate from account passwords and the channel credential encryption key
 - **Channel queue** — The in-memory hold created by `/queue`, released one message
   at a time after a direct Agent turn ends. Distinct from the durable **channel
   ingress queue**, which admits transport events for processing.
+- **Queue** — Host-owned ordered inputs awaiting durable handoff to an Agent session or Chat. One `queue.json` belongs to the target; a Chat queue waits for the discussion boundary. The app's queue editor is local metadata in `ComposerEditingSession`, and opening it never pauses the original input. UI: "Queue", "Save changes", "Move to end". Code: `InputQueueStore` and `InputQueueRuntime` (`packages/server/src/server/input-queue/`). See [Host queue](features/bots-and-chats/queue-proposal/README.md).

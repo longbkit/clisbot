@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { loadConfig } from "./config.js";
+import { daemonLaunchEnvironment } from "./config-environment.js";
 
 const roots: string[] = [];
 
@@ -33,6 +34,26 @@ describe("Clisbot daemon defaults", () => {
     expect(
       loadConfig(off, { env: { CLISBOT_AGENT_SESSION_STORAGE: "1" } }).agentSessionStorage,
     ).toBe(true);
+  });
+
+  test("Host input queue uses a default-on startup flag with explicit environment override", async () => {
+    const unset = await createClisbotHome({ version: 1 });
+    expect(loadConfig(unset, { env: {} }).hostInputQueue).toBe(true);
+    const off = await createClisbotHome({ version: 1, features: { hostInputQueue: false } });
+    expect(loadConfig(off, { env: {} }).hostInputQueue).toBe(false);
+    const explicit = loadConfig(off, { env: { CLISBOT_HOST_INPUT_QUEUE: "1" } });
+    expect(explicit.hostInputQueue).toBe(true);
+    expect(explicit.configReload?.overrideControlledPaths).toContain("features.hostInputQueue");
+    expect(loadConfig(unset, { env: { CLISBOT_HOST_INPUT_QUEUE: "0" } }).hostInputQueue).toBe(
+      false,
+    );
+    expect(
+      daemonLaunchEnvironment({
+        env: { CLISBOT_HOST_INPUT_QUEUE: "0" },
+        home: unset,
+        mode: "managed",
+      }).CLISBOT_HOST_INPUT_QUEUE,
+    ).toBeUndefined();
   });
 
   test("bots run unless the environment or config turns them off; the environment wins", async () => {

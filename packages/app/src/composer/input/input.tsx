@@ -1,3 +1,4 @@
+import { SendActionsButton } from "../send-actions-menu";
 import {
   useComposerEditingSession,
   useComposerFullscreen,
@@ -165,6 +166,7 @@ export interface MessageInputProps {
   defaultSendBehavior: "interrupt" | "steer" | "queue";
   /** Callback for queue button when agent is running */
   onQueue?: (payload: MessagePayload) => void;
+  onOneOffSend?: (action: "queue" | "steer") => void;
   /** Optional handler used when submit button is in loading state. */
   onSubmitLoadingPress?: () => void;
   /** Intercept key press events before default handling. Return true to prevent default. */
@@ -772,6 +774,7 @@ function SendButtonTooltip({
   canPressLoadingButton,
   onSubmitLoadingPress,
   onDefaultSendAction,
+  onOneOffSend,
   isSendButtonDisabled,
   submitAccessibilityLabel,
   sendButtonCombinedStyle,
@@ -787,6 +790,7 @@ function SendButtonTooltip({
   canPressLoadingButton: boolean;
   onSubmitLoadingPress: (() => void) | undefined;
   onDefaultSendAction: () => void;
+  onOneOffSend: ((action: "queue" | "steer") => void) | undefined;
   isSendButtonDisabled: boolean;
   submitAccessibilityLabel: string;
   sendButtonCombinedStyle: React.ComponentProps<typeof TooltipTrigger>["style"];
@@ -801,29 +805,32 @@ function SendButtonTooltip({
   if (!shouldShow) return null;
   return (
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
-      <TooltipTrigger
-        onPress={canPressLoadingButton ? onSubmitLoadingPress : onDefaultSendAction}
-        disabled={isSendButtonDisabled}
-        accessibilityLabel={submitAccessibilityLabel}
-        accessibilityRole="button"
-        testID={submitButtonTestID}
-        style={sendButtonCombinedStyle}
-      >
-        <View
-          testID="composer-send-face"
-          style={[
-            composerActionGeometry.face,
-            composerActionGeometry.primary,
-            submitLabel ? styles.sendFaceLabeled : undefined,
-          ]}
+      <TooltipTrigger asChild triggerRefProp="triggerRef">
+        <SendActionsButton
+          onOneOffSend={isSubmitLoading ? undefined : onOneOffSend}
+          onPress={canPressLoadingButton ? onSubmitLoadingPress : onDefaultSendAction}
+          disabled={isSendButtonDisabled}
+          accessibilityLabel={submitAccessibilityLabel}
+          accessibilityRole="button"
+          testID={submitButtonTestID ?? "composer-send-button"}
+          style={sendButtonCombinedStyle}
         >
-          <SendButtonContent
-            isSubmitLoading={isSubmitLoading}
-            submitIcon={submitIcon}
-            submitLabel={submitLabel}
-            buttonIconSize={buttonIconSize}
-          />
-        </View>
+          <View
+            testID="composer-send-face"
+            style={[
+              composerActionGeometry.face,
+              composerActionGeometry.primary,
+              submitLabel ? styles.sendFaceLabeled : undefined,
+            ]}
+          >
+            <SendButtonContent
+              isSubmitLoading={isSubmitLoading}
+              submitIcon={submitIcon}
+              submitLabel={submitLabel}
+              buttonIconSize={buttonIconSize}
+            />
+          </View>
+        </SendActionsButton>
       </TooltipTrigger>
       <TooltipContent side="top" align="center" offset={8}>
         <SendTooltipBody label={sendTooltipLabel} sendKeys={sendKeys} />
@@ -998,7 +1005,6 @@ function queueMessageImpl(ctx: QueueMessageContext): void {
   const trimmed = ctx.value.trim();
   if (!trimmed && ctx.attachments.length === 0) return;
   ctx.onQueue({ text: trimmed, attachments: ctx.attachments, cwd: ctx.cwd });
-  ctx.replaceText("");
   ctx.onMinimizeHeight();
 }
 
@@ -1120,6 +1126,7 @@ interface ResolvedMessageInputProps {
   isAgentRunning: boolean;
   defaultSendBehavior: "interrupt" | "steer" | "queue";
   onQueue: ((payload: MessagePayload) => void) | undefined;
+  onOneOffSend: ((action: "queue" | "steer") => void) | undefined;
   onSubmitLoadingPress: (() => void) | undefined;
   onKeyPressCallback: ((event: ComposerKeyPressEvent) => boolean) | undefined;
   onSelectionChangeCallback: ((selection: { start: number; end: number }) => void) | undefined;
@@ -1168,6 +1175,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     isAgentRunning: props.isAgentRunning ?? false,
     defaultSendBehavior: props.defaultSendBehavior,
     onQueue: props.onQueue,
+    onOneOffSend: props.onOneOffSend,
     onSubmitLoadingPress: props.onSubmitLoadingPress,
     onKeyPressCallback: props.onKeyPress,
     onSelectionChangeCallback: props.onSelectionChange,
@@ -1248,6 +1256,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       isAgentRunning,
       defaultSendBehavior,
       onQueue,
+      onOneOffSend,
       onSubmitLoadingPress,
       onKeyPressCallback,
       onSelectionChangeCallback,
@@ -1965,6 +1974,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           canPressLoadingButton={canPressLoadingButton}
           onSubmitLoadingPress={onSubmitLoadingPress}
           onDefaultSendAction={handleDefaultSendAction}
+          onOneOffSend={onOneOffSend}
           isSendButtonDisabled={resolvePresentationSendDisabled({
             fullscreen: isFullscreen,
             disabled: isSendButtonDisabled,
@@ -1991,6 +2001,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         canPressLoadingButton,
         onSubmitLoadingPress,
         handleDefaultSendAction,
+        onOneOffSend,
         isSendButtonDisabled,
         hasLiveText,
         attachments,

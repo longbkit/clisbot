@@ -23,6 +23,8 @@ interface ChatComposerProps {
   placeholder: string;
   /** Sending is disabled while the host is not online or a send is in flight. */
   disabled?: boolean;
+  busy?: boolean;
+  hasPermission?: boolean;
   onSubmitMessage: (payload: MessagePayload) => Promise<void>;
   /** Group members the `@` picker offers; none in a direct chat. */
   mentionMembers?: readonly MentionMember[];
@@ -37,6 +39,8 @@ export const ChatComposer = memo(function ChatComposer({
   chatId,
   placeholder,
   disabled = false,
+  busy = false,
+  hasPermission = false,
   onSubmitMessage,
   mentionMembers,
 }: ChatComposerProps) {
@@ -58,6 +62,9 @@ export const ChatComposer = memo(function ChatComposer({
         agentId={project?.agentId ?? draftKey}
         workspaceId={project?.workspaceId}
         submissionTarget="conversation"
+        queueChatId={chatId}
+        conversationBusy={busy}
+        conversationHasPermission={hasPermission}
         resolveWorkspaceFilePath={resolveWorkspaceFilePath}
         mentionMembers={mentionMembers}
         // One `bots` gate covers attachments and canonical spoken-input routing.

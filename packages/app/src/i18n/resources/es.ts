@@ -1,3 +1,4 @@
+import { hostQueueEs as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
@@ -128,6 +129,7 @@ export const es: TranslationResources = {
     },
   },
   composer: {
+    hostQueue,
     placeholders: {
       desktop: "Envíe un mensaje al agente, etiquete@fileso use/commandsy/skills",
       mobile: "Mensaje,@files,/commands",

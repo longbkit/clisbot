@@ -213,6 +213,7 @@ export interface AgentRunOptions {
 }
 
 export interface AgentSteerOptions extends AgentRunOptions {
+  expectedTurnId?: string;
   /** Deny permissions that block this steer. An accepted steer must honor this contract. */
   clearPendingPermissions?: boolean;
 }

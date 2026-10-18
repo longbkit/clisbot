@@ -688,6 +688,9 @@
         "agentSessionStorage": {
           "type": "boolean"
         },
+        "hostInputQueue": {
+          "type": "boolean"
+        },
         "dictation": {
           "type": "object",
           "properties": {

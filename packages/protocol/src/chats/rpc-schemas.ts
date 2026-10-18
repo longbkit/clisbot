@@ -115,6 +115,9 @@ export const ChatMessageSendRequestSchema = z.object({
   text: z.string(),
   images: z.array(ImageAttachmentSchema).optional(),
   attachments: z.array(AgentAttachmentSchema).optional(),
+  // COMPAT(hostInputQueue): shared composer send action; older clients retain Chat rules.
+  activeTurnBehavior: z.enum(["steer", "interrupt"]).optional(),
+  steerTarget: z.object({ agentId: z.string(), turnId: z.string() }).optional(),
   /** Client-chosen id; a resend with the same id is answered `duplicate: true`. */
   messageId: z.string().optional(),
 });

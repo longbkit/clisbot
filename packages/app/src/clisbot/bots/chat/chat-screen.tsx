@@ -27,6 +27,7 @@ export interface ChatScreenProps {
   liveHeads: ReadonlyMap<string, ChatLiveHead>;
   /** False while the host is offline: the composer will not send. */
   canSend?: boolean;
+  discussionActive?: boolean;
   onSubmitMessage: (payload: MessagePayload) => Promise<void>;
   onReachTop?: () => void;
   headerRight?: ReactNode;
@@ -49,6 +50,7 @@ export function ChatScreen({
   transcript,
   liveHeads,
   canSend = true,
+  discussionActive = false,
   onSubmitMessage,
   onReachTop,
   headerRight,
@@ -89,6 +91,8 @@ export function ChatScreen({
           chatId={chatId}
           placeholder={placeholder}
           disabled={!canSend}
+          busy={discussionActive || [...liveHeads.values()].some((head) => head.turnActive)}
+          hasPermission={[...liveHeads.values()].some((head) => head.permissions.length > 0)}
           onSubmitMessage={onSubmitMessage}
           mentionMembers={group ? members : undefined}
         />

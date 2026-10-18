@@ -1,3 +1,4 @@
+import type { AgentInputQueues } from "./input-queue/agent-runtime.js";
 import { quickStartOwnerForActor } from "./quick-starts/identity.js";
 import { handleProjectGitRequest } from "./session/project-git.js";
 import { filterInboxCandidates } from "./quick-starts/inbox-filter.js";
@@ -509,6 +510,7 @@ export interface SessionOptions {
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   messageReceipts: Pick<MessageReceipts, "send">;
+  inputQueues?: AgentInputQueues;
   creationService: Pick<CreationService, "create" | "subscribe">;
   projectRegistry: ProjectRegistry;
   workspaceRegistry: WorkspaceRegistry;
@@ -887,6 +889,7 @@ export class Session {
   private readonly hubExecutionController: HubExecutionController | null;
   private readonly workspaceScripts: WorkspaceScriptsService;
   private readonly messageReceipts: Pick<MessageReceipts, "send">;
+  private readonly optionsInputQueues?: AgentInputQueues;
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
 
@@ -978,6 +981,7 @@ export class Session {
     this.pushNotifications = pushNotifications;
     this.clisbotHome = clisbotHome;
     this.messageReceipts = options.messageReceipts;
+    this.optionsInputQueues = options.inputQueues;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(clisbotHome);
     this.worktreesRoot = worktreesRoot;
@@ -1244,6 +1248,7 @@ export class Session {
       (msg) => this.emit(msg),
       (directory, messageId, files) =>
         this.workspaceFilesSession.attachChatMessageFiles(directory, messageId, files),
+      this.workspaceFilesSession.queueFileAuthority(),
     );
     this.quickStartSession = this.createQuickStartSession(options);
     this.botSession = createBotSession(
@@ -2783,8 +2788,15 @@ export class Session {
     })();
   }
 
+  private dispatchInputQueueMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    return msg.type === "agent.queue.execute.request"
+      ? this.handleAgentQueueRequest(msg)
+      : undefined;
+  }
+
   private dispatchWorkspaceLifecycleMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     return (
+      this.dispatchInputQueueMessage(msg) ??
       this.dispatchWorkspaceStateMessage(msg) ??
       this.dispatchWorkspaceLabelMessage(msg) ??
       this.dispatchWorkspaceSetupMessage(msg) ??
@@ -9270,6 +9282,37 @@ export class Session {
     }
   }
 
+  private async handleAgentQueueRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.queue.execute.request" }>,
+  ): Promise<void> {
+    try {
+      const owner = this.optionsInputQueues;
+      if (!owner) throw new Error("Durable Host queue is unavailable");
+      if (!(await this.resourceAuthorizer.allowsAgent(msg.agentId, "agent.interact")))
+        throw new Error("Agent interaction access denied");
+      await owner.register(msg.agentId);
+      const result = await owner.runtime.command(
+        msg.agentId,
+        msg.command,
+        this.workspaceFilesSession.queueFileAuthority(),
+      );
+      this.emit({
+        type: "agent.queue.execute.response",
+        payload: { requestId: msg.requestId, agentId: msg.agentId, ...result },
+      });
+    } catch (error) {
+      this.emit({
+        type: "agent.queue.execute.response",
+        payload: {
+          requestId: msg.requestId,
+          agentId: msg.agentId,
+          queue: null,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+  }
+
   private async handleSendAgentMessageRequest(
     msg: Extract<SessionInboundMessage, { type: "send_agent_message_request" }>,
   ): Promise<void> {
@@ -9289,6 +9332,8 @@ export class Session {
 
     try {
       const agentId = resolved.agentId;
+      if (msg.expectedTurnId && !this.optionsInputQueues?.enabled)
+        throw new Error("Exact turn steering is disabled on this Host");
 
       const messageId = resolveClientMessageId(msg.messageId);
       const files = await this.workspaceFilesSession.attachMessageFiles(
@@ -9321,6 +9366,8 @@ export class Session {
             : undefined,
           messageId,
           activeTurnBehavior: msg.activeTurnBehavior ?? "interrupt",
+          expectedTurnId: msg.expectedTurnId,
+          strictSteer: this.optionsInputQueues?.enabled,
           clearPendingPermissions: true,
           logger: this.sessionLogger,
         });
@@ -9343,6 +9390,7 @@ export class Session {
             prompt,
             sourceAgentId: msg.sourceAgentId,
             activeTurnBehavior: msg.activeTurnBehavior ?? "interrupt",
+            expectedTurnId: msg.expectedTurnId,
           },
           prepare: async () => {
             if (!msg.sourceAgentId) await this.prepareAgentMessage(agentId, msg.text);

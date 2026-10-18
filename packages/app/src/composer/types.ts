@@ -7,6 +7,7 @@ export interface MessagePayload {
   attachments: ComposerAttachment[];
   cwd: string;
   forceSend?: boolean;
+  activeTurnBehavior?: "steer" | "interrupt";
 }
 
 export interface TextReplacement {

@@ -48,6 +48,7 @@ export const REQUIRED_PRIVILEGE_BY_OPERATION = {
   create_agent_request: "agent.create",
   "project.git.inspect.request": "project.use",
   "project.git.fetch.request": "approval.command",
+  "agent.queue.execute.request": "agent.interact",
   send_agent_message_request: "agent.interact",
   cancel_agent_request: "agent.interact",
   refresh_agent_request: "agent.interact",

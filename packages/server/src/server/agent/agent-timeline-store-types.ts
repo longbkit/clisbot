@@ -85,6 +85,10 @@ export interface AgentTimelineStore {
   recoverAuthorship?(
     agentId: string,
   ): Promise<import("./session-storage/session-summary.js").DurableSessionSummary>;
+  readMessageSubmission?(
+    agentId: string,
+    id: string,
+  ): Promise<import("./session-storage/message-submissions.js").MessageSubmission | undefined>;
   writeMessageSubmission?(
     agentId: string,
     record: import("./session-storage/message-submissions.js").MessageSubmission,

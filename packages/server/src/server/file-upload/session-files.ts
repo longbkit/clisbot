@@ -1,3 +1,4 @@
+import { queuedAttachmentIds } from "../input-queue/file-storage.js";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
@@ -275,6 +276,8 @@ export async function attachSessionFiles(input: {
   attachments?: AgentAttachment[];
   images?: { data: string; mimeType: string }[];
   ownsUpload: (attachment: UploadedFile) => boolean;
+  /** Keep bytes for a queue snapshot; canonical message links are written only on handoff. */
+  queueOnly?: boolean;
   resolveForkSource?: ResolveForkSource;
 }): Promise<{
   attachments?: AgentAttachment[];
@@ -310,7 +313,9 @@ export async function attachSessionFiles(input: {
           }
           return { ...item, text };
         });
-      const existing = await readMessageFiles(input.directory, input.messageId);
+      const existing = input.queueOnly
+        ? null
+        : await readMessageFiles(input.directory, input.messageId);
       if (existing) {
         if (
           existing.clientMessageId !== input.messageId ||
@@ -372,12 +377,13 @@ export async function attachSessionFiles(input: {
         imageDigests: digests,
         ...(forkSources.length ? { forkSources, forkPaths } : {}),
       };
-      await recordMessageFiles(input.directory, links);
+      if (!input.queueOnly) await recordMessageFiles(input.directory, links);
       // The message link is authoritative. A stale draft marker cannot cause deletion of linked files.
       for (const file of files)
         await writeDurableJson(path.join(input.directory, "uploads", file.id, "upload.json"), {
           version: 1,
-          status: "attached",
+          status: input.queueOnly ? "draft" : "attached",
+          ...(input.queueOnly ? { createdAt: new Date().toISOString() } : {}),
           clientMessageId: input.messageId,
           file,
         });
@@ -422,6 +428,7 @@ export async function pruneSessionDrafts(directory: string, now = Date.now()): P
     directory,
     async () => {
       if (hasSessionUploads(directory)) return 0;
+      const queuedFileIds = await queuedAttachmentIds(directory);
       let entries;
       try {
         entries = await fs.opendir(path.join(directory, "uploads"));
@@ -449,6 +456,7 @@ export async function pruneSessionDrafts(directory: string, now = Date.now()): P
           now - Date.parse(metadata.createdAt) <= SESSION_DRAFT_RETENTION_MS
         )
           continue;
+        if (queuedFileIds.has(entry.name)) continue;
         if (await isFileLinked(directory, entry.name)) {
           // Repair the nonauthoritative marker once; subsequent maintenance avoids a history scan.
           await writeDurableJson(metadataPath, { ...metadata, status: "attached" });

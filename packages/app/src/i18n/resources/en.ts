@@ -1,3 +1,4 @@
+import { hostQueue } from "./host-queue";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { connectors } from "./connectors";
@@ -123,6 +124,7 @@ export const en = {
     },
   },
   composer: {
+    hostQueue,
     placeholders: {
       desktop: "Message the agent, tag @files, or use /commands and /skills",
       mobile: "Message, @files, /commands",

@@ -128,6 +128,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     setChat,
     setError,
     attachmentsSupported,
+    serverId,
   );
   const { loadOlder } = transcript;
   const reachTop = useCallback(() => {
@@ -215,6 +216,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
                     group={group}
                     transcript={transcript.transcript.messages}
                     liveHeads={heads}
+                    discussionActive={chat?.discussionActive === true}
                     canSend={online && authorized && !sending}
                     onSubmitMessage={send}
                     onReachTop={reachTop}

@@ -1,3 +1,4 @@
+import { hostInputQueueEnabled } from "./input-queue/feature.js";
 import { createDaemonDeviceAuthority, createDeviceRuntimeAccess } from "./device-access/runtime.js";
 import { fenceQuickChatsFromGit } from "./quick-chats/quick-chat-folders.js";
 import { controlHostLocalWeb, resumeHostLocalServices } from "./hub/local-web.js";
@@ -453,6 +454,7 @@ export interface ClisbotDaemonConfig {
   agentClients: Partial<Record<AgentProvider, AgentClient>>;
   agentStoragePath: string;
   agentSessionStorage?: boolean;
+  hostInputQueue?: boolean;
   relayEnabled?: boolean;
   relayEnabledMutable?: boolean;
   relayEndpoint?: string;
@@ -1050,6 +1052,7 @@ export async function createClisbotDaemon(
   const stopSessionFileMaintenance = startSessionFileMaintenance({
     agentRoot: config.agentStoragePath,
     temporaryRoot: config.clisbotHome,
+    chatRoot: path.join(config.clisbotHome, "chats"),
     onError: (err, directory) =>
       logger.warn({ err, directory }, "Session draft maintenance failed"),
   });
@@ -1682,6 +1685,7 @@ export async function createClisbotDaemon(
       agentStorage,
       createAgent,
       durableTimelineStore: sessionStorage.agentManagerOptions.durableTimelineStore,
+      queueEnabled: hostInputQueueEnabled(config),
       schedules: scheduleService,
       logger,
     },
@@ -2032,6 +2036,7 @@ export async function createClisbotDaemon(
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
                 startPaused: true,
+                hostInputQueue: hostInputQueueEnabled(config),
                 managedAccess: {
                   mode: config.managedAccessMode ?? "off",
                   resolver: {

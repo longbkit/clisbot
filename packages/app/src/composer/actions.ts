@@ -51,6 +51,7 @@ export interface ComposerSendClient {
     options: {
       messageId: string;
       activeTurnBehavior?: ActiveTurnBehavior;
+      expectedTurnId?: string;
       images: Array<{ data: string; mimeType: string }>;
       attachments: ReturnType<typeof splitComposerAttachmentsForSubmit>["attachments"];
     },
@@ -130,6 +131,11 @@ export async function pickAndPersistImages(input: {
 export async function uploadFileAttachments(input: {
   client: ComposerSendClient;
   files: SelectedFile[];
+  persistLocalCopy?: (file: {
+    bytes: Uint8Array;
+    fileName: string;
+    mimeType: string;
+  }) => Promise<import("@/attachments/types").AttachmentMetadata>;
 }): Promise<Extract<ComposerAttachment, { kind: "file" }>[]> {
   const result: Extract<ComposerAttachment, { kind: "file" }>[] = [];
   const prepared: Array<{ fileName: string; mimeType: string; bytes: Uint8Array }> = [];
@@ -149,11 +155,12 @@ export async function uploadFileAttachments(input: {
   }
 
   for (const file of prepared) {
+    const localCopy = input.persistLocalCopy ? await input.persistLocalCopy(file) : undefined;
     const response = await input.client.uploadFile(file);
     if (response.error || !response.file) {
       throw new Error(response.error ?? "Upload failed.");
     }
-    result.push({ kind: "file", attachment: response.file });
+    result.push({ kind: "file", attachment: response.file, ...(localCopy ? { localCopy } : {}) });
   }
 
   return result;
@@ -226,6 +233,9 @@ export async function dispatchComposerAgentMessage(
     await input.client.sendAgentMessage(input.agentId, input.text, {
       messageId: clientMessageId,
       ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),
+      ...(input.activeTurnBehavior === "steer" && input.activeTurnId
+        ? { expectedTurnId: input.activeTurnId }
+        : {}),
       images: imagesData ?? [],
       attachments: wirePayload.attachments,
     });
@@ -352,7 +362,11 @@ export function openComposerAttachment(input: OpenComposerAttachmentInput): void
     input.setLightboxMetadata(input.attachment.metadata);
     return;
   }
-  if (input.attachment.kind === "file" || input.attachment.kind === "workspace_file") {
+  if (
+    input.attachment.kind === "agent_attachment" ||
+    input.attachment.kind === "file" ||
+    input.attachment.kind === "workspace_file"
+  ) {
     return;
   }
   if (isWorkspaceAttachment(input.attachment)) {

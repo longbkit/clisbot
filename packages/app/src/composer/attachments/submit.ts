@@ -50,6 +50,11 @@ export function splitComposerAttachmentsForSubmit(
       continue;
     }
 
+    if (attachment.kind === "agent_attachment") {
+      agentAttachments.push(attachment.attachment);
+      continue;
+    }
+
     if (attachment.kind === "file") {
       agentAttachments.push(attachment.attachment);
       continue;

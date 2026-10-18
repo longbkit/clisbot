@@ -5,21 +5,6 @@
     "text": {
       "type": "string"
     },
-    "images": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "string"
-          },
-          "mimeType": {
-            "type": "string"
-          }
-        },
-        "required": ["data", "mimeType"]
-      }
-    },
     "attachments": {
       "type": "array",
       "items": {
@@ -355,12 +340,80 @@
                           "type": "string"
                         },
                         "targetLine": {
-                          "$ref": "#/$defs/__schema0"
+                          "type": "object",
+                          "properties": {
+                            "oldLineNumber": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "newLineNumber": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": ["add", "remove", "context"]
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["oldLineNumber", "newLineNumber", "type", "content"]
                         },
                         "lines": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/$defs/__schema0"
+                            "type": "object",
+                            "properties": {
+                              "oldLineNumber": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "newLineNumber": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": ["add", "remove", "context"]
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["oldLineNumber", "newLineNumber", "type", "content"]
                           }
                         }
                       },
@@ -402,49 +455,128 @@
           }
         ]
       }
-    }
-  },
-  "required": ["text", "images", "attachments"],
-  "additionalProperties": false,
-  "$defs": {
-    "__schema0": {
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "relativePath": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "fileName", "mimeType", "size", "relativePath"]
+      }
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "relativePath": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "fileName", "mimeType", "size", "relativePath"]
+      }
+    },
+    "fingerprint": {
+      "type": "string"
+    },
+    "identity": {
       "type": "object",
       "properties": {
-        "oldLineNumber": {
-          "anyOf": [
-            {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
+        "actor": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["user", "automation", "system"]
             },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "newLineNumber": {
-          "anyOf": [
-            {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
+            "id": {
+              "type": "string"
             },
-            {
-              "type": "null"
+            "displayName": {
+              "type": "string"
+            },
+            "avatarUrl": {
+              "type": "string"
+            },
+            "hubOrigin": {
+              "type": "string"
+            },
+            "hubIdentity": {
+              "type": "string"
+            },
+            "organizationId": {
+              "type": "string"
+            },
+            "connectionId": {
+              "type": "string"
+            },
+            "memberId": {
+              "type": "string"
             }
-          ]
+          },
+          "required": ["kind", "id"]
         },
-        "type": {
-          "type": "string",
-          "enum": ["add", "remove", "context"]
+        "channel": {
+          "type": "object",
+          "properties": {
+            "hubOrigin": {
+              "type": "string"
+            },
+            "organizationId": {
+              "type": "string"
+            },
+            "connectionId": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "channel": {
+              "type": "string"
+            }
+          },
+          "required": ["hubOrigin", "organizationId", "connectionId", "channelId"]
         },
-        "content": {
+        "receivedAt": {
           "type": "string"
         }
-      },
-      "required": ["oldLineNumber", "newLineNumber", "type", "content"]
+      }
     }
   },
-  "$id": "https://clisbot.com/schemas/proposals/cto-021/v1/content.schema.json",
-  "title": "PROPOSED CTO-021 v1 content; not implemented wire"
+  "required": ["text", "files", "images", "fingerprint", "identity"]
 }

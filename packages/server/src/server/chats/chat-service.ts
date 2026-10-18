@@ -1,3 +1,6 @@
+import type { InputQueueCommand, InputQueueView } from "@clisbot/protocol/input-queue";
+import { InputQueueRuntime, type QueueFileAuthority } from "../input-queue/runtime.js";
+import { registerChatInputQueue, publishChatQueueBoundary } from "./chat-input-queue.js";
 import { isDeepStrictEqual } from "node:util";
 import { createHash } from "node:crypto";
 import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
@@ -36,6 +39,7 @@ import {
 export interface ChatServiceOptions {
   /** `$CLISBOT_HOME/chats`; created on the first chat, never at start. */
   rootDir: string;
+  queueEnabled?: boolean;
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   createAgent: BoundCreateAgentCommand;
@@ -82,6 +86,17 @@ export interface ChatService {
   removeParticipant(chatId: string, botId: string): Promise<ChatPayload>;
   archive(chatId: string): Promise<ChatPayload>;
   send(input: SendMessageInput): Promise<SendMessageResult>;
+  queue(
+    chatId: string,
+    command: InputQueueCommand,
+    authority: QueueFileAuthority,
+  ): Promise<{
+    queue: InputQueueView;
+    error: string | null;
+    fileChunk?: { data: string; done: boolean };
+    unchanged?: boolean;
+    errorCode?: string;
+  }>;
   /** A heartbeat run that goes through the Chat (docs/audits/2026-10-06-conversation-schedules.md). */
   postScheduled(input: ScheduledLineInput): Promise<ScheduledLineResult>;
   fetchTranscript(chatId: string, options?: TranscriptFetchOptions): Promise<TranscriptWindow>;
@@ -101,6 +116,8 @@ interface ChatServiceParts {
   publisher: ChatPublisher;
   transcriptOf: (chatId: string) => TranscriptLog;
   transcripts: Map<string, TranscriptLog>;
+  queues: InputQueueRuntime;
+  registerQueue(chatId: string): void;
 }
 
 export function createChatService(options: ChatServiceOptions): ChatService {
@@ -117,6 +134,8 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     },
     async start() {
       await parts.store.load();
+      if (options.queueEnabled !== false)
+        for (const chat of await parts.store.list()) parts.registerQueue(chat.id);
       unsubscribe ??= publishStoreChanges(parts);
       await watchParticipants(parts);
       await reconcile(parts).catch((error: unknown) =>
@@ -126,6 +145,7 @@ export function createChatService(options: ChatServiceOptions): ChatService {
     async stop() {
       unsubscribe?.();
       unsubscribe = null;
+      await parts.queues.stop();
       parts.engine.stop();
       await parts.engine.idle();
       await parts.store.idle();
@@ -151,8 +171,24 @@ function createChatServiceParts(
     return log;
   };
   const publisher = fanOutPublisher(options.publisher, listeners);
-  const engine = createEngine(options, store, transcriptOf, publisher);
-  return { options, store, engine, publisher, transcriptOf, transcripts };
+  const queues = new InputQueueRuntime(options.logger);
+  const engine = createEngine(options, store, transcriptOf, publisher, (chatId) =>
+    publishChatQueueBoundary({
+      chatId,
+      enabled: options.queueEnabled !== false,
+      queues,
+      store,
+      engine,
+      publish: publisher.chatUpdated,
+      logger: options.logger,
+    }),
+  );
+  const registerQueue = (chatId: string) =>
+    registerChatInputQueue(
+      { store, engine, queues, agentManager: options.agentManager, transcriptOf },
+      chatId,
+    );
+  return { options, store, engine, publisher, transcriptOf, transcripts, queues, registerQueue };
 }
 
 /** Every push reaches the Session wiring and every in-process subscriber. */
@@ -178,6 +214,7 @@ function createEngine(
   store: ChatStore,
   transcriptOf: (chatId: string) => TranscriptLog,
   publisher: ChatPublisher,
+  onBoundary: (chatId: string) => void,
 ): ChatEngine {
   const { agentManager, agentStorage, logger } = options;
   const botSessions = new BotSessions({
@@ -198,6 +235,7 @@ function createEngine(
     },
   });
   return new ChatEngine({
+    onBoundary,
     store,
     transcriptOf,
     bots: options.bots,
@@ -213,6 +251,8 @@ function createEngine(
         prompt: params.prompt,
         messageId: params.messageId,
         ...(params.activeTurnBehavior ? { activeTurnBehavior: params.activeTurnBehavior } : {}),
+        ...(params.expectedTurnId ? { expectedTurnId: params.expectedTurnId } : {}),
+        strictSteer: params.strictSteer,
         unarchive: false,
         clearPendingPermissions: false,
         logger,
@@ -293,7 +333,13 @@ function chatReads({ store, engine, transcriptOf }: ChatServiceParts): ChatReads
 
 type ChatWrites = Omit<ChatService, keyof ChatReads | "subscribe" | "start" | "stop">;
 
-function chatWrites({ options, store, engine }: ChatServiceParts): ChatWrites {
+function chatWrites({
+  options,
+  store,
+  engine,
+  queues,
+  registerQueue,
+}: ChatServiceParts): ChatWrites {
   return {
     create: (input) => createChat(store, engine, input),
     async update(chatId, patch) {
@@ -309,7 +355,17 @@ function chatWrites({ options, store, engine }: ChatServiceParts): ChatWrites {
     async archive(chatId) {
       return engine.payload(await store.archive(chatId));
     },
-    send: (input) => engine.send(input),
+    send: (input) => {
+      if (options.queueEnabled === false && input.activeTurnBehavior)
+        return Promise.reject(new Error("Host input queue and shared send actions are disabled"));
+      return engine.send(input);
+    },
+    async queue(chatId, command, authority) {
+      if (options.queueEnabled === false) throw new Error("Host input queue is disabled");
+      await store.require(chatId);
+      registerQueue(chatId);
+      return queues.command(chatId, command, authority);
+    },
     postScheduled: (input) => engine.postScheduled(input),
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
     stopDiscussion: (chatId) => engine.stopDiscussion(chatId),

@@ -21,6 +21,7 @@ interface TestClisbotDaemonOptions {
   bots?: ClisbotDaemonConfig["bots"];
   createDaemon?: typeof createClisbotDaemon;
   agentSessionStorage?: boolean;
+  hostInputQueue?: boolean;
   daemonVersion?: string;
   desktopManaged?: boolean;
   downloadTokenTtlMs?: number;
@@ -190,6 +191,7 @@ async function prepareTestDaemonConfig(
   const listenPort = options.listenPort ?? 0;
   const config: ClisbotDaemonConfig = {
     agentSessionStorage: options.agentSessionStorage,
+    hostInputQueue: options.hostInputQueue,
     listen: `${listenHost}:${listenPort}`,
     clisbotHome,
     daemonVersion: options.daemonVersion,

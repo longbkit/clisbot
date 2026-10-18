@@ -80,7 +80,6 @@ export function applyDictationTranscript(text: string, ctx: DictationTranscriptC
 
   if (ctx.defaultSendBehavior === "queue" && ctx.isAgentRunning && ctx.onQueue) {
     ctx.onQueue({ text: nextValue, attachments: ctx.attachments, cwd: ctx.cwd });
-    ctx.replaceText("");
     return;
   }
 

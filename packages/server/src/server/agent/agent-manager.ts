@@ -100,7 +100,7 @@ import {
   type PendingForegroundRun,
 } from "./agent-run-state.js";
 import { invokeRewindCapability, type RewindMode } from "./rewind/rewind.js";
-import { projectAgentMessage } from "./agent-messages/index.js";
+import { projectAgentMessage, prepareAgentMessage } from "./agent-messages/index.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
 import {
   PromptNotDeliveredError,
@@ -3584,6 +3584,8 @@ export class AgentManager {
   ): Promise<SteerResult> {
     const agent = this.requireReadySessionAgent(agentId);
     const expectedTurnId = agent.activeForegroundTurnId ?? agent.activeTurnId;
+    if (options?.expectedTurnId && options.expectedTurnId !== expectedTurnId)
+      throw new Error("Active turn changed before steering could be delivered");
     if (!expectedTurnId || !agent.session.steerActiveTurn) {
       return { status: "unavailable" };
     }
@@ -6211,6 +6213,83 @@ export class AgentManager {
     const text = submittedPromptText(prompt);
     const item = projectAgentMessage({ type: "user_message", text });
     return item?.type === "user_message" ? item.text : text;
+  }
+
+  async verifySubmittedMessageContent(
+    agentId: string,
+    id: string,
+    prompt: AgentPromptInput,
+  ): Promise<void> {
+    const submission = await this.durableTimelineStore?.readMessageSubmission?.(agentId, id);
+    const context = currentSessionOperationIdentity();
+    if (
+      !submission ||
+      submission.digest !==
+        createHash("sha256")
+          .update(JSON.stringify(prepareAgentMessage(prompt, undefined, id).prompt))
+          .digest("hex") ||
+      !isDeepStrictEqual(submission.identity, {
+        ...(context?.actor ? { actor: context.actor } : {}),
+        ...(context?.channel ? { channel: context.channel } : {}),
+      })
+    )
+      throw new Error("Queue ID conflicts with submitted content or sender");
+  }
+
+  async waitForDurableSubmittedMessage(
+    agentId: string,
+    id: string,
+    timeoutMs = 60_000,
+  ): Promise<void> {
+    if (await this.hasDurableSubmittedMessage(agentId, id)) return;
+    await new Promise<void>((complete, reject) => {
+      let checking = false;
+      let again = false;
+      let stopped = false;
+      let unsubscribe = () => {};
+      const finish = (error?: unknown) => {
+        if (stopped) return;
+        stopped = true;
+        clearTimeout(timer);
+        unsubscribe();
+        if (error) {
+          reject(error);
+          return;
+        }
+        complete();
+      };
+      const check = async () => {
+        if (stopped) return;
+        if (checking) {
+          again = true;
+          return;
+        }
+        checking = true;
+        try {
+          if (await this.hasDurableSubmittedMessage(agentId, id)) finish();
+        } catch (error) {
+          finish(error);
+        } finally {
+          checking = false;
+          if (again) {
+            again = false;
+            void check();
+          }
+        }
+      };
+      const timer = setTimeout(
+        () => finish(new Error("Durable submission was not confirmed before the handoff timeout")),
+        timeoutMs,
+      );
+      unsubscribe = this.subscribe(() => void check(), { agentId, replayState: false });
+      void check();
+    });
+  }
+
+  /** Queue recovery uses only a confirmed, persisted user row, never a pending receipt. */
+  async hasDurableSubmittedMessage(agentId: string, messageId: string): Promise<boolean> {
+    await this.waitForTimelinePersistence(agentId);
+    return Boolean(await this.durableTimelineStore?.getSubmittedUserMessage?.(agentId, messageId));
   }
 
   private async hasSubmittedPrompt(
