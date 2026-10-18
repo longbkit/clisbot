@@ -531,16 +531,14 @@ function holdNextSessionMessage(session: (typeof sessionMock.instances)[number])
 function holdSessionCleanup(session: (typeof sessionMock.instances)[number]): {
   finish: () => void;
 } {
-  let finish = () => {};
-  session.cleanup.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
-        finish = resolve;
-      }),
-  );
-  return {
-    finish: () => finish(),
-  };
+  let finish!: () => void;
+  // Release can precede cleanup after shutdown awaits subscription delivery.
+  // Create the gate now so an early release is not lost.
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  session.cleanup.mockImplementationOnce(() => finished);
+  return { finish };
 }
 
 describe("relay external socket reconnect behavior", () => {
