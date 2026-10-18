@@ -25,6 +25,10 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
         let upgraded = false;
         let publishUpgrade: (() => void) | undefined;
         let hostFetches = 0;
+        let holdLegacyDrain = false;
+        let heldLegacyDrain: (() => void) | undefined;
+        let competingTurnStarted = false;
+        const sendResponses: Array<Record<string, unknown>> = [];
         const violations: unknown[] = [];
         const sends: Array<Record<string, unknown>> = [];
         await page.routeWebSocket(daemonWsRoutePattern(), (browser) => {
@@ -42,7 +46,13 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
             )
               violations.push(request);
             if (upgraded && request.type === "agent.queue.execute.request") hostFetches++;
-            if (request.type === "send_agent_message_request") sends.push(request);
+            if (request.type === "send_agent_message_request") {
+              sends.push(request);
+              if (holdLegacyDrain && request.text === "Default queue") {
+                heldLegacyDrain = () => server.send(raw);
+                return;
+              }
+            }
             server.send(raw);
           });
           server.onMessage((raw) => {
@@ -52,6 +62,13 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
             }
             const envelope = JSON.parse(String(raw));
             const message = envelope.type === "session" ? envelope.message : envelope;
+            if (message.type === "send_agent_message_response") sendResponses.push(message.payload);
+            if (
+              holdLegacyDrain &&
+              message.type === "agent_stream" &&
+              message.payload?.event?.type === "turn_started"
+            )
+              competingTurnStarted = true;
             if (message.payload?.status === "server_info") {
               publishUpgrade = () => {
                 upgraded = true;
@@ -136,7 +153,11 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
             }
             await writeFile(
               info.outputPath("legacy-wire.json"),
-              JSON.stringify({ mode, capability, preference, violations, sends }, null, 2),
+              JSON.stringify(
+                { mode, capability, preference, violations, sends, sendResponses },
+                null,
+                2,
+              ),
             );
             return;
           }
@@ -170,13 +191,30 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
             ).queue!.items,
           ).toHaveLength(1);
           if (preference === "queue") {
+            // Both owners wake on idle. Force the durable Host item to start
+            // before the retained client send reaches the Host, as seen in CI.
+            holdLegacyDrain = true;
+            await client.cancelAgent(workspace.agentId);
+            await expect.poll(() => Boolean(heldLegacyDrain) && competingTurnStarted).toBe(true);
+            holdLegacyDrain = false;
+            heldLegacyDrain!();
+            await expect
+              .poll(() => sendResponses.some((response) => response.accepted === false))
+              .toBe(true);
+            const retainedRow = page
+              .locator('[data-testid^="host-queue-"]')
+              .filter({ hasText: "Default queue" });
+            await expect(retainedRow).toBeVisible();
+            // A rejected steer must remain local, then drain on the next idle
+            // boundary rather than interrupting the competing durable turn.
             await client.cancelAgent(workspace.agentId);
             await expect
               .poll(() => sends.filter((send) => send.text === "Default queue").length)
-              .toBe(1);
-            await expect(
-              page.locator('[data-testid^="host-queue-"]').filter({ hasText: "Default queue" }),
-            ).toHaveCount(0);
+              .toBe(2);
+            await expect
+              .poll(() => sendResponses.some((response) => response.accepted === true))
+              .toBe(true);
+            await expect(retainedRow).toHaveCount(0);
           }
           expect(
             await page.evaluate(
@@ -185,13 +223,17 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
           ).toBe(preference);
           await writeFile(
             info.outputPath("legacy-wire.json"),
-            JSON.stringify({ capability, preference, violations, sends }, null, 2),
+            JSON.stringify({ capability, preference, violations, sends, sendResponses }, null, 2),
           );
         } catch (error) {
           await page.screenshot({ path: info.outputPath("failure-before-cleanup.png") });
           await writeFile(
             info.outputPath("failure-wire.json"),
-            JSON.stringify({ mode, capability, preference, violations, sends }, null, 2),
+            JSON.stringify(
+              { mode, capability, preference, violations, sends, sendResponses },
+              null,
+              2,
+            ),
           );
           throw error;
         } finally {
