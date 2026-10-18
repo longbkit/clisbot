@@ -24,6 +24,8 @@ Revision tăng theo mỗi lần ghi. Client gửi expected revision và item ID;
 
 ## Attachment
 
+Direct Send/Steer dùng composer chung phải giữ các attachment ID (ảnh, local file copy, browser screenshot) trước khi xóa draft để hiển thị lượt gửi. Giữ bằng cơ chế GC retention hiện có đến khi handoff xong hoặc draft đã được khôi phục sau lỗi; preview đã hiển thị không chứng minh file vẫn tồn tại. Không thêm persistence hay thay đổi quyền đọc file.
+
 Dùng storage/upload và quyền hiện có của target. `packages/protocol/src/agent-attachments.ts` hiện có `uploaded_file` gồm id/fileName/mimeType/size/path; text/review/forge context là các loại khác, phải giữ nguyên metadata có nghĩa. Shape file reference gọn trong JSON là đề xuất persistence, **không tự thay wire schema hiện có**. Adapter chuyển về payload provider khi drain.
 
 Trước ack: chuẩn bị upload/copy ảnh và file vào storage bền vững của Host, kiểm quyền, kích thước, tồn tại bytes rồi lưu reference trong queue. Không chấp nhận URI điện thoại, URL có hạn hoặc path tùy ý do client gửi. Khi tái sử dụng upload có TTL, phải giữ file khỏi cleanup chừng nào queue/draft còn tham chiếu; nếu owner hiện tại không giữ được thì copy vào vùng attachment bền vững hiện có trước ack. Không xây content-addressed store mới.

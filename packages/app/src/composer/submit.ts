@@ -1,3 +1,6 @@
+import type { ComposerAttachment } from "@/attachments/types";
+import { retainAttachmentForGarbageCollection } from "@/attachments/gc-retention";
+import { composerAttachmentIds } from "./attachment-references";
 import { i18n } from "@/i18n/i18next";
 
 export type AgentInputSubmitResult = "noop" | "queued" | "submitted" | "failed";
@@ -22,7 +25,7 @@ export interface AgentInputSubmitActionInput<TAttachment> {
   failedToSendMessage?: string;
 }
 
-export async function submitAgentInput<TAttachment>(
+export async function submitAgentInput<TAttachment extends ComposerAttachment>(
   input: AgentInputSubmitActionInput<TAttachment>,
 ): Promise<AgentInputSubmitResult> {
   const trimmedMessage = input.message.trim();
@@ -61,6 +64,12 @@ export async function submitAgentInput<TAttachment>(
     }
   }
 
+  // Retain bytes before draft clearing can schedule GC; release after handoff or restoration.
+  const releaseAttachments = Array.from(
+    composerAttachmentIds(attachments),
+    retainAttachmentForGarbageCollection,
+  );
+
   // Clear immediately so the submitted timeline row and composer state stay in sync.
   if (shouldClearOnSubmit) {
     input.setUserInput("");
@@ -87,6 +96,8 @@ export async function submitAgentInput<TAttachment>(
     );
     input.setIsProcessing(false);
     return "failed";
+  } finally {
+    for (const release of releaseAttachments) release();
   }
 }
 

@@ -32,7 +32,19 @@ test("a failed Host write retains text and attachments with a recoverable error"
   const effects: string[] = [];
   const result = await submitAgentInput({
     message: "next",
-    attachments: [{ id: "file" }],
+    attachments: [
+      {
+        kind: "file",
+        attachment: {
+          type: "uploaded_file",
+          id: "file",
+          fileName: "file.txt",
+          mimeType: "text/plain",
+          size: 1,
+          path: "/synthetic/file.txt",
+        },
+      },
+    ],
     isAgentRunning: true,
     canSubmit: true,
     queueMessage: async () => {

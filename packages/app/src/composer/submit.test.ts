@@ -1,5 +1,17 @@
+import type { ComposerAttachment } from "@/attachments/types";
 import { describe, expect, it, vi } from "vitest";
 import { submitAgentInput } from "./submit";
+
+const image: ComposerAttachment = {
+  kind: "image",
+  metadata: {
+    id: "img-1",
+    mimeType: "image/png",
+    storageType: "desktop-file",
+    storageKey: "/synthetic/img-1.png",
+    createdAt: 0,
+  },
+};
 
 function createDeferredPromise<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -61,7 +73,7 @@ describe("submitAgentInput", () => {
 
   it("preserves the composer before an in-flight submit resolves when requested", async () => {
     const deferred = createDeferredPromise<void>();
-    const attachments = [{ id: "img-1" }];
+    const attachments = [image];
     const queueMessage = vi.fn();
     const submitMessage = vi.fn(async () => {
       await deferred.promise;
@@ -116,7 +128,7 @@ describe("submitAgentInput", () => {
     await expect(
       submitAgentInput({
         message: "  queued message  ",
-        attachments: [{ id: "img-1" }],
+        attachments: [image],
         isAgentRunning: true,
         canSubmit: true,
         queueMessage,
@@ -131,7 +143,7 @@ describe("submitAgentInput", () => {
 
     expect(queueMessage).toHaveBeenCalledWith({
       message: "queued message",
-      attachments: [{ id: "img-1" }],
+      attachments: [image],
     });
     expect(submitMessage).not.toHaveBeenCalled();
     expect(setUserInput).toHaveBeenCalledWith("");
@@ -153,7 +165,7 @@ describe("submitAgentInput", () => {
     const setSendError = vi.fn();
     const setIsProcessing = vi.fn();
     const onSubmitError = vi.fn();
-    const attachments = [{ id: "img-1" }];
+    const attachments = [image];
 
     await expect(
       submitAgentInput({
@@ -194,7 +206,7 @@ describe("submitAgentInput", () => {
     await expect(
       submitAgentInput({
         message: "  steer this turn  ",
-        attachments: [{ id: "img-1" }],
+        attachments: [image],
         forceSend: true,
         isAgentRunning: true,
         canSubmit: true,
@@ -213,7 +225,7 @@ describe("submitAgentInput", () => {
     expect(setUserInput).toHaveBeenNthCalledWith(1, "");
     expect(setUserInput).toHaveBeenNthCalledWith(2, "steer this turn");
     expect(setAttachments).toHaveBeenNthCalledWith(1, []);
-    expect(setAttachments).toHaveBeenNthCalledWith(2, [{ id: "img-1" }]);
+    expect(setAttachments).toHaveBeenNthCalledWith(2, [image]);
     expect(setSendError).toHaveBeenLastCalledWith("connection lost after delivery");
   });
 
