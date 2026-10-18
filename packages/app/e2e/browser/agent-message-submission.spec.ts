@@ -437,9 +437,15 @@ async function expectInterruptedTurnOrderAfterReconnect(
     await agent.client.sendAgentMessage(agent.agentId, "Start the turn that will be interrupted.");
     await expect(page.getByRole("button", { name: /stop|cancel/i }).first()).toBeVisible();
     await expect(page.getByText("Cycle 1", { exact: true })).toBeVisible();
-    await queueMessage(page, prompt);
+    await configureInterruptInSettings(page);
+    await page.goBack();
+    await expectComposerVisible(page);
+    await fillComposerDraft(page, prompt);
+    await expect(
+      page.getByRole("button", { name: "Send and interrupt", exact: true }),
+    ).toBeEnabled();
     gate.setAgentStreamSuppressed(true);
-    await page.getByRole("button", { name: "Send queued message now" }).click();
+    await composerLocator(page).press("Enter");
     const promptRow = page.getByTestId("user-message").filter({ hasText: prompt });
     await expect(promptRow).toBeVisible();
     await gate.waitForServerMessage("send_agent_message_response");
@@ -447,8 +453,12 @@ async function expectInterruptedTurnOrderAfterReconnect(
     await agent.client.waitForFinish(agent.agentId, 90_000);
     gate.setAgentStreamSuppressed(false);
     gate.forceNextTimelineEpochReset();
+    // Settings navigation can already fetch history twice. Wait for the fresh
+    // response after reconnect, rather than a cumulative pre-disconnect count.
+    gate.holdTimelineResponses(agent.agentId);
     gate.restoreFresh();
-    await gate.waitForServerMessage("fetch_agent_timeline_response", 2);
+    await gate.waitForHeldTimelineResponse();
+    gate.releaseHeldTimelineResponses();
     const response = page.getByText("(end of synthetic stream)", { exact: true }).last();
     await expect(promptRow).toBeVisible();
     await expect(response).toBeVisible();
@@ -659,10 +669,16 @@ async function expectLegacyAssistantStartsAfterInterruptedPrompt(
     await expectComposerVisible(page);
     await agent.client.sendAgentMessage(agent.agentId, "Start the interrupted answer.");
     await expect(page.getByText("Cycle 1", { exact: true })).toBeVisible();
-    await queueMessage(page, prompt);
+    await configureInterruptInSettings(page);
+    await page.goBack();
+    await expectComposerVisible(page);
+    await fillComposerDraft(page, prompt);
+    await expect(
+      page.getByRole("button", { name: "Send and interrupt", exact: true }),
+    ).toBeEnabled();
     gate.setAssistantMessageIdsStripped(true);
     gate.setAgentStreamEventSuppressed("turn_canceled", true);
-    await page.getByRole("button", { name: "Send queued message now" }).click();
+    await composerLocator(page).press("Enter");
     const promptRow = page.getByTestId("user-message").filter({ hasText: prompt });
     const replacementAnswer = page.getByText("(end of synthetic stream)", { exact: true }).last();
     await expect(promptRow).toBeVisible();
