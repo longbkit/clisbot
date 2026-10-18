@@ -53,6 +53,10 @@ jobs:
       - name: Build app dependencies
         run: npm run build:app-deps
 
+      # App attachment regression tests also typecheck the real Desktop storage adapter.
+      - name: Build server declarations for app typecheck
+        run: npm run build:server-deps && npm run build --workspace=@clisbot/server
+
       - name: Typecheck
         run: npm run typecheck --workspace=@clisbot/app
 
