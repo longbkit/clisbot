@@ -61,6 +61,8 @@ test("disconnected capability retains accepted Host item and refuses queue witho
       mimeType: "text/plain",
       buffer: Buffer.from("unsent draft bytes"),
     });
+    // setFiles only starts upload; prove the attachment was accepted before disconnecting.
+    await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
     await input.fill("Keep this offline draft");
     await page.context().setOffline(true);
     disconnect!();

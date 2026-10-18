@@ -1,3 +1,5 @@
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { longPressSend } from "../support/helpers/queue-send-gesture";
 import { attachFileFromMenu } from "../support/helpers/composer";
 import { expect, test, disabledQueueProviders } from "../support/helpers/queue-fixture";
@@ -12,7 +14,7 @@ test.use({
     },
   },
 });
-test("Queue reports an update requirement and retains the draft without a RAM fallback", async ({
+test("disabled Host queue retains dismissed drafts and admits attachments through the client queue", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -23,6 +25,9 @@ test("Queue reports an update requirement and retains the draft without a RAM fa
     repoPrefix: "queue-disabled-",
     title: "Queue disabled fixture",
     model: "one-minute-stream",
+  });
+  const client = await connectDaemonClient<DaemonClient>({
+    clientIdPrefix: "disabled-queue-drain-control",
   });
   try {
     await openAgentRoute(page, {
@@ -36,14 +41,14 @@ test("Queue reports an update requirement and retains the draft without a RAM fa
     await attachFileFromMenu(page, {
       name: "retained.txt",
       mimeType: "text/plain",
-      buffer: Buffer.from("Keep unsupported send bytes"),
+      buffer: Buffer.from("Keep client queue bytes"),
     });
-    await composer.fill("Keep this unaccepted queue draft");
+    await composer.fill("Keep this client queue draft");
     await longPressSend(page, page.locator("body"));
-    await expect(composer).toHaveValue("Keep this unaccepted queue draft");
+    await expect(composer).toHaveValue("Keep this client queue draft");
     await page.touchscreen.tap(12, 12);
     await expect(page.getByTestId("composer-send-once-queue")).toHaveCount(0);
-    await expect(composer).toHaveValue("Keep this unaccepted queue draft");
+    await expect(composer).toHaveValue("Keep this client queue draft");
     await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
     expect(
       await page.evaluate(
@@ -52,18 +57,30 @@ test("Queue reports an update requirement and retains the draft without a RAM fa
     ).toBe("steer");
     await longPressSend(page, page.locator("body"));
     await page.getByTestId("composer-send-once-queue").tap();
-    await expect(composer).toHaveValue("Keep this unaccepted queue draft");
-    await expect(
-      page.getByRole("alert").filter({ hasText: "Update this Host" }).first(),
-    ).toBeVisible();
+    await expect(composer).toHaveValue("");
+    const row = page
+      .locator('[data-testid^="host-queue-"]')
+      .filter({ hasText: "Keep this client queue draft" });
+    await expect(row).toBeVisible();
+    await expect(row.getByLabel("Attachments (1)", { exact: true })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "Update this Host" })).toHaveCount(0);
+    expect(client.getLastServerInfoMessage()?.features?.hostInputQueue).not.toBe(true);
+    await row.getByRole("button", { name: "Edit", exact: true }).tap();
+    await expect(composer).toHaveValue("Keep this client queue draft");
     await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
-    await longPressSend(page, page.locator("body"));
-    await page.getByTestId("composer-send-once-steer").tap();
-    await expect(composer).toHaveValue("Keep this unaccepted queue draft");
-    await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
-    await expect(page.getByTestId("turn-working-indicator").first()).toBeVisible();
-    await expect(page.locator('[data-testid^="host-queue-"]')).toHaveCount(0);
+    await page.getByTestId("composer-send-button").tap();
+    await expect(composer).toHaveValue("");
+    await expect(row).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => JSON.parse(localStorage.getItem("@clisbot:app-settings")!).sendBehavior,
+      ),
+    ).toBe("steer");
+    await client.cancelAgent(workspace.agentId);
+    await expect(row).toHaveCount(0);
+    await expect(page.getByText("Keep this client queue draft", { exact: true })).toBeVisible();
   } finally {
+    await client.close();
     await workspace.cleanup();
   }
 });
