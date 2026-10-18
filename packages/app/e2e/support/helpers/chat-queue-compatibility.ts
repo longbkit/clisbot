@@ -122,7 +122,7 @@ export function registerChatQueueCompatibility() {
         await expect(input).toHaveValue("");
         const row = page.locator('[data-testid^="host-queue-"]').filter({ hasText: "2+2" });
         await expect(row).toBeVisible();
-        await expect(row).toContainText("Attachments (2)");
+        await expect(row.getByLabel("Attachments (2)", { exact: true })).toBeVisible();
         const itemId = (await row.getAttribute("data-testid"))!.slice("host-queue-".length);
         expect(requests.filter((r) => r.type === "chat.message.send.request")).toHaveLength(
           countBefore,
@@ -143,9 +143,9 @@ export function registerChatQueueCompatibility() {
         await client.setAgentModel(agentId, "ten-second-stream");
         await client.cancelAgent(agentId);
         if (scenario.trigger === "manual") {
-          await expect(
-            scope.getByText(/This Host cannot report when the group ends/),
-          ).toBeVisible();
+          await row.getByRole("button", { name: "Manual", exact: true }).tap();
+          await expect(page.getByText(/This Host cannot report when the group ends/)).toBeVisible();
+          await page.touchscreen.tap(12, 100);
           await expect(
             row.getByRole("button", { name: "Steer this send", exact: true }),
           ).toHaveCount(0);

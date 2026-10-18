@@ -2741,7 +2741,6 @@ function ComposerContentImpl({
     <>
       {clientQueue.items.length > 0 || queueEditor?.owner === "client" ? (
         <HostInputQueuePanel
-          label={t("composer.hostQueue.clientQueue")}
           notice={clientQueue.manualDelivery ? t("composer.hostQueue.manualGroup") : undefined}
           sendNowLabel={clientQueue.dispatch ? t("composer.input.sendMessage") : undefined}
           hideSteer={clientQueue.manualDelivery}

@@ -1,5 +1,6 @@
 export const hostQueue = {
   clientQueue: "Client queue (this app)",
+  manual: "Manual",
   manualGroup:
     "This Host cannot report when the group ends. Send a queued item when you choose to take the floor.",
   sendActions: "Send actions",
@@ -25,6 +26,7 @@ export const hostQueue = {
 
 export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
   clientQueue: "Hàng chờ client (app này)",
+  manual: "Gửi thủ công",
   manualGroup:
     "Host này chưa báo được khi nhóm kết thúc. Chọn Gửi ở mục chờ khi bạn muốn tiếp lời.",
   sendActions: "Cách gửi",
@@ -49,6 +51,7 @@ export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
   clientQueue: "Cola del cliente (esta app)",
+  manual: "Manual",
   manualGroup:
     "Este Host no informa cuándo termina el grupo. Envía un elemento cuando quieras tomar la palabra.",
   sendActions: "Acciones de envío",
@@ -74,6 +77,7 @@ export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
   clientQueue: "File du client (cette app)",
+  manual: "Manuel",
   manualGroup:
     "Ce Host ne signale pas la fin du groupe. Envoyez un élément quand vous souhaitez prendre la parole.",
   sendActions: "Actions d’envoi",
@@ -99,6 +103,7 @@ export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
   clientQueue: "クライアントのキュー（このアプリ）",
+  manual: "手動",
   manualGroup:
     "このHostはグループの終了を通知できません。発言したいときに待機中の項目を送信してください。",
   sendActions: "送信アクション",
@@ -124,6 +129,7 @@ export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
   clientQueue: "클라이언트 대기열 (이 앱)",
+  manual: "수동",
   manualGroup: "이 Host는 그룹 종료를 알리지 못합니다. 발언하려면 대기 항목의 보내기를 선택하세요.",
   sendActions: "전송 작업",
   longPressHint: "길게 눌러 이번 전송만 대기열 또는 방향 조정",
@@ -147,6 +153,7 @@ export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
   clientQueue: "Fila do cliente (este app)",
+  manual: "Manual",
   manualGroup:
     "Este Host não informa quando o grupo termina. Envie um item quando quiser tomar a palavra.",
   sendActions: "Ações de envio",
@@ -172,6 +179,7 @@ export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
   clientQueue: "Очередь клиента (это приложение)",
+  manual: "Вручную",
   manualGroup:
     "Этот Host не сообщает о завершении обсуждения. Отправьте элемент, когда решите взять слово.",
   sendActions: "Действия отправки",
@@ -197,6 +205,7 @@ export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
   clientQueue: "客户端队列（此应用）",
+  manual: "手动",
   manualGroup: "此Host无法报告群组讨论何时结束。需要接话时，请主动发送队列中的消息。",
   sendActions: "发送操作",
   longPressHint: "长按以仅对本次发送选择队列或引导",
@@ -220,6 +229,7 @@ export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
 
 export const hostQueueAr: Record<keyof typeof hostQueue, string> = {
   clientQueue: "قائمة انتظار العميل (هذا التطبيق)",
+  manual: "يدوي",
   manualGroup:
     "لا يبلغ هذا Host عن انتهاء المجموعة. أرسل عنصراً من قائمة الانتظار عندما تختار أخذ الدور.",
   sendActions: "إجراءات الإرسال",

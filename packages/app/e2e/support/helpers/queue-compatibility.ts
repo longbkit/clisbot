@@ -117,7 +117,9 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
           await input.fill("Edited local queue");
           await page.getByTestId("composer-send-button").tap();
           await expect(page.getByTestId(rowId!)).toContainText("Edited local queue");
-          await expect(page.getByTestId(rowId!)).toContainText("Attachments (1)");
+          await expect(
+            page.getByTestId(rowId!).getByLabel("Attachments (1)", { exact: true }),
+          ).toBeVisible();
           expect(violations).toEqual([]);
           await page.screenshot({ path: info.outputPath("legacy-client-queue.png") });
           if (mode === "legacy") {

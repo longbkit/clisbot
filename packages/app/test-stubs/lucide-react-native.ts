@@ -208,3 +208,6 @@ export const ZoomOut = StubIcon;
 
 export const Laptop = StubIcon;
 export const LockKeyhole = StubIcon;
+export const PencilLine = StubIcon;
+export const Send = StubIcon;
+export const CircleStop = StubIcon;
