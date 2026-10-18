@@ -278,7 +278,7 @@ it("discovery returns a locator when fetch finds grok credentials", async () => 
     });
     expect(requested).toBe(true);
     expect(await discover()).toEqual([
-      { key: "default", input: { store: "env", locator: "GROK_TOKEN" } },
+      { key: "default", providerId: "grok", input: { store: "env", locator: "GROK_TOKEN" } },
     ]);
   } finally {
     if (previous === undefined) delete process.env["GROK_TOKEN"];

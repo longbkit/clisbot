@@ -75,6 +75,7 @@ export class Usage {
         }
         return accounts.map((account) => ({
           key: account,
+          providerId: "muse",
           label: "Muse Code",
           input: { account },
         }));

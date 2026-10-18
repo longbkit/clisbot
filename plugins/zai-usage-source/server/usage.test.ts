@@ -129,7 +129,7 @@ it("discovery returns a locator when fetch finds zai credentials", async () => {
     });
     expect(requested).toBe(true);
     expect(await discover()).toEqual([
-      { key: "default", input: { store: "env", locator: "ZAI_API_KEY" } },
+      { key: "default", providerId: "zai", input: { store: "env", locator: "ZAI_API_KEY" } },
     ]);
   } finally {
     if (previous === undefined) delete process.env["ZAI_API_KEY"];

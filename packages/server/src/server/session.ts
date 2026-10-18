@@ -1159,6 +1159,8 @@ export class Session {
     this.usageSession = new UsageSession({
       emit: (msg) => this.emit(msg),
       runtime: pluginRuntime,
+      canReadProvider: (providerId) => this.resourceAuthorizer.canReadUsageProvider(providerId),
+      accessKey: () => this.resourceAuthorizer.usageAccessKey(),
       logger: this.sessionLogger,
     });
     this.agentConfigSession = new AgentConfigSession({

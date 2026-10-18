@@ -22,6 +22,7 @@ export interface UsageSource {
 interface Login {
   input: unknown;
   harness: string;
+  providerId?: string;
 }
 
 interface KnownReport {
@@ -32,6 +33,7 @@ interface KnownReport {
 
 export interface AgentUsageLookup {
   hasAgent(id: string): boolean;
+  providerId?(id: string): string | undefined;
   usageSession(id: string): AgentUsageSession | null;
 }
 
@@ -40,6 +42,8 @@ export interface ListUsageReportsOptions {
   reportIds?: string[];
   agentId?: string;
   onReport?: (report: UsageReportEntry) => void;
+  /** Host-supplied live authority; never accepted from the wire. */
+  canReadProvider?: (providerId: string | undefined) => boolean;
 }
 
 interface AgentReports {
@@ -100,18 +104,10 @@ export class UsageSourceRegistry {
       this.mergeKnown();
       ids = [...this.known.keys()];
     }
-    return Promise.all(
-      [...new Set(ids)].flatMap((id) => {
-        const known = reports.get(id);
-        if (!known) return [];
-        return [
-          this.fetchId(id, known, options.forceRefresh).then((entry) => {
-            options.onReport?.(entry);
-            return entry;
-          }),
-        ];
-      }),
+    const entries = await Promise.all(
+      [...new Set(ids)].map((id) => this.fetchAuthorized(id, reports.get(id), options)),
     );
+    return entries.flatMap((result) => (result?.stillAllowed() ? [result.entry] : []));
   }
 
   private pruneAgents(): void {
@@ -121,27 +117,57 @@ export class UsageSourceRegistry {
     this.mergeKnown();
   }
 
+  private async fetchAuthorized(
+    id: string,
+    known: KnownReport | undefined,
+    options: ListUsageReportsOptions,
+  ): Promise<{ entry: UsageReportEntry; stillAllowed(): boolean } | null> {
+    if (!known) return null;
+    const logins = known.logins.filter(
+      (login) => options.canReadProvider?.(login.providerId) ?? true,
+    );
+    const distinct = [
+      ...new Map(
+        logins.map((login) => [loginKey({ input: login.input, harness: login.harness }), login]),
+      ).values(),
+    ];
+    const first = distinct[0];
+    if (!first) return null;
+    const filtered = { ...known, logins: [first, ...distinct.slice(1)] as [Login, ...Login[]] };
+    const entry = await this.fetchId(id, filtered, options.forceRefresh);
+    // Grants may change while a vendor request is in flight. Do not emit its old result.
+    const stillAllowed = () =>
+      logins.every((login) => options.canReadProvider?.(login.providerId) ?? true);
+    if (!stillAllowed()) return null;
+    options.onReport?.(entry);
+    return { entry, stillAllowed };
+  }
+
   private async discoverAgent(agentId: string): Promise<string[]> {
     if (!this.agents.hasAgent(agentId)) throw new Error(`Unknown agent: ${agentId}`);
     const session = this.agents.usageSession(agentId);
     if (!session) return [];
+    const authorizationProvider = this.agents.providerId?.(agentId) ?? session.provider;
     const previous = this.byAgent.get(agentId);
     const sameScope =
       previous?.sessionKey === session.sessionKey &&
-      previous.provider === session.provider &&
+      previous.provider === authorizationProvider &&
       previous.model === session.model;
     if (sameScope) return [...previous.reports.keys()];
-    const reports = await this.discover({
-      kind: "session",
-      provider: session.provider,
-      model: session.model,
-      env: session.env,
-    });
+    const reports = await this.discover(
+      {
+        kind: "session",
+        provider: session.provider,
+        model: session.model,
+        env: session.env,
+      },
+      authorizationProvider,
+    );
     // A query that finishes after a resume must not publish the previous launch's mapping.
     if (this.agents.usageSession(agentId)?.sessionKey !== session.sessionKey) return [];
     this.byAgent.set(agentId, {
       sessionKey: session.sessionKey,
-      provider: session.provider,
+      provider: authorizationProvider,
       model: session.model,
       reports,
     });
@@ -170,7 +196,10 @@ export class UsageSourceRegistry {
     }
   }
 
-  private async discover(scope: UsageScope): Promise<Map<string, KnownReport>> {
+  private async discover(
+    scope: UsageScope,
+    authorizationProvider?: string,
+  ): Promise<Map<string, KnownReport>> {
     const discovered = await Promise.all(
       [...this.sources.values()].map(async (source) => {
         const reports = new Map<string, KnownReport>();
@@ -181,6 +210,7 @@ export class UsageSourceRegistry {
                 key: z.string().regex(/^[A-Za-z0-9._-]{1,128}$/),
                 label: z.string().optional(),
                 harness: z.string().min(1).optional(),
+                providerId: z.string().min(1).optional(),
                 input: z.json(),
               }),
             )
@@ -189,7 +219,16 @@ export class UsageSourceRegistry {
             const id = `${source.id}:${account.key}`;
             const known = reports.get(id);
             // COMPAT(usageLoginHarness): added in v0.11.0, remove after 2027-04-05 once plugin floor >= v0.11.0.
-            const login = { input: account.input, harness: account.harness ?? source.label };
+            const providerId =
+              scope.kind === "session" &&
+              (account.providerId === undefined || account.providerId === scope.provider)
+                ? (authorizationProvider ?? scope.provider)
+                : account.providerId;
+            const login = {
+              input: account.input,
+              harness: account.harness ?? source.label,
+              providerId,
+            };
             if (known) {
               if (!known.logins.some((existing) => loginKey(existing) === loginKey(login)))
                 known.logins.push(login);
@@ -209,8 +248,10 @@ export class UsageSourceRegistry {
   }
 
   // COMPAT(providerUsageList): added in v0.1.98, remove after 2027-03-26.
-  async listLegacyUsage(): Promise<{ fetchedAt: string; providers: ProviderUsage[] }> {
-    const reports = await this.listReports();
+  async listLegacyUsage(
+    options: ListUsageReportsOptions = {},
+  ): Promise<{ fetchedAt: string; providers: ProviderUsage[] }> {
+    const reports = await this.listReports(options);
     return {
       fetchedAt: reports.length
         ? reports.reduce(

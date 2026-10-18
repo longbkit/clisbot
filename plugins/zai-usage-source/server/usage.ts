@@ -66,7 +66,8 @@ export async function fetchUsage(
 
 export async function discover(): Promise<UsageAccount[]> {
   for (const locator of ["ZAI_API_KEY", "GLM_API_KEY"]) {
-    if (process.env[locator]) return [{ key: "default", input: { store: "env", locator } }];
+    if (process.env[locator])
+      return [{ key: "default", providerId: "zai", input: { store: "env", locator } }];
   }
   return [];
 }

@@ -123,7 +123,7 @@ it("discovery returns a locator when fetch finds copilot credentials", async () 
     });
     expect(requested).toBe(true);
     expect(await discover()).toEqual([
-      { key: "default", input: { store: "env", locator: "COPILOT_TOKEN" } },
+      { key: "default", providerId: "copilot", input: { store: "env", locator: "COPILOT_TOKEN" } },
     ]);
   } finally {
     if (previous === undefined) delete process.env["COPILOT_TOKEN"];

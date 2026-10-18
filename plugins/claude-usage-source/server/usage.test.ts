@@ -916,6 +916,7 @@ it("keeps an expired Keychain login without calling the network and prefers Keyc
       {
         key: expect.stringMatching(/^[a-f0-9]{64}$/),
         harness: "Claude",
+        providerId: "claude",
         input: {
           route: { store: "keychain", service: "Claude Code-credentials", account: "fixture" },
         },
@@ -964,6 +965,7 @@ it.each([401, 403])("a rejected profile HTTP %i keeps a locator-keyed account", 
     {
       key: expect.stringMatching(/^[a-f0-9]{64}$/),
       harness: "Claude",
+      providerId: "claude",
       input: credentialInput(lookup.claudeHome),
     },
   ]);
@@ -998,7 +1000,12 @@ it.each([
     };
     const accounts = await discover({ kind: "global" }, lookup, api);
     expect(accounts).toEqual([
-      { key: hashAccountKey(JSON.stringify(input.route)), harness: "Claude", input },
+      {
+        key: hashAccountKey(JSON.stringify(input.route)),
+        harness: "Claude",
+        providerId: "claude",
+        input,
+      },
     ]);
     await expect(fetchUsage(accounts[0]!.input as UsageInput, api, lookup)).rejects.toThrow(error);
   },
@@ -1082,6 +1089,7 @@ it("session discovery reads only its Claude home and excludes foreign sessions",
         key: "session-account.org",
         label: "session@example.test",
         harness: "Claude",
+        providerId: "claude",
         input: credentialInput(home),
       },
     ]);

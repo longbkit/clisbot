@@ -269,7 +269,11 @@ it("discovery returns a locator when fetch finds cursor credentials", async () =
     });
     expect(requested).toBe(true);
     expect(await discover()).toEqual([
-      { key: "default", input: { store: "env", locator: "CURSOR_ACCESS_TOKEN" } },
+      {
+        key: "default",
+        providerId: "cursor",
+        input: { store: "env", locator: "CURSOR_ACCESS_TOKEN" },
+      },
     ]);
   } finally {
     if (previous === undefined) delete process.env["CURSOR_ACCESS_TOKEN"];

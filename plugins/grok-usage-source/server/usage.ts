@@ -163,6 +163,7 @@ export async function discover(): Promise<UsageAccount[]> {
     locator,
   }));
   candidates.push({ store: "file", locator: join(homedir(), ".grok", "auth.json") });
-  for (const input of candidates) if (await readToken(input)) return [{ key: "default", input }];
+  for (const input of candidates)
+    if (await readToken(input)) return [{ key: "default", providerId: "grok", input }];
   return [];
 }

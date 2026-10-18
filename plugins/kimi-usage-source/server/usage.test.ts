@@ -380,7 +380,7 @@ it("discovery returns a locator when fetch finds kimi credentials", async () => 
     });
     expect(requested).toBe(true);
     expect(await discover()).toEqual([
-      { key: "default", input: { store: "env", locator: "KIMI_TOKEN" } },
+      { key: "default", providerId: "kimi", input: { store: "env", locator: "KIMI_TOKEN" } },
     ]);
   } finally {
     if (previous === undefined) delete process.env["KIMI_TOKEN"];

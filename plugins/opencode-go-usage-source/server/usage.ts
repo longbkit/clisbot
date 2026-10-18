@@ -47,7 +47,9 @@ export async function readDefaultKey(path = authPath()): Promise<string | null> 
 }
 
 export async function discover(path = authPath()): Promise<UsageAccount[]> {
-  return (await readDefaultKey(path)) ? [{ key: hashAccountKey(path), input: { path } }] : [];
+  return (await readDefaultKey(path))
+    ? [{ key: hashAccountKey(path), providerId: "opencode", input: { path } }]
+    : [];
 }
 
 export async function fetchUsage(

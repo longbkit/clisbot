@@ -764,6 +764,7 @@ export async function createClisbotDaemon(
     usageAgents: {
       hasAgent: (id) => agentManager.getAgent(id) !== null,
       usageSession: (id) => agentManager.usageSession(id),
+      providerId: (id) => agentManager.getAgent(id)?.provider,
     },
     managedSources: new ManagedPluginSources(config.clisbotHome, {
       registries: config.pluginRegistries,

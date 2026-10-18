@@ -328,7 +328,11 @@ it("discovery returns a locator when fetch finds minimax credentials", async () 
     });
     expect(requested).toBe(true);
     expect(await discover()).toEqual([
-      { key: "default", input: { store: "env", locator: "MINIMAX_API_KEY" } },
+      {
+        key: "default",
+        providerId: "minimax",
+        input: { store: "env", locator: "MINIMAX_API_KEY" },
+      },
     ]);
   } finally {
     if (previous === undefined) delete process.env["MINIMAX_API_KEY"];

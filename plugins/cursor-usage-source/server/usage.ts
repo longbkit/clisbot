@@ -235,6 +235,7 @@ export async function discover(): Promise<UsageAccount[]> {
     ].map((locator) => ({ store: "sqlite" as const, locator })),
     { store: "file", locator: join(home, ".config", "cursor", "auth.json") },
   );
-  for (const input of candidates) if (await readToken(input)) return [{ key: "default", input }];
+  for (const input of candidates)
+    if (await readToken(input)) return [{ key: "default", providerId: "cursor", input }];
   return [];
 }

@@ -321,6 +321,6 @@ export async function discover(): Promise<UsageAccount[]> {
     ].map((locator) => ({ store: "file" as const, locator })),
   );
   for (const input of candidates)
-    if (await readCredentials(input)) return [{ key: "default", input }];
+    if (await readCredentials(input)) return [{ key: "default", providerId: "kimi", input }];
   return [];
 }

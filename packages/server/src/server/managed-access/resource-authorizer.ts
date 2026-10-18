@@ -1205,7 +1205,7 @@ export class ManagedResourceAuthorizer {
           );
     return projectIds.flatMap((projectId) => {
       const project = this.authorization.project(projectId);
-      if (project === undefined || !this.authorization.allowsProject(projectId, "project.use")) {
+      if (project === undefined || !this.allowsProject(projectId, "project.use")) {
         return [];
       }
       return project.agentConfigurations.map((configuration) => ({
@@ -1213,6 +1213,36 @@ export class ManagedResourceAuthorizer {
         privileges: project.privileges,
       }));
     });
+  }
+
+  usageAccessKey(): string {
+    return JSON.stringify([
+      this.authorization.isLeaseActive(),
+      this.isRestricted(),
+      [
+        ...new Set(
+          this.catalogAuthorities(undefined).map(({ configuration }) => configuration.providerId),
+        ),
+      ].sort(),
+    ]);
+  }
+
+  canReadUsageProvider(providerId: string | undefined): boolean {
+    if (!this.authorization.isLeaseActive()) return false;
+    if (!this.isRestricted()) return true;
+    return (
+      providerId !== undefined &&
+      this.catalogAuthorities(undefined).some(
+        ({ configuration }) => configuration.providerId === providerId,
+      )
+    );
+  }
+
+  private async canReadUsageReports(agentId: string | undefined): Promise<boolean> {
+    return (
+      this.catalogAuthorities(undefined).length > 0 &&
+      (agentId === undefined || (await this.allowsAgent(agentId, "project.use")))
+    );
   }
 
   private canReadProviderCatalog(provider: string, cwd: string | undefined): boolean {
@@ -1227,6 +1257,10 @@ export class ManagedResourceAuthorizer {
     switch (message.type) {
       case "ping":
         return true;
+      case "provider.usage.list.request":
+        return this.catalogAuthorities(undefined).length > 0;
+      case "usage.list_reports.request":
+        return this.canReadUsageReports(message.agentId);
       case "list_commands_request":
         return this.allowsAgent(message.agentId, "project.use");
       case "list_available_providers_request":
@@ -1266,7 +1300,7 @@ export class ManagedResourceAuthorizer {
           : requested.every((provider) => this.canReadProviderCatalog(provider, message.cwd));
       }
       default:
-        // `daemon.read` also protects config, status, diagnostics, usage, and
+        // `daemon.read` also protects config, status, diagnostics, and
         // skills. Project authority never opens those daemon-global surfaces.
         return false;
     }
@@ -1274,6 +1308,11 @@ export class ManagedResourceAuthorizer {
 
   private allowsRestrictedDaemonReadOutbound(message: SessionOutboundMessage): boolean {
     switch (message.type) {
+      case "provider.usage.list.response":
+      case "usage.list_reports.update":
+      case "usage.list_reports.response":
+        // UsageSession filters every login with live provider grants before fetching/emitting.
+        return this.catalogAuthorities(undefined).length > 0;
       case "pong":
       case "get_providers_snapshot_response":
       case "providers_snapshot_update":

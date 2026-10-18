@@ -1,3 +1,4 @@
+import { UsageSourceRegistry } from "./plugins/usage-sources/index.js";
 import {
   createMessageReceiptsStub,
   createTestCreationService,
@@ -6742,4 +6743,106 @@ describe("fetch agent timeline agent snapshot", () => {
     expect(agent?.pendingPermissions).toEqual([]);
     expect(markAgentInUse).not.toHaveBeenCalled();
   });
+});
+
+test("provider usage respects managed provider grants through both Session RPC paths", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const fetched: string[] = [];
+  const registry = new UsageSourceRegistry();
+  registry.register({
+    id: "fixture",
+    label: "Fixture",
+    discover: async () => [
+      { key: "allowed", providerId: "codex", input: "codex" },
+      { key: "private", providerId: "claude", input: "claude" },
+    ],
+    fetch: async (input) => {
+      fetched.push(String(input));
+      return { status: "available", windows: [] };
+    },
+  });
+  const project = { ...createProjectRecord("/work/a"), projectId: "project-a" };
+  const session = createSessionForTest({
+    messages,
+    permissions: ["daemon.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map([
+        [
+          "project-a",
+          {
+            privileges: new Set(["project.use"] as const),
+            agentConfigurations: [{ providerId: "codex" }],
+          },
+        ],
+      ]),
+      leaseId: "usage-test",
+      leaseExpiresAt: Date.now() + 60_000,
+    },
+    projectRegistry: {
+      list: vi.fn().mockResolvedValue([project]),
+      get: vi.fn().mockResolvedValue(project),
+    },
+    pluginRuntime: {
+      before: async (_name, request) => request,
+      emit: () => {},
+      listPlugins: async () => [],
+      getLogs: () => [],
+      installDirectory: vi.fn(),
+      inspectDirectory: vi.fn(),
+      reloadPlugin: vi.fn(),
+      enablePlugin: vi.fn(),
+      disablePlugin: vi.fn(),
+      removePlugin: vi.fn(),
+      subscribe: () => () => {},
+      catalog: () => [],
+      invokePluginRpc: vi.fn(),
+      listUsageReports: (options) => registry.listReports(options),
+      listLegacyUsage: (options) => registry.listLegacyUsage(options),
+    },
+  });
+  try {
+    await session.handleMessage({ type: "usage.list_reports.request", requestId: "modern" });
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: "usage.list_reports.update",
+        payload: expect.objectContaining({
+          report: expect.objectContaining({ id: "fixture:allowed" }),
+        }),
+      }),
+    );
+    expect(messages).not.toContainEqual(expect.objectContaining({ type: "rpc_error" }));
+    messages.length = 0;
+    await session.handleMessage({ type: "provider.usage.list.request", requestId: "legacy" });
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: "provider.usage.list.response",
+        payload: expect.objectContaining({
+          providers: [expect.objectContaining({ providerId: "fixture" })],
+        }),
+      }),
+    );
+    messages.length = 0;
+    await session.handleMessage({
+      type: "usage.list_reports.request",
+      requestId: "forged",
+      reportIds: ["fixture:private"],
+      forceRefresh: true,
+    });
+    expect(messages).not.toContainEqual(
+      expect.objectContaining({ type: "usage.list_reports.update" }),
+    );
+    expect(fetched).toEqual(["codex"]);
+    session.setPermissions([]);
+    messages.length = 0;
+    await session.handleMessage({ type: "usage.list_reports.request", requestId: "denied" });
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: "rpc_error",
+        payload: expect.objectContaining({ code: "access_denied" }),
+      }),
+    );
+  } finally {
+    await session.cleanup();
+  }
 });

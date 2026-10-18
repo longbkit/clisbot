@@ -247,6 +247,6 @@ export async function discover(): Promise<UsageAccount[]> {
   ];
   const accounts: UsageAccount[] = [];
   for (const input of candidates)
-    if (await readAuth(input)) accounts.push({ key: "default", input });
+    if (await readAuth(input)) accounts.push({ key: "default", providerId: "minimax", input });
   return accounts;
 }

@@ -60,6 +60,8 @@ export interface UsageAccount {
   label?: string;
   /** Harness owning this login, e.g. Codex, OpenCode, Pi or OMP. */
   harness?: string;
+  /** Exact provider owning this login; used by Host access filtering, never a display label. */
+  providerId?: string;
   /** Store locator, opaque to the daemon. */
   input: JsonValue;
 }

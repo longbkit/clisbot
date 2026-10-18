@@ -40,7 +40,7 @@ test("discovers and fetches the default key from read-only auth.json", async () 
   try {
     await writeFile(path, content);
     expect(await discover(path)).toEqual([
-      { key: expect.stringMatching(/^[a-f0-9]{64}$/), input: { path } },
+      { key: expect.stringMatching(/^[a-f0-9]{64}$/), providerId: "opencode", input: { path } },
     ]);
     const requests: Array<{ url: string; authorization: string | null }> = [];
     const fetchApi = async (url: string | URL | Request, init?: RequestInit) => {

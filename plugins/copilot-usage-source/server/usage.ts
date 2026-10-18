@@ -40,7 +40,8 @@ export async function discover(): Promise<UsageAccount[]> {
       locator: join(process.env.APPDATA, "GitHub CLI", "hosts.yml"),
     });
   candidates.push({ store: "file", locator: join(homedir(), ".config", "gh", "hosts.yml") });
-  for (const input of candidates) if (await readToken(input)) return [{ key: "default", input }];
+  for (const input of candidates)
+    if (await readToken(input)) return [{ key: "default", providerId: "copilot", input }];
   return [];
 }
 

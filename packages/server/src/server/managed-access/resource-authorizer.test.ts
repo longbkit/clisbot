@@ -420,7 +420,7 @@ describe("ManagedResourceAuthorizer", () => {
         type: "provider.usage.list.request",
         requestId: "usage",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
     await expect(
       authorizer.allowsInbound({
         type: "list_provider_models_request",
@@ -1242,4 +1242,51 @@ describe("managed caller provenance", () => {
       ).resolves.toBe(expected);
     },
   );
+});
+
+describe("provider usage access", () => {
+  it("uses provider configuration grants without opening daemon configuration or other agent scopes", async () => {
+    const authorizer = createHarness(["project.use"]);
+    await authorizer.ready();
+    expect(authorizer.canReadUsageProvider("codex")).toBe(true);
+    expect(authorizer.canReadUsageProvider("claude")).toBe(false);
+    expect(authorizer.canReadUsageProvider(undefined)).toBe(false);
+    await expect(
+      authorizer.allowsInbound({ type: "usage.list_reports.request", requestId: "all" }),
+    ).resolves.toBe(true);
+    await expect(
+      authorizer.allowsInbound({
+        type: "usage.list_reports.request",
+        requestId: "mine",
+        agentId: "agent-a",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      authorizer.allowsInbound({
+        type: "usage.list_reports.request",
+        requestId: "other",
+        agentId: "agent-b",
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      authorizer.allowsInbound({ type: "get_daemon_config_request", requestId: "config" }),
+    ).resolves.toBe(false);
+    expect(
+      authorizer.allowsOutbound({
+        type: "usage.list_reports.response",
+        payload: { requestId: "all", error: null },
+      }),
+    ).toBe(true);
+  });
+  it("denies usage without project use even if a provider configuration is listed", async () => {
+    const authorizer = createHarness([]);
+    await authorizer.ready();
+    expect(authorizer.canReadUsageProvider("codex")).toBe(false);
+    await expect(
+      authorizer.allowsInbound({ type: "provider.usage.list.request", requestId: "legacy" }),
+    ).resolves.toBe(false);
+    await expect(
+      authorizer.allowsInbound({ type: "usage.list_reports.request", requestId: "modern" }),
+    ).resolves.toBe(false);
+  });
 });

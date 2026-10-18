@@ -5,9 +5,13 @@ import type { SessionInboundMessage, SessionOutboundMessage } from "../../messag
 
 export interface UsageSessionOptions {
   emit(message: SessionOutboundMessage): void;
+  accessKey?: () => string;
+  canReadProvider?: (providerId: string | undefined) => boolean;
   runtime?: {
     listUsageReports(options: ListUsageReportsOptions): Promise<UsageReportEntry[]>;
-    listLegacyUsage(): Promise<{ fetchedAt: string; providers: ProviderUsage[] }>;
+    listLegacyUsage(
+      options?: ListUsageReportsOptions,
+    ): Promise<{ fetchedAt: string; providers: ProviderUsage[] }>;
   };
   logger: pino.Logger;
 }
@@ -22,6 +26,7 @@ export class UsageSession {
       if (!this.options.runtime) throw new Error("Plugin runtime is unavailable");
       await this.options.runtime.listUsageReports({
         forceRefresh: msg.forceRefresh,
+        canReadProvider: this.options.canReadProvider,
         reportIds: msg.reportIds,
         agentId: msg.agentId,
         onReport: (report) =>
@@ -51,7 +56,12 @@ export class UsageSession {
   ): Promise<void> {
     try {
       if (!this.options.runtime) throw new Error("Plugin runtime is unavailable");
-      const usage = await this.options.runtime.listLegacyUsage();
+      const accessKey = this.options.accessKey?.();
+      const usage = await this.options.runtime.listLegacyUsage({
+        canReadProvider: this.options.canReadProvider,
+      });
+      if (accessKey !== this.options.accessKey?.())
+        throw new Error("Usage access changed; retry the request");
       this.options.emit({
         type: "provider.usage.list.response",
         payload: {

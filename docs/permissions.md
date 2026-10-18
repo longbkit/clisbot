@@ -93,6 +93,21 @@ Project grants on requests and outbound observations; see the
 without granting daemon-wide `workspace.manage`. Project creation still requires
 `workspace.manage`. Existing stored grants do not gain new privileges when a UI preset changes.
 
+### Provider quota and usage
+
+Usage keeps its existing report content and UI. A Managed Access user may read usage
+for providers listed in their usable Project configuration grants; Host Administrator
+is not required. Both usage RPC versions apply the same filter, including explicit
+report refresh and streaming updates. This does not grant daemon configuration or
+diagnostics access.
+
+Provider identity belongs to each discovered login, not the quota source or its display
+label: one account can have Codex, OpenCode and other logins. The Host filters those
+logins before fetch/cache/fallback and rechecks current grants before delivery. Global
+reports without provider attribution remain available only to unrestricted callers.
+For a custom provider, session discovery keeps the selected custom provider identity
+for access checks; granting it does not grant the base provider's default logins.
+
 ### Access scopes
 
 A Hub assignment names one Resource: an Organization, a Host, a Project, a Team, a
