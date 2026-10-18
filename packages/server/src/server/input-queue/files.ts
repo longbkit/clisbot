@@ -129,6 +129,9 @@ export async function prepareQueueFiles(
     images: input.files.images,
     queueOnly: true,
     resolveForkSource: input.resolveForkSource,
+    retainedForkFiles: input.previous?.forkLinks
+      ? { links: input.previous.forkLinks, attachments: input.previous.attachments }
+      : undefined,
     ownsUpload: (file) =>
       input.ownsUpload(file) || retained.has(uploadKey(file)) || previousUpload(input, file),
   });
@@ -141,6 +144,7 @@ export async function prepareQueueFiles(
     attachments: result.attachments,
     files: result.links.files,
     images: result.links.files.slice(uploadedCount, uploadedCount + imageCount),
+    ...(result.links.forkSources?.length ? { forkLinks: result.links } : {}),
     fingerprint: input.fingerprint,
     identity: input.identity,
   };
@@ -165,4 +169,21 @@ export async function readQueueFileChunk(
   } finally {
     await handle.close();
   }
+}
+
+/** Existing attachment owner transfers authorized retained copies into canonical message links. */
+export async function attachQueueFiles(
+  directory: string,
+  messageId: string,
+  content: StoredQueueContent,
+) {
+  return attachSessionFiles({
+    directory,
+    messageId,
+    ...(await hydrateQueueContent(directory, content)),
+    retainedForkFiles: content.forkLinks
+      ? { links: content.forkLinks, attachments: content.attachments }
+      : undefined,
+    ownsUpload: (file) => content.files.some((ref) => ref.id === file.id && ref.size === file.size),
+  });
 }

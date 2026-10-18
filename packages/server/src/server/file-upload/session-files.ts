@@ -1,3 +1,4 @@
+import { appendRetainedForkFiles, type RetainedForkFiles } from "./retained-fork-files.js";
 import { queuedAttachmentIds } from "../input-queue/file-storage.js";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
@@ -190,6 +191,19 @@ async function addForkFiles(
       !attachment.sourceSession
     )
       continue;
+    if (
+      await appendRetainedForkFiles({
+        directory: input.directory,
+        attachment,
+        attachmentIndex,
+        retained: input.retainedForkFiles,
+        files,
+        paths: forkPaths,
+      })
+    ) {
+      checkLinkBudget(files, forkPaths);
+      continue;
+    }
     if (!input.resolveForkSource) throw new Error("Fork file source resolution is unavailable");
     const sourceAnchor = attachment.sourceSession;
     const source = await input.resolveForkSource(sourceAnchor);
@@ -279,6 +293,8 @@ export async function attachSessionFiles(input: {
   /** Keep bytes for a queue snapshot; canonical message links are written only on handoff. */
   queueOnly?: boolean;
   resolveForkSource?: ResolveForkSource;
+  /** Trusted queue-held copies and provenance; not a wire input or source-session lookup. */
+  retainedForkFiles?: RetainedForkFiles;
 }): Promise<{
   attachments?: AgentAttachment[];
   images?: { data: string; mimeType: string }[];

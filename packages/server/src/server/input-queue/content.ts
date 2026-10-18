@@ -17,6 +17,26 @@ export const StoredQueueContentSchema = z.object({
   attachments: z.array(AgentAttachmentSchema).optional(),
   files: z.array(FileSchema),
   images: z.array(FileSchema),
+  forkLinks: z
+    .object({
+      version: z.literal(1),
+      clientMessageId: z.string(),
+      files: z.array(FileSchema),
+      imageDigests: z.array(z.string()),
+      forkSources: z
+        .array(z.object({ agentId: z.string(), epoch: z.string(), seq: z.number() }))
+        .optional(),
+      forkPaths: z
+        .array(
+          z.object({
+            attachmentIndex: z.number().int().nonnegative(),
+            sourceRelativePath: z.string(),
+            targetRelativePath: z.string(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
   fingerprint: z.string(),
   identity: z.object({
     actor: SessionActorSchema.optional(),

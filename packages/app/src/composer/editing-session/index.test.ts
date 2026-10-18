@@ -50,3 +50,33 @@ describe("composer editing remount handoff", () => {
     },
   );
 });
+
+describe("local queue edit mutation ownership", () => {
+  const editor = { targetKey: "target", id: "old", revision: 1, original: "original", stale: true };
+  it("admits one mutation and retains one new admission ID across failed acknowledgements", () => {
+    const session = new ComposerEditingSession();
+    session.setQueueEdit(editor);
+    const first = session.beginQueueMutation(editor)!;
+    expect(session.beginQueueMutation(editor)).toBeNull();
+    expect(session.queueAdmissionId(first, "same draft", () => "new-a")).toBe("new-a");
+    session.finishQueueMutation(first);
+    const retry = session.beginQueueMutation(editor)!;
+    expect(session.queueAdmissionId(retry, "same draft", () => "new-b")).toBe("new-a");
+    session.finishQueueMutation(retry);
+    session.setQueueEdit({ ...editor });
+    const deliberate = session.beginQueueMutation(session.getQueueEdit())!;
+    expect(session.queueAdmissionId(deliberate, "same draft", () => "new-c")).toBe("new-c");
+  });
+  it("superseded editors reject late ownership and an old completion cannot unlock a newer mutation", () => {
+    const session = new ComposerEditingSession();
+    session.setQueueEdit(editor);
+    const old = session.beginQueueMutation(editor)!;
+    session.setQueueEdit({ ...editor, id: "newer" });
+    expect(session.ownsQueueMutation(old)).toBe(false);
+    session.finishQueueMutation(old);
+    const current = session.beginQueueMutation(session.getQueueEdit())!;
+    session.finishQueueMutation(old);
+    expect(session.getQueueMutationPending()).toBe(true);
+    expect(session.ownsQueueMutation(current)).toBe(true);
+  });
+});

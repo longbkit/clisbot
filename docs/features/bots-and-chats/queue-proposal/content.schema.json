@@ -508,6 +508,89 @@
         "required": ["id", "fileName", "mimeType", "size", "relativePath"]
       }
     },
+    "forkLinks": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "clientMessageId": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fileName": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "relativePath": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "fileName", "mimeType", "size", "relativePath"]
+          }
+        },
+        "imageDigests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forkSources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agentId": {
+                "type": "string"
+              },
+              "epoch": {
+                "type": "string"
+              },
+              "seq": {
+                "type": "number"
+              }
+            },
+            "required": ["agentId", "epoch", "seq"]
+          }
+        },
+        "forkPaths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "attachmentIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sourceRelativePath": {
+                "type": "string"
+              },
+              "targetRelativePath": {
+                "type": "string"
+              }
+            },
+            "required": ["attachmentIndex", "sourceRelativePath", "targetRelativePath"]
+          }
+        }
+      },
+      "required": ["version", "clientMessageId", "files", "imageDigests"]
+    },
     "fingerprint": {
       "type": "string"
     },

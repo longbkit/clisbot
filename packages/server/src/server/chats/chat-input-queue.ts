@@ -1,8 +1,8 @@
+import { currentSessionOperationIdentity } from "../agent/session-operation-context.js";
 import type { Logger } from "pino";
 import type { AgentManager } from "../agent/agent-manager.js";
-import { attachSessionFiles } from "../file-upload/session-files.js";
 import { InputQueueRuntime } from "../input-queue/runtime.js";
-import { hydrateQueueContent } from "../input-queue/files.js";
+import { attachQueueFiles, hydrateQueueContent } from "../input-queue/files.js";
 import type { ChatStore } from "./chat-store.js";
 import type { ChatEngine } from "./chat-engine.js";
 import type { TranscriptLog } from "./transcript-log.js";
@@ -32,7 +32,13 @@ export function registerChatInputQueue(options: ChatInputQueueOptions, chatId: s
     },
     delivered: async (id, content) => {
       if (!(await transcriptOf(chatId).findById(id))) return false;
-      if (content) await engine.send({ chatId, messageId: id, ...content });
+      if (content)
+        await engine.send({
+          chatId,
+          messageId: id,
+          ...content,
+          actor: currentSessionOperationIdentity()?.actor,
+        });
       return true;
     },
     handoff: async (id, content, interrupt, steerTarget) => {
@@ -45,14 +51,8 @@ export function registerChatInputQueue(options: ChatInputQueueOptions, chatId: s
         onlyWhenIdle: !interrupt && !steerTarget,
         ...(steerTarget ? { activeTurnBehavior: "steer" as const, steerTarget } : {}),
         ...(interrupt ? { activeTurnBehavior: "interrupt" as const } : {}),
-        prepareFiles: async (messageDirectory, messageId, payload) =>
-          attachSessionFiles({
-            directory: messageDirectory,
-            messageId,
-            ...payload,
-            ownsUpload: (file) =>
-              content.files.some((ref) => ref.id === file.id && ref.size === file.size),
-          }),
+        prepareFiles: (messageDirectory, messageId) =>
+          attachQueueFiles(messageDirectory, messageId, content),
       });
     },
   });

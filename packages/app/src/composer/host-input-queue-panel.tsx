@@ -19,6 +19,7 @@ interface QueueEditorActions {
 }
 interface HostInputQueuePanelProps extends QueuePanelActions, QueueEditorActions {
   view: InputQueueView;
+  pending: boolean;
   editor: { stale: boolean } | null;
   error: string | null;
 }
@@ -29,7 +30,8 @@ function QueueRow({
   sendNow,
   steer,
   remove,
-}: QueuePanelActions & { item: InputQueueView["items"][number] }) {
+  pending,
+}: QueuePanelActions & { pending: boolean } & { item: InputQueueView["items"][number] }) {
   const { t } = useTranslation();
   const editItem = useCallback(() => edit(item.id), [edit, item.id]);
   const steerItem = useCallback(() => steer(item.id), [steer, item.id]);
@@ -52,20 +54,44 @@ function QueueRow({
       <View style={styles.actions}>
         {item.state !== "sending" ? (
           <>
-            <Button size="xs" variant="outline" style={styles.touchAction} onPress={editItem}>
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={pending}
+              style={styles.touchAction}
+              onPress={editItem}
+            >
               {t("composer.hostQueue.edit")}
             </Button>
             {item.state === "queued" ? (
               <>
-                <Button size="xs" variant="outline" style={styles.touchAction} onPress={steerItem}>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={pending}
+                  style={styles.touchAction}
+                  onPress={steerItem}
+                >
                   {t("composer.hostQueue.steerOnce")}
                 </Button>
-                <Button size="xs" variant="outline" style={styles.touchAction} onPress={sendItem}>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={pending}
+                  style={styles.touchAction}
+                  onPress={sendItem}
+                >
                   {t("composer.hostQueue.sendNow")}
                 </Button>
               </>
             ) : null}
-            <Button size="xs" variant="outline" style={styles.touchAction} onPress={removeItem}>
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={pending}
+              style={styles.touchAction}
+              onPress={removeItem}
+            >
               {t("composer.hostQueue.delete")}
             </Button>
           </>
@@ -79,11 +105,12 @@ function QueueRow({
 
 function QueueEditor({
   stale,
+  pending,
   save,
   move,
   cancel,
   enqueueNew,
-}: QueueEditorActions & { stale: boolean }) {
+}: QueueEditorActions & { stale: boolean; pending: boolean }) {
   const { t } = useTranslation();
   return (
     <View style={styles.editor}>
@@ -94,7 +121,7 @@ function QueueEditor({
         <Button
           size="xs"
           variant="outline"
-          disabled={stale}
+          disabled={stale || pending}
           style={styles.touchAction}
           onPress={save}
         >
@@ -103,17 +130,29 @@ function QueueEditor({
         <Button
           size="xs"
           variant="ghost"
-          disabled={stale}
+          disabled={stale || pending}
           style={styles.touchAction}
           onPress={move}
         >
           {t("composer.hostQueue.move")}
         </Button>
-        <Button size="xs" variant="ghost" style={styles.touchAction} onPress={cancel}>
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={pending}
+          style={styles.touchAction}
+          onPress={cancel}
+        >
           {t("composer.hostQueue.cancel")}
         </Button>
         {stale ? (
-          <Button size="xs" variant="default" style={styles.touchAction} onPress={enqueueNew}>
+          <Button
+            size="xs"
+            variant="default"
+            disabled={pending}
+            style={styles.touchAction}
+            onPress={enqueueNew}
+          >
             {t("composer.hostQueue.enqueueNew")}
           </Button>
         ) : null}
@@ -137,6 +176,7 @@ export function HostInputQueuePanel(props: HostInputQueuePanelProps) {
             <QueueRow
               key={item.id}
               item={item}
+              pending={props.pending}
               edit={props.edit}
               sendNow={props.sendNow}
               steer={props.steer}
@@ -148,6 +188,7 @@ export function HostInputQueuePanel(props: HostInputQueuePanelProps) {
       {props.editor ? (
         <QueueEditor
           stale={props.editor.stale}
+          pending={props.pending}
           save={props.save}
           move={props.move}
           cancel={props.cancel}

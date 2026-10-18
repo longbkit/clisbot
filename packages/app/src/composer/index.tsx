@@ -10,6 +10,7 @@ import {
   useComposerEditingSession,
   useComposerFullscreen,
   useComposerQueueEdit,
+  useComposerQueueMutationPending,
 } from "./editing-session";
 import type { ComposerTextSource } from "./text-source";
 import { createStore, type StoreApi } from "zustand/vanilla";
@@ -1377,6 +1378,33 @@ function ComposerContentImpl({
   const [queueEdit, setQueueEditor] = useComposerQueueEdit(editingSession);
   const queueTargetKey = `${serverId}:${queueChatId ? `chat:${queueChatId}` : `agent:${agentId}`}`;
   const queueEditor = queueEdit?.targetKey === queueTargetKey ? queueEdit : null;
+  const queueEditPending = useComposerQueueMutationPending(editingSession);
+  const queueDraftContext = useRef<{
+    targetKey: string;
+    attachments: ComposerAttachment[];
+    textSource: typeof textSource;
+  } | null>(null);
+  queueDraftContext.current = { targetKey: queueTargetKey, attachments, textSource };
+  useEffect(
+    () => () => {
+      queueDraftContext.current = null;
+    },
+    [],
+  );
+  const beginQueueEditMutation = useCallback(() => {
+    const token = editingSession.beginQueueMutation(queueEdit);
+    if (!token) return null;
+    const originalText = textSource.getSnapshot();
+    return {
+      token,
+      current: () =>
+        editingSession.ownsQueueMutation(token) &&
+        queueDraftContext.current?.targetKey === queueTargetKey &&
+        queueDraftContext.current.attachments === attachments &&
+        queueDraftContext.current.textSource.getSnapshot() === originalText,
+      finish: () => editingSession.finishQueueMutation(token),
+    };
+  }, [editingSession, queueEdit, queueTargetKey, textSource, attachments]);
   const isFullscreen = useComposerFullscreen(editingSession);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
@@ -1672,6 +1700,8 @@ function ComposerContentImpl({
   const saveQueueEdit = useCallback(
     async (text: string, values: ComposerAttachment[], move = false) => {
       if (!queueEditor || queueEditor.stale) return;
+      const mutation = beginQueueEditMutation();
+      if (!mutation) return;
       try {
         const latest = await executeQueueCommand({ action: "fetch" });
         const revision = queueEditRevision(queueEditor.id, queueEditor.original, latest);
@@ -1683,12 +1713,14 @@ function ComposerContentImpl({
           revision,
           ...content,
         });
+        if (!mutation.current()) return;
         setQueueEditor(null);
         replaceUserInput("");
         setSelectedAttachments([]);
         clearSentAttachments(values);
         setSendError(null);
       } catch (error) {
+        if (!mutation.current()) return;
         const stale =
           error instanceof QueueMutationConflict &&
           (!error.queue ||
@@ -1697,10 +1729,13 @@ function ComposerContentImpl({
           setQueueEditor((current) => (current ? { ...current, stale } : current));
         const message = error instanceof Error ? error.message : String(error);
         setSendError(stale ? null : message);
+      } finally {
+        mutation.finish();
       }
     },
     [
       queueEditor,
+      beginQueueEditMutation,
       t,
       setQueueEditor,
       prepareQueueContent,
@@ -2045,12 +2080,15 @@ function ComposerContentImpl({
     async (id: string) => {
       const item = queueView.items.find((value) => value.id === id);
       if (!item || item.state === "sending") return;
+      const mutation = beginQueueEditMutation();
+      if (!mutation) return;
       try {
         const restored = await queueItemAttachments(
           item,
           persistAttachmentFromDataUrl,
           readQueueAttachment,
         );
+        if (!mutation.current()) return;
         replaceUserInput(item.text);
         setSelectedAttachments(restored);
         setQueueEditor({
@@ -2061,11 +2099,14 @@ function ComposerContentImpl({
           stale: item.state === "needs_review",
         });
       } catch (error) {
-        setSendError(String(error));
+        if (mutation.current()) setSendError(String(error));
+      } finally {
+        mutation.finish();
       }
     },
     [
       queueView,
+      beginQueueEditMutation,
       replaceUserInput,
       setSelectedAttachments,
       queueTargetKey,
@@ -2498,21 +2539,59 @@ function ComposerContentImpl({
     [saveQueueEdit, textSource, buildOutgoingAttachments, attachments],
   );
   const handleCancelQueueEdit = useCallback(() => {
+    if (editingSession.getQueueMutationPending()) return;
     setQueueEditor(null);
     replaceUserInput("");
     setSelectedAttachments([]);
     setSendError(null);
-  }, [setQueueEditor, replaceUserInput, setSelectedAttachments]);
+  }, [editingSession, setQueueEditor, replaceUserInput, setSelectedAttachments]);
   const handleEnqueueQueueEdit = useCallback(() => {
-    queueAttempt.current = null;
-    void queueMessage(textSource.getSnapshot(), buildOutgoingAttachments(attachments))
-      .then(() => setQueueEditor(null))
-      .catch((error) => setSendError(String(error)));
-  }, [queueMessage, textSource, buildOutgoingAttachments, attachments, setQueueEditor]);
+    if (!queueEditor?.stale) return;
+    const mutation = beginQueueEditMutation();
+    if (!mutation) return;
+    const values = buildOutgoingAttachments(attachments);
+    void (async () => {
+      try {
+        const content = await prepareQueueContent(textSource.getSnapshot(), values);
+        const id = editingSession.queueAdmissionId(
+          mutation.token,
+          JSON.stringify(content),
+          generateMessageId,
+        );
+        await executeQueueCommand({ action: "enqueue", id, ...content });
+        if (!mutation.current()) return;
+        setQueueEditor(null);
+        replaceUserInput("");
+        setSelectedAttachments([]);
+        resetSuppression();
+        clearSentAttachments(values);
+        setSendError(null);
+      } catch (error) {
+        if (mutation.current()) setSendError(String(error));
+      } finally {
+        mutation.finish();
+      }
+    })();
+  }, [
+    queueEditor,
+    beginQueueEditMutation,
+    buildOutgoingAttachments,
+    attachments,
+    prepareQueueContent,
+    textSource,
+    editingSession,
+    executeQueueCommand,
+    setQueueEditor,
+    replaceUserInput,
+    setSelectedAttachments,
+    resetSuppression,
+    clearSentAttachments,
+  ]);
   const queueList = (
     <HostInputQueuePanel
       view={queueView}
       editor={queueEditor}
+      pending={queueEditPending}
       error={queueReadError}
       edit={handleEditQueuedMessage}
       sendNow={handleSendQueuedNow}
@@ -2635,11 +2714,15 @@ function ComposerContentImpl({
                   onChangeText={setUserInput}
                   onSubmit={handleSubmit}
                   hasExternalContent={hasExternalContent}
-                  allowEmptySubmit={allowEmptySubmit}
-                  submitButtonAccessibilityLabel={submitButtonAccessibilityLabel}
+                  allowEmptySubmit={Boolean(queueEditor) || allowEmptySubmit}
+                  submitButtonAccessibilityLabel={
+                    queueEditor ? t("composer.hostQueue.save") : submitButtonAccessibilityLabel
+                  }
                   submitButtonTestID={submitButtonTestID}
                   submitIcon={submitIcon}
-                  isSubmitDisabled={isSubmitDisabled || queueEditor?.stale === true}
+                  isSubmitDisabled={
+                    isSubmitDisabled || queueEditor?.stale === true || queueEditPending
+                  }
                   isSubmitLoading={isSubmitLoadingVisible}
                   preserveHeightOnSubmit={submitBehavior === "preserve-and-lock"}
                   attachments={selectedAttachments}
@@ -2654,7 +2737,7 @@ function ComposerContentImpl({
                   placeholder={messagePlaceholder}
                   autoFocus={messageInputAutoFocus}
                   autoFocusKey={`${serverId}:${agentId}:${autoFocusKey ?? ""}`}
-                  disabled={isSubmitLoading}
+                  disabled={isSubmitLoading || queueEditPending}
                   leftContent={leftContent}
                   beforeVoiceContent={beforeVoiceContent}
                   rightContent={rightContent}
@@ -2667,7 +2750,7 @@ function ComposerContentImpl({
                   isAgentRunning={isAgentRunning}
                   defaultSendBehavior={queueEditor ? "interrupt" : activeSendBehavior}
                   onQueue={queueEditor ? undefined : handleQueue}
-                  onSubmitLoadingPress={submitLoadingPressHandler}
+                  onSubmitLoadingPress={queueEditor ? undefined : submitLoadingPressHandler}
                   onKeyPress={handleCommandKeyPress}
                   onSelectionChange={handleSelectionChange}
                   onFocusChange={handleFocusChange}

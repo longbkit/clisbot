@@ -35,9 +35,41 @@ export class ComposerEditingSession {
       | null
       | ((current: ComposerQueueEdit | null) => ComposerQueueEdit | null),
   ) => {
+    this.queueAdmission = null;
     this.queueEdit = typeof next === "function" ? next(this.queueEdit) : next;
     for (const listener of this.listeners) listener();
   };
+  private queueMutation: { token: symbol; editor: ComposerQueueEdit | null } | null = null;
+  private queueAdmission: {
+    editor: ComposerQueueEdit | null;
+    fingerprint: string;
+    id: string;
+  } | null = null;
+  getQueueMutationPending = () => this.queueMutation !== null;
+  beginQueueMutation(editor: ComposerQueueEdit | null): symbol | null {
+    if (this.queueMutation || this.queueEdit !== editor) return null;
+    const token = Symbol("local queue editor mutation");
+    this.queueMutation = { token, editor };
+    for (const listener of this.listeners) listener();
+    return token;
+  }
+  ownsQueueMutation(token: symbol): boolean {
+    return this.queueMutation?.token === token && this.queueMutation.editor === this.queueEdit;
+  }
+  finishQueueMutation(token: symbol): void {
+    if (this.queueMutation?.token !== token) return;
+    this.queueMutation = null;
+    for (const listener of this.listeners) listener();
+  }
+  queueAdmissionId(token: symbol, fingerprint: string, createId: () => string): string {
+    if (!this.ownsQueueMutation(token)) throw new Error("Local queue editor changed");
+    if (
+      this.queueAdmission?.editor !== this.queueEdit ||
+      this.queueAdmission.fingerprint !== fingerprint
+    )
+      this.queueAdmission = { editor: this.queueEdit, fingerprint, id: createId() };
+    return this.queueAdmission.id;
+  }
   private handoff: ComposerEditingHandoff | null = null;
   private listeners = new Set<() => void>();
   getFullscreen = () => this.fullscreen;
@@ -164,4 +196,12 @@ export function useComposerFullscreen(session: ComposerEditingSession): boolean 
 export function useComposerQueueEdit(session: ComposerEditingSession) {
   const edit = useSyncExternalStore(session.subscribe, session.getQueueEdit, session.getQueueEdit);
   return [edit, session.setQueueEdit] as const;
+}
+
+export function useComposerQueueMutationPending(session: ComposerEditingSession) {
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getQueueMutationPending,
+    session.getQueueMutationPending,
+  );
 }

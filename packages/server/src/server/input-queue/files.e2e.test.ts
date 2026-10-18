@@ -1,8 +1,10 @@
+import pino from "pino";
+import { InputQueueRuntime } from "./runtime.js";
 import { mkdtemp, mkdir, readFile, writeFile, rm, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
-import { prepareQueueFiles, hydrateQueueContent } from "./files.js";
+import { prepareQueueFiles, hydrateQueueContent, attachQueueFiles } from "./files.js";
 import { attachSessionFiles, pruneSessionDrafts } from "../file-upload/session-files.js";
 import { writeJsonFileAtomic } from "../atomic-file.js";
 
@@ -122,5 +124,130 @@ test("queue image/file bytes survive TTL, transfer to messages, and release only
     for (const file of handed.links.files) await access(path.join(directory, file.relativePath));
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+for (const { withFile, removeSource } of [
+  { withFile: false, removeSource: true },
+  { withFile: true, removeSource: true },
+  { withFile: true, removeSource: false },
+]) {
+  test(`authorized queued history handoff retains source provenance after source removal: files=${withFile}, removed=${removeSource}`, async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "queue-history-"));
+    try {
+      const source = path.join(root, "source");
+      const target = path.join(root, "target");
+      await mkdir(source);
+      await mkdir(target);
+      const sourceFile = path.join(source, "original.txt");
+      await writeFile(sourceFile, "retained fork bytes");
+      if (withFile)
+        await attachSessionFiles({
+          directory: source,
+          messageId: "history-message",
+          attachments: [
+            {
+              type: "uploaded_file",
+              id: "source-file",
+              fileName: "original.txt",
+              mimeType: "text/plain",
+              size: 19,
+              path: sourceFile,
+            },
+          ],
+          ownsUpload: () => true,
+        });
+      const anchor = { agentId: "source", epoch: "observed", seq: 1 };
+      const content = await prepareQueueFiles({
+        directory: target,
+        text: "Fork context",
+        files: {
+          attachments: [
+            {
+              type: "text",
+              mimeType: "text/plain",
+              contextKind: "chat_history",
+              text: `Known ${path.join(source, "uploads", "source-file", "original.txt")}`,
+              sourceSession: anchor,
+            },
+          ],
+        },
+        ownsUpload: () => false,
+        resolveForkSource: async () => ({
+          directory: source,
+          messageIds: (async function* () {
+            yield "history-message";
+          })(),
+        }),
+        identity: {},
+        fingerprint: "fixture",
+      });
+      if (withFile)
+        await writeFile(
+          path.join(source, "uploads", "source-file", "original.txt"),
+          "changed source bytes",
+        );
+      if (removeSource) await rm(source, { recursive: true });
+      await hydrateQueueContent(target, content);
+      const handed = await attachQueueFiles(target, "logical", content);
+      expect(handed.links.forkSources).toEqual([anchor]);
+      expect(handed.links.files).toHaveLength(withFile ? 1 : 0);
+      for (const file of handed.links.files)
+        expect(await readFile(path.join(target, file.relativePath), "utf8")).toBe(
+          "retained fork bytes",
+        );
+      expect(handed.attachments?.[0]).toMatchObject({ sourceSession: anchor });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("unauthorized history source fails before durable queue acknowledgement", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "queue-history-denied-"));
+  const runtime = new InputQueueRuntime(pino({ level: "silent" }));
+  try {
+    runtime.register("target", {
+      directory,
+      ready: async () => false,
+      delivered: async () => false,
+      handoff: async () => {
+        throw new Error("must not dispatch");
+      },
+    });
+    await expect(
+      runtime.command(
+        "target",
+        {
+          action: "enqueue",
+          id: "denied",
+          text: "",
+          attachments: [
+            {
+              type: "text",
+              mimeType: "text/plain",
+              contextKind: "chat_history",
+              text: "Unauthorized",
+              sourceSession: { agentId: "forbidden", epoch: "e", seq: 1 },
+            },
+          ],
+        },
+        {
+          ownsUpload: () => false,
+          resolveForkSource: async () => {
+            throw new Error("Source session access denied");
+          },
+        },
+      ),
+    ).rejects.toThrow("Source session access denied");
+    const result = await runtime.command(
+      "target",
+      { action: "fetch" },
+      { ownsUpload: () => false },
+    );
+    expect(result.queue).toEqual({ revision: 0, items: [] });
+  } finally {
+    await runtime.stop();
+    await rm(directory, { recursive: true, force: true });
   }
 });

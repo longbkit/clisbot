@@ -7,7 +7,7 @@ import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import { sendPromptToAgent, waitForAgentRunStartWithTimeout } from "../agent/agent-prompt.js";
 import { buildAgentPrompt } from "../agent/prompt-attachments.js";
 import { attachSessionFiles } from "../file-upload/session-files.js";
-import { hydrateQueueContent } from "./files.js";
+import { attachQueueFiles } from "./files.js";
 import type { StoredQueueContent } from "./content.js";
 import { InputQueueRuntime, type QueueTarget } from "./runtime.js";
 
@@ -113,14 +113,7 @@ export class AgentInputQueues {
     const { manager, storage, logger } = this.options;
     if (steerTarget && steerTarget.agentId !== owner.agentId)
       throw new Error("Steer target does not match this session");
-    const payload = await hydrateQueueContent(owner.directory, content);
-    const files = await attachSessionFiles({
-      directory: owner.directory,
-      messageId: id,
-      ...payload,
-      ownsUpload: (file) =>
-        content.files.some((ref) => ref.id === file.id && ref.size === file.size),
-    });
+    const files = await attachQueueFiles(owner.directory, id, content);
     if (!interrupt && !steerTarget && manager.hasInFlightRun(owner.agentId))
       throw new Error("A turn started before queue handoff; check outcome");
     const result = await sendPromptToAgent({

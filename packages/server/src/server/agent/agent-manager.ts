@@ -6286,9 +6286,11 @@ export class AgentManager {
     });
   }
 
-  /** Queue recovery uses only a confirmed, persisted user row, never a pending receipt. */
+  /** A human attempt row can represent rejection; only applied admission plus its row proves handoff. */
   async hasDurableSubmittedMessage(agentId: string, messageId: string): Promise<boolean> {
     await this.waitForTimelinePersistence(agentId);
+    const submission = await this.durableTimelineStore?.readMessageSubmission?.(agentId, messageId);
+    if (submission?.status !== "applied") return false;
     return Boolean(await this.durableTimelineStore?.getSubmittedUserMessage?.(agentId, messageId));
   }
 

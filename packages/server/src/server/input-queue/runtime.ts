@@ -91,11 +91,27 @@ export class InputQueueRuntime {
   register(key: string, target: QueueTarget): void {
     if (this.stopped || this.targets.has(key)) return;
     const queue = new InputQueueStore(validatedStorage(target.directory));
-    const recovering = queue.recover((item) => target.delivered(item.id));
+    const recovering = queue.recover((item) => this.recoveredDelivery(target, item));
     this.targets.set(key, { queue, target, recovering });
     void recovering
       .then(() => this.wake(key))
       .catch((err) => this.logger.error({ err, key }, "Queue recovery failed; target paused"));
+  }
+
+  private async recoveredDelivery(target: QueueTarget, item: QueueItem): Promise<boolean> {
+    try {
+      const content = StoredQueueContentSchema.parse(item.payload);
+      const payload = await hydrateQueueContent(target.directory, content);
+      return await withSessionOperationIdentity(content.identity, () =>
+        target.delivered(item.id, payload),
+      );
+    } catch (err) {
+      this.logger.warn(
+        { err, id: item.id },
+        "Queue recovery could not corroborate accepted handoff",
+      );
+      return false;
+    }
   }
 
   command(
