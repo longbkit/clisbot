@@ -1280,9 +1280,12 @@ function ComposerContentImpl({
 
   const agentState = useSessionStore(useShallow(buildAgentStateSelector(serverId, agentId)));
 
-  const queueSupported = useSessionStore(
+  const hasAgent = agentState.status !== null;
+  const hasQueueTarget = submissionTarget === "conversation" ? Boolean(queueChatId) : hasAgent;
+  const hostQueueSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.hostInputQueue === true,
   );
+  const queueSupported = hasQueueTarget && hostQueueSupported;
   const {
     view: queueView,
     command: executeQueueCommand,
@@ -1657,8 +1660,6 @@ function ComposerContentImpl({
     appSettings.sendBehavior,
     submissionTarget === "conversation" ? conversationHasPermission : hasPendingPermission,
   );
-  const hasAgent = agentState.status !== null;
-
   const prepareQueueContent = useCallback(
     async (text: string, values: ComposerAttachment[]) => {
       const wire = splitComposerAttachmentsForSubmit(await uploadLocalQueueCopies(client, values));
@@ -1852,6 +1853,7 @@ function ComposerContentImpl({
 
   const handleOneOffSend = useCallback(
     async (action: "queue" | "steer") => {
+      if (!hasQueueTarget) return;
       const text = textSource.getSnapshot();
       const values = buildOutgoingAttachments(attachments);
       setIsProcessing(true);
@@ -1873,6 +1875,7 @@ function ComposerContentImpl({
       }
     },
     [
+      hasQueueTarget,
       queueEditor,
       textSource,
       buildOutgoingAttachments,
@@ -2742,14 +2745,16 @@ function ComposerContentImpl({
                   beforeVoiceContent={beforeVoiceContent}
                   rightContent={rightContent}
                   onOneOffSend={
-                    queueEditor || readOnly || isSubmitLoadingVisible ? undefined : handleOneOffSend
+                    !hasQueueTarget || queueEditor || readOnly || isSubmitLoadingVisible
+                      ? undefined
+                      : handleOneOffSend
                   }
                   activeActionContent={activeActionContent}
                   voiceServerId={serverId}
                   voiceAgentId={realtimeVoiceEnabled && !pendingSessionReason ? agentId : undefined}
                   isAgentRunning={isAgentRunning}
                   defaultSendBehavior={queueEditor ? "interrupt" : activeSendBehavior}
-                  onQueue={queueEditor ? undefined : handleQueue}
+                  onQueue={!hasQueueTarget || queueEditor ? undefined : handleQueue}
                   onSubmitLoadingPress={queueEditor ? undefined : submitLoadingPressHandler}
                   onKeyPress={handleCommandKeyPress}
                   onSelectionChange={handleSelectionChange}

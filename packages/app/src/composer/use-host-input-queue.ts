@@ -58,7 +58,7 @@ export function useHostInputQueue(options: HostInputQueueOptions) {
     view: enabled && !query.isError ? (query.data ?? EMPTY) : EMPTY,
     command,
     readAttachment,
-    error: query.error?.message ?? null,
+    error: enabled ? (query.error?.message ?? null) : null,
   };
 }
 
