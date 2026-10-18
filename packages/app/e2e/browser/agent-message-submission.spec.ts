@@ -1,3 +1,4 @@
+import { recordTimelinePagination } from "../support/helpers/timeline-pagination-diagnostics";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test as baseTest } from "../support/fixtures";
 import {
@@ -1019,6 +1020,7 @@ test.describe("Agent message submission", () => {
   test("keeps one prompt when its provider echo crosses the bounded tail", async ({
     page,
   }, testInfo) => {
+    const savePaginationDiagnostic = await recordTimelinePagination(page);
     const workspace = await seedWorkspace({
       repoPrefix: `submission-echo-past-tail-${testInfo.workerIndex}-`,
     });
@@ -1038,7 +1040,11 @@ test.describe("Agent message submission", () => {
       await expect(submittedPrompt).toHaveCount(1);
       await expect(submittedPrompt).toHaveAttribute("aria-busy", "false");
     } finally {
-      await workspace.cleanup();
+      try {
+        await savePaginationDiagnostic(testInfo);
+      } finally {
+        await workspace.cleanup();
+      }
     }
   });
 
