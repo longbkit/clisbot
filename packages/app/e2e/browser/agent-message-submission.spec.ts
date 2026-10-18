@@ -1091,8 +1091,12 @@ test.describe("Agent message submission", () => {
       await expectComposerVisible(page);
       await submitMessage(page, "Keep running until the queued turn is ready.");
       await expectRunningAgentChrome(page, title);
-      await queueMessage(page, secondPrompt);
-      await expect(page.getByRole("button", { name: "Send queued message now" })).toBeVisible();
+      await fillComposerDraft(page, secondPrompt);
+      await expect(page.getByRole("button", { name: "Send and steer", exact: true })).toBeEnabled();
+      await sendDraftToQueue(page);
+      await expect(
+        page.getByRole("button", { name: "Steer this send", exact: true }),
+      ).toBeVisible();
 
       gate.holdNextServerMessage("cancel_agent_response");
       await page.getByRole("button", { name: "Stop agent", exact: true }).click();

@@ -82,7 +82,7 @@ export async function sendDraftToQueue(page: Page): Promise<void> {
 }
 
 export async function expectQueuedMessageButton(page: Page): Promise<void> {
-  await expect(page.getByRole("button", { name: "Send queued message now" })).toBeVisible({
+  await expect(page.getByRole("button", { name: "Steer this send", exact: true })).toBeVisible({
     timeout: 10_000,
   });
 }
