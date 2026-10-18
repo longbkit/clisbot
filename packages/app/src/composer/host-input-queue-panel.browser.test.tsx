@@ -49,38 +49,28 @@ function button(label: string) {
   return document.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
 }
 const click = (element: Element) => act(() => (element as HTMLElement).click());
-test("compact row exposes accessible icon actions and original named send choices without accidental admission", async () => {
-  const actions = mount();
-  expect(container.textContent).not.toContain("Client queue");
-  expect(container.querySelector('[aria-label="Attachments (1)"]')).not.toBeNull();
-  for (const label of ["Edit", "Send actions", "Delete"]) {
-    const rect = button(label).getBoundingClientRect();
-    expect(rect.width).toBeGreaterThanOrEqual(44);
-    expect(rect.height).toBeGreaterThanOrEqual(44);
-  }
-  click(button("Edit"));
-  expect(actions.edit).toHaveBeenCalledExactlyOnceWith("one");
-  click(button("Delete"));
-  expect(actions.remove).toHaveBeenCalledExactlyOnceWith("one");
-  click(button("Send actions"));
-  expect(actions.sendNow).not.toHaveBeenCalled();
-  expect(actions.steer).not.toHaveBeenCalled();
-  const choice = [...document.querySelectorAll('[role="menuitem"]')].find((e) =>
-    e.textContent?.includes("Steer this send"),
-  )!;
-  expect(choice).toBeDefined();
-  click(choice);
-  await vi.waitFor(() => expect(actions.steer).toHaveBeenCalledExactlyOnceWith("one"));
-  expect(actions.sendNow).not.toHaveBeenCalled();
-  click(button("Send actions"));
-  await vi.waitFor(() => expect(document.querySelector('[role="menuitem"]')).not.toBeNull());
-  const interrupt = [...document.querySelectorAll('[role="menuitem"]')].find((e) =>
-    e.textContent?.includes("Interrupt and send"),
-  )!;
-  click(interrupt);
-  await vi.waitFor(() => expect(actions.sendNow).toHaveBeenCalledExactlyOnceWith("one"));
-  expect(actions.steer).toHaveBeenCalledTimes(1);
-});
+test.each([undefined, "Send message"])(
+  "queue row directly steers without an interrupt menu; client label=%s",
+  async (sendNowLabel) => {
+    const actions = mount({ sendNowLabel });
+    expect(container.textContent).not.toContain("Client queue");
+    expect(container.querySelector('[aria-label="Attachments (1)"]')).not.toBeNull();
+    for (const label of ["Edit", "Steer this send", "Delete"]) {
+      const rect = button(label).getBoundingClientRect();
+      expect(rect.width).toBeGreaterThanOrEqual(44);
+      expect(rect.height).toBeGreaterThanOrEqual(44);
+    }
+    click(button("Edit"));
+    expect(actions.edit).toHaveBeenCalledExactlyOnceWith("one");
+    click(button("Delete"));
+    expect(actions.remove).toHaveBeenCalledExactlyOnceWith("one");
+    click(button("Steer this send"));
+    expect(actions.steer).toHaveBeenCalledExactlyOnceWith("one");
+    expect(actions.sendNow).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="menuitem"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("Interrupt and send");
+  },
+);
 test("manual badge explains on demand, direct Send remains named; disabled/review/sending and stale editor guards remain", async () => {
   const actions = mount({
     notice: "Group explanation",
@@ -106,11 +96,14 @@ test("pending and nonqueued rows cannot send; stale Save/Move remain disabled", 
     },
   });
   expect(button("Edit").getAttribute("aria-disabled")).toBe("true");
-  expect(button("Send actions").getAttribute("aria-disabled")).toBe("true");
+  expect(button("Steer this send").getAttribute("aria-disabled")).toBe("true");
+  click(button("Steer this send"));
+  expect(actions.steer).not.toHaveBeenCalled();
+  expect(actions.sendNow).not.toHaveBeenCalled();
   const sending = container.querySelector('[data-testid="host-queue-two"]')!;
   const review = container.querySelector('[data-testid="host-queue-three"]')!;
   expect(sending.querySelector('[role="button"]')).toBeNull();
-  expect(review.querySelector('[aria-label="Send actions"]')).toBeNull();
+  expect(review.querySelector('[aria-label="Steer this send"]')).toBeNull();
   const save = [...container.querySelectorAll('button,[role="button"]')].find(
     (e) => e.textContent === "Save changes",
   ) as HTMLButtonElement;

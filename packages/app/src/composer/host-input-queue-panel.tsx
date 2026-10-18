@@ -3,31 +3,16 @@ import { View, Text, ScrollView } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import {
-  PencilLine,
-  Send,
-  Trash2,
-  Paperclip,
-  ArrowUp,
-  CircleStop,
-  type LucideIcon,
-} from "lucide-react-native";
+import { PencilLine, Send, Trash2, Paperclip, type LucideIcon } from "lucide-react-native";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
-const ThemedSend = withUnistyles(Send);
 const ThemedPaperclip = withUnistyles(Paperclip);
-const ThemedSteer = withUnistyles(ArrowUp);
-const ThemedInterrupt = withUnistyles(CircleStop);
-const STEER_ICON = <ThemedSteer size={16} uniProps={mutedIconColorMapping} />;
-const SEND_ICON = <ThemedSend size={16} uniProps={mutedIconColorMapping} />;
-const INTERRUPT_ICON = <ThemedInterrupt size={16} uniProps={mutedIconColorMapping} />;
 interface QueuePanelItem {
   id: string;
   text: string;
@@ -121,32 +106,17 @@ function QueueSendActions({
   steer(): void;
 }) {
   const { t } = useTranslation();
-  const label = sendNowLabel ?? t("composer.hostQueue.sendNow");
-  if (hideSteer)
-    return <QueueIconAction label={label} Icon={Send} disabled={disabled} onPress={sendNow} />;
   return (
-    <DropdownMenu compactMode="sheet">
-      <DropdownMenuTrigger
-        accessibilityRole="button"
-        accessibilityLabel={t("composer.hostQueue.sendActions")}
-        style={styles.iconTarget}
-        disabled={disabled}
-      >
-        <ThemedSend size={16} uniProps={mutedIconColorMapping} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={disabled} onSelect={steer} leading={STEER_ICON}>
-          {t("composer.hostQueue.steerOnce")}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={disabled}
-          onSelect={sendNow}
-          leading={sendNowLabel ? SEND_ICON : INTERRUPT_ICON}
-        >
-          {label}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <QueueIconAction
+      label={
+        hideSteer
+          ? (sendNowLabel ?? t("composer.input.sendMessage"))
+          : t("composer.hostQueue.steerOnce")
+      }
+      Icon={Send}
+      disabled={disabled}
+      onPress={hideSteer ? sendNow : steer}
+    />
   );
 }
 

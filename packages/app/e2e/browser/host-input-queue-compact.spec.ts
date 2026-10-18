@@ -86,7 +86,7 @@ for (const manual of [false, true]) {
           await expect(scope.getByText("Client queue (this app)", { exact: true })).toHaveCount(0);
           const box = (await first.boundingBox())!;
           expect(box.height).toBeLessThanOrEqual(56);
-          for (const label of ["Edit", "Delete", manual ? "Send message" : "Send actions"]) {
+          for (const label of ["Edit", "Delete", manual ? "Send message" : "Steer this send"]) {
             const button = first.getByRole("button", { name: label, exact: true });
             const target = (await button.boundingBox())!;
             expect(target.height).toBeGreaterThanOrEqual(44);
