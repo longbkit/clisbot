@@ -4,7 +4,11 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
 let gestureSequence = 0;
 
 /** Real held Chromium touch gesture in phone-sized browser; native touch remains a separate proof. */
-export async function longPressSend(page: Page, scope: Locator) {
+export async function longPressSend(
+  page: Page,
+  scope: Locator,
+  expectedAction: "queue" | "steer" = "queue",
+) {
   const prefix = `held-send-${++gestureSequence}`;
   const info = test.info();
   const button = scope.getByTestId("composer-send-button").first();
@@ -98,5 +102,5 @@ export async function longPressSend(page: Page, scope: Locator) {
   );
   await info.attach("held-send-dom-events", { path: eventsPath, contentType: "application/json" });
   await page.screenshot({ path: info.outputPath(`${prefix}-release.png`), fullPage: false });
-  await expect(page.getByTestId("composer-send-once-queue")).toBeVisible();
+  await expect(page.getByTestId(`composer-send-once-${expectedAction}`)).toBeVisible();
 }

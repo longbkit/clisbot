@@ -36,11 +36,16 @@ type TriggerProps = Omit<ComponentProps<typeof PressHighlight>, "ref" | "childre
   triggerRef?: Ref<View | null>;
 };
 interface SendActionsProps extends TriggerProps {
+  oneOffQueueAvailable?: boolean;
   onOneOffSend?: (action: "queue" | "steer") => void;
 }
 
 /** Same Send touch target: short tap sends, long press only opens the existing menu sheet. */
-export function SendActionsButton({ onOneOffSend, ...props }: SendActionsProps) {
+export function SendActionsButton({
+  onOneOffSend,
+  oneOffQueueAvailable = true,
+  ...props
+}: SendActionsProps) {
   const { t } = useTranslation();
   const queue = useCallback(() => onOneOffSend?.("queue"), [onOneOffSend]);
   const steer = useCallback(() => onOneOffSend?.("steer"), [onOneOffSend]);
@@ -50,17 +55,19 @@ export function SendActionsButton({ onOneOffSend, ...props }: SendActionsProps) 
   }
   return (
     <ContextMenu>
-      <SendActionsTrigger {...props} />
+      <SendActionsTrigger {...props} queueAvailable={oneOffQueueAvailable} />
       <ContextMenuContent sheetTitle={t("composer.hostQueue.sendActions")}>
         <ContextMenuLabel>{t("composer.hostQueue.once")}</ContextMenuLabel>
-        <ContextMenuItem
-          style={styles.touchRow}
-          testID="composer-send-once-queue"
-          leading={QUEUE_ICON}
-          onSelect={queue}
-        >
-          {t("composer.hostQueue.queueOnce")}
-        </ContextMenuItem>
+        {oneOffQueueAvailable ? (
+          <ContextMenuItem
+            style={styles.touchRow}
+            testID="composer-send-once-queue"
+            leading={QUEUE_ICON}
+            onSelect={queue}
+          >
+            {t("composer.hostQueue.queueOnce")}
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuItem
           style={styles.touchRow}
           testID="composer-send-once-steer"
@@ -74,7 +81,12 @@ export function SendActionsButton({ onOneOffSend, ...props }: SendActionsProps) 
   );
 }
 
-function SendActionsTrigger({ onPress, onPressIn, ...props }: TriggerProps) {
+function SendActionsTrigger({
+  onPress,
+  onPressIn,
+  queueAvailable,
+  ...props
+}: TriggerProps & { queueAvailable: boolean }) {
   const { t } = useTranslation();
   const menu = useContextMenu();
   const gate = useRef(new SendPressGate());
@@ -116,7 +128,9 @@ function SendActionsTrigger({ onPress, onPressIn, ...props }: TriggerProps) {
     <ContextMenuTrigger
       {...props}
       dataSet={SEND_MENU_DATA_SET}
-      accessibilityHint={t("composer.hostQueue.longPressHint")}
+      accessibilityHint={t(
+        queueAvailable ? "composer.hostQueue.longPressHint" : "composer.hostQueue.sendActions",
+      )}
       accessibilityActions={[{ name: "longpress", label: t("composer.hostQueue.sendActions") }]}
       onAccessibilityAction={accessibleOpen}
       onPressIn={begin}

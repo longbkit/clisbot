@@ -93,3 +93,7 @@ Follow-up independent review CTO021: local editor dùng một lease in-flight tr
 Proof handoff session cần submission ledger `applied` và canonical user row; row của rejected human attempt với ledger `pending` không phải proof. Recovery khôi phục identity và dùng kiểm tra content/sender của owner hiện có, lỗi/thiếu proof thành needs_review, không replay.
 
 History/fork được copy sau authorize trước ACK. Snapshot lưu optional `forkLinks` (metadata SessionMessageFiles hiện có) cùng refs; attachment owner chuyển các bytes/link/provenance đã giữ sang logical message mà không cần nguồn gốc còn tồn tại. Đây không phải blob store/journal mới, không nhận metadata này từ client. History snapshot cũ thiếu provenance không được suy đoán đã handoff; giữ review nếu không đủ dữ liệu. Source mới chưa authorize vẫn bị từ chối trước admission.
+
+### Host cũ và feature-off
+
+Session fallback về hàng chờ client hiện có; Host có capability dùng hàng chờ durable. Item client đang chờ giữ owner và không migrate tự động khi upgrade. DM/group Host cũ dùng Chat Send/rules, không có client Queue: ẩn Queue override và không thay đổi preference đã lưu. Khi capability chưa rõ/mất kết nối, giữ draft/file và item Host đã nhận; không tự chuyển sang client hay replay.

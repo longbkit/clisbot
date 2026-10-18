@@ -52,7 +52,7 @@ Xóa item sau khi owner submission/message đã nhận bền vững với identi
 
 Restart đọc snapshot; queued tiếp tục. Sending đối soát submission/transcript: đã giao thì bỏ; chắc chắn chưa giao mới được trở lại queued; thiếu proof thành needs_review. Timeout không phải proof chưa giao. needs_review giữ item và file; cho kiểm kết quả, bỏ mục hoặc chủ động gửi lại sau cảnh báo khả năng trùng. Không tự retry không giới hạn.
 
-Host cũ chưa hỗ trợ phải báo chưa hỗ trợ durable queue, không fallback send thường. Không tự migrate RAM hay xóa queue pending khi downgrade. Scope sửa docs không cho phép đổi runtime/dữ liệu thật.
+Host đã kết nối và xác nhận capability `hostInputQueue=true` dùng durable Host queue. Host cũ/feature-off dùng `queuedMessages` + QueueWriter và HostRuntime drain hiện có cho session; Steer gửi legacy wire, không expectedTurnId. Client item đã nhận vẫn hiển thị và giữ owner khi upgrade, không migrate/re-enqueue sang Host. Capability chưa rõ hoặc mất kết nối không chuyển item Host đã nhận sang client; projection cuối giữ lại, lệnh cần kết nối bị từ chối và giữ draft/file. DM/group cũ không có client queue: dùng Chat send/rules hiện có, không gọi đó là Queue, ẩn explicit Queue, primary label/action là Send và không đổi preference. Explicit Queue còn lọt qua callback/shortcut phải từ chối và giữ draft/file. Explicit legacy Chat Steer không được đổi thành Interrupt khi Chat busy rules khác Steer.
 
 ## Acceptance khi triển khai
 
@@ -88,3 +88,5 @@ Follow-up independent review CTO021: local editor dùng một lease in-flight tr
 Proof handoff session cần submission ledger `applied` và canonical user row; row của rejected human attempt với ledger `pending` không phải proof. Recovery khôi phục identity và dùng kiểm tra content/sender của owner hiện có, lỗi/thiếu proof thành needs_review, không replay.
 
 History/fork được copy sau authorize trước ACK. Snapshot lưu optional `forkLinks` (metadata SessionMessageFiles hiện có) cùng refs; attachment owner chuyển các bytes/link/provenance đã giữ sang logical message mà không cần nguồn gốc còn tồn tại. Đây không phải blob store/journal mới, không nhận metadata này từ client. History snapshot cũ thiếu provenance không được suy đoán đã handoff; giữ review nếu không đủ dữ liệu. Source mới chưa authorize vẫn bị từ chối trước admission.
+
+Compatibility fallback vẫn dùng editor local-only: Save/Move kiểm original payload của đúng owner, missing/claimed giữ draft và chỉ enqueue mới khi chủ động; không bỏ item lúc mở editor. Client attachment vẫn dùng local draft/attachment owner hiện có, không encode/move sang Host queue khi chỉ enqueue client. Long press vẫn trên chính Send; guard fresh creation dựa lifecycle target giữ nguyên.

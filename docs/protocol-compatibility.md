@@ -93,3 +93,7 @@ When a tag's condition is met, delete the shim and the tag in the same change.
 ## QA
 
 Tests don't fully cover compatibility. If you touched `packages/protocol`, say in the pull request why an older app still parses your message and why an older daemon still satisfies your app. See [qa.md](qa.md).
+
+### Host input queue capability fallback
+
+`hostInputQueue=true` selects durable Host queue and exact-turn Steer. Connected server_info with missing/false capability selects the existing session client queue (`queuedMessages`, QueueWriter, HostRuntime idle drain); legacy Steer omits expectedTurnId. Unknown/disconnected info never selects a replacement owner for accepted Host input. Existing client items stay visible and drain under their original owner across upgrade; no automatic migration. Older DM/group have no client queue: preserve Chat send/rules and reply stream, hide unavailable explicit Queue, use truthful Send primary without changing preferences. A still-reachable explicit Queue must refuse while retaining draft/files. Explicit legacy Chat Steer refuses if busy rules would perform another action. Review after 2027-04-18.

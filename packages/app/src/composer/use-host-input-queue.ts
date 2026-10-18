@@ -27,6 +27,10 @@ interface HostInputQueueOptions {
 /** Admission-scoped Host projection; editors and unaccepted drafts belong to the composer. */
 export function useHostInputQueue(options: HostInputQueueOptions) {
   const { client, enabled, serverId, agentId, chatId } = options;
+  const retained = useMemo(
+    () => ({ view: EMPTY, serverId, agentId, chatId }),
+    [serverId, agentId, chatId],
+  );
   const snapshot = useHostRuntimeSnapshot(serverId);
   const active = useRetainedPanelActive();
   const key = useMemo(
@@ -54,8 +58,9 @@ export function useHostInputQueue(options: HostInputQueueOptions) {
     [execute],
   );
   const { command, query } = useQueueProjection(key, execute, enabled && active && Boolean(client));
+  if (enabled && !query.isError && query.data) retained.view = query.data;
   return {
-    view: enabled && !query.isError ? (query.data ?? EMPTY) : EMPTY,
+    view: retained.view,
     command,
     readAttachment,
     error: enabled ? (query.error?.message ?? null) : null,

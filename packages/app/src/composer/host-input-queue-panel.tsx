@@ -3,7 +3,14 @@ import { View, Text, ScrollView } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import type { InputQueueView } from "@clisbot/protocol/input-queue";
+interface QueuePanelItem {
+  id: string;
+  text: string;
+  state: "queued" | "sending" | "needs_review";
+  reason?: string;
+  attachments?: readonly unknown[];
+  images?: readonly unknown[];
+}
 
 interface QueuePanelActions {
   edit(id: string): void;
@@ -18,7 +25,8 @@ interface QueueEditorActions {
   enqueueNew(): void;
 }
 interface HostInputQueuePanelProps extends QueuePanelActions, QueueEditorActions {
-  view: InputQueueView;
+  label?: string;
+  view: { items: readonly QueuePanelItem[] };
   pending: boolean;
   editor: { stale: boolean } | null;
   error: string | null;
@@ -31,7 +39,7 @@ function QueueRow({
   steer,
   remove,
   pending,
-}: QueuePanelActions & { pending: boolean } & { item: InputQueueView["items"][number] }) {
+}: QueuePanelActions & { pending: boolean } & { item: QueuePanelItem }) {
   const { t } = useTranslation();
   const editItem = useCallback(() => edit(item.id), [edit, item.id]);
   const steerItem = useCallback(() => steer(item.id), [steer, item.id]);
@@ -165,6 +173,7 @@ export function HostInputQueuePanel(props: HostInputQueuePanelProps) {
   if (!props.view.items.length && !props.editor && !props.error) return null;
   return (
     <View style={styles.track}>
+      {props.label ? <Text style={styles.hint}>{props.label}</Text> : null}
       {props.error ? (
         <Text accessibilityRole="alert" style={styles.hint}>
           {props.error}

@@ -17,6 +17,7 @@ export interface ComposerEditingHandoff {
 }
 
 export interface ComposerQueueEdit {
+  owner?: "client";
   targetKey: string;
   id: string;
   revision: number;

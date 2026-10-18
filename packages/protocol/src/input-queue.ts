@@ -45,7 +45,7 @@ export const InputQueueCommandSchema = z.discriminatedUnion("action", [
   }),
 ]);
 export type InputQueueCommand = z.infer<typeof InputQueueCommandSchema>;
-// COMPAT(hostInputQueue): optional capability on older Hosts; no RAM/send fallback. Review 2027-04-18.
+// COMPAT(hostInputQueue): optional on older Hosts; session client fallback belongs to the app, not these RPCs. Review 2027-04-18.
 export const AgentQueueExecuteRequestSchema = z.object({
   type: z.literal("agent.queue.execute.request"),
   requestId: z.string(),

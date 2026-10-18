@@ -166,6 +166,7 @@ export interface MessageInputProps {
   defaultSendBehavior: "interrupt" | "steer" | "queue";
   /** Callback for queue button when agent is running */
   onQueue?: (payload: MessagePayload) => void;
+  oneOffQueueAvailable?: boolean;
   onOneOffSend?: (action: "queue" | "steer") => void;
   /** Optional handler used when submit button is in loading state. */
   onSubmitLoadingPress?: () => void;
@@ -775,6 +776,7 @@ function SendButtonTooltip({
   onSubmitLoadingPress,
   onDefaultSendAction,
   onOneOffSend,
+  oneOffQueueAvailable,
   isSendButtonDisabled,
   submitAccessibilityLabel,
   sendButtonCombinedStyle,
@@ -790,6 +792,7 @@ function SendButtonTooltip({
   canPressLoadingButton: boolean;
   onSubmitLoadingPress: (() => void) | undefined;
   onDefaultSendAction: () => void;
+  oneOffQueueAvailable?: boolean;
   onOneOffSend: ((action: "queue" | "steer") => void) | undefined;
   isSendButtonDisabled: boolean;
   submitAccessibilityLabel: string;
@@ -807,6 +810,7 @@ function SendButtonTooltip({
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
       <TooltipTrigger asChild triggerRefProp="triggerRef">
         <SendActionsButton
+          oneOffQueueAvailable={oneOffQueueAvailable}
           onOneOffSend={isSubmitLoading ? undefined : onOneOffSend}
           onPress={canPressLoadingButton ? onSubmitLoadingPress : onDefaultSendAction}
           disabled={isSendButtonDisabled}
@@ -1126,6 +1130,7 @@ interface ResolvedMessageInputProps {
   isAgentRunning: boolean;
   defaultSendBehavior: "interrupt" | "steer" | "queue";
   onQueue: ((payload: MessagePayload) => void) | undefined;
+  oneOffQueueAvailable?: boolean;
   onOneOffSend: ((action: "queue" | "steer") => void) | undefined;
   onSubmitLoadingPress: (() => void) | undefined;
   onKeyPressCallback: ((event: ComposerKeyPressEvent) => boolean) | undefined;
@@ -1176,6 +1181,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     defaultSendBehavior: props.defaultSendBehavior,
     onQueue: props.onQueue,
     onOneOffSend: props.onOneOffSend,
+    oneOffQueueAvailable: props.oneOffQueueAvailable,
     onSubmitLoadingPress: props.onSubmitLoadingPress,
     onKeyPressCallback: props.onKeyPress,
     onSelectionChangeCallback: props.onSelectionChange,
@@ -1257,6 +1263,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       defaultSendBehavior,
       onQueue,
       onOneOffSend,
+      oneOffQueueAvailable,
       onSubmitLoadingPress,
       onKeyPressCallback,
       onSelectionChangeCallback,
@@ -1974,6 +1981,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           canPressLoadingButton={canPressLoadingButton}
           onSubmitLoadingPress={onSubmitLoadingPress}
           onDefaultSendAction={handleDefaultSendAction}
+          oneOffQueueAvailable={oneOffQueueAvailable}
           onOneOffSend={onOneOffSend}
           isSendButtonDisabled={resolvePresentationSendDisabled({
             fullscreen: isFullscreen,
@@ -2002,6 +2010,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         onSubmitLoadingPress,
         handleDefaultSendAction,
         onOneOffSend,
+        oneOffQueueAvailable,
         isSendButtonDisabled,
         hasLiveText,
         attachments,

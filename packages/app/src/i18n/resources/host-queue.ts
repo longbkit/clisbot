@@ -1,4 +1,5 @@
 export const hostQueue = {
+  clientQueue: "Client queue (this app)",
   sendActions: "Send actions",
   longPressHint: "Long press for one-off Queue or Steer",
   once: "For this send only",
@@ -21,6 +22,7 @@ export const hostQueue = {
 };
 
 export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "Hàng chờ client (app này)",
   sendActions: "Cách gửi",
   longPressHint: "Nhấn giữ để chọn Queue hoặc Steer cho lần gửi này",
   once: "Chỉ cho lần gửi này",
@@ -42,6 +44,7 @@ export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "Cola del cliente (esta app)",
   sendActions: "Acciones de envío",
   longPressHint: "Mantén pulsado para poner en cola o guiar una vez",
   once: "Solo para este envío",
@@ -64,6 +67,7 @@ export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "File du client (cette app)",
   sendActions: "Actions d’envoi",
   longPressHint: "Appuyez longuement pour choisir la file ou le guidage une fois",
   once: "Pour cet envoi uniquement",
@@ -86,6 +90,7 @@ export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "クライアントのキュー（このアプリ）",
   sendActions: "送信アクション",
   longPressHint: "長押しで今回のみキュー追加または方向修正",
   once: "今回の送信のみ",
@@ -108,6 +113,7 @@ export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "클라이언트 대기열 (이 앱)",
   sendActions: "전송 작업",
   longPressHint: "길게 눌러 이번 전송만 대기열 또는 방향 조정",
   once: "이번 전송에만 적용",
@@ -129,6 +135,7 @@ export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "Fila do cliente (este app)",
   sendActions: "Ações de envio",
   longPressHint: "Pressione e segure para enfileirar ou orientar uma vez",
   once: "Somente para este envio",
@@ -151,6 +158,7 @@ export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "Очередь клиента (это приложение)",
   sendActions: "Действия отправки",
   longPressHint: "Удерживайте для разовой очереди или направления",
   once: "Только для этой отправки",
@@ -173,6 +181,7 @@ export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "客户端队列（此应用）",
   sendActions: "发送操作",
   longPressHint: "长按以仅对本次发送选择队列或引导",
   once: "仅用于本次发送",
@@ -194,6 +203,7 @@ export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
 };
 
 export const hostQueueAr: Record<keyof typeof hostQueue, string> = {
+  clientQueue: "قائمة انتظار العميل (هذا التطبيق)",
   sendActions: "إجراءات الإرسال",
   longPressHint: "اضغط مطولاً لاختيار الانتظار أو التوجيه لهذا الإرسال",
   once: "لهذا الإرسال فقط",
