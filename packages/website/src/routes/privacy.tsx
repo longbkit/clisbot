@@ -6,7 +6,7 @@ export const Route = createFileRoute("/privacy")({
   head: () =>
     pageMeta(
       "Privacy Policy - Clisbot",
-      "What stays on your machines, what the encrypted relay can see, and what Clisbot Hub stores.",
+      "What stays on your machines, what the encrypted relay can see, and how self-hosted Hubs handle their own data.",
       "/privacy",
     ),
   component: Privacy,
@@ -14,12 +14,12 @@ export const Route = createFileRoute("/privacy")({
 
 function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 1, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 20, 2026">
       <p>
         Clisbot is local-first. Installing or using the open-source software does not send us your
         code, prompts, files, terminal output, or agent conversations. This policy explains the
-        separate data boundaries for local Clisbot, the optional official relay, the hosted Clisbot
-        Hub, and clisbot.com.
+        separate data boundaries for local Clisbot, the optional official relay, self-hosted Clisbot
+        Hubs, and clisbot.com. Clisbot does not operate a hosted Hub service.
       </p>
 
       <section>
@@ -27,7 +27,7 @@ function Privacy() {
         <ClisbotLegalIdentity />
         <p>
           Long Luong is the data controller for personal data processed through the official Clisbot
-          website, relay, and hosted Hub. Independently self-hosted daemons, Hubs, and relays are
+          website, official relay, and product analytics. Self-hosted daemons, Hubs, and relays are
           controlled by their operators and are not covered by this policy.
         </p>
       </section>
@@ -51,11 +51,12 @@ function Privacy() {
         <p>
           When enabled, the app sends Google Analytics app opens, standardized screen names, usage
           duration, app version, and platform information. Android and iOS use Firebase Analytics,
-          which also collects basic device and app lifecycle information. Electron sends these
-          limited usage events through our Cloudflare collector. Analytics identifiers are
-          pseudonymous and reset on this device when you turn analytics off. Advertising identifiers
-          and personalization are disabled. Analytics never includes prompts, chats, code, project
-          names, file paths, host addresses, or account email addresses.
+          which also collects basic device and app lifecycle information and derives coarse location
+          from masked IP addresses. Electron sends these limited usage events through our Cloudflare
+          collector. Analytics identifiers are pseudonymous and reset on this device when you turn
+          analytics off. Advertising identifiers and personalization are disabled. Analytics never
+          includes prompts, chats, code, project names, file paths, host addresses, or account email
+          addresses.
         </p>
         <p>
           Packaged desktop apps check GitHub Releases for updates. GitHub receives the ordinary
@@ -87,35 +88,27 @@ function Privacy() {
       </section>
 
       <section>
-        <h2>Clisbot Hub</h2>
-        <p>When you create or use a hosted Hub account, we process:</p>
-        <ul>
-          <li>Your name, email, account credentials, sessions, IP address, and user agent</li>
-          <li>Your organization, members, roles, invitations, and daemon registrations</li>
-          <li>Identifiers and credentials for services you connect</li>
-          <li>
-            Webhook events, messages, comments, attachment metadata, and related context received
-            from those services
-          </li>
-          <li>
-            Workflow configurations, trigger inputs, outputs, execution state, activity, and audit
-            records
-          </li>
-          <li>Stripe customer identifiers and subscription information needed to provide access</li>
-        </ul>
+        <h2>Self-hosted Clisbot Hub</h2>
         <p>
-          Your repositories, local files, and agent-provider credentials remain on your
-          infrastructure unless a workflow explicitly sends information to Hub or a connected
-          service. Hub does not provide AI inference.
+          Clisbot Hub is software that you or your organization host. Clisbot does not host Hub
+          accounts, store Hub conversations, or operate Hub billing. The Hub operator controls its
+          accounts, organization settings, connected-service credentials, workflow data, and logs.
+        </p>
+        <p>
+          Connecting the app to a Hub sends the information needed for the features you use to that
+          Hub. Your Hub operator determines its privacy policy, retention, access, and deletion
+          procedures. Contact that operator about your Hub account and data. Hub does not provide AI
+          inference; your configured AI providers process requests under their own terms.
         </p>
       </section>
 
       <section>
         <h2>Who controls workflow data</h2>
         <p>
-          Clisbot controls account, billing, security, and service-operation data. When an
-          organization uses Hub to process personal data in its workflows, that organization decides
-          why the data is processed and Clisbot processes it on the organization&apos;s behalf.
+          You and the operators of the Hosts, Hubs, and connected services you choose control your
+          workflow data. Clisbot does not receive that data merely because you use our software.
+          Product analytics excludes work content, and the official relay cannot read encrypted
+          application traffic.
         </p>
       </section>
 
@@ -123,8 +116,8 @@ function Privacy() {
         <h2>Why we process data</h2>
         <p>We process data to:</p>
         <ul>
-          <li>Provide accounts, Hub workflows, relay connectivity, billing, and support</li>
-          <li>Authenticate users, daemons, and connected services</li>
+          <li>Provide relay connectivity, software distribution, and support</li>
+          <li>Measure app usage when analytics is enabled</li>
           <li>Prevent abuse and protect the services</li>
           <li>Maintain operational and audit records</li>
           <li>Meet accounting, tax, and other legal obligations</li>
@@ -138,31 +131,25 @@ function Privacy() {
       <section>
         <h2>Service providers</h2>
         <p>
-          We use Fly.io for hosted infrastructure, Stripe for subscriptions and payments, and GitHub
-          for software releases and connected GitHub features. Slack, Discord, Linear, and other
-          services receive data only when you choose to connect or use them.
+          Google processes the usage analytics described in this policy. Cloudflare provides our
+          website and desktop analytics collector, and GitHub distributes software releases. Your
+          self-hosted Hub and the services you connect have their own operators and privacy
+          policies.
         </p>
-        <p>
-          Some providers may process data outside the European Economic Area. Where required, we use
-          appropriate contractual safeguards for those transfers.
-        </p>
-        <p>
-          We do not sell personal data, share it with advertisers, or use it to train AI models.
-        </p>
+        <p>We do not sell personal data or use it for advertising or to train AI models.</p>
       </section>
 
       <section>
         <h2>Retention and deletion</h2>
         <p>
-          We keep account and organization data while your account remains active. We retain
-          operational, workflow, and audit records while needed to provide and protect the service.
-          Billing records may be kept for legally required accounting and tax periods. Short-lived
-          authorization codes and sessions expire automatically.
+          Turning app analytics off stops future collection and resets local analytics identifiers;
+          it does not erase data Google has already processed. Contact us about personal data
+          processed by Clisbot through the website, analytics, support, or official relay.
         </p>
         <p>
-          You can request account deletion by emailing us. Some records may remain where the law
-          requires it or where they form part of another organization&apos;s legitimate audit
-          history.
+          Hub accounts and workflow records belong to your self-hosted environment. Request their
+          deletion from the Hub operator. Uninstalling the mobile app does not delete data stored on
+          your Host, Hub, AI provider, or connected services.
         </p>
       </section>
 
@@ -189,8 +176,8 @@ function Privacy() {
         <h2>Cookies</h2>
         <p>
           The marketing website stores your analytics preference locally and uses first-party Google
-          Analytics cookies only if you accept. It does not use advertising cookies. Hub uses the
-          session and security cookies needed to sign you in and operate your account.
+          Analytics cookies only if you accept. It does not use advertising cookies. Your
+          self-hosted Hub may use session and security cookies under its operator&apos;s policy.
         </p>
       </section>
 
@@ -199,11 +186,8 @@ function Privacy() {
         <p>
           Depending on applicable law, you may request access, correction, deletion, restriction,
           objection, or portability of your personal data. Email{" "}
-          <a href="mailto:clisbot@gmail.com">clisbot@gmail.com</a>. You may also complain to the{" "}
-          <a href="https://www.aepd.es/" target="_blank" rel="noopener noreferrer">
-            Spanish Data Protection Agency
-          </a>
-          .
+          <a href="mailto:clisbot@gmail.com">clisbot@gmail.com</a>. You may also complain to the
+          data protection authority responsible in your jurisdiction.
         </p>
       </section>
 
