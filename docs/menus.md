@@ -92,6 +92,8 @@ that page, and both are set on the page definition rather than discovered later:
   `BottomSheetTextInput` on compact native, which reads the sheet's context and has none in a
   popover.
 
+On web, Home/End must keep editing the focused text field. They navigate to the first/last option only when focus is outside editable content; adding a search field must not turn caret movement into a menu selection.
+
 The sheet keeps `keyboardBehavior="interactive"`. `extend` grows a sheet to its largest snap
 point, and with `enableDynamicSizing` that point is the content's own height — a short page does
 not grow, and the keyboard comes up over the field you are typing into.
@@ -163,6 +165,10 @@ and a column of icons there is decoration competing with the values you actually
 - Separators use `borderAccent`, the same colour the surface outlines itself with. `border` sits
   between `surface1` and `surface2`, which put it within a hair of the hover fill and made
   separators disappear against a hovered row.
+
+## Long lists
+
+Enable `scrollable` on `MenuSurface` when options come from a directory; its flyouts inherit the viewport height limit and optional `maxHeight`. Bound the list content’s width too, so long identity details truncate instead of making the flyout wider than the screen. Searchable pages also follow the input-page rules above.
 
 ## Entity rows
 

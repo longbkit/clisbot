@@ -24,6 +24,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { FloatingScrollView, FloatingSurface } from "@/components/ui/floating";
 import { isWeb } from "@/constants/platform";
 import type { KeyboardFocusScope } from "@/keyboard/actions";
+import { resolveKeyboardFocusScope } from "@/keyboard/focus-scope";
 import {
   getOverlayRoot,
   OverlayLayerProvider,
@@ -419,6 +420,12 @@ export function AnchoredSurface({
   );
 }
 
+function isTextEditingBoundaryKey(event: KeyboardEvent): boolean {
+  if (event.key !== "Home" && event.key !== "End") return false;
+  const scope = resolveKeyboardFocusScope({ target: event.target, commandCenterOpen: false });
+  return scope === "editable" || scope === "message-input";
+}
+
 /**
  * The full-screen layer every floating menu surface lives in: a web portal into the overlay
  * root, or a transparent Modal on native. Submenus render inside their parent's layer rather
@@ -449,6 +456,7 @@ export function MenuOverlay({
       const target = event.target instanceof Element ? event.target : null;
       const surface = target?.closest<HTMLElement>('[data-menu-surface="true"]');
       if (!surface) return false;
+      if (isTextEditingBoundaryKey(event)) return false;
       const items = Array.from(
         surface.querySelectorAll<HTMLElement>(
           '[data-menu-item="true"]:not([data-menu-disabled="true"])',
