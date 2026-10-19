@@ -387,7 +387,37 @@ export async function holdOlderHistoryPages(
       const expectedCount = gate.getOwnedEntryCountContaining(text);
       expect(expectedCount).toBeGreaterThan(0);
       const timeline = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
-      await expect(timeline.getByText(text, { exact: false })).toHaveCount(expectedCount);
+      // Loaded entries outside the virtual window are not DOM nodes. Read each
+      // mounted region and count a row once across overlapping scroll windows.
+      const countsByRow = new Map<string, number>();
+      await timeline.hover();
+      for (let step = 0; step < 200; step += 1) {
+        await waitForTimelineGeometryToSettle(page);
+        const rows = await timeline.getByText(text, { exact: false }).evaluateAll((nodes) =>
+          nodes.map((node) => {
+            const id = node.closest("[data-history-row-id]")?.getAttribute("data-history-row-id");
+            if (!id) throw new Error("Matching timeline text has no owning row");
+            return id;
+          }),
+        );
+        const mountedCounts = new Map<string, number>();
+        for (const id of rows) mountedCounts.set(id, (mountedCounts.get(id) ?? 0) + 1);
+        for (const [id, count] of mountedCounts) {
+          countsByRow.set(id, Math.max(countsByRow.get(id) ?? 0, count));
+        }
+        const viewport = await timeline.evaluate((element) => ({
+          remaining: element.scrollHeight - element.clientHeight - element.scrollTop,
+          step: Math.max(1, Math.floor(element.clientHeight / 2)),
+        }));
+        if (viewport.remaining <= 1) {
+          expect([...countsByRow.values()].reduce((total, count) => total + count, 0)).toBe(
+            expectedCount,
+          );
+          return;
+        }
+        await page.mouse.wheel(0, viewport.step);
+      }
+      throw new Error("Did not reach the end of the loaded timeline within 200 scroll steps");
     },
     releasePage(pageNumber) {
       gate.releasePage(pageNumber);
