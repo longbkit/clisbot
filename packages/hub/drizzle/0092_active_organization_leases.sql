@@ -1,0 +1,1 @@
+CREATE INDEX "daemon_access_leases_active_organization_expiry_idx" ON "daemon_access_leases" USING btree ("organization_id","expires_at") WHERE "daemon_access_leases"."revoked_at" is null;
