@@ -1,5 +1,5 @@
 import { spawn, execFileSync, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -134,14 +134,19 @@ export async function startIsolatedHostDaemon(
     }
   }
   if (options.mutableRelay) {
+    const existing = JSON.parse(
+      await readFile(path.join(clisbotHome, "config.json"), "utf8").catch(() => "{}"),
+    );
     const endpoint =
       options.mutableRelay.endpoint ??
       (process.env.E2E_RELAY_PORT ? `127.0.0.1:${process.env.E2E_RELAY_PORT}` : "127.0.0.1:9");
     await writeFile(
       path.join(clisbotHome, "config.json"),
       `${JSON.stringify({
+        ...existing,
         version: 1,
         daemon: {
+          ...existing.daemon,
           relay: {
             enabled: options.mutableRelay.enabled,
             endpoint,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { offerConnections } from "@/device-access/host-profile";
 import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
@@ -194,6 +195,7 @@ function HubHostBinding({
         ? issueAccessTicket
         : async () => undefined,
       management,
+      synchronizedOffer.v === 5 ? offerConnections(synchronizedOffer) : undefined,
     );
     void enqueueManagedHostMutation(async () => {
       if (disposed) return;

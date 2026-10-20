@@ -85,6 +85,9 @@ import { queryClient } from "@/data/query-client";
 import { agentHistoryQueryKey, allAgentHistoryQueryRootKey } from "@/hooks/agent-history-query-key";
 import {
   hostRequiresSessionAdmission,
+  hostAdvertisedConnections,
+  matchesAdvertisedHostConnection,
+  subscribeHostSessionAccess,
   resolveHostAccessTicket,
 } from "@/runtime/host-session-access";
 import {
@@ -285,6 +288,7 @@ export interface HostRuntimeControllerDeps {
     connection: HostConnection;
     clientId: string;
     runtimeGeneration: number;
+    onAdmissionFailure?: (revoked: boolean) => boolean;
   }) => DaemonClient;
   connectToDaemon: (input: {
     host: HostProfile;
@@ -633,14 +637,21 @@ function createDefaultDeps(
   };
 
   return {
-    createClient: ({ host, connection, clientId, runtimeGeneration }) => {
+    createClient: ({ host, connection, clientId, runtimeGeneration, onAdmissionFailure }) => {
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const base = {
         selectReceiveCodec,
         ...(host.devicePairing
           ? {
-              resolveDeviceAccess: () => resolveHostDeviceAccess(host, connection),
+              resolveDeviceAccess: async () => {
+                try {
+                  return await resolveHostDeviceAccess(host, connection);
+                } catch (error) {
+                  onAdmissionFailure?.(false);
+                  throw error;
+                }
+              },
               e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
             }
           : {}),
@@ -655,16 +666,22 @@ function createDefaultDeps(
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
         resolveAccessTicket: async () => {
-          return resolveHostAccessTicket(
-            host.serverId,
-            clientId,
-            host.management,
-            usesDeviceCredential(host),
-          );
+          try {
+            return await resolveHostAccessTicket(
+              host.serverId,
+              clientId,
+              host.management,
+              usesDeviceCredential(host),
+            );
+          } catch (error) {
+            onAdmissionFailure?.(false);
+            throw error;
+          }
         },
         // Only a closed admission removes a Hub Host. A single operation denied for missing
         // permission (`access_denied`) is an ordinary authorization result, not revocation.
         onAccessRevoked: () => {
+          if (onAdmissionFailure?.(true) === false) return;
           if (host.management) onManagedHostRevoked(host.management);
         },
         providerSnapshots: "wire",
@@ -778,6 +795,11 @@ export class HostRuntimeController {
   private probeRequestVersion = 0;
   private probeCycleInFlight: Promise<void> | null = null;
   private readonly authRejectedConnectionIds = new Set<string>();
+  private advertisedConnections: readonly HostConnection[] | undefined;
+  private admissionBindingRegistered = false;
+  private unsubscribeAdmission: (() => void) | null = null;
+  private admissionAttemptFailed = false;
+  private admissionRevoked = false;
 
   constructor(input: {
     host: HostProfile;
@@ -825,6 +847,10 @@ export class HostRuntimeController {
       return;
     }
     this.started = true;
+    const advertised = hostAdvertisedConnections(this.host.serverId);
+    if (advertised !== undefined) this.advertisedConnections = advertised;
+    this.admissionBindingRegistered = hostRequiresSessionAdmission(this.host.serverId);
+    this.unsubscribeAdmission = subscribeHostSessionAccess(() => this.refreshAdmissionRoutes());
     this.trackConnectionFirstSeen();
     if (options?.initialConnection) {
       await this.switchToConnection({
@@ -854,6 +880,8 @@ export class HostRuntimeController {
     // connect that was cut off mid-admission may never settle.
     this.probeCycleInFlight = null;
     this.started = false;
+    this.unsubscribeAdmission?.();
+    this.unsubscribeAdmission = null;
     if (this.probeIntervalHandle) {
       clearInterval(this.probeIntervalHandle);
       this.probeIntervalHandle = null;
@@ -878,6 +906,34 @@ export class HostRuntimeController {
     });
   }
 
+  private refreshAdmissionRoutes(): void {
+    const advertised = hostAdvertisedConnections(this.host.serverId);
+    const registered = hostRequiresSessionAdmission(this.host.serverId);
+    if (
+      registered === this.admissionBindingRegistered &&
+      (advertised === undefined || equal(advertised, this.advertisedConnections))
+    )
+      return;
+    this.admissionBindingRegistered = registered;
+    // Cleanup or a failed refresh is not an empty offer. Retain the last authoritative
+    // inventory so stale manually saved Relay routes cannot become automatic candidates.
+    if (advertised !== undefined) this.advertisedConnections = advertised;
+    if (registered) this.admissionRevoked = false;
+    this.switchRequestVersion += 1;
+    this.probeRequestVersion += 1;
+    const pending = this.probeCycleInFlight;
+    this.applyConnectionEvent({ type: "stopped" });
+    this.updateSnapshot({
+      ...toSnapshotConnectionPatch(this.connectionMachineState, this.connectionEpoch),
+      client: null,
+    });
+    void this.disposePreviousActiveClient().then(async () => {
+      await pending;
+      if (this.started) await this.runProbeCycleNow();
+      return undefined;
+    });
+  }
+
   async updateHost(host: HostProfile): Promise<void> {
     const passwordChanged = this.host.password !== host.password;
     if (passwordChanged) {
@@ -893,11 +949,27 @@ export class HostRuntimeController {
     if (
       activeConnectionId &&
       previousActiveConnection &&
-      nextActiveConnection &&
-      (!equal(previousActiveConnection, nextActiveConnection) || passwordChanged)
+      (!nextActiveConnection ||
+        !equal(previousActiveConnection, nextActiveConnection) ||
+        passwordChanged)
     ) {
+      this.switchRequestVersion += 1;
+      this.probeRequestVersion += 1;
       this.connectionLastProbedAt.delete(activeConnectionId);
-      await this.switchToConnection({ connectionId: activeConnectionId });
+      await this.disposePreviousActiveClient();
+      this.applyConnectionEvent({ type: "stopped" });
+      this.updateSnapshot({
+        ...toSnapshotConnectionPatch(this.connectionMachineState, this.connectionEpoch),
+        client: null,
+      });
+      await this.probeCycleInFlight;
+      if (
+        nextActiveConnection &&
+        !this.host.management &&
+        !hostRequiresSessionAdmission(this.host.serverId)
+      ) {
+        await this.switchToConnection({ connectionId: activeConnectionId });
+      }
     }
     if (passwordChanged) this.connectionLastProbedAt.clear();
     if (passwordChanged) await this.probeCycleInFlight;
@@ -905,6 +977,14 @@ export class HostRuntimeController {
   }
 
   ensureConnected(options?: { verify?: boolean }): void {
+    if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
+      if (this.snapshot.connectionStatus === "online") {
+        if (options?.verify) this.activeClient?.verifyConnection();
+      } else {
+        void this.runProbeCycleNow();
+      }
+      return;
+    }
     this.activeClient?.ensureConnected(options);
   }
 
@@ -1293,11 +1373,17 @@ export class HostRuntimeController {
     requestVersion: number,
     localConnectionId: string | null = null,
   ): Promise<void> {
-    if (!this.isCurrentProbeRequest(requestVersion)) return;
+    if (
+      !this.isCurrentProbeRequest(requestVersion) ||
+      this.admissionRevoked ||
+      this.snapshot.authFailureReason
+    )
+      return;
+    this.admissionAttemptFailed = false;
     const activeConnectionId = this.snapshot.activeConnectionId;
     const activeConnection = findConnectionById(this.host, activeConnectionId);
-    if (activeConnection !== null && this.snapshot.client !== null) {
-      const rttMs = this.snapshot.client.getLastLivenessRttMs();
+    if (activeConnection !== null && this.snapshot.connectionStatus === "online") {
+      const rttMs = this.snapshot.client?.getLastLivenessRttMs() ?? null;
       if (rttMs !== null) {
         this.updateSnapshot({
           probeByConnectionId: new Map([
@@ -1307,22 +1393,40 @@ export class HostRuntimeController {
       }
       return;
     }
-    // Without a device credential only the desktop's local connection can admit this device.
-    const preferred = findConnectionById(
-      this.host,
-      localConnectionId ?? this.host.preferredConnectionId,
-    );
-    const connection =
-      preferred && !this.authRejectedConnectionIds.has(preferred.id)
-        ? preferred
-        : this.host.connections.find(
-            (candidate) => !this.authRejectedConnectionIds.has(candidate.id),
-          );
-    if (connection === undefined) return;
-    await this.switchToConnection({
-      connectionId: connection.id,
-      expectedProbeVersion: requestVersion,
+    for (const connection of this.sessionAdmissionCandidates(localConnectionId)) {
+      if (!this.isCurrentProbeRequest(requestVersion)) return;
+      await this.switchToConnection({
+        connectionId: connection.id,
+        expectedProbeVersion: requestVersion,
+      });
+      if (
+        this.snapshot.connectionStatus === "online" ||
+        this.snapshot.authFailureReason ||
+        this.admissionAttemptFailed
+      )
+        return;
+    }
+  }
+
+  private sessionAdmissionCandidates(localConnectionId: string | null): HostConnection[] {
+    // A local credential never authorizes a remote attempt, even after local failure.
+    const candidates = this.host.connections.filter((connection) => {
+      if (this.authRejectedConnectionIds.has(connection.id)) return false;
+      if (localConnectionId) return connection.id === localConnectionId;
+      return (
+        this.advertisedConnections?.some((offered) =>
+          matchesAdvertisedHostConnection(connection, offered),
+        ) ?? true
+      );
     });
+    const preferredId = localConnectionId ?? this.host.preferredConnectionId;
+    candidates.sort((a, b) => Number(b.id === preferredId) - Number(a.id === preferredId));
+    // Once a connected route breaks, try the other advertised routes before retrying it.
+    if (this.snapshot.client) {
+      const failedId = this.snapshot.activeConnectionId;
+      candidates.sort((a, b) => Number(a.id === failedId) - Number(b.id === failedId));
+    }
+    return candidates;
   }
 
   private isConnectionUnavailable(
@@ -1518,8 +1622,18 @@ export class HostRuntimeController {
         connection,
         clientId,
         runtimeGeneration: nextGeneration,
+        onAdmissionFailure: (revoked) => {
+          if (!this.isCurrentSwitchRequest(requestVersion)) return false;
+          this.admissionAttemptFailed = true;
+          if (revoked) this.admissionRevoked = true;
+          return true;
+        },
       });
-    client.setReconnectEnabled(true);
+    // Admission is a real session, not a disposable latency probe. This controller owns
+    // sequential route retries; client auto-retry would keep connect() pending forever.
+    client.setReconnectEnabled(
+      !(this.host.management || hostRequiresSessionAdmission(this.host.serverId)),
+    );
 
     if (!this.isSwitchStillValid(requestVersion, expectedProbeVersion)) {
       await client.close().catch(() => undefined);
@@ -2395,7 +2509,9 @@ export class HostRuntimeStore {
         connections: [
           ...connections,
           ...(existing?.connections ?? []).filter(
-            (old) => !connections.some((next) => next.id === old.id),
+            (old) =>
+              management.manualConnectionIds?.includes(old.id) &&
+              !connections.some((next) => next.id === old.id),
           ),
         ],
         preferredConnectionId: connections[0]!.id,

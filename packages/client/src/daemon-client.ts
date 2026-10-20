@@ -1662,9 +1662,7 @@ export class DaemonClient {
       { status: "disposed" },
       { event: "DISPOSE", reason: "Client closed", reasonCode: "disposed" },
     );
-    this.connectPromise = null;
-    this.connectResolve = null;
-    this.connectReject = null;
+    this.rejectConnect(new Error("Daemon client closed"));
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -1703,10 +1701,12 @@ export class DaemonClient {
       this.attemptConnect();
       return;
     }
-    void this.connect();
+    // This fire-and-forget entry point reports failures through connection state.
+    // Closing during admission now rejects connect(), just like a transport failure.
+    void this.connect().catch(() => undefined);
   }
 
-  private verifyConnection(): void {
+  verifyConnection(): void {
     const transport = this.transport;
     if (!transport || this.connectionVerification === transport) return;
     this.connectionVerification = transport;
@@ -1721,7 +1721,8 @@ export class DaemonClient {
           event: "CONNECTION_VERIFICATION_FAILED",
           reasonCode: "liveness_timeout",
         });
-        this.ensureConnected();
+        if (this.shouldReconnect && this.config.reconnect?.enabled !== false)
+          this.ensureConnected();
       })
       .finally(() => {
         if (this.connectionVerification === transport) this.connectionVerification = null;

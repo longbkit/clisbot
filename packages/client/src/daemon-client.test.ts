@@ -193,6 +193,22 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+test("closing an in-flight admission settles connect without waiting for a timeout", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "cancel-admission",
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const outcome = client.connect().then(
+    () => "connected",
+    (error: Error) => error.message,
+  );
+  await client.close();
+  await expect(outcome).resolves.toBe("Daemon client closed");
+});
+
 test("traces WebSocket frames, message types, and JSON parse duration", async () => {
   const mock = createMockTransport();
   const recorder = createTraceRecorder();
@@ -1222,11 +1238,16 @@ test("keeps relay upgrade credentials out of the socket request", async () => {
     },
   });
   clients.push(client);
-  void client.connect();
+  const pending = client.connect().then(
+    () => "connected",
+    (error: Error) => error.message,
+  );
   await vi.waitFor(() => expect(requests).toHaveLength(1));
   expect(requests[0]).toEqual({
     url: "ws://relay.test/ws?role=client&serverId=srv_test&v=2",
   });
+  await client.close();
+  await expect(pending).resolves.toBe("Daemon client closed");
 });
 
 test("refuses relay password auth without an encrypted hello", async () => {
@@ -2729,6 +2750,31 @@ test("foreground verification replaces a silently broken socket without waiting 
   expect(attempts).toBe(2);
   second.openConnection();
   expect(client.getConnectionState()).toEqual({ status: "connected" });
+});
+
+test("foreground verification leaves reconnect disabled for an external retry owner", async () => {
+  useHeartbeatClock();
+  const daemon = new FakeDaemon();
+  daemon.daemonGoesSilent();
+  let attempts = 0;
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "runtime-owned-recovery",
+    logger: noopLogger,
+    transportFactory: () => {
+      attempts += 1;
+      return daemon.transport;
+    },
+  });
+  clients.push(client);
+  client.setReconnectEnabled(false);
+  const connection = client.connect();
+  daemon.openConnection();
+  await connection;
+  client.verifyConnection();
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(attempts).toBe(1);
+  expect(client.getConnectionState().status).toBe("disconnected");
 });
 
 test("foreground verification preserves a healthy socket and deduplicates simultaneous checks", async () => {
