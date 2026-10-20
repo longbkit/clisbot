@@ -46,23 +46,40 @@ and it may do so only when every kind of work its runtime can keep between turns
 the daemon is not certain, the agent stays resident: losing parked work or failing a message costs
 more than a resident process.
 
-OpenCode is the only built-in provider that certifies. It reports idle only while its session has
-no foreground or autonomous run, stop, steer, pending permission or question, running tool call, or
-running child session (the child sessions it links through `task` tool calls and hydrates on
-subscribe). A session driven by another runtime's server never certifies: closing it frees no
-process and its abort could cut the parent's work. Closing releases the dedicated `opencode serve`
-the session held; the next load resumes the same OpenCode session on a fresh server. A session
-whose first turn failed before dispatch (`PromptNotDeliveredError`) is idle, so the reaper reclaims
-its server too.
+OpenCode, Claude, and Codex app-server certify.
+
+OpenCode reports idle only while its session has no foreground or autonomous run, stop, steer,
+pending permission or question, running tool call, or running child session (the child sessions it
+links through `task` tool calls and hydrates on subscribe). A session driven by another runtime's
+server never certifies: closing it frees no process and its abort could cut the parent's work.
+Closing releases the dedicated `opencode serve` the session held; the next load resumes the same
+OpenCode session on a fresh server. A session whose first turn failed before dispatch
+(`PromptNotDeliveredError`) is idle, so the reaper reclaims its server too.
+
+Claude reports idle only while no foreground, autonomous, or Claude-side turn, compaction, or
+pending permission is in flight, and the Claude Code process holds no background work. Background
+tasks — Bash shells, `Monitor` watches (both announced as `local_bash`), background subagents, and
+workflows — arrive in `system/background_tasks_changed`, which lists every live task and replaces
+the previous list. Session crons (`CronCreate`, `ScheduleWakeup`, `/loop`) appear nowhere in the
+stream; the adapter reads them, with the background tasks, from the `session_crons` and
+`background_tasks` of an observe-only Stop hook. Crons are read once per turn, so a turn that ends
+without a Stop hook (interrupted, failed) leaves the state unknown and the session resident until a
+later turn reports. A process that has not run a turn yet certifies: durable crons it restored from
+disk are not visible to the adapter. A new or exited process starts from nothing.
+
+Codex app-server reports idle only while no turn, turn start, history load, compaction, or pending
+permission is in flight, and the app-server holds no background work: no open `commandExecution`
+item or legacy `exec_command_begin`, no thread with an `active` goal, and no thread, root or
+subagent, whose `thread/status/changed` is `active`. A command the model leaves running completes
+long after `turn/completed`, and one whose completion never arrives keeps the session resident. A
+new app-server starts from nothing.
 
 The other providers do not certify:
 
-| Provider                                                  | Why it does not certify                                                                                                                                                                                                                                                                                            |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Claude                                                    | Background shells, Task subagents and workflows arrive as SDK tasks, but the adapter tracks status only for subagents and workflows, `Monitor` watches are not verified on the wire, and session crons (`CronCreate`, `ScheduleWakeup`, `/loop`) are reported in `session_crons`, which the adapter does not read. |
-| Codex app-server                                          | Background terminals can outlive the turn that started them, and the provider adapter does not observe them.                                                                                                                                                                                                       |
-| ACP providers (Grok, Copilot, Cursor, Kimi, custom `acp`) | The ACP protocol has no background-work signal.                                                                                                                                                                                                                                                                    |
-| Pi, OMP                                                   | Not assessed; they do not implement the check.                                                                                                                                                                                                                                                                     |
+| Provider                                                  | Why it does not certify                         |
+| --------------------------------------------------------- | ----------------------------------------------- |
+| ACP providers (Grok, Copilot, Cursor, Kimi, custom `acp`) | The ACP protocol has no background-work signal. |
+| Pi, OMP                                                   | Not assessed; they do not implement the check.  |
 
 For a certifying provider, `agents.closeIdleSessionsAfterMs` sets the idle window (default 30
 minutes, `0` disables) and `agents.providers.<id>.closeIdleSessionsAfterMs` overrides it per

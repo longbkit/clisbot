@@ -55,6 +55,7 @@ import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
 import { curateAgentActivity } from "../activity-curator.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
+import { CodexBackgroundWork } from "./codex-background-work.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -3518,6 +3519,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   private connectionState: "disconnected" | "history-ready" | "connected" = "disconnected";
   private connectionPromise: Promise<void> | null = null;
   private closed = false;
+  private readonly backgroundWork = new CodexBackgroundWork();
   private collaborationModes: Array<{
     name: string;
     mode?: string | null;
@@ -3638,6 +3640,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       throw this.createClosedError();
     }
     this.client = client;
+    this.backgroundWork.reset();
     client.setUnexpectedTerminationHandler((error) => {
       this.handleUnexpectedTermination(error);
     });
@@ -5065,6 +5068,25 @@ export class CodexAppServerAgentSession implements AgentSession {
     }
   }
 
+  /**
+   * Idle once no turn, permission, or compaction is in flight and the app-server holds no
+   * background work: a command left running past its turn, or an active goal that will start
+   * turns on its own. Both die with the process, so closing the session would kill them.
+   */
+  isIdleForRelease(): boolean {
+    return (
+      !this.closed &&
+      this.activeForegroundTurnId === null &&
+      this.currentTurnId === null &&
+      this.pendingForegroundStart === null &&
+      !this.loadingPersistedHistory &&
+      this.pendingPermissions.size === 0 &&
+      this.pendingManualCompactionStarts === 0 &&
+      this.pendingRootCompactionItemIds.size === 0 &&
+      this.backgroundWork.isIdle
+    );
+  }
+
   async close(): Promise<void> {
     this.closed = true;
     this.clearPendingPermissions();
@@ -5227,6 +5249,7 @@ export class CodexAppServerAgentSession implements AgentSession {
             objective: subcommand.objective,
             status: "active",
           });
+          this.backgroundWork.observeGoalStatus(this.currentThreadId, "active");
           return `Goal set: ${subcommand.objective}`;
         }
         case "pause": {
@@ -5234,6 +5257,7 @@ export class CodexAppServerAgentSession implements AgentSession {
             threadId: this.currentThreadId,
             status: "paused",
           });
+          this.backgroundWork.observeGoalStatus(this.currentThreadId, "paused");
           return "Goal paused.";
         }
         case "resume": {
@@ -5241,12 +5265,14 @@ export class CodexAppServerAgentSession implements AgentSession {
             threadId: this.currentThreadId,
             status: "active",
           });
+          this.backgroundWork.observeGoalStatus(this.currentThreadId, "active");
           return "Goal resumed.";
         }
         case "clear": {
           await this.client.request("thread/goal/clear", {
             threadId: this.currentThreadId,
           });
+          this.backgroundWork.observeGoalStatus(this.currentThreadId, null);
           return "Goal cleared.";
         }
       }
@@ -5450,6 +5476,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private handleNotification(method: string, params: unknown): void {
+    this.backgroundWork.observe(method, params);
     const notificationParams = toObjectRecord(params);
     if (method === "serverRequest/resolved" && typeof notificationParams?.requestId === "number") {
       const requestId = this.mcpElicitationPermissionIds.get(notificationParams.requestId);
