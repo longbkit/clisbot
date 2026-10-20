@@ -1,0 +1,12 @@
+Added
+- Search User and Channel sidebar filters
+
+Fixed
+- Try advertised relay routes when a direct Host connection fails
+- Avoid scanning historical access leases before acknowledging Team saves on updated Hubs
+- Fix iPhone/iPad production builds with static frameworks
+
+Changed
+- Describe self-hosted Hub privacy and optional push notification processing
+
+Full notes: https://clisbot.com/changelog

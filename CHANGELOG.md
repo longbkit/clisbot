@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.5 - 2026-10-20
+
+### Added
+
+- Search User and Channel sidebar filters ([#36](https://github.com/longbkit/clisbot/pull/36))
+
+### Fixed
+
+- Try advertised relay routes when a direct Host connection fails
+- Avoid scanning historical access leases before acknowledging Team saves on updated Hubs
+- Fix iPhone/iPad production builds with static frameworks ([#33](https://github.com/longbkit/clisbot/pull/33))
+
+### Changed
+
+- Describe self-hosted Hub privacy and optional push notification processing ([#33](https://github.com/longbkit/clisbot/pull/33), [#34](https://github.com/longbkit/clisbot/pull/34))
+
 ## 2.1.4 - 2026-10-18
 
 ### Added
