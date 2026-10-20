@@ -861,6 +861,10 @@ export const daemonAccessLeases = pgTable(
   (table) => [
     index("daemon_access_leases_member_idx").on(table.organizationId, table.membershipId),
     index("daemon_access_leases_daemon_expiry_idx").on(table.daemonId, table.expiresAt),
+    // Team/access changes must not scan historical leases before acknowledging the write.
+    index("daemon_access_leases_active_organization_expiry_idx")
+      .on(table.organizationId, table.expiresAt)
+      .where(sql`${table.revokedAt} is null`),
   ],
 );
 

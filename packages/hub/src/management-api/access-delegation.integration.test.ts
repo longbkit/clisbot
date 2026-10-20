@@ -106,6 +106,55 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 }, 30_000);
 
+it("saves Team membership without scanning expired leases and still revokes active access", async () => {
+  await bundle.runtime.query(
+    `insert into daemon_access_leases
+      (id, organization_id, daemon_id, user_id, membership_id, client_id, expires_at)
+     select gen_random_uuid(), $1, $2, $3, $4, 'historical', now() - interval '1 day'
+     from generate_series(1, 20000)`,
+    [ORGANIZATION_ID, TEST_DAEMON_ID, OTHER.userId, OTHER.membershipId],
+  );
+  await bundle.runtime.query(
+    `insert into daemon_access_leases
+      (id, organization_id, daemon_id, user_id, membership_id, client_id, expires_at)
+     values (gen_random_uuid(), $1, $2, $3, $4, 'active', now() + interval '1 hour')`,
+    [ORGANIZATION_ID, TEST_DAEMON_ID, OTHER.userId, OTHER.membershipId],
+  );
+  await bundle.runtime.query("analyze daemon_access_leases");
+  const plan = await bundle.runtime.query(
+    `explain (analyze, buffers, format json) select id, daemon_id from daemon_access_leases
+     where organization_id = $1 and revoked_at is null and expires_at > $2`,
+    [ORGANIZATION_ID, new Date()],
+  );
+  // A Team save waits for revocation. Historical rows must not consume its query deadline.
+  assert.match(JSON.stringify(plan.rows), /"Index Cond":"[^"]*organization_id/);
+  assert.match(JSON.stringify(plan.rows), /"Index Cond":"[^"]*expires_at/);
+  const team = await (await owner.handle(request("/teams", "POST", { name: "Lease test" }))).json();
+  // Team creation also revokes leases; make this synthetic lease active for the grant itself.
+  await bundle.runtime.query(
+    "update daemon_access_leases set revoked_at = null where client_id = 'active'",
+  );
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await owner.handle(
+      request(`/teams/${team.id}/members`, "POST", { userId: OTHER.userId }),
+    );
+    assert.equal(response.status, 201);
+    const membership = await response.json();
+    assert.equal(membership.teamId, team.id);
+    assert.equal(membership.userId, OTHER.userId);
+    assert.equal(typeof membership.createdAt, "string");
+  }
+  const rows = await bundle.runtime.query('select id from "teamMember" where team_id = $1', [
+    team.id,
+  ]);
+  assert.equal(rows.rowCount, 1);
+  const leases = await bundle.runtime.query(
+    "select client_id, revoked_at from daemon_access_leases where expires_at > now()",
+  );
+  assert.equal(leases.rowCount, 1);
+  assert.notEqual(leases.rows[0]?.["revoked_at"], null);
+});
+
 it("lets a Team Admin manage membership and appoint a Team Admin, and hides Team rows unless asked", async () => {
   const created = await owner.handle(request("/teams", "POST", { name: "QC" }));
   assert.equal(created.status, 201);
