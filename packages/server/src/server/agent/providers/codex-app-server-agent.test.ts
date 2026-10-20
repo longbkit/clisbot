@@ -7169,3 +7169,55 @@ describe("Codex denied plan approvals", () => {
     });
   });
 });
+
+describe("Codex idle release", () => {
+  function completeRootTurn(session: CodexTestSession): void {
+    asInternals(session).handleNotification("turn/completed", {
+      threadId: "test-thread",
+      turn: { id: "test-turn", status: "completed" },
+    });
+  }
+
+  test("certifies once the root turn completes with nothing left running", () => {
+    const session = createSession();
+    expect(session.isIdleForRelease?.()).toBe(false);
+
+    completeRootTurn(session);
+    expect(session.isIdleForRelease?.()).toBe(true);
+  });
+
+  test("holds a session whose command outlives its turn", () => {
+    const session = createSession();
+    const commandItem = (status: string) => ({
+      threadId: "test-thread",
+      turnId: "test-turn",
+      item: { type: "commandExecution", id: "call-bg", command: "sleep 40", status },
+    });
+    asInternals(session).handleNotification("item/started", commandItem("inProgress"));
+    completeRootTurn(session);
+    expect(session.isIdleForRelease?.()).toBe(false);
+
+    asInternals(session).handleNotification("item/completed", commandItem("completed"));
+    expect(session.isIdleForRelease?.()).toBe(true);
+  });
+
+  test("holds a session with an active goal", () => {
+    const session = createSession();
+    asInternals(session).handleNotification("thread/goal/updated", {
+      threadId: "test-thread",
+      goal: { objective: "ship it", status: "active" },
+    });
+    completeRootTurn(session);
+    expect(session.isIdleForRelease?.()).toBe(false);
+
+    asInternals(session).handleNotification("thread/goal/cleared", { threadId: "test-thread" });
+    expect(session.isIdleForRelease?.()).toBe(true);
+  });
+
+  test("never certifies a closed session", async () => {
+    const session = createSession();
+    completeRootTurn(session);
+    await session.close();
+    expect(session.isIdleForRelease?.()).toBe(false);
+  });
+});
