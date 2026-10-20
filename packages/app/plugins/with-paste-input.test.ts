@@ -31,6 +31,21 @@ describe("withPasteInput", () => {
     const configured = configurePasteInputBridgingHeader(source);
 
     expect(configured).toContain("#import <react-native-paste-input/PasteInputModule.h>");
+    expect(configured).toContain("#import <react_native_paste_input/PasteInputModule.h>");
+    expect(configurePasteInputBridgingHeader(configured)).toBe(configured);
+  });
+
+  it("upgrades the old header import without leaving a second unconditional import", () => {
+    const source =
+      "// Swift bridging header\n#import <react-native-paste-input/PasteInputModule.h>\n";
+    const configured = configurePasteInputBridgingHeader(source);
+
+    expect(
+      configured.match(/#import <react-native-paste-input\/PasteInputModule.h>/g),
+    ).toHaveLength(1);
+    expect(configured).toContain(
+      "#else\n#import <react-native-paste-input/PasteInputModule.h>\n#endif",
+    );
     expect(configurePasteInputBridgingHeader(configured)).toBe(configured);
   });
 
