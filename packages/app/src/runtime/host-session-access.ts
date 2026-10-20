@@ -1,10 +1,16 @@
-import type { HubHostManagement } from "@/types/host-connection";
+import {
+  normalizeHostPort,
+  normalizeLoopbackToLocalhost,
+  shouldUseTlsForDefaultHostedRelay,
+} from "@clisbot/protocol/daemon-endpoints";
+import type { HostConnection, HubHostManagement } from "@/types/host-connection";
 
 export type HostAccessTicketResolver = (clientId: string) => Promise<string | undefined>;
 
 interface HostSessionAccessBinding {
   resolveAccessTicket: HostAccessTicketResolver;
   management?: HubHostManagement;
+  advertisedConnections?: readonly HostConnection[];
 }
 
 const GLOBAL_KEY = "__clisbotHostSessionAccessBindings";
@@ -26,11 +32,13 @@ export function registerHostAccessTicketResolver(
   serverId: string,
   resolver: HostAccessTicketResolver,
   management?: HubHostManagement,
+  advertisedConnections?: readonly HostConnection[],
 ): () => void {
   const resolvers = registry();
   const binding: HostSessionAccessBinding = {
     resolveAccessTicket: resolver,
     ...(management === undefined ? {} : { management }),
+    ...(advertisedConnections === undefined ? {} : { advertisedConnections }),
   };
   resolvers.set(serverId, binding);
   emitChange();
@@ -77,4 +85,32 @@ export function hostSessionHubManagement(serverId: string): HubHostManagement | 
 export function subscribeHostSessionAccess(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** Current authenticated offer, not a discovery service or a persisted transport policy. */
+export function hostAdvertisedConnections(serverId: string): readonly HostConnection[] | undefined {
+  return registry().get(serverId)?.advertisedConnections;
+}
+
+/** Stored profiles normalize IDs/loopback names; authorization follows the actual route. */
+export function matchesAdvertisedHostConnection(
+  current: HostConnection,
+  offered: HostConnection,
+): boolean {
+  if (current.type === "directTcp" && offered.type === "directTcp") {
+    return (
+      normalizeLoopbackToLocalhost(normalizeHostPort(current.endpoint)) ===
+        normalizeLoopbackToLocalhost(normalizeHostPort(offered.endpoint)) &&
+      (current.useTls ?? false) === (offered.useTls ?? false)
+    );
+  }
+  if (current.type === "relay" && offered.type === "relay") {
+    return (
+      normalizeHostPort(current.relayEndpoint) === normalizeHostPort(offered.relayEndpoint) &&
+      (current.useTls ?? shouldUseTlsForDefaultHostedRelay(current.relayEndpoint)) ===
+        (offered.useTls ?? shouldUseTlsForDefaultHostedRelay(offered.relayEndpoint)) &&
+      current.daemonPublicKeyB64 === offered.daemonPublicKeyB64
+    );
+  }
+  return false;
 }

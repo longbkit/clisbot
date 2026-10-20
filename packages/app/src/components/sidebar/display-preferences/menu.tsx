@@ -1,3 +1,4 @@
+import { MetadataFilterPage } from "./metadata-filter-page";
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import { GROUP_MODE_MENU_ORDER } from "@/clisbot/workspace-sessions/grouping";
 import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
@@ -333,6 +334,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
       definitions.push({
         id: "userFilter",
         title: "User",
+        hoverIntent: false,
         content: (
           <MetadataFilterPage
             options={
@@ -352,6 +354,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
       definitions.push({
         id: "channelFilter",
         title: "Channel",
+        hoverIntent: false,
         content: (
           <MetadataFilterPage
             options={
@@ -409,6 +412,8 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
         <MenuSurface
           align="end"
           width={MENU_WIDTH}
+          scrollable
+          maxHeight={400}
           pages={pages}
           sheetTitle={t("sidebar.display.heading")}
           testID="sidebar-display-preferences-content"
@@ -929,56 +934,3 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 8,
   },
 }));
-
-function MetadataFilterPage({
-  options,
-  selected,
-  toggle,
-  clear,
-}: {
-  options: ReadonlyMap<string, string>;
-  selected: readonly string[];
-  toggle: (key: string) => void;
-  clear: () => void;
-}): ReactElement {
-  const entries = new Map(options);
-  for (const key of selected) if (!entries.has(key)) entries.set(key, key);
-  return (
-    <>
-      {[...entries].map(([key, label]) => (
-        <MetadataFilterItem
-          key={key}
-          value={key}
-          label={label}
-          selected={selected.includes(key)}
-          toggle={toggle}
-        />
-      ))}
-      {selected.length > 0 ? (
-        <>
-          <MenuSeparator />
-          <MenuItem onSelect={clear}>Clear filter</MenuItem>
-        </>
-      ) : null}
-    </>
-  );
-}
-
-function MetadataFilterItem({
-  value,
-  label,
-  selected,
-  toggle,
-}: {
-  value: string;
-  label: string;
-  selected: boolean;
-  toggle: (key: string) => void;
-}): ReactElement {
-  const handleSelect = useCallback(() => toggle(value), [toggle, value]);
-  return (
-    <MenuItem selected={selected} closeOnSelect={false} onSelect={handleSelect}>
-      {label}
-    </MenuItem>
-  );
-}

@@ -1772,6 +1772,43 @@ describe("HostRuntimeStore", () => {
     daemonId: "daemon-one",
   };
 
+  it("replaces withdrawn v5 Hub routes while preserving manual connections for leaving Hub", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    await seedRelayConnection(store, {
+      serverId: "v5-route-refresh",
+      relayEndpoint: "manual.example.test:443",
+      useTls: true,
+      daemonPublicKeyB64: "same-public-key",
+    });
+    const manual = store.getHosts()[0]!.connections[0]!;
+    const direct = { endpoint: "fresh.example.test:8443", useTls: true };
+    const offer = {
+      v: 5 as const,
+      encrypted: true as const,
+      serverId: "v5-route-refresh",
+      daemonPublicKeyB64: "same-public-key",
+      direct,
+      relay: { endpoint: "advertised.example.test:443", useTls: true },
+    };
+    try {
+      await store.upsertManagedConnectionFromOffer({ offer, management });
+      const { relay: _relay, ...directOnly } = offer;
+      await store.upsertManagedConnectionFromOffer({ offer: directOnly, management });
+      expect(store.getHosts()[0]!.connections.map(({ id }) => id)).toEqual([
+        "direct:wss:fresh.example.test:8443",
+        manual.id,
+      ]);
+      await store.removeManagedHost(management);
+      expect(store.getHosts()[0]!.connections).toEqual([manual]);
+      expect(store.getHosts()[0]!.management).toBeUndefined();
+    } finally {
+      store.syncHosts([]);
+    }
+  });
+
   it("tags a Host created from a managed Hub offer", async () => {
     const store = new HostRuntimeStore({
       storage: createMemoryHostRuntimeStorage(),

@@ -18,6 +18,8 @@ Connect to your Host using:
 
 A phone or browser pairs with the daemon: open **Pair a device** on the computer, then scan the QR code or paste the pairing link. The link carries every route the daemon offers; the app tries Tailscale first, then the relay.
 
+For an existing Host, the app tries the routes that Host advertises, one at a time. If its direct route cannot connect or disconnects, an advertised relay route can take over without pairing again. This does not enable the relay on the Host: a direct-only company Host remains direct-only. A fresh Hub offer replaces the automatic route choices; saved manual connections are kept for manual use and for leaving Hub management. A failed Hub refresh is not a request to remove those connections. Authentication or access denial is not treated as a network failure.
+
 This is client-to-daemon transport. If you are looking for the service that connects chat platforms and shares Hosts with a team, that is [Hub](/docs/hub).
 
 ## Tailscale
