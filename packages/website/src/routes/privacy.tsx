@@ -88,6 +88,29 @@ function Privacy() {
       </section>
 
       <section>
+        <h2>Optional push notifications</h2>
+        <p>
+          If you allow notifications, the mobile app obtains an Expo push token and registers it
+          with your connected Host. Expo processes the device token and app/project identifiers
+          needed to route notifications. Your Host sends notifications through Expo and the
+          applicable Apple or Google push service.
+        </p>
+        <p>
+          Notification payloads may contain an assistant-reply preview, permission-request text, a
+          terminal name, and routing metadata such as Host, workspace, or agent identifiers and a
+          working-directory path. These payloads are separate from relay traffic: they are encrypted
+          in transit but are not protected by the relay&apos;s end-to-end encryption, and the
+          notification delivery providers can process their contents.
+        </p>
+        <p>
+          You can disable notifications in your device settings. Your Host operator controls stored
+          push subscriptions and can remove them. Notification providers handle delivery and
+          retention under their own policies; disabling notifications does not delete data they have
+          already processed.
+        </p>
+      </section>
+
+      <section>
         <h2>Self-hosted Clisbot Hub</h2>
         <p>
           Clisbot Hub is software that you or your organization host. Clisbot does not host Hub
@@ -131,7 +154,9 @@ function Privacy() {
       <section>
         <h2>Service providers</h2>
         <p>
-          Google processes the usage analytics described in this policy. Cloudflare provides our
+          Google processes the usage analytics described in this policy. Firebase SDKs also process
+          limited technical diagnostic information. Expo and the applicable Apple or Google push
+          service process optional notification delivery as described above. Cloudflare provides our
           website and desktop analytics collector, and GitHub distributes software releases. Your
           self-hosted Hub and the services you connect have their own operators and privacy
           policies.
