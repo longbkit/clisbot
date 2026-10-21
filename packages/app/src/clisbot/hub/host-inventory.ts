@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import { useFetchQueries, useFetchQuery } from "@/data/query";
-import { useHosts } from "@/runtime/host-runtime";
+import { useHosts, useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
 import { type HubAccountContextValue, useHubAccount, useHubAccounts } from "./account-provider";
 import { HubDaemonsSchema } from "./contracts";
 import { hubResourceQueryKey } from "./query-keys";
@@ -50,12 +50,15 @@ export interface HubHostListing {
  * Whether a saved Host is visible to the Hub accounts on this device. A Hub-managed Host is
  * judged by the Hub that manages it, not by the selected Hub. With managed access off it is
  * reached with this device's own daemon credential, so it stays visible while that Hub is
- * unavailable. Every other managed Host needs its Hub to list it.
+ * unavailable. A Desktop session authenticated locally is also independent of Hub inventory.
+ * Every other managed Host needs its Hub to list it.
  */
 export function isAccountHost(
   host: Pick<RegisteredHost, "serverId" | "management">,
   listings: readonly HubHostListing[],
+  locallyConnected = false,
 ): boolean {
+  if (locallyConnected) return true;
   const management = host.management;
   if (management === undefined) return true;
   const listing = listings.find((entry) => entry.origin === management.hubOrigin);
@@ -89,6 +92,8 @@ export function useHostInventory() {
   const hub = useHubAccount();
   const accounts = useHubAccounts();
   const registeredHosts = useHosts();
+  const serverIds = useMemo(() => registeredHosts.map((host) => host.serverId), [registeredHosts]);
+  const localServerIds = useHostRuntimeConnectedServerIds(serverIds, true);
   const queries = useFetchQueries(accounts.map(hubDaemonsQueryInput));
   const lists = useStableItems(queries.map((query) => query.data));
   const errors = useStableItems(queries.map((query) => query.error));
@@ -100,8 +105,10 @@ export function useHostInventory() {
       organizationId: account.signedIn?.organization.id ?? null,
       daemons: lists[index]?.daemons,
     }));
-    return registeredHosts.filter((host) => isAccountHost(host, listings));
-  }, [accounts, lists, registeredHosts]);
+    return registeredHosts.filter((host) =>
+      isAccountHost(host, listings, localServerIds.includes(host.serverId)),
+    );
+  }, [accounts, lists, registeredHosts, localServerIds]);
   // Daemon ids are unique across Hubs, so one merged list answers "does a Hub list this Host".
   const daemons = useMemo<{ data: HubDaemons | undefined; error: Error | null }>(
     () => ({
