@@ -47,6 +47,7 @@ import { ClaudeSidechainTracker } from "./sidechain-tracker.js";
 import { claudeSkillNames, skillOverridesFor } from "./claude-skills.js";
 import { readClaudeSubagentHandback } from "./subagent-handback.js";
 import { ClaudeTaskState } from "./task-state.js";
+import { ClaudeBackgroundWork } from "./background-work.js";
 import {
   ClaudeTaskProtocolSource,
   type ClaudeHookObservationInput,
@@ -2195,6 +2196,7 @@ class ClaudeAgentSession implements AgentSession {
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
   private readonly timelineAssembler = new TimelineAssembler();
   private readonly taskState = new ClaudeTaskState();
+  private readonly backgroundWork = new ClaudeBackgroundWork();
   private readonly taskProtocolSource = new ClaudeTaskProtocolSource({
     getToolInput: (toolUseId) => this.toolUseCache.get(toolUseId)?.input ?? null,
     readWorkflowResult: readClaudeWorkflowResultFile,
@@ -2503,6 +2505,23 @@ class ClaudeAgentSession implements AgentSession {
     return () => {
       this.subscribers.delete(callback);
     };
+  }
+
+  /**
+   * Idle once no turn, permission, or compaction is in flight and the process holds no background
+   * work (see ClaudeBackgroundWork). Closing the session kills the process, and everything it runs
+   * between turns with it.
+   */
+  isIdleForRelease(): boolean {
+    return (
+      !this.closed &&
+      this.activeForegroundTurnId === null &&
+      this.autonomousTurn === null &&
+      !this.mainTurnInFlight &&
+      !this.compacting &&
+      this.pendingPermissions.size === 0 &&
+      this.backgroundWork.isIdle
+    );
   }
 
   async interrupt(): Promise<void> {
@@ -3319,8 +3338,9 @@ class ClaudeAgentSession implements AgentSession {
     const options = await this.buildOptions(launchMode);
     this.logger.debug({ options: summarizeClaudeOptionsForLog(options) }, "claude query");
     this.input = input;
-    // A fresh Claude process has no turn of its own in flight.
+    // A fresh Claude process has no turn of its own in flight, and no background work.
     this.mainTurnInFlight = false;
+    this.backgroundWork.reset();
     this.query = claudeQuery(
       { prompt: input.iterable, options },
       {
@@ -3519,7 +3539,7 @@ class ClaudeAgentSession implements AgentSession {
       // subagents keep running. Without this declaration an interrupt kills every one of them.
       // Claude stops a helper itself with its TaskStop tool.
       perTaskStopAffordance: true,
-      hooks: this.buildSubagentEffortHooks(),
+      hooks: { ...this.buildSubagentEffortHooks(), ...this.buildBackgroundWorkHooks() },
       ...(this.persistSession === undefined ? {} : { persistSession: this.persistSession }),
       env: sdkEnv,
     };
@@ -3885,6 +3905,7 @@ class ClaudeAgentSession implements AgentSession {
       return;
     }
     this.childProcess = null;
+    this.backgroundWork.reset();
     this.logger.warn(
       { agentId: this.agentId, pid: child.pid, code, signal },
       "Claude runtime exited unexpectedly",
@@ -4080,6 +4101,7 @@ class ClaudeAgentSession implements AgentSession {
     }
     if (isClaudeTurnInit(message)) {
       this.mainTurnInFlight = true;
+      this.backgroundWork.observeTurnStarted();
       // A new turn has begun, so the interrupted one is over. An interrupt that landed after its
       // turn had already ended gets no result, and the leftover flag would swallow this turn's.
       this.pendingInterruptAbort = false;
@@ -4087,6 +4109,7 @@ class ClaudeAgentSession implements AgentSession {
     }
     if (readClaudeCommandLifecycle(message)?.state === "started") {
       this.mainTurnInFlight = true;
+      this.backgroundWork.observeTurnStarted();
     }
   }
 
@@ -4100,6 +4123,7 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private async routeSdkMessageFromPump(message: SDKMessage): Promise<void> {
+    this.backgroundWork.observeMessage(message);
     if (this.consumeSessionStateChange(message)) {
       return;
     }
@@ -5105,6 +5129,18 @@ class ClaudeAgentSession implements AgentSession {
       PostToolUse: [{ hooks: [observe] }],
       SubagentStop: [{ hooks: [observe] }],
     };
+  }
+
+  /**
+   * The Stop hook is the only place Claude reports session crons, so it is how release learns
+   * what the turn left behind. Observation-only, like the effort hooks.
+   */
+  private buildBackgroundWorkHooks(): NonNullable<ClaudeOptions["hooks"]> {
+    const observe = async (input: unknown): Promise<Record<string, never>> => {
+      this.backgroundWork.observeStopHook(input);
+      return {};
+    };
+    return { Stop: [{ hooks: [observe] }] };
   }
 
   private notifySubscribers(event: AgentStreamEvent): void {

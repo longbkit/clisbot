@@ -9,7 +9,14 @@ const {
 
 const MODULE_SETUP = "    PasteInputModule.setup(factory.rootViewFactory)";
 const REACT_NATIVE_START_END = "      launchOptions: launchOptions)\n#endif";
-const BRIDGING_HEADER_IMPORT = "#import <react-native-paste-input/PasteInputModule.h>";
+const LEGACY_BRIDGING_HEADER_IMPORT = "#import <react-native-paste-input/PasteInputModule.h>";
+const BRIDGING_HEADER_IMPORT = [
+  "#if __has_include(<react_native_paste_input/PasteInputModule.h>)",
+  "#import <react_native_paste_input/PasteInputModule.h>",
+  "#else",
+  LEGACY_BRIDGING_HEADER_IMPORT,
+  "#endif",
+].join("\n");
 const PODFILE_NEW_ARCH_DISABLED =
   "ENV['RCT_NEW_ARCH_ENABLED'] ||= '0' if podfile_properties['newArchEnabled'] == 'false'";
 const PODFILE_NEW_ARCH_ENABLED =
@@ -30,7 +37,10 @@ function configurePasteInputBridgingHeader(contents) {
   if (contents.includes(BRIDGING_HEADER_IMPORT)) {
     return contents;
   }
-  return `${contents.trimEnd()}\n${BRIDGING_HEADER_IMPORT}\n`;
+  // CocoaPods normalizes the framework name when Firebase enables use_frameworks.
+  // Replace a previous prebuild's import as well as supporting a fresh header.
+  const withoutLegacyImport = contents.replace(LEGACY_BRIDGING_HEADER_IMPORT, "");
+  return `${withoutLegacyImport.trimEnd()}\n${BRIDGING_HEADER_IMPORT}\n`;
 }
 
 function configurePasteInputPodfile(contents) {
