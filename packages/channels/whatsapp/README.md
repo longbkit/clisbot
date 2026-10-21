@@ -13,6 +13,14 @@ version OpenClaw uses. Ported from `extensions/whatsapp/src` at OpenClaw
   agent, the QR verbs.
 - How the Hub drives it: [HUB-WIRING.md](HUB-WIRING.md).
 
+## Licensing
+
+The npm package includes `LICENSE` for the repository license, `NOTICE` for
+the pinned OpenClaw attribution and MIT terms, and the unchanged upstream
+`THIRD_PARTY_NOTICES.md`. Keep these files in the package allowlist when syncing
+upstream; inspect the actual tarball before publishing. Dependency licenses are
+separate from these source notices.
+
 ## Checks
 
 ```sh
