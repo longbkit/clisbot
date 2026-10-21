@@ -1679,6 +1679,7 @@ describe("HostRuntimeController", () => {
       ],
     });
     const slowProbe = createDeferred<number>();
+    const probeStarted = createDeferred<void>();
     let probeCalls = 0;
 
     const controller = new HostRuntimeController({
@@ -1687,6 +1688,7 @@ describe("HostRuntimeController", () => {
         createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
         connectToDaemon: async ({ host: hostProfile }) => {
           probeCalls += 1;
+          probeStarted.resolve();
           const client = new FakeDaemonClient();
           client.connectCalls = 1;
           client.setConnectionState({ status: "connected" });
@@ -1708,10 +1710,12 @@ describe("HostRuntimeController", () => {
 
     const first = controller.runProbeCycleNow();
     const second = controller.runProbeCycleNow();
+    await probeStarted.promise;
     expect(probeCalls).toBe(1);
 
     slowProbe.resolve(900);
     await Promise.all([first, second]);
+    expect(probeCalls).toBe(1);
     const probeAfterCycle = controller.getSnapshot().probeByConnectionId.get("direct:lan:6868");
     expect(probeAfterCycle).toEqual({
       status: "available",

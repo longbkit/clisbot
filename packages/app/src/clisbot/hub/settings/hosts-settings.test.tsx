@@ -29,6 +29,7 @@ const adapters = vi.hoisted(() => ({
   remove: vi.fn(),
   restart: vi.fn(),
   hosts: [] as HostProfile[],
+  localServerIds: [] as string[],
   statuses: new Map(),
   statusListeners: new Set<() => void>(),
   subscribeStatuses: (listener: () => void) => {
@@ -67,6 +68,7 @@ vi.mock("../account-provider", () => {
 });
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => adapters.hosts,
+  useHostRuntimeConnectedServerIds: () => adapters.localServerIds,
   useHostMutations: () => ({ removeHost: adapters.remove }),
   useHostRuntimeConnectionStatuses: () =>
     React.useSyncExternalStore(adapters.subscribeStatuses, () => adapters.statuses),

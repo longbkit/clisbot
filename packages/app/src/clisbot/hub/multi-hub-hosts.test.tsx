@@ -35,6 +35,7 @@ const state = vi.hoisted(() => ({
   accountSignedIn: true,
   accountListeners: new Set<() => void>(),
   hosts: [] as FakeHost[],
+  localServerIds: [] as string[],
   listeners: new Set<() => void>(),
   register: vi.fn(),
   remove: vi.fn(),
@@ -145,6 +146,7 @@ vi.mock("@/runtime/host-runtime", () => {
   };
   return {
     getHostRuntimeStore: () => store,
+    useHostRuntimeConnectedServerIds: () => state.localServerIds,
     useHosts: () =>
       useSyncExternalStore(
         (listener) => {
