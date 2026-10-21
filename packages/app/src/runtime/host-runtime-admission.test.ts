@@ -3,35 +3,41 @@ import { WebSocket, WebSocketServer } from "ws";
 import { DaemonClient, type WebSocketLike } from "@clisbot/client/internal/daemon-client";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import type { HostProfile } from "@/types/host-connection";
-import { HostRuntimeController } from "./host-runtime";
+import { HostRuntimeController, isHostRuntimeLocallyConnected } from "./host-runtime";
 import { registerHostAccessTicketResolver } from "./host-session-access";
 
-const credential = vi.hoisted(() => ({ localOnly: false }));
+const credential = vi.hoisted(() => ({ localOnly: false, localId: "direct" }));
 vi.mock("@/device-access/credentials", async (original) => ({
   ...(await original<typeof import("@/device-access/credentials")>()),
   readDeviceCredential: async () => (credential.localOnly ? null : { backendId: "route-test" }),
 }));
 vi.mock("@/desktop/daemon/local-credential", () => ({
   readDesktopManagedLocalCredential: async (connection: { id: string }) =>
-    credential.localOnly && connection.id === "direct" ? "local-test-credential" : undefined,
+    credential.localOnly && connection.id === credential.localId
+      ? "local-test-credential"
+      : undefined,
 }));
 
 const cleanup: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0).toReversed()) await close();
   credential.localOnly = false;
+  credential.localId = "direct";
+  vi.unstubAllGlobals();
 });
 
 async function endpoint(accept: boolean | "deny") {
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await new Promise<void>((resolve) => server.once("listening", resolve));
   let helloCount = 0;
+  let lastAuth: unknown;
   let accepting = accept;
   server.on("connection", (socket) => {
     socket.on("message", (bytes) => {
       const frame = JSON.parse(bytes.toString());
       if (frame.type !== "hello") return;
       helloCount += 1;
+      lastAuth = frame.auth;
       if (!accepting) return;
       if (accepting === "deny") {
         socket.close(4403, "Access denied");
@@ -62,6 +68,7 @@ async function endpoint(accept: boolean | "deny") {
   return {
     endpoint: `127.0.0.1:${address.port}`,
     hellos: () => helloCount,
+    auth: () => lastAuth,
     disconnect: () => {
       accepting = false;
       for (const socket of server.clients) socket.terminate();
@@ -298,4 +305,72 @@ it("does not replace a healthy connection for an identical advertised inventory"
   await controller.runProbeCycleNow();
   expect(controller.getClient()).toBe(original);
   expect(attempts).toEqual(["direct"]);
+});
+
+it.each([true, false])(
+  "local authority=%s with a failing Hub ticket resolver never guesses from loopback",
+  async (localAuthority) => {
+    credential.localOnly = localAuthority;
+    const local = await endpoint(true);
+    const remote = await endpoint(true);
+    const host: HostProfile = {
+      serverId: "route-test",
+      label: "Local Mac",
+      appearance: defaultHostAppearance(),
+      lifecycle: {},
+      createdAt: "2026-10-22",
+      updatedAt: "2026-10-22",
+      preferredConnectionId: "remote",
+      management: {
+        kind: "hub",
+        hubOrigin: "https://offline.example.test",
+        organizationId: "org",
+        daemonId: "daemon",
+        managedAccessMode: "external",
+      },
+      connections: [
+        { id: "remote", type: "directTcp", endpoint: remote.endpoint },
+        { id: "direct", type: "directTcp", endpoint: local.endpoint },
+      ],
+    };
+    const ticket = vi.fn(async () => {
+      throw new Error("Hub unavailable");
+    });
+    cleanup.push(
+      registerHostAccessTicketResolver(host.serverId, ticket, host.management, [
+        host.connections[0]!,
+      ]),
+    );
+    vi.stubGlobal("WebSocket", WebSocket);
+    const controller = new HostRuntimeController({ host });
+    cleanup.push(() => controller.stop());
+    await controller.start({ autoProbe: false });
+    if (localAuthority) {
+      expect(controller.getSnapshot().connectionStatus).toBe("online");
+      expect(controller.getSnapshot().activeConnectionId).toBe("direct");
+      expect(isHostRuntimeLocallyConnected(controller.getSnapshot())).toBe(true);
+      expect(local.hellos()).toBe(1);
+      expect(local.auth()).toEqual({ kind: "localCredential", token: "local-test-credential" });
+      expect(ticket).not.toHaveBeenCalled();
+    } else {
+      expect(controller.getSnapshot().connectionStatus).toBe("error");
+      expect(isHostRuntimeLocallyConnected(controller.getSnapshot())).toBe(false);
+      expect(local.hellos()).toBe(0);
+      expect(ticket).toHaveBeenCalled();
+    }
+    expect(remote.hellos()).toBe(0);
+  },
+);
+
+it("switches an in-flight remote connection to the newly discovered local route", async () => {
+  const { controller, host, direct, attempts } = await admittedRuntime(false);
+  const pending = controller.start({ autoProbe: false });
+  await vi.waitFor(() => expect(direct.hellos()).toBe(1));
+  credential.localOnly = true;
+  credential.localId = "alternate";
+  await controller.updateHost({ ...host, preferredConnectionId: "alternate" });
+  await pending;
+  expect(controller.getSnapshot().connectionStatus).toBe("online");
+  expect(controller.getSnapshot().activeConnectionId).toBe("alternate");
+  expect(attempts).toEqual(["direct", "alternate"]);
 });

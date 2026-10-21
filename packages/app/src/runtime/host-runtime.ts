@@ -172,6 +172,8 @@ export type HostRuntimeAgentDirectoryStatus = HostRuntimeDirectoryStatus;
 export interface HostRuntimeSnapshot {
   serverId: string;
   activeConnectionId: string | null;
+  /** Ephemeral proof from Desktop main, never inferred from the endpoint or persisted. */
+  localCredentialConnectionId?: string | null;
   activeConnection: ActiveConnection | null;
   connectionStatus: HostRuntimeConnectionStatus;
   client: DaemonClient | null;
@@ -666,6 +668,9 @@ function createDefaultDeps(
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
         resolveAccessTicket: async () => {
+          // Electron validates the live local target; this authority does not depend on Hub.
+          if (await readDesktopManagedLocalCredential(connection).catch(() => undefined))
+            return undefined;
           try {
             return await resolveHostAccessTicket(
               host.serverId,
@@ -941,6 +946,7 @@ export class HostRuntimeController {
       this.authRejectedConnectionIds.clear();
       this.updateSnapshot({ authFailureReason: null });
     }
+    const preferredChanged = this.host.preferredConnectionId !== host.preferredConnectionId;
     const activeConnectionId = this.snapshot.activeConnectionId;
     const previousActiveConnection = findConnectionById(this.host, activeConnectionId);
     this.host = host;
@@ -951,7 +957,8 @@ export class HostRuntimeController {
       previousActiveConnection &&
       (!nextActiveConnection ||
         !equal(previousActiveConnection, nextActiveConnection) ||
-        passwordChanged)
+        passwordChanged ||
+        (preferredChanged && this.snapshot.connectionStatus !== "online"))
     ) {
       this.switchRequestVersion += 1;
       this.probeRequestVersion += 1;
@@ -1091,7 +1098,7 @@ export class HostRuntimeController {
     }
 
     let localConnectionId: string | null = null;
-    if (this.snapshot.connectionStatus !== "online" && usesDeviceCredential(this.host)) {
+    if (this.snapshot.connectionStatus !== "online") {
       const access = await deviceCredentialAccess(this.host);
       if (access.missing) {
         // Pairing again is the only way forward. Retrying every tick would flip the Host
@@ -1101,6 +1108,8 @@ export class HostRuntimeController {
         return;
       }
       localConnectionId = access.localConnectionId;
+      if (!this.isCurrentProbeRequest(requestVersion)) return;
+      this.updateSnapshot({ localCredentialConnectionId: localConnectionId });
     }
 
     if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
@@ -1375,7 +1384,7 @@ export class HostRuntimeController {
   ): Promise<void> {
     if (
       !this.isCurrentProbeRequest(requestVersion) ||
-      this.admissionRevoked ||
+      (this.admissionRevoked && !localConnectionId) ||
       this.snapshot.authFailureReason
     )
       return;
@@ -2591,10 +2600,30 @@ export class HostRuntimeStore {
     if (!serverId) {
       throw new Error("Desktop daemon did not return a server id.");
     }
-    return this.upsertHostConnection({
-      serverId,
-      label: input.hostname ?? undefined,
-      connection,
+    return this.withHostRegistryMutation(async () => {
+      const existing = this.hosts.find((host) => host.serverId === serverId);
+      // Desktop-discovered routes belong to this installation, not the Hub's offer.
+      const management = existing?.management
+        ? {
+            ...existing.management,
+            manualConnectionIds: [
+              ...new Set([...(existing.management.manualConnectionIds ?? []), connection.id]),
+            ],
+          }
+        : undefined;
+      const profiles = upsertHostConnectionInProfiles({
+        profiles: this.hosts,
+        serverId,
+        connection,
+        label: input.hostname ?? undefined,
+        management,
+      });
+      const index = profiles.findIndex((host) => host.serverId === serverId);
+      const profile = { ...profiles[index]!, preferredConnectionId: connection.id };
+      const next = profiles.with(index, profile);
+      await this.persistHosts(next);
+      this.setHostsAndSync(next);
+      return profile;
     });
   }
 
@@ -3310,8 +3339,20 @@ export function useHostRuntimeIsConnected(serverId: string): boolean {
   );
 }
 
+/** An online session admitted with the existing Desktop credential, not merely a local address. */
+export function isHostRuntimeLocallyConnected(snapshot: HostRuntimeSnapshot | null): boolean {
+  return (
+    isHostRuntimeConnected(snapshot) &&
+    !!snapshot?.localCredentialConnectionId &&
+    snapshot.activeConnectionId === snapshot.localCredentialConnectionId
+  );
+}
+
 /** Server ids whose live connection is currently authorized and online. */
-export function useHostRuntimeConnectedServerIds(serverIds: readonly string[]): string[] {
+export function useHostRuntimeConnectedServerIds(
+  serverIds: readonly string[],
+  localOnly = false,
+): string[] {
   const store = getHostRuntimeStore();
   const connectedKey = useSyncExternalStore(
     (onStoreChange) => {
@@ -3320,11 +3361,21 @@ export function useHostRuntimeConnectedServerIds(serverIds: readonly string[]): 
     },
     () =>
       serverIds
-        .filter((serverId) => isHostRuntimeConnected(store.getSnapshot(serverId)))
+        .filter((serverId) => {
+          const snapshot = store.getSnapshot(serverId);
+          return localOnly
+            ? isHostRuntimeLocallyConnected(snapshot)
+            : isHostRuntimeConnected(snapshot);
+        })
         .join("\u0000"),
     () =>
       serverIds
-        .filter((serverId) => isHostRuntimeConnected(store.getSnapshot(serverId)))
+        .filter((serverId) => {
+          const snapshot = store.getSnapshot(serverId);
+          return localOnly
+            ? isHostRuntimeLocallyConnected(snapshot)
+            : isHostRuntimeConnected(snapshot);
+        })
         .join("\u0000"),
   );
   return useMemo(() => (connectedKey ? connectedKey.split("\u0000") : []), [connectedKey]);

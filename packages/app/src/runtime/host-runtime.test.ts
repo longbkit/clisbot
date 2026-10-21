@@ -4081,6 +4081,62 @@ describe("HostRuntimeStore", () => {
     store.syncHosts([]);
   });
 
+  it("reconciles Desktop's current port into a Hub Host and preserves it across offer refresh", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    const offer = {
+      v: 5 as const,
+      encrypted: true as const,
+      serverId: "srv_offer",
+      daemonPublicKeyB64: "key",
+      relay: { endpoint: "relay.example.test:443", useTls: true },
+    };
+    const localManagement: HubHostManagement = {
+      kind: "hub",
+      hubOrigin: "https://hub.example.test",
+      organizationId: "org",
+      daemonId: "daemon",
+      managedAccessMode: "external",
+    };
+    try {
+      await store.upsertManagedConnectionFromOffer({
+        offer,
+        management: localManagement,
+        label: "My Mac",
+      });
+      for (const port of [6868, 6868, 7878]) {
+        await store.upsertConnectionFromListen({
+          serverId: offer.serverId,
+          hostname: "My Mac",
+          listenAddress: `127.0.0.1:${port}`,
+        });
+      }
+      expect(store.getHosts()).toHaveLength(1);
+      const local = store.getHosts()[0]!;
+      expect(local.preferredConnectionId).toBe("direct:localhost:7878");
+      expect(
+        local.connections.filter((route) => route.id === "direct:localhost:6868"),
+      ).toHaveLength(1);
+      expect(local.management?.manualConnectionIds).toEqual([
+        "direct:localhost:6868",
+        "direct:localhost:7878",
+      ]);
+      await store.upsertManagedConnectionFromOffer({ offer, management: localManagement });
+      expect(store.getHosts()[0]?.connections.map(({ id }) => id)).toContain(
+        "direct:localhost:7878",
+      );
+      await store.removeManagedHost(localManagement);
+      expect(store.getHosts()[0]?.management).toBeUndefined();
+      expect(store.getHosts()[0]?.connections.map(({ id }) => id)).toContain(
+        "direct:localhost:7878",
+      );
+    } finally {
+      store.syncHosts([]);
+    }
+  });
+
   it("preserves a manual host rename when desktop status re-advertises the daemon hostname", async () => {
     const advertisedHostname = "macbook-pro.local";
     const store = new HostRuntimeStore({

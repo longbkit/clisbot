@@ -20,6 +20,8 @@ For installs without anyone to approve, pass an API key with the `daemons:enroll
 
 Hosts already saved in the app (for example a direct `localhost` connection) are attached to the Hub right away and keep their name and existing connection. Signing out of the Hub removes only the Hub part; saved Hosts stay.
 
+Desktop also updates its local daemon's connection when that Host was first saved through the Hub. It uses the current local port reported by Desktop, keeps the same Host identity, and preserves that route through Hub refreshes. The existing Desktop local credential authorizes this connection independently of Tailscale, relay, or Hub availability; a loopback address alone grants no access. Remote routes and daemon transport settings are unchanged.
+
 The daemon currently publishes connection info to the Hub only when relay is on. New daemons have relay off by default; if a Host is registered but lacks connection info, turn relay on in the daemon configuration (Docker: `CLISBOT_RELAY_ENABLED=true`, then recreate the container with the same volume). This configures the connection path; no extra CLI sign-in is needed.
 
 In a Host's **Connections**, the connection the Hub provides (usually Relay) says **Provided by Hub** and has no Remove button, because the Hub would add it back. Connections you saved yourself can still be removed.

@@ -37,6 +37,12 @@ describe("isAccountHost", () => {
     expect(isAccountHost(host, [listing("hub://old", "org-old", "srv")])).toBe(true);
   });
 
+  it("keeps an externally managed Host with a verified local session while Hub is unavailable", () => {
+    const host = { serverId: "srv", management: management("external") };
+    expect(isAccountHost(host, [unavailableHub], true)).toBe(true);
+    expect(isAccountHost(host, [unavailableHub], false)).toBe(false);
+  });
+
   it("always keeps a Host no Hub manages", () => {
     expect(isAccountHost({ serverId: "srv", management: undefined }, [])).toBe(true);
   });

@@ -27,7 +27,7 @@ const paired = {
 describe("deviceCredentialAccess", () => {
   beforeEach(() => {
     store.read.mockReset();
-    store.local.mockReset();
+    store.local.mockReset().mockResolvedValue(undefined);
     store.access.mockReset();
   });
 
@@ -51,6 +51,23 @@ describe("deviceCredentialAccess", () => {
     });
   });
 
+  it.each(["off", "external"])(
+    "prefers proven local access with a stored device credential and mode %s",
+    async (managedAccessMode) => {
+      store.read.mockResolvedValue({ backendId: "srv" });
+      store.local.mockImplementation(async (connection: HostConnection) =>
+        connection.id === loopback.id ? "local-token" : undefined,
+      );
+      expect(
+        await deviceCredentialAccess({
+          ...paired,
+          management: { managedAccessMode },
+        } as HostProfile),
+      ).toEqual({ missing: false, localConnectionId: loopback.id });
+      expect(store.read).not.toHaveBeenCalled();
+    },
+  );
+
   it("lets the connection attempt decide when the store cannot be read", async () => {
     store.read.mockImplementation(async () => {
       throw new Error("keychain locked");
@@ -73,7 +90,7 @@ describe("deviceCredentialAccess", () => {
 
 describe("resolveHostDeviceAccess", () => {
   beforeEach(() => {
-    store.local.mockReset();
+    store.local.mockReset().mockResolvedValue(undefined);
     store.access.mockReset();
   });
 
@@ -81,6 +98,13 @@ describe("resolveHostDeviceAccess", () => {
     store.access.mockRejectedValue(new Error("credential unavailable"));
     store.local.mockResolvedValue("local-token");
     expect(await resolveHostDeviceAccess(paired, loopback)).toBeUndefined();
+  });
+
+  it("uses local authority before requesting a paired device credential", async () => {
+    store.local.mockResolvedValue("local-token");
+    store.access.mockResolvedValue({ credential: "device-token" });
+    expect(await resolveHostDeviceAccess(paired, loopback)).toBeUndefined();
+    expect(store.access).not.toHaveBeenCalled();
   });
 
   it("still fails on a connection without the local credential", async () => {
