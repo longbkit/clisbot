@@ -26,7 +26,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function endpoint(accept: boolean | "deny") {
+async function endpoint(accept: boolean | "deny" | "bad-password") {
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await new Promise<void>((resolve) => server.once("listening", resolve));
   let helloCount = 0;
@@ -39,6 +39,10 @@ async function endpoint(accept: boolean | "deny") {
       helloCount += 1;
       lastAuth = frame.auth;
       if (!accepting) return;
+      if (accepting === "bad-password") {
+        socket.close(4001, "Incorrect password");
+        return;
+      }
       if (accepting === "deny") {
         socket.close(4403, "Access denied");
         return;
@@ -77,7 +81,7 @@ async function endpoint(accept: boolean | "deny") {
 }
 
 async function admittedRuntime(
-  directAccepts: boolean | "deny",
+  directAccepts: boolean | "deny" | "bad-password",
   advertised = ["direct", "alternate"],
 ) {
   const direct = await endpoint(directAccepts);
@@ -373,4 +377,26 @@ it("switches an in-flight remote connection to the newly discovered local route"
   expect(controller.getSnapshot().connectionStatus).toBe("online");
   expect(controller.getSnapshot().activeConnectionId).toBe("alternate");
   expect(attempts).toEqual(["direct", "alternate"]);
+});
+
+it("allows a newly proven local route after a remote credential rejection", async () => {
+  const { controller, host, attempts } = await admittedRuntime("bad-password");
+  await controller.start({ autoProbe: false });
+  expect(controller.getSnapshot().authFailureReason).toBe("incorrect_password");
+  credential.localOnly = true;
+  credential.localId = "alternate";
+  await controller.updateHost({ ...host, preferredConnectionId: "alternate" });
+  expect(controller.getSnapshot().connectionStatus).toBe("online");
+  expect(controller.getSnapshot().activeConnectionId).toBe("alternate");
+  expect(attempts).toEqual(["direct", "alternate"]);
+});
+
+it("does not retry a locally rejected credential or send it to another route", async () => {
+  credential.localOnly = true;
+  const { controller, attempts, alternate } = await admittedRuntime("bad-password");
+  await controller.start({ autoProbe: false });
+  await controller.runProbeCycleNow();
+  expect(controller.getSnapshot().authFailureReason).toBe("incorrect_password");
+  expect(attempts).toEqual(["direct"]);
+  expect(alternate.hellos()).toBe(0);
 });

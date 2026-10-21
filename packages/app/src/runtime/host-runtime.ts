@@ -1382,10 +1382,11 @@ export class HostRuntimeController {
     requestVersion: number,
     localConnectionId: string | null = null,
   ): Promise<void> {
+    const hasLocalAccess =
+      localConnectionId !== null && !this.authRejectedConnectionIds.has(localConnectionId);
     if (
       !this.isCurrentProbeRequest(requestVersion) ||
-      (this.admissionRevoked && !localConnectionId) ||
-      this.snapshot.authFailureReason
+      ((this.admissionRevoked || this.snapshot.authFailureReason) && !hasLocalAccess)
     )
       return;
     this.admissionAttemptFailed = false;
@@ -2611,16 +2612,18 @@ export class HostRuntimeStore {
             ],
           }
         : undefined;
+      // A reused port is not proof that two saved daemon identities are the same Host.
       const profiles = upsertHostConnectionInProfiles({
-        profiles: this.hosts,
+        profiles: existing ? [existing] : [],
         serverId,
         connection,
         label: input.hostname ?? undefined,
         management,
       });
-      const index = profiles.findIndex((host) => host.serverId === serverId);
-      const profile = { ...profiles[index]!, preferredConnectionId: connection.id };
-      const next = profiles.with(index, profile);
+      const profile = { ...profiles[0]!, preferredConnectionId: connection.id };
+      const next = existing
+        ? this.hosts.with(this.hosts.indexOf(existing), profile)
+        : [...this.hosts, profile];
       await this.persistHosts(next);
       this.setHostsAndSync(next);
       return profile;

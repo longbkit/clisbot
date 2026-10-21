@@ -4081,6 +4081,33 @@ describe("HostRuntimeStore", () => {
     store.syncHosts([]);
   });
 
+  it("does not merge another saved Host when Desktop reuses its old local port", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    try {
+      await store.upsertConnectionFromListen({
+        serverId: "old-daemon",
+        hostname: "Old daemon",
+        listenAddress: "127.0.0.1:6868",
+      });
+      const oldHost = store.getHosts()[0];
+      await store.upsertConnectionFromListen({
+        serverId: "new-daemon",
+        hostname: "New daemon",
+        listenAddress: "127.0.0.1:6868",
+      });
+      expect(store.getHosts()).toHaveLength(2);
+      expect(store.getHosts().find((host) => host.serverId === "old-daemon")).toEqual(oldHost);
+      expect(store.getHosts().find((host) => host.serverId === "new-daemon")?.label).toBe(
+        "New daemon",
+      );
+    } finally {
+      store.syncHosts([]);
+    }
+  });
+
   it("reconciles Desktop's current port into a Hub Host and preserves it across offer refresh", async () => {
     const store = new HostRuntimeStore({
       storage: createMemoryHostRuntimeStorage(),
