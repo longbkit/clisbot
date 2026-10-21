@@ -366,20 +366,19 @@ export const selectModel = async (page: Page, model: string) => {
   const exactOption = dialog
     .getByText(new RegExp(`^${escapeRegex(normalizedModel)}$`, "i"))
     .first();
-  const exactVisible = await exactOption.isVisible().catch(() => false);
-  if (exactVisible) {
-    await exactOption.click({ force: true });
-  } else {
-    // Modern labels include version suffixes (for example "Haiku 4.5"), so
-    // select the first filtered result using keyboard confirm.
-    await searchInput.press("Enter");
-  }
-
-  // Wait for dropdown to close
-  if (await searchInput.isVisible().catch(() => false)) {
-    await page.keyboard.press("Escape").catch(() => undefined);
-  }
+  // Model IDs and display labels differ. Wait for the requested row rather than
+  // confirming the previous search result before the filtered list has rendered.
+  const modelOption = dialog
+    .getByTestId(new RegExp(`^model-row-.+-${escapeRegex(normalizedModel)}$`))
+    .or(exactOption)
+    .first();
+  await expect(modelOption).toBeVisible();
+  const selectedLabel = (await modelOption.innerText()).split("\n")[0].trim();
+  await modelOption.click();
   await expect(searchInput).not.toBeVisible({ timeout: 5000 });
+  await expect(
+    page.getByTestId("combined-model-selector").filter({ visible: true }).first(),
+  ).toHaveAccessibleName(new RegExp(escapeRegex(selectedLabel)));
 };
 
 export const selectMode = async (page: Page, mode: string) => {
