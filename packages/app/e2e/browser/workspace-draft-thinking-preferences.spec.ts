@@ -1,4 +1,10 @@
-import { hostFormPreferencesKey } from "../support/helpers/form-preferences";
+import path from "node:path";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import {
+  hostFormPreferencesKey,
+  readHostFormPreferences,
+} from "../support/helpers/form-preferences";
+import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { expect, test, type Page } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -9,7 +15,6 @@ import {
 } from "../support/helpers/command-center-agent-controls";
 import { openCommandCenter } from "../support/helpers/command-center";
 import { runWorkspaceActionFromCommandCenter } from "../support/helpers/command-center-workspace-actions";
-import { selectModel } from "../support/helpers/app";
 
 const DISABLE_DEFAULT_SEED_ONCE_KEY = "@clisbot:e2e-disable-default-seed-once";
 const SEED_NONCE_KEY = "@clisbot:e2e-seed-nonce";
@@ -147,8 +152,37 @@ test.describe("Workspace draft thinking preferences", () => {
     page,
   }) => {
     const workspace = await seedWorkspace({ repoPrefix: "draft-mode-preferences-" });
+    let client: DaemonClient | undefined;
+    const catalogProvider = "draft-mode-catalog";
 
     try {
+      client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "draft-mode" });
+      await client.patchDaemonConfig({
+        providers: {
+          [catalogProvider]: {
+            extends: "acp",
+            label: "Draft Mode Catalog",
+            enabled: true,
+            command: [
+              process.execPath,
+              path.resolve(__dirname, "../support/fixtures/catalog-acp.cjs"),
+              "1",
+            ],
+          },
+        },
+      });
+      const catalogClient = client;
+      const matchesCatalogProvider = (entry: { provider: string }) =>
+        entry.provider === catalogProvider;
+      await expect
+        .poll(
+          async () =>
+            (await catalogClient.getProvidersSnapshot({ cwd: workspace.repoPath })).entries.find(
+              matchesCatalogProvider,
+            )?.status,
+          { timeout: 30_000 },
+        )
+        .toBe("ready");
       await gotoWorkspace(page, workspace.workspaceId);
       await openNewAgentTab(page);
       await chooseDraftControl(
@@ -162,15 +196,42 @@ test.describe("Workspace draft thinking preferences", () => {
 
       await openNewAgentTab(page);
       await expectModeSelected(page, "Approval test");
-      await selectModel(page, "gpt-5.4-mini");
+      // Use a synthetic provider and the host-wide picker, not the current provider's models.
+      await chooseDraftControl(
+        page,
+        "gemini 3.5 flash",
+        "Model › Draft Mode Catalog › Gemini 3.5 Flash",
+      );
+      await expect(
+        page.getByRole("button", { name: "Select model (Gemini 3.5 Flash)", exact: true }),
+      ).toBeVisible();
+      await expect
+        .poll(async () => (await readHostFormPreferences(page))?.provider)
+        .toBe(catalogProvider);
 
       await openNewAgentTab(page);
       await reloadWithPersistedPreferences(page);
-      await selectModel(page, "Five minute stream");
+      await expect
+        .poll(async () => (await readHostFormPreferences(page))?.provider)
+        .toBe(catalogProvider);
+      await chooseDraftControl(
+        page,
+        "five minute stream",
+        "Model › Mock Load Test › Five minute stream",
+      );
+      await expect.poll(async () => (await readHostFormPreferences(page))?.provider).toBe("mock");
 
       await expectModeSelected(page, "Approval test");
     } finally {
-      await workspace.cleanup();
+      try {
+        await client?.patchDaemonConfig({ removeProviders: [catalogProvider] });
+      } finally {
+        try {
+          await client?.close();
+        } finally {
+          await workspace.cleanup();
+        }
+      }
     }
   });
 
