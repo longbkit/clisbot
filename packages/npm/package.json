@@ -1,6 +1,6 @@
 {
   "name": "clisbot",
-  "version": "2.1.4",
+  "version": "2.1.7",
   "description": "Clisbot — connect to and control your local AI agents",
   "homepage": "https://clisbot.com",
   "license": "Apache-2.0",
@@ -21,7 +21,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@clisbot/cli": "2.1.4"
+    "@clisbot/cli": "2.1.7"
   },
   "engines": {
     "node": ">=22.19.0"

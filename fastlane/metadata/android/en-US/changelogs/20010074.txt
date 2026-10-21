@@ -1,0 +1,8 @@
+The Team membership fix takes effect when the Hub is upgraded. Android store availability follows the existing closed Alpha review process.
+
+Paseo baseline remains the reviewed main snapshot 337e81a9c6d4551dbcede5930c21408776d06b1b recorded in 2.1.1.
+
+Fixed
+- Release idle Claude and Codex runtimes when no active turn or background work needs them, respecting the configured idle timeout
+
+Full notes: https://clisbot.com/changelog
