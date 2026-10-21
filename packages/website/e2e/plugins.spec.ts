@@ -191,6 +191,19 @@ test("searches for a term typed before the page finished loading", async ({ page
   await expect(page).toHaveURL(/\/plugins\/all\?q=graphite&window=month$/);
 });
 
+test("submits the visible search value even before React has adopted it", async ({ page }) => {
+  await page.goto("/plugins?window=month");
+  await searchPlugins(page, "old term");
+  await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
+  // Autofill and input before hydration can update the DOM before React's state catches up.
+  const searchbox = page.getByRole("searchbox", { name: "Search plugins" });
+  await searchbox.evaluate((input: HTMLInputElement) => {
+    input.value = "graphite";
+  });
+  await searchbox.press("Enter");
+  await expect(page).toHaveURL(/\/plugins\/all\?q=graphite&window=month$/);
+});
+
 test("filters browse results for a term typed before the page finished loading", async ({
   page,
 }) => {

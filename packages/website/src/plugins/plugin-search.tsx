@@ -64,7 +64,8 @@ export function PluginSearch({
     (event: FormEvent) => {
       event.preventDefault();
       // Live results already show the term.
-      if (!live) show(term, { replace: false });
+      // The submitted DOM value may precede state during hydration or browser autofill.
+      if (!live) show(input.current?.value ?? term, { replace: false });
     },
     [live, show, term],
   );
