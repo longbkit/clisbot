@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.7 - 2026-10-22
+
+### Fixed
+
+- Release idle Claude and Codex runtimes when no active turn or background work needs them, respecting the configured idle timeout
+- Connect Desktop to the daemon on the same machine even when the Host was saved through a Hub and Tailscale or the Hub is unavailable
+- Try other authorized Host connection routes after a direct connection fails, while preserving the daemon's transport settings
+- Make User and Channel sidebar filters searchable and scrollable
+- Avoid timeouts after saving Team memberships by indexing active organization leases
+- Fix iOS production builds that use static CocoaPods frameworks
+- Exclude unused Android advertising permissions
+- Include the original upstream license notices in the WhatsApp channel package
+- Preserve the entered plugin search term when submitting before the page has synchronized its input state
+
+### Changed
+
+- Clarify self-hosted Hub privacy boundaries and optional mobile push notification processing
+
+The Team membership fix takes effect when the Hub is upgraded. Android store availability follows the existing closed Alpha review process.
+
+Paseo baseline remains the reviewed main snapshot `337e81a9c6d4551dbcede5930c21408776d06b1b` recorded in 2.1.1.
+
 ## 2.1.4 - 2026-10-18
 
 ### Added
