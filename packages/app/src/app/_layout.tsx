@@ -898,6 +898,8 @@ function RootStack() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="cli-login" />
+      <Stack.Screen name="hub-auth/callback" />
+      <Stack.Screen name="+not-found" />
       <Stack.Protected guard={storeReady}>
         <Stack.Screen name="welcome" />
         <Stack.Screen name="settings/index" />

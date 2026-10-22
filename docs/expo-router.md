@@ -74,6 +74,18 @@ dynamic params exist before any nested workspace leaf is selected.
 
 ## Error Recovery
 
+Native Hub OAuth returns through `hub-auth/callback`, registered in the root stack.
+Like `hub-google`, this route only returns to Hub account settings. WebBrowser and
+the native Hub transport own the pending PKCE transaction, callback validation and
+grant exchange; a landing route must never read, display or replay its credentials.
+A cold callback with no pending transaction returns to the existing sign-in action.
+
+Native Hub OAuth requests use an AbortController deadline and explicitly serialized form bodies. Hermes does not provide `AbortSignal.timeout`, and React Native fetch does not serialize a `URLSearchParams` body object. Exchange, refresh, and revoke must keep these native contracts; browser-only mocks are not sufficient validation.
+
+Unknown links use the app's `+not-found` recovery screen with Back and Home. Do not
+display the raw incoming URL (it can contain a one-time credential), or send users
+to Expo's diagnostic Sitemap as recovery from a failed link.
+
 The root error boundary lives above `ExpoRoot` in `src/root-app.tsx`. Reload
 remounts the router at `/open-project`, preserving saved workspace layouts and
 the remembered selection. Do not move the boundary inside the root layout:

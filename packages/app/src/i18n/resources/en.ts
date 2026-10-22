@@ -1588,6 +1588,11 @@ export const en = {
       },
     },
   },
+  notFound: {
+    title: "Page not found",
+    body: "This link is no longer available. Go back or open Home to continue.",
+    home: "Open Home",
+  },
   rootError: {
     title: "Clisbot ran into a problem.",
     body: "Try again to reload the app. If this keeps happening, include the details below when you report it.",

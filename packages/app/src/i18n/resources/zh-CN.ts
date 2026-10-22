@@ -1547,6 +1547,11 @@ export const zhCN: TranslationResources = {
       },
     },
   },
+  notFound: {
+    title: "找不到页面",
+    body: "此链接已不可用。请返回或打开首页以继续。",
+    home: "打开首页",
+  },
   rootError: {
     title: "Clisbot 遇到了问题。",
     body: "请重试以重新加载应用。如果问题持续发生，请在报告时附上下面的详细信息。",

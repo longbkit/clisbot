@@ -1593,6 +1593,11 @@ export const ptBR: TranslationResources = {
       },
     },
   },
+  notFound: {
+    title: "Página não encontrada",
+    body: "Este link não está mais disponível. Volte ou abra o Início para continuar.",
+    home: "Abrir Início",
+  },
   rootError: {
     title: "O Clisbot encontrou um problema.",
     body: "Tente novamente para recarregar o app. Se isso continuar acontecendo, inclua os detalhes abaixo ao relatar o problema.",

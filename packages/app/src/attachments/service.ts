@@ -1,3 +1,4 @@
+import { prepareImagesForSend, MAX_PREPARED_IMAGE_CHARACTERS } from "./image-send-preparation";
 import { collectRetainedAttachmentIds } from "@/attachments/gc-retention";
 import { getAttachmentStore } from "@/attachments/store";
 import type { AttachmentMetadata, SaveAttachmentInput } from "@/attachments/types";
@@ -105,40 +106,57 @@ export async function encodeAttachmentsForSend(
   if (attachments.length > MAX_SEND_ATTACHMENT_COUNT) {
     throw new Error(`Too many attachments (maximum ${MAX_SEND_ATTACHMENT_COUNT}).`);
   }
-  const knownBytes = attachments.reduce((total, attachment) => {
-    const size = attachment.byteSize;
-    return typeof size === "number" && Number.isFinite(size) && size >= 0 ? total + size : total;
-  }, 0);
-  if (knownBytes > MAX_SEND_ATTACHMENT_BYTES) {
-    throw new Error(`Attachments exceed the ${MAX_SEND_ATTACHMENT_BYTES} byte send limit.`);
-  }
-
+  // Store metadata rejects known oversized originals before loading. The actual
+  // encoded size below also bounds inputs with missing/understated metadata.
   const store = await getAttachmentStore();
-  const encoded: Array<{ data: string; mimeType: string }> = [];
-  let encodedBytes = 0;
-  // Encode sequentially so the base64 strings do not all peak concurrently.
-  for (const attachment of attachments) {
+  const prepared: Array<{ data: string; mimeType: string }> = [];
+  let remaining = MAX_PREPARED_IMAGE_CHARACTERS;
+  for (let index = 0; index < attachments.length; index++) {
+    const attachment = attachments[index];
+    if (
+      typeof attachment.byteSize === "number" &&
+      attachment.byteSize > MAX_SEND_ATTACHMENT_BYTES
+    ) {
+      throw new Error(
+        "This image is too large to prepare. Your draft is kept; choose an image under 32 MiB.",
+      );
+    }
     let data: string;
     try {
       data = await store.encodeBase64({ attachment });
     } catch (error) {
-      console.error("[attachments] Failed to encode attachment for send", {
-        id: attachment.id,
-        error,
-      });
-      throw new Error(`Unable to encode attachment ${attachment.fileName ?? attachment.id}.`, {
-        cause: error,
-      });
-    }
-    encodedBytes += data.length;
-    if (encodedBytes > MAX_SEND_ATTACHMENT_BYTES * 2) {
       throw new Error(
-        `Encoded attachments exceed the ${MAX_SEND_ATTACHMENT_BYTES * 2} byte send limit.`,
+        `Unable to read image ${attachment.fileName ?? attachment.id}. Your draft is kept; try choosing it again.`,
+        { cause: error },
       );
     }
-    encoded.push({ data, mimeType: attachment.mimeType });
+    if (data.length > Math.ceil(MAX_SEND_ATTACHMENT_BYTES / 3) * 4) {
+      throw new Error(
+        "This image is too large to prepare. Your draft is kept; choose an image under 32 MiB.",
+      );
+    }
+    // Equal shares avoid starving an image when stored metadata is stale.
+    // Unused space from earlier small images remains available to later ones.
+    const allowance = Math.floor(remaining / (attachments.length - index));
+    try {
+      const image = { data, mimeType: attachment.mimeType };
+      if (data.length <= allowance) {
+        prepared.push(image);
+      } else {
+        const { createSendImageEncoder } = await import("./image-send-encoder");
+        const [copy] = await prepareImagesForSend([image], createSendImageEncoder, allowance);
+        prepared.push(copy);
+      }
+      remaining -= prepared[index].data.length;
+    } catch (error) {
+      throw new Error(
+        "Could not prepare these images. Your draft is kept; try choosing the images again.",
+        { cause: error },
+      );
+    }
+    // Only bounded send copies survive this iteration, never all originals.
   }
-  return encoded.length > 0 ? encoded : undefined;
+  return prepared;
 }
 
 export async function resolveAttachmentPreviewUrl(attachment: AttachmentMetadata): Promise<string> {

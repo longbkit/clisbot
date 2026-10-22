@@ -192,3 +192,31 @@ Workspace naming, selection and reuse live in
 [Workspace organization](../workspace-organization/README.md). The sidebar's per-session
 lines, which show this authorship for each session, live in
 [Agent sessions](../sidebar-agent-sessions/README.md).
+
+### Image send preparation
+
+The shared app attachment service prepares image send copies before Session,
+Chat, Queue and Steer submission. It reads and prepares one original at a time,
+with at most 32 images and a 32 MiB per-original bound (trusted store metadata
+precheck plus an actual base64-length check). Original aggregate size alone is
+not a refusal: three large phone photos can be prepared sequentially. The send
+copies together contain at most 2 MiB of base64 characters. Small images fitting
+their remaining share stay byte-identical; larger images first try lossless PNG
+at up to 2560 pixels, then progressively smaller JPEG/WebP copies. Non-JPEG
+sources use WebP for lossy steps to retain transparency. Persisted originals,
+draft identities and non-image file uploads are unchanged.
+
+This output fits the existing Host 16 MiB operation reservation, one Chat log
+row and relay frame. It benefits a new app talking to an old Host without a wire
+change; an old app still needs updating for oversized raw image sends. Native
+encoding uses the existing Expo image manipulator and releases decoder/cache
+resources. A preparation failure leaves the draft and its originals available.
+
+Session attachment admission may retry only typed capacity refusals before any
+capture or write, with the same input/message ID, after 50/150/350 ms. Intrinsic
+oversize, nested source-lease failures after admission, writes, provider calls
+and uncertain acknowledgements are never replayed. At most one process-wide
+retry waiter retains an already bounded input (an additional conservative
+16 MiB reservation, reported separately from the unchanged 64 MiB active
+storage-operation budget); further contenders fail promptly. These bounds are
+storage admission accounting, not a process-wide RSS guarantee.

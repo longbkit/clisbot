@@ -1,3 +1,4 @@
+import { retrySessionFileAdmission } from "../../file-upload/session-file-activity.js";
 import type pino from "pino";
 import type { SessionDelivery } from "../owned-subscriptions/index.js";
 import type { FileVersion } from "@clisbot/protocol/messages";
@@ -445,14 +446,17 @@ export class WorkspaceFilesSession {
     )
       return { attachments, images };
     if (!this.options.resolveAgentDirectory) throw new Error("Session file storage is unavailable");
-    const result = await attachSessionFiles({
-      directory: await this.options.resolveAgentDirectory(agentId),
-      messageId,
-      attachments,
-      images,
-      ownsUpload: (file) => this.fileUploads.ownsUploadedFile(file),
-      resolveForkSource: this.options.resolveForkSource,
-    });
+    const directory = await this.options.resolveAgentDirectory(agentId);
+    const result = await retrySessionFileAdmission(() =>
+      attachSessionFiles({
+        directory,
+        messageId,
+        attachments,
+        images,
+        ownsUpload: (file) => this.fileUploads.ownsUploadedFile(file),
+        resolveForkSource: this.options.resolveForkSource,
+      }),
+    );
     await this.fileUploads.releaseLinkedUploads(attachments ?? []);
     return result;
   }
