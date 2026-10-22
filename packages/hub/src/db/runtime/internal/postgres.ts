@@ -71,30 +71,11 @@ class PostgresRuntime implements DatabaseRuntime {
 
   async transaction<T>(operation: (transaction: TransactionHandle) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
-    const connection = new PostgresTransactionHandle(client);
-    try {
-      await connection.query("begin");
-      try {
-        const result = await operation(connection);
-        await connection.query("commit");
-        return result;
-      } catch (error) {
-        try {
-          await connection.query("rollback");
-        } catch (rollbackError) {
-          reportFailure(rollbackError, {
-            operation: "database.postgres.transaction.rollback",
-            component: "database",
-          });
-        }
-        // The rollback value originated in this same generic transaction callback.
-        // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
-        if (error instanceof TransactionRollback) return error.result as T;
-        throw error;
-      }
-    } finally {
-      client.release();
-    }
+    return runPostgresTransaction(
+      new PostgresTransactionHandle(client),
+      (discard) => client.release(discard),
+      operation,
+    );
   }
 
   drizzle() {
@@ -119,6 +100,43 @@ class PostgresRuntime implements DatabaseRuntime {
     } finally {
       client.release();
     }
+  }
+}
+
+/** @package */
+export async function runPostgresTransaction<T>(
+  connection: TransactionHandle,
+  release: (discard: boolean) => void,
+  operation: (transaction: TransactionHandle) => Promise<T>,
+): Promise<T> {
+  // A failed BEGIN or ROLLBACK leaves transaction state unconfirmed. Never lend
+  // that connection to another request, even if pg still considers it queryable.
+  let discard = true;
+  try {
+    await connection.query("begin");
+    try {
+      const result = await operation(connection);
+      await connection.query("commit");
+      discard = false;
+      return result;
+    } catch (error) {
+      try {
+        await connection.query("rollback");
+        discard = false;
+      } catch (rollbackError) {
+        reportFailure(rollbackError, {
+          operation: "database.postgres.transaction.rollback",
+          component: "database",
+        });
+        if (error instanceof TransactionRollback) throw rollbackError;
+      }
+      // The rollback value originated in this same generic transaction callback.
+      // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
+      if (error instanceof TransactionRollback) return error.result as T;
+      throw error;
+    }
+  } finally {
+    release(discard);
   }
 }
 
