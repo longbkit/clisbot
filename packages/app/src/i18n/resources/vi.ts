@@ -827,6 +827,11 @@ export const vi: TranslationResources = {
       },
     },
   },
+  notFound: {
+    title: "Không tìm thấy trang",
+    body: "Liên kết này không còn khả dụng. Quay lại hoặc mở Trang chủ để tiếp tục.",
+    home: "Mở Trang chủ",
+  },
   rootError: {
     title: "Clisbot gặp sự cố.",
     body: "Hãy thử lại để tải lại ứng dụng. Nếu lỗi vẫn lặp lại, hãy gửi kèm thông tin chi tiết bên dưới khi báo lỗi.",

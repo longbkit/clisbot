@@ -1604,6 +1604,11 @@ export const fr: TranslationResources = {
       },
     },
   },
+  notFound: {
+    title: "Page introuvable",
+    body: "Ce lien n’est plus disponible. Revenez en arrière ou ouvrez l’accueil pour continuer.",
+    home: "Ouvrir l’accueil",
+  },
   rootError: {
     title: "Clisbot a rencontré un problème.",
     body: "Réessayez pour recharger l’application. Si le problème persiste, joignez les détails ci-dessous à votre signalement.",

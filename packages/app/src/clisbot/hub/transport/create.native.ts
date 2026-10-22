@@ -87,14 +87,19 @@ class NativeHubTransport implements HubTransport {
       this.access = null;
       await deleteSecret(this.refreshKey);
       if (!credential) return;
-      await fetch(new URL("/api/auth/oauth2/revoke", this.origin), {
-        method: "POST",
-        credentials: "omit",
-        redirect: "error",
-        signal: AbortSignal.timeout(10_000),
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ token: credential.refreshToken, client_id: CLISBOT_CLIENT_ID }),
-      }).catch(() => undefined);
+      await withRequestTimeout(10_000, (signal) =>
+        fetch(new URL("/api/auth/oauth2/revoke", this.origin), {
+          method: "POST",
+          credentials: "omit",
+          redirect: "error",
+          signal,
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: credential.refreshToken,
+            client_id: CLISBOT_CLIENT_ID,
+          }).toString(),
+        }),
+      ).catch(() => undefined);
     });
   }
 
@@ -120,45 +125,61 @@ class NativeHubTransport implements HubTransport {
   }
 
   private async exchange(body: URLSearchParams, generation: string) {
-    const response = await fetch(new URL("/api/auth/oauth2/token", this.origin), {
-      method: "POST",
-      credentials: "omit",
-      redirect: "error",
-      signal: AbortSignal.timeout(20_000),
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      if (
-        body.get("grant_type") === "refresh_token" &&
-        response.status === 400 &&
-        error?.error === "invalid_grant"
-      ) {
-        this.access = null;
-        await deleteSecret(this.refreshKey);
-        return null;
+    return withRequestTimeout(20_000, async (signal) => {
+      const response = await fetch(new URL("/api/auth/oauth2/token", this.origin), {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        signal,
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        if (
+          body.get("grant_type") === "refresh_token" &&
+          response.status === 400 &&
+          error?.error === "invalid_grant"
+        ) {
+          this.access = null;
+          await deleteSecret(this.refreshKey);
+          return null;
+        }
+        throw new Error(
+          i18n.t("hub.account.signIn.credentialExchangeFailed", { status: response.status }),
+        );
       }
-      throw new Error(
-        i18n.t("hub.account.signIn.credentialExchangeFailed", { status: response.status }),
+      const token = OAuthTokenResponseSchema.parse(await response.json());
+      if (!token.refresh_token) throw new Error(i18n.t("hub.account.signIn.noRefreshToken"));
+      await writeSecret(
+        this.refreshKey,
+        JSON.stringify({ issuer: this.origin, refreshToken: token.refresh_token, generation }),
       );
-    }
-    const token = OAuthTokenResponseSchema.parse(await response.json());
-    if (!token.refresh_token) throw new Error(i18n.t("hub.account.signIn.noRefreshToken"));
-    await writeSecret(
-      this.refreshKey,
-      JSON.stringify({ issuer: this.origin, refreshToken: token.refresh_token, generation }),
-    );
-    this.access = {
-      generation,
-      accessToken: token.access_token,
-      expiresAt: Date.now() + token.expires_in * 1_000,
-    };
-    return token;
+      this.access = {
+        generation,
+        accessToken: token.access_token,
+        expiresAt: Date.now() + token.expires_in * 1_000,
+      };
+      return token;
+    });
   }
 }
 
 function assertHubPath(path: string): string {
   if (!path.startsWith("/api/")) throw new Error("Hub requests must use an API path.");
   return path;
+}
+
+/** Hermes does not implement AbortSignal.timeout; keep the deadline through body reads. */
+async function withRequestTimeout<T>(
+  milliseconds: number,
+  request: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), milliseconds);
+  try {
+    return await request(controller.signal);
+  } finally {
+    clearTimeout(timeout);
+  }
 }

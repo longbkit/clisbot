@@ -1609,6 +1609,11 @@ export const es: TranslationResources = {
       },
     },
   },
+  notFound: {
+    title: "Página no encontrada",
+    body: "Este enlace ya no está disponible. Vuelve atrás o abre Inicio para continuar.",
+    home: "Abrir Inicio",
+  },
   rootError: {
     title: "Clisbot tuvo un problema.",
     body: "Vuelve a intentarlo para recargar la app. Si sigue ocurriendo, incluye los detalles de abajo al reportarlo.",

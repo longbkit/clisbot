@@ -1573,6 +1573,11 @@ export const ko: TranslationResources = {
       },
     },
   },
+  notFound: {
+    title: "페이지를 찾을 수 없습니다",
+    body: "이 링크는 더 이상 사용할 수 없습니다. 뒤로 가거나 홈을 열어 계속하세요.",
+    home: "홈 열기",
+  },
   rootError: {
     title: "Clisbot에 문제가 발생했습니다.",
     body: "앱을 다시 로드해 보세요. 이런 일이 계속 발생하면 신고할 때 아래 세부정보를 포함하세요.",
