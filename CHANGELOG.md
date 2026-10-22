@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.8 - 2026-10-22
+
+### Fixed
+
+- Automatically resize large image attachments for sending while preserving the original images and draft
+- Recover from brief attachment-storage contention without resending an accepted message
+- Fix Android Hub sign-in when returning from the browser, including the callback route, request timeout and token exchange
+- Show safe Back and Home navigation for unknown app links
+
+Paseo baseline remains the reviewed main snapshot `337e81a9c6d4551dbcede5930c21408776d06b1b` recorded in 2.1.1.
+
 ## 2.1.7 - 2026-10-22
 
 ### Fixed
