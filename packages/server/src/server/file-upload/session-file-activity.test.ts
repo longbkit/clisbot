@@ -5,6 +5,8 @@ import path from "node:path";
 import { attachSessionFiles, deleteSessionDirectory } from "./session-files.js";
 import {
   SESSION_FILE_LIMITS,
+  SessionFileAdmissionBusyError,
+  retrySessionFileAdmission,
   sessionFileActivityUsage,
   withSessionFileLease,
   withSessionFileOperation,
@@ -45,6 +47,7 @@ it("rejects over-budget images before copying or decoding and releases all admis
     operations: 0,
     uploads: 0,
     retainedBytes: 0,
+    retryRetainedBytes: 0,
   });
   expect(await fs.readdir(directory)).toEqual([]);
 });
@@ -68,7 +71,7 @@ it("bounds queued operations before capture and drains every admitted operation"
         captured = true;
       },
     ),
-  ).rejects.toThrow("budget");
+  ).rejects.toThrow(SessionFileAdmissionBusyError);
   expect(captured).toBe(false);
   gate.resolve();
   await Promise.all(operations);
@@ -141,6 +144,7 @@ it.each([false, true])(
       operations: 0,
       uploads: 0,
       retainedBytes: 0,
+      retryRetainedBytes: 0,
     });
     // The failed attempt is retryable and does not permanently reject new work.
     await expect(
@@ -196,6 +200,92 @@ it("releases registration when deletion cancels a transfer during asynchronous a
     operations: 0,
     uploads: 0,
     retainedBytes: 0,
+    retryRetainedBytes: 0,
   });
   await expect(fs.stat(directory)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+it("retries only refused admission and preserves the exact input after concurrent attachment work drains", async () => {
+  const directory = await temporary();
+  const gate = deferred();
+  const blocking = withSessionFileOperation(directory, () => gate.promise, 14 * 1024 * 1024);
+  let attempts = 0;
+  const input = {
+    directory,
+    messageId: "same-message",
+    images: [{ data: Buffer.from("unchanged").toString("base64"), mimeType: "image/png" }],
+    ownsUpload: () => false,
+  };
+  const retry = retrySessionFileAdmission(async () => {
+    attempts += 1;
+    try {
+      return await attachSessionFiles(input);
+    } catch (error) {
+      gate.resolve();
+      throw error;
+    }
+  });
+  const result = await retry;
+  await blocking;
+  expect(attempts).toBe(2);
+  expect(result.links.clientMessageId).toBe("same-message");
+  expect(await fs.readFile(path.join(directory, result.links.files[0].relativePath), "utf8")).toBe(
+    "unchanged",
+  );
+  expect(sessionFileActivityUsage().operations).toBe(0);
+  expect(sessionFileActivityUsage().retryRetainedBytes).toBe(0);
+});
+it("never retries an admitted operation failure or an intrinsically oversized request", async () => {
+  let attempts = 0;
+  await expect(
+    retrySessionFileAdmission(async () => {
+      attempts++;
+      throw new Error("write failed");
+    }),
+  ).rejects.toThrow("write failed");
+  expect(attempts).toBe(1);
+  const directory = await temporary();
+  attempts = 0;
+  await expect(
+    retrySessionFileAdmission(() => {
+      attempts++;
+      return withSessionFileOperation(
+        directory,
+        async () => {},
+        SESSION_FILE_LIMITS.operationBytes + 1,
+      );
+    }),
+  ).rejects.toThrow("budget");
+  expect(attempts).toBe(1);
+});
+
+it("does not replay when a nested admission is busy after the outer operation started", async () => {
+  const directory = await temporary();
+  let writes = 0;
+  const readSource = async () => {};
+  await expect(
+    retrySessionFileAdmission(() =>
+      withSessionFileOperation(directory, async () => {
+        writes++;
+        return withSessionFileLease(directory, readSource, SESSION_FILE_LIMITS.operationBytes);
+      }),
+    ),
+  ).rejects.toThrow("busy saving attachments");
+  expect(writes).toBe(1);
+});
+it("bounds refused-input waiters and releases the reservation after retry exhaustion", async () => {
+  vi.useFakeTimers();
+  const refused = () => Promise.reject(new SessionFileAdmissionBusyError());
+  try {
+    const first = retrySessionFileAdmission(refused);
+    const rejected = expect(first).rejects.toThrow("busy saving attachments");
+    await Promise.resolve();
+    expect(sessionFileActivityUsage().retryRetainedBytes).toBe(SESSION_FILE_LIMITS.operationBytes);
+    await expect(retrySessionFileAdmission(refused)).rejects.toThrow("busy saving attachments");
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(sessionFileActivityUsage().retryRetainedBytes).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
