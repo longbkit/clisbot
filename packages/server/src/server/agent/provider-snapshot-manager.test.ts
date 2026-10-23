@@ -438,6 +438,140 @@ describe("ProviderSnapshotManager public surface", () => {
     }
   });
 
+  describe("cached unavailable recovery", () => {
+    function fixture(unavailableRetryMs: number) {
+      let now = 1_000_000;
+      let available = false;
+      let calls = 0;
+      let catalogCalls = 0;
+      let availabilityGate: Promise<void> | undefined;
+      let availabilityError: Error | undefined;
+      const manager = new ProviderSnapshotManager({
+        logger: createTestLogger(),
+        unavailableRetryMs,
+        now: () => now,
+        extraClients: {
+          codex: createExtraClient("codex", {
+            isAvailable: async () => {
+              calls += 1;
+              await availabilityGate;
+              if (availabilityError) throw availabilityError;
+              return available;
+            },
+            fetchCatalog: async () => {
+              catalogCalls += 1;
+              return { models: [], modes: [] };
+            },
+          }),
+        },
+      });
+      return {
+        manager,
+        read: (cwd = "/tmp/project") => manager.getProvider({ provider: "codex", cwd, wait: true }),
+        advance: (milliseconds: number) => {
+          now += milliseconds;
+        },
+        recover: () => {
+          available = true;
+        },
+        gate: (promise: Promise<void>) => {
+          availabilityGate = promise;
+        },
+        failAvailability: () => {
+          availabilityError = new Error("fixture availability failure");
+        },
+        counts: () => ({ calls, catalogCalls }),
+      };
+    }
+
+    test("keeps legacy caching when recovery is disabled", async () => {
+      const f = fixture(0);
+      try {
+        expect((await f.read()).status).toBe("unavailable");
+        f.recover();
+        f.advance(120_000);
+        expect((await f.read()).status).toBe("unavailable");
+        expect(f.counts()).toEqual({ calls: 1, catalogCalls: 0 });
+      } finally {
+        f.manager.destroy();
+      }
+    });
+
+    test("recovers after the interval and retains the ready cache", async () => {
+      const f = fixture(60_000);
+      try {
+        expect((await f.read()).status).toBe("unavailable");
+        f.recover();
+        f.advance(59_999);
+        expect((await f.read()).status).toBe("unavailable");
+        expect(f.counts()).toEqual({ calls: 1, catalogCalls: 0 });
+        f.advance(1);
+        expect((await f.read()).status).toBe("ready");
+        f.advance(120_000);
+        expect((await f.read()).status).toBe("ready");
+        expect(f.counts()).toEqual({ calls: 2, catalogCalls: 1 });
+      } finally {
+        f.manager.destroy();
+      }
+    });
+
+    test("starts a new retry interval after another negative result", async () => {
+      const f = fixture(60_000);
+      try {
+        await f.read();
+        f.advance(60_000);
+        expect((await f.read()).status).toBe("unavailable");
+        f.advance(59_999);
+        await f.read();
+        expect(f.counts()).toEqual({ calls: 2, catalogCalls: 0 });
+        f.advance(1);
+        await f.read();
+        expect(f.counts()).toEqual({ calls: 3, catalogCalls: 0 });
+      } finally {
+        f.manager.destroy();
+      }
+    });
+
+    test("does not automatically retry an error from the recovery probe", async () => {
+      const f = fixture(60_000);
+      try {
+        await f.read();
+        f.advance(60_000);
+        f.failAvailability();
+        expect((await f.read()).status).toBe("error");
+        f.advance(120_000);
+        expect((await f.read()).status).toBe("error");
+        expect(f.counts()).toEqual({ calls: 2, catalogCalls: 0 });
+      } finally {
+        f.manager.destroy();
+      }
+    });
+
+    test("shares one retry across concurrent readers of the same catalog", async () => {
+      const f = fixture(60_000);
+      let release!: () => void;
+      try {
+        await f.read();
+        f.advance(60_000);
+        f.recover();
+        f.gate(
+          new Promise<void>((finish) => {
+            release = finish;
+          }),
+        );
+        const a = f.read("/tmp/project-a");
+        const b = f.read("/tmp/project-b");
+        release();
+        expect((await a).status).toBe("ready");
+        expect((await b).status).toBe("ready");
+        expect(f.counts()).toEqual({ calls: 2, catalogCalls: 1 });
+      } finally {
+        release?.();
+        f.manager.destroy();
+      }
+    });
+  });
+
   test("wait:true returns a warm provider without refreshing it", async () => {
     const cwd = "/tmp/project";
     const isAvailable = vi.fn(async () => true);
