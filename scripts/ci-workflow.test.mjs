@@ -125,6 +125,10 @@ test("focused contracts stay inside existing required checks", () => {
   const server = jobs.get("server-tests-ubuntu")?.join("\n") ?? "";
   const desktop = jobs.get("desktop-tests-ubuntu")?.join("\n") ?? "";
 
+  const typecheck = jobs.get("typecheck")?.join("\n") ?? "";
+  assert.match(typecheck, /working-directory: packages\/hub/);
+  assert.match(typecheck, /vitest run src\/db\/runtime\/internal\/postgres\.test\.ts --bail=1/);
+
   assert.match(changes, /scripts\/daemon-launch-contract\.test\.mjs/);
   assert.doesNotMatch(changes, /Install dependencies|npm run build/);
 

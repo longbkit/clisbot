@@ -127,6 +127,10 @@ jobs:
       - name: Typecheck all packages
         run: npm run typecheck
 
+      - name: Run Hub PostgreSQL runtime tests
+        working-directory: packages/hub
+        run: npx vitest run src/db/runtime/internal/postgres.test.ts --bail=1
+
       - name: Run website tests
         run: npx vitest run packages/website/src --bail=1
 
