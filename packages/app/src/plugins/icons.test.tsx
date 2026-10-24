@@ -2,7 +2,7 @@ import { Settings } from "lucide-react-native";
 import React, { isValidElement, type ReactElement, type ReactNode } from "react";
 import { SvgXml } from "react-native-svg";
 import { describe, expect, it } from "vitest";
-import type { PluginIconProps } from "@getpaseo/plugin";
+import type { PluginIconProps } from "@clisbot/plugin";
 import { Icon, parsePluginIcon, parseSerializablePluginIcon, PluginIconView } from "./icons";
 
 const SVG = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h16v16H4z" /></svg>';

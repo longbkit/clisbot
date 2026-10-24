@@ -96,7 +96,7 @@ export interface ManagedProcessRegistry {
 }
 
 interface ManagedProcessRegistryOptions {
-  paseoHome: string;
+  clisbotHome: string;
   processTable: ManagedProcessTable;
   terminateProcess: ProcessTerminator;
   logger: Logger;
@@ -213,7 +213,7 @@ class FileBackedManagedProcessRegistry implements ManagedProcessRegistry {
   private readonly logger: Logger;
 
   constructor(options: ManagedProcessRegistryOptions) {
-    this.directory = path.join(options.paseoHome, "runtime", "managed-processes");
+    this.directory = path.join(options.clisbotHome, "runtime", "managed-processes");
     this.processTable = options.processTable;
     this.terminateProcess = options.terminateProcess;
     this.logger = options.logger.child({ module: "managed-processes" });

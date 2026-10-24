@@ -13,7 +13,7 @@ import {
 import { cleanupRewindFlow, launchAgent, type AgentHandle } from "../support/helpers/rewind-flow";
 
 // Claude Code currently gates the Workflow tool behind its own rollout. The real-provider test
-// opts in explicitly so it tests Paseo's integration rather than the account's rollout cohort.
+// opts in explicitly so it tests Clisbot's integration rather than the account's rollout cohort.
 process.env.CLAUDE_CODE_WORKFLOWS = "1";
 
 const WORKFLOW_SCRIPT = path.resolve(__dirname, "../fixtures/claude-workflow/one-child.js");
@@ -24,7 +24,7 @@ test.describe("real Claude workflow subagent row", () => {
   test("shows a real Claude workflow running and completed through the generic subagent UI", async ({
     page,
   }, testInfo) => {
-    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-claude-workflow-row-")));
+    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-claude-workflow-row-")));
     const gatePath = path.join(cwd, "release-workflow");
     let handle: AgentHandle | undefined;
 

@@ -1,6 +1,6 @@
 ---
 title: Voice
-description: Paseo voice architecture, local-first model execution, and provider configuration.
+description: Clisbot voice architecture, local-first model execution, and provider configuration.
 nav: Voice
 order: 41
 category: Configuration
@@ -8,11 +8,11 @@ category: Configuration
 
 # Voice
 
-Paseo has first-class voice support for dictation and voice mode conversations with your coding environment.
+Clisbot has first-class voice support for dictation and voice mode conversations with your coding environment.
 
 ## Philosophy
 
-Voice is local-first. You can run speech fully on-device, or choose OpenAI for speech features. For voice reasoning/orchestration, Paseo reuses agent providers already installed and authenticated on your machine.
+Voice is local-first. You can run speech fully on-device, or choose OpenAI for speech features. For voice reasoning/orchestration, Clisbot reuses agent providers already installed and authenticated on your machine.
 
 This keeps credentials and execution in your environment and avoids introducing a separate cloud-only voice stack.
 
@@ -27,7 +27,7 @@ This keeps credentials and execution in your environment and avoids introducing 
 
 Local speech defaults to model IDs `parakeet-tdt-0.6b-v2-int8` (STT) and `kokoro-en-v0_19` (TTS, speaker 0 / voice 00).
 
-Missing models are downloaded at daemon startup into `$PASEO_HOME/models/local-speech`. Downloads happen only for missing files.
+Missing models are downloaded at daemon startup into `$CLISBOT_HOME/models/local-speech`. Downloads happen only for missing files.
 
 ### Local STT models and language support
 
@@ -53,7 +53,7 @@ Missing models are downloaded at daemon startup into `$PASEO_HOME/models/local-s
   },
   "providers": {
     "local": {
-      "modelsDir": "~/.paseo/models/local-speech"
+      "modelsDir": "~/.clisbot/models/local-speech"
     }
   }
 }
@@ -72,7 +72,7 @@ For multilingual local dictation, set the model to v3 — it auto-detects the la
 }
 ```
 
-The `language` field applies only to the OpenAI STT provider: set `features.dictation.stt.language` for dictation and `features.voiceMode.stt.language` for voice mode. If voice language is omitted, Paseo uses the dictation language before falling back to `en`. It has no effect on the local Parakeet models.
+The `language` field applies only to the OpenAI STT provider: set `features.dictation.stt.language` for dictation and `features.voiceMode.stt.language` for voice mode. If voice language is omitted, Clisbot uses the dictation language before falling back to `en`. It has no effect on the local Parakeet models.
 
 ## OpenAI Voice Option
 
@@ -103,9 +103,9 @@ You can switch dictation, voice STT, and voice TTS to OpenAI by setting provider
 }
 ```
 
-`providers.openai.stt` covers dictation and voice mode speech-to-text, and `providers.openai.tts` covers voice mode text-to-speech. Because they resolve independently, you can point STT and TTS at different endpoints. Each falls back to `providers.openai.apiKey`/`baseUrl`, then `OPENAI_API_KEY`/`OPENAI_BASE_URL`, when unset. These settings configure only Paseo OpenAI speech traffic, without changing Codex or other OpenAI-backed tools.
+`providers.openai.stt` covers dictation and voice mode speech-to-text, and `providers.openai.tts` covers voice mode text-to-speech. Because they resolve independently, you can point STT and TTS at different endpoints. Each falls back to `providers.openai.apiKey`/`baseUrl`, then `OPENAI_API_KEY`/`OPENAI_BASE_URL`, when unset. These settings configure only Clisbot OpenAI speech traffic, without changing Codex or other OpenAI-backed tools.
 
-Paseo uses these paths under the configured OpenAI base URL:
+Clisbot uses these paths under the configured OpenAI base URL:
 
 - dictation STT: `/v1/audio/transcriptions`
 - voice mode STT: `/v1/audio/transcriptions`
@@ -113,16 +113,16 @@ Paseo uses these paths under the configured OpenAI base URL:
 
 ## Environment Variables
 
-- `PASEO_VOICE_LLM_PROVIDER`, voice agent provider override
-- `PASEO_DICTATION_STT_PROVIDER`, `PASEO_VOICE_STT_PROVIDER`, `PASEO_VOICE_TTS_PROVIDER`, speech provider selection (`local` or `openai`)
+- `CLISBOT_VOICE_LLM_PROVIDER`, voice agent provider override
+- `CLISBOT_DICTATION_STT_PROVIDER`, `CLISBOT_VOICE_STT_PROVIDER`, `CLISBOT_VOICE_TTS_PROVIDER`, speech provider selection (`local` or `openai`)
 - `OPENAI_STT_API_KEY`, `OPENAI_STT_BASE_URL`, OpenAI speech-to-text endpoint (dictation + voice mode STT)
 - `OPENAI_TTS_API_KEY`, `OPENAI_TTS_BASE_URL`, OpenAI text-to-speech endpoint (voice mode TTS)
-- `PASEO_LOCAL_MODELS_DIR`, local model storage directory
-- `PASEO_DICTATION_LOCAL_STT_MODEL`, local dictation STT model ID
-- `PASEO_VOICE_LOCAL_STT_MODEL`, `PASEO_VOICE_LOCAL_TTS_MODEL`, local voice STT/TTS model IDs
-- `PASEO_DICTATION_LANGUAGE`, dictation STT language (OpenAI STT only; ignored by local Parakeet)
-- `PASEO_VOICE_LANGUAGE`, voice mode STT language; falls back to `PASEO_DICTATION_LANGUAGE` when unset (OpenAI STT only; ignored by local Parakeet)
-- `PASEO_VOICE_LOCAL_TTS_SPEAKER_ID`, `PASEO_VOICE_LOCAL_TTS_SPEED`, optional local voice TTS tuning
+- `CLISBOT_LOCAL_MODELS_DIR`, local model storage directory
+- `CLISBOT_DICTATION_LOCAL_STT_MODEL`, local dictation STT model ID
+- `CLISBOT_VOICE_LOCAL_STT_MODEL`, `CLISBOT_VOICE_LOCAL_TTS_MODEL`, local voice STT/TTS model IDs
+- `CLISBOT_DICTATION_LANGUAGE`, dictation STT language (OpenAI STT only; ignored by local Parakeet)
+- `CLISBOT_VOICE_LANGUAGE`, voice mode STT language; falls back to `CLISBOT_DICTATION_LANGUAGE` when unset (OpenAI STT only; ignored by local Parakeet)
+- `CLISBOT_VOICE_LOCAL_TTS_SPEAKER_ID`, `CLISBOT_VOICE_LOCAL_TTS_SPEED`, optional local voice TTS tuning
 
 ## Operational Notes
 

@@ -26,7 +26,7 @@ import {
 } from "@/components/sidebar/display-preferences/row-items";
 import { DEFAULT_CONTENT_MAX_WIDTH, THEME_OPTIONS } from "@/styles/theme";
 
-const LEGACY_SETTINGS_KEY = "@paseo:settings";
+const LEGACY_SETTINGS_KEY = "@clisbot:settings";
 
 function makeDeps(
   overrides: {
@@ -74,7 +74,7 @@ describe("loadAppSettingsFromStorage", () => {
   it("preserves a persisted steer send behavior", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({
-        "@paseo:app-settings": JSON.stringify({ sendBehavior: "steer" }),
+        "@clisbot:app-settings": JSON.stringify({ sendBehavior: "steer" }),
       }),
     });
     expect((await loadAppSettingsFromStorage(deps)).sendBehavior).toBe("steer");

@@ -25,7 +25,7 @@ export function createCliParseArgv(input: {
     return invocation;
   }
 
-  const nodeArgv = input.nodeArgv ?? ["paseo", "paseo"];
+  const nodeArgv = input.nodeArgv ?? ["clisbot", "clisbot"];
   const isOnboardRootFlag = invocation.argv[0] === "--relay" || invocation.argv[0] === "--no-relay";
   let cliArgv = invocation.argv;
   if (invocation.argv.length === 0) {
@@ -37,7 +37,7 @@ export function createCliParseArgv(input: {
 }
 
 // The program that started the CLI can close its end of stdout before the output
-// is written, as `paseo ls | head -1` or a launcher that discards output does.
+// is written, as `clisbot ls | head -1` or a launcher that discards output does.
 // Drop the output nobody reads and let the command finish, instead of surfacing
 // the failed write as an uncaught error.
 function ignoreClosedStdout(error: NodeJS.ErrnoException): void {

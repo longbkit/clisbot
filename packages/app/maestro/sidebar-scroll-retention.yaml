@@ -1,4 +1,4 @@
-appId: sh.paseo.debug
+appId: sh.clisbot.debug
 ---
 # Start in a workspace with the sidebar closed. Both workspace IDs come from
 # the connected host: TOP_WORKSPACE is near the top; SCROLLED_WORKSPACE starts

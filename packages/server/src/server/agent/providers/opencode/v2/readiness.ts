@@ -23,7 +23,7 @@ export function waitForLocationReady(input: ReadinessInput): Promise<void> {
   return waitForPlugins({ ...input, requireBridge: false });
 }
 
-export function awaitPaseoPlugin(input: ReadinessInput): Promise<void> {
+export function awaitClisbotPlugin(input: ReadinessInput): Promise<void> {
   return waitForPlugins({ ...input, requireBridge: true });
 }
 
@@ -47,10 +47,10 @@ async function waitForPlugins(input: PluginReadinessInput): Promise<void> {
           client.plugin.list({ location }, { signal: requestSignal }),
         );
         if (!requireBridge && plugins.data.length > 0) return;
-        const bridge = plugins.data.find((plugin) => plugin.id === "paseo");
+        const bridge = plugins.data.find((plugin) => plugin.id === "clisbot");
         if (requireBridge && bridge?.state.status === "active") return;
         if (requireBridge && bridge?.state.status === "failed")
-          throw new Error(`OpenCode Paseo tool bridge plugin failed: ${bridge.state.error}`);
+          throw new Error(`OpenCode Clisbot tool bridge plugin failed: ${bridge.state.error}`);
       } catch (error) {
         lifetime.throwIfAborted();
         if (!requestTimeout.aborted) throw error;

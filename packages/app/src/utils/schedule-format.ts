@@ -1,5 +1,5 @@
-import type { ScheduleCadence, ScheduleSummary } from "@getpaseo/protocol/schedule/types";
-import { validateCronExpression } from "@getpaseo/protocol/schedule/cron-expression";
+import type { ScheduleCadence, ScheduleSummary } from "@clisbot/protocol/schedule/types";
+import { validateCronExpression } from "@clisbot/protocol/schedule/cron-expression";
 
 export type IntervalUnit = "minutes" | "hours" | "days";
 type CronCadence = Extract<ScheduleCadence, { type: "cron" }>;

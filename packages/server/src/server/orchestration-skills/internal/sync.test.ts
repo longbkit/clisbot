@@ -13,7 +13,7 @@ interface Sandbox {
 }
 
 async function makeSandbox(): Promise<Sandbox> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-skill-sync-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-skill-sync-"));
   const sourceDir = path.join(root, "bundle");
   const agentsDir = path.join(root, "home", ".agents", "skills");
   const claudeDir = path.join(root, "home", ".claude", "skills");
@@ -48,40 +48,42 @@ describe("syncSkills", () => {
   });
 
   it("overwrites on-disk skill content when the bundle differs", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", {
-      "SKILL.md": "new paseo content",
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", {
+      "SKILL.md": "new clisbot content",
     });
-    const onDiskSkill = path.join(sandbox.agentsDir, "paseo");
+    const onDiskSkill = path.join(sandbox.agentsDir, "clisbot");
     await fs.mkdir(onDiskSkill, { recursive: true });
-    await fs.writeFile(path.join(onDiskSkill, "SKILL.md"), "old paseo content");
+    await fs.writeFile(path.join(onDiskSkill, "SKILL.md"), "old clisbot content");
 
     const result = await syncSkills({
       sourceDir: sandbox.sourceDir,
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
 
     expect(result.processedSkills).toBe(1);
     expect(result.changedFiles).toBeGreaterThan(0);
     const agentsContent = await fs.readFile(
-      path.join(sandbox.agentsDir, "paseo", "SKILL.md"),
+      path.join(sandbox.agentsDir, "clisbot", "SKILL.md"),
       "utf-8",
     );
-    expect(agentsContent).toBe("new paseo content");
+    expect(agentsContent).toBe("new clisbot content");
     const claudeContent = await fs.readFile(
-      path.join(sandbox.claudeDir, "paseo", "SKILL.md"),
+      path.join(sandbox.claudeDir, "clisbot", "SKILL.md"),
       "utf-8",
     );
-    expect(claudeContent).toBe("new paseo content");
-    await expect(fs.stat(path.join(sandbox.codexDir, "paseo", "SKILL.md"))).rejects.toMatchObject({
-      code: "ENOENT",
-    });
+    expect(claudeContent).toBe("new clisbot content");
+    await expect(fs.stat(path.join(sandbox.codexDir, "clisbot", "SKILL.md"))).rejects.toMatchObject(
+      {
+        code: "ENOENT",
+      },
+    );
   });
 
   it("installs new bundled skills, including references/, when not present on disk", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo-committee", {
+    await writeBundleSkill(sandbox.sourceDir, "clisbot-committee", {
       "SKILL.md": "committee content",
       "references/roles.md": "roles content",
     });
@@ -91,23 +93,23 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo-committee"],
+      skillNames: ["clisbot-committee"],
     });
 
     expect(
-      await fs.readFile(path.join(sandbox.agentsDir, "paseo-committee", "SKILL.md"), "utf-8"),
+      await fs.readFile(path.join(sandbox.agentsDir, "clisbot-committee", "SKILL.md"), "utf-8"),
     ).toBe("committee content");
     expect(
       await fs.readFile(
-        path.join(sandbox.agentsDir, "paseo-committee", "references", "roles.md"),
+        path.join(sandbox.agentsDir, "clisbot-committee", "references", "roles.md"),
         "utf-8",
       ),
     ).toBe("roles content");
-    await expect(fs.stat(path.join(sandbox.codexDir, "paseo-committee"))).rejects.toMatchObject({
+    await expect(fs.stat(path.join(sandbox.codexDir, "clisbot-committee"))).rejects.toMatchObject({
       code: "ENOENT",
     });
 
-    const claudeSkillDir = path.join(sandbox.claudeDir, "paseo-committee");
+    const claudeSkillDir = path.join(sandbox.claudeDir, "clisbot-committee");
     expect((await fs.lstat(claudeSkillDir)).isDirectory()).toBe(true);
     expect(await fs.readFile(path.join(claudeSkillDir, "SKILL.md"), "utf-8")).toBe(
       "committee content",
@@ -118,7 +120,7 @@ describe("syncSkills", () => {
   });
 
   it("leaves on-disk skills not in the bundle untouched", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "new" });
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "new" });
     const customSkill = path.join(sandbox.agentsDir, "user-custom-skill");
     await fs.mkdir(customSkill, { recursive: true });
     await fs.writeFile(path.join(customSkill, "SKILL.md"), "user content");
@@ -128,36 +130,36 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
 
     expect(await fs.readFile(path.join(customSkill, "SKILL.md"), "utf-8")).toBe("user content");
   });
 
   it("removes stale files previously written to managed skill dirs", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", {
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", {
       "SKILL.md": "old",
       "references/stale.md": "stale",
     });
-    const onDiskSkill = path.join(sandbox.agentsDir, "paseo");
+    const onDiskSkill = path.join(sandbox.agentsDir, "clisbot");
 
     await syncSkills({
       sourceDir: sandbox.sourceDir,
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
 
-    await fs.rm(path.join(sandbox.sourceDir, "paseo"), { recursive: true, force: true });
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "new" });
+    await fs.rm(path.join(sandbox.sourceDir, "clisbot"), { recursive: true, force: true });
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "new" });
 
     await syncSkills({
       sourceDir: sandbox.sourceDir,
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
 
     expect(await fs.readFile(path.join(onDiskSkill, "SKILL.md"), "utf-8")).toBe("new");
@@ -166,8 +168,8 @@ describe("syncSkills", () => {
   });
 
   it("preserves user-added files in managed skill dirs", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "new" });
-    const onDiskSkill = path.join(sandbox.agentsDir, "paseo");
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "new" });
+    const onDiskSkill = path.join(sandbox.agentsDir, "clisbot");
     await fs.mkdir(path.join(onDiskSkill, "references"), { recursive: true });
     await fs.writeFile(path.join(onDiskSkill, "SKILL.md"), "old");
     await fs.writeFile(path.join(onDiskSkill, "my-context.md"), "user context");
@@ -178,7 +180,7 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
 
     expect(await fs.readFile(path.join(onDiskSkill, "SKILL.md"), "utf-8")).toBe("new");
@@ -193,11 +195,11 @@ describe("syncSkills", () => {
   it.skipIf(process.platform === "win32")(
     "rejects managed paths that would write through a symlink",
     async () => {
-      await writeBundleSkill(sandbox.sourceDir, "paseo", {
+      await writeBundleSkill(sandbox.sourceDir, "clisbot", {
         "SKILL.md": "new skill",
         "references/guide.md": "new guide",
       });
-      const onDiskSkill = path.join(sandbox.agentsDir, "paseo");
+      const onDiskSkill = path.join(sandbox.agentsDir, "clisbot");
       const externalReferences = path.join(sandbox.root, "external-references");
       await fs.mkdir(onDiskSkill, { recursive: true });
       await fs.mkdir(externalReferences, { recursive: true });
@@ -211,7 +213,7 @@ describe("syncSkills", () => {
           agentsDir: sandbox.agentsDir,
           claudeDir: sandbox.claudeDir,
           codexDir: sandbox.codexDir,
-          skillNames: ["paseo"],
+          skillNames: ["clisbot"],
         }),
       ).rejects.toThrow("Cannot sync through symbolic link");
 
@@ -224,7 +226,7 @@ describe("syncSkills", () => {
   );
 
   it("reports zero changed files on a no-op resync", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", {
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", {
       "SKILL.md": "content",
       "references/extra.md": "ref",
     });
@@ -234,7 +236,7 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
     expect(first.changedFiles).toBeGreaterThan(0);
 
@@ -243,14 +245,14 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
     expect(second.changedFiles).toBe(0);
   });
 
   it("skips skills listed in skillNames that are missing from the bundle without raising", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "content" });
-    // "paseo-removed" is in skillNames but not in the bundle on disk.
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "content" });
+    // "clisbot-removed" is in skillNames but not in the bundle on disk.
 
     const errors: Array<{ name: string; error: unknown }> = [];
     const result = await syncSkills({
@@ -258,21 +260,21 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo", "paseo-removed"],
+      skillNames: ["clisbot", "clisbot-removed"],
       onSkillError: (name, error) => errors.push({ name, error }),
     });
 
     expect(errors).toEqual([]);
     expect(result.processedSkills).toBe(1);
-    expect(await fs.readFile(path.join(sandbox.agentsDir, "paseo", "SKILL.md"), "utf-8")).toBe(
+    expect(await fs.readFile(path.join(sandbox.agentsDir, "clisbot", "SKILL.md"), "utf-8")).toBe(
       "content",
     );
-    await expect(fs.access(path.join(sandbox.agentsDir, "paseo-removed"))).rejects.toThrow();
+    await expect(fs.access(path.join(sandbox.agentsDir, "clisbot-removed"))).rejects.toThrow();
   });
 
   it("leaves on-disk skill content alone when the skill has been removed from the bundle", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "current" });
-    const deprecatedDir = path.join(sandbox.agentsDir, "paseo-deprecated");
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "current" });
+    const deprecatedDir = path.join(sandbox.agentsDir, "clisbot-deprecated");
     await fs.mkdir(deprecatedDir, { recursive: true });
     await fs.writeFile(path.join(deprecatedDir, "SKILL.md"), "old content");
 
@@ -281,7 +283,7 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo", "paseo-deprecated"],
+      skillNames: ["clisbot", "clisbot-deprecated"],
     });
 
     expect(await fs.readFile(path.join(deprecatedDir, "SKILL.md"), "utf-8")).toBe("old content");
@@ -296,7 +298,7 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
       onSkillError: (skillName) => errors.push(skillName),
     });
 
@@ -305,10 +307,10 @@ describe("syncSkills", () => {
   });
 
   it("reports per-skill errors via onSkillError without throwing", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "content" });
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "content" });
     // Make agents skill path a file (not a directory) to force a write error
     await fs.mkdir(sandbox.agentsDir, { recursive: true });
-    await fs.writeFile(path.join(sandbox.agentsDir, "paseo"), "blocking file");
+    await fs.writeFile(path.join(sandbox.agentsDir, "clisbot"), "blocking file");
 
     const errors: string[] = [];
     const result = await syncSkills({
@@ -316,11 +318,11 @@ describe("syncSkills", () => {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
       onSkillError: (skillName) => errors.push(skillName),
     });
 
-    expect(errors).toContain("paseo");
+    expect(errors).toContain("clisbot");
     expect(result.processedSkills).toBe(0);
   });
 });
@@ -337,24 +339,24 @@ describe("removeSkill", () => {
   });
 
   it("removes the skill from all three targets when present", async () => {
-    await writeBundleSkill(sandbox.sourceDir, "paseo", { "SKILL.md": "content" });
+    await writeBundleSkill(sandbox.sourceDir, "clisbot", { "SKILL.md": "content" });
     await syncSkills({
       sourceDir: sandbox.sourceDir,
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
-      skillNames: ["paseo"],
+      skillNames: ["clisbot"],
     });
 
-    await removeSkill("paseo", {
+    await removeSkill("clisbot", {
       agentsDir: sandbox.agentsDir,
       claudeDir: sandbox.claudeDir,
       codexDir: sandbox.codexDir,
     });
 
-    await expect(fs.access(path.join(sandbox.agentsDir, "paseo"))).rejects.toThrow();
-    await expect(fs.access(path.join(sandbox.claudeDir, "paseo"))).rejects.toThrow();
-    await expect(fs.access(path.join(sandbox.codexDir, "paseo"))).rejects.toThrow();
+    await expect(fs.access(path.join(sandbox.agentsDir, "clisbot"))).rejects.toThrow();
+    await expect(fs.access(path.join(sandbox.claudeDir, "clisbot"))).rejects.toThrow();
+    await expect(fs.access(path.join(sandbox.codexDir, "clisbot"))).rejects.toThrow();
   });
 
   it("does not throw when targets are missing", async () => {

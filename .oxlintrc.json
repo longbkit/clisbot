@@ -5,7 +5,7 @@
   },
   "ignorePatterns": [".dev/**"],
   "plugins": ["react", "react-perf", "unicorn", "typescript", "oxc", "import", "promise"],
-  "jsPlugins": ["./scripts/oxlint/paseo-plugin.mjs"],
+  "jsPlugins": ["./scripts/oxlint/clisbot-plugin.mjs"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -256,7 +256,7 @@
         "packages/app/src/components/headers/screen-header.tsx",
         "packages/app/src/components/host-status-dot.tsx",
         "packages/app/src/components/hosts/host-picker.tsx",
-        "packages/app/src/components/icons/paseo-logo.tsx",
+        "packages/app/src/components/icons/clisbot-logo.tsx",
         "packages/app/src/components/left-sidebar.tsx",
         "packages/app/src/components/pair-link-modal.tsx",
         "packages/app/src/components/plan-card.tsx",
@@ -360,7 +360,7 @@
     {
       "files": ["packages/app/src/**/*.{ts,tsx}"],
       "rules": {
-        "paseo/no-raw-pressable": "error"
+        "clisbot/no-raw-pressable": "error"
       }
     },
     // Press feedback is owned by the primitives in components/ui. Raw pressable burn-down:
@@ -465,7 +465,7 @@
         "packages/app/src/workspace/open-in-editor/button.tsx"
       ],
       "rules": {
-        "paseo/no-raw-pressable": "off"
+        "clisbot/no-raw-pressable": "off"
       }
     },
     {

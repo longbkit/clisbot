@@ -1,5 +1,5 @@
 import type { PersistedWorkspaceRecord } from "./workspace-registry.js";
-import type { WorkspaceSetupSnapshot } from "@getpaseo/protocol/messages";
+import type { WorkspaceSetupSnapshot } from "@clisbot/protocol/messages";
 
 type Listener = (
   workspaceId: string,

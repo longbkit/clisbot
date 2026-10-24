@@ -1,4 +1,4 @@
-import type { AgentMode, AgentModelDefinition } from "@getpaseo/protocol/agent-types";
+import type { AgentMode, AgentModelDefinition } from "@clisbot/protocol/agent-types";
 import { useShallow } from "zustand/shallow";
 import { formatAgentModeLabel } from "@/agent-controls/labels";
 import { formatTokenCount } from "@/components/context-window-meter.utils";
@@ -19,7 +19,7 @@ export interface AgentFactsInput {
 }
 
 /**
- * What the composer's controls and context meter show about a Paseo agent, as one line: model,
+ * What the composer's controls and context meter show about a Clisbot agent, as one line: model,
  * thinking, mode, and context usage, each resolved exactly as its control resolves it. Null until
  * the agent has a model at all.
  */
@@ -36,7 +36,7 @@ export function buildAgentFactsLine(input: AgentFactsInput): string | null {
   return parts.join(" · ");
 }
 
-/** The facts line for a Paseo agent in the session store, kept current as the agent reports. */
+/** The facts line for a Clisbot agent in the session store, kept current as the agent reports. */
 export function useAgentFactsLine(serverId: string, agentId: string): string | null {
   const agent = useSessionStore(
     useShallow((state) => {

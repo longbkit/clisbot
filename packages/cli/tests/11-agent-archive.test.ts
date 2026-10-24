@@ -18,7 +18,7 @@
 
 import assert from "node:assert";
 import { getAvailablePort } from "./helpers/network.ts";
-import { createTempDirs, runPaseoCli, startTestDaemon } from "./helpers/test-daemon.ts";
+import { createTempDirs, runClisbotCli, startTestDaemon } from "./helpers/test-daemon.ts";
 import { $ } from "zx";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
@@ -29,21 +29,21 @@ $.verbose = false;
 const TARGET_AGENT_ID = "11111111-2222-4333-8444-555555555555";
 
 /**
- * A PASEO_HOME whose archive-inclusive agent listing overflows one page.
+ * A CLISBOT_HOME whose archive-inclusive agent listing overflows one page.
  * `fetch_agents` answers at most 200 entries, so the older unarchived agent
  * sits behind 201 newer archived ones and never appears on the first page.
  */
 async function seedHomePastPageCap(
   targetAgentId: string,
   newerAgentCount = 201,
-): Promise<{ paseoHome: string; workDir: string }> {
+): Promise<{ clisbotHome: string; workDir: string }> {
   const dirs = await createTempDirs();
   const olderAt = "2026-09-03T18:29:21.949Z";
   const newerAt = "2026-09-10T12:00:00.000Z";
 
   const writeRecord = (record: Record<string, unknown>) =>
     writeFile(
-      join(dirs.paseoHome, "agents", `${record.id as string}.json`),
+      join(dirs.clisbotHome, "agents", `${record.id as string}.json`),
       JSON.stringify(record, null, 2),
     );
 
@@ -90,13 +90,13 @@ console.log("=== Agent Archive Command Tests ===\n");
 
 // Allocate an unused endpoint for connection-error and argument-validation checks.
 const port = await getAvailablePort();
-const paseoHome = await mkdtemp(join(tmpdir(), "paseo-test-home-"));
+const clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-test-home-"));
 
 try {
   // Test 1: agent archive --help shows options
   {
     console.log("Test 1: agent archive --help shows options");
-    const result = await $`npx paseo agent archive --help`.nothrow();
+    const result = await $`npx clisbot agent archive --help`.nothrow();
     assert.strictEqual(result.exitCode, 0, "agent archive --help should exit 0");
     assert(result.stdout.includes("--force"), "help should mention --force flag");
     assert(result.stdout.includes("--host"), "help should mention --host option");
@@ -108,7 +108,7 @@ try {
   {
     console.log("Test 2: agent archive requires ID argument");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} agent archive`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} agent archive`.nothrow();
     assert.notStrictEqual(result.exitCode, 0, "should fail without id");
     const output = result.stdout + result.stderr;
     const hasError =
@@ -123,7 +123,7 @@ try {
   {
     console.log("Test 3: agent archive handles daemon not running");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} agent archive abc123`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} agent archive abc123`.nothrow();
     // Should fail because daemon not running
     assert.notStrictEqual(result.exitCode, 0, "should fail when daemon not running");
     const output = result.stdout + result.stderr;
@@ -139,7 +139,7 @@ try {
   {
     console.log("Test 4: agent archive --force flag is accepted");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} agent archive abc123 --force`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} agent archive abc123 --force`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept --force flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -150,7 +150,7 @@ try {
   {
     console.log("Test 5: agent archive with ID and --host flag is accepted");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} agent archive abc123 --host localhost:${port}`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} agent archive abc123 --host localhost:${port}`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept --host flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -160,7 +160,7 @@ try {
   // Test 6: agent shows archive in subcommands
   {
     console.log("Test 6: agent --help shows archive subcommand");
-    const result = await $`npx paseo agent --help`.nothrow();
+    const result = await $`npx clisbot agent --help`.nothrow();
     assert.strictEqual(result.exitCode, 0, "agent --help should exit 0");
     assert(result.stdout.includes("archive"), "help should mention archive subcommand");
     console.log("✓ agent --help shows archive subcommand\n");
@@ -170,7 +170,7 @@ try {
   {
     console.log("Test 7: -q (quiet) flag is accepted with agent archive");
     const result =
-      await $`PASEO_HOME=${paseoHome} npx paseo --host localhost:${port} -q agent archive abc123`.nothrow();
+      await $`CLISBOT_HOME=${clisbotHome} npx clisbot --host localhost:${port} -q agent archive abc123`.nothrow();
     const output = result.stdout + result.stderr;
     assert(!output.includes("unknown option"), "should accept -q flag");
     assert(!output.includes("error: option"), "should not have option parsing error");
@@ -183,7 +183,7 @@ try {
     const daemon = await startTestDaemon(await seedHomePastPageCap(TARGET_AGENT_ID));
     const host = `127.0.0.1:${daemon.port}`;
     try {
-      const listed = await runPaseoCli(daemon, [
+      const listed = await runClisbotCli(daemon, [
         "agent",
         "ls",
         "--global",
@@ -197,7 +197,7 @@ try {
         "the agent should be listed before it is archived",
       );
 
-      const archived = await runPaseoCli(daemon, [
+      const archived = await runClisbotCli(daemon, [
         "agent",
         "archive",
         TARGET_AGENT_ID,
@@ -210,7 +210,7 @@ try {
       assert.strictEqual(result.agentId, TARGET_AGENT_ID);
       assert.strictEqual(result.status, "archived");
 
-      const remaining = await runPaseoCli(daemon, [
+      const remaining = await runClisbotCli(daemon, [
         "agent",
         "ls",
         "--global",
@@ -226,7 +226,7 @@ try {
         "the archived agent should leave the active list",
       );
 
-      const repeated = await runPaseoCli(daemon, [
+      const repeated = await runClisbotCli(daemon, [
         "agent",
         "archive",
         TARGET_AGENT_ID,
@@ -240,7 +240,7 @@ try {
         "AGENT_ALREADY_ARCHIVED",
       );
 
-      const missing = await runPaseoCli(daemon, [
+      const missing = await runClisbotCli(daemon, [
         "agent",
         "archive",
         "no-such-agent",
@@ -253,7 +253,7 @@ try {
         error: {
           code: "AGENT_NOT_FOUND",
           message: "Agent not found: no-such-agent",
-          details: 'Use "paseo ls" to list available agents',
+          details: 'Use "clisbot ls" to list available agents',
         },
       });
     } finally {
@@ -267,7 +267,7 @@ try {
     const targetId = "abcdefab-2222-4333-8444-555555555555";
     const daemon = await startTestDaemon(await seedHomePastPageCap(targetId, 0));
     try {
-      const archived = await runPaseoCli(daemon, [
+      const archived = await runClisbotCli(daemon, [
         "agent",
         "archive",
         query,
@@ -285,7 +285,7 @@ try {
   }
 } finally {
   // Clean up temp directory
-  await rm(paseoHome, { recursive: true, force: true });
+  await rm(clisbotHome, { recursive: true, force: true });
 }
 
 console.log("=== All agent archive tests passed ===");

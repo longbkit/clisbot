@@ -9,7 +9,7 @@ nav: 自托管
 最快的方式只需一条命令：
 
 ```sh
-npx @getpaseo/hub
+npx @clisbot/hub
 ```
 
 打开 <http://localhost:3000>。全新的 Hub 会创建内嵌数据库和认证密钥，然后引导你创建管理员账号，以及你需要的 GitHub、Slack 或 Discord 应用。
@@ -18,12 +18,12 @@ npx @getpaseo/hub
 
 ## 本地数据 {#local-data}
 
-如果没有设置 `DATABASE_URL`，Hub 会把内嵌的 PGlite 数据库及其生成的认证密钥保存在 `$XDG_DATA_HOME/paseo-hub` 下。如果 `XDG_DATA_HOME` 没有设置为绝对路径，Hub 会使用 `~/.local/share/paseo-hub`。两者在重启后都会保留。
+如果没有设置 `DATABASE_URL`，Hub 会把内嵌的 PGlite 数据库及其生成的认证密钥保存在 `$XDG_DATA_HOME/clisbot-hub` 下。如果 `XDG_DATA_HOME` 没有设置为绝对路径，Hub 会使用 `~/.local/share/clisbot-hub`。两者在重启后都会保留。
 
 用以下方式显式指定其他位置：
 
 ```sh
-PASEO_HUB_DATA_DIR=/path/to/paseo-hub-data npx @getpaseo/hub
+CLISBOT_HUB_DATA_DIR=/path/to/clisbot-hub-data npx @clisbot/hub
 ```
 
 内嵌模式下，每个数据目录只支持一个 Hub 进程，适用于个人或单进程的 Hub。升级或迁移之前，请备份整个数据目录。
@@ -37,7 +37,7 @@ GitHub 事件触发器使用 webhook，需要一个公开的 HTTPS 地址。没�
 当 Hub 有一个稳定的公开地址时，请在启动前设置它：
 
 ```sh
-PASEO_HUB_APP_URL=https://hub.example.com npx @getpaseo/hub
+CLISBOT_HUB_APP_URL=https://hub.example.com npx @clisbot/hub
 ```
 
 修改公开地址后，需要更新 Provider 应用中的回调和 webhook 设置。**Apps** 页面会为 Hub 当前使用的地址生成这些 URL。
@@ -47,13 +47,13 @@ PASEO_HUB_APP_URL=https://hub.example.com npx @getpaseo/hub
 设置 `DATABASE_URL`，即可使用 PostgreSQL 代替内嵌数据库：
 
 ```sh
-DATABASE_URL=postgres://paseo:password@localhost:5432/paseo_hub \
-  npx @getpaseo/hub
+DATABASE_URL=postgres://clisbot:password@localhost:5432/clisbot_hub \
+  npx @clisbot/hub
 ```
 
 对于持久的服务器部署、多个 Hub 进程，或已有的数据库备份和运维体系，请使用 PostgreSQL。迁移会在启动时自动运行。迁移失败时，Hub 不会开始监听。
 
-数据库同样保存 Hub 生成的认证密钥。只有当部署必须从平台的密钥存储中提供该密钥时，才设置 `PASEO_HUB_AUTH_SECRET`。设置此覆盖期间，Hub 会使用它，但不会替换已保存的密钥。更改实际生效的密钥会让所有人退出控制台；已签发的执行凭据在其执行结束前仍然有效。
+数据库同样保存 Hub 生成的认证密钥。只有当部署必须从平台的密钥存储中提供该密钥时，才设置 `CLISBOT_HUB_AUTH_SECRET`。设置此覆盖期间，Hub 会使用它，但不会替换已保存的密钥。更改实际生效的密钥会让所有人退出控制台；已签发的执行凭据在其执行结束前仍然有效。
 
 ## 应用配置 {#app-configuration}
 
@@ -95,12 +95,12 @@ DISCORD_BOT_TOKEN=
 对于全新的数据库，默认通过浏览器完成设置。无人值守的部署可以改用环境变量创建第一个管理员：
 
 ```dotenv
-PASEO_BOOTSTRAP_ORGANIZATION=My organization
-PASEO_BOOTSTRAP_OWNER_EMAIL=me@example.com
-PASEO_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
+CLISBOT_BOOTSTRAP_ORGANIZATION=My organization
+CLISBOT_BOOTSTRAP_OWNER_EMAIL=me@example.com
+CLISBOT_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
 ```
 
-密码至少需要 12 个字符。登录一次，在控制台中替换密码，然后移除 `PASEO_BOOTSTRAP_OWNER_PASSWORD`。Hub 会保留该账号和组织。
+密码至少需要 12 个字符。登录一次，在控制台中替换密码，然后移除 `CLISBOT_BOOTSTRAP_OWNER_PASSWORD`。Hub 会保留该账号和组织。
 
 ## Docker Compose {#docker-compose}
 
@@ -113,7 +113,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-打开 <http://localhost:3000> 并完成浏览器设置。对于公开部署，请在启动栈之前，在 `.env` 中设置 `PASEO_HUB_APP_URL` 以及任何反向代理设置。
+打开 <http://localhost:3000> 并完成浏览器设置。对于公开部署，请在启动栈之前，在 `.env` 中设置 `CLISBOT_HUB_APP_URL` 以及任何反向代理设置。
 
 该栈在端口 `3000` 上发布 Hub，并把 PostgreSQL 数据保存在一个命名卷中。Hub 镜像是 `ghcr.io/getpaseo/hub:latest`。
 
@@ -132,8 +132,8 @@ hub.example.com {
 然后在 `.env` 中设置：
 
 ```dotenv
-PASEO_HUB_APP_URL=https://hub.example.com
-PASEO_HUB_TRUSTED_CLIENT_IP_HEADER=x-forwarded-for
+CLISBOT_HUB_APP_URL=https://hub.example.com
+CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER=x-forwarded-for
 ```
 
 如果不想让端口 `3000` 暴露在公网接口上，请把 `compose.yml` 中 `hub` 的端口改为 `"127.0.0.1:3000:3000"`。
@@ -154,7 +154,7 @@ fly postgres attach your-hub-db -a your-hub
 
 ```sh
 fly deploy -a your-hub \
-  -e PASEO_HUB_APP_URL=https://your-hub.fly.dev
+  -e CLISBOT_HUB_APP_URL=https://your-hub.fly.dev
 ```
 
 打开该地址并完成浏览器设置，或者在部署前设置[初始化环境变量](#bootstrap-from-environment)。

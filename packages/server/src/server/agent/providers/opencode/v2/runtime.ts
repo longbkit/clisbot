@@ -1,5 +1,5 @@
 import { decorateOpenCodeV2Env, materializeOpenCodeV2Plugin } from "../bridge.js";
-import { resolvePaseoHome } from "../../../../paseo-home.js";
+import { resolveClisbotHome } from "../../../../clisbot-home.js";
 import { OpenCode } from "@opencode/client";
 import type { V2Api } from "./api.js";
 import { randomBytes } from "node:crypto";
@@ -162,7 +162,7 @@ export class V2Runtime {
     };
     const decorated = this.options.decorateEnv
       ? await this.options.decorateEnv(configured)
-      : decorateOpenCodeV2Env(configured, await materializeOpenCodeV2Plugin(resolvePaseoHome()));
+      : decorateOpenCodeV2Env(configured, await materializeOpenCodeV2Plugin(resolveClisbotHome()));
     const args = [...launch.args, "serve", "--hostname", "127.0.0.1", "--port", "0"];
     const process = spawnProcess(launch.command, args, {
       cwd,

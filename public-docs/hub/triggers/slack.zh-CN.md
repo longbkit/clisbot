@@ -8,7 +8,7 @@ nav: Slack
 
 当机器人在它所在的频道中被提及时，`slack.mention` 会触发。私信、斜杠命令和交互组件不会产生这个触发器。
 
-`.paseo/workflows/slack-help.yml`：
+`.clisbot/workflows/slack-help.yml`：
 
 ```yaml
 name: slack-help
@@ -27,7 +27,7 @@ steps:
     prompt:
       - text: |
           Answer with hub.reply, then call hub.finish_execution.
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
     allow_outputs:
       - { type: slack.reply, max: 1, required: true }
 ```
@@ -39,10 +39,10 @@ Slack 过滤器使用 ID，而不是显示名称或 Hub 连接的 slug。`from_u
 提及之后紧跟的是已声明的输入：
 
 ```text
-@Paseo repo=project agent=claude investigate the failed sync
+@Clisbot repo=project agent=claude investigate the failed sync
 ```
 
-Hub 会读取连续的已声明头部，并把剩余部分作为 `${{ paseo.prompt }}` 提供。参见 [Workflow](/docs/hub/workflows)。
+Hub 会读取连续的已声明头部，并把剩余部分作为 `${{ clisbot.prompt }}` 提供。参见 [Workflow](/docs/hub/workflows)。
 
 ## 查找 Slack ID {#find-your-slack-ids}
 

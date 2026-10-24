@@ -101,7 +101,7 @@ test.describe("Settings host page", () => {
   }) => {
     const password = "e2e host password";
     const daemon = await startIsolatedHostDaemon("srv_e2e_password_host", {
-      environment: { ...process.env, PASEO_PASSWORD: password },
+      environment: { ...process.env, CLISBOT_PASSWORD: password },
     });
     try {
       await seedSavedSettingsHosts(page, [

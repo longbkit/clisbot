@@ -15,7 +15,7 @@ describe("runPluginBuild", () => {
   });
 
   it("executes build commands in the target directory", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 
@@ -41,7 +41,7 @@ describe("runPluginBuild", () => {
   });
 
   it.runIf(process.platform === "win32")("executes Windows command scripts (.cmd)", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
     const scriptPath = path.join(directory, "build.cmd");
@@ -56,7 +56,7 @@ describe("runPluginBuild", () => {
   it.runIf(process.platform === "win32")(
     "executes bare Windows command scripts resolved through PATH",
     async () => {
-      const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+      const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
       directories.push(directory);
       const logger = createTestLogger();
 
@@ -68,7 +68,7 @@ describe("runPluginBuild", () => {
   );
 
   it("passes arguments unchanged to a native executable", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 
@@ -90,7 +90,7 @@ describe("runPluginBuild", () => {
   });
 
   it.runIf(process.platform !== "win32")("executes POSIX shell scripts", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
     const scriptPath = path.join(directory, "build.sh");
@@ -104,7 +104,7 @@ describe("runPluginBuild", () => {
   });
 
   it("throws when a build command exits with a non-zero code", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 
@@ -118,7 +118,7 @@ describe("runPluginBuild", () => {
   });
 
   it("handles empty or undefined build commands gracefully", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 

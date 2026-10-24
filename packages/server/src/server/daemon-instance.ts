@@ -25,7 +25,7 @@ const killTree = (pid: number, signal: string): Promise<void> =>
 
 // Process ownership only: desktop and CLI load this entry in their own processes.
 // Keep daemon bootstrap and WebSocket schemas out of its dependency tree.
-export { resolvePaseoHome } from "./paseo-home.js";
+export { resolveClisbotHome } from "./clisbot-home.js";
 export { ensurePrivateDirectory } from "./private-files.js";
 export { daemonLaunchEnvironment } from "./config-environment.js";
 export { readLocalCredentialForTarget } from "./local-credential.js";
@@ -71,7 +71,7 @@ export async function waitForDaemonReady(
     if (!instance)
       throw new DaemonInstanceError(
         "DAEMON_NOT_RUNNING",
-        `Daemon is not running for ${home}. Start with: paseo daemon start --home ${JSON.stringify(home)}`,
+        `Daemon is not running for ${home}. Start with: clisbot daemon start --home ${JSON.stringify(home)}`,
       );
     if (options.instance && !isSamePidLock(instance, options.instance)) {
       throw new DaemonInstanceError(
@@ -88,7 +88,7 @@ export async function waitForDaemonReady(
 function notReady(home: string, instance: PidLockInfo): DaemonInstanceError {
   return new DaemonInstanceError(
     "DAEMON_NOT_READY",
-    `Daemon PID ${instance.pid} remains running but is not ready for ${home}.\nLogs: ${daemonLogPath(home)}\nStatus: paseo daemon status --home ${JSON.stringify(home)}\nStop: paseo daemon stop --home ${JSON.stringify(home)}`,
+    `Daemon PID ${instance.pid} remains running but is not ready for ${home}.\nLogs: ${daemonLogPath(home)}\nStatus: clisbot daemon status --home ${JSON.stringify(home)}\nStop: clisbot daemon stop --home ${JSON.stringify(home)}`,
   );
 }
 
@@ -283,7 +283,7 @@ export async function startDaemonInstance(input: {
         if (acquired) throw notReady(input.home, acquired);
         throw new DaemonInstanceError(
           "DAEMON_NOT_READY",
-          `Supervisor PID ${child.pid} remains running but has not published its lock for ${input.home}. Logs: ${daemonLogPath(input.home)}. Check paseo daemon status --home ${JSON.stringify(input.home)}. Stop with paseo daemon stop --home ${JSON.stringify(input.home)} once its lock is published, or signal this PID.`,
+          `Supervisor PID ${child.pid} remains running but has not published its lock for ${input.home}. Logs: ${daemonLogPath(input.home)}. Check clisbot daemon status --home ${JSON.stringify(input.home)}. Stop with clisbot daemon stop --home ${JSON.stringify(input.home)} once its lock is published, or signal this PID.`,
         );
       }
       await delay(100, undefined, { signal });

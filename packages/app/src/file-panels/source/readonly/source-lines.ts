@@ -1,4 +1,4 @@
-import { highlightCodeInSteps, type HighlightToken } from "@getpaseo/highlight";
+import { highlightCodeInSteps, type HighlightToken } from "@clisbot/highlight";
 
 /** JavaScript time per slice; the rest of the frame stays free for input and rendering. */
 const SLICE_BUDGET_MS = 12;

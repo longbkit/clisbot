@@ -10,7 +10,7 @@ export async function installLocalDesktopHost(page: Page, directory: string): Pr
   }
   await page.addInitScript(
     (localHost: { serverId: string; directory: string }) => {
-      (window as unknown as { paseoDesktop: unknown }).paseoDesktop = {
+      (window as unknown as { clisbotDesktop: unknown }).clisbotDesktop = {
         platform: "linux",
         invoke: async (command: string) => {
           if (command === "desktop_daemon_status") {

@@ -1,8 +1,8 @@
 import { filePanelTitle } from "@/file-panels/choice/presentation";
 import { i18n } from "@/i18n/i18next";
 import { createPluginHosts } from "./hosts";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PaseoApi } from "@getpaseo/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { ClisbotApi } from "@clisbot/client";
 import { expect, test } from "vitest";
 import { PluginRegistry } from "./registry";
 
@@ -29,17 +29,17 @@ function observingClient() {
 }
 
 function registry(
-  localeSource: import("@getpaseo/plugin/client/host").PluginLocaleSource = {
+  localeSource: import("@clisbot/plugin/client/host").PluginLocaleSource = {
     getLocale: () => "en",
     subscribe: () => () => {},
   },
 ) {
-  const setupClients = new Map<string, PaseoApi>();
+  const setupClients = new Map<string, ClisbotApi>();
   const plugins = new PluginRegistry({
     localeSource,
     version: "0.8.0",
     createRuntime: (installation) => {
-      setupClients.set(installation.id, installation.paseo);
+      setupClients.set(installation.id, installation.clisbot);
       return {
         hosts: createPluginHosts(
           {
@@ -50,7 +50,7 @@ function registry(
           },
           installation.lifetime.signal,
         ),
-        paseo: installation.paseo,
+        clisbot: installation.clisbot,
         i18n: installation.i18n,
         rpc: async () => {
           throw new Error("Unexpected plugin RPC");
@@ -72,17 +72,17 @@ function registry(
 function catalog(id: string, body = "return function() {};") {
   return {
     id,
-    requirements: { paseo: ">=0.8.0" },
-    clientBundle: `(function() { return { default: function(plugin) { plugin.paseo.observeEvents(["${id}"]); ${body} } }; })`,
+    requirements: { clisbot: ">=0.8.0" },
+    clientBundle: `(function() { return { default: function(plugin) { plugin.clisbot.observeEvents(["${id}"]); ${body} } }; })`,
   };
 }
 
-test("setup and every surface share the installation's one Paseo client", () => {
+test("setup and every surface share the installation's one Clisbot client", () => {
   const h = registry();
   h.plugins.installCatalog("host", [catalog("deploys")], { client: h.client, audio });
 
   const [installation] = h.plugins.getSnapshot();
-  expect(h.setupClients.get("deploys")).toBe(installation.paseo);
+  expect(h.setupClients.get("deploys")).toBe(installation.clisbot);
   expect(h.open).toEqual(new Set(["deploys"]));
 });
 
@@ -115,9 +115,9 @@ test("reloading a plugin ends the old installation's subscriptions", async () =>
 
   const [second] = h.plugins.getSnapshot();
   expect(second).not.toBe(first);
-  expect(second.paseo).not.toBe(first.paseo);
-  await expect(first.paseo.dispose()).resolves.toBeUndefined();
-  expect(() => first.paseo.observeEvents(["project.update"])).toThrow("Paseo API is disposed");
+  expect(second.clisbot).not.toBe(first.clisbot);
+  await expect(first.clisbot.dispose()).resolves.toBeUndefined();
+  expect(() => first.clisbot.observeEvents(["project.update"])).toThrow("Clisbot API is disposed");
   expect(h.open).toEqual(new Set(["reloaded"]));
 });
 
@@ -170,10 +170,10 @@ test("locale snapshots preserve installation state and observations, then releas
   const translated = {
     ...catalog("notes"),
     clientBundle: `(function(require) {
-    const {defineTranslations} = require("@getpaseo/plugin/client");
+    const {defineTranslations} = require("@clisbot/plugin/client");
     const messages = defineTranslations({resources:{en:{title:"Notes"},"zh-CN":{title:"笔记"}}});
     return {default(plugin) {
-      plugin.paseo.observeEvents(["notes"]);
+      plugin.clisbot.observeEvents(["notes"]);
       plugin.addScreen({id:"notes",title:messages.message("title"),Component:function Notes(){return null;}});
       plugin.addFilePanel({id:"notes",title:messages.message("title"),icon:"FileText",files:{extensions:["notes"]},Component:function NotesFile(){return null;}});
       return function(){};
@@ -197,7 +197,7 @@ test("locale snapshots preserve installation state and observations, then releas
   expect(before.locale).toBe("en");
   expect(
     before.i18n.resolve(
-      before.surfaces[0].title as import("@getpaseo/plugin/client").PluginText,
+      before.surfaces[0].title as import("@clisbot/plugin/client").PluginText,
       before.locale,
     ),
   ).toBe("Notes");
@@ -210,13 +210,13 @@ test("locale snapshots preserve installation state and observations, then releas
   expect(after.filePanels[0].Component).toBe(before.filePanels[0].Component);
   expect(
     after.i18n.resolve(
-      after.surfaces[0].title as import("@getpaseo/plugin/client").PluginText,
+      after.surfaces[0].title as import("@clisbot/plugin/client").PluginText,
       after.locale,
     ),
   ).toBe("笔记");
   expect(after.lifetime).toBe(before.lifetime);
   expect(after.queryClient).toBe(before.queryClient);
-  expect(after.paseo).toBe(before.paseo);
+  expect(after.clisbot).toBe(before.clisbot);
   expect(after.surfaces[0].Component).toBe(before.surfaces[0].Component);
   expect(h.open).toEqual(new Set(["notes"]));
   h.plugins.installCatalog("host", [translated], { client: h.client, audio });

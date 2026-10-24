@@ -190,7 +190,7 @@ it("inherits registered env for the worktree root cwd", async () => {
 
   manager.registerCwdEnv({
     cwd,
-    env: { PASEO_WORKTREE_PORT: "45678" },
+    env: { CLISBOT_WORKTREE_PORT: "45678" },
   });
   await manager.createTerminal({
     workspaceId: "ws-test",
@@ -198,7 +198,7 @@ it("inherits registered env for the worktree root cwd", async () => {
     command: process.execPath,
     args: [
       "-e",
-      `require('fs').writeFileSync(${JSON.stringify(markerPath)}, process.env.PASEO_WORKTREE_PORT ?? '')`,
+      `require('fs').writeFileSync(${JSON.stringify(markerPath)}, process.env.CLISBOT_WORKTREE_PORT ?? '')`,
     ],
   });
 
@@ -219,7 +219,7 @@ it("inherits registered env for subdirectories within the worktree", async () =>
 
   manager.registerCwdEnv({
     cwd: rootCwd,
-    env: { PASEO_WORKTREE_PORT: "45679" },
+    env: { CLISBOT_WORKTREE_PORT: "45679" },
   });
   await manager.createTerminal({
     workspaceId: "ws-test",
@@ -227,7 +227,7 @@ it("inherits registered env for subdirectories within the worktree", async () =>
     command: process.execPath,
     args: [
       "-e",
-      `require('fs').writeFileSync(${JSON.stringify(markerPath)}, process.env.PASEO_WORKTREE_PORT ?? '')`,
+      `require('fs').writeFileSync(${JSON.stringify(markerPath)}, process.env.CLISBOT_WORKTREE_PORT ?? '')`,
     ],
   });
 

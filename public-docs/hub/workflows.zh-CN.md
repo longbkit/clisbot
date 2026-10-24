@@ -6,11 +6,11 @@ nav: Workflow
 
 # Hub workflow {#hub-workflows}
 
-一个 workflow 文件包含一个触发器，以及它启动的有序 step。文件从 `.paseo/workflows/*.yml` 中发现。
+一个 workflow 文件包含一个触发器，以及它启动的有序 step。文件从 `.clisbot/workflows/*.yml` 中发现。
 
 ## 你的第一个 workflow {#your-first-workflow}
 
-假设 `.paseo/hub.yml` 定义了一个名为 `dev` 的环境和一个名为 `codex` 的 Agent。添加 `.paseo/workflows/slack-help.yml`：
+假设 `.clisbot/hub.yml` 定义了一个名为 `dev` 的环境和一个名为 `codex` 的 Agent。添加 `.clisbot/workflows/slack-help.yml`：
 
 ```yaml
 name: slack-help
@@ -31,13 +31,13 @@ steps:
           Answer the request. Call hub.reply once, then call hub.finish_execution.
 
           <user-prompt>
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
           </user-prompt>
     allow_outputs:
       - { type: slack.reply, max: 1, required: true }
 ```
 
-Hub 会先去掉提及和已声明的输入头部，再把剩余文本作为 `${{ paseo.prompt }}` 提供。回复能力在 Slack 触发器旁边显式声明。Discord 使用 `discord.reply`；GitHub 使用 step 级的 [`github` 块](/docs/hub/github)，而不是 `hub.reply`。
+Hub 会先去掉提及和已声明的输入头部，再把剩余文本作为 `${{ clisbot.prompt }}` 提供。回复能力在 Slack 触发器旁边显式声明。Discord 使用 `discord.reply`；GitHub 使用 step 级的 [`github` 块](/docs/hub/github)，而不是 `hub.reply`。
 
 ## 选择 step 在哪里运行 {#choose-where-a-step-runs}
 
@@ -59,15 +59,15 @@ inputs:
   repo:
     type: string
     required: true
-    choices: [paseo, hub]
+    choices: [clisbot, hub]
 steps:
   - id: work
-    environment: ${{ paseo.inputs.repo }}
+    environment: ${{ clisbot.inputs.repo }}
     max_runtime: 30m
     idle_timeout: 5m
     agent: codex
     prompt:
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
 ```
 
 激活时会检查每一个 `choices` 结果。环境对象永远不会被 workflow 合并或覆盖。
@@ -103,15 +103,15 @@ inputs:
     choices: [codex-safe, claude]
 steps:
   - id: work
-    environment: paseo
+    environment: clisbot
     max_runtime: 30m
     idle_timeout: 5m
-    agent: ${{ paseo.inputs.agent }}
+    agent: ${{ clisbot.inputs.agent }}
     prompt:
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
 ```
 
-如果 `codex-safe` 在 `hub.yml` 中包含结构化的沙箱选项，选择它时会原样带上这些选项。像 `provider: ${{ paseo.inputs.agent }}` 这样的动态内联对象会被拒绝。
+如果 `codex-safe` 在 `hub.yml` 中包含结构化的沙箱选项，选择它时会原样带上这些选项。像 `provider: ${{ clisbot.inputs.agent }}` 这样的动态内联对象会被拒绝。
 
 ## 由分类器路由 {#route-from-a-classifier}
 
@@ -135,13 +135,13 @@ steps:
     agent: claude
     prompt:
       - include: partials/classify.md
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
     output:
       schema:
         type: object
         required: [environment, agent]
         properties:
-          environment: { enum: [paseo, hub] }
+          environment: { enum: [clisbot, hub] }
           agent: { enum: [codex-safe, claude] }
         additionalProperties: false
   - id: work
@@ -152,12 +152,12 @@ steps:
     prompt:
       - text: |
           Complete the request. Call hub.reply once, then call hub.finish_execution.
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
     allow_outputs:
       - { type: discord.reply, max: 1, required: true }
 ```
 
-`.paseo/workflows/partials/classify.md`：
+`.clisbot/workflows/partials/classify.md`：
 
 ```text
 Choose one configured repository environment and one complete named agent configuration.
@@ -174,15 +174,15 @@ prompt:
   - include: partials/instructions.md
   - text: |
       Provider evidence:
-      ${{ paseo.context }}
+      ${{ clisbot.context }}
 
       <user-prompt>
-      ${{ paseo.prompt }}
+      ${{ clisbot.prompt }}
       </user-prompt>
 ```
 
-- `${{ paseo.prompt }}` 是规范化后的请求文本。它始终在编写的提示词中显式出现。
-- `${{ paseo.context }}` 让该 step 选择加入 Provider 上下文的物化，并插入 JSON。没有这个表达式时，Hub 不会获取或注入环境上下文。
+- `${{ clisbot.prompt }}` 是规范化后的请求文本。它始终在编写的提示词中显式出现。
+- `${{ clisbot.context }}` 让该 step 选择加入 Provider 上下文的物化，并插入 JSON。没有这个表达式时，Hub 不会获取或注入环境上下文。
 
 把不受信任的请求文本放在界限清晰的块中。片段是指令文本，而不是隐藏的权限。
 
@@ -198,12 +198,12 @@ filters:
   from_users: [automation]
 steps:
   - id: inspect
-    environment: paseo
+    environment: clisbot
     max_runtime: 10m
     idle_timeout: 2m
     agent: codex-safe
     prompt:
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
     output:
       schema:
         type: object
@@ -213,7 +213,7 @@ steps:
         additionalProperties: false
   - id: review
     if: ${{ steps.inspect.outputs.needs_review == true }}
-    environment: paseo
+    environment: clisbot
     max_runtime: 30m
     idle_timeout: 5m
     agent: claude

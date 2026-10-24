@@ -1,6 +1,6 @@
 ---
 title: Workspaces with the SDK
-description: Open directories as Paseo workspaces, place agents in them, follow changes, and archive them.
+description: Open directories as Clisbot workspaces, place agents in them, follow changes, and archive them.
 nav: Workspaces
 order: 53
 category: TypeScript SDK
@@ -8,7 +8,7 @@ category: TypeScript SDK
 
 # Workspaces with the SDK
 
-Use a workspace when an integration needs a durable place in the Paseo app for agents, terminals, browsers, and files related to one task.
+Use a workspace when an integration needs a durable place in the Clisbot app for agents, terminals, browsers, and files related to one task.
 
 ## Open a directory
 
@@ -35,7 +35,7 @@ const workspace = await client.workspaces.create({
 });
 ```
 
-Create a Paseo-owned worktree when concurrent work needs an isolated checkout:
+Create a Clisbot-owned worktree when concurrent work needs an isolated checkout:
 
 ```ts
 const workspace = await client.workspaces.create({

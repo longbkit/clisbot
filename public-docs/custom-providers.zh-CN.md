@@ -1,12 +1,12 @@
 ---
 title: 自定义 Provider
-description: 在 ~/.paseo/config.json 中配置自定义 Provider、替代端点、多个配置、自定义二进制和 ACP Agent。
+description: 在 ~/.clisbot/config.json 中配置自定义 Provider、替代端点、多个配置、自定义二进制和 ACP Agent。
 nav: 自定义 Provider
 ---
 
 # 自定义 Provider {#custom-providers}
 
-[支持的 Provider](/docs/supported-providers) 之外的一切都配置在 `~/.paseo/config.json` 的 `agents.providers` 下。你可以：
+[支持的 Provider](/docs/supported-providers) 之外的一切都配置在 `~/.clisbot/config.json` 的 `agents.providers` 下。你可以：
 
 - **扩展**一个一等 Provider，让它指向不同的 API（Z.AI、阿里巴巴/通义千问、代理或自托管端点）。
 - **添加多个配置**：针对同一个底层 Provider 创建多个条目，使用不同的凭据或精选的模型列表。
@@ -14,11 +14,11 @@ nav: 自定义 Provider
 - **添加 ACP Agent**：Gemini CLI、Hermes，或任何通过 stdio 使用 Agent Client Protocol 的 Agent。
 - **禁用**你不使用的 Provider。
 
-编辑文件后运行 `paseo reload`。Provider 的修改会应用到之后的启动，无需重启 daemon。
+编辑文件后运行 `clisbot reload`。Provider 的修改会应用到之后的启动，无需重启 daemon。
 
 Provider ID 必须是小写字母、数字和连字符（`/^[a-z][a-z0-9-]*$/`）。新的自定义 Provider 需要 `extends`（一个一等 Provider ID 或 `"acp"`）和 `label`。要覆盖内置的 Provider 插件，请使用它的 Provider ID 并省略 `extends`。对于 [Muse Code](/docs/muse-code)，在 `agents.providers.muse` 下设置命令或环境变量覆盖。
 
-下面的示例只是快速浏览。完整、最新的参考在 GitHub 上：[docs/custom-providers.md](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md)。
+下面的示例只是快速浏览。完整、最新的参考在 GitHub 上：[docs/custom-providers.md](https://github.com/longbkit/clisbot/blob/main/docs/custom-providers.md)。
 
 ## Provider 选项 {#provider-options}
 
@@ -149,7 +149,7 @@ Z.AI 通过兼容 Anthropic 的端点提供 GLM 模型。把 `ANTHROPIC_BASE_URL
 
 ## ACP Provider {#acp-providers}
 
-任何通过 stdio 使用 [ACP](https://agentclientprotocol.com) 的 Agent，都可以用 `extends: "acp"` 和 `command` 添加。Paseo 启动该进程并发送 `initialize` JSON-RPC 请求，Agent 在运行时报告它的能力、模式和模型。
+任何通过 stdio 使用 [ACP](https://agentclientprotocol.com) 的 Agent，都可以用 `extends: "acp"` 和 `command` 添加。Clisbot 启动该进程并发送 `initialize` JSON-RPC 请求，Agent 在运行时报告它的能力、模式和模型。
 
 ```json
 {
@@ -206,4 +206,4 @@ Z.AI 通过兼容 Anthropic 的端点提供 GLM 模型。把 `ANTHROPIC_BASE_URL
 
 ## 完整参考 {#full-reference}
 
-完整的字段参考（`extends`、`label`、`command`、`env`、`options`、`models`、`additionalModels`、`disallowedTools`、`paseoTools`、`enabled`、`order`）、模型和思考选项的 schema，以及每种套餐更深入的示例，请参见 GitHub 上的 [docs/custom-providers.md](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md)。`paseoTools` 的配置见[按 Provider 限制 Paseo 工具](/docs/mcp#limit-paseo-tools-by-provider)。
+完整的字段参考（`extends`、`label`、`command`、`env`、`options`、`models`、`additionalModels`、`disallowedTools`、`clisbotTools`、`enabled`、`order`）、模型和思考选项的 schema，以及每种套餐更深入的示例，请参见 GitHub 上的 [docs/custom-providers.md](https://github.com/longbkit/clisbot/blob/main/docs/custom-providers.md)。`clisbotTools` 的配置见[按 Provider 限制 Clisbot 工具](/docs/mcp#limit-clisbot-tools-by-provider)。

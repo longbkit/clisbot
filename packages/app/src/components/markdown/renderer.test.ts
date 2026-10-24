@@ -212,7 +212,7 @@ describe("bare URL sentence punctuation", () => {
   it.each([".", ",", ";", ":", "!", "?", ")", ").", "...", "?!"])(
     "leaves %s outside the link and preserves the rendered sentence",
     async (punctuation) => {
-      const url = "https://github.com/getpaseo/paseo/pull/7357";
+      const url = "https://github.com/longbkit/clisbot/pull/7357";
       const source = `${url}${punctuation} Not merged.`;
       const prepared = prepareMarkdownSource(source);
       const tree = recognizeTextLinks(
@@ -526,7 +526,7 @@ it("uses the first repeated image reference definition", () => {
 
 it("preserves authored adjacency in the Greptile header", () => {
   const source =
-    '<h2><a href="https://app.greptile.com/api/retrigger?id=81261069"><picture><source media="(prefers-color-scheme: dark)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/RetriggerDark.svg?v=2"><source media="(prefers-color-scheme: light)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/Retrigger.svg?v=2"><img alt="Retrigger" src="https://greptile-static-assets.s3.amazonaws.com/badges/Retrigger.svg?v=2" align="right"></picture></a><a href="https://app.greptile.com/paseo/github/getpaseo/paseo/-/pull/6973"><picture><source media="(prefers-color-scheme: dark)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/ViewInGreptileDark.svg?v=2"><source media="(prefers-color-scheme: light)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/ViewInGreptile.svg?v=2"><img alt="View in Greptile" src="https://greptile-static-assets.s3.amazonaws.com/badges/ViewInGreptile.svg?v=2" align="right"></picture></a>Confidence Score: 2/5</h2>';
+    '<h2><a href="https://app.greptile.com/api/retrigger?id=81261069"><picture><source media="(prefers-color-scheme: dark)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/RetriggerDark.svg?v=2"><source media="(prefers-color-scheme: light)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/Retrigger.svg?v=2"><img alt="Retrigger" src="https://greptile-static-assets.s3.amazonaws.com/badges/Retrigger.svg?v=2" align="right"></picture></a><a href="https://app.greptile.com/clisbot/github/longbkit/clisbot/-/pull/6973"><picture><source media="(prefers-color-scheme: dark)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/ViewInGreptileDark.svg?v=2"><source media="(prefers-color-scheme: light)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/ViewInGreptile.svg?v=2"><img alt="View in Greptile" src="https://greptile-static-assets.s3.amazonaws.com/badges/ViewInGreptile.svg?v=2" align="right"></picture></a>Confidence Score: 2/5</h2>';
   const rendered = prepareMarkdownSource(source, undefined, { supportsSvg: false }).render();
   expect(rendered).toContain(
     "[Retrigger](<https://app.greptile.com/api/retrigger?id=81261069>)[View in Greptile]",
@@ -659,7 +659,7 @@ it.each([
   "src/run:12",
   "src/run:12:3",
   "src/run:12-20",
-  "~/dev/paseo",
+  "~/dev/clisbot",
   String.raw`C:\Users\x\file.txt`,
   "file.ts:12",
   "file.ts:12-20",

@@ -2,7 +2,7 @@ import { indexedDB as fakeIndexedDb } from "fake-indexeddb";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { clearLegacyReplicaCache } from "./legacy-cleanup.web";
 
-const LEGACY_DATABASE_NAME = "paseo-replica-cache";
+const LEGACY_DATABASE_NAME = "clisbot-replica-cache";
 
 beforeAll(() => vi.stubGlobal("indexedDB", fakeIndexedDb));
 afterAll(() => vi.unstubAllGlobals());

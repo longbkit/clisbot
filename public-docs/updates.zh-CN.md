@@ -1,18 +1,18 @@
 ---
 title: 更新
-description: Paseo 如何发布版本、稳定版与测试版渠道的区别，以及如何提前获取更新。
+description: Clisbot 如何发布版本、稳定版与测试版渠道的区别，以及如何提前获取更新。
 nav: 更新
 ---
 
 # 更新 {#updates}
 
-Paseo 通过两个渠道发布更新：**Stable**（稳定版）和 **Beta**（测试版）。
+Clisbot 通过两个渠道发布更新：**Stable**（稳定版）和 **Beta**（测试版）。
 
 大多数版本在稳定版渠道发布。测试版是候选版本，让你在新内容推送给所有人之前先行测试。
 
 ## 版本号 {#version-numbers}
 
-Paseo 遵循带预发布标签的[语义化版本](https://semver.org)。
+Clisbot 遵循带预发布标签的[语义化版本](https://semver.org)。
 
 稳定版看起来是这样：
 
@@ -62,7 +62,7 @@ v0.1.92-beta.3
 
 桌面端版本和 CLI 通常最先提供。App Store 和 Play Store 的版本需要经过审核，可能会滞后。
 
-应用商店目前没有测试版渠道，只提交稳定版构建。如果你想提前使用 Android 构建，请从 [GitHub releases 页面](https://github.com/getpaseo/paseo/releases)下载 APK。
+应用商店目前没有测试版渠道，只提交稳定版构建。如果你想提前使用 Android 构建，请从 [GitHub releases 页面](https://github.com/longbkit/clisbot/releases)下载 APK。
 
 ## 出现问题怎么办 {#what-to-do-if-something-breaks}
 

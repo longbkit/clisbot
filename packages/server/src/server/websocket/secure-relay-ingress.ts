@@ -15,7 +15,7 @@ import {
   type KeyPair,
   type SecurityMode,
   type Transport as RelayTransport,
-} from "@getpaseo/relay/e2ee";
+} from "@clisbot/relay/e2ee";
 import { createEncryptedRelaySocket, type EncryptedRelaySocket } from "./encrypted-relay-socket.js";
 
 const HANDSHAKE_TIMEOUT_MS = 15_000;

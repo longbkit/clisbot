@@ -1,11 +1,11 @@
-import type { AgentMessage } from "@getpaseo/protocol/agent-message";
-import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
+import type { AgentMessage } from "@clisbot/protocol/agent-message";
+import type { ToolCallDetail } from "@clisbot/protocol/agent-types";
 import { describe, expect, it } from "vitest";
 
 import { buildToolCallPresentation, type ToolCallPresentationIcon } from "./presentation";
 
 const fakeIcons = {
-  paseo: (() => null) as ToolCallPresentationIcon,
+  clisbot: (() => null) as ToolCallPresentationIcon,
   brain: (() => null) as ToolCallPresentationIcon,
   eye: (() => null) as ToolCallPresentationIcon,
   wrench: (() => null) as ToolCallPresentationIcon,
@@ -17,7 +17,7 @@ function fakeResolveIcon(
   agentMessage: AgentMessage | undefined,
 ): ToolCallPresentationIcon {
   if (agentMessage) {
-    return fakeIcons.paseo;
+    return fakeIcons.clisbot;
   }
   if (detail?.type === "plan") {
     return fakeIcons.brain;
@@ -106,7 +106,7 @@ it.each([
   ["permission-required", "Agent needs permission"],
   ["closed", "Agent closed"],
 ] as const)(
-  "presents %s with a fixed label, the sender as context, and the Paseo icon",
+  "presents %s with a fixed label, the sender as context, and the Clisbot icon",
   (event, heading) => {
     const presentation = buildToolCallPresentation({
       toolName: "internal_name_should_not_be_visible",
@@ -122,7 +122,7 @@ it.each([
     });
     expect(presentation.displayName).toBe(heading);
     expect(presentation.summary).toBe("QA messenger");
-    expect(presentation.icon).toBe(fakeIcons.paseo);
+    expect(presentation.icon).toBe(fakeIcons.clisbot);
     expect(presentation.detail).toEqual({
       type: "plain_text",
       text: "From agent: server::sender\n\nThe delivered message.",
@@ -142,9 +142,9 @@ it("uses an opaque sender ID when no title is available", () => {
   expect(presentation.summary).toBe("remote::worker");
 });
 
-it("shows the target agent title as context for Paseo agent tools", () => {
+it("shows the target agent title as context for Clisbot agent tools", () => {
   const presentation = buildToolCallPresentation({
-    toolName: "mcp__paseo__kill_agent",
+    toolName: "mcp__clisbot__kill_agent",
     status: "completed",
     error: null,
     detail: { type: "unknown", input: { agentId: "agt_1" }, output: null },

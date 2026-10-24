@@ -36,7 +36,7 @@ for (const name of ["Code font family", "Interface font family"]) {
 test("opens settings with defaults when a malformed font was already saved", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
-      "@paseo:app-settings",
+      "@clisbot:app-settings",
       JSON.stringify({ monoFontFamily: "'foo", uiFontFamily: '"foo' }),
     );
   });

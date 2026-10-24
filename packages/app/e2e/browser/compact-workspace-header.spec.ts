@@ -21,7 +21,7 @@ const labels = {
     title: "workspace-with-a-very-long-release-and-investigation-name",
     project: "project-with-a-very-long-customer-integration-name",
   },
-  short: { title: "main", project: "Paseo" },
+  short: { title: "main", project: "Clisbot" },
 };
 
 async function openNamedWorkspace(page: Page, names: typeof labels.long) {
@@ -109,13 +109,13 @@ for (const width of [320, 390]) {
 
 const KEEP_ALIVE = 'node -e "setInterval(() => {}, 1000)"';
 const WEB_SERVER =
-  "node -e \"require('http').createServer((q, r) => r.end('ok')).listen(process.env.PASEO_PORT)\"";
+  "node -e \"require('http').createServer((q, r) => r.end('ok')).listen(process.env.CLISBOT_PORT)\"";
 
 async function openWorkspaceWithScripts(page: Page) {
   const workspace = await seedWorkspace({
     repoPrefix: "compact-scripts-",
     repo: {
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           lint: { type: "script", command: KEEP_ALIVE },
           web: { type: "service", command: WEB_SERVER },

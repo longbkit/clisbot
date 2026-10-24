@@ -64,7 +64,7 @@ test("a tool's image output is shown as an image, not as base64 in the tool outp
     {
       type: "tool",
       id: "call-screenshot",
-      name: "paseo_browser_screenshot",
+      name: "clisbot_browser_screenshot",
       executed: false,
       state: {
         status: "completed",
@@ -86,13 +86,13 @@ test("a tool's image output is shown as an image, not as base64 in the tool outp
   expect(events.map((event) => event.type === "timeline" && event.item)).toMatchObject([
     {
       type: "tool_call",
-      name: "paseo_browser_screenshot",
+      name: "clisbot_browser_screenshot",
       status: "completed",
       detail: { output: "Captured browser screenshot (1x1).\n[image]" },
     },
     {
       type: "assistant_message",
-      text: expect.stringMatching(/^\n\n!\[Image\]\(file:\/\/.*paseo-attachments.*\.png\)\n\n$/),
+      text: expect.stringMatching(/^\n\n!\[Image\]\(file:\/\/.*clisbot-attachments.*\.png\)\n\n$/),
     },
   ]);
   expect(timeline.messages([screenshot])).toEqual([]);

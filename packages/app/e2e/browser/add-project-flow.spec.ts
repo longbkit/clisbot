@@ -173,7 +173,7 @@ test.describe("Add Project command-center flow", () => {
     });
 
     test("New directory creates a Project on the selected remote host", async ({ page }) => {
-      const parentDirectory = await mkdtemp(path.join(tmpdir(), "paseo-e2e-remote-project-"));
+      const parentDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-remote-project-"));
       const directoryName = `remote-${randomUUID().slice(0, 8)}`;
       const directoryPath = path.join(parentDirectory, directoryName);
 
@@ -301,7 +301,7 @@ test.describe("Add Project command-center flow", () => {
   test("keyboard navigation keeps the selected row inside the visible results", async ({
     page,
   }) => {
-    const parentDirectory = await mkdtemp(path.join(homedir(), "paseo-e2e-scroll-"));
+    const parentDirectory = await mkdtemp(path.join(homedir(), "clisbot-e2e-scroll-"));
     const rowPath = (index: number) =>
       path.join(parentDirectory, `scroll-probe-${String(index).padStart(2, "0")}`);
     let projectId: string | null = null;
@@ -367,7 +367,7 @@ test.describe("Add Project command-center flow", () => {
     const title = addProjectFlow(page).getByTestId("add-project-flow-title");
     await expect(title.getByText("Choose destination", { exact: true })).toBeVisible();
     await expect(title.getByText("localhost", { exact: true })).toBeVisible();
-    await expect(title).not.toContainText("Where should Paseo create");
+    await expect(title).not.toContainText("Where should Clisbot create");
     await addProjectFlowBack(page).click();
     await expect(addProjectFlowInput(page)).toHaveValue(remote);
   });
@@ -375,7 +375,7 @@ test.describe("Add Project command-center flow", () => {
   test("New directory validates the name, restores parent and name state, then creates a Project", async ({
     page,
   }) => {
-    const parentDirectory = await mkdtemp(path.join(tmpdir(), "paseo-e2e-new-project-"));
+    const parentDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-new-project-"));
     const directoryName = `created-${randomUUID().slice(0, 8)}`;
     const directoryPath = path.join(parentDirectory, directoryName);
     let projectId: string | null = null;

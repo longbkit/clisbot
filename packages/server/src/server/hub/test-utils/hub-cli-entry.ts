@@ -12,7 +12,7 @@ class HubContractHttpClient extends HubHttpClient {
   }
 }
 
-const argv = [process.argv[0] ?? "node", process.argv[1] ?? "paseo", ...process.argv.slice(3)];
+const argv = [process.argv[0] ?? "node", process.argv[1] ?? "clisbot", ...process.argv.slice(3)];
 await createHubCommand({ hub: new HubContractHttpClient(), env: {} }).parseAsync(argv, {
   from: "node",
 });

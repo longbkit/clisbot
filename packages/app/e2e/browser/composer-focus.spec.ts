@@ -112,9 +112,9 @@ test("focusing the feed preserves assistant text selection and code copy control
     await page.keyboard.press("ControlOrMeta+c");
     expect((await page.evaluate(() => navigator.clipboard.readText())).trim()).toBe(sentence);
 
-    const code = feed.locator('[data-paseo-markdown-language="bash"]');
+    const code = feed.locator('[data-clisbot-markdown-language="bash"]');
     await code.hover();
-    await code.locator("[data-paseo-markdown-ignore]").click();
+    await code.locator("[data-clisbot-markdown-ignore]").click();
     await expect(feed).not.toBeFocused();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("echo example");
     await expectComposerDraft(page, "Keep this draft");

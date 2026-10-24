@@ -24,7 +24,7 @@ APP_VARIANT=development npx expo start --localhost --port 8096
 With one Android emulator running, open that bundle:
 
 ```sh
-agent-device open sh.paseo.debug 'exp+voice-mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8096' --platform android --session status-ring --metro-port 8096
+agent-device open sh.clisbot.debug 'exp+voice-mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8096' --platform android --session status-ring --metro-port 8096
 ```
 
 From the repository root:

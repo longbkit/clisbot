@@ -39,7 +39,7 @@ async function expectUncoveredMatch(page: Page) {
       const selected = await page.evaluate(() => {
         const term = (
           window as Window & {
-            __paseoTerminal?: {
+            __clisbotTerminal?: {
               rows: number;
               cols: number;
               buffer: { active: { viewportY: number } };
@@ -48,7 +48,7 @@ async function expectUncoveredMatch(page: Page) {
                 | undefined;
             };
           }
-        ).__paseoTerminal;
+        ).__clisbotTerminal;
         const selection = term?.getSelectionPosition();
         return term && selection
           ? { selection, rows: term.rows, cols: term.cols, firstRow: term.buffer.active.viewportY }
@@ -73,8 +73,8 @@ async function expectUncoveredMatch(page: Page) {
 async function viewport(page: Page) {
   return page.evaluate(
     () =>
-      (window as Window & { __paseoTerminal?: { buffer: { active: { viewportY: number } } } })
-        .__paseoTerminal?.buffer.active.viewportY,
+      (window as Window & { __clisbotTerminal?: { buffer: { active: { viewportY: number } } } })
+        .__clisbotTerminal?.buffer.active.viewportY,
   );
 }
 
@@ -164,7 +164,7 @@ async function openNumberedFileInVim(page: Page) {
 
 async function readVimScreen(page: Page) {
   const rows = await page.evaluate(
-    () => (window as Window & { __paseoTerminal: { rows: number } }).__paseoTerminal.rows,
+    () => (window as Window & { __clisbotTerminal: { rows: number } }).__clisbotTerminal.rows,
   );
   const text = await getTerminalBufferText(page);
   const numberedLines = text

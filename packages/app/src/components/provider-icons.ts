@@ -3,7 +3,7 @@ import { providerSnapshotIcons } from "@/data/provider-icons";
 import { Bot } from "lucide-react-native";
 import { createElement, useCallback, type ComponentType } from "react";
 import { SvgXml } from "react-native-svg";
-import { TERMINAL_PROFILE_ICON_NAMES } from "@getpaseo/protocol/provider-icon-names";
+import { TERMINAL_PROFILE_ICON_NAMES } from "@clisbot/protocol/provider-icon-names";
 import { AntigravityIcon } from "@/components/icons/antigravity-icon";
 import { ClaudeIcon } from "@/components/icons/claude-icon";
 import { CodexIcon } from "@/components/icons/codex-icon";

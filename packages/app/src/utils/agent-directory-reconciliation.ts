@@ -1,4 +1,4 @@
-import type { FetchAgentsEntry } from "@getpaseo/client/internal/daemon-client";
+import type { FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
 import type { AgentDirectoryDelta } from "./agent-directory-sync";
 import { acceptAgentDirectoryUpdate } from "./agent-directory-update-policy";
 
@@ -29,7 +29,7 @@ export function reconcileAgentDirectory(input: {
           currentBranch: null,
           remoteUrl: null,
           worktreeRoot: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: null,
         },
       },

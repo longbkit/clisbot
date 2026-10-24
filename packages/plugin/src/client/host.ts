@@ -7,7 +7,7 @@ export {
 } from "./runtime-context-bridge.js";
 import type { PluginAttachmentSourceContribution } from "../contracts.js";
 import { PluginRpcProvider } from "./rpc-context.js";
-import { PaseoApiProvider } from "./paseo-context.js";
+import { ClisbotApiProvider } from "./clisbot-context.js";
 import { callPluginRpc } from "../rpc.js";
 
 export async function searchPluginAttachments(
@@ -19,7 +19,7 @@ export async function searchPluginAttachments(
   return PluginAttachmentSearchPayloadSchema.parseAsync(output);
 }
 
-export { callPluginRpc, PaseoApiProvider, PluginRpcProvider };
+export { callPluginRpc, ClisbotApiProvider, PluginRpcProvider };
 
 export {
   PluginTranslationRuntime,

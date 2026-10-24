@@ -564,7 +564,7 @@ describe("ClaudeAgentSession persisted subagent replay", () => {
       // Cross V8's whole-string limit only in the opt-in reproduction, keeping routine CI small.
       generate: (root: string) =>
         generateReplayCorpus(root, {
-          parentMiB: process.env.PASEO_TEST_LARGE_CLAUDE_REPLAY === "1" ? 550 : 2,
+          parentMiB: process.env.CLISBOT_TEST_LARGE_CLAUDE_REPLAY === "1" ? 550 : 2,
           childrenMiB: 0,
           children: 0,
         }),

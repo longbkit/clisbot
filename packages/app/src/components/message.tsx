@@ -27,10 +27,10 @@ import { getDefaultMarkdownClipboardEnvironment } from "@/utils/rich-clipboard-d
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { useTargetAgentTitle } from "@/tool-calls/use-target-agent-title";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { AgentMessage } from "@getpaseo/protocol/agent-message";
-import type { AgentCapabilityFlags, ToolCallDetail } from "@getpaseo/protocol/agent-types";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { AgentMessage } from "@clisbot/protocol/agent-message";
+import type { AgentCapabilityFlags, ToolCallDetail } from "@clisbot/protocol/agent-types";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import MaskedView from "@react-native-masked-view/masked-view";
 import {
   Check,
@@ -125,8 +125,8 @@ function useDisableOuterSpacing(disableOuterSpacing: boolean | undefined) {
   return disableOuterSpacing ?? contextValue;
 }
 
-const WEB_TOOLCALL_SHIMMER_KEYFRAME_ID = "paseo-toolcall-shimmer-keyframes";
-const WEB_TOOLCALL_SHIMMER_ANIMATION_NAME = "paseo-toolcall-shimmer";
+const WEB_TOOLCALL_SHIMMER_KEYFRAME_ID = "clisbot-toolcall-shimmer-keyframes";
+const WEB_TOOLCALL_SHIMMER_ANIMATION_NAME = "clisbot-toolcall-shimmer";
 const ThemedMicVocal = withUnistyles(MicVocal);
 const ThemedFileSymlinkIcon = withUnistyles(FileSymlink);
 const ThemedTriangleAlertIcon = withUnistyles(TriangleAlertIcon);
@@ -148,10 +148,10 @@ const warningColorMapping = (theme: Theme) => ({ color: theme.colors.palette.amb
 const WEB_TOOLCALL_SHIMMER_KEYFRAME_CSS = `
   @keyframes ${WEB_TOOLCALL_SHIMMER_ANIMATION_NAME} {
     0% {
-      background-position: var(--paseo-shimmer-start, -200px) 0;
+      background-position: var(--clisbot-shimmer-start, -200px) 0;
     }
     100% {
-      background-position: var(--paseo-shimmer-end, 200px) 0;
+      background-position: var(--clisbot-shimmer-end, 200px) 0;
     }
   }
 `;
@@ -1858,8 +1858,8 @@ function buildShimmerTextStyle(input: {
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     animation: `${WEB_TOOLCALL_SHIMMER_ANIMATION_NAME} ${input.shimmerDuration}s linear infinite`,
-    "--paseo-shimmer-start": `${input.webShimmerTrackStart - input.offsetX}px`,
-    "--paseo-shimmer-end": `${input.webShimmerTrackEnd - input.offsetX}px`,
+    "--clisbot-shimmer-start": `${input.webShimmerTrackStart - input.offsetX}px`,
+    "--clisbot-shimmer-end": `${input.webShimmerTrackEnd - input.offsetX}px`,
   });
 }
 

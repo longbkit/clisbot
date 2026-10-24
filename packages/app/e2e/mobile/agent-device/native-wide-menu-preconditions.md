@@ -13,12 +13,12 @@ For tab scrolling, first create enough tabs for actual horizontal overflow. The 
 Android Pixel Tablet API 36.1:
 
 ```sh
-agent-device replay packages/app/e2e/mobile/agent-device/native-wide-context-meter.android.ad --platform android --device paseo-tablet-p1-api36 --env OTHER_AGENT_ID=<other-agent-id>
-agent-device replay packages/app/e2e/mobile/agent-device/native-wide-agent-tab-menu.android.ad --platform android --device paseo-tablet-p1-api36 --env AGENT_ID=<existing-agent-id> --env TAB_ID=<existing-tab-id>
-agent-device replay packages/app/e2e/mobile/agent-device/native-wide-sidebar-rename.android.ad --platform android --device paseo-tablet-p1-api36 --env WORKSPACE_KEY=<selected-workspace-key>
-agent-device replay packages/app/e2e/mobile/agent-device/native-wide-tooltip-dismissal.android.yaml --maestro --platform android --device paseo-tablet-p1-api36
-agent-device replay packages/app/e2e/mobile/agent-device/native-wide-overlay-dismissal.android.yaml --maestro --platform android --device paseo-tablet-p1-api36 --env AGENT_ID=<existing-agent-id> --env TAB_ID=<existing-tab-id> --env WORKSPACE_KEY=<selected-workspace-key>
-agent-device replay packages/app/e2e/mobile/agent-device/native-wide-tab-scroll.android.ad --platform android --device paseo-tablet-p1-api36 --env DRAFT_ID=<visible-draft-id> --env AGENT_ID=<existing-agent-id> --env OTHER_AGENT_ID=<other-agent-id> --env TAB_ID=<existing-tab-id>
+agent-device replay packages/app/e2e/mobile/agent-device/native-wide-context-meter.android.ad --platform android --device clisbot-tablet-p1-api36 --env OTHER_AGENT_ID=<other-agent-id>
+agent-device replay packages/app/e2e/mobile/agent-device/native-wide-agent-tab-menu.android.ad --platform android --device clisbot-tablet-p1-api36 --env AGENT_ID=<existing-agent-id> --env TAB_ID=<existing-tab-id>
+agent-device replay packages/app/e2e/mobile/agent-device/native-wide-sidebar-rename.android.ad --platform android --device clisbot-tablet-p1-api36 --env WORKSPACE_KEY=<selected-workspace-key>
+agent-device replay packages/app/e2e/mobile/agent-device/native-wide-tooltip-dismissal.android.yaml --maestro --platform android --device clisbot-tablet-p1-api36
+agent-device replay packages/app/e2e/mobile/agent-device/native-wide-overlay-dismissal.android.yaml --maestro --platform android --device clisbot-tablet-p1-api36 --env AGENT_ID=<existing-agent-id> --env TAB_ID=<existing-tab-id> --env WORKSPACE_KEY=<selected-workspace-key>
+agent-device replay packages/app/e2e/mobile/agent-device/native-wide-tab-scroll.android.ad --platform android --device clisbot-tablet-p1-api36 --env DRAFT_ID=<visible-draft-id> --env AGENT_ID=<existing-agent-id> --env OTHER_AGENT_ID=<other-agent-id> --env TAB_ID=<existing-tab-id>
 ```
 
 iPad Pro 11-inch (M5), iOS 26.5, from the Namespace Mac checkout:

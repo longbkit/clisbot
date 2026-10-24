@@ -1,21 +1,21 @@
 import type { AgentSessionConfig, McpServerConfig } from "./agent-sdk-types.js";
 
-const PASEO_MCP_SERVER_NAME = "paseo";
-const PASEO_MCP_PATHNAME = "/mcp/agents";
+const CLISBOT_MCP_SERVER_NAME = "clisbot";
+const CLISBOT_MCP_PATHNAME = "/mcp/agents";
 
-export function stripInternalPaseoMcpServer(config: AgentSessionConfig): AgentSessionConfig {
+export function stripInternalClisbotMcpServer(config: AgentSessionConfig): AgentSessionConfig {
   const mcpServers = config.mcpServers;
   if (!mcpServers) {
     return config;
   }
 
-  const paseoServer = mcpServers[PASEO_MCP_SERVER_NAME];
-  if (!paseoServer || !isInternalPaseoMcpServer(paseoServer)) {
+  const clisbotServer = mcpServers[CLISBOT_MCP_SERVER_NAME];
+  if (!clisbotServer || !isInternalClisbotMcpServer(clisbotServer)) {
     return config;
   }
 
   const nextMcpServers = { ...mcpServers };
-  delete nextMcpServers[PASEO_MCP_SERVER_NAME];
+  delete nextMcpServers[CLISBOT_MCP_SERVER_NAME];
 
   const next = { ...config };
   if (Object.keys(nextMcpServers).length > 0) {
@@ -26,7 +26,7 @@ export function stripInternalPaseoMcpServer(config: AgentSessionConfig): AgentSe
   return next;
 }
 
-export function withRuntimePaseoMcpServer(params: {
+export function withRuntimeClisbotMcpServer(params: {
   config: AgentSessionConfig;
   agentId: string;
   mcpBaseUrl: string | null;
@@ -37,15 +37,15 @@ export function withRuntimePaseoMcpServer(params: {
    */
   mcpAuthToken: string | null;
 }): AgentSessionConfig {
-  const storedConfig = stripInternalPaseoMcpServer(params.config);
-  if (!params.mcpBaseUrl || storedConfig.mcpServers?.[PASEO_MCP_SERVER_NAME]) {
+  const storedConfig = stripInternalClisbotMcpServer(params.config);
+  if (!params.mcpBaseUrl || storedConfig.mcpServers?.[CLISBOT_MCP_SERVER_NAME]) {
     return storedConfig;
   }
 
   return {
     ...storedConfig,
     mcpServers: {
-      [PASEO_MCP_SERVER_NAME]: {
+      [CLISBOT_MCP_SERVER_NAME]: {
         type: "http",
         url: `${params.mcpBaseUrl}?callerAgentId=${params.agentId}`,
         ...(params.mcpAuthToken
@@ -57,13 +57,13 @@ export function withRuntimePaseoMcpServer(params: {
   };
 }
 
-function isInternalPaseoMcpServer(config: McpServerConfig): boolean {
+function isInternalClisbotMcpServer(config: McpServerConfig): boolean {
   if (config.type !== "http" && config.type !== "sse") {
     return false;
   }
 
   try {
-    return new URL(config.url).pathname === PASEO_MCP_PATHNAME;
+    return new URL(config.url).pathname === CLISBOT_MCP_PATHNAME;
   } catch {
     return false;
   }

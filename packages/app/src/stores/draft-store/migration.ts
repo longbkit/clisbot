@@ -45,7 +45,7 @@ const LegacyReviewAttachmentSchema = z.strictObject({
   commentCount: z.number().int().nonnegative(),
   attachment: z.strictObject({
     type: z.literal("review"),
-    mimeType: z.literal("application/paseo-review"),
+    mimeType: z.literal("application/clisbot-review"),
     cwd: z.string(),
     mode: z.enum(["uncommitted", "base"]),
     baseRef: z.string().nullable().optional(),

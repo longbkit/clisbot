@@ -1,4 +1,4 @@
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { InstalledPlugin } from "../types";
@@ -16,7 +16,7 @@ function plugin(input: {
     locale: "en",
     i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
     queryClient: new QueryClient(),
-    paseo: {} as InstalledPlugin["paseo"],
+    clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
     cleanup: () => {},
     settingsScreens: [],

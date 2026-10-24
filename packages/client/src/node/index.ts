@@ -3,11 +3,11 @@ import { HostTransportBudget } from "./buffering.js";
 export { HostTransportBudget } from "./buffering.js";
 import { homedir } from "node:os";
 import { WebSocket } from "ws";
-import { parseHostTarget, type HostTarget } from "@getpaseo/protocol/host-target";
+import { parseHostTarget, type HostTarget } from "@clisbot/protocol/host-target";
 import { createSshTunnel, type SshTunnel } from "./ssh-tunnel.js";
 import { createWebSocketTransportFactory } from "../daemon-client-websocket-transport.js";
 import { createRelayE2eeTransportFactory } from "../daemon-client-relay-e2ee-transport.js";
-import type { SecurityMode } from "@getpaseo/relay/e2ee";
+import type { SecurityMode } from "@clisbot/relay/e2ee";
 import type {
   DaemonTransport,
   DaemonTransportFactory,

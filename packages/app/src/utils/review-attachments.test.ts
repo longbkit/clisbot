@@ -11,7 +11,7 @@ describe("buildGitHubAttachmentFromSearchItem", () => {
       kind: "change_request",
       number: 123,
       title: "Fix race in worktree setup",
-      url: "https://github.com/getpaseo/paseo/pull/123",
+      url: "https://github.com/longbkit/clisbot/pull/123",
       state: "OPEN",
       body: "PR body",
       labels: ["bug"],
@@ -21,11 +21,11 @@ describe("buildGitHubAttachmentFromSearchItem", () => {
 
     expect(attachment).toEqual({
       type: "forge_change_request",
-      mimeType: "application/paseo-forge-change-request",
+      mimeType: "application/clisbot-forge-change-request",
       forge: "github",
       number: 123,
       title: "Fix race in worktree setup",
-      url: "https://github.com/getpaseo/paseo/pull/123",
+      url: "https://github.com/longbkit/clisbot/pull/123",
       body: "PR body",
       baseRefName: "main",
       headRefName: "fix/worktree-race",
@@ -37,7 +37,7 @@ describe("buildGitHubAttachmentFromSearchItem", () => {
       kind: "issue",
       number: 55,
       title: "Improve startup error details",
-      url: "https://github.com/getpaseo/paseo/issues/55",
+      url: "https://github.com/longbkit/clisbot/issues/55",
       state: "OPEN",
       body: "Issue body",
       labels: ["bug"],
@@ -45,11 +45,11 @@ describe("buildGitHubAttachmentFromSearchItem", () => {
 
     expect(attachment).toEqual({
       type: "forge_issue",
-      mimeType: "application/paseo-forge-issue",
+      mimeType: "application/clisbot-forge-issue",
       forge: "github",
       number: 55,
       title: "Improve startup error details",
-      url: "https://github.com/getpaseo/paseo/issues/55",
+      url: "https://github.com/longbkit/clisbot/issues/55",
       body: "Issue body",
     });
   });
@@ -65,7 +65,7 @@ describe("buildLegacyGitHubAttachmentFromSearchItem", () => {
       kind: "change_request",
       number: 123,
       title: "Fix race in worktree setup",
-      url: "https://github.com/getpaseo/paseo/pull/123",
+      url: "https://github.com/longbkit/clisbot/pull/123",
       state: "OPEN",
       body: "PR body",
       labels: ["bug"],
@@ -78,7 +78,7 @@ describe("buildLegacyGitHubAttachmentFromSearchItem", () => {
       mimeType: "application/github-pr",
       number: 123,
       title: "Fix race in worktree setup",
-      url: "https://github.com/getpaseo/paseo/pull/123",
+      url: "https://github.com/longbkit/clisbot/pull/123",
       body: "PR body",
       baseRefName: "main",
       headRefName: "fix/worktree-race",

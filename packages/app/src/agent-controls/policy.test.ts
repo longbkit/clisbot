@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentMode } from "@getpaseo/protocol/agent-types";
+import type { AgentMode } from "@clisbot/protocol/agent-types";
 import { isPlanningAgentMode, resolveNonPlanningModeId } from "./policy";
 
 describe("isPlanningAgentMode", () => {

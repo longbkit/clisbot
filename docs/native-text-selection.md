@@ -4,7 +4,7 @@ Keep completed assistant prose in one native text view so selection crosses para
 
 ## Android inverted chat
 
-Keep selection visibility handling in `modules/paseo-scroll`. Android's visibility
+Keep selection visibility handling in `modules/clisbot-scroll`. Android's visibility
 rectangles ignore list inversion. React Native decomposes Android's `scale: -1`
 into rotation with positive `scaleY`, so test the composed matrix when deciding
 whether those requests should move the viewport. Native tests must apply the

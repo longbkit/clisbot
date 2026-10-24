@@ -15,7 +15,7 @@ import {
   WORKSPACE_LABEL_COLORS,
   type WorkspaceLabelColor,
   type WorkspaceLabelDefinition,
-} from "@getpaseo/protocol/workspace-labels";
+} from "@clisbot/protocol/workspace-labels";
 import {
   MenuHint,
   MenuItem,

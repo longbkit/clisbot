@@ -36,19 +36,19 @@ const COMMUNITY = [
     name: "Discord",
     icon: <DiscordIcon className="h-6 w-6" />,
     body: "discord",
-    href: "https://discord.gg/jz8T2uahpH",
+    href: "https://discord.gg/awGmcmFXC",
   },
   {
     name: "GitHub",
     icon: <GitHubIcon className="h-6 w-6" />,
     body: "github",
-    href: "https://github.com/getpaseo/paseo",
+    href: "https://github.com/longbkit/clisbot",
   },
   {
     name: "Reddit",
     icon: <RedditIcon className="h-6 w-6" />,
     body: "reddit",
-    href: "https://www.reddit.com/r/PaseoAI/",
+    href: "https://www.reddit.com/r/ClisbotAI/",
   },
 ] as const;
 

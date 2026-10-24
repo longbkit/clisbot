@@ -1,14 +1,14 @@
 import { watchdog } from "@/watchdog";
-import type { DaemonClientTrace } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClientTrace } from "@clisbot/client/internal/daemon-client";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { isProfileBuild } from "@/constants/build-profile";
 
-interface PaseoNativeTraceModule {
+interface ClisbotNativeTraceModule {
   beginSection(name: string): void;
   endSection(): void;
 }
 
-const traceModule = requireOptionalNativeModule<PaseoNativeTraceModule>("PaseoNativeTrace");
+const traceModule = requireOptionalNativeModule<ClisbotNativeTraceModule>("ClisbotNativeTrace");
 
 const nativeSink: DaemonClientTrace | null =
   isProfileBuild && traceModule

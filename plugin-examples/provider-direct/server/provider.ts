@@ -8,7 +8,7 @@ import {
   type ProviderPersistence,
   type ProviderRegistration,
   type ProviderSessionConfig,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { randomUUID } from "node:crypto";
 import { providerResultKind } from "../shared/provider-result.js";
 
@@ -36,7 +36,7 @@ export function createDirectExampleProvider(): ProviderRegistration {
   return {
     id: "direct-example",
     label: "Direct provider example",
-    description: "A complete provider implemented directly against Paseo's provider boundary",
+    description: "A complete provider implemented directly against Clisbot's provider boundary",
     icon: "icon.svg",
     async connect(request) {
       if (!request.versions.includes(1)) throw new Error("Provider protocol version 1 is required");

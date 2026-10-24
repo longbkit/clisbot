@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { openSettings } from "./app";
 import { openHostSection, openSettingsHost, seedSavedSettingsHosts } from "./settings";

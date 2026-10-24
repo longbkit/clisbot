@@ -90,8 +90,8 @@ async function mergeFeatureIntoBaseWorktree(baseName: string): Promise<void> {
   try {
     mkdirSync(base);
     git({ cwd: base, args: ["init", "-b", "main"] });
-    git({ cwd: base, args: ["config", "user.name", "Paseo Test"] });
-    git({ cwd: base, args: ["config", "user.email", "test@paseo.local"] });
+    git({ cwd: base, args: ["config", "user.name", "Clisbot Test"] });
+    git({ cwd: base, args: ["config", "user.email", "test@clisbot.local"] });
     git({ cwd: base, args: ["config", "commit.gpgsign", "false"] });
     git({ cwd: base, args: ["config", "core.autocrlf", "false"] });
     git({ cwd: base, args: ["commit", "--allow-empty", "-m", "base"] });
@@ -128,8 +128,8 @@ test("merges into a local base branch without another worktree", async () => {
   }
   try {
     git(["init", "-b", "main"]);
-    git(["config", "user.name", "Paseo Test"]);
-    git(["config", "user.email", "test@paseo.local"]);
+    git(["config", "user.name", "Clisbot Test"]);
+    git(["config", "user.email", "test@clisbot.local"]);
     git(["config", "commit.gpgsign", "false"]);
     git(["commit", "--allow-empty", "-m", "base"]);
     git(["checkout", "-b", "feature"]);
@@ -337,7 +337,7 @@ test("returns isGit false for non-git directory", async () => {
   rmSync(cwd, { recursive: true, force: true });
 }, 60000); // 1 minute timeout
 
-test("runs paseo.json setup asynchronously and reports workspace status", async () => {
+test("runs clisbot.json setup asynchronously and reports workspace status", async () => {
   const repoRoot = tmpCwd();
 
   const { execSync } = await import("child_process");
@@ -357,13 +357,13 @@ test("runs paseo.json setup asynchronously and reports workspace status", async 
   execSync("git branch -M main", { cwd: repoRoot, stdio: "pipe" });
 
   const setupCommand =
-    'while [ ! -f "$PASEO_WORKTREE_PATH/allow-setup" ]; do sleep 0.05; done; echo "done" > "$PASEO_WORKTREE_PATH/setup-done.txt"';
+    'while [ ! -f "$CLISBOT_WORKTREE_PATH/allow-setup" ]; do sleep 0.05; done; echo "done" > "$CLISBOT_WORKTREE_PATH/setup-done.txt"';
   writeFileSync(
-    path.join(repoRoot, "paseo.json"),
+    path.join(repoRoot, "clisbot.json"),
     JSON.stringify({ worktree: { setup: [setupCommand] } }),
   );
-  execSync("git add paseo.json", { cwd: repoRoot, stdio: "pipe" });
-  execSync("git -c commit.gpgsign=false commit -m 'add paseo.json'", {
+  execSync("git add clisbot.json", { cwd: repoRoot, stdio: "pipe" });
+  execSync("git -c commit.gpgsign=false commit -m 'add clisbot.json'", {
     cwd: repoRoot,
     stdio: "pipe",
   });
@@ -381,7 +381,7 @@ test("runs paseo.json setup asynchronously and reports workspace status", async 
     label: "createAgent should not block on setup",
   });
 
-  expect(agent.cwd).toContain(path.join(".paseo", "worktrees"));
+  expect(agent.cwd).toContain(path.join(".clisbot", "worktrees"));
   expect(existsSync(path.join(agent.cwd, "setup-done.txt"))).toBe(false);
 
   writeFileSync(path.join(agent.cwd, "allow-setup"), "ok\n");
@@ -418,9 +418,9 @@ test("bootstraps configured worktree terminals after setup succeeds", async () =
     execSync("git branch -M main", { cwd: repoRoot, stdio: "pipe" });
 
     const setupCommand =
-      'while [ ! -f "$PASEO_WORKTREE_PATH/allow-setup" ]; do sleep 0.05; done; echo "done" > "$PASEO_WORKTREE_PATH/setup-done.txt"; echo "$PASEO_WORKTREE_PORT" > "$PASEO_WORKTREE_PATH/setup-port.txt"';
+      'while [ ! -f "$CLISBOT_WORKTREE_PATH/allow-setup" ]; do sleep 0.05; done; echo "done" > "$CLISBOT_WORKTREE_PATH/setup-done.txt"; echo "$CLISBOT_WORKTREE_PORT" > "$CLISBOT_WORKTREE_PATH/setup-port.txt"';
     writeFileSync(
-      path.join(repoRoot, "paseo.json"),
+      path.join(repoRoot, "clisbot.json"),
       JSON.stringify({
         worktree: {
           setup: [setupCommand],
@@ -436,7 +436,7 @@ test("bootstraps configured worktree terminals after setup succeeds", async () =
         },
       }),
     );
-    execSync("git add paseo.json", { cwd: repoRoot, stdio: "pipe" });
+    execSync("git add clisbot.json", { cwd: repoRoot, stdio: "pipe" });
     execSync("git -c commit.gpgsign=false commit -m 'add setup and terminals'", {
       cwd: repoRoot,
       stdio: "pipe",
@@ -455,7 +455,7 @@ test("bootstraps configured worktree terminals after setup succeeds", async () =
       label: "createAgent should not block on setup",
     });
 
-    expect(agent.cwd).toContain(path.join(".paseo", "worktrees"));
+    expect(agent.cwd).toContain(path.join(".clisbot", "worktrees"));
     expect(existsSync(path.join(agent.cwd, "setup-done.txt"))).toBe(false);
     expect(existsSync(path.join(agent.cwd, "dev-terminal.txt"))).toBe(false);
     expect(existsSync(path.join(agent.cwd, "lint-terminal.txt"))).toBe(false);
@@ -502,7 +502,7 @@ test("bootstraps configured worktree terminals after setup succeeds", async () =
     }
     ctx.client.sendTerminalInput(manualTerminalId, {
       type: "input",
-      data: 'echo "$PASEO_WORKTREE_PORT" > "$PASEO_WORKTREE_PATH/manual-terminal-port.txt"\r',
+      data: 'echo "$CLISBOT_WORKTREE_PORT" > "$CLISBOT_WORKTREE_PATH/manual-terminal-port.txt"\r',
     });
     await waitForPathExists({
       targetPath: path.join(agent.cwd, "manual-terminal-port.txt"),
@@ -540,9 +540,9 @@ test("reports workspace setup failures without deleting the created worktree", a
   execSync("git branch -M main", { cwd: repoRoot, stdio: "pipe" });
 
   const setupCommand =
-    'echo "started" > "$PASEO_WORKTREE_PATH/setup-start.txt"; sleep 0.1; echo "boom" 1>&2; exit 7';
+    'echo "started" > "$CLISBOT_WORKTREE_PATH/setup-start.txt"; sleep 0.1; echo "boom" 1>&2; exit 7';
   writeFileSync(
-    path.join(repoRoot, "paseo.json"),
+    path.join(repoRoot, "clisbot.json"),
     JSON.stringify({
       worktree: {
         setup: [setupCommand],
@@ -555,7 +555,7 @@ test("reports workspace setup failures without deleting the created worktree", a
       },
     }),
   );
-  execSync("git add paseo.json", { cwd: repoRoot, stdio: "pipe" });
+  execSync("git add clisbot.json", { cwd: repoRoot, stdio: "pipe" });
   execSync("git -c commit.gpgsign=false commit -m 'add failing setup'", {
     cwd: repoRoot,
     stdio: "pipe",
@@ -574,7 +574,7 @@ test("reports workspace setup failures without deleting the created worktree", a
     label: "createAgent should not block on failing setup",
   });
 
-  expect(agent.cwd).toContain(path.join(".paseo", "worktrees"));
+  expect(agent.cwd).toContain(path.join(".clisbot", "worktrees"));
   expect(existsSync(agent.cwd)).toBe(true);
 
   const failed = await waitForWorkspaceSetup(agent.workspaceId!, "failed");
@@ -593,7 +593,7 @@ test("reports workspace setup failures without deleting the created worktree", a
   rmSync(repoRoot, { recursive: true, force: true });
 }, 60000);
 
-test("creates agent in ~/.paseo/worktrees/{hash} when worktree is requested", async () => {
+test("creates agent in ~/.clisbot/worktrees/{hash} when worktree is requested", async () => {
   const cwd = tmpCwd();
   const projectHash = await deriveWorktreeProjectHash(cwd);
 
@@ -622,7 +622,7 @@ test("creates agent in ~/.paseo/worktrees/{hash} when worktree is requested", as
   expect(agent.id).toBeTruthy();
   expect(agent.status).toBe("idle");
   expect(realpathSync(agent.cwd)).toBe(
-    realpathSync(path.join(ctx.daemon.paseoHome, "worktrees", projectHash, "worktree-test")),
+    realpathSync(path.join(ctx.daemon.clisbotHome, "worktrees", projectHash, "worktree-test")),
   );
   expect(existsSync(agent.cwd)).toBe(true);
 
@@ -651,7 +651,7 @@ test("archiving a worktree shuts down terminals and removes its final workspace 
 
   const teardownMarkerPath = path.join(repoRoot, "teardown-marker.txt");
   writeFileSync(
-    path.join(repoRoot, "paseo.json"),
+    path.join(repoRoot, "clisbot.json"),
     JSON.stringify({
       worktree: {
         terminals: [
@@ -660,11 +660,11 @@ test("archiving a worktree shuts down terminals and removes its final workspace 
             command: 'echo "dev-server" > dev-terminal.txt; tail -f /dev/null',
           },
         ],
-        teardown: [`echo "$PASEO_WORKTREE_PATH" > "${teardownMarkerPath}"`],
+        teardown: [`echo "$CLISBOT_WORKTREE_PATH" > "${teardownMarkerPath}"`],
       },
     }),
   );
-  execSync("git add paseo.json", { cwd: repoRoot, stdio: "pipe" });
+  execSync("git add clisbot.json", { cwd: repoRoot, stdio: "pipe" });
   execSync("git -c commit.gpgsign=false commit -m 'add worktree terminal + teardown'", {
     cwd: repoRoot,
     stdio: "pipe",
@@ -699,7 +699,7 @@ test("archiving a worktree shuts down terminals and removes its final workspace 
   const beforeArchiveDirectories = ctx.daemon.daemon.terminalManager.listDirectories();
   expect(beforeArchiveDirectories).toContain(agent.cwd);
 
-  const archive = await ctx.client.archivePaseoWorktree({
+  const archive = await ctx.client.archiveClisbotWorktree({
     worktreePath: agent.cwd,
   });
   expect(archive.error).toBeNull();

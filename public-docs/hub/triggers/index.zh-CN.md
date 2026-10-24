@@ -8,7 +8,7 @@ nav: 触发器
 
 触发器说明哪个 Provider 事件可以启动一个 workflow。[Hub workflow](/docs/hub/workflows) 页面介绍匹配之后运行的 step、输入、路由、提示词和截止时间。
 
-`.paseo/workflows/github-issue.yml`：
+`.clisbot/workflows/github-issue.yml`：
 
 ```yaml
 name: triage-issue
@@ -25,7 +25,7 @@ steps:
     agent: codex
     prompt:
       - text: Call hub.finish_execution when the step is complete.
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
 ```
 
 逐字段的说明见[配置参考](/docs/hub/configuration/hub-yml)。
@@ -38,7 +38,7 @@ steps:
 
 修改 daemon 或工作目录会重新加载这些选项。如果已有的触发器指定的模型、模式或思考选项不再由 daemon 报告，Hub 会把该值标记为不可用，但不会替换它。你可以保留原先编写的值、选择当前可用的值，或切换到 YAML 编辑。
 
-如果 daemon 离线或需要更新的 Paseo 版本，Agent 选择器会显示错误和重试操作。触发器的其余部分及其 YAML 仍然可以编辑。
+如果 daemon 离线或需要更新的 Clisbot 版本，Agent 选择器会显示错误和重试操作。触发器的其余部分及其 YAML 仍然可以编辑。
 
 ## 保存时会对照 daemon 检查 Agent {#saving-checks-the-agent-against-the-daemon}
 
@@ -50,13 +50,13 @@ run.agent.mode: Mode 'default' is not available for provider 'opencode'
 
 这项检查需要 daemon 已连接。daemon 离线时，新的触发器，以及对 daemon、工作目录或 Agent 的修改都无法保存；拒绝信息会指出是哪个 daemon。编辑已有触发器的提示词、过滤条件或限制则无论如何都能保存。
 
-无论在哪里编写触发器，都会运行相同的检查：控制台表单、它的 YAML 模式、`POST /api/v1/triggers/install`、`paseo hub init` 和 `paseo hub deploy`。
+无论在哪里编写触发器，都会运行相同的检查：控制台表单、它的 YAML 模式、`POST /api/v1/triggers/install`、`clisbot hub init` 和 `clisbot hub deploy`。
 
 ## 继续同一个 Agent {#continue-the-same-agent}
 
 控制台中的触发器默认为 **Same conversation**。同一个 Slack 或 Discord 线程中的消息、同一个 GitHub issue 或 Pull Request 上的事件，以及同一个 Linear issue 上的事件，都会在该项目中继续现有的 Agent。没有对话的事件会启动一个新的 Agent。
 
-如果 Agent 正忙，新的提示词会引导它当前的工作。每次到达都保留各自的输出限制和完成状态。如果可复用的工作区已被归档，Hub 会在发送提示词之前请 Paseo 恢复它。
+如果 Agent 正忙，新的提示词会引导它当前的工作。每次到达都保留各自的输出限制和完成状态。如果可复用的工作区已被归档，Hub 会在发送提示词之前请 Clisbot 恢复它。
 
 选择 **Custom key** 可以按某个输入对到达的事件分组，选择 **New agent** 则让它们彼此独立。自包含的触发器文档也可以表达同样的选择：
 

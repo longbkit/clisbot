@@ -70,7 +70,7 @@ function Release({ group }: { group: ChangelogReleaseGroup }) {
       <div id={releaseAnchor(group.version)} className="changelog-release-heading">
         <HeadingAnchor version={group.version} />
         <h2 className="changelog-release-title">
-          Paseo <span>{group.version}</span>
+          Clisbot <span>{group.version}</span>
         </h2>
       </div>
       <div className="changelog-patches">

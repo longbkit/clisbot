@@ -1,4 +1,4 @@
-import type { ProviderCatalog, ProviderLaunch } from "@getpaseo/plugin/server/provider";
+import type { ProviderCatalog, ProviderLaunch } from "@clisbot/plugin/server/provider";
 import type { z } from "zod";
 import { createHash } from "node:crypto";
 import { MspConnection } from "./connection.js";

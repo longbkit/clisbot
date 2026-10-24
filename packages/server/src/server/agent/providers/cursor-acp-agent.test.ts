@@ -399,7 +399,7 @@ describe("CursorACPAgentClient usage session", () => {
 async function withFakeACPAgent(
   run: (command: [string, ...string[]], cwd: string) => Promise<void>,
 ): Promise<void> {
-  const testDir = await mkdtemp(path.join(tmpdir(), "paseo-cursor-usage-"));
+  const testDir = await mkdtemp(path.join(tmpdir(), "clisbot-cursor-usage-"));
   try {
     const scriptPath = path.join(testDir, "fake-acp-agent.cjs");
     await writeFile(scriptPath, fakeACPAgentScript, "utf8");

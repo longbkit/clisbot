@@ -17,9 +17,9 @@ $.verbose = false;
 
 const pollIntervalMs = 100;
 const testEnv = {
-  PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: process.env.PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD ?? "0",
-  PASEO_DICTATION_ENABLED: process.env.PASEO_DICTATION_ENABLED ?? "0",
-  PASEO_VOICE_MODE_ENABLED: process.env.PASEO_VOICE_MODE_ENABLED ?? "0",
+  CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: process.env.CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD ?? "0",
+  CLISBOT_DICTATION_ENABLED: process.env.CLISBOT_DICTATION_ENABLED ?? "0",
+  CLISBOT_VOICE_MODE_ENABLED: process.env.CLISBOT_VOICE_MODE_ENABLED ?? "0",
 };
 
 function sleep(ms: number): Promise<void> {
@@ -66,9 +66,9 @@ interface DaemonStatus {
   pid: number | null;
 }
 
-async function readDaemonStatus(paseoHome: string): Promise<DaemonStatus> {
+async function readDaemonStatus(clisbotHome: string): Promise<DaemonStatus> {
   const result =
-    await $`PASEO_HOME=${paseoHome} PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD=${testEnv.PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD} PASEO_DICTATION_ENABLED=${testEnv.PASEO_DICTATION_ENABLED} PASEO_VOICE_MODE_ENABLED=${testEnv.PASEO_VOICE_MODE_ENABLED} npx paseo daemon status --home ${paseoHome} --json`.nothrow();
+    await $`CLISBOT_HOME=${clisbotHome} CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD=${testEnv.CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD} CLISBOT_DICTATION_ENABLED=${testEnv.CLISBOT_DICTATION_ENABLED} CLISBOT_VOICE_MODE_ENABLED=${testEnv.CLISBOT_VOICE_MODE_ENABLED} npx clisbot daemon status --home ${clisbotHome} --json`.nothrow();
   if (result.exitCode !== 0) {
     return { localDaemon: null, pid: null };
   }
@@ -124,14 +124,14 @@ function waitForProcessExit(processRef: ChildProcess, timeoutMs: number): Promis
 console.log("=== Daemon SIGINT (supervisor regression) ===\n");
 
 const port = await getAvailablePort();
-const paseoHome = await mkdtemp(join(tmpdir(), "paseo-sigint-supervisor-"));
+const clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-sigint-supervisor-"));
 const cliRoot = join(import.meta.dirname, "..");
 
 let supervisorProcess: ChildProcess | null = null;
 let recentSupervisorLogs = "";
 
 try {
-  console.log("Test 1: start supervisor-entrypoint in dev mode with isolated PASEO_HOME");
+  console.log("Test 1: start supervisor-entrypoint in dev mode with isolated CLISBOT_HOME");
 
   supervisorProcess = spawn(
     process.execPath,
@@ -141,9 +141,9 @@ try {
       env: {
         ...process.env,
         ...testEnv,
-        PASEO_HOME: paseoHome,
-        PASEO_LISTEN: `127.0.0.1:${port}`,
-        PASEO_RELAY_ENABLED: "false",
+        CLISBOT_HOME: clisbotHome,
+        CLISBOT_LISTEN: `127.0.0.1:${port}`,
+        CLISBOT_RELAY_ENABLED: "false",
         CI: "true",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -160,7 +160,7 @@ try {
 
   await waitFor(
     async () => {
-      const status = await readDaemonStatus(paseoHome);
+      const status = await readDaemonStatus(clisbotHome);
       return (
         status.localDaemon === "running" && status.pid !== null && isProcessRunning(status.pid)
       );
@@ -188,7 +188,7 @@ try {
 
   await waitFor(
     async () => {
-      const status = await readDaemonStatus(paseoHome);
+      const status = await readDaemonStatus(clisbotHome);
       return status.localDaemon === "stopped";
     },
     15000,
@@ -223,8 +223,8 @@ try {
     });
   }
 
-  await $`PASEO_HOME=${paseoHome} PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD=${testEnv.PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD} PASEO_DICTATION_ENABLED=${testEnv.PASEO_DICTATION_ENABLED} PASEO_VOICE_MODE_ENABLED=${testEnv.PASEO_VOICE_MODE_ENABLED} npx paseo daemon stop --home ${paseoHome} --force`.nothrow();
-  await rm(paseoHome, { recursive: true, force: true });
+  await $`CLISBOT_HOME=${clisbotHome} CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD=${testEnv.CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD} CLISBOT_DICTATION_ENABLED=${testEnv.CLISBOT_DICTATION_ENABLED} CLISBOT_VOICE_MODE_ENABLED=${testEnv.CLISBOT_VOICE_MODE_ENABLED} npx clisbot daemon stop --home ${clisbotHome} --force`.nothrow();
+  await rm(clisbotHome, { recursive: true, force: true });
 }
 
 if (recentSupervisorLogs.trim().length === 0) {

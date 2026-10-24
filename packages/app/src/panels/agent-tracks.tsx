@@ -1,4 +1,4 @@
-import type { AgentAddress } from "@getpaseo/protocol/addresses";
+import type { AgentAddress } from "@clisbot/protocol/addresses";
 import { memo, useCallback, type ReactElement } from "react";
 import { WorkspaceDiffStatPill } from "@/composer/diff-stat-pill";
 import { useWorkspaceHasDiffStat } from "@/composer/workspace-diff-stat";

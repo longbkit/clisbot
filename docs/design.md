@@ -6,7 +6,7 @@ Tokens — every color, font size, weight, spacing step, radius, icon size — l
 
 ## 1. Character
 
-Paseo is minimal, spacious, quiet, confident. Whitespace is deliberate. Nothing crowds, nothing decorates, nothing apologizes. A row, a label, a control. That is the bar.
+Clisbot is minimal, spacious, quiet, confident. Whitespace is deliberate. Nothing crowds, nothing decorates, nothing apologizes. A row, a label, a control. That is the bar.
 
 The app is calm so the user's work is not. Every visual decision serves either _act on this_ or _understand this_ — never _look at this_.
 
@@ -169,7 +169,7 @@ A new list+detail feature copies the settings shell. A new workspace-shaped feat
 
 ## 10. Copy and voice
 
-Sentence case. "Pair a device", "Danger zone", "Restart daemon", "Inject Paseo tools", "No sessions yet", "Load more". Proper nouns retain casing — Paseo, Beta, Stable, Local. Title case is wrong.
+Sentence case. "Pair a device", "Danger zone", "Restart daemon", "Inject Clisbot tools", "No sessions yet", "Load more". Proper nouns retain casing — Clisbot, Beta, Stable, Local. Title case is wrong.
 
 No trailing periods on row titles, labels, or buttons. No trailing period on a single-clause hint: "What happens when you press Enter while the agent is running" (`packages/app/src/screens/settings-screen.tsx:271-272`). Periods exist inside multi-sentence prose: "Restarts the daemon process. The app will reconnect automatically."
 
@@ -249,7 +249,7 @@ New status pills use `<StatusBadge>`. Identity, shortcut, and interactive link b
 
 - `fontWeight.medium` on row titles, body text, button labels, badge text, or `<SidebarCallout>` titles. Medium is reserved for the structural-label tier described in §3 — section labels, modal/sheet titles, dense metadata emphasis, and tight action labels. Anything else is `normal`. `<ScreenTitle>` is responsive `400/300` and is never overridden.
 - `<Pressable>` wrapping `<Text>` to make a button. `<Button>` exists.
-- Importing `Pressable` or a `Touchable*` outside `components/ui/`. A raw pressable has no standard press or hover feedback, so every one drifts. `paseo/no-raw-pressable` reports it; the files on its burn-down list in `.oxlintrc.json` may only leave it.
+- Importing `Pressable` or a `Touchable*` outside `components/ui/`. A raw pressable has no standard press or hover feedback, so every one drifts. `clisbot/no-raw-pressable` reports it; the files on its burn-down list in `.oxlintrc.json` may only leave it.
 - Bare `<Text>` for a section header inside settings. `<SettingsSection>` exists.
 - A muted paragraph between a section header and its card. Section-level explanation is the header's `info` tooltip (§7).
 - A "Settings" CTA on a detail page. Detail pages are settings; settings is reached from the sidebar, the host entry, or a row's kebab menu.

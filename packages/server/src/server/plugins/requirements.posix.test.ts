@@ -16,12 +16,12 @@ async function directory() {
   roots.push(root);
   return root;
 }
-async function writePlugin(root: string, paseo?: string, build?: string[][]) {
+async function writePlugin(root: string, clisbot?: string, build?: string[][]) {
   await writeFile(
-    path.join(root, "paseo-plugin.json"),
+    path.join(root, "clisbot-plugin.json"),
     JSON.stringify({
       id: "example",
-      requirements: paseo === undefined ? undefined : { paseo },
+      requirements: clisbot === undefined ? undefined : { clisbot },
       build,
     }),
   );
@@ -69,7 +69,7 @@ it("rejects incompatible installs without persisting them, then accepts the corr
     status: "running",
   });
   expect(service.catalog()).toEqual([
-    { id: "example", requirements: { paseo: "^0.8.0" }, clientBundle: expect.any(String) },
+    { id: "example", requirements: { clisbot: "^0.8.0" }, clientBundle: expect.any(String) },
   ]);
 });
 
@@ -80,13 +80,13 @@ it("marks pre-0.8 plugins failed on startup and recovers after migration and rel
   expect(await service.listPlugins()).toEqual([
     expect.objectContaining({
       status: "failed",
-      error: expect.stringContaining("https://paseo.sh/docs/plugins/migration"),
+      error: expect.stringContaining("https://clisbot.com/docs/plugins/migration"),
     }),
   ]);
   await writePlugin(root, ">=0.8.0");
   await expect(service.reloadPlugin("example")).resolves.toMatchObject({ status: "running" });
   await writePlugin(root, ">=0.9.0");
-  await expect(service.reloadPlugin("example")).rejects.toThrow("requires Paseo >=0.9.0");
+  await expect(service.reloadPlugin("example")).rejects.toThrow("requires Clisbot >=0.9.0");
   expect(service.catalog()).toEqual([]);
 });
 
@@ -97,14 +97,14 @@ it("still requires entry migration when an old plugin adds a compatible requirem
   await writeFile(path.join(root, "index.ts"), "export default () => () => {};");
   const { service } = await host();
   await expect(service.installDirectory({ path: root })).rejects.toThrow(
-    "https://paseo.sh/docs/plugins/migration",
+    "https://clisbot.com/docs/plugins/migration",
   );
 });
 
 it("rejects Git install and update before build commands, preserving the running revision", async () => {
   const repository = await directory();
   await runGitCommand(["init", "-b", "main"], { cwd: repository });
-  await runGitCommand(["config", "user.name", "Paseo Tests"], { cwd: repository });
+  await runGitCommand(["config", "user.name", "Clisbot Tests"], { cwd: repository });
   await runGitCommand(["config", "user.email", "tests@example.test"], { cwd: repository });
   const commit = async () => {
     await runGitCommand(["add", "-A"], { cwd: repository });
@@ -123,14 +123,14 @@ it("rejects Git install and update before build commands, preserving the running
   const [preview] = await service.previewUpdates({ pluginId: "example" });
   expect(preview).toMatchObject({ outcome: "update" });
   await expect(service.applyUpdates([preview!.proposal!])).resolves.toMatchObject([
-    { id: "example", outcome: "error", error: expect.stringContaining("requires Paseo >=0.9.0") },
+    { id: "example", outcome: "error", error: expect.stringContaining("requires Clisbot >=0.9.0") },
   ]);
   expect(await service.listPlugins()).toEqual([installed]);
   expect(service.catalog()).toHaveLength(1);
   expect(await readdir(path.join(home, "plugins", ".staging"))).toEqual([]);
   await expect(readFile(marker)).rejects.toMatchObject({ code: "ENOENT" });
   await expect(service.installSource({ source, id: "second" })).rejects.toThrow(
-    "requires Paseo >=0.9.0",
+    "requires Clisbot >=0.9.0",
   );
   await expect(readFile(marker)).rejects.toMatchObject({ code: "ENOENT" });
   expect(await service.listPlugins()).toEqual([installed]);

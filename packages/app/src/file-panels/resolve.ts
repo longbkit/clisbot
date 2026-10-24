@@ -16,7 +16,7 @@ export type FilePanelFiles = FilePanelSelector | "all";
 
 export interface FilePanelCandidate {
   id: string;
-  /** Paseo's own panel. Paseo asks which panel opens a file only when a plugin panel claims it. */
+  /** Clisbot's own panel. Clisbot asks which panel opens a file only when a plugin panel claims it. */
   builtin: boolean;
   files: FilePanelFiles;
   /** The only kind of file a built-in panel reads. Plugin panels are offered for any kind. */
@@ -107,7 +107,7 @@ function isBuiltinFloor(candidate: FilePanelCandidate): boolean {
   return candidate.builtin && candidate.files === "all";
 }
 
-/** Paseo asks which panel opens a file only when a plugin panel is one of several candidates. */
+/** Clisbot asks which panel opens a file only when a plugin panel is one of several candidates. */
 export function asksForFilePanel(candidates: readonly FilePanelCandidate[]): boolean {
   return candidates.length > 1 && candidates.some((candidate) => !candidate.builtin);
 }

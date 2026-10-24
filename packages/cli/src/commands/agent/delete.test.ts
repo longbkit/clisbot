@@ -51,7 +51,7 @@ vi.mock("../../utils/client.js", () => ({
     deleteAgent,
     close,
   })),
-  getDaemonHost: vi.fn(() => "ws://127.0.0.1:6767"),
+  getDaemonHost: vi.fn(() => "ws://127.0.0.1:6868"),
 }));
 
 describe("runDeleteCommand", () => {

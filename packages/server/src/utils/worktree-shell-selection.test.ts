@@ -78,7 +78,7 @@ describe("worktree shell selection", () => {
     try {
       mkdirSync(join(worktreePath, ".git"), { recursive: true });
       writeFileSync(
-        join(worktreePath, "paseo.json"),
+        join(worktreePath, "clisbot.json"),
         JSON.stringify({
           worktree: {
             teardown: ["Write-Output 'teardown'"],
@@ -131,7 +131,7 @@ describe("worktree shell selection", () => {
     process.env.BASH_ENV = "should-not-leak";
     try {
       writeFileSync(
-        join(worktreePath, "paseo.json"),
+        join(worktreePath, "clisbot.json"),
         JSON.stringify({
           worktree: {
             setup: ["Write-Output 'setup'"],
@@ -145,11 +145,11 @@ describe("worktree shell selection", () => {
         worktreePath,
         branchName: "main",
         runtimeEnv: {
-          PASEO_SOURCE_CHECKOUT_PATH: worktreePath,
-          PASEO_ROOT_PATH: worktreePath,
-          PASEO_WORKTREE_PATH: worktreePath,
-          PASEO_BRANCH_NAME: "main",
-          PASEO_WORKTREE_PORT: "12345",
+          CLISBOT_SOURCE_CHECKOUT_PATH: worktreePath,
+          CLISBOT_ROOT_PATH: worktreePath,
+          CLISBOT_WORKTREE_PATH: worktreePath,
+          CLISBOT_BRANCH_NAME: "main",
+          CLISBOT_WORKTREE_PORT: "12345",
         },
         onEvent: () => {},
       });

@@ -26,12 +26,12 @@ console.log(result.status, result.lastMessage);
 
 `waitForFinish()` 返回以下四种状态之一：
 
-| 状态         | 含义                                     |
-| ------------ | ---------------------------------------- |
-| `idle`       | 本轮已完成，Agent 可以接收下一条提示词。 |
-| `permission` | Agent 需要有人在 Paseo 中回应权限请求。  |
-| `error`      | Provider 以错误结束了本轮。              |
-| `timeout`    | 已超过等待截止时间；Agent 可能仍在运行。 |
+| 状态         | 含义                                      |
+| ------------ | ----------------------------------------- |
+| `idle`       | 本轮已完成，Agent 可以接收下一条提示词。  |
+| `permission` | Agent 需要有人在 Clisbot 中回应权限请求。 |
+| `error`      | Provider 以错误结束了本轮。               |
+| `timeout`    | 已超过等待截止时间；Agent 可能仍在运行。  |
 
 超时不会取消 Agent。
 

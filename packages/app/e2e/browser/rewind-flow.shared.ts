@@ -17,7 +17,8 @@ import {
   type RewindFlowProvider,
 } from "../support/helpers/rewind-flow";
 
-const FILE_PROMPT = "Use the Write tool to create ./qa.txt with the exact content: PASEO_QA_TOKEN";
+const FILE_PROMPT =
+  "Use the Write tool to create ./qa.txt with the exact content: CLISBOT_QA_TOKEN";
 
 interface RewindFlowCase {
   provider: RewindFlowProvider;
@@ -32,7 +33,7 @@ export function defineRewindFlowSpec(input: RewindFlowCase): void {
 
     test("rewinds conversation and file-write turns without transcript drift", async ({ page }) => {
       const cwd = realpathSync(
-        mkdtempSync(path.join(tmpdir(), `paseo-rewind-flow-${input.provider}-`)),
+        mkdtempSync(path.join(tmpdir(), `clisbot-rewind-flow-${input.provider}-`)),
       );
       let handle: AgentHandle | undefined;
 
@@ -61,7 +62,7 @@ export function defineRewindFlowSpec(input: RewindFlowCase): void {
         ]);
 
         await sendMessage(handle, FILE_PROMPT);
-        await assertFileContains(path.join(cwd, "qa.txt"), "PASEO_QA_TOKEN");
+        await assertFileContains(path.join(cwd, "qa.txt"), "CLISBOT_QA_TOKEN");
         await assertChatTranscript(handle, [
           { role: "user", text: "hello" },
           { role: "assistant", text: /.+/ },

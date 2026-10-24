@@ -3,7 +3,7 @@ import { generateDraftId } from "@/stores/draft-keys";
 import type {
   WorkspaceSetupSnapshot as SetupDetailSnapshot,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { create } from "zustand";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 

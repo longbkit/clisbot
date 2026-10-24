@@ -17,8 +17,8 @@ function createWorkspaceDescriptor(input: Partial<WorkspaceDescriptor> = {}): Wo
     createdAt: null,
     lastUserMessageAt: null,
     id: "/repo/main",
-    projectId: "remote:github.com/getpaseo/paseo",
-    projectDisplayName: "getpaseo/paseo",
+    projectId: "remote:github.com/longbkit/clisbot",
+    projectDisplayName: "longbkit/clisbot",
     projectRootPath: "/repo/main",
     workspaceDirectory: "/repo/main",
     projectKind: "git",
@@ -44,7 +44,7 @@ describe("workspace source of truth consumption", () => {
     });
 
     expect(header.title).toBe("feat/workspace-sot");
-    expect(header.subtitle).toBe("getpaseo/paseo");
+    expect(header.subtitle).toBe("longbkit/clisbot");
     expect(sidebarWorkspace.name).toBe(header.title);
     expect(sidebarWorkspace.statusBucket).toBe("running");
   });
@@ -106,7 +106,7 @@ describe("workspace source of truth consumption", () => {
     ).toEqual({
       kind: "ready",
       title: "feat/workspace-sot",
-      subtitle: "getpaseo/paseo",
+      subtitle: "longbkit/clisbot",
       isSubtitleDistinct: true,
       isGitCheckout: false,
       currentBranchName: null,
@@ -146,7 +146,7 @@ describe("workspace source of truth consumption", () => {
     ).toEqual({
       kind: "ready",
       title: "feat/workspace-sot",
-      subtitle: "getpaseo/paseo",
+      subtitle: "longbkit/clisbot",
       isSubtitleDistinct: true,
       isGitCheckout: true,
       currentBranchName: "feat/workspace-sot",
@@ -186,7 +186,7 @@ describe("workspace source of truth consumption", () => {
     ).toEqual({
       kind: "ready",
       title: "feat/workspace-sot",
-      subtitle: "getpaseo/paseo",
+      subtitle: "longbkit/clisbot",
       isSubtitleDistinct: true,
       isGitCheckout: false,
       currentBranchName: null,

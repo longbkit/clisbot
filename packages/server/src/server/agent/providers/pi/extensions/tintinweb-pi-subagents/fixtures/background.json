@@ -26,7 +26,7 @@
         "content": [
           {
             "type": "text",
-            "text": "Agent started in background.\nAgent ID: 98cdb309-045e-45d\nType: Agent\nDescription: list files\nOutput file: /tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output\n\nYou will be notified when this agent completes.\nUse get_subagent_result to retrieve full results, or steer_subagent to send it messages.\nDo not duplicate this agent's work."
+            "text": "Agent started in background.\nAgent ID: 98cdb309-045e-45d\nType: Agent\nDescription: list files\nOutput file: /tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output\n\nYou will be notified when this agent completes.\nUse get_subagent_result to retrieve full results, or steer_subagent to send it messages.\nDo not duplicate this agent's work."
           }
         ],
         "details": {
@@ -49,7 +49,7 @@
       "message": {
         "role": "custom",
         "customType": "subagent-notification",
-        "content": "<task-notification>\n<task-id>98cdb309-045e-45d</task-id>\n<tool-use-id>call_411074</tool-use-id>\n<output-file>/tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output</output-file>\n<status>Done</status>\n<summary>Agent \"list files\" completed</summary>\n<result>The workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty.</result>\n<usage><total_tokens>18642</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>5292</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
+        "content": "<task-notification>\n<task-id>98cdb309-045e-45d</task-id>\n<tool-use-id>call_411074</tool-use-id>\n<output-file>/tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output</output-file>\n<status>Done</status>\n<summary>Agent \"list files\" completed</summary>\n<result>The workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty.</result>\n<usage><total_tokens>18642</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>5292</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
         "display": true,
         "details": {
           "id": "98cdb309-045e-45d",
@@ -60,8 +60,8 @@
           "totalTokens": 18642,
           "totalCost": 0.015582600000000002,
           "durationMs": 5292,
-          "outputFile": "/tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
-          "resultPreview": "The workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty."
+          "outputFile": "/tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
+          "resultPreview": "The workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty."
         },
         "timestamp": 1790197702084
       }
@@ -113,7 +113,7 @@
       "content": [
         {
           "type": "text",
-          "text": "Agent started in background.\nAgent ID: 98cdb309-045e-45d\nType: Agent\nDescription: list files\nOutput file: /tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output\n\nYou will be notified when this agent completes.\nUse get_subagent_result to retrieve full results, or steer_subagent to send it messages.\nDo not duplicate this agent's work."
+          "text": "Agent started in background.\nAgent ID: 98cdb309-045e-45d\nType: Agent\nDescription: list files\nOutput file: /tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output\n\nYou will be notified when this agent completes.\nUse get_subagent_result to retrieve full results, or steer_subagent to send it messages.\nDo not duplicate this agent's work."
         }
       ],
       "details": {
@@ -134,7 +134,7 @@
     {
       "role": "custom",
       "customType": "subagent-notification",
-      "content": "<task-notification>\n<task-id>98cdb309-045e-45d</task-id>\n<tool-use-id>call_411074</tool-use-id>\n<output-file>/tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output</output-file>\n<status>Done</status>\n<summary>Agent \"list files\" completed</summary>\n<result>The workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty.</result>\n<usage><total_tokens>18642</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>5292</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
+      "content": "<task-notification>\n<task-id>98cdb309-045e-45d</task-id>\n<tool-use-id>call_411074</tool-use-id>\n<output-file>/tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output</output-file>\n<status>Done</status>\n<summary>Agent \"list files\" completed</summary>\n<result>The workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty.</result>\n<usage><total_tokens>18642</total_tokens><tool_uses>1</tool_uses><context_percent>1</context_percent><duration_ms>5292</duration_ms></usage>\n</task-notification>\nFull transcript available at: /tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
       "display": true,
       "details": {
         "id": "98cdb309-045e-45d",
@@ -145,8 +145,8 @@
         "totalTokens": 18642,
         "totalCost": 0.015582600000000002,
         "durationMs": 5292,
-        "outputFile": "/tmp/pi-subagents-1000/tmp-paseo-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
-        "resultPreview": "The workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty."
+        "outputFile": "/tmp/pi-subagents-1000/tmp-clisbot-pi-extension-phase3-workspace/01a0d018-fd1c-7ee8-bafa-16831f748cf1/tasks/98cdb309-045e-45d.output",
+        "resultPreview": "The workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty."
       },
       "timestamp": 1790197702084
     }

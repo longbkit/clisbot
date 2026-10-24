@@ -8,7 +8,7 @@ import { openChangesTreePanel } from "../support/helpers/workspace-tabs";
 
 const test = base.extend<{ projectWithTrailingSpace: string }>({
   projectWithTrailingSpace: async ({ e2eWorkerClient: client }, provide) => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-project-path-spaces-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-project-path-spaces-"));
     try {
       const repoPath = path.join(root, "repo ");
       execFileSync("git", ["init", "-b", "main", repoPath], { stdio: "pipe" });
@@ -16,9 +16,9 @@ const test = base.extend<{ projectWithTrailingSpace: string }>({
         "git",
         [
           "-c",
-          "user.name=Paseo Test",
+          "user.name=Clisbot Test",
           "-c",
-          "user.email=test@getpaseo.local",
+          "user.email=test@clisbot.local",
           "-c",
           "commit.gpgsign=false",
           "commit",

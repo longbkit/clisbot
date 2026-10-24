@@ -9,7 +9,7 @@ for (const path of PAGES) {
     const sponsors = page.getByRole("region", { name: "Sponsors", exact: true });
     await expect(sponsors.getByRole("link", { name: "Hoplite" })).toHaveAttribute(
       "href",
-      "https://hoplite.sh/?utm_source=paseo&utm_medium=website&utm_campaign=sponsor",
+      "https://hoplite.sh/?utm_source=clisbot&utm_medium=website&utm_campaign=sponsor",
     );
     await expect(sponsors.getByText("Cloud coding agents", { exact: true })).toBeVisible();
     await expect(sponsors.getByRole("link", { name: "Become a sponsor" })).toHaveAttribute(

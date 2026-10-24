@@ -5,9 +5,9 @@ import {
   getScriptConfigs,
   getWorktreeTerminalSpecs,
   isServiceScript,
-  paseoConfigParseError,
+  clisbotConfigParseError,
   processCarriageReturns,
-  readPaseoConfig,
+  readClisbotConfig,
   runWorktreeSetupCommands,
   type WorktreeConfig,
   type WorktreeSetupCommandResult,
@@ -27,7 +27,7 @@ import {
   requirePlannedWorkspaceServicePort,
   refreshWorkspaceServicePort,
 } from "./workspace-service-port-registry.js";
-import type { PaseoServicePortAllocation } from "@getpaseo/protocol/paseo-config-schema";
+import type { ClisbotServicePortAllocation } from "@clisbot/protocol/clisbot-config-schema";
 
 const MAX_WORKTREE_SETUP_COMMAND_OUTPUT_BYTES = 64 * 1024;
 const WORKTREE_SETUP_TRUNCATION_MARKER = "\n...<output truncated in the middle>...\n";
@@ -378,7 +378,7 @@ export interface SpawnWorkspaceScriptOptions {
   serviceProxy: ServiceProxySubsystem;
   runtimeStore: WorkspaceScriptRuntimeStore;
   terminalManager: TerminalManager;
-  globalServicePorts?: PaseoServicePortAllocation;
+  globalServicePorts?: ClisbotServicePortAllocation;
   logger?: Logger;
   onLifecycleChanged?: () => void;
 }
@@ -402,7 +402,7 @@ async function setupServiceScriptRoute(params: {
   serviceProxyPublicBaseUrl: string | null | undefined;
   existingRuntimeEntry: ReturnType<WorkspaceScriptRuntimeStore["get"]>;
   serviceProxy: ServiceProxySubsystem;
-  servicePortAllocation: PaseoServicePortAllocation | undefined;
+  servicePortAllocation: ClisbotServicePortAllocation | undefined;
 }): Promise<ServiceScriptSetupResult> {
   const {
     scriptConfigs,
@@ -545,14 +545,14 @@ export async function spawnWorkspaceScript(
     logger,
     onLifecycleChanged,
   } = options;
-  const configResult = readPaseoConfig(repoRoot);
+  const configResult = readClisbotConfig(repoRoot);
   if (!configResult.ok) {
-    throw paseoConfigParseError(configResult);
+    throw clisbotConfigParseError(configResult);
   }
   const scriptConfigs = getScriptConfigs(configResult.config);
   const config = scriptConfigs.get(scriptName);
   if (!config) {
-    throw new Error(`Script '${scriptName}' is not configured in paseo.json`);
+    throw new Error(`Script '${scriptName}' is not configured in clisbot.json`);
   }
 
   const serviceScript = isServiceScript(config);

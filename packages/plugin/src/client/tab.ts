@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { ZodType } from "zod";
 import type { PluginTab } from "./contracts.js";
 

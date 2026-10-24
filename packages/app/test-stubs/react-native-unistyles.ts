@@ -1,4 +1,4 @@
-import { lightHighlightColors } from "@getpaseo/highlight";
+import { lightHighlightColors } from "@clisbot/highlight";
 
 const testTheme = {
   colorScheme: "light",

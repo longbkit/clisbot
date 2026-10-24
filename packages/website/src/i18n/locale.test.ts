@@ -41,16 +41,16 @@ describe("pageMeta", () => {
     });
 
     expect(links).toEqual([
-      { rel: "canonical", href: "https://paseo.sh/zh-CN/docs/cli" },
-      { rel: "alternate", hrefLang: "en", href: "https://paseo.sh/docs/cli" },
-      { rel: "alternate", hrefLang: "zh-CN", href: "https://paseo.sh/zh-CN/docs/cli" },
-      { rel: "alternate", hrefLang: "x-default", href: "https://paseo.sh/docs/cli" },
+      { rel: "canonical", href: "https://clisbot.com/zh-CN/docs/cli" },
+      { rel: "alternate", hrefLang: "en", href: "https://clisbot.com/docs/cli" },
+      { rel: "alternate", hrefLang: "zh-CN", href: "https://clisbot.com/zh-CN/docs/cli" },
+      { rel: "alternate", hrefLang: "x-default", href: "https://clisbot.com/docs/cli" },
     ]);
     expect(meta).toEqual(
       expect.arrayContaining([
         { property: "og:locale", content: "zh_CN" },
         { property: "og:locale:alternate", content: "en_US" },
-        { property: "og:url", content: "https://paseo.sh/zh-CN/docs/cli" },
+        { property: "og:url", content: "https://clisbot.com/zh-CN/docs/cli" },
         { name: "twitter:title", content: "命令行" },
       ]),
     );

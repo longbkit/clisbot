@@ -22,7 +22,7 @@ const renderingPanels = [
 ] as const satisfies readonly FilePanelCandidate[];
 
 /**
- * Paseo's editor, the floor for text files: every text file no other built-in claims has it, so a
+ * Clisbot's editor, the floor for text files: every text file no other built-in claims has it, so a
  * text file always opens with some panel. A built-in that claims a file owns its source view.
  */
 export const sourceFilePanel = {

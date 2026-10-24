@@ -370,11 +370,11 @@ test("updates populated code and diff appearance without losing the editor insta
     await writeFile(`${workspace.repoPath}/appearance.ts`, source);
     await page.addInitScript(() => {
       localStorage.setItem(
-        "@paseo:app-settings",
+        "@clisbot:app-settings",
         JSON.stringify({ codeFontSize: 13, theme: "light" }),
       );
       localStorage.setItem(
-        "@paseo:changes-preferences",
+        "@clisbot:changes-preferences",
         JSON.stringify({ inlineDiff: true, layout: "unified" }),
       );
     });

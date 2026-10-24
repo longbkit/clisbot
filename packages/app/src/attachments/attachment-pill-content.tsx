@@ -9,7 +9,7 @@ import {
   MousePointer2,
 } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { WorkspaceComposerAttachment } from "@/attachments/types";
 import { getFileTypeLabel } from "@/attachments/file-types";
 import { isPullRequestContextAttachment } from "@/attachments/workspace-attachment-utils";

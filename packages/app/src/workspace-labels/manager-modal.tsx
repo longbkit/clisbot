@@ -13,7 +13,7 @@ import {
   workspaceLabelKey,
   type WorkspaceLabelColor,
   type WorkspaceLabelDefinition,
-} from "@getpaseo/protocol/workspace-labels";
+} from "@clisbot/protocol/workspace-labels";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { HostFilter } from "@/components/hosts/host-filter";
 import { Button } from "@/components/ui/button";

@@ -1,16 +1,16 @@
 ---
 title: Muse Code
-description: 为 Paseo 安装和配置 Muse Code。
+description: 为 Clisbot 安装和配置 Muse Code。
 nav: Muse Code
 ---
 
 # Muse Code {#muse-code}
 
-使用你现有的 Muse 安装和凭据，在 Paseo 中运行 Meta 的终端编程 Agent。
+使用你现有的 Muse 安装和凭据，在 Clisbot 中运行 Meta 的终端编程 Agent。
 
 ## 开始使用 {#getting-started}
 
-在运行 Paseo daemon 的机器上安装 Muse Code：
+在运行 Clisbot daemon 的机器上安装 Muse Code：
 
 ```bash
 curl -fsSL https://dev.meta.ai/install.sh | sh
@@ -19,11 +19,11 @@ muse login
 
 请使用 Muse 1.3.0 或更高版本。此集成已在 1.4.1 上验证。如需 API 访问，请在 daemon 的环境中设置 `META_API_KEY`，而不是登录。参见 [Provider 环境变量覆盖](/docs/custom-providers)。
 
-在 Paseo 中选择 **Muse Code**，然后选择模型、审批模式和推理强度。Paseo 运行 `muse serve`，并通过 Muse Session Protocol（MSP）通信。可用的模型由你的 Muse 配置决定。
+在 Clisbot 中选择 **Muse Code**，然后选择模型、审批模式和推理强度。Clisbot 运行 `muse serve`，并通过 Muse Session Protocol（MSP）通信。可用的模型由你的 Muse 配置决定。
 
 ## Provider 选项 {#provider-options}
 
-Paseo 启动 Muse 时会禁用沙箱（`--disable-sandbox`）并开启工作区信任（`--trust-workspace`）。Muse 可以使用你的 npm 缓存安装软件包，并加载项目规则、技能和配置。
+Clisbot 启动 Muse 时会禁用沙箱（`--disable-sandbox`）并开启工作区信任（`--trust-workspace`）。Muse 可以使用你的 npm 缓存安装软件包，并加载项目规则、技能和配置。
 
 在 daemon 所在机器的 `config.json` 中，于 `agents.providers.muse.options` 下为所有 Muse Agent 设置默认值：
 
@@ -56,7 +56,7 @@ Paseo 启动 Muse 时会禁用沙箱（`--disable-sandbox`）并开启工作区�
 
 ## Muse 1.4.1 中的限制 {#limitations-in-muse-141}
 
-- **Paseo MCP 工具不可用。** Muse 在匹配 MCP 调用之前丢弃了返回的工具命名空间。这是上游问题，必须先在 Muse 中修复，它的 Agent 才能使用 Paseo 工具。
+- **Clisbot MCP 工具不可用。** Muse 在匹配 MCP 调用之前丢弃了返回的工具命名空间。这是上游问题，必须先在 Muse 中修复，它的 Agent 才能使用 Clisbot 工具。
 - **上下文压缩需要模型的上下文上限。** 如果你的端点不报告上限，请在 Muse 中为所选模型配置 `context_compaction.provider_context_limit_tokens`。
 - **只有 Muse 报告用量窗口时才会显示。** `usage/read` 返回空响应时，订阅用量将不可用。
 - **原生子 Agent 可能需要 Muse 的实验性 SDK 开关。** 如果缺少原生子 Agent 工具，请在 Provider 环境中设置 `MUSE_EXPERIMENTAL_SDK_ENABLED=on`。只有当 Muse 提供 `childSessionId` 时，关联的子会话才会出现。

@@ -1,4 +1,4 @@
-import type { AgentAddress } from "@getpaseo/protocol/addresses";
+import type { AgentAddress } from "@clisbot/protocol/addresses";
 import type { Agent } from "@/stores/session-store";
 import type { SubagentRow } from "./select";
 
@@ -13,9 +13,9 @@ export interface ArchiveFinishedState {
 }
 
 export interface ArchiveFinishedOutcome {
-  archivedPaseoIds: string[];
+  archivedClisbotIds: string[];
   dismissedProviderIds: string[];
-  skippedPaseoIds: string[];
+  skippedClisbotIds: string[];
   failures: Array<{ id: string; error: unknown }>;
 }
 
@@ -36,7 +36,7 @@ export interface ArchiveFinishedSubagents {
 }
 
 export function isFinishedSubagent(row: SubagentRow): boolean {
-  if (row.kind === "paseo") return row.status === "idle" || row.status === "error";
+  if (row.kind === "clisbot") return row.status === "idle" || row.status === "error";
   return row.status === "completed" || row.status === "failed" || row.status === "canceled";
 }
 
@@ -57,11 +57,11 @@ function eligibleSignature(rows: readonly SubagentRow[]): string {
 }
 
 function managedRowIdentity(address: AgentAddress): string {
-  return `paseo:${address.serverId}:${address.agentId}`;
+  return `clisbot:${address.serverId}:${address.agentId}`;
 }
 
 function rowIdentity(row: SubagentRow): string {
-  return row.kind === "paseo" ? managedRowIdentity(row.address) : `provider:${row.id}`;
+  return row.kind === "clisbot" ? managedRowIdentity(row.address) : `provider:${row.id}`;
 }
 
 function rowIdentities(rows: readonly SubagentRow[]): Set<string> {
@@ -74,9 +74,9 @@ function identitySignature(ids: ReadonlySet<string>): string {
 
 function emptyOutcome(): ArchiveFinishedOutcome {
   return {
-    archivedPaseoIds: [],
+    archivedClisbotIds: [],
     dismissedProviderIds: [],
-    skippedPaseoIds: [],
+    skippedClisbotIds: [],
     failures: [],
   };
 }
@@ -170,7 +170,7 @@ async function runArchiveFinished(
   reportProgress: (completedCount: number) => void,
 ): Promise<{ outcome: ArchiveFinishedOutcome; retryableFailureIds: Set<string> }> {
   const providerIds = rows.filter((row) => row.kind === "provider").map((row) => row.id);
-  const paseoAddresses = rows.filter((row) => row.kind === "paseo").map((row) => row.address);
+  const clisbotAddresses = rows.filter((row) => row.kind === "clisbot").map((row) => row.address);
   let completedCount = 0;
   const outcome = emptyOutcome();
   const retryableFailureIds = new Set<string>();
@@ -182,12 +182,12 @@ async function runArchiveFinished(
     reportProgress(completedCount);
   }
 
-  for (const address of paseoAddresses) {
+  for (const address of clisbotAddresses) {
     const id = address.agentId;
     if (canArchiveManagedSubagent(deps.getManagedSubagent(address), deps.parentAgentId)) {
       try {
         await deps.archiveManagedSubagent(address);
-        outcome.archivedPaseoIds.push(id);
+        outcome.archivedClisbotIds.push(id);
       } catch (error) {
         outcome.failures.push({ id, error });
         if (canArchiveManagedSubagent(deps.getManagedSubagent(address), deps.parentAgentId)) {
@@ -195,7 +195,7 @@ async function runArchiveFinished(
         }
       }
     } else {
-      outcome.skippedPaseoIds.push(id);
+      outcome.skippedClisbotIds.push(id);
     }
     completedCount += 1;
     reportProgress(completedCount);

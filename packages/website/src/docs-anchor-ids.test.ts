@@ -18,7 +18,7 @@ function render(markdown: string): string {
 const TRANSLATED = [
   "## 安装 {#install}",
   "",
-  "### 运行 `paseo run` {#paseo-run}",
+  "### 运行 `clisbot run` {#clisbot-run}",
   "",
   "## 配置",
   "",
@@ -32,8 +32,8 @@ describe("{#id} anchors", () => {
     const html = render(TRANSLATED);
 
     expect(html).toContain('<h2 id="install">');
-    expect(html).toContain('<h3 id="paseo-run">');
-    expect(html).toContain("<code>paseo run</code>");
+    expect(html).toContain('<h3 id="clisbot-run">');
+    expect(html).toContain("<code>clisbot run</code>");
     expect(html).toContain('<h2 id="配置">');
     expect(html).toContain('<details class="docs-example" id="answer-a-slack-mention">');
     expect(html).toContain('<summary class="docs-example-summary">回复 Slack 提及</summary>');
@@ -43,7 +43,7 @@ describe("{#id} anchors", () => {
   it("give the outline the same ids the page renders", () => {
     expect(parseHeadings(TRANSLATED)).toEqual([
       { depth: 2, text: "安装", id: "install" },
-      { depth: 3, text: "运行 paseo run", id: "paseo-run" },
+      { depth: 3, text: "运行 clisbot run", id: "clisbot-run" },
       { depth: 2, text: "配置", id: "配置" },
     ]);
   });

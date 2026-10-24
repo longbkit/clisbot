@@ -1,5 +1,5 @@
-import { runAcpProvider } from "@getpaseo/plugin/server/acp";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import { runAcpProvider } from "@clisbot/plugin/server/acp";
+import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
 import { runPhaseTransformer } from "./run-phase.js";
 
 export function createHopliteProvider(): ProviderRegistration {

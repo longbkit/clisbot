@@ -95,7 +95,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
 
     it("injects real peer service env into terminal-backed services", async () => {
       writeFileSync(
-        join(repoDir, "paseo.json"),
+        join(repoDir, "clisbot.json"),
         JSON.stringify({
           scripts: {
             api: {
@@ -111,7 +111,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
           },
         }),
       );
-      execFileSync("git", ["add", "paseo.json"], { cwd: repoDir, stdio: "pipe" });
+      execFileSync("git", ["add", "clisbot.json"], { cwd: repoDir, stdio: "pipe" });
       execFileSync(
         "git",
         ["-c", "commit.gpgsign=false", "commit", "-m", "add real peer env services"],
@@ -134,7 +134,7 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
             projectSlug: "repo",
             branchName: "feature-peer-env",
             scriptName,
-            daemonPort: 6767,
+            daemonPort: 6868,
             serviceProxy: routeStore,
             runtimeStore,
             terminalManager,
@@ -150,32 +150,32 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
       const apiEnv = readEnvFile(apiEnvPath);
       const webEnv = readEnvFile(webEnvPath);
 
-      expect(apiEnv.PASEO_SERVICE_API_URL).toBe(
-        "http://api--feature-peer-env--repo.localhost:6767",
+      expect(apiEnv.CLISBOT_SERVICE_API_URL).toBe(
+        "http://api--feature-peer-env--repo.localhost:6868",
       );
-      expect(apiEnv.PASEO_SERVICE_WEB_URL).toBe(
-        "http://web--feature-peer-env--repo.localhost:6767",
+      expect(apiEnv.CLISBOT_SERVICE_WEB_URL).toBe(
+        "http://web--feature-peer-env--repo.localhost:6868",
       );
-      expect(apiEnv.PASEO_SERVICE_API_PORT).toEqual(expect.stringMatching(/^\d+$/));
-      expect(apiEnv.PASEO_SERVICE_WEB_PORT).toEqual(expect.stringMatching(/^\d+$/));
-      expect(apiEnv.PASEO_URL).toBe(apiEnv.PASEO_SERVICE_API_URL);
-      expect(apiEnv.PASEO_PORT).toBe(apiEnv.PASEO_SERVICE_API_PORT);
+      expect(apiEnv.CLISBOT_SERVICE_API_PORT).toEqual(expect.stringMatching(/^\d+$/));
+      expect(apiEnv.CLISBOT_SERVICE_WEB_PORT).toEqual(expect.stringMatching(/^\d+$/));
+      expect(apiEnv.CLISBOT_URL).toBe(apiEnv.CLISBOT_SERVICE_API_URL);
+      expect(apiEnv.CLISBOT_PORT).toBe(apiEnv.CLISBOT_SERVICE_API_PORT);
       expect(apiEnv).not.toHaveProperty("PORT");
 
-      expect(webEnv.PASEO_SERVICE_API_URL).toBe(
-        "http://api--feature-peer-env--repo.localhost:6767",
+      expect(webEnv.CLISBOT_SERVICE_API_URL).toBe(
+        "http://api--feature-peer-env--repo.localhost:6868",
       );
-      expect(webEnv.PASEO_SERVICE_WEB_URL).toBe(
-        "http://web--feature-peer-env--repo.localhost:6767",
+      expect(webEnv.CLISBOT_SERVICE_WEB_URL).toBe(
+        "http://web--feature-peer-env--repo.localhost:6868",
       );
-      expect(webEnv.PASEO_SERVICE_API_PORT).toBe(apiEnv.PASEO_SERVICE_API_PORT);
-      expect(webEnv.PASEO_SERVICE_WEB_PORT).toBe(apiEnv.PASEO_SERVICE_WEB_PORT);
-      expect(webEnv.PASEO_URL).toBe(webEnv.PASEO_SERVICE_WEB_URL);
-      expect(webEnv.PASEO_PORT).toBe(webEnv.PASEO_SERVICE_WEB_PORT);
+      expect(webEnv.CLISBOT_SERVICE_API_PORT).toBe(apiEnv.CLISBOT_SERVICE_API_PORT);
+      expect(webEnv.CLISBOT_SERVICE_WEB_PORT).toBe(apiEnv.CLISBOT_SERVICE_WEB_PORT);
+      expect(webEnv.CLISBOT_URL).toBe(webEnv.CLISBOT_SERVICE_WEB_URL);
+      expect(webEnv.CLISBOT_PORT).toBe(webEnv.CLISBOT_SERVICE_WEB_PORT);
       expect(webEnv).not.toHaveProperty("PORT");
 
-      const apiPort = Number(apiEnv.PASEO_SERVICE_API_PORT);
-      const webPort = Number(apiEnv.PASEO_SERVICE_WEB_PORT);
+      const apiPort = Number(apiEnv.CLISBOT_SERVICE_API_PORT);
+      const webPort = Number(apiEnv.CLISBOT_SERVICE_WEB_PORT);
       expect(Number.isInteger(apiPort)).toBe(true);
       expect(Number.isInteger(webPort)).toBe(true);
       expect(routeStore.listRoutes()).toEqual([

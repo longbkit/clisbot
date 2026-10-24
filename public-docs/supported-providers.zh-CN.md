@@ -1,12 +1,12 @@
 ---
 title: 支持的 Provider
-description: Paseo 可以启动的所有编程 Agent，包括原生支持的 Provider 和 ACP 目录。
+description: Clisbot 可以启动的所有编程 Agent，包括原生支持的 Provider 和 ACP 目录。
 nav: 支持的 Provider
 ---
 
 # 支持的 Provider {#supported-providers}
 
-关于 Provider 的概念以及 Paseo 如何管理 Provider，请参见 [Provider](/docs/providers)。要添加或配置你自己的 Provider，请参见[自定义 Provider](/docs/custom-providers)。
+关于 Provider 的概念以及 Clisbot 如何管理 Provider，请参见 [Provider](/docs/providers)。要添加或配置你自己的 Provider，请参见[自定义 Provider](/docs/custom-providers)。
 
 ## 原生支持 {#native-support}
 
@@ -21,17 +21,17 @@ nav: 支持的 Provider
 
 ### Antigravity {#antigravity}
 
-在 daemon 主机上安装 Antigravity CLI（`agy`），然后运行一次 `agy` 登录。在 Paseo 中选择 **Antigravity**。该 Provider 随 Paseo 一起提供，无需另外安装插件。
+在 daemon 主机上安装 Antigravity CLI（`agy`），然后运行一次 `agy` 登录。在 Clisbot 中选择 **Antigravity**。该 Provider 随 Clisbot 一起提供，无需另外安装插件。
 
-**Full access** 是唯一的权限模式。当由其他应用驱动时，Antigravity 无法请求权限，因此 Paseo 会以 `--dangerously-skip-permissions` 启动 `agy`。每次工具调用（包括 shell 命令）都不会询问就直接运行。每个会话开始时都会显示一条说明此事的警告，重新打开聊天时也会显示。Antigravity 自己的策略仍然可以拒绝某个操作。
+**Full access** 是唯一的权限模式。当由其他应用驱动时，Antigravity 无法请求权限，因此 Clisbot 会以 `--dangerously-skip-permissions` 启动 `agy`。每次工具调用（包括 shell 命令）都不会询问就直接运行。每个会话开始时都会显示一条说明此事的警告，重新打开聊天时也会显示。Antigravity 自己的策略仍然可以拒绝某个操作。
 
-daemon 重启后，Antigravity 会记得对话，但 Paseo 的对话记录会重新开始，因为 `agy` 不会重放它的历史。
+daemon 重启后，Antigravity 会记得对话，但 Clisbot 的对话记录会重新开始，因为 `agy` 不会重放它的历史。
 
 此集成使用你已安装的 CLI 和登录状态，未经 Google 认可。
 
-Paseo MCP 工具和引导功能不可用。你自己为 `agy` 配置的 MCP 服务器仍然可用。附加的图片会以文件引用的形式传给 Agent 读取。
+Clisbot MCP 工具和引导功能不可用。你自己为 `agy` 配置的 MCP 服务器仍然可用。附加的图片会以文件引用的形式传给 Agent 读取。
 
-如果 `agy` 不在 daemon 的 PATH 中，请在 `~/.paseo/config.json` 中覆盖它的命令。使用 `env` 设置 Provider 专用的环境变量：
+如果 `agy` 不在 daemon 的 PATH 中，请在 `~/.clisbot/config.json` 中覆盖它的命令。使用 `env` 设置 Provider 专用的环境变量：
 
 ```json
 {
@@ -94,8 +94,8 @@ Paseo MCP 工具和引导功能不可用。你自己为 `agy` 配置的 MCP 服�
 
 ### Hoplite {#hoplite}
 
-在 daemon 主机上安装 [Hoplite CLI](https://hoplite.sh/docs/cli) 并运行 `hoplite login`。在 **设置 → Hosts → 你的主机 → Providers** 中，在目录里找到 **Hoplite** 并选择 **添加**。Paseo 会通过通用 ACP 适配器启动 `hoplite acp`。
+在 daemon 主机上安装 [Hoplite CLI](https://hoplite.sh/docs/cli) 并运行 `hoplite login`。在 **设置 → Hosts → 你的主机 → Providers** 中，在目录里找到 **Hoplite** 并选择 **添加**。Clisbot 会通过通用 ACP 适配器启动 `hoplite acp`。
 
-Hoplite 在云端工作区中运行 Agent。请打开一个关联了 Hoplite 项目的仓库，或者设置 `agents.providers.hoplite.env.HOPLITE_PROJECT_ID`，在所有地方使用同一个项目。如果既没有关联的仓库也没有固定的项目，发现过程会报告 `No Hoplite project`。你的本地文件和 Paseo 的回环 MCP 工具在该云端工作区中不可用。
+Hoplite 在云端工作区中运行 Agent。请打开一个关联了 Hoplite 项目的仓库，或者设置 `agents.providers.hoplite.env.HOPLITE_PROJECT_ID`，在所有地方使用同一个项目。如果既没有关联的仓库也没有固定的项目，发现过程会报告 `No Hoplite project`。你的本地文件和 Clisbot 的回环 MCP 工具在该云端工作区中不可用。
 
 认证和项目设置见 [Hoplite 的 ACP 指南](https://hoplite.sh/docs/cli/acp)。如果 `hoplite` 不在 daemon 的 PATH 中，请使用[命令覆盖](/docs/custom-providers)，并在参数中保留 `acp`。

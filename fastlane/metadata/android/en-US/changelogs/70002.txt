@@ -8,4 +8,4 @@ Added
 - Added plugin-defined timeline transformations and rendering
 - Added SSH connections to existing remote daemons from Desktop and CLI
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

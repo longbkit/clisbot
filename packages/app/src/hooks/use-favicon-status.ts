@@ -17,9 +17,9 @@ const FAVICON_IMAGES: Record<ColorScheme, Record<FaviconStatus, { uri: string } 
     attention: require("../../assets/images/favicon-dark-attention.png"),
   },
   light: {
-    none: require("../../assets/images/favicon-light.png"),
-    running: require("../../assets/images/favicon-light-running.png"),
-    attention: require("../../assets/images/favicon-light-attention.png"),
+    none: require("../../assets/images/favicon-dark.png"),
+    running: require("../../assets/images/favicon-dark-running.png"),
+    attention: require("../../assets/images/favicon-dark-attention.png"),
   },
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -45,7 +45,7 @@ function getFaviconUri(status: FaviconStatus, colorScheme: ColorScheme): string 
     return image.uri;
   }
   const suffix = status === "none" ? "" : `-${status}`;
-  return `/assets/images/favicon-${colorScheme}${suffix}.png`;
+  return `/assets/images/favicon-dark${suffix}.png`;
 }
 
 function getOrCreateFaviconLink(): HTMLLinkElement | null {

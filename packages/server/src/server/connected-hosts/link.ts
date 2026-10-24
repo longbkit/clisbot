@@ -1,12 +1,12 @@
 import type { SessionDelivery } from "../session/owned-subscriptions/index.js";
 import { EventEmitter } from "node:events";
 import { createHash } from "node:crypto";
-import { encodeHostRouteFrame, type HostRouteFrame } from "@getpaseo/protocol/binary-frames/index";
+import { encodeHostRouteFrame, type HostRouteFrame } from "@clisbot/protocol/binary-frames/index";
 import type {
   DaemonPermission,
   SessionInboundMessage,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 /** A logical socket has no network resources or authority of its own. */
 export class VirtualHostSocket extends EventEmitter {

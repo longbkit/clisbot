@@ -14,7 +14,7 @@ import {
   getRealProviderRuntimeSettings,
 } from "./real-provider-test-config.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 type NativeProvider = "claude" | "codex" | "opencode";
 
@@ -28,11 +28,11 @@ async function withNativeConversation(
   run: (conversation: ReloadConversation) => Promise<void>,
 ): Promise<void> {
   const secret = `RELOAD_${provider.toUpperCase()}_7F31`;
-  const root = mkdtempSync(path.join(tmpdir(), `paseo-reload-${provider}-`));
+  const root = mkdtempSync(path.join(tmpdir(), `clisbot-reload-${provider}-`));
   const cwd = path.join(root, "workspace");
   mkdirSync(cwd);
   const logger = pino({ level: "warn" });
-  let daemon: TestPaseoDaemon | undefined;
+  let daemon: TestClisbotDaemon | undefined;
   let client: DaemonClient | undefined;
   let openCode: OpenCodeAgentClient | undefined;
   let openCodeRuntimeRoot: string | undefined;
@@ -54,7 +54,7 @@ async function withNativeConversation(
       providerClient = openCode;
       config = getRealProviderConfig("opencode");
     }
-    daemon = await createTestPaseoDaemon({
+    daemon = await createTestClisbotDaemon({
       agentClients: { [provider]: providerClient },
       logger,
       pluginsEnabled: false,
@@ -115,7 +115,7 @@ async function withNativeConversation(
 
 // Opt in: real requests using local Claude/Codex auth and the OpenRouter test setup.
 test
-  .runIf(process.env.PASEO_NATIVE_RELOAD_QA === "1")
+  .runIf(process.env.CLISBOT_NATIVE_RELOAD_QA === "1")
   .each(["claude", "codex", "opencode"] as const)(
   "%s retains its session and conversation through repeated refresh RPCs",
   async (provider) => {

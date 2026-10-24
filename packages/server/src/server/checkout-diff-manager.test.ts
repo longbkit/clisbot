@@ -39,7 +39,7 @@ function createWorkspaceSnapshot(
       mainRepoRoot: null,
       currentBranch: "feature",
       remoteUrl: "https://github.com/acme/repo.git",
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: false,
       baseRef: "main",
       aheadBehind: { ahead: 1, behind: 0 },
@@ -93,7 +93,7 @@ function createPendingManager() {
   const manager = new CheckoutDiffManager({
     workspaceRuntimeStore: createWorkspaceRuntimeStore(),
     logger: logger as unknown as pino.Logger,
-    paseoHome: "/tmp/paseo-test",
+    clisbotHome: "/tmp/clisbot-test",
     workspaceGitService,
   });
   return { manager, watches };
@@ -151,7 +151,7 @@ describe("CheckoutDiffManager", () => {
     const manager = new CheckoutDiffManager({
       workspaceRuntimeStore: createWorkspaceRuntimeStore(),
       logger: logger as unknown as pino.Logger,
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       workspaceGitService: workspaceGitService as unknown as WorkspaceGitService,
     });
 

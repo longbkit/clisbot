@@ -9,7 +9,7 @@ export const Route = createFileRoute("/{-$locale}/privacy")({
     const locale = routeLocale(params);
     const document = getLegalDocument("privacy", locale);
     return pageMeta({
-      title: `${document.title} - Paseo`,
+      title: `${document.title} - Clisbot`,
       description: document.description,
       path: "/privacy",
       locale,

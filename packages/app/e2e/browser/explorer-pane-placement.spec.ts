@@ -252,7 +252,7 @@ async function expectNewLauncher(page: Page): Promise<void> {
   ).toBeVisible();
   await expect(draftTabChip(page)).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Message agent..." })).toHaveCount(0);
-  await expect(page.getByText("Paseo ran into a problem.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Clisbot ran into a problem.", { exact: true })).toHaveCount(0);
 }
 
 async function openAgentDraftFromLauncher(page: Page): Promise<void> {

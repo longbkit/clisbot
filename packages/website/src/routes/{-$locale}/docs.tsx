@@ -36,8 +36,8 @@ function DocsLayout() {
       <header className="lg:hidden sticky top-0 z-50 bg-background border-b border-border">
         <div className="flex items-center justify-between p-4">
           <Link to={localize("/")} className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Paseo" className="w-6 h-6" />
-            <span className="text-lg font-medium">Paseo</span>
+            <img src="/logo.svg" alt="Clisbot" className="w-6 h-6" />
+            <span className="text-lg font-medium">Clisbot</span>
           </Link>
           <div className="flex items-center gap-3">
             <LanguageSelector />
@@ -64,8 +64,8 @@ function DocsLayout() {
         <aside className="hidden lg:block sticky top-0 h-screen w-60 shrink-0 border-r border-border p-6 overflow-y-auto">
           <div className="flex items-center justify-between gap-3 mb-8">
             <Link to={localize("/")} className="flex items-center gap-3">
-              <img src="/logo.svg" alt="Paseo" className="w-6 h-6" />
-              <span className="text-lg font-medium">Paseo</span>
+              <img src="/logo.svg" alt="Clisbot" className="w-6 h-6" />
+              <span className="text-lg font-medium">Clisbot</span>
             </Link>
             <LanguageSelector />
           </div>

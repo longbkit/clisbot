@@ -5,7 +5,7 @@ import path from "node:path";
 import pino from "pino";
 import { afterEach, describe, expect, test } from "vitest";
 import { ensureAgentLoaded } from "./agent/agent-loading.js";
-import type { PaseoDaemonConfig } from "./bootstrap.js";
+import type { ClisbotDaemonConfig } from "./bootstrap.js";
 
 const originalEnv = {
   PATH: process.env.PATH,
@@ -26,8 +26,8 @@ describe("bootstrap provider availability", () => {
   });
 
   test("loads a persisted Codex record without spawning a missing Codex binary", async () => {
-    const { createPaseoDaemon } = await import("./bootstrap.js");
-    const root = await mkdtemp(path.join(os.tmpdir(), "paseo-bootstrap-provider-"));
+    const { createClisbotDaemon } = await import("./bootstrap.js");
+    const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-bootstrap-provider-"));
     tempRoots.push(root);
     const gitPath = execFileSync(process.platform === "win32" ? "where" : "which", ["git"], {
       encoding: "utf8",
@@ -36,9 +36,9 @@ describe("bootstrap provider availability", () => {
       .trim();
     process.env.PATH = path.dirname(gitPath);
     expect(execFileSync("git", ["--version"], { encoding: "utf8" })).toMatch(/git version/i);
-    const paseoHome = path.join(root, ".paseo");
+    const clisbotHome = path.join(root, ".clisbot");
     const staticDir = path.join(root, "static");
-    const agentStoragePath = path.join(paseoHome, "agents");
+    const agentStoragePath = path.join(clisbotHome, "agents");
     const now = new Date("2026-04-16T00:00:00.000Z").toISOString();
     const agentId = "11111111-1111-4111-8111-111111111111";
     await mkdir(agentStoragePath, { recursive: true });
@@ -68,9 +68,9 @@ describe("bootstrap provider availability", () => {
       }),
     );
 
-    const config: PaseoDaemonConfig = {
+    const config: ClisbotDaemonConfig = {
       listen: "127.0.0.1:0",
-      paseoHome,
+      clisbotHome,
       corsAllowedOrigins: [],
       hostnames: true,
       mcpEnabled: false,
@@ -79,7 +79,7 @@ describe("bootstrap provider availability", () => {
       agentClients: {},
       agentStoragePath,
       relayEnabled: false,
-      appBaseUrl: "https://app.paseo.sh",
+      appBaseUrl: "https://app.clisbot.com",
       openai: undefined,
       speech: undefined,
     };
@@ -93,7 +93,7 @@ describe("bootstrap provider availability", () => {
     process.on("unhandledRejection", onUnhandledRejection);
     process.on("uncaughtException", onUncaughtException);
 
-    const daemon = await createPaseoDaemon(config, pino({ level: "silent" }));
+    const daemon = await createClisbotDaemon(config, pino({ level: "silent" }));
     try {
       await expect(daemon.agentStorage.list()).resolves.toHaveLength(1);
       await expect(daemon.agentManager.listProviderAvailability()).resolves.toContainEqual({

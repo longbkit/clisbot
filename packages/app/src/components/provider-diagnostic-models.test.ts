@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentModelDefinition } from "@getpaseo/protocol/agent-types";
+import type { AgentModelDefinition } from "@clisbot/protocol/agent-types";
 import {
   resolveProviderDiscoveredModels,
   type ProviderDiscoveredModelsCache,

@@ -2,13 +2,13 @@ import { expect, test } from "vitest";
 import { parseHostTarget } from "./host-target.js";
 
 test.each([
-  ["127.0.0.1:6767", "tcp://127.0.0.1:6767"],
+  ["127.0.0.1:6868", "tcp://127.0.0.1:6868"],
   ["4321", "tcp://127.0.0.1:4321"],
   ["[::1]:4321", "tcp://[::1]:4321"],
-  ["unix:///tmp/paseo.sock", "unix:///tmp/paseo.sock"],
-  ["pipe://\\\\.\\pipe\\paseo", "pipe://\\\\.\\pipe\\paseo"],
+  ["unix:///tmp/clisbot.sock", "unix:///tmp/clisbot.sock"],
+  ["pipe://\\\\.\\pipe\\clisbot", "pipe://\\\\.\\pipe\\clisbot"],
   ["wss://example.com/custom?token=secret", "wss://example.com"],
-  ["tcp://example.com:6767?password=secret", "tcp://example.com:6767"],
+  ["tcp://example.com:6868?password=secret", "tcp://example.com:6868"],
 ])(
   "the shared connector accepts %s and exposes only safe display text",
   (connection, description) => {
@@ -31,20 +31,20 @@ test.each([
   "unix://",
   "tcp://host:0",
   "C:\\Users\\socket",
-  "alice:example-secret@localhost:6767",
-  "not-a-scheme://localhost:6767",
-  "localhost/path:6767",
-  "localhost?password=example-secret:6767",
-  "localhost#example-secret:6767",
-  "tcp://localhost/path:6767",
-  "relay://alice:example-secret@localhost:6767/server?key=private",
+  "alice:example-secret@localhost:6868",
+  "not-a-scheme://localhost:6868",
+  "localhost/path:6868",
+  "localhost?password=example-secret:6868",
+  "localhost#example-secret:6868",
+  "tcp://localhost/path:6868",
+  "relay://alice:example-secret@localhost:6868/server?key=private",
 ])("invalid target syntax is rejected without echoing %s", (connection) => {
   expect(() => parseHostTarget(connection)).toThrow("Invalid host connection");
 });
 
 test("SSH aliases and DNS names retain their connection semantics", () => {
-  expect(parseHostTarget("build-box.example.:6767").description).toBe(
-    "tcp://build-box.example.:6767",
+  expect(parseHostTarget("build-box.example.:6868").description).toBe(
+    "tcp://build-box.example.:6868",
   );
   expect(parseHostTarget("ssh://deploy@my_ssh-alias")).toMatchObject({
     kind: "ssh",
@@ -54,15 +54,15 @@ test("SSH aliases and DNS names retain their connection semantics", () => {
 
 test("encoded SSH usernames cannot leak into the target description", () => {
   expect(parseHostTarget("ssh://alice%3Aexample-secret@my-alias").description).toBe(
-    "ssh://my-alias (daemon port 6767)",
+    "ssh://my-alias (daemon port 6868)",
   );
 });
 
 test("pairing offers cannot publish a credential-bearing or malformed relay authority", () => {
   for (const endpoint of [
-    "alice:example-secret@localhost:6767",
-    "localhost/path:6767",
-    "localhost?token=example-secret:6767",
+    "alice:example-secret@localhost:6868",
+    "localhost/path:6868",
+    "localhost?token=example-secret:6868",
   ]) {
     const offer = {
       v: 2,
@@ -70,7 +70,7 @@ test("pairing offers cannot publish a credential-bearing or malformed relay auth
       daemonPublicKeyB64: "private-key",
       relay: { endpoint, useTls: false },
     };
-    const url = `https://app.paseo.sh/#offer=${Buffer.from(JSON.stringify(offer)).toString("base64url")}`;
+    const url = `https://app.clisbot.com/#offer=${Buffer.from(JSON.stringify(offer)).toString("base64url")}`;
     expect(() => parseHostTarget(url)).toThrow("Invalid host connection");
   }
 });

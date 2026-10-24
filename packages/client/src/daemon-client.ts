@@ -3,9 +3,9 @@ import {
   encodeHostRouteFrame,
   decodeHostRouteFrame,
   type HostRouteFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import { messageTooLargeError } from "./daemon-client-transport-utils.js";
-import type { HostAdd, HostUpdate, HostDirectory } from "@getpaseo/protocol/hosts";
+import type { HostAdd, HostUpdate, HostDirectory } from "@clisbot/protocol/hosts";
 import { legacyUsageIcon } from "./legacy-usage-icons.js";
 import { subscribeTimeline, type TimelineMessage } from "./timeline-subscription/index.js";
 import { ProviderSnapshotUpdates } from "./provider-snapshots/index.js";
@@ -16,12 +16,12 @@ import {
   type TimelineSubscription,
 } from "./connection/index.js";
 import { CreationClient } from "./creation/index.js";
-import type { CreationSnapshot } from "@getpaseo/protocol/messages";
+import type { CreationSnapshot } from "@clisbot/protocol/messages";
 import type { z } from "zod";
-import type { SessionEventSubscription } from "@getpaseo/protocol/messages";
-import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-capabilities";
-import type { AgentAttentionNotificationPayload } from "@getpaseo/protocol/agent-attention-notification";
-import { MAX_WEBSOCKET_MESSAGE_BYTES } from "@getpaseo/protocol/websocket-message-limit";
+import type { SessionEventSubscription } from "@clisbot/protocol/messages";
+import { CLIENT_CAPS, type ClientCapability } from "@clisbot/protocol/client-capabilities";
+import type { AgentAttentionNotificationPayload } from "@clisbot/protocol/agent-attention-notification";
+import { MAX_WEBSOCKET_MESSAGE_BYTES } from "@clisbot/protocol/websocket-message-limit";
 import {
   AgentCreateFailedStatusPayloadSchema,
   AgentCreatedStatusPayloadSchema,
@@ -36,15 +36,15 @@ import {
   SessionInboundMessageSchema,
   type ActiveTurnBehavior,
   type ServerInfoStatusPayload,
-} from "@getpaseo/protocol/messages";
-import { validateWSOutboundMessage } from "@getpaseo/protocol/validation/ws-outbound";
+} from "@clisbot/protocol/messages";
+import { validateWSOutboundMessage } from "@clisbot/protocol/validation/ws-outbound";
 import type {
   AgentStreamEventPayload,
   AgentSnapshotPayload,
   ProjectPlacementPayload,
   AgentPermissionResolvedMessage,
   CreateAgentRequestMessage,
-  CreatePaseoWorktreeRequest,
+  CreateClisbotWorktreeRequest,
   FileDownloadTokenResponse,
   FileUploadResponse,
   FileExplorerResponse,
@@ -82,8 +82,8 @@ import type {
   GitHubSearchResponse,
   GitHubSearchRequest,
   DirectorySuggestionsResponse,
-  PaseoWorktreeListResponse,
-  PaseoWorktreeArchiveResponse,
+  ClisbotWorktreeListResponse,
+  ClisbotWorktreeArchiveResponse,
   ProjectIconSource,
   ProjectIconResponse,
   ProjectIconGetResponse,
@@ -121,8 +121,8 @@ import type {
   SessionInboundMessage,
   SessionOutboundMessage,
   SendAgentMessageRequest,
-  PaseoConfigRaw,
-  PaseoConfigRevision,
+  ClisbotConfigRaw,
+  ClisbotConfigRevision,
   WorkspaceCreateRequest,
   WorkspaceRecoveryState,
   PluginListItem,
@@ -136,7 +136,7 @@ import type {
   AgentSkillSelection,
   AgentSkillsStatus,
   AgentSkillsSaveResult,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
@@ -144,13 +144,13 @@ import type {
   AgentProviderNotice,
   AgentProvider,
   AgentSessionConfig,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import type {
   AgentConfigApply,
   MutableDaemonConfig,
   MutableDaemonConfigPatch,
-} from "@getpaseo/protocol/messages";
-import { isRelayClientWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+} from "@clisbot/protocol/messages";
+import { isRelayClientWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
 import {
   asUint8Array,
   decodeFileTransferFrame,
@@ -159,7 +159,7 @@ import {
   FileTransferOpcode,
   TerminalStreamOpcode,
   type FileTransferFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import {
   createRelayE2eeTransportFactory,
   createRelayUpgradeTransportFactory,
@@ -183,7 +183,7 @@ import { TerminalStreamRouter, type TerminalStreamEvent } from "./terminal-strea
 import type {
   BrowserAutomationExecuteRequest,
   BrowserAutomationExecuteResponse,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
 
 export interface Logger {
   debug(obj: object, msg?: string): void;
@@ -277,7 +277,7 @@ function chooseConnectionAuth(
   return {
     helloAuth,
     headers,
-    ...(compatibleBearer ? { protocols: [`paseo.bearer.${compatibleBearer}`] } : {}),
+    ...(compatibleBearer ? { protocols: [`clisbot.bearer.${compatibleBearer}`] } : {}),
   };
 }
 
@@ -402,7 +402,7 @@ export interface DaemonClientConfig {
   /** Deliver compact bodies/hash references to a caller-owned snapshot cache.
    * The default keeps public SDK snapshot entries expanded. */
   providerSnapshots?: "wire";
-  sessionPermissions?: import("@getpaseo/protocol/messages").DaemonPermission[];
+  sessionPermissions?: import("@clisbot/protocol/messages").DaemonPermission[];
   url: string;
   clientId: string;
   clientType?: "mobile" | "browser" | "cli" | "mcp" | "hub";
@@ -505,8 +505,8 @@ export interface CreateWorkspaceRequestOptions {
   requestId?: string;
 }
 
-export interface CreatePaseoWorktreeInput extends Pick<
-  CreatePaseoWorktreeRequest,
+export interface CreateClisbotWorktreeInput extends Pick<
+  CreateClisbotWorktreeRequest,
   | "cwd"
   | "projectId"
   | "worktreeSlug"
@@ -547,11 +547,11 @@ type BranchSuggestionsPayload = BranchSuggestionsResponse["payload"];
 type ForgeSearchPayload = ForgeSearchResponse["payload"];
 type GitHubSearchPayload = GitHubSearchResponse["payload"];
 type DirectorySuggestionsPayload = DirectorySuggestionsResponse["payload"];
-type PaseoWorktreeListPayload = PaseoWorktreeListResponse["payload"];
-type PaseoWorktreeArchivePayload = PaseoWorktreeArchiveResponse["payload"];
-type CreatePaseoWorktreePayload = Extract<
+type ClisbotWorktreeListPayload = ClisbotWorktreeListResponse["payload"];
+type ClisbotWorktreeArchivePayload = ClisbotWorktreeArchiveResponse["payload"];
+type CreateClisbotWorktreePayload = Extract<
   SessionOutboundMessage,
-  { type: "create_paseo_worktree_response" }
+  { type: "create_clisbot_worktree_response" }
 >["payload"];
 type WorkspaceCreatePayload = Extract<
   SessionOutboundMessage,
@@ -610,8 +610,8 @@ type ListCommandsDraftConfig = Pick<
 >;
 export interface WriteProjectConfigInput {
   repoRoot: string;
-  config: PaseoConfigRaw;
-  expectedRevision: PaseoConfigRevision | null;
+  config: ClisbotConfigRaw;
+  expectedRevision: ClisbotConfigRevision | null;
   requestId?: string;
 }
 interface ListCommandsOptions {
@@ -1523,7 +1523,7 @@ export class DaemonClient {
 
       this.transportCleanup = [
         transport.onOpen(() => {
-          this.traceInstant("paseo.connection.open");
+          this.traceInstant("clisbot.connection.open");
           if (this.pendingGenericTransportErrorTimeout) {
             clearTimeout(this.pendingGenericTransportErrorTimeout);
             this.pendingGenericTransportErrorTimeout = null;
@@ -1532,7 +1532,7 @@ export class DaemonClient {
           void this.sendHelloMessage();
         }),
         transport.onClose((event) => {
-          this.traceInstant("paseo.connection.close", {
+          this.traceInstant("clisbot.connection.close", {
             code: String(
               event && typeof event === "object" && "code" in event ? event.code : "unknown",
             ),
@@ -1560,7 +1560,7 @@ export class DaemonClient {
           });
         }),
         transport.onError((event) => {
-          this.traceInstant("paseo.connection.error");
+          this.traceInstant("clisbot.connection.error");
           this.resetConnectTimeout();
           const reason = describeTransportError(event);
           const isGeneric = reason === "Transport error";
@@ -1970,8 +1970,8 @@ export class DaemonClient {
   private beginSessionDispatchTrace(message: SessionOutboundMessage): boolean {
     if (!this.config.trace?.isEnabled()) return false;
     const fields = { messageType: message.type, ...describeRequestIdentity(message) };
-    this.traceInstant("paseo.ws.message.inbound", { envelopeType: "session", ...fields });
-    return this.beginTraceSection("paseo.ws.dispatch", fields);
+    this.traceInstant("clisbot.ws.message.inbound", { envelopeType: "session", ...fields });
+    return this.beginTraceSection("clisbot.ws.dispatch", fields);
   }
 
   private sendJsonMessage(
@@ -1982,7 +1982,7 @@ export class DaemonClient {
   ): void {
     const isOpen =
       this.config.trace?.isEnabled() === true &&
-      this.beginTraceSection("paseo.ws.message.outbound", {
+      this.beginTraceSection("clisbot.ws.message.outbound", {
         envelopeType,
         messageType,
         ...describeRequestIdentity(message),
@@ -2012,7 +2012,7 @@ export class DaemonClient {
     }
     // The daemon closes the connection on an oversized message, and creations resubmit on reconnect.
     assertTransportFrameFits(frame);
-    const isOpen = this.beginTraceSection("paseo.ws.frame.outbound", {
+    const isOpen = this.beginTraceSection("clisbot.ws.frame.outbound", {
       kind: typeof frame === "string" ? "text" : "binary",
       size: String(getTransportFrameSize(frame)),
       sizeUnit: typeof frame === "string" ? "utf16-code-units" : "bytes",
@@ -2056,7 +2056,7 @@ export class DaemonClient {
       throw new Error(`Transport not connected (status: ${this.connectionState.status})`);
     }
     try {
-      this.traceInstant("paseo.ws.message.outbound", {
+      this.traceInstant("clisbot.ws.message.outbound", {
         envelopeType: "binary",
         messageType: "binary",
       });
@@ -3584,7 +3584,7 @@ export class DaemonClient {
 
   async appendAgentTimelineItem(
     agentId: string,
-    item: Omit<import("@getpaseo/protocol/agent-types").PluginTimelineItem, "pluginId">,
+    item: Omit<import("@clisbot/protocol/agent-types").PluginTimelineItem, "pluginId">,
   ): Promise<{ seq: number; epoch: string }> {
     const requestId = this.createRequestId();
     const payload = await this.sendCorrelatedSessionRequest({
@@ -3769,13 +3769,13 @@ export class DaemonClient {
       options.sourceAgentId &&
       this.lastServerInfoMessage?.features?.agentMessageProvenance !== true
     ) {
-      throw new Error("Update the Paseo host to send messages with agent provenance.");
+      throw new Error("Update the Clisbot host to send messages with agent provenance.");
     }
     if (
       options.sourceAgentServerId &&
       this.lastServerInfoMessage?.features?.agentMessageBatching !== true
     ) {
-      throw new Error("Update the Paseo host to send messages with a qualified agent address.");
+      throw new Error("Update the Clisbot host to send messages with a qualified agent address.");
     }
     const requestId = this.createRequestId();
     const messageId = options.messageId ?? crypto.randomUUID();
@@ -4809,7 +4809,7 @@ export class DaemonClient {
 
   async stashList(
     cwd: string,
-    options?: { paseoOnly?: boolean },
+    options?: { clisbotOnly?: boolean },
     requestId?: string,
   ): Promise<StashListPayload> {
     return this.sendCorrelatedSessionRequest({
@@ -4817,28 +4817,28 @@ export class DaemonClient {
       message: {
         type: "stash_list_request",
         cwd,
-        paseoOnly: options?.paseoOnly,
+        clisbotOnly: options?.clisbotOnly,
       },
       responseType: "stash_list_response",
     });
   }
 
-  async getPaseoWorktreeList(
+  async getClisbotWorktreeList(
     input: { cwd?: string; repoRoot?: string },
     requestId?: string,
-  ): Promise<PaseoWorktreeListPayload> {
+  ): Promise<ClisbotWorktreeListPayload> {
     return this.sendCorrelatedSessionRequest({
       requestId,
       message: {
-        type: "paseo_worktree_list_request",
+        type: "clisbot_worktree_list_request",
         cwd: input.cwd,
         repoRoot: input.repoRoot,
       },
-      responseType: "paseo_worktree_list_response",
+      responseType: "clisbot_worktree_list_response",
     });
   }
 
-  async archivePaseoWorktree(
+  async archiveClisbotWorktree(
     input: {
       worktreePath?: string;
       repoRoot?: string;
@@ -4847,29 +4847,29 @@ export class DaemonClient {
       scope?: "workspace" | "worktree";
     },
     requestId?: string,
-  ): Promise<PaseoWorktreeArchivePayload> {
+  ): Promise<ClisbotWorktreeArchivePayload> {
     return this.sendCorrelatedSessionRequest({
       requestId,
       message: {
-        type: "paseo_worktree_archive_request",
+        type: "clisbot_worktree_archive_request",
         worktreePath: input.worktreePath,
         repoRoot: input.repoRoot,
         branchName: input.branchName,
         ...(input.workspaceId !== undefined ? { workspaceId: input.workspaceId } : {}),
         ...(input.scope !== undefined ? { scope: input.scope } : {}),
       },
-      responseType: "paseo_worktree_archive_response",
+      responseType: "clisbot_worktree_archive_response",
     });
   }
 
-  async createPaseoWorktree(
-    input: CreatePaseoWorktreeInput,
+  async createClisbotWorktree(
+    input: CreateClisbotWorktreeInput,
     requestId?: string,
-  ): Promise<CreatePaseoWorktreePayload> {
+  ): Promise<CreateClisbotWorktreePayload> {
     return this.sendCorrelatedSessionRequest({
       requestId,
       message: {
-        type: "create_paseo_worktree_request",
+        type: "create_clisbot_worktree_request",
         cwd: input.cwd,
         ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
         worktreeSlug: input.worktreeSlug,
@@ -4881,7 +4881,7 @@ export class DaemonClient {
         ...(input.checkoutSource !== undefined ? { checkoutSource: input.checkoutSource } : {}),
         ...(input.githubPrNumber !== undefined ? { githubPrNumber: input.githubPrNumber } : {}),
       },
-      responseType: "create_paseo_worktree_response",
+      responseType: "create_clisbot_worktree_response",
     });
   }
 
@@ -6656,7 +6656,7 @@ export class DaemonClient {
     }
 
     const isOpen = this.beginTraceSection(
-      "paseo.ws.frame.inbound",
+      "clisbot.ws.frame.inbound",
       describeInboundTransportFrame(rawData),
     );
     try {
@@ -6679,20 +6679,20 @@ export class DaemonClient {
     const bytes = rawBytesLength ?? payload.length;
     const startMs = perfNow();
     let parsedJson: unknown;
-    const parseTraceOpen = this.beginTraceSection("paseo.ws.json.parse", {
+    const parseTraceOpen = this.beginTraceSection("clisbot.ws.json.parse", {
       size: String(bytes),
       sizeUnit: rawBytesLength === undefined ? "utf16-code-units" : "bytes",
     });
     try {
       parsedJson = JSON.parse(payload);
     } catch {
-      this.traceInstant("paseo.ws.json.invalid");
+      this.traceInstant("clisbot.ws.json.invalid");
       return;
     } finally {
       this.endTraceSection(parseTraceOpen);
     }
 
-    const validationTrace = this.beginTraceSection("paseo.ws.validate");
+    const validationTrace = this.beginTraceSection("clisbot.ws.validate");
     let parsed: ReturnType<typeof validateWSOutboundMessage>;
     try {
       parsed = validateWSOutboundMessage(parsedJson);
@@ -6700,7 +6700,7 @@ export class DaemonClient {
       this.endTraceSection(validationTrace);
     }
     if (!parsed.success) {
-      this.traceInstant("paseo.ws.validation.failed");
+      this.traceInstant("clisbot.ws.validation.failed");
       const responseIdentity = extractCorrelatedResponseIdentity(parsedJson);
       const envelopeType =
         parsedJson != null &&
@@ -6723,7 +6723,7 @@ export class DaemonClient {
     this.consecutiveLivenessFailures = 0;
 
     if (parsed.data.type === "pong") {
-      this.traceInstant("paseo.ws.message.inbound", {
+      this.traceInstant("clisbot.ws.message.inbound", {
         envelopeType: "pong",
         messageType: "pong",
       });
@@ -6733,7 +6733,7 @@ export class DaemonClient {
     }
 
     if (parsed.data.type === "hello.rejected") {
-      this.traceInstant("paseo.connection.rejected", { reason: parsed.data.reason });
+      this.traceInstant("clisbot.connection.rejected", { reason: parsed.data.reason });
       const reasonMessage = {
         password_required: "Password required",
         incorrect_password: "Incorrect password",
@@ -6771,7 +6771,7 @@ export class DaemonClient {
     }
     const fileFrame = decodeFileTransferFrame(rawBytes);
     if (fileFrame) {
-      this.traceInstant("paseo.ws.message.inbound", {
+      this.traceInstant("clisbot.ws.message.inbound", {
         envelopeType: "binary",
         messageType: "file",
         opcode: String(fileFrame.opcode),
@@ -6787,7 +6787,7 @@ export class DaemonClient {
     if (!frame) {
       return false;
     }
-    this.traceInstant("paseo.ws.message.inbound", {
+    this.traceInstant("clisbot.ws.message.inbound", {
       envelopeType: "binary",
       messageType: "terminal",
       opcode: String(frame.opcode),
@@ -6910,7 +6910,7 @@ export class DaemonClient {
       next.status === "disconnected" && typeof next.reason === "string" ? next.reason : null;
     const reason = metadata?.reason ?? reasonFromNext;
     const reasonCode = metadata?.reasonCode ?? toReasonCode(reason);
-    this.traceInstant("paseo.connection.state", {
+    this.traceInstant("clisbot.connection.state", {
       from: previous.status,
       to: next.status,
       event: metadata?.event ?? "STATE_UPDATE",
@@ -7040,7 +7040,7 @@ export class DaemonClient {
     const baseDelay = this.config.reconnect?.baseDelayMs ?? DEFAULT_RECONNECT_BASE_DELAY_MS;
     const maxDelay = this.config.reconnect?.maxDelayMs ?? DEFAULT_RECONNECT_MAX_DELAY_MS;
     const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
-    this.traceInstant("paseo.connection.reconnect", {
+    this.traceInstant("clisbot.connection.reconnect", {
       attempt: String(attempt),
       delayMs: String(delay),
     });

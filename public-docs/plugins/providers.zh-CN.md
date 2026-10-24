@@ -1,14 +1,14 @@
 ---
 title: 构建 Provider 插件
-description: 直接把编程 Agent 接入 Paseo，或适配一个 ACP Agent。
+description: 直接把编程 Agent 接入 Clisbot，或适配一个 ACP Agent。
 nav: Provider 插件
 ---
 
 # 构建 Provider 插件 {#build-a-provider-plugin}
 
-如果你之前没有构建过 Paseo 插件，请从[插件快速上手](/docs/plugins)开始。
+如果你之前没有构建过 Clisbot 插件，请从[插件快速上手](/docs/plugins)开始。
 
-Provider 插件把一个编程 Agent 接入 Paseo，而无需把它加入 Paseo 核心。在 npm 或 Git 仓库中[发布插件](/docs/plugins/publishing)，用户就可以用 `paseo plugin install` 安装它。
+Provider 插件把一个编程 Agent 接入 Clisbot，而无需把它加入 Clisbot 核心。在 npm 或 Git 仓库中[发布插件](/docs/plugins/publishing)，用户就可以用 `clisbot plugin install` 安装它。
 
 选择一种实现方式：
 
@@ -19,9 +19,9 @@ Provider 插件把一个编程 Agent 接入 Paseo，而无需把它加入 Paseo 
 
 示例有：
 
-- [`provider-direct`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-direct)：会话、设置、提示词、持久化、子会话，以及一个由 Provider 拥有的时间线渲染器；
-- [`provider-acp-transformer`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-acp-transformer)：一个 ACP 命令模板，带有一个用 Zod 校验的厂商编辑转换器。加载之前，请把 `example-acp --stdio` 替换为一个已安装的 ACP Agent；
-- [`inline-thinking`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/inline-thinking)：一个只包含渲染器、不实现 Provider 的插件。
+- [`provider-direct`](https://github.com/longbkit/clisbot/tree/main/plugin-examples/provider-direct)：会话、设置、提示词、持久化、子会话，以及一个由 Provider 拥有的时间线渲染器；
+- [`provider-acp-transformer`](https://github.com/longbkit/clisbot/tree/main/plugin-examples/provider-acp-transformer)：一个 ACP 命令模板，带有一个用 Zod 校验的厂商编辑转换器。加载之前，请把 `example-acp --stdio` 替换为一个已安装的 ACP Agent；
+- [`inline-thinking`](https://github.com/longbkit/clisbot/tree/main/plugin-examples/inline-thinking)：一个只包含渲染器、不实现 Provider 的插件。
 
 ## 注册直接实现的 Provider {#register-a-direct-provider}
 
@@ -29,7 +29,7 @@ Provider 插件把一个编程 Agent 接入 Paseo，而无需把它加入 Paseo 
 
 ```ts
 // index.server.ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { createProvider } from "./server/provider";
 
 export default function contribute(server: PluginServerContext) {
@@ -44,7 +44,7 @@ export default function contribute(server: PluginServerContext) {
 import {
   negotiateProviderCapabilities,
   type ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 const supported = ["prompt.message"] as const;
 
@@ -71,12 +71,12 @@ export function createProvider(): ProviderRegistration {
 
 ## 启动 Provider CLI {#launch-the-provider-cli}
 
-对于进程传输和 CLI 探测，请使用 `@getpaseo/plugin/server` 中的 `spawnProcess` 和 `execCommand`。两者都能处理 Windows 的 `.cmd`/`.bat` 启动器，并为 shell 参数加引号。原生的 Node `spawn` 和 `execFile` 在 Windows 上会拒绝这些启动器。
+对于进程传输和 CLI 探测，请使用 `@clisbot/plugin/server` 中的 `spawnProcess` 和 `execCommand`。两者都能处理 Windows 的 `.cmd`/`.bat` 启动器，并为 shell 参数加引号。原生的 Node `spawn` 和 `execFile` 在 Windows 上会拒绝这些启动器。
 
 daemon 在 `request.launch` 中提供解析后的命令、参数前缀和完整的环境变量。请显式传入这些环境变量；这些辅助函数不会应用 daemon 的环境策略。把进程生命周期和协议截止时间保留在你的 Provider 内部。正常关闭时结束 stdin；强制停止时使用 `terminateProcess(child)`。它在 Windows 上会结束整个进程树，包括命令脚本启动器背后的 CLI。为最后等待流关闭的过程设定上限。
 
 ```ts
-import { spawnProcess, execCommand } from "@getpaseo/plugin/server";
+import { spawnProcess, execCommand } from "@clisbot/plugin/server";
 
 const child = spawnProcess(launch.command, [...launch.args, "serve"], {
   env: launch.env,
@@ -91,7 +91,7 @@ const { stdout } = await execCommand(launch.command, [...launch.args, "--version
 
 ## 返回模型、模式和思考选项 {#return-models-modes-and-thinking-options}
 
-Paseo 在创建会话之前会请求目录。返回 Agent 表单需要的选项：
+Clisbot 在创建会话之前会请求目录。返回 Agent 表单需要的选项：
 
 ```ts
 if (input.type === "catalog") {
@@ -203,7 +203,7 @@ emit({
 emit({ type: "session.turn", sessionId, turnId, state: "completed" });
 ```
 
-对每个 `clientMessageId` 恰好发布一个 `session.prompt_result`。把 `clientMessageId` 复制到用户的时间线条目上，以便 Paseo 替换它乐观显示的消息。每个已开始的轮次都需要一个终止的 `completed`、`failed` 或 `canceled` 事件。
+对每个 `clientMessageId` 恰好发布一个 `session.prompt_result`。把 `clientMessageId` 复制到用户的时间线条目上，以便 Clisbot 替换它乐观显示的消息。每个已开始的轮次都需要一个终止的 `completed`、`failed` 或 `canceled` 事件。
 
 到这一步，Provider 已经可用：用户可以选择模型、打开会话、发送消息并看到回复。
 
@@ -242,19 +242,19 @@ emit({
 });
 ```
 
-Paseo 会在 Composer 中渲染这些控件。用户的修改会以 `session.configure` 的形式到达；应用它，并在 `request.completed` 之前发布已确定的 `session.config`。Provider 可以在运行时改变可用的控件，包括在模型变化之后。
+Clisbot 会在 Composer 中渲染这些控件。用户的修改会以 `session.configure` 的形式到达；应用它，并在 `request.completed` 之前发布已确定的 `session.config`。Provider 可以在运行时改变可用的控件，包括在模型变化之后。
 
-`settings` 是面向用户的控件。`providerOptions` 是在创建会话时提供的不透明 JSON，用于 Paseo 不会渲染的 Provider 专属配置。Provider 专属的 token 预算应放在这两处之一；它不是一个专门的提示词字段。
+`settings` 是面向用户的控件。`providerOptions` 是在创建会话时提供的不透明 JSON，用于 Clisbot 不会渲染的 Provider 专属配置。Provider 专属的 token 预算应放在这两处之一；它不是一个专门的提示词字段。
 
 ## 添加持久化与重放 {#add-persistence-and-replay}
 
-当原生会话可以被重新打开时，声明 `session.persistence`。当 `session.open.persistence` 不存在时，打开一个新的原生会话；存在时，恢复它所指定的原生会话。在 `session.opened` 或 `session.persistence` 中返回一个不透明的持久化值；Paseo 会保存它而不检查其内容。
+当原生会话可以被重新打开时，声明 `session.persistence`。当 `session.open.persistence` 不存在时，打开一个新的原生会话；存在时，恢复它所指定的原生会话。在 `session.opened` 或 `session.persistence` 中返回一个不透明的持久化值；Clisbot 会保存它而不检查其内容。
 
 当 `history` 为 `"replay"` 时，请在 `session.ready` 之前发布原生会话已有的 `timeline.item` 快照。使用 `history: "skip"` 可以在不重放旧记录的情况下打开会话。
 
-Paseo 刷新 Agent 的方式是关闭它当前的 Provider 会话，然后用当前的配置和持久化值重新打开。请在 `session.open` 期间重新读取凭据、环境变量、全局配置和 MCP 服务器。没有单独的重新加载操作。
+Clisbot 刷新 Agent 的方式是关闭它当前的 Provider 会话，然后用当前的配置和持久化值重新打开。请在 `session.open` 期间重新读取凭据、环境变量、全局配置和 MCP 服务器。没有单独的重新加载操作。
 
-当 Paseo 可以从持久化值重新打开会话时，使用 `restoration: "core"`。由 Provider 拥有的子会话使用 `restoration: "parent"`；把它作为另一个带有 `parentSessionId` 的 `session.opened` 事件发出，并在恢复父会话时重新创建它。
+当 Clisbot 可以从持久化值重新打开会话时，使用 `restoration: "core"`。由 Provider 拥有的子会话使用 `restoration: "parent"`；把它作为另一个带有 `parentSessionId` 的 `session.opened` 事件发出，并在恢复父会话时重新创建它。
 
 ## 添加命令和引导 {#add-commands-and-steering}
 
@@ -267,11 +267,11 @@ Paseo 刷新 Agent 的方式是关闭它当前的 Provider 会话，然后用当
 
 发布 `session.commands`，向 Composer 添加结构化命令。命令可以开始一个普通轮次，也可以作为副作用完成，并返回一个 `completed` 的提示词结果。
 
-只声明你实现了的能力。如果不支持引导，请省略 `prompt.steer`；Paseo 可以改为替换当前轮次。
+只声明你实现了的能力。如果不支持引导，请省略 `prompt.steer`；Clisbot 可以改为替换当前轮次。
 
 ## 发布时间线条目 {#publish-timeline-items}
 
-通过 `timeline.item` 发布完整的快照。更新流式文本、运行中的工具或待办列表时，复用条目的 `id`。Paseo 会推导出实时增量，并保持正常的时间线。
+通过 `timeline.item` 发布完整的快照。更新流式文本、运行中的工具或待办列表时，复用条目的 `id`。Clisbot 会推导出实时增量，并保持正常的时间线。
 
 内置的条目类型涵盖用户和助手消息、推理、工具、待办事项、错误、通知和上下文压缩。当你的 Provider 有这些类型无法表达的展示方式时，使用插件条目：
 
@@ -293,7 +293,7 @@ emit({
 在 `index.client.tsx` 中单独注册渲染器：
 
 ```tsx
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { z } from "zod";
 import { ReviewVerdict } from "./client/review-verdict";
 
@@ -320,8 +320,8 @@ export default function contribute(client: PluginClientContext) {
 当 Agent 已经支持 ACP 时，使用 ACP 适配层：
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { runAcpProvider } from "@getpaseo/plugin/server/acp";
+import type { PluginServerContext } from "@clisbot/plugin/server";
+import { runAcpProvider } from "@clisbot/plugin/server/acp";
 
 export default function contribute(server: PluginServerContext) {
   server.registerProvider(
@@ -341,7 +341,7 @@ export default function contribute(server: PluginServerContext) {
 只在 ACP 无法描述厂商差异时使用 `transformers`。用 Zod 校验厂商负载，并让格式错误或无关的值保持不变：
 
 ```ts
-import type { AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpTransformer } from "@clisbot/plugin/server/acp";
 import { z } from "zod";
 
 const editSchema = z.object({

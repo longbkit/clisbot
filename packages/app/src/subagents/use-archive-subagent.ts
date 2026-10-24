@@ -1,4 +1,4 @@
-import type { AgentAddress } from "@getpaseo/protocol/addresses";
+import type { AgentAddress } from "@clisbot/protocol/addresses";
 import { useCallback } from "react";
 import { useToast } from "@/contexts/toast-context";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";

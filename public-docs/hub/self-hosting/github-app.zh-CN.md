@@ -14,16 +14,16 @@ Hub 通过一个由你创建并拥有的 GitHub App 与 GitHub 通信。一个 A
 
 仓库访问和安装不需要 GitHub webhook。GitHub 事件触发器和配置同步则需要：GitHub 必须能够把事件投递到一个公开的 HTTPS URL。
 
-在本地 HTTP 的 Hub 上，Apps 指南允许你配置仓库访问，并说明事件设置不可用。设置 `PASEO_HUB_APP_URL` 后，在 Hub 的公开地址上重新打开它，即可添加 webhook 密钥和事件。
+在本地 HTTP 的 Hub 上，Apps 指南允许你配置仓库访问，并说明事件设置不可用。设置 `CLISBOT_HUB_APP_URL` 后，在 Hub 的公开地址上重新打开它，即可添加 webhook 密钥和事件。
 
 GitHub 会使用以下 Hub URL：
 
-| 设置项       | Hub URL                                                |
-| ------------ | ------------------------------------------------------ |
-| Homepage URL | `<PASEO_HUB_APP_URL>`                                  |
-| Callback URL | `<PASEO_HUB_APP_URL>/api/integrations/github/callback` |
-| Setup URL    | `<PASEO_HUB_APP_URL>/api/integrations/github/setup`    |
-| Webhook URL  | `<PASEO_HUB_APP_URL>/webhook`                          |
+| 设置项       | Hub URL                                                  |
+| ------------ | -------------------------------------------------------- |
+| Homepage URL | `<CLISBOT_HUB_APP_URL>`                                  |
+| Callback URL | `<CLISBOT_HUB_APP_URL>/api/integrations/github/callback` |
+| Setup URL    | `<CLISBOT_HUB_APP_URL>/api/integrations/github/setup`    |
+| Webhook URL  | `<CLISBOT_HUB_APP_URL>/webhook`                          |
 
 请保持 GitHub 的 SSL 验证开启。
 
@@ -42,7 +42,7 @@ Hub 验证 App 之后，选择 **Install on GitHub**。选择 App 可以访问�
 ## 连接提供什么 {#what-the-connection-provides}
 
 - **事件**：来自该安装可见仓库的 issue、评论、审查和推送。参见 [GitHub 触发器](/docs/hub/triggers/github)。
-- **配置同步**：仓库可以保存标准的 `.paseo` 配置包。参见[配置](/docs/hub/configuration)。
+- **配置同步**：仓库可以保存标准的 `.clisbot` 配置包。参见[配置](/docs/hub/configuration)。
 - **执行凭据**：对于明确请求 GitHub 权限的 workflow step，Hub 会签发限定范围的 GitHub App token。
 
 daemon 上已认证的 `gh` CLI 不会配置 Hub 的 GitHub 集成。它仍然可以在 Hub 限定的 GitHub 权限之外为 Agent 服务，但受 daemon 和 Provider 自身的环境与权限策略约束。

@@ -1,6 +1,6 @@
 import { usePaneContext } from "@/panels/pane-context";
 import { useEffect, useMemo, useState } from "react";
-import type { PluginFile, PluginTab } from "@getpaseo/plugin/client";
+import type { PluginFile, PluginTab } from "@clisbot/plugin/client";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";

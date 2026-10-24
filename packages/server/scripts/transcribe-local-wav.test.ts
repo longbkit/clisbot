@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe("transcribe-local-wav CLI", () => {
   test("initializes the complete speech provider configuration", () => {
-    const modelsDir = mkdtempSync(path.join(tmpdir(), "paseo-transcribe-local-"));
+    const modelsDir = mkdtempSync(path.join(tmpdir(), "clisbot-transcribe-local-"));
     tempDirs.push(modelsDir);
     const missingWav = path.join(modelsDir, "missing.wav");
     const scriptPath = fileURLToPath(new URL("./transcribe-local-wav.ts", import.meta.url));

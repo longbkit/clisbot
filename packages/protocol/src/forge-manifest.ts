@@ -1,5 +1,5 @@
 /**
- * Declarative manifest of the git forges Paseo knows how to present, mirroring
+ * Declarative manifest of the git forges Clisbot knows how to present, mirroring
  * provider-manifest.ts. Pure build-time data shared by BOTH the client (icon,
  * brand label, PR↔MR relabel) and the server (registry host-matching, prompt
  * branding). It is NEVER serialized over the wire, so adding a forge here is not
@@ -45,7 +45,7 @@ export interface ForgeDefinition {
   issueNumberPrefix: string;
   /** Icon key; the client falls back to a generic git icon for unknown values. */
   iconKind: string;
-  /** Sign-in recipe, or null when the forge has no Paseo-driven sign-in. */
+  /** Sign-in recipe, or null when the forge has no Clisbot-driven sign-in. */
   signIn: ForgeSignInCommand | null;
   /**
    * Public cloud hosts this forge owns exactly. A BOUNDED list, never an

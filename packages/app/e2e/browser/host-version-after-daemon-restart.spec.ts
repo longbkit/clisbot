@@ -15,7 +15,7 @@ const HOST_LABEL = "Version restart QA";
 const NO_RELOAD_MARKER = "before-restart";
 
 interface ReloadMarkerWindow {
-  __paseoE2eHostVersionMarker?: string;
+  __clisbotE2eHostVersionMarker?: string;
 }
 
 test.describe.configure({ timeout: 120_000 });
@@ -99,13 +99,13 @@ async function markPageForNoReloadCheck(page: Page, marker: string): Promise<voi
   // The marker has to cross into the page as an argument: the callback runs in the browser, so a
   // captured Node-side constant is not defined there.
   await page.evaluate((value) => {
-    (window as typeof window & ReloadMarkerWindow).__paseoE2eHostVersionMarker = value;
+    (window as typeof window & ReloadMarkerWindow).__clisbotE2eHostVersionMarker = value;
   }, marker);
 }
 
 async function expectNoReloadSinceMarker(page: Page): Promise<void> {
   const marker = await page.evaluate(
-    () => (window as typeof window & ReloadMarkerWindow).__paseoE2eHostVersionMarker ?? null,
+    () => (window as typeof window & ReloadMarkerWindow).__clisbotE2eHostVersionMarker ?? null,
   );
   expect(marker).toBe(NO_RELOAD_MARKER);
 }

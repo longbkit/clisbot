@@ -19,7 +19,7 @@ let GIT_WORKTREE: string;
 
 describe("bootstrapWorkspaceRegistries", () => {
   let tmpDir: string;
-  let paseoHome: string;
+  let clisbotHome: string;
   let agentStorage: AgentStorage;
   let projectRegistry: FileBackedProjectRegistry;
   let workspaceRegistry: FileBackedWorkspaceRegistry;
@@ -32,14 +32,14 @@ describe("bootstrapWorkspaceRegistries", () => {
     ARCHIVED_PROJECT = path.join(tmpDir, "archived-project");
     GIT_PROJECT = path.join(tmpDir, "legacy-git-project");
     GIT_WORKTREE = path.join(tmpDir, "legacy-git-project-feature");
-    paseoHome = path.join(tmpDir, ".paseo");
-    agentStorage = new AgentStorage(path.join(paseoHome, "agents"), logger);
+    clisbotHome = path.join(tmpDir, ".clisbot");
+    agentStorage = new AgentStorage(path.join(clisbotHome, "agents"), logger);
     projectRegistry = new FileBackedProjectRegistry(
-      path.join(paseoHome, "projects", "projects.json"),
+      path.join(clisbotHome, "projects", "projects.json"),
       logger,
     );
     workspaceRegistry = new FileBackedWorkspaceRegistry(
-      path.join(paseoHome, "projects", "workspaces.json"),
+      path.join(clisbotHome, "projects", "workspaces.json"),
       logger,
     );
     workspaceGitService = createNoopWorkspaceGitService();
@@ -78,7 +78,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -119,7 +119,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -160,7 +160,7 @@ describe("bootstrapWorkspaceRegistries", () => {
 
     await expect(
       bootstrapWorkspaceRegistries({
-        paseoHome,
+        clisbotHome,
         agentStorage,
         projectRegistry,
         workspaceRegistry,
@@ -225,7 +225,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -298,7 +298,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -319,7 +319,7 @@ describe("bootstrapWorkspaceRegistries", () => {
         currentBranch: cwd === GIT_PROJECT ? "main" : "feature/plain",
         remoteUrl: "git@github.com:acme/legacy-project.git",
         worktreeRoot: cwd,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: cwd === GIT_PROJECT ? null : GIT_PROJECT,
       }),
     });
@@ -348,7 +348,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     }
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -440,7 +440,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -495,7 +495,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -513,7 +513,7 @@ describe("bootstrapWorkspaceRegistries", () => {
       archivedAt: null,
     });
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,
@@ -560,7 +560,7 @@ describe("bootstrapWorkspaceRegistries", () => {
     });
 
     await bootstrapWorkspaceRegistries({
-      paseoHome,
+      clisbotHome,
       agentStorage,
       projectRegistry,
       workspaceRegistry,

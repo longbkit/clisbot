@@ -8,11 +8,11 @@ category: Hub
 
 # GitHub triggers
 
-Use semantic GitHub events to start a workflow from one GitHub action. Add the workflow below to a repository whose `.paseo/hub.yml` defines the `dev` environment and `codex` agent, then activate the bundle.
+Use semantic GitHub events to start a workflow from one GitHub action. Add the workflow below to a repository whose `.clisbot/hub.yml` defines the `dev` environment and `codex` agent, then activate the bundle.
 
 ## Triage new issues
 
-`.paseo/workflows/triage-issue.yml`:
+`.clisbot/workflows/triage-issue.yml`:
 
 ```yaml
 name: triage-issue
@@ -36,7 +36,7 @@ steps:
       - text: |
           Triage the new issue. Add the appropriate labels and leave a short comment
           explaining the result with gh. Use this event context:
-          ${{ paseo.context }}
+          ${{ clisbot.context }}
           Call hub.finish_execution when done.
 ```
 
@@ -44,7 +44,7 @@ steps:
 
 ## Review new pull requests
 
-`.paseo/workflows/review-pull-request.yml`:
+`.clisbot/workflows/review-pull-request.yml`:
 
 ```yaml
 name: review-pull-request
@@ -68,7 +68,7 @@ steps:
     prompt:
       - text: |
           Review the new pull request and submit your findings with gh. Use this event context:
-          ${{ paseo.context }}
+          ${{ clisbot.context }}
           Call hub.finish_execution when done.
 ```
 
@@ -76,7 +76,7 @@ steps:
 
 ## Respond to new comments
 
-`.paseo/workflows/respond-to-issue-comment.yml`:
+`.clisbot/workflows/respond-to-issue-comment.yml`:
 
 ```yaml
 name: respond-to-issue-comment
@@ -84,7 +84,7 @@ on: github.issue_comment_created
 max_runtime: 2h
 filters:
   repo: example/project
-  contains: "@paseo"
+  contains: "@clisbot"
   from_users: [maintainer]
 steps:
   - id: respond
@@ -100,13 +100,13 @@ steps:
     prompt:
       - text: |
           Respond to the new issue comment with gh. Address this request:
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
           Use this event context:
-          ${{ paseo.context }}
+          ${{ clisbot.context }}
           Call hub.finish_execution when done.
 ```
 
-`.paseo/workflows/respond-to-pull-request-comment.yml`:
+`.clisbot/workflows/respond-to-pull-request-comment.yml`:
 
 ```yaml
 name: respond-to-pull-request-comment
@@ -114,7 +114,7 @@ on: github.pull_request_comment_created
 max_runtime: 2h
 filters:
   repo: example/project
-  contains: "@paseo"
+  contains: "@clisbot"
   from_users: [maintainer]
 steps:
   - id: respond
@@ -130,9 +130,9 @@ steps:
     prompt:
       - text: |
           Respond to the new pull-request conversation comment with gh. Address this request:
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
           Use this event context:
-          ${{ paseo.context }}
+          ${{ clisbot.context }}
           Call hub.finish_execution when done.
 ```
 
@@ -142,7 +142,7 @@ For `github.issue_comment_created`, `github.pull_request_comment_created`, `gith
 
 ## Start work when an issue becomes ready
 
-`.paseo/workflows/implement-ready-issue.yml`:
+`.clisbot/workflows/implement-ready-issue.yml`:
 
 ```yaml
 name: implement-ready-issue
@@ -169,7 +169,7 @@ steps:
       - text: |
           Implement the issue that was marked ready for an agent. Create a branch,
           push it, and open a pull request with gh. Use this event context:
-          ${{ paseo.context }}
+          ${{ clisbot.context }}
           Call hub.finish_execution when done.
 ```
 

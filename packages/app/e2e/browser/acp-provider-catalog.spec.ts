@@ -70,7 +70,7 @@ for (const theme of ["light", "dark"] as const) {
         (await client.getProvidersSnapshot()).entries.some((entry) => entry.provider === "hoplite"),
       ).toBe(false);
       await page.addInitScript((value) => {
-        localStorage.setItem("@paseo:app-settings", JSON.stringify({ theme: value }));
+        localStorage.setItem("@clisbot:app-settings", JSON.stringify({ theme: value }));
       }, theme);
       await gotoAppShell(page);
       await openSettings(page);

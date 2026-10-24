@@ -1,4 +1,4 @@
-import { normalizeHost } from "@getpaseo/protocol/git-remote";
+import { normalizeHost } from "@clisbot/protocol/git-remote";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
 import { execCommand } from "./spawn.js";
 

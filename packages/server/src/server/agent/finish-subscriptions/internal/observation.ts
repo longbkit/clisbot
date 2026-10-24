@@ -7,7 +7,7 @@ import { serializeSnapshotWithMetadata } from "../../mcp-shared.js";
 import { createHostObservationResolver, type ToolHosts } from "../../host-operations/index.js";
 import { openFinishObservation } from "./observation-stream.js";
 import type { AgentStreamEvent } from "../../agent-sdk-types.js";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import type { FinishObservation } from "../index.js";
 
 export function createFinishObservation(input: {

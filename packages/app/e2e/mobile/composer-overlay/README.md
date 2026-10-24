@@ -9,7 +9,7 @@ no provider calls are needed during the test.
 Prerequisites:
 
 - Build the server and app dependencies with `npm run build:server` and
-  `npm run build --workspace=@getpaseo/expo-two-way-audio`.
+  `npm run build --workspace=@clisbot/expo-two-way-audio`.
 - Run an isolated development daemon on a non-default port.
 - Run this checkout's Metro server and open the connected Android dev client
   with `agent-device`. The app must already know the isolated daemon.
@@ -21,9 +21,9 @@ Set `WORKSPACE_ID` and `AGENT_ID` to that conversation, then run from the
 repository root, substituting the session and ports:
 
 ```sh
-PASEO_OVERLAY_ARTIFACTS_DIR=.dev/composer-overlay-evidence \
+CLISBOT_OVERLAY_ARTIFACTS_DIR=.dev/composer-overlay-evidence \
   node packages/app/e2e/mobile/composer-overlay/android.mjs \
-  composer-overlay ws://127.0.0.1:6843/ws "$WORKSPACE_ID" "$AGENT_ID" sh.paseo.debug 8193
+  composer-overlay ws://127.0.0.1:6843/ws "$WORKSPACE_ID" "$AGENT_ID" sh.clisbot.debug 8193
 ```
 
 The runner installs and removes its delayed plugin and leaves the conversation

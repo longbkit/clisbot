@@ -1,5 +1,5 @@
-import { parseHostTarget } from "@getpaseo/protocol/host-target";
-import { resolvePaseoHome } from "@getpaseo/server/daemon-control";
+import { parseHostTarget } from "@clisbot/protocol/host-target";
+import { resolveClisbotHome } from "@clisbot/server/daemon-control";
 
 export type DaemonTarget = { kind: "instance"; home: string } | { kind: "endpoint"; host: string };
 
@@ -22,19 +22,19 @@ export function selectDaemonTarget(
       };
     return {
       kind: "instance",
-      home: resolvePaseoHome({ PASEO_HOME: options.home ?? env.PASEO_HOME }),
+      home: resolveClisbotHome({ CLISBOT_HOME: options.home ?? env.CLISBOT_HOME }),
     };
   }
   if (options.home !== undefined)
-    return { kind: "instance", home: resolvePaseoHome({ PASEO_HOME: options.home }) };
+    return { kind: "instance", home: resolveClisbotHome({ CLISBOT_HOME: options.home }) };
   if (options.host !== undefined) return { kind: "endpoint", host: options.host };
-  if (env.PASEO_HOME && env.PASEO_HOST)
+  if (env.CLISBOT_HOME && env.CLISBOT_HOST)
     throw {
       code: "TARGET_AMBIGUOUS",
-      message: "PASEO_HOME and PASEO_HOST are both set. Choose --home or --host explicitly.",
+      message: "CLISBOT_HOME and CLISBOT_HOST are both set. Choose --home or --host explicitly.",
     };
-  if (env.PASEO_HOST) return { kind: "endpoint", host: env.PASEO_HOST };
-  return { kind: "instance", home: resolvePaseoHome({ PASEO_HOME: env.PASEO_HOME }) };
+  if (env.CLISBOT_HOST) return { kind: "endpoint", host: env.CLISBOT_HOST };
+  return { kind: "instance", home: resolveClisbotHome({ CLISBOT_HOME: env.CLISBOT_HOME }) };
 }
 
 export function describeDaemonTarget(target: DaemonTarget): string {

@@ -8,7 +8,7 @@ nav: 概览
 
 定时任务按 cron 节奏为你启动一个新的 Agent：在这个时间，在这个仓库里，用这些 Agent 设置运行这段提示词。
 
-Paseo 还有 **heartbeat**。heartbeat 会定期向一个已有的 Agent 发送提示词，让它重新评估并继续同一段对话。
+Clisbot 还有 **heartbeat**。heartbeat 会定期向一个已有的 Agent 发送提示词，让它重新评估并继续同一段对话。
 
 两者使用同一个 cron 引擎，但在产品中是分开的：
 
@@ -31,13 +31,13 @@ cron 是标准的节奏表示。CLI 接受 `5m` 或 `1h` 这样的简单预设�
 
 - **在应用中**：打开定时任务视图，设置 Agent、cron 节奏、仓库和提示词来创建。这是创建和管理定时任务的主要方式。
 - **[在聊天中](/docs/schedules-chat)**：在聊天中告诉 Agent，它会为你创建定时任务。
-- **[通过 CLI](/docs/schedules-cli)**：`paseo schedule create`，适用于无界面的机器和脚本。
+- **[通过 CLI](/docs/schedules-cli)**：`clisbot schedule create`，适用于无界面的机器和脚本。
 - **[通过 MCP](/docs/mcp)**：Agent 以编程方式创建和管理定时任务。
 
 ## 保留运行工作区 {#keep-run-workspaces}
 
-新建 Agent 的定时任务每次运行都会创建一个工作区。**Archive on finish** 默认开启：运行结束时，Paseo 会归档该工作区及其 Agent。使用 worktree 隔离时，最后一个使用该 worktree 的活跃工作区被归档后，归档还会删除这个 worktree。
+新建 Agent 的定时任务每次运行都会创建一个工作区。**Archive on finish** 默认开启：运行结束时，Clisbot 会归档该工作区及其 Agent。使用 worktree 隔离时，最后一个使用该 worktree 的活跃工作区被归档后，归档还会删除这个 worktree。
 
-要保留运行结果，在应用的定时任务视图中打开该定时任务，关闭 **Archive on finish** 并保存。Paseo 会让每次运行的工作区和 Agent 保持活跃，直到你手动归档；在创建 Agent 之前就失败的运行仍会被清理。该选项同样适用于本地隔离；归档本地工作区不会删除项目目录。
+要保留运行结果，在应用的定时任务视图中打开该定时任务，关闭 **Archive on finish** 并保存。Clisbot 会让每次运行的工作区和 Agent 保持活跃，直到你手动归档；在创建 Agent 之前就失败的运行仍会被清理。该选项同样适用于本地隔离；归档本地工作区不会删除项目目录。
 
 存储的选项是 `target.config.archiveOnFinish`，一个布尔值，省略时默认为 `true`。CLI 和 MCP 的定时任务工具不提供这个选项；请在应用中修改。heartbeat 使用已有的 Agent，没有这个选项。

@@ -4,12 +4,12 @@ Connect your daemon to another machine, then ask an agent to delegate work there
 
 `sh
 
-paseo host add 192.168.1.20:6767 --label studio
+clisbot host add 192.168.1.20:6767 --label studio
 
-paseo host add 'ssh://me@build-box' --label build-box
+clisbot host add 'ssh://me@build-box' --label build-box
 
-paseo host add 'relay://...' --label laptop
+clisbot host add 'relay://...' --label laptop
 
 `
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

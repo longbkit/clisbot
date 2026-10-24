@@ -2,7 +2,7 @@
 
 `native-compact-workspace-scripts.android.ad` covers live script status in the compact ⋯ → Scripts sheet when nothing else keeps the host directory live. Start on a phone with a workspace open, the sidebar closed, and no agent tab selected. A viewed agent tab or the open sidebar hides the failure, because either one keeps the directory subscribed.
 
-The workspace's `paseo.json` needs a long-running plain script, stopped before the run. `SCRIPT` defaults to `worker`:
+The workspace's `clisbot.json` needs a long-running plain script, stopped before the run. `SCRIPT` defaults to `worker`:
 
 ```json
 { "scripts": { "worker": { "command": "node -e \"setInterval(() => {}, 1000)\"" } } }

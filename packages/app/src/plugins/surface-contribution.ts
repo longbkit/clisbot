@@ -1,4 +1,4 @@
-import type { PluginScreenLocation, PluginScreenParams } from "@getpaseo/plugin/client";
+import type { PluginScreenLocation, PluginScreenParams } from "@clisbot/plugin/client";
 import {
   parsePluginScreenParams,
   parsePluginSurfaceRoute,
@@ -42,7 +42,7 @@ export function resolvePluginScreenTitle(
   screen: InstalledPlugin["surfaces"][number],
   legacySidebarItem: InstalledPlugin["legacySidebarItems"][number] | null,
   params: PluginScreenParams,
-  resolve: (text: import("@getpaseo/plugin/client").PluginText) => string,
+  resolve: (text: import("@clisbot/plugin/client").PluginText) => string,
 ): string {
   if (legacySidebarItem) return resolve(legacySidebarItem.title);
   if (typeof screen.title !== "function") return resolve(screen.title);

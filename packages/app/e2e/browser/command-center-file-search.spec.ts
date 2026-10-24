@@ -23,7 +23,7 @@ const FILE_NAME = "needle-layout-stability-command-center.tsx";
 const FILE_DIRECTORY =
   "packages/app/src/command-center/features/workspace-file-search/layout-stability";
 
-function paseoSizedFiles(): Array<{ path: string; content: string }> {
+function clisbotSizedFiles(): Array<{ path: string; content: string }> {
   const files = Array.from({ length: 120 }, (_, index) => ({
     path: `packages/app/src/features/feature-${String(index).padStart(3, "0")}/index.ts`,
     content: `export const feature${index} = ${index};\n`,
@@ -54,8 +54,8 @@ test("workspace file search stays geometrically stable through delayed loading a
   test.setTimeout(120_000);
   const seeded = await seedWorkspace({
     repoPrefix: "command-center-file-search-",
-    title: "Paseo-shaped file search",
-    repo: { files: paseoSizedFiles() },
+    title: "Clisbot-shaped file search",
+    repo: { files: clisbotSizedFiles() },
   });
 
   try {
@@ -150,7 +150,7 @@ test("manual scrolling cancels a pending file-search reveal and query editing re
   const seeded = await seedWorkspace({
     repoPrefix: "command-center-delayed-scroll-",
     title: "Delayed file search scroll",
-    repo: { files: paseoSizedFiles() },
+    repo: { files: clisbotSizedFiles() },
   });
   try {
     const responses = await holdDirectorySuggestionResponses(page);

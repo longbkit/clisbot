@@ -9,14 +9,14 @@ import { connectNewWorkspaceDaemonClient } from "../support/helpers/new-workspac
 
 const PLUGIN_ID = "plugin-host-ui-e2e";
 
-const PLUGIN_SOURCE = `import { usePaseo } from "@getpaseo/plugin/client";
-import { Icon, Modal, useToast, Markdown } from "@getpaseo/plugin/client/ui";
+const PLUGIN_SOURCE = `import { useClisbot } from "@clisbot/plugin/client";
+import { Icon, Modal, useToast, Markdown } from "@clisbot/plugin/client/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 function ModalBody({ onSaved }) {
-  usePaseo();
+  useClisbot();
   useQueryClient();
   const toast = useToast();
 
@@ -28,7 +28,7 @@ function ModalBody({ onSaved }) {
   return <View>
     <Text>Plugin modal contexts ready</Text>
     <Markdown>{"## Plugin report"}</Markdown>
-    <Markdown>{"Checks **passed**. [Documentation](https://paseo.sh/docs/plugins)"}</Markdown>
+    <Markdown>{"Checks **passed**. [Documentation](https://clisbot.com/docs/plugins)"}</Markdown>
     <Markdown>{""}</Markdown>
     <Pressable accessibilityRole="button" onPress={save}>
       <Text>Save issue</Text>
@@ -100,7 +100,7 @@ async function expectPluginMarkdown(page: Page): Promise<void> {
   await expect(page.getByText("Checks passed.", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Documentation", exact: true })).toHaveAttribute(
     "href",
-    "https://paseo.sh/docs/plugins",
+    "https://clisbot.com/docs/plugins",
   );
 }
 
@@ -130,11 +130,11 @@ async function savePluginIssue(page: Page): Promise<void> {
 }
 
 test("plugin modal adapts its presentation and preserves host contexts", async ({ page }) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-host-ui-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-host-ui-e2e-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
   );
   const audio = await readFile(path.resolve(__dirname, "../../assets/audio/thinking-tone.wav"));

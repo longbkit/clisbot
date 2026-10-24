@@ -1,4 +1,4 @@
-import { defineRpc } from "@getpaseo/plugin";
+import { defineRpc } from "@clisbot/plugin";
 import { z } from "zod";
 
 export const incrementRpc = defineRpc({

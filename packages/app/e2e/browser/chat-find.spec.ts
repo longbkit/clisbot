@@ -68,7 +68,7 @@ async function expectHighlight(page: Page, text: string) {
     .poll(() =>
       page.evaluate(() => {
         const entries = Array.from(CSS.highlights.entries()).filter(([name]) =>
-          name.startsWith("paseo-chat-find-"),
+          name.startsWith("clisbot-chat-find-"),
         );
         const texts: string[] = [];
         for (const [, highlight] of entries) {
@@ -82,7 +82,7 @@ async function expectHighlight(page: Page, text: string) {
     .poll(() =>
       page.evaluate(() => {
         const entry = Array.from(CSS.highlights.entries()).find(([name]) =>
-          name.startsWith("paseo-chat-find-"),
+          name.startsWith("clisbot-chat-find-"),
         );
         const range = entry && Array.from(entry[1])[0];
         if (!(range instanceof Range)) return false;
@@ -119,7 +119,7 @@ async function closeFind(page: Page) {
   await expect
     .poll(() =>
       page.evaluate(() =>
-        Array.from(CSS.highlights.keys()).filter((key) => key.startsWith("paseo-chat-find-")),
+        Array.from(CSS.highlights.keys()).filter((key) => key.startsWith("clisbot-chat-find-")),
       ),
     )
     .toEqual([]);
@@ -217,7 +217,7 @@ const ACROSS_RESPONSE = "Reply with scope-needle here.\n\nAnd scope-needle again
 async function highlightedMessage(page: Page) {
   return page.evaluate(() => {
     const entry = Array.from(CSS.highlights.entries()).find(([name]) =>
-      name.startsWith("paseo-chat-find-"),
+      name.startsWith("clisbot-chat-find-"),
     );
     const range = entry && Array.from(entry[1])[0];
     if (!(range instanceof Range)) return null;

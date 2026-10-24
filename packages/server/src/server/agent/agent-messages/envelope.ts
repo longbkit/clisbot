@@ -74,13 +74,12 @@ export function formatAgentMessage(message: AgentMessage): string {
   const server = source?.serverId ? ` source-server-id="${escapeXml(source.serverId)}"` : "";
   const title = source?.title ? ` source-agent-title="${escapeXml(source.title)}"` : "";
   const event = source?.kind === "agent-notification" ? ` event="${source.event}"` : "";
-  return `<paseo-system version="1" ${attributes} message-id="${escapeXml(message.id)}"${server}${title}${event}>\n${escapeXml(message.text)}\n</paseo-system>`;
+  return `<clisbot-system version="1" ${attributes} message-id="${escapeXml(message.id)}"${server}${title}${event}>\n${escapeXml(message.text)}\n</clisbot-system>`;
 }
 
 export function parseAgentMessage(text: string): AgentMessage | null {
-  const envelope = /^<paseo-system((?:\s+[a-z-]+="[^"<>]*")+)>\n([\s\S]*)\n<\/paseo-system>$/.exec(
-    text,
-  );
+  const envelope =
+    /^<clisbot-system((?:\s+[a-z-]+="[^"<>]*")+)>\n([\s\S]*)\n<\/clisbot-system>$/.exec(text);
   if (!envelope) return null;
   const attributes = new Map<string, string>();
   for (const match of envelope[1].matchAll(/\s+([a-z-]+)="([^"<>]*)"/g)) {
@@ -110,7 +109,7 @@ export function parseAgentMessage(text: string): AgentMessage | null {
 /** Accept only a complete sequence of envelopes; prose around them stays user text. */
 export function parseAgentMessages(text: string): AgentMessage[] | null {
   // Bodies are XML escaped, so a literal closing tag unambiguously ends an entry.
-  const parts = text.split(/(?<=<\/paseo-system>)\n+(?=<paseo-system )/);
+  const parts = text.split(/(?<=<\/clisbot-system>)\n+(?=<clisbot-system )/);
   const messages = parts.map(parseAgentMessage);
   return messages.every((message) => message !== null) ? messages : null;
 }
@@ -185,7 +184,7 @@ function projectAgentMessage(item: AgentTimelineItem): AgentTimelineItem | null 
   }
   return {
     type: "tool_call",
-    callId: `paseo-agent-message:${message.id}`,
+    callId: `clisbot-agent-message:${message.id}`,
     agentMessage: {
       event: source.kind === "agent-message" ? "message" : source.event,
       sender: {
@@ -206,15 +205,15 @@ function projectAgentMessage(item: AgentTimelineItem): AgentTimelineItem | null 
 }
 
 /**
- * Wrap a body in <paseo-system>…</paseo-system> so the receiving agent
+ * Wrap a body in <clisbot-system>…</clisbot-system> so the receiving agent
  * recognizes the prompt as system-injected context — not a user turn.
  * Used by schedule fires; agent messages use the versioned envelope.
  */
 export function formatSystemNotificationPrompt(reason: string): string {
-  return `<paseo-system>\n${reason}\n</paseo-system>`;
+  return `<clisbot-system>\n${reason}\n</clisbot-system>`;
 }
 
-const SYSTEM_ENVELOPE_PATTERN = /^<paseo-system>\n[\s\S]*\n<\/paseo-system>$/;
+const SYSTEM_ENVELOPE_PATTERN = /^<clisbot-system>\n[\s\S]*\n<\/clisbot-system>$/;
 
 export function isSystemInjectedEnvelope(text: string): boolean {
   return SYSTEM_ENVELOPE_PATTERN.test(text);

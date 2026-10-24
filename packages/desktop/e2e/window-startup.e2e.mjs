@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron, expect } from "playwright/test";
 
-const root = await mkdtemp(path.join(tmpdir(), "paseo-window-startup-"));
+const root = await mkdtemp(path.join(tmpdir(), "clisbot-window-startup-"));
 const modulePath = fileURLToPath(new URL("../dist/window/show-when-ready.js", import.meta.url));
 
 async function launchWindowWithoutHiddenFrames() {

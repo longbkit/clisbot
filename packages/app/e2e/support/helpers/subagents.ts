@@ -2,7 +2,7 @@ import { connectDaemonClient } from "./daemon-client-loader";
 import { startIsolatedHostDaemon } from "./isolated-host-daemon";
 import { seedWorkspace } from "./seed-client";
 import { getE2EDaemonPort } from "./daemon-port";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { expect, type Page } from "@playwright/test";
 import { daemonWsRoutePattern } from "./daemon-port";
 import type { SeededWorkspace } from "./seed-client";
@@ -65,7 +65,7 @@ export async function seedParentWithSubagent(
   };
 }
 
-/** Seeds an idle Paseo subagent of an existing agent in the same workspace. */
+/** Seeds an idle Clisbot subagent of an existing agent in the same workspace. */
 export async function seedSubagent(
   workspace: Pick<SeededWorkspace, "client" | "repoPath" | "workspaceId">,
   input: { parentId: string; title: string },
@@ -331,7 +331,7 @@ export async function delegateFleetThroughMcp() {
   const { StreamableHTTPClientTransport } =
     await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
   const { z } = await import("zod");
-  type DaemonClient = import("@getpaseo/client/internal/daemon-client").DaemonClient;
+  type DaemonClient = import("@clisbot/client/internal/daemon-client").DaemonClient;
   const workspace = await seedWorkspace({ repoPrefix: "fleet-mcp-" });
   const destination = await startIsolatedHostDaemon(`fleet_${crypto.randomUUID()}`);
   const a = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "fleet-seed-A" });

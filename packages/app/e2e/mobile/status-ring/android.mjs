@@ -19,7 +19,7 @@ const deadline = Date.now() + 30_000;
 do {
   target = ad("cdp", "target", "list", "--url", metroUrl)
     .split("\n")
-    .find((line) => line.includes("sh.paseo.debug"));
+    .find((line) => line.includes("sh.clisbot.debug"));
   if (!target) await delay(250);
 } while (!target && Date.now() < deadline);
 assert(target, "Open the Android dev client on this Metro bundle first");

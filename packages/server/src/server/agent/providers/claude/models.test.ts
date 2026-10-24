@@ -48,14 +48,14 @@ afterEach(async () => {
 });
 
 async function createClaudeConfigDir(settings: unknown): Promise<string> {
-  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-models-"));
   createdClaudeConfigDirs.push(configDir);
   await fs.writeFile(path.join(configDir, "settings.json"), JSON.stringify(settings, null, 2));
   return configDir;
 }
 
 async function createClaudeConfigDirWithRawSettings(settings: string): Promise<string> {
-  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-models-"));
   createdClaudeConfigDirs.push(configDir);
   await fs.writeFile(path.join(configDir, "settings.json"), settings);
   return configDir;
@@ -456,7 +456,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
   });
 
   it("falls back to hardcoded models when settings.json is missing", async () => {
-    const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-"));
+    const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-models-"));
     createdClaudeConfigDirs.push(configDir);
     vi.stubEnv("CLAUDE_CONFIG_DIR", configDir);
     const client = createCatalogClient();
@@ -562,7 +562,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
 
   it("keeps version-gated models when the probe command cannot identify Claude Code", async () => {
     const configDir = await createClaudeConfigDir({});
-    const wrapperDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-wrapper-"));
+    const wrapperDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-wrapper-"));
     const wrapperPath = path.join(wrapperDir, "wrapper");
     await fs.writeFile(wrapperPath, 'console.log("cux 0.4.1");\n');
     try {

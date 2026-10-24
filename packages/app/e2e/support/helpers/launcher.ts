@@ -154,9 +154,9 @@ export async function sampleTabsDuringTransition(
 ): Promise<Array<Array<{ id: string; width: number }>>> {
   await page.evaluate((duration) => {
     const scope = globalThis as typeof globalThis & {
-      __paseoTabTrackFrames?: Array<Array<{ id: string; width: number }>>;
+      __clisbotTabTrackFrames?: Array<Array<{ id: string; width: number }>>;
     };
-    scope.__paseoTabTrackFrames = [];
+    scope.__clisbotTabTrackFrames = [];
     const startedAt = performance.now();
     function sample() {
       const tabs = Array.from(
@@ -164,7 +164,7 @@ export async function sampleTabsDuringTransition(
           '[data-testid^="workspace-tab-"][role="button"][aria-selected]',
         ),
       ).filter((element) => element.getClientRects().length > 0);
-      scope.__paseoTabTrackFrames?.push(
+      scope.__clisbotTabTrackFrames?.push(
         tabs.map((element) => ({
           id: element.getAttribute("data-testid") ?? "",
           width: Math.round(element.getBoundingClientRect().width),
@@ -183,9 +183,9 @@ export async function sampleTabsDuringTransition(
   await page.waitForTimeout(durationMs + 100);
   return page.evaluate(() => {
     const scope = globalThis as typeof globalThis & {
-      __paseoTabTrackFrames?: Array<Array<{ id: string; width: number }>>;
+      __clisbotTabTrackFrames?: Array<Array<{ id: string; width: number }>>;
     };
-    return scope.__paseoTabTrackFrames ?? [];
+    return scope.__clisbotTabTrackFrames ?? [];
   });
 }
 

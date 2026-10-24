@@ -65,7 +65,7 @@ is exhausted.
 
 ## Durable item anchors
 
-Provider message IDs are not guaranteed for every displayed item. Paseo-generated system errors are one example. Rendered item indices are not durable either because pagination and projection can merge source rows.
+Provider message IDs are not guaranteed for every displayed item. Clisbot-generated system errors are one example. Rendered item indices are not durable either because pagination and projection can merge source rows.
 
 Actions that address a point in chat history, such as Fork, use the daemon timeline `epoch` plus the projected item's `seqEnd`. The app carries that position on the rendered assistant item for both live and fetched history. When adjacent projected chunks merge, the merged item retains the newer chunk's position.
 
@@ -251,8 +251,8 @@ do not imply local ownership or authorization. Capture the sender title at deliv
 removed senders must remain understandable without a live directory lookup.
 
 The optional `agentMessage` payload carries event, sender, and delivered text. Shared client
-presentation (`protocol/paseo-tool-presentation`) owns its heading and expanded details, next to the
-labels for every Paseo MCP tool. The daemon
+presentation (`protocol/clisbot-tool-presentation`) owns its heading and expanded details, next to the
+labels for every Clisbot MCP tool. The daemon
 must not construct UI labels or prepend sender labels to the semantic message body. The existing
 `tool_call` / `plain_text` envelope is a compatibility adapter: older clients still parse the row and
 expand its body. New clients use the typed payload, never infer the event from a tool name or parse

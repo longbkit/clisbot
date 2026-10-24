@@ -1,4 +1,4 @@
-import type { ScheduleSummary } from "@getpaseo/protocol/schedule/types";
+import type { ScheduleSummary } from "@clisbot/protocol/schedule/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   describeCron,

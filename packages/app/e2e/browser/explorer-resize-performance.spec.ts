@@ -9,7 +9,7 @@ interface DragMeasurement {
 
 declare global {
   interface Window {
-    __PASEO_EXPLORER_DRAG_MEASUREMENT__?: DragMeasurement;
+    __CLISBOT_EXPLORER_DRAG_MEASUREMENT__?: DragMeasurement;
   }
 }
 
@@ -26,7 +26,7 @@ async function beginResizeMeasurement(page: Page): Promise<void> {
   await page.evaluate(() => {
     const stylesheet = document.getElementById("unistyles-web");
     if (!stylesheet) throw new Error("Shared stylesheet is missing");
-    globalThis.__PASEO_RESET_RENDER_PROFILE__!();
+    globalThis.__CLISBOT_RESET_RENDER_PROFILE__!();
     const measurement: DragMeasurement = {
       stylesheetMutations: 0,
       observer: new MutationObserver((records) => {
@@ -38,7 +38,7 @@ async function beginResizeMeasurement(page: Page): Promise<void> {
       subtree: true,
       characterData: true,
     });
-    window.__PASEO_EXPLORER_DRAG_MEASUREMENT__ = measurement;
+    window.__CLISBOT_EXPLORER_DRAG_MEASUREMENT__ = measurement;
   });
 }
 
@@ -62,11 +62,11 @@ async function previewExplorerResize(page: Page, distance: number) {
   }
   const during = (await explorer.boundingBox())!.width;
   const measurement = await page.evaluate(() => {
-    const state = window.__PASEO_EXPLORER_DRAG_MEASUREMENT__!;
+    const state = window.__CLISBOT_EXPLORER_DRAG_MEASUREMENT__!;
     state.observer.disconnect();
     return {
       stylesheetMutations: state.stylesheetMutations,
-      paneRenders: Object.entries(globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {})
+      paneRenders: Object.entries(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {})
         .filter(([id]) => id.startsWith("SplitPaneView:"))
         .reduce((sum, [, reasons]) => sum + (reasons.render ?? 0), 0),
     };
@@ -92,7 +92,7 @@ test("Explorer drag previews without rerendering panes or rewriting the shared s
 }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.addInitScript(() => {
-    globalThis.__PASEO_RENDER_PROFILE_ENABLED__ = true;
+    globalThis.__CLISBOT_RENDER_PROFILE_ENABLED__ = true;
   });
   const workspace = await withWorkspace();
   await workspace.navigateTo();
@@ -103,7 +103,7 @@ test("Explorer drag previews without rerendering panes or rewriting the shared s
   // Verify that direct pane renders are being counted before resetting them.
   expect(
     await page.evaluate(() =>
-      Object.keys(globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {}).some((id) =>
+      Object.keys(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {}).some((id) =>
         id.startsWith("SplitPaneView:"),
       ),
     ),

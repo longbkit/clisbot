@@ -28,7 +28,7 @@ Slack 可以通过两种方式连接 Hub：
 把机器人邀请到每个它需要关注的频道：
 
 ```text
-/invite @Paseo
+/invite @Clisbot
 ```
 
 现在编写一个 [Slack 触发器](/docs/hub/triggers/slack)。
@@ -43,10 +43,10 @@ Apps 指南会给出一份 webhook manifest，并要求填写 App ID、Client ID
 
 Slack 调用：
 
-| Provider 设置 | Hub URL                                               |
-| ------------- | ----------------------------------------------------- |
-| Redirect URL  | `<PASEO_HUB_APP_URL>/api/integrations/slack/callback` |
-| Request URL   | `<PASEO_HUB_APP_URL>/api/integrations/slack/events`   |
+| Provider 设置 | Hub URL                                                 |
+| ------------- | ------------------------------------------------------- |
+| Redirect URL  | `<CLISBOT_HUB_APP_URL>/api/integrations/slack/callback` |
+| Request URL   | `<CLISBOT_HUB_APP_URL>/api/integrations/slack/events`   |
 
 请从 Hub 发起安装。只从 Slack 发起的安装不会绑定到任何 Hub 组织。
 

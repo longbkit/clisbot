@@ -9,7 +9,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { languageAlternates, LOCALES, localizePath } from "./src/i18n/locale";
 
 const repoRoot = path.resolve(__dirname, "../..");
-const siteHost = "https://paseo.sh";
+const siteHost = "https://clisbot.com";
 const routesDir = path.join(__dirname, "src/routes/{-$locale}");
 // A translation such as `cli.zh-CN.md` is the same page as `cli.md` in another language.
 const TRANSLATION_FILE = /\.[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*\.md$/;

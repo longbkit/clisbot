@@ -14,7 +14,7 @@ on: github.issue_comment
 max_runtime: 2h
 filters:
   repo: example/project
-  contains: "@paseo"
+  contains: "@clisbot"
   from_users: [maintainer]
 steps:
   - id: implement
@@ -32,7 +32,7 @@ steps:
       - text: |
           Implement the request, push a branch, and open a pull request with gh.
           Call hub.finish_execution when done.
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
 ```
 
 Agent 可以在声明的仓库和权限范围内使用 `git` 和 `gh`。当请求延续某个 Agent 时 token 的生命周期，见 [Agent 延续](/docs/hub/configuration/hub-yml#agent-continuation)。
@@ -68,7 +68,7 @@ Hub 通过环境变量提供 `GH_TOKEN` 以及进程级的 git 配置：
 
 ```yaml
 env:
-  SOME_TOKEN: "${{ paseo.connections.some-connection.token }}"
+  SOME_TOKEN: "${{ clisbot.connections.some-connection.token }}"
 ```
 
 Hub 在准备 Agent 的环境时解析这个值。Provider 和主机的边界见 [Hub 安全](/docs/hub/security)。

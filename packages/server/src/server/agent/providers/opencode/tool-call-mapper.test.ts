@@ -188,9 +188,9 @@ describe("opencode tool-call mapper", () => {
         toolName: "read",
         callId: "opencode-read-xml",
         status: "completed",
-        input: { filePath: "/workspaces/paseo/docs/release.md" },
+        input: { filePath: "/workspaces/clisbot/docs/release.md" },
         output: [
-          "<path>/workspaces/paseo/docs/release.md</path>",
+          "<path>/workspaces/clisbot/docs/release.md</path>",
           "<type>file</type>",
           "<content>",
           "1: # Release",
@@ -203,7 +203,7 @@ describe("opencode tool-call mapper", () => {
 
     expect(item.detail).toEqual({
       type: "read",
-      filePath: "/workspaces/paseo/docs/release.md",
+      filePath: "/workspaces/clisbot/docs/release.md",
       content: [
         "1: # Release",
         "2:",
@@ -282,7 +282,7 @@ describe("opencode tool-call mapper", () => {
         callId: "opencode-write-success-text",
         status: "completed",
         input: {
-          filePath: "/workspaces/paseo/worktrees/cold-ladybug/dummy.txt",
+          filePath: "/workspaces/clisbot/worktrees/cold-ladybug/dummy.txt",
           content: "hello world\n",
         },
         output: "Wrote file successfully.",
@@ -291,7 +291,7 @@ describe("opencode tool-call mapper", () => {
 
     expect(item.detail).toEqual({
       type: "write",
-      filePath: "/workspaces/paseo/worktrees/cold-ladybug/dummy.txt",
+      filePath: "/workspaces/clisbot/worktrees/cold-ladybug/dummy.txt",
       content: "hello world\n",
     });
   });
@@ -303,7 +303,7 @@ describe("opencode tool-call mapper", () => {
         callId: "opencode-edit-camel",
         status: "completed",
         input: {
-          filePath: "/workspaces/paseo/packages/website/src/data/agent-pages.ts",
+          filePath: "/workspaces/clisbot/packages/website/src/data/agent-pages.ts",
           oldString: 'metaTitle: "Agent page"',
           newString: 'metaTitle: "Updated agent page"',
         },
@@ -313,7 +313,7 @@ describe("opencode tool-call mapper", () => {
 
     expect(item.detail).toEqual({
       type: "edit",
-      filePath: "/workspaces/paseo/packages/website/src/data/agent-pages.ts",
+      filePath: "/workspaces/clisbot/packages/website/src/data/agent-pages.ts",
       oldString: 'metaTitle: "Agent page"',
       newString: 'metaTitle: "Updated agent page"',
     });
@@ -539,7 +539,7 @@ describe("opencode tool-call mapper", () => {
   it("does not apply cross-provider speak normalization in opencode mapper", () => {
     const item = expectMapped(
       mapOpencodeToolCall({
-        toolName: "paseo_voice.speak",
+        toolName: "clisbot_voice.speak",
         callId: "opencode-call-voice-1",
         status: "completed",
         input: { text: "Voice response from OpenCode." },
@@ -547,7 +547,7 @@ describe("opencode tool-call mapper", () => {
       }),
     );
 
-    expect(item.name).toBe("paseo_voice.speak");
+    expect(item.name).toBe("clisbot_voice.speak");
     expect(item.detail).toEqual({
       type: "unknown",
       input: { text: "Voice response from OpenCode." },

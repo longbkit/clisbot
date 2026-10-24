@@ -11,7 +11,7 @@ import {
 import { createAssistantImageAcquisitionCache } from "@/assistant-image/acquisition-cache";
 import { retainAttachmentForGarbageCollection } from "@/attachments/gc-retention";
 import { resolveAssistantImageSource } from "@/utils/assistant-image-source";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { resolveMarkdownPreviewImageSource } from "./image-source";
 import { prepareMarkdownSource } from "./source";

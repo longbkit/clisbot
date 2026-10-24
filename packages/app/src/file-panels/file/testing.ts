@@ -1,4 +1,4 @@
-import type { FileWriteResult } from "@getpaseo/protocol/messages";
+import type { FileWriteResult } from "@clisbot/protocol/messages";
 import type { FileContents, FileObservation, FileSession, FileTarget } from "./handle";
 
 interface StoredFile {

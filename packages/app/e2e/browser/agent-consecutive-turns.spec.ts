@@ -820,7 +820,7 @@ test("keeps the first prompt of a new agent in place through authoritative hydra
   try {
     await page.addInitScript(() => {
       localStorage.setItem(
-        "@paseo:create-agent-preferences",
+        "@clisbot:create-agent-preferences",
         JSON.stringify({
           provider: "mock",
           providerPreferences: {

@@ -10,8 +10,8 @@ const {
 
 const BRIDGING_HEADER_IMPORT = "#import <react-native-paste-input/PasteInputModule.h>";
 const SCENE_DELEGATE = `
-@objc(PaseoSceneDelegate)
-class PaseoSceneDelegate: ExpoAppSceneDelegate {
+@objc(ClisbotSceneDelegate)
+class ClisbotSceneDelegate: ExpoAppSceneDelegate {
   override func scene(
     _ scene: UIScene,
     willConnectTo session: UISceneSession,
@@ -26,7 +26,7 @@ class PaseoSceneDelegate: ExpoAppSceneDelegate {
 `;
 
 function configurePasteInputAppDelegate(contents) {
-  if (contents.includes("class PaseoSceneDelegate:")) return contents;
+  if (contents.includes("class ClisbotSceneDelegate:")) return contents;
   if (!contents.includes("ExpoReactNativeFactoryProvider")) {
     throw new Error("Paste input requires Expo scene support");
   }
@@ -55,7 +55,7 @@ function withPasteInput(config) {
     if (!scenes || scenes.length !== 1) {
       throw new Error("Paste input requires Expo's single scene configuration");
     }
-    scenes[0].UISceneDelegateClassName = "PaseoSceneDelegate";
+    scenes[0].UISceneDelegateClassName = "ClisbotSceneDelegate";
     return modConfig;
   });
   const withPods = withPodfile(withScene, (modConfig) => {

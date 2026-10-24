@@ -5,14 +5,14 @@ import { chromium } from "playwright";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-const baseUrl = process.env.PASEO_PROFILE_APP_URL ?? "http://localhost:19010";
-const serverId = requiredEnv("PASEO_PROFILE_SERVER_ID");
-const workspaceId = requiredEnv("PASEO_PROFILE_WORKSPACE_ID");
-const agentId = requiredEnv("PASEO_PROFILE_AGENT_ID");
-const switchCount = Number(process.env.PASEO_PROFILE_SWITCH_COUNT ?? 6);
-const switchWaitMs = Number(process.env.PASEO_PROFILE_SWITCH_WAIT_MS ?? 250);
-const idleWaitMs = Number(process.env.PASEO_PROFILE_IDLE_WAIT_MS ?? 0);
-const dumpCommits = process.env.PASEO_PROFILE_DUMP_COMMITS === "1";
+const baseUrl = process.env.CLISBOT_PROFILE_APP_URL ?? "http://localhost:19010";
+const serverId = requiredEnv("CLISBOT_PROFILE_SERVER_ID");
+const workspaceId = requiredEnv("CLISBOT_PROFILE_WORKSPACE_ID");
+const agentId = requiredEnv("CLISBOT_PROFILE_AGENT_ID");
+const switchCount = Number(process.env.CLISBOT_PROFILE_SWITCH_COUNT ?? 6);
+const switchWaitMs = Number(process.env.CLISBOT_PROFILE_SWITCH_WAIT_MS ?? 250);
+const idleWaitMs = Number(process.env.CLISBOT_PROFILE_IDLE_WAIT_MS ?? 0);
+const dumpCommits = process.env.CLISBOT_PROFILE_DUMP_COMMITS === "1";
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();
@@ -53,8 +53,8 @@ function killTerminal(terminalId) {
   });
 }
 
-const createdTerminalId = process.env.PASEO_PROFILE_TERMINAL_ID ? null : createTerminal();
-const terminalId = process.env.PASEO_PROFILE_TERMINAL_ID ?? createdTerminalId;
+const createdTerminalId = process.env.CLISBOT_PROFILE_TERMINAL_ID ? null : createTerminal();
+const terminalId = process.env.CLISBOT_PROFILE_TERMINAL_ID ?? createdTerminalId;
 const workspaceSegment = `b64_${Buffer.from(workspaceId, "utf8").toString("base64url")}`;
 const workspaceUrl = `${baseUrl}/h/${serverId}/workspace/${workspaceSegment}`;
 
@@ -128,7 +128,7 @@ async function main() {
     await clickTab(page, agentTab);
     await clickTab(page, terminalTab);
     await page.waitForTimeout(500);
-    await page.evaluate(() => globalThis.__PASEO_RESET_RENDER_PROFILE__?.());
+    await page.evaluate(() => globalThis.__CLISBOT_RESET_RENDER_PROFILE__?.());
 
     if (idleWaitMs > 0) {
       await page.waitForTimeout(idleWaitMs);
@@ -139,8 +139,8 @@ async function main() {
       await clickTab(page, terminalTab);
     }
 
-    const samples = await page.evaluate(() => globalThis.__PASEO_RENDER_PROFILE__ ?? []);
-    const reasons = await page.evaluate(() => globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {});
+    const samples = await page.evaluate(() => globalThis.__CLISBOT_RENDER_PROFILE__ ?? []);
+    const reasons = await page.evaluate(() => globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {});
     console.log(
       JSON.stringify(
         {

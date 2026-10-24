@@ -1,11 +1,11 @@
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { i18n } from "@/i18n/i18next";
 import type { AudioEngine } from "@/audio";
 import { useMemo, useSyncExternalStore } from "react";
 import { QueryClient } from "@tanstack/react-query";
-import { createPaseoApi } from "@getpaseo/client";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
+import { createClisbotApi } from "@clisbot/client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { assertPluginCompatibility } from "@clisbot/protocol/plugin-requirements";
 import { resolveAppVersion } from "@/utils/app-version";
 import { createPluginClientRuntime } from "./client-runtime";
 import { runPluginClientBundle } from "./evaluate";
@@ -22,7 +22,7 @@ export class PluginRegistry {
 
   constructor(
     private readonly dependencies: {
-      localeSource: import("@getpaseo/plugin/client/host").PluginLocaleSource;
+      localeSource: import("@clisbot/plugin/client/host").PluginLocaleSource;
       version: string | null;
       createRuntime: typeof createPluginClientRuntime;
     },
@@ -58,7 +58,7 @@ export class PluginRegistry {
           plugin.id !== options.replacePluginId &&
           plugin.id === entry.id &&
           plugin.clientBundle === entry.clientBundle &&
-          plugin.requirements?.paseo === entry.requirements?.paseo,
+          plugin.requirements?.clisbot === entry.requirements?.clisbot,
       );
       return existing ? [existing] : [];
     });
@@ -86,7 +86,7 @@ export class PluginRegistry {
           lifetime: new AbortController(),
           locale: this.dependencies.localeSource.getLocale(),
           i18n: new PluginTranslationRuntime(this.dependencies.localeSource),
-          paseo: createPaseoApi(client),
+          clisbot: createClisbotApi(client),
           invoke: (method, input) => client.invokePluginRpc(entry.id, method, input),
           id: entry.id,
           serverId,
@@ -116,9 +116,9 @@ export class PluginRegistry {
           this.publish(),
         );
         Object.assign(installation, evaluated);
-        const paseo = installation.paseo;
+        const clisbot = installation.clisbot;
         installation.cleanup = async () => {
-          const results = await Promise.allSettled([paseo.dispose(), evaluated.cleanup()]);
+          const results = await Promise.allSettled([clisbot.dispose(), evaluated.cleanup()]);
           const failures = results.filter((result) => result.status === "rejected");
           if (failures.length)
             throw new AggregateError(
@@ -131,7 +131,7 @@ export class PluginRegistry {
       } catch (error) {
         installation?.lifetime.abort();
         installation?.i18n.dispose();
-        void installation?.paseo
+        void installation?.clisbot
           .dispose()
           .catch((failure) => console.warn(`[Plugins] API cleanup failed for ${key}`, failure));
         this.evaluationErrors.set(key, error instanceof Error ? error.message : String(error));

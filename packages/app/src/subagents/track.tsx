@@ -1,4 +1,4 @@
-import type { AgentAddress } from "@getpaseo/protocol/addresses";
+import type { AgentAddress } from "@clisbot/protocol/addresses";
 import { useHosts } from "@/runtime/host-runtime";
 import { useCallback, useMemo, type ReactElement, type ReactNode } from "react";
 import { Text, View } from "react-native";
@@ -107,7 +107,7 @@ export function SubagentsTrack({
       ) : null}
       {rows.map((row) => (
         <SubagentsTrackRow
-          key={row.kind === "paseo" ? `${row.address.serverId}:${row.id}` : row.id}
+          key={row.kind === "clisbot" ? `${row.address.serverId}:${row.id}` : row.id}
           row={row}
           serverId={serverId}
           onOpenSubagent={onOpenSubagent}
@@ -200,7 +200,7 @@ function SubagentsTrackRow({
 }: SubagentsTrackRowProps): ReactElement {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
-  const rowServerId = row.kind === "paseo" ? row.address.serverId : serverId;
+  const rowServerId = row.kind === "clisbot" ? row.address.serverId : serverId;
   const hostLabel = useHosts().find((host) => host.serverId === rowServerId)?.label ?? rowServerId;
   const presentation = useRowPresentation(row, rowServerId);
   const displayLabel =
@@ -213,10 +213,10 @@ function SubagentsTrackRow({
     }
   }, [onOpenProviderSubagent, onOpenSubagent, row]);
   const handleArchivePress = useCallback(() => {
-    if (row.kind === "paseo") onArchiveSubagent(row.address);
+    if (row.kind === "clisbot") onArchiveSubagent(row.address);
   }, [onArchiveSubagent, row]);
   const handleDetachPress = useCallback(() => {
-    if (row.kind === "paseo") onDetachSubagent?.(row.address);
+    if (row.kind === "clisbot") onDetachSubagent?.(row.address);
   }, [onDetachSubagent, row]);
   const actionsAlwaysVisible = isNative || isCompact;
 
@@ -228,16 +228,16 @@ function SubagentsTrackRow({
           <Text style={styles.rowTitle} numberOfLines={1}>
             {displayLabel}
           </Text>
-          {row.kind === "paseo" ? (
+          {row.kind === "clisbot" ? (
             <>
               <SubagentFacts rowId={row.id} text={rowServerId !== serverId ? hostLabel : ""} />
-              <PaseoSubagentFacts serverId={rowServerId} agentId={row.id} />
+              <ClisbotSubagentFacts serverId={rowServerId} agentId={row.id} />
             </>
           ) : (
             <SubagentFacts rowId={row.id} text={presentation.subtitle} />
           )}
         </View>
-        {row.kind === "paseo" ? (
+        {row.kind === "clisbot" ? (
           <SubagentRowActions
             rowId={row.id}
             displayLabel={displayLabel}
@@ -278,7 +278,7 @@ function SubagentsTrackRow({
 }
 
 /** The same facts line the agent's sheet shows when it opens without its composer. */
-function PaseoSubagentFacts({ serverId, agentId }: { serverId: string; agentId: string }) {
+function ClisbotSubagentFacts({ serverId, agentId }: { serverId: string; agentId: string }) {
   const text = useAgentFactsLine(serverId, agentId);
   return <SubagentFacts rowId={agentId} text={text} />;
 }

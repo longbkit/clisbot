@@ -1,7 +1,7 @@
 import net from "node:net";
 import { execCommand } from "../utils/spawn.js";
 import { findFreePort } from "./service-proxy.js";
-import type { PaseoServicePortAllocation } from "@getpaseo/protocol/paseo-config-schema";
+import type { ClisbotServicePortAllocation } from "@clisbot/protocol/clisbot-config-schema";
 
 const PORT_SCRIPT_TIMEOUT_MS = 10_000;
 const PORT_SCRIPT_MAX_OUTPUT_BYTES = 1024;
@@ -14,7 +14,7 @@ interface PortRange {
 }
 
 export interface AllocateWorkspaceServicePortOptions {
-  allocation: PaseoServicePortAllocation | undefined;
+  allocation: ClisbotServicePortAllocation | undefined;
   cwd: string;
   scriptName: string;
   workspaceId: string;
@@ -60,10 +60,10 @@ async function allocatePortFromScript(options: {
       {
         cwd: options.cwd,
         envOverlay: {
-          PASEO_SCRIPTNAME: options.scriptName,
-          PASEO_WORKSPACE_ID: options.workspaceId,
-          PASEO_BRANCH_NAME: options.branchName ?? "",
-          PASEO_WORKTREE_PATH: options.cwd,
+          CLISBOT_SCRIPTNAME: options.scriptName,
+          CLISBOT_WORKSPACE_ID: options.workspaceId,
+          CLISBOT_BRANCH_NAME: options.branchName ?? "",
+          CLISBOT_WORKTREE_PATH: options.cwd,
         },
         timeout: PORT_SCRIPT_TIMEOUT_MS,
         maxBuffer: PORT_SCRIPT_MAX_OUTPUT_BYTES,

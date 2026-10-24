@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native-unistyles";
 
 /**
  * One muted line of facts about a pane's agent, under the pane's header and above its stream:
- * model, thinking, tokens. Provider subagents get it from the daemon; a Paseo agent shown without
+ * model, thinking, tokens. Provider subagents get it from the daemon; a Clisbot agent shown without
  * its composer gets it from the same facts the composer's controls show.
  */
 export function PaneSubtitle({ text, testID }: { text: string; testID?: string }) {

@@ -12,8 +12,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import {
   DaemonClient as SocketDaemonClient,
   type WebSocketLike,
-} from "@getpaseo/client/internal/daemon-client";
-import { createTestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+} from "@clisbot/client/internal/daemon-client";
+import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
 // The reshaped workspace.create.request forwards its worktree `source`
 // (action/refName/branchName/githubPrNumber/worktreeSlug) into createWorktreeCore.
@@ -27,11 +27,11 @@ function createGitRepoWithBranch(): { repoDir: string; tempRoot: string } {
   const repoDir = path.join(tempRoot, "repo");
   execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
   execFileSync("git", ["config", "core.autocrlf", "false"], { cwd: repoDir, stdio: "pipe" });
-  execFileSync("git", ["config", "user.email", "test@getpaseo.local"], {
+  execFileSync("git", ["config", "user.email", "test@clisbot.local"], {
     cwd: repoDir,
     stdio: "pipe",
   });
-  execFileSync("git", ["config", "user.name", "Paseo Test"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Clisbot Test"], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "initial"], {
     cwd: repoDir,
     stdio: "pipe",
@@ -42,7 +42,7 @@ function createGitRepoWithBranch(): { repoDir: string; tempRoot: string } {
 }
 
 test("workspace.create worktree source forwards action=checkout + refName into the real worktree", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -76,10 +76,10 @@ test("workspace.create worktree source forwards action=checkout + refName into t
 test.each([false, true])(
   "workspace.create opens worktree.terminals (setup service: %s)",
   async (withSetupService) => {
-    const daemon = await createTestPaseoDaemon();
+    const daemon = await createTestClisbotDaemon();
     const { repoDir, tempRoot } = createGitRepoWithBranch();
     writeFileSync(
-      path.join(repoDir, "paseo.json"),
+      path.join(repoDir, "clisbot.json"),
       JSON.stringify({
         worktree: {
           ...(withSetupService
@@ -93,7 +93,7 @@ test.each([false, true])(
               }
             : {}),
           terminals: [
-            { name: "preview", command: "echo paseo-auto-terminal >> terminal-marker.txt" },
+            { name: "preview", command: "echo clisbot-auto-terminal >> terminal-marker.txt" },
           ],
         },
       }),
@@ -103,7 +103,7 @@ test.each([false, true])(
       `
 const fs = require("node:fs");
 if (process.argv[2] === "serve") {
-  require("node:net").createServer().listen(Number(process.env.PASEO_WORKTREE_PORT), "127.0.0.1", () => {
+  require("node:net").createServer().listen(Number(process.env.CLISBOT_WORKTREE_PORT), "127.0.0.1", () => {
     fs.writeFileSync("setup-pid.txt", String(process.pid));
     process.send?.("ready");
   });
@@ -116,8 +116,8 @@ if (process.argv[2] === "serve") {
 }
 `,
     );
-    execFileSync("git", ["add", "paseo.json", "setup.cjs"], { cwd: repoDir, stdio: "pipe" });
-    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "add paseo.json"], {
+    execFileSync("git", ["add", "clisbot.json", "setup.cjs"], { cwd: repoDir, stdio: "pipe" });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "add clisbot.json"], {
       cwd: repoDir,
       stdio: "pipe",
     });
@@ -179,7 +179,7 @@ if (process.argv[2] === "serve") {
           },
           { timeout: 10000 },
         )
-        .toBe("paseo-auto-terminal");
+        .toBe("clisbot-auto-terminal");
       expect(
         (await client.listTerminals(workspaceCwd, undefined, { workspaceId: workspace.id }))
           .terminals,
@@ -198,7 +198,7 @@ if (process.argv[2] === "serve") {
 );
 
 test("existing branch changes remain visible after archive and restore", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -240,7 +240,7 @@ test("existing branch changes remain visible after archive and restore", async (
 }, 180000);
 
 test("workspace.create keeps a branch-off name separate from its worktree slug", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -271,8 +271,8 @@ test("workspace.create keeps a branch-off name separate from its worktree slug",
   }
 }, 180000);
 
-test("workspace.create accepts a Git-valid branch-off name outside Paseo slug syntax", async () => {
-  const daemon = await createTestPaseoDaemon();
+test("workspace.create accepts a Git-valid branch-off name outside Clisbot slug syntax", async () => {
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -306,7 +306,7 @@ test("workspace.create accepts a Git-valid branch-off name outside Paseo slug sy
 }, 180000);
 
 test("workspace.create always creates a new worktree when the slug is already occupied", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -348,7 +348,7 @@ test("workspace.create always creates a new worktree when the slug is already oc
 }, 180000);
 
 test("workspace.create suffixes past an occupied detached worktree", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -393,7 +393,7 @@ test("workspace.create suffixes past an occupied detached worktree", async () =>
 }, 180000);
 
 test("workspace.create suffixes an occupied checkout branch", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -467,7 +467,7 @@ test("restore preserves upstream comparison and update but rejects a missing loc
 }, 180000);
 
 async function createRestorableWorkspace(baseRef: string) {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   onTestFinished(async () => {
@@ -547,7 +547,7 @@ async function expectRestoredComparison(
   ]);
   expect((await client.getCommitFileDiff(cwd, head, "feature.txt")).file?.path).toBe("feature.txt");
   const records = JSON.parse(
-    readFileSync(path.join(daemon.paseoHome, "projects/workspaces.json"), "utf8"),
+    readFileSync(path.join(daemon.clisbotHome, "projects/workspaces.json"), "utf8"),
   );
   expect(
     records.find((record: { workspaceId: string }) => record.workspaceId === workspace.id)
@@ -610,7 +610,7 @@ function setupCommandOutput(detail: { commands: Array<{ log: string }> }): strin
 
 // Setup output is opt-in even for multiple sockets sharing one logical client.
 test("setup details follow one workspace/source and restore after reconnect with minimal directory status", async () => {
-  const daemon = await createTestPaseoDaemon({ mcpEnabled: true });
+  const daemon = await createTestClisbotDaemon({ mcpEnabled: true });
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const clients: SocketDaemonClient[] = [];
   const sockets = new Map<string, WebSocket[]>();
@@ -624,7 +624,7 @@ test("setup details follow one workspace/source and restore after reconnect with
       new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${daemon.port}/mcp/agents`)),
     );
     writeFileSync(
-      path.join(repoDir, "paseo.json"),
+      path.join(repoDir, "clisbot.json"),
       JSON.stringify({ worktree: { setup: "node setup.cjs" } }),
     );
     writeFileSync(
@@ -647,7 +647,7 @@ const timer = setInterval(() => {
 `,
     );
     writeFileSync(path.join(repoDir, ".gitignore"), "*.txt\nwave-*\nemitted-*\n");
-    execFileSync("git", ["add", "paseo.json", "setup.cjs", ".gitignore"], { cwd: repoDir });
+    execFileSync("git", ["add", "clisbot.json", "setup.cjs", ".gitignore"], { cwd: repoDir });
     execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "setup fixture"], {
       cwd: repoDir,
       stdio: "pipe",
@@ -689,9 +689,9 @@ const timer = setInterval(() => {
     const viewer = await connect("setup-viewer");
     const sibling = await connect("setup-viewer");
     const quiet = await connect("setup-quiet");
-    const viewerMessages: import("@getpaseo/protocol/messages").SessionOutboundMessage[] = [];
-    const quietMessages: import("@getpaseo/protocol/messages").SessionOutboundMessage[] = [];
-    const siblingMessages: import("@getpaseo/protocol/messages").SessionOutboundMessage[] = [];
+    const viewerMessages: import("@clisbot/protocol/messages").SessionOutboundMessage[] = [];
+    const quietMessages: import("@clisbot/protocol/messages").SessionOutboundMessage[] = [];
+    const siblingMessages: import("@clisbot/protocol/messages").SessionOutboundMessage[] = [];
     viewer.subscribeRawMessages((message) => viewerMessages.push(message));
     quiet.subscribeRawMessages((message) => quietMessages.push(message));
     sibling.subscribeRawMessages((message) => siblingMessages.push(message));
@@ -903,7 +903,7 @@ const timer = setInterval(() => {
 }, 180000);
 
 test("agent creation rejects legacy worktree intent without provisioning or executing setup", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {

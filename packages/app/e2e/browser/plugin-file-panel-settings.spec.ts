@@ -17,7 +17,7 @@ import { seedWorkspace } from "../support/helpers/seed-client";
 import { openSettingsSection } from "../support/helpers/settings";
 
 const ASK_EVERY_TIME = "Ask every time";
-const SOURCE_OPTION = "Source — Paseo";
+const SOURCE_OPTION = "Source — Clisbot";
 
 function markdownRow(page: Page) {
   return page.getByTestId("file-panel-settings-row-ext:md");
@@ -133,7 +133,7 @@ test("Settings > Files offers Source in place of a panel no host has, and forget
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
-      "@paseo:app-settings",
+      "@clisbot:app-settings",
       JSON.stringify({ filePanelAssociations: { "ext:pdf": "plugin:none/none" } }),
     );
   });

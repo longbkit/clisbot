@@ -171,7 +171,7 @@ describe("Codex app-server provider features", () => {
     }
   });
 
-  test("new models and service tiers work without a Paseo catalog update", async () => {
+  test("new models and service tiers work without a Clisbot catalog update", async () => {
     const { session, appServer } = await createConnectedSession(
       { model: "future-codex-model" },
       {

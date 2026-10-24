@@ -1,5 +1,5 @@
 context platform=ios timeout=90000 retries=1
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 
 open "${APP_ID}"
 wait "id=\"workspace-new-tab-button\"" 30000

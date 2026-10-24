@@ -1,5 +1,5 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { ScheduleSummary } from "@getpaseo/protocol/schedule/types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { ScheduleSummary } from "@clisbot/protocol/schedule/types";
 import { toErrorMessage } from "@/utils/error-messages";
 
 export const schedulesQueryBaseKey = ["schedules"] as const;

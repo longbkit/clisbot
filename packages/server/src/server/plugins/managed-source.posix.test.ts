@@ -15,13 +15,13 @@ afterEach(async () => {
 });
 
 async function createRepository(): Promise<string> {
-  const repository = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-repository-"));
+  const repository = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-repository-"));
   roots.push(repository);
   await runGitCommand(["init", "-b", "main"], { cwd: repository });
-  await runGitCommand(["config", "user.name", "Paseo Tests"], { cwd: repository });
-  await runGitCommand(["config", "user.email", "paseo@example.test"], { cwd: repository });
+  await runGitCommand(["config", "user.name", "Clisbot Tests"], { cwd: repository });
+  await runGitCommand(["config", "user.email", "clisbot@example.test"], { cwd: repository });
   await writeFile(
-    path.join(repository, "paseo-plugin.json"),
+    path.join(repository, "clisbot-plugin.json"),
     JSON.stringify({ id: "managed-example" }),
   );
   await writeFile(path.join(repository, "index.server.ts"), "export default () => () => {};\n");
@@ -57,7 +57,7 @@ async function withGitHubFixture(repository: string, run: () => Promise<void>): 
 
 describe("managed Git plugin sources", () => {
   it("does not expose Git URL credentials when cloning fails", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-home-"));
     roots.push(home);
     const sources = new ManagedPluginSources(home);
 
@@ -69,7 +69,7 @@ describe("managed Git plugin sources", () => {
 
   it("normalizes explicit GitHub and Git identifiers to the same Git source", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-github-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-github-home-"));
     roots.push(home);
     await withGitHubFixture(repository, async () => {
       const sources = new ManagedPluginSources(home);
@@ -86,7 +86,7 @@ describe("managed Git plugin sources", () => {
 
   it("offers current default HEAD after installing a tag", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-home-"));
     roots.push(home);
     const remote = pathToFileURL(repository).href;
     const sources = new ManagedPluginSources(home);
@@ -155,7 +155,7 @@ describe("managed Git plugin sources", () => {
   }, 30_000);
   it("resolves branch, tag and commit installs against changed default HEAD and preserves the reviewed commit", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-review-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-review-"));
     roots.push(home);
     const remote = pathToFileURL(repository).href;
     const initial = (await runGitCommand(["rev-parse", "HEAD"], { cwd: repository })).stdout.trim();
@@ -217,7 +217,7 @@ describe("managed Git plugin sources", () => {
     const repository = await createRepository();
     const nested = path.join(repository, "plugins", "review");
     await mkdir(nested, { recursive: true });
-    for (const name of ["paseo-plugin.json", "index.server.ts"])
+    for (const name of ["clisbot-plugin.json", "index.server.ts"])
       await rename(path.join(repository, name), path.join(nested, name));
     await commitAll(repository, "nested plugin");
     await runGitCommand(["update-server-info"], { cwd: repository });
@@ -238,7 +238,7 @@ describe("managed Git plugin sources", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Expected HTTP port");
     const remote = `http://fixture:fake-secret@127.0.0.1:${address.port}/`;
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-plugin-credential-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-credential-"));
     roots.push(home);
     try {
       const sources = new ManagedPluginSources(home);
@@ -251,7 +251,7 @@ describe("managed Git plugin sources", () => {
         (
           await runGitCommand(["remote", "get-url", "origin"], { cwd: candidate.directory })
         ).stdout.trim(),
-      ).toBe("https://paseo.invalid/plugin.git");
+      ).toBe("https://clisbot.invalid/plugin.git");
       const before = await sources.describe("nested", candidate.directory);
       expect(before.identity).toEqual({
         kind: "git",
@@ -281,7 +281,7 @@ describe("managed Git plugin sources", () => {
 
 describe("registry plugin sources", () => {
   it("explains how to choose a revision when --ref is used with a registry id", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-registry-ref-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-registry-ref-home-"));
     roots.push(home);
     const sources = new ManagedPluginSources(home);
     await expect(
@@ -292,7 +292,7 @@ describe("registry plugin sources", () => {
   });
 
   it("names the registry URL and recovery steps when the registry fetch fails", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-registry-offline-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-registry-offline-home-"));
     roots.push(home);
     const server = createServer((request) => request.socket.destroy());
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -310,7 +310,7 @@ describe("registry plugin sources", () => {
   });
 
   it("explains explicit local and GitHub sources when a registry ID is missing", async () => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-registry-missing-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-registry-missing-home-"));
     roots.push(home);
     const requests: Array<string | undefined> = [];
     const server = createServer((request, response) => {
@@ -335,7 +335,7 @@ describe("registry plugin sources", () => {
 
   it("keeps explicit Git sources and persisted Git installs independent of the registry", async () => {
     const repository = await createRepository();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-registry-off-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-registry-off-home-"));
     roots.push(home);
     const requests: Array<string | undefined> = [];
     const server = createServer((req, res) => {
@@ -390,8 +390,8 @@ describe("registry plugin sources", () => {
     const repository = await createRepository();
     await mkdir(path.join(repository, "packages/example"), { recursive: true });
     await rename(
-      path.join(repository, "paseo-plugin.json"),
-      path.join(repository, "packages/example/paseo-plugin.json"),
+      path.join(repository, "clisbot-plugin.json"),
+      path.join(repository, "packages/example/clisbot-plugin.json"),
     );
     await rename(
       path.join(repository, "index.server.ts"),
@@ -400,7 +400,7 @@ describe("registry plugin sources", () => {
     await commitAll(repository, "move plugin into monorepo");
     const revision = await runGitCommand(["rev-parse", "HEAD"], { cwd: repository });
     const commit = revision.stdout.trim();
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-registry-home-"));
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-registry-home-"));
     roots.push(home);
     const requests: Array<{
       path: string | undefined;
@@ -411,7 +411,7 @@ describe("registry plugin sources", () => {
     const server = createServer((req, res) => {
       requests.push({
         path: req.url,
-        intent: req.headers["x-paseo-install"],
+        intent: req.headers["x-clisbot-install"],
         authorization: req.headers.authorization,
       });
       if (missing) {
@@ -455,7 +455,8 @@ describe("registry plugin sources", () => {
       let candidate = await sources.prepareInstall({ source: "acme/example" });
       candidate = await sources.place("managed-example", candidate);
       expect(
-        JSON.parse(await readFile(path.join(candidate.directory, "paseo-plugin.json"), "utf8")).id,
+        JSON.parse(await readFile(path.join(candidate.directory, "clisbot-plugin.json"), "utf8"))
+          .id,
       ).toBe("managed-example");
       await sources.verifyCandidate("managed-example", candidate);
       sources.commit("managed-example", candidate.record);
@@ -509,17 +510,17 @@ it("installs and updates only the npm artifacts pinned by the plugin registry", 
   const npm = await startNpmRegistry(npmPluginPackages());
   const previous = process.env.npm_config_userconfig;
   process.env.npm_config_userconfig = npm.userconfig;
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-registry-npm-"));
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-registry-npm-"));
   roots.push(home);
   const intents: Array<string | string[] | undefined> = [];
-  let pin = await resolveNpm("paseo-fixture-plugin", "1.0.0", home);
+  let pin = await resolveNpm("clisbot-fixture-plugin", "1.0.0", home);
   const server = createServer((request, response) => {
-    intents.push(request.headers["x-paseo-install"]);
+    intents.push(request.headers["x-clisbot-install"]);
     response.end(
       // Install reads only the ID and artifact, so the document omits the directory's display fields.
       JSON.stringify({
         id: "acme/example",
-        artifact: { kind: "npm", package: "paseo-fixture-plugin", ...pin },
+        artifact: { kind: "npm", package: "clisbot-fixture-plugin", ...pin },
       }),
     );
   });
@@ -537,7 +538,7 @@ it("installs and updates only the npm artifacts pinned by the plugin registry", 
     sources.commit("example", candidate.record);
     expect((await sources.describe("example", candidate.directory)).currentRevision).toBe("1.0.0");
     expect((await sources.preview("example", candidate.directory)).outcome).toBe("current");
-    pin = await resolveNpm("paseo-fixture-plugin", "1.1.0", home);
+    pin = await resolveNpm("clisbot-fixture-plugin", "1.1.0", home);
     const restarted = new ManagedPluginSources(home, options);
     const preview = await restarted.preview("example", candidate.directory);
     expect(preview.target).toEqual({ kind: "npm", ...pin });

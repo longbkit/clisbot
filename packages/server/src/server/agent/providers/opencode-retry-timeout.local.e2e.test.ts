@@ -25,7 +25,7 @@ function listen(server: http.Server): Promise<number> {
 }
 
 test("does not fail an active OpenCode provider retry before the advertised retry delay elapses", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-opencode-retry-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-retry-"));
   const projectDir = path.join(root, "project");
   const xdgConfigHome = path.join(root, "config");
   const xdgDataHome = path.join(root, "data");

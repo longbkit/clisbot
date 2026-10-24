@@ -1,0 +1,6 @@
+{
+  "id": "lifecycle-logger",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

@@ -3,7 +3,7 @@ import { Command } from "commander";
 import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import { describe, expect, it } from "vitest";
 import { createAllowCommand, type PermitClient } from "./allow.js";
 import { createDenyCommand } from "./deny.js";
@@ -165,7 +165,7 @@ for (const action of actions) {
       const failure = expect(command).rejects.toMatchObject({
         code: "PERMISSION_RESPONSE_UNCONFIRMED",
         message: expect.stringContaining(requests[0].id),
-        details: 'Use "paseo permit ls" to check whether the request is still pending',
+        details: 'Use "clisbot permit ls" to check whether the request is still pending',
       });
       await client.waitForResponses(1);
       client.fail(requests[0].id, new Error("Timeout waiting for message (15000ms)"));

@@ -1,4 +1,4 @@
-import type { PluginTheme } from "@getpaseo/plugin";
+import type { PluginTheme } from "@clisbot/plugin";
 import type { Theme } from "@/styles/theme";
 
 export function toPluginTheme(theme: Theme): PluginTheme {

@@ -55,7 +55,7 @@ export function extractWsBearerProtocol(value: string | undefined): string | nul
   for (const protocol of value.split(",")) {
     const trimmed = protocol.trim();
     const segments = trimmed.split(".");
-    if (segments[0] === "paseo" && segments[1] === "bearer" && segments.length >= 3) {
+    if (segments[0] === "clisbot" && segments[1] === "bearer" && segments.length >= 3) {
       return trimmed;
     }
   }
@@ -68,7 +68,7 @@ export function extractWsBearerToken(protocol: string | null): string | null {
     return null;
   }
   const segments = protocol.split(".");
-  if (segments[0] !== "paseo" || segments[1] !== "bearer" || segments.length < 3) {
+  if (segments[0] !== "clisbot" || segments[1] !== "bearer" || segments.length < 3) {
     return null;
   }
   return segments.slice(2).join(".");

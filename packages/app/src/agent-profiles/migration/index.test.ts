@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { LegacyFavoriteProfileMigration } from ".";
 
 class MemoryStorage {
@@ -97,7 +97,7 @@ class FakeProfileHost {
   }
 }
 
-const PREFERENCES_KEY = "@paseo:create-agent-preferences";
+const PREFERENCES_KEY = "@clisbot:create-agent-preferences";
 
 function migrationStorage() {
   return new MemoryStorage({

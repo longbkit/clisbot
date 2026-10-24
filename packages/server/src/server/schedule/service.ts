@@ -12,7 +12,7 @@ import { startAgentRun, type AgentRunController } from "../agent/agent-prompt.js
 import { resolveCreateAgentTitles } from "../agent/create-agent-title.js";
 import { type BoundCreateAgentCommand, formatProviderModel } from "../agent/create-agent/create.js";
 import type { PersistedWorkspaceRecord } from "../workspace-registry.js";
-import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
+import type { CreateClisbotWorktreeWorkflowResult } from "../worktree-session.js";
 import { ScheduleStore } from "./store.js";
 import { computeNextRunAt, validateScheduleCadence } from "./cron.js";
 import type {
@@ -23,8 +23,8 @@ import type {
   StoredSchedule,
   UpdateScheduleInput,
   UpdateScheduleNewAgentConfig,
-} from "@getpaseo/protocol/schedule/types";
-import type { FirstAgentContext } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/schedule/types";
+import type { FirstAgentContext } from "@clisbot/protocol/messages";
 
 const SCHEDULE_TICK_INTERVAL_MS = 1000;
 
@@ -249,7 +249,7 @@ interface ScheduleWorkspaceCreateInput {
 }
 
 export interface ScheduleServiceOptions {
-  paseoHome: string;
+  clisbotHome: string;
   logger: Logger;
   agentManager: ScheduleAgentManager;
   agentStorage: AgentStorage;
@@ -257,9 +257,9 @@ export interface ScheduleServiceOptions {
   createDirectoryWorkspace: (
     input: ScheduleWorkspaceCreateInput,
   ) => Promise<PersistedWorkspaceRecord>;
-  createPaseoWorktreeWorkspace: (
+  createClisbotWorktreeWorkspace: (
     input: ScheduleWorkspaceCreateInput,
-  ) => Promise<CreatePaseoWorktreeWorkflowResult>;
+  ) => Promise<CreateClisbotWorktreeWorkflowResult>;
   archiveWorkspace: (workspaceId: string) => Promise<void>;
   now?: () => Date;
   runner?: (schedule: StoredSchedule, runId: string) => Promise<ScheduleExecutionResult>;
@@ -274,9 +274,9 @@ export class ScheduleService {
   private readonly createDirectoryWorkspace: (
     input: ScheduleWorkspaceCreateInput,
   ) => Promise<PersistedWorkspaceRecord>;
-  private readonly createPaseoWorktreeWorkspace: (
+  private readonly createClisbotWorktreeWorkspace: (
     input: ScheduleWorkspaceCreateInput,
-  ) => Promise<CreatePaseoWorktreeWorkflowResult>;
+  ) => Promise<CreateClisbotWorktreeWorkflowResult>;
   private readonly archiveWorkspace: (workspaceId: string) => Promise<void>;
   private readonly now: () => Date;
   private readonly runner: (
@@ -288,12 +288,12 @@ export class ScheduleService {
 
   constructor(options: ScheduleServiceOptions) {
     this.logger = options.logger.child({ module: "schedule-service" });
-    this.store = new ScheduleStore(join(options.paseoHome, "schedules"), this.logger);
+    this.store = new ScheduleStore(join(options.clisbotHome, "schedules"), this.logger);
     this.agentManager = options.agentManager;
     this.agentStorage = options.agentStorage;
     this.createAgent = options.createAgent;
     this.createDirectoryWorkspace = options.createDirectoryWorkspace;
-    this.createPaseoWorktreeWorkspace = options.createPaseoWorktreeWorkspace;
+    this.createClisbotWorktreeWorkspace = options.createClisbotWorktreeWorkspace;
     this.archiveWorkspace = options.archiveWorkspace;
     this.now = options.now ?? (() => new Date());
     this.runner = options.runner ?? ((schedule, runId) => this.executeSchedule(schedule, runId));
@@ -992,8 +992,8 @@ export class ScheduleService {
         workspaceId: workspace.workspaceId,
         title: resolveScheduleAgentTitle(config, schedule.prompt),
         labels: {
-          "paseo.schedule-id": schedule.id,
-          "paseo.schedule-run": runId,
+          "clisbot.schedule-id": schedule.id,
+          "clisbot.schedule-run": runId,
         },
         mode: config.modeId,
         thinking: config.thinkingOptionId,
@@ -1067,7 +1067,7 @@ export class ScheduleService {
       case "local":
         return this.createDirectoryWorkspace({ cwd: config.cwd, firstAgentContext });
       case "worktree":
-        return (await this.createPaseoWorktreeWorkspace({ cwd: config.cwd, firstAgentContext }))
+        return (await this.createClisbotWorktreeWorkspace({ cwd: config.cwd, firstAgentContext }))
           .workspace;
     }
   }

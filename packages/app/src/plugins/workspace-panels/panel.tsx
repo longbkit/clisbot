@@ -3,9 +3,9 @@ import type {
   PluginAgentPanelProps,
   PluginWorkspacePanelProps,
   PluginTab,
-} from "@getpaseo/plugin/client";
-import type { PluginTheme } from "@getpaseo/plugin";
-import { PluginClientStateProvider } from "@getpaseo/plugin/client/host";
+} from "@clisbot/plugin/client";
+import type { PluginTheme } from "@clisbot/plugin";
+import { PluginClientStateProvider } from "@clisbot/plugin/client/host";
 import { CircleAlert } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";

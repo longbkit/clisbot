@@ -16,7 +16,7 @@ vi.mock("@react-native-async-storage/async-storage", () => {
 });
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { setPanelInstanceAttributes } from "@/panels/panel-instance-attributes";
 import { createViewedTimelineSync } from "@/timeline/viewed-timeline-sync";
@@ -3423,7 +3423,7 @@ describe("workspace-layout-store actions", () => {
   });
 
   it("convertDraftToAgent removes the draft and focuses the existing canonical agent tab", () => {
-    useWorkspaceLayoutIds("67676767-6767-6767-6767-676767676767");
+    useWorkspaceLayoutIds("67676767-6868-6868-6868-676767676767");
     const workspaceKey = createWorkspaceKey();
     const store = workspaceLayoutStore.getState();
 
@@ -3449,7 +3449,7 @@ describe("workspace-layout-store actions", () => {
     const nextTabId = store.convertDraftToAgent(workspaceKey, draftTabId!, "agent-1");
     const layout = workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
 
-    expect(splitPaneId).toBe("pane_67676767-6767-6767-6767-676767676767");
+    expect(splitPaneId).toBe("pane_67676767-6868-6868-6868-676767676767");
     expect(nextTabId).toBe("agent_agent-1");
     expect(collectContentTabs(layout.root).map((tab) => tab.tabId)).toEqual(["agent_agent-1"]);
     expect(layout.focusedPaneId).toBe(splitPaneId);

@@ -7,7 +7,7 @@ import { createTestLogger } from "../../../../test-utils/test-logger.js";
 import { ClaudeAgentClient } from "./agent.js";
 import { claudeProjectDirSync } from "./project-dir.js";
 
-const SESSION_CWD = "/tmp/paseo-claude-renamed-import";
+const SESSION_CWD = "/tmp/clisbot-claude-renamed-import";
 
 interface ClaudeTranscriptRecord {
   [key: string]: unknown;
@@ -62,7 +62,7 @@ async function importSession(sessionId: string) {
 }
 
 beforeEach(async () => {
-  configDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-renamed-"));
+  configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-renamed-"));
   previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
   process.env.CLAUDE_CONFIG_DIR = configDir;
 });

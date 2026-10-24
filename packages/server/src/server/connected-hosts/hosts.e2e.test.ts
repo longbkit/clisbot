@@ -3,23 +3,23 @@ import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, expect, test } from "vitest";
-import { createPaseoApi } from "@getpaseo/client";
-import { createHostClient, createHostChannelTransport } from "@getpaseo/client/node";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
-import type { HostDirectory } from "@getpaseo/protocol/hosts";
+import { createClisbotApi } from "@clisbot/client";
+import { createHostClient, createHostChannelTransport } from "@clisbot/client/node";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
+import type { HostDirectory } from "@clisbot/protocol/hosts";
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0).toReversed()) await close();
 });
 async function daemon(
-  options: Parameters<typeof createTestPaseoDaemon>[0] = {},
-): Promise<TestPaseoDaemon> {
-  const instance = await createTestPaseoDaemon(options);
+  options: Parameters<typeof createTestClisbotDaemon>[0] = {},
+): Promise<TestClisbotDaemon> {
+  const instance = await createTestClisbotDaemon(options);
   cleanup.push(() => instance.close());
   return instance;
 }
-async function api(instance: TestPaseoDaemon) {
+async function api(instance: TestClisbotDaemon) {
   const client = createHostClient(`127.0.0.1:${instance.port}`, {
     clientId: crypto.randomUUID(),
     reconnect: { enabled: false },
@@ -27,19 +27,19 @@ async function api(instance: TestPaseoDaemon) {
   await client.connect();
   expect(client.getLastServerInfoMessage()).toMatchObject({ sourceId: "owner" });
   expect(client.getLastServerInfoMessage()).not.toHaveProperty("principalId");
-  const paseo = createPaseoApi(client);
+  const clisbot = createClisbotApi(client);
   cleanup.push(async () => {
-    await paseo.dispose();
+    await clisbot.dispose();
     await client.close();
   });
-  return { paseo, client };
+  return { clisbot, client };
 }
-async function online(paseo: ReturnType<typeof createPaseoApi>): Promise<HostDirectory> {
+async function online(clisbot: ReturnType<typeof createClisbotApi>): Promise<HostDirectory> {
   let directory!: HostDirectory;
   await expect
     .poll(
       async () => {
-        directory = await paseo.hosts.list();
+        directory = await clisbot.hosts.list();
         return directory.hosts[0]?.status;
       },
       { timeout: 15000 },
@@ -50,21 +50,21 @@ async function online(paseo: ReturnType<typeof createPaseoApi>): Promise<HostDir
 
 test("SDK saves unreachable hosts, rejects syntax and preserves source identity without exposing secrets", async () => {
   const a = await daemon();
-  const { paseo } = await api(a);
-  await expect(paseo.hosts.add({ connection: "ssh://-bad" })).rejects.toMatchObject({
+  const { clisbot } = await api(a);
+  await expect(clisbot.hosts.add({ connection: "ssh://-bad" })).rejects.toMatchObject({
     code: "invalid_connection",
   });
   for (const connection of [
-    "alice:example-secret@localhost:6767",
-    "not-a-scheme://localhost:6767",
-    "localhost/path:6767",
+    "alice:example-secret@localhost:6868",
+    "not-a-scheme://localhost:6868",
+    "localhost/path:6868",
   ]) {
-    const failure = await paseo.hosts.add({ connection }).catch((error: unknown) => error);
+    const failure = await clisbot.hosts.add({ connection }).catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: "invalid_connection" });
     expect(String(failure)).not.toContain("example-secret");
-    expect((await paseo.hosts.list()).hosts).toEqual([]);
+    expect((await clisbot.hosts.list()).hosts).toEqual([]);
   }
-  const saved = await paseo.hosts.add({
+  const saved = await clisbot.hosts.add({
     connection: "tcp://127.0.0.1:1?password=private-secret",
     label: "Unavailable",
     metadata: { team: "infra" },
@@ -78,10 +78,10 @@ test("SDK saves unreachable hosts, rejects syntax and preserves source identity 
     metadata: { team: "infra" },
     enabled: true,
   });
-  expect(JSON.stringify(await paseo.hosts.list())).not.toContain("private-secret");
-  await paseo.hosts.update(saved.registrationId, { enabled: false });
+  expect(JSON.stringify(await clisbot.hosts.list())).not.toContain("private-secret");
+  await clisbot.hosts.update(saved.registrationId, { enabled: false });
   expect(
-    await paseo.hosts.add({
+    await clisbot.hosts.add({
       connection: "tcp://127.0.0.1:1?password=private-secret",
       label: "Unavailable",
       metadata: { team: "infra" },
@@ -89,24 +89,24 @@ test("SDK saves unreachable hosts, rejects syntax and preserves source identity 
     }),
   ).toMatchObject({ registrationId: saved.registrationId, enabled: false, status: "disabled" });
   await expect(
-    paseo.hosts.add({ connection: "127.0.0.1:2", sourceKey: "stable" }),
+    clisbot.hosts.add({ connection: "127.0.0.1:2", sourceKey: "stable" }),
   ).rejects.toMatchObject({ code: "source_conflict" });
-  await paseo.hosts.remove(saved.registrationId);
-  expect((await paseo.hosts.list()).hosts).toEqual([]);
+  await clisbot.hosts.remove(saved.registrationId);
+  expect((await clisbot.hosts.list()).hosts).toEqual([]);
 });
 
 test("ordinary routed APIs isolate scopes and enforce one-hop, disable and origin disposal", async () => {
   const b = await daemon();
   const wire = await hostWire(b);
   const a = await daemon();
-  const { paseo } = await api(a);
-  const observation = paseo.hosts.observe();
+  const { clisbot } = await api(a);
+  const observation = clisbot.hosts.observe();
   expect((await observation.ready).hosts).toEqual([]);
-  const saved = await paseo.hosts.add({ connection: wire.connection, label: "B" });
-  const directory = await online(paseo);
+  const saved = await clisbot.hosts.add({ connection: wire.connection, label: "B" });
+  const directory = await online(clisbot);
   const serverId = directory.hosts[0]!.serverId!;
-  const first = await paseo.hosts.client(serverId);
-  const second = await paseo.hosts.client(serverId);
+  const first = await clisbot.hosts.client(serverId);
+  const second = await clisbot.hosts.client(serverId);
   expect(wire.connections()).toBe(1);
   expect(wire.active()).toBe(1);
   const workspaces = await second.workspaces.list({ subscribe: {} });
@@ -117,10 +117,10 @@ test("ordinary routed APIs isolate scopes and enforce one-hop, disable and origi
   await expect(second.hosts.client(directory.self.serverId)).rejects.toMatchObject({
     code: "unsupported_capability",
   });
-  await paseo.hosts.update(saved.registrationId, { enabled: false });
-  await expect(paseo.hosts.client(serverId)).rejects.toMatchObject({ code: "host_disabled" });
-  await paseo.hosts.update(saved.registrationId, { enabled: true });
-  await online(paseo);
+  await clisbot.hosts.update(saved.registrationId, { enabled: false });
+  await expect(clisbot.hosts.client(serverId)).rejects.toMatchObject({ code: "host_disabled" });
+  await clisbot.hosts.update(saved.registrationId, { enabled: true });
+  await online(clisbot);
   await expect
     .poll(
       async () => {
@@ -138,15 +138,15 @@ test("ordinary routed APIs isolate scopes and enforce one-hop, disable and origi
   await second.dispose();
   expect(wire.active()).toBe(1);
   await observation.release();
-  await paseo.dispose();
+  await clisbot.dispose();
 });
 
 test("routed authority is bounded by the caller, with isolated simultaneous sessions", async () => {
   const b = await daemon();
   const a = await daemon();
   const owner = await api(a);
-  await owner.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-  const directory = await online(owner.paseo);
+  await owner.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const directory = await online(owner.clisbot);
   const serverId = directory.hosts[0]!.serverId!;
   const viewerClient = createHostClient(`127.0.0.1:${a.port}`, {
     clientId: "overlapping",
@@ -154,7 +154,7 @@ test("routed authority is bounded by the caller, with isolated simultaneous sess
     reconnect: { enabled: false },
   });
   await viewerClient.connect();
-  const viewer = createPaseoApi(viewerClient);
+  const viewer = createClisbotApi(viewerClient);
   cleanup.push(async () => {
     await viewer.dispose();
     await viewerClient.close();
@@ -162,12 +162,12 @@ test("routed authority is bounded by the caller, with isolated simultaneous sess
   const remote = await viewer.hosts.client(serverId);
   expect((await remote.workspaces.list()).entries).toEqual([]);
   await expect(
-    remote.workspaces.create({ source: { kind: "directory", path: b.paseoHome } }),
+    remote.workspaces.create({ source: { kind: "directory", path: b.clisbotHome } }),
   ).rejects.toMatchObject({ code: "access_denied" });
   await expect(viewer.hosts.add({ connection: "127.0.0.1:1" })).rejects.toMatchObject({
     code: "permission_denied",
   });
-  expect((await owner.paseo.hosts.list()).hosts).toHaveLength(1);
+  expect((await owner.clisbot.hosts.list()).hosts).toHaveLength(1);
   await remote.dispose();
 });
 
@@ -175,8 +175,8 @@ test("SDK host clients preserve ordinary permission RPC errors", async () => {
   const b = await daemon();
   const a = await daemon();
   const owner = await api(a);
-  await owner.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-  const serverId = (await online(owner.paseo)).hosts[0]!.serverId!;
+  await owner.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const serverId = (await online(owner.clisbot)).hosts[0]!.serverId!;
   const clients = [a, b].map((host) =>
     createHostClient(`127.0.0.1:${host.port}`, {
       clientId: crypto.randomUUID(),
@@ -188,8 +188,8 @@ test("SDK host clients preserve ordinary permission RPC errors", async () => {
     cleanup.push(() => client.close());
     await client.connect();
   }
-  const origin = createPaseoApi(clients[0]!);
-  const direct = createPaseoApi(clients[1]!);
+  const origin = createClisbotApi(clients[0]!);
+  const direct = createClisbotApi(clients[1]!);
   const remote = await origin.hosts.client(serverId);
   cleanup.push(async () => {
     await remote.dispose();
@@ -212,9 +212,9 @@ test("distinct origin sessions cannot collide through a caller-selected route sc
   const wire = await hostWire(b);
   const a = await daemon();
   const admin = await api(a);
-  await admin.paseo.hosts.add({ connection: wire.connection });
-  const serverId = (await online(admin.paseo)).hosts[0]!.serverId!;
-  const remote = await admin.paseo.hosts.client(serverId);
+  await admin.clisbot.hosts.add({ connection: wire.connection });
+  const serverId = (await online(admin.clisbot)).hosts[0]!.serverId!;
+  const remote = await admin.clisbot.hosts.client(serverId);
   const workspace = await remote.workspaces.create({
     source: { kind: "directory", path: b.staticDir },
   });
@@ -289,13 +289,13 @@ import {
   decodeTerminalStreamFrame,
   encodeTerminalStreamFrame,
   TerminalStreamOpcode,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import {
   WSOutboundMessageSchema,
   type SessionOutboundMessage,
   type SessionInboundMessage,
-} from "@getpaseo/protocol/messages";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/protocol/messages";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 class RoutePeer {
   readonly messages: SessionOutboundMessage[] = [];
   readonly bytes: Uint8Array[] = [];
@@ -442,52 +442,54 @@ test("identity discovery failures remain inspectable and changing a pinned desti
   const a = await daemon();
   const b = await daemon();
   const c = await daemon();
-  const { paseo } = await api(a);
-  const self = await paseo.hosts.add({ connection: `127.0.0.1:${a.port}` });
-  await expect.poll(async () => (await paseo.hosts.list()).hosts[0]!.error?.code).toBe("self_host");
-  expect((await paseo.hosts.list()).hosts[0]!.serverId).toBe(a.daemon.getServerId());
-  await paseo.hosts.remove(self.registrationId);
-  const original = await paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-  const bId = (await online(paseo)).hosts[0]!.serverId;
-  const duplicate = await paseo.hosts.add({ connection: `ws://127.0.0.1:${b.port}/ws` });
+  const { clisbot } = await api(a);
+  const self = await clisbot.hosts.add({ connection: `127.0.0.1:${a.port}` });
   await expect
-    .poll(async () => (await paseo.hosts.list()).hosts[1]!.error?.code)
+    .poll(async () => (await clisbot.hosts.list()).hosts[0]!.error?.code)
+    .toBe("self_host");
+  expect((await clisbot.hosts.list()).hosts[0]!.serverId).toBe(a.daemon.getServerId());
+  await clisbot.hosts.remove(self.registrationId);
+  const original = await clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const bId = (await online(clisbot)).hosts[0]!.serverId;
+  const duplicate = await clisbot.hosts.add({ connection: `ws://127.0.0.1:${b.port}/ws` });
+  await expect
+    .poll(async () => (await clisbot.hosts.list()).hosts[1]!.error?.code)
     .toBe("duplicate_host");
-  expect((await paseo.hosts.list()).hosts[1]!.serverId).toBe(bId);
-  await paseo.hosts.remove(duplicate.registrationId);
-  await paseo.hosts.update(original.registrationId, { connection: `127.0.0.1:${c.port}` });
+  expect((await clisbot.hosts.list()).hosts[1]!.serverId).toBe(bId);
+  await clisbot.hosts.remove(duplicate.registrationId);
+  await clisbot.hosts.update(original.registrationId, { connection: `127.0.0.1:${c.port}` });
   await expect
-    .poll(async () => (await paseo.hosts.list()).hosts[0]!.error?.code)
+    .poll(async () => (await clisbot.hosts.list()).hosts[0]!.error?.code)
     .toBe("server_id_mismatch");
-  expect((await paseo.hosts.list()).hosts[0]!.serverId).toBe(bId);
-  await paseo.hosts.update(original.registrationId, {
+  expect((await clisbot.hosts.list()).hosts[0]!.serverId).toBe(bId);
+  await clisbot.hosts.update(original.registrationId, {
     connection: `127.0.0.1:${c.port}`,
     replaceIdentity: true,
   });
-  expect((await online(paseo)).hosts[0]!.serverId).toBe(c.daemon.getServerId());
+  expect((await online(clisbot)).hosts[0]!.serverId).toBe(c.daemon.getServerId());
 });
 
 test("disabled host configuration and source survive a fresh daemon instance", async () => {
-  const root = await mkdtemp(join(tmpdir(), "paseo-host-restart-"));
+  const root = await mkdtemp(join(tmpdir(), "clisbot-host-restart-"));
   cleanup.push(() => rm(root, { recursive: true, force: true }));
-  const a = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
+  const a = await createTestClisbotDaemon({ clisbotHomeRoot: root, cleanup: false });
   cleanup.push(() => a.close());
-  const { paseo } = await api(a);
-  const host = await paseo.hosts.add({
+  const { clisbot } = await api(a);
+  const host = await clisbot.hosts.add({
     connection: "tcp://127.0.0.1:1?password=secret",
     label: "Persistent",
     metadata: { team: "infra" },
     sourceKey: "stable",
   });
-  await paseo.hosts.update(host.registrationId, { enabled: false });
+  await clisbot.hosts.update(host.registrationId, { enabled: false });
   // Windows exposes inherited ACLs, not POSIX owner/group/other mode bits.
   if (process.platform !== "win32")
-    expect((await stat(join(a.paseoHome, "hosts.json"))).mode & 0o777).toBe(0o600);
+    expect((await stat(join(a.clisbotHome, "hosts.json"))).mode & 0o777).toBe(0o600);
   await a.close();
-  const restarted = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
+  const restarted = await createTestClisbotDaemon({ clisbotHomeRoot: root, cleanup: false });
   cleanup.push(() => restarted.close());
   const next = await api(restarted);
-  expect((await next.paseo.hosts.list()).hosts).toEqual([
+  expect((await next.clisbot.hosts.list()).hosts).toEqual([
     expect.objectContaining({
       registrationId: host.registrationId,
       label: "Persistent",
@@ -502,27 +504,27 @@ test("disabled host configuration and source survive a fresh daemon instance", a
 test("server plugins use ordinary remote SDK operations and retain qualified source ownership on B", async () => {
   const b = await daemon();
   const a = await daemon();
-  const { paseo, client } = await api(a);
-  await paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-  const serverId = (await online(paseo)).hosts[0]!.serverId!;
+  const { clisbot, client } = await api(a);
+  await clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const serverId = (await online(clisbot)).hosts[0]!.serverId!;
   const directory = join(a.staticDir, "host-plugin");
   await mkdir(directory);
   await writeFile(
-    join(directory, "paseo-plugin.json"),
+    join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "connected-host-test",
-      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+      requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
     }),
   );
   await writeFile(
     join(directory, "index.server.ts"),
     `
-import { defineRpc } from "@getpaseo/plugin";
+import { defineRpc } from "@clisbot/plugin";
 import { z } from "zod";
 const operate = defineRpc({ name: "operate", input: z.object({ serverId: z.string(), path: z.string() }), output: z.object({ workspaceId: z.string(), registrationId: z.string(), sourceId: z.string() }) });
 export default function contribute(server) {
   server.handle(operate, async (input, context) => {
-    const remote = await context.paseo.hosts.client(input.serverId);
+    const remote = await context.clisbot.hosts.client(input.serverId);
     try {
       const workspace = await remote.workspaces.create({ source: { kind: "directory", path: input.path }, title: "Plugin remote workspace" });
       const host = await remote.hosts.add({ connection: "127.0.0.1:1", sourceKey: "plugin-stable", metadata: { team: "plugin" } });
@@ -544,8 +546,8 @@ export default function contribute(server) {
     sourceId: `route:owner:${a.daemon.getServerId()}:plugin%3Aconnected-host-test`,
   });
   const direct = await api(b);
-  expect((await direct.paseo.workspaces.list()).entries).toHaveLength(1);
-  expect((await direct.paseo.hosts.list()).hosts[0]).toMatchObject({
+  expect((await direct.clisbot.workspaces.list()).entries).toHaveLength(1);
+  expect((await direct.clisbot.hosts.list()).hosts[0]).toMatchObject({
     source: {
       id: `route:owner:${a.daemon.getServerId()}:plugin%3Aconnected-host-test`,
       key: "plugin-stable",
@@ -553,7 +555,7 @@ export default function contribute(server) {
     metadata: { team: "plugin" },
   });
   await client.removePlugin("connected-host-test");
-  expect((await direct.paseo.workspaces.list()).entries).toHaveLength(1);
+  expect((await direct.clisbot.workspaces.list()).entries).toHaveLength(1);
 });
 
 import { execFile, spawn } from "node:child_process";
@@ -582,7 +584,7 @@ test("CLI host commands manage the selected daemon and emit secret-free structur
         )
       ).stdout,
     );
-  const malformed = await cli("add", "alice:example-secret@localhost:6767").catch(
+  const malformed = await cli("add", "alice:example-secret@localhost:6868").catch(
     (error: unknown) => error,
   );
   expect(malformed).toHaveProperty("stderr");
@@ -632,19 +634,19 @@ test("resuming an A session with narrower grants terminates existing routes and 
   const b = await daemon();
   const a = await daemon();
   const admin = await api(a);
-  await admin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-  const serverId = (await online(admin.paseo)).hosts[0]!.serverId!;
+  await admin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const serverId = (await online(admin.clisbot)).hosts[0]!.serverId!;
   const origin = createHostClient(`127.0.0.1:${a.port}`, {
     clientId: "resumed-authority",
     reconnect: { enabled: false },
   });
   await origin.connect();
-  const paseo = createPaseoApi(origin);
+  const clisbot = createClisbotApi(origin);
   cleanup.push(async () => {
-    await paseo.dispose();
+    await clisbot.dispose();
     await origin.close();
   });
-  const remote = await paseo.hosts.client(serverId);
+  const remote = await clisbot.hosts.client(serverId);
   const observed = await remote.workspaces.list({ subscribe: {} });
   const snapshots: unknown[] = [];
   observed.subscription.subscribe({
@@ -712,34 +714,36 @@ test("old capabilities fail before execution and authentication errors recover t
   });
   await old.connect();
   cleanup.push(() => old.close());
-  await expect(createPaseoApi(old).hosts.add({ connection: "127.0.0.1:1" })).rejects.toMatchObject({
+  await expect(
+    createClisbotApi(old).hosts.add({ connection: "127.0.0.1:1" }),
+  ).rejects.toMatchObject({
     code: "unsupported_capability",
   });
   expect(operations).toEqual([]);
   const a = await daemon();
-  const { paseo } = await api(a);
-  const registration = await paseo.hosts.add({ connection: `127.0.0.1:${address.port}` });
+  const { clisbot } = await api(a);
+  const registration = await clisbot.hosts.add({ connection: `127.0.0.1:${address.port}` });
   await expect
-    .poll(async () => (await paseo.hosts.list()).hosts[0]!.error?.code)
+    .poll(async () => (await clisbot.hosts.list()).hosts[0]!.error?.code)
     .toBe("unsupported_capability");
-  await expect(paseo.hosts.client("srv_old")).rejects.toMatchObject({
+  await expect(clisbot.hosts.client("srv_old")).rejects.toMatchObject({
     code: "unsupported_capability",
   });
   expect(operations).toEqual([]);
-  await paseo.hosts.remove(registration.registrationId);
-  const b = await createTestPaseoDaemon({ auth: { password: hashSync("right-password", 4) } });
+  await clisbot.hosts.remove(registration.registrationId);
+  const b = await createTestClisbotDaemon({ auth: { password: hashSync("right-password", 4) } });
   cleanup.push(() => b.close());
-  const saved = await paseo.hosts.add({
+  const saved = await clisbot.hosts.add({
     connection: `tcp://127.0.0.1:${b.port}?password=wrong-password`,
   });
   await expect
-    .poll(async () => (await paseo.hosts.list()).hosts[0]!.error?.code)
+    .poll(async () => (await clisbot.hosts.list()).hosts[0]!.error?.code)
     .toBe("authentication_failed");
-  expect(JSON.stringify(await paseo.hosts.list())).not.toContain("wrong-password");
-  await paseo.hosts.update(saved.registrationId, {
+  expect(JSON.stringify(await clisbot.hosts.list())).not.toContain("wrong-password");
+  await clisbot.hosts.update(saved.registrationId, {
     connection: `tcp://127.0.0.1:${b.port}?password=right-password`,
   });
-  expect((await online(paseo)).hosts[0]!.serverId).toBe(b.daemon.getServerId());
+  expect((await online(clisbot)).hosts[0]!.serverId).toBe(b.daemon.getServerId());
 });
 
 test("an unreachable saved target becomes online after its daemon starts without being added again", async () => {
@@ -750,12 +754,12 @@ test("an unreachable saved target becomes online after its daemon starts without
   if (!address || typeof address === "string") throw new Error("Missing reserved port");
   await new Promise<void>((resolve) => reservation.close(() => resolve()));
   const a = await daemon();
-  const { paseo } = await api(a);
-  const host = await paseo.hosts.add({ connection: `127.0.0.1:${address.port}` });
-  await expect.poll(async () => (await paseo.hosts.list()).hosts[0]!.status).toBe("offline");
-  const b = await createTestPaseoDaemon({ listenPort: address.port });
+  const { clisbot } = await api(a);
+  const host = await clisbot.hosts.add({ connection: `127.0.0.1:${address.port}` });
+  await expect.poll(async () => (await clisbot.hosts.list()).hosts[0]!.status).toBe("offline");
+  const b = await createTestClisbotDaemon({ listenPort: address.port });
   cleanup.push(() => b.close());
-  expect((await online(paseo)).hosts[0]).toMatchObject({
+  expect((await online(clisbot)).hosts[0]).toMatchObject({
     registrationId: host.registrationId,
     serverId: b.daemon.getServerId(),
     status: "online",
@@ -767,10 +771,10 @@ test("an unreachable saved target becomes online after its daemon starts without
 test("losing a sent mutation result retains ordinary errors, identifies the destination and never replays it", async () => {
   const b = await daemon();
   const a = await daemon();
-  const { paseo, client } = await api(a);
-  await paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-  const serverId = (await online(paseo)).hosts[0]!.serverId!;
-  const remote = await paseo.hosts.client(serverId);
+  const { clisbot, client } = await api(a);
+  await clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const serverId = (await online(clisbot)).hosts[0]!.serverId!;
+  const remote = await clisbot.hosts.client(serverId);
   const pending = remote.config.patch({ pluginsEnabled: false });
   const result = pending.catch((error: unknown) => error);
   await client.close();
@@ -785,7 +789,7 @@ test("losing a sent mutation result retains ordinary errors, identifies the dest
   });
   const direct = await api(b);
   await direct.client.close();
-  const terminalFailure = (await direct.paseo.terminals
+  const terminalFailure = (await direct.clisbot.terminals
     .list()
     .catch((error: unknown) => error)) as Error;
   await expect(remote.terminals.list()).rejects.toThrow(terminalFailure.message);
@@ -793,7 +797,7 @@ test("losing a sent mutation result retains ordinary errors, identifies the dest
     source: { kind: "directory" as const, path: "/tmp" },
     workspaceId: "offline-never-created",
   };
-  const creationFailure = (await direct.paseo.workspaces
+  const creationFailure = (await direct.clisbot.workspaces
     .create(creation)
     .catch((error: unknown) => error)) as Error;
   await expect(remote.workspaces.create(creation)).rejects.toThrow(creationFailure.message);
@@ -855,28 +859,28 @@ test("disposing an origin during routed handshake settles acquisition and closes
   const address = http.address();
   if (!address || typeof address === "string") throw new Error("Missing pending endpoint port");
   const a = await daemon();
-  const { paseo } = await api(a);
-  await paseo.hosts.add({ connection: `127.0.0.1:${address.port}` });
-  await online(paseo);
-  const pending = paseo.hosts.client("srv_pending");
+  const { clisbot } = await api(a);
+  await clisbot.hosts.add({ connection: `127.0.0.1:${address.port}` });
+  await online(clisbot);
+  const pending = clisbot.hosts.client("srv_pending");
   const result = pending.catch((error: unknown) => error);
   await expect.poll(() => routeHello).toBe(true);
-  await paseo.dispose();
+  await clisbot.dispose();
   expect(await result).toBeInstanceOf(Error);
   await expect.poll(() => routeClosed).toBe(true);
   expect(ws.clients.size).toBe(1);
   expect(connections).toBe(1);
   routeClosed = false;
   const next = await api(a);
-  await expect(next.paseo.hosts.client("srv_pending")).rejects.toMatchObject({
+  await expect(next.clisbot.hosts.client("srv_pending")).rejects.toMatchObject({
     code: "host_offline",
     serverId: "srv_pending",
   });
   await expect.poll(() => routeClosed).toBe(true);
   expect(ws.clients.size).toBe(1);
   expect(connections).toBe(1);
-  expect((await next.paseo.workspaces.list()).entries).toEqual([]);
-  expect((await next.paseo.hosts.list()).hosts[0]?.status).toBe("online");
+  expect((await next.clisbot.workspaces.list()).entries).toEqual([]);
+  expect((await next.clisbot.hosts.list()).hosts[0]?.status).toBe("online");
 });
 
 test("source-key registration remains idempotent at directory capacity", async () => {
@@ -910,7 +914,7 @@ test("source-key registration remains idempotent at directory capacity", async (
 });
 
 /** Real WebSocket proxy records the A–B physical wire without replacing either daemon. */
-async function hostWire(b: TestPaseoDaemon) {
+async function hostWire(b: TestClisbotDaemon) {
   const http = createServer();
   const wss = new WebSocketServer({ server: http });
   const frames: { binary: boolean; bytes: Buffer; direction: "toB" | "fromB" }[] = [];
@@ -971,7 +975,7 @@ test("a resumed physical link re-admits every logical session under its current 
   cleanup.push(() => logical.close());
   const connecting = logical.connect();
   expect(() => logical.ensureConnected()).not.toThrow();
-  const scoped = createPaseoApi(logical);
+  const scoped = createClisbotApi(logical);
   cleanup.push(() => scoped.dispose());
   const initialCall = scoped.workspaces.list();
   await connecting;
@@ -1160,14 +1164,14 @@ test.skipIf(process.platform !== "linux" || !existsSync("/usr/sbin/sshd"))(
     cleanup.push(async () => {
       process.env.PATH = originalPath;
     });
-    const b = await createTestPaseoDaemon({ auth: { password: hashSync("ssh-password", 4) } });
+    const b = await createTestClisbotDaemon({ auth: { password: hashSync("ssh-password", 4) } });
     cleanup.push(() => b.close());
     const a = await daemon();
-    const { paseo, client } = await api(a);
-    const host = await paseo.hosts.add({
+    const { clisbot, client } = await api(a);
+    const host = await clisbot.hosts.add({
       connection: `ssh://${userInfo().username}@127.0.0.1:${address.port}?daemonPort=${b.port}&password=ssh-password`,
     });
-    await expect.poll(async () => (await paseo.hosts.list()).hosts[0]?.status).toBe("offline");
+    await expect.poll(async () => (await clisbot.hosts.list()).hosts[0]?.status).toBe("offline");
     const sshd = spawn("/usr/sbin/sshd", [
       "-D",
       "-f",
@@ -1178,12 +1182,12 @@ test.skipIf(process.platform !== "linux" || !existsSync("/usr/sbin/sshd"))(
     cleanup.push(async () => {
       sshd.kill();
     });
-    await online(paseo);
+    await online(clisbot);
     const attempts = async () =>
       (await readFile(join(root, "attempts"), "utf8")).trim().split("\n").length;
     const before = await attempts();
-    const first = await paseo.hosts.client(b.daemon.getServerId());
-    const sibling = await paseo.hosts.client(b.daemon.getServerId());
+    const first = await clisbot.hosts.client(b.daemon.getServerId());
+    const sibling = await clisbot.hosts.client(b.daemon.getServerId());
     expect((await sibling.workspaces.list()).entries).toEqual([]);
     expect(await attempts()).toBe(before);
     await first.dispose();
@@ -1203,9 +1207,9 @@ test.skipIf(process.platform !== "linux" || !existsSync("/usr/sbin/sshd"))(
     await stream.close();
     expect(await attempts()).toBe(before);
 
-    await paseo.hosts.update(host.registrationId, { enabled: false });
-    await paseo.hosts.update(host.registrationId, { enabled: true });
-    await online(paseo);
+    await clisbot.hosts.update(host.registrationId, { enabled: false });
+    await clisbot.hosts.update(host.registrationId, { enabled: true });
+    await online(clisbot);
     await expect
       .poll(
         async () => {
@@ -1227,16 +1231,16 @@ test.skipIf(process.platform !== "linux" || !existsSync("/usr/sbin/sshd"))(
     await terminal.kill();
     expect(await attempts()).toBe(before + 1);
     await sibling.dispose();
-    await paseo.hosts.update(host.registrationId, { enabled: false });
+    await clisbot.hosts.update(host.registrationId, { enabled: false });
     await writeFile(join(root, "authorized_keys"), "");
-    await paseo.hosts.update(host.registrationId, { enabled: true });
+    await clisbot.hosts.update(host.registrationId, { enabled: true });
     await expect
-      .poll(async () => (await paseo.hosts.list()).hosts[0]?.error?.code, { timeout: 15000 })
+      .poll(async () => (await clisbot.hosts.list()).hosts[0]?.error?.code, { timeout: 15000 })
       .toBe("authentication_failed");
-    expect((await paseo.hosts.list()).hosts[0]?.nextRetryAt).toBeNull();
+    expect((await clisbot.hosts.list()).hosts[0]?.nextRetryAt).toBeNull();
     await writeFile(join(root, "authorized_keys"), authorized);
-    await paseo.hosts.update(host.registrationId, { enabled: true });
-    await online(paseo);
+    await clisbot.hosts.update(host.registrationId, { enabled: true });
+    await online(clisbot);
   },
   60000,
 );
@@ -1269,7 +1273,7 @@ test("malformed routing headers terminate their physical source and leave the da
   const closed = once(socket, "close");
   socket.send(new Uint8Array([0x30, 0, 3, 97]));
   expect((await closed)[0]).toBe(1008);
-  expect((await (await api(b)).paseo.workspaces.list()).entries).toEqual([]);
+  expect((await (await api(b)).clisbot.workspaces.list()).entries).toEqual([]);
 });
 
 test("cancelling a logical scope during admission settles it and releases its owned channel", async () => {
@@ -1323,10 +1327,10 @@ test(
       }),
     });
     const b = await daemon();
-    const { paseo, client: aClient } = await api(a);
-    await paseo.hosts.add({ connection: `127.0.0.1:${b.port}`, label: "Fleet B" });
-    const directory = await online(paseo);
-    const workspace = await paseo.workspaces.create({
+    const { clisbot, client: aClient } = await api(a);
+    await clisbot.hosts.add({ connection: `127.0.0.1:${b.port}`, label: "Fleet B" });
+    const directory = await online(clisbot);
+    const workspace = await clisbot.workspaces.create({
       source: { kind: "directory", path: a.staticDir },
     });
     const parent = await workspace.agents.create({
@@ -1380,10 +1384,10 @@ test(
     expect(remote.serverId).toBe(serverId);
     const bApi = await api(b);
     expect(
-      (await bApi.paseo.agents.ref(String(remote.agentId)).refresh())?.agent.labels,
+      (await bApi.clisbot.agents.ref(String(remote.agentId)).refresh())?.agent.labels,
     ).toMatchObject({
-      "paseo.parent-agent-id": parent.id,
-      "paseo.parent-server-id": directory.self.serverId,
+      "clisbot.parent-agent-id": parent.id,
+      "clisbot.parent-server-id": directory.self.serverId,
     });
     await expect
       .poll(() => parentPrompts.join("\n"), { timeout: 10000 })
@@ -1527,16 +1531,16 @@ test(
     });
     const origin = await api(a);
     const destination = await api(b);
-    await origin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-    await destination.paseo.hosts.add({ connection: `127.0.0.1:${a.port}` });
-    const aDirectory = await online(origin.paseo);
-    const bDirectory = await online(destination.paseo);
+    await origin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+    await destination.clisbot.hosts.add({ connection: `127.0.0.1:${a.port}` });
+    const aDirectory = await online(origin.clisbot);
+    const bDirectory = await online(destination.clisbot);
     const aId = aDirectory.self.serverId;
     const bId = bDirectory.self.serverId;
-    const aWorkspace = await origin.paseo.workspaces.create({
+    const aWorkspace = await origin.clisbot.workspaces.create({
       source: { kind: "directory", path: a.staticDir },
     });
-    const bWorkspace = await destination.paseo.workspaces.create({
+    const bWorkspace = await destination.clisbot.workspaces.create({
       source: { kind: "directory", path: b.staticDir },
     });
     const parent = await aWorkspace.agents.create({
@@ -1546,9 +1550,9 @@ test(
     const child = await bWorkspace.agents.create({
       config: { provider: "claude/claude-test", modeId: "full-access" },
       title: "Batch child",
-      labels: { "paseo.parent-agent-id": parent.id, "paseo.parent-server-id": aId },
+      labels: { "clisbot.parent-agent-id": parent.id, "clisbot.parent-server-id": aId },
     });
-    const caller = async (host: TestPaseoDaemon, agentId: string) => {
+    const caller = async (host: TestClisbotDaemon, agentId: string) => {
       const mcp = new Client({ name: "batching-agent", version: "1" });
       await mcp.connect(
         new StreamableHTTPClientTransport(
@@ -1608,14 +1612,14 @@ test(
         "--json",
       ],
       {
-        env: { ...process.env, PASEO_AGENT_ID: parent.id },
+        env: { ...process.env, CLISBOT_AGENT_ID: parent.id },
         timeout: 15000,
       },
     );
     expect(JSON.parse(cli.stdout)).toMatchObject({ status: "queued" });
     expect(parentPrompts).toEqual([]);
     const receiptStates = async () => {
-      const directory = join(a.paseoHome, "agent-requests");
+      const directory = join(a.clisbotHome, "agent-requests");
       const receipts = await Promise.all(
         (await readdir(directory))
           .filter((file) => file.endsWith(".json"))
@@ -1672,9 +1676,9 @@ test(
     const wire = await hostWire(b);
     const origin = await api(a);
     const destination = await api(b);
-    await origin.paseo.hosts.add({ connection: wire.connection });
-    const serverId = (await online(origin.paseo)).hosts[0]!.serverId!;
-    const workspace = await destination.paseo.workspaces.create({
+    await origin.clisbot.hosts.add({ connection: wire.connection });
+    const serverId = (await online(origin.clisbot)).hosts[0]!.serverId!;
+    const workspace = await destination.clisbot.workspaces.create({
       source: { kind: "directory", path: b.staticDir },
     });
     const agent = await workspace.agents.create({
@@ -1738,20 +1742,20 @@ test(
         },
       });
     const a = await daemon({
-      paseoHomeRoot: root,
+      clisbotHomeRoot: root,
       cleanup: false,
       agentClients: clients(),
       mcpEnabled: true,
     });
     const origin = await api(a);
     const destination = await api(b);
-    const saved = await origin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-    const directory = await online(origin.paseo);
+    const saved = await origin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+    const directory = await online(origin.clisbot);
     const remoteId = directory.hosts[0]!.serverId!;
-    const workspace = await origin.paseo.workspaces.create({
+    const workspace = await origin.clisbot.workspaces.create({
       source: { kind: "directory", path: a.staticDir },
     });
-    const remoteWorkspace = await destination.paseo.workspaces.create({
+    const remoteWorkspace = await destination.clisbot.workspaces.create({
       source: { kind: "directory", path: b.staticDir },
     });
     const parent = await workspace.agents.create({
@@ -1781,33 +1785,33 @@ test(
     expect((await destination.client.fetchAgent(childId))?.agent.status).toBe("running");
     const records = async (home: string) =>
       JSON.parse(await readFile(join(home, "finish-subscriptions.json"), "utf8"));
-    expect(await records(a.paseoHome)).toHaveLength(1);
+    expect(await records(a.clisbotHome)).toHaveLength(1);
     // An unavailable saved route must retain intent, including through a restart.
-    await origin.paseo.hosts.update(saved.registrationId, { enabled: false });
-    await origin.paseo.dispose();
+    await origin.clisbot.hosts.update(saved.registrationId, { enabled: false });
+    await origin.clisbot.dispose();
     await origin.client.close();
     await mcp.close();
     await a.close();
     const restarted = await daemon({
-      paseoHomeRoot: root,
+      clisbotHomeRoot: root,
       cleanup: false,
       agentClients: clients(),
       mcpEnabled: true,
     });
     const recovered = await api(restarted);
-    expect(await records(restarted.paseoHome)).toHaveLength(1);
+    expect(await records(restarted.clisbotHome)).toHaveLength(1);
     expect(parentPrompts).toEqual([]);
     expect((await destination.client.fetchAgent(childId))?.agent.status).toBe("running");
-    await recovered.paseo.hosts.update(saved.registrationId, { enabled: true });
-    await online(recovered.paseo);
+    await recovered.clisbot.hosts.update(saved.registrationId, { enabled: true });
+    await online(recovered.clisbot);
     expect(parentPrompts).toEqual([]);
-    expect(await records(restarted.paseoHome)).toHaveLength(1);
+    expect(await records(restarted.clisbotHome)).toHaveLength(1);
     finish.resolve();
     await expect.poll(() => parentPrompts, { timeout: 15000 }).toHaveLength(1);
     expect(parentPrompts[0]).toContain(`Agent ${childId}`);
     expect(parentPrompts[0]).toContain(`Server: ${remoteId}`);
     expect(parentPrompts[0]).toContain('event="finished"');
-    await expect.poll(() => records(restarted.paseoHome), { timeout: 5000 }).toEqual([]);
+    await expect.poll(() => records(restarted.clisbotHome), { timeout: 5000 }).toEqual([]);
   },
 );
 
@@ -1834,12 +1838,12 @@ test(
     });
     const origin = await api(a);
     const destination = await api(b);
-    await origin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-    const directory = await online(origin.paseo);
-    const workspace = await origin.paseo.workspaces.create({
+    await origin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+    const directory = await online(origin.clisbot);
+    const workspace = await origin.clisbot.workspaces.create({
       source: { kind: "directory", path: a.staticDir },
     });
-    const remoteWorkspace = await destination.paseo.workspaces.create({
+    const remoteWorkspace = await destination.clisbot.workspaces.create({
       source: { kind: "directory", path: b.staticDir },
     });
     const parent = await workspace.agents.create({
@@ -1872,7 +1876,7 @@ test(
     const child = (await destination.client.fetchAgent(childId))!.agent;
     expect(child.pendingPermissions).toHaveLength(1);
     expect(
-      JSON.parse(await readFile(join(a.paseoHome, "finish-subscriptions.json"), "utf8")),
+      JSON.parse(await readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8")),
     ).toHaveLength(1);
     await destination.client.respondToPermission(childId, child.pendingPermissions[0]!.id, {
       behavior: "allow",
@@ -1884,7 +1888,7 @@ test(
     expect(parentPrompts[1]).toContain('event="finished"');
     await expect
       .poll(async () =>
-        JSON.parse(await readFile(join(a.paseoHome, "finish-subscriptions.json"), "utf8")),
+        JSON.parse(await readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8")),
       )
       .toEqual([]);
   },
@@ -1907,13 +1911,13 @@ test(
     const b = await daemon({ agentClients: createTestAgentClients() });
     const origin = await api(a);
     const destination = await api(b);
-    const saved = await origin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-    const directory = await online(origin.paseo);
+    const saved = await origin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+    const directory = await online(origin.clisbot);
     const serverId = directory.hosts[0]!.serverId!;
-    const workspace = await origin.paseo.workspaces.create({
+    const workspace = await origin.clisbot.workspaces.create({
       source: { kind: "directory", path: a.staticDir },
     });
-    const remoteWorkspace = await destination.paseo.workspaces.create({
+    const remoteWorkspace = await destination.clisbot.workspaces.create({
       source: { kind: "directory", path: b.staticDir },
     });
     const parent = await workspace.agents.create({
@@ -1931,17 +1935,17 @@ test(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
       ),
     );
-    await origin.paseo.hosts.update(saved.registrationId, { enabled: false });
+    await origin.clisbot.hosts.update(saved.registrationId, { enabled: false });
     const response = await mcp.callTool({
       name: "send_agent_prompt",
       arguments: { serverId, agentId: child.id, prompt: "Never sent" },
     });
     expect(response.isError).toBe(true);
     const records = () =>
-      readFile(join(a.paseoHome, "finish-subscriptions.json"), "utf8").then(JSON.parse);
+      readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8").then(JSON.parse);
     expect(await records()).toEqual([]);
-    await origin.paseo.hosts.update(saved.registrationId, { enabled: true });
-    await online(origin.paseo);
+    await origin.clisbot.hosts.update(saved.registrationId, { enabled: true });
+    await online(origin.clisbot);
     expect((await destination.client.fetchAgent(child.id))?.agent.status).toBe("idle");
     expect(await records()).toEqual([]);
     expect(parentPrompts).toEqual([]);
@@ -1969,13 +1973,13 @@ test.each(["removed", "disabled"] as const)(
     });
     const origin = await api(a);
     const destination = await api(b);
-    const saved = await origin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-    const directory = await online(origin.paseo);
+    const saved = await origin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+    const directory = await online(origin.clisbot);
     const serverId = directory.hosts[0]!.serverId!;
-    const workspace = await origin.paseo.workspaces.create({
+    const workspace = await origin.clisbot.workspaces.create({
       source: { kind: "directory", path: a.staticDir },
     });
-    const remoteWorkspace = await destination.paseo.workspaces.create({
+    const remoteWorkspace = await destination.clisbot.workspaces.create({
       source: { kind: "directory", path: b.staticDir },
     });
     const parent = await workspace.agents.create({
@@ -2002,8 +2006,8 @@ test.each(["removed", "disabled"] as const)(
     });
     expect(response.isError).not.toBe(true);
     const childId = (response.structuredContent as { agentId: string }).agentId;
-    if (availability === "removed") await origin.paseo.hosts.remove(saved.registrationId);
-    else await origin.paseo.hosts.update(saved.registrationId, { enabled: false });
+    if (availability === "removed") await origin.clisbot.hosts.remove(saved.registrationId);
+    else await origin.clisbot.hosts.update(saved.registrationId, { enabled: false });
     await expect.poll(() => parentPrompts, { timeout: 15000 }).toHaveLength(1);
     expect(parentPrompts[0]).toContain(`Status of child agent ${childId}`);
     expect(parentPrompts[0]).toContain(`Server: ${serverId}`);
@@ -2016,19 +2020,19 @@ test.each(["removed", "disabled"] as const)(
     expect(parentPrompts[0]).not.toContain("finished.");
     await expect
       .poll(async () =>
-        JSON.parse(await readFile(join(a.paseoHome, "finish-subscriptions.json"), "utf8")),
+        JSON.parse(await readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8")),
       )
       .toEqual([]);
     if (availability === "removed")
-      await origin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
-    else await origin.paseo.hosts.update(saved.registrationId, { enabled: true });
-    await online(origin.paseo);
+      await origin.clisbot.hosts.add({ connection: `127.0.0.1:${b.port}` });
+    else await origin.clisbot.hosts.update(saved.registrationId, { enabled: true });
+    await online(origin.clisbot);
     finish.resolve();
     const completed = await destination.client.waitForFinish(childId, 5000);
     expect(completed.final?.status).toBe("idle");
     expect(parentPrompts).toHaveLength(1);
     expect(
-      JSON.parse(await readFile(join(a.paseoHome, "finish-subscriptions.json"), "utf8")),
+      JSON.parse(await readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8")),
     ).toEqual([]);
   },
 );

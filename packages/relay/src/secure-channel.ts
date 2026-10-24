@@ -111,7 +111,7 @@ const DAEMON_RECORD_FAILURE_CLOSE_CODE = 1011;
 const REHANDSHAKE_REJECTION_CODE = 1008;
 const REHANDSHAKE_MISMATCH_CLOSE_REASON = "E2EE re-handshake transcript mismatch";
 
-const NOISE_PROLOGUE = new TextEncoder().encode("paseo-relay-e2ee/1");
+const NOISE_PROLOGUE = new TextEncoder().encode("clisbot-relay-e2ee/1");
 const PROTECTED_ENVELOPE_VERSION = 1;
 const PARAMS_VERSION = 0x01;
 const PARAM_FLAG_BINARY_CIPHERTEXT = 0x01;

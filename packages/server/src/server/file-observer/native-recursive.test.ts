@@ -7,7 +7,7 @@ import { createNativeRecursiveBackend } from "./internal/native-recursive.js";
 import { createObserverPaths } from "./internal/paths.js";
 
 test("the recursive watcher remembers newly announced files before reconciliation", async () => {
-  const root = await mkdtemp(join(tmpdir(), "paseo-observer-native-"));
+  const root = await mkdtemp(join(tmpdir(), "clisbot-observer-native-"));
   const paths = createObserverPaths(process.platform);
   const changes: FileChange[] = [];
   let active = true;

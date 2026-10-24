@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { pluginOverviewPolicy, pluginOverviewUrl } from "@getpaseo/protocol/plugin-overview";
+import { pluginOverviewPolicy, pluginOverviewUrl } from "@clisbot/protocol/plugin-overview";
 import type { Locale } from "~/i18n";
 
 /** A rejected destination leaves its label as text, without even an empty anchor. */

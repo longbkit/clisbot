@@ -11,15 +11,15 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 FLOW_TEMPLATE_DIR="$REPO_ROOT/packages/app/maestro"
 SETUP_TEMPLATE="$REPO_ROOT/packages/app/maestro/workspace-create-android-ready-sidebar.yaml"
 FOCUS_TEMPLATE="$REPO_ROOT/packages/app/maestro/workspace-create-android-create-focused.yaml"
-OUT_DIR="/tmp/paseo-workspace-create-android-focus-$(date +%s)"
-VIDEO_DIR="/tmp/paseo-maestro-videos"
-DEVICE_VIDEO="/sdcard/paseo-maestro-workspace-create-focused.mp4"
-LOCAL_VIDEO="$VIDEO_DIR/paseo-maestro-workspace-create-focused.mp4"
+OUT_DIR="/tmp/clisbot-workspace-create-android-focus-$(date +%s)"
+VIDEO_DIR="/tmp/clisbot-maestro-videos"
+DEVICE_VIDEO="/sdcard/clisbot-maestro-workspace-create-focused.mp4"
+LOCAL_VIDEO="$VIDEO_DIR/clisbot-maestro-workspace-create-focused.mp4"
 CLIENT_EXPORTS="$REPO_ROOT/packages/client/dist/daemon-client.js"
 
-export PASEO_MAESTRO_APP_ID="${PASEO_MAESTRO_APP_ID:-sh.paseo.debug}"
-export PASEO_MAESTRO_DIRECT_ENDPOINT="${PASEO_MAESTRO_DIRECT_ENDPOINT:-127.0.0.1:6767}"
-export PASEO_MAESTRO_DAEMON_WS_URL="${PASEO_MAESTRO_DAEMON_WS_URL:-ws://127.0.0.1:6767/ws}"
+export CLISBOT_MAESTRO_APP_ID="${CLISBOT_MAESTRO_APP_ID:-sh.clisbot.debug}"
+export CLISBOT_MAESTRO_DIRECT_ENDPOINT="${CLISBOT_MAESTRO_DIRECT_ENDPOINT:-127.0.0.1:6868}"
+export CLISBOT_MAESTRO_DAEMON_WS_URL="${CLISBOT_MAESTRO_DAEMON_WS_URL:-ws://127.0.0.1:6868/ws}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -33,9 +33,9 @@ render_flow() {
   local target="$2"
   mkdir -p "$(dirname "$target")"
   perl -0pe '
-    s/\$\{PASEO_MAESTRO_APP_ID\}/$ENV{PASEO_MAESTRO_APP_ID}/g;
-    s/\$\{PASEO_MAESTRO_DIRECT_ENDPOINT\}/$ENV{PASEO_MAESTRO_DIRECT_ENDPOINT}/g;
-    s/\$\{PASEO_MAESTRO_PROJECT_NAME\}/$ENV{PASEO_MAESTRO_PROJECT_NAME}/g;
+    s/\$\{CLISBOT_MAESTRO_APP_ID\}/$ENV{CLISBOT_MAESTRO_APP_ID}/g;
+    s/\$\{CLISBOT_MAESTRO_DIRECT_ENDPOINT\}/$ENV{CLISBOT_MAESTRO_DIRECT_ENDPOINT}/g;
+    s/\$\{CLISBOT_MAESTRO_PROJECT_NAME\}/$ENV{CLISBOT_MAESTRO_PROJECT_NAME}/g;
   ' "$source" > "$target"
 }
 
@@ -62,21 +62,21 @@ if [ ! -f "$CLIENT_EXPORTS" ]; then
   exit 1
 fi
 
-if [ -z "${PASEO_MAESTRO_PROJECT_PATH:-}" ]; then
-  PROJECT_PARENT="$(mktemp -d /tmp/paseo-maestro-project-XXXXXX)"
+if [ -z "${CLISBOT_MAESTRO_PROJECT_PATH:-}" ]; then
+  PROJECT_PARENT="$(mktemp -d /tmp/clisbot-maestro-project-XXXXXX)"
   PROJECT_BASENAME="aaa-workspace-create-android-$(basename "$PROJECT_PARENT")"
-  export PASEO_MAESTRO_PROJECT_PATH="$PROJECT_PARENT/$PROJECT_BASENAME"
-  mkdir -p "$PASEO_MAESTRO_PROJECT_PATH"
-  git -C "$PASEO_MAESTRO_PROJECT_PATH" init >/dev/null
-  git -C "$PASEO_MAESTRO_PROJECT_PATH" checkout -b main >/dev/null 2>&1 || true
-  git -C "$PASEO_MAESTRO_PROJECT_PATH" config user.name "Paseo Maestro"
-  git -C "$PASEO_MAESTRO_PROJECT_PATH" config user.email "maestro@getpaseo.local"
-  printf "# Workspace create Android focused recording\n" > "$PASEO_MAESTRO_PROJECT_PATH/README.md"
-  git -C "$PASEO_MAESTRO_PROJECT_PATH" add README.md
-  git -C "$PASEO_MAESTRO_PROJECT_PATH" commit -m "Initial commit" >/dev/null
+  export CLISBOT_MAESTRO_PROJECT_PATH="$PROJECT_PARENT/$PROJECT_BASENAME"
+  mkdir -p "$CLISBOT_MAESTRO_PROJECT_PATH"
+  git -C "$CLISBOT_MAESTRO_PROJECT_PATH" init >/dev/null
+  git -C "$CLISBOT_MAESTRO_PROJECT_PATH" checkout -b main >/dev/null 2>&1 || true
+  git -C "$CLISBOT_MAESTRO_PROJECT_PATH" config user.name "Clisbot Maestro"
+  git -C "$CLISBOT_MAESTRO_PROJECT_PATH" config user.email "maestro@clisbot.local"
+  printf "# Workspace create Android focused recording\n" > "$CLISBOT_MAESTRO_PROJECT_PATH/README.md"
+  git -C "$CLISBOT_MAESTRO_PROJECT_PATH" add README.md
+  git -C "$CLISBOT_MAESTRO_PROJECT_PATH" commit -m "Initial commit" >/dev/null
 fi
 
-export PASEO_MAESTRO_PROJECT_NAME="${PASEO_MAESTRO_PROJECT_NAME:-$(basename "$PASEO_MAESTRO_PROJECT_PATH")}"
+export CLISBOT_MAESTRO_PROJECT_NAME="${CLISBOT_MAESTRO_PROJECT_NAME:-$(basename "$CLISBOT_MAESTRO_PROJECT_PATH")}"
 
 SETUP_FLOW="$OUT_DIR/workspace-create-android-ready-sidebar.rendered.yaml"
 FOCUS_FLOW="$OUT_DIR/workspace-create-android-create-focused.rendered.yaml"
@@ -85,10 +85,10 @@ render_flow_tree
 echo "=== Focused Android Workspace Create Recording ==="
 echo "Output dir: $OUT_DIR"
 echo "Video: $LOCAL_VIDEO"
-echo "Project: $PASEO_MAESTRO_PROJECT_PATH"
-echo "Project name: $PASEO_MAESTRO_PROJECT_NAME"
+echo "Project: $CLISBOT_MAESTRO_PROJECT_PATH"
+echo "Project name: $CLISBOT_MAESTRO_PROJECT_NAME"
 
-adb reverse tcp:6767 tcp:6767 >/dev/null
+adb reverse tcp:6868 tcp:6868 >/dev/null
 
 echo ""
 echo "Opening project in daemon..."
@@ -97,8 +97,8 @@ import { pathToFileURL } from "node:url";
 import WebSocket from "ws";
 
 const repoRoot = process.env.REPO_ROOT;
-const projectPath = process.env.PASEO_MAESTRO_PROJECT_PATH;
-const daemonUrl = process.env.PASEO_MAESTRO_DAEMON_WS_URL;
+const projectPath = process.env.CLISBOT_MAESTRO_PROJECT_PATH;
+const daemonUrl = process.env.CLISBOT_MAESTRO_DAEMON_WS_URL;
 if (!repoRoot || !projectPath || !daemonUrl) {
   throw new Error("Missing required environment for daemon project setup.");
 }

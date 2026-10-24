@@ -10,15 +10,17 @@ describe("deriveProjectKey", () => {
     deriveProjectKey({ rootPath, remoteUrl, worktreeRoot: rootPath, mainRepoRoot: null });
 
   test.each([
-    "https://github.com/getpaseo/paseo.git",
-    "ssh://git@github.com/getpaseo/paseo.git",
-    "git@github.com:getpaseo/paseo.git",
+    "https://github.com/longbkit/clisbot.git",
+    "ssh://git@github.com/longbkit/clisbot.git",
+    "git@github.com:longbkit/clisbot.git",
   ])("normalizes common remote form %s", (remoteUrl) => {
-    expect(derive(remoteUrl)).toBe("remote:github.com/getpaseo/paseo");
+    expect(derive(remoteUrl)).toBe("remote:github.com/longbkit/clisbot");
   });
 
   test("normalizes GitHub casing", () => {
-    expect(derive("git@github.com:GetPaseo/Paseo.git")).toBe("remote:github.com/getpaseo/paseo");
+    expect(derive("git@github.com:GetClisbot/Clisbot.git")).toBe(
+      "remote:github.com/longbkit/clisbot",
+    );
   });
 
   test("preserves self-hosted paths and explicit ports", () => {
@@ -28,8 +30,8 @@ describe("deriveProjectKey", () => {
   });
 
   test("groups an SSH remote whether or not its default port is spelled out", () => {
-    expect(derive("ssh://git@github.com:22/getpaseo/paseo.git")).toBe(
-      derive("ssh://git@github.com/getpaseo/paseo.git"),
+    expect(derive("ssh://git@github.com:22/longbkit/clisbot.git")).toBe(
+      derive("ssh://git@github.com/longbkit/clisbot.git"),
     );
   });
 
@@ -75,11 +77,11 @@ describe("deriveProjectKey", () => {
 
   test("keeps a repository root distinct from one of its subprojects", () => {
     const worktreeRoot = path.resolve("host-a", "repo");
-    const remoteUrl = "git@github.com:getpaseo/paseo.git";
+    const remoteUrl = "git@github.com:longbkit/clisbot.git";
 
     expect(
       deriveProjectKey({ rootPath: worktreeRoot, remoteUrl, worktreeRoot, mainRepoRoot: null }),
-    ).toBe("remote:github.com/getpaseo/paseo");
+    ).toBe("remote:github.com/longbkit/clisbot");
     expect(
       deriveProjectKey({
         rootPath: path.join(worktreeRoot, "packages", "app"),
@@ -87,11 +89,11 @@ describe("deriveProjectKey", () => {
         worktreeRoot,
         mainRepoRoot: null,
       }),
-    ).toBe("remote:github.com/getpaseo/paseo#subdir:packages/app");
+    ).toBe("remote:github.com/longbkit/clisbot#subdir:packages/app");
   });
 
   test("groups the same subproject across different absolute checkout roots", () => {
-    const remoteUrl = "git@github.com:getpaseo/paseo.git";
+    const remoteUrl = "git@github.com:longbkit/clisbot.git";
     const deriveSubproject = (worktreeRoot: string) =>
       deriveProjectKey({
         rootPath: path.join(worktreeRoot, "packages", "app"),
@@ -111,10 +113,10 @@ describe("deriveProjectGroupingDisplayName", () => {
     expect(
       deriveProjectGroupingDisplayName({
         rootPath: path.resolve("repo"),
-        remoteUrl: "git@github.com:getpaseo/paseo.git",
+        remoteUrl: "git@github.com:longbkit/clisbot.git",
         worktreeRoot: path.resolve("repo"),
       }),
-    ).toBe("getpaseo/paseo");
+    ).toBe("longbkit/clisbot");
   });
 
   test("uses the selected directory name without a remote", () => {

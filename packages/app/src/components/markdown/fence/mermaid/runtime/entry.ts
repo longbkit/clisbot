@@ -10,7 +10,7 @@ declare global {
     ReactNativeWebView?: {
       postMessage?: (data: string) => void;
     };
-    __PASEO_MERMAID_RUNTIME_RECEIVE__?: (message: unknown) => void;
+    __CLISBOT_MERMAID_RUNTIME_RECEIVE__?: (message: unknown) => void;
   }
 }
 
@@ -97,7 +97,7 @@ function measureDiagram(host: HTMLElement, svg: SVGSVGElement | null): DiagramSi
 async function render(message: MermaidRuntimeRenderMessage): Promise<void> {
   try {
     initializeMermaid(message.colorScheme);
-    const { svg } = await mermaid.render(`paseo-mermaid-${message.revision}`, message.source);
+    const { svg } = await mermaid.render(`clisbot-mermaid-${message.revision}`, message.source);
     if (message.revision !== latestRevision) {
       return;
     }
@@ -160,7 +160,7 @@ function receiveRender(value: unknown): void {
   }, 0);
 }
 
-window.__PASEO_MERMAID_RUNTIME_RECEIVE__ = receiveRender;
+window.__CLISBOT_MERMAID_RUNTIME_RECEIVE__ = receiveRender;
 window.addEventListener("message", (event) => {
   if (event.source === window.parent) {
     receiveRender(event.data);

@@ -159,7 +159,7 @@ const OmpToolResultContentSchema = z.union([
   OmpToolResultUnknownContentSchema,
 ]);
 
-// OMP's own tools report a string error; Paseo host tools (browser_*) report
+// OMP's own tools report a string error; Clisbot host tools (browser_*) report
 // a structured `{ code, message, retryable }` error.
 const OmpToolResultErrorSchema = z.union([
   z.string(),

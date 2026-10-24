@@ -1,29 +1,38 @@
-name: Deploy Relay
+name: Deploy Clisbot Relay (Cloudflare Worker)
 
 on:
-  # Manual-only while relay.paseo.sh bridges traffic to the Fly deployment.
-  # A release or main push must not redeploy the temporary Cloudflare bridge.
+  # Manual deployment option: Worker relay or Worker proxy to an upstream origin.
+  # The current official relay uses the independent Docker + Tunnel deployment.
   workflow_dispatch:
+    inputs:
+      upstream_url:
+        description: "Optional HTTPS origin (e.g. Fly); blank uses the Worker relay"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
-
       - name: Install dependencies
-        run: node scripts/npm-retry.mjs ci --workspace=@getpaseo/relay --include-workspace-root
-
+        run: node scripts/npm-retry.mjs ci --workspace=@clisbot/relay --include-workspace-root
       - name: Typecheck
-        run: npm run typecheck --workspace=@getpaseo/relay
-
-      - name: Deploy worker
-        run: cd packages/relay && npx wrangler deploy
+        run: npm run typecheck --workspace=@clisbot/relay
+      - name: Test
+        run: npm run test --workspace=@clisbot/relay
+      - name: Deploy Clisbot Worker
+        working-directory: packages/relay
+        run: npx wrangler deploy --var "CLISBOT_RELAY_UPSTREAM:$CLISBOT_RELAY_UPSTREAM"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLISBOT_RELAY_UPSTREAM: ${{ inputs.upstream_url }}

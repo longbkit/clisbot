@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CheckoutPrStatusResponse } from "@getpaseo/protocol/messages";
+import type { CheckoutPrStatusResponse } from "@clisbot/protocol/messages";
 import {
   deriveGitlabApprovals,
   deriveGitlabPipelineSummary,

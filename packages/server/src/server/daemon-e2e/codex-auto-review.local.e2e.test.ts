@@ -12,7 +12,7 @@ import { describe, expect, test } from "vitest";
 
 import { CodexAppServerAgentClient } from "../agent/providers/codex-app-server-agent.js";
 import { createMessageCollector } from "../test-utils/message-collector.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 const QA_REPORT_PATH = "/tmp/codex-auto-review-qa.md";
@@ -269,7 +269,7 @@ async function runScenario(modeId: "auto" | "auto-review") {
       : [approvalToolCallSse(), finalAnswerSse()],
   );
   const { logger, records } = createTraceLogger();
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: {
       codex: new CodexAppServerAgentClient(logger, {
         env: {

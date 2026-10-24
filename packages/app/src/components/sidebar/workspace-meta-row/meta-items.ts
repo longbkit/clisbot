@@ -1,4 +1,4 @@
-import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
+import type { WorkspaceLabelDefinition } from "@clisbot/protocol/workspace-labels";
 import type { PrHint } from "@/git/pr-hint";
 import type { SidebarChecksDisplay } from "@/components/sidebar/display-preferences/checks-display";
 import type { SidebarRowItems } from "@/components/sidebar/display-preferences/row-items";

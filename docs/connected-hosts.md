@@ -1,7 +1,7 @@
 # Connected hosts
 
 A saved host belongs to the daemon that stores it. The app's saved connections remain a separate list.
-Connect A to B through `paseo --host A host` or `paseo.hosts`. Consumers select B by its learned `serverId`; management uses the stable
+Connect A to B through `clisbot --host A host` or `clisbot.hosts`. Consumers select B by its learned `serverId`; management uses the stable
 `registrationId` created before B is reachable.
 
 ## Ownership and authority

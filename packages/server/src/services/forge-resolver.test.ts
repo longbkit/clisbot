@@ -252,7 +252,7 @@ describe("createForgeResolver", () => {
 
     await expect(resolver.resolve("/repo")).resolves.toMatchObject({ forge: "github" });
 
-    // A remote changed outside Paseo (`git remote set-url` from a terminal)
+    // A remote changed outside Clisbot (`git remote set-url` from a terminal)
     // does not go through invalidate(), so the cache must still serve the
     // stale value until its TTL expires.
     remoteUrl = "git@gitlab.com:owner/repo.git";

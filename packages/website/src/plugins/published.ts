@@ -2,7 +2,7 @@ import {
   PluginRegistryIdSchema,
   PluginRegistryIndexSchema,
   PublishedPluginDetailSchema,
-} from "@getpaseo/protocol/plugin-registry";
+} from "@clisbot/protocol/plugin-registry";
 import { languageAlternates, LOCALES, localizePath } from "~/i18n";
 import { SITE_ORIGIN } from "~/meta";
 import { getBlockingColdCache, type WebsiteCacheContext } from "../github-cache";
@@ -70,7 +70,7 @@ export async function handlePluginRegistryRequest(
     const index = await loadRegistryIndex(base, context);
     return handlePluginThumbnailRequest(request, index.plugins);
   }
-  if (url.hostname === "plugins.paseo.sh" && url.pathname === "/index.json")
+  if (url.hostname === "plugins.clisbot.com" && url.pathname === "/index.json")
     return Response.json(await loadRegistryIndex(base, context));
   if (url.pathname === "/sitemap-plugins.xml") {
     const index = await loadRegistryIndex(base, context);
@@ -125,7 +125,7 @@ export async function handlePluginRegistryRequest(
   const plugin = await loadRegistryPlugin(base, id, context);
   if (!plugin) return Response.json({ error: "Plugin not found" }, { status: 404 });
   if (
-    request.headers.get("X-Paseo-Install") === "1" ||
+    request.headers.get("X-Clisbot-Install") === "1" ||
     url.searchParams.get("intent") === "install"
   ) {
     const cache = context.cache;

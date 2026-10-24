@@ -72,12 +72,12 @@ test.describe("plugin icons", () => {
   test.describe.configure({ timeout: 180_000 });
 
   test("renders a Lucide name, inline SVG, and a component", async ({ page }, testInfo) => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-icons-e2e-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-icons-e2e-"));
     const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
     const previous = await client.getDaemonConfig();
     const workspace = await seedWorkspace({ repoPrefix: "plugin-icons-" });
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
     );
     await writeFile(path.join(directory, "index.client.tsx"), pluginClientSource);

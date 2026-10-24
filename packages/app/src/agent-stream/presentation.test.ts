@@ -1,4 +1,4 @@
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { runPluginClientBundle, type PluginClientRuntime } from "@/plugins/evaluate";
 import { transformTimelineItem, type TimelineItemTransform } from "@/plugins/timeline/model";
 import type { InstalledPlugin } from "@/plugins/types";
@@ -9,14 +9,14 @@ import {
   type ToolCallItem,
   type UserMessageItem,
 } from "@/types/stream";
-import type { AgentStreamEventPayload } from "@getpaseo/protocol/messages";
+import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { buildAgentStreamRenderModel } from "./model";
 import { createStreamPresentation, getStreamItemMessageId } from "./presentation";
 
 const runtime = {
-  paseo: {},
+  clisbot: {},
   async rpc() {},
   openSettings() {},
   openSurface() {},
@@ -65,7 +65,7 @@ function installProbe(
     locale: "en",
     i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
     queryClient: new QueryClient(),
-    paseo: {} as InstalledPlugin["paseo"],
+    clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
   };
 }

@@ -1,4 +1,4 @@
-import { pluginMediaKind } from "@getpaseo/protocol/plugin-registry";
+import { pluginMediaKind } from "@clisbot/protocol/plugin-registry";
 import type { Plugin } from "./registry";
 
 // The single-column grid reaches 591px just below sm (640px minus 48px padding).

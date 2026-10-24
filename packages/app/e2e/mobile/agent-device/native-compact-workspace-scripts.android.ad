@@ -1,5 +1,5 @@
 context platform=android timeout=120000 retries=0
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 env SCRIPT=worker
 
 open "${APP_ID}"

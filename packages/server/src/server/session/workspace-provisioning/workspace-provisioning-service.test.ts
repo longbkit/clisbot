@@ -18,7 +18,7 @@ import {
   type WorkspaceRegistry,
 } from "../../workspace-registry.js";
 import { checkoutLiteFromGitSnapshot } from "../../workspace-registry-model.js";
-import type { CreatePaseoWorktreeWorkflowResult } from "../../worktree-session.js";
+import type { CreateClisbotWorktreeWorkflowResult } from "../../worktree-session.js";
 import {
   createWorkspaceProvisioningService,
   WorkspaceProvisioningError,
@@ -89,7 +89,7 @@ function gitService() {
         currentBranch: worktreeRoot ? (gitBranches.get(worktreeRoot) ?? "main") : null,
         remoteUrl: null,
         worktreeRoot,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       };
     },
@@ -226,7 +226,7 @@ test("re-opening refreshes mutable checkout metadata without renaming the worksp
     branch: "feature/refresh",
     displayName: first.displayName,
     title: "Pinned work",
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: null,
   });
   expect(await workspaceRegistry.get(first.workspaceId)).toEqual(refreshed);
@@ -247,7 +247,7 @@ test("persists manual worktree ownership separately from its workspace kind", as
         currentBranch: "feature/manual",
         remoteUrl: null,
         worktreeRoot: cwd,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot,
       }),
     }),
@@ -257,7 +257,7 @@ test("persists manual worktree ownership separately from its workspace kind", as
 
   expect(workspace).toMatchObject({
     kind: "worktree",
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot,
   });
 });
@@ -334,7 +334,7 @@ test("reopening archived exact-root records restores the fresh Git project", asy
         currentBranch: "main",
         remoteUrl: "https://github.com/acme/new-repo.git",
         worktreeRoot: cwd,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       }),
     }),
@@ -443,7 +443,7 @@ test("ensureWorkspaceRecordUnarchived restores the owning archived project with 
 
 test("ensureWorkspaceRecordUnarchived preserves the consumed auto-archive change request", async () => {
   const repo = path.join(tmpDir, "repo");
-  const changeRequestUrl = "https://github.com/getpaseo/paseo/pull/2714";
+  const changeRequestUrl = "https://github.com/longbkit/clisbot/pull/2714";
   gitRoots.add(repo);
   const created = await provisioning.findOrCreateWorkspaceForDirectory(repo);
   await workspaceRegistry.archive(created.workspaceId, ARCHIVED_AT, {
@@ -465,7 +465,7 @@ test("ensureWorkspaceRecordUnarchived preserves the consumed auto-archive change
 
 test("ensureWorkspaceRecordUnarchived acknowledges a merged change request for a legacy archive", async () => {
   const repo = path.join(tmpDir, "repo");
-  const changeRequestUrl = "https://github.com/getpaseo/paseo/pull/2714";
+  const changeRequestUrl = "https://github.com/longbkit/clisbot/pull/2714";
   gitRoots.add(repo);
   const created = await provisioning.findOrCreateWorkspaceForDirectory(repo);
   await workspaceRegistry.archive(created.workspaceId, ARCHIVED_AT);
@@ -486,8 +486,8 @@ test("ensureWorkspaceRecordUnarchived acknowledges a merged change request for a
 
 test("ensureWorkspaceRecordUnarchived refreshes the latch for a different merged change request", async () => {
   const repo = path.join(tmpDir, "repo");
-  const previousChangeRequestUrl = "https://github.com/getpaseo/paseo/pull/2713";
-  const currentChangeRequestUrl = "https://github.com/getpaseo/paseo/pull/2714";
+  const previousChangeRequestUrl = "https://github.com/longbkit/clisbot/pull/2713";
+  const currentChangeRequestUrl = "https://github.com/longbkit/clisbot/pull/2714";
   gitRoots.add(repo);
   const created = await provisioning.findOrCreateWorkspaceForDirectory(repo);
   await workspaceRegistry.archive(created.workspaceId, ARCHIVED_AT, {
@@ -531,7 +531,7 @@ test("resolveOrCreateWorkspaceIdForCreateAgent returns a created worktree's id w
   // The branch only reads workspace.workspaceId off the worktree result.
   const createdWorktree = {
     workspace: { workspaceId: "ws-from-worktree" },
-  } as unknown as CreatePaseoWorktreeWorkflowResult;
+  } as unknown as CreateClisbotWorktreeWorkflowResult;
 
   const id = await provisioning.resolveOrCreateWorkspaceIdForCreateAgent({
     createdWorktree,
@@ -870,7 +870,7 @@ test("a failed import keeps an archived worktree's placement when its directory 
     branch: "feature/example",
     worktreeRoot: worktreeCwd,
     baseBranch: "main",
-    isPaseoOwnedWorktree: true,
+    isClisbotOwnedWorktree: true,
     mainRepoRoot,
     createdAt: ARCHIVED_AT,
     updatedAt: ARCHIVED_AT,
@@ -893,7 +893,7 @@ test("a failed import keeps an archived worktree's placement when its directory 
                 currentBranch: status.currentBranch,
                 remoteUrl: status.remoteUrl,
                 repoRoot: status.repoRoot,
-                isPaseoOwnedWorktree: status.isPaseoOwnedWorktree,
+                isClisbotOwnedWorktree: status.isClisbotOwnedWorktree,
                 mainRepoRoot: status.mainRepoRoot,
               }
             : {
@@ -901,7 +901,7 @@ test("a failed import keeps an archived worktree's placement when its directory 
                 currentBranch: null,
                 remoteUrl: null,
                 repoRoot: null,
-                isPaseoOwnedWorktree: false,
+                isClisbotOwnedWorktree: false,
                 mainRepoRoot: null,
               },
         );
@@ -920,7 +920,7 @@ test("a failed import keeps an archived worktree's placement when its directory 
     branch: "feature/example",
     worktreeRoot: worktreeCwd,
     mainRepoRoot,
-    isPaseoOwnedWorktree: true,
+    isClisbotOwnedWorktree: true,
   });
 });
 
@@ -964,7 +964,7 @@ test("a directory that goes away while the git read is in flight keeps its place
           currentBranch: null,
           remoteUrl: null,
           worktreeRoot: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: null,
         };
       },

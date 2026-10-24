@@ -847,37 +847,37 @@
   },
   {
     "name": "HTTPS credentials link",
-    "markdown": "[click](https://paseo.sh@evil.example/login)",
+    "markdown": "[click](https://clisbot.com@evil.example/login)",
     "links": [],
     "images": []
   },
   {
     "name": "HTTPS credentials image",
-    "markdown": "![picture](https://paseo.sh@evil.example/login)",
+    "markdown": "![picture](https://clisbot.com@evil.example/login)",
     "links": [],
     "images": []
   },
   {
     "name": "HTTPS credentials reference link",
-    "markdown": "[click][ref]\n\n[ref]: https://paseo.sh@evil.example/login",
+    "markdown": "[click][ref]\n\n[ref]: https://clisbot.com@evil.example/login",
     "links": [],
     "images": []
   },
   {
     "name": "HTTPS credentials reference image",
-    "markdown": "![picture][ref]\n\n[ref]: https://paseo.sh@evil.example/login",
+    "markdown": "![picture][ref]\n\n[ref]: https://clisbot.com@evil.example/login",
     "links": [],
     "images": []
   },
   {
     "name": "HTTPS credentials HTML link",
-    "markdown": "<a href=\"https://paseo.sh@evil.example/login\">click</a>",
+    "markdown": "<a href=\"https://clisbot.com@evil.example/login\">click</a>",
     "links": [],
     "images": []
   },
   {
     "name": "HTTPS credentials HTML image",
-    "markdown": "<img src=\"https://paseo.sh@evil.example/login\">",
+    "markdown": "<img src=\"https://clisbot.com@evil.example/login\">",
     "links": [],
     "images": []
   },
@@ -1033,7 +1033,7 @@
   },
   {
     "name": "deceptive RTL text",
-    "markdown": "[paseo.sh‮evil](https://example.com/path)",
+    "markdown": "[clisbot.com‮evil](https://example.com/path)",
     "links": ["https://example.com/path"],
     "images": []
   },

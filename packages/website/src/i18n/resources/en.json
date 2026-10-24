@@ -3,7 +3,7 @@
     "breadcrumb": "Breadcrumb",
     "untranslated": "This page has not been translated into your language yet, so it is shown in English.",
     "notFound": "Page not found.",
-    "notFoundTitle": "Not Found - Paseo",
+    "notFoundTitle": "Not Found - Clisbot",
     "more": "+{{count}} more",
     "copy": "Copy",
     "copied": "Copied",
@@ -59,8 +59,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "notFound": "Doc not found.",
-    "notFoundTitle": "Not Found - Paseo Docs",
-    "pageTitle": "{{title}} - Paseo Docs",
+    "notFoundTitle": "Not Found - Clisbot Docs",
+    "pageTitle": "{{title}} - Clisbot Docs",
     "categories": {
       "Getting started": "Getting started",
       "Workspaces": "Workspaces",
@@ -122,7 +122,7 @@
       "title": "Open source app for Antigravity",
       "subtitle": "Run your installed Antigravity CLI on your machine and drive it from your phone or desktop.",
       "metaTitle": "Antigravity Mobile and Desktop App, Open Source",
-      "metaDescription": "Run your installed Antigravity CLI through Paseo. Watch agents work and review changes from your phone or desktop. Self-hosted, your code stays on your machine."
+      "metaDescription": "Run your installed Antigravity CLI through Clisbot. Watch agents work and review changes from your phone or desktop. Self-hosted, your code stays on your machine."
     },
     "copilot": {
       "title": "Open source app for GitHub Copilot",
@@ -324,21 +324,21 @@
     }
   },
   "home": {
-    "metaTitle": "Paseo – Run Claude Code, Codex, Copilot, OpenCode from anywhere",
+    "metaTitle": "Clisbot – Run Claude Code, Codex, Copilot, OpenCode from anywhere",
     "metaDescription": "Open source app for Claude Code, Codex, OpenCode, Pi, and 30+ more coding agents. Run many agents in parallel on your machines. Editor, terminals, diffs, pull requests, and a browser in one window. One download on desktop. The full app on iOS and Android.",
     "title": "The agentic development<br/>environment",
     "subtitle": "Run many coding agents at once,<mobileBreak/><wideSpace/>on any machine.<br/>From your desk and from your phone."
   },
   "agents": {
-    "metaTitle": "Supported agents – Every coding agent Paseo runs",
+    "metaTitle": "Supported agents – Every coding agent Clisbot runs",
     "metaDescription": "Run Claude Code, Codex, OpenCode, Pi, OMP, Cursor, Muse Code, Antigravity, and dozens more coding agents from your phone. Self-hosted, your code stays on your machine.",
     "title": "Supported agents",
-    "intro": "Paseo supports many agents natively, it can run any <acp>ACP agent</acp> and you can implement new providers via <plugins>plugins</plugins>."
+    "intro": "Clisbot supports many agents natively, it can run any <acp>ACP agent</acp> and you can implement new providers via <plugins>plugins</plugins>."
   },
   "landing": {
     "socialProof": {
       "title": "Loved by developers",
-      "description": "See what developers are saying about Paseo",
+      "description": "See what developers are saying about Clisbot",
       "readPost": "Read {{name}}'s original post"
     },
     "providers": {
@@ -347,22 +347,22 @@
     },
     "runAnywhere": {
       "title": "Run it anywhere",
-      "description": "Use Paseo locally, from another machine, or with a team",
+      "description": "Use Clisbot locally, from another machine, or with a team",
       "desktopTitle": "Desktop app",
       "desktopDescription": "The one click experience, download the app and it just works, no server required",
       "mobileTitle": "Mobile",
       "mobileDescription": "Full client and native, not a WebView",
       "mobileCta": "Download",
       "remoteTitle": "Remote machines",
-      "remoteDescription": "Run Paseo on a home lab, or a cloud machine",
+      "remoteDescription": "Run Clisbot on a home lab, or a cloud machine",
       "remoteCta": "Docs",
       "teamsTitle": "Teams and triggers",
       "teamsDescription": "Share access or start work from GitHub, Slack, and Discord",
-      "teamsCta": "Paseo Hub"
+      "teamsCta": "Clisbot Hub"
     },
     "automation": {
       "title": "Built for automation",
-      "description": "Use MCP, the CLI, or the TypeScript SDK to automate Paseo",
+      "description": "Use MCP, the CLI, or the TypeScript SDK to automate Clisbot",
       "mcpCaption": "From another agent",
       "cliCaption": "From the terminal",
       "sdkCaption": "From code",
@@ -380,7 +380,7 @@
       "lead": "Plugins",
       "browse": "Browse plugins",
       "docs": "Plugin docs",
-      "license": "Paseo is Apache 2.0.",
+      "license": "Clisbot is Apache 2.0.",
       "fork": "Fork the repo",
       "uiTitle": "UI",
       "uiDescription": "Screens, workspace panels, sidebar items, slash commands, and themes",
@@ -391,11 +391,11 @@
     },
     "philosophy": {
       "title": "Philosophy",
-      "description": "What Paseo stands for, and what every feature is built on",
+      "description": "What Clisbot stands for, and what every feature is built on",
       "privateTitle": "Private",
       "privateDescription": "No telemetry, tracking, or forced login. Code stays on your machine.",
       "independentTitle": "Independent",
-      "independentDescription": "Paseo doesn't answer to investors. Its users guide what gets built.",
+      "independentDescription": "Clisbot doesn't answer to investors. Its users guide what gets built.",
       "polishedTitle": "Polished",
       "polishedDescription": "Install the app and start working. No need to know what a daemon is.",
       "unifiedTitle": "Unified",
@@ -403,7 +403,7 @@
       "composableTitle": "Composable",
       "composableDescription": "Run agents on a laptop or a server, and connect from any device.",
       "extensibleTitle": "Extensible",
-      "extensibleDescription": "If Paseo doesn't fit how you work, change it with a plugin or fork."
+      "extensibleDescription": "If Clisbot doesn't fit how you work, change it with a plugin or fork."
     },
     "getStarted": {
       "supports": "Supports",
@@ -412,41 +412,41 @@
       "desktopApp": "Desktop app",
       "serverInstallLabel": "Install the daemon on a remote machine",
       "serverInstallTitle": "Run agents on a remote machine",
-      "serverInstallDescription": "For headless machines you want to connect to from the Paseo apps. The desktop app already includes a built-in daemon",
-      "serverInstallFootnote": "Requires Node.js 18+. Run <code>paseo</code> to start the daemon."
+      "serverInstallDescription": "For headless machines you want to connect to from the Clisbot apps. The desktop app already includes a built-in daemon",
+      "serverInstallFootnote": "Requires Node.js 18+. Run <code>clisbot</code> to start the daemon."
     },
     "showcase": {
       "heading": "When you want to step away from your desk, you can.",
       "subheading": "The native mobile app has full feature parity with desktop.",
-      "sidebarLabel": "Paseo workspace drawer",
-      "chatLabel": "Paseo agent chat",
-      "diffLabel": "Paseo diff view"
+      "sidebarLabel": "Clisbot workspace drawer",
+      "chatLabel": "Clisbot agent chat",
+      "diffLabel": "Clisbot diff view"
     },
     "faq": {
       "title": "FAQ",
       "freeQuestion": "Is this free?",
-      "freeAnswer": "Yes. Paseo is free and open source. You need agent providers installed with your own credentials. Voice is local-first by default and can optionally use cloud speech providers if you configure them.",
+      "freeAnswer": "Yes. Clisbot is free and open source. You need agent providers installed with your own credentials. Voice is local-first by default and can optionally use cloud speech providers if you configure them.",
       "codeQuestion": "Does my code leave my machine?",
-      "codeAnswer": "Paseo doesn't send your code anywhere. Agents run locally and talk to their own APIs as they normally would. For remote access, you can use the optional <relay>end-to-end encrypted relay</relay>, connect directly over your local network, or use your own tunnel.",
+      "codeAnswer": "Clisbot doesn't send your code anywhere. Agents run locally and talk to their own APIs as they normally would. For remote access, you can use the optional <relay>end-to-end encrypted relay</relay>, connect directly over your local network, or use your own tunnel.",
       "agentsQuestion": "What agents does it support?",
-      "agentsAnswer": "Paseo supports many providers. It has custom implementations for Claude, Codex, OpenCode, Pi, OMP, Antigravity, and Muse Code, and supports many more via ACP. See the full list here: <agents>all supported providers</agents>. See <muse>Muse Code setup and limitations</muse>.",
-      "providersQuestion": "How does Paseo run providers?",
-      "providersAnswer": "Paseo runs the providers installed on your machine as you'd normally run them. Paseo doesn't modify or change their behavior.",
+      "agentsAnswer": "Clisbot supports many providers. It has custom implementations for Claude, Codex, OpenCode, Pi, OMP, Antigravity, and Muse Code, and supports many more via ACP. See the full list here: <agents>all supported providers</agents>. See <muse>Muse Code setup and limitations</muse>.",
+      "providersQuestion": "How does Clisbot run providers?",
+      "providersAnswer": "Clisbot runs the providers installed on your machine as you'd normally run them. Clisbot doesn't modify or change their behavior.",
       "desktopQuestion": "Do I need the desktop app?",
       "desktopAnswer": "No. You can run the daemon headless and use any client to connect. The desktop app just bundles the daemon with a UI.",
       "voiceQuestion": "How does voice work?",
       "voiceAnswer": "Voice runs locally on your device by default. You talk, the app transcribes and sends it to your agent as text. Optionally, you can configure OpenAI speech providers for higher-quality transcription and text-to-speech. See the <voice>voice docs</voice>.",
       "networkQuestion": "Can I connect from outside my network?",
-      "networkAnswer": "Yes. You can use the hosted relay (end-to-end encrypted, Paseo can't read your traffic), set up your own tunnel (Tailscale, Cloudflare Tunnel, etc.), or expose the daemon port directly. See <configuration>configuration</configuration>.",
+      "networkAnswer": "Yes. You can use the hosted relay (end-to-end encrypted, Clisbot can't read your traffic), set up your own tunnel (Tailscale, Cloudflare Tunnel, etc.), or expose the daemon port directly. See <configuration>configuration</configuration>.",
       "gitQuestion": "Do I need git or GitHub?",
-      "gitAnswer": "No. Paseo works in any directory. Worktrees are optional and only relevant if you use git. You can run agents anywhere you'd normally work.",
-      "banQuestion": "Can I get banned for using Paseo?",
-      "banAnswer": "Paseo is designed to use each provider's officially supported integration and does not attempt to bypass its terms of service. It doesn't extract tokens or call inference APIs directly.",
+      "gitAnswer": "No. Clisbot works in any directory. Worktrees are optional and only relevant if you use git. You can run agents anywhere you'd normally work.",
+      "banQuestion": "Can I get banned for using Clisbot?",
+      "banAnswer": "Clisbot is designed to use each provider's officially supported integration and does not attempt to bypass its terms of service. It doesn't extract tokens or call inference APIs directly.",
       "worktreesQuestion": "How do worktrees work?",
-      "worktreesAnswer": "When you launch an agent with the worktree option (from the app, desktop, or CLI), Paseo creates a git worktree and runs the agent inside it. The agent works on an isolated branch without touching your main working directory. See the <worktrees>worktrees docs</worktrees>."
+      "worktreesAnswer": "When you launch an agent with the worktree option (from the app, desktop, or CLI), Clisbot creates a git worktree and runs the agent inside it. The agent works on an isolated branch without touching your main working directory. See the <worktrees>worktrees docs</worktrees>."
     },
     "mockup": {
-      "alt": "Paseo desktop app with coding agents, a conversation, and a code diff open side by side",
+      "alt": "Clisbot desktop app with coding agents, a conversation, and a code diff open side by side",
       "build": "Build",
       "review": "Review",
       "ship": "Ship",
@@ -489,28 +489,28 @@
     }
   },
   "sponsor": {
-    "metaTitle": "Sponsor Paseo",
-    "metaDescription": "Paseo is an independent project used by tens of thousands of developers daily, maintained by one person, shaped by the community, with no investors. Sponsor the work on GitHub Sponsors, Open Collective or Buy Me a Coffee, or sponsor it as a company.",
-    "title": "Sponsor Paseo",
+    "metaTitle": "Sponsor Clisbot",
+    "metaDescription": "Clisbot is an independent project used by tens of thousands of developers daily, maintained by one person, shaped by the community, with no investors. Sponsor the work on GitHub Sponsors, Open Collective or Buy Me a Coffee, or sponsor it as a company.",
+    "title": "Sponsor Clisbot",
     "sponsors": "Sponsors",
     "becomeSponsor": "Become a sponsor",
     "maintainer": "<maintainer>Mo</maintainer>, maintainer",
     "note": {
-      "independent": "Paseo is an independent project used by tens of thousands of developers daily.",
+      "independent": "Clisbot is an independent project used by tens of thousands of developers daily.",
       "maintained": "It is maintained by one person, full time, and shaped by the community. There are no investors, no board and no company behind it. I have turned down funding offers to keep it that way.",
-      "community": "The community helps Paseo grow through feedback, testing, bug reports, code contributions and plugins. Your sponsorship helps me keep improving and maintaining it.",
+      "community": "The community helps Clisbot grow through feedback, testing, bug reports, code contributions and plugins. Your sponsorship helps me keep improving and maintaining it.",
       "neutral": "A tool that sits between you and your code, your keys and your machines has to stay neutral, and that gets hard once someone else owns a return on it. Funding creates pressure to monetize, and that pressure changes what gets built.",
-      "selfFunded": "Paseo is self-funded: the work is paid for by sponsorship and by <hub>Paseo Hub</hub>, an optional hosted service. Your support is what lets me keep working on it."
+      "selfFunded": "Clisbot is self-funded: the work is paid for by sponsorship and by <hub>Clisbot Hub</hub>, an optional hosted service. Your support is what lets me keep working on it."
     },
     "shortNote": {
       "maintained": "It is maintained by one person, full time, and shaped by the community. There are no investors and no company behind it. I have turned down funding to keep it that way. A tool that sits between you and your code, your keys and your machines has to stay neutral, and funding creates pressure to monetize.",
-      "selfFunded": "Paseo is self-funded through sponsorship and <hub>Paseo Hub</hub>. Your support is what lets me keep working on it."
+      "selfFunded": "Clisbot is self-funded through sponsorship and <hub>Clisbot Hub</hub>. Your support is what lets me keep working on it."
     },
     "company": {
       "title": "Sponsor as a company",
-      "description": "Support Paseo financially and get visibility for your company",
+      "description": "Support Clisbot financially and get visibility for your company",
       "perMonth": "a month",
-      "homepage": "Your logo on the paseo.sh homepage and docs, around 70,000 visitors a month",
+      "homepage": "Your logo on the clisbot.com homepage and docs, around 70,000 visitors a month",
       "readme": "Your logo in the GitHub README, around 30,000 visitors a month",
       "discord": "An announcement in the Discord, around 2,000 members",
       "x": "An announcement from me on X",
@@ -519,8 +519,8 @@
     }
   },
   "download": {
-    "metaTitle": "Download Paseo for macOS, Windows, Linux, iOS, and Android",
-    "metaDescription": "Install Paseo on every platform. Native desktop apps for macOS, Windows, and Linux. Mobile apps for iOS and Android. Self-hosted, open source, free to download.",
+    "metaTitle": "Download Clisbot for macOS, Windows, Linux, iOS, and Android",
+    "metaDescription": "Install Clisbot on every platform. Native desktop apps for macOS, Windows, and Linux. Mobile apps for iOS and Android. Self-hosted, open source, free to download.",
     "title": "Download",
     "whatsNew": "What's new",
     "desktop": "Desktop",
@@ -533,7 +533,7 @@
     "webApp": "Web App",
     "open": "Open",
     "server": "Server",
-    "serverDescription": "Run the Paseo server anywhere, connect from any client",
+    "serverDescription": "Run the Clisbot server anywhere, connect from any client",
     "allReleases": "All releases are available on <github>GitHub</github>.",
     "releaseChannel": "Release channel",
     "stable": "Stable",
@@ -542,9 +542,9 @@
     "betaSettings": "Already running the desktop app? Set <setting>Settings → Release channel → Beta</setting> and it updates itself from here on."
   },
   "thanks": {
-    "metaTitle": "Thanks for downloading Paseo",
-    "metaDescription": "Your Paseo download is starting. Join the community on Discord, GitHub, and Reddit, or sponsor Paseo.",
-    "title": "Thanks for downloading Paseo",
+    "metaTitle": "Thanks for downloading Clisbot",
+    "metaDescription": "Your Clisbot download is starting. Join the community on Discord, GitHub, and Reddit, or sponsor Clisbot.",
+    "title": "Thanks for downloading Clisbot",
     "intro": "Get help, share feedback, and follow along.",
     "didNotStart": "Download didn't start?",
     "tryAgain": "Try again",
@@ -553,9 +553,9 @@
     "reddit": "Workflows and questions."
   },
   "hub": {
-    "metaTitle": "Paseo Hub - GitHub, Slack, and Discord triggers",
-    "metaDescription": "Run Paseo Hub yourself and start agents on your own machines from GitHub, Slack, and Discord.",
-    "title": "Paseo Hub",
+    "metaTitle": "Clisbot Hub - GitHub, Slack, and Discord triggers",
+    "metaDescription": "Run Clisbot Hub yourself and start agents on your own machines from GitHub, Slack, and Discord.",
+    "title": "Clisbot Hub",
     "intro": "An optional service that sits above your daemons and gives them extra capabilities.",
     "runIt": "Run it yourself or use the hosted service.",
     "pricing": {
@@ -591,7 +591,7 @@
       "showIssues": "<mention/> show me the latest P0 issues",
       "issuesOpen": "Three P0 issues are open:",
       "createPr": "<mention/> create a pull request for the first one",
-      "ranOn": "Ran on <host>macbook-pro</host>. Opened <pr>getpaseo/paseo#1234</pr> with a fix for the terminal writes.",
+      "ranOn": "Ran on <host>macbook-pro</host>. Opened <pr>longbkit/clisbot#1234</pr> with a fix for the terminal writes.",
       "filesChanged": "3 files changed",
       "testsPassed": "tests passed",
       "bot": "Bot",
@@ -613,7 +613,7 @@
       "sameRpcs": "the same RPCs the app and CLI use",
       "daemonsRow": "Your daemons",
       "directOrRelay": "direct connection or relay",
-      "appsRow": "Paseo apps",
+      "appsRow": "Clisbot apps",
       "desktop": "Desktop",
       "web": "Web",
       "mobile": "Mobile",
@@ -622,14 +622,14 @@
     "faq": {
       "title": "FAQ",
       "whatQuestion": "What is the Hub?",
-      "whatAnswer": "A separate service that sits above your Paseo daemons. You connect one or more daemons to it and it gives them GitHub, Slack, and Discord triggers, with collaboration features planned. Paseo works fully without it.",
+      "whatAnswer": "A separate service that sits above your Clisbot daemons. You connect one or more daemons to it and it gives them GitHub, Slack, and Discord triggers, with collaboration features planned. Clisbot works fully without it.",
       "separateQuestion": "Why is it a separate service instead of part of the daemon?",
-      "separateAnswer1": "The daemon stays one lean executable on one machine. The Hub talks to daemons over the same RPCs the app and the CLI use, so anyone can build their own hub on top of Paseo.",
+      "separateAnswer1": "The daemon stays one lean executable on one machine. The Hub talks to daemons over the same RPCs the app and the CLI use, so anyone can build their own hub on top of Clisbot.",
       "separateAnswer2": "It also has a different job. The Hub is meant to be exposed to the internet, shared with a team, and run multi-tenant. None of that belongs in a single machine daemon.",
       "selfHostQuestion": "Can I run it myself?",
-      "selfHostAnswer": "Yes. Run <code>npx @getpaseo/hub</code> and complete setup in the browser. The source is available on <github>GitHub</github>, and the <guide>self-hosting guide</guide> covers more involved deployments.",
+      "selfHostAnswer": "Yes. Run <code>npx @clisbot/hub</code> and complete setup in the browser. The source is available on <github>GitHub</github>, and the <guide>self-hosting guide</guide> covers more involved deployments.",
       "needQuestion": "What do I need to run it?",
-      "needAnswer": "Node.js and a running Paseo daemon. Hub guides you through connecting the provider apps you want.",
+      "needAnswer": "Node.js and a running Clisbot daemon. Hub guides you through connecting the provider apps you want.",
       "hostedQuestion": "Is there a hosted version?",
       "hostedAnswer": "Yes. The hosted service runs the same Hub software you can self-host.",
       "plannedQuestion": "What else is planned?",
@@ -638,7 +638,7 @@
       "plannedSharing": "Sharing settings and skills across a team",
       "plannedIntegrations": "More integrations",
       "moveQuestion": "Do I have to move my team to a new tool?",
-      "moveAnswer": "No. The Hub works in the Slack or Discord your team already uses, and on the daemons you already run. When the work gets serious you switch to the Paseo app on those same daemons.",
+      "moveAnswer": "No. The Hub works in the Slack or Discord your team already uses, and on the daemons you already run. When the work gets serious you switch to the Clisbot app on those same daemons.",
       "agentsQuestion": "Which agents does it run?",
       "agentsAnswer": "Whichever ones your daemons have configured, with your own subscriptions and skills. The Hub ships no agent of its own.",
       "codeQuestion": "Can the Hub run code on my machines?",
@@ -648,17 +648,17 @@
     }
   },
   "changelog": {
-    "metaTitle": "Changelog - Paseo",
-    "metaDescription": "Product updates, bug fixes, and improvements shipped in each Paseo release. Track new agent providers, mobile features, and daemon changes over time.",
+    "metaTitle": "Changelog - Clisbot",
+    "metaDescription": "Product updates, bug fixes, and improvements shipped in each Clisbot release. Track new agent providers, mobile features, and daemon changes over time.",
     "title": "Changelog",
-    "linkTo": "Link to Paseo {{version}}",
+    "linkTo": "Link to Clisbot {{version}}",
     "untranslatedRelease": "These release notes have not been translated yet, so they are shown in English."
   },
   "blog": {
-    "metaTitle": "Blog – Updates and announcements from the Paseo team",
-    "metaDescription": "Product updates, technical posts, and announcements from the Paseo team. Notes on building a self-hosted, multi-agent dev environment for your phone.",
-    "postTitle": "{{title}} - Paseo",
-    "notFoundTitle": "Not Found - Paseo",
+    "metaTitle": "Blog – Updates and announcements from the Clisbot team",
+    "metaDescription": "Product updates, technical posts, and announcements from the Clisbot team. Notes on building a self-hosted, multi-agent dev environment for your phone.",
+    "postTitle": "{{title}} - Clisbot",
+    "notFoundTitle": "Not Found - Clisbot",
     "notFound": "Post not found.",
     "draft": "DRAFT",
     "showingDrafts": "Showing draft posts",
@@ -669,19 +669,19 @@
   },
   "plugins": {
     "meta": {
-      "indexTitle": "Plugins – Extend Paseo with community plugins",
-      "indexDescription": "Themes, providers, panels, and automations built by the Paseo community. Install any of them with one command.",
-      "allTitle": "All plugins – Paseo plugins",
-      "allDescription": "Every community plugin for Paseo, by installs or newest first.",
-      "categoryTitle": "{{category}} – Paseo plugins",
-      "authorTitle": "{{author}} – Paseo plugins",
-      "authorDescription": "Paseo plugins published by {{author}}.",
-      "pluginTitle": "{{name}} – Paseo plugin",
-      "authorNotFoundTitle": "Author not found – Paseo",
+      "indexTitle": "Plugins – Extend Clisbot with community plugins",
+      "indexDescription": "Themes, providers, panels, and automations built by the Clisbot community. Install any of them with one command.",
+      "allTitle": "All plugins – Clisbot plugins",
+      "allDescription": "Every community plugin for Clisbot, by installs or newest first.",
+      "categoryTitle": "{{category}} – Clisbot plugins",
+      "authorTitle": "{{author}} – Clisbot plugins",
+      "authorDescription": "Clisbot plugins published by {{author}}.",
+      "pluginTitle": "{{name}} – Clisbot plugin",
+      "authorNotFoundTitle": "Author not found – Clisbot",
       "authorNotFoundDescription": "Author not found.",
-      "pluginNotFoundTitle": "Plugin not found – Paseo",
+      "pluginNotFoundTitle": "Plugin not found – Clisbot",
       "pluginNotFoundDescription": "Plugin not found.",
-      "categoryNotFoundTitle": "Category not found – Paseo",
+      "categoryNotFoundTitle": "Category not found – Clisbot",
       "categoryNotFoundDescription": "Category not found."
     },
     "title": "Plugins",
@@ -690,11 +690,11 @@
     "authorCount_one": "{{count}} author",
     "authorCount_other": "{{count}} authors",
     "counts": "{{plugins}} by {{authors}}",
-    "lead": "Browse community plugins that extend Paseo with new functionality.",
+    "lead": "Browse community plugins that extend Clisbot with new functionality.",
     "readDocs": "Read the docs",
     "submit": "Submit a plugin",
     "buildTitle": "Build your own plugin",
-    "buildDescription": "Plugins add themes, workspace panels, slash commands, and agent hooks to Paseo. Write one with the plugin docs, then submit it to get it listed here.",
+    "buildDescription": "Plugins add themes, workspace panels, slash commands, and agent hooks to Clisbot. Write one with the plugin docs, then submit it to get it listed here.",
     "featured": "Featured",
     "featuredDescription": "A selection of hand picked plugins",
     "seeAll": "See all",

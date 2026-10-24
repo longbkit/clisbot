@@ -1,6 +1,6 @@
 ---
 title: Hub FAQ
-description: Common questions about projects, connections, configuration, and daemons in Paseo Hub.
+description: Common questions about projects, connections, configuration, and daemons in Clisbot Hub.
 nav: FAQ
 order: 78
 category: Hub
@@ -8,9 +8,9 @@ category: Hub
 
 # Hub FAQ
 
-## Do I need Hub to use Paseo?
+## Do I need Hub to use Clisbot?
 
-No. Paseo runs agents on your machines without it. Hub adds what a single daemon cannot do on its own: starting agents from external activity, versioned configuration, a shared record of what ran, and team access.
+No. Clisbot runs agents on your machines without it. Hub adds what a single daemon cannot do on its own: starting agents from external activity, versioned configuration, a shared record of what ran, and team access.
 
 ## Can one organization connect several GitHub organizations?
 
@@ -28,11 +28,11 @@ Yes. Both run. Repositories are not owned by a project.
 
 ## Can the configuration live somewhere other than the repository being watched?
 
-Yes. `filters.repo` can name any repository the organization can reach, so a private repository can hold the `.paseo` bundle for workflows that watch public repositories. Protect push access because the bundle selects the organization's connections, daemons, agents, and outputs.
+Yes. `filters.repo` can name any repository the organization can reach, so a private repository can hold the `.clisbot` bundle for workflows that watch public repositories. Protect push access because the bundle selects the organization's connections, daemons, agents, and outputs.
 
 ## Where do triggers go now?
 
-Each trigger and its ordered steps live in one direct `.paseo/workflows/*.yml` file. `hub.yml` contains only named environments and agents. Hub rejects monolithic `triggers` configuration instead of translating it.
+Each trigger and its ordered steps live in one direct `.clisbot/workflows/*.yml` file. `hub.yml` contains only named environments and agents. Hub rejects monolithic `triggers` configuration instead of translating it.
 
 ## Can I edit configuration in the dashboard?
 
@@ -48,7 +48,7 @@ Dispatch fails and the event is recorded as failed. Nothing is queued, so trigge
 
 ## Does logging out disconnect my daemon?
 
-No. The stored CLI login is a human organization credential; the enrolled daemon has its own relationship credential. Interactive `paseo hub logout` offers to disconnect a daemon related to the same Hub. Declining is normal, and JSON or noninteractive logout never disconnects unless you pass `--disconnect-daemon`.
+No. The stored CLI login is a human organization credential; the enrolled daemon has its own relationship credential. Interactive `clisbot hub logout` offers to disconnect a daemon related to the same Hub. Declining is normal, and JSON or noninteractive logout never disconnects unless you pass `--disconnect-daemon`.
 
 ## Can an agent reply back to Slack or Discord?
 

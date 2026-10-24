@@ -314,7 +314,7 @@ describe("ClaudeTaskProtocolSource", () => {
         taskStarted({
           task_type: "local_workflow",
           subagent_type: undefined,
-          workflow_name: "paseo-workflow-one-child",
+          workflow_name: "clisbot-workflow-one-child",
           description: "Runs one deterministic child and returns its structured result",
           prompt: "export const meta = {};",
         }),
@@ -339,7 +339,7 @@ describe("ClaudeTaskProtocolSource", () => {
   });
 
   it("adds a completed workflow result to its generic timeline", () => {
-    const readWorkflowResult = vi.fn(() => "What Paseo is\nA local-first environment.");
+    const readWorkflowResult = vi.fn(() => "What Clisbot is\nA local-first environment.");
     const source = new ClaudeTaskProtocolSource({ readWorkflowResult });
     source.observe(
       taskStarted({ task_type: "local_workflow", subagent_type: undefined, prompt: "SECRET" }),
@@ -351,7 +351,7 @@ describe("ClaudeTaskProtocolSource", () => {
         id: "toolu_01DgLoPMW9",
         item: {
           type: "assistant_message",
-          text: "What Paseo is\nA local-first environment.",
+          text: "What Clisbot is\nA local-first environment.",
         },
       },
       { kind: "status", id: "toolu_01DgLoPMW9", status: "completed" },

@@ -17,7 +17,7 @@ export async function withStreamingMarkdown(
     title: "Streaming Markdown",
     featureValues: {
       mockStreamingAssistantResponse:
-        "**Bold text stays bold** and [Paseo docs](https://example.com/documentation). Done.",
+        "**Bold text stays bold** and [Clisbot docs](https://example.com/documentation). Done.",
       mockStreamingAssistantIntervalMs: 400,
     },
   });
@@ -55,9 +55,9 @@ export async function expectUnfinishedLink(
   testInfo: TestInfo,
 ): Promise<void> {
   const message = page.getByTestId("assistant-message").last();
-  await agent.stream.showThrough("**Bold text stays bold** and [Paseo docs");
-  await expect(message).toContainText("Paseo docs");
-  await expect(message.getByRole("link", { name: "Paseo docs" })).toHaveCount(0);
+  await agent.stream.showThrough("**Bold text stays bold** and [Clisbot docs");
+  await expect(message).toContainText("Clisbot docs");
+  await expect(message.getByRole("link", { name: "Clisbot docs" })).toHaveCount(0);
   await expect(message).not.toContainText("https:");
   await captureMarkdown(page, testInfo, "unfinished-link");
 }
@@ -87,9 +87,9 @@ async function captureMarkdown(page: Page, testInfo: TestInfo, name: string): Pr
 
 async function expectCompletedMarkdown(page: Page): Promise<void> {
   const message = page.getByTestId("assistant-message").last();
-  await expect(message).toHaveText("Bold text stays bold and Paseo docs. Done.");
+  await expect(message).toHaveText("Bold text stays bold and Clisbot docs. Done.");
   await expect(
-    message.getByRole("link", { name: "Paseo docs" }).and(message.locator("a")),
+    message.getByRole("link", { name: "Clisbot docs" }).and(message.locator("a")),
   ).toHaveAttribute("href", "https://example.com/documentation");
   await expect(message.locator("strong")).toHaveCSS("font-weight", "700");
 }

@@ -5,7 +5,7 @@ import {
   mapClaudeFailedToolCall,
   mapClaudeRunningToolCall,
 } from "./tool-call-mapper.js";
-import { buildToolCallDisplayModel } from "@getpaseo/protocol/tool-call-display";
+import { buildToolCallDisplayModel } from "@clisbot/protocol/tool-call-display";
 import {
   isClaudeSubagentHandbackToolName,
   readClaudeSubagentHandback,

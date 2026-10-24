@@ -232,7 +232,7 @@ describe("workspace navigation", () => {
 
     expect(selection).toEqual({
       serverId: "server-1",
-      workspaceId: "/tmp/paseo-missing-workspace",
+      workspaceId: "/tmp/clisbot-missing-workspace",
     });
   });
 

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import type { WaitForFinishResult } from "@getpaseo/client/internal/daemon-client";
+import type { WaitForFinishResult } from "@clisbot/client/internal/daemon-client";
 import type { AgentMessageDelivery } from "../agent-messages/index.js";
 import { buildStoredAgentPayload } from "../agent-projections.js";
 import { createTestLogger } from "../../../test-utils/test-logger.js";
@@ -118,7 +118,7 @@ function outcome(status: "idle" | "running" | "closed" | "error" = "closed"): Wa
         title: "Child",
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
-        labels: { "paseo.parent-agent-id": "parent" },
+        labels: { "clisbot.parent-agent-id": "parent" },
         lastStatus: status,
       },
       ["codex"],

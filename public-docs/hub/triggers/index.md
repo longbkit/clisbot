@@ -10,7 +10,7 @@ category: Hub
 
 A trigger says which provider event can start a workflow. The [Hub workflows](/docs/hub/workflows) page covers the steps, inputs, routing, prompts, and deadlines that run after a match.
 
-`.paseo/workflows/github-issue.yml`:
+`.clisbot/workflows/github-issue.yml`:
 
 ```yaml
 name: triage-issue
@@ -27,7 +27,7 @@ steps:
     agent: codex
     prompt:
       - text: Call hub.finish_execution when the step is complete.
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
 ```
 
 Field-by-field detail is in the [configuration reference](/docs/hub/configuration/hub-yml).
@@ -40,7 +40,7 @@ Only daemons that were granted `hub.execute` are offered as targets, and only Cl
 
 Changing the daemon or working directory reloads the choices. If an existing trigger names a model, mode, or thinking option that the daemon no longer reports, Hub marks that value unavailable without replacing it. You can keep the authored value, choose a current value, or switch to YAML editing.
 
-If the daemon is offline or needs a newer Paseo version, the agent selectors show an error and a retry action. The rest of the trigger and its YAML remain editable.
+If the daemon is offline or needs a newer Clisbot version, the agent selectors show an error and a retry action. The rest of the trigger and its YAML remain editable.
 
 ## Saving checks the agent against the daemon
 
@@ -52,13 +52,13 @@ run.agent.mode: Mode 'default' is not available for provider 'opencode'
 
 The check needs the daemon connected. A new trigger, or a change of daemon, working directory, or agent, cannot be saved while its daemon is offline; the refusal names the daemon. Editing the prompt, filters, or limits of an existing trigger saves either way.
 
-The same checks run wherever a trigger is authored: the dashboard form, its YAML mode, `POST /api/v1/triggers/install`, `paseo hub init`, and `paseo hub deploy`.
+The same checks run wherever a trigger is authored: the dashboard form, its YAML mode, `POST /api/v1/triggers/install`, `clisbot hub init`, and `clisbot hub deploy`.
 
 ## Continue the same agent
 
 Dashboard triggers default to **Same conversation**. Messages in the same Slack or Discord thread, events on the same GitHub issue or pull request, and events on the same Linear issue continue the existing agent in that project. An event without a conversation starts a new agent.
 
-If the agent is busy, the new prompt steers its current work. Each arrival keeps its own output limits and completion status. If a reusable workspace is archived, Hub asks Paseo to restore it before sending the prompt.
+If the agent is busy, the new prompt steers its current work. Each arrival keeps its own output limits and completion status. If a reusable workspace is archived, Hub asks Clisbot to restore it before sending the prompt.
 
 Choose **Custom key** to group arrivals by an input, or **New agent** to keep them separate. A self-contained trigger document can express the same choice:
 

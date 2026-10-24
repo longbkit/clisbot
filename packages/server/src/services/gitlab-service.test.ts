@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { PullRequestCommandStatus } from "./forge-service.js";
-import { GITLAB_ACTIVE_PIPELINE_STATUS_SET } from "@getpaseo/protocol/gitlab-pipeline";
+import { GITLAB_ACTIVE_PIPELINE_STATUS_SET } from "@clisbot/protocol/gitlab-pipeline";
 import type { GitLabStatusFacts } from "./gitlab-facts.js";
 import {
   type CreateGitLabServiceOptions,

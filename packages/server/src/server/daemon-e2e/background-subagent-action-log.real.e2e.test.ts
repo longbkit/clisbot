@@ -7,13 +7,13 @@ import path from "node:path";
 import pino from "pino";
 import { expect, test } from "vitest";
 import { ClaudeAgentClient } from "../agent/providers/claude/agent.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 test("background cards retain child actions after the parent finishes (#6253)", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-background-card-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-background-card-"));
   const logger = pino({ level: "silent" });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     logger,
     agentClients: { claude: new ClaudeAgentClient({ logger }) },
   });
@@ -74,7 +74,7 @@ test("background cards retain child actions after the parent finishes (#6253)", 
         "logs",
         agent.id,
       ],
-      { env: { ...process.env, PASEO_HOME: daemon.paseoHome }, timeout: 30_000 },
+      { env: { ...process.env, CLISBOT_HOME: daemon.clisbotHome }, timeout: 30_000 },
     );
     expect(stdout).toContain("[Bash] ls -1");
     expect(stdout).toContain("[Bash] pwd");

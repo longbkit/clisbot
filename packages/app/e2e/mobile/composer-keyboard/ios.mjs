@@ -10,13 +10,13 @@ import { fileURLToPath } from "node:url";
 import { resolveAutocompletePlacement } from "./autocomplete-placement.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
-const env = (name, fallback) => process.env[`PASEO_COMPOSER_KEYBOARD_${name}`] ?? fallback;
+const env = (name, fallback) => process.env[`CLISBOT_COMPOSER_KEYBOARD_${name}`] ?? fallback;
 const serverId = env("SERVER_ID");
 const agentId = env("AGENT_ID");
 const workspaceId = env("WORKSPACE_ID");
 if (!serverId || !agentId || !workspaceId) {
   throw new Error(
-    "Set PASEO_COMPOSER_KEYBOARD_SERVER_ID, _AGENT_ID (an idle chat) and _WORKSPACE_ID (its workspace)",
+    "Set CLISBOT_COMPOSER_KEYBOARD_SERVER_ID, _AGENT_ID (an idle chat) and _WORKSPACE_ID (its workspace)",
   );
 }
 const draftId = env("DRAFT_ID", "composer-keyboard");
@@ -217,9 +217,9 @@ async function runHost(host) {
 }
 
 const hosts = [
-  ["chat", `paseo://h/${serverId}/agent/${agentId}`],
-  ["workspace-draft", `paseo://h/${serverId}/workspace/${workspaceId}?open=draft%3A${draftId}`],
-  ["new-workspace", `paseo://new?serverId=${serverId}`],
+  ["chat", `clisbot://h/${serverId}/agent/${agentId}`],
+  ["workspace-draft", `clisbot://h/${serverId}/workspace/${workspaceId}?open=draft%3A${draftId}`],
+  ["new-workspace", `clisbot://new?serverId=${serverId}`],
 ];
 for (const [host, url] of hosts) {
   ad("open", url, "--platform", "ios", "--device", device);

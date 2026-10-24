@@ -10,7 +10,7 @@ import { HubRelationshipController } from "./relationship-controller.js";
 import { DirectHubRelationshipRemote } from "./relationship-remote.js";
 
 test("a silently lost Hub connection leaves connected state and reconnects when the path recovers", async () => {
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-hub-liveness-"));
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-hub-liveness-"));
   const hub = createHttpServer(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
@@ -61,7 +61,7 @@ test("a silently lost Hub connection leaves connected state and reconnects when 
   const proxyPort = (proxy.address() as AddressInfo).port;
   let retry: (() => void) | undefined;
   const controller = new HubRelationshipController({
-    paseoHome: home,
+    clisbotHome: home,
     hostname: "test-daemon",
     serverId: "server-1",
     daemonPublicKey: "public-key",

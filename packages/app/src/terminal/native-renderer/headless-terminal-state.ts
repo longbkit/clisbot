@@ -4,7 +4,7 @@ import {
   type IBufferLine,
   type Terminal as HeadlessTerminalInstance,
 } from "@xterm/headless";
-import type { TerminalCell, TerminalState } from "@getpaseo/protocol/messages";
+import type { TerminalCell, TerminalState } from "@clisbot/protocol/messages";
 
 export type NativeTerminalWriteData = Uint8Array | string;
 export interface NativeTerminalCell extends TerminalCell {

@@ -31,7 +31,7 @@ jobs:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
       external_groups:
-        - Paseo Beta
+        - Clisbot Beta
       submit_beta_review: true
 
   submit_android:

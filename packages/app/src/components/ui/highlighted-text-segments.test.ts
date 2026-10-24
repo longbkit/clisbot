@@ -66,7 +66,7 @@ describe("findHighlightRanges", () => {
     expect(
       marked("billing", findHighlightRanges("bulling", "billing", { typoTolerant: true })),
     ).toBe("[billing]");
-    expect(marked("paseo-babysit", findHighlightRanges("pasbab", "paseo-babysit"))).toBe(
+    expect(marked("clisbot-babysit", findHighlightRanges("pasbab", "clisbot-babysit"))).toBe(
       "[pas]eo-[bab]ysit",
     );
   });

@@ -1,5 +1,5 @@
-import { pluginOverviewPolicy, pluginOverviewUrl } from "@getpaseo/protocol/plugin-overview";
-import { pluginMediaKind } from "@getpaseo/protocol/plugin-registry";
+import { pluginOverviewPolicy, pluginOverviewUrl } from "@clisbot/protocol/plugin-overview";
+import { pluginMediaKind } from "@clisbot/protocol/plugin-registry";
 import type { TFunction } from "i18next";
 import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import {

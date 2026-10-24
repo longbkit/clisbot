@@ -13,7 +13,7 @@ interface ManifestEntry {
   $: Record<string, string>;
 }
 
-const originalFdroidFlag = process.env.PASEO_FDROID_BUILD;
+const originalFdroidFlag = process.env.CLISBOT_FDROID_BUILD;
 
 async function resolveAndroidManifest() {
   const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
@@ -29,9 +29,9 @@ async function resolveAndroidManifest() {
 describe("Android app config", () => {
   afterEach(() => {
     if (originalFdroidFlag === undefined) {
-      delete process.env.PASEO_FDROID_BUILD;
+      delete process.env.CLISBOT_FDROID_BUILD;
     } else {
-      process.env.PASEO_FDROID_BUILD = originalFdroidFlag;
+      process.env.CLISBOT_FDROID_BUILD = originalFdroidFlag;
     }
   });
 
@@ -41,7 +41,7 @@ describe("Android app config", () => {
   ])(
     "%s build installs on devices without a camera",
     async (_build, fdroidFlag) => {
-      process.env.PASEO_FDROID_BUILD = fdroidFlag;
+      process.env.CLISBOT_FDROID_BUILD = fdroidFlag;
       const manifest = await resolveAndroidManifest();
       const permissions = (manifest["uses-permission"] ?? []).map(
         (entry: ManifestEntry) => entry.$["android:name"],

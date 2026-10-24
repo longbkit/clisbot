@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { PluginFileDeletedError, useFileText, useFileUrl } from "@getpaseo/plugin/client";
+import { PluginFileDeletedError, useFileText, useFileUrl } from "@clisbot/plugin/client";
 import { describe, expect, it } from "vitest";
 import { FileHandle } from "./handle";
 import { InMemoryFileSession } from "./testing";

@@ -22,19 +22,19 @@ test.describe("server-rendered Chinese pages", () => {
     await page.goto("/zh-CN/docs/cli");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-    await expect(page).toHaveTitle("CLI 参考 - Paseo 文档");
+    await expect(page).toHaveTitle("CLI 参考 - Clisbot 文档");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(/CLI 参考$/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
-      "https://paseo.sh/zh-CN/docs/cli",
+      "https://clisbot.com/zh-CN/docs/cli",
     );
     const alternates = await page
       .locator('link[rel="alternate"][hreflang]')
       .evaluateAll(describeAlternates);
     expect(alternates).toEqual([
-      "en https://paseo.sh/docs/cli",
-      "zh-CN https://paseo.sh/zh-CN/docs/cli",
-      "x-default https://paseo.sh/docs/cli",
+      "en https://clisbot.com/docs/cli",
+      "zh-CN https://clisbot.com/zh-CN/docs/cli",
+      "x-default https://clisbot.com/docs/cli",
     ]);
     await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute("content", "zh_CN");
   });
@@ -57,7 +57,7 @@ test.describe("server-rendered Chinese pages", () => {
     await page.goto("/zh-CN");
 
     const mockup = page.getByRole("img", {
-      name: "Paseo 桌面应用，并排打开了编程 Agent、一段对话和一份代码 diff",
+      name: "Clisbot 桌面应用，并排打开了编程 Agent、一段对话和一份代码 diff",
     });
     await expect(mockup).toContainText("新建工作区");
     await expect(mockup).toContainText("待查看");

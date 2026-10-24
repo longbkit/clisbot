@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
+import type { WorkspaceLabelDefinition } from "@clisbot/protocol/workspace-labels";
 
 export type WorkspaceLabelChange =
   | { kind: "upsert"; label: WorkspaceLabelDefinition; previousName?: string }

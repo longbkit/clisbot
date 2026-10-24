@@ -37,7 +37,7 @@ const LEGACY_PLUGIN = {
 };
 const LEGACY_INDEX = {
   schemaVersion: 1,
-  registry: { name: "Paseo", url: "https://plugins.paseo.sh" },
+  registry: { name: "Clisbot", url: "https://plugins.clisbot.com" },
   categories: [{ slug: "themes", label: "Themes" }],
   plugins: [LEGACY_PLUGIN],
   featured: [],

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { createDaemonTestContext, type DaemonTestContext } from "../test-utils/index.js";
-import type { PersistenceHandle } from "@getpaseo/protocol/messages";
+import type { PersistenceHandle } from "@clisbot/protocol/messages";
 
 function tmpCwd(): string {
   return mkdtempSync(path.join(tmpdir(), "daemon-restart-resume-"));
@@ -94,7 +94,7 @@ async function restartFixture(root: string) {
   });
   const ready = await Promise.race([
     once(child, "message").then(
-      ([message]) => message as { port: number; paseoHome: string; cwd: string },
+      ([message]) => message as { port: number; clisbotHome: string; cwd: string },
     ),
     once(child, "exit").then(([code]) => {
       throw new Error(`Fixture exited ${code}: ${output}`);
@@ -164,14 +164,17 @@ test.each([false, true])(
         .poll(
           async () =>
             (
-              await new AgentStorage(path.join(first.paseoHome, "agents"), createTestLogger()).get(
-                childId,
-              )
+              await new AgentStorage(
+                path.join(first.clisbotHome, "agents"),
+                createTestLogger(),
+              ).get(childId)
             )?.lastStatus,
         )
         .toBe("running");
       expect(
-        JSON.parse(await readFile(path.join(first.paseoHome, "finish-subscriptions.json"), "utf8")),
+        JSON.parse(
+          await readFile(path.join(first.clisbotHome, "finish-subscriptions.json"), "utf8"),
+        ),
       ).toHaveLength(1);
       await mcp.close();
       mcp = undefined;
@@ -188,7 +191,7 @@ test.each([false, true])(
         .poll(
           async () =>
             JSON.parse(
-              await readFile(path.join(second.paseoHome, "finish-subscriptions.json"), "utf8"),
+              await readFile(path.join(second.clisbotHome, "finish-subscriptions.json"), "utf8"),
             ),
           { timeout: 5000 },
         )
@@ -204,7 +207,9 @@ test.each([false, true])(
       processes.push(third.child);
       expect(await readPrompts(root)).toHaveLength(1);
       expect(
-        JSON.parse(await readFile(path.join(third.paseoHome, "finish-subscriptions.json"), "utf8")),
+        JSON.parse(
+          await readFile(path.join(third.clisbotHome, "finish-subscriptions.json"), "utf8"),
+        ),
       ).toEqual([]);
     } catch (error) {
       console.error(

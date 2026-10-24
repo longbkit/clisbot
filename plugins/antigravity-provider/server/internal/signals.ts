@@ -1,4 +1,4 @@
-import { execCommand } from "@getpaseo/plugin/server";
+import { execCommand } from "@clisbot/plugin/server";
 
 interface SignalOptions {
   platform: NodeJS.Platform;

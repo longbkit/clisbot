@@ -1,4 +1,4 @@
-import type { TerminalCell } from "@getpaseo/protocol/messages";
+import type { TerminalCell } from "@clisbot/protocol/messages";
 import { describe, expect, test } from "vitest";
 
 import { createTerminalCellStyleResolver, DEFAULT_TERMINAL_THEME } from "./colors";

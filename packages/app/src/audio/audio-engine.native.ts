@@ -15,7 +15,7 @@ export function createAudioEngine(
   callbacks: AudioEngineCallbacks,
   options?: AudioEngineOptions,
 ): AudioEngine {
-  const native = require("@getpaseo/expo-two-way-audio");
+  const native = require("@clisbot/expo-two-way-audio");
 
   const refs: {
     initialized: boolean;
@@ -143,7 +143,7 @@ export function createAudioEngine(
         "audio/ogg": "ogg",
         "audio/flac": "flac",
       }[audio.type.split(";")[0].trim()] ?? "audio";
-    const file = new File(Paths.cache, `paseo-audio-${Date.now()}-${nextFileId++}.${extension}`);
+    const file = new File(Paths.cache, `clisbot-audio-${Date.now()}-${nextFileId++}.${extension}`);
     try {
       file.write(bytes);
       const player = createAudioPlayer(file.uri, {

@@ -3,7 +3,7 @@ import { useRevealedText } from "@/hooks/use-revealed-text";
 import { runPluginClientBundle, type PluginClientRuntime } from "./evaluate";
 
 const runtime = {
-  paseo: {},
+  clisbot: {},
   async rpc() {},
   openSettings() {},
   openScreen() {},
@@ -535,7 +535,7 @@ describe("evaluatePluginClientBundle", () => {
     const plugin = evaluatePluginClientBundle(
       "review",
       bundle(`
-        if (!plugin.paseo || !plugin.rpc || !plugin.openSurface || !plugin.openPanel || !plugin.addComposerPill) {
+        if (!plugin.clisbot || !plugin.rpc || !plugin.openSurface || !plugin.openPanel || !plugin.addComposerPill) {
           throw new Error("missing client runtime");
         }
       `),
@@ -664,11 +664,11 @@ describe("evaluatePluginClientBundle", () => {
     ).toThrow("must return a cleanup function");
   });
 
-  it("provides the host Icon component through @getpaseo/plugin/client/ui", () => {
+  it("provides the host Icon component through @clisbot/plugin/client/ui", () => {
     const plugin = evaluatePluginClientBundle(
       "example",
       `(function(require) {
-        const { Icon } = require("@getpaseo/plugin/client/ui");
+        const { Icon } = require("@clisbot/plugin/client/ui");
         const module = { exports: {} };
         module.exports.default = function(plugin) {
           plugin.addScreen({ id: "main", title: "Main", Component: function Surface() {
@@ -686,11 +686,11 @@ describe("evaluatePluginClientBundle", () => {
     expect(element).toMatchObject({ props: { size: 18, color: "#123456" } });
   });
 
-  it("provides Paseo UI through @getpaseo/plugin/client/ui", () => {
+  it("provides Clisbot UI through @clisbot/plugin/client/ui", () => {
     const plugin = evaluatePluginClientBundle(
       "example",
       `(function(require) {
-        const { Icon, Modal, useToast, SettingsSection, SidebarRow, StreamedText } = require("@getpaseo/plugin/client/ui");
+        const { Icon, Modal, useToast, SettingsSection, SidebarRow, StreamedText } = require("@clisbot/plugin/client/ui");
         const module = { exports: {} };
         module.exports.default = function(plugin) {
           if (typeof Icon !== "function" || typeof Modal !== "function" || typeof Modal.Content !== "function" || typeof useToast !== "function" || typeof SettingsSection !== "function" || typeof SidebarRow !== "function" || typeof StreamedText !== "function") {
@@ -710,8 +710,8 @@ describe("evaluatePluginClientBundle", () => {
     const plugin = evaluatePluginClientBundle(
       "legacy-reveal",
       bundle(`
-        const legacy = require("@getpaseo/plugin/client/react-native");
-        const ui = require("@getpaseo/plugin/client/ui");
+        const legacy = require("@clisbot/plugin/client/react-native");
+        const ui = require("@clisbot/plugin/client/ui");
         if (typeof legacy.useRevealedText !== "function") throw new Error("Missing legacy reveal hook");
         if (legacy.StreamedText !== ui.StreamedText) throw new Error("Missing current UI exports");
         if ("useRevealedText" in ui) throw new Error("Legacy hook leaked into current UI");
@@ -726,13 +726,13 @@ describe("evaluatePluginClientBundle", () => {
       evaluatePluginClientBundle(
         "example",
         `(function(require) {
-      const shared = require("@getpaseo/plugin");
-      const client = require("@getpaseo/plugin/client");
-      const { ExternalLink, Loading, Markdown } = require("@getpaseo/plugin/client/ui");
+      const shared = require("@clisbot/plugin");
+      const client = require("@clisbot/plugin/client");
+      const { ExternalLink, Loading, Markdown } = require("@clisbot/plugin/client/ui");
       if (typeof Markdown !== "function") throw new Error("Markdown");
       if (typeof ExternalLink !== "function") throw new Error("ExternalLink");
       if (typeof Loading !== "function") throw new Error("Loading");
-      for (const name of ["usePaseo", "useRpc", "useSettings", "useAgent", "useWorkspace", "openExternalUrl", "useFileText", "useFileBytes", "useFileUrl", "PluginFileConflictError", "PluginFileDeletedError"]) {
+      for (const name of ["useClisbot", "useRpc", "useSettings", "useAgent", "useWorkspace", "openExternalUrl", "useFileText", "useFileBytes", "useFileUrl", "PluginFileConflictError", "PluginFileDeletedError"]) {
         if (name in shared || typeof client[name] !== "function") throw new Error(name);
       }
       if ("Icon" in shared || typeof shared.PluginAttachmentItemSchema.parse !== "function") throw new Error("shared exports");
@@ -743,14 +743,14 @@ describe("evaluatePluginClientBundle", () => {
   });
 
   it.each([
-    "@getpaseo/plugin/server",
-    "@getpaseo/plugin/server/provider",
-    "@getpaseo/plugin/server/acp",
-    "@getpaseo/plugin/client/host",
-    "@getpaseo/plugin/react-native",
-    "@getpaseo/plugin/ui",
-    "@getpaseo/plugin/host",
-    "@paseo/plugin",
+    "@clisbot/plugin/server",
+    "@clisbot/plugin/server/provider",
+    "@clisbot/plugin/server/acp",
+    "@clisbot/plugin/client/host",
+    "@clisbot/plugin/react-native",
+    "@clisbot/plugin/ui",
+    "@clisbot/plugin/host",
+    "@clisbot/plugin",
   ])("rejects %s in the client loader", (specifier) => {
     expect(() =>
       evaluatePluginClientBundle(
@@ -760,11 +760,11 @@ describe("evaluatePluginClientBundle", () => {
     ).toThrow("not available in plugin client code");
   });
 
-  it("resolves shared RPC helpers from @getpaseo/plugin", () => {
+  it("resolves shared RPC helpers from @clisbot/plugin", () => {
     const plugin = evaluatePluginClientBundle(
       "example",
       `(function(require) {
-        const { defineRpc, defineAttachmentSource } = require("@getpaseo/plugin");
+        const { defineRpc, defineAttachmentSource } = require("@clisbot/plugin");
         const search = defineRpc({ name: "issues.search", input: {}, output: {} });
         const module = { exports: {} };
         module.exports.default = function(plugin) {
@@ -819,18 +819,18 @@ it("binds imported getters to each originating installation across delayed callb
     hosts: {
       getSnapshot: () => [],
       subscribe: () => () => {},
-      getPaseoClient(serverId) {
+      getClisbotClient(serverId) {
         calls.push(`${installation}/${serverId}`);
-        return runtime.paseo;
+        return runtime.clisbot;
       },
     },
   });
   const source = bundle(`
-    const { getPaseoClient } = require("@getpaseo/plugin/client");
-    getPaseoClient("entry-host");
+    const { getClisbotClient } = require("@clisbot/plugin/client");
+    getClisbotClient("entry-host");
     plugin.addCommandCenterItem({
       id: "read", title: "Read", icon: "Server", context: "global",
-      onSelect: async () => { await Promise.resolve(); getPaseoClient("target-host"); },
+      onSelect: async () => { await Promise.resolve(); getClisbotClient("target-host"); },
     });
   `);
   const first = runPluginClientBundle("same-id", source, hostRuntime("first"));

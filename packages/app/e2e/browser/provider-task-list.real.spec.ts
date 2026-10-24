@@ -53,7 +53,7 @@ test.describe("real provider composer task lists", () => {
       page,
     }, testInfo) => {
       const cwd = realpathSync(
-        mkdtempSync(path.join(tmpdir(), `paseo-task-list-${scenario.provider}-`)),
+        mkdtempSync(path.join(tmpdir(), `clisbot-task-list-${scenario.provider}-`)),
       );
       let handle: AgentHandle | undefined;
 
@@ -85,7 +85,7 @@ test.describe("real provider composer task lists", () => {
   }
 
   test("Codex genuine Plan mode keeps the existing plan card", async ({ page }, testInfo) => {
-    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-genuine-codex-plan-")));
+    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-genuine-codex-plan-")));
     let handle: AgentHandle | undefined;
 
     try {

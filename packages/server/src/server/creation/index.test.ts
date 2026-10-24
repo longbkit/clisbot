@@ -8,7 +8,7 @@ import type {
   AgentSnapshotPayload,
   CreationSnapshot,
   WorkspaceDescriptorPayload,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { CreationService, type CreationInput } from "./index.js";
 
 const silentLogger = pino({ level: "silent" });

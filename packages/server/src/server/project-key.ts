@@ -1,5 +1,5 @@
 import { resolve, win32 } from "node:path";
-import { isGitHubHost, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
+import { isGitHubHost, parseGitRemoteLocation } from "@clisbot/protocol/git-remote";
 import { getRealpathAwareRelativePath, normalizePathForIdentity } from "../utils/path.js";
 
 /** Persisted opaque key used to join the same remote across hosts. */

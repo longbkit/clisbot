@@ -112,7 +112,7 @@ function FilePanelSettingsRowView({
   );
 }
 
-/** What the dropdown shows: the remembered panel, or that Paseo asks on every open. */
+/** What the dropdown shows: the remembered panel, or that Clisbot asks on every open. */
 function associatedValueLabel(t: TFunction, row: FilePanelSettingsRow<FilePanel>): string {
   if (row.associatedPanelId === null) return t("settings.files.askEveryTime");
   const panel = row.candidates.find((candidate) => candidate.id === row.associatedPanelId);

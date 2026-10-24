@@ -1,4 +1,4 @@
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { RichMarkdownPanel } from "./client/rich-markdown";
 
 export default function contribute(client: PluginClientContext) {

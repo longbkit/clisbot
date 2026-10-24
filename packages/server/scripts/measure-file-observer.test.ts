@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
 test.skipIf(process.platform !== "linux").each(["healthy", "directory-churn"])(
   "%s benchmark collects a startup batch larger than the argument limit",
   async (mode) => {
-    const temporaryRoot = await mkdtemp(join(tmpdir(), "paseo-watch-benchmark-test-"));
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "clisbot-watch-benchmark-test-"));
     try {
       const { stdout } = await execFileAsync(
         process.execPath,
@@ -31,18 +31,18 @@ test.skipIf(process.platform !== "linux").each(["healthy", "directory-churn"])(
           env: {
             ...process.env,
             TMPDIR: temporaryRoot,
-            PASEO_WATCH_BENCH_MODE: mode,
-            PASEO_WATCH_BENCH_ROOTS: "1",
-            PASEO_WATCH_BENCH_DIRS: "10",
-            PASEO_WATCH_BENCH_PREEXISTING_FILES: "40000",
-            PASEO_WATCH_BENCH_IGNORED_FILES: "1",
-            PASEO_WATCH_BENCH_EDITS: "1",
-            PASEO_WATCH_BENCH_SUSTAINED_EDITS: "1",
-            PASEO_WATCH_BENCH_SUSTAINED_INTERVAL_MS: "1",
-            PASEO_WATCH_BENCH_CHURN_DIRECTORIES: "10",
-            PASEO_WATCH_BENCH_CHURN_FILES_PER_DIRECTORY: "4000",
-            PASEO_WATCH_BENCH_CHURN_ROUNDS: "1",
-            PASEO_WATCH_BENCH_CHURN_DIRECTORIES_PER_ROUND: "2",
+            CLISBOT_WATCH_BENCH_MODE: mode,
+            CLISBOT_WATCH_BENCH_ROOTS: "1",
+            CLISBOT_WATCH_BENCH_DIRS: "10",
+            CLISBOT_WATCH_BENCH_PREEXISTING_FILES: "40000",
+            CLISBOT_WATCH_BENCH_IGNORED_FILES: "1",
+            CLISBOT_WATCH_BENCH_EDITS: "1",
+            CLISBOT_WATCH_BENCH_SUSTAINED_EDITS: "1",
+            CLISBOT_WATCH_BENCH_SUSTAINED_INTERVAL_MS: "1",
+            CLISBOT_WATCH_BENCH_CHURN_DIRECTORIES: "10",
+            CLISBOT_WATCH_BENCH_CHURN_FILES_PER_DIRECTORY: "4000",
+            CLISBOT_WATCH_BENCH_CHURN_ROUNDS: "1",
+            CLISBOT_WATCH_BENCH_CHURN_DIRECTORIES_PER_ROUND: "2",
           },
         },
       );

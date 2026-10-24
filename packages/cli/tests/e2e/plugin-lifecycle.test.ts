@@ -140,20 +140,20 @@ async function countActivations(logPath: string): Promise<number> {
 }
 
 async function main(): Promise<void> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-cli-e2e-"));
-  const gitDirectory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-git-cli-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-cli-e2e-"));
+  const gitDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-git-cli-e2e-"));
   const registry = await startNpmRegistry(npmPluginPackages());
   const context = await createE2ETestContext({ timeout: 45_000, env: registry.env });
   try {
     const scaffold = path.join(context.workDir, "authored-plugin");
-    const init = await context.paseo(["plugin", "init", scaffold, "--json"]);
+    const init = await context.clisbot(["plugin", "init", scaffold, "--json"]);
     assert.equal(init.exitCode, 0, init.stderr);
-    const manifestPath = path.join(scaffold, "paseo-plugin.json");
+    const manifestPath = path.join(scaffold, "clisbot-plugin.json");
     const manifest = await readPluginManifest(scaffold);
-    assert.deepEqual(manifest.requirements, { paseo: `>=${resolveCliVersion()}` });
+    assert.deepEqual(manifest.requirements, { clisbot: `>=${resolveCliVersion()}` });
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "cli-e2e", requirements: { paseo: `>=${resolveCliVersion()}` } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "cli-e2e", requirements: { clisbot: `>=${resolveCliVersion()}` } }),
     );
     await writeFile(path.join(directory, "index.server.ts"), pluginSource);
 
@@ -167,12 +167,12 @@ async function main(): Promise<void> {
     const caller = path.join(context.workDir, "caller");
     await mkdir(caller);
     await mkdir(path.join(sibling, "sub"), { recursive: true });
-    for (const target of [caller, path.join(sibling, "sub"), context.paseoHome]) {
+    for (const target of [caller, path.join(sibling, "sub"), context.clisbotHome]) {
       await writeFile(
-        path.join(target, "paseo-plugin.json"),
+        path.join(target, "clisbot-plugin.json"),
         JSON.stringify({
           id: "relative-cli",
-          requirements: { paseo: `>=${resolveCliVersion()}` },
+          requirements: { clisbot: `>=${resolveCliVersion()}` },
         }),
       );
       await writeFile(path.join(target, "index.server.ts"), pluginSource);
@@ -183,24 +183,24 @@ async function main(): Promise<void> {
         [".", caller, caller, []],
         ["../x:sub", `${sibling}:sub`, path.join(sibling, "sub"), []],
         ["../x", `${sibling}:sub`, path.join(sibling, "sub"), ["--path", "sub"]],
-        ["~", context.paseoHome, context.paseoHome, []],
-        ["~/.:.", `${context.paseoHome}:.`, context.paseoHome, []],
+        ["~", context.clisbotHome, context.clisbotHome, []],
+        ["~/.:.", `${context.clisbotHome}:.`, context.clisbotHome, []],
       ] as const) {
         observer.requests.length = 0;
-        const result = await context.paseo(
+        const result = await context.clisbot(
           ["plugin", "add", source, ...extraArgs, "--host", `127.0.0.1:${observer.port}`, "--json"],
           { cwd: caller },
         );
         assert.deepEqual(installedSources(), [expectedSource]);
         assert.equal(result.exitCode, 0, result.stderr);
         assert.equal(JSON.parse(result.stdout).path, expectedDirectory);
-        const removed = await context.paseo(["plugin", "remove", "relative-cli", "--json"]);
+        const removed = await context.clisbot(["plugin", "remove", "relative-cli", "--json"]);
         assert.equal(removed.exitCode, 0, removed.stderr);
       }
       // An absolute path belongs to the daemon's platform, which can differ from the CLI's.
       const windowsSource = `C:\\${path.basename(context.workDir)}\\missing:sub`;
       observer.requests.length = 0;
-      const missing = await context.paseo(
+      const missing = await context.clisbot(
         ["plugin", "add", windowsSource, "--host", `127.0.0.1:${observer.port}`, "--json"],
         { cwd: caller },
       );
@@ -211,7 +211,7 @@ async function main(): Promise<void> {
       await observer.close();
     }
 
-    const install = await context.paseo(["plugin", "install", directory, "--json"]);
+    const install = await context.clisbot(["plugin", "install", directory, "--json"]);
     assert.equal(install.exitCode, 0, install.stderr);
     assert.equal(JSON.parse(install.stdout).id, "cli-e2e");
 
@@ -223,34 +223,34 @@ async function main(): Promise<void> {
 
     await writeFile(
       manifestPath,
-      JSON.stringify({ ...manifest, requirements: { paseo: ">=999.0.0" } }),
+      JSON.stringify({ ...manifest, requirements: { clisbot: ">=999.0.0" } }),
     );
-    const incompatibleInstall = await context.paseo(["plugin", "install", scaffold, "--json"]);
+    const incompatibleInstall = await context.clisbot(["plugin", "install", scaffold, "--json"]);
     assert.equal(incompatibleInstall.exitCode, 1);
-    assert.match(incompatibleInstall.stderr, /requires Paseo >=999.0.0/);
-    const afterRejection = await context.paseo(["plugin", "ls", "--json"]);
+    assert.match(incompatibleInstall.stderr, /requires Clisbot >=999.0.0/);
+    const afterRejection = await context.clisbot(["plugin", "ls", "--json"]);
     assert.equal(afterRejection.exitCode, 0, afterRejection.stderr);
     assert.deepEqual(
       JSON.parse(afterRejection.stdout).map((plugin: { id: string }) => plugin.id),
       ["cli-e2e"],
     );
     await writeFile(manifestPath, JSON.stringify(manifest));
-    const scaffoldInstall = await context.paseo(["plugin", "install", scaffold, "--json"]);
+    const scaffoldInstall = await context.clisbot(["plugin", "install", scaffold, "--json"]);
     assert.equal(scaffoldInstall.exitCode, 0, scaffoldInstall.stderr);
     assert.equal(JSON.parse(scaffoldInstall.stdout).status, "running");
 
     await git(gitDirectory, ["init", "-b", "main"]);
-    await git(gitDirectory, ["config", "user.name", "Paseo Tests"]);
-    await git(gitDirectory, ["config", "user.email", "paseo@example.test"]);
+    await git(gitDirectory, ["config", "user.name", "Clisbot Tests"]);
+    await git(gitDirectory, ["config", "user.email", "clisbot@example.test"]);
     await writeFile(
-      path.join(gitDirectory, "paseo-plugin.json"),
-      JSON.stringify({ id: "git-cli-e2e", requirements: { paseo: `>=${resolveCliVersion()}` } }),
+      path.join(gitDirectory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "git-cli-e2e", requirements: { clisbot: `>=${resolveCliVersion()}` } }),
     );
     await writeFile(path.join(gitDirectory, "index.server.ts"), pluginSource);
     await git(gitDirectory, ["add", "-A"]);
     await git(gitDirectory, ["commit", "-m", "initial"]);
 
-    const gitInstall = await context.paseo([
+    const gitInstall = await context.clisbot([
       "plugin",
       "add",
       `git:${pathToFileURL(gitDirectory).href}`,
@@ -265,22 +265,22 @@ async function main(): Promise<void> {
     );
     await git(gitDirectory, ["add", "-A"]);
     await git(gitDirectory, ["commit", "-m", "update"]);
-    const status = await context.paseo(["plugin", "status", "git-cli-e2e", "--json"]);
+    const status = await context.clisbot(["plugin", "status", "git-cli-e2e", "--json"]);
     assert.equal(status.exitCode, 0, status.stderr);
     assert.equal(JSON.parse(status.stdout)[0].status, "running");
     assert.equal(JSON.parse(status.stdout)[0].commit, JSON.parse(gitInstall.stdout).commit);
 
-    const update = await context.paseo(["plugin", "update", "git-cli-e2e", "--yes", "--json"]);
+    const update = await context.clisbot(["plugin", "update", "git-cli-e2e", "--yes", "--json"]);
     assert.equal(update.exitCode, 0, update.stderr);
     assert.equal(JSON.parse(update.stdout)[0].outcome, "updated");
 
     const installedCommit = JSON.parse(update.stdout)[0].plugin.installation.currentRevision;
     const buildMarker = path.join(context.workDir, "incompatible-build-ran");
     await writeFile(
-      path.join(gitDirectory, "paseo-plugin.json"),
+      path.join(gitDirectory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "git-cli-e2e",
-        requirements: { paseo: ">=999.0.0" },
+        requirements: { clisbot: ">=999.0.0" },
         build: [
           [
             process.execPath,
@@ -292,8 +292,8 @@ async function main(): Promise<void> {
       }),
     );
     await git(gitDirectory, ["add", "-A"]);
-    await git(gitDirectory, ["commit", "-m", "requires a future Paseo"]);
-    const incompatibleUpdate = await context.paseo([
+    await git(gitDirectory, ["commit", "-m", "requires a future Clisbot"]);
+    const incompatibleUpdate = await context.clisbot([
       "plugin",
       "update",
       "git-cli-e2e",
@@ -301,13 +301,13 @@ async function main(): Promise<void> {
       "--json",
     ]);
     assert.equal(incompatibleUpdate.exitCode, 1);
-    assert.match(JSON.parse(incompatibleUpdate.stdout)[0].error, /requires Paseo >=999.0.0/);
+    assert.match(JSON.parse(incompatibleUpdate.stdout)[0].error, /requires Clisbot >=999.0.0/);
     await assert.rejects(readFile(buildMarker), { code: "ENOENT" });
-    const retained = await context.paseo(["plugin", "ls", "git-cli-e2e", "--json"]);
+    const retained = await context.clisbot(["plugin", "ls", "git-cli-e2e", "--json"]);
     assert.equal(retained.exitCode, 0, retained.stderr);
     assert.equal(JSON.parse(retained.stdout)[0].commit, installedCommit);
     assert.equal(JSON.parse(retained.stdout)[0].status, "running");
-    const incompatibleAdd = await context.paseo([
+    const incompatibleAdd = await context.clisbot([
       "plugin",
       "add",
       pathToFileURL(gitDirectory).href,
@@ -316,58 +316,58 @@ async function main(): Promise<void> {
       "--json",
     ]);
     assert.equal(incompatibleAdd.exitCode, 1);
-    assert.match(incompatibleAdd.stderr, /requires Paseo >=999.0.0/);
+    assert.match(incompatibleAdd.stderr, /requires Clisbot >=999.0.0/);
     await assert.rejects(readFile(buildMarker), { code: "ENOENT" });
 
-    const reload = await context.paseo(["plugin", "reload", "cli-e2e", "--json"]);
+    const reload = await context.clisbot(["plugin", "reload", "cli-e2e", "--json"]);
     assert.equal(reload.exitCode, 0, reload.stderr);
     assert.equal(JSON.parse(reload.stdout).status, "running");
 
-    const disable = await context.paseo(["plugin", "disable", "cli-e2e", "--json"]);
+    const disable = await context.clisbot(["plugin", "disable", "cli-e2e", "--json"]);
     assert.equal(disable.exitCode, 0, disable.stderr);
     assert.equal(JSON.parse(disable.stdout).status, "disabled");
 
-    const enable = await context.paseo(["plugin", "enable", "cli-e2e", "--json"]);
+    const enable = await context.clisbot(["plugin", "enable", "cli-e2e", "--json"]);
     assert.equal(enable.exitCode, 0, enable.stderr);
     assert.equal(JSON.parse(enable.stdout).status, "running");
 
     // A reload that finishes after the client's former one-minute deadline must still report its
     // real result. The wait is the daemon's own lifecycle queue, so it runs on real wall-clock time.
-    const gateDirectory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-reload-e2e-"));
+    const gateDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-reload-e2e-"));
     const buildStarted = path.join(gateDirectory, "build-started");
     const buildGate = path.join(gateDirectory, "build-gate");
     const activationLog = path.join(gateDirectory, "activations.log");
     const targetDirectory = path.join(gateDirectory, "slow-reload-target");
     const slowRepository = path.join(gateDirectory, "slow-build");
     const reloadObserver = await startRequestObserver(context.port);
-    let slowInstall: ReturnType<typeof context.paseo> | undefined;
-    let slowReload: ReturnType<typeof context.paseo> | undefined;
+    let slowInstall: ReturnType<typeof context.clisbot> | undefined;
+    let slowReload: ReturnType<typeof context.clisbot> | undefined;
     try {
       await mkdir(targetDirectory);
       await writeFile(
-        path.join(targetDirectory, "paseo-plugin.json"),
+        path.join(targetDirectory, "clisbot-plugin.json"),
         JSON.stringify({
           id: "slow-reload-target",
-          requirements: { paseo: `>=${resolveCliVersion()}` },
+          requirements: { clisbot: `>=${resolveCliVersion()}` },
         }),
       );
       await writeFile(
         path.join(targetDirectory, "index.server.ts"),
         activationCountingPlugin(activationLog),
       );
-      const targetInstall = await context.paseo(["plugin", "install", targetDirectory, "--json"]);
+      const targetInstall = await context.clisbot(["plugin", "install", targetDirectory, "--json"]);
       assert.equal(targetInstall.exitCode, 0, targetInstall.stderr);
       assert.equal(await countActivations(activationLog), 1);
 
       await mkdir(slowRepository);
       await git(slowRepository, ["init", "-b", "main"]);
-      await git(slowRepository, ["config", "user.name", "Paseo Tests"]);
-      await git(slowRepository, ["config", "user.email", "paseo@example.test"]);
+      await git(slowRepository, ["config", "user.name", "Clisbot Tests"]);
+      await git(slowRepository, ["config", "user.email", "clisbot@example.test"]);
       await writeFile(
-        path.join(slowRepository, "paseo-plugin.json"),
+        path.join(slowRepository, "clisbot-plugin.json"),
         JSON.stringify({
           id: "slow-build",
-          requirements: { paseo: `>=${resolveCliVersion()}` },
+          requirements: { clisbot: `>=${resolveCliVersion()}` },
           build: [[process.execPath, "-e", gateWaitBuild, buildStarted, buildGate]],
         }),
       );
@@ -376,7 +376,7 @@ async function main(): Promise<void> {
       await git(slowRepository, ["commit", "-m", "blocking build"]);
 
       // This install holds the plugin lifecycle queue while its build waits for the gate.
-      slowInstall = context.paseo(
+      slowInstall = context.clisbot(
         ["plugin", "add", `git:${pathToFileURL(slowRepository).href}`, "--json"],
         { timeout: 180_000 },
       );
@@ -392,7 +392,7 @@ async function main(): Promise<void> {
         "the blocking build to start",
       );
 
-      slowReload = context.paseo(
+      slowReload = context.clisbot(
         [
           "plugin",
           "reload",
@@ -409,7 +409,7 @@ async function main(): Promise<void> {
 
       // The interim listing is not the reload's outcome: it still reports the plugin running and
       // no restart has happened while the reload waits behind the queue.
-      const duringReload = await context.paseo(["plugin", "ls", "slow-reload-target", "--json"]);
+      const duringReload = await context.clisbot(["plugin", "ls", "slow-reload-target", "--json"]);
       assert.equal(duringReload.exitCode, 0, duringReload.stderr);
       assert.equal(JSON.parse(duringReload.stdout)[0].status, "running");
       assert.equal(await countActivations(activationLog), 1);
@@ -430,24 +430,24 @@ async function main(): Promise<void> {
       const brokenDirectory = path.join(gateDirectory, "broken-plugin");
       await mkdir(brokenDirectory);
       await writeFile(
-        path.join(brokenDirectory, "paseo-plugin.json"),
+        path.join(brokenDirectory, "clisbot-plugin.json"),
         JSON.stringify({
           id: "broken-reload",
-          requirements: { paseo: `>=${resolveCliVersion()}` },
+          requirements: { clisbot: `>=${resolveCliVersion()}` },
         }),
       );
       await writeFile(path.join(brokenDirectory, "index.server.ts"), "export default broken !!!");
-      const brokenInstall = await context.paseo(["plugin", "install", brokenDirectory, "--json"]);
+      const brokenInstall = await context.clisbot(["plugin", "install", brokenDirectory, "--json"]);
       assert.equal(brokenInstall.exitCode, 1);
       assert.match(brokenInstall.stderr, /broken-reload|broken|failed/i);
-      const brokenReload = await context.paseo(["plugin", "reload", "broken-reload", "--json"], {
+      const brokenReload = await context.clisbot(["plugin", "reload", "broken-reload", "--json"], {
         timeout: 60_000,
       });
       assert.equal(brokenReload.exitCode, 1);
       assert.match(brokenReload.stderr, /broken-reload|broken|failed/i);
 
       for (const pluginId of ["slow-reload-target", "slow-build", "broken-reload"]) {
-        const removed = await context.paseo(["plugin", "remove", pluginId, "--json"]);
+        const removed = await context.clisbot(["plugin", "remove", pluginId, "--json"]);
         assert.equal(removed.exitCode, 0, removed.stderr);
       }
     } finally {
@@ -459,14 +459,17 @@ async function main(): Promise<void> {
       await rm(gateDirectory, { recursive: true, force: true });
     }
 
-    const remove = await context.paseo(["plugin", "remove", "cli-e2e", "--json"]);
+    const remove = await context.clisbot(["plugin", "remove", "cli-e2e", "--json"]);
     assert.equal(remove.exitCode, 0, remove.stderr);
-    const removeGit = await context.paseo(["plugin", "remove", "git-cli-e2e", "--json"]);
+    const removeGit = await context.clisbot(["plugin", "remove", "git-cli-e2e", "--json"]);
     assert.equal(removeGit.exitCode, 0, removeGit.stderr);
-    const removeScaffold = await context.paseo(["plugin", "remove", "authored-plugin", "--json"]);
+    const removeScaffold = await context.clisbot(["plugin", "remove", "authored-plugin", "--json"]);
     assert.equal(removeScaffold.exitCode, 0, removeScaffold.stderr);
-    for (const source of ["npm:paseo-fixture-plugin@^1.0.0", "npm:@paseo-fixture/review@2.0.0"]) {
-      const npmInstall = await context.paseo([
+    for (const source of [
+      "npm:clisbot-fixture-plugin@^1.0.0",
+      "npm:@clisbot-fixture/review@2.0.0",
+    ]) {
+      const npmInstall = await context.clisbot([
         "plugin",
         "install",
         source,
@@ -479,11 +482,11 @@ async function main(): Promise<void> {
       assert.equal(JSON.parse(npmInstall.stdout).status, "running");
       assert.equal(
         JSON.parse(npmInstall.stdout).installation.currentRevision,
-        source.includes("@paseo-fixture") ? "2.0.0" : "1.1.0",
+        source.includes("@clisbot-fixture") ? "2.0.0" : "1.1.0",
       );
-      const npmDisabled = await context.paseo(["plugin", "disable", "npm-review", "--json"]);
+      const npmDisabled = await context.clisbot(["plugin", "disable", "npm-review", "--json"]);
       assert.equal(npmDisabled.exitCode, 0, npmDisabled.stderr);
-      const restart = await context.paseo(["daemon", "restart", "--timeout", "45", "--json"], {
+      const restart = await context.clisbot(["daemon", "restart", "--timeout", "45", "--json"], {
         timeout: 60_000,
       });
       assert.equal(restart.exitCode, 0, restart.stderr);
@@ -491,7 +494,7 @@ async function main(): Promise<void> {
         JSON.parse(restart.stdout).workerPid,
         JSON.parse(restart.stdout).previousWorkerPid,
       );
-      const persisted = await context.paseo(["plugin", "ls", "npm-review", "--json"]);
+      const persisted = await context.clisbot(["plugin", "ls", "npm-review", "--json"]);
       assert.equal(persisted.exitCode, 0, persisted.stderr);
       assert.equal(JSON.parse(persisted.stdout)[0].status, "disabled");
       assert.equal(JSON.parse(persisted.stdout)[0].path, JSON.parse(npmInstall.stdout).path);
@@ -499,15 +502,15 @@ async function main(): Promise<void> {
         JSON.parse(persisted.stdout)[0].installation,
         JSON.parse(npmInstall.stdout).installation,
       );
-      const npmEnabled = await context.paseo(["plugin", "enable", "npm-review", "--json"]);
+      const npmEnabled = await context.clisbot(["plugin", "enable", "npm-review", "--json"]);
       assert.equal(npmEnabled.exitCode, 0, npmEnabled.stderr);
       assert.equal(JSON.parse(npmEnabled.stdout).status, "running");
-      const npmReload = await context.paseo(["plugin", "reload", "npm-review", "--json"]);
+      const npmReload = await context.clisbot(["plugin", "reload", "npm-review", "--json"]);
       assert.equal(npmReload.exitCode, 0, npmReload.stderr);
-      const npmRemove = await context.paseo(["plugin", "remove", "npm-review", "--json"]);
+      const npmRemove = await context.clisbot(["plugin", "remove", "npm-review", "--json"]);
       assert.equal(npmRemove.exitCode, 0, npmRemove.stderr);
     }
-    const list = await context.paseo(["plugin", "ls", "--json"]);
+    const list = await context.clisbot(["plugin", "ls", "--json"]);
     assert.equal(list.exitCode, 0, list.stderr);
     assert.deepEqual(JSON.parse(list.stdout), []);
   } finally {

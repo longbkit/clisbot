@@ -23,12 +23,12 @@ test("retains, replaces, and removes snapshots by resolved workspace directory",
 });
 
 test("retains refreshed Git changes without a workspace subscription", async () => {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-runtime-store-")));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-runtime-store-")));
   const repo = path.join(root, "repo");
   let now = Date.now();
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(root, "home"),
+    clisbotHome: path.join(root, "home"),
     deps: { now: () => new Date(now) },
   });
   const store = createWorkspaceRuntimeStore();

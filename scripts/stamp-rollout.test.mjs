@@ -6,7 +6,7 @@ import { test } from "vitest";
 import { stampRollout } from "./stamp-rollout.mjs";
 
 test("rewrites rollout fields and preserves unrelated manifest data", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "paseo-stamp-rollout-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "clisbot-stamp-rollout-"));
   try {
     const firstPath = path.join(dir, "latest.yml");
     const secondPath = path.join(dir, "latest-mac.yml");
@@ -38,7 +38,7 @@ test("rewrites rollout fields and preserves unrelated manifest data", () => {
 });
 
 test("only updates rolloutHours when releaseDate is omitted", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "paseo-stamp-rollout-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "clisbot-stamp-rollout-"));
   try {
     const filePath = path.join(dir, "latest.yml");
     writeFileSync(

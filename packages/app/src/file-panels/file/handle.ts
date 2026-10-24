@@ -4,8 +4,8 @@ import {
   type PluginFile,
   type PluginFileEvent,
   type PluginFileWriteOptions,
-} from "@getpaseo/plugin/client";
-import type { FileVersion, FileWriteResult } from "@getpaseo/protocol/messages";
+} from "@clisbot/plugin/client";
+import type { FileVersion, FileWriteResult } from "@clisbot/protocol/messages";
 import { decodeUtf8 } from "@/utils/decode-utf8";
 
 export interface FileTarget {

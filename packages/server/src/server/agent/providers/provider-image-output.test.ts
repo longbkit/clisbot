@@ -22,31 +22,31 @@ function renderImageMarkdown(imagePath: string): string {
 
 describe("isProviderImageMarkdown", () => {
   test("matches the markdown emitted for a materialized attachment", () => {
-    expect(isProviderImageMarkdown(`![Image](/tmp/paseo-attachments/${HASH}.png)`)).toBe(true);
-    expect(isProviderImageMarkdown(`![Image](/tmp/paseo-attachments-a1B2c3/${HASH}.png)`)).toBe(
+    expect(isProviderImageMarkdown(`![Image](/tmp/clisbot-attachments/${HASH}.png)`)).toBe(true);
+    expect(isProviderImageMarkdown(`![Image](/tmp/clisbot-attachments-a1B2c3/${HASH}.png)`)).toBe(
       true,
     );
-    expect(isProviderImageMarkdown(`![Image](/tmp/paseo-attachments/user-1000/${HASH}.png)`)).toBe(
-      true,
-    );
-    expect(isProviderImageMarkdown(`![shot](/var/folders/x/paseo-attachments/${HASH}.webp)`)).toBe(
-      true,
-    );
+    expect(
+      isProviderImageMarkdown(`![Image](/tmp/clisbot-attachments/user-1000/${HASH}.png)`),
+    ).toBe(true);
+    expect(
+      isProviderImageMarkdown(`![shot](/var/folders/x/clisbot-attachments/${HASH}.webp)`),
+    ).toBe(true);
     // Windows: backslash path separators are doubled by escapeMarkdownImageSource.
     expect(
       isProviderImageMarkdown(
-        `![Image](C:\\\\Users\\\\me\\\\AppData\\\\Local\\\\Temp\\\\paseo-attachments\\\\${HASH}.png)`,
+        `![Image](C:\\\\Users\\\\me\\\\AppData\\\\Local\\\\Temp\\\\clisbot-attachments\\\\${HASH}.png)`,
       ),
     ).toBe(true);
   });
 
   test("emits Windows file paths as file URIs", () => {
     const markdown = renderImageMarkdown(
-      `C:\\Users\\me\\AppData\\Local\\Temp\\paseo-attachments\\${HASH}.png`,
+      `C:\\Users\\me\\AppData\\Local\\Temp\\clisbot-attachments\\${HASH}.png`,
     );
 
     expect(markdown).toBe(
-      `\n\n![Image](file:///C:/Users/me/AppData/Local/Temp/paseo-attachments/${HASH}.png)\n\n`,
+      `\n\n![Image](file:///C:/Users/me/AppData/Local/Temp/clisbot-attachments/${HASH}.png)\n\n`,
     );
     expect(isProviderImageMarkdown(markdown)).toBe(true);
   });
@@ -84,7 +84,7 @@ describe("isProviderImageMarkdown", () => {
 
   test("rejects user-authored markdown that is not a materialized attachment", () => {
     // No content hash — a hand-written path, not something the writer produced.
-    expect(isProviderImageMarkdown("![diagram](./paseo-attachments/notes.png)")).toBe(false);
+    expect(isProviderImageMarkdown("![diagram](./clisbot-attachments/notes.png)")).toBe(false);
     expect(isProviderImageMarkdown("![logo](https://example.com/logo.png)")).toBe(false);
     // Image markdown that does not start the text.
     expect(isProviderImageMarkdown("see the chart: ![chart](x.png)")).toBe(false);
@@ -155,11 +155,11 @@ describe("provider image paragraph boundaries", () => {
 test("materialized image output retains paragraph boundaries and attachment recognition", () => {
   const item = renderProviderImageOutputAsAssistantMarkdown(
     { data: "YWJjMTIz", mimeType: "image/png" },
-    { materialize: () => ({ path: `/tmp/paseo-attachments/${HASH}.png` }) },
+    { materialize: () => ({ path: `/tmp/clisbot-attachments/${HASH}.png` }) },
   );
   expect(item).toEqual({
     type: "assistant_message",
-    text: `\n\n![Image](file:///tmp/paseo-attachments/${HASH}.png)\n\n`,
+    text: `\n\n![Image](file:///tmp/clisbot-attachments/${HASH}.png)\n\n`,
   });
   if (!item || item.type !== "assistant_message") throw new Error("Expected image output");
   expect(isProviderImageMarkdown(item.text)).toBe(true);

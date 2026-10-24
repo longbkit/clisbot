@@ -129,7 +129,6 @@ export function LandingPage({ title, subtitle }: LandingPageProps) {
       <div className="landing-content bg-background">
         <main className="p-6 md:p-20 md:pt-40 max-w-5xl mx-auto">
           <div className="space-y-24">
-            <SocialProofWall />
             <MultiProviderSection />
             <TurnkeySection />
             <AutomationSection />
@@ -177,88 +176,6 @@ const FEATURED_AGENTS = [
 ] as const;
 
 const ADDITIONAL_AGENT_COUNT = AGENT_PAGES.length - FEATURED_AGENTS.length;
-
-const SOCIAL_PROOF_TWEETS = [
-  {
-    name: "Cam",
-    handle: "@ceeebeeebeee",
-    date: "Apr 6, 2026",
-    avatar: "/social-proof/ceeebeeebeee.jpg",
-    url: "https://x.com/ceeebeeebeee/status/2041008798798864537",
-    text: "without a doubt the most slept on orchestrator right now. Open source, every OS, and a mobile experience that truly blew me away.",
-  },
-  {
-    name: "Erik Sherman",
-    handle: "@erikksherman",
-    date: "Apr 11, 2026",
-    avatar: "/social-proof/erikksherman.jpg",
-    url: "https://x.com/erikksherman/status/2043011630590751008",
-    text: "control agents from anywhere - mac, phone, web. one simple change transformed my health while INCREASING productivity",
-  },
-  {
-    name: "Aman Kumar Jagdev",
-    handle: "@amankumarjagdev",
-    date: "Apr 16, 2026",
-    avatar: "/social-proof/amankumarjagdev.jpg",
-    url: "https://x.com/amankumarjagdev/status/2044815258414674307",
-    text: "I have tried 100s of agent orchestrator, cli and gui. the best one i have found. Please give it a try! it's really good",
-  },
-  {
-    name: "RUI",
-    handle: "@tietougongshiba",
-    date: "May 3, 2026",
-    avatar: "/social-proof/tietougongshiba.jpg",
-    url: "https://x.com/tietougongshiba/status/2050886374941925754",
-    text: "Being able to check and manage agent progress from my phone while I'm out is so convenient.",
-  },
-  {
-    name: "Jason Torres",
-    handle: "@jasontorres",
-    date: "May 11, 2026",
-    avatar: "/social-proof/jasontorres.jpg",
-    url: "https://x.com/jasontorres/status/2053875385515790731",
-    text: "Can interchange between Codex, Claude Code, Opencode, Pi. Stable mobile and desktop apps connected through a secure relay from your VMs.",
-  },
-  {
-    name: "A9",
-    handle: "@aadtyn",
-    date: "May 29, 2026",
-    avatar: "/social-proof/aadtyn.jpg",
-    url: "https://x.com/aadtyn/status/2060371229773803943",
-    text: "cross platform agent orchestration with inbuilt relay and tailscale / self host daemon options + the best UI ive seen in this segment",
-  },
-  {
-    name: "boris evstratov",
-    handle: "@bevstratov",
-    date: "May 30, 2026",
-    avatar: "/social-proof/bevstratov.jpg",
-    url: "https://x.com/bevstratov/status/2060733983042781550",
-    text: "It’s an incredible piece of software. The last building block I needed to fully work from my phone. everything super smooth.",
-  },
-  {
-    name: "Arnold Gamboa",
-    handle: "@arnoldgamboa",
-    date: "May 28, 2026",
-    avatar: "/social-proof/arnoldgamboa.jpg",
-    url: "https://x.com/arnoldgamboa/status/2059832028099436921",
-    text: "Paseo is a really good interface for Pi. It’s not the only thing it does, but that’s my current use case for now.",
-  },
-  {
-    name: "Dong",
-    handle: "@dongnaebi",
-    date: "Apr 12, 2026",
-    avatar: "/social-proof/dongnaebi.jpg",
-    url: "https://x.com/dongnaebi/status/2043162391941398735",
-    text: "Paseo is the best software I've used this year. Absolutely amazing!",
-  },
-] as const;
-
-const SOCIAL_PROOF_ROWS = [
-  { id: "top", tweets: SOCIAL_PROOF_TWEETS.slice(0, 5), reverse: false },
-  { id: "bottom", tweets: SOCIAL_PROOF_TWEETS.slice(5), reverse: true },
-] as const;
-
-type SocialProofTweet = (typeof SOCIAL_PROOF_TWEETS)[number];
 
 function AgentBadge({ name, Icon }: (typeof FEATURED_AGENTS)[number]) {
   const [hovered, setHovered] = React.useState(false);
@@ -354,86 +271,6 @@ function SectionTitle({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function SocialProofWall() {
-  const { t } = useTranslation();
-  return (
-    <motion.section
-      initial={FADE_IN_UP}
-      whileInView={FADE_IN}
-      viewport={VIEWPORT_60}
-      transition={EASE_OUT_05}
-    >
-      <SectionTitle
-        title={t("landing.socialProof.title")}
-        description={t("landing.socialProof.description")}
-      />
-
-      <div className="social-proof-marquee space-y-4 overflow-hidden">
-        {SOCIAL_PROOF_ROWS.map((row) => (
-          <SocialProofRow key={row.id} tweets={row.tweets} reverse={row.reverse} />
-        ))}
-      </div>
-    </motion.section>
-  );
-}
-
-function SocialProofRow({
-  tweets,
-  reverse,
-}: {
-  tweets: readonly SocialProofTweet[];
-  reverse: boolean;
-}) {
-  return (
-    <div className="social-proof-row">
-      <div className={`social-proof-track ${reverse ? "social-proof-track-reverse" : ""}`}>
-        <div className="flex shrink-0 gap-4 pr-4">
-          {tweets.map((tweet) => (
-            <SocialProofCard key={tweet.url} tweet={tweet} />
-          ))}
-        </div>
-        <div className="flex shrink-0 gap-4 pr-4" aria-hidden="true">
-          {tweets.map((tweet) => (
-            <SocialProofCard key={`${tweet.url}-clone`} tweet={tweet} inert />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SocialProofCard({ tweet, inert }: { tweet: SocialProofTweet; inert?: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <a
-      href={tweet.url}
-      target="_blank"
-      rel="noreferrer"
-      tabIndex={inert ? -1 : undefined}
-      className="group flex h-[154px] w-[320px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-white/20 hover:bg-white/[0.05] md:w-[420px]"
-      aria-label={t("landing.socialProof.readPost", { name: tweet.name })}
-    >
-      <div>
-        <div className="flex min-w-0 items-center gap-3">
-          <img
-            src={tweet.avatar}
-            alt=""
-            width={28}
-            height={28}
-            loading="lazy"
-            decoding="async"
-            className="h-7 w-7 shrink-0 rounded-full bg-white/10 object-cover"
-          />
-          <p className="truncate text-sm font-medium text-white/60">{tweet.handle}</p>
-        </div>
-        <p className="social-proof-card-text mt-4 text-sm leading-relaxed text-white/72">
-          {tweet.text}
-        </p>
-      </div>
-    </a>
   );
 }
 
@@ -749,7 +586,7 @@ function CliAutomationExample() {
       <div className="space-y-6">
         <div>
           <ShellPrompt>
-            <span className="text-white">paseo run</span> <span className="text-white/35">\</span>
+            <span className="text-white">clisbot run</span> <span className="text-white/35">\</span>
           </ShellPrompt>
           <div className="pl-5">
             <span className="text-sky-300/75">--provider</span>{" "}
@@ -762,7 +599,7 @@ function CliAutomationExample() {
 
         <div className="space-y-1">
           <ShellPrompt>
-            <span className="text-white">paseo ls</span>
+            <span className="text-white">clisbot ls</span>
           </ShellPrompt>
           <AgentListOutput />
         </div>
@@ -770,7 +607,7 @@ function CliAutomationExample() {
         <div>
           <div className="text-white/30">{t("landing.automation.otherHostComment")}</div>
           <ShellPrompt>
-            <span className="text-white">paseo ls</span>{" "}
+            <span className="text-white">clisbot ls</span>{" "}
             <span className="text-sky-300/75">--host</span>{" "}
             <span className="text-white/75">devbox:6767</span>
           </ShellPrompt>
@@ -807,11 +644,11 @@ function AgentListOutput() {
 function SdkAutomationExample() {
   return (
     <pre className="overflow-x-auto font-mono text-[11px] leading-5 text-white/60">
-      <span className="text-purple-300">import</span> {"{"} createPaseoClient {"}"}{" "}
+      <span className="text-purple-300">import</span> {"{"} createClisbotClient {"}"}{" "}
       <span className="text-purple-300">from</span>{" "}
-      <span className="text-emerald-300/80">{'"@getpaseo/client"'}</span>;{"\n\n"}
+      <span className="text-emerald-300/80">{'"@clisbot/client"'}</span>;{"\n\n"}
       <span className="text-purple-300">const</span> client ={" "}
-      <span className="text-sky-300">createPaseoClient</span>({"{"}
+      <span className="text-sky-300">createClisbotClient</span>({"{"}
       {"\n"} url: <span className="text-emerald-300/80">{'"ws://127.0.0.1:6767/ws"'}</span>,{"\n"}
       {"}"});
       {"\n"}
@@ -823,7 +660,7 @@ function SdkAutomationExample() {
       <span className="text-sky-300">create</span>({"{"}
       {"\n"} config: {"{"} provider:{" "}
       <span className="text-emerald-300/80">{'"codex/gpt-5.6-sol"'}</span> {"}"},{"\n"} cwd:{" "}
-      <span className="text-emerald-300/80">{'"/Users/me/dev/paseo"'}</span>,{"\n"} prompt:{" "}
+      <span className="text-emerald-300/80">{'"/Users/me/dev/clisbot"'}</span>,{"\n"} prompt:{" "}
       <span className="text-emerald-300/80">{'"Fix issue #412 and add tests."'}</span>,{"\n"}
       {"}"});
       {"\n\n"}
@@ -857,7 +694,7 @@ function ExtensibleSection() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-white/45">{t("landing.plugins.license")}</p>
           <a
-            href="https://github.com/getpaseo/paseo"
+            href="https://github.com/longbkit/clisbot"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex shrink-0 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -874,7 +711,7 @@ function ExtensibleSection() {
 
 const PLUGINS_BROWSE = PLUGINS_LINKED
   ? { href: "/plugins", external: false }
-  : { href: "https://paseo.cafe", external: true };
+  : { href: "https://clisbot.cafe", external: true };
 
 function PluginActions() {
   const { t } = useTranslation();
@@ -1071,7 +908,7 @@ function ServerInstallButton() {
       trigger={trigger}
       title={t("landing.getStarted.serverInstallTitle")}
       description={t("landing.getStarted.serverInstallDescription")}
-      command="npm install -g @getpaseo/cli && paseo"
+      command="npm install -g @clisbot/cli && clisbot"
       footnote={footnote}
     />
   );

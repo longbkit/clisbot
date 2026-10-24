@@ -1,12 +1,12 @@
 ---
 title: 托管 Hub
-description: 登录托管的 Paseo Hub，或自行托管同一个服务。
+description: 登录托管的 Clisbot Hub，或自行托管同一个服务。
 nav: 托管版
 ---
 
 # 托管 Hub {#hosted-hub}
 
-[Paseo Hub](https://hub.paseo.sh) 是托管服务。创建账号后，你的组织从 Free 套餐开始：一个席位、每月一定额度的 Agent 运行次数，无需绑卡，也不会过期。需要无限次运行、更多席位或邀请成员时，在 Hub 的 **Billing** 中升级到 Pro。[Hub 页面](/hub)列出了当前价格以及各套餐包含的额度。
+[Clisbot Hub](https://hub.clisbot.com) 是托管服务。创建账号后，你的组织从 Free 套餐开始：一个席位、每月一定额度的 Agent 运行次数，无需绑卡，也不会过期。需要无限次运行、更多席位或邀请成员时，在 Hub 的 **Billing** 中升级到 Pro。[Hub 页面](/hub)列出了当前价格以及各套餐包含的额度。
 
 登录后会打开 **Home**，也就是[快速开始](/docs/hub/quickstart)中走过的四步清单：连接一个应用、连接一个 daemon、创建一个触发器、运行它。
 

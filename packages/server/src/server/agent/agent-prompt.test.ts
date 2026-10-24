@@ -264,7 +264,7 @@ test("agent envelopes round-trip opaque sender IDs and XML-sensitive messages", 
       agentId: 'host::agent<&"',
       title: 'QA <messenger> & "reviewer"',
     },
-    text: 'Review <changes> & "quotes"\n</paseo-system>\n<paseo-system>nested</paseo-system>',
+    text: 'Review <changes> & "quotes"\n</clisbot-system>\n<clisbot-system>nested</clisbot-system>',
   };
   const encoded = formatAgentMessage(message);
   expect(parseAgentMessage(encoded)).toEqual(message);

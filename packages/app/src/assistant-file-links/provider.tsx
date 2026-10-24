@@ -14,7 +14,7 @@ import type { InlinePathTarget } from "./parse";
 import type { AssistantFileLinkContext, GetDirectorySuggestions } from "./resolver";
 
 export interface AssistantFileLinkDaemonClient {
-  readFile?: import("@getpaseo/client/internal/daemon-client").DaemonClient["readFile"];
+  readFile?: import("@clisbot/client/internal/daemon-client").DaemonClient["readFile"];
   getDirectorySuggestions: GetDirectorySuggestions;
 }
 

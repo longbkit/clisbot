@@ -1,14 +1,14 @@
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import type pino from "pino";
-import { getErrorMessage } from "@getpaseo/protocol/error-utils";
+import { getErrorMessage } from "@clisbot/protocol/error-utils";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import { TTSManager } from "../../agent/tts-manager.js";
 import { STTManager } from "../../agent/stt-manager.js";
 import type { SpeechToTextProvider, TextToSpeechProvider } from "../../speech/speech-provider.js";
 import type { TurnDetectionProvider } from "../../speech/turn-detection-provider.js";
 import { maybePersistTtsDebugAudio } from "../../agent/tts-debug.js";
-import { isPaseoDictationDebugEnabled } from "../../agent/recordings-debug.js";
+import { isClisbotDictationDebugEnabled } from "../../agent/recordings-debug.js";
 import {
   DictationStreamManager,
   type DictationStreamOutboundMessage,
@@ -1266,7 +1266,7 @@ export class VoiceSession {
     if (this.closed) return;
     if (
       msg.type === "audio_output" &&
-      (process.env.TTS_DEBUG_AUDIO_DIR || isPaseoDictationDebugEnabled()) &&
+      (process.env.TTS_DEBUG_AUDIO_DIR || isClisbotDictationDebugEnabled()) &&
       msg.payload.groupId &&
       typeof msg.payload.audio === "string"
     ) {

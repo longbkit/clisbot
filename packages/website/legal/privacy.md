@@ -1,28 +1,28 @@
 ---
 title: "Privacy Policy"
-description: "What stays on your machines, what the encrypted relay can see, and what Paseo Hub stores."
+description: "What stays on your machines, what the encrypted relay can see, and what Clisbot Hub stores."
 lastUpdated: "2026-08-29"
 ---
 
-Paseo is local-first. Installing or using the open-source software does not send us your code, prompts, files, terminal output, or agent conversations. This policy explains the separate data boundaries for local Paseo, the optional official relay, the hosted Paseo Hub, and paseo.sh.
+Clisbot is local-first. Installing or using the open-source software does not send us your code, prompts, files, terminal output, or agent conversations. This policy explains the separate data boundaries for local Clisbot, the optional official relay, the hosted Clisbot Hub, and clisbot.com.
 
 ## Who is responsible
 
-**Mohamed Boudra Ziani**, operating as Paseo\
+**Mohamed Boudra Ziani**, operating as Clisbot\
 NIF/VAT ID: ES26617095T\
 Roc Boronat 48, Bajos 2\
 08005 Barcelona, Spain\
 Email: [hello@moboudra.com](mailto:hello@moboudra.com)
 
-Mohamed Boudra Ziani is the data controller for personal data processed through the official Paseo website, relay, and hosted Hub. Independently self-hosted daemons, Hubs, and relays are controlled by their operators and are not covered by this policy.
+Mohamed Boudra Ziani is the data controller for personal data processed through the official Clisbot website, relay, and hosted Hub. Independently self-hosted daemons, Hubs, and relays are controlled by their operators and are not covered by this policy.
 
-## Local Paseo apps and daemons
+## Local Clisbot apps and daemons
 
-Paseo runs on your machines. It does not send us analytics, telemetry, advertising identifiers, or crash reports.
+Clisbot runs on your machines. It does not send us analytics, telemetry, advertising identifiers, or crash reports.
 
 Packaged desktop apps check GitHub Releases for updates. GitHub receives the ordinary network information needed to answer that request under its own privacy policy.
 
-Agents such as Claude Code, Codex, and OpenCode communicate with their providers using credentials on your machine. Paseo does not manage or intercept those provider API calls.
+Agents such as Claude Code, Codex, and OpenCode communicate with their providers using credentials on your machine. Clisbot does not manage or intercept those provider API calls.
 
 ## The official relay
 
@@ -35,7 +35,7 @@ The relay is optional. To connect your client and daemon, it processes:
 
 Your client and daemon encrypt application traffic end-to-end with NaCl box encryption. The relay carries ciphertext and cannot read your code, prompts, terminal output, or agent conversations. Payloads exist in relay memory only while being forwarded. We do not store message contents. Infrastructure may retain limited operational logs and aggregate metrics for security, capacity planning, and troubleshooting.
 
-## Paseo Hub
+## Clisbot Hub
 
 When you create or use a hosted Hub account, we process:
 
@@ -50,7 +50,7 @@ Your repositories, local files, and agent-provider credentials remain on your in
 
 ## Who controls workflow data
 
-Paseo controls account, billing, security, and service-operation data. When an organization uses Hub to process personal data in its workflows, that organization decides why the data is processed and Paseo processes it on the organization's behalf.
+Clisbot controls account, billing, security, and service-operation data. When an organization uses Hub to process personal data in its workflows, that organization decides why the data is processed and Clisbot processes it on the organization's behalf.
 
 ## Why we process data
 
@@ -88,7 +88,7 @@ Depending on applicable law, you may request access, correction, deletion, restr
 
 ## Security
 
-We use access controls, encrypted transport, and limited service permissions. No online service can guarantee absolute security. Read Paseo's [security model](https://github.com/getpaseo/paseo/blob/main/SECURITY.md) or report a vulnerability privately to [hello@moboudra.com](mailto:hello@moboudra.com).
+We use access controls, encrypted transport, and limited service permissions. No online service can guarantee absolute security. Read Clisbot's [security model](https://github.com/longbkit/clisbot/blob/main/SECURITY.md) or report a vulnerability privately to [hello@moboudra.com](mailto:hello@moboudra.com).
 
 ## Children
 

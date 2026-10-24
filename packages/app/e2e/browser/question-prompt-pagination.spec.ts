@@ -227,7 +227,7 @@ const retryTest = test.extend<{
           nowIso: new Date().toISOString(),
         });
         await page.evaluate((extraHost) => {
-          localStorage.setItem("@paseo:e2e-extra-hosts", JSON.stringify([extraHost]));
+          localStorage.setItem("@clisbot:e2e-extra-hosts", JSON.stringify([extraHost]));
         }, host);
         await page.goto(buildAgentRoute(session.workspaceId, session.agentId, serverId), {
           waitUntil: "commit",

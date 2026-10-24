@@ -80,12 +80,12 @@ describe("terminal file paste queue", () => {
 
   it("quotes Windows host paths for the host shell", async () => {
     const { queue, host } = createQueue();
-    host.holdUpload("shot.png").resolve("C:\\Users\\Jo Doe\\.paseo\\uploads\\upload_1\\shot.png");
+    host.holdUpload("shot.png").resolve("C:\\Users\\Jo Doe\\.clisbot\\uploads\\upload_1\\shot.png");
 
     queue.add(Promise.resolve(file("shot.png")), host);
     await settle();
 
-    expect(host.pasted).toEqual(['"C:\\Users\\Jo Doe\\.paseo\\uploads\\upload_1\\shot.png"']);
+    expect(host.pasted).toEqual(['"C:\\Users\\Jo Doe\\.clisbot\\uploads\\upload_1\\shot.png"']);
   });
 
   it("uploads under a file name that needs no shell quoting", async () => {

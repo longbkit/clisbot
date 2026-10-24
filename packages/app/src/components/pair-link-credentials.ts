@@ -1,4 +1,4 @@
-import { parseConnectionOfferFromUrl } from "@getpaseo/protocol/connection-offer";
+import { parseConnectionOfferFromUrl } from "@clisbot/protocol/connection-offer";
 import { parseRelayConnectionUri } from "@/utils/daemon-endpoints";
 
 function pairingTarget(url: string): string | null {

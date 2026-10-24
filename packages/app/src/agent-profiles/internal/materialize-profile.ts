@@ -1,4 +1,4 @@
-import type { AgentConfigApply, AgentProfile } from "@getpaseo/protocol/messages";
+import type { AgentConfigApply, AgentProfile } from "@clisbot/protocol/messages";
 
 /**
  * A profile with its blank fields resolved away. Storage keeps every field

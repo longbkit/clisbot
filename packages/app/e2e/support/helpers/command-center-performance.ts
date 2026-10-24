@@ -40,7 +40,7 @@ export async function seedSearchableCommandCenter() {
 
 export async function observeCommandCenterRowRenders(page: Page) {
   await page.addInitScript(() => {
-    globalThis.__PASEO_RENDER_PROFILE_ENABLED__ = true;
+    globalThis.__CLISBOT_RENDER_PROFILE_ENABLED__ = true;
   });
 }
 
@@ -52,7 +52,7 @@ export async function warmCommandCenterRows(page: Page) {
   // FlatList fills its overscan window in timed batches after the first visible frame.
   await page.waitForTimeout(600);
   await page.evaluate(() => {
-    globalThis.__PASEO_RENDER_PROFILE_REASONS__ = {};
+    globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ = {};
   });
 }
 
@@ -65,7 +65,7 @@ export async function expectOnlyCommandCenterRowRendered(page: Page, resultId: s
   );
   const renders = await page.evaluate(() =>
     Object.fromEntries(
-      Object.entries(globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {}).filter(([id]) =>
+      Object.entries(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {}).filter(([id]) =>
         id.startsWith("CommandCenterResultRow:"),
       ),
     ),

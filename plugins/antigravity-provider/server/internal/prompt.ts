@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { ProviderPrompt } from "@getpaseo/plugin/server/provider";
+import type { ProviderPrompt } from "@clisbot/plugin/server/provider";
 import { AntigravityError } from "./wire.js";
 
 interface EncodedPrompt {
@@ -34,7 +34,7 @@ export class PromptFiles {
       } else if (part.type === "image") {
         const extension = part.extension;
         if (this.directory === null) {
-          this.directory = await mkdtemp(path.join(os.tmpdir(), "paseo-antigravity-images-"));
+          this.directory = await mkdtemp(path.join(os.tmpdir(), "clisbot-antigravity-images-"));
           await chmod(this.directory, 0o700);
         }
         const file = path.join(this.directory, `${randomUUID()}.${extension}`);

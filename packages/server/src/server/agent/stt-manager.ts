@@ -94,7 +94,7 @@ function preparePcmForModel(audio: Buffer, format: string, requiredSampleRate: n
 }
 
 function resolveBatchCommitEverySeconds(): number {
-  const fromEnv = process.env.PASEO_STT_BATCH_COMMIT_EVERY_SECONDS;
+  const fromEnv = process.env.CLISBOT_STT_BATCH_COMMIT_EVERY_SECONDS;
   if (!fromEnv) {
     return DEFAULT_BATCH_COMMIT_EVERY_SECONDS;
   }

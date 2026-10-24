@@ -96,14 +96,14 @@ describe("Claude session request journal replay", () => {
         })),
         {
           type: "assistant",
-          message: { role: "assistant", content: [{ type: "text", text: "paseo" }] },
+          message: { role: "assistant", content: [{ type: "text", text: "clisbot" }] },
         },
       ]);
 
       expect(items).toEqual([
         expect.objectContaining({ type: "user_message", text: "Read package.json" }),
         expect.objectContaining({ type: "tool_call", callId: "read-1", name: "Read" }),
-        expect.objectContaining({ type: "assistant_message", text: "paseo" }),
+        expect.objectContaining({ type: "assistant_message", text: "clisbot" }),
       ]);
     },
   );

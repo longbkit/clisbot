@@ -10,7 +10,7 @@ describe("withPasteInput", () => {
   it("registers paste input after Expo connects the React Native scene", () => {
     const source = "class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {}";
     const configured = configurePasteInputAppDelegate(source);
-    expect(configured).toContain("class PaseoSceneDelegate: ExpoAppSceneDelegate");
+    expect(configured).toContain("class ClisbotSceneDelegate: ExpoAppSceneDelegate");
     expect(configured.indexOf("super.scene(")).toBeLessThan(
       configured.indexOf("PasteInputModule.setup("),
     );

@@ -18,7 +18,7 @@ import {
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
-const CREATE_AGENT_PREFERENCES_KEY = "@paseo:create-agent-preferences";
+const CREATE_AGENT_PREFERENCES_KEY = "@clisbot:create-agent-preferences";
 const MODELESS_PROVIDER = "modeless-profile-e2e";
 const MODELESS_MODEL = "pi-profile-model";
 

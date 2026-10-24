@@ -4,7 +4,7 @@ import {
   AssistantFileLinkResolverProvider,
   useAssistantFileLinkEnvironment,
 } from "@/assistant-file-links";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

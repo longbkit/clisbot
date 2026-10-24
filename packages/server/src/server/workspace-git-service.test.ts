@@ -43,7 +43,7 @@ function createSnapshot(
       mainRepoRoot: null,
       currentBranch: "main",
       remoteUrl: "https://github.com/acme/repo.git",
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: false,
       baseRef: "main",
       aheadBehind: { ahead: 0, behind: 0 },
@@ -141,7 +141,7 @@ function createCheckoutStatus(
     behindOfOrigin: 0,
     hasRemote: true,
     remoteUrl: "https://github.com/acme/repo.git",
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     ...overrides,
   };
 }
@@ -154,7 +154,7 @@ function createCheckoutSnapshotFacts(cwd: string): CheckoutSnapshotFacts {
     remoteUrl: "https://github.com/acme/repo.git",
     absoluteGitDir: join(cwd, ".git"),
     gitCommonDir: join(cwd, ".git"),
-    paseoWorktree: { isPaseoOwnedWorktree: false },
+    clisbotWorktree: { isClisbotOwnedWorktree: false },
     storedBaseRef: null,
     resolvedBaseRef: "main",
     mainRepoRoot: null,
@@ -319,7 +319,7 @@ function createService(options?: CreateServiceTestOptions) {
     });
   return new WorkspaceGitServiceImpl({
     logger: createLogger() as unknown as pino.Logger,
-    paseoHome: "/tmp/paseo-test",
+    clisbotHome: "/tmp/clisbot-test",
     deps,
   });
 }
@@ -419,7 +419,7 @@ describe("WorkspaceGitServiceImpl", () => {
     let reads = 0;
     const service = new WorkspaceGitServiceImpl({
       logger: createLogger() as unknown as pino.Logger,
-      paseoHome: "/tmp/paseo-test",
+      clisbotHome: "/tmp/clisbot-test",
       deps: {
         ...buildDefaultTestServiceDeps(),
         getPullRequestStatus: async () => {
@@ -530,7 +530,7 @@ describe("WorkspaceGitServiceImpl", () => {
   test("getSnapshot keeps plain git classification when shortstat lookup fails", async () => {
     const getCheckoutShortstat = vi.fn(async () => {
       throw new Error(
-        "Missing Paseo worktree base metadata: /tmp/repo/.git/worktrees/feature/paseo/worktree.json",
+        "Missing Clisbot worktree base metadata: /tmp/repo/.git/worktrees/feature/clisbot/worktree.json",
       );
     });
     const service = createService({
@@ -538,7 +538,7 @@ describe("WorkspaceGitServiceImpl", () => {
         createCheckoutStatus(cwd, {
           repoRoot: cwd,
           currentBranch: "feature/worktree",
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: "/tmp/main-repo",
         }),
       ),
@@ -550,7 +550,7 @@ describe("WorkspaceGitServiceImpl", () => {
         git: {
           repoRoot: REPO_CWD,
           currentBranch: "feature/worktree",
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: "/tmp/main-repo",
           diffStat: null,
         },
@@ -1493,7 +1493,7 @@ describe("WorkspaceGitServiceImpl", () => {
 
     expect(getCheckoutWorktreeState).toHaveBeenCalledWith(
       REPO_CWD,
-      expect.objectContaining({ paseoHome: "/tmp/paseo-test" }),
+      expect.objectContaining({ clisbotHome: "/tmp/clisbot-test" }),
     );
     expect(workspaceListener).toHaveBeenCalledWith(
       createSnapshot(REPO_CWD, {

@@ -31,7 +31,7 @@ it.each([
 it.each([
   ["C:/repo/docs", "../README.md", "C:/repo/README.md"],
   ["C:/repo/docs", "../../", "C:/"],
-  ["~/.paseo/docs", "../guide.md", "~/.paseo/guide.md"],
+  ["~/.clisbot/docs", "../guide.md", "~/.clisbot/guide.md"],
   ["/repo/docs", "/other/file.md", "/other/file.md"],
   ["/repo/docs", "file:///other/file.md", "/other/file.md"],
   ["/repo/docs", "guide/details.md#L3", "/repo/docs/guide/details.md"],
@@ -277,15 +277,15 @@ describe("classifyForResolution", () => {
   });
 
   it("keeps tilde paths as direct file targets", () => {
-    const result = classifyForResolution({ href: "~/.paseo/plans/file-preview.md" }, CONTEXT);
+    const result = classifyForResolution({ href: "~/.clisbot/plans/file-preview.md" }, CONTEXT);
 
     expect(result).toEqual({
       kind: "resolved",
       value: {
         kind: "file",
         target: {
-          raw: "~/.paseo/plans/file-preview.md",
-          path: "~/.paseo/plans/file-preview.md",
+          raw: "~/.clisbot/plans/file-preview.md",
+          path: "~/.clisbot/plans/file-preview.md",
           lineStart: undefined,
           lineEnd: undefined,
         },

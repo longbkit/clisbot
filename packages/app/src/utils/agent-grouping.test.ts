@@ -45,10 +45,10 @@ describe("deriveProjectDisplayName", () => {
   it("shows owner/repo for GitHub remote keys", () => {
     expect(
       deriveProjectDisplayName({
-        projectKey: "remote:github.com/getpaseo/paseo",
-        projectName: "paseo",
+        projectKey: "remote:github.com/longbkit/clisbot",
+        projectName: "clisbot",
       }),
-    ).toBe("getpaseo/paseo");
+    ).toBe("longbkit/clisbot");
   });
 
   it("shows remote path for non-GitHub remote keys", () => {
@@ -63,10 +63,10 @@ describe("deriveProjectDisplayName", () => {
   it("falls back to projectName for local keys", () => {
     expect(
       deriveProjectDisplayName({
-        projectKey: "/Users/me/dev/paseo",
-        projectName: "paseo",
+        projectKey: "/Users/me/dev/clisbot",
+        projectName: "clisbot",
       }),
-    ).toBe("paseo");
+    ).toBe("clisbot");
   });
 });
 
@@ -95,12 +95,12 @@ describe("groupAgents", () => {
 
   it("groups active agents by remote URL when available", () => {
     const agents = [
-      makeAgent({ id: "a1", cwd: "/Users/me/dev/paseo" }),
-      makeAgent({ id: "a2", cwd: "/Users/me/dev/paseo-fix/worktree" }),
+      makeAgent({ id: "a1", cwd: "/Users/me/dev/clisbot" }),
+      makeAgent({ id: "a2", cwd: "/Users/me/dev/clisbot-fix/worktree" }),
     ];
 
     const { activeGroups } = groupAgents(agents, {
-      getRemoteUrl: () => "git@github.com:getpaseo/paseo.git",
+      getRemoteUrl: () => "git@github.com:longbkit/clisbot.git",
     });
 
     expect(activeGroups).toHaveLength(1);
@@ -109,8 +109,8 @@ describe("groupAgents", () => {
 
   it("falls back to cwd grouping when remote URL is unavailable", () => {
     const agents = [
-      makeAgent({ id: "a1", cwd: "/Users/me/dev/paseo" }),
-      makeAgent({ id: "a2", cwd: "/Users/me/dev/paseo-fix/worktree" }),
+      makeAgent({ id: "a1", cwd: "/Users/me/dev/clisbot" }),
+      makeAgent({ id: "a2", cwd: "/Users/me/dev/clisbot-fix/worktree" }),
     ];
 
     const { activeGroups } = groupAgents(agents, {

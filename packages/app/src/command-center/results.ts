@@ -3,7 +3,7 @@ import {
   compareMatchScores,
   type MatchScore,
   scoreTextFields,
-} from "@getpaseo/protocol/search/text-match";
+} from "@clisbot/protocol/search/text-match";
 import type { CommandCenterContribution } from "./contributions";
 import type { CommandCenterListMetrics } from "./list-metrics";
 

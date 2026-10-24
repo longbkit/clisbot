@@ -57,12 +57,12 @@ function boundaryViolations(entry: string, runtime: "shared" | "server" | "clien
         if (runtime !== "server" && serverModule.test(module)) violations.push(label);
         pending.push(local);
       } else if (runtime === "shared") {
-        if (specifier !== "zod" && specifier !== "@getpaseo/protocol/agent-types")
+        if (specifier !== "zod" && specifier !== "@clisbot/protocol/agent-types")
           violations.push(label);
       } else if (runtime === "server") {
-        if (uiDependency.test(specifier) || /^@getpaseo\/plugin\/client(\/|$)/.test(specifier))
+        if (uiDependency.test(specifier) || /^@clisbot\/plugin\/client(\/|$)/.test(specifier))
           violations.push(label);
-      } else if (isBuiltin(specifier) || /^@getpaseo\/plugin\/server(\/|$)/.test(specifier)) {
+      } else if (isBuiltin(specifier) || /^@clisbot\/plugin\/server(\/|$)/.test(specifier)) {
         violations.push(label);
       }
     }
@@ -113,10 +113,10 @@ describe("plugin SDK import boundaries", () => {
   it("typechecks a 0.12 reveal-hook consumer without exposing the hook on current UI", () => {
     expect(
       typeErrors(`
-      import { useRevealedText, Icon } from "@getpaseo/plugin/client/react-native";
-      import { StreamedText } from "@getpaseo/plugin/client/ui";
+      import { useRevealedText, Icon } from "@clisbot/plugin/client/react-native";
+      import { StreamedText } from "@clisbot/plugin/client/ui";
       // @ts-expect-error the legacy hook is not part of the current UI API
-      import { useRevealedText as currentHook } from "@getpaseo/plugin/client/ui";
+      import { useRevealedText as currentHook } from "@clisbot/plugin/client/ui";
       import { Text } from "react-native";
       function LegacyRow({ text, phase }: { text: string; phase: "streaming" | "complete" }) {
         const revealed: string = useRevealedText(text, phase);
@@ -161,8 +161,8 @@ describe("plugin example import boundaries", () => {
       if (specifier.startsWith(".")) {
         const imported = owner(resolveLocal(file, specifier));
         if (imported !== "shared" && imported !== runtime) violations.push(specifier);
-      } else if (specifier.startsWith("@getpaseo/plugin")) {
-        const entry = specifier.replace("@getpaseo/plugin", ".") as keyof typeof entries;
+      } else if (specifier.startsWith("@clisbot/plugin")) {
+        const entry = specifier.replace("@clisbot/plugin", ".") as keyof typeof entries;
         if (
           entry === "./client/host" ||
           !(entry in entries) ||
@@ -184,7 +184,7 @@ describe("plugin panel SDK boundary", () => {
   it("accepts uniform params and persisted tab state alongside 0.12 panels", () => {
     expect(
       typeErrors(`
-      import { type PluginClientContext, type PluginFilePanelProps, type PluginWorkspacePanelProps, type PluginAgentPanelProps, type PluginTab, useTabState } from "@getpaseo/plugin/client";
+      import { type PluginClientContext, type PluginFilePanelProps, type PluginWorkspacePanelProps, type PluginAgentPanelProps, type PluginTab, useTabState } from "@clisbot/plugin/client";
       import { z } from "zod";
       function FilePanel({ params, revision, tab, file }: PluginFilePanelProps) {
         const [state, setState] = useTabState(tab, z.object({ view: z.enum(["preview", "source"]) }), { view: "preview" });

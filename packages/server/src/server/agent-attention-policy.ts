@@ -1,4 +1,4 @@
-import type { AgentAttentionReason } from "@getpaseo/protocol/agent-attention-notification";
+import type { AgentAttentionReason } from "@clisbot/protocol/agent-attention-notification";
 
 export const PRESENCE_THRESHOLD_MS = 180_000;
 

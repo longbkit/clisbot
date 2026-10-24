@@ -9,7 +9,7 @@ nav: 配置参考
 Hub 接受以下结构的 YAML：
 
 ```text
-.paseo/
+.clisbot/
 ├── hub.yml
 └── workflows/
     ├── <workflow>.yml
@@ -17,18 +17,18 @@ Hub 接受以下结构的 YAML：
         └── <partial>.md
 ```
 
-只有 `.paseo/workflows/` 下直接的 `.yml` 子文件才是 workflow。每个文件包含一个触发器及其有序的 step。没有 manifest、`includes`、`uses`、可复用的 step、workflow 调用或继承。
+只有 `.clisbot/workflows/` 下直接的 `.yml` 子文件才是 workflow。每个文件包含一个触发器及其有序的 step。没有 manifest、`includes`、`uses`、可复用的 step、workflow 调用或继承。
 
 ## `hub.yml` {#hubyml}
 
-`.paseo/hub.yml` 包含具名的项目资源。名称是映射的键，不会在每个对象内部重复。
+`.clisbot/hub.yml` 包含具名的项目资源。名称是映射的键，不会在每个对象内部重复。
 
 ```yaml
 environments:
-  paseo:
+  clisbot:
     kind: daemon
     daemon: laptop
-    cwd: /Users/you/code/paseo
+    cwd: /Users/you/code/clisbot
   hub:
     kind: daemon
     daemon: devbox
@@ -70,17 +70,17 @@ environments:
     cwd: /workspace/project
     worktree:
       mode: branch-off
-      newBranch: trigger-${{ paseo.execution.id }}
+      newBranch: trigger-${{ clisbot.execution.id }}
       base: origin/main
 ```
 
-`newBranch` 是一个分支名字符串。在其中嵌入 `${{ paseo.execution.id }}`，它会渲染为该次执行的 UUID，这样每次执行都会从 `base` 分出自己的分支，并在 Hub 重试或恢复该执行时保留这个分支。
+`newBranch` 是一个分支名字符串。在其中嵌入 `${{ clisbot.execution.id }}`，它会渲染为该次执行的 UUID，这样每次执行都会从 `base` 分出自己的分支，并在 Hub 重试或恢复该执行时保留这个分支。
 
 一次执行就是一次 step 运行，因此选择同一环境的两个 step 会得到各自独立的分支。
 
-`${{ paseo.execution.id }}` 是 `newBranch` 唯一接受的表达式。`paseo.prompt`、`paseo.context`、`paseo.inputs.*`、`values.*`、`steps.<id>.outputs.*` 以及 Provider 事件字段在这里都不可用，任何一个都会在编写它的字段处导致文件包激活失败，例如 `.paseo/hub.yml.environments.review.worktree.newBranch`。
+`${{ clisbot.execution.id }}` 是 `newBranch` 唯一接受的表达式。`clisbot.prompt`、`clisbot.context`、`clisbot.inputs.*`、`values.*`、`steps.<id>.outputs.*` 以及 Provider 事件字段在这里都不可用，任何一个都会在编写它的字段处导致文件包激活失败，例如 `.clisbot/hub.yml.environments.review.worktree.newBranch`。
 
-`${{ paseo.execution.id }}` 出现在文件包中其他任何位置时，同样会导致激活失败。`branch` 和 `prNumber` 只接受字面值。
+`${{ clisbot.execution.id }}` 出现在文件包中其他任何位置时，同样会导致激活失败。`branch` 和 `prNumber` 只接受字面值。
 
 环境是一个完整的具名对象。step 选择它的名称；对象不会被继承、合并或部分覆盖。
 
@@ -92,17 +92,17 @@ environments:
 | ------------------ | -------- | --------------------------------------------------------------------------------- |
 | `provider`         | 是       | Provider ID。Hub 在无人值守的情况下运行，因此为 `claude`、`codex` 或 `opencode`。 |
 | `model`            | 否       | Provider 的模型 ID。                                                              |
-| `mode`             | 否       | Paseo 模式 ID。                                                                   |
+| `mode`             | 否       | Clisbot 模式 ID。                                                                 |
 | `thinkingOptionId` | 否       | Provider 的思考选项。                                                             |
 | `options`          | 否       | 可安全序列化为 JSON 的 Provider 原生选项，保留名称和嵌套结构。                    |
 
 具名选择会保留完整的对象，包括结构化的选项。具名 Agent 没有父级、补丁或按 step 的覆盖。
 
-Hub 把 `model`、`mode`、`thinkingOptionId` 和 `options` 传给 Paseo daemon，不会重命名或展平 Provider 字段。保存或部署触发器时，所选的 daemon 会按它当前的 Provider schema 校验这些值，因此它不提供的值会在那时被拒绝，而不是等到第一次运行；Hub 不会转换 Provider 原生选项。见[保存时会对照 daemon 检查 Agent](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon)。
+Hub 把 `model`、`mode`、`thinkingOptionId` 和 `options` 传给 Clisbot daemon，不会重命名或展平 Provider 字段。保存或部署触发器时，所选的 daemon 会按它当前的 Provider schema 校验这些值，因此它不提供的值会在那时被拒绝，而不是等到第一次运行；Hub 不会转换 Provider 原生选项。见[保存时会对照 daemon 检查 Agent](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon)。
 
 ## workflow 文件 {#workflow-files}
 
-`.paseo/workflows/review.yml`：
+`.clisbot/workflows/review.yml`：
 
 ```yaml
 name: review
@@ -114,15 +114,15 @@ inputs:
   repo:
     type: string
     required: true
-    choices: [paseo, hub]
+    choices: [clisbot, hub]
 steps:
   - id: inspect
-    environment: ${{ paseo.inputs.repo }}
+    environment: ${{ clisbot.inputs.repo }}
     max_runtime: 30m
     idle_timeout: 5m
     agent: codex-safe
     prompt:
-      - text: ${{ paseo.prompt }}
+      - text: ${{ clisbot.prompt }}
 ```
 
 | 字段          | 是否必填 | 说明                                                    |
@@ -180,7 +180,7 @@ values:
   selected_agent: ${{ steps.classify.outputs.agent }}
 ```
 
-表达式可以读取已声明的 `paseo.inputs`、之前的 `steps.<id>.outputs` 以及 `values`。语法支持路径、JSON 字面量、括号、`!`、`==`、`!=`、`&&`、`||` 和 `??`。
+表达式可以读取已声明的 `clisbot.inputs`、之前的 `steps.<id>.outputs` 以及 `values`。语法支持路径、JSON 字面量、括号、`!`、`==`、`!=`、`&&`、`||` 和 `??`。
 
 用于选择环境或动态具名 Agent 的表达式，在激活时必须具有一个有限的、可能的字符串结果集合。每个结果都必须是一个已配置资源的名称。运行时的选择从不会退回到其他环境或 Agent。
 
@@ -222,15 +222,15 @@ prompt:
   - include: partials/review.md
   - text: |
       <user-prompt>
-      ${{ paseo.prompt }}
+      ${{ clisbot.prompt }}
       </user-prompt>
 ```
 
-`${{ paseo.prompt }}` 是去掉 Provider 标记和已声明的开头 `key=value` 输入之后的规范化请求。它不会被改写，也不会附加事件上下文。
+`${{ clisbot.prompt }}` 是去掉 Provider 标记和已声明的开头 `key=value` 输入之后的规范化请求。它不会被改写，也不会附加事件上下文。
 
-`${{ paseo.context }}` 让该 step 选择加入 Provider 上下文的具体化，并在提示词中把结果渲染为 JSON。它只能用在提示词文本中。除非 workflow 编写了这个表达式，否则 Hub 不会注入它。
+`${{ clisbot.context }}` 让该 step 选择加入 Provider 上下文的具体化，并在提示词中把结果渲染为 JSON。它只能用在提示词文本中。除非 workflow 编写了这个表达式，否则 Hub 不会注入它。
 
-include 相对于 `.paseo/workflows/` 解析，因此共享片段使用 `partials/<name>.md`。缺失的文件、绝对路径或越界路径、符号链接、内容不一致以及位于片段目录树之外的文件都会被拒绝。
+include 相对于 `.clisbot/workflows/` 解析，因此共享片段使用 `partials/<name>.md`。缺失的文件、绝对路径或越界路径、符号链接、内容不一致以及位于片段目录树之外的文件都会被拒绝。
 
 ### 输出能力 {#output-capabilities}
 
@@ -249,7 +249,7 @@ Slack workflow 使用 `slack.reply`；Discord workflow 使用 `discord.reply`。
 
 ## 迁移单体文件 {#migrating-a-monolithic-file}
 
-把 `environments` 保留在 `hub.yml` 中，把环境列表转换为具名映射，并把原先的每个触发器移到它自己的 `.paseo/workflows/<name>.yml` 文件中。把共享的提示词文件移到 `.paseo/workflows/partials/`。在 `agents` 下定义完整的具名 Agent 配置，并用有限的具名 Agent 选择替换动态的 Provider 字段。
+把 `environments` 保留在 `hub.yml` 中，把环境列表转换为具名映射，并把原先的每个触发器移到它自己的 `.clisbot/workflows/<name>.yml` 文件中。把共享的提示词文件移到 `.clisbot/workflows/partials/`。在 `agents` 下定义完整的具名 Agent 配置，并用有限的具名 Agent 选择替换动态的 Provider 字段。
 
 Hub 不读取 TOML 或单体的 `triggers` 部分，CLI 也不会改写这两种格式。
 
@@ -259,11 +259,11 @@ Hub 不读取 TOML 或单体的 `triggers` 部分，CLI 也不会改写这两种
 
 自包含的控制台触发器文档接受 `run.continuation`：
 
-| 值                                                       | 行为                                                                       |
-| -------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `{mode: conversation}`                                   | 默认值。为事件所属的对话复用项目中的 Agent；事件没有对话时创建新的 Agent。 |
-| `{mode: key, key: "support-${{ paseo.inputs.ticket }}"}` | 为求值得到的自定义键复用项目中的 Agent。                                   |
-| `{mode: new}`                                            | 每次到达都创建新的 Agent。                                                 |
+| 值                                                         | 行为                                                                       |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `{mode: conversation}`                                     | 默认值。为事件所属的对话复用项目中的 Agent；事件没有对话时创建新的 Agent。 |
+| `{mode: key, key: "support-${{ clisbot.inputs.ticket }}"}` | 为求值得到的自定义键复用项目中的 Agent。                                   |
+| `{mode: new}`                                              | 每次到达都创建新的 Agent。                                                 |
 
 键使用现有的表达式语法，必须解析为长度不超过 512 个字符的非空字符串。自定义键和 Provider 的对话标识位于不同的命名空间。不同项目中的相同键不会共享 Agent。
 
@@ -273,7 +273,7 @@ Hub 不读取 TOML 或单体的 `triggers` 部分，CLI 也不会改写这两种
 
 ### 升级 {#upgrading}
 
-在启用新版 Hub 之前，请先升级已连接的 Paseo daemon。Hub 需要 daemon 的常规 Agent RPC 和请求回执能力；较旧的主机会产生一个可操作的发起错误。
+在启用新版 Hub 之前，请先升级已连接的 Clisbot daemon。Hub 需要 daemon 的常规 Agent RPC 和请求回执能力；较旧的主机会产生一个可操作的发起错误。
 
 Hub 的数据库迁移会添加会话以及可为空的执行关联。已有的执行会保留它们已保存的启动契约和执行专属的 MCP 端点，直到完成。已有自包含触发器文档的新到达使用对话默认值。历史上的 Agent 不会被回填到会话中。
 

@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import type { connectToDaemon } from "./client.js";
 
 type FetchAgentsOptions = NonNullable<

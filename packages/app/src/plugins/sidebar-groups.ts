@@ -9,7 +9,7 @@ import type {
   PluginSidebarItemContribution,
   PluginSidebarSection,
 } from "./types";
-import type { PluginIcon } from "@getpaseo/plugin/client";
+import type { PluginIcon } from "@clisbot/plugin/client";
 
 export interface PluginSidebarTarget {
   plugin: InstalledPlugin;

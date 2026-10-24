@@ -1,4 +1,4 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createSubagentsForParentSelector,
@@ -57,7 +57,7 @@ function makeAgent(input: Partial<Agent> & Pick<Agent, "id">): Agent {
     ...AGENT_DEFAULTS,
     ...input,
     labels: {
-      ...(input.parentAgentId ? { "paseo.parent-agent-id": input.parentAgentId } : {}),
+      ...(input.parentAgentId ? { "clisbot.parent-agent-id": input.parentAgentId } : {}),
       ...input.labels,
     },
   };
@@ -86,13 +86,13 @@ describe("selectSubagentsForParent", () => {
     const local = makeAgent({
       id: childId,
       parentAgentId: parentId,
-      labels: { "paseo.parent-agent-id": parentId, "paseo.parent-server-id": SERVER_ID },
+      labels: { "clisbot.parent-agent-id": parentId, "clisbot.parent-server-id": SERVER_ID },
     });
     const remote = makeAgent({
       id: childId,
       serverId: "server-2",
       parentAgentId: null,
-      labels: { "paseo.parent-agent-id": parentId, "paseo.parent-server-id": SERVER_ID },
+      labels: { "clisbot.parent-agent-id": parentId, "clisbot.parent-server-id": SERVER_ID },
     });
     setAgents([local]);
     useSessionStore.getState().initializeSession("server-2", null as unknown as DaemonClient);
@@ -356,7 +356,7 @@ describe("selectSubagentsForParent", () => {
 
     expect(rows).toEqual([
       {
-        kind: "paseo",
+        kind: "clisbot",
         address: { serverId: SERVER_ID, agentId: "child" },
         id: "child",
         provider: "claude",
@@ -415,7 +415,7 @@ describe("selectSubagentsForParent", () => {
     setAgents([
       makeAgent({ id: "parent-a" }),
       makeAgent({ id: "parent-b" }),
-      { ...child, parentAgentId: "parent-b", labels: { "paseo.parent-agent-id": "parent-b" } },
+      { ...child, parentAgentId: "parent-b", labels: { "clisbot.parent-agent-id": "parent-b" } },
     ]);
 
     expect(

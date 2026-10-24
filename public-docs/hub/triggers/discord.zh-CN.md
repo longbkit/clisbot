@@ -8,7 +8,7 @@ nav: Discord
 
 当机器人或受管角色在服务器频道或子区中被提及时，`discord.mention` 会触发。
 
-`.paseo/workflows/discord-help.yml`：
+`.clisbot/workflows/discord-help.yml`：
 
 ```yaml
 name: discord-help
@@ -27,7 +27,7 @@ steps:
     prompt:
       - text: |
           Answer with hub.reply, then call hub.finish_execution.
-          ${{ paseo.prompt }}
+          ${{ clisbot.prompt }}
     allow_outputs:
       - { type: discord.reply, max: 1, required: true }
 ```
@@ -36,7 +36,7 @@ Discord 过滤器使用 ID，而不是服务器名称、显示名称或 Hub 连�
 
 回复会发布在触发它的子区或频道中。`discord.reply` 授予 `hub.reply`，但不会改写提示词。Discord 触发器不授予任何 GitHub 凭据；请在需要的 step 中添加 [`github` 块](/docs/hub/github)。
 
-提及之后紧跟的是已声明的输入。Hub 把剩余文本作为 `${{ paseo.prompt }}` 提供。参见 [Workflow](/docs/hub/workflows)。
+提及之后紧跟的是已声明的输入。Hub 把剩余文本作为 `${{ clisbot.prompt }}` 提供。参见 [Workflow](/docs/hub/workflows)。
 
 ## 查找 Discord ID {#find-your-discord-ids}
 

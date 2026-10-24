@@ -29,7 +29,7 @@ let nextTraceId = 1;
 let pendingTraceWrite = Promise.resolve();
 
 function appendTrace(event: Record<string, unknown>): void {
-  const tracePath = process.env.PASEO_GIT_TRACE_FILE?.trim();
+  const tracePath = process.env.CLISBOT_GIT_TRACE_FILE?.trim();
   if (!tracePath) return;
 
   pendingTraceWrite = pendingTraceWrite
@@ -48,7 +48,7 @@ export function submitGitCommandTrace(
   cwd: string,
   queue: GitCommandTraceQueueState,
 ): GitCommandTraceContext | null {
-  if (!process.env.PASEO_GIT_TRACE_FILE?.trim()) return null;
+  if (!process.env.CLISBOT_GIT_TRACE_FILE?.trim()) return null;
 
   const submittedAtMs = Date.now();
   const context: GitCommandTraceContext = {

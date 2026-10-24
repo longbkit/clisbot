@@ -8,7 +8,7 @@ import { syncReleaseNotes } from "./sync-release-notes-from-changelog.mjs";
 
 function withTempChangelog(fn, changelogText = "## 0.1.60-beta.1 - 2026-04-20\n\n- Beta notes.\n") {
   const previousCwd = process.cwd();
-  const tempDir = mkdtempSync(path.join(tmpdir(), "paseo-release-notes-test-"));
+  const tempDir = mkdtempSync(path.join(tmpdir(), "clisbot-release-notes-test-"));
   process.chdir(tempDir);
   writeFileSync("CHANGELOG.md", changelogText);
 
@@ -28,7 +28,7 @@ test("uses the untagged URL slug for draft release CLI operations", () => {
   assert.equal(
     getReleaseLookupTag({
       draft: true,
-      html_url: "https://github.com/getpaseo/paseo/releases/tag/untagged-draft",
+      html_url: "https://github.com/longbkit/clisbot/releases/tag/untagged-draft",
       tag_name: "v0.1.60-beta.1",
     }),
     "untagged-draft",
@@ -42,7 +42,7 @@ test("does not treat GitHub authentication failures as missing releases", () => 
   });
   assert.throws(
     () =>
-      getGitHubRelease("getpaseo/paseo", "v0.1.60-beta.1", (command, args) => {
+      getGitHubRelease("longbkit/clisbot", "v0.1.60-beta.1", (command, args) => {
         calls.push({ args, command });
         throw authError;
       }),
@@ -58,7 +58,7 @@ test("updates an existing release body through the release id API", () => {
     const execFileSync = (command, args, options) => {
       calls.push({ args, command, options });
 
-      if (args[0] === "api" && args[1] === "repos/getpaseo/paseo/releases/tags/v0.1.60-beta.1") {
+      if (args[0] === "api" && args[1] === "repos/longbkit/clisbot/releases/tags/v0.1.60-beta.1") {
         return JSON.stringify({ id: 311163621, draft: false });
       }
 
@@ -73,7 +73,7 @@ test("updates an existing release body through the release id API", () => {
       throw new Error(`Unexpected gh call: ${command} ${args.join(" ")}`);
     };
 
-    syncReleaseNotes(["--repo", "getpaseo/paseo", "--tag", "v0.1.60-beta.1"], {
+    syncReleaseNotes(["--repo", "longbkit/clisbot", "--tag", "v0.1.60-beta.1"], {
       execFileSync,
     });
 
@@ -88,7 +88,7 @@ test("updates an existing release body through the release id API", () => {
           call.args[0] === "api" &&
           call.args[1] === "-X" &&
           call.args[2] === "PATCH" &&
-          call.args[3] === "repos/getpaseo/paseo/releases/311163621",
+          call.args[3] === "repos/longbkit/clisbot/releases/311163621",
       ),
       true,
       "existing releases should be patched by release id",
@@ -103,18 +103,18 @@ test("updates a draft release body without publishing it", () => {
     const execFileSync = (command, args, options) => {
       calls.push({ args, command, options });
 
-      if (args[0] === "api" && args[1] === "repos/getpaseo/paseo/releases/tags/v0.1.60-beta.1") {
+      if (args[0] === "api" && args[1] === "repos/longbkit/clisbot/releases/tags/v0.1.60-beta.1") {
         throw notFoundError();
       }
 
-      if (args[0] === "api" && args[1] === "repos/getpaseo/paseo/releases?per_page=100") {
+      if (args[0] === "api" && args[1] === "repos/longbkit/clisbot/releases?per_page=100") {
         return JSON.stringify([
           {
             id: 311163621,
             draft: true,
-            name: "Paseo v0.1.60-beta.1",
+            name: "Clisbot v0.1.60-beta.1",
             tag_name: "untagged-draft",
-            html_url: "https://github.com/getpaseo/paseo/releases/tag/untagged-draft",
+            html_url: "https://github.com/longbkit/clisbot/releases/tag/untagged-draft",
           },
         ]);
       }
@@ -126,7 +126,7 @@ test("updates a draft release body without publishing it", () => {
       throw new Error(`Unexpected gh call: ${command} ${args.join(" ")}`);
     };
 
-    syncReleaseNotes(["--repo", "getpaseo/paseo", "--tag", "v0.1.60-beta.1"], {
+    syncReleaseNotes(["--repo", "longbkit/clisbot", "--tag", "v0.1.60-beta.1"], {
       execFileSync,
     });
 
@@ -150,17 +150,17 @@ test("creates missing beta releases as drafts", () => {
     const execFileSync = (command, args, options) => {
       calls.push({ args, command, options });
 
-      if (args[0] === "api" && args[1] === "repos/getpaseo/paseo/releases/tags/v0.1.60-beta.1") {
+      if (args[0] === "api" && args[1] === "repos/longbkit/clisbot/releases/tags/v0.1.60-beta.1") {
         throw notFoundError();
       }
 
-      if (args[0] === "api" && args[1] === "repos/getpaseo/paseo/releases?per_page=100") {
+      if (args[0] === "api" && args[1] === "repos/longbkit/clisbot/releases?per_page=100") {
         return created
           ? JSON.stringify([
               {
                 id: 311163621,
                 draft: true,
-                name: "Paseo v0.1.60-beta.1",
+                name: "Clisbot v0.1.60-beta.1",
                 tag_name: "v0.1.60-beta.1",
               },
             ])
@@ -180,7 +180,7 @@ test("creates missing beta releases as drafts", () => {
     };
 
     syncReleaseNotes(
-      ["--repo", "getpaseo/paseo", "--tag", "v0.1.60-beta.1", "--create-if-missing"],
+      ["--repo", "longbkit/clisbot", "--tag", "v0.1.60-beta.1", "--create-if-missing"],
       { execFileSync },
     );
 
@@ -197,7 +197,7 @@ test("converts contributor profile links to mentions in synced release notes", (
   const changelogText = [
     "## 0.1.60-beta.1 - 2026-04-20",
     "",
-    "- Beta notes. ([#526](https://github.com/getpaseo/paseo/pull/526) by [@therainisme](https://github.com/therainisme))",
+    "- Beta notes. ([#526](https://github.com/longbkit/clisbot/pull/526) by [@therainisme](https://github.com/therainisme))",
     "",
   ].join("\n");
 
@@ -205,7 +205,7 @@ test("converts contributor profile links to mentions in synced release notes", (
     let syncedNotes = "";
 
     const execFileSync = (command, args) => {
-      if (args[0] === "api" && args[1] === "repos/getpaseo/paseo/releases/tags/v0.1.60-beta.1") {
+      if (args[0] === "api" && args[1] === "repos/longbkit/clisbot/releases/tags/v0.1.60-beta.1") {
         return JSON.stringify({ id: 311163621, draft: false });
       }
 
@@ -219,7 +219,7 @@ test("converts contributor profile links to mentions in synced release notes", (
       throw new Error(`Unexpected gh call: ${command} ${args.join(" ")}`);
     };
 
-    syncReleaseNotes(["--repo", "getpaseo/paseo", "--tag", "v0.1.60-beta.1"], {
+    syncReleaseNotes(["--repo", "longbkit/clisbot", "--tag", "v0.1.60-beta.1"], {
       execFileSync,
     });
 

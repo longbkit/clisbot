@@ -11,7 +11,7 @@ describe("Android AsyncStorage configuration", () => {
         "-e",
         `
           const plugin = require("./plugins/with-android-async-storage-size");
-          const config = plugin({ name: "Paseo", slug: "paseo" }, 64);
+          const config = plugin({ name: "Clisbot", slug: "clisbot" }, 64);
           const mod = config.mods.android.gradleProperties;
           mod({ ...config, modResults: [], modRequest: {}, modRawConfig: config })
             .then((result) => process.stdout.write(JSON.stringify(result.modResults)));

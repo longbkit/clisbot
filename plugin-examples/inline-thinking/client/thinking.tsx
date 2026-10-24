@@ -1,5 +1,5 @@
-import type { PluginTimelineItemProps } from "@getpaseo/plugin/client";
-import { StreamedText } from "@getpaseo/plugin/client/ui";
+import type { PluginTimelineItemProps } from "@clisbot/plugin/client";
+import { StreamedText } from "@clisbot/plugin/client/ui";
 import { useMemo } from "react";
 import { z } from "zod";
 

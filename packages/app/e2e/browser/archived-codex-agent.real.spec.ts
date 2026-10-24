@@ -37,7 +37,7 @@ test.describe("archived Codex agent recovery", () => {
   test("cold-opens without provider history, then unarchives and restores the conversation", async ({
     page,
   }) => {
-    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-archived-codex-")));
+    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-archived-codex-")));
     let handle: AgentHandle | undefined;
 
     try {

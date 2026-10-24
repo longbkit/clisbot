@@ -59,7 +59,7 @@
             "remaining": 63
           },
           "missionId": "bc1a1172-b106-4b35-9325-9fd304278827",
-          "missionPath": "/tmp/paseo-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/bc1a1172-b106-4b35-9325-9fd304278827.json",
+          "missionPath": "/tmp/clisbot-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/bc1a1172-b106-4b35-9325-9fd304278827.json",
           "mission": {
             "schemaVersion": 1,
             "id": "bc1a1172-b106-4b35-9325-9fd304278827",
@@ -91,8 +91,8 @@
               }
             ],
             "receipts": [],
-            "cwd": "/tmp/paseo-pi-extension-phase3/workspace",
-            "ownerSessionId": "/tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff.jsonl"
+            "cwd": "/tmp/clisbot-pi-extension-phase3/workspace",
+            "ownerSessionId": "/tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff.jsonl"
           }
         }
       },
@@ -103,7 +103,7 @@
       "message": {
         "role": "custom",
         "customType": "subagent-notify",
-        "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\n(No files found; the workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty.)\n\n## Key Code\nN/A - Empty repository / workspace.\n\n## Architecture\nN/A - Empty repository / workspace.\n\n## Start Here\nThe workspace is currently empty. Initialize or populate the workspace with source code to begin development.\n\nOutput saved to: /tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/005cfec2-1376-4e96-b622-5ad8f4c15cb5/context.md (356 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/005cfec2-1376-4e96-b622-5ad8f4c15cb5\n\nSession file: /tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff/2a37ef22-e1f9-4f75-b9a0-510e82ffd422/run-0/session.jsonl",
+        "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\n(No files found; the workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty.)\n\n## Key Code\nN/A - Empty repository / workspace.\n\n## Architecture\nN/A - Empty repository / workspace.\n\n## Start Here\nThe workspace is currently empty. Initialize or populate the workspace with source code to begin development.\n\nOutput saved to: /tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/005cfec2-1376-4e96-b622-5ad8f4c15cb5/context.md (356 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/005cfec2-1376-4e96-b622-5ad8f4c15cb5\n\nSession file: /tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff/2a37ef22-e1f9-4f75-b9a0-510e82ffd422/run-0/session.jsonl",
         "display": false,
         "timestamp": 1790197711046
       }
@@ -188,7 +188,7 @@
           "remaining": 63
         },
         "missionId": "bc1a1172-b106-4b35-9325-9fd304278827",
-        "missionPath": "/tmp/paseo-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/bc1a1172-b106-4b35-9325-9fd304278827.json",
+        "missionPath": "/tmp/clisbot-pi-extension-phase3/pi-agent/missions/projects/8618955a5c85eb731bdb33d90016edaaf64963be032225b8a26a6936621a378d/bc1a1172-b106-4b35-9325-9fd304278827.json",
         "mission": {
           "schemaVersion": 1,
           "id": "bc1a1172-b106-4b35-9325-9fd304278827",
@@ -220,8 +220,8 @@
             }
           ],
           "receipts": [],
-          "cwd": "/tmp/paseo-pi-extension-phase3/workspace",
-          "ownerSessionId": "/tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff.jsonl"
+          "cwd": "/tmp/clisbot-pi-extension-phase3/workspace",
+          "ownerSessionId": "/tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff.jsonl"
         }
       },
       "isError": false,
@@ -230,7 +230,7 @@
     {
       "role": "custom",
       "customType": "subagent-notify",
-      "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\n(No files found; the workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty.)\n\n## Key Code\nN/A - Empty repository / workspace.\n\n## Architecture\nN/A - Empty repository / workspace.\n\n## Start Here\nThe workspace is currently empty. Initialize or populate the workspace with source code to begin development.\n\nOutput saved to: /tmp/paseo-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/005cfec2-1376-4e96-b622-5ad8f4c15cb5/context.md (356 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/005cfec2-1376-4e96-b622-5ad8f4c15cb5\n\nSession file: /tmp/paseo-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff/2a37ef22-e1f9-4f75-b9a0-510e82ffd422/run-0/session.jsonl",
+      "content": "Background task completed: **scout**\n\nscout:\n# Code Context\n\n## Files Retrieved\n(No files found; the workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty.)\n\n## Key Code\nN/A - Empty repository / workspace.\n\n## Architecture\nN/A - Empty repository / workspace.\n\n## Start Here\nThe workspace is currently empty. Initialize or populate the workspace with source code to begin development.\n\nOutput saved to: /tmp/clisbot-pi-extension-phase3/sessions-nico/subagent-artifacts/outputs/005cfec2-1376-4e96-b622-5ad8f4c15cb5/context.md (356 B, 13 lines). Read this file if needed.\n\nRetention-managed async directory: /tmp/pi-subagents-uid-1000/async-subagent-runs/005cfec2-1376-4e96-b622-5ad8f4c15cb5\n\nSession file: /tmp/clisbot-pi-extension-phase3/sessions-nico/2026-09-23T21-08-13-722Z_01a0d018-fd1a-7711-9c17-933fd34f0cff/2a37ef22-e1f9-4f75-b9a0-510e82ffd422/run-0/session.jsonl",
       "display": false,
       "timestamp": 1790197711046
     }

@@ -17,7 +17,7 @@ import {
 import { createGitHubService } from "../../services/github-service.js";
 import { archiveIfSafe } from "./archive-if-safe.js";
 import { killTerminalsForWorkspace } from "../workspace-archive-service.js";
-import { isPaseoOwnedWorktreeCwd, createWorktree } from "../../utils/worktree.js";
+import { isClisbotOwnedWorktreeCwd, createWorktree } from "../../utils/worktree.js";
 
 type PullRequestState = "open" | "closed" | "merged";
 
@@ -44,21 +44,21 @@ async function createWorkspaceFiles() {
   cleanupPaths.push(tempDir);
   const repoDir = path.join(tempDir, "repo");
   run(tempDir, ["init", "-b", "main", repoDir]);
-  run(repoDir, ["config", "user.email", "test@getpaseo.local"]);
-  run(repoDir, ["config", "user.name", "Paseo Test"]);
+  run(repoDir, ["config", "user.email", "test@clisbot.local"]);
+  run(repoDir, ["config", "user.name", "Clisbot Test"]);
   writeFileSync(path.join(repoDir, "README.md"), "workspace journey\n");
   run(repoDir, ["add", "README.md"]);
   run(repoDir, ["-c", "commit.gpgsign=false", "commit", "-m", "initial"]);
 
-  const paseoHome = path.join(tempDir, ".paseo");
+  const clisbotHome = path.join(tempDir, ".clisbot");
   const worktree = await createWorktree({
     cwd: repoDir,
     worktreeSlug: "workspace",
     source: { kind: "branch-off", baseBranch: "main", branchName: "workspace" },
 
-    paseoHome,
+    clisbotHome,
   });
-  return { repoDir, paseoHome, worktree };
+  return { repoDir, clisbotHome, worktree };
 }
 
 async function createWorkspaceJourney() {
@@ -82,7 +82,7 @@ async function createWorkspaceJourney() {
         mainRepoRoot: repoDir,
         currentBranch: branch,
         remoteUrl: "https://github.com/acme/repo.git",
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isDirty: false,
         baseRef: "main",
         aheadBehind: { ahead: 0, behind: 0 },
@@ -162,7 +162,7 @@ async function createWorkspaceJourney() {
 }
 
 async function createUnobservedWorkspace(archiveBarrier?: Promise<void>) {
-  const { repoDir, paseoHome, worktree } = await createWorkspaceFiles();
+  const { repoDir, clisbotHome, worktree } = await createWorkspaceFiles();
   const cwd = worktree.worktreePath;
   run(repoDir, ["remote", "add", "origin", "https://github.com/acme/repo.git"]);
   run(repoDir, ["update-ref", "refs/remotes/origin/workspace", "HEAD"]);
@@ -178,7 +178,7 @@ async function createUnobservedWorkspace(archiveBarrier?: Promise<void>) {
   let active = true;
   const service = new WorkspaceGitServiceImpl({
     logger,
-    paseoHome,
+    clisbotHome,
     deps: {
       forgeOverrides: { github },
       getPullRequestStatus: async (_cwd, _forge, options) => {
@@ -200,7 +200,7 @@ async function createUnobservedWorkspace(archiveBarrier?: Promise<void>) {
   cleanupServices.push(service);
   const options = {
     logger,
-    paseoHome,
+    clisbotHome,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
     workspaceGitService: service,
     getAutoArchivedChangeRequestUrl: async () => null,
@@ -213,7 +213,7 @@ async function createUnobservedWorkspace(archiveBarrier?: Promise<void>) {
       archiveIfSafe({
         ...input,
         deps: {
-          isPaseoOwnedWorktreeCwd,
+          isClisbotOwnedWorktreeCwd,
           killTerminalsForWorkspace,
           archiveByScope: async (_options, request) => {
             if (request.scope.kind !== "workspace") throw new Error("Expected workspace archive");
@@ -284,7 +284,7 @@ describe("workspace auto-archive behavior", () => {
       expect(merged.git).toMatchObject({
         isDirty: false,
         aheadOfOrigin: 0,
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
       });
       await expect.poll(() => workspace.archives).toEqual(["workspace-under-test"]);
       expect(workspace.isActive()).toBe(true);

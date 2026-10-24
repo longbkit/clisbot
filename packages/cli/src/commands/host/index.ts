@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import type { HostSummary, HostUpdate } from "@getpaseo/client";
+import type { HostSummary, HostUpdate } from "@clisbot/client";
 import {
   withOutput,
   type CommandOptions,

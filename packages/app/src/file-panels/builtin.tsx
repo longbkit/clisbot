@@ -1,4 +1,4 @@
-import { useWorkspace, useFileUrl, type PluginFilePanelProps } from "@getpaseo/plugin/client";
+import { useWorkspace, useFileUrl, type PluginFilePanelProps } from "@clisbot/plugin/client";
 import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

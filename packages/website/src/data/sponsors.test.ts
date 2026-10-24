@@ -7,10 +7,10 @@ const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const WEBSITE_PUBLIC = fileURLToPath(new URL("../../public", import.meta.url));
 // Each README invites sponsors to the sponsor page in its own language, where the website has one.
 const READMES = [
-  { readme: "README.md", sponsorPage: "https://paseo.sh/sponsor" },
-  { readme: "README.zh-CN.md", sponsorPage: "https://paseo.sh/zh-CN/sponsor" },
-  { readme: "README.ja.md", sponsorPage: "https://paseo.sh/sponsor" },
-  { readme: "README.ko.md", sponsorPage: "https://paseo.sh/sponsor" },
+  { readme: "README.md", sponsorPage: "https://clisbot.com/sponsor" },
+  { readme: "README.zh-CN.md", sponsorPage: "https://clisbot.com/zh-CN/sponsor" },
+  { readme: "README.ja.md", sponsorPage: "https://clisbot.com/sponsor" },
+  { readme: "README.ko.md", sponsorPage: "https://clisbot.com/sponsor" },
 ];
 const README_SPONSOR_CELLS = 3;
 
@@ -24,10 +24,10 @@ describe("sponsorHref", () => {
     };
 
     expect(sponsorHref(sponsor, "website")).toBe(
-      "https://acme.dev/?utm_source=paseo&utm_medium=website&utm_campaign=sponsor",
+      "https://acme.dev/?utm_source=clisbot&utm_medium=website&utm_campaign=sponsor",
     );
     expect(sponsorHref(sponsor, "x")).toBe(
-      "https://acme.dev/?utm_source=paseo&utm_medium=x&utm_campaign=sponsor",
+      "https://acme.dev/?utm_source=clisbot&utm_medium=x&utm_campaign=sponsor",
     );
   });
 });

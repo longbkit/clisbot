@@ -4,7 +4,7 @@ import { launchAgent, sendMessage, type AgentHandle } from "./rewind-flow";
 import { openSubagentsTrack } from "./subagents";
 
 const NESTED_OWNERSHIP_PROMPT =
-  "You are ROOT_OWNER. Use Claude Code's native Agent tool exactly once, never Paseo tools. " +
+  "You are ROOT_OWNER. Use Claude Code's native Agent tool exactly once, never Clisbot tools. " +
   "Name the agent direct_owner and give it this complete task: You are DIRECT_OWNER. Use " +
   "Claude Code's native Agent tool exactly once. Name that agent nested_owner and give it " +
   "this complete task: You are NESTED_OWNER. Use Bash exactly once to run `sleep 2; printf " +

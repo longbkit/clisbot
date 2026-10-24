@@ -1,73 +1,73 @@
 ---
 title: 开源的 Conductor 替代品，支持 Linux、Windows 和移动端
-description: Paseo 是一个开源的 Conductor 替代品，支持 Linux、Windows、原生移动应用、自托管的 daemon 以及可扩展的客户端。
+description: Clisbot 是一个开源的 Conductor 替代品，支持 Linux、Windows、原生移动应用、自托管的 daemon 以及可扩展的客户端。
 nav: Conductor
 order: 50
 ---
 
-# Paseo 与 Conductor 对比
+# Clisbot 与 Conductor 对比
 
 Conductor 是一款专有的 macOS 应用，用于在并行的 Git worktree 和托管的云端工作区中运行 Claude Code、Codex、Cursor 和 OpenCode。
 
-Paseo 是一个开源的 Agent 式开发环境。你可以在各自独立的 worktree 中并行运行多个 Agent，编辑文件，审查 diff 和拉取请求，并用终端和内置的桌面浏览器测试你的应用。它以 Apache-2.0 许可提供桌面端、移动端、Web 和 CLI。
+Clisbot 是一个开源的 Agent 式开发环境。你可以在各自独立的 worktree 中并行运行多个 Agent，编辑文件，审查 diff 和拉取请求，并用终端和内置的桌面浏览器测试你的应用。它以 Apache-2.0 许可提供桌面端、移动端、Web 和 CLI。
 
-![Paseo 桌面端和移动端应用](/hero-mockup.png)
+![Clisbot 桌面端和移动端应用](/hero-mockup.png)
 
 ## 主要区别 {#the-main-difference}
 
 Conductor 在 macOS 上免费提供本地工作区。它的托管云端工作区、API、协作功能以及即将推出的移动应用包含在每月 50 美元的 Pro 套餐中。
 
-Conductor 完成了 2200 万美元的 A 轮融资，并且是专有软件。Paseo 是独立项目，采用 Apache 2.0 许可，支持 macOS、Linux、Windows、iOS 和 Android，并且可以连接到你掌控的机器。
+Conductor 完成了 2200 万美元的 A 轮融资，并且是专有软件。Clisbot 是独立项目，采用 Apache 2.0 许可，支持 macOS、Linux、Windows、iOS 和 Android，并且可以连接到你掌控的机器。
 
 ## 架构 {#architecture}
 
-Paseo daemon 作为独立进程运行。桌面端、Web、移动端和 CLI 都通过 websocket 连接到它。你可以在笔记本、虚拟机、Docker 或一组机器上运行 daemon，并从任意客户端连接到其中任何一个。
+Clisbot daemon 作为独立进程运行。桌面端、Web、移动端和 CLI 都通过 websocket 连接到它。你可以在笔记本、虚拟机、Docker 或一组机器上运行 daemon，并从任意客户端连接到其中任何一个。
 
 Conductor 通过其 macOS 应用运行本地工作区，并在托管的 Vercel 沙箱中运行云端工作区。它目前不支持把客户端连接到你自己运维的云主机。
 
 ## Provider {#providers}
 
-Paseo 原生支持 Claude Code、Codex、OpenCode、Pi、Antigravity 和 Muse Code，并通过应用内目录支持另外 30 多个 Agent，包括 GitHub Copilot、Cursor、Gemini CLI 和 Amp。Paseo 支持 [Agent Client Protocol](https://agentclientprotocol.com)，因此任何 ACP Agent 都可以使用。自定义 Provider 可以运行任何 CLI Agent。查看[所有支持的 Provider](/agents)。
+Clisbot 原生支持 Claude Code、Codex、OpenCode、Pi、Antigravity 和 Muse Code，并通过应用内目录支持另外 30 多个 Agent，包括 GitHub Copilot、Cursor、Gemini CLI 和 Amp。Clisbot 支持 [Agent Client Protocol](https://agentclientprotocol.com)，因此任何 ACP Agent 都可以使用。自定义 Provider 可以运行任何 CLI Agent。查看[所有支持的 Provider](/agents)。
 
 Conductor 支持 Claude Code、Codex、Cursor 和 OpenCode。
 
-两者都使用你自己的 Provider 凭据。Paseo 启动安装在你机器上的 Provider。Conductor 捆绑了托管的 Claude Code 和 Codex 二进制文件，并为 Cursor 和 OpenCode 提供托管集成。
+两者都使用你自己的 Provider 凭据。Clisbot 启动安装在你机器上的 Provider。Conductor 捆绑了托管的 Claude Code 和 Codex 二进制文件，并为 Cursor 和 OpenCode 提供托管集成。
 
 ## 应用插件 {#application-plugins}
 
-[Paseo 插件](/docs/plugins)用于扩展 Paseo 本身。它们可以添加服务端行为和原生客户端组件，例如工作区面板、侧边栏项、Composer 附件、主题和 Command Center 条目，并在桌面端、浏览器、iOS 和 Android 上运行。
+[Clisbot 插件](/docs/plugins)用于扩展 Clisbot 本身。它们可以添加服务端行为和原生客户端组件，例如工作区面板、侧边栏项、Composer 附件、主题和 Command Center 条目，并在桌面端、浏览器、iOS 和 Android 上运行。
 
 Conductor 没有公开文档化的应用扩展 API，无法同时添加服务端行为和原生客户端组件。
 
 ## 窗格 {#panes}
 
-Paseo 应用支持拆分窗格和标签页（⌘D 垂直拆分，⌘⇧D 水平拆分）。窗格可以是与 Agent 并排的终端、diff 查看器，以及用于测试运行中服务的浏览器。
+Clisbot 应用支持拆分窗格和标签页（⌘D 垂直拆分，⌘⇧D 水平拆分）。窗格可以是与 Agent 并排的终端、diff 查看器，以及用于测试运行中服务的浏览器。
 
 ## GitHub {#github}
 
-Paseo 应用可以完成提交、推送、创建 PR、关注检查和审查，以及合并。
+Clisbot 应用可以完成提交、推送、创建 PR、关注检查和审查，以及合并。
 
 ## CLI {#cli}
 
-Paseo 有一个与应用功能对应的 CLI：
+Clisbot 有一个与应用功能对应的 CLI：
 
 ```bash
-paseo run --provider codex "implement OAuth"
-paseo run --host devbox:6767 "run the test suite"
-paseo ls
-paseo send <agent-id> "add tests"
-paseo schedule create --cron "0 9 * * 1" "audit the codebase"
+clisbot run --provider codex "implement OAuth"
+clisbot run --host devbox:6767 "run the test suite"
+clisbot ls
+clisbot send <agent-id> "add tests"
+clisbot schedule create --cron "0 9 * * 1" "audit the codebase"
 ```
 
-`paseo run --host` 连接到远程 daemon。`paseo schedule` 按 cron 运行 Agent。
+`clisbot run --host` 连接到远程 daemon。`clisbot schedule` 按 cron 运行 Agent。
 
-Conductor 把 API 列为 Pro 功能，但没有公开文档化与 Paseo 相当的面向用户的 CLI。
+Conductor 把 API 列为 Pro 功能，但没有公开文档化与 Clisbot 相当的面向用户的 CLI。
 
 ## Worktree 与服务 {#worktrees-and-services}
 
 两者都把并行的 Agent 隔离在 git worktree 中。
 
-Paseo 还为每个 worktree 提供独立的开发服务器 URL。两个 Agent 同时运行开发服务器时，会分别得到 `web--fix-auth--my-app.localhost` 和 `web--add-search--my-app.localhost`，而不会发生端口冲突。
+Clisbot 还为每个 worktree 提供独立的开发服务器 URL。两个 Agent 同时运行开发服务器时，会分别得到 `web--fix-auth--my-app.localhost` 和 `web--add-search--my-app.localhost`，而不会发生端口冲突。
 
 ## 移动端 {#mobile}
 
@@ -75,11 +75,11 @@ Paseo 还为每个 worktree 提供独立的开发服务器 URL。两个 Agent �
 
 ## 语音 {#voice}
 
-Paseo 支持本地的语音转文字和文字转语音。Conductor 目前没有公开文档化的语音界面。
+Clisbot 支持本地的语音转文字和文字转语音。Conductor 目前没有公开文档化的语音界面。
 
 ## 对比 {#comparison}
 
-|                                | Paseo                                                                              | Conductor                            |
+|                                | Clisbot                                                                            | Conductor                            |
 | ------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ |
 | 许可证                         | 开源（Apache-2.0）                                                                 | 闭源                                 |
 | 需要账号                       | 否                                                                                 | 是                                   |
@@ -106,4 +106,4 @@ Paseo 支持本地的语音转文字和文字转语音。Conductor 目前没有�
 | 语音                           | 是（本地语音输入、实时语音）                                                       | -                                    |
 | 遥测                           | 无                                                                                 | -                                    |
 
-另请参阅：[Paseo 与 Superset 对比](/alternatives/superset)、[Paseo 与 OpenChamber 对比](/alternatives/openchamber)、[Paseo 与 Happy Coder 对比](/alternatives/happy-coder)。
+另请参阅：[Clisbot 与 Superset 对比](/alternatives/superset)、[Clisbot 与 OpenChamber 对比](/alternatives/openchamber)、[Clisbot 与 Happy Coder 对比](/alternatives/happy-coder)。

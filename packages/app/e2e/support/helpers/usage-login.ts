@@ -1,7 +1,7 @@
 import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { UsageReport } from "@getpaseo/protocol/messages";
+import type { UsageReport } from "@clisbot/protocol/messages";
 import { expect, type Page } from "@playwright/test";
 import { expectPinnedUsage, pinRow, usageItem } from "./usage-sidebar-item";
 import { connectNewWorkspaceDaemonClient } from "./new-workspace";
@@ -29,7 +29,7 @@ export async function installLoginUsage(initialReport: UsageReport | LoginReport
   try {
     await setReport(initialReport);
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: "login-journey", requirements: pluginRequirements }),
     );
     await writeFile(
@@ -93,7 +93,7 @@ export async function installCodexWindowUsage(payload: unknown) {
     );
     await writeFile(path.join(directory, "payload.json"), JSON.stringify(payload));
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: "codex-window-qa", requirements: pluginRequirements }),
     );
     await writeFile(

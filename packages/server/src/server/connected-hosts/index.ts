@@ -9,8 +9,8 @@ import {
   createHostChannelTransport,
   parseHostTarget,
   HostTransportBudget,
-} from "@getpaseo/client/node";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/node";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import {
   HostSummarySchema,
   HostAddSchema,
@@ -19,8 +19,8 @@ import {
   type HostSummary,
   type HostAdd,
   type HostUpdate,
-} from "@getpaseo/protocol/hosts";
-import type { DaemonPermission, WSHelloMessage } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/hosts";
+import type { DaemonPermission, WSHelloMessage } from "@clisbot/protocol/messages";
 
 export class HostError extends Error {
   constructor(

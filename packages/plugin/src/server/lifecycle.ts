@@ -3,12 +3,12 @@ import type {
   AgentPermissionResponse,
   AgentTimelineItem,
   AgentSessionConfig,
-} from "@getpaseo/protocol/agent-types";
-import type { PaseoApi } from "@getpaseo/client";
-import type { WorkspaceCreateRequest } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/agent-types";
+import type { ClisbotApi } from "@clisbot/client";
+import type { WorkspaceCreateRequest } from "@clisbot/protocol/messages";
 
 export interface PluginHookContext {
-  paseo: PaseoApi;
+  clisbot: ClisbotApi;
   signal: AbortSignal;
 }
 
@@ -52,7 +52,7 @@ export interface PluginLifecycleEvents {
     outcome: PluginTurnOutcome;
     /**
      * @deprecated Always empty. Fetch history on demand with
-     * context.paseo.agents.ref(agent.id).timeline.refetch({ direction: "tail", limit: 20 }).
+     * context.clisbot.agents.ref(agent.id).timeline.refetch({ direction: "tail", limit: 20 }).
      */
     timeline: readonly AgentTimelineItem[];
   };

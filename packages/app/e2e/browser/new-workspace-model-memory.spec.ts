@@ -1,7 +1,7 @@
 import { mkdtemp, rename, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { test, expect } from "../support/fixtures";
 import { seedModelProvider } from "../support/helpers/agent-profiles";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
@@ -63,7 +63,7 @@ for (const hostStatus of ["ready", "unavailable"] as const) {
   }) => {
     test.setTimeout(150_000);
     const workspace = await seedWorkspace({ repoPrefix: "model-memory-scope-" });
-    const binDir = await mkdtemp(path.join(tmpdir(), "paseo-model-memory-bin-"));
+    const binDir = await mkdtemp(path.join(tmpdir(), "clisbot-model-memory-bin-"));
     const executable = path.join(binDir, "provider-node");
     await symlink(process.execPath, executable);
     const provider = await seedModelProvider({

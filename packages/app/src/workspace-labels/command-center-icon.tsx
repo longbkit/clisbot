@@ -1,4 +1,4 @@
-import type { WorkspaceLabelColor } from "@getpaseo/protocol/workspace-labels";
+import type { WorkspaceLabelColor } from "@clisbot/protocol/workspace-labels";
 import type { CommandCenterIcon } from "@/command-center/contributions";
 import { WorkspaceLabelDot } from "./swatch";
 

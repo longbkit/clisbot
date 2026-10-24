@@ -45,7 +45,7 @@ export async function acquireNpm(source: string, installRoot: string, target?: N
   await writeFile(
     path.join(installRoot, "package.json"),
     JSON.stringify({
-      name: "paseo-plugin-installation",
+      name: "clisbot-plugin-installation",
       version: "1.0.0",
       private: true,
       dependencies: { [packageName]: target?.resolved ?? requestedSpec },

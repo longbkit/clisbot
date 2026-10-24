@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { gotoAppShell, openSettings } from "./app";
 import { connectDaemonClient } from "./daemon-client-loader";
@@ -54,20 +54,20 @@ export async function stageLegacyFavoritesForHostMigration(
   await gotoAppShell(page);
   await page.evaluate(
     ({ favorites: storedFavorites, serverId: hostId }) => {
-      const preferencesKey = "@paseo:create-agent-preferences";
+      const preferencesKey = "@clisbot:create-agent-preferences";
       const raw = localStorage.getItem(preferencesKey);
       const preferences = raw ? JSON.parse(raw) : {};
       localStorage.setItem(
         preferencesKey,
         JSON.stringify({ ...preferences, favoriteModels: storedFavorites }),
       );
-      localStorage.removeItem(`@paseo:legacy-favorites-to-agent-profiles:v1:${hostId}`);
+      localStorage.removeItem(`@clisbot:legacy-favorites-to-agent-profiles:v1:${hostId}`);
 
       // Preserve this upgrade-shaped storage across the fixture's next-page
       // default seed; a reload is the startup boundary under test.
-      const nonce = localStorage.getItem("@paseo:e2e-seed-nonce");
+      const nonce = localStorage.getItem("@clisbot:e2e-seed-nonce");
       if (nonce) {
-        localStorage.setItem("@paseo:e2e-disable-default-seed-once", nonce);
+        localStorage.setItem("@clisbot:e2e-disable-default-seed-once", nonce);
       }
     },
     { favorites, serverId },

@@ -1,5 +1,5 @@
 import type { PluginWorkspacePanelContribution } from "../types";
-import type { PluginPanelLocation } from "@getpaseo/plugin/client";
+import type { PluginPanelLocation } from "@clisbot/plugin/client";
 import type { PaneHost } from "@/panels/panel-manifest";
 import { panelSupportsHost } from "@/panels/panel-manifest";
 import type { PluginWorkspaceTabTarget, WorkspaceTabTarget } from "@/workspace-tabs/model";

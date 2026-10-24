@@ -3,12 +3,12 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createTestPaseoDaemon, DaemonClient } from "./test-utils/index.js";
+import { createTestClisbotDaemon, DaemonClient } from "./test-utils/index.js";
 
 test("a rename-only commit returns zero added or deleted lines through the client", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "commit-rename-diff-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-  const daemon = await createTestPaseoDaemon({ agentClients: {} });
+  const daemon = await createTestClisbotDaemon({ agentClients: {} });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     git("init", "-b", "main");
@@ -59,7 +59,7 @@ test.skipIf(process.platform === "win32")(
       expect.objectContaining({ type: "remove", content: "before" }),
       expect.objectContaining({ type: "add", content: "after" }),
     ]);
-    const daemon = await createTestPaseoDaemon({ agentClients: {} });
+    const daemon = await createTestClisbotDaemon({ agentClients: {} });
     const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
     try {
       git("init", "-b", "main");

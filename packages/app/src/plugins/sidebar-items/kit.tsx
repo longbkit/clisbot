@@ -1,4 +1,4 @@
-import type { SidebarRowProps } from "@getpaseo/plugin/client/ui";
+import type { SidebarRowProps } from "@clisbot/plugin/client/ui";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

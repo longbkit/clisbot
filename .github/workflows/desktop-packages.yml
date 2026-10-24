@@ -47,7 +47,7 @@ jobs:
           npm run build:desktop -- --publish never --linux --x64 --config "$RUNNER_TEMP/desktop-smoke-builder.json"
         env:
           EP_GH_IGNORE_TIME: true
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
 
       - name: Smoke installed artifacts with restricted user namespaces
         run: |
@@ -59,7 +59,7 @@ jobs:
           sudo apt-get install -y ./packages/desktop/release/*.deb
           node packages/desktop/e2e/linux-artifact-smoke.js packages/desktop/release disabled
         env:
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke/restricted
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke/restricted
 
       - name: Smoke sandbox-preserving portable launches
         run: |
@@ -67,18 +67,18 @@ jobs:
           unshare --user --map-root-user --net true
           node packages/desktop/e2e/linux-artifact-smoke.js packages/desktop/release enabled
         env:
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke/userns
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke/userns
 
       - name: Smoke installed RPM with restricted user namespaces
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
-          sudo dpkg --remove paseo
+          sudo dpkg --remove clisbot
           # Ubuntu supplies the runtime libraries under Debian package names.
           # RPM still performs the real payload installation and postinstall.
           sudo rpm --install --nodeps packages/desktop/release/*.rpm
           node packages/desktop/e2e/linux-artifact-smoke.js packages/desktop/release disabled --installed-only
         env:
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke/rpm
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke/rpm
 
       - name: Upload packaged smoke diagnostics
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -1,30 +1,30 @@
 ---
 title: "隐私政策"
-description: "哪些数据留在你的机器上、加密中继能看到什么，以及 Paseo Hub 存储哪些数据。"
+description: "哪些数据留在你的机器上、加密中继能看到什么，以及 Clisbot Hub 存储哪些数据。"
 lastUpdated: "2026-08-29"
 ---
 
 本中文版本为英文原文的翻译，仅供参考。如两者存在任何不一致，以英文版本为准。
 
-Paseo 是本地优先的。安装或使用这款开源软件不会向我们发送你的代码、提示词、文件、终端输出或 Agent 对话。本政策说明本地 Paseo、可选的官方中继、托管的 Paseo Hub 以及 paseo.sh 各自独立的数据边界。
+Clisbot 是本地优先的。安装或使用这款开源软件不会向我们发送你的代码、提示词、文件、终端输出或 Agent 对话。本政策说明本地 Clisbot、可选的官方中继、托管的 Clisbot Hub 以及 clisbot.com 各自独立的数据边界。
 
 ## 谁负责
 
-**Mohamed Boudra Ziani**，以 Paseo 名义经营\
+**Mohamed Boudra Ziani**，以 Clisbot 名义经营\
 NIF/VAT ID：ES26617095T\
 Roc Boronat 48, Bajos 2\
 08005 Barcelona, Spain\
 邮箱：[hello@moboudra.com](mailto:hello@moboudra.com)
 
-Mohamed Boudra Ziani 是通过官方 Paseo 网站、中继和托管 Hub 处理的个人数据的数据控制者。独立自托管的 daemon、Hub 和中继由其运营者控制，不受本政策约束。
+Mohamed Boudra Ziani 是通过官方 Clisbot 网站、中继和托管 Hub 处理的个人数据的数据控制者。独立自托管的 daemon、Hub 和中继由其运营者控制，不受本政策约束。
 
-## 本地 Paseo 应用和 daemon
+## 本地 Clisbot 应用和 daemon
 
-Paseo 在你的机器上运行。它不会向我们发送分析数据、遥测数据、广告标识符或崩溃报告。
+Clisbot 在你的机器上运行。它不会向我们发送分析数据、遥测数据、广告标识符或崩溃报告。
 
 打包的桌面应用会检查 GitHub Releases 以获取更新。GitHub 会依据其自身的隐私政策，接收响应该请求所需的常规网络信息。
 
-Claude Code、Codex 和 OpenCode 等 Agent 使用你机器上的凭据与各自的 Provider 通信。Paseo 不管理也不拦截这些 Provider API 调用。
+Claude Code、Codex 和 OpenCode 等 Agent 使用你机器上的凭据与各自的 Provider 通信。Clisbot 不管理也不拦截这些 Provider API 调用。
 
 ## 官方中继
 
@@ -37,7 +37,7 @@ Claude Code、Codex 和 OpenCode 等 Agent 使用你机器上的凭据与各自�
 
 你的客户端和 daemon 使用 NaCl box 加密对应用流量进行端到端加密。中继传输的是密文，无法读取你的代码、提示词、终端输出或 Agent 对话。有效载荷仅在转发期间存在于中继内存中。我们不存储消息内容。基础设施可能会保留有限的运维日志和汇总指标，用于安全、容量规划和故障排查。
 
-## Paseo Hub
+## Clisbot Hub
 
 当你创建或使用托管 Hub 账户时，我们会处理：
 
@@ -52,7 +52,7 @@ Claude Code、Codex 和 OpenCode 等 Agent 使用你机器上的凭据与各自�
 
 ## 谁控制工作流数据
 
-Paseo 控制账户、账单、安全和服务运营数据。当某个组织使用 Hub 在其工作流中处理个人数据时，由该组织决定处理数据的目的，Paseo 代表该组织处理这些数据。
+Clisbot 控制账户、账单、安全和服务运营数据。当某个组织使用 Hub 在其工作流中处理个人数据时，由该组织决定处理数据的目的，Clisbot 代表该组织处理这些数据。
 
 ## 我们为什么处理数据
 
@@ -90,7 +90,7 @@ Paseo 控制账户、账单、安全和服务运营数据。当某个组织使�
 
 ## 安全
 
-我们采用访问控制、加密传输和有限的服务权限。任何在线服务都无法保证绝对安全。请阅读 Paseo 的[安全模型](https://github.com/getpaseo/paseo/blob/main/SECURITY.md)，或私下向 [hello@moboudra.com](mailto:hello@moboudra.com) 报告漏洞。
+我们采用访问控制、加密传输和有限的服务权限。任何在线服务都无法保证绝对安全。请阅读 Clisbot 的[安全模型](https://github.com/longbkit/clisbot/blob/main/SECURITY.md)，或私下向 [hello@moboudra.com](mailto:hello@moboudra.com) 报告漏洞。
 
 ## 儿童
 

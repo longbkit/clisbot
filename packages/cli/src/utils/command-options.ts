@@ -9,7 +9,7 @@ const localCommands = new WeakSet<Command>();
 
 export function addLocalDaemonOptions<T extends Command>(command: T): T {
   localCommands.add(command);
-  command.option("--home <path>", "Local daemon home (default: ~/.paseo)");
+  command.option("--home <path>", "Local daemon home (default: ~/.clisbot)");
   return command;
 }
 
@@ -25,7 +25,7 @@ export function addJsonOption<T extends Command>(command: T): T {
 export function addDaemonHostOption<T extends Command>(command: T): T {
   command.option("--host <host>", DAEMON_HOST_OPTION_DESCRIPTION);
   if (!command.options.some((option) => option.long === "--home"))
-    command.option("--home <path>", "Select a local daemon home (default: ~/.paseo)");
+    command.option("--home <path>", "Select a local daemon home (default: ~/.clisbot)");
   return command;
 }
 

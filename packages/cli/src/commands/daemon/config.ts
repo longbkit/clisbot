@@ -1,11 +1,11 @@
 import { addLocalDaemonOptions } from "../../utils/command-options.js";
 import { Command } from "commander";
-import { readDaemonInstance } from "@getpaseo/server/daemon-control";
+import { readDaemonInstance } from "@clisbot/server/daemon-control";
 import {
   readPersistedConfig,
   getPersistedConfigValue,
   editPersistedConfig,
-} from "@getpaseo/server/configuration";
+} from "@clisbot/server/configuration";
 import { connectToDaemon } from "../../utils/client.js";
 import { withOutput, type CommandOptions } from "../../output/index.js";
 
@@ -41,7 +41,7 @@ function homeOf(options: CommandOptions) {
 }
 
 async function applySaved(home: string, options: CommandOptions) {
-  const nextCommand = `paseo daemon start --home ${JSON.stringify(home)}`;
+  const nextCommand = `clisbot daemon start --home ${JSON.stringify(home)}`;
   const instance = await readDaemonInstance(home);
   if (!instance?.listen)
     return result({
@@ -58,7 +58,7 @@ async function applySaved(home: string, options: CommandOptions) {
       action: "saved",
       applied: false,
       message: "Saved; not applied to a running daemon",
-      nextCommand: `paseo daemon reload --home ${JSON.stringify(home)}`,
+      nextCommand: `clisbot daemon reload --home ${JSON.stringify(home)}`,
     });
   }
   try {

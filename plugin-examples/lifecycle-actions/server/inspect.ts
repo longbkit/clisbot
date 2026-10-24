@@ -1,4 +1,4 @@
-import type { AgentPermissionRequest, AgentTimelineItem } from "@getpaseo/protocol/agent-types";
+import type { AgentPermissionRequest, AgentTimelineItem } from "@clisbot/protocol/agent-types";
 
 export function latestOutputText(timeline: readonly AgentTimelineItem[]): string {
   let output = "";

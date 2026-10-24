@@ -13,9 +13,9 @@ import {
   seedParentWithSubagent,
 } from "../support/helpers/subagents";
 
-test.use({ e2eInjectPaseoTools: true });
+test.use({ e2eInjectClisbotTools: true });
 
-const SETTINGS_KEY = "@paseo:app-settings";
+const SETTINGS_KEY = "@clisbot:app-settings";
 
 async function openParentInRightPane(page: Page, parentId: string, workspaceId: string) {
   await page.setViewportSize({ width: 1400, height: 900 });
@@ -227,7 +227,7 @@ test("MCP delegates to self and B and opens both qualified children in ordinary 
       page.getByRole("button", { name: /Agent finished.*MCP child on B/ }),
     ).toBeVisible();
     const owners = await page.evaluate(() => {
-      const runtime = Reflect.get(globalThis, "__paseoHostRuntimeStore") as {
+      const runtime = Reflect.get(globalThis, "__clisbotHostRuntimeStore") as {
         getHosts(): Array<{ serverId: string }>;
         getSnapshot(
           serverId: string,
@@ -266,7 +266,7 @@ async function openFleetParentWithDirectB(
     nowIso: new Date().toISOString(),
   });
   await page.evaluate((extraHost) => {
-    localStorage.setItem("@paseo:e2e-extra-hosts", JSON.stringify([extraHost]));
+    localStorage.setItem("@clisbot:e2e-extra-hosts", JSON.stringify([extraHost]));
   }, host);
   await openAgentRoute(page, {
     workspaceId: fleet.workspace.workspaceId,
@@ -322,7 +322,7 @@ test("an unavailable B child opens its cached workspace with existing reconnecti
     await expect
       .poll(() =>
         page.evaluate((serverId) => {
-          const runtime = Reflect.get(globalThis, "__paseoHostRuntimeStore") as {
+          const runtime = Reflect.get(globalThis, "__clisbotHostRuntimeStore") as {
             getSnapshot(id: string): { serverId: string; connectionStatus: string } | null;
           };
           return runtime.getSnapshot(serverId);

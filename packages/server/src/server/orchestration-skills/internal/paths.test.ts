@@ -24,7 +24,7 @@ describe("orchestration skill paths", () => {
   });
 
   it("finds the catalog beside the actual emitted server layout", async () => {
-    const packageRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-built-skills-"));
+    const packageRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-built-skills-"));
     roots.push(packageRoot);
     const catalog = path.join(packageRoot, "dist", "server", "skills");
     await mkdir(catalog, { recursive: true });

@@ -1,4 +1,4 @@
-export const GOTGENES_CHILD_SESSION_MARKER = "PASEO_GOTGENES_CHILD_SESSION";
+export const GOTGENES_CHILD_SESSION_MARKER = "CLISBOT_GOTGENES_CHILD_SESSION";
 
 /**
  * Runs inside Pi. The spawn result omits the child's session file, so the parent's public service

@@ -4,8 +4,8 @@
 .dev
 .playwright-mcp
 **/.playwright-mcp
-.paseo
-**/.paseo-provider-history
+.clisbot
+**/.clisbot-provider-history
 .plans
 .tasks
 .valknut

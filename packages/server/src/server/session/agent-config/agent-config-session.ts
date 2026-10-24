@@ -1,7 +1,7 @@
 import type pino from "pino";
 import { v4 as uuidv4 } from "uuid";
-import { getErrorMessage, getErrorMessageOr } from "@getpaseo/protocol/error-utils";
-import type { AgentConfigApply } from "@getpaseo/protocol/messages";
+import { getErrorMessage, getErrorMessageOr } from "@clisbot/protocol/error-utils";
+import type { AgentConfigApply } from "@clisbot/protocol/messages";
 import type { AgentProviderNotice } from "../../agent/agent-sdk-types.js";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 

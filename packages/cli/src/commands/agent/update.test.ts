@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentProviderNotice } from "@getpaseo/protocol/agent-types";
+import type { AgentProviderNotice } from "@clisbot/protocol/agent-types";
 import {
   applyAgentChanges,
   toAgentUpdateResult,

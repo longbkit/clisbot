@@ -4,7 +4,7 @@ const INTERACTIVE_TARGET_SELECTOR = [
   "select",
   "[role='button']",
   "[role='link']",
-  "[data-paseo-pane-focus-exempt='true']",
+  "[data-clisbot-pane-focus-exempt='true']",
 ].join(", ");
 
 export function shouldFocusPaneFromEventTarget(target: EventTarget | null): boolean {

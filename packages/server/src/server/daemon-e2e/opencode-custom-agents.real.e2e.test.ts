@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { canRunRealProvider, createRealProviderClients } from "./real-provider-test-config.js";
 
@@ -14,10 +14,10 @@ function tmpCwd(): string {
 
 async function createHarness(): Promise<{
   client: DaemonClient;
-  daemon: Awaited<ReturnType<typeof createTestPaseoDaemon>>;
+  daemon: Awaited<ReturnType<typeof createTestClisbotDaemon>>;
 }> {
   const logger = pino({ level: "silent" });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: createRealProviderClients(["opencode"], logger),
     logger,
   });
@@ -46,8 +46,8 @@ describe("daemon E2E (real opencode) - custom agent discovery", () => {
       path.join(cwd, "opencode.json"),
       JSON.stringify({
         agent: {
-          "paseo-e2e-custom": {
-            description: "Custom agent for Paseo daemon E2E test",
+          "clisbot-e2e-custom": {
+            description: "Custom agent for Clisbot daemon E2E test",
             mode: "primary",
           },
         },
@@ -73,9 +73,9 @@ describe("daemon E2E (real opencode) - custom agent discovery", () => {
       expect(snapshot.availableModes.some((m) => m.id === "build")).toBe(true);
       expect(snapshot.availableModes.some((m) => m.id === "plan")).toBe(true);
 
-      const custom = snapshot.availableModes.find((m) => m.id === "paseo-e2e-custom");
+      const custom = snapshot.availableModes.find((m) => m.id === "clisbot-e2e-custom");
       expect(custom).toBeDefined();
-      expect(custom!.description).toBe("Custom agent for Paseo daemon E2E test");
+      expect(custom!.description).toBe("Custom agent for Clisbot daemon E2E test");
 
       // System agents should not leak through
       expect(snapshot.availableModes.some((m) => m.id === "compaction")).toBe(false);

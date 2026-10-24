@@ -1,12 +1,12 @@
-import type { PluginText } from "@getpaseo/plugin/client";
-import type { PaseoApi } from "@getpaseo/client";
+import type { PluginText } from "@clisbot/plugin/client";
+import type { ClisbotApi } from "@clisbot/client";
 import type { QueryClient } from "@tanstack/react-query";
-import type { PluginRequirements } from "@getpaseo/protocol/messages";
+import type { PluginRequirements } from "@clisbot/protocol/messages";
 import type {
   PluginAttachmentSourceContribution as SDKPluginAttachmentSourceContribution,
   PluginCleanup,
   PluginThemeContribution as SDKPluginThemeContribution,
-} from "@getpaseo/plugin";
+} from "@clisbot/plugin";
 import type {
   PluginFilePanelContribution as SDKPluginFilePanelContribution,
   PluginCommandCenterItemContribution as SDKPluginCommandCenterItemContribution,
@@ -20,7 +20,7 @@ import type {
   PluginTimelineTransformerContribution,
   PluginPanelLocation,
   PluginWorkspacePanelContribution as SDKPluginWorkspacePanelContribution,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 
 type PluginFilePanelContribution = SDKPluginFilePanelContribution<PluginText>;
 type PluginAttachmentSourceContribution = SDKPluginAttachmentSourceContribution<PluginText>;
@@ -66,9 +66,9 @@ export interface InstalledPlugin extends EvaluatedPlugin {
   lifetime: AbortController;
   /** Immutable presentation locale, refreshed without replacing the installation lifetime. */
   locale: string;
-  i18n: import("@getpaseo/plugin/client/host").PluginTranslationRuntime;
-  /** The plugin's one Paseo client, `usePaseo()` in every surface; disposed at teardown. */
-  paseo: PaseoApi;
+  i18n: import("@clisbot/plugin/client/host").PluginTranslationRuntime;
+  /** The plugin's one Clisbot client, `useClisbot()` in every surface; disposed at teardown. */
+  clisbot: ClisbotApi;
   /** Calls one of the plugin's server RPC methods on its host. */
   invoke(method: string, input: unknown): Promise<unknown>;
   serverId: string;

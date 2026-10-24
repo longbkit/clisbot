@@ -1,12 +1,12 @@
 ---
 title: 浏览器工具
-description: Agent 用来操作 Paseo 浏览器标签页的 browser_* MCP 工具。
+description: Agent 用来操作 Clisbot 浏览器标签页的 browser_* MCP 工具。
 nav: 工具参考
 ---
 
 # 浏览器工具 {#browser-tools}
 
-启用[浏览器自动化](/docs/browser)后，`browser_*` 工具会和其他 [Paseo MCP 工具](/docs/mcp)一起注入到 Agent 中。
+启用[浏览器自动化](/docs/browser)后，`browser_*` 工具会和其他 [Clisbot MCP 工具](/docs/mcp)一起注入到 Agent 中。
 
 通用概念：
 

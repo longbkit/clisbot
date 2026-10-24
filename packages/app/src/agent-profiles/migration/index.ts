@@ -1,12 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { FormPreferencesSchema } from "@/create-agent-preferences/preferences";
 import { readValidatedJson, readValidatedString } from "@/storage/validated-storage";
 
-const PREFERENCES_KEY = "@paseo:create-agent-preferences";
-const COMPLETION_KEY_PREFIX = "@paseo:legacy-favorites-to-agent-profiles:v1:";
+const PREFERENCES_KEY = "@clisbot:create-agent-preferences";
+const COMPLETION_KEY_PREFIX = "@clisbot:legacy-favorites-to-agent-profiles:v1:";
 const CATALOG_LOADING_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000, 4_000] as const;
 
 type LegacyFavorite = NonNullable<z.infer<typeof FormPreferencesSchema>["favoriteModels"]>[number];

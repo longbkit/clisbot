@@ -29,10 +29,10 @@ describe("resolveMarkdownFileDirectory", () => {
   it("preserves the host home directory for home-relative markdown paths", () => {
     expect(
       resolveMarkdownFileDirectory({
-        markdownPath: "~/.paseo/plans/note.md",
+        markdownPath: "~/.clisbot/plans/note.md",
         workspaceRoot: "/Users/test/project",
       }),
-    ).toBe("~/.paseo/plans");
+    ).toBe("~/.clisbot/plans");
   });
 });
 
@@ -111,31 +111,31 @@ describe("resolveMarkdownPreviewImageSource", () => {
     ).toBe("/tmp/screenshot.png");
     expect(
       resolveMarkdownPreviewImageSource({
-        source: "~/.paseo/screenshots/output.png",
+        source: "~/.clisbot/screenshots/output.png",
         markdownPath: "docs/guide.md",
         workspaceRoot: "/Users/test/project",
       }),
-    ).toBe("~/.paseo/screenshots/output.png");
+    ).toBe("~/.clisbot/screenshots/output.png");
   });
 
   it("normalizes file URIs into host paths", () => {
     expect(
       resolveMarkdownPreviewImageSource({
-        source: "file:///tmp/paseo-preview.png",
+        source: "file:///tmp/clisbot-preview.png",
         markdownPath: "docs/guide.md",
         workspaceRoot: "/Users/test/project",
       }),
-    ).toBe("/tmp/paseo-preview.png");
+    ).toBe("/tmp/clisbot-preview.png");
   });
 
   it("resolves images beside a home-relative document without using the workspace root", () => {
     expect(
       resolveMarkdownPreviewImageSource({
         source: "screenshots/output.png",
-        markdownPath: "~/.paseo/plans/note.md",
+        markdownPath: "~/.clisbot/plans/note.md",
         workspaceRoot: "/Users/test/project",
       }),
-    ).toBe("~/.paseo/plans/screenshots/output.png");
+    ).toBe("~/.clisbot/plans/screenshots/output.png");
   });
 
   it("decodes a file URI exactly once", () => {

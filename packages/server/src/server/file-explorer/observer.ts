@@ -1,6 +1,6 @@
 import { watch, type FSWatcher } from "node:fs";
 import path from "node:path";
-import type { FileVersion } from "@getpaseo/protocol/messages";
+import type { FileVersion } from "@clisbot/protocol/messages";
 import { getExplorerFileVersion, resolveExplorerFilePath } from "./service.js";
 
 interface FileWatch {

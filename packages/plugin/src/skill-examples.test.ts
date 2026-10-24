@@ -5,7 +5,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const skill = readFileSync(path.join(repository, "skills/paseo-plugin/SKILL.md"), "utf8");
+const skill = readFileSync(path.join(repository, "skills/clisbot-plugin/SKILL.md"), "utf8");
 
 function sectionCode(heading: string): string {
   const section = skill.slice(skill.indexOf(`\n## ${heading}\n`));
@@ -33,7 +33,7 @@ function typeErrors(code: string): string[] {
     .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
 }
 
-describe("paseo-plugin skill examples", () => {
+describe("clisbot-plugin skill examples", () => {
   it("composer pill example typechecks against the plugin SDK", () => {
     expect(typeErrors(sectionCode("Add a composer pill"))).toEqual([]);
   });
@@ -43,7 +43,7 @@ describe("plugin translation author types", () => {
   it("checks JSON keys, plural counts, literal interpolation names and imperative translation", () => {
     expect(
       typeErrors(`
-      import { defineTranslations, useTranslation, type PluginClientContext } from "@getpaseo/plugin/client";
+      import { defineTranslations, useTranslation, type PluginClientContext } from "@clisbot/plugin/client";
       import en from "../../translations/client/locales/en.json";
       const json = defineTranslations({ resources: { en } });
       const literal = defineTranslations({ resources: { en: { greeting: "Hello {{name}}", value: "{{amount, number}}" } } });
@@ -75,9 +75,9 @@ describe("plugin translation author types", () => {
 it("keeps historical string descriptor helpers while accepting translated registrations", () => {
   expect(
     typeErrors(`
-    import { defineTranslations, type PluginText, type PluginFilePanelContribution, type PluginClientContext, type PluginScreenContribution, type PluginWorkspacePanelContribution, type PluginSettingsScreenContribution, type PluginSidebarItemContribution, type PluginSidebarContribution, type PluginCommandCenterItemContribution, type PluginClientSlashCommandContribution, type PluginButton, type PluginHeaderButtonContribution, type PluginComposerPillContribution, type PluginButtonMenuEntry } from "@getpaseo/plugin/client";
+    import { defineTranslations, type PluginText, type PluginFilePanelContribution, type PluginClientContext, type PluginScreenContribution, type PluginWorkspacePanelContribution, type PluginSettingsScreenContribution, type PluginSidebarItemContribution, type PluginSidebarContribution, type PluginCommandCenterItemContribution, type PluginClientSlashCommandContribution, type PluginButton, type PluginHeaderButtonContribution, type PluginComposerPillContribution, type PluginButtonMenuEntry } from "@clisbot/plugin/client";
     import { z } from "zod";
-    import { defineAttachmentSource, type PluginThemeContribution, type PluginAttachmentSourceContribution } from "@getpaseo/plugin";
+    import { defineAttachmentSource, type PluginThemeContribution, type PluginAttachmentSourceContribution } from "@clisbot/plugin";
     const messages = defineTranslations({ resources: { en: { title: "Notes" } } });
     const Component = () => null;
     function historicalScreen(screen: PluginScreenContribution) {

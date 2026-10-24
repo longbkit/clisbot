@@ -10,7 +10,7 @@ category: Schedules
 
 A schedule starts a new agent for you on a cron cadence: at this time, run this prompt, in this repo, with these agent settings.
 
-Paseo also has **heartbeats**. A heartbeat sends a recurring prompt back into one existing agent so it can reassess and continue the same conversation.
+Clisbot also has **heartbeats**. A heartbeat sends a recurring prompt back into one existing agent so it can reassess and continue the same conversation.
 
 Both concepts use the same cron engine, but their product surfaces stay separate:
 
@@ -33,13 +33,13 @@ Both run on a cadence you set. To start an agent from an external event instead 
 
 - **In the app** — open the Schedules view and create one with agent settings, a cron cadence, a repo, and a prompt. This is the main way to create and manage schedules.
 - **[From chat](/docs/schedules-chat)** — ask the agent in a chat and it sets the schedule up for you.
-- **[From the CLI](/docs/schedules-cli)** — `paseo schedule create`, for headless boxes and scripts.
+- **[From the CLI](/docs/schedules-cli)** — `clisbot schedule create`, for headless boxes and scripts.
 - **[Over MCP](/docs/mcp)** — agents create and manage schedules programmatically.
 
 ## Keep run workspaces
 
-Each new-agent schedule run creates a workspace. **Archive on finish** is on by default: when the run ends, Paseo archives that workspace and its agent. With worktree isolation, archiving also removes the worktree after its last active workspace is archived.
+Each new-agent schedule run creates a workspace. **Archive on finish** is on by default: when the run ends, Clisbot archives that workspace and its agent. With worktree isolation, archiving also removes the worktree after its last active workspace is archived.
 
-To keep runs available, open the schedule in the app's Schedules view, turn off **Archive on finish**, and save. Paseo keeps each run's workspace and agent active until you archive them; runs that fail before creating an agent are still cleaned up. This option also applies to local isolation; archiving a local workspace leaves the project directory in place.
+To keep runs available, open the schedule in the app's Schedules view, turn off **Archive on finish**, and save. Clisbot keeps each run's workspace and agent active until you archive them; runs that fail before creating an agent are still cleaned up. This option also applies to local isolation; archiving a local workspace leaves the project directory in place.
 
 The stored option is `target.config.archiveOnFinish`, a boolean that defaults to `true` when omitted. The CLI and MCP schedule tools do not expose this option; use the app to change it. Heartbeats use an existing agent and do not have this option.

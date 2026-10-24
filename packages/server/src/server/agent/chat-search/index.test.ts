@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
+import type { AgentTimelineItem } from "@clisbot/protocol/agent-types";
 import { searchTimeline } from "./index.js";
 
 function rows(items: AgentTimelineItem[]) {

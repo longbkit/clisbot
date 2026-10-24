@@ -48,7 +48,7 @@ export const Route = createFileRoute("/{-$locale}/download")({
 const ALL_RELEASES_COMPONENTS = {
   github: (
     <a
-      href="https://github.com/getpaseo/paseo/releases"
+      href="https://github.com/longbkit/clisbot/releases"
       target="_blank"
       rel="noopener noreferrer"
       className="underline hover:text-foreground transition-colors"
@@ -118,7 +118,7 @@ function Download() {
 
           {!onBeta && (
             <PlatformRow icon={TerminalIcon} label="Homebrew">
-              <CodeBlock size="sm">brew install --cask paseo</CodeBlock>
+              <CodeBlock size="sm">brew install --cask clisbot</CodeBlock>
             </PlatformRow>
           )}
 
@@ -204,16 +204,16 @@ function Download() {
           <PlatformRow icon={TerminalIcon} label="npm">
             <CodeBlock size="sm">
               {onBeta
-                ? "npm install -g @getpaseo/cli@beta && paseo"
-                : "npm install -g @getpaseo/cli && paseo"}
+                ? "npm install -g @clisbot/cli@beta && clisbot"
+                : "npm install -g @clisbot/cli && clisbot"}
             </CodeBlock>
           </PlatformRow>
 
           <PlatformRow icon={TerminalIcon} label="Nix">
             <CodeBlock size="sm">
               {onBeta
-                ? `nix run github:getpaseo/paseo/v${version}`
-                : "nix run github:getpaseo/paseo"}
+                ? `nix run github:longbkit/clisbot/v${version}`
+                : "nix run github:longbkit/clisbot"}
             </CodeBlock>
           </PlatformRow>
         </div>

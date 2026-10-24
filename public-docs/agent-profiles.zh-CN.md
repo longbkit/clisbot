@@ -23,13 +23,13 @@ nav: Agent 配置
 
 ## 一键应用设置 {#apply-settings-in-one-click}
 
-创建 Agent 时，打开模型选择器，在 **配置文件** 下选择一个已保存的配置。Paseo 会一并应用其中的设置；发送提示词之前你仍然可以调整。
+创建 Agent 时，打开模型选择器，在 **配置文件** 下选择一个已保存的配置。Clisbot 会一并应用其中的设置；发送提示词之前你仍然可以调整。
 
 修改已保存的配置只影响之后的选择，不会更新你已经启动的 Agent。
 
 ## 用说明指导委派 {#guide-delegation-with-notes}
 
-**适用场景** 字段就是配置的说明。Paseo 通过它的工具公开这些说明，负责编排的 Agent 在决定如何启动执行者之前可以先读取它们。
+**适用场景** 字段就是配置的说明。Clisbot 通过它的工具公开这些说明，负责编排的 Agent 在决定如何启动执行者之前可以先读取它们。
 
 为每个配置设定清晰的专长：
 
@@ -41,12 +41,12 @@ nav: Agent 配置
 
 每个配置可以使用不同的 Provider 和模型，也可以对同一个模型使用不同的设置。
 
-[启用 Paseo 工具](/docs/orchestration#get-started)之后，你可以这样要求：
+[启用 Clisbot 工具](/docs/orchestration#get-started)之后，你可以这样要求：
 
-> 查看我的 Paseo 配置及其说明。为设置页面的 UI 改动选择一个配置，然后用审查配置对 diff 做一次独立审查。
+> 查看我的 Clisbot 配置及其说明。为设置页面的 UI 改动选择一个配置，然后用审查配置对 diff 做一次独立审查。
 
 编排者会读取配置，为每个任务选择设置，并启动执行者。说明用来指导这个选择；执行者的具体任务要写在它的任务提示词中。
 
-内置的 [Paseo 技能](/docs/skills#paseo-paseo-reference)会指示 Agent 在委派前查看配置并阅读其说明。如果没有合适的配置，它会引导 Agent 发现已配置的 Provider 和模型，并告诉你采用了哪个备选方案。
+内置的 [Clisbot 技能](/docs/skills#clisbot-clisbot-reference)会指示 Agent 在委派前查看配置并阅读其说明。如果没有合适的配置，它会引导 Agent 发现已配置的 Provider 和模型，并告诉你采用了哪个备选方案。
 
 委派示例见[常用工作流](/docs/orchestration-workflows)，工具接口见 [MCP 参考](/docs/mcp#agent-profiles)。

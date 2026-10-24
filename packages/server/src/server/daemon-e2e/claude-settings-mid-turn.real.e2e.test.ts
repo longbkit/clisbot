@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 import { ClaudeAgentClient } from "../agent/providers/claude/agent.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 test("changing thinking then mode preserves a foreground Claude command", async () => {
   const logger = pino({ level: "silent" });
   const cwd = await mkdtemp(path.join(tmpdir(), "claude-settings-mid-turn-"));
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     logger,
     agentClients: { claude: new ClaudeAgentClient({ logger }) },
   });

@@ -14,8 +14,8 @@ import { claudeProjectDir, claudeProjectDirSync } from "./project-dir.js";
 // that path. If we write a session file at the path our function computes and
 // the SDK finds it, our encoding matches theirs for that input.
 
-const workspaceRoot = join(homedir(), ".paseo-claude-parity-tests");
-const tmpWorkspaceRoot = join(tmpdir(), "paseo-claude-parity");
+const workspaceRoot = join(homedir(), ".clisbot-claude-parity-tests");
+const tmpWorkspaceRoot = join(tmpdir(), "clisbot-claude-parity");
 const createdSessionFiles: string[] = [];
 
 interface ParityCase {

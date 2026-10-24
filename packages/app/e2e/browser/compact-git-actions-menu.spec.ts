@@ -71,8 +71,11 @@ test("compact git actions menu lists a promoted Pull once", async ({ page }) => 
     execFileSync("rm", ["-rf", other]);
   });
   execFileSync("git", ["clone", path.join(repoPath, "remote.git"), other], { stdio: "ignore" });
-  execFileSync("git", ["config", "user.email", "e2e@paseo.test"], { cwd: other, stdio: "ignore" });
-  execFileSync("git", ["config", "user.name", "Paseo E2E"], { cwd: other, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "e2e@clisbot.test"], {
+    cwd: other,
+    stdio: "ignore",
+  });
+  execFileSync("git", ["config", "user.name", "Clisbot E2E"], { cwd: other, stdio: "ignore" });
   await writeFile(path.join(other, "src/incoming.ts"), "export const incoming = 1;\n");
   execFileSync("git", ["add", "--all"], { cwd: other, stdio: "ignore" });
   execFileSync("git", ["commit", "-m", "Incoming commit"], { cwd: other, stdio: "ignore" });

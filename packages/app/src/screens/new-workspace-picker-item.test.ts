@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildVisibleComboboxOptions } from "@/components/ui/combobox-options";
-import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
+import type { ForgeSearchItem } from "@clisbot/protocol/messages";
 import {
   type BranchPickerDetail,
   branchPickerOptionId,

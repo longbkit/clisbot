@@ -1,8 +1,8 @@
 const BLOCKS = ["p", "pre", "li", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6"]
-  .flatMap((tag) => [tag, `[data-paseo-markdown-tag="${tag}"]`])
+  .flatMap((tag) => [tag, `[data-clisbot-markdown-tag="${tag}"]`])
   .join(",");
 const IGNORED =
-  '[data-paseo-markdown-ignore="true"], [aria-hidden="true"], button, [role="button"], svg, script, style';
+  '[data-clisbot-markdown-ignore="true"], [aria-hidden="true"], button, [role="button"], svg, script, style';
 
 /** Rendered rows carrying a source message identity, in reading order. */
 export function findMessageRows(root: HTMLElement | null, messageId: string): HTMLElement[] {

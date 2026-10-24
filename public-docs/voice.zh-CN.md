@@ -1,16 +1,16 @@
 ---
 title: 语音
-description: Paseo 的语音架构、本地优先的模型执行以及 Provider 配置。
+description: Clisbot 的语音架构、本地优先的模型执行以及 Provider 配置。
 nav: 语音
 ---
 
 # 语音 {#voice}
 
-Paseo 对语音提供一流的支持，可用于口述输入，以及与编程环境进行语音模式对话。
+Clisbot 对语音提供一流的支持，可用于口述输入，以及与编程环境进行语音模式对话。
 
 ## 设计理念 {#philosophy}
 
-语音以本地优先。你可以完全在设备上运行语音功能，也可以为语音功能选择 OpenAI。对于语音推理和编排，Paseo 复用你机器上已安装并完成认证的 Agent Provider。
+语音以本地优先。你可以完全在设备上运行语音功能，也可以为语音功能选择 OpenAI。对于语音推理和编排，Clisbot 复用你机器上已安装并完成认证的 Agent Provider。
 
 这让凭据和执行都留在你的环境中，也避免了引入一套独立的、只能在云端运行的语音系统。
 
@@ -25,7 +25,7 @@ Paseo 对语音提供一流的支持，可用于口述输入，以及与编程�
 
 本地语音默认使用模型 ID `parakeet-tdt-0.6b-v2-int8`（STT）和 `kokoro-en-v0_19`（TTS，speaker 0 / voice 00）。
 
-缺失的模型会在 daemon 启动时下载到 `$PASEO_HOME/models/local-speech`。只会下载缺失的文件。
+缺失的模型会在 daemon 启动时下载到 `$CLISBOT_HOME/models/local-speech`。只会下载缺失的文件。
 
 ### 本地 STT 模型与语言支持 {#local-stt-models-and-language-support}
 
@@ -51,7 +51,7 @@ Paseo 对语音提供一流的支持，可用于口述输入，以及与编程�
   },
   "providers": {
     "local": {
-      "modelsDir": "~/.paseo/models/local-speech"
+      "modelsDir": "~/.clisbot/models/local-speech"
     }
   }
 }
@@ -70,7 +70,7 @@ Paseo 对语音提供一流的支持，可用于口述输入，以及与编程�
 }
 ```
 
-`language` 字段只适用于 OpenAI STT Provider：口述使用 `features.dictation.stt.language`，语音模式使用 `features.voiceMode.stt.language`。如果省略语音语言，Paseo 会先使用口述语言，再退回到 `en`。它对本地 Parakeet 模型没有任何作用。
+`language` 字段只适用于 OpenAI STT Provider：口述使用 `features.dictation.stt.language`，语音模式使用 `features.voiceMode.stt.language`。如果省略语音语言，Clisbot 会先使用口述语言，再退回到 `en`。它对本地 Parakeet 模型没有任何作用。
 
 ## OpenAI 语音选项 {#openai-voice-option}
 
@@ -101,9 +101,9 @@ Paseo 对语音提供一流的支持，可用于口述输入，以及与编程�
 }
 ```
 
-`providers.openai.stt` 用于口述和语音模式的语音转文字，`providers.openai.tts` 用于语音模式的文字转语音。由于两者独立解析，你可以把 STT 和 TTS 指向不同的端点。未设置时，各自先退回到 `providers.openai.apiKey`/`baseUrl`，再退回到 `OPENAI_API_KEY`/`OPENAI_BASE_URL`。这些设置只配置 Paseo 的 OpenAI 语音流量，不会改变 Codex 或其他基于 OpenAI 的工具。
+`providers.openai.stt` 用于口述和语音模式的语音转文字，`providers.openai.tts` 用于语音模式的文字转语音。由于两者独立解析，你可以把 STT 和 TTS 指向不同的端点。未设置时，各自先退回到 `providers.openai.apiKey`/`baseUrl`，再退回到 `OPENAI_API_KEY`/`OPENAI_BASE_URL`。这些设置只配置 Clisbot 的 OpenAI 语音流量，不会改变 Codex 或其他基于 OpenAI 的工具。
 
-Paseo 在配置的 OpenAI base URL 下使用以下路径：
+Clisbot 在配置的 OpenAI base URL 下使用以下路径：
 
 - 口述 STT：`/v1/audio/transcriptions`
 - 语音模式 STT：`/v1/audio/transcriptions`
@@ -111,16 +111,16 @@ Paseo 在配置的 OpenAI base URL 下使用以下路径：
 
 ## 环境变量 {#environment-variables}
 
-- `PASEO_VOICE_LLM_PROVIDER`：覆盖语音 Agent 的 Provider
-- `PASEO_DICTATION_STT_PROVIDER`、`PASEO_VOICE_STT_PROVIDER`、`PASEO_VOICE_TTS_PROVIDER`：选择语音 Provider（`local` 或 `openai`）
+- `CLISBOT_VOICE_LLM_PROVIDER`：覆盖语音 Agent 的 Provider
+- `CLISBOT_DICTATION_STT_PROVIDER`、`CLISBOT_VOICE_STT_PROVIDER`、`CLISBOT_VOICE_TTS_PROVIDER`：选择语音 Provider（`local` 或 `openai`）
 - `OPENAI_STT_API_KEY`、`OPENAI_STT_BASE_URL`：OpenAI 语音转文字端点（口述 + 语音模式 STT）
 - `OPENAI_TTS_API_KEY`、`OPENAI_TTS_BASE_URL`：OpenAI 文字转语音端点（语音模式 TTS）
-- `PASEO_LOCAL_MODELS_DIR`：本地模型存储目录
-- `PASEO_DICTATION_LOCAL_STT_MODEL`：本地口述 STT 模型 ID
-- `PASEO_VOICE_LOCAL_STT_MODEL`、`PASEO_VOICE_LOCAL_TTS_MODEL`：本地语音 STT/TTS 模型 ID
-- `PASEO_DICTATION_LANGUAGE`：口述 STT 语言（仅限 OpenAI STT；本地 Parakeet 会忽略）
-- `PASEO_VOICE_LANGUAGE`：语音模式 STT 语言；未设置时退回到 `PASEO_DICTATION_LANGUAGE`（仅限 OpenAI STT；本地 Parakeet 会忽略）
-- `PASEO_VOICE_LOCAL_TTS_SPEAKER_ID`、`PASEO_VOICE_LOCAL_TTS_SPEED`：可选的本地语音 TTS 调优
+- `CLISBOT_LOCAL_MODELS_DIR`：本地模型存储目录
+- `CLISBOT_DICTATION_LOCAL_STT_MODEL`：本地口述 STT 模型 ID
+- `CLISBOT_VOICE_LOCAL_STT_MODEL`、`CLISBOT_VOICE_LOCAL_TTS_MODEL`：本地语音 STT/TTS 模型 ID
+- `CLISBOT_DICTATION_LANGUAGE`：口述 STT 语言（仅限 OpenAI STT；本地 Parakeet 会忽略）
+- `CLISBOT_VOICE_LANGUAGE`：语音模式 STT 语言；未设置时退回到 `CLISBOT_DICTATION_LANGUAGE`（仅限 OpenAI STT；本地 Parakeet 会忽略）
+- `CLISBOT_VOICE_LOCAL_TTS_SPEAKER_ID`、`CLISBOT_VOICE_LOCAL_TTS_SPEED`：可选的本地语音 TTS 调优
 
 ## 使用须知 {#operational-notes}
 

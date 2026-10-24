@@ -1,7 +1,7 @@
 import { registerStructuredOutput, STRUCTURED_OUTPUT_TOOL } from "./structured-output-plugin.mjs";
 
 export default {
-  id: "paseo",
+  id: "clisbot",
   async setup(context) {
     const disposeStructuredOutput = await registerStructuredOutput(context);
     const { baseUrl, token } = context.options;
@@ -19,7 +19,7 @@ export default {
         const message =
           typeof payload?.error === "string" && payload.error
             ? payload.error
-            : `Paseo tool bridge returned HTTP ${response.status}`;
+            : `Clisbot tool bridge returned HTTP ${response.status}`;
         const error = new Error(detail ? `${message}: ${detail}` : message);
         error.status = response.status;
         if (detail) error.details = detail;
@@ -40,13 +40,13 @@ export default {
         const session = await context.session.get({ sessionID });
         sessionID = session.parentID;
       }
-      throw new Error("OpenCode session is not bound to a Paseo agent");
+      throw new Error("OpenCode session is not bound to a Clisbot agent");
     }
     const manifest = await request("/tools");
     const registration = await context.tool.transform((editor) => {
       for (const definition of manifest.tools) {
         editor.add({
-          name: `paseo_${definition.name}`,
+          name: `clisbot_${definition.name}`,
           description: definition.description,
           input: definition.inputSchema,
           options: { codemode: false },
@@ -58,7 +58,7 @@ export default {
             );
             return {
               content: result.content.map(toOpenCodeContent),
-              metadata: { paseoTool: definition.name },
+              metadata: { clisbotTool: definition.name },
             };
           },
         });
@@ -66,9 +66,9 @@ export default {
     });
     const filtering = await context.session.hook("context", async (input) => {
       const binding = await scope(input.sessionID);
-      const allowed = new Set(binding.tools.map((name) => `paseo_${name}`));
+      const allowed = new Set(binding.tools.map((name) => `clisbot_${name}`));
       for (const name of Object.keys(input.tools)) {
-        if (name !== STRUCTURED_OUTPUT_TOOL && name.startsWith("paseo_") && !allowed.has(name))
+        if (name !== STRUCTURED_OUTPUT_TOOL && name.startsWith("clisbot_") && !allowed.has(name))
           delete input.tools[name];
       }
     });

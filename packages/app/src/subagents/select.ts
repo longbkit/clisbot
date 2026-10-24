@@ -1,15 +1,15 @@
-import type { AgentAddress } from "@getpaseo/protocol/addresses";
-import { getParentAddressFromLabels } from "@getpaseo/protocol/agent-labels";
+import type { AgentAddress } from "@clisbot/protocol/addresses";
+import { getParentAddressFromLabels } from "@clisbot/protocol/agent-labels";
 import { useEffect, useMemo } from "react";
 import { usePendingArchiveAgentKeys } from "@/hooks/use-archive-agent";
 import equal from "fast-deep-equal";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { refreshProviderSubagents, useProviderSubagentStore } from "./provider-store";
-import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
+import type { ProviderSubagentDescriptorPayload } from "@clisbot/protocol/messages";
 
-export interface PaseoSubagentRow {
-  kind: "paseo";
+export interface ClisbotSubagentRow {
+  kind: "clisbot";
   address: AgentAddress;
   id: Agent["id"];
   provider: Agent["provider"];
@@ -40,7 +40,7 @@ export interface ProviderSubagentRow {
   createdAt: Date;
 }
 
-export type SubagentRow = PaseoSubagentRow | ProviderSubagentRow;
+export type SubagentRow = ClisbotSubagentRow | ProviderSubagentRow;
 
 type SessionStoreSnapshot = ReturnType<typeof useSessionStore.getState>;
 type ProviderSubagentStoreSnapshot = ReturnType<typeof useProviderSubagentStore.getState>;
@@ -57,7 +57,7 @@ const EMPTY_PROVIDER_SUBAGENT_ROWS: ProviderSubagentRow[] = [];
 
 function toSubagentRow(agent: Agent): SubagentRow {
   return {
-    kind: "paseo",
+    kind: "clisbot",
     address: { serverId: agent.serverId, agentId: agent.id },
     id: agent.id,
     provider: agent.provider,
@@ -171,11 +171,11 @@ export function selectProviderSubagentsForParent(
 export function useSubagentsForParent(params: SelectSubagentsParams): SubagentRow[] {
   const { serverId, parentAgentId } = params;
   const pendingArchiveIds = usePendingArchiveAgentKeys();
-  const selectPaseoRows = useMemo(
+  const selectClisbotRows = useMemo(
     () => createSubagentsForParentSelector({ serverId, parentAgentId }, pendingArchiveIds),
     [serverId, parentAgentId, pendingArchiveIds],
   );
-  const paseoRows = useStoreWithEqualityFn(useSessionStore, selectPaseoRows, equal);
+  const clisbotRows = useStoreWithEqualityFn(useSessionStore, selectClisbotRows, equal);
   const supported = useSessionStore(
     (state) => state.sessions[params.serverId]?.serverInfo?.features?.providerSubagents === true,
   );
@@ -199,9 +199,9 @@ export function useSubagentsForParent(params: SelectSubagentsParams): SubagentRo
 
   return useMemo(() => {
     if (params.providerParentSubagentId) return providerRows;
-    if (providerRows.length === 0) return paseoRows;
-    const rows = [...paseoRows, ...providerRows];
+    if (providerRows.length === 0) return clisbotRows;
+    const rows = [...clisbotRows, ...providerRows];
     rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
     return rows;
-  }, [params.providerParentSubagentId, paseoRows, providerRows]);
+  }, [params.providerParentSubagentId, clisbotRows, providerRows]);
 }

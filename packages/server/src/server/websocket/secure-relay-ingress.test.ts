@@ -5,8 +5,8 @@ import {
   exportPublicKey,
   generateKeyPair,
   openClientSecureChannel,
-} from "@getpaseo/relay/e2ee";
-import type { Transport } from "@getpaseo/relay/e2ee";
+} from "@clisbot/relay/e2ee";
+import type { Transport } from "@clisbot/relay/e2ee";
 import { admitSecuredRelaySocket, type SecuredRelaySocket } from "./secure-relay-ingress.js";
 
 type Listener = (...args: unknown[]) => void;

@@ -26,12 +26,12 @@ test("connector retains per-attempt headers and WebSocket subprotocols", async (
   const transport = createHostTransportFactory(server.url)({
     url: server.url,
     headers: { Authorization: "Bearer example" },
-    protocols: ["paseo-test"],
+    protocols: ["clisbot-test"],
   });
   cleanup.push(async () => transport.close());
   const [socket, request] = (await connected) as [WebSocket, import("node:http").IncomingMessage];
   expect(request.headers.authorization).toBe("Bearer example");
-  expect(socket.protocol).toBe("paseo-test");
+  expect(socket.protocol).toBe("clisbot-test");
 });
 test("a slow consumer cannot exceed the shared byte budget and close releases reserved bytes", async () => {
   const server = await endpoint();
@@ -78,7 +78,7 @@ import {
   generateKeyPair,
   exportPublicKey,
   type Transport,
-} from "@getpaseo/relay/e2ee";
+} from "@clisbot/relay/e2ee";
 test("encrypted connector rejects overload synchronously and preserves the physical link for sibling traffic", async () => {
   const server = await endpoint();
   const keys = generateKeyPair();
@@ -152,7 +152,7 @@ test("encrypted connector rejects overload synchronously and preserves the physi
   expect(server.wss.clients.size).toBe(1);
 });
 
-import { openDaemonSecureChannel } from "@getpaseo/relay/e2ee";
+import { openDaemonSecureChannel } from "@clisbot/relay/e2ee";
 test("encrypted connector refuses legacy endpoint security on a later attempt once protected was negotiated", async () => {
   const server = await endpoint();
   const keys = generateKeyPair();

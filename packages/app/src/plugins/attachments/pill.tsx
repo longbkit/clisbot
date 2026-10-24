@@ -4,7 +4,7 @@ import { withUnistyles } from "react-native-unistyles";
 import { AttachmentLabel, AttachmentPill } from "@/components/attachment-pill";
 import type { ComposerAttachment } from "@/attachments/types";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
-import type { PluginSerializableIcon } from "@getpaseo/plugin";
+import type { PluginSerializableIcon } from "@clisbot/plugin";
 import { PluginIconView } from "../icons";
 import type { PluginResourceComposerAttachment } from "./model";
 

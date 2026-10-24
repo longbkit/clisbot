@@ -1,7 +1,7 @@
 import { buildHostRootRoute } from "@/utils/host-routes";
 import type { NotificationOpenSource, NotificationTap } from "./source";
 
-export const WEB_NOTIFICATION_CLICK_EVENT = "paseo:web-notification-click";
+export const WEB_NOTIFICATION_CLICK_EVENT = "clisbot:web-notification-click";
 
 export type NotificationOpenTarget =
   | { kind: "agent"; serverId: string; agentId: string }
