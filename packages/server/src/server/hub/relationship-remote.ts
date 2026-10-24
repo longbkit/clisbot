@@ -429,6 +429,12 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       },
     });
     let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      socket.terminate();
+      events.failed(error);
+    };
     socket.once("upgrade", (response) => {
       if (response.headers["x-clisbot-session-protocol"] === "1") {
         sessionProtocol = "session-v1";
@@ -458,12 +464,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       settled = true;
       events.closed(code);
     });
-    socket.once("error", (error) => {
-      if (settled) return;
-      settled = true;
-      socket.terminate();
-      events.failed(error);
-    });
+    socket.once("error", fail);
     return socket;
   }
 

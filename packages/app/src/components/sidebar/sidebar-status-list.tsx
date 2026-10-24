@@ -38,9 +38,10 @@ import {
 import type {
   StatusDisplayGroup,
   StatusSessionGroupItem,
+  StatusGroupItem,
 } from "@/clisbot/workspace-sessions/status-sessions";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
-import { type SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
+import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import type { StatusBucket } from "@/hooks/sidebar-status-view-model";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import { SidebarFilterEmptyState } from "@/components/sidebar/empty-states";
@@ -48,7 +49,7 @@ import type { HostBadgeModel } from "@/hosts/appearance";
 import { isWeb as platformIsWeb, isNative as platformIsNative } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { StyleSheet } from "react-native-unistyles";
-import { density, densityFontSize, densityIconBox, densityIconProps } from "@/styles/density";
+import { density, densityIconBox, densityIconProps } from "@/styles/density";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { withUnistyles } from "react-native-unistyles";
 import {
@@ -93,7 +94,7 @@ import {
   SidebarWorkspaceContextMenu,
   SidebarWorkspaceMenu,
 } from "@/components/sidebar/sidebar-workspace-menu";
-import { PinnedSectionHeader } from "@/components/sidebar/pinned-section-header";
+import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-header";
 import { ProjectStatusIndicator } from "@/components/sidebar/project-leading-visual";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
@@ -169,6 +170,7 @@ export function SidebarStatusWorkspaceList({
   parentGestureRef,
   dragGestureHostActive,
 }: StatusWorkspaceListProps) {
+  const { t } = useTranslation();
   const collapsedWorkspaceGroupKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedWorkspaceGroupKeys,
   );
@@ -228,7 +230,12 @@ export function SidebarStatusWorkspaceList({
       {listLeadingComponent}
       {pinnedWorkspaces.length > 0 ? (
         <View style={styles.pinnedSection} testID="sidebar-pinned-section">
-          <PinnedSectionHeader collapsed={pinnedCollapsed} onToggle={togglePinnedCollapsed} />
+          <SidebarSectionHeader
+            title={t("sidebar.pinned.title")}
+            collapsed={pinnedCollapsed}
+            onToggle={togglePinnedCollapsed}
+            testID="sidebar-pinned-section-header"
+          />
           {pinnedCollapsed ? null : (
             <>
               <DraggableList
@@ -339,6 +346,12 @@ function StatusGroupList({
   return <>{groups.map(renderGroup)}</>;
 }
 
+const STATUS_GROUP_VISIBILITY = {
+  kind: "workspaces" as const,
+  getStatusBucket: (item: StatusGroupItem) =>
+    item.kind === "session" ? item.session.statusBucket : item.workspace.statusBucket,
+};
+
 function StatusGroupRows({
   group,
   collapsed,
@@ -365,7 +378,7 @@ function StatusGroupRows({
     expanded: workspacesExpanded,
     canToggle: canToggleWorkspaces,
     toggleExpanded: toggleWorkspacesExpanded,
-  } = useLimitedSidebarGroup(group.items);
+  } = useLimitedSidebarGroup(group.items, STATUS_GROUP_VISIBILITY);
   // Clisbot: a group with no header (Workspace, Session) lists flush in the Projects section,
   // and a group that is not a project names each row's project above its title.
   const headed = group.leading.kind !== "none";
@@ -1305,7 +1318,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   statusGroupTitle: {
     color: theme.colors.foregroundMuted,
-    fontSize: densityFontSize(theme, "base"),
+    fontSize: theme.fontSize.base,
     fontWeight: "400",
     minWidth: 0,
     flexShrink: 1,

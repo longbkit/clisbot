@@ -10,7 +10,7 @@ import { acceptedChatRecord, useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { scopedTranscriptKey } from "../data/session-scope";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useChatLiveHeads } from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
 import { ChatHeartbeatsButton } from "@/clisbot/heartbeats/chat-heartbeats-button";

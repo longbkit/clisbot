@@ -59,7 +59,7 @@ test("creates a worktree and registers it in the source workspace project withou
       cwd: repoDir,
       worktreeSlug: "feature-one",
       title: "Feature One",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -114,7 +114,7 @@ test("refreshes a source project that became Git while creating a worktree", asy
     {
       cwd: repoDir,
       worktreeSlug: "project-became-git",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -148,7 +148,7 @@ test("repairs a legacy source workspace whose project record is missing", async 
     {
       cwd: repoDir,
       worktreeSlug: "repaired-source",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -192,7 +192,7 @@ test("uses an equivalent source workspace path when creating a worktree", async 
     {
       cwd: sourceDir,
       worktreeSlug: "equivalent-source",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -221,7 +221,7 @@ test("creates a worktree workspace at the selected project subdirectory", async 
       cwd: sourceDir,
       projectId: project.projectId,
       worktreeSlug: "selected-subdirectory",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -249,7 +249,7 @@ test("seeds an uncommitted exact-project config into the mapped worktree directo
     {
       cwd: sourceDir,
       worktreeSlug: "seed-nested-config",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     createDeps(),
@@ -277,7 +277,7 @@ test("does not overwrite a committed exact-project config with source checkout e
     {
       cwd: sourceDir,
       worktreeSlug: "preserve-nested-config",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     createDeps(),
@@ -316,7 +316,7 @@ test("removes a new worktree when its ref does not contain the selected project 
         action: "checkout",
         refName: "without-subproject",
         worktreeSlug: "missing-subproject",
-        runSetup: false,
+
         clisbotHome,
       },
       deps,
@@ -347,7 +347,7 @@ test("removes a new worktree when workspace persistence fails", async () => {
         cwd: repoDir,
         projectId: "missing-project",
         worktreeSlug: "persistence-failure",
-        runSetup: false,
+
         clisbotHome,
       },
       createDeps(),
@@ -375,7 +375,7 @@ test("maps a nested cwd from an existing Clisbot worktree into the next worktree
     {
       cwd: repoDir,
       worktreeSlug: "source-worktree",
-      runSetup: false,
+
       clisbotHome,
     },
     deps,
@@ -386,7 +386,7 @@ test("maps a nested cwd from an existing Clisbot worktree into the next worktree
     {
       cwd: sourceCwd,
       worktreeSlug: "nested-worktree",
-      runSetup: false,
+
       clisbotHome,
     },
     deps,
@@ -410,7 +410,7 @@ test("rejects source checkout planning before creating a worktree", async () => 
       {
         cwd: repoDir,
         worktreeSlug: "must-not-create",
-        runSetup: false,
+
         clisbotHome,
       },
       deps,
@@ -445,7 +445,7 @@ test("registers a new worktree in the existing root project after the main check
       cwd: repoDir,
       projectId: sourceProject.projectId,
       worktreeSlug: "second-worktree",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -474,7 +474,7 @@ test("an explicit project FK remains unchanged when its worktree comes from anot
       cwd: repoDir,
       projectId: project.projectId,
       worktreeSlug: "attached-worktree",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -504,7 +504,7 @@ test.skipIf(isPlatform("win32"))(
       {
         cwd: repoDir,
         worktreeSlug: "reuse-me",
-        runSetup: false,
+
         clisbotHome,
       },
       firstDeps,
@@ -520,7 +520,7 @@ test.skipIf(isPlatform("win32"))(
       {
         cwd: repoDir,
         worktreeSlug: "reuse-me",
-        runSetup: false,
+
         clisbotHome,
       },
       deps,
@@ -543,7 +543,7 @@ test("renames an eligible unnamed branch-off worktree once on first agent contex
     {
       cwd: repoDir,
       worktreeSlug: "dazzling-yak",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -612,7 +612,7 @@ test("falls back to a numeric suffix when the desired branch name already exists
     {
       cwd: repoDir,
       worktreeSlug: "dazzling-yak",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     createDeps(),
@@ -649,7 +649,7 @@ test("renames the branch even when the app supplies a random placeholder slug", 
       cwd: repoDir,
       worktreeSlug: "dazzling-yak",
       firstAgentContext: { prompt: "Investigate the failing login flow" },
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -697,7 +697,7 @@ test("renames the branch from a github_pr attachment when no prompt is supplied"
           },
         ],
       },
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     deps,
@@ -742,7 +742,7 @@ test("leaves the branch alone when generated branch text is invalid", async () =
       cwd: repoDir,
       worktreeSlug: "dazzling-yak",
       firstAgentContext: { prompt: "Name this branch" },
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     createDeps(),
@@ -787,7 +787,7 @@ test("does not mark checkout branch worktrees as eligible for first-agent rename
       cwd: repoDir,
       action: "checkout",
       refName: "dev",
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     createDeps(),
@@ -827,7 +827,7 @@ test("does not mark GitHub PR checkout worktrees as eligible for first-agent ren
       cwd: repoDir,
       action: "checkout",
       githubPrNumber: 123,
-      runSetup: false,
+
       clisbotHome: path.join(tempDir, ".clisbot"),
     },
     createDeps(),
@@ -864,7 +864,7 @@ test("does not mutate registries or broadcast when core worktree creation fails"
       {
         cwd: tempDir,
         worktreeSlug: "not-git",
-        runSetup: false,
+
         clisbotHome: path.join(tempDir, ".clisbot"),
       },
       deps,
@@ -890,7 +890,7 @@ test.skipIf(isPlatform("win32"))(
       cwd: repoDir,
       worktreeSlug: "restore-me",
       source: { kind: "checkout-branch", branchName: "restore-me" },
-      runSetup: false,
+
       clisbotHome,
     });
     expect(existsSync(created.worktreePath)).toBe(true);
@@ -905,7 +905,7 @@ test.skipIf(isPlatform("win32"))(
       cwd: repoDir,
       worktreeSlug: "restore-me",
       source: { kind: "checkout-branch", branchName: "restore-me" },
-      runSetup: false,
+
       clisbotHome,
     });
 
@@ -949,7 +949,7 @@ test.skipIf(isPlatform("win32"))(
       cwd: repoDir,
       worktreeSlug: "restore-me",
       source: { kind: "checkout-branch", branchName: "restore-me" },
-      runSetup: false,
+
       clisbotHome,
     });
     expect(existsSync(created.worktreePath)).toBe(true);
@@ -972,7 +972,7 @@ test.skipIf(isPlatform("win32"))(
         cwd: repoDir,
         worktreeSlug: "restore-me",
         source: { kind: "checkout-branch", branchName: "restore-me" },
-        runSetup: false,
+
         clisbotHome,
       }),
     ).rejects.toThrow("missing but already registered worktree");
@@ -984,7 +984,7 @@ test.skipIf(isPlatform("win32"))(
       cwd: repoDir,
       worktreeSlug: "restore-me",
       source: { kind: "checkout-branch", branchName: "restore-me" },
-      runSetup: false,
+
       clisbotHome,
     });
 
@@ -1012,7 +1012,7 @@ test.skipIf(isPlatform("win32"))(
         cwd: repoDir,
         worktreeSlug: "gone-branch",
         source: { kind: "checkout-branch", branchName: "gone-branch" },
-        runSetup: false,
+
         clisbotHome: path.join(tempDir, ".clisbot"),
       }),
     ).rejects.toMatchObject({ name: "UnknownBranchError" });
@@ -1031,7 +1031,7 @@ test.skipIf(isPlatform("win32"))(
       cwd: repoDir,
       worktreeSlug: "busy-branch",
       source: { kind: "checkout-branch", branchName: "busy-branch" },
-      runSetup: false,
+
       clisbotHome,
     });
     expect(existsSync(first.worktreePath)).toBe(true);
@@ -1040,7 +1040,7 @@ test.skipIf(isPlatform("win32"))(
       cwd: repoDir,
       worktreeSlug: "busy-branch-again",
       source: { kind: "checkout-branch", branchName: "busy-branch" },
-      runSetup: false,
+
       clisbotHome,
     });
 
@@ -1223,7 +1223,7 @@ function createWorkspaceGitServiceStub(): WorkspaceGitService {
     registerWorkspace: () => ({
       unsubscribe: () => {},
     }),
-    peekSnapshot: (cwd) => createWorkspaceGitSnapshot(cwd),
+
     getCheckout: async (cwd) => {
       try {
         const snapshot = createWorkspaceGitSnapshot(cwd);

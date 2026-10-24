@@ -797,6 +797,7 @@ describe("ForgeService", () => {
       headRepositorySshUrl: "git@github.com:therainisme/clisbot.git",
       headRepositoryUrl: "https://github.com/therainisme/clisbot",
       isCrossRepository: true,
+      headRefKind: "branch",
     });
 
     expect(runner.calls).toHaveLength(2);

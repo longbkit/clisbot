@@ -1,6 +1,6 @@
 {
   "id": "inline-thinking",
   "requirements": {
-    "clisbot": ">=0.8.0"
+    "clisbot": ">=0.13.0"
   }
 }

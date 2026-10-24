@@ -46,10 +46,16 @@
 <!-- clisbot:intro:end -->
 
 - **셀프 호스팅:** 에이전트는 완전한 개발 환경이 갖춰진 내 컴퓨터에서 실행됩니다. 평소 쓰던 도구, 설정, 스킬을 그대로 쓸 수 있습니다.
-- **에이전트 선택의 자유:** 40개가 넘는 에이전트 옵션을 제공합니다. 기본 지원하는 Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, Muse Code에 더해 Grok을 포함한 ACP 카탈로그 프리셋 38개를 이용할 수 있습니다. 작업마다 모델을 선택하세요.
+- **에이전트 선택의 자유:** 40개가 넘는 에이전트 옵션을 제공합니다. 기본 지원하는 Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, Muse Code에 더해 Grok을 포함한 ACP 카탈로그 프리셋 39개를 이용할 수 있습니다. 작업마다 모델을 선택하세요.
 - **음성 제어:** 음성 모드에서 작업을 말로 지시하거나 문제를 음성으로 함께 검토할 수 있습니다. 손을 쓰지 않고 작업해야 할 때 유용합니다.
 - **여러 기기 지원:** iOS, Android, 데스크톱, 웹, CLI를 지원합니다. 데스크톱에서 시작해 휴대폰으로 확인하고 터미널에서 자동화할 수 있습니다.
 - **개인정보 보호 설정:** 지원되는 앱 프로덕션 빌드에서는 선택적 사용 분석이 기본으로 활성화됩니다. 설정 → 일반 → 개인정보 보호에서 끌 수 있습니다. [분석 범위 및 설정](docs/product-analytics.md)을 참고하세요.
+
+## 스폰서
+
+Clisbot 후원 안내를 준비 중입니다. 준비가 완료되면 이곳에 업데이트하겠습니다.
+
+<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
 ## 컨셉
 
@@ -183,11 +189,9 @@ npm run build:server
 npm run typecheck
 ```
 
-## 스폰서
+## Clisbot 후원하기
 
-Clisbot 후원 안내를 준비 중입니다. 준비가 완료되면 이곳에 업데이트하겠습니다.
-
-<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
+Clisbot는 한 사람이 개발하며, 사용하는 분들의 후원으로 운영됩니다. [GitHub Sponsors](https://github.com/sponsors/boudra)로 후원할 수 있습니다. 회사는 매월 [Clisbot를 후원](https://clisbot.com/sponsor#spot)하고 로고를 이 README 상단과 clisbot.com 홈페이지 및 문서에 게재할 수 있습니다.
 
 ## 출처 및 기여
 

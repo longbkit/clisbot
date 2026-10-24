@@ -1,3 +1,4 @@
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { useClisbot, useRpc } from "@clisbot/plugin/client";
 import { defineRpc } from "@clisbot/plugin";
 import type { ClisbotApi } from "@clisbot/client";
@@ -21,6 +22,8 @@ function installation(invoked: string[]): InstalledPlugin {
     serverId: "host",
     clientBundle: "",
     lifetime: new AbortController(),
+    locale: "en",
+    i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
     clisbot: { dispose: async () => undefined } as ClisbotApi,
     invoke: async (method) => {
       invoked.push(method);
@@ -32,6 +35,7 @@ function installation(invoked: string[]): InstalledPlugin {
     surfaces: [],
     sidebarItems: { header: [], footer: [] },
     legacySidebarItems: [],
+    filePanels: [],
     workspacePanels: [],
     commandCenterItems: [],
     clientSlashCommands: [],

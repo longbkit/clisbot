@@ -37,6 +37,7 @@ export const DevicePairingOfferSchema = z.object({
   v: z.literal(3),
   serverId: z.string().min(1).max(128),
   daemonPublicKeyB64: z.string().min(1).max(128),
+  minimumSecurityMode: z.literal("protected").optional(),
   managedAccessMode: z.enum(["off", "external"]).optional(),
   direct: EndpointSchema.optional(),
   relay: EndpointSchema.optional(),

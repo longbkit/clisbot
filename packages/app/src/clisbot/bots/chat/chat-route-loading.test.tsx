@@ -57,7 +57,7 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ serverId: "host", chatId: "chat" }),
 }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => true }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => true }));
 vi.mock("@/components/headers/menu-header", () => ({
   MenuHeader: () => <button type="button">Back</button>,
 }));

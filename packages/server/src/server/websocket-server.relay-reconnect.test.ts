@@ -1,3 +1,4 @@
+import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import { SessionDelivery } from "./session/owned-subscriptions/index.js";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Server as HTTPServer } from "http";
@@ -19,6 +20,7 @@ import {
   encodeTerminalStreamFrame,
   TerminalStreamOpcode,
 } from "@clisbot/protocol/terminal-stream-protocol";
+import { encodeHostRouteFrame } from "@clisbot/protocol/binary-frames/index";
 import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { MANAGED_ACCESS_REBIND_CLOSE_CODE } from "@clisbot/protocol/managed-access";
 import { APPLICATION_SOCKET_LEASE_MS } from "./websocket/physical-socket.js";
@@ -80,7 +82,27 @@ const sessionMock = vi.hoisted(() => {
     getPermissions = vi.fn(() => this.args.permissions as string[]);
     canUseQuickChat = vi.fn(() => true);
     canStartLocalHub = vi.fn(() => false);
-    allowsInbound = vi.fn(() => true);
+    canUseConnectedHosts = vi.fn(
+      () =>
+        (this.args.resourceAuthorization as { resourceMode?: string } | undefined)?.resourceMode !==
+          "projects" && (this.args.permissions as string[]).includes("tunnel.manage"),
+    );
+    setPermissions = (permissions: string[]) => {
+      this.args.permissions = permissions;
+    };
+    private routed = false;
+    setRouted = (routed: boolean) => {
+      this.routed = routed;
+    };
+    isRouted = () => this.routed;
+    setHostSource = (sourceId: string) => {
+      this.args.sourceId = sourceId;
+    };
+    getHostSourceId = () => this.args.sourceId as string;
+    allowsInbound = vi.fn(
+      (message: { type: string }) =>
+        !message.type.startsWith("hosts.") || this.canUseConnectedHosts(),
+    );
     allowsPermission = vi.fn(() => true);
     extendManagedLease = vi.fn(() => true);
     replaceManagedAdmission = vi.fn((admission: { permissions: unknown }) => {
@@ -158,6 +180,17 @@ function parseSentEnvelope(data: unknown): z.infer<typeof WireEnvelopeSchema> {
 
 function sentEnvelopes(socket: MockSocket): z.infer<typeof WireEnvelopeSchema>[] {
   return socket.sent.filter((data) => typeof data === "string").map(parseSentEnvelope);
+}
+
+function sentHostLinkRouteId(socket: MockSocket): string | undefined {
+  const response = sentEnvelopes(socket).find(
+    (frame) => frame.message?.type === "hosts.link.open.response",
+  )?.message?.payload as { routeId?: string } | undefined;
+  return response?.routeId;
+}
+
+function hasSentHostRouteClosed(socket: MockSocket): boolean {
+  return sentEnvelopes(socket).some((frame) => frame.message?.type === "hosts.route.closed");
 }
 
 function rpcErrorPayload(socket: MockSocket): unknown {
@@ -324,6 +357,7 @@ function createServer(options?: {
       ...(options?.managedAccess === undefined ? {} : { managedAccess: options.managedAccess }),
     },
     createWorkspaceAutoNameStub(),
+    createWorkspaceRuntimeStore(),
     options?.auth,
     speechReadiness
       ? {
@@ -542,6 +576,54 @@ function holdSessionCleanup(session: (typeof sessionMock.instances)[number]): {
 }
 
 describe("relay external socket reconnect behavior", () => {
+  test("host-link fastpaths refuse denied origins and close channels before accepting late binary traffic", async () => {
+    const server = createServer();
+    const socket = new MockSocket();
+    try {
+      await attachRelayAndHello({ server, socket, clientId: "host-authority" });
+      const session = sessionMock.instances[0]!;
+      session.canUseConnectedHosts.mockReturnValue(false);
+      socket.emit(
+        "message",
+        JSON.stringify({
+          type: "session",
+          message: {
+            type: "hosts.link.open.request",
+            requestId: "denied-link",
+            channelId: "denied",
+          },
+        }),
+      );
+      await vi.waitFor(() =>
+        expect(rpcErrorPayload(socket)).toMatchObject({
+          requestId: "denied-link",
+          code: "permission_denied",
+        }),
+      );
+      session.canUseConnectedHosts.mockReturnValue(true);
+      socket.emit(
+        "message",
+        JSON.stringify({
+          type: "session",
+          message: { type: "hosts.link.open.request", requestId: "owner-link", channelId: "owner" },
+        }),
+      );
+      let routeId = "";
+      await vi.waitFor(() => {
+        const responseRouteId = sentHostLinkRouteId(socket);
+        expect(responseRouteId).toEqual(expect.any(String));
+        routeId = responseRouteId!;
+      });
+      session.canUseConnectedHosts.mockReturnValue(false);
+      socket.emit("message", Buffer.from(encodeHostRouteFrame(routeId, new Uint8Array([1, 2, 3]))));
+      await vi.waitFor(() => expect(hasSentHostRouteClosed(socket)).toBe(true));
+      expect(session.handleBinaryFrame).not.toHaveBeenCalled();
+      expect(sessionMock.instances).toHaveLength(1);
+    } finally {
+      await server.close();
+    }
+  });
+
   test("closes only a hello socket when post-admission setup throws", async () => {
     const server = createServer();
     class ThrowOnceSocket extends MockSocket {
@@ -591,7 +673,7 @@ describe("relay external socket reconnect behavior", () => {
       await server.close();
     }
   });
-  test("admits a hello password and an old relay hello, but rejects a wrong password", async () => {
+  test("admits a relay hello password, but rejects a wrong or missing password", async () => {
     const server = createServer({
       auth: {
         password: "$2b$12$OLxyuuP9uLK30Uzc4wQX0O6liuU/Q1t5P2b0Ebf36mULvpVK3DRZW",
@@ -613,7 +695,8 @@ describe("relay external socket reconnect behavior", () => {
       const legacySocket = new MockSocket();
       await server.attachExternalSocket(legacySocket, { transport: "relay" });
       legacySocket.emit("message", JSON.stringify(createHelloMessage("relay-legacy")));
-      await vi.waitFor(() => expect(sentServerInfoEnvelopes(legacySocket)).toHaveLength(1));
+      await vi.waitFor(() => expect(legacySocket.readyState).toBe(3));
+      expect(sentServerInfoEnvelopes(legacySocket)).toHaveLength(0);
 
       const wrongSocket = new MockSocket();
       await server.attachExternalSocket(wrongSocket, { transport: "relay" });
@@ -1962,6 +2045,7 @@ describe("relay external socket reconnect behavior", () => {
     expect(serverInfo.features?.stableProjectIdentity).toBe(true);
     expect(serverInfo.features?.canonicalSubmittedPrompts).toBe(true);
     expect(serverInfo.features?.providersSnapshotCwd).toBe(true);
+    expect(serverInfo.features?.hopliteProvider).toBe(false);
     expect(serverInfo.features?.pluginLogs).toBe(true);
     expect(serverInfo.features?.workspaceMarkUnread).toBe(true);
     expect(serverInfo.features?.["terminal-input-mode-replay"]).toBe(true);

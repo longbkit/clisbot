@@ -369,7 +369,7 @@ test("replaces upstream sponsorship with placeholders and uses the Clisbot commu
   assert.match(readme, /alternative to Grok Bot, Muse, or Dots/);
   assert.match(readme, /\*\*Freedom to choose:\*\*/);
   assert.match(readme, /40\+ agent options/);
-  assert.match(readme, /38 ACP catalog presets including Grok/);
+  assert.match(readme, /39 ACP catalog presets including Grok/);
   assert.match(readme, /Pi, Antigravity, and Muse Code are built in/);
   assert.match(readme, /Sponsorship options for Clisbot are being set up/);
   assert.match(readme, /## Concept\n/);
@@ -411,7 +411,9 @@ test("keeps the README provider count aligned with the ACP catalog", () => {
     "utf8",
   );
   const ids = [...catalog.matchAll(/^    id: "([^"]+)",/gm)].map((match) => match[1]);
-  assert.equal(ids.length, 38);
+  assert.equal(ids.length, 39);
+  const readme = readFileSync(join(dirname(script), "../README.md"), "utf8");
+  assert.match(readme, new RegExp(`explore ${ids.length} ACP catalog presets`));
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(ids.includes("grok"));
   assert.ok(!ids.includes("antigravity"));
@@ -492,6 +494,13 @@ test("keeps Clisbot publication identity and archives upstream endorsements idem
     "packages/website/posts/hello-world.md",
     '---\ntitle: "Hello World"\n---\nWelcome to the Paseo blog.\n',
   );
+  for (const name of ["hello-world.zh-CN.md", "i-was-wrong-about-electron.zh-CN.md"]) {
+    put(
+      root,
+      `packages/website/posts/${name}`,
+      '---\ntitle: "Paseo 中文文章"\n---\nPaseo 原作者的文章。\n',
+    );
+  }
   put(
     root,
     "packages/website/src/components/landing-page.tsx",
@@ -534,6 +543,14 @@ test("keeps Clisbot publication identity and archives upstream endorsements idem
   );
   assert.match(archived, /Mo Boudra about Paseo/);
   assert.match(archived, /Welcome to the Paseo blog/);
+  for (const name of ["hello-world.zh-CN.md", "i-was-wrong-about-electron.zh-CN.md"]) {
+    const translated = readFileSync(join(root, "packages/website/posts/upstream", name), "utf8");
+    assert.match(translated, /Mo Boudra about Paseo/);
+    assert.match(translated, /Paseo 原作者的文章/);
+    assert.throws(() => readFileSync(join(root, "packages/website/posts", name)), {
+      code: "ENOENT",
+    });
+  }
 });
 
 test("stops on unfamiliar testimonial markup before applying any rename", () => {

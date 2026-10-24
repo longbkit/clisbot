@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Platform, StatusBar, type GestureResponderEvent } from "react-native";
+import type { GestureResponderEvent } from "react-native";
 import * as Haptics from "expo-haptics";
 import { isWeb as platformIsWeb } from "@/constants/platform";
 import { decideLongPressMove } from "@/utils/sidebar-gesture-arbitration";
@@ -7,7 +7,7 @@ import type { useContextMenu } from "@/components/ui/context-menu";
 import { traceInstant } from "@/performance/native-trace";
 
 export function useLongPressDragInteraction(input: {
-  drag: () => void;
+  drag?: () => void;
   menuController: ReturnType<typeof useContextMenu> | null;
   traceKey?: string;
 }) {
@@ -50,10 +50,9 @@ export function useLongPressDragInteraction(input: {
     if (!menuController || !touchStartRef.current) {
       return;
     }
-    const statusBarHeight = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0;
     menuController.setAnchorRect({
       x: touchStartRef.current.x,
-      y: touchStartRef.current.y + statusBarHeight,
+      y: touchStartRef.current.y,
       width: 0,
       height: 0,
     });
@@ -75,7 +74,7 @@ export function useLongPressDragInteraction(input: {
 
   const armTimers = useCallback(() => {
     clearTimers();
-    if (platformIsWeb) {
+    if (platformIsWeb || !drag) {
       return;
     }
 

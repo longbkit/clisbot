@@ -1,33 +1,35 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
-import { useToastHost, type ToastApi } from "./toast-host";
-let api: ToastApi;
-function Probe() {
-  const host = useToastHost();
-  api = host.api;
-  return <div>{host.toast?.content}</div>;
-}
-afterEach(cleanup);
-test("dismissing an owned error cannot remove a newer unrelated toast", () => {
-  render(<Probe />);
-  let pairingId: number | void;
-  act(() => {
-    pairingId = api.show("Pairing failed", { durationMs: null });
+
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { useToastHost } from "./toast-host";
+
+describe("useToastHost", () => {
+  it("dismisses the toast that show returned the dismiss for", () => {
+    const { result } = renderHook(() => useToastHost());
+
+    let dismiss = () => {};
+    act(() => {
+      dismiss = result.current.api.show("Uploading image…", { durationMs: null });
+    });
+    expect(result.current.toast?.content).toBe("Uploading image…");
+
+    act(() => dismiss());
+    expect(result.current.toast).toBeNull();
   });
-  act(() => {
-    api.show("Saved another setting");
+
+  it("leaves a newer toast in place when an older one is dismissed", () => {
+    const { result } = renderHook(() => useToastHost());
+
+    let dismissUploading = () => {};
+    act(() => {
+      dismissUploading = result.current.api.show("Uploading image…", { durationMs: null });
+    });
+    act(() => {
+      result.current.api.show("Image uploaded", { variant: "success" });
+    });
+
+    act(() => dismissUploading());
+    expect(result.current.toast?.content).toBe("Image uploaded");
   });
-  act(() => {
-    if (typeof pairingId === "number") api.dismiss?.(pairingId);
-  });
-  expect(screen.getByText("Saved another setting")).toBeTruthy();
-  let currentId: number | void;
-  act(() => {
-    currentId = api.show("Pairing failed", { durationMs: null });
-  });
-  act(() => {
-    if (typeof currentId === "number") api.dismiss?.(currentId);
-  });
-  expect(screen.queryByText("Pairing failed")).toBeNull();
 });

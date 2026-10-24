@@ -1290,3 +1290,33 @@ describe("provider usage access", () => {
     ).resolves.toBe(false);
   });
 });
+
+it("a Project grant never delegates the daemon's saved-host credentials", async () => {
+  const authorizer = createHarness([
+    "project.use",
+    "workspace.create",
+    "agent.interact",
+    "agent.create",
+  ]);
+  for (const message of [
+    { type: "hosts.list.request", requestId: "list" },
+    { type: "hosts.add.request", requestId: "add", input: { connection: "127.0.0.1:6767" } },
+    {
+      type: "hosts.update.request",
+      requestId: "update",
+      registrationId: "saved-private",
+      patch: { enabled: true },
+    },
+    { type: "hosts.remove.request", requestId: "remove", registrationId: "saved-private" },
+    {
+      type: "hosts.route.open.request",
+      requestId: "open",
+      serverId: "private-b",
+      scopeId: "scope",
+    },
+    { type: "hosts.link.open.request", requestId: "link", channelId: "scope" },
+    { type: "hosts.route.frame.request", routeId: "route", data: "{}", binary: false },
+    { type: "hosts.route.close.request", routeId: "route" },
+  ] as const)
+    expect(await authorizer.allowsInbound(message)).toBe(false);
+});

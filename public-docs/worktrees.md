@@ -40,6 +40,8 @@ With a custom root, Clisbot keeps the same hashed layout under that directory:
 3. Review the diff against the base branch
 4. Merge or archive the workspace; after the last workspace using it is archived, Clisbot runs teardown and removes the worktree
 
+Scheduled runs archive their workspaces when they finish by default. Turn off **Archive on finish** in the schedule's app form to [keep run workspaces](/docs/schedules#keep-run-workspaces) and their worktrees until you archive them.
+
 ## Create a worktree-backed workspace
 
 From a Hub channel, [`/workspace new`](/docs/hub/channels/commands#create-the-workspace-before-starting-an-agent) creates a worktree Workspace; [`/worktree`](/docs/hub/channels/commands#inspect-git-and-refresh-branches) inspects Git without selecting or creating one.

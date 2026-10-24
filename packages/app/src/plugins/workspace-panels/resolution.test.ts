@@ -1,3 +1,4 @@
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import type { InstalledPlugin } from "../types";
@@ -9,6 +10,8 @@ function installed(): InstalledPlugin {
     serverId: "host-1",
     clientBundle: "bundle",
     lifetime: new AbortController(),
+    locale: "en",
+    i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
     queryClient: new QueryClient(),
     clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
@@ -17,6 +20,7 @@ function installed(): InstalledPlugin {
     surfaces: [],
     sidebarItems: { header: [], footer: [] },
     legacySidebarItems: [],
+    filePanels: [],
     workspacePanels: [
       {
         id: "details",

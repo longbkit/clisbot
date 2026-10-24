@@ -19,7 +19,6 @@ import {
   Platform,
   Modal,
   Pressable,
-  StatusBar,
   View,
   type PressableProps,
   type StyleProp,
@@ -42,10 +41,12 @@ interface Rect {
   height: number;
 }
 
+type TooltipTriggerElement = View | HTMLElement;
+
 interface TooltipContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
-  triggerRef: React.RefObject<View | null>;
+  triggerRef: React.RefObject<TooltipTriggerElement | null>;
   enabled: boolean;
   openOnPress: boolean;
   delayDuration: number;
@@ -121,12 +122,19 @@ function useControllableOpenState({
   return [value, setValue];
 }
 
-function measureElement(element: View): Promise<Rect> {
-  return new Promise((resolve) => {
-    element.measureInWindow((x, y, width, height) => {
-      resolve({ x, y, width, height });
+function measureElement(element: TooltipTriggerElement): Promise<Rect> {
+  if (isWeb && element instanceof HTMLElement) {
+    const { x, y, width, height } = element.getBoundingClientRect();
+    return Promise.resolve({ x, y, width, height });
+  }
+  if ("measureInWindow" in element) {
+    return new Promise((resolve) => {
+      element.measureInWindow((x, y, width, height) => {
+        resolve({ x, y, width, height });
+      });
     });
-  });
+  }
+  throw new Error("A DOM tooltip trigger requires the web platform");
 }
 
 function resolveActualSide(args: {
@@ -241,7 +249,7 @@ export function Tooltip({
   enabledOnDesktop?: boolean;
   enabledOnMobile?: boolean;
 }>): ReactElement {
-  const triggerRef = useRef<View>(null);
+  const triggerRef = useRef<TooltipTriggerElement>(null);
   const [isOpen, setIsOpen] = useControllableOpenState({
     open,
     defaultOpen,
@@ -283,6 +291,12 @@ export function TooltipTrigger({
   triggerRefProp?: string;
 }): ReactElement {
   const ctx = useTooltipContext("TooltipTrigger");
+  const setTriggerRef = useCallback(
+    (node: View | null) => {
+      ctx.triggerRef.current = node;
+    },
+    [ctx.triggerRef],
+  );
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearOpenTimer = useCallback(() => {
@@ -417,7 +431,7 @@ export function TooltipTrigger({
     };
 
     const existingRefProp = Reflect.get(rawProps, triggerRefProp);
-    mergedProps[triggerRefProp] = (node: View) => {
+    mergedProps[triggerRefProp] = (node: TooltipTriggerElement) => {
       if (isCallable(existingRefProp)) {
         existingRefProp(node);
       } else if (existingRefProp && typeof existingRefProp === "object") {
@@ -430,7 +444,7 @@ export function TooltipTrigger({
   }
 
   return (
-    <Pressable {...triggerProps} ref={ctx.triggerRef} collapsable={false}>
+    <Pressable {...triggerProps} ref={setTriggerRef} collapsable={false}>
       {children}
     </Pressable>
   );
@@ -465,11 +479,10 @@ export function TooltipContent({
       return () => {};
     }
 
-    const statusBarHeight = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0;
     let cancelled = false;
 
     void measureElement(ctx.triggerRef.current).then((rect) => {
-      if (!cancelled) setTriggerRect({ ...rect, y: rect.y + statusBarHeight });
+      if (!cancelled) setTriggerRect(rect);
       return undefined;
     });
 

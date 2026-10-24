@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useIsFocused, useNavigation, useRoute } from "expo-router/react-navigation";
 import { StyleSheet, View } from "react-native";
-import {
-  useGlobalSearchParams,
-  useLocalSearchParams,
-  usePathname,
-  useRootNavigationState,
-} from "expo-router";
+import { useLocalSearchParams, usePathname } from "expo-router";
 import { useChatListPresentedLeaf } from "@/clisbot/home/use-chat-list-navigation";
 import { nativePerformanceTrace, traceInstant } from "@/performance/native-trace";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
@@ -18,7 +13,7 @@ import {
 import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { WorkspaceScreen } from "@/screens/workspace/workspace-screen";
-import { useWorkspaceLayoutStoreHydrated } from "@/stores/workspace-layout-store";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import {
   areRetainedWorkspaceSelectionListsEqual,
   areWorkspaceSelectionsEqual,
@@ -41,7 +36,7 @@ import {
   replaceBrowserRouteWithCanonicalHostWorkspaceRoute,
   stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit,
 } from "@/utils/host-route-browser";
-import { prepareWorkspaceTab } from "@/utils/workspace-navigation";
+import { prepareWorkspaceTab } from "@/utils/prepare-workspace-tab";
 import { isNative, isWeb } from "@/constants/platform";
 import { RenderProfile } from "@/utils/render-profiler";
 
@@ -72,6 +67,8 @@ function getOpenIntentTarget(openIntent: WorkspaceOpenIntent): WorkspaceTabTarge
   return { kind: "draft", draftId: openIntent.draftId };
 }
 
+// COMPAT(workspace-open-url): added in v0.12.0, remove after 2027-01-22.
+// Bookmarks and older clients still send ?open=; internal navigation uses pending model state.
 function stripOpenSearchParamFromBrowserUrl() {
   if (!isWeb || typeof window === "undefined") {
     return;
@@ -89,7 +86,9 @@ function clearConsumedOpenIntent(input: {
 }) {
   input.navigation.setParams({ open: undefined });
   if (isWeb) {
-    stripOpenSearchParamFromBrowserUrl();
+    // Expo commits the incoming browser URL after setParams. Strip the consumed legacy input
+    // after that commit so it cannot be restored into the address bar and replayed on reload.
+    window.setTimeout(stripOpenSearchParamFromBrowserUrl, 0);
   }
 }
 
@@ -103,15 +102,9 @@ export default function HostWorkspaceIndexRoute() {
 
 function HostWorkspaceRouteContent() {
   const navigation = useNavigation();
-  const rootNavigationState = useRootNavigationState();
-  const hasHydratedWorkspaceLayoutStore = useWorkspaceLayoutStoreHydrated();
-  const consumedIntentRef = useRef<string | null>(null);
-  const [intentConsumed, setIntentConsumed] = useState(false);
   const params = useLocalSearchParams<{
     serverId?: string | string[];
     workspaceId?: string | string[];
-  }>();
-  const globalParams = useGlobalSearchParams<{
     open?: string | string[];
   }>();
   const serverId = getParamValue(params.serverId);
@@ -119,14 +112,7 @@ function HostWorkspaceRouteContent() {
   const workspaceId = workspaceValue
     ? (decodeWorkspaceIdFromPathSegment(workspaceValue) ?? "")
     : "";
-  const openValue = getParamValue(globalParams.open);
-  const hasHydratedWorkspaces = useHasHydratedWorkspaces(serverId);
-  const workspaceExists = useWorkspaceExists(serverId, workspaceId);
-  const openIntent = useMemo(() => parseWorkspaceOpenIntent(openValue), [openValue]);
-  const isAgentOpenIntent = openIntent?.kind === "agent";
-  const isOpenIntentWaitingForWorkspace = Boolean(
-    isAgentOpenIntent && (!hasHydratedWorkspaces || !workspaceExists),
-  );
+  const openValue = getParamValue(params.open);
   useEffect(() => {
     if (!serverId || !workspaceId) {
       return;
@@ -134,74 +120,31 @@ function HostWorkspaceRouteContent() {
     stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit();
   }, [serverId, workspaceId]);
 
-  useEffect(() => {
-    if (!openValue) {
-      return;
-    }
-    if (!rootNavigationState?.key) {
-      return;
-    }
-    if (!hasHydratedWorkspaceLayoutStore) {
-      return;
-    }
-    if (isOpenIntentWaitingForWorkspace) {
-      return;
-    }
-
-    const consumptionKey = `${serverId}:${workspaceId}:${openValue}`;
-    if (consumedIntentRef.current === consumptionKey) {
-      clearConsumedOpenIntent({
-        navigation: navigation as unknown as {
-          setParams: (params: { open?: string | undefined }) => void;
-        },
-      });
-      setIntentConsumed(true);
-      return;
-    }
-    consumedIntentRef.current = consumptionKey;
-
+  useLayoutEffect(() => {
+    if (!openValue || !serverId || !workspaceId) return;
+    const openIntent = parseWorkspaceOpenIntent(openValue);
     if (openIntent) {
-      prepareWorkspaceTab({
-        serverId,
-        workspaceId,
-        target: getOpenIntentTarget(openIntent),
-        pin: openIntent.kind === "agent",
-      });
+      prepareWorkspaceTab(
+        {
+          serverId,
+          workspaceId,
+          target: getOpenIntentTarget(openIntent),
+          pin: openIntent.kind === "agent",
+        },
+        { openTab: useWorkspaceLayoutStore.getState().deferOpenTab },
+      );
     }
-
-    // Expo Router's replace ignores query-param-only changes (findDivergentState
-    // skips search params). Strip ?open from the browser URL directly so the
-    // address bar reflects the clean workspace route.
     clearConsumedOpenIntent({
       navigation: navigation as unknown as {
         setParams: (params: { open?: string | undefined }) => void;
       },
     });
+  }, [navigation, openValue, serverId, workspaceId]);
 
-    setIntentConsumed(true);
-  }, [
-    hasHydratedWorkspaceLayoutStore,
-    isOpenIntentWaitingForWorkspace,
-    navigation,
-    openIntent,
-    openValue,
-    rootNavigationState?.key,
-    serverId,
-    workspaceId,
-  ]);
-
-  if (
-    openValue &&
-    !isOpenIntentWaitingForWorkspace &&
-    (!intentConsumed || !hasHydratedWorkspaceLayoutStore)
-  ) {
-    return null;
-  }
-
-  return <WorkspaceDeck recoveryRequested={isAgentOpenIntent} />;
+  return <WorkspaceDeck />;
 }
 
-function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
+function WorkspaceDeck() {
   const parsedSelection = useActiveWorkspaceSelection();
   const pathname = usePathname();
   const route = useRoute();
@@ -312,7 +255,6 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
               key={getWorkspaceSelectionKey(selection)}
               selection={selection}
               active={active}
-              recoveryRequested={recoveryRequested}
               onUnmountInactive={unmountWorkspaceSelection}
             />
           );
@@ -325,12 +267,10 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
 function WorkspaceDeckEntry({
   selection,
   active,
-  recoveryRequested,
   onUnmountInactive,
 }: {
   selection: ActiveWorkspaceSelection;
   active: boolean;
-  recoveryRequested: boolean;
   onUnmountInactive: (selection: ActiveWorkspaceSelection) => void;
 }) {
   const hasHydratedWorkspaces = useHasHydratedWorkspaces(selection.serverId);
@@ -360,7 +300,6 @@ function WorkspaceDeckEntry({
         serverId={selection.serverId}
         workspaceId={selection.workspaceId}
         isRouteFocused={active}
-        recoveryRequested={active && recoveryRequested}
       />
     </RetainedPanel>
   );

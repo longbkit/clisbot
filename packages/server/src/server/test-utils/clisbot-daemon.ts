@@ -36,6 +36,7 @@ interface TestClisbotDaemonOptions {
   relayEndpoint?: string;
   relayUseTls?: boolean;
   relayPublicUseTls?: boolean;
+  relayRequireProtectedSecurity?: boolean;
   daemonStatusRpcCapability?: boolean;
   relayConfigCapability?: boolean;
   agentClients?: Partial<Record<AgentProvider, AgentClient>>;
@@ -210,6 +211,7 @@ async function prepareTestDaemonConfig(
     relayEndpoint: options.relayEndpoint ?? DEFAULT_RELAY_ENDPOINT,
     relayUseTls: options.relayUseTls,
     relayPublicUseTls: options.relayPublicUseTls,
+    relayRequireProtectedSecurity: options.relayRequireProtectedSecurity,
     appBaseUrl: "https://app.clisbot.com",
     auth: options.auth,
     devicePairingEnabled: options.devicePairingEnabled,

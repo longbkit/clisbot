@@ -26,7 +26,7 @@ export function SponsorSection() {
   );
 }
 
-export function SponsorsSection() {
+export function SponsorsSection({ placement: _placement }: { placement?: "page" | "footer" } = {}) {
   if (HOMEPAGE_SPONSORS.length === 0) return null;
   return (
     <section>

@@ -6,7 +6,7 @@ import {
   TextInput,
   copyText,
   useToast,
-} from "@clisbot/plugin/client/react-native";
+} from "@clisbot/plugin/client/ui";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Pressable,

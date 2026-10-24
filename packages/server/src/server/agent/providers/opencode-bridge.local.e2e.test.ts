@@ -13,6 +13,14 @@ import {
   getRealProviderRuntimeSettings,
 } from "../../daemon-e2e/real-provider-test-config.js";
 import type { ClisbotToolCatalog } from "../tools/types.js";
+import { AgentManager } from "../agent-manager.js";
+import { AgentStorage } from "../agent-storage.js";
+import { ProviderSnapshotManager } from "../provider-snapshot-manager.js";
+import {
+  createClisbotAgentToolManifest,
+  createClisbotToolCatalog,
+} from "../tools/clisbot-tools.js";
+import { serializeClisbotToolInputParameters } from "../tools/clisbot-tool-serialization.js";
 import { OpenCodeAgentClient } from "./opencode-agent.js";
 import { OpenCodeV2AgentClient } from "./opencode/v2/agent.js";
 import { OpenCodeBridge } from "./opencode/bridge.js";
@@ -22,6 +30,61 @@ import {
   readAssistantText,
   requireSessionId,
 } from "./opencode/test-utils/v2-local-e2e-helpers.js";
+
+test("real OpenCode server advertises agent-scoped notification descriptions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-manifest-real-"));
+  const logger = createTestLogger();
+  const providerSnapshotManager = new ProviderSnapshotManager({ logger });
+  const dependencies = {
+    agentManager: new AgentManager({ logger }),
+    agentStorage: new AgentStorage(path.join(root, "agents"), logger),
+    providerSnapshotManager,
+    logger,
+  };
+  const bridge = new OpenCodeBridge({ clisbotHome: root, logger });
+  bridge.setManifestCatalog(createClisbotAgentToolManifest(dependencies));
+  const manager = new OpenCodeServerManager({
+    logger,
+    resolveHomeDir: () => root,
+    runtimeSettings: {
+      env: {
+        XDG_CONFIG_HOME: path.join(root, "config"),
+        XDG_DATA_HOME: path.join(root, "data"),
+        XDG_CACHE_HOME: path.join(root, "cache"),
+        OPENCODE_DISABLE_AUTO_UPDATE: "1",
+      },
+    },
+    decorateServerEnv: (env) => bridge.decorateServerEnv(env),
+  });
+  let inspection: Awaited<ReturnType<OpenCodeServerManager["acquireCurrent"]>> | undefined;
+  try {
+    await bridge.start();
+    inspection = await manager.acquireCurrent();
+    const sdk = createOpencodeClient({ baseUrl: inspection.server.url, directory: root });
+    const response = await sdk.tool.list({ directory: root, provider: "openai", model: "gpt-5.4" });
+    expect(response.error).toBeUndefined();
+    const agentCatalog = createClisbotToolCatalog({ ...dependencies, callerAgentId: "caller" });
+    for (const name of ["create_agent", "send_agent_prompt"]) {
+      const actual = response.data!.find((tool) => tool.id === `clisbot_${name}`)!;
+      expect(actual).toBeDefined();
+      const expected = serializeClisbotToolInputParameters(agentCatalog.getTool(name)!);
+      expect(actual.parameters).toMatchObject({
+        properties: {
+          notifyOnFinish: {
+            description: (expected.properties as Record<string, { description: string }>)
+              .notifyOnFinish.description,
+          },
+        },
+      });
+    }
+  } finally {
+    await inspection?.release();
+    await manager.shutdown();
+    await bridge.close();
+    await providerSnapshotManager.shutdown();
+    await rm(root, { recursive: true, force: true });
+  }
+}, 120_000);
 
 test("real OpenCode server persists provider permissions across creation and resume", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-permissions-"));

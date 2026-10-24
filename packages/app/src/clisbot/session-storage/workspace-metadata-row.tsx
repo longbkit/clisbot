@@ -164,7 +164,7 @@ export function WorkspaceMetadataRow({ workspace }: { workspace: SidebarWorkspac
     <SessionMetadataLine
       serverId={workspace.serverId}
       metadata={workspace}
-      createdAt={workspace.createdAt}
+      createdAt={workspace.createdAt?.toISOString()}
       visible={visible}
       channelsLabel="Workspace channels"
     />

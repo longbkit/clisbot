@@ -1,4 +1,8 @@
 import { hubOnlyPairingTarget } from "@/device-access/pairing-target";
+import { watchdog } from "@/watchdog";
+import { createHostChannelTransport } from "@clisbot/client/internal/hosts";
+import type { OwnedSubscription } from "@clisbot/client";
+import type { HostDirectory } from "@clisbot/protocol/hosts";
 import { useSyncExternalStore, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { persistHostRegistry, type ProviderCacheStorage } from "@/storage/provider-cache-pressure";
@@ -14,6 +18,7 @@ import {
   connectionFromListen,
   createRemoteSshHostConnection,
   normalizeStoredHostProfile,
+  pinRelayProtectedSecurityInProfiles,
   upsertHostConnectionInProfiles,
   hostHasConnection,
   registryHasConnection,
@@ -28,7 +33,11 @@ import {
   parseDevicePairingOfferFromUrl,
   type DevicePairingOffer,
 } from "@clisbot/protocol/device-pairing-offer";
-import { devicePairedHost, offerConnections } from "@/device-access/host-profile";
+import {
+  devicePairedHost,
+  devicePairingFromOffer,
+  offerConnections,
+} from "@/device-access/host-profile";
 import { pairDaemon } from "@/device-access/pair-daemon";
 import { pairHub } from "@/device-access/hub-transport";
 import { i18n } from "@/i18n/i18next";
@@ -113,7 +122,7 @@ import {
   type ViewedTimelineOwnerPorts,
 } from "@/timeline/viewed-timeline-sync";
 import { projectIconCache } from "@/projects/icon-cache";
-import { nativePerformanceTrace } from "@/performance/native-trace";
+import { createPerformanceTrace } from "@/performance/native-trace";
 import { revokePushNotifications } from "@/push-notifications";
 import { createAppWebSocketFactory } from "./websocket-factory";
 import { selectReceiveCodec } from "./encrypted-receive";
@@ -153,6 +162,7 @@ export type ConnectionLinkImport =
   | { status: "cancelled" };
 
 export type ActiveConnection =
+  | { type: "routed"; endpoint: string; display: string }
   | { type: "directTcp"; endpoint: string; display: string }
   | { type: "directSocket"; endpoint: string; display: "socket" }
   | { type: "directPipe"; endpoint: string; display: "pipe" }
@@ -276,12 +286,10 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function hashForLog(value: string): string {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) | 0;
-  }
-  return `h_${Math.abs(hash).toString(16)}`;
+/** A daemon identity that negotiated protected relay security. */
+export interface RelaySecurityPin {
+  serverId: string;
+  daemonPublicKeyB64: string;
 }
 
 export interface HostRuntimeControllerDeps {
@@ -333,6 +341,12 @@ const ADAPTIVE_SWITCH_CONSECUTIVE_PROBES = 3;
 const CONFIGURED_OVERRIDE_BOOTSTRAP_RETRY_MS = 1_000;
 
 function toActiveConnection(connection: HostConnection): ActiveConnection {
+  if (connection.type === "routed")
+    return {
+      type: "routed",
+      endpoint: connection.originServerId,
+      display: `via ${connection.originServerId}`,
+    };
   if (connection.type === "directSocket") {
     return {
       type: "directSocket",
@@ -595,6 +609,29 @@ function buildConnectionCandidates(host: HostProfile): ConnectionCandidate[] {
   }));
 }
 
+/**
+ * A pin learned from the active client is already enforced by that client, so
+ * it keeps running. A pin that arrived from elsewhere (a strict offer) while
+ * the active client is still legacy needs a client that enforces it.
+ */
+function connectionNeedsNewClient(
+  previous: HostConnection,
+  next: HostConnection,
+  activeClient: DaemonClient | null,
+): boolean {
+  if (previous.type === "relay" && next.type === "relay") {
+    const { minimumSecurityMode: previousPin, ...previousRest } = previous;
+    const { minimumSecurityMode: nextPin, ...nextRest } = next;
+    if (!equal(previousRest, nextRest)) return true;
+    return (
+      nextPin === "protected" &&
+      previousPin !== "protected" &&
+      activeClient?.relaySecurityFloor !== "protected"
+    );
+  }
+  return !equal(previous, next);
+}
+
 function findConnectionById(host: HostProfile, connectionId: string | null): HostConnection | null {
   if (!connectionId) {
     return null;
@@ -621,8 +658,20 @@ function probeIntervalForConnection(
   return PROBE_MAX_BACKOFF_MS;
 }
 
+function relayEncryptionForHost(
+  connection: Extract<HostConnection, { type: "relay" }>,
+  devicePairing: HostProfile["devicePairing"],
+): DaemonClientConfig["e2ee"] {
+  return {
+    enabled: true,
+    daemonPublicKeyB64: connection.daemonPublicKeyB64,
+    minimumMode: connection.minimumSecurityMode ?? devicePairing?.minimumSecurityMode,
+  };
+}
+
 function createDefaultDeps(
   onManagedHostRevoked: (management: HubHostManagement) => void = () => undefined,
+  resolveOrigin: (serverId: string) => DaemonClient | null = () => null,
 ): HostRuntimeControllerDeps {
   const browserHostAvailable =
     typeof getDesktopHost()?.browser?.executeAutomationCommand === "function";
@@ -654,7 +703,11 @@ function createDefaultDeps(
                   throw error;
                 }
               },
-              e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
+              e2ee: {
+                enabled: true,
+                daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64,
+                minimumMode: host.devicePairing.minimumSecurityMode,
+              },
             }
           : {}),
         suppressSendErrors: true,
@@ -663,7 +716,7 @@ function createDefaultDeps(
         appVersion: resolveAppVersion() ?? undefined,
         runtimeGeneration,
         capabilities: appCapabilities,
-        trace: nativePerformanceTrace,
+        trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
         // Admission is resolved per hello, not per client: Hub binding
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
@@ -693,6 +746,15 @@ function createDefaultDeps(
         ...(host.password ? { password: host.password } : {}),
         localCredential: () => readDesktopManagedLocalCredential(connection),
       } satisfies Omit<DaemonClientConfig, "url">;
+      if (connection.type === "routed") {
+        const origin = resolveOrigin(connection.originServerId);
+        if (!origin) throw new Error(`Origin host ${connection.originServerId} is unavailable`);
+        return new DaemonClient({
+          ...base,
+          url: "ws://routed-host/ws",
+          transportFactory: createHostChannelTransport(origin, host.serverId, clientId, null),
+        });
+      }
       if (connection.type === "directSocket" || connection.type === "directPipe") {
         return new DaemonClient({
           ...base,
@@ -735,18 +797,43 @@ function createDefaultDeps(
           useTls: connection.useTls ?? shouldUseTlsForDefaultHostedRelay(connection.relayEndpoint),
           serverId: host.serverId,
         }),
-        e2ee: {
-          enabled: true,
-          daemonPublicKeyB64: connection.daemonPublicKeyB64,
-        },
+        e2ee: relayEncryptionForHost(connection, host.devicePairing),
       });
     },
-    connectToDaemon: ({ host, connection, timeoutMs }) =>
-      connectToDaemon(connection, {
+    connectToDaemon: async ({ host, connection, timeoutMs }) => {
+      if (connection.type === "routed") {
+        const origin = resolveOrigin(connection.originServerId);
+        if (!origin?.isConnected)
+          throw new Error(`Origin host ${connection.originServerId} is unavailable`);
+        const client = new DaemonClient({
+          url: "ws://routed-host/ws",
+          clientId: crypto.randomUUID(),
+          transportFactory: createHostChannelTransport(
+            origin,
+            host.serverId,
+            crypto.randomUUID(),
+            null,
+          ),
+          reconnect: { enabled: false },
+          appVersion: resolveAppVersion() ?? undefined,
+        });
+        try {
+          await client.connect();
+          return { client, serverId: host.serverId, hostname: null };
+        } catch (error) {
+          await client.close();
+          throw error;
+        }
+      }
+      return connectToDaemon(connection, {
         ...(host.devicePairing
           ? {
               resolveDeviceAccess: () => resolveHostDeviceAccess(host, connection),
-              e2ee: { enabled: true, daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64 },
+              e2ee: {
+                enabled: true,
+                daemonPublicKeyB64: host.devicePairing.daemonPublicKeyB64,
+                minimumMode: host.devicePairing.minimumSecurityMode,
+              },
             }
           : {}),
         ...(host.serverId ? { serverId: host.serverId } : {}),
@@ -754,8 +841,9 @@ function createDefaultDeps(
         localCredential: () => readDesktopManagedLocalCredential(connection),
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         capabilities: appCapabilities,
-        trace: nativePerformanceTrace,
-      }),
+        trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
+      });
+    },
     getClientId: () => getOrCreateClientId(),
     mountClientHandlers: ({ client, host }) => {
       const unmountServerData = mountServerDataPushRouter({
@@ -781,6 +869,7 @@ export class HostRuntimeController {
   private host: HostProfile;
   private deps: HostRuntimeControllerDeps;
   private onReconcileServerId: ((oldId: string, newId: string) => void) | null;
+  private onRelayProtectedSecurityNegotiated: ((input: RelaySecurityPin) => void) | null;
   private connectionMachineState: HostRuntimeConnectionMachineState;
   private connectionEpoch = 0;
   private snapshot: HostRuntimeSnapshot;
@@ -795,7 +884,6 @@ export class HostRuntimeController {
   private switchCandidateConnectionId: string | null = null;
   private switchCandidateHitCount = 0;
   private clientIdPromise: Promise<string> | null = null;
-  private clientIdHash: string | null = null;
   private switchRequestVersion = 0;
   private probeRequestVersion = 0;
   private probeCycleInFlight: Promise<void> | null = null;
@@ -810,10 +898,12 @@ export class HostRuntimeController {
     host: HostProfile;
     deps?: HostRuntimeControllerDeps;
     onReconcileServerId?: (oldId: string, newId: string) => void;
+    onRelayProtectedSecurityNegotiated?: (input: RelaySecurityPin) => void;
   }) {
     this.host = input.host;
     this.deps = input.deps ?? createDefaultDeps();
     this.onReconcileServerId = input.onReconcileServerId ?? null;
+    this.onRelayProtectedSecurityNegotiated = input.onRelayProtectedSecurityNegotiated ?? null;
     this.connectionMachineState = {
       tag: "booting",
     };
@@ -947,6 +1037,10 @@ export class HostRuntimeController {
       this.updateSnapshot({ authFailureReason: null });
     }
     const preferredChanged = this.host.preferredConnectionId !== host.preferredConnectionId;
+    const deviceSecurityFloorRaised =
+      this.host.devicePairing?.minimumSecurityMode !== "protected" &&
+      host.devicePairing?.minimumSecurityMode === "protected" &&
+      this.activeClient?.relaySecurityFloor !== "protected";
     const activeConnectionId = this.snapshot.activeConnectionId;
     const previousActiveConnection = findConnectionById(this.host, activeConnectionId);
     this.host = host;
@@ -956,8 +1050,13 @@ export class HostRuntimeController {
       activeConnectionId &&
       previousActiveConnection &&
       (!nextActiveConnection ||
-        !equal(previousActiveConnection, nextActiveConnection) ||
+        connectionNeedsNewClient(
+          previousActiveConnection,
+          nextActiveConnection,
+          this.activeClient,
+        ) ||
         passwordChanged ||
+        deviceSecurityFloorRaised ||
         (preferredChanged && this.snapshot.connectionStatus !== "online"))
     ) {
       this.switchRequestVersion += 1;
@@ -1330,6 +1429,14 @@ export class HostRuntimeController {
             shouldCloseClient = shouldCloseClient && !activated;
 
             if (activeClient) {
+              if (activeClient.getConnectionState().status !== "connected") {
+                probeByConnectionId.set(connection.id, {
+                  status: "unavailable",
+                  latencyMs: null,
+                });
+                publishProbeState();
+                return;
+              }
               const rttMs = activeClient.getLastLivenessRttMs();
               if (!this.isCurrentProbeRequest(requestVersion)) {
                 return;
@@ -1487,12 +1594,18 @@ export class HostRuntimeController {
     });
   }
 
-  private logConnectionTransition(_input: {
+  private logConnectionTransition(input: {
     from: HostRuntimeConnectionMachineState["tag"];
     to: HostRuntimeConnectionMachineState["tag"];
     event: HostRuntimeConnectionMachineEvent;
   }): void {
-    // Intentionally empty - logging removed.
+    watchdog?.record("host.transition", {
+      host: this.host.serverId,
+      from: input.from,
+      to: input.to,
+      event: input.event.type,
+      epoch: String(this.connectionEpoch),
+    });
   }
 
   private trackConnectionFirstSeen(): void {
@@ -1710,6 +1823,7 @@ export class HostRuntimeController {
           void failConnection(new DaemonAuthenticationError(client.authFailureReason));
           return;
         }
+        if (state.status === "connected") this.learnRelaySecurity(client, connection.id);
         this.applyConnectionEvent({ type: "client_state", state, lastError: client.lastError });
         this.updateSnapshot({
           ...toSnapshotConnectionPatch(this.connectionMachineState, this.connectionEpoch),
@@ -1723,6 +1837,27 @@ export class HostRuntimeController {
     }
   }
 
+  // The active client is the one place every connection path meets: clients
+  // created here and probe clients adopted from `connectToDaemon` both land in
+  // `switchToConnection`. A protected handshake observed here becomes the
+  // persisted pin for that daemon identity.
+  private learnRelaySecurity(client: DaemonClient, connectionId: string): void {
+    const connection = findConnectionById(this.host, connectionId);
+    if (!connection || client.relaySecurityFloor !== "protected") return;
+    const pairing = this.host.devicePairing;
+    const daemonPublicKeyB64 =
+      connection.type === "relay" ? connection.daemonPublicKeyB64 : pairing?.daemonPublicKeyB64;
+    if (!daemonPublicKeyB64) return;
+    const routePinned =
+      connection.type !== "relay" || connection.minimumSecurityMode === "protected";
+    const identityPinned = !pairing || pairing.minimumSecurityMode === "protected";
+    if (routePinned && identityPinned) return;
+    this.onRelayProtectedSecurityNegotiated?.({
+      serverId: this.host.serverId,
+      daemonPublicKeyB64,
+    });
+  }
+
   adoptReconciledServerId(newServerId: string): void {
     this.host = { ...this.host, serverId: newServerId };
     this.snapshot = { ...this.snapshot, serverId: newServerId };
@@ -1733,10 +1868,7 @@ export class HostRuntimeController {
 
   private resolveClientId(): Promise<string> {
     if (!this.clientIdPromise) {
-      this.clientIdPromise = this.deps.getClientId().then((value) => {
-        this.clientIdHash = hashForLog(value);
-        return value;
-      });
+      this.clientIdPromise = this.deps.getClientId();
     }
     return this.clientIdPromise;
   }
@@ -1832,6 +1964,11 @@ interface AgentDirectoryRefreshInput {
 
 export class HostRuntimeStore {
   private controllers = new Map<string, HostRuntimeController>();
+  private hostObservations = new Map<
+    string,
+    { client: DaemonClient; observation: OwnedSubscription<HostDirectory>; unsubscribe: () => void }
+  >();
+  private fleetDirectoryDemand = new Map<string, () => void>();
   private serverListeners = new Map<string, Set<() => void>>();
   private globalListeners = new Set<() => void>();
   private hostListListeners = new Set<() => void>();
@@ -1864,9 +2001,12 @@ export class HostRuntimeStore {
   }) {
     this.deps =
       input?.deps ??
-      createDefaultDeps((management) => {
-        void this.removeManagedHost(management, "access revoked by the Host or Hub");
-      });
+      createDefaultDeps(
+        (management) => {
+          void this.removeManagedHost(management, "access revoked by the Host or Hub");
+        },
+        (serverId) => this.getClient(serverId),
+      );
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
@@ -2291,39 +2431,6 @@ export class HostRuntimeStore {
     });
   }
 
-  private async upsertRelayConnection(input: {
-    serverId: string;
-    relayEndpoint: string;
-    useTls?: boolean;
-    daemonPublicKeyB64: string;
-    label?: string;
-    password?: string;
-  }): Promise<HostProfile> {
-    const relayEndpoint = normalizeHostPort(input.relayEndpoint);
-    const useTls = input.useTls ?? false;
-    const daemonPublicKeyB64 = input.daemonPublicKeyB64.trim();
-    if (!daemonPublicKeyB64) {
-      throw new Error("daemonPublicKeyB64 is required");
-    }
-    const explicitUseTls = input.useTls !== undefined;
-    const profile = await this.upsertHostConnection({
-      serverId: input.serverId,
-      label: input.label,
-      connection: {
-        id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
-        type: "relay",
-        relayEndpoint,
-        ...(explicitUseTls ? { useTls } : {}),
-        daemonPublicKeyB64,
-      },
-    });
-    if (input.password) {
-      await this.setHostPassword(profile.serverId, input.password);
-      return this.hosts.find((host) => host.serverId === profile.serverId) ?? profile;
-    }
-    return profile;
-  }
-
   // A pairing link (a URL, a QR code, or a pasted link) asks the user to
   // confirm when it adds a new host or changes a saved host's key, relay, or
   // TLS setting. The answer needs the saved hosts, so it waits for them to load.
@@ -2418,14 +2525,19 @@ export class HostRuntimeStore {
   ): Promise<HostProfile> {
     if (offer.v === 5) throw new Error(PROTECTED_HOST_LINK_ERROR);
     const connection = relayConnectionFromOffer(offer);
-    return this.upsertRelayConnection({
+    if (!connection.daemonPublicKeyB64) {
+      throw new Error("daemonPublicKeyB64 is required");
+    }
+    const profile = await this.upsertHostConnection({
       serverId: offer.serverId,
-      relayEndpoint: connection.relayEndpoint,
-      useTls: connection.useTls,
-      daemonPublicKeyB64: connection.daemonPublicKeyB64,
       label,
-      password,
+      connection,
     });
+    if (password) {
+      await this.setHostPassword(profile.serverId, password);
+      return this.hosts.find((host) => host.serverId === profile.serverId) ?? profile;
+    }
+    return profile;
   }
 
   async upsertManagedConnectionFromOffer(input: {
@@ -2434,16 +2546,7 @@ export class HostRuntimeStore {
     label?: string;
   }): Promise<HostProfile | null> {
     if (input.offer.v === 5) return this.upsertDeviceManagedConnection(input);
-    const useTls =
-      input.offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(input.offer.relay.endpoint);
-    const relayEndpoint = normalizeHostPort(input.offer.relay.endpoint);
-    const relayConnection: HostConnection = {
-      id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
-      type: "relay",
-      relayEndpoint,
-      useTls,
-      daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
-    };
+    const relayConnection = relayConnectionFromOffer(input.offer);
     const directConnection: HostConnection | null = input.offer.direct
       ? {
           id: `direct:${input.offer.direct.endpoint}`,
@@ -2501,7 +2604,11 @@ export class HostRuntimeStore {
           (existing.management && !sameHubManagement(existing.management, input.management)))
       )
         return null;
-      const connections = offerConnections(input.offer);
+      const devicePairing = devicePairingFromOffer(input.offer, existing);
+      const connections = offerConnections({
+        ...input.offer,
+        minimumSecurityMode: devicePairing.minimumSecurityMode,
+      });
       const now = new Date().toISOString();
       const management = withManualConnections(input.management, existing);
       const profile: HostProfile = {
@@ -2511,10 +2618,7 @@ export class HostRuntimeStore {
         lifecycle: {},
         createdAt: now,
         ...existing,
-        devicePairing: {
-          backendId: input.offer.serverId,
-          daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
-        },
+        devicePairing,
         management,
         connections: [
           ...connections,
@@ -2628,6 +2732,13 @@ export class HostRuntimeStore {
       this.setHostsAndSync(next);
       return profile;
     });
+  }
+
+  private async pinRelayProtectedSecurity(input: RelaySecurityPin): Promise<void> {
+    const next = pinRelayProtectedSecurityInProfiles({ profiles: this.hosts, ...input });
+    if (next === this.hosts) return;
+    this.setHostsAndSync(next);
+    await this.persistHosts();
   }
 
   private async updateHost(
@@ -2861,6 +2972,11 @@ export class HostRuntimeStore {
       if (nextIds.has(serverId)) {
         continue;
       }
+      this.hostObservations.get(serverId)?.unsubscribe();
+      void this.hostObservations.get(serverId)?.observation.release();
+      this.hostObservations.delete(serverId);
+      this.fleetDirectoryDemand.get(serverId)?.();
+      this.fleetDirectoryDemand.delete(serverId);
       this.controllers.delete(serverId);
       this.lastConnectionStatusByServer.delete(serverId);
       this.connectionStatusStartedAtByServer.delete(serverId);
@@ -2888,6 +3004,7 @@ export class HostRuntimeStore {
         host,
         deps: this.deps,
         onReconcileServerId: (oldId, newId) => this.reconcileServerId(oldId, newId),
+        onRelayProtectedSecurityNegotiated: (pin) => void this.pinRelayProtectedSecurity(pin),
       });
       this.controllers.set(host.serverId, controller);
       useSessionStore.getState().initializeSession(host.serverId, null);
@@ -2920,6 +3037,7 @@ export class HostRuntimeStore {
         const snapshot = controller.getSnapshot();
         this.syncSessionReplica(snapshot.serverId, snapshot);
         this.syncDirectoryConnection(snapshot.serverId);
+        this.syncHostDiscovery(snapshot.serverId);
         this.emit(snapshot.serverId);
       });
       void controller
@@ -2936,6 +3054,56 @@ export class HostRuntimeStore {
         });
       this.emit(host.serverId);
     }
+  }
+
+  private syncHostDiscovery(serverId: string): void {
+    const client = this.getClient(serverId);
+    const previous = this.hostObservations.get(serverId);
+    if (previous?.client === client) return;
+    previous?.unsubscribe();
+    void previous?.observation.release();
+    this.hostObservations.delete(serverId);
+    const host = this.hosts.find((candidate) => candidate.serverId === serverId);
+    if (
+      !client?.isConnected ||
+      !client.getLastServerInfoMessage()?.features?.connectedHosts ||
+      host?.connections.some((connection) => connection.type === "routed")
+    )
+      return;
+    const observation = client.observeHosts();
+    const apply = (directory: HostDirectory) => {
+      if (this.hostObservations.get(serverId)?.client !== client) return;
+      for (const target of directory.hosts) {
+        if (!target.serverId || target.serverId === serverId) continue;
+        const next = upsertHostConnectionInProfiles({
+          profiles: this.hosts,
+          serverId: target.serverId,
+          label: target.label ?? undefined,
+          connection: {
+            id: `via:${serverId}`,
+            type: "routed",
+            originServerId: serverId,
+          },
+        });
+        if (next !== this.hosts) {
+          this.setHostsAndSync(next);
+          void this.persistHosts();
+        }
+        if (!this.fleetDirectoryDemand.has(target.serverId))
+          this.fleetDirectoryDemand.set(
+            target.serverId,
+            this.acquireDirectoryDemand(target.serverId),
+          );
+      }
+    };
+    const unsubscribe = observation.subscribe({
+      snapshot: apply,
+      update: (message) => {
+        if (message.type === "hosts.changed") apply(message.payload.directory);
+      },
+    });
+    this.hostObservations.set(serverId, { client, observation, unsubscribe });
+    void observation.ready.then(apply).catch(() => undefined);
   }
 
   private syncSessionReplica(serverId: string, snapshot: HostRuntimeSnapshot): void {
@@ -3221,6 +3389,14 @@ export class HostRuntimeStore {
     const source = {};
     directory.setDemand(source, true);
     return () => directory.setDemand(source, false);
+  }
+
+  acquireScriptStatusDemand(serverId: string, workspaceId: string): () => void {
+    const directory = this.directorySyncByServer.get(serverId);
+    if (!directory) return () => undefined;
+    const source = {};
+    directory.setScriptStatusDemand(source, workspaceId);
+    return () => directory.setScriptStatusDemand(source, null);
   }
 
   async prepareAgentRoute(serverId: string, agentId: string): Promise<void> {

@@ -746,6 +746,9 @@ export class ManagedResourceAuthorizer {
 
   async allowsInbound(message: SessionInboundMessage): Promise<boolean> {
     if (!this.isRestricted()) return true;
+    // Connected-host credentials belong to the daemon. Coarse permissions do not
+    // delegate a Project-scoped caller's destination actor, grants, or lease.
+    if (message.type.startsWith("hosts.")) return false;
     await this.ready();
 
     // Caller provenance and workspace inheritance may read another agent before
@@ -788,6 +791,10 @@ export class ManagedResourceAuthorizer {
     const workspace = await this.allowsWorkspaceInbound(message);
     if (workspace !== undefined) return workspace;
 
+    return this.allowsReferencedResources(message);
+  }
+
+  private async allowsReferencedResources(message: SessionInboundMessage): Promise<boolean> {
     // The shared overlap map returns the product privilege for known agent
     // interaction ops; anything else falls back to plain project.use. Agent
     // creation and terminal ops never reach here — earlier branches settle them.

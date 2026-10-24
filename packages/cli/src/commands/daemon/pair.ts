@@ -132,6 +132,7 @@ export async function resolveLocalPairingOffer(options: {
     relayPublicEndpoint: config.relayPublicEndpoint,
     relayUseTls: config.relayUseTls,
     relayPublicUseTls: config.relayPublicUseTls,
+    relayRequireProtectedSecurity: config.relayRequireProtectedSecurity,
     appBaseUrl: config.appBaseUrl,
     includeQr: true,
     devicePairingEnabled: config.devicePairingEnabled,

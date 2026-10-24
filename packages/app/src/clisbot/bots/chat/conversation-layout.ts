@@ -37,7 +37,6 @@ export function openConversationFile(input: {
   return openWorkspaceTargetAtLocation({
     workspaceKey: input.layoutKey,
     target,
-    isCompact: input.compact,
     location: "side",
   });
 }

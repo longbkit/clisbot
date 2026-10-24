@@ -10,6 +10,7 @@ const withAndroidScroll = require("./modules/clisbot-scroll/app.plugin");
 const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
+const isWatchdogBuild = process.env.CLISBOT_WATCHDOG_BUILD === "1";
 const isProfileBuild = process.env.CLISBOT_PROFILE_BUILD === "1";
 const {
   isSyntheticReactProfileBuild,
@@ -214,7 +215,10 @@ export default {
       [
         "expo-build-properties",
         {
-          ...(firebaseConfigured ? { ios: { useFrameworks: "static" } } : {}),
+          ios: {
+            enableSceneSupport: true,
+            ...(firebaseConfigured ? { useFrameworks: "static" } : {}),
+          },
           android: {
             minSdkVersion: 29,
             kotlinVersion: "2.1.20",
@@ -230,7 +234,7 @@ export default {
             ["@react-native-firebase/analytics", { ios: { withoutAdIdSupport: true } }],
           ]
         : []),
-      ...(isProfileBuild ? [withAndroidProfileable] : []),
+      ...(isProfileBuild || isWatchdogBuild ? [withAndroidProfileable] : []),
     ],
     experiments: {
       typedRoutes: true,
@@ -246,6 +250,9 @@ export default {
         nativeConfigured: firebaseConfigured,
       },
       ...(clisbotHubOrigin === undefined ? {} : { clisbotHub: { origin: clisbotHubOrigin } }),
+      watchdogBuild: isWatchdogBuild,
+      diagnosticRevision: process.env.CLISBOT_DIAGNOSTIC_REVISION,
+      diagnosticBuildTime: process.env.CLISBOT_DIAGNOSTIC_BUILD_TIME,
       router: {},
       eas: {
         projectId: "9314cc2c-4abe-4637-b1cf-647fbbfbd807",

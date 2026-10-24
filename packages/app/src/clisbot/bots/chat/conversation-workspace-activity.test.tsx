@@ -3,7 +3,7 @@ import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ focused: true }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => state.focused }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => state.focused }));
 vi.mock("react-native", () => ({
   View: "div",
   StyleSheet: { create: (value: unknown) => value },

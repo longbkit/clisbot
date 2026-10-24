@@ -2,14 +2,30 @@ import { expect, test } from "../support/fixtures";
 import { openCommandCenter } from "../support/helpers/command-center";
 import {
   delayDirectorySuggestionResponses,
+  holdDirectorySuggestionResponses,
   expectOneLineTruncatedFileResult,
   expectStableCommandCenterLayout,
   failDirectorySuggestionRequests,
   startCommandCenterLayoutObservation,
 } from "../support/helpers/command-center-file-search";
+import {
+  scrollCommandCenterAwayFromSelection,
+  expectCommandCenterScrollToStayAt,
+  expectKeyboardNavigationToResume,
+} from "../support/helpers/command-center-scroll";
 import { expectFileTabOpen } from "../support/helpers/file-explorer";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
+import {
+  closeMobileAgentSidebar,
+  expectMobileAgentSidebarHidden,
+  expectMobileAgentSidebarVisible,
+  openMobileAgentSidebar,
+} from "../support/helpers/sidebar";
+import { expectAppRoute } from "../support/helpers/route-assertions";
+import { getServerId } from "../support/helpers/server-id";
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
+import type { SidebarNavPreference } from "../support/helpers/sidebar-nav-settings";
 
 const FILE_PATH =
   "packages/app/src/command-center/features/workspace-file-search/layout-stability/needle-layout-stability-command-center.tsx";
@@ -136,4 +152,152 @@ test("unscoped command search keeps commands visible and reports file-search fai
   } finally {
     await Promise.allSettled(seeded.map((workspace) => workspace.cleanup()));
   }
+});
+
+test("manual scrolling cancels a pending file-search reveal and query editing restores it", async ({
+  page,
+}) => {
+  const seeded = await seedWorkspace({
+    repoPrefix: "command-center-delayed-scroll-",
+    title: "Delayed file search scroll",
+    repo: { files: clisbotSizedFiles() },
+  });
+  try {
+    const responses = await holdDirectorySuggestionResponses(page);
+    await gotoWorkspace(page, seeded.workspaceId);
+    await page.keyboard.press("Meta+P");
+    const panel = page.getByTestId("command-center-panel");
+    await expect(panel).toBeVisible();
+    await panel.getByTestId("command-center-input").fill("index");
+    await expect(panel.getByTestId("command-center-file-search-loading")).toBeHidden();
+    await expect(
+      panel.getByRole("button", {
+        name: "index.ts packages/app/src/features/feature-000",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    responses.hold();
+    await panel.getByTestId("command-center-input").fill("index.");
+    await expect(panel.getByTestId("command-center-file-search-loading")).toBeVisible();
+    const offset = await scrollCommandCenterAwayFromSelection(page, panel);
+    await responses.release();
+    await expect(panel.getByTestId("command-center-file-search-loading")).toBeHidden();
+    await expectCommandCenterScrollToStayAt(panel, offset);
+    await expectKeyboardNavigationToResume(page, panel, offset);
+
+    const nextOffset = await scrollCommandCenterAwayFromSelection(page, panel);
+    await panel.getByTestId("command-center-input").fill("index.ts");
+    await expect(panel.getByTestId("command-center-file-search-loading")).toBeHidden();
+    await expect
+      .poll(() => panel.getByTestId("command-center-results").evaluate((el) => el.scrollTop))
+      .toBeLessThan(nextOffset);
+    await expect(
+      panel.getByRole("button", {
+        name: "index.ts packages/app/src/features/feature-000",
+        exact: true,
+      }),
+    ).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+P");
+    await expect(panel.getByTestId("command-center-input")).toHaveValue("");
+    await panel.getByTestId("command-center-input").fill("index");
+    await expect(
+      panel.getByRole("button", {
+        name: "index.ts packages/app/src/features/feature-000",
+        exact: true,
+      }),
+    ).toBeInViewport({ ratio: 1 });
+  } finally {
+    await seeded.cleanup();
+  }
+});
+
+test.describe("Compact file search context", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test("compact file search keeps its source and sheet across navigation modes", async ({
+    page,
+  }) => {
+    const seeded = await seedWorkspace({
+      repoPrefix: "compact-search-file-",
+      title: "Compact file lookup",
+      repo: { files: [{ path: "lookup.ts", content: "export const lookup = true;\n" }] },
+    });
+    try {
+      // Pin the ordinary Search-in-navigation preference used by upstream's legacy
+      // sidebar-retention contract. Footer Search deliberately closes the legacy drawer.
+      // These are the same persisted fields as the owning sidebar preference seed helpers.
+      const sidebarNavItems: SidebarNavPreference[] = [{ key: "search", visible: true }];
+      const sidebarFooterItems: SidebarNavPreference[] = [{ key: "search", visible: false }];
+      await page.addInitScript(
+        (settings) => localStorage.setItem("@clisbot:app-settings", JSON.stringify(settings)),
+        { sidebarNavItems, sidebarFooterItems },
+      );
+      const workRoute = buildHostWorkspaceRoute(getServerId(), seeded.workspaceId);
+      // Compact uses a title switcher rather than the wide tab strip awaited by gotoWorkspace.
+      await page.goto(workRoute);
+      await expectAppRoute(page, workRoute);
+      const navigationMode = await openMobileAgentSidebar(page);
+      await expectMobileAgentSidebarVisible(page);
+
+      if (navigationMode === "chat") {
+        await page
+          .getByTestId(`sidebar-workspace-row-${getServerId()}:${seeded.workspaceId}`)
+          .filter({ visible: true })
+          .click();
+        await expectAppRoute(page, workRoute);
+        await expectMobileAgentSidebarHidden(page);
+        await expect(page.getByTestId("chat-back").filter({ visible: true })).toBeVisible();
+        await page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }).click();
+        const searchFiles = page.getByTestId("workspace-header-search-files");
+        await expect(searchFiles).toHaveText("Search files");
+        await expect(searchFiles).toBeEnabled();
+        await searchFiles.click();
+        await expect(page.getByTestId("command-center-files-scope")).toHaveText("Files");
+      } else {
+        // Legacy opens the list over this same Work route. Selecting an already
+        // current workspace need not close it; use its actual navigation Search.
+        await expectMobileAgentSidebarVisible(page);
+        await expectAppRoute(page, workRoute);
+        await openCommandCenter(page);
+      }
+
+      const search = page.getByTestId("command-center-panel");
+      await expect(search).toBeVisible();
+      await expectAppRoute(page, workRoute);
+      await search.getByTestId("command-center-input").fill("lookup.ts");
+      await expect(search.getByTestId("command-center-input")).toHaveValue("lookup.ts");
+      await search.getByRole("button", { name: "lookup.ts", exact: true }).click();
+      await expect(search).not.toBeVisible();
+      await expect(page.getByTestId("sheet-tab-body")).toBeVisible();
+      await expect(page.getByTestId("sheet-tab-header")).toContainText("lookup.ts");
+      await expect(page.getByTestId("sheet-tab-body")).toContainText("export const lookup = true;");
+      await expectAppRoute(page, workRoute);
+      await page
+        .getByTestId("sheet-tab-header")
+        .getByRole("button", { name: "Close", exact: true })
+        .click();
+      await expect(page.getByTestId("sheet-tab-body")).not.toBeVisible();
+      await expectAppRoute(page, workRoute);
+
+      if (navigationMode === "chat") {
+        await expectMobileAgentSidebarHidden(page);
+        await page.getByTestId("chat-back").filter({ visible: true }).click();
+        await expect(page).toHaveURL(/\/chat$/);
+        await expectMobileAgentSidebarVisible(page);
+      } else {
+        await expectMobileAgentSidebarVisible(page);
+        await expect(page.getByRole("button", { name: "Close menu", exact: true })).toHaveAttribute(
+          "aria-expanded",
+          "true",
+        );
+        await closeMobileAgentSidebar(page);
+        await expectMobileAgentSidebarHidden(page);
+        await expectAppRoute(page, workRoute);
+        await expect(page.getByRole("button", { name: "Open menu", exact: true })).toBeVisible();
+      }
+    } finally {
+      await seeded.cleanup();
+    }
+  });
 });

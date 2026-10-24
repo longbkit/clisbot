@@ -135,7 +135,7 @@ async function createClisbotWorktreeWithPriority(
       {
         cwd: createdWorktree.repoRoot,
         worktreePath: createdWorktree.worktree.worktreePath,
-        ...(input.runSetup === false ? { teardownCwds: [] } : {}),
+        teardownCwds: [],
         clisbotHome: input.clisbotHome,
         worktreesBaseRoot: input.worktreesRoot,
       },

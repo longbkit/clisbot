@@ -144,7 +144,6 @@ describe("worktree shell selection", () => {
       await runWorktreeSetupCommands({
         worktreePath,
         branchName: "main",
-        cleanupOnFailure: false,
         runtimeEnv: {
           CLISBOT_SOURCE_CHECKOUT_PATH: worktreePath,
           CLISBOT_ROOT_PATH: worktreePath,

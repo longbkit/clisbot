@@ -9,11 +9,7 @@ import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles"
 import { X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { formatPrTabLabel, PullRequestTabIcon } from "@/git/pull-request-panel";
-import {
-  usePanelStore,
-  selectIsCompactFileExplorerOpen,
-  type ExplorerTab,
-} from "@/stores/panel-store";
+import { usePanelStore, selectIsCompactFileExplorerOpen } from "@/stores/panel-store";
 import { useCloseFileExplorerGesture } from "@/mobile-panels/gestures";
 import { useIsMobilePanelActive } from "@/mobile-panels/provider";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
@@ -27,7 +23,6 @@ import { ChangesSurface } from "@/git/diff-pane";
 import { changesStateSchema, defaultChangesState, type ChangesState } from "@/panels/changes/state";
 import { FileExplorerPane } from "./file-explorer-pane";
 import { useKeyboardShiftStyle } from "@/keyboard/shift";
-import { shouldUseCompactExplorerKeyboardPadding } from "@/keyboard/shift";
 import { WindowChromeSafeArea } from "@/utils/desktop-window";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { RetainedPanel, RetainedPanelActivity } from "@/components/retained-panel";
@@ -40,16 +35,34 @@ import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
   SIDEBAR_RESIZE_FAIL_OFFSET,
 } from "@/components/sidebar-resize-handle-layout";
-import {
-  EXPLORER_TAB_RAIL_INSET,
-  explorerSidebarCloseButtonLayout,
-  resolveExplorerSidebarWidth,
-} from "@/components/explorer-sidebar-layout";
+import { resolveExplorerSidebarWidth } from "@/components/explorer-sidebar-layout";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 
+import {
+  conversationExplorerTab,
+  useConversationExplorerTabs,
+  type ConversationExplorerTab as ExplorerTab,
+} from "@/clisbot/bots/chat/explorer-tab-store";
+import {
+  paneContentToolbarIconSize,
+  paneContentToolbarTrailingPadding,
+} from "@/components/ui/pane-content-toolbar";
+import { smallIconButtonChromeFrameSize } from "@/components/ui/icon-button-chrome";
+
 const ThemedX = withUnistyles(X);
+const EXPLORER_TAB_RAIL_INSET = 4;
+function explorerSidebarCloseButtonLayout(compact: boolean) {
+  return compact
+    ? {
+        size: smallIconButtonChromeFrameSize(compact),
+        iconSize: paneContentToolbarIconSize(compact),
+        hitSlop: 0,
+        trailingPadding: paneContentToolbarTrailingPadding(compact, "glyph"),
+      }
+    : { size: 34, iconSize: 18, hitSlop: 8, trailingPadding: 8 };
+}
 
 function logExplorerSidebar(_event: string, _details: Record<string, unknown>): void {}
 
@@ -72,13 +85,19 @@ function useExplorerSidebarSharedState({
   workspaceRoot,
   isGit,
 }: Pick<ExplorerSidebarProps, "serverId" | "workspaceRoot" | "isGit">): ExplorerSidebarSharedState {
-  const explorerTab = usePanelStore((state) => state.explorerTab);
-  const setExplorerTabForCheckout = usePanelStore((state) => state.setExplorerTabForCheckout);
+  const checkout = useMemo(
+    () => ({ serverId, cwd: workspaceRoot, isGit }),
+    [serverId, workspaceRoot, isGit],
+  );
+  const explorerTab = useConversationExplorerTabs((state) =>
+    conversationExplorerTab(state.tabs, checkout),
+  );
+  const setTab = useConversationExplorerTabs((state) => state.setTab);
   const handleTabPress = useCallback(
     (tab: ExplorerTab) => {
-      setExplorerTabForCheckout({ serverId, cwd: workspaceRoot, isGit, tab });
+      setTab(checkout, tab);
     },
-    [isGit, serverId, setExplorerTabForCheckout, workspaceRoot],
+    [checkout, setTab],
   );
 
   return { explorerTab, handleTabPress };
@@ -101,7 +120,7 @@ export function CompactExplorerSidebar({
     workspaceRoot,
     isGit,
   });
-  const usePanelKeyboardPadding = shouldUseCompactExplorerKeyboardPadding({ isGit, explorerTab });
+  const usePanelKeyboardPadding = !isGit || explorerTab !== "changes";
   const { style: mobileKeyboardInsetStyle } = useKeyboardShiftStyle({
     mode: "padding",
     enabled: usePanelKeyboardPadding,

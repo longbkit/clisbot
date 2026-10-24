@@ -215,6 +215,14 @@ export async function scrollUsage(page: Page, deltaY: number): Promise<void> {
   await page.mouse.wheel(0, deltaY);
 }
 
+/** Reach a window with the wheel even when other reports follow its card. */
+export async function scrollUsageToWindow(page: Page, label: string): Promise<void> {
+  const target = await usageModal(page).getByText(label, { exact: true }).boundingBox();
+  const viewport = page.viewportSize();
+  if (!target || !viewport) throw new Error("Usage window must exist before scrolling to it.");
+  await scrollUsage(page, target.y + target.height / 2 - viewport.height / 2);
+}
+
 /** The modal's own Close button. */
 export async function closeUsage(page: Page): Promise<void> {
   await visible(page, "usage-modal").getByRole("button", { name: "Close", exact: true }).click();
@@ -295,4 +303,11 @@ export async function refreshAllUsage(page: Page): Promise<void> {
 /** Opens the compact conversation list (the Chat tab, or the drawer without the Home tabs). */
 export async function openCompactSidebar(page: Page): Promise<void> {
   await openMobileAgentSidebar(page);
+}
+
+export async function expectCompactSidebarOpen(page: Page): Promise<void> {
+  await expect(page.getByRole("button", { name: "Close menu", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
 }

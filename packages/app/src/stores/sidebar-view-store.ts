@@ -1,3 +1,4 @@
+import type { WorkspaceSort } from "@/projects/workspace-structure";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, type StateStorage } from "zustand/middleware";
@@ -22,7 +23,7 @@ export type SidebarGroupMode =
 
 const SIDEBAR_VIEW_STORAGE_KEY = "sidebar-view";
 const LEGACY_SIDEBAR_GROUP_MODE_STORAGE_KEY = "sidebar-group-mode";
-const SIDEBAR_VIEW_STORE_VERSION = 7;
+const SIDEBAR_VIEW_STORE_VERSION = 8;
 
 /**
  * The key standing for "this workspace carries no labels at all".
@@ -81,6 +82,7 @@ export type SidebarGroupModeUsage = Partial<Record<SidebarGroupMode, number>>;
 interface SidebarViewStoreState {
   groupMode: SidebarGroupMode;
   groupModeUsage: SidebarGroupModeUsage;
+  workspaceSort: WorkspaceSort;
   showBackground: boolean;
   // Empty means "all hosts". A non-empty list pins the sidebar to those hosts.
   hostFilters: string[];
@@ -104,6 +106,7 @@ interface SidebarViewStoreState {
   clearChannelFilters: () => void;
   toggleBackground: () => void;
   setGroupMode: (mode: SidebarGroupMode) => void;
+  setWorkspaceSort: (sort: WorkspaceSort) => void;
   toggleHostFilter: (serverId: string) => void;
   pinHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
@@ -119,6 +122,7 @@ interface SidebarViewStoreState {
 interface SidebarViewPersistedState {
   groupMode: SidebarGroupMode;
   groupModeUsage?: SidebarGroupModeUsage;
+  workspaceSort: WorkspaceSort;
   showBackground: boolean;
   hostFilters: string[];
   projectFilters: string[];
@@ -140,6 +144,7 @@ const SidebarLabelFilterSchema = z.object({
   labels: z.array(z.string()),
 });
 const SidebarViewPersistedStateSchema = z.strictObject({
+  workspaceSort: z.enum(["manual", "created", "lastPrompt"]).optional(),
   showBackground: z.boolean().optional(),
   groupMode: PersistedSidebarGroupModeSchema.optional(),
   groupModeUsage: z.record(z.string(), z.number()).optional(),
@@ -184,6 +189,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
     return {
       showBackground: false,
       groupMode: "project",
+      workspaceSort: "created",
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
@@ -198,6 +204,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
     return {
       showBackground: false,
       groupMode: legacyGroupMode,
+      workspaceSort: "created",
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
@@ -210,6 +217,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
     showBackground: state.showBackground ?? false,
     // The retired `label` mode reads as project, as it always has.
     groupMode: !state.groupMode || state.groupMode === "label" ? "project" : state.groupMode,
+    workspaceSort: state.workspaceSort ?? "created",
     hostFilters: readHostFilters(state),
     projectFilters: state.projectFilters ?? [],
     userFilters: state.userFilters ?? [],
@@ -251,6 +259,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       showBackground: false,
       groupMode: "project",
       groupModeUsage: {},
+      workspaceSort: "created",
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
@@ -275,6 +284,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
             [mode]: (state.groupModeUsage[mode] ?? 0) + 1,
           },
         })),
+      setWorkspaceSort: (workspaceSort) => set({ workspaceSort }),
       toggleHostFilter: (serverId) =>
         set((state) => ({ hostFilters: toggleFilterEntry(state.hostFilters, serverId) })),
       pinHostFilter: (serverId) => set({ hostFilters: [serverId] }),
@@ -332,6 +342,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
         showBackground: state.showBackground ?? false,
         groupMode: state.groupMode,
         groupModeUsage: state.groupModeUsage,
+        workspaceSort: state.workspaceSort,
         hostFilters: state.hostFilters,
         projectFilters: state.projectFilters,
         labelFilter: state.labelFilter,

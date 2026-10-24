@@ -1,5 +1,9 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ClisbotApiProvider, PluginRpcProvider } from "@clisbot/plugin/client/host";
+import {
+  ClisbotApiProvider,
+  PluginRpcProvider,
+  PluginTranslationProvider,
+} from "@clisbot/plugin/client/host";
 import React, { type ReactNode } from "react";
 import type { InstalledPlugin } from "./types";
 
@@ -14,7 +18,9 @@ export function PluginInstallationProvider({
   return (
     <QueryClientProvider client={plugin.queryClient}>
       <ClisbotApiProvider clisbot={plugin.clisbot}>
-        <PluginRpcProvider invoke={plugin.invoke}>{children}</PluginRpcProvider>
+        <PluginRpcProvider invoke={plugin.invoke}>
+          <PluginTranslationProvider runtime={plugin.i18n}>{children}</PluginTranslationProvider>
+        </PluginRpcProvider>
       </ClisbotApiProvider>
     </QueryClientProvider>
   );

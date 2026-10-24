@@ -52,10 +52,21 @@
 <!-- clisbot:intro:end -->
 
 - **自托管：** Agents 在你的机器上运行，使用完整的本地开发环境、工具、配置和技能。
-- **自由选择 Agent：** 提供 40 多种 Agent 选项：内置 Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity 和 Muse Code 的集成，ACP 目录另有 38 个预设（包括 Grok）。为每个任务选择合适的模型。
+- **自由选择 Agent：** 提供 40 多种 Agent 选项：内置 Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity 和 Muse Code 的集成，ACP 目录另有 39 个预设（包括 Grok）。为每个任务选择合适的模型。
 - **语音控制：** 在语音模式下口述任务或讨论问题。需要免手操作时很方便。
 - **跨设备：** 支持 iOS、Android、桌面端、Web 和 CLI。在桌前开始工作，用手机查看进度，也可以从终端脚本化操作。
 - **隐私设置：** 支持的应用生产构建默认启用可选的使用情况分析。你可以在“设置 → 通用 → 隐私”中关闭。参阅[分析范围和控制选项](docs/product-analytics.md)。
+
+## 赞助商
+
+<!-- Sponsors: one cell per sponsor in the order of packages/website/src/data/sponsors.ts, then "become a sponsor" cells up to three. -->
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="https://hoplite.sh/?utm_source=clisbot&utm_medium=readme&utm_campaign=sponsor"><picture><source media="(prefers-color-scheme: dark)" srcset="packages/website/public/sponsors/hoplite-on-dark.svg"><img src="packages/website/public/sponsors/hoplite-on-light.svg" alt="Hoplite" height="40"></picture></a><br><sub>Cloud coding agents</sub></td>
+    <td align="center" width="33%"><a href="https://clisbot.com/zh-CN/sponsor">成为 Clisbot 赞助商</a></td>
+    <td align="center" width="33%"><a href="https://clisbot.com/zh-CN/sponsor">成为 Clisbot 赞助商</a></td>
+  </tr>
+</table>
 
 ## 项目理念
 
@@ -91,7 +102,7 @@ Clisbot 会运行一个名为 daemon 的本地服务，用来管理你的 coding
 
 ### 桌面 app（推荐）
 
-从 [clisbot.com/download](https://clisbot.com/download) 或 [GitHub releases 页面](https://github.com/longbkit/clisbot/releases)下载。打开 app 后 daemon 会自动启动，不需要再安装其他东西。
+从 [clisbot.com/download](https://clisbot.com/zh-CN/download) 或 [GitHub releases 页面](https://github.com/longbkit/clisbot/releases)下载。打开 app 后 daemon 会自动启动，不需要再安装其他东西。
 
 如果要从手机连接，在 Settings 中扫描显示的二维码。
 
@@ -108,8 +119,8 @@ clisbot
 
 完整安装和配置见：
 
-- [文档](https://clisbot.com/docs)
-- [配置参考](https://clisbot.com/docs/configuration)
+- [文档](https://clisbot.com/zh-CN/docs)
+- [配置参考](https://clisbot.com/zh-CN/docs/configuration)
 
 ## CLI
 
@@ -127,7 +138,7 @@ clisbot send abc123 "also add tests" # 发送后续任务
 clisbot --host workstation.local:6868 run "run the full test suite"
 ```
 
-更多内容见[完整 CLI 参考](https://clisbot.com/docs/cli)。
+更多内容见[完整 CLI 参考](https://clisbot.com/zh-CN/docs/cli)。
 
 ## Skills
 
@@ -173,11 +184,9 @@ npm run build:server
 npm run typecheck
 ```
 
-## 赞助
+## 支持 Clisbot
 
-Clisbot 的赞助方式正在准备中。设置完成后，我们会在此更新。
-
-<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
+Clisbot 由一个人开发，靠使用它的人来资助。你可以通过 [GitHub Sponsors](https://github.com/sponsors/boudra) 支持这项工作。公司也可以按月[赞助 Clisbot](https://clisbot.com/zh-CN/sponsor#spot)，logo 会展示在本 README 顶部，以及 clisbot.com 的首页和文档中。
 
 ## 自托管 relay TLS
 

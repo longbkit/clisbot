@@ -120,6 +120,35 @@ describe("DaemonConfigStore", () => {
     expect(loadPersistedConfig(clisbotHome).daemon?.relay?.enabled).toBe(true);
   });
 
+  test("patch persists the relay protected security requirement independently of relay enablement", () => {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(
+      clisbotHome,
+      {
+        relay: { enabled: true },
+        mcp: { injectIntoAgents: false },
+        browserTools: { enabled: false },
+        providers: {},
+        metadataGeneration: { providers: [] },
+        autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
+        appendSystemPrompt: "",
+      },
+      undefined,
+      // A launch override owns relay.enabled; the security requirement is still editable.
+      { relayEnabledMutable: false },
+    );
+    const changes: unknown[] = [];
+    store.onFieldChange("relay.requireProtectedSecurity", (value) => changes.push(value));
+
+    store.patch({ relay: { requireProtectedSecurity: true } });
+
+    expect(changes).toEqual([true]);
+    expect(store.get().relay).toEqual({ enabled: true, requireProtectedSecurity: true });
+    expect(loadPersistedConfig(clisbotHome).daemon?.relay?.requireProtectedSecurity).toBe(true);
+  });
+
   test("patch round-trips agent profiles through the strictly-parsed persisted config", () => {
     const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
     tempDirs.push(clisbotHome);

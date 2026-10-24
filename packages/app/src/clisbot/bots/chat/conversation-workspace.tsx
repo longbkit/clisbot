@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { RetainedPanelActivity } from "@/components/retained-panel";
 import { useIsCompactFormFactor, supportsDesktopPaneSplits } from "@/constants/layout";
 import { useConversationLayout } from "./use-conversation-layout";

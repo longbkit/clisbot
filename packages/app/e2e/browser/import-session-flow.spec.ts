@@ -12,6 +12,7 @@ import {
   type OpenedProject,
 } from "../support/helpers/new-workspace";
 import { createTempDirectory, createTempGitRepo } from "../support/helpers/workspace";
+import { expectMobileAgentSidebarHidden } from "../support/helpers/sidebar";
 
 const SCREENSHOT_DIRECTORY = path.join(
   process.env.HOME ?? tmpdir(),
@@ -182,6 +183,8 @@ test("captures the compact import-session journey", async ({ page }, testInfo) =
   await test.step("the selected row imports and opens the hydrated transcript", async () => {
     await flow.importSession(scenario.importSessionId);
     await flow.expectTranscript("Review the invoice migration", "The fixture transcript is ready.");
+    await expect(page.getByTestId("chat-back").filter({ visible: true })).toBeVisible();
+    await expectMobileAgentSidebarHidden(page);
     await capture(page, testInfo, "08-mobile-agent-after-import.png");
   });
 

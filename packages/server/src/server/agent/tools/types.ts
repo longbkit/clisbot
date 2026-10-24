@@ -1,6 +1,18 @@
 import type { z } from "zod";
 import type { ProviderClisbotToolsPolicy } from "@clisbot/protocol/provider-config";
 
+export class ClisbotToolInputError extends Error {
+  readonly status = 400;
+
+  constructor(
+    message: string,
+    readonly issues?: z.ZodError["issues"],
+  ) {
+    super(message);
+    this.name = "ClisbotToolInputError";
+  }
+}
+
 export interface ClisbotToolExecutionContext {
   signal?: AbortSignal;
   sendUpdate?: (update: ClisbotToolResult) => void;
@@ -35,7 +47,15 @@ export interface ClisbotToolCatalog {
   ): Promise<ClisbotToolResult>;
 }
 
+/** HTTP credentials cannot gain operator authority by changing a context selector. */
+export type ClisbotToolHostAuthority =
+  | "agent-capability"
+  | "password-operator"
+  | "legacy-anonymous"
+  | "trusted-operator";
+
 export interface ClisbotToolRuntimeContext {
+  hostAuthority?: ClisbotToolHostAuthority;
   callerAgentId?: string;
   clisbotToolPolicy?: ProviderClisbotToolsPolicy;
   /** Overrides the Host's "Browser tools" for this caller (its Project's choice). */

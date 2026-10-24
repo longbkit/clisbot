@@ -78,6 +78,7 @@ export interface WorkspaceDirectoryDeps {
     list(): Promise<PersistedWorkspaceRecord[]>;
   };
   listAgentPayloads(): Promise<AgentSnapshotPayload[]>;
+  workspaceLastUserMessageTimes(): Promise<ReadonlyMap<string, string>>;
   listProviderSubagentActivity(): Promise<ProviderSubagentWorkspaceActivity[]>;
   listTerminalActivityContributions(): Promise<
     Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>
@@ -219,12 +220,14 @@ export class WorkspaceDirectory {
   }): Promise<Map<string, WorkspaceDescriptorPayload>> {
     const [
       agents,
+      lastUserMessageTimes,
       providerSubagentActivity,
       persistedWorkspaces,
       persistedProjects,
       terminalContributions,
     ] = await Promise.all([
       this.deps.listAgentPayloads(),
+      this.deps.workspaceLastUserMessageTimes(),
       this.deps.listProviderSubagentActivity(),
       this.deps.workspaceRegistry.list(),
       this.deps.projectRegistry.list(),
@@ -270,6 +273,8 @@ export class WorkspaceDirectory {
           includedWorkspaces[i],
           authorshipAgentsByWorkspaceId.get(workspaceId) ?? [],
         ),
+        createdAt: includedWorkspaces[i].createdAt,
+        lastUserMessageAt: lastUserMessageTimes.get(workspaceId) ?? null,
         archivingAt: this.archivingByWorkspaceId.get(workspaceId) ?? null,
       });
     }

@@ -100,7 +100,11 @@ import {
   type PendingForegroundRun,
 } from "./agent-run-state.js";
 import { invokeRewindCapability, type RewindMode } from "./rewind/rewind.js";
-import { projectAgentMessage, prepareAgentMessage } from "./agent-messages/index.js";
+import {
+  parseAgentMessage,
+  projectAgentMessages,
+  prepareAgentMessage,
+} from "./agent-messages/index.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
 import {
   PromptNotDeliveredError,
@@ -414,6 +418,7 @@ export interface AgentManagerOptions {
   registry?: AgentStorage;
   onAgentAttention?: AgentAttentionCallback;
   onWorkspaceStateMayHaveChanged?: (params: { cwd: string }) => void;
+  timelineStore?: InMemoryAgentTimelineStore;
   durableTimelineStore?: AgentTimelineStore;
   durableTimelineReader?: AgentTimelineStore;
   agentSessionStorage?: boolean;
@@ -762,13 +767,13 @@ function buildImportedTimelineRows(
 ): AgentTimelineRow[] {
   const rows: AgentTimelineRow[] = [];
   for (const entry of entries) {
-    const item = projectAgentMessage(entry.item);
-    if (!item) continue;
-    rows.push({
-      seq: rows.length + 1,
-      timestamp: entry.timestamp ?? new Date().toISOString(),
-      item: preserveContent ? item : limitAgentTimelineItemContent(item),
-    });
+    for (const item of projectAgentMessages(entry.item)) {
+      rows.push({
+        seq: rows.length + 1,
+        timestamp: entry.timestamp ?? new Date().toISOString(),
+        item: preserveContent ? item : limitAgentTimelineItemContent(item),
+      });
+    }
   }
   return rows;
 }
@@ -864,7 +869,7 @@ export class AgentManager {
   private readonly providerEnabled = new Map<AgentProvider, boolean>();
   private readonly providerDefinitions = new Map<AgentProvider, ProviderEnabledFlag>();
   private readonly agents = new Map<string, LiveManagedAgent>();
-  private readonly timelineStore = new InMemoryAgentTimelineStore();
+  private readonly timelineStore: InMemoryAgentTimelineStore;
   private readonly timelineRetention = new TimelineRetentionBudget((agentId, seqs) =>
     this.timelineStore.discardCommittedRows(agentId, seqs),
   );
@@ -943,6 +948,7 @@ export class AgentManager {
   constructor(options: AgentManagerOptions) {
     this.serverId = options.serverId;
     this.pluginLifecycle = options.pluginLifecycle;
+    this.timelineStore = options.timelineStore ?? new InMemoryAgentTimelineStore();
     this.idFactory = options.idFactory ?? (() => randomUUID());
     this.registry = options.registry;
     this.providerSubagents = createProviderSubagentStore(options);
@@ -963,16 +969,7 @@ export class AgentManager {
     this.durableTimelineReader = options.durableTimelineReader ?? options.durableTimelineStore;
     this.sessionStorageEnabled =
       options.agentSessionStorage ?? Boolean(options.durableTimelineStore);
-    const journal = this.durableTimelineStore;
-    if (journal?.readPermissionResponse && journal.appendPermissionResponse) {
-      this.permissionResponseAdmission = new PermissionResponseAdmission({
-        readPermissionResponse: journal.readPermissionResponse.bind(journal),
-        appendPermissionResponse: async (agentId, record, identity) => {
-          await journal.appendPermissionResponse!(agentId, record, identity);
-          this.dispatch({ type: "permission_response", agentId, record });
-        },
-      });
-    }
+    this.permissionResponseAdmission = this.createPermissionResponseAdmission();
     this.onAgentAttention = options.onAgentAttention;
     this.onWorkspaceStateMayHaveChanged = options.onWorkspaceStateMayHaveChanged;
     this.mcpBaseUrl = options.mcpBaseUrl ?? null;
@@ -3146,7 +3143,12 @@ export class AgentManager {
     options?: AgentRunOptions,
   ): Promise<boolean> {
     const agent = this.requireReadySessionAgent(agentId);
-    const handler = agent.session.tryHandleOutOfBand?.(prompt);
+    // Providers parse slash commands from the raw text, so a command another agent sent
+    // must reach them without its sender envelope.
+    const agentMessage = typeof prompt === "string" ? parseAgentMessage(prompt) : null;
+    const handler = agent.session.tryHandleOutOfBand?.(
+      agentMessage?.source ? agentMessage.text : prompt,
+    );
     if (!handler) {
       return false;
     }
@@ -4217,11 +4219,9 @@ export class AgentManager {
   }
 
   async getLastAssistantMessage(agentId: string): Promise<string | null> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      return null;
+    if (!this.timelineStore.has(agentId)) {
+      return (await this.durableTimelineStore?.getLastAssistantMessage(agentId)) ?? null;
     }
-
     return await this.getLastAssistantMessageFromStores(agentId);
   }
 
@@ -4605,6 +4605,8 @@ export class AgentManager {
       this.subscribeToSession(managed);
       managed.lifecycle = "idle";
       this.emitState(managed, { persist: false });
+      await this.drainSessionEvents(managed.id);
+      this.assertAgentRegistrationActive(managed);
       return { ...managed };
     } catch (error) {
       if (!registered) {
@@ -4624,6 +4626,18 @@ export class AgentManager {
       }
       throw error;
     }
+  }
+
+  private createPermissionResponseAdmission(): PermissionResponseAdmission | undefined {
+    const journal = this.durableTimelineStore;
+    if (!journal?.readPermissionResponse || !journal.appendPermissionResponse) return undefined;
+    return new PermissionResponseAdmission({
+      readPermissionResponse: journal.readPermissionResponse.bind(journal),
+      appendPermissionResponse: async (agentId, record, identity) => {
+        await journal.appendPermissionResponse!(agentId, record, identity);
+        this.dispatch({ type: "permission_response", agentId, record });
+      },
+    });
   }
 
   private assertAcceptingAgentRegistrations(): void {
@@ -5331,9 +5345,9 @@ export class AgentManager {
     for await (const rawEvent of history) {
       const event = limitAgentStreamEventContent(rawEvent, this.preserveCanonicalContent(agent.id));
       if (event.type === "timeline") {
-        const item = projectAgentMessage(event.item);
-        if (!item) continue;
-        historyEvents.push({ ...event, item });
+        for (const item of projectAgentMessages(event.item)) {
+          historyEvents.push({ ...event, item });
+        }
       } else if (event.type === "provider_subagent") {
         providerSubagentEvents.push(event);
       }
@@ -5462,9 +5476,9 @@ export class AgentManager {
         if (event.type !== "timeline") {
           continue;
         }
-        const item = projectAgentMessage(event.item);
-        if (!item) continue;
-        historyEvents.push({ ...event, item });
+        for (const item of projectAgentMessages(event.item)) {
+          historyEvents.push({ ...event, item });
+        }
       }
     } catch (error) {
       this.logger.warn({ err: error, agentId: agent.id }, "Failed to hydrate provider history");
@@ -5796,42 +5810,32 @@ export class AgentManager {
   }): Promise<void> {
     const { agent, event, options, flags } = params;
 
-    const item = projectAgentMessage(event.item);
-    if (!item) {
-      flags.shouldDispatchEvent = false;
-      flags.shouldNotifyWaiters = false;
-      return;
-    }
-
-    event.item = item;
-    if (
-      event.item.type === "user_message" &&
-      event.item.clientMessageId &&
-      (await this.reconcileSubmittedPromptEcho(agent, event.item, event.turnId))
-    ) {
-      flags.shouldDispatchEvent = false;
-      flags.shouldNotifyWaiters = false;
-      return;
-    }
-
-    if (options?.fromHistory) {
-      this.recordTimeline(
-        agent.id,
-        event.item,
-        event.timestamp ? { timestamp: event.timestamp } : undefined,
-      );
-      flags.shouldDispatchEvent = false;
-      flags.shouldNotifyWaiters = false;
-      return;
-    }
-
-    this.recordAndDispatchTimelineItem(agent.id, event.item, event.provider, event.turnId);
-    if (event.item.type === "user_message") {
-      agent.lastUserMessageAt = new Date();
-      this.emitState(agent);
-    }
     flags.shouldDispatchEvent = false;
-    flags.shouldNotifyWaiters = true;
+    flags.shouldNotifyWaiters = false;
+    for (const item of projectAgentMessages(event.item)) {
+      if (
+        item.type === "user_message" &&
+        item.clientMessageId &&
+        (await this.reconcileSubmittedPromptEcho(agent, item, event.turnId))
+      )
+        continue;
+
+      if (options?.fromHistory) {
+        this.recordTimeline(
+          agent.id,
+          item,
+          event.timestamp ? { timestamp: event.timestamp } : undefined,
+        );
+        continue;
+      }
+
+      this.recordAndDispatchTimelineItem(agent.id, item, event.provider, event.turnId);
+      if (item.type === "user_message") {
+        agent.lastUserMessageAt = new Date();
+        this.emitState(agent);
+      }
+      flags.shouldNotifyWaiters = true;
+    }
   }
 
   private onStreamTurnCompleted(params: {
@@ -6211,7 +6215,7 @@ export class AgentManager {
 
   private projectSubmittedPromptText(prompt: AgentPromptInput): string {
     const text = submittedPromptText(prompt);
-    const item = projectAgentMessage({ type: "user_message", text });
+    const item = projectAgentMessages({ type: "user_message", text })[0];
     return item?.type === "user_message" ? item.text : text;
   }
 
@@ -6349,7 +6353,7 @@ export class AgentManager {
     },
   ): string {
     this.touchUpdatedAt(agent);
-    const item = projectAgentMessage({
+    const items = projectAgentMessages({
       type: "user_message",
       text: submittedPromptText(prompt),
       clientMessageId,
@@ -6357,10 +6361,11 @@ export class AgentManager {
       ...(options?.messageId ? { messageId: options.messageId } : {}),
     });
     const submittedAt = new Date().toISOString();
-    if (!item) return submittedAt;
-    // Human attempts stay in history on rejection; delivery notifications require acceptance.
-    if (options?.outcome === "rejected" && item.type !== "user_message") return submittedAt;
-    this.recordSubmittedPromptItem(agent, item, options);
+    for (const item of items) {
+      // Human attempts stay in history on rejection; delivery notifications require acceptance.
+      if (options?.outcome === "rejected" && item.type !== "user_message") continue;
+      this.recordSubmittedPromptItem(agent, item, options);
+    }
     return submittedAt;
   }
 
@@ -6412,10 +6417,10 @@ export class AgentManager {
         ...options.submission,
         status: "applied",
       });
-    const projected = projectAgentMessage({
+    const projected = projectAgentMessages({
       type: "user_message",
       text: submittedPromptText(prompt),
-    });
+    })[0];
     if (projected?.type === "user_message" && !(await this.refreshSessionAuthorship(agent))) {
       recordSessionInteraction(agent, {
         ...options?.identity,
@@ -6849,7 +6854,6 @@ export class AgentManager {
         this.pluginLifecycle,
         describeHookAgent({ ...agent, title: agent.config.title }),
         event,
-        this.timelineStore.getItems(agentId),
       );
     }
   }

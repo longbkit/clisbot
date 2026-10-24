@@ -49,12 +49,18 @@
 - **Built-in orchestration:** Agents in Clisbot can create worktrees, launch other agents, and talk to them, across providers.
 - **Complete development workflow:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
 - **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
-- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 38 ACP catalog presets including Grok. Pick the model for each task.
+- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 39 ACP catalog presets including Grok. Pick the model for each task.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
 - **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
 - **Privacy controls:** Supported production app builds enable optional usage analytics by default. You can turn it off in Settings → General → Privacy. See [analytics scope and controls](docs/product-analytics.md).
 
 [Run parallel tasks in Clisbot](https://clisbot.com/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
+
+## Sponsors
+
+Sponsorship options for Clisbot are being set up. Check back here when they are ready.
+
+<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
 ## Concept
 
@@ -229,11 +235,9 @@ npm run build:server
 npm run typecheck
 ```
 
-## Sponsors
+## Support Clisbot
 
-Sponsorship options for Clisbot are being set up. Check back here when they are ready.
-
-<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
+Clisbot is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Clisbot](https://clisbot.com/sponsor#spot) monthly and have their logo shown at the top of this README and on the clisbot.com homepage and docs.
 
 ## Attribution
 

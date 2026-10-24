@@ -17,7 +17,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, MessageSquare, Inbox, CalendarClock } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { isWeb } from "@/constants/platform";
+import { isWeb, isNative } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
 import type { Theme } from "@/styles/theme";
@@ -76,7 +76,6 @@ function Tab({
 }) {
   const navigate = useNavigateHomeTab();
   const router = useRouter();
-  const state = useMemo(() => ({ selected }), [selected]);
   const inboxLabel = useInboxActivityLabel();
   const open = useCallback(
     (event: GestureResponderEvent) => {
@@ -105,7 +104,7 @@ function Tab({
   return (
     <Pressable
       accessibilityRole="tab"
-      accessibilityState={state}
+      aria-selected={selected}
       accessibilityLabel={entry.path === "/sessions" ? inboxLabel : entry.name}
       style={tabStyle}
       onPress={open}
@@ -150,7 +149,7 @@ function useMobileHardwareBack(path: string, compact: boolean, departing: boolea
   const detail = isChatDetail(path);
   const tab = isHomeTabPath(path);
   useEffect(() => {
-    if (!HOME_V2_ENABLED || !compact || (!detail && !tab && !departing)) return;
+    if (!isNative || !HOME_V2_ENABLED || !compact || (!detail && !tab && !departing)) return;
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
       const panels = usePanelStore.getState();
       if (returnFromPendingChat(router, navigate)) return true;

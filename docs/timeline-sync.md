@@ -274,7 +274,8 @@ do not imply local ownership or authorization. Capture the sender title at deliv
 removed senders must remain understandable without a live directory lookup.
 
 The optional `agentMessage` payload carries event, sender, and delivered text. Shared client
-presentation (`protocol/agent-message-display`) owns its heading and expanded details. The daemon
+presentation (`protocol/clisbot-tool-presentation`) owns its heading and expanded details, next to the
+labels for every Clisbot MCP tool. The daemon
 must not construct UI labels or prepend sender labels to the semantic message body. The existing
 `tool_call` / `plain_text` envelope is a compatibility adapter: older clients still parse the row and
 expand its body. New clients use the typed payload, never infer the event from a tool name or parse

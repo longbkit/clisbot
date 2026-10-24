@@ -150,7 +150,7 @@ buildNpmPackage rec {
   meta = {
     description = "Self-hosted daemon for Claude Code, Codex, and OpenCode";
     homepage = "https://github.com/longbkit/clisbot";
-    license = lib.licenses.agpl3Plus;
+    license = lib.licenses.asl20;
     mainProgram = "clisbot";
     platforms = lib.platforms.linux ++ lib.platforms.darwin;
   };

@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   showMobileAgent: vi.fn(),
   remove: vi.fn(),
   addEventListener: vi.fn(),
-  setExplorerTabForCheckout: vi.fn(),
 }));
 vi.mock("react-native", () => ({ BackHandler: { addEventListener: mocks.addEventListener } }));
 vi.mock("@/constants/platform", () => ({
@@ -21,7 +20,6 @@ vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => mocks.compa
 vi.mock("@/stores/panel-store", () => {
   const state = {
     showMobileAgent: mocks.showMobileAgent,
-    setExplorerTabForCheckout: mocks.setExplorerTabForCheckout,
   };
   return {
     selectIsCompactFileExplorerOpen: () => mocks.open,

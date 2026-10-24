@@ -1,5 +1,13 @@
+import { Client as AgentMcpTestClient } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { HubRelationshipController } from "./hub/relationship-controller.js";
 import { resolveDaemonVersion } from "./daemon-version.js";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
+import { once } from "node:events";
+import type { ChildProcess } from "node:child_process";
+import type { Query } from "@anthropic-ai/claude-agent-sdk";
+import { ClaudeAgentClient } from "./agent/providers/claude/agent.js";
 import http from "node:http";
 import path from "node:path";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -15,6 +23,14 @@ import {
 } from "./bootstrap.js";
 import type { ProviderSnapshotEntry } from "./agent/agent-sdk-types.js";
 import { loadConfig } from "./config.js";
+import {
+  FileBackedProjectRegistry,
+  FileBackedWorkspaceRegistry,
+  createPersistedProjectRecord,
+  createPersistedWorkspaceRecord,
+} from "./workspace-registry.js";
+import { AgentStorage, type StoredAgentRecord } from "./agent/agent-storage.js";
+import { ensureAgentLoaded } from "./agent/agent-loading.js";
 import { AgentManagerShuttingDownError } from "./agent/agent-manager.js";
 import { hashDaemonPassword } from "./auth.js";
 import { generateLocalPairingOffer } from "./pairing-offer.js";
@@ -54,6 +70,28 @@ interface BlockedDaemonShutdown {
 type WebSocketProbeResult =
   | { status: "connected" }
   | { status: "rejected"; statusCode: number | null };
+
+async function callAgentMcpAuthorityTool(
+  port: number,
+  token: string | undefined,
+  callerAgentId: string | undefined,
+  name: string,
+  args: Record<string, unknown> = {},
+) {
+  const url = new URL(`http://127.0.0.1:${port}/mcp/agents`);
+  if (callerAgentId !== undefined) url.searchParams.set("callerAgentId", callerAgentId);
+  const client = new AgentMcpTestClient({ name: "credential-authority-regression", version: "1" });
+  try {
+    await client.connect(
+      new StreamableHTTPClientTransport(url, {
+        requestInit: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      }),
+    );
+    return await client.callTool({ name, arguments: args });
+  } finally {
+    await client.close();
+  }
+}
 
 describe("clisbot daemon bootstrap", () => {
   afterEach(() => {
@@ -814,6 +852,96 @@ export default function contribute(plugin: unknown) {
     }
   });
 
+  test("managed Agent MCP HTTP capability and anonymous credentials cannot become operators by omitting or forging caller selectors", async () => {
+    // Exercise real HTTP admission and catalog execution while isolating the
+    // existing enrollment predicate; no Hub, provider or saved credentials leave the fixture.
+    const tickets = vi
+      .spyOn(HubRelationshipController.prototype, "requiresTickets")
+      .mockReturnValue(true);
+    const daemonHandle = await createTestClisbotDaemon({
+      auth: { password: hashDaemonPassword("explicit-mcp-operator") },
+      createDaemon: (config, logger, dependencies) =>
+        createClisbotDaemon({ ...config, managedAccessMode: "external" }, logger, dependencies),
+    });
+    try {
+      const capability = daemonHandle.daemon.agentManager.getMcpAuthToken();
+      expect(capability).toEqual(expect.any(String));
+      for (const selector of [undefined, "forged-operator-context"]) {
+        const denied = await callAgentMcpAuthorityTool(
+          daemonHandle.port,
+          capability!,
+          selector,
+          "list_agents",
+          { serverId: "private-destination" },
+        );
+        expect(denied).toMatchObject({
+          isError: true,
+          structuredContent: { code: "permission_denied" },
+        });
+        const discovery = await callAgentMcpAuthorityTool(
+          daemonHandle.port,
+          capability!,
+          selector,
+          "list_hosts",
+        );
+        expect(discovery.isError).toBe(true);
+        expect(JSON.stringify(discovery.content)).toContain(
+          "cannot use saved destination credentials",
+        );
+      }
+      const operator = await callAgentMcpAuthorityTool(
+        daemonHandle.port,
+        "explicit-mcp-operator",
+        undefined,
+        "list_hosts",
+      );
+      expect(operator.isError).not.toBe(true);
+      expect(operator.structuredContent).toMatchObject({
+        self: { serverId: daemonHandle.daemon.getServerId() },
+        hosts: [],
+      });
+      // Same external default without a Hub ticket requirement is still personal.
+      tickets.mockReturnValue(false);
+      const personal = await callAgentMcpAuthorityTool(
+        daemonHandle.port,
+        capability!,
+        undefined,
+        "list_hosts",
+      );
+      expect(personal.isError).not.toBe(true);
+      expect(personal.structuredContent).toMatchObject({ hosts: [] });
+    } finally {
+      await daemonHandle.close();
+    }
+    tickets.mockReturnValue(true);
+    const anonymous = await createTestClisbotDaemon({
+      createDaemon: (config, logger, dependencies) =>
+        createClisbotDaemon({ ...config, managedAccessMode: "external" }, logger, dependencies),
+    });
+    try {
+      for (const selector of [undefined, "forged-operator-context"]) {
+        const denied = await callAgentMcpAuthorityTool(
+          anonymous.port,
+          undefined,
+          selector,
+          "list_agents",
+          { serverId: "private-destination" },
+        );
+        expect(denied).toMatchObject({
+          isError: true,
+          structuredContent: { code: "permission_denied" },
+        });
+      }
+      tickets.mockReturnValue(false);
+      expect(
+        (await callAgentMcpAuthorityTool(anonymous.port, undefined, undefined, "list_hosts"))
+          .isError,
+      ).not.toBe(true);
+    } finally {
+      await anonymous.close();
+    }
+  }, 30000);
+
   test("redacts Agent MCP debug request credentials and bodies", async () => {
     const logLines: string[] = [];
     const logger = pino(
@@ -1155,3 +1283,225 @@ function probeWebSocketConnection(
     });
   });
 }
+
+test("startup closes stale active records before serving status without resuming sessions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-stale-status-"));
+  const logger = pino({ level: "silent" });
+  const storagePath = path.join(root, ".clisbot", "agents");
+  const storage = new AgentStorage(storagePath, logger);
+  const timestamp = "2025-01-01T00:00:00.000Z";
+  const registryDir = path.join(root, ".clisbot", "projects");
+  await new FileBackedProjectRegistry(path.join(registryDir, "projects.json"), logger).upsert(
+    createPersistedProjectRecord({
+      projectId: "existing-project",
+      rootPath: root,
+      kind: "non_git",
+      displayName: "Existing",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
+  );
+  await new FileBackedWorkspaceRegistry(path.join(registryDir, "workspaces.json"), logger).upsert(
+    createPersistedWorkspaceRecord({
+      workspaceId: "existing-workspace",
+      projectId: "existing-project",
+      cwd: root,
+      kind: "directory",
+      displayName: "Existing",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
+  );
+  const records: StoredAgentRecord[] = ["running", "initializing", "idle", "error", "closed"].map(
+    (status, index) => ({
+      id: randomUUID(),
+      workspaceId: "existing-workspace",
+      provider: "codex",
+      cwd: root,
+      createdAt: "2025-01-01T00:00:00.000Z",
+      updatedAt: "2025-01-02T00:00:00.000Z",
+      lastActivityAt: "2025-01-02T00:00:00.000Z",
+      lastStatus: status as StoredAgentRecord["lastStatus"],
+      title: `Keep ${status}`,
+      labels: { "clisbot.parent-agent-id": "parent", custom: "keep" },
+      persistence: { provider: "codex", sessionId: `session-${index}` },
+      config: { modeId: "full-access" },
+      requiresAttention: true,
+      attentionReason: "permission",
+      attentionTimestamp: "2025-01-02T00:00:00.000Z",
+      archivedAt: index === 1 ? "2025-01-03T00:00:00.000Z" : null,
+    }),
+  );
+  for (const record of records) await storage.upsert(record);
+  let sessionsCreated = 0;
+  const handle = await createTestClisbotDaemon({
+    clisbotHomeRoot: root,
+    agentClients: createTestAgentClients({
+      beforeCreateSession: async () => {
+        sessionsCreated++;
+      },
+    }),
+  });
+  const client = new DaemonClient({ url: `ws://127.0.0.1:${handle.port}/ws` });
+  try {
+    const expected = records.map((record) => ({
+      ...record,
+      lastStatus:
+        record.lastStatus === "running" || record.lastStatus === "initializing"
+          ? "closed"
+          : record.lastStatus,
+    }));
+    expect(
+      (await handle.daemon.agentStorage.list()).sort((a, b) => a.id.localeCompare(b.id)),
+    ).toEqual(expected.sort((a, b) => a.id.localeCompare(b.id)));
+    // A fresh reader proves the repaired states were written, rather than projected only in memory.
+    expect(
+      (await new AgentStorage(storagePath, logger).list()).sort((a, b) => a.id.localeCompare(b.id)),
+    ).toEqual(expected);
+    expect(handle.daemon.agentManager.listAgents()).toEqual([]);
+    expect(sessionsCreated).toBe(0);
+    await client.connect();
+    const snapshot = await client.fetchAgents({ filter: { includeArchived: true } });
+    expect(
+      Object.fromEntries(snapshot.entries.map((entry) => [entry.agent.id, entry.agent.status])),
+    ).toEqual(Object.fromEntries(expected.map((record) => [record.id, record.lastStatus])));
+    const opened = await ensureAgentLoaded(records[0]!.id, {
+      agentManager: handle.daemon.agentManager,
+      agentStorage: handle.daemon.agentStorage,
+      logger,
+    });
+    expect(opened.id).toBe(records[0]!.id);
+    expect(opened.persistence?.sessionId).toBe("session-0");
+    expect(opened.lifecycle).toBe("idle");
+    await handle.daemon.agentManager.runAgent(opened.id, "hello");
+    expect(handle.daemon.agentManager.getAgent(opened.id)?.lifecycle).toBe("idle");
+  } finally {
+    await client.close();
+    await handle.close();
+  }
+}, 30_000);
+
+test.each(["reject", "stall"] as const)(
+  "shutdown closes Claude and its process despite a %s peer and stalled SDK handshake",
+  async (failure) => {
+    let child: ChildProcess | undefined;
+    let ready!: () => void;
+    const processReady = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    let finishStream!: () => void;
+    const streamFinished = new Promise<void>((resolve) => {
+      finishStream = resolve;
+    });
+    const never = new Promise<never>(() => {});
+    const claude = new ClaudeAgentClient({
+      logger: pino({ level: "silent" }),
+      resolveBinary: async () => process.execPath,
+      queryFactory: ({ options }) => {
+        child = options.spawnClaudeCodeProcess!({
+          command: process.execPath,
+          args: [
+            "-e",
+            "process.on('SIGTERM', () => {}); console.log('ready'); setInterval(() => {}, 1000)",
+          ],
+          cwd: process.cwd(),
+          env: process.env,
+          signal: new AbortController().signal,
+        }) as ChildProcess;
+        child.stdout!.once("data", ready);
+        let initialized = false;
+        // An injected SDK adapter leaves an active turn and both close requests unanswered.
+        return {
+          async next() {
+            if (!initialized) {
+              initialized = true;
+              return {
+                done: false,
+                value: {
+                  type: "system",
+                  subtype: "init",
+                  session_id: "shutdown-session",
+                  permissionMode: "default",
+                },
+              };
+            }
+            await streamFinished;
+            return { done: true, value: undefined };
+          },
+          interrupt: () => never,
+          return: () => never,
+          close() {},
+          async supportedModels() {
+            return [];
+          },
+          async supportedCommands() {
+            return [];
+          },
+          async setPermissionMode() {},
+          async setModel() {},
+          async applyFlagSettings() {},
+          [Symbol.asyncIterator]() {
+            return this;
+          },
+        } as Query;
+      },
+    });
+    let armed = false;
+    let peerRunning!: () => void;
+    const peerReady = new Promise<void>((resolve) => {
+      peerRunning = resolve;
+    });
+    const peers = createTestAgentClients({
+      beforeTurnComplete: async () => {
+        peerRunning();
+        await streamFinished;
+      },
+      closeSession: async () => {
+        if (!armed) return;
+        if (failure === "reject") throw new Error("peer close rejected");
+        await never;
+      },
+    });
+    const handle = await createTestClisbotDaemon({ agentClients: { claude, codex: peers.codex } });
+    let stopped = false;
+    let run: Promise<unknown> | undefined;
+    let peerRun: Promise<unknown> | undefined;
+    try {
+      const agent = await handle.daemon.agentManager.createAgent(
+        { provider: "claude", cwd: handle.clisbotHome },
+        undefined,
+        { workspaceId: undefined },
+      );
+      run = handle.daemon.agentManager.runAgent(agent.id, "keep working").catch(() => undefined);
+      await processReady;
+      expect(handle.daemon.agentManager.getAgent(agent.id)?.lifecycle).toBe("running");
+      const peer = await handle.daemon.agentManager.createAgent(
+        { provider: "codex", cwd: handle.clisbotHome, modeId: "full-access" },
+        undefined,
+        { workspaceId: undefined },
+      );
+      peerRun = handle.daemon.agentManager.runAgent(peer.id, "keep working").catch(() => undefined);
+      await peerReady;
+      armed = true;
+      await handle.daemon.stop();
+      stopped = true;
+      // Windows taskkill is forceful on the first signal; POSIX escalates after SIGTERM.
+      expect(child!.exitCode !== null || child!.signalCode !== null).toBe(true);
+      expect((await handle.daemon.agentStorage.get(agent.id))?.lastStatus).toBe("closed");
+      expect(handle.daemon.agentManager.getAgent(agent.id)).toBeNull();
+      expect((await handle.daemon.agentStorage.get(peer.id))?.lastStatus).toBe("running");
+    } finally {
+      finishStream();
+      if (child && child.exitCode === null && child.signalCode === null) {
+        const exited = once(child, "exit");
+        child.kill("SIGKILL");
+        await exited;
+      }
+      if (!stopped) await handle.daemon.stop();
+      await Promise.all([run, peerRun]);
+      await rm(path.dirname(handle.clisbotHome), { recursive: true, force: true });
+      await rm(handle.staticDir, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);

@@ -22,11 +22,15 @@ const sourceB = { serverId: "host", workspaceId: "writer" };
 const key = conversationLayoutKey("host", "group", "admission");
 const read = (layoutKey = key) => useWorkspaceLayoutStore.getState().layoutByWorkspace[layoutKey]!;
 const tabs = (layoutKey = key) => collectAllTabs(read(layoutKey).root);
-const open = (path: string, source = sourceA, compact = false, layoutKey = key) =>
-  openConversationFile({ layoutKey, source, target: { kind: "file", path }, compact });
+const open = (path: string, source = sourceA, compact = false, layoutKey = key) => {
+  useWorkspaceLayoutStore.getState().setLayoutMode(compact ? "compact" : "split-panes");
+  return openConversationFile({ layoutKey, source, target: { kind: "file", path }, compact });
+};
 beforeEach(() => {
   useWorkspaceLayoutStore.setState({
     layoutByWorkspace: {},
+    sheetsByWorkspace: {},
+    layoutMode: "split-panes",
     sidePaneIdByWorkspace: {},
     explorerSidebarPaneIdByWorkspace: {},
   });
@@ -78,6 +82,13 @@ describe("conversation workspace ownership", () => {
   it("mobile keeps one pane and can select Messages after opening a file", () => {
     open("README.md", sourceA, true);
     expect(collectAllPanes(read().root)).toHaveLength(1);
+    const sheet = useWorkspaceLayoutStore.getState().sheetsByWorkspace[key]?.at(-1);
+    expect(sheet?.tab.target).toMatchObject({
+      kind: "file",
+      path: "README.md",
+      workspaceContext: sourceA,
+    });
+    expect(tabs().filter((tab) => tab.target.kind === "file")).toHaveLength(0);
     const message = tabs().find((t) => t.target.kind === "conversation")!;
     useWorkspaceLayoutStore.getState().focusTab(key, message.tabId);
     expect(collectAllPanes(read().root)[0]?.focusedTabId).toBe(message.tabId);
@@ -85,7 +96,7 @@ describe("conversation workspace ownership", () => {
   it("DM and group editors for same source/file never share runtime instance IDs", () => {
     const other = conversationLayoutKey("host", "dm", "admission");
     const first = open("README.md");
-    const second = open("README.md", sourceA, true, other);
+    const second = open("README.md", sourceA, false, other);
     expect(first).not.toBe(second);
     expect(tabs().find((tab) => tab.target.kind === "file")?.target.workspaceContext).toEqual(
       sourceA,
@@ -95,8 +106,8 @@ describe("conversation workspace ownership", () => {
     );
   });
   it("restores both same-name documents and their sources through persisted layout reload", () => {
-    open("README.md", sourceA, true);
-    open("README.md", sourceB, true);
+    open("README.md", sourceA);
+    open("README.md", sourceB);
     const options = useWorkspaceLayoutStore.persist.getOptions();
     const persisted = JSON.parse(
       JSON.stringify(options.partialize!(useWorkspaceLayoutStore.getState())),

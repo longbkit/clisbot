@@ -863,7 +863,7 @@ const lightShadow = {
     elevation: 8,
   },
   sm: {
-    shadowColor: "rgba(0, 0, 0, 0.02)",
+    shadowColor: "rgba(0, 0, 0, 0.08)",
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
     elevation: 2,

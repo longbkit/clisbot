@@ -1,7 +1,7 @@
 import { useOpenConversationFile } from "./use-open-conversation-file";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspacePaneContentModel } from "@/screens/workspace/workspace-pane-content";
 import { createWorkspaceFileTabTarget } from "@/workspace/file-open";
 import { confirmPanelClose } from "@/panels/confirm-panel-close";
@@ -23,12 +23,17 @@ export function useConversationTabs(input: {
   tabs: WorkspaceTab[];
   selectBot: (id: string) => void;
 }) {
-  const { serverId, bots, layoutKey, singlePanel, tabs, selectBot } = input;
+  const { serverId, bots, layoutKey, singlePanel, selectBot } = input;
   const { t } = useTranslation();
   const open = useOpenConversationFile({ serverId, bots, layoutKey, singlePanel, selectBot });
   const closeTab = useCallback(
     async (tabId: string) => {
-      const tab = tabs.find((candidate) => candidate.tabId === tabId);
+      const current = useWorkspaceLayoutStore.getState();
+      const layout = current.layoutByWorkspace[layoutKey];
+      const tab =
+        (layout ? collectAllTabs(layout.root) : []).find(
+          (candidate) => candidate.tabId === tabId,
+        ) ?? current.sheetsByWorkspace[layoutKey]?.find((sheet) => sheet.tab.tabId === tabId)?.tab;
       if (!tab || tab.target.kind === "conversation") return;
       const origin = tab.target.workspaceContext;
       if (
@@ -47,7 +52,7 @@ export function useConversationTabs(input: {
         return;
       useWorkspaceLayoutStore.getState().closeTab(layoutKey, tabId);
     },
-    [layoutKey, tabs, t],
+    [layoutKey, t],
   );
   const buildContent = useCallback(
     ({ tab }: { tab: WorkspaceTabDescriptor; paneId: string }) =>
@@ -105,7 +110,7 @@ function buildContentModel({
     onOpenWorkspaceFile: (request) => openTarget(createWorkspaceFileTabTarget(request.location)),
     onOpenImportSheet: () => {},
   });
-  return tab.kind === "conversation"
+  return tab.kind === "conversation" || tab.kind === "user_profile"
     ? content
     : { ...content, Component: ConversationResourcePanel };
 }

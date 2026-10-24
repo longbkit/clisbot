@@ -314,7 +314,9 @@ const WorkspaceGitRuntimeSchema = z
 
 const StoredWorkspaceSchema = z.strictObject({
   ...SessionAuthorshipShape,
-  createdAt: IsoDateSchema.optional(),
+  // Require both keys: a cursor without these values would preserve the wrong sort on reconnect.
+  createdAt: IsoDateSchema.nullable(),
+  lastUserMessageAt: IsoDateSchema.nullable(),
   id: z.string(),
   projectId: z.string(),
   projectDisplayName: z.string(),
@@ -325,6 +327,8 @@ const StoredWorkspaceSchema = z.strictObject({
   worktreeSlug: z.string().optional(),
   projectKind: z.enum(["git", "non_git", "directory"]),
   workspaceKind: z.enum(["directory", "local_checkout", "checkout", "worktree"]),
+  // Require the flag so older rows that lost background visibility invalidate the workspace cursor.
+  background: z.boolean(),
   name: z.string(),
   title: z.string().nullable(),
   pinnedAt: z.string().nullable(),
@@ -708,10 +712,15 @@ function deserializeAgent(serverId: string, stored: StoredAgent): Agent {
   };
 }
 
+function restoreWorkspace(stored: StoredWorkspace): WorkspaceDescriptor {
+  return normalizeWorkspaceDescriptor({ ...stored, createdAt: stored.createdAt ?? undefined });
+}
+
 function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
   return {
     ...copySessionMetadata(workspace),
-    createdAt: workspace.createdAt,
+    createdAt: workspace.createdAt?.toISOString() ?? null,
+    lastUserMessageAt: workspace.lastUserMessageAt?.toISOString() ?? null,
     id: workspace.id,
     projectId: workspace.projectId,
     projectDisplayName: workspace.projectDisplayName,
@@ -722,6 +731,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     worktreeSlug: workspace.worktreeSlug,
     projectKind: workspace.projectKind,
     workspaceKind: workspace.workspaceKind,
+    background: workspace.background ?? false,
     name: workspace.name,
     title: workspace.title ?? null,
     pinnedAt: workspace.pinnedAt ?? null,
@@ -877,7 +887,7 @@ function applyDirectoryRow(
     case "workspace": {
       const stored = parseStoredPayload(StoredWorkspaceSchema, row.payload);
       if (stored.id !== row.id) throw new Error("Replica workspace row id mismatch");
-      result.workspaces.set(row.id, normalizeWorkspaceDescriptor(stored));
+      result.workspaces.set(row.id, restoreWorkspace(stored));
       return;
     }
     case "project": {
@@ -904,9 +914,24 @@ function directoryEntityForRow(row: ReplicaRow): keyof DirectoryCheckpoint | und
   return undefined;
 }
 
+interface ReplicaRead {
+  serverId: string;
+  kinds: readonly ReplicaRowKind[];
+  ids?: readonly string[];
+  invalidated: boolean;
+}
+
+function matchesReplicaRead(read: ReplicaRead, row: ReplicaRowKey): boolean {
+  return (
+    read.serverId === row.serverId &&
+    read.kinds.includes(row.kind) &&
+    (!read.ids || read.ids.includes(row.id))
+  );
+}
+
 export class ReplicaCache {
   private readonly activeServerIds = new Set<string>();
-  private readonly hostRevisions = new Map<string, number>();
+  private readonly activeReads = new Set<ReplicaRead>();
   private readonly storedRows = new Map<string, Map<string, ReplicaRow>>();
   private readonly hostBytes = new Map<string, number>();
   private readonly hostWriteOrder = new Map<string, true>();
@@ -952,7 +977,7 @@ export class ReplicaCache {
     try {
       const stored = parseStoredPayload(StoredWorkspaceSchema, workspaceRow.payload);
       if (stored.id !== workspaceRow.id) throw new Error("Replica workspace row id mismatch");
-      workspace = normalizeWorkspaceDescriptor(stored);
+      workspace = restoreWorkspace(stored);
     } catch {
       await this.deleteInvalidRow(workspaceRow);
       return undefined;
@@ -1034,15 +1059,27 @@ export class ReplicaCache {
         // accepted commits to land. A store that rejects them will keep rejecting them: fail closed
         // rather than re-attempt the write on every pass. A write rejected for another host leaves
         // this host's stored rows readable.
-        if (agentId) traceTimelinePhase("cache.queue", serverId, agentId);
-        const persisted = await this.syncPending();
-        if (agentId) traceTimelinePhase("cache.queueDone", serverId, agentId);
-        if (!persisted && this.hasPendingHostChanges(serverId)) return [];
-        const revision = this.hostRevisions.get(serverId) ?? 0;
-        if (agentId) traceTimelinePhase("cache.store", serverId, agentId);
-        const rows = await this.rowStore.read(serverId, kinds, ids);
-        if (agentId) traceTimelinePhase("cache.storeDone", serverId, agentId);
-        if (this.canReadHostRevision(serverId, revision)) return rows;
+        const read: ReplicaRead = { serverId, kinds, ids, invalidated: false };
+        this.activeReads.add(read);
+        try {
+          if (agentId) traceTimelinePhase("cache.queue", serverId, agentId);
+          const persisted = await this.syncPending();
+          if (agentId) traceTimelinePhase("cache.queueDone", serverId, agentId);
+          if (!persisted && this.hasPendingHostChanges(serverId)) return [];
+          if (read.invalidated || this.hasPendingReadChanges(read)) continue;
+          if (agentId) traceTimelinePhase("cache.store", serverId, agentId);
+          const rows = await this.rowStore.read(serverId, kinds, ids);
+          if (agentId) traceTimelinePhase("cache.storeDone", serverId, agentId);
+          if (
+            this.activeServerIds.has(serverId) &&
+            !read.invalidated &&
+            !this.hasPendingReadChanges(read)
+          ) {
+            return rows;
+          }
+        } finally {
+          this.activeReads.delete(read);
+        }
       }
       return [];
     } catch {
@@ -1127,7 +1164,6 @@ export class ReplicaCache {
   ): void {
     if (!this.activeServerIds.has(serverId)) return;
     if (this.invalidatedHosts.has(serverId)) return;
-    this.advanceHostRevision(serverId);
     for (const mutation of mutations) {
       if (mutation.type === "delete") {
         this.queueEntityDelete(serverId, mutation.kind, mutation.id);
@@ -1153,7 +1189,7 @@ export class ReplicaCache {
 
   replaceDirectoryBaseline(serverId: string, directory: CachedDirectory): void {
     if (!this.activeServerIds.has(serverId)) return;
-    this.advanceHostRevision(serverId);
+    this.invalidateHostReads(serverId, ["agent", "workspace", "project", "checkpoint"]);
     // Replacing the directory must not discard independently accepted timeline changes.
     for (const [key, row] of this.pendingUpserts) {
       if (row.serverId === serverId && row.kind !== "timeline") this.pendingUpserts.delete(key);
@@ -1185,7 +1221,6 @@ export class ReplicaCache {
   commitTimeline(serverId: string, agentId: string, timeline: CachedTimeline): void {
     if (!this.activeServerIds.has(serverId)) return;
     if (timeline.agentId !== agentId) throw new Error("Timeline cache key does not match payload");
-    this.advanceHostRevision(serverId);
     this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline });
     this.schedulePersist();
   }
@@ -1194,7 +1229,7 @@ export class ReplicaCache {
     const next = new Set(serverIds);
     const removed = [...this.activeServerIds].filter((serverId) => !next.has(serverId));
     const added = [...next].filter((serverId) => !this.activeServerIds.has(serverId));
-    for (const serverId of [...removed, ...added]) this.advanceHostRevision(serverId);
+    for (const serverId of [...removed, ...added]) this.invalidateHostReads(serverId);
     this.activeServerIds.clear();
     for (const serverId of next) this.activeServerIds.add(serverId);
     for (const serverId of removed) {
@@ -1206,8 +1241,8 @@ export class ReplicaCache {
   }
 
   reconcileServerId(oldServerId: string, newServerId: string): void {
-    this.advanceHostRevision(oldServerId);
-    this.advanceHostRevision(newServerId);
+    this.invalidateHostReads(oldServerId);
+    this.invalidateHostReads(newServerId);
     const rows = this.storedRows.get(oldServerId);
     if (rows) {
       const newRows = this.storedRows.get(newServerId) ?? new Map<string, ReplicaRow>();
@@ -1289,12 +1324,14 @@ export class ReplicaCache {
   }
 
   private queueUpsert(row: StructuredReplicaUpsert): void {
+    this.invalidateRowReads(row);
     const key = pendingRowKey(row);
     this.pendingDeletes.delete(key);
     this.pendingUpserts.set(key, row);
   }
 
   private queueDelete(key: ReplicaRowKey): void {
+    this.invalidateRowReads(key);
     const pendingKey = pendingRowKey(key);
     this.pendingUpserts.delete(pendingKey);
     this.pendingDeletes.set(pendingKey, key);
@@ -1306,12 +1343,34 @@ export class ReplicaCache {
     );
   }
 
-  private canReadHostRevision(serverId: string, revision: number): boolean {
+  private hasPendingReadChanges(read: ReplicaRead): boolean {
+    if (
+      this.pendingBaselines.has(read.serverId) &&
+      read.kinds.some((kind) => kind !== "timeline")
+    ) {
+      return true;
+    }
     return (
-      this.activeServerIds.has(serverId) &&
-      (this.hostRevisions.get(serverId) ?? 0) === revision &&
-      !this.hasPendingHostChanges(serverId)
+      [...this.pendingUpserts.values()].some((row) => matchesReplicaRead(read, row)) ||
+      [...this.pendingDeletes.values()].some((row) => matchesReplicaRead(read, row))
     );
+  }
+
+  private invalidateRowReads(row: ReplicaRowKey): void {
+    for (const read of this.activeReads) {
+      if (matchesReplicaRead(read, row)) read.invalidated = true;
+    }
+  }
+
+  private invalidateHostReads(serverId: string, kinds?: readonly ReplicaRowKind[]): void {
+    for (const read of this.activeReads) {
+      if (
+        read.serverId === serverId &&
+        (!kinds || kinds.some((kind) => read.kinds.includes(kind)))
+      ) {
+        read.invalidated = true;
+      }
+    }
   }
 
   private hasPendingHostChanges(serverId: string): boolean {
@@ -1323,10 +1382,6 @@ export class ReplicaCache {
       if (row.serverId === serverId) return true;
     }
     return false;
-  }
-
-  private advanceHostRevision(serverId: string): void {
-    this.hostRevisions.set(serverId, (this.hostRevisions.get(serverId) ?? 0) + 1);
   }
 
   private drainPendingChanges(): PendingReplicaChanges {

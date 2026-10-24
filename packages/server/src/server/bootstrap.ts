@@ -11,6 +11,12 @@ import { recoverStoredSessionAuthorship } from "./agent/session-storage/recover-
 import { deleteSessionDirectory } from "./file-upload/session-files.js";
 import { startSessionFileMaintenance } from "./file-upload/session-file-maintenance.js";
 import { FileAgentTimelineStore } from "./agent/session-storage/file-agent-timeline-store.js";
+import {
+  createFinishSubscriptions,
+  createFinishObservation,
+  createJsonFinishSubscriptionStore,
+} from "./agent/finish-subscriptions/index.js";
+import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import type { PluginRegistries } from "@clisbot/protocol/plugin-registry";
 import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
 import express from "express";
@@ -155,6 +161,7 @@ import { attachAgentStoragePersistence } from "./persistence-hooks.js";
 import { createAgentMcpServer } from "./agent/mcp-server.js";
 import {
   createClisbotToolCatalog,
+  createClisbotAgentToolManifest,
   type ClisbotToolHostDependencies,
 } from "./agent/tools/clisbot-tools.js";
 import type { ClisbotToolRuntimeContext } from "./agent/tools/types.js";
@@ -198,6 +205,7 @@ import { createConfiguredTerminalManager } from "../terminal/terminal-manager-fa
 import { applyTerminalAgentHookSetting } from "../terminal/agent-hooks/terminal-agent-hook-setting.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
 import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
+import { admitSecuredRelaySocket } from "./websocket/secure-relay-ingress.js";
 import type { PushNotificationSender } from "./push/index.js";
 import { getOrCreateServerId } from "./server-id.js";
 import { resolveDaemonVersion } from "./daemon-version.js";
@@ -236,7 +244,7 @@ import { withTimeout } from "../utils/promise-timeout.js";
 import { isHostnameAllowed, type HostnamesConfig } from "./hostnames.js";
 import {
   createRequireBearerMiddleware,
-  isAgentMcpRequestAuthorized,
+  classifyAgentMcpRequestAuthority,
   type DaemonAuthConfig,
 } from "./auth.js";
 import { deleteLocalCredential, writeLocalCredential } from "./local-credential.js";
@@ -457,6 +465,7 @@ export interface ClisbotDaemonConfig {
   hostInputQueue?: boolean;
   relayEnabled?: boolean;
   relayEnabledMutable?: boolean;
+  relayRequireProtectedSecurity?: boolean;
   relayEndpoint?: string;
   relayPublicEndpoint?: string;
   relayUseTls?: boolean;
@@ -648,11 +657,18 @@ function classifyHubAgentMode(
   }
 }
 
+function createInitialRelayConfig(config: ClisbotDaemonConfig): MutableDaemonConfig["relay"] {
+  return {
+    enabled: config.relayEnabled ?? true,
+    requireProtectedSecurity: config.relayRequireProtectedSecurity ?? false,
+  };
+}
+
 function createInitialMutableDaemonConfig(config: ClisbotDaemonConfig): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
   const initialConfig: MutableDaemonConfig = {
-    relay: { enabled: config.relayEnabled ?? true },
+    relay: createInitialRelayConfig(config),
     mcp: {
       enabled: config.mcpEnabled ?? true,
       injectIntoAgents: config.mcpInjectIntoAgents ?? true,
@@ -1081,7 +1097,17 @@ export async function createClisbotDaemon(
       forgeOverrides: { github },
     },
   });
-  workspaceRegistry.subscribeToMutations((mutation) => {
+  const workspaceRuntimeStore = createWorkspaceRuntimeStore();
+  workspaceGitService.onSnapshotUpdated((snapshot) => workspaceRuntimeStore.set(snapshot));
+  workspaceRegistry.subscribeToMutations(async (mutation) => {
+    if (mutation.kind === "remove" && mutation.workspace) {
+      const cwd = path.resolve(mutation.workspace.cwd);
+      const workspaces = await workspaceRegistry.list();
+      const hasActiveWorkspace = workspaces.some(
+        (workspace) => !workspace.archivedAt && path.resolve(workspace.cwd) === cwd,
+      );
+      if (!hasActiveWorkspace) workspaceRuntimeStore.remove(cwd);
+    }
     if (mutation.kind === "archive" && mutation.workspace) {
       pluginRuntime.emit("workspace.archived", {
         workspace: describeHookWorkspace(mutation.workspace),
@@ -1157,6 +1183,7 @@ export async function createClisbotDaemon(
     agentManager,
     agentStorage,
   );
+  await closeStaleAgentRecords(agentStorage);
   if (sessionStorage.durable)
     await recoverStoredSessionAuthorship(
       agentStorage,
@@ -1203,6 +1230,7 @@ export async function createClisbotDaemon(
     logger,
     clisbotHome: config.clisbotHome,
     workspaceGitService,
+    workspaceRuntimeStore,
   });
   const archiveWorkspaceRecordExternal = async (
     workspaceId: string,
@@ -1448,6 +1476,7 @@ export async function createClisbotDaemon(
       killTerminalsForWorkspace({ terminalManager, sessionLogger: logger }, workspaceId),
     logger,
   });
+  const remoteAgentHostAuthorityListeners = new Set<() => void>();
   const hubRelationships = new HubRelationshipController({
     clisbotHome: config.clisbotHome,
     hostname: getHostName(),
@@ -1536,11 +1565,16 @@ export async function createClisbotDaemon(
         daemonConfigStore.get().relay?.enabled,
         serverId,
         daemonKeyPair.publicKeyB64,
+        daemonConfigStore.get().relay?.requireProtectedSecurity === true,
       ),
     getManagedAccessMode: () => daemonConfigStore.get().managedAccess.mode,
     // Joining or leaving a Hub changes whether `external` asks for tickets. Deferred so a
     // `hub connect` reply reaches its client before that session is closed for lacking one.
-    onRecordChange: () => setImmediate(() => wsServer?.refreshManagedAccessEnforcement()),
+    onRecordChange: () =>
+      setImmediate(() => {
+        wsServer?.refreshManagedAccessEnforcement();
+        for (const listener of remoteAgentHostAuthorityListeners) listener();
+      }),
   });
   const stopHubProjectMutationPublishing =
     projectRegistry.subscribeToMutations?.(() => {
@@ -1717,9 +1751,65 @@ export async function createClisbotDaemon(
   );
   logger.info({ elapsed: elapsed() }, "Preparing voice and MCP runtime");
 
+  // `external` is also the personal Host default; enforcement begins only after
+  // Hub enrollment, matching WebSocket admission rather than the raw mode alone.
+  const canUseRemoteAgentHosts = () =>
+    !(
+      daemonConfigStore.get().managedAccess.mode === "external" &&
+      hubRelationships.requiresTickets()
+    );
+  const onRemoteAgentHostAuthorityChange = (listener: () => void) => {
+    remoteAgentHostAuthorityListeners.add(listener);
+    const unsubscribe = daemonConfigStore.onFieldChange("managedAccess.mode", listener);
+    return () => {
+      unsubscribe();
+      remoteAgentHostAuthorityListeners.delete(listener);
+    };
+  };
+  const finishSubscriptions = createFinishSubscriptions({
+    store: createJsonFinishSubscriptionStore(config.clisbotHome),
+    serverId,
+    logger,
+    messages: () => {
+      if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+      return wsServer.agentMessages;
+    },
+    callerIsActive: async (agentId) => {
+      const record = await agentStorage.get(agentId);
+      return record ? !record.archivedAt : Boolean(agentManager.getAgent(agentId));
+    },
+    ...createFinishObservation({
+      canUseRemoteHosts: canUseRemoteAgentHosts,
+      onRemoteAuthorityChange: onRemoteAgentHostAuthorityChange,
+      agentManager,
+      agentStorage,
+      serverId,
+      logger,
+      messages: () => {
+        if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+        return wsServer.agentMessages;
+      },
+      hosts: () => {
+        if (!wsServer) throw new Error("Daemon is not accepting host operations");
+        return wsServer.toolHosts();
+      },
+    }),
+  });
+
   const createAgentToolHostDependencies = (
     runtime: ClisbotToolRuntimeContext,
   ): ClisbotToolHostDependencies => ({
+    finishSubscriptions: () => finishSubscriptions,
+    canUseRemoteHosts: canUseRemoteAgentHosts,
+    agentMessages: () => {
+      if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+      return wsServer.agentMessages;
+    },
+    serverId,
+    hosts: () => {
+      if (!wsServer) throw new Error("Daemon is not accepting host operations");
+      return wsServer.toolHosts();
+    },
     agentManager,
     agentStorage,
     terminalManager,
@@ -1751,7 +1841,7 @@ export async function createClisbotDaemon(
       terminalManager,
       workspaceRegistry,
       projectRegistry,
-      workspaceGitService,
+      workspaceRuntimeStore,
       getDaemonTcpPort: () => (boundListenTarget?.type === "tcp" ? boundListenTarget.port : null),
       getDaemonTcpHost: () => (boundListenTarget?.type === "tcp" ? boundListenTarget.host : null),
       serviceProxyPublicBaseUrl,
@@ -1778,6 +1868,7 @@ export async function createClisbotDaemon(
     clisbotHome: config.clisbotHome,
     worktreesRoot: config.worktreesRoot,
     callerAgentId: runtime.callerAgentId,
+    hostAuthority: runtime.hostAuthority,
     enableVoiceTools: runtime.enableVoiceTools,
     voiceOnly: runtime.voiceOnly,
     resolveSpeakHandler: (agentId) => wsServer?.resolveVoiceSpeakHandler(agentId) ?? null,
@@ -1787,7 +1878,9 @@ export async function createClisbotDaemon(
   const createAgentToolCatalog = (runtime: ClisbotToolRuntimeContext) =>
     createClisbotToolCatalog(createAgentToolHostDependencies(runtime));
   const setAgentProviderToolsEnabled = (enabled: boolean) => {
-    agentProviderRuntime.setClisbotToolCatalog(enabled ? createAgentToolCatalog({}) : null);
+    agentProviderRuntime.setClisbotToolCatalog(
+      enabled ? createClisbotAgentToolManifest(createAgentToolHostDependencies({})) : null,
+    );
   };
   agentManager.setClisbotToolCatalogFactory(createAgentToolCatalog);
   agentManager.setClisbotToolsEnabled(config.mcpInjectIntoAgents !== false);
@@ -1798,7 +1891,10 @@ export async function createClisbotDaemon(
   {
     const agentMcpRoute = "/mcp/agents";
 
-    const createAgentMcpSession = async (callerAgentId?: string) => {
+    const createAgentMcpSession = async (
+      callerAgentId: string | undefined,
+      hostAuthority: NonNullable<ClisbotToolRuntimeContext["hostAuthority"]>,
+    ) => {
       // Clisbot Connectors: the Project's and the session's tool choices, read on every request.
       const access = callerAgentId
         ? await connectors.agentToolAccess(callerAgentId, {
@@ -1809,6 +1905,7 @@ export async function createClisbotDaemon(
       const agentMcpServer = await createAgentMcpServer(
         createAgentToolHostDependencies({
           callerAgentId,
+          hostAuthority,
           clisbotToolPolicy: access?.policy,
           browserToolsEnabled: access?.browserTools,
         }),
@@ -1847,14 +1944,13 @@ export async function createClisbotDaemon(
       // authenticates here using the injected capability token (or a valid
       // daemon password). Without this, a password-protected daemon would be
       // wide open on its agent control plane.
-      if (
-        !(await isAgentMcpRequestAuthorized({
-          password: config.auth?.password,
-          devicePairingEnabled: config.devicePairingEnabled,
-          capabilityToken: agentMcpAuthToken,
-          authorizationHeader: req.header("authorization"),
-        }))
-      ) {
+      const hostAuthority = await classifyAgentMcpRequestAuthority({
+        password: config.auth?.password,
+        devicePairingEnabled: config.devicePairingEnabled,
+        capabilityToken: agentMcpAuthToken,
+        authorizationHeader: req.header("authorization"),
+      });
+      if (hostAuthority === "rejected") {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -1892,7 +1988,7 @@ export async function createClisbotDaemon(
         } else if (Array.isArray(callerAgentIdRaw) && typeof callerAgentIdRaw[0] === "string") {
           callerAgentId = callerAgentIdRaw[0];
         }
-        const { server, transport } = await createAgentMcpSession(callerAgentId);
+        const { server, transport } = await createAgentMcpSession(callerAgentId, hostAuthority);
         res.on("close", () => {
           void transport.close();
           void server.close();
@@ -2052,6 +2148,7 @@ export async function createClisbotDaemon(
                 },
               },
               workspaceAutoName,
+              workspaceRuntimeStore,
               daemonAuth,
               speechService,
               terminalManager,
@@ -2103,14 +2200,17 @@ export async function createClisbotDaemon(
                         setUp: (options) => setUpHostTailscale(config.clisbotHome, options),
                       }
                     : undefined,
-                getRelayConfig: () =>
-                  relayRuntime?.getConfig() ?? {
+                getRelayConfig: () => ({
+                  ...(relayRuntime?.getConfig() ?? {
                     enabled: daemonConfigStore.get().relay?.enabled ?? relayEnabled,
                     endpoint: relayEndpoint,
                     publicEndpoint: relayPublicEndpoint,
                     useTls: relayUseTls,
                     publicUseTls: relayPublicUseTls,
-                  },
+                  }),
+                  requireProtectedSecurity:
+                    daemonConfigStore.get().relay?.requireProtectedSecurity === true,
+                }),
               },
               serviceProxyPublicBaseUrl,
               browserToolsBroker,
@@ -2132,7 +2232,9 @@ export async function createClisbotDaemon(
             );
             await pluginRuntime.start();
             providerSnapshotManager.settlePluginProviders();
+            await finishSubscriptions.start();
             wsServer.beginAcceptingConnections();
+            const relaySecurityLogger = logger.child({ module: "relay-security" });
             relayRuntime = createRelayRuntime({
               config: {
                 enabled: relayEnabled,
@@ -2142,17 +2244,39 @@ export async function createClisbotDaemon(
                 publicUseTls: relayPublicUseTls,
               },
               logger,
-              attachSocket: async (ws, metadata) => {
-                if (!wsServer) throw new Error("WebSocket server is not ready");
-                await wsServer.attachExternalSocket(ws, metadata);
-              },
+              attachSocket: (ws, metadata) =>
+                admitSecuredRelaySocket(
+                  ws,
+                  {
+                    daemonKeyPair: daemonKeyPair.keyPair,
+                    logger: relaySecurityLogger,
+                    requireProtectedMode: () =>
+                      daemonConfigStore.get().relay?.requireProtectedSecurity === true,
+                  },
+                  async (secured) => {
+                    if (!wsServer) throw new Error("WebSocket server is not ready");
+                    await wsServer.attachExternalSocket(secured.socket, {
+                      ...metadata,
+                      transport: "relay",
+                      securityMode: secured.securityMode,
+                      encrypted: true,
+                    });
+                  },
+                ),
               serverId,
-              daemonKeyPair: daemonKeyPair.keyPair,
             });
             daemonConfigStore.onFieldChange("relay.enabled", (value) => {
               relayRuntime?.setEnabled(value === true);
               void hubRelationships.publishConnectionOffer().catch((error: unknown) => {
                 logger.warn({ err: error }, "Failed to replace Hub Connection Offer");
+              });
+            });
+            daemonConfigStore.onFieldChange("relay.requireProtectedSecurity", () => {
+              void hubRelationships.publishConnectionOffer().catch((error: unknown) => {
+                logger.warn(
+                  { err: error },
+                  "Failed to replace Hub Connection Offer after endpoint security change",
+                );
               });
             });
             daemonConfigStore.onFieldChange("managedAccess.mode", () => {
@@ -2215,6 +2339,8 @@ export async function createClisbotDaemon(
     scriptHealthMonitor.stop();
     // Freeze both ingress and registration before taking the agent closure snapshot.
     wsServer?.prepareForShutdown();
+    await finishSubscriptions.close();
+    await wsServer?.agentMessages.close();
     agentManager.prepareForShutdown();
     await closeAllAgents(logger, agentManager);
     await withTimeout({
@@ -2269,6 +2395,16 @@ export async function createClisbotDaemon(
     getListenTarget: () => boundListenTarget,
     getServerId: () => serverId,
   };
+}
+
+async function closeStaleAgentRecords(agentStorage: AgentStorage): Promise<void> {
+  // No provider runtimes are loaded at startup. Repair interrupted
+  // shutdowns before any status consumer sees the persisted active states.
+  for (const record of await agentStorage.list()) {
+    if (record.lastStatus === "running" || record.lastStatus === "initializing") {
+      await agentStorage.upsert({ ...record, lastStatus: "closed" });
+    }
+  }
 }
 
 /**

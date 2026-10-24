@@ -734,8 +734,6 @@ export interface AssistantMessageItem {
   text: string;
   timestamp: Date;
   /** Display-only fields, assigned after source-item plugin transforms. */
-  blockGroupId?: string;
-  blockIndex?: number;
 }
 
 type WireTimelineEntry = Extract<

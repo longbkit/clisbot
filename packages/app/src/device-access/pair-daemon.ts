@@ -34,7 +34,14 @@ export async function pairDaemon(
       connectTimeoutMs: 5000,
       reconnect: { enabled: false },
       webSocketFactory: createAppWebSocketFactory(),
-      e2ee: { enabled: true, daemonPublicKeyB64: offer.daemonPublicKeyB64 },
+      e2ee: {
+        enabled: true,
+        daemonPublicKeyB64: offer.daemonPublicKeyB64,
+        minimumMode:
+          profile.devicePairing?.minimumSecurityMode ??
+          offer.minimumSecurityMode ??
+          (connection.type === "relay" ? connection.minimumSecurityMode : undefined),
+      },
       resolveDeviceAccess: () => daemonDeviceAccess(offer.serverId, true),
     });
     try {

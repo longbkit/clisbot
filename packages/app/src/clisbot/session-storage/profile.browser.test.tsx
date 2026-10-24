@@ -133,7 +133,7 @@ const workspace: SidebarWorkspaceEntry = {
   hasRunningScripts: false,
   createdBy: actor,
   lastInteractionBy: { ...actor, id: "slack:U2", displayName: "Bailey" },
-  createdAt: "2026-01-01T12:00:00Z",
+  createdAt: new Date("2026-01-01T12:00:00Z"),
   lastInteractionAt: "2026-01-02T12:00:00Z",
   channels: [
     {

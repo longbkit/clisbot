@@ -1,10 +1,15 @@
+import { createClisbotApi } from "@clisbot/client";
+import { createHostClient } from "@clisbot/client/node";
+import { ConnectedHosts } from "../connected-hosts/index.js";
+import { createToolHosts } from "../agent/host-operations/index.js";
+import { OWNER_PERMISSIONS } from "../authorization/index.js";
 import { CreationService } from "../creation/index.js";
 import { MessageReceipts } from "../message-receipts/index.js";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { Session, type SessionOptions } from "../session.js";
 import type { SessionOutboundMessage } from "../messages.js";
 import { FileBackedProjectRegistry, FileBackedWorkspaceRegistry } from "../workspace-registry.js";
@@ -55,7 +60,8 @@ async function fixture() {
 
   /** A real Session admitted the way a Hub ticket would admit it. */
   const open = (grant: {
-    permissions: DaemonPermission[];
+    permissions: readonly DaemonPermission[];
+    connectedHosts?: ConnectedHosts;
     projects: Record<string, ProjectPrivilege[]>;
     daemonPrivileges?: ProjectPrivilege[];
     projectFolders?: { allow: string[]; deny: string[] }[];
@@ -64,6 +70,7 @@ async function fixture() {
     const snapshot = createProviderSnapshotManagerStub();
     const session = new Session({
       clientId: `client-${Math.random()}`,
+      connectedHosts: grant.connectedHosts,
       permissions: grant.permissions,
       resourceAuthorization: {
         resourceMode: "projects",
@@ -127,7 +134,7 @@ async function fixture() {
         throw new Error(`no reply to ${requestId}: ${JSON.stringify(messages)}`);
       return reply.type === "rpc_error" ? "denied" : (reply.payload as Record<string, unknown>);
     };
-    return { request };
+    return { request, session };
   };
   return { root, projects, addProject, open };
 }
@@ -242,3 +249,63 @@ test("managing one Project does not reach another the session can only use", asy
   expect(await rename(managed.projectId, "own")).toMatchObject({ accepted: true, error: null });
   expect((await projects.get(usedOnly.projectId))?.archivedAt ?? null).toBeNull();
 });
+
+test("a Project-scoped origin cannot borrow an owner-configured personal Host", async () => {
+  const { root, addProject, open } = await fixture();
+  const allowed = await addProject("allowed-a");
+  const b = await createTestClisbotDaemon();
+  cleanups.push(() => b.close());
+  const owner = createHostClient(`127.0.0.1:${b.port}`, {
+    clientId: "private-b-owner",
+    reconnect: { enabled: false },
+  });
+  cleanups.push(() => owner.close());
+  await owner.connect();
+  const api = createClisbotApi(owner);
+  cleanups.push(() => api.dispose());
+  await api.workspaces.create({ source: { kind: "directory", path: b.staticDir } });
+  const hosts = new ConnectedHosts(path.join(root, "saved-hosts"), {
+    serverId: "origin-a",
+    label: "Origin A",
+  });
+  cleanups.push(() => hosts.close());
+  await hosts.add(
+    { connection: `127.0.0.1:${b.port}` },
+    { sourceId: "owner", manageSources: true },
+  );
+  await expect
+    .poll(async () => (await hosts.list()).hosts[0]?.status, { timeout: 15_000 })
+    .toBe("online");
+  const serverId = (await hosts.list()).hosts[0]!.serverId!;
+  // The daemon's own authority can see the private destination; the caller's A grant cannot.
+  const visible = await createToolHosts(hosts).use(serverId, (client) =>
+    client.fetchWorkspaces({}),
+  );
+  expect(visible.entries).toHaveLength(1);
+  const routed = vi.spyOn(hosts, "openRoute");
+  const caller = open({
+    permissions: OWNER_PERMISSIONS,
+    projects: { [allowed.projectId]: FULL_ACCESS },
+    connectedHosts: hosts,
+  });
+  expect(caller.session.canUseConnectedHosts()).toBe(false);
+  expect(
+    await caller.request({
+      type: "hosts.route.open.request",
+      requestId: "private-b",
+      serverId,
+      scopeId: "caller",
+    }),
+  ).toBe("denied");
+  expect(await caller.request({ type: "hosts.list.request", requestId: "private-inventory" })).toBe(
+    "denied",
+  );
+  expect(
+    await caller.request({
+      type: "hosts.link.open.request",
+      requestId: "same-host-link",
+      channelId: "caller",
+    }),
+  ).toBe("denied");
+  expect(routed).not.toHaveBeenCalled();
+}, 30_000);

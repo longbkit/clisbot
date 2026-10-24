@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  classifyAgentMcpRequestAuthority,
   extractHttpBearerToken,
   extractWsBearerProtocol,
   extractWsBearerToken,
@@ -157,7 +158,6 @@ describe("hello admission", () => {
         credential: { kind: "localCredential", token: "stale" },
         passwordHash: undefined,
         localCredential: "current",
-        transport: "direct",
       }),
     ).toMatchObject({ admission: { principalId: "owner" } });
   });
@@ -169,7 +169,6 @@ describe("hello admission", () => {
       const input = {
         passwordHash: CORRECT_PASSWORD_HASH,
         localCredential: second,
-        transport: "direct" as const,
       };
       expect(
         await resolveSessionAdmission({
@@ -195,19 +194,9 @@ describe("hello admission", () => {
           credential: { kind: "password", password: "wrong" },
         }),
       ).toEqual({ rejection: "incorrect_password" });
-      expect(
-        await resolveSessionAdmission({
-          ...input,
-          transport: "relay",
-          credential: { kind: "password", password: "wrong" },
-        }),
-      ).toEqual({ rejection: "incorrect_password" });
       expect(await resolveSessionAdmission({ ...input, credential: undefined })).toEqual({
         rejection: "password_required",
       });
-      expect(
-        await resolveSessionAdmission({ ...input, transport: "relay", credential: undefined }),
-      ).toMatchObject({ admission: { principalId: "owner" } });
     } finally {
       await deleteLocalCredential(home);
       await rm(home, { recursive: true, force: true });
@@ -233,4 +222,56 @@ describe("hello admission", () => {
       await rm(home, { recursive: true, force: true });
     }
   });
+});
+
+test("Agent MCP credential authority distinguishes injected capability, configured password and legacy admission", async () => {
+  const base = { capabilityToken: "injected-agent-token", devicePairingEnabled: false };
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      password: undefined,
+      authorizationHeader: "Bearer injected-agent-token",
+    }),
+  ).toBe("agent-capability");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      password: CORRECT_PASSWORD_HASH,
+      authorizationHeader: "Bearer injected-agent-token",
+    }),
+  ).toBe("agent-capability");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      password: CORRECT_PASSWORD_HASH,
+      authorizationHeader: "Bearer correct-password",
+    }),
+  ).toBe("password-operator");
+  for (const authorizationHeader of [undefined, "Bearer arbitrary", "Basic not-bearer"])
+    expect(
+      await classifyAgentMcpRequestAuthority({ ...base, password: undefined, authorizationHeader }),
+    ).toBe("legacy-anonymous");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      password: CORRECT_PASSWORD_HASH,
+      authorizationHeader: "Bearer wrong",
+    }),
+  ).toBe("rejected");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      devicePairingEnabled: true,
+      password: CORRECT_PASSWORD_HASH,
+      authorizationHeader: "Bearer correct-password",
+    }),
+  ).toBe("rejected");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      devicePairingEnabled: true,
+      password: undefined,
+      authorizationHeader: undefined,
+    }),
+  ).toBe("rejected");
 });

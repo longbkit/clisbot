@@ -20,7 +20,7 @@ const env = vi.hoisted(() => ({
   refetch: vi.fn(),
   focused: true,
 }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => env.focused }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => env.focused }));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ replace: env.replace, push: env.push }),
   useLocalSearchParams: () => env.params,

@@ -1,12 +1,12 @@
 // Product identity and inherited editorial material need contextual transforms.
 // Keep this module outside the general text replacement, like the README templates.
 import { rebrandPorts } from "./ports.mjs";
-const upstreamPosts = new Set(["hello-world.md", "i-was-wrong-about-electron.md"]);
+const upstreamPost = /^(?:hello-world|i-was-wrong-about-electron)(?:\.[A-Za-z0-9-]+)?\.md$/;
 const postsRoot = "packages/website/posts/";
 
 export function publicationPath(path) {
   const name = path.slice(postsRoot.length);
-  return path.startsWith(postsRoot) && upstreamPosts.has(name)
+  return path.startsWith(postsRoot) && upstreamPost.test(name)
     ? `${postsRoot}upstream/${name}`
     : path;
 }

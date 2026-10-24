@@ -50,6 +50,7 @@ desktop:
   - "packages/server/src/server/hub/local-start*"
   - "packages/protocol/src/{device-access,device-pairing-offer,hub-local,hub-device-http}.ts"
   - "packages/app/src/desktop/**"
+  - "packages/app/src/**/*.electron.{ts,tsx}"
   - "packages/server/src/server/browser-tools/**"
   - "packages/app/e2e/support/**"
   - "packages/app/*config.{cjs,js,ts}"

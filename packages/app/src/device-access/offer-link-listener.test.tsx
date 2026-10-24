@@ -114,12 +114,12 @@ test("root teardown cancels pending navigation while daemon-only links retain th
 
 test("a successful explicit retry dismisses only its prior pairing error", async () => {
   state.initial = link;
-  state.toast.mockReturnValue(72);
+  state.toast.mockReturnValue(state.dismiss);
   state.importLink.mockRejectedValueOnce(new Error("network"));
   render(<OfferLinkListener />);
   await waitFor(() => expect(state.toast).toHaveBeenCalledOnce());
   state.importLink.mockResolvedValue({ status: "hub_connected" });
   await act(async () => state.listener?.({ url: link }));
   await waitFor(() => expect(state.replace).toHaveBeenCalledWith("/settings/hub/overview"));
-  expect(state.dismiss).toHaveBeenCalledExactlyOnceWith(72);
+  expect(state.dismiss).toHaveBeenCalledOnce();
 });

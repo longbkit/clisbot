@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { isPlatform } from "../test-utils/platform.js";
 import {
   buildTerminalEnvironment,
+  assertTerminalCommandCanStart,
   createTerminal,
   ensureNodePtySpawnHelperExecutableForCurrentPlatform,
   resolveDefaultTerminalShell,
@@ -26,7 +27,7 @@ import { spawnSync } from "node:child_process";
 import * as pty from "node-pty";
 import xterm from "@xterm/headless";
 import { renderTerminalSnapshotToAnsi } from "@clisbot/protocol/terminal-snapshot";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { setImmediate as waitForImmediate, setTimeout as delay } from "node:timers/promises";
 import { stripVTControlCharacters } from "node:util";
@@ -637,6 +638,151 @@ describe("createTerminal", () => {
     expect(exitInfo.lastOutputLines.length).toBeGreaterThan(0);
     expect(exitInfo.lastOutputLines[exitInfo.lastOutputLines.length - 1]).toBe("line-2999");
   });
+
+  it.runIf(isPlatform("linux", "darwin"))(
+    "rejects a profile command that is not installed instead of opening a terminal",
+    async () => {
+      await expect(
+        createTerminal({
+          workspaceId: "ws-test",
+          cwd: realpathSync(tmpdir()),
+          name: "Codex",
+          command: "clisbot-qa-absent-codex",
+          args: [],
+        }),
+      ).rejects.toThrow("clisbot-qa-absent-codex: command not found");
+    },
+  );
+
+  it.runIf(isPlatform("linux", "darwin"))(
+    "opens a command found only on the PATH carried by the env option",
+    async () => {
+      // execve resolves the command against the child's PATH, which carries the
+      // per-cwd registered environment. A version-manager shim lives there and
+      // not necessarily on the daemon's own PATH.
+      const binDir = mkdtempSync(join(tmpdir(), "terminal-envpath-bin-"));
+      temporaryDirs.push(binDir);
+      const toolPath = join(binDir, "clisbot-qa-envpath-tool");
+      writeFileSync(toolPath, "#!/usr/bin/env bash\nprintf 'clisbot-launch-ok\\n'\nsleep 30\n");
+      chmodSync(toolPath, 0o755);
+
+      const session = trackSession(
+        await createTerminal({
+          workspaceId: "ws-test",
+          cwd: realpathSync(tmpdir()),
+          name: "Shim",
+          command: "clisbot-qa-envpath-tool",
+          args: [],
+          env: { PATH: `${binDir}${delimiter}${process.env.PATH ?? ""}` },
+        }),
+      );
+
+      await waitForLines(session, ["clisbot-launch-ok"]);
+      expect(getLines(session.getState())[0]).toBe("clisbot-launch-ok");
+    },
+  );
+
+  it.runIf(isPlatform("linux", "darwin"))(
+    "reports command not found when the command is on neither PATH",
+    async () => {
+      await expect(
+        createTerminal({
+          workspaceId: "ws-test",
+          cwd: realpathSync(tmpdir()),
+          name: "Codex",
+          command: "clisbot-qa-absent-codex",
+          args: [],
+          env: { PATH: `/clisbot-qa-empty${delimiter}${process.env.PATH ?? ""}` },
+        }),
+      ).rejects.toThrow("clisbot-qa-absent-codex: command not found");
+    },
+  );
+
+  it.runIf(isPlatform("linux", "darwin"))(
+    "opens a relative command path resolved against the terminal cwd",
+    async () => {
+      // execve resolves a path-ish command against the child's cwd, never the
+      // daemon's own working directory.
+      const projectDir = mkdtempSync(join(tmpdir(), "terminal-relative-cmd-"));
+      temporaryDirs.push(projectDir);
+      mkdirSync(join(projectDir, "scripts"));
+      const scriptPath = join(projectDir, "scripts", "dev.sh");
+      writeFileSync(scriptPath, "#!/usr/bin/env bash\nprintf 'clisbot-launch-ok\\n'\nsleep 30\n");
+      chmodSync(scriptPath, 0o755);
+
+      const session = trackSession(
+        await createTerminal({
+          workspaceId: "ws-test",
+          cwd: realpathSync(projectDir),
+          name: "Dev script",
+          command: "./scripts/dev.sh",
+          args: [],
+        }),
+      );
+
+      await waitForLines(session, ["clisbot-launch-ok"]);
+      expect(getLines(session.getState())[0]).toBe("clisbot-launch-ok");
+    },
+  );
+
+  it.runIf(isPlatform("linux", "darwin"))("opens an absolute command path", async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "terminal-absolute-cmd-"));
+    temporaryDirs.push(projectDir);
+    const scriptPath = join(projectDir, "run.sh");
+    writeFileSync(scriptPath, "#!/usr/bin/env bash\nprintf 'clisbot-launch-ok\\n'\nsleep 30\n");
+    chmodSync(scriptPath, 0o755);
+
+    const session = trackSession(
+      await createTerminal({
+        workspaceId: "ws-test",
+        cwd: realpathSync(tmpdir()),
+        name: "Absolute",
+        command: scriptPath,
+        args: [],
+      }),
+    );
+
+    await waitForLines(session, ["clisbot-launch-ok"]);
+    expect(getLines(session.getState())[0]).toBe("clisbot-launch-ok");
+  });
+
+  it("leaves the command check to the terminal itself on Windows", async () => {
+    // Windows resolves inside resolveTerminalSpawnCommand, which has its own
+    // shim handling and its own fallback for an unresolved command.
+    await expect(
+      assertTerminalCommandCanStart({
+        command: "clisbot-qa-absent-codex",
+        cwd: realpathSync(tmpdir()),
+        env: { PATH: "/clisbot-qa-empty" },
+        platform: "win32",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it.runIf(isPlatform("linux", "darwin"))(
+    "still opens a terminal for an installed command that exits non-zero",
+    async () => {
+      // A profile running a failing test suite must keep opening a tab with its
+      // output. Only a command that cannot start at all is reported as an error,
+      // and "exited non-zero" does not distinguish the two: a missing binary and
+      // `false` both surface as exit code 1 from node-pty.
+      const session = trackSession(
+        await createTerminal({
+          workspaceId: "ws-test",
+          cwd: realpathSync(tmpdir()),
+          name: "Failing suite",
+          command: "false",
+          args: [],
+        }),
+      );
+
+      const exitInfo = await new Promise<{ exitCode: number | null }>((resolve) => {
+        session.onExit((info) => resolve({ exitCode: info.exitCode }));
+      });
+
+      expect(exitInfo).toEqual({ exitCode: 1 });
+    },
+  );
 });
 
 describe.skipIf(isPlatform("win32"))("send input", () => {
@@ -1388,3 +1534,43 @@ describe.runIf(isPlatform("win32"))(".cmd shim argv round-trip on Windows", () =
     expect(await roundTrip("first\nsecond")).toEqual(["first second"]);
   });
 });
+
+it.runIf(isPlatform("linux", "darwin"))(
+  "opens a profile command from a PATH entry relative to the terminal cwd",
+  async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "terminal-relative-path-"));
+    mkdirSync(join(projectDir, "bin"));
+    const script = join(projectDir, "bin", "clisbot-relative-path-tool");
+    writeFileSync(script, "#!/bin/sh\nprintf 'clisbot-launch-ok\\n'\nexec /bin/sleep 30\n");
+    chmodSync(script, 0o755);
+    let session: TerminalSession | undefined;
+    try {
+      session = await createTerminal({
+        workspaceId: "ws-test",
+        cwd: realpathSync(projectDir),
+        command: "clisbot-relative-path-tool",
+        env: { PATH: "bin" },
+      });
+      await waitForLines(session, ["clisbot-launch-ok"]);
+      expect(getLines(session.getState())[0]).toBe("clisbot-launch-ok");
+      expect(session.cwd).toBe(realpathSync(projectDir));
+      expect(session.getExitInfo()).toBeNull();
+    } finally {
+      await session?.killAndWait({ gracefulTimeoutMs: 1000, forceTimeoutMs: 500 });
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  },
+);
+
+it.runIf(isPlatform("linux", "darwin"))(
+  "checks the exact command rather than accepting a trimmed executable name",
+  async () => {
+    await expect(
+      createTerminal({
+        workspaceId: "ws-test",
+        cwd: realpathSync(tmpdir()),
+        command: " node ",
+      }),
+    ).rejects.toThrow(" node : command not found");
+  },
+);

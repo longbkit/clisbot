@@ -100,6 +100,13 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 [claude-channel-doc]: docs/features/channels/claude-channel.md
 [channels-operations-doc]: docs/guides/developer-guide/channels-operations.md
 
+| [docs/notifications.md](docs/notifications.md) | Notification tap ownership, native replay and acknowledgement, startup handoff, and payload QA |
+| [docs/website-i18n.md](docs/website-i18n.md) | Website languages: locale URLs, translated Markdown pairs, `{#id}` anchors, Chinese style |
+| [docs/relay-endpoint-security.md](docs/relay-endpoint-security.md) | Relay E2EE modes: Noise NK mapping, record framing, negotiation, the `requireProtectedSecurity` flag, close codes |
+| [docs/connected-hosts.md](docs/connected-hosts.md) | Daemon-owned host registrations, routed SDK scopes, identity and authority boundaries |
+| [docs/markdown-renderer.md](docs/markdown-renderer.md) | Shared Markdown engine, native selection, links, images and library constraints |
+| [docs/native-text-selection.md](docs/native-text-selection.md) | Native diagram grouping, selection boundaries and leading inline image limitations |
+
 ### Writing docs
 
 - **Integrate, don't append.** Find the doc that owns the subject and rewrite the part that is now wrong. The standard failure is finishing a task and adding a paragraph to the bottom of the closest-looking doc; ten tasks later the doc is a pile of paragraphs in discovery order. `docs/custom-providers.md` is what that looks like.
@@ -140,6 +147,8 @@ npm run format:check                 # Check formatting without writing
 ```
 
 Repo dev commands use checkout-local state by default. In this checkout, `CLISBOT_HOME` resolves to `.dev/clisbot-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.clisbot` on port `6868`.
+
+When Mo requests an APK, use `npm run build:apk:arm64` for an ARM64 build: writes `artifacts/clisbot-dogfood-arm64.apk` with diagnostics without starting a device; `npm run build:apk` builds all four Android architectures.
 
 See [docs/development.md](docs/development.md) for full setup, build sync requirements, and debugging.
 

@@ -4,13 +4,28 @@ import { gotoAppShell } from "../support/helpers/app";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { fillNewWorkspaceDraft } from "../support/helpers/new-workspace";
+import { expectComposerVisible } from "../support/helpers/composer";
 import { addConnectedHostAndReload } from "../support/helpers/hosts";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
+import { createMockIdleAgent } from "../support/helpers/archive-tab";
+import { getServerId } from "../support/helpers/server-id";
+import { expectAppRoute } from "../support/helpers/route-assertions";
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 
 test("mobile Quick chat and Bot keep agent controls and Back returns to Home", async ({
   page,
 }, info) => {
   test.setTimeout(120000);
+  // Exercise the real ExpoRoot/Stack context across Home, Chat list, Work and bot DM.
+  // React's boundary can catch a context error without emitting a pageerror.
+  const navigationErrors: string[] = [];
+  const recordNavigationError = (message: string) => {
+    if (/Couldn't find a (navigation|route) object/.test(message)) navigationErrors.push(message);
+  };
+  page.on("pageerror", (error) => recordNavigationError(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") recordNavigationError(message.text());
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   const workspace = await seedWorkspace({ repoPrefix: "home-destinations-" });
   const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "home-bot" });
@@ -18,6 +33,12 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     (await client.fetchWorkspaces()).entries.map((w) => w.projectId),
   );
   try {
+    const workAgent = await createMockIdleAgent(workspace.client, {
+      cwd: workspace.workspaceDirectory,
+      workspaceId: workspace.workspaceId,
+      title: "Home navigation Work agent",
+    });
+    const workRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
     const bot = await client.createBot({
       name: "Triage helper",
       kind: "personal",
@@ -25,6 +46,7 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     });
     expect(bot.error).toBeNull();
     await gotoAppShell(page);
+    await expect(page.getByTestId("workspace-create-submit")).toBeVisible();
     await page.getByRole("button", { name: "Quick chat", exact: true }).click();
     await expect(page.getByRole("button", { name: "Quick chat", exact: true })).toHaveAttribute(
       "aria-selected",
@@ -34,27 +56,27 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     await fillNewWorkspaceDraft(page, "Quick chat test");
     await page.getByTestId("workspace-create-submit").click();
     await expect(page).toHaveURL(/\/workspace\//, { timeout: 30000 });
+    await expectComposerVisible(page);
     await expect(page.getByTestId("home-mobile-tabs")).not.toBeVisible();
     await page.getByTestId("chat-back").filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/open-project$/);
     // Inbox establishes one return origin, then a sidebar selection must replace it.
     await page.getByRole("tab", { name: /^Inbox, / }).click();
     const activityRow = page
-      .locator('[data-testid^="agent-row-"]')
-      .filter({ visible: true })
-      .filter({ has: page.locator('[data-testid^="agent-row-title-"]') })
-      .first();
+      .getByTestId(`agent-row-${getServerId()}-${workAgent.id}`)
+      .filter({ visible: true });
     await activityRow.click();
-    await expect(page).toHaveURL(/\/workspace\//);
+    await expectAppRoute(page, workRoute);
+    await expectComposerVisible(page);
     await page.getByTestId("chat-back").filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/sessions$/);
     await page.getByRole("tab", { name: "Chat", exact: true }).click();
     await page
-      .locator('[data-testid^="sidebar-workspace-row-"]')
+      .getByTestId(`sidebar-workspace-row-${getServerId()}:${workspace.workspaceId}`)
       .filter({ visible: true })
-      .first()
       .click();
-    await expect(page).toHaveURL(/\/workspace\//);
+    await expectAppRoute(page, workRoute);
+    await expectComposerVisible(page);
     await page.getByTestId("chat-back").filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/chat$/);
     await page.getByRole("tab", { name: "Home", exact: true }).click();
@@ -64,10 +86,14 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     await fillNewWorkspaceDraft(page, "Triage this bug");
     await page.getByTestId("workspace-create-submit").click();
     await expect(page).toHaveURL(/\/chat\/chat_/, { timeout: 30000 });
+    await expect(page.getByTestId("chat-composer").getByRole("textbox")).toBeEditable();
     await page.screenshot({ path: info.outputPath("bot-chat-mobile.png"), fullPage: true });
     await page.getByTestId("chat-back").filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/open-project$/);
     await expect(page.getByTestId("home-mobile-tabs")).toBeVisible();
+    expect(navigationErrors, "Expo Router routes must share the mounted navigator context").toEqual(
+      [],
+    );
   } finally {
     for (const projectId of new Set(
       (await client.fetchWorkspaces()).entries.map((w) => w.projectId),
@@ -75,6 +101,32 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
       if (!baselineProjects.has(projectId)) await client.removeProject(projectId);
     }
     await client.close();
+    await workspace.cleanup();
+  }
+});
+
+test("mobile empty Work opens the launcher and Back returns to Chat", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const workspace = await seedWorkspace({ repoPrefix: "home-empty-work-" });
+  try {
+    await gotoAppShell(page);
+    await expect(page.getByTestId("workspace-create-submit")).toBeVisible();
+    await page.getByRole("tab", { name: "Chat", exact: true }).click();
+    await expect(page).toHaveURL(/\/chat$/);
+    await page
+      .getByTestId(`sidebar-workspace-row-${getServerId()}:${workspace.workspaceId}`)
+      .filter({ visible: true })
+      .click();
+    await expectAppRoute(page, buildHostWorkspaceRoute(getServerId(), workspace.workspaceId));
+    // An empty workspace has no conversation to compose into; its real content is the launcher.
+    await expect(
+      page.getByTestId("workspace-new-tab-panel").filter({ visible: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Message agent..." })).not.toBeVisible();
+    await page.getByTestId("chat-back").filter({ visible: true }).click();
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page.getByTestId("home-mobile-tabs")).toBeVisible();
+  } finally {
     await workspace.cleanup();
   }
 });

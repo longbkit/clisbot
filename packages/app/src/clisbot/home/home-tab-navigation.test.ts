@@ -1,14 +1,16 @@
+// Test-only entry: the public navigation barrel also loads native UI. Exercise the same
+// installed Expo reducer through its pure module so Node never parses React Native Flow.
 import {
   CommonActions,
   StackActions,
   StackRouter,
   type StackActionType,
-} from "@react-navigation/routers";
+} from "expo-router/build/react-navigation/routers/index.js";
 import type { Href } from "expo-router";
 import { describe, expect, it } from "vitest";
 import { navigateHomeTab } from "./home-tab-navigation";
 
-// Exercise the installed navigation reducer: navigate without getId retains a fresh native
+// Exercise the installed Expo Router navigation reducer: navigate without getId retains a fresh native
 // stack page on each cycle. No React trees or app state owners are mocked.
 function navigation() {
   const stack = StackRouter({ initialRouteName: "open-project" });

@@ -128,7 +128,7 @@ function useDiscardChangesAction({
 }: {
   serverId: string;
   cwd: string;
-  diffMode: "uncommitted" | "base";
+  diffMode: "uncommitted" | "base" | "all";
 }): ((path: string, oldPath?: string) => void) | undefined {
   const { t } = useTranslation();
   const toast = useToast();
@@ -276,11 +276,12 @@ export function DiffLayoutToggle({
 }
 
 interface DiffModeMenuProps {
-  diffMode: "uncommitted" | "base";
+  diffMode: "uncommitted" | "base" | "all";
   committedDescription?: string;
   testIDPrefix?: string;
   onSelectUncommitted: () => void;
   onSelectBase: () => void;
+  onSelectAll: () => void;
 }
 
 export function DiffModeMenu({
@@ -289,10 +290,12 @@ export function DiffModeMenu({
   testIDPrefix = "changes-diff",
   onSelectUncommitted,
   onSelectBase,
+  onSelectAll,
 }: DiffModeMenuProps) {
   const { t } = useTranslation();
   const uncommittedLabel = t("workspace.git.diff.uncommitted");
   const committedLabel = t("workspace.git.diff.committed");
+  const allLabel = t("workspace.git.diff.all");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -306,7 +309,7 @@ export function DiffModeMenu({
           return (
             <>
               <Text style={toolbarLabelTriggerTextStyle(highlighted)} numberOfLines={1}>
-                {diffMode === "uncommitted" ? uncommittedLabel : committedLabel}
+                {{ all: allLabel, uncommitted: uncommittedLabel, base: committedLabel }[diffMode]}
               </Text>
               <ToolbarLabelTriggerIcon>
                 <ThemedChevronDown size={12} uniProps={extraMutedIconColorMapping} />
@@ -316,6 +319,14 @@ export function DiffModeMenu({
         }}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" width={260} testID={`${testIDPrefix}-status-menu`}>
+        <DropdownMenuItem
+          testID={`${testIDPrefix}-mode-all`}
+          selected={diffMode === "all"}
+          onSelect={onSelectAll}
+        >
+          {allLabel}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           testID={`${testIDPrefix}-mode-uncommitted`}
           selected={diffMode === "uncommitted"}
@@ -464,10 +475,11 @@ interface ChangesRepositoryToolbarModel {
 
 interface ChangesComparisonToolbarModel {
   committedDescription?: string;
-  diffMode: "uncommitted" | "base";
+  diffMode: "uncommitted" | "base" | "all";
   mode: ChangesToolbarMode;
   selectedDiffStat: { additions: number; deletions: number } | null;
   onSelectBase: () => void;
+  onSelectAll: () => void;
   onSelectUncommitted: () => void;
 }
 
@@ -483,11 +495,12 @@ interface BuildChangesHeaderModelInput {
   committedDescription?: string;
   compact: boolean;
   cwd: string;
-  diffMode: "uncommitted" | "base";
+  diffMode: "uncommitted" | "base" | "all";
   gitActions: GitActions;
   mode: ChangesToolbarMode;
   onOpenPullRequest: () => void;
   onSelectBase: () => void;
+  onSelectAll: () => void;
   onSelectUncommitted: () => void;
   pullRequest: PrHint | null;
   selectedDiffStat: { additions: number; deletions: number } | null;
@@ -516,6 +529,7 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
       mode: input.mode,
       selectedDiffStat: input.selectedDiffStat,
       onSelectBase: input.onSelectBase,
+      onSelectAll: input.onSelectAll,
       onSelectUncommitted: input.onSelectUncommitted,
     },
   };
@@ -732,6 +746,7 @@ function ChangesComparisonToolbar({
           committedDescription={model.committedDescription}
           onSelectUncommitted={model.onSelectUncommitted}
           onSelectBase={model.onSelectBase}
+          onSelectAll={model.onSelectAll}
         />
         {model.selectedDiffStat ? (
           <DiffStat
@@ -1150,7 +1165,7 @@ interface ChangesEmptyAction {
 
 function computeChangesEmptyAction(input: {
   hideWhitespace: boolean;
-  diffMode: "uncommitted" | "base";
+  diffMode: "uncommitted" | "base" | "all";
   status: CheckoutStatusPayload | null;
   seeUncommittedLabel: string;
   seeCommittedLabel: string;
@@ -1487,6 +1502,7 @@ export function ChangesSurface({
     diffMode,
     selectUncommitted: handleSelectUncommitted,
     selectBase: handleSelectBase,
+    selectAll: handleSelectAll,
     files,
     diffPayloadError,
     diffTooLarge,
@@ -1840,6 +1856,7 @@ export function ChangesSurface({
         mode: toolbarMode,
         onOpenPullRequest: handleOpenPullRequest,
         onSelectBase: handleSelectBase,
+        onSelectAll: handleSelectAll,
         onSelectUncommitted: handleSelectUncommitted,
         pullRequest: selectPrHintFromStatus(pullRequestStatus, forge),
         selectedDiffStat,
@@ -1854,6 +1871,7 @@ export function ChangesSurface({
       gitActions,
       handleOpenPullRequest,
       handleSelectBase,
+      handleSelectAll,
       handleSelectUncommitted,
       isMobile,
       forge,

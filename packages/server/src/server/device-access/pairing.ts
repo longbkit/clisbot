@@ -20,6 +20,7 @@ export async function generateDevicePairingOffer(options: {
   relay?: DevicePairingOffer["relay"];
   hub?: DevicePairingOffer["hub"];
   managedAccessMode?: DevicePairingOffer["managedAccessMode"];
+  relayRequireProtectedSecurity?: boolean;
   appBaseUrl?: string;
   includeQr?: boolean;
   logger?: Logger;
@@ -41,6 +42,7 @@ export async function generateDevicePairingOffer(options: {
     relay: options.relay,
     hub: options.hub,
     managedAccessMode: options.managedAccessMode,
+    ...(options.relayRequireProtectedSecurity === true ? { minimumSecurityMode: "protected" } : {}),
   });
   const url = encodeOfferToFragmentUrl({
     offer,

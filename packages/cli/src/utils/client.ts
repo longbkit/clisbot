@@ -1,3 +1,4 @@
+import { createHostClient, parseHostTarget } from "@clisbot/client/node";
 import {
   waitForDaemonReady,
   resolveClisbotHome,
@@ -8,25 +9,16 @@ import { describeDaemonTarget, type DaemonTarget } from "./daemon-target.js";
 export type { DaemonTarget } from "./daemon-target.js";
 import {
   buildDaemonWebSocketUrl,
-  buildRelayWebSocketUrl,
   normalizeHostPort,
   parseConnectionUri,
-  shouldUseTlsForDefaultHostedRelay,
 } from "@clisbot/protocol/daemon-endpoints";
-import {
-  parseConnectionOfferFromUrl,
-  type ConnectionOffer,
-} from "@clisbot/protocol/connection-offer";
-import { parseSshTransportUri } from "@clisbot/protocol/ssh-transport";
-import { DaemonClient, type WebSocketLike } from "@clisbot/client/internal/daemon-client";
-import { WebSocket } from "ws";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { getOrCreateCliClientId } from "./client-id.js";
 import {
   createDaemonAccessTicketResolver,
   requiresDaemonAccessTicket,
 } from "../commands/hub/daemon-access-ticket.js";
 import { resolveCliVersion } from "../version.js";
-import { createSshTunnel } from "../ssh/ssh-tunnel.js";
 
 export interface ConnectOptions {
   target: DaemonTarget;
@@ -54,15 +46,15 @@ export function buildDaemonConnectionCommandError(options: ConnectOptions & { er
   if (error && typeof error === "object" && "message" in error) message = String(error.message);
   if (options.target.kind === "endpoint")
     message = message.replaceAll(options.target.host, describeDaemonTarget(options.target));
-  if (message.startsWith("Cannot connect to daemon at "))
-    return error as { code: string; message: string; details: string };
   let code = "DAEMON_UNREACHABLE";
   if (typeof error === "object" && error !== null && "code" in error) code = String(error.code);
   else if (message === "Password required") code = "AUTH_REQUIRED";
   else if (message === "Incorrect password") code = "AUTH_FAILED";
   return {
     code,
-    message: `Cannot connect to daemon at ${describeDaemonTarget(options.target)}: ${message}`,
+    message: message.startsWith("Cannot connect to daemon at ")
+      ? message
+      : `Cannot connect to daemon at ${describeDaemonTarget(options.target)}: ${message}`,
     details: describeConnectionRemedy(code, options.target),
   };
 }
@@ -174,11 +166,8 @@ export function resolveDaemonTarget(host: string): TransportTarget {
 }
 
 export function resolveDaemonPassword(host: string): string | undefined {
-  const trimmed = host.trim();
-  if (trimmed.startsWith("tcp://")) {
-    const fromUri = parseConnectionUri(trimmed).password;
-    if (fromUri) return fromUri;
-  }
+  const fromUri = parseHostTarget(host).password;
+  if (fromUri) return fromUri;
   const fromEnv = process.env.CLISBOT_PASSWORD;
   return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
 }
@@ -193,123 +182,9 @@ export function resolveDaemonCredential(
   return token ? { kind: "localCredential", token } : null;
 }
 
-/**
- * Create a WebSocket factory that works in Node.js
- */
-function createNodeWebSocketFactory() {
-  return (
-    url: string,
-    options?: { headers?: Record<string, string>; protocols?: string[]; socketPath?: string },
-  ): WebSocketLike => {
-    return new WebSocket(url, options?.protocols, {
-      headers: options?.headers,
-      ...(options?.socketPath ? { socketPath: options.socketPath } : {}),
-    }) as unknown as WebSocketLike;
-  };
-}
-
-/**
- * Create and connect a daemon client
- * Returns the connected client or throws if connection fails
- */
-async function tryConnectHost(
-  host: string,
-  credential: ReturnType<typeof resolveDaemonCredential>,
-  home: string,
-  clientId: string,
-  timeout: number,
-  nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
-  resolveAccessTicket?: () => Promise<string>,
-): Promise<{ client: DaemonClient } | { error: unknown }> {
-  const target = resolveDaemonTarget(host);
-  const client = new DaemonClient({
-    url: target.url,
-    clientId,
-    clientType: "cli",
-    appVersion: resolveCliVersion(),
-    ...(credential?.kind === "password" ? { password: credential.password } : {}),
-    ...(credential?.kind === "localCredential"
-      ? { localCredential: () => readLocalCredentialForTarget(home, host) ?? undefined }
-      : {}),
-    ...(resolveAccessTicket ? { resolveAccessTicket } : {}),
-    connectTimeoutMs: timeout,
-    webSocketFactory: (
-      url: string,
-      config?: { headers?: Record<string, string>; protocols?: string[] },
-    ) =>
-      nodeWebSocketFactory(url, {
-        headers: config?.headers,
-        protocols: config?.protocols,
-        ...(target.type === "ipc" ? { socketPath: target.socketPath } : {}),
-      }),
-    reconnect: { enabled: false },
-  });
-
-  try {
-    await client.connect();
-    return { client };
-  } catch (error) {
-    await client.close().catch(() => {});
-    return { error };
-  }
-}
-
-async function connectViaRelayOffer(
-  offer: ConnectionOffer,
-  clientId: string,
-  timeout: number,
-  nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
-): Promise<DaemonClient> {
-  if (!offer.relay)
-    throw new Error(
-      "This Host publishes a direct-only endpoint; connect with its paired profile or a Hub access ticket",
-    );
-  const url = buildRelayWebSocketUrl({
-    endpoint: offer.relay.endpoint,
-    serverId: offer.serverId,
-    role: "client",
-    useTls: offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(offer.relay.endpoint),
-  });
-
-  const client = new DaemonClient({
-    url,
-    clientId,
-    clientType: "cli",
-    appVersion: resolveCliVersion(),
-    connectTimeoutMs: timeout,
-    webSocketFactory: (
-      target: string,
-      config?: { headers?: Record<string, string>; protocols?: string[] },
-    ) => nodeWebSocketFactory(target, { headers: config?.headers, protocols: config?.protocols }),
-    e2ee: { enabled: true, daemonPublicKeyB64: offer.daemonPublicKeyB64 },
-    reconnect: { enabled: false },
-  });
-
-  try {
-    await client.connect();
-    return client;
-  } catch (error) {
-    await client.close().catch(() => {});
-    const message = error instanceof Error ? error.message : String(error);
-    const lastError = client.lastError ? ` (${client.lastError})` : "";
-    throw new Error(`Failed to connect via relay offer: ${message}${lastError}`, { cause: error });
-  }
-}
-
-function parseHostOfferOrNull(host: string | undefined): ConnectionOffer | null {
-  if (!host) return null;
-  try {
-    return parseConnectionOfferFromUrl(host);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid pairing offer URL: ${message}`, { cause: error });
-  }
-}
-
 async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonClient> {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
-  const deadline = Date.now() + timeout;
-  const explicitHost =
+  const host =
     options.target.kind === "endpoint"
       ? options.target.host
       : (
@@ -319,58 +194,42 @@ async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonCli
           })
         ).listen;
   const home = resolveClientClisbotHome(options.target);
+  const credential = resolveDaemonCredential(host, home);
   const clientId = await getOrCreateCliClientId(home);
-  const nodeWebSocketFactory = createNodeWebSocketFactory();
-
-  if (explicitHost?.trim().startsWith("ssh://")) {
-    const target = parseSshTransportUri(explicitHost.trim());
-    const tunnel = await createSshTunnel(target);
-    const password = resolveDaemonPassword(explicitHost);
-    const result = await tryConnectHost(
-      tunnel.endpoint,
-      password ? { kind: "password", password } : null,
-      home,
+  const deadline = Date.now() + timeout;
+  async function connect(resolveAccessTicket?: () => Promise<string>): Promise<DaemonClient> {
+    const client = createHostClient(host, {
       clientId,
-      Math.max(1, deadline - Date.now()),
-      nodeWebSocketFactory,
-    );
-    if ("client" in result) {
-      const close = result.client.close.bind(result.client);
-      result.client.close = async () => {
-        try {
-          await close();
-        } finally {
-          tunnel.close();
-        }
-      };
-      return result.client;
+      clientType: "cli",
+      appVersion: resolveCliVersion(),
+      ...(credential?.kind === "password" ? { password: credential.password } : {}),
+      ...(credential?.kind === "localCredential"
+        ? { localCredential: () => readLocalCredentialForTarget(home, host) ?? undefined }
+        : {}),
+      ...(resolveAccessTicket ? { resolveAccessTicket } : {}),
+      connectTimeoutMs: Math.max(1, deadline - Date.now()),
+      reconnect: { enabled: false },
+    });
+    try {
+      await client.connect();
+      return client;
+    } catch (error) {
+      await client.close().catch(() => {});
+      throw error;
     }
-
-    const failure = tunnel.failureDetail();
-    tunnel.close();
-    if (failure) throw new Error(`SSH connection failed: ${failure}`, { cause: result.error });
-    throw result.error;
   }
-  const offer = parseHostOfferOrNull(explicitHost);
-  if (offer) {
-    return connectViaRelayOffer(
-      offer,
-      clientId,
-      Math.max(1, deadline - Date.now()),
-      nodeWebSocketFactory,
-    );
+  try {
+    return await connect();
+  } catch (error) {
+    if (!requiresDaemonAccessTicket(error)) throw error;
+    const resolver = createDaemonAccessTicketResolver({ clisbotHome: home, clientId });
+    if (!resolver)
+      throw new Error(
+        "This daemon requires Hub access. Log in to the Hub it is connected to with `clisbot hub login`, then try again.",
+        { cause: error },
+      );
+    return connect(resolver);
   }
-
-  const result = await tryConnectHostWithAccessTicket(
-    explicitHost,
-    resolveDaemonCredential(explicitHost, home),
-    home,
-    clientId,
-    Math.max(1, deadline - Date.now()),
-    nodeWebSocketFactory,
-  );
-  if ("client" in result) return result.client;
-  throw result.error;
 }
 
 export async function connectToDaemon(options: ConnectOptions): Promise<DaemonClient> {
@@ -379,50 +238,6 @@ export async function connectToDaemon(options: ConnectOptions): Promise<DaemonCl
   } catch (error) {
     throw buildDaemonConnectionCommandError({ ...options, error });
   }
-}
-
-/**
- * COMPAT(clisbot-cli-access-ticket): a daemon with managed access closes an unticketed hello. The
- * CLI then asks the daemon's Hub for a ticket with its login and connects again, as the app does.
- */
-async function tryConnectHostWithAccessTicket(
-  host: string,
-  credential: ReturnType<typeof resolveDaemonCredential>,
-  home: string,
-  clientId: string,
-  timeout: number,
-  nodeWebSocketFactory: ReturnType<typeof createNodeWebSocketFactory>,
-): Promise<{ client: DaemonClient } | { error: unknown }> {
-  const result = await tryConnectHost(
-    host,
-    credential,
-    home,
-    clientId,
-    timeout,
-    nodeWebSocketFactory,
-  );
-  if (!("error" in result) || !requiresDaemonAccessTicket(result.error)) return result;
-  const resolveAccessTicket = createDaemonAccessTicketResolver({
-    clisbotHome: home,
-    clientId,
-  });
-  if (resolveAccessTicket === null) {
-    return {
-      error: new Error(
-        "This daemon requires Hub access. Log in to the Hub it is connected to with `clisbot hub login`, then try again.",
-        { cause: result.error },
-      ),
-    };
-  }
-  return tryConnectHost(
-    host,
-    credential,
-    home,
-    clientId,
-    timeout,
-    nodeWebSocketFactory,
-    resolveAccessTicket,
-  );
 }
 
 /**

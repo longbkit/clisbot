@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { View, Text } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { router } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ChevronLeft, Import } from "lucide-react-native";

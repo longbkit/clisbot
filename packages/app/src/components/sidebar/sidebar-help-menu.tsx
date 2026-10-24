@@ -17,6 +17,7 @@ import {
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { DensityIcon } from "@/components/ui/density-icon";
+import { SidebarFooterIconHighlight } from "./sidebar-footer-icon-highlight";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useAppDiagnosticStore } from "@/diagnostics/store";
@@ -113,12 +114,15 @@ export function SidebarHelpMenu() {
               accessibilityRole="button"
               accessibilityLabel={t("sidebar.help.trigger")}
             >
-              {({ hovered }) => (
-                <DensityIcon
-                  icon={CircleHelp}
-                  size="md"
-                  color={hovered ? "foreground" : "foregroundMuted"}
-                />
+              {({ hovered, pressed, open: menuOpen }) => (
+                <>
+                  <SidebarFooterIconHighlight visible={pressed || menuOpen} />
+                  <DensityIcon
+                    icon={CircleHelp}
+                    size="md"
+                    color={hovered ? "foreground" : "foregroundMuted"}
+                  />
+                </>
               )}
             </DropdownMenuTrigger>
           </View>

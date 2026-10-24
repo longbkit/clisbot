@@ -56,8 +56,21 @@ class ClisbotNativeTraceModule : Module() {
     return true
   }
 
+  private var recorder: DiagnosticRecorder? = null
+
   override fun definition() = ModuleDefinition {
     Name("ClisbotNativeTrace")
+
+    Function("startRecorder") { metadata: Map<String, String> ->
+      if (recorder == null) {
+        appContext.reactContext?.applicationContext?.let { recorder = DiagnosticRecorder(it, metadata) }
+      }
+      HeartbeatTiming.intervalMs
+    }
+    Function("record") { name: String, data: Map<String, String> -> recorder?.record(name, data) }
+    Function("heartbeat") { recorder?.heartbeat() }
+    OnActivityEntersForeground { recorder?.active(true) }
+    OnActivityEntersBackground { recorder?.active(false) }
 
     Function("beginSection") { name: String ->
       Trace.beginSection(name.take(127))
@@ -131,6 +144,8 @@ class ClisbotNativeTraceModule : Module() {
     }
 
     OnDestroy {
+      recorder?.close()
+      recorder = null
       val window = tracedWindow
       val callback = originalCallback
       appContext.currentActivity?.runOnUiThread {

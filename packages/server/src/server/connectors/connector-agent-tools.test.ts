@@ -4,6 +4,7 @@ import {
   readConnectorsOff,
   type ConnectorGrant,
 } from "@clisbot/protocol/connectors/types";
+import { isClisbotToolEnabled } from "../agent/clisbot-tool-policy.js";
 import { agentToolAccess } from "./connector-agent-tools.js";
 import type { ConnectorProjectDirectory } from "./connector-runtime.js";
 
@@ -103,4 +104,15 @@ describe("agentToolAccess", () => {
       browserTools: false,
     });
   });
+});
+
+it("list_hosts follows Project, individual session and Agents group off policies", async () => {
+  expect(isClisbotToolEnabled((await access(undefined)).policy, "list_hosts")).toBe(true);
+  for (const result of [
+    await access({ agentTools: { disabledTools: ["list_hosts"] } }),
+    await access(undefined, { [CONNECTORS_OFF_LABEL]: "tool:list_hosts" }),
+    await access(undefined, { [CONNECTORS_OFF_LABEL]: "tools:agents" }),
+    await access({ agentTools: { enabled: false } }),
+  ])
+    expect(isClisbotToolEnabled(result.policy, "list_hosts")).toBe(false);
 });

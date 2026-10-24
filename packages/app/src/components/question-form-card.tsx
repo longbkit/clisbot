@@ -1,3 +1,4 @@
+import { Alert } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useState, useCallback, useMemo, useRef, type RefObject } from "react";
 import { View, Text, Pressable, type PressableStateCallbackType } from "react-native";
@@ -10,6 +11,7 @@ import type { AgentPermissionResponse } from "@clisbot/protocol/agent-types";
 import { isWeb } from "@/constants/platform";
 import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import type { EditingTextInputHandle } from "@/components/ui/text-input/types";
+import { ScrollableCodeSurface } from "@/components/ui/scrollable-code-surface";
 import {
   areQuestionsAnswered,
   buildQuestionFormAnswers,
@@ -26,9 +28,13 @@ interface QuestionFormCardProps {
   permission: PendingPermission;
   onRespond: (response: AgentPermissionResponse) => void;
   isResponding: boolean;
+  responseError: string | null;
 }
 
 const IS_WEB = isWeb;
+// Native previews are uncapped: inside the option's Pressable, Android never hands a
+// drag to the preview's nested scroll, so lines past a cap would be unreachable.
+const OPTION_PREVIEW_MAX_HEIGHT = IS_WEB ? 240 : undefined;
 
 function getQuestionInputPlaceholder({
   question,
@@ -132,6 +138,20 @@ function QuestionOptionRow({
           <Text style={optionLabelStyle}>{option.label}</Text>
           {option.description ? (
             <Text style={optionDescriptionStyle}>{option.description}</Text>
+          ) : null}
+          {option.preview ? (
+            // Shown for every option at once so they can be compared before picking.
+            // Long lines wrap, as in Claude Code, since most previews are prose.
+            <ScrollableCodeSurface
+              tone="surface0"
+              maxHeight={OPTION_PREVIEW_MAX_HEIGHT}
+              horizontal={false}
+              selectable={false}
+              textStyle={styles.optionPreviewText}
+              testID="question-form-option-preview"
+            >
+              {option.preview}
+            </ScrollableCodeSurface>
           ) : null}
         </View>
       </View>
@@ -321,7 +341,12 @@ function QuestionOtherInput({
   );
 }
 
-export function QuestionFormCard({ permission, onRespond, isResponding }: QuestionFormCardProps) {
+export function QuestionFormCard({
+  permission,
+  onRespond,
+  isResponding,
+  responseError,
+}: QuestionFormCardProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
@@ -335,7 +360,6 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   const otherInputRef = useRef<EditingTextInputHandle | null>(null);
   const [respondingAction, setRespondingAction] = useState<"submit" | "dismiss" | null>(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
-  const pendingAction = isResponding ? respondingAction : null;
 
   const toggleOption = useCallback(
     (qIndex: number, optIndex: number, multiSelect: boolean) => {
@@ -421,7 +445,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   ]);
 
   const handleDeny = useCallback(() => {
-    if (!questions) return;
+    if (!questions || isResponding) return;
     setRespondingAction("dismiss");
     if (shouldSubmitEmptyOnDismiss(questions)) {
       onRespond({
@@ -437,7 +461,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
       behavior: "deny",
       message: "Dismissed by user",
     });
-  }, [questions, onRespond, otherTexts, permission.request.input, selections]);
+  }, [questions, isResponding, onRespond, otherTexts, permission.request.input, selections]);
 
   const handleSelectQuestion = useCallback((index: number) => {
     setActiveQuestionIndex(index);
@@ -470,6 +494,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
     [theme.colors.surface2, theme.colors.surface1, theme.colors.borderAccent],
   );
 
+  const pendingAction = isResponding ? respondingAction : null;
   const primaryDisabled = isResponding || (isLastQuestion ? !allAnswered : !activeQuestionAnswered);
   const primaryActionLabel = isLastQuestion
     ? t("message.question.submit")
@@ -533,7 +558,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   const dismissLabel = resolveDismissLabel(questions, t("common.actions.dismiss"));
   const selected = selections[resolvedActiveQuestionIndex] ?? new Set<number>();
   const otherText = otherTexts[resolvedActiveQuestionIndex] ?? "";
-  const showTextInput = activeQuestion ? questionShowsTextInput(activeQuestion) : false;
+  const showTextInput = questionShowsTextInput(questions[resolvedActiveQuestionIndex]);
 
   return (
     <View style={containerStyle} testID="question-form-card">
@@ -586,6 +611,8 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
           ) : null}
         </View>
       ) : null}
+
+      {responseError ? <Alert variant="error" description={responseError} size="sm" /> : null}
 
       <View style={actionsContainerStyle}>
         <Pressable
@@ -704,6 +731,10 @@ const styles = StyleSheet.create((theme) => ({
   optionDescription: {
     fontSize: theme.fontSize.base,
     lineHeight: 20,
+  },
+  optionPreviewText: {
+    lineHeight: 20,
+    ...(isWeb ? { whiteSpace: "pre-wrap", overflowWrap: "break-word" } : null),
   },
   selectionControl: {
     width: 18,

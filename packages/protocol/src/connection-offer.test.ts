@@ -77,3 +77,15 @@ describe("connection offer", () => {
     expect(parseConnectionOfferFromUrl("https://app.clisbot.com/pair")).toBeNull();
   });
 });
+
+it.each([2, 5])("preserves optional protected security pin in offer v%s", (v) => {
+  const offer = {
+    v,
+    ...(v === 5 ? { encrypted: true } : {}),
+    serverId: "srv_pin",
+    daemonPublicKeyB64: "public-key",
+    relay: { endpoint: "relay.example:443" },
+    minimumSecurityMode: "protected",
+  };
+  expect(ConnectionOfferSchema.parse(offer)).toMatchObject(offer);
+});

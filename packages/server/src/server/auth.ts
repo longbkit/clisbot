@@ -134,34 +134,44 @@ export function shouldBypassBearerAuth(method: string, path: string): boolean {
   return isBearerFreeRoute(path);
 }
 
-/**
- * Authorizes a request to the Agent MCP endpoint (/mcp/agents), which is exempt
- * from the global daemon-password middleware. Accepts either the per-daemon-run
- * capability token the daemon injects into its own agents' configs and MCP
- * client, or a valid daemon-password bearer (so existing password-authenticated
- * callers keep working). Device pairing requires the injected capability token;
- * password and anonymous admission remain available only in legacy mode.
- */
-export async function isAgentMcpRequestAuthorized(input: {
+/** Credential authority is established once per HTTP request, never by callerAgentId. */
+export type AgentMcpRequestAuthority =
+  | "agent-capability"
+  | "password-operator"
+  | "legacy-anonymous"
+  | "rejected";
+
+interface AgentMcpRequestAuthInput {
   password: string | undefined;
   devicePairingEnabled?: boolean;
   capabilityToken: string | null;
   authorizationHeader: string | undefined;
-}): Promise<boolean> {
-  if (!input.password && !input.devicePairingEnabled) {
-    return true;
-  }
+}
+
+/** Legacy anonymous admission remains compatible but grants no managed saved-Host authority. */
+export async function classifyAgentMcpRequestAuthority(
+  input: AgentMcpRequestAuthInput,
+): Promise<AgentMcpRequestAuthority> {
   const token = extractHttpBearerToken(input.authorizationHeader);
   if (input.capabilityToken !== null && token !== null) {
-    // Constant-time compare; length-guard first because timingSafeEqual throws
-    // on differing buffer lengths.
     const provided = Buffer.from(token);
     const expected = Buffer.from(input.capabilityToken);
-    if (provided.length === expected.length && timingSafeEqual(provided, expected)) {
-      return true;
-    }
+    if (provided.length === expected.length && timingSafeEqual(provided, expected))
+      return "agent-capability";
   }
-  return (
-    !input.devicePairingEnabled && isBearerTokenValidAsync({ password: input.password, token })
-  );
+  // Pairing mode intentionally accepts only the injected agent capability here.
+  if (input.devicePairingEnabled) return "rejected";
+  // The generic password validator allows no-password daemons. That is admission
+  // compatibility, not evidence that an HTTP caller owns an operator credential.
+  if (!input.password) return "legacy-anonymous";
+  return (await isBearerTokenValidAsync({ password: input.password, token }))
+    ? "password-operator"
+    : "rejected";
+}
+
+/** Boolean admission API retained for existing consumers. */
+export async function isAgentMcpRequestAuthorized(
+  input: AgentMcpRequestAuthInput,
+): Promise<boolean> {
+  return (await classifyAgentMcpRequestAuthority(input)) !== "rejected";
 }

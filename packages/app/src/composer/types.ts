@@ -10,8 +10,12 @@ export interface MessagePayload {
   activeTurnBehavior?: "steer" | "interrupt";
 }
 
+/**
+ * Text the draft owner hands the editor. `hydrated` is the owner's answer to a mount:
+ * the draft's text as persisted or still pending from the editor that unmounted.
+ */
 export interface TextReplacement {
-  kind: "initial" | "replace";
+  kind: "initial" | "hydrated" | "replace";
   key: string;
   text: string;
 }

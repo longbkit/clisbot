@@ -386,12 +386,16 @@ export const vi: TranslationResources = {
       insertAndSend: "Chèn bản chép lời và gửi",
       failed: "Đọc chính tả thất bại: {{error}}",
       failedRetry: "Đọc chính tả thất bại. Nhấn thử lại.",
+
+      paused: "Micrô bị gián đoạn. Đang chờ tiếp tục…",
     },
     question: {
       submit: "Gửi",
       next: "Tiếp",
       answerPlaceholder: "Nhập câu trả lời...",
       otherPlaceholder: "Khác...",
+
+      responseFailed: "Không thể gửi câu trả lời. Hãy thử lại.",
     },
     todo: {
       title: "Công việc",
@@ -510,6 +514,14 @@ export const vi: TranslationResources = {
       projectFilter: {
         label: "Dự án",
         all: "Tất cả dự án",
+      },
+
+      sort: {
+        label: "Sắp xếp",
+        created: "Ngày tạo",
+        manual: "Thủ công",
+        lastPrompt: "Prompt gần nhất",
+        updateHost: "Cập nhật các Host để sắp xếp workspace",
       },
     },
     filterEmpty: {
@@ -938,9 +950,16 @@ export const vi: TranslationResources = {
       cancel: "Hủy",
       installInstructions: "Hướng dẫn cài đặt",
       installInstructionsFor: "Hướng dẫn cài đặt {{provider}}",
+
+      addProvider: "Thêm {{provider}}",
     },
     errors: {
       unableToInstall: "Không thể cài provider",
+    },
+
+    clearSearch: "Xóa tìm kiếm",
+    types: {
+      acp: "ACP",
     },
   },
   providerSelection: {
@@ -1352,6 +1371,8 @@ export const vi: TranslationResources = {
       log: {
         noOutput: "Không có output",
       },
+
+      updateHost: "Cập nhật Host để xem chi tiết thiết lập workspace",
     },
     browser: {
       unavailable: {
@@ -1396,6 +1417,10 @@ export const vi: TranslationResources = {
       hostDisconnected: "Host chưa được kết nối",
       updateHost: "Hãy cập nhật host để dùng trình hiển thị terminal gốc.",
       unableToSubscribe: "Không thể theo dõi terminal",
+
+      fileUploaded: "Đã tải file lên",
+      pasteFileFailed: "Không thể dán file: {{reason}}",
+      uploadingFile: "Đang tải file lên…",
     },
     tabs: {
       loading: "Đang tải...",
@@ -1514,6 +1539,8 @@ export const vi: TranslationResources = {
         copyProjectPath: "Sao chép đường dẫn dự án",
         copyBranchName: "Sao chép tên branch",
         showSetup: "Xem thiết lập",
+
+        workspaceActionsUnhealthy: "Thao tác workspace, có dịch vụ đang gặp lỗi",
       },
       toasts: {
         workspacePathUnavailable: "Chưa có đường dẫn workspace",
@@ -1555,6 +1582,9 @@ export const vi: TranslationResources = {
         exitCode: "exit {{code}}",
         startFailed: "Không thể khởi động {{scriptName}}",
         stopFailed: "Không thể dừng {{scriptName}}",
+
+        running: "Đang chạy",
+        runningCount: "{{count}} đang chạy",
       },
     },
     tree: {
@@ -1746,6 +1776,8 @@ export const vi: TranslationResources = {
           loadError: "Không thể tải commit",
           empty: "Chưa có commit",
         },
+
+        all: "Tất cả thay đổi",
       },
       openInEditor: {
         open: "Mở",
@@ -1869,6 +1901,10 @@ export const vi: TranslationResources = {
         generic: "Thiết lập {{brand}} trên host này để dùng các tính năng của nó.",
       },
     },
+
+    sheet: {
+      openAsTab: "Mở thành tab",
+    },
   },
   workspaceLabels: {
     title: "Nhãn",
@@ -1922,8 +1958,10 @@ export const vi: TranslationResources = {
     },
     fields: {
       project: "Dự án",
-      base: "Gốc",
       baseNotApplicable: "Không áp dụng",
+
+      branch: "Branch",
+      host: "Host",
     },
     titlePlaceholder: "Tiêu đề (không bắt buộc)",
     errors: {
@@ -2136,7 +2174,6 @@ export const vi: TranslationResources = {
         preview: "Xem trước",
         source: "Mã nguồn",
         deletedTitle: "File đã bị xóa trên ổ đĩa",
-        checkFailedTitle: "Không thể kiểm tra file trên ổ đĩa",
         preservedDescription: "Bản đang mở vẫn được giữ lại.",
         conflictDescription:
           "Bản trong trình soạn thảo vẫn được giữ lại. Hãy chọn phiên bản muốn giữ.",
@@ -2145,6 +2182,26 @@ export const vi: TranslationResources = {
         reloadTitle: "Tải lại từ ổ đĩa?",
         reloadMessage: "Các thay đổi chưa lưu của bạn sẽ bị mất.",
       },
+
+      filePanels: {
+        pickerTitleExtension: "Mở file .{{extension}} bằng",
+        pickerTitleFilename: "Mở {{filename}} bằng",
+        dontAskAgain: "Không hỏi lại",
+        use: "Sử dụng",
+        openWith: "Mở bằng…",
+        alwaysUseExtension: "Luôn dùng cho .{{extension}}",
+        alwaysUseFilename: "Luôn dùng cho {{filename}}",
+        option: "{{title}} — {{owner}}",
+        builtin: {
+          owner: "Clisbot",
+          markdown: "Markdown",
+          html: "HTML",
+          image: "Ảnh",
+          source: "Mã nguồn",
+        },
+      },
+      documentUnsupported: "Không thể hiển thị file {{type}} trên thiết bị này",
+      notFound: "Không tìm thấy file",
     },
     files: {
       label: "File",
@@ -2206,6 +2263,8 @@ export const vi: TranslationResources = {
       permissions: "Quyền",
       diagnostics: "Chẩn đoán",
       about: "Giới thiệu",
+
+      files: "File",
     },
     layout: {
       openInSidePane: {
@@ -2290,10 +2349,10 @@ export const vi: TranslationResources = {
       automaticHint: "Clisbot tự chọn một model nhanh đang có sẵn",
       preferredHint: "Chọn model mà Clisbot sẽ dùng",
       model: "Model",
-      fallbackHint:
-        "Nếu model này không khả dụng, Clisbot sẽ chuyển sang một model khác đang có sẵn",
       docs: "Tài liệu",
       saveError: "Không thể cập nhật cài đặt tạo metadata",
+
+      modelHint: "Chỉ sử dụng model này. Nếu lỗi, Clisbot không thử model khác",
     },
     general: {
       title: "Chung",
@@ -2370,11 +2429,6 @@ export const vi: TranslationResources = {
     },
     diagnostics: {
       title: "Chẩn đoán",
-      legacyTerminalRenderer: {
-        label: "Dùng trình hiển thị terminal cũ",
-        description: "Dùng terminal WebView trước đây sau khi mở lại terminal",
-        accessibilityLabel: "Dùng trình hiển thị terminal cũ",
-      },
       testAudio: "Thử âm thanh",
       playTest: "Phát thử",
       playing: "Đang phát...",
@@ -2571,6 +2625,8 @@ export const vi: TranslationResources = {
         showKeyboardShortcuts:
           "Dùng được khi con trỏ không nằm trong ô nhập văn bản hoặc terminal.",
       },
+
+      captureIndexPrompt: "Kết thúc bằng một số từ 1 đến 9.",
     },
     integrations: {
       title: "Tích hợp",
@@ -3018,9 +3074,83 @@ export const vi: TranslationResources = {
         cancel: "Hủy",
       },
     },
+
+    files: {
+      title: "File",
+      askEveryTime: "Hỏi mỗi lần",
+      askAgain: "Hỏi lại",
+      askAgainFor: "Hỏi lại với {{label}}",
+      unavailable: "Không có trên Host đã kết nối",
+      empty: "Các trình xem file xuất hiện ở đây khi plugin thêm vào",
+    },
   },
   hub: hub.vi,
   connectors: connectors.vi,
   bots: bots.vi,
   heartbeats: heartbeats.vi,
+
+  providerUsage: {
+    options: "Cài đặt",
+    refreshFailed: "Không thể làm mới mức sử dụng",
+    noHosts: "Không có Host đã kết nối",
+    agentError: "Không thể tải mức sử dụng: {{reason}}",
+    pin: "Ghim",
+    unpin: "Bỏ ghim",
+    displayAs: "Phần trăm",
+    displayUsed: "Đã dùng",
+    displayRemaining: "Còn lại",
+    showInSidebar: "Tóm tắt ở thanh bên",
+    showInSidebarHint: "Các cửa sổ đã ghim xuất hiện ở chân thanh bên",
+    runToRefresh: "Chạy {{command}} để làm mới.",
+    signInAgain: "Đăng nhập lại.",
+    loginRejected: "Đăng nhập bị từ chối (HTTP {{status}}). {{remedy}}",
+    loginExpired: "Đăng nhập hết hạn {{relativeTime}}. {{remedy}}",
+    title: "Mức sử dụng gói",
+    refresh: "Làm mới",
+    refreshAll: "Làm mới tất cả",
+    refreshing: "Đang làm mới...",
+    loading: "Đang tải mức sử dụng...",
+    empty: "Chưa có dữ liệu sử dụng",
+    errorTitle: "Không thể tải mức sử dụng",
+    hostUnavailable: "Kết nối {{host}} để xem mức sử dụng",
+    hostUpgradeRequired: "Cập nhật {{host}} để xem mức sử dụng",
+    clientUnavailable: "Kết nối Host chưa sẵn sàng",
+    retry: "Thử lại",
+    tooltipLoading: "Đang tải mức sử dụng gói...",
+    status: {
+      error: "Lỗi",
+      unavailable: "Không khả dụng",
+    },
+    values: {
+      used: "Đã dùng {{percentage}}",
+      remaining: "Còn {{amount}}",
+    },
+    labels: {
+      session: "Phiên",
+      weekly: "Hằng tuần",
+      monthly: "Hằng tháng",
+      codeReview: "Review code",
+      credits: "Credits",
+      monthlyCredits: "Credits hằng tháng",
+    },
+    duration: {
+      days: "{{value}}n",
+      hours: "{{value}}g",
+      minutes: "{{value}}p",
+    },
+    timing: {
+      lastUpdated: "Cập nhật gần nhất {{relativeTime}}",
+      noSuccessfulUpdate: "Chưa có lần cập nhật thành công",
+      resetTimePassed: "Đã qua thời gian đặt lại",
+      resettingNow: "đang đặt lại",
+      resetsIn: "đặt lại sau {{duration}}",
+      runsOutNow: "sắp hết ngay",
+      runsOutIn: "hết sau {{duration}}",
+      justNow: "vừa xong",
+      daysAgo: "{{value}} ngày trước",
+      hoursAgo: "{{value}} giờ trước",
+      minutesAgo: "{{value}} phút trước",
+      updated: "Đã cập nhật {{relativeTime}}",
+    },
+  },
 };

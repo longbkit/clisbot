@@ -80,13 +80,6 @@ export async function pressDirectNewTabShortcut(page: Page, key: string): Promis
 
 // ─── Tab bar assertions ───────────────────────────────────────────────────
 
-/** Assert the inline plus button is visible in the tab bar. */
-export async function assertNewChatTileVisible(page: Page): Promise<void> {
-  await expect(
-    page.getByTestId("workspace-new-tab-button").filter({ visible: true }).first(),
-  ).toBeVisible();
-}
-
 /** Assert the New tab button is visible in the tab bar. */
 export async function assertNewTabMenuTriggerVisible(page: Page): Promise<void> {
   await expect(
@@ -130,13 +123,6 @@ export async function waitForTabWithTitle(
       .filter({ visible: true })
       .first(),
   ).toBeVisible({ timeout });
-}
-
-/** Assert the inline plus button is visible in the tab bar. */
-export async function assertSingleNewTabButton(page: Page): Promise<void> {
-  const buttons = page.getByTestId("workspace-new-tab-button").filter({ visible: true });
-  const count = await buttons.count();
-  expect(count).toBeGreaterThanOrEqual(1);
 }
 
 // ─── No-flash measurement ──────────────────────────────────────────────────
@@ -229,10 +215,26 @@ export function terminalSurfaceLocator(page: Page) {
 
 export async function expectAgentTabActive(page: Page, agentId: string): Promise<void> {
   const tabTestId = `workspace-tab-agent_${agentId}`;
-  await expect(page.getByTestId(tabTestId).filter({ visible: true })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  const tab = page.getByTestId(tabTestId).filter({ visible: true });
+  const switcher = page
+    .getByTestId("workspace-tab-switcher-trigger")
+    .filter({ visible: true })
+    .first();
+  await expect(tab.or(switcher)).toHaveCount(1);
+  if (await switcher.isVisible()) {
+    await switcher.click();
+    const option = page
+      .getByTestId(`workspace-tab-option-agent_${agentId}`)
+      .filter({ visible: true });
+    // Assert the existing selection before pressing anything: selecting the expected agent
+    // first would conceal a wrong active tab. The selected option then closes the switcher.
+    await expect(option).toHaveAttribute("role", "button");
+    await expect(option).toHaveAttribute("aria-selected", "true");
+    await option.click();
+    await expect(option).not.toBeVisible();
+    return;
+  }
+  await expect(tab).toHaveAttribute("aria-selected", "true");
   await expect(getActiveTabTestId(page)).resolves.toBe(tabTestId);
 }
 

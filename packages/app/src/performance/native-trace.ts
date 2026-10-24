@@ -1,3 +1,4 @@
+import { watchdog } from "@/watchdog";
 import type { DaemonClientTrace } from "@clisbot/client/internal/daemon-client";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { isProfileBuild, isSyntheticReactProfileBuild } from "@/constants/build-profile";
@@ -51,6 +52,8 @@ export const nativePerformanceTrace: DaemonClientTrace = {
   },
 };
 
+const nativeSink = nativePerformanceTrace.isEnabled() ? nativePerformanceTrace : null;
+
 function formatSectionName(name: string, args?: Record<string, string>): string {
   if (!args) {
     return name;
@@ -59,12 +62,32 @@ function formatSectionName(name: string, args?: Record<string, string>): string 
   return `${name}|${fields.join(";")}`;
 }
 
+const instantSinks: ((name: string, args?: Record<string, string>) => void)[] = [];
+if (watchdog) instantSinks.push(watchdog.record);
+if (nativeSink)
+  instantSinks.push((name, args) => {
+    nativeSink.beginSection(name, args);
+    nativeSink.endSection();
+  });
 export function traceInstant(name: string, args?: Record<string, string>): void {
-  if (!nativePerformanceTrace.isEnabled()) {
-    return;
-  }
-  nativePerformanceTrace.beginSection(name, args);
-  nativePerformanceTrace.endSection();
+  for (const write of instantSinks) write(name, args);
+}
+
+/** Each client owns its section stack; overlapping hosts never share span identity. */
+export function createPerformanceTrace(context: Record<string, string>): DaemonClientTrace {
+  const sinks = [watchdog?.trace(context), nativeSink].filter(
+    (sink): sink is DaemonClientTrace => sink != null,
+  );
+  return {
+    correlate,
+    isEnabled: () => sinks.length > 0,
+    beginSection(name, args) {
+      for (const sink of sinks) sink.beginSection(name, args);
+    },
+    endSection() {
+      for (const sink of sinks) sink.endSection();
+    },
+  };
 }
 
 /** Conversation admission keys share the existing bounded, profile-only alias registry. */

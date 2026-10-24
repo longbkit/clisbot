@@ -35,6 +35,8 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
   omitTabDestinations?: boolean;
   /** Shares the first navigation row's height; status changes never insert another row. */
   accessory?: ReactNode;
+  /** Sits to the right of the first row, which shrinks to make room. */
+  firstRowTrailing?: ReactNode;
 }
 
 const TAB_DESTINATIONS: ReadonlySet<BuiltinSidebarNavId> = new Set(["history", "schedules"]);
@@ -49,7 +51,9 @@ export function SidebarNavRows({
   onBeforeNavigate,
   omitTabDestinations = false,
   accessory,
+  firstRowTrailing,
 }: SidebarNavRowsProps) {
+  accessory ??= firstRowTrailing;
   const { items } = useSidebarNavItems("header");
   const visibleItems = useMemo(
     () =>
@@ -198,14 +202,13 @@ function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
   );
 }
 
-function SidebarSearchRow({ onBeforeNavigate }: SidebarNavRowProps) {
+function SidebarSearchRow() {
   const { t } = useTranslation();
   const shortcutKeys = useShortcutKeys(builtinSidebarNavShortcutAction("search"));
   const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
   const handlePress = useCallback(() => {
-    onBeforeNavigate?.();
     setCommandCenterOpen(true);
-  }, [onBeforeNavigate, setCommandCenterOpen]);
+  }, [setCommandCenterOpen]);
 
   return (
     <SidebarHeaderRow

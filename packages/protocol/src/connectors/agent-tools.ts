@@ -61,6 +61,7 @@ export const AGENT_TOOL_GROUPS: readonly AgentToolGroup[] = [
       t("get_agent_status", "Read an agent's state"),
       t("get_agent_activity", "Read what an agent did recently"),
       t("list_agents", "List the agents on this Host"),
+      t("list_hosts", "List connected Hosts available to this agent"),
       t("update_agent", "Rename an agent or change its labels"),
       t("set_agent_mode", "Change an agent's permission mode"),
       t("cancel_agent", "Stop an agent's current turn"),

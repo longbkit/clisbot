@@ -1,11 +1,11 @@
 import { BackHeader } from "@/components/headers/back-header";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Keyboard, Pressable, Text, View } from "react-native";
 import type { DimensionValue, StyleProp, ViewStyle } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   getOverlayRoot,
@@ -13,9 +13,9 @@ import {
   useGlobalWebOverlayLayer,
   useWebOverlayRegistration,
 } from "../lib/overlay-root";
-import { type BottomSheetBackgroundProps } from "@gorhom/bottom-sheet";
+import { BottomSheetHandle, type BottomSheetBackgroundProps } from "@gorhom/bottom-sheet";
 import Animated from "react-native-reanimated";
-import { ArrowLeft, Search, X } from "lucide-react-native";
+import { ArrowLeft, Search, X, type LucideIcon } from "lucide-react-native";
 import {
   IsolatedBottomSheetModal,
   SheetVisibleFrame,
@@ -69,7 +69,7 @@ export interface SheetHeader {
 }
 
 const SCROLL_CONTENT_GROW = { flexGrow: 1 };
-const ABSOLUTE_FILL_STYLE = { ...StyleSheet.absoluteFillObject };
+const ABSOLUTE_FILL_STYLE = { ...StyleSheet.absoluteFill };
 const NATIVE_DIALOG_SNAP_POINTS = ["100%"];
 
 const styles = StyleSheet.create((theme) => ({
@@ -80,7 +80,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: "transparent",
   },
   desktopOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     alignItems: "center",
@@ -237,7 +237,8 @@ const styles = StyleSheet.create((theme) => ({
 
 const WEB_EXIT_DURATION_MS = 160;
 
-function SheetBackground({ style }: BottomSheetBackgroundProps) {
+/** The compact sheet's surface: Gorhom's `backgroundComponent` for every bottom sheet. */
+export function SheetBackground({ style }: BottomSheetBackgroundProps) {
   const { theme } = useUnistyles();
   const combinedStyle = useMemo(
     () => [
@@ -253,6 +254,39 @@ function SheetBackground({ style }: BottomSheetBackgroundProps) {
   return <Animated.View pointerEvents="none" style={combinedStyle} />;
 }
 
+const ThemedBottomSheetHandle = withUnistyles(BottomSheetHandle, (theme) => ({
+  indicatorStyle: { backgroundColor: theme.colors.palette.zinc[600] },
+}));
+
+const HANDLE_WITH_CONTENT_STYLE = { paddingHorizontal: 0, paddingBottom: 0 };
+
+/**
+ * The compact sheet's drag handle: Gorhom's `handleComponent` for every bottom sheet. Children
+ * join the handle, so a header passed here drags the sheet like the indicator does. That is how a
+ * sheet whose content scrolls on its own keeps its header draggable without content panning.
+ */
+export function SheetHandle({
+  children,
+  // Gorhom passes `indicatorStyle={undefined}`, which would override the themed indicator.
+  indicatorStyle: _indicatorStyle,
+  ...props
+}: ComponentProps<typeof BottomSheetHandle>) {
+  if (!children) return <ThemedBottomSheetHandle {...props} />;
+  // The children carry their own semantics; the handle's slider role would swallow them on web.
+  return (
+    <ThemedBottomSheetHandle
+      {...props}
+      style={HANDLE_WITH_CONTENT_STYLE}
+      accessible={false}
+      accessibilityRole={null}
+      accessibilityLabel={null}
+      accessibilityHint={null}
+    >
+      {children}
+    </ThemedBottomSheetHandle>
+  );
+}
+
 /**
  * The sheet body, indented to the sheet's content inset.
  *
@@ -265,6 +299,38 @@ function SheetBackground({ style }: BottomSheetBackgroundProps) {
  */
 function SheetContent({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
   return <View style={[styles.sheetContent, style]}>{children}</View>;
+}
+
+/**
+ * An icon action in a sheet header's trailing rail, drawn like the Close button so a header's
+ * actions line up with it at one size. Pass it through `SheetHeader.actions`.
+ */
+export function SheetHeaderIconButton({
+  icon: Icon,
+  accessibilityLabel,
+  onPress,
+  testID,
+}: {
+  icon: LucideIcon;
+  accessibilityLabel: string;
+  onPress: () => void;
+  testID?: string;
+}) {
+  const { theme } = useUnistyles();
+  const compact = useIsCompactFormFactor();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.closeButton, compact && styles.mobileHeaderTarget]}
+      onPress={onPress}
+      testID={testID}
+    >
+      {({ pressed }) => (
+        <Icon size={16} color={pressed ? theme.colors.foreground : theme.colors.foregroundMuted} />
+      )}
+    </Pressable>
+  );
 }
 
 export function SheetHeaderView({
@@ -324,19 +390,11 @@ export function SheetHeaderView({
         </View>
         {header.actions ? <View style={styles.headerActions}>{header.actions}</View> : null}
         {showCloseButton ? (
-          <Pressable
-            accessibilityRole="button"
+          <SheetHeaderIconButton
+            icon={X}
             accessibilityLabel={t("common.actions.close")}
-            style={[styles.closeButton, compact && styles.mobileHeaderTarget]}
             onPress={onClose}
-          >
-            {({ pressed }) => (
-              <X
-                size={16}
-                color={pressed ? theme.colors.foreground : theme.colors.foregroundMuted}
-              />
-            )}
-          </Pressable>
+          />
         ) : null}
       </View>
       {search ? (
@@ -469,7 +527,6 @@ export function AdaptiveModalSheet({
   bodyStyle,
   contextBridge = null,
 }: AdaptiveModalSheetProps) {
-  const { theme } = useUnistyles();
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
   const insets = useSafeAreaInsets();
@@ -504,10 +561,6 @@ export function AdaptiveModalSheet({
         </View>
       ) : null,
     [footer, footerClearanceStyle, footerContainerStyle],
-  );
-  const handleIndicatorStyle = useMemo(
-    () => ({ backgroundColor: theme.colors.palette.zinc[600] }),
-    [theme.colors.palette.zinc],
   );
   useEffect(() => {
     if (!isWeb && visible) {
@@ -626,7 +679,8 @@ export function AdaptiveModalSheet({
         enableContentPanningGesture={!isPage}
         enableHandlePanningGesture={!isPage}
         {...compactTaskPresentation(isPage)}
-        handleIndicatorStyle={handleIndicatorStyle}
+        backgroundComponent={SheetBackground}
+        handleComponent={isPage ? null : SheetHandle}
         keyboardBehavior="extend"
         keyboardBlurBehavior="restore"
         accessible={false}

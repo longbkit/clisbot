@@ -56,18 +56,37 @@ it.each(["primary-action", "dismiss"])(
   (action) => {
     const respond = vi.fn();
     const { rerender } = render(
-      <QuestionFormCard permission={permission} isResponding={false} onRespond={respond} />,
+      <QuestionFormCard
+        responseError={null}
+        permission={permission}
+        isResponding={false}
+        onRespond={respond}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Yes" }));
     const testId = `question-form-${action}`;
     const originalLabel = screen.getByTestId(testId).textContent;
     fireEvent.click(screen.getByTestId(testId));
     expect(respond).toHaveBeenCalledTimes(1);
-    rerender(<QuestionFormCard permission={permission} isResponding onRespond={respond} />);
+    rerender(
+      <QuestionFormCard
+        responseError={null}
+        permission={permission}
+        isResponding
+        onRespond={respond}
+      />,
+    );
     expect(screen.getByTestId("pending-spinner")).toBeTruthy();
     fireEvent.click(screen.getByTestId(testId));
     expect(respond).toHaveBeenCalledTimes(1);
-    rerender(<QuestionFormCard permission={permission} isResponding={false} onRespond={respond} />);
+    rerender(
+      <QuestionFormCard
+        responseError={null}
+        permission={permission}
+        isResponding={false}
+        onRespond={respond}
+      />,
+    );
     expect(screen.queryByTestId("pending-spinner")).toBeNull();
     expect(screen.getByTestId(testId).textContent).toBe(originalLabel);
     fireEvent.click(screen.getByTestId(testId));

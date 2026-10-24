@@ -1,4 +1,6 @@
+import { watchdog } from "@/watchdog";
 import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from "react";
+
 import { isSyntheticReactProfileBuild } from "@/constants/build-profile";
 import {
   consumeRenderProfileCommand,
@@ -90,14 +92,100 @@ function getSearchParam(name: string): string | null {
   return new URLSearchParams(search).get(name);
 }
 
-export function isRenderProfileEnabled(): boolean {
-  if (isSyntheticReactProfileBuild) return nativeCollecting;
-  return (
-    globalThis.__CLISBOT_RENDER_PROFILE_ENABLED__ === true ||
-    getSearchParam("renderProfile") === "1"
-  );
+interface RenderSink {
+  isEnabled(): boolean;
+  render(sample: RenderProfileSample): void;
+  reasons(id: string, reasons: string[]): void;
 }
 
+function createBrowserSink(): RenderSink {
+  return {
+    isEnabled: () =>
+      globalThis.__CLISBOT_RENDER_PROFILE_ENABLED__ === true ||
+      getSearchParam("renderProfile") === "1",
+    render(sample) {
+      globalThis.__CLISBOT_RENDER_PROFILE__ ??= [];
+      globalThis.__CLISBOT_RESET_RENDER_PROFILE__ ??= () => {
+        globalThis.__CLISBOT_RENDER_PROFILE__ = [];
+        globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ = {};
+      };
+      // Browser QA compares cumulative commit counts until an explicit reset.
+      globalThis.__CLISBOT_RENDER_PROFILE__.push(sample);
+    },
+    reasons(id, reasons) {
+      globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ??= {};
+      const counts = (globalThis.__CLISBOT_RENDER_PROFILE_REASONS__[id] ??= {});
+      for (const reason of reasons) counts[reason] = (counts[reason] ?? 0) + 1;
+    },
+  };
+}
+
+function createSyntheticSink(): RenderSink {
+  return {
+    isEnabled: () => nativeCollecting,
+    render(sample) {
+      const { id, phase, actualDuration, baseDuration, startTime, commitTime } = sample;
+      if (!nativeCollecting) return;
+      globalThis.__CLISBOT_RENDER_PROFILE__ ??= [];
+      if (
+        isSyntheticReactProfileBuild &&
+        globalThis.__CLISBOT_RENDER_PROFILE__.length >= NATIVE_SAMPLE_LIMIT
+      ) {
+        dropped += 1;
+        return;
+      }
+      globalThis.__CLISBOT_RENDER_PROFILE__.push(sample);
+      {
+        if (!aliases.has(id)) aliases.set(id, aliases.size + 1);
+        traceInstant("clisbot.react.render", {
+          i: String(aliases.get(id)),
+          p: phase[0]!,
+          a: actualDuration.toFixed(2),
+          b: baseDuration.toFixed(2),
+          s: startTime.toFixed(2),
+          c: commitTime.toFixed(2),
+          n: performance.now().toFixed(2),
+        });
+      }
+    },
+    reasons(id, reasons) {
+      if (!nativeCollecting || reasons.length === 0) {
+        return;
+      }
+      globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ??= {};
+      if (
+        isSyntheticReactProfileBuild &&
+        (Object.keys(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__).length >= 256 ||
+          reasons.length > 64)
+      ) {
+        dropped += 1;
+        return;
+      }
+      const counts = (globalThis.__CLISBOT_RENDER_PROFILE_REASONS__[id] ??= {});
+      for (const reason of reasons) {
+        if (
+          isSyntheticReactProfileBuild &&
+          !(reason in counts) &&
+          Object.keys(counts).length >= 64
+        ) {
+          dropped += 1;
+          continue;
+        }
+        counts[reason] = (counts[reason] ?? 0) + 1;
+      }
+    },
+  };
+}
+
+// Choose the destination once. Browser QA can still enable capture at runtime.
+function selectRenderSink(): RenderSink {
+  if (isSyntheticReactProfileBuild) return createSyntheticSink();
+  if (watchdog) return { isEnabled: () => true, render: watchdog.render, reasons: () => {} };
+  return createBrowserSink();
+}
+const sink = selectRenderSink();
+
+export const isRenderProfileEnabled = sink.isEnabled;
 const onRender: ProfilerOnRenderCallback = (
   id,
   phase,
@@ -105,47 +193,10 @@ const onRender: ProfilerOnRenderCallback = (
   baseDuration,
   startTime,
   commitTime,
-) => {
-  if (isSyntheticReactProfileBuild && !nativeCollecting) return;
-  globalThis.__CLISBOT_RENDER_PROFILE__ ??= [];
-  if (
-    isSyntheticReactProfileBuild &&
-    globalThis.__CLISBOT_RENDER_PROFILE__.length >= NATIVE_SAMPLE_LIMIT
-  ) {
-    dropped += 1;
-    return;
-  }
-  globalThis.__CLISBOT_RENDER_PROFILE__.push({
-    id,
-    phase,
-    actualDuration,
-    baseDuration,
-    startTime,
-    commitTime,
-  });
-  if (isSyntheticReactProfileBuild) {
-    if (!aliases.has(id)) aliases.set(id, aliases.size + 1);
-    traceInstant("clisbot.react.render", {
-      i: String(aliases.get(id)),
-      p: phase[0]!,
-      a: actualDuration.toFixed(2),
-      b: baseDuration.toFixed(2),
-      s: startTime.toFixed(2),
-      c: commitTime.toFixed(2),
-      n: performance.now().toFixed(2),
-    });
-  }
-};
+) => sink.render({ id, phase, actualDuration, baseDuration, startTime, commitTime });
 
 export function RenderProfile({ id, children }: { id: string; children: ReactNode }) {
-  if (!isRenderProfileEnabled()) {
-    return children;
-  }
-
-  globalThis.__CLISBOT_RENDER_PROFILE__ ??= [];
-  globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ??= {};
-  globalThis.__CLISBOT_RESET_RENDER_PROFILE__ = resetRenderProfile;
-
+  if (!sink.isEnabled()) return children;
   return (
     <Profiler id={id} onRender={onRender}>
       {children}
@@ -154,24 +205,5 @@ export function RenderProfile({ id, children }: { id: string; children: ReactNod
 }
 
 export function recordRenderProfileReasons(id: string, reasons: string[]) {
-  if (!isRenderProfileEnabled() || reasons.length === 0) {
-    return;
-  }
-  globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ??= {};
-  if (
-    isSyntheticReactProfileBuild &&
-    (Object.keys(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__).length >= 256 ||
-      reasons.length > 64)
-  ) {
-    dropped += 1;
-    return;
-  }
-  const counts = (globalThis.__CLISBOT_RENDER_PROFILE_REASONS__[id] ??= {});
-  for (const reason of reasons) {
-    if (isSyntheticReactProfileBuild && !(reason in counts) && Object.keys(counts).length >= 64) {
-      dropped += 1;
-      continue;
-    }
-    counts[reason] = (counts[reason] ?? 0) + 1;
-  }
+  if (sink.isEnabled()) sink.reasons(id, reasons);
 }

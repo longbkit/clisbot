@@ -110,7 +110,7 @@ async function createClisbotOwnedWorktree(
       baseBranch: "main",
       branchName: worktreeSlug,
     },
-    runSetup: false,
+
     clisbotHome,
   });
 }

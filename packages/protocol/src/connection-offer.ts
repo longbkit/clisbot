@@ -23,6 +23,9 @@ export const ConnectionOfferV2Schema = z.object({
       useTls: z.boolean().optional(),
     })
     .optional(),
+  // COMPAT(relayProtectedSecurity): added in v0.13.0. Present when the daemon requires
+  // protected endpoint security; clients pin it before their first handshake.
+  minimumSecurityMode: z.literal("protected").optional(),
 });
 
 export type ConnectionOfferV2 = z.infer<typeof ConnectionOfferV2Schema>;
@@ -37,6 +40,7 @@ export const ConnectionOfferV5Schema = z
     encrypted: z.literal(true),
     relay: ConnectionOfferV2Schema.shape.relay.optional(),
     direct: ConnectionOfferV2Schema.shape.direct,
+    minimumSecurityMode: ConnectionOfferV2Schema.shape.minimumSecurityMode,
   })
   .refine((value) => value.relay || value.direct, "A connection route is required");
 export const ConnectionOfferSchema = z.union([ConnectionOfferV2Schema, ConnectionOfferV5Schema]);

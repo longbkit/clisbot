@@ -11,7 +11,8 @@ import { useTranslation } from "react-i18next";
 import { Globe, SquarePen, SquareTerminal } from "lucide-react-native";
 import invariant from "tiny-invariant";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
-import { resolvePluginIcon } from "@/plugins/icons";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { pluginIconComponent } from "@/plugins/icons";
 import { useInstalledPlugins } from "@/plugins/registry";
 import { pluginPanelSupportsLocation } from "@/plugins/workspace-panels/locations";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
@@ -110,6 +111,7 @@ export function useWorkspaceTabLaunchCatalog(input: {
     launcher.workspaceDirectory ?? null,
   );
   const plugins = useInstalledPlugins();
+  const isCompact = useIsCompactFormFactor();
   ensurePanelsRegistered();
 
   const launchSelection = useCallback(
@@ -123,7 +125,6 @@ export function useWorkspaceTabLaunchCatalog(input: {
   }, [router, serverId]);
 
   return useMemo(() => {
-    const isExplorerMenu = host === "explorer" && surface === "menu";
     const changesPresentation = getLaunchPresentation("changes_tree");
     const diffPresentation = getLaunchPresentation("working_diff");
     const filesPresentation = getLaunchPresentation("files");
@@ -136,7 +137,6 @@ export function useWorkspaceTabLaunchCatalog(input: {
         shortcutActionId: "workspace-tab-target-agent",
         disabled: false,
         panelKind: "draft",
-        hidden: isExplorerMenu,
         launch: launchSelection(BUILT_IN_SELECTIONS.agent),
       },
       terminal: {
@@ -165,7 +165,8 @@ export function useWorkspaceTabLaunchCatalog(input: {
         shortcutActionId: "workspace-tab-target-changes",
         disabled: false,
         panelKind: "working_diff",
-        hidden: !launcher.showChanges,
+        // Compact Changes shows each file's diff inline, so a separate Diff panel is redundant.
+        hidden: !launcher.showChanges || isCompact,
         launch: launchSelection(BUILT_IN_SELECTIONS.diff),
       },
       files: {
@@ -215,8 +216,8 @@ export function useWorkspaceTabLaunchCatalog(input: {
         };
         pluginItems.push({
           id: `plugin:${plugin.id}:${panel.id}`,
-          label: panel.title,
-          Icon: resolvePluginIcon(panel.icon),
+          label: plugin.i18n.resolve(panel.title, plugin.locale),
+          Icon: pluginIconComponent(panel.icon),
           disabled: false,
           panelKind: "plugin",
           launch: launchSelection(selection),
@@ -229,7 +230,7 @@ export function useWorkspaceTabLaunchCatalog(input: {
     if (pluginItems.length > 0) {
       groups.push({ id: "plugin-panels", label: null, items: pluginItems });
     }
-    if (!isExplorerMenu && profiles.length > 0) {
+    if (profiles.length > 0) {
       groups.push({
         id: "terminal-profiles",
         label: t("workspace.tabs.actions.terminalProfilesMenu"),
@@ -275,6 +276,7 @@ export function useWorkspaceTabLaunchCatalog(input: {
   }, [
     terminalAccess,
     editTerminalProfiles,
+    isCompact,
     launchSelection,
     launcher,
     plugins,

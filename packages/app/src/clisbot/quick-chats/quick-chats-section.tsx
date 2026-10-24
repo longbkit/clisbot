@@ -130,7 +130,7 @@ function useQuickChatRows(): QuickChatRow[] {
             serverId: host.serverId,
             workspaceId: workspace.id,
             title: workspace.title?.trim() || workspace.name,
-            startedAt: workspace.createdAt ?? new Date(0).toISOString(),
+            startedAt: workspace.createdAt?.toISOString() ?? new Date(0).toISOString(),
             hostLabel: hosts.length > 1 ? host.label : null,
           });
         }

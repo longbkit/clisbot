@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { getServerId } from "./server-id";
+import { projectEquivalenceViewKey } from "./project-view-key";
 
 interface ContextMenuAnchor {
   x: number;
@@ -307,20 +308,78 @@ export async function closeMobileAgentSidebar(page: Page): Promise<void> {
 
 // The mobile sidebar panel animates via translateX. Waiting for its footer to be fully visible
 // prevents a click from targeting a button while the panel is still moving. The footer is in the
-// list with and without the Home tabs (the Chat tab drops the Inbox row).
+// list with and without the Home tabs. Panel hosts have unique React IDs because other screens
+// may retain their own hidden panel; inspect the presented footer, not a removed singleton ID.
+function presentedMobileSidebarFooter(page: Page): Locator {
+  return page
+    .locator('[id^="agent-list-gesture-host-"]')
+    .getByTestId("sidebar-footer-bottom-line")
+    .filter({ visible: true });
+}
+
 export async function expectMobileAgentSidebarVisible(page: Page): Promise<void> {
-  await expect(
-    page.locator("#agent-list-gesture-host").getByTestId("sidebar-footer-bottom-line"),
-  ).toBeInViewport({
+  await expect(presentedMobileSidebarFooter(page)).toBeInViewport({
     ratio: 1,
     timeout: 5_000,
   });
 }
 
 export async function expectMobileAgentSidebarHidden(page: Page): Promise<void> {
-  await expect(
-    page.locator("#agent-list-gesture-host").getByTestId("sidebar-footer-bottom-line"),
-  ).not.toBeInViewport({
+  await expect(presentedMobileSidebarFooter(page)).not.toBeInViewport({
     timeout: 5_000,
   });
+}
+
+/** Drag from the left edge: the only way to open the list while fullscreen hides the header. */
+export async function swipeOpenMobileAgentSidebar(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("viewport size is required");
+  const y = Math.round(viewport.height / 2);
+  await page.mouse.move(8, y);
+  await page.mouse.down();
+  await page.mouse.move(40, y, { steps: 4 });
+  await page.mouse.move(Math.round(viewport.width * 0.7), y, { steps: 12 });
+  await page.mouse.up();
+}
+
+/** Drag from the right edge to open the compact Explorer over the agent. */
+export async function swipeOpenMobileExplorer(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("viewport size is required");
+  const y = Math.round(viewport.height / 2);
+  await page.mouse.move(viewport.width - 8, y);
+  await page.mouse.down();
+  await page.mouse.move(viewport.width - 40, y, { steps: 4 });
+  await page.mouse.move(Math.round(viewport.width * 0.3), y, { steps: 12 });
+  await page.mouse.up();
+}
+
+export async function closeMobileExplorer(page: Page): Promise<void> {
+  const closeButton = page
+    .getByTestId("workspace-explorer-sidebar")
+    .getByRole("button", { name: "Close Explorer sidebar", exact: true });
+  await expect(closeButton).toBeInViewport({ ratio: 1, timeout: 5_000 });
+  await closeButton.click();
+}
+
+export async function expectMobileExplorerVisible(page: Page): Promise<void> {
+  await expect(page.getByTestId("workspace-explorer-sidebar")).toBeInViewport({
+    ratio: 1,
+    timeout: 5_000,
+  });
+}
+
+export async function expectMobileExplorerHidden(page: Page): Promise<void> {
+  await expect(page.getByTestId("workspace-explorer-sidebar")).not.toBeInViewport({
+    timeout: 5_000,
+  });
+}
+
+export async function revealSidebarProjectWorkspaces(
+  page: Page,
+  projectKey: string,
+): Promise<void> {
+  await page
+    .getByTestId(`sidebar-project-show-more-${projectEquivalenceViewKey(projectKey)}`)
+    .click();
 }

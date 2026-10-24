@@ -1,4 +1,10 @@
 import { EventEmitter } from "node:events";
+import {
+  openDaemonSecureChannel,
+  generateKeyPair,
+  exportPublicKey,
+  type Transport,
+} from "@clisbot/relay/e2ee";
 import { describe, expect, test, vi } from "vitest";
 import {
   createEncryptedTransport,
@@ -10,17 +16,80 @@ import {
   extractRelayMessage,
 } from "./daemon-client-transport.js";
 
-const createClientChannelMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@clisbot/relay/e2ee", () => ({
-  createClientChannel: createClientChannelMock,
-}));
-
 describe("daemon-client transport helpers", () => {
-  test("createEncryptedTransport closes handshake failures with browser-safe code", async () => {
-    createClientChannelMock.mockReset();
-    createClientChannelMock.mockRejectedValueOnce(new Error("handshake failed"));
+  test("a synchronous protected ready publishes the actual mode only when the transport can send", async () => {
+    const keys = generateKeyPair();
+    let open: (() => void) | undefined;
+    let incoming: ((data: unknown, binary: boolean) => void) | undefined;
+    const modes: string[] = [];
+    const received: Array<string | ArrayBuffer> = [];
+    const errors: unknown[] = [];
+    const daemonTransport: Transport = {
+      send: (data) => {
+        incoming?.(data, data instanceof ArrayBuffer);
+      },
+      close: () => {},
+      onmessage: null,
+      onclose: null,
+      onerror: null,
+    };
+    const daemonReady = openDaemonSecureChannel(daemonTransport, {
+      daemonKeyPair: keys,
+      events: { onmessage: (data) => received.push(data) },
+    });
+    const client = createEncryptedTransport(
+      {
+        send: (data) => {
+          const frame =
+            typeof data === "string" || data instanceof ArrayBuffer
+              ? data
+              : (data.buffer.slice(
+                  data.byteOffset,
+                  data.byteOffset + data.byteLength,
+                ) as ArrayBuffer);
+          daemonTransport.onmessage?.({ data: frame, isBinary: typeof frame !== "string" });
+        },
+        close: () => {},
+        onOpen: (handler) => {
+          open = handler;
+          return () => {};
+        },
+        onMessage: (handler) => {
+          incoming = handler;
+          return () => {};
+        },
+        onClose: () => () => {},
+        onError: () => () => {},
+      },
+      {
+        daemonPublicKeyB64: exportPublicKey(keys.publicKey),
+        minimumMode: "protected",
+        logger: { warn: vi.fn() },
+        onSecurityMode: (mode) => modes.push(mode),
+      },
+    );
+    client.onOpen(() => {
+      try {
+        client.send("first encrypted application frame");
+      } catch (error) {
+        errors.push(error);
+      }
+    });
+    open?.();
+    const daemon = await daemonReady;
+    try {
+      await vi.waitFor(() => expect(received).toEqual(["first encrypted application frame"]));
+      expect(modes).toEqual(["protected"]);
+      expect(errors).toEqual([]);
+      expect(daemon.securityMode()).toBe("protected");
+    } finally {
+      client.close();
+      daemon.close();
+    }
+  });
 
+  test("createEncryptedTransport closes handshake failures with browser-safe code", async () => {
+    // An unusable daemon key fails the handshake before any frame is sent.
     const connection: { open: (() => void) | null } = { open: null };
     const close = vi.fn();
 
@@ -40,8 +109,7 @@ describe("daemon-client transport helpers", () => {
         onError: () => () => {},
         onMessage: () => () => {},
       },
-      "daemon-public-key",
-      { warn: vi.fn() },
+      { daemonPublicKeyB64: "not-a-key", logger: { warn: vi.fn() } },
     );
 
     expect(connection.open).not.toBeNull();

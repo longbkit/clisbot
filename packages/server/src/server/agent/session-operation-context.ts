@@ -10,9 +10,10 @@ export function currentSessionOperationIdentity(): SessionOperationContext | und
   return operations.getStore();
 }
 export function withSessionOperationIdentity<T>(
-  identity: SessionOperationContext,
+  identity: SessionOperationContext | undefined,
   operation: () => T,
 ): T {
+  if (identity === undefined) return operations.exit(operation);
   return operations.run(
     structuredClone({ ...identity, receivedAt: identity.receivedAt ?? new Date().toISOString() }),
     operation,

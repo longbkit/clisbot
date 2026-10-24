@@ -1,4 +1,11 @@
-import { useState, useMemo, useCallback, type ComponentProps, type ReactNode } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useContext,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
@@ -15,6 +22,22 @@ import type { useConversationTabs } from "./use-conversation-tabs";
 import type { useConversationProject } from "./use-conversation-project";
 import type { ConversationHeadingRenderer } from "./conversation-header";
 import { ConversationHeading } from "./conversation-heading";
+import { SheetTabs } from "@/screens/workspace/sheet-tabs";
+import type { ContextBridge } from "@/components/ui/isolated-bottom-sheet-modal";
+import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { useSessionStore } from "@/stores/session-store";
+import { selectWorkspace } from "@/stores/session-store-hooks/selectors";
+import {
+  ConversationAccessContext,
+  conversationSourceKey,
+  isConversationDocumentTarget,
+} from "./conversation-access";
+import { ConversationDraftContext } from "./conversation-draft-context";
+import { ConversationFileContext } from "./conversation-file-context";
+import { ConversationShellContext } from "./conversation-shell-context";
+import { ConversationProjectContext } from "./conversation-project-context";
+import { useConversationSourceLabelsBridge } from "./conversation-source-labels";
+
 const noop = () => {};
 const EMPTY_CLOSING = new Set<string>();
 const fill = { flex: 1, minHeight: 0, minWidth: 0 } as const;
@@ -201,6 +224,7 @@ export function MobileConversationSurface({
         </View>
         {explorer && compact ? <CompactExplorerSidebar {...explorer} /> : null}
       </View>
+      <ConversationSheetTabs {...{ serverId, focused, state, actions }} />
       {explorer && !compact ? (
         <NativeExplorerSidebarDock
           {...explorer}
@@ -209,6 +233,72 @@ export function MobileConversationSurface({
         />
       ) : null}
     </View>
+  );
+}
+
+/** The shell owns its layout key; the portal retains source admission and draft ownership. */
+export function ConversationSheetTabs({
+  serverId,
+  focused,
+  state,
+  actions,
+}: Pick<SurfaceProps, "serverId" | "focused" | "state" | "actions">) {
+  const allowed = useContext(ConversationAccessContext);
+  const draft = useContext(ConversationDraftContext);
+  const openFile = useContext(ConversationFileContext);
+  const inShell = useContext(ConversationShellContext);
+  const project = useContext(ConversationProjectContext);
+  const sourceLabels = useConversationSourceLabelsBridge();
+  const contextBridge = useCallback<ContextBridge>(
+    (children) =>
+      sourceLabels(
+        <ConversationAccessContext.Provider value={allowed}>
+          <ConversationDraftContext.Provider value={draft}>
+            <ConversationFileContext.Provider value={openFile}>
+              <ConversationShellContext.Provider value={inShell}>
+                <ConversationProjectContext.Provider value={project}>
+                  {children}
+                </ConversationProjectContext.Provider>
+              </ConversationShellContext.Provider>
+            </ConversationFileContext.Provider>
+          </ConversationDraftContext.Provider>
+        </ConversationAccessContext.Provider>,
+      ),
+    [allowed, draft, openFile, inShell, project, sourceLabels],
+  );
+  const canRenderTarget = useCallback(
+    (target: WorkspaceTabTarget) => {
+      if (target.layoutScope !== state.layoutKey) return false;
+      if (target.kind === "user_profile") return true;
+      const source = target.workspaceContext;
+      return (
+        !!source &&
+        source.serverId === serverId &&
+        isConversationDocumentTarget(target) &&
+        allowed.has(conversationSourceKey(source.serverId, source.workspaceId)) &&
+        !!selectWorkspace(useSessionStore.getState(), source.serverId, source.workspaceId)
+      );
+    },
+    [allowed, serverId, state.layoutKey],
+  );
+  const { buildContent: buildPaneContent } = actions;
+  const buildContent = useCallback(
+    (tab: Parameters<TabActions["buildContent"]>[0]["tab"]) =>
+      buildPaneContent({ tab, paneId: "conversation-sheet" }),
+    [buildPaneContent],
+  );
+  if (!focused) return null;
+  return (
+    <SheetTabs
+      workspaceKey={state.layoutKey}
+      serverId={serverId}
+      workspaceId=""
+      isWorkspaceFocused={focused}
+      buildContent={buildContent}
+      onCloseTab={actions.closeTab}
+      contextBridge={contextBridge}
+      canRenderTarget={canRenderTarget}
+    />
   );
 }
 

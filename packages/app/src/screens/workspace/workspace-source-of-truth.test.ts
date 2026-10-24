@@ -14,6 +14,8 @@ import type { WorkspaceDescriptor } from "@/stores/session-store";
 
 function createWorkspaceDescriptor(input: Partial<WorkspaceDescriptor> = {}): WorkspaceDescriptor {
   return {
+    createdAt: null,
+    lastUserMessageAt: null,
     id: "/repo/main",
     projectId: "remote:github.com/longbkit/clisbot",
     projectDisplayName: "longbkit/clisbot",

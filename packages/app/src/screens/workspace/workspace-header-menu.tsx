@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
-import { useRouter, type Href } from "expo-router";
+import { usePathname, useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Copy, Ellipsis, Globe, Import as ImportIcon, Settings } from "lucide-react-native";
+import { Copy, Ellipsis, Globe, Import as ImportIcon, Search, Settings } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TerminalProfile } from "@clisbot/protocol/messages";
 import {
@@ -22,16 +22,28 @@ import {
 import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
 import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
-import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import {
+  buildSettingsHostSectionRoute,
+  parseHostWorkspaceRouteFromPathname,
+} from "@/utils/host-routes";
 import { shortenPath } from "@/utils/shorten-path";
 import { CopyProjectPathItem } from "@/clisbot/workspace-header/copy-project-path-item";
 import type { Theme } from "@/styles/theme";
+import {
+  useWorkspaceScriptsMenuPages,
+  type UseWorkspaceScriptsMenuPagesInput,
+} from "@/screens/workspace/scripts";
+import { usePluginWorkspaceMenu } from "@/plugins";
+import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedImport = withUnistyles(ImportIcon);
 const ThemedSettings = withUnistyles(Settings);
+const ThemedSearch = withUnistyles(Search);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -39,12 +51,23 @@ const MENU_NEW_BROWSER_ICON = <ThemedGlobe size={16} uniProps={mutedColorMapping
 const MENU_IMPORT_ICON = <ThemedImport size={16} uniProps={mutedColorMapping} />;
 const MENU_COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
 const MENU_SETTINGS_ICON = <ThemedSettings size={16} uniProps={mutedColorMapping} />;
+const MENU_SEARCH_ICON = <ThemedSearch size={16} uniProps={mutedColorMapping} />;
 function WorkspaceHeaderMenuTriggerIcon() {
   return (
     <ThemedEllipsis
       size={iconButtonChromeGlyphSize("large")}
       uniProps={extraMutedIconColorMapping}
     />
+  );
+}
+
+/** The ⋯ with a dot on it, for when something inside the menu needs looking at. */
+function WorkspaceHeaderMenuAttentionTriggerIcon() {
+  return (
+    <View>
+      <WorkspaceHeaderMenuTriggerIcon />
+      <View style={styles.attentionDot} testID="workspace-header-menu-attention" />
+    </View>
   );
 }
 
@@ -202,8 +225,46 @@ function HeaderMenuProfileItem({
   );
 }
 
+/** The active Work route owns file search; Chat never borrows a remembered workspace. */
+function WorkspaceFileSearchAction({
+  serverId,
+  workspaceId,
+  workspaceDirectory,
+}: {
+  serverId: string;
+  workspaceId: string;
+  workspaceDirectory?: string | null;
+}) {
+  const { t } = useTranslation();
+  const selection = parseHostWorkspaceRouteFromPathname(usePathname());
+  const connected = useHostRuntimeIsConnected(serverId);
+  const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
+  const enabled = Boolean(
+    workspaceDirectory &&
+    connected &&
+    selection?.serverId === serverId &&
+    selection?.workspaceId === workspaceId,
+  );
+  const handleSearchFiles = useCallback(() => {
+    if (enabled) setCommandCenterOpen(true, "files");
+  }, [enabled, setCommandCenterOpen]);
+  return (
+    <DropdownMenuItem
+      testID="workspace-header-search-files"
+      leading={MENU_SEARCH_ICON}
+      disabled={!enabled}
+      onSelect={handleSearchFiles}
+    >
+      {t("settings.shortcuts.help.searchFiles")}
+    </DropdownMenuItem>
+  );
+}
+
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
   normalizedServerId: string;
+  normalizedWorkspaceId: string;
+  workspaceDirectory?: string | null;
+  scripts: UseWorkspaceScriptsMenuPagesInput;
   showCreateBrowserTab: boolean;
   createTerminalDisabled: boolean;
   onCreateTerminalWithProfile: (profile: TerminalProfile) => void;
@@ -213,10 +274,16 @@ export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspace
 /**
  * Compact layouts have no tab strip. New agent and New terminal sit in the tab switcher's footer;
  * the rarer launches stay here alongside the workspace actions.
+ *
+ * The header has no room for a scripts button either, so scripts are a page of this menu, and the
+ * ⋯ carries a dot while a running service is unhealthy. Plugin header buttons are rows here for the
+ * same reason.
  */
 export function WorkspaceHeaderMenuMobile({
   normalizedServerId,
   workspaceDirectory,
+  normalizedWorkspaceId,
+  scripts,
   showCreateBrowserTab,
   createTerminalDisabled,
   onCreateTerminalWithProfile,
@@ -235,6 +302,12 @@ export function WorkspaceHeaderMenuMobile({
   const handleEditProfiles = useCallback(() => {
     router.push(buildSettingsHostSectionRoute(normalizedServerId, "terminals") as Href);
   }, [normalizedServerId, router]);
+  const scriptsMenu = useWorkspaceScriptsMenuPages(scripts);
+  const pluginMenu = usePluginWorkspaceMenu(normalizedServerId, normalizedWorkspaceId);
+  const pages = useMemo(
+    () => [...scriptsMenu.pages, ...pluginMenu.pages],
+    [scriptsMenu.pages, pluginMenu.pages],
+  );
 
   return (
     <DropdownMenu compactMode="sheet">
@@ -243,16 +316,35 @@ export function WorkspaceHeaderMenuMobile({
         style={triggerStyle}
         hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
         accessibilityRole="button"
-        accessibilityLabel={t("workspace.header.actions.workspaceActions")}
+        accessibilityLabel={
+          scriptsMenu.needsAttention
+            ? t("workspace.header.actions.workspaceActionsUnhealthy")
+            : t("workspace.header.actions.workspaceActions")
+        }
       >
-        <WorkspaceHeaderMenuTriggerIcon />
+        {scriptsMenu.needsAttention ? (
+          <WorkspaceHeaderMenuAttentionTriggerIcon />
+        ) : (
+          <WorkspaceHeaderMenuTriggerIcon />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         width={220}
         testID="workspace-header-menu"
+        pages={pages}
         sheetTitle={t("workspace.header.actions.workspaceActions")}
       >
+        {scriptsMenu.trigger}
+        {pluginMenu.rows}
+        {pluginMenu.rows.length > 0 ? <DropdownMenuSeparator /> : null}
+        {HOME_V2_ENABLED ? (
+          <WorkspaceFileSearchAction
+            serverId={normalizedServerId}
+            workspaceId={normalizedWorkspaceId}
+            workspaceDirectory={workspaceDirectory}
+          />
+        ) : null}
         {showCreateBrowserTab ? (
           <DropdownMenuItem
             testID="workspace-header-new-browser"
@@ -292,9 +384,21 @@ export function WorkspaceHeaderMenuMobile({
   );
 }
 
-const styles = StyleSheet.create({
+const ATTENTION_DOT_SIZE = 6;
+
+const styles = StyleSheet.create((theme) => ({
   headerMenuProfileIconWrapper: {
     width: 16,
     height: 16,
   },
-});
+  // Same red as the Scripts row's unhealthy ▶, so the dot and the row it leads to agree.
+  attentionDot: {
+    position: "absolute",
+    top: -1,
+    right: -2,
+    width: ATTENTION_DOT_SIZE,
+    height: ATTENTION_DOT_SIZE,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.palette.red[500],
+  },
+}));

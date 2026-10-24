@@ -36,6 +36,24 @@ function outboundMessage(type: SessionOutboundMessage["type"]): SessionOutboundM
 }
 
 describe("SessionAuthorization", () => {
+  test("saved-host operations require explicit tunnel management, not ordinary workspace grants", () => {
+    const viewer = new SessionAuthorization(["daemon.read", "workspace.read", "workspace.write"]);
+    const manager = new SessionAuthorization(["tunnel.manage"]);
+    for (const type of [
+      "hosts.list.request",
+      "hosts.add.request",
+      "hosts.update.request",
+      "hosts.remove.request",
+      "hosts.link.open.request",
+      "hosts.route.open.request",
+      "hosts.route.frame.request",
+      "hosts.route.close.request",
+    ] as const) {
+      expect(viewer.allowsInbound(inboundMessage(type))).toBe(false);
+      expect(manager.allowsInbound(inboundMessage(type))).toBe(true);
+    }
+  });
+
   test("owner authority covers every session operation", () => {
     const authorization = new SessionAuthorization(OWNER_PERMISSIONS);
 

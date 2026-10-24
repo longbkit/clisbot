@@ -129,6 +129,19 @@ function resolveConnectionCredentials(
   };
 }
 
+/** A new relay route must not weaken the floor already pinned to its paired identity. */
+function relayProbeEncryption(
+  connection: Extract<HostConnection, { type: "relay" }>,
+  configured: DaemonClientConfig["e2ee"],
+): NonNullable<DaemonClientConfig["e2ee"]> {
+  return {
+    ...configured,
+    enabled: true,
+    daemonPublicKeyB64: connection.daemonPublicKeyB64,
+    minimumMode: connection.minimumSecurityMode ?? configured?.minimumMode,
+  };
+}
+
 export async function buildClientConfig(
   connection: HostConnection,
   serverId?: string,
@@ -148,6 +161,8 @@ export async function buildClientConfig(
     | "buildDesktopTransportUrl"
   > = defaultDaemonConnectionDependencies,
 ): Promise<DaemonClientConfig> {
+  if (connection.type === "routed")
+    throw new Error("Routed host connections are resolved by HostRuntime");
   const clientId = await deps.getClientId();
   const desktopTransportFactory = deps.createDesktopTransportFactory();
   const base = {
@@ -161,15 +176,12 @@ export async function buildClientConfig(
     e2ee: options?.e2ee,
     ...(options?.capabilities ? { capabilities: options.capabilities } : {}),
     ...(options?.trace ? { trace: options.trace } : {}),
-    ...((connection.type === "directSocket" || connection.type === "directPipe") &&
-    desktopTransportFactory
-      ? { transportFactory: desktopTransportFactory }
-      : {}),
   };
 
   if (connection.type === "directSocket" || connection.type === "directPipe") {
     return {
       ...base,
+      ...(desktopTransportFactory ? { transportFactory: desktopTransportFactory } : {}),
       url: deps.buildDesktopTransportUrl({
         transportType: connection.type === "directSocket" ? "socket" : "pipe",
         transportPath: connection.path,
@@ -204,7 +216,7 @@ export async function buildClientConfig(
       useTls: connection.useTls ?? shouldUseTlsForDefaultHostedRelay(connection.relayEndpoint),
       serverId,
     }),
-    e2ee: { enabled: true, daemonPublicKeyB64: connection.daemonPublicKeyB64 },
+    e2ee: relayProbeEncryption(connection, options?.e2ee),
   };
 }
 

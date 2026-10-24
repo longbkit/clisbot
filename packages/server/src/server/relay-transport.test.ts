@@ -1,8 +1,23 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import pino from "pino";
-import { createClientChannel, type Transport } from "@clisbot/relay/e2ee";
-import { exportPublicKey, generateKeyPair } from "@clisbot/relay";
-import { startRelayTransport } from "./relay-transport";
+import { startRelayTransport, attachEncryptedSocket } from "./relay-transport.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import {
+  createClientChannel,
+  openClientSecureChannel,
+  generateKeyPair,
+  exportPublicKey,
+  type Transport,
+} from "@clisbot/relay/e2ee";
+import { DeviceAuthority } from "@clisbot/device-access/authority";
+import { FileDeviceAuthorityStore } from "@clisbot/device-access/file-store";
+import { createDeviceKey, digest, signDeviceProof } from "@clisbot/device-access/proof";
+import { resolveSessionAdmission } from "./session-admission-auth.js";
+import type { WSHelloMessage } from "@clisbot/protocol/messages";
+import type { ExternalSocketMetadata } from "./websocket-server.js";
 
 function createMockLogger() {
   const messages: { level: "debug" | "info" | "warn" | "error"; args: unknown[] }[] = [];
@@ -146,37 +161,6 @@ describe("relay-transport control lifecycle", () => {
     vi.useRealTimers();
   });
 
-  test("releases a stalled encrypted data connection without restarting control", async () => {
-    vi.useFakeTimers();
-    let attachments = 0;
-    controllers.push(
-      startRelayTransport({
-        logger: pino({ level: "silent" }),
-        attachSocket: async () => {
-          attachments += 1;
-        },
-        relayEndpoint: "relay.clisbot.com:443",
-        relayUseTls: true,
-        serverId: "srv_test",
-        daemonKeyPair: generateKeyPair(),
-        createWebSocket: relay.createWebSocket,
-      }),
-    );
-    const control = relay.sockets[0];
-    control.open();
-    const connected = JSON.stringify({ type: "connected", connectionId: "stalled" });
-    control.message(connected);
-    const stalled = relay.sockets[1];
-    stalled.open();
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(stalled.terminateCalls).toBe(1);
-    expect(attachments).toBe(0);
-    expect(control.terminateCalls).toBe(0);
-    control.message(connected);
-    expect(relay.sockets).toHaveLength(3);
-    expect(relay.sockets[2].url).toBe(stalled.url);
-  });
-
   test("logs relay_control_connected only after first valid control message", () => {
     const logger = createMockLogger();
     const controller = startRelayTransport({
@@ -286,80 +270,6 @@ describe("relay-transport control lifecycle", () => {
     ]);
   });
 
-  test("encrypted sends wait for the physical data socket callback", async () => {
-    const logger = createMockLogger();
-    const daemonKeyPair = generateKeyPair();
-    let resolveAttached: ((socket: unknown) => void) | undefined;
-    const attached = new Promise<unknown>((resolve) => {
-      resolveAttached = resolve;
-    });
-    const controller = startRelayTransport({
-      logger: logger as unknown as pino.Logger,
-      attachSocket: async (socket) => resolveAttached?.(socket),
-      relayEndpoint: "relay.clisbot.com:443",
-      relayUseTls: true,
-      serverId: "srv_test",
-      daemonKeyPair,
-      createWebSocket: relay.createWebSocket,
-    });
-    controllers.push(controller);
-
-    const control = relay.sockets[0];
-    control.open();
-    control.message(JSON.stringify({ type: "sync", connectionIds: [] }), false);
-    control.message(JSON.stringify({ type: "connected", connectionId: "clt_test" }), false);
-
-    const dataSocket = relay.sockets[1];
-    dataSocket.deferSendCompletion = true;
-    dataSocket.open();
-    let clientTransport: Transport;
-    clientTransport = {
-      send: (data) => dataSocket.message(data, data instanceof ArrayBuffer),
-      close: () => undefined,
-      onmessage: null,
-      onclose: null,
-      onerror: null,
-    };
-    dataSocket.onSend = (data) => {
-      clientTransport.onmessage?.({
-        data: data instanceof Uint8Array ? data.slice().buffer : data,
-        isBinary: data instanceof ArrayBuffer || data instanceof Uint8Array,
-      });
-    };
-    let resolveClientOpen: (() => void) | undefined;
-    const clientOpen = new Promise<void>((resolve) => {
-      resolveClientOpen = resolve;
-    });
-    await createClientChannel(clientTransport, exportPublicKey(daemonKeyPair.publicKey), {
-      onopen: () => resolveClientOpen?.(),
-    });
-
-    let attachedCompleted = false;
-    void attached.then(() => {
-      attachedCompleted = true;
-      return undefined;
-    });
-    await clientOpen;
-    await Promise.resolve();
-    expect(attachedCompleted).toBe(false);
-    dataSocket.completeNextSend();
-    const encryptedSocket = (await attached) as {
-      send: (data: Uint8Array) => void | Promise<void>;
-    };
-    let completed = false;
-
-    const sending = Promise.resolve(encryptedSocket.send(new Uint8Array([1, 2, 3]))).then(() => {
-      completed = true;
-      return undefined;
-    });
-    await Promise.resolve();
-    expect(completed).toBe(false);
-
-    dataSocket.completeNextSend();
-    await sending;
-    expect(completed).toBe(true);
-  });
-
   test("uses relayUseTls for control and data socket URLs", () => {
     const logger = createMockLogger();
     const controller = startRelayTransport({
@@ -380,4 +290,165 @@ describe("relay-transport control lifecycle", () => {
     expect(relay.sockets[0]?.url).toMatch(/^wss:\/\/\[::1\]\/ws\?/);
     expect(relay.sockets[1]?.url).toMatch(/^wss:\/\/\[::1\]\/ws\?/);
   });
+});
+
+function createDirectPairingAdmissionListener(
+  authority: DeviceAuthority,
+  encrypted: boolean | undefined,
+  accept: (value: Awaited<ReturnType<typeof resolveSessionAdmission>>) => void,
+  reject: (error: unknown) => void,
+): (data: unknown) => void {
+  return (data) => {
+    const receivedHello = JSON.parse(String(data)) as WSHelloMessage;
+    void resolveSessionAdmission({
+      credential: receivedHello.auth,
+      hello: receivedHello,
+      deviceAuthority: authority,
+      localCredential: null,
+      passwordHash: undefined,
+      transport: "direct",
+      encrypted,
+    }).then(accept, reject);
+  };
+}
+
+// Exercise the actual direct endpoint handshake and device authority, without a running daemon.
+// A legacy-only direct helper fails the protected case before it can admit the paired device.
+describe("direct paired endpoint security", () => {
+  test.each(["legacy", "protected"] as const)(
+    "%s clients preserve encrypted device admission without a security downgrade",
+    async (mode) => {
+      const home = await mkdtemp(join(tmpdir(), "clisbot-direct-security-"));
+      const daemonKeys = generateKeyPair();
+      const socket = new FakeRelayWebSocket("ws://127.0.0.1/ws");
+      socket.open();
+      const clientTransport: Transport = {
+        send: (data) => {
+          queueMicrotask(() => socket.message(data));
+        },
+        close: (code, reason) => socket.close(code, reason),
+        onmessage: null,
+        onclose: null,
+        onerror: null,
+      };
+      socket.onSend = (data) => {
+        if (data instanceof Uint8Array) throw new Error("Unexpected raw typed-array frame");
+        queueMicrotask(() =>
+          clientTransport.onmessage?.({ data, isBinary: data instanceof ArrayBuffer }),
+        );
+      };
+      const authority = new DeviceAuthority(
+        new FileDeviceAuthorityStore(join(home, "access.json"), "direct-daemon"),
+      );
+      const device = createDeviceKey(randomBytes(32));
+      const invitation = await authority.createInvitation();
+      const hello: WSHelloMessage = {
+        type: "hello",
+        clientId: "paired-phone",
+        clientType: "mobile",
+        protocolVersion: 1,
+        auth: {
+          kind: "pairing",
+          token: invitation.token,
+          publicKey: device.publicKey,
+          proof: signDeviceProof({
+            key: device,
+            proof: {
+              backendId: "direct-daemon",
+              credentialId: "pair",
+              timestamp: Date.now(),
+              nonce: randomBytes(24).toString("base64url"),
+            },
+            context: { purpose: "pair", binding: digest(invitation.token) },
+          }),
+        },
+      };
+      let metadata: ExternalSocketMetadata | undefined;
+      let acceptAdmission!: (value: Awaited<ReturnType<typeof resolveSessionAdmission>>) => void;
+      let rejectAdmission!: (error: unknown) => void;
+      const admission = new Promise<Awaited<ReturnType<typeof resolveSessionAdmission>>>(
+        (resolve, reject) => {
+          acceptAdmission = resolve;
+          rejectAdmission = reject;
+        },
+      );
+      const attaching = attachEncryptedSocket(
+        socket,
+        daemonKeys,
+        createMockLogger() as unknown as pino.Logger,
+        async (secured, receivedMetadata) => {
+          metadata = receivedMetadata;
+          secured.on(
+            "message",
+            createDirectPairingAdmissionListener(
+              authority,
+              receivedMetadata?.encrypted,
+              acceptAdmission,
+              rejectAdmission,
+            ),
+          );
+        },
+        { transport: "direct" },
+      );
+      let client:
+        | Awaited<ReturnType<typeof createClientChannel>>
+        | Awaited<ReturnType<typeof openClientSecureChannel>>
+        | undefined;
+      try {
+        let opened!: () => void;
+        let failed!: (error: unknown) => void;
+        const ready = new Promise<void>((resolve, reject) => {
+          opened = resolve;
+          failed = reject;
+        });
+        const events = {
+          onopen: opened,
+          onerror: failed,
+          onclose: (code: number, reason: string) =>
+            failed(new Error(`Endpoint closed ${code}: ${reason}`)),
+        };
+        client =
+          mode === "legacy"
+            ? await createClientChannel(
+                clientTransport,
+                exportPublicKey(daemonKeys.publicKey),
+                events,
+              )
+            : await openClientSecureChannel(clientTransport, {
+                daemonPublicKeyB64: exportPublicKey(daemonKeys.publicKey),
+                minimumMode: "protected",
+                events,
+              });
+        await ready;
+        await client.send(JSON.stringify(hello));
+        const result = await admission;
+        await attaching;
+        expect(metadata).toMatchObject({
+          transport: "direct",
+          encrypted: true,
+          securityMode: mode,
+        });
+        expect(result).toMatchObject({
+          admission: { deviceCredential: { backendId: "direct-daemon" } },
+        });
+        // Encryption is required: possession of the invitation alone cannot admit a raw socket.
+        expect(
+          await resolveSessionAdmission({
+            credential: hello.auth,
+            hello,
+            deviceAuthority: authority,
+            localCredential: null,
+            passwordHash: undefined,
+            transport: "direct",
+            encrypted: false,
+          }),
+        ).toEqual({ rejection: "incorrect_password" });
+      } finally {
+        client?.close();
+        socket.close();
+        await attaching;
+        await rm(home, { recursive: true, force: true });
+      }
+    },
+  );
 });

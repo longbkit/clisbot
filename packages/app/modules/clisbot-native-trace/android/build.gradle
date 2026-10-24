@@ -22,3 +22,7 @@ android {
     buildConfigField "boolean", "SYNTHETIC_REACT_PROFILE", (System.getenv("CLISBOT_PROFILE_BUILD") == "1" && System.getenv("APP_VARIANT") == "development" && System.getenv("CLISBOT_REACT_PROFILE") == "1").toString()
   }
 }
+
+dependencies {
+  testImplementation "junit:junit:4.13.2"
+}

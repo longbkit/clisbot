@@ -102,22 +102,16 @@ export function useConversationExplorer(input: {
       else store.hideExplorerSidebar(layoutKey);
       return;
     }
-    if (singlePanel) {
-      const panel = usePanelStore.getState();
-      panel.setExplorerTabForCheckout({
-        serverId: source.serverId,
-        cwd,
-        isGit,
-        tab: panel.explorerTab,
-      });
-    } else if (selectIsExplorerSidebarVisible(store, layoutKey))
+    if (!singlePanel && selectIsExplorerSidebarVisible(store, layoutKey))
       syncExplorer(layoutKey, source, isGit);
   }, [cwd, focused, isGit, layoutKey, singlePanel, source]);
   return useCallback(() => {
     if (!source || !cwd) return;
-    if (singlePanel)
-      usePanelStore.getState().toggleCompactFileExplorer({ serverId: source.serverId, cwd, isGit });
-    else if (selectIsExplorerSidebarVisible(useWorkspaceLayoutStore.getState(), layoutKey))
+    if (singlePanel) {
+      const panel = usePanelStore.getState();
+      if (selectIsCompactFileExplorerOpen(panel)) panel.showMobileAgent();
+      else panel.showMobileFileExplorer();
+    } else if (selectIsExplorerSidebarVisible(useWorkspaceLayoutStore.getState(), layoutKey))
       useWorkspaceLayoutStore.getState().hideExplorerSidebar(layoutKey);
     else syncExplorer(layoutKey, source, isGit);
   }, [cwd, isGit, layoutKey, singlePanel, source]);

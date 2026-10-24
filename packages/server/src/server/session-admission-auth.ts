@@ -20,16 +20,12 @@ export async function resolveSessionAdmission(input: {
   allowManagedTicket?: boolean;
   encrypted?: boolean;
 }): Promise<AdmissionResolution> {
-  const { credential, passwordHash, localCredential, transport } = input;
+  const { credential, passwordHash, localCredential } = input;
   if (input.deviceAuthority) return resolveDeviceAdmission(input);
   if (!passwordHash) {
     return { admission: { principalId: "owner", permissions: OWNER_PERMISSIONS } };
   }
   if (!credential) {
-    // COMPAT(relayPasswordOptional): added in v0.9.1, remove once release N mobile builds are live on App Store and Play.
-    if (transport === "relay") {
-      return { admission: { principalId: "owner", permissions: OWNER_PERMISSIONS } };
-    }
     return { rejection: "password_required" };
   }
   if (credential.kind === "localCredential") {

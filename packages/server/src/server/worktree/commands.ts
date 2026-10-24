@@ -45,10 +45,7 @@ export interface CreateClisbotWorktreeCommandDependencies<
   createClisbotWorktreeWorkflow?: CreateClisbotWorktreeWorkflow<Result>;
 }
 
-export type CreateClisbotWorktreeCommandInput = Omit<
-  CreateClisbotWorktreeInput,
-  "clisbotHome" | "runSetup"
-> & {
+export type CreateClisbotWorktreeCommandInput = Omit<CreateClisbotWorktreeInput, "clisbotHome"> & {
   clisbotHome?: string;
   worktreesRoot?: string;
 };
@@ -75,7 +72,7 @@ export async function createClisbotWorktreeCommand<Result extends CreateClisbotW
 
     const createdWorktree = await dependencies.createClisbotWorktreeWorkflow({
       ...input,
-      runSetup: false,
+
       clisbotHome: input.clisbotHome ?? dependencies.clisbotHome,
       worktreesRoot: input.worktreesRoot ?? dependencies.worktreesRoot,
     });

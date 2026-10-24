@@ -16,6 +16,23 @@ describe("canonical CLI surface", () => {
       "--web",
     );
   });
+
+  it.each(["send", "agent send"])("%s accepts an explicit behavior override", async (path) => {
+    const cli = createCli();
+    const owner =
+      path === "send" ? cli : cli.commands.find((command) => command.name() === "agent")!;
+    const send = owner.commands.find((command) => command.name() === "send")!;
+    send.action(() => {});
+    await send.parseAsync(["target", "message", "--behavior", "interrupt"], { from: "user" });
+    expect(send.opts().behavior).toBe("interrupt");
+    await send.parseAsync(["target", "message", "--behavior", "steer"], { from: "user" });
+    expect(send.opts().behavior).toBe("steer");
+    send.exitOverride().configureOutput({ writeErr: () => {} });
+    await expect(
+      send.parseAsync(["target", "message", "--behavior", "queue"], { from: "user" }),
+    ).rejects.toThrow();
+  });
+
   it("offers daemon host selection as a global option", () => {
     expect(createCli().helpInformation()).toContain("--host <host>");
   });

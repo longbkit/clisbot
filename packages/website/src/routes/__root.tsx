@@ -7,6 +7,7 @@ import { getVisitorPlatform } from "~/platform";
 import { getLatestRelease } from "~/release";
 import { getStarCount } from "~/stars";
 import { WebsiteAnalytics } from "~/components/website-analytics";
+import { useLocale } from "~/i18n";
 
 interface StarsContext {
   stars: string;
@@ -80,8 +81,9 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
+  const locale = useLocale();
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <HeadContent />
       </head>

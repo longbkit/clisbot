@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getPanelManifest,
   panelCanLaunchInPane,
+  panelCompactSheetPolicy,
   panelResourceKey,
   panelSupportsHost,
 } from "@/panels/panel-manifest";
@@ -16,6 +17,31 @@ describe("panel manifest", () => {
     expect(panelSupportsHost("files", "explorer")).toBe(true);
     expect(panelSupportsHost("files", "main")).toBe(false);
     expect(panelSupportsHost("setup", "explorer")).toBe(false);
+  });
+
+  it("supports the sheet exactly for kinds with a compact sheet rule", () => {
+    expect(panelSupportsHost("file", "sheet")).toBe(true);
+    expect(panelSupportsHost("agent", "sheet")).toBe(true);
+    expect(panelSupportsHost("provider_subagent", "sheet")).toBe(true);
+    expect(panelSupportsHost("terminal", "sheet")).toBe(false);
+    expect(panelSupportsHost("plugin", "sheet")).toBe(false);
+  });
+
+  it("keeps conversation and root agent tabs while profiles can open in a compact sheet", () => {
+    const facts = { isWorkspaceRootAgent: (agentId: string) => agentId === "root" };
+    expect(panelCompactSheetPolicy({ kind: "conversation", chatId: "group" }, facts)).toBeNull();
+    expect(panelCompactSheetPolicy({ kind: "agent", agentId: "root" }, facts)).toBeNull();
+    expect(panelCompactSheetPolicy({ kind: "agent", agentId: "child" }, facts)).toEqual({
+      openAsTab: true,
+    });
+    expect(
+      panelCompactSheetPolicy(
+        { kind: "user_profile", actor: { kind: "user", id: "person" } },
+        facts,
+      ),
+    ).toEqual({ openAsTab: true });
+    expect(panelSupportsHost("conversation", "sheet")).toBe(false);
+    expect(panelSupportsHost("user_profile", "sheet")).toBe(true);
   });
 
   it("lets navigation tabs hide their close button without losing their close action", () => {

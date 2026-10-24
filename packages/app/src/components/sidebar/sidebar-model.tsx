@@ -1,3 +1,4 @@
+import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useTranslation } from "react-i18next";
 import {
   matchesSessionMetadata,
@@ -9,7 +10,6 @@ import React, { createContext, useContext, useEffect, useMemo, type ReactNode } 
 import {
   useSidebarWorkspacesList,
   type SidebarProjectEntry,
-  type SidebarWorkspaceEntry,
   type SidebarWorkspacesListResult,
 } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarWorkspaceEntries } from "@/hooks/use-sidebar-workspace-entries";
@@ -160,7 +160,7 @@ export function SidebarModelProvider({
         );
         return workspaces.length > 0 ||
           (!hasActiveLabelFilter && !hasMetadataFilter && project.workspaces.length === 0)
-          ? [{ ...project, workspaces }]
+          ? [workspaces.length === project.workspaces.length ? project : { ...project, workspaces }]
           : [];
       });
     }

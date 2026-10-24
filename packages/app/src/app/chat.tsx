@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { usePanelStore } from "@/stores/panel-store";
 import { useIsMobilePanelActive } from "@/mobile-panels/provider";
 import {

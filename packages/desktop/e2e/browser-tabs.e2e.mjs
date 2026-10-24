@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { experimental_createMCPClient } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { chromium } from "playwright";
+import { hideDeveloperToasts } from "../../app/e2e/support/developer-ui.mjs";
 import { runAppearanceFontSizeRegression } from "./appearance-font-size.electron.mjs";
 import { runSettingsMemoryRegression } from "./settings-memory.electron.mjs";
 
@@ -1196,6 +1197,7 @@ async function main() {
         cwd: rootDir,
         env: {
           ...commonEnv,
+          EXPO_UNSTABLE_HEADLESS: "1",
           EXPO_PORT: String(expoPort),
           EXPO_DEV_URL: `http://localhost:${expoPort}`,
           CLISBOT_ELECTRON_REMOTE_DEBUGGING_PORT: String(cdpPort),
@@ -1214,6 +1216,7 @@ async function main() {
     // Keep the fixture rendering when another local window occludes it.
     // The hidden-window assertions explicitly restore native throttling.
     await setWindowHidden(inspectorPort, false);
+    await hideDeveloperToasts(page);
     const status = await waitForDesktopStatus(page);
 
     const checkPluginLinks = () =>

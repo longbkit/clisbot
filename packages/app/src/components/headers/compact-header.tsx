@@ -45,8 +45,15 @@ export function CompactHeader({
 }: CompactHeaderProps) {
   const insets = useSafeAreaInsets();
   const rootStyle = useMemo(
-    () => [styles.root, { paddingTop: insets.top + HEADER_TOP_PADDING_MOBILE }],
-    [insets.top],
+    () => [
+      styles.root,
+      {
+        paddingTop: insets.top + HEADER_TOP_PADDING_MOBILE,
+        marginLeft: insets.left,
+        marginRight: insets.right,
+      },
+    ],
+    [insets.top, insets.left, insets.right],
   );
 
   let leadingNavigation = navigationContent;
@@ -94,7 +101,11 @@ function CompactHeaderTitle({
     <>
       <View style={styles.titleRow}>
         {title ? (
-          <Text style={styles.title} numberOfLines={1} testID={titleTestID}>
+          <Text
+            style={subtitle ? styles.title : styles.singleLineTitle}
+            numberOfLines={1}
+            testID={titleTestID}
+          >
             {title}
           </Text>
         ) : null}
@@ -132,6 +143,13 @@ const styles = StyleSheet.create((theme) => ({
   title: {
     flexShrink: 1,
     fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foreground,
+    textAlign: "left",
+  },
+  // A title without a subtitle has the header to itself, so it reads one step larger.
+  singleLineTitle: {
+    fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
     textAlign: "left",

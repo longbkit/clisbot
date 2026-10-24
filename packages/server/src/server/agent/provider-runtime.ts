@@ -9,7 +9,7 @@ import type { ClisbotToolCatalog } from "./tools/types.js";
 
 export interface AgentProviderRuntime {
   snapshotManager: ProviderSnapshotManager;
-  setClisbotToolCatalog(catalog: ClisbotToolCatalog | null): void;
+  setClisbotToolCatalog(catalog: Pick<ClisbotToolCatalog, "tools"> | null): void;
   shutdown(): Promise<void>;
 }
 

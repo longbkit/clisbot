@@ -1,0 +1,15 @@
+Foldable phone layouts, agents that delegate work to other machines, plugin file panels, and plugin translations.
+
+Connect your daemon to another machine, then ask an agent to delegate work there:
+
+`sh
+
+clisbot host add 192.168.1.20:6767 --label studio
+
+clisbot host add 'ssh://me@build-box' --label build-box
+
+clisbot host add 'relay://...' --label laptop
+
+`
+
+Full notes: https://clisbot.com/changelog

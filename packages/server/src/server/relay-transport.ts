@@ -1,15 +1,15 @@
 /// <reference lib="dom" />
 import { EventEmitter } from "node:events";
-import { WebSocket } from "ws";
-import type pino from "pino";
 import {
-  createDaemonChannel,
+  openDaemonSecureChannel,
   type Transport as RelayTransport,
   type KeyPair,
 } from "@clisbot/relay/e2ee";
+import { createEncryptedRelaySocket } from "./websocket/encrypted-relay-socket.js";
+import { WebSocket } from "ws";
+import type pino from "pino";
 import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
 import type { ExternalSocketMetadata } from "./websocket-server.js";
-import { createEncryptedRelaySocket } from "./websocket/encrypted-relay-socket.js";
 
 export interface RelayTransportOptions {
   logger: pino.Logger;
@@ -17,7 +17,6 @@ export interface RelayTransportOptions {
   relayEndpoint: string; // "host:port"
   relayUseTls: boolean;
   serverId: string;
-  daemonKeyPair?: KeyPair;
   createWebSocket?: RelayWebSocketFactory;
 }
 
@@ -30,13 +29,12 @@ export interface RelaySocketLike {
   bufferedAmount?: number;
   send: (data: string | Uint8Array | ArrayBuffer, callback?: (error?: Error) => void) => void;
   close: (code?: number, reason?: string) => void;
-  terminate?: () => void;
+  terminate: () => void;
   on: (event: "message" | "close" | "error", listener: (...args: unknown[]) => void) => void;
   once: (event: "close" | "error", listener: (...args: unknown[]) => void) => void;
 }
 
 interface RelayWebSocketLike extends RelaySocketLike {
-  terminate: () => void;
   ping: () => void;
   on: (
     event: "open" | "message" | "close" | "error" | "pong",
@@ -56,7 +54,13 @@ type ControlMessage =
 const CONTROL_PING_INTERVAL_MS = 10_000;
 const CONTROL_STALE_TIMEOUT_MS = 30_000;
 const CONTROL_READY_TIMEOUT_MS = 8_000;
-const RELAY_WEBSOCKET_OPTIONS = { handshakeTimeout: 10_000, perMessageDeflate: false } as const;
+const RELAY_WEBSOCKET_OPTIONS = {
+  handshakeTimeout: 10_000,
+  perMessageDeflate: false,
+  // Node cancels each non-final address when this expires, even if the next
+  // address is unreachable. Allow high-latency routes time to connect.
+  autoSelectFamilyAttemptTimeout: 5_000,
+} as const;
 
 function createDefaultRelayWebSocket(url: string): RelayWebSocketLike {
   return new WebSocket(url, RELAY_WEBSOCKET_OPTIONS);
@@ -112,7 +116,6 @@ export function startRelayTransport({
   relayEndpoint,
   relayUseTls,
   serverId,
-  daemonKeyPair,
   createWebSocket = createDefaultRelayWebSocket,
 }: RelayTransportOptions): RelayTransportController {
   const relayLogger = logger.child({ module: "relay-transport" });
@@ -379,17 +382,7 @@ export function startRelayTransport({
         externalSessionKey: `session:${connectionId}`,
         relayConnectionId: connectionId,
       };
-      if (daemonKeyPair) {
-        void attachEncryptedSocket(
-          socket,
-          daemonKeyPair,
-          relayLogger.child({ connectionId }),
-          attachSocket,
-          externalMetadata,
-        );
-      } else {
-        void attachSocket(socket, externalMetadata);
-      }
+      void attachSocket(socket, externalMetadata);
     });
 
     socket.on("close", (code, reason) => {
@@ -431,20 +424,37 @@ export async function attachEncryptedSocket(
     emitter.on("error", () => undefined);
     const pendingMessages: Array<string | ArrayBuffer> = [];
     let attached = false;
+    let pendingBytes = 0;
+    let bufferFailed = false;
     const emitMessage = (data: string | ArrayBuffer) => {
       if (attached) {
         emitter.emit("message", data);
         return;
       }
+      if (bufferFailed) return;
+      const bytes = typeof data === "string" ? Buffer.byteLength(data, "utf8") : data.byteLength;
+      if (pendingMessages.length >= 64 || pendingBytes + bytes > 1024 * 1024) {
+        bufferFailed = true;
+        pendingMessages.length = 0;
+        socket.close(1008, "E2EE admission buffer exceeded");
+        return;
+      }
+      pendingBytes += bytes;
       pendingMessages.push(data);
     };
-    const channel = await createDaemonChannel(relayTransport, daemonKeyPair, {
-      onmessage: emitMessage,
-      onclose: (code, reason) => emitter.emit("close", code, reason),
-      onerror: (error) => {
-        logger.warn({ err: error }, "relay_e2ee_error");
-        emitter.emit("error", error);
-        socket.close(4401, "Invalid encrypted frame");
+    // Direct paired devices and relay peers negotiate the same endpoint protocol.
+    // Old direct clients may still use legacy; a protected offer is never downgraded.
+    const channel = await openDaemonSecureChannel(relayTransport, {
+      daemonKeyPair,
+      minimumMode: "legacy",
+      events: {
+        onmessage: emitMessage,
+        onclose: (code, reason) => emitter.emit("close", code, reason),
+        onerror: (error) => {
+          logger.warn({ err: error }, "relay_e2ee_error");
+          emitter.emit("error", error);
+          socket.close(4401, "Invalid encrypted frame");
+        },
       },
     });
     clearTimeout(handshakeTimeout);
@@ -454,7 +464,14 @@ export async function attachEncryptedSocket(
       getTransportBufferedAmount: () => socket.bufferedAmount,
       terminateTransport: () => socket.terminate(),
     });
-    await attachSocket(encryptedSocket, metadata ? { ...metadata, encrypted: true } : undefined);
+    if (bufferFailed) return;
+    await attachSocket(encryptedSocket, {
+      ...metadata,
+      transport: metadata?.transport ?? "direct",
+      encrypted: true,
+      securityMode: channel.securityMode(),
+    });
+    if (bufferFailed) return;
     attached = true;
     for (const message of pendingMessages) {
       emitter.emit("message", message);

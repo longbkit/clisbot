@@ -106,6 +106,47 @@ describe("test-daemon-connection connectToDaemon", () => {
     expect(probe.clientIdsRequested).toBe(2);
   });
 
+  it.each([
+    { routeFloor: undefined, identityFloor: "protected", expected: "protected" },
+    { routeFloor: "protected", identityFloor: "legacy", expected: "protected" },
+    { routeFloor: "protected", identityFloor: undefined, expected: "protected" },
+    { routeFloor: undefined, identityFloor: undefined, expected: undefined },
+  ] as const)(
+    "keeps the strongest identity/route floor when probing a relay fallback: %j",
+    async ({ routeFloor, identityFloor, expected }) => {
+      const { connectToDaemon } = await import("./test-daemon-connection");
+      const onSecurityMode = vi.fn();
+      const result = await connectToDaemon(
+        {
+          id: "relay:relay.example.test:443",
+          type: "relay",
+          relayEndpoint: "relay.example.test:443",
+          useTls: true,
+          daemonPublicKeyB64: "route-authoritative-key",
+          ...(routeFloor ? { minimumSecurityMode: routeFloor } : {}),
+        },
+        {
+          serverId: "srv_probe_test",
+          // This is the same identity-level E2EE context HostRuntime passes after direct failure.
+          e2ee: {
+            enabled: true,
+            daemonPublicKeyB64: "identity-context-key",
+            minimumMode: identityFloor,
+            onSecurityMode,
+          },
+        },
+        probe.deps,
+      );
+      await result.client.close();
+      expect(probe.createdConfigs()[0]?.e2ee).toMatchObject({
+        enabled: true,
+        daemonPublicKeyB64: "route-authoritative-key",
+        minimumMode: expected,
+        onSecurityMode,
+      });
+    },
+  );
+
   it("keeps direct TCP probes on the renderer WebSocket", async () => {
     const { connectToDaemon } = await import("./test-daemon-connection");
     const deps = {

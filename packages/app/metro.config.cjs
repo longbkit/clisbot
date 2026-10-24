@@ -9,6 +9,7 @@ const {
 const projectRoot = __dirname;
 const appNodeModulesRoot = path.resolve(projectRoot, "node_modules");
 const appSrcRoot = path.resolve(projectRoot, "src");
+const isWatchdogBuild = process.env.CLISBOT_WATCHDOG_BUILD === "1";
 const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
 const fdroidModuleOverrides = {
   "expo-camera": path.resolve(appSrcRoot, "fdroid/expo-camera.tsx"),
@@ -20,6 +21,8 @@ const customWebPlatform = (process.env.CLISBOT_WEB_PLATFORM ?? "")
   .toLowerCase();
 
 const config = getDefaultConfig(projectRoot);
+config.cacheVersion = isWatchdogBuild ? "watchdog" : "standard";
+
 // Cloudflare limits each uncompressed asset to 25 MiB. Preserve Unicode as UTF-8
 // for this web export; native and desktop packaging keep Metro's defaults.
 if (process.env.CLISBOT_WEB_UTF8_EXPORT === "1") {
@@ -88,6 +91,14 @@ function resolveWithCustomWebOverlay(context, moduleName, platform) {
 }
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (
+    isWatchdogBuild &&
+    platform === "android" &&
+    /[/\\]Renderer[/\\]shims[/\\]/.test(context.originModulePath) &&
+    /implementations\/(ReactFabric|ReactNativeRenderer)-prod$/.test(moduleName)
+  ) {
+    return defaultResolveRequest(context, moduleName.replace(/-prod$/, "-profiling"), platform);
+  }
   if (isFdroidBuild && platform === "android" && fdroidModuleOverrides[moduleName]) {
     return resolveWithCustomWebOverlay(context, fdroidModuleOverrides[moduleName], platform);
   }

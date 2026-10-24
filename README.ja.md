@@ -52,10 +52,16 @@
 <!-- clisbot:intro:end -->
 
 - **セルフホスト:** エージェントはあなたのマシン上で動作し、完全な開発環境を使用します。自分のツール・設定・スキルをそのまま活用できます。
-- **エージェントを自由に選択:** 40 種類以上の選択肢。Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity、Muse Code の標準対応に加え、Grok を含む 38 件の ACP カタログプリセットを利用できます。タスクごとにモデルも選べます。
+- **エージェントを自由に選択:** 40 種類以上の選択肢。Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity、Muse Code の標準対応に加え、Grok を含む 39 件の ACP カタログプリセットを利用できます。タスクごとにモデルも選べます。
 - **音声コントロール:** 音声モードでタスクを口述したり問題を話し合ったりできます。ハンズフリーが必要なときに便利です。
 - **クロスデバイス:** iOS、Android、デスクトップ、Web、CLI に対応。机で作業を始め、スマートフォンで確認し、ターミナルから自動化できます。
 - **プライバシー設定:** 対応する本番用アプリビルドでは、任意の利用状況分析がデフォルトで有効です。設定 → 一般 → プライバシーで無効にできます。[分析の範囲と設定](docs/product-analytics.md)をご覧ください。
+
+## スポンサー
+
+Clisbot のスポンサー向け情報は準備中です。準備ができ次第、ここに掲載します。
+
+<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
 ## コンセプト
 
@@ -173,11 +179,9 @@ npm run build:server
 npm run typecheck
 ```
 
-## スポンサー
+## Clisbot を支援する
 
-Clisbot のスポンサー向け情報は準備中です。準備ができ次第、ここに掲載します。
-
-<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
+Clisbot は一人で開発しており、使ってくれる人たちの支援で成り立っています。[GitHub Sponsors](https://github.com/sponsors/boudra) で支援できます。企業として毎月[スポンサー](https://clisbot.com/sponsor#spot)になっていただくと、ロゴをこの README の冒頭と、clisbot.com のトップページおよびドキュメントに掲載します。
 
 ## 出典と謝辞
 

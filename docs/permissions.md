@@ -41,6 +41,17 @@ Narrow a connection with `clisbot hub permissions revoke <permission>`.
 
 Agents and terminals use workspace authority. Both can execute code and mutate the workspace, so separate write permissions would claim an isolation boundary the daemon cannot enforce.
 
+Connected-host management uses `tunnel.manage`; source-owned connection and metadata replacement
+requires the producer or `access.manage`. Routed operations retain both caller and link authority,
+see [Connected hosts](connected-hosts.md#ownership-and-authority).
+
+Connected-host discovery, configuration and routed sessions require `tunnel.manage`, an active
+origin lease and unrestricted Host resources. A Project-scoped Hub grant cannot use a daemon's
+saved links, even if its coarse permission list contains `tunnel.manage`: those links carry the
+daemon's credentials, not the caller's destination actor and Project grants. Use an explicitly
+authorized connection to that destination instead. Personal paired owners retain their existing
+Host authority. Revocation closes derived channels; late text or binary frames cannot reopen them.
+
 Owner, operator, and viewer are UI presets expanded into explicit permissions. Do not persist them as roles. Adding a permission must not silently widen an existing principal.
 
 Permissions are additive allows. Missing authority denies the operation. Do not add deny precedence.

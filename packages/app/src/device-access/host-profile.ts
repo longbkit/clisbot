@@ -17,7 +17,11 @@ export function devicePairedHost(input: {
     throw new Error(i18n.t("hub.connection.errors.hostIdentityChanged"));
   if (offer.pairing.backendId !== offer.serverId)
     throw new Error(i18n.t("hub.connection.errors.pairingMismatch"));
-  const connections = offerConnections(offer);
+  const devicePairing = devicePairingFromOffer(offer, existing);
+  const connections = offerConnections({
+    ...offer,
+    minimumSecurityMode: devicePairing.minimumSecurityMode,
+  });
   const now = new Date().toISOString();
   const { password: _password, ...previous } = existing ?? {};
   return {
@@ -27,7 +31,7 @@ export function devicePairedHost(input: {
     lifecycle: {},
     createdAt: now,
     ...previous,
-    devicePairing: { backendId: offer.serverId, daemonPublicKeyB64: offer.daemonPublicKeyB64 },
+    devicePairing,
     connections: [
       ...connections,
       ...(existing?.connections ?? []).filter((c) => !connections.some((n) => n.id === c.id)),
@@ -37,8 +41,33 @@ export function devicePairedHost(input: {
   };
 }
 
+/** Caller verifies the offered identity before carrying an existing pin forward. */
+export function devicePairingFromOffer(
+  offer: Pick<DevicePairingOffer, "serverId" | "daemonPublicKeyB64" | "minimumSecurityMode">,
+  existing?: HostProfile,
+): NonNullable<HostProfile["devicePairing"]> {
+  const learnedRelayPin = existing?.connections.some(
+    (connection) =>
+      connection.type === "relay" &&
+      connection.daemonPublicKeyB64 === offer.daemonPublicKeyB64 &&
+      connection.minimumSecurityMode === "protected",
+  )
+    ? "protected"
+    : undefined;
+  const minimumSecurityMode =
+    offer.minimumSecurityMode ?? existing?.devicePairing?.minimumSecurityMode ?? learnedRelayPin;
+  return {
+    backendId: offer.serverId,
+    daemonPublicKeyB64: offer.daemonPublicKeyB64,
+    ...(minimumSecurityMode ? { minimumSecurityMode } : {}),
+  };
+}
+
 export function offerConnections(
-  offer: Pick<DevicePairingOffer, "direct" | "relay" | "daemonPublicKeyB64">,
+  offer: Pick<
+    DevicePairingOffer,
+    "direct" | "relay" | "daemonPublicKeyB64" | "minimumSecurityMode"
+  >,
 ): HostConnection[] {
   const connections: HostConnection[] = [];
   if (offer.direct) {
@@ -60,6 +89,7 @@ export function offerConnections(
       relayEndpoint: normalizeHostPort(offer.relay.endpoint),
       useTls: offer.relay.useTls ?? true,
       daemonPublicKeyB64: offer.daemonPublicKeyB64,
+      ...(offer.minimumSecurityMode ? { minimumSecurityMode: offer.minimumSecurityMode } : {}),
     });
   if (!connections.length) throw new Error(i18n.t("hub.connection.errors.linkNoRoute"));
   return connections;

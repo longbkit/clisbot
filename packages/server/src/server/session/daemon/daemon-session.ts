@@ -44,6 +44,7 @@ export interface DaemonRuntimeConfig {
     publicEndpoint: string;
     useTls: boolean;
     publicUseTls: boolean;
+    requireProtectedSecurity?: boolean;
   } | null;
 }
 
@@ -357,29 +358,36 @@ export class DaemonSession {
     }
   }
 
+  private createPairingOffer(
+    msg: Extract<SessionInboundMessage, { type: "daemon.get_pairing_offer.request" }>,
+  ): ReturnType<typeof generateLocalPairingOffer> {
+    const relay = this.daemonRuntimeConfig?.getRelayConfig();
+    const configured = readDevicePairingConfiguration(this.clisbotHome);
+    return generateLocalPairingOffer({
+      clisbotHome: this.clisbotHome,
+      relayEnabled: relay?.enabled ?? false,
+      relayEndpoint: relay?.endpoint,
+      relayPublicEndpoint: relay?.publicEndpoint,
+      relayUseTls: relay?.useTls,
+      relayPublicUseTls: relay?.publicUseTls,
+      relayRequireProtectedSecurity: relay?.requireProtectedSecurity ?? false,
+      appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
+      includeQr: true,
+      logger: this.logger,
+      devicePairingEnabled: this.daemonRuntimeConfig?.devicePairingEnabled,
+      label: msg.label,
+      ttlMs: msg.ttlMs,
+      direct: msg.direct ?? configured.direct,
+      hub: msg.hub,
+      managedAccessMode: configured.managedAccessMode,
+    });
+  }
+
   async handleGetPairingOfferRequest(
     msg: Extract<SessionInboundMessage, { type: "daemon.get_pairing_offer.request" }>,
   ): Promise<void> {
     try {
-      const relay = this.daemonRuntimeConfig?.getRelayConfig();
-      const configured = readDevicePairingConfiguration(this.clisbotHome);
-      const pairing = await generateLocalPairingOffer({
-        clisbotHome: this.clisbotHome,
-        relayEnabled: relay?.enabled ?? false,
-        relayEndpoint: relay?.endpoint,
-        relayPublicEndpoint: relay?.publicEndpoint,
-        relayUseTls: relay?.useTls,
-        relayPublicUseTls: relay?.publicUseTls,
-        appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
-        includeQr: true,
-        logger: this.logger,
-        devicePairingEnabled: this.daemonRuntimeConfig?.devicePairingEnabled,
-        label: msg.label,
-        ttlMs: msg.ttlMs,
-        direct: msg.direct ?? configured.direct,
-        hub: msg.hub,
-        managedAccessMode: configured.managedAccessMode,
-      });
+      const pairing = await this.createPairingOffer(msg);
       if (this.daemonRuntimeConfig?.devicePairingEnabled) {
         void this.hubRelationships
           ?.publishConnectionOffer?.()

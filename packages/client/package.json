@@ -28,6 +28,14 @@
     "./internal/hub-device-transport": {
       "types": "./dist/hub-device-transport.d.ts",
       "default": "./dist/hub-device-transport.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "default": "./dist/node/index.js"
+    },
+    "./internal/hosts": {
+      "types": "./dist/hosts/index.d.ts",
+      "default": "./dist/hosts/index.js"
     }
   },
   "publishConfig": {
@@ -47,6 +55,7 @@
     "@clisbot/protocol": "2.1.8",
     "@clisbot/relay": "2.1.8",
     "base64-js": "^1.5.1",
+    "ws": "^8.20.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

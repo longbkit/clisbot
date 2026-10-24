@@ -28,7 +28,6 @@ export interface CreateWorktreeCoreInput {
   firstAgentContext?: FirstAgentContext;
   clisbotHome?: string;
   worktreesRoot?: string;
-  runSetup?: boolean;
 }
 
 export interface CreateWorktreeCoreDeps {
@@ -120,7 +119,6 @@ async function createWorktreeCoreWithPriority(
       cwd: repoRoot,
       worktreeSlug: normalizedSlug,
       source: intent,
-      runSetup: input.runSetup ?? true,
       clisbotHome: input.clisbotHome,
       worktreesRoot: input.worktreesRoot,
     }),

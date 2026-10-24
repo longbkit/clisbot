@@ -20,10 +20,12 @@ vi.mock("@/stores/panel-store", () => ({
   usePanelStore: {
     getState: () => ({
       showMobileAgent: mocks.show,
-      openCompactFileExplorer: mocks.explorer,
-      setExplorerTabForCheckout: mocks.setTree,
+      showMobileFileExplorer: mocks.explorer,
     }),
   },
+}));
+vi.mock("./explorer-tab-store", () => ({
+  useConversationExplorerTabs: { getState: () => ({ setTab: mocks.setTree }) },
 }));
 vi.mock("./conversation-layout", () => ({ openConversationFile: mocks.open }));
 vi.mock("./conversation-access", () => ({
@@ -51,8 +53,11 @@ function setup(singlePanel: boolean) {
 it("mobile folder link selects its original bot and opens the existing Explorer", () => {
   setup(true)(source, { kind: "files" });
   expect(mocks.select).toHaveBeenCalledWith("writer-bot");
-  expect(mocks.explorer).toHaveBeenCalledWith({ serverId: "host", cwd: "/writer", isGit: false });
-  expect(mocks.setTree).toHaveBeenCalledWith(expect.objectContaining({ tab: "files" }));
+  expect(mocks.explorer).toHaveBeenCalledOnce();
+  expect(mocks.setTree).toHaveBeenCalledWith(
+    { serverId: "host", cwd: "/writer", isGit: false },
+    "files",
+  );
   expect(mocks.open).not.toHaveBeenCalled();
   expect(mocks.show).not.toHaveBeenCalled();
 });
@@ -70,13 +75,15 @@ it("mobile changes link selects the source bot and opens Changes in its existing
   mocks.workspace = { workspaceDirectory: "/writer", projectKind: "git" };
   setup(true)(source, { kind: "changes_tree" });
   expect(mocks.select).toHaveBeenCalledWith("writer-bot");
-  expect(mocks.setTree).toHaveBeenCalledWith({
-    serverId: "host",
-    cwd: "/writer",
-    isGit: true,
-    tab: "changes",
-  });
-  expect(mocks.explorer).toHaveBeenCalledWith({ serverId: "host", cwd: "/writer", isGit: true });
+  expect(mocks.setTree).toHaveBeenCalledWith(
+    {
+      serverId: "host",
+      cwd: "/writer",
+      isGit: true,
+    },
+    "changes",
+  );
+  expect(mocks.explorer).toHaveBeenCalledOnce();
   expect(mocks.open).not.toHaveBeenCalled();
   expect(mocks.show).not.toHaveBeenCalled();
 });

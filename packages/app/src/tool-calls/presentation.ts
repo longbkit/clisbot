@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@clisbot/protocol/agent-message";
-import { buildAgentMessageDisplay } from "@clisbot/protocol/agent-message-display";
+import { buildAgentMessageDisplay } from "@clisbot/protocol/clisbot-tool-presentation/index";
 import type { PlanOutcome } from "@/components/plan-card";
 import type { ComponentType } from "react";
 import type { ToolCallDetail } from "@clisbot/protocol/agent-types";
@@ -22,6 +22,7 @@ interface BuildToolCallPresentationInput {
   detail?: ToolCallDetail;
   cwd?: string;
   metadata?: Record<string, unknown>;
+  targetAgentTitle?: string;
   resolveIcon: ToolCallIconResolver;
 }
 
@@ -42,6 +43,7 @@ export interface ToolCallPresentation {
 export type ToolCallIconResolver = (
   toolName: string,
   detail: ToolCallDetail | undefined,
+  agentMessage: AgentMessage | undefined,
 ) => ToolCallPresentationIcon;
 
 function displayStatus(status: ToolCallStatus): ToolCallDisplayInput["status"] {
@@ -67,6 +69,7 @@ export function buildToolCallPresentation(
     detail: detailForDisplay,
     metadata: input.metadata,
     cwd: input.cwd,
+    targetAgentTitle: input.targetAgentTitle,
   });
   const isLoadingDetails = isPendingToolCallDetail({
     detail,
@@ -80,7 +83,7 @@ export function buildToolCallPresentation(
     displayName: displayModel.displayName,
     summary: displayModel.summary,
     errorText: displayModel.errorText,
-    icon: input.resolveIcon(input.toolName, detail),
+    icon: input.resolveIcon(input.toolName, detail, input.agentMessage),
     isLoadingDetails,
     hasDetails,
     canOpenDetails: hasDetails || isLoadingDetails,

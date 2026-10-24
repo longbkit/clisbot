@@ -1,7 +1,7 @@
-import type { Href, Router } from "expo-router";
+import type { Href, router } from "expo-router";
 
 interface TabNavigation {
-  router: Pick<Router, "navigate" | "replace">;
+  router: Pick<typeof router, "navigate" | "replace">;
   href: Href;
   nativeTab: boolean;
 }

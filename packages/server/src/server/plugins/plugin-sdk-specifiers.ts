@@ -2,6 +2,7 @@
 export const PLUGIN_CLIENT_ONLY_SDK_SPECIFIERS = [
   "@clisbot/plugin/client",
   "@clisbot/plugin/client/ui",
+  // COMPAT(pluginReactNativeEntrypoint): added in v0.13.0, remove after 2027-04-20
   "@clisbot/plugin/client/react-native",
 ] as const;
 

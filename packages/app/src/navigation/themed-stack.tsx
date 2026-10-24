@@ -1,9 +1,20 @@
 import { useChatListScreenListeners } from "@/clisbot/home/use-chat-list-navigation";
-import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Stack } from "expo-router";
-import { isValidElement, type ReactElement, type ReactNode, useCallback, useMemo } from "react";
+import {
+  isValidElement,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useMemo,
+} from "react";
 import { withUnistyles } from "react-native-unistyles";
 import { AppearanceStyleBoundary } from "@/components/appearance-style-boundary";
+
+type NativeStackNavigationOptions = Exclude<
+  NonNullable<ComponentProps<typeof Stack>["screenOptions"]>,
+  (...args: never[]) => unknown
+>;
 
 interface ThemedStackBaseProps {
   backgroundColor: string;
@@ -12,6 +23,8 @@ interface ThemedStackBaseProps {
   // Screens whose content is another navigator. That navigator owns its own screens' appearance
   // boundary; wrapping it here would remount it.
   nestedNavigatorScreens?: readonly string[];
+  /** Screens with retained lifetime owners update appearance at their own leaves. */
+  screenOwnedAppearance?: readonly string[];
 }
 
 interface ScreenContent {
@@ -24,6 +37,7 @@ function ThemedStackBase({
   children,
   screenOptions,
   nestedNavigatorScreens,
+  screenOwnedAppearance,
 }: ThemedStackBaseProps) {
   const screenListeners = useChatListScreenListeners();
   const themedScreenOptions = useMemo<NativeStackNavigationOptions>(
@@ -37,10 +51,15 @@ function ThemedStackBase({
   // and its screen containers keep their identity. See docs/unistyles.md.
   const screenLayout = useCallback(
     ({ route, children: content }: ScreenContent): ReactElement => {
-      if (nestedNavigatorScreens?.includes(route.name) && isValidElement(content)) return content;
+      if (
+        (nestedNavigatorScreens?.includes(route.name) ||
+          screenOwnedAppearance?.includes(route.name)) &&
+        isValidElement(content)
+      )
+        return content;
       return <AppearanceStyleBoundary>{content}</AppearanceStyleBoundary>;
     },
-    [nestedNavigatorScreens],
+    [nestedNavigatorScreens, screenOwnedAppearance],
   );
 
   return (

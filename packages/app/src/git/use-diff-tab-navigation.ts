@@ -60,10 +60,9 @@ export function useDiffTabNavigation({
     openWorkspacePullRequest({
       isCompact: isMobile,
       workspaceKey: persistenceKey,
-      checkout: { serverId, cwd, isGit: true },
       destination: pullRequestOpenLocation,
     });
-  }, [cwd, isMobile, persistenceKey, pullRequestOpenLocation, serverId, openInConversation]);
+  }, [isMobile, persistenceKey, pullRequestOpenLocation, openInConversation]);
   return {
     openDiff,
     openCommit,

@@ -18,10 +18,10 @@ export function OfferLinkListener() {
   useEffect(() => {
     let cancelled = false;
     const pending = new Set<string>();
-    let failureToastId: number | undefined;
+    let dismissFailureToast: (() => void) | undefined;
     const dismissFailure = () => {
-      if (failureToastId !== undefined) current.current.toast.dismiss?.(failureToastId);
-      failureToastId = undefined;
+      dismissFailureToast?.();
+      dismissFailureToast = undefined;
     };
     const handleUrl = async (url: string | null) => {
       if (
@@ -41,12 +41,12 @@ export function OfferLinkListener() {
           current.current.router.replace(pairedHubSettingsRoute(url));
       } catch {
         if (!cancelled) {
-          const id = current.current.toast.show(pairingLinkFailureMessage(url), {
+          const dismiss = current.current.toast.show(pairingLinkFailureMessage(url), {
             variant: "error",
             durationMs: null,
             testID: "pairing-link-error",
           });
-          failureToastId = typeof id === "number" ? id : undefined;
+          dismissFailureToast = dismiss;
         }
       } finally {
         pending.delete(url);

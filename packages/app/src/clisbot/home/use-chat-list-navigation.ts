@@ -19,7 +19,11 @@ export function useChatListScreenListeners() {
   return useMemo(
     () => ({
       state: () => {
-        if (HOME_V2_ENABLED && isNative && navigation.getCurrentRoute()?.name === "chat")
+        if (
+          HOME_V2_ENABLED &&
+          isNative &&
+          (navigation.getCurrentRoute() as PresentedRoute | undefined)?.name === "chat"
+        )
           nativePresentation.didReturnToList();
       },
       transitionStart: (event: TransitionEvent) => {
@@ -30,7 +34,7 @@ export function useChatListScreenListeners() {
           });
           nativePresentation.transitionStart(
             event,
-            navigation.getCurrentRoute(),
+            navigation.getCurrentRoute() as PresentedRoute | undefined,
             usePanelStore.getState().mobilePanel,
           );
         }
@@ -43,7 +47,7 @@ export function useChatListScreenListeners() {
           });
           nativePresentation.transitionEnd(
             event,
-            navigation.getCurrentRoute(),
+            navigation.getCurrentRoute() as PresentedRoute | undefined,
             usePanelStore.getState().mobilePanel,
           );
         }

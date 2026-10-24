@@ -90,21 +90,16 @@ vi.mock("react-native", () => ({
   Pressable: ({
     children,
     accessibilityRole,
-    accessibilityState,
+    "aria-selected": selected,
     onPress,
   }: React.PropsWithChildren<{
     onPress?: (event: { nativeEvent: { timestamp: number } }) => void;
     accessibilityRole?: React.AriaRole;
-    accessibilityState?: { selected: boolean };
+    "aria-selected"?: boolean;
   }>) => {
     const click = useCallback(() => onPress?.({ nativeEvent: { timestamp: 1 } }), [onPress]);
     return (
-      <button
-        type="button"
-        role={accessibilityRole}
-        aria-selected={accessibilityState?.selected}
-        onClick={click}
-      >
+      <button type="button" role={accessibilityRole} aria-selected={selected} onClick={click}>
         {children}
       </button>
     );
@@ -243,6 +238,12 @@ it("keeps the actual Chat footer and unchanged selection projection while native
   expect(screen.queryByTestId("home-mobile-tabs")).toBeNull();
   expect(screen.getByTestId("expanded-session").textContent).toBe("a");
 });
+it("does not register native hardware Back from the compact browser footer", () => {
+  env.native = false;
+  render(<MobileHomeTabs />);
+  expect(env.back).toBeNull();
+});
+
 it("keeps peer footer rendering at root and Back/input tracing in one root owner", () => {
   env.path = "/open-project";
   const view = render(<Page />);

@@ -32,6 +32,7 @@ interface GenericACPAgentClientOptions {
   label?: string;
   /** The configured provider options; only `exactMcpPreapproval` is read here. */
   providerParams?: unknown;
+  usageProvider?: string;
   waitForInitialCommands?: boolean;
   initialCommandsWaitTimeoutMs?: number;
   diagnosticPhaseTimeoutMs?: number;
@@ -54,6 +55,7 @@ export class GenericACPAgentClient extends ACPAgentClient {
     );
     super({
       provider: "acp",
+      usageProvider: options.usageProvider,
       // Every custom ACP provider shares the "acp" id; the configured id tells their log lines apart.
       logger: options.providerId
         ? options.logger.child({ providerId: options.providerId })
