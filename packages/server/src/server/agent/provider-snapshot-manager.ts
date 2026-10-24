@@ -122,6 +122,9 @@ export interface ProviderSnapshotManagerOptions {
   extraClients?: Partial<Record<AgentProvider, AgentClient>>;
   refreshTimeoutMs?: number;
   diagnosticTimeoutMs?: number;
+  /** Opt-in recovery of cached unavailable results on reads; zero keeps legacy caching. */
+  unavailableRetryMs?: number;
+  now?: () => number;
   openCodeBridge?: OpenCodeBridge;
 }
 
@@ -209,6 +212,7 @@ interface CatalogBinding {
 
 interface ProviderCatalog {
   result?: ProviderSnapshotRecord;
+  resultUpdatedAt?: number;
   stale?: boolean;
   load?: Promise<void>;
 }
@@ -241,6 +245,8 @@ export class ProviderSnapshotManager {
   private destroyed = false;
   private refreshTimeoutMs: number;
   private diagnosticTimeoutMs: number;
+  private readonly unavailableRetryMs: number;
+  private readonly now: () => number;
   private readonly logger: Logger;
   private readonly workspaceGitService?: Pick<WorkspaceGitService, "resolveRepoRoot">;
   private readonly managedProcesses?: ManagedProcessRegistry;
@@ -258,6 +264,12 @@ export class ProviderSnapshotManager {
 
   constructor(options: ProviderSnapshotManagerOptions) {
     this.logger = options.logger;
+    this.now = options.now ?? (() => performance.now());
+    const unavailableRetryMs = options.unavailableRetryMs ?? 0;
+    this.unavailableRetryMs =
+      Number.isFinite(unavailableRetryMs) && unavailableRetryMs > 0
+        ? Math.max(1_000, unavailableRetryMs)
+        : 0;
     this.pluginProviders = new PluginAgentClientRegistry(
       options.logger.child({ module: "plugin-providers" }),
     );
@@ -988,7 +1000,14 @@ export class ProviderSnapshotManager {
       catalogs.set(provider, catalog);
     }
     this.publishTargets([snapshotCwd]);
-    if (!force && (catalog.load || (catalog.result && !catalog.stale))) return catalog.load;
+    const unavailableExpired =
+      this.unavailableRetryMs > 0 &&
+      catalog.result?.entry.status === "unavailable" &&
+      catalog.resultUpdatedAt !== undefined &&
+      this.now() - catalog.resultUpdatedAt >= this.unavailableRetryMs;
+    if (!force && (catalog.load || (catalog.result && !catalog.stale && !unavailableExpired))) {
+      return catalog.load;
+    }
     catalog.stale = false;
 
     const current = catalog;
@@ -1007,6 +1026,7 @@ export class ProviderSnapshotManager {
           publish: (entry) => {
             if (!isCurrent()) return false;
             current.result = identifyEntry(structuredClone(entry));
+            current.resultUpdatedAt = this.now();
             const boundTargets = [...this.targets].flatMap(([cwd, target]) =>
               target.bindings.get(provider)?.key === key ? [cwd] : [],
             );

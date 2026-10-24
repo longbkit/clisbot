@@ -26,6 +26,7 @@ export async function createAgentProviderRuntime(
   try {
     await bridge.start();
     const snapshotManager = new ProviderSnapshotManager({
+      unavailableRetryMs: process.env.CLISBOT_PROVIDER_UNAVAILABLE_RETRY === "1" ? 60_000 : 0,
       ...options.snapshotManager,
       logger: options.logger.child({ module: "provider-snapshot-manager" }),
       openCodeBridge: bridge,
