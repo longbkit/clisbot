@@ -1,5 +1,14 @@
-import { useCallback, useMemo } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
+import { EdgeFade } from "./edge-fade";
 import { StyleSheet } from "react-native-unistyles";
 
 export interface FilterChip<T extends string> {
@@ -19,12 +28,15 @@ export function FilterChips<T extends string>({
   value,
   onChange,
   scroll = false,
+  backdrop = "surface0",
   testID,
 }: {
   chips: readonly FilterChip<T>[];
   value: T;
   onChange(value: T): void;
   scroll?: boolean;
+  /** The surface behind a scrolling row; its trailing edge fades into it. */
+  backdrop?: "surface0" | "surfaceSidebar";
   testID?: string;
 }) {
   const row = (
@@ -41,10 +53,44 @@ export function FilterChips<T extends string>({
     </View>
   );
   if (!scroll) return row;
+  return <ScrollingChips backdrop={backdrop}>{row}</ScrollingChips>;
+}
+
+/** One line that scrolls sideways; a fade on the trailing edge says there is more. */
+function ScrollingChips({
+  backdrop,
+  children,
+}: {
+  backdrop: "surface0" | "surfaceSidebar";
+  children: ReactNode;
+}) {
+  const [width, setWidth] = useState(0);
+  const [content, setContent] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const measure = useCallback((event: LayoutChangeEvent) => {
+    setWidth(event.nativeEvent.layout.width);
+  }, []);
+  const measureContent = useCallback((contentWidth: number) => setContent(contentWidth), []);
+  const track = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setOffset(event.nativeEvent.contentOffset.x);
+  }, []);
+  const more = content - width - offset > 1;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
-      {row}
-    </ScrollView>
+    <View style={styles.scrollFrame} onLayout={measure}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.scroll}
+        onContentSizeChange={measureContent}
+        onScroll={track}
+        scrollEventThrottle={32}
+      >
+        {children}
+      </ScrollView>
+      {more ? (
+        <EdgeFade edge="right" solidFraction={0} backdrop={backdrop} style={styles.fade} />
+      ) : null}
+    </View>
   );
 }
 
@@ -94,6 +140,8 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
   scroll: { flexGrow: 0 },
+  scrollFrame: { position: "relative" },
+  fade: { position: "absolute", top: 0, bottom: 0, right: 0, width: theme.spacing[8] },
   chip: {
     flexDirection: "row",
     alignItems: "center",

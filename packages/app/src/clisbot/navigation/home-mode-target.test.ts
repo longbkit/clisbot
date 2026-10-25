@@ -17,3 +17,12 @@ describe("modeTargetChange", () => {
     expect(modeTargetChange("hybrid", "bot", {})).toBeNull();
   });
 });
+
+describe("modeStartKinds", () => {
+  it("offers only the starts a mode allows", async () => {
+    const { modeStartKinds } = await import("./home-mode-target");
+    expect(modeStartKinds("chat")).toEqual({ quickChat: false, project: false, bot: true });
+    expect(modeStartKinds("work")).toEqual({ quickChat: true, project: true, bot: false });
+    expect(modeStartKinds("hybrid")).toEqual({ quickChat: true, project: true, bot: true });
+  });
+});

@@ -41,8 +41,17 @@ export function NavigationHomeFeed({
   filterKey: string;
 }) {
   const { t } = useTranslation();
-  const { agents, isInitialLoad, directoryHealth, accepted, needs, limit, showMore } =
-    useHomeActivity();
+  const {
+    agents,
+    isInitialLoad,
+    directoryHealth,
+    accepted,
+    needs,
+    limit,
+    showMore,
+    pending,
+    update,
+  } = useHomeActivity();
   const activity = useNavigationActivity();
   const requestApply = useApplyReaderChanges(filterKey);
   const showHost = useHosts().length > 1;
@@ -78,11 +87,19 @@ export function NavigationHomeFeed({
       {!isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length ? (
         <Text style={styles.muted}>{t("navigation.lists.emptyFeed")}</Text>
       ) : null}
-      {unseen.length > 1 ? (
+      {pending > 0 || unseen.length > 1 ? (
         <View style={styles.markAll}>
-          <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
-            {t("navigation.actions.markAllSeen")}
-          </Button>
+          {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
+          {pending > 0 ? (
+            <Button size="xs" variant="ghost" onPress={update} testID="home-activity-apply">
+              {t("navigation.updates", { count: pending })}
+            </Button>
+          ) : null}
+          {unseen.length > 1 ? (
+            <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
+              {t("navigation.actions.markAllSeen")}
+            </Button>
+          ) : null}
         </View>
       ) : null}
       {sections.map((section) => (

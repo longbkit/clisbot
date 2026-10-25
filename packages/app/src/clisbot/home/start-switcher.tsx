@@ -32,6 +32,9 @@ export function StartSwitcher({
   mark,
   anchorRef,
   quickChat = true,
+  project = true,
+  bot = true,
+  compactSegments = false,
   onQuickChat,
   onPick,
 }: {
@@ -45,6 +48,11 @@ export function StartSwitcher({
   anchorRef: RefObject<View | null>;
   /** False when this session may not start a Quick chat on the Host; the segment is left out. */
   quickChat?: boolean;
+  /** Navigation V2 Home's mode leaves out the starts it does not offer (Chat: Bot only). */
+  project?: boolean;
+  bot?: boolean;
+  /** Unselected segments show only their icon, so every start fits a 320pt phone. */
+  compactSegments?: boolean;
   onQuickChat: () => void;
   onPick: (kind: "project" | "bot") => void;
 }) {
@@ -70,32 +78,39 @@ export function StartSwitcher({
       onValueChange={onQuickChat}
       size={size}
       variant="track"
+      hideLabels={compactSegments && kind !== "quickChat"}
       trailing={
         <>
-          <DestinationSegment
-            ref={projectRef}
-            size={size}
-            selected={kind === "project"}
-            disabled={disabled}
-            label={kind === "project" ? label : "Project"}
-            mark={kind === "project" ? mark : undefined}
-            Icon={FolderOpen}
-            onPress={pickProject}
-            accessibilityLabel="Workspace project"
-            testID="new-workspace-project-picker-trigger"
-          />
-          <DestinationSegment
-            ref={botRef}
-            size={size}
-            selected={kind === "bot"}
-            disabled={disabled}
-            label={kind === "bot" ? label : "Bot"}
-            mark={kind === "bot" ? mark : undefined}
-            Icon={Bot}
-            onPress={pickBot}
-            accessibilityLabel="With a bot"
-            testID="start-switcher-bot"
-          />
+          {project ? (
+            <DestinationSegment
+              ref={projectRef}
+              size={size}
+              selected={kind === "project"}
+              disabled={disabled}
+              label={kind === "project" ? label : "Project"}
+              iconOnly={compactSegments && kind !== "project"}
+              mark={kind === "project" ? mark : undefined}
+              Icon={FolderOpen}
+              onPress={pickProject}
+              accessibilityLabel="Workspace project"
+              testID="new-workspace-project-picker-trigger"
+            />
+          ) : null}
+          {bot ? (
+            <DestinationSegment
+              ref={botRef}
+              size={size}
+              selected={kind === "bot"}
+              disabled={disabled}
+              label={kind === "bot" ? label : "Bot"}
+              iconOnly={compactSegments && kind !== "bot"}
+              mark={kind === "bot" ? mark : undefined}
+              Icon={Bot}
+              onPress={pickBot}
+              accessibilityLabel="With a bot"
+              testID="start-switcher-bot"
+            />
+          ) : null}
         </>
       }
     />
@@ -116,6 +131,7 @@ interface SegmentProps {
   selected: boolean;
   disabled?: boolean;
   label: string;
+  iconOnly?: boolean;
   mark?: ReactNode;
   Icon: typeof Bot;
   onPress: () => void;
@@ -124,7 +140,7 @@ interface SegmentProps {
 }
 
 const DestinationSegment = forwardRef<View, SegmentProps>(function DestinationSegment(
-  { size, selected, disabled, label, mark, Icon, onPress, accessibilityLabel, testID },
+  { size, selected, disabled, label, iconOnly, mark, Icon, onPress, accessibilityLabel, testID },
   ref,
 ) {
   const style = useCallback(
@@ -155,15 +171,17 @@ const DestinationSegment = forwardRef<View, SegmentProps>(function DestinationSe
       testID={testID}
     >
       {mark ?? <ThemedGlyph Icon={Icon} size={iconSize} uniProps={selected ? strong : muted} />}
-      <Text
-        style={[
-          segmentedLabelStyle({ size, selected, variant: "track" }),
-          size === "md" ? styles.nameCompact : styles.name,
-        ]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
+      {iconOnly ? null : (
+        <Text
+          style={[
+            segmentedLabelStyle({ size, selected, variant: "track" }),
+            size === "md" ? styles.nameCompact : styles.name,
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      )}
       {/* On a phone only the chosen segment shows its chevron; the row must fit 360pt. */}
       {selected || size !== "md" ? (
         <ThemedGlyph Icon={ChevronDown} size={12} uniProps={muted} />

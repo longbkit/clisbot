@@ -17,6 +17,9 @@ const PersistedSchema = z.object({
   scopes: z.object({ home: ScopeSchema, chats: ScopeSchema, work: ScopeSchema }),
   lastList: z.enum(["chats", "work"]),
   showBotProjectsInWork: z.boolean().optional(),
+  chatsSort: z.enum(["recent", "name"]).optional(),
+  chatsSplit: z.boolean().optional(),
+  chatsHosts: z.array(z.string()).optional(),
 });
 
 interface NavigationState {
@@ -27,6 +30,14 @@ interface NavigationState {
   homeChip: HomeChip;
   chatsChip: ChatsChip;
   workChip: WorkChip;
+  /** Chats' Display menu: order, the opt-in DM/group split, and the Hosts it lists. */
+  chatsSort: "recent" | "name";
+  chatsSplit: boolean;
+  chatsHosts: string[];
+  setChatsSort: (sort: "recent" | "name") => void;
+  toggleChatsSplit: () => void;
+  toggleChatsHost: (serverId: string) => void;
+  clearChatsHosts: () => void;
   /** Bot home projects are Chats; Work lists them only when the reader opts in (brief C4). */
   showBotProjectsInWork: boolean;
   toggleBotProjectsInWork: () => void;
@@ -61,6 +72,18 @@ export const useNavigationStore = create<NavigationState>()(
       workChip: "all",
       showOthersPins: false,
       showBotProjectsInWork: false,
+      chatsSort: "recent",
+      chatsSplit: false,
+      chatsHosts: [],
+      setChatsSort: (chatsSort) => set({ chatsSort }),
+      toggleChatsSplit: () => set((state) => ({ chatsSplit: !state.chatsSplit })),
+      toggleChatsHost: (serverId) =>
+        set((state) => ({
+          chatsHosts: state.chatsHosts.includes(serverId)
+            ? state.chatsHosts.filter((id) => id !== serverId)
+            : [...state.chatsHosts, serverId],
+        })),
+      clearChatsHosts: () => set({ chatsHosts: [] }),
       toggleBotProjectsInWork: () =>
         set((state) => ({ showBotProjectsInWork: !state.showBotProjectsInWork })),
       homeSearchOpen: false,
@@ -86,6 +109,9 @@ export const useNavigationStore = create<NavigationState>()(
         scopes: state.scopes,
         lastList: state.lastList,
         showBotProjectsInWork: state.showBotProjectsInWork,
+        chatsSort: state.chatsSort,
+        chatsSplit: state.chatsSplit,
+        chatsHosts: state.chatsHosts,
       }),
     },
   ),

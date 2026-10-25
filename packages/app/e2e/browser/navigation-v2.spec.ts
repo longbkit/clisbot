@@ -68,6 +68,10 @@ test.describe("Navigation V2", () => {
       await expect(page.getByTestId("sidebar-hosts-trigger")).toBeVisible();
       await expect(page.getByTestId("sidebar-help")).toBeVisible();
       await expect(page.getByTestId("sidebar-unified-pinned")).toHaveCount(0);
+      // Healthy Hosts say nothing on Home; there is no floating updates bar.
+      await expect(page.getByTestId("home-hosts")).toHaveCount(0);
+      await expect(page.getByTestId("home-connection-issues")).toHaveCount(0);
+      await expect(page.getByTestId("home-activity-updates")).toHaveCount(0);
 
       const failedRow = page.getByTestId(`agent-row-${getServerId()}-${seeded.failing.id}`);
       await expect(page.getByTestId("home-feed-controls")).toBeVisible();
@@ -92,6 +96,12 @@ test.describe("Navigation V2", () => {
       await expect(page.getByTestId(`sidebar-bot-${seeded.botId}`)).toBeVisible({
         timeout: 20_000,
       });
+      // One Display menu for the mixed list; the old per-group menus are gone.
+      await expect(page.getByTestId("sidebar-bots-display-menu")).toHaveCount(0);
+      await page.getByTestId("chats-display").click();
+      await expect(page.getByTestId("chats-display-split")).toBeVisible();
+      await shot(page, "desktop-chats-display");
+      await page.keyboard.press("Escape");
       await shot(page, "desktop-chats");
 
       await page.getByTestId("navigation-rail-work").click();
@@ -295,6 +305,9 @@ test.describe("Navigation V2", () => {
         for (const [tab, surface] of tabs) {
           await page.getByTestId(`home-tab-${tab}`).click();
           await expect(page.getByTestId(surface)).toBeVisible();
+          if (tab === "open-project")
+            // Every start fits: the third segment is on screen, not clipped.
+            await expect(page.getByTestId("start-switcher-bot")).toBeInViewport({ ratio: 1 });
           // Nothing pushes the page wider than the phone.
           const overflow = await page.evaluate(
             () => document.documentElement.scrollWidth - window.innerWidth,

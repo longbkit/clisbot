@@ -2,14 +2,14 @@ import { useMemo, type ReactElement, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { activityKey } from "@/clisbot/home/activity-layout";
-import { ActivityUpdates, HomeActivityProvider } from "@/clisbot/home/activity-state";
+import { HomeActivityProvider } from "@/clisbot/home/activity-state";
 import type { ActivityBucketOf } from "@/clisbot/home/activity";
 import { ActivityScrollView, ActivityViewportProvider } from "@/clisbot/home/activity-viewport";
-import { HostsStrip } from "@/clisbot/home/hosts-strip";
 import { StartStatus } from "@/clisbot/home/start-surface";
 import { ComposerPickerPlacementProvider } from "@/composer/picker-placement";
 import { InboxHistory } from "@/screens/sessions-screen";
 import { useNavigationActivity } from "./activity";
+import { HomeConnectionNotice } from "./connection-notice";
 import { HomeFeedControls } from "./home-controls";
 import { buildHomeFeed, type HomeRow } from "./home-feed";
 import { NavigationHomeFeed } from "./home-feed-view";
@@ -27,7 +27,8 @@ interface HomeLayoutProps {
 
 /**
  * Home in Navigation V2 (brief C6, 3.1 order): composer → quick starts → scope → chips → Host
- * filter → pins → feed. 🔍 swaps the feed for Inbox's full history and search.
+ * filter → pins → feed. Hosts live on the rail and in More; a problem shows as one line on top.
+ * 🔍 swaps the feed for Inbox's full history and search.
  */
 export function NavigationHomeLayout(props: HomeLayoutProps) {
   const { rows } = useNavigationActivity();
@@ -61,7 +62,7 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
           contentContainerStyle={styles.scroll}
         >
           <View style={styles.column}>
-            <HostsStrip />
+            <HomeConnectionNotice />
             <StartBlock {...props} />
             <HomeFeedControls scopeCounts={feed.scopeCounts} chipCounts={feed.chipCounts} />
             <NavigationHomeFeed
@@ -70,7 +71,6 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
             />
           </View>
         </ActivityScrollView>
-        <ActivityUpdates />
       </HomeActivityProvider>
     </ActivityViewportProvider>
   );

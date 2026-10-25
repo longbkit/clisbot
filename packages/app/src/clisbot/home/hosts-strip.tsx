@@ -35,9 +35,6 @@ import { ConnectionIssuesSheet } from "./connection-issues-sheet";
 export function HostsStrip() {
   const compact = useIsCompactFormFactor();
   const { entries, hubs, issues, summary } = useHostsStrip();
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const openDetails = useCallback(() => setDetailsOpen(true), []);
-  const closeDetails = useCallback(() => setDetailsOpen(false), []);
   if (!summary.total && !hubs.length) return null;
   const list = (
     <>
@@ -72,27 +69,50 @@ export function HostsStrip() {
       )}
       <View style={styles.issueSlot}>
         {issues.length ? (
-          <Pressable
-            onPress={openDetails}
-            style={issueStyle}
-            accessibilityRole="button"
-            testID="home-connection-issues"
-          >
-            <WarningGlyph size={14} />
-            <Text style={[styles.issueText, styles.grow]} numberOfLines={1}>
-              {issues.length === 1
+          <ConnectionIssuesLine
+            issues={issues}
+            summary={
+              issues.length === 1
                 ? "1 connection needs attention"
-                : `${issues.length} connections need attention`}
-            </Text>
-            <Text style={styles.muted}>View details</Text>
-            <MutedChevron size={14} />
-          </Pressable>
+                : `${issues.length} connections need attention`
+            }
+          />
         ) : (
           <Text style={styles.muted}>No connection issues</Text>
         )}
       </View>
-      <ConnectionIssuesSheet issues={issues} visible={detailsOpen} onClose={closeDetails} />
     </View>
+  );
+}
+
+/** One line for every connection problem; it opens the sheet with each problem's action. */
+export function ConnectionIssuesLine({
+  issues,
+  summary,
+}: {
+  issues: ReturnType<typeof useHostsStrip>["issues"];
+  summary: string;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const openDetails = useCallback(() => setDetailsOpen(true), []);
+  const closeDetails = useCallback(() => setDetailsOpen(false), []);
+  return (
+    <>
+      <Pressable
+        onPress={openDetails}
+        style={issueStyle}
+        accessibilityRole="button"
+        testID="home-connection-issues"
+      >
+        <WarningGlyph size={14} />
+        <Text style={[styles.issueText, styles.grow]} numberOfLines={1}>
+          {summary}
+        </Text>
+        <Text style={styles.muted}>View details</Text>
+        <MutedChevron size={14} />
+      </Pressable>
+      <ConnectionIssuesSheet issues={issues} visible={detailsOpen} onClose={closeDetails} />
+    </>
   );
 }
 

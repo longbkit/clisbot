@@ -54,23 +54,35 @@ export function compareByRecency(a: ChatListEntry, b: ChatListEntry): number {
  * rest newest first. `held` is the order the reader is looking at: while it is held (the pointer or
  * a finger is on the list), rows already shown keep their places and only new rows enter at the top.
  */
+export type ChatsSort = "recent" | "name";
+
+export function compareByName(a: ChatListEntry, b: ChatListEntry): number {
+  return a.title.localeCompare(b.title) || a.key.localeCompare(b.key);
+}
+
 export function orderChatList<T extends ChatListEntry>(input: {
   entries: readonly T[];
   scope: OwnershipScope;
   chip: ChatsChip;
   search: string;
   held?: readonly string[] | null;
+  sort?: ChatsSort;
+  /** Host filter; empty lists every Host. */
+  serverIds?: readonly string[];
 }): T[] {
+  const hosts = input.serverIds ?? [];
   const visible = input.entries.filter(
     (entry) =>
       inScope(input.scope, entry.ownership) &&
+      (hosts.length === 0 || hosts.includes(entry.serverId)) &&
       matchesChatsChip(entry, input.chip) &&
       matchesChatsSearch(entry, input.search),
   );
   const pinned = visible
     .filter((entry) => entry.pinned)
     .sort((a, b) => (a.pinIndex ?? 0) - (b.pinIndex ?? 0));
-  const rest = visible.filter((entry) => !entry.pinned).sort(compareByRecency);
+  const compare = input.sort === "name" ? compareByName : compareByRecency;
+  const rest = visible.filter((entry) => !entry.pinned).sort(compare);
   const fresh = [...pinned, ...rest];
   if (!input.held) return fresh;
   return holdOrder(input.held, fresh);
@@ -93,4 +105,27 @@ export function chatScopeCounts(entries: readonly ChatListEntry[]) {
   let mine = 0;
   for (const entry of entries) if (entry.ownership === "mine") mine += 1;
   return { mine, others: entries.length - mine, all: entries.length };
+}
+
+export type ChatsListItem<T extends ChatListEntry> =
+  | { type: "entry"; key: string; entry: T }
+  | { type: "heading"; key: string; kind: "bot" | "group" };
+
+/**
+ * The rows the list draws: one mixed list by default (brief C3), or, when the reader opts in,
+ * Bot chats then groups under their headings, each keeping its own order.
+ */
+export function chatListItems<T extends ChatListEntry>(
+  ordered: readonly T[],
+  split: boolean,
+): ChatsListItem<T>[] {
+  const item = (entry: T): ChatsListItem<T> => ({ type: "entry", key: entry.key, entry });
+  if (!split) return ordered.map(item);
+  const items: ChatsListItem<T>[] = [];
+  for (const kind of ["bot", "group"] as const) {
+    const rows = ordered.filter((entry) => entry.kind === kind);
+    if (!rows.length) continue;
+    items.push({ type: "heading", key: `heading:${kind}`, kind }, ...rows.map(item));
+  }
+  return items;
 }

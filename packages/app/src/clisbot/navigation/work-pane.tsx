@@ -151,7 +151,14 @@ function WorkControls() {
     <View style={styles.controls}>
       <ScopeTabs section="work" counts={counts.scopes} />
       <View style={styles.inset}>
-        <FilterChips chips={chips} value={chip} onChange={setChip} scroll testID="work-chip" />
+        <FilterChips
+          chips={chips}
+          value={chip}
+          onChange={setChip}
+          scroll
+          backdrop="surfaceSidebar"
+          testID="work-chip"
+        />
       </View>
       <View style={styles.display}>
         <Text style={styles.displayLabel}>{t("navigation.display")}</Text>

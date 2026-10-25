@@ -3,7 +3,6 @@ import { useHubAccounts } from "@/clisbot/hub/account-provider";
 import { isUnreadReply } from "@/clisbot/home/activity";
 import { useSidebarCatalog } from "@/clisbot/bots/sidebar/sections";
 import { projectBotSidebar, projectGroupSidebar } from "@/clisbot/bots/sidebar/sidebar-model";
-import { filterByHost, useSidebarDisplayStore } from "@/clisbot/bots/sidebar/display/preferences";
 import { pinKey, useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import type { BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
 import type { ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
@@ -43,7 +42,7 @@ function useUnreadAgents(): ReadonlySet<string> {
 
 /**
  * Every Chats row (brief C3): each Bot's direct chat and each group chat, with the facts the
- * list orders and filters by. The Bots/Group chats display menus' Host filters still apply.
+ * list orders and filters by. Chats' own Display menu holds the Host filter.
  */
 export function useChatEntries() {
   const catalog = useSidebarCatalog();
@@ -52,25 +51,15 @@ export function useChatEntries() {
   const accounts = useReaderAccounts();
   const company = useCompanyHosts();
   const unread = useUnreadAgents();
-  const hostFilters = useSidebarDisplayStore((state) => state.hostFilters);
   const entries = useMemo(() => {
     const multiple = hosts.length > 1;
-    const hostIds = hosts.map((host) => host.serverId);
     const order = new Map(pins.map((pin, index) => [pinKey(pin), index]));
     const pinIndex = (kind: "bot" | "chat", serverId: string, id: string) =>
       order.get(pinKey({ kind, serverId, id }));
     const ownersById = new Map(botRows.map((bot) => [`${bot.serverId}:${bot.id}`, bot]));
     const chatById = new Map(chatRows.map((chat) => [`${chat.serverId}:${chat.id}`, chat]));
-    const bots = filterByHost(
-      projectBotSidebar(botRows, chatRows, multiple),
-      hostFilters.bots,
-      hostIds,
-    );
-    const groups = filterByHost(
-      projectGroupSidebar(chatRows, multiple),
-      hostFilters.chats,
-      hostIds,
-    );
+    const bots = projectBotSidebar(botRows, chatRows, multiple);
+    const groups = projectGroupSidebar(chatRows, multiple);
     const botEntries = bots.map((bot): ChatsEntry => {
       const payload = ownersById.get(bot.key);
       const direct = bot.chatId ? chatById.get(`${bot.serverId}:${bot.chatId}`) : undefined;
@@ -109,6 +98,6 @@ export function useChatEntries() {
       }),
     );
     return [...botEntries, ...groupEntries];
-  }, [accounts, botRows, chatRows, company, hostFilters, hosts, isPinned, pins, unread]);
+  }, [accounts, botRows, chatRows, company, hosts, isPinned, pins, unread]);
   return { entries, catalog };
 }

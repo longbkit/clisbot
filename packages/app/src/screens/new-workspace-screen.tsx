@@ -7,7 +7,10 @@ import { findDestination } from "@/clisbot/quick-starts/model";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { NavigationHomeLayout } from "@/clisbot/navigation/home-layout";
-import { useHomeModeStartTarget } from "@/clisbot/navigation/home-mode-target";
+import {
+  useHomeModeStartTarget,
+  useHomeStartSwitcher,
+} from "@/clisbot/navigation/home-mode-target";
 import { HomeStartLayout, StartFeedback } from "@/clisbot/home/start-surface";
 import { StartSwitcher } from "@/clisbot/home/start-switcher";
 import { useQuickChatByDefault } from "@/clisbot/home/use-quick-chat-default";
@@ -1823,6 +1826,11 @@ export function NewWorkspaceScreen({
     hasOrdinaryProject: destinations.some((entry) => entry.option.group === "Projects"),
     prepare: prepareQuickChat,
   });
+  const startSwitcher = useHomeStartSwitcher({
+    home,
+    compact: isCompact,
+    quickChat: quickChatAllowed,
+  });
   const quickChat = useCallback(() => chooseStart("quickChat"), [chooseStart]);
   const choices = useMemo(
     () => (
@@ -1833,7 +1841,7 @@ export function NewWorkspaceScreen({
         label={projectTriggerLabel}
         mark={startKind === "project" ? projectMark : startMark}
         anchorRef={projectPickerAnchorRef}
-        quickChat={quickChatAllowed}
+        {...startSwitcher}
         onQuickChat={quickChat}
         onPick={chooseStart}
       />
@@ -1845,7 +1853,7 @@ export function NewWorkspaceScreen({
       projectTriggerLabel,
       projectMark,
       startMark,
-      quickChatAllowed,
+      startSwitcher,
       quickChat,
       chooseStart,
     ],

@@ -17,12 +17,15 @@ import type { Theme } from "@/styles/theme";
 export function SectionHeader({
   title,
   center,
+  centerInline = false,
   actions,
   testID,
 }: {
   title: ReactNode;
   /** Home's mode switch sits between the title and the actions. */
   center?: ReactNode;
+  /** Keep `center` in the title row on a phone too, instead of a row of its own. */
+  centerInline?: boolean;
   actions?: ReactNode;
   testID?: string;
 }) {
@@ -31,16 +34,18 @@ export function SectionHeader({
     () => (
       <View style={styles.left}>
         {typeof title === "string" ? <ScreenTitle>{title}</ScreenTitle> : title}
-        {center && !compact ? <View style={styles.center}>{center}</View> : null}
+        {center && (!compact || centerInline) ? <View style={styles.center}>{center}</View> : null}
       </View>
     ),
-    [center, compact, title],
+    [center, centerInline, compact, title],
   );
   const right = useMemo(() => <View style={styles.actions}>{actions}</View>, [actions]);
   return (
     <View testID={testID}>
       <ScreenHeader borderless left={left} right={right} />
-      {center && compact ? <View style={styles.centerCompact}>{center}</View> : null}
+      {center && compact && !centerInline ? (
+        <View style={styles.centerCompact}>{center}</View>
+      ) : null}
     </View>
   );
 }

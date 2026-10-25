@@ -4,32 +4,35 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from "reac
 import { withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
 
-type EdgeFadeBackdrop = "surface0" | "surfaceWorkspace";
+type EdgeFadeBackdrop = "surface0" | "surfaceWorkspace" | "surfaceSidebar";
+type EdgeFadeEdge = "top" | "bottom" | "left" | "right";
 
 const backdropColorMappings: Record<EdgeFadeBackdrop, (theme: Theme) => { color: string }> = {
   surface0: (theme) => ({ color: theme.colors.surface0 }),
   surfaceWorkspace: (theme) => ({ color: theme.colors.surfaceWorkspace }),
+  surfaceSidebar: (theme) => ({ color: theme.colors.surfaceSidebar }),
+};
+
+/** Gradient endpoints running from the solid edge into the content. */
+const GRADIENT_AXIS: Record<EdgeFadeEdge, { x1: string; y1: string; x2: string; y2: string }> = {
+  top: { x1: "0%", y1: "0%", x2: "0%", y2: "100%" },
+  bottom: { x1: "0%", y1: "100%", x2: "0%", y2: "0%" },
+  left: { x1: "0%", y1: "0%", x2: "100%", y2: "0%" },
+  right: { x1: "100%", y1: "0%", x2: "0%", y2: "0%" },
 };
 
 interface EdgeFadeSvgProps {
   gradientId: string;
   color: string;
-  edge: "top" | "bottom";
+  edge: EdgeFadeEdge;
   solidFraction: number;
 }
 
 function EdgeFadeSvg({ gradientId, color, edge, solidFraction }: EdgeFadeSvgProps) {
-  const fromTop = edge === "top";
   return (
     <Svg width="100%" height="100%" preserveAspectRatio="none">
       <Defs>
-        <SvgLinearGradient
-          id={gradientId}
-          x1="0%"
-          y1={fromTop ? "0%" : "100%"}
-          x2="0%"
-          y2={fromTop ? "100%" : "0%"}
-        >
+        <SvgLinearGradient id={gradientId} {...GRADIENT_AXIS[edge]}>
           {/* Vary opacity rather than interpolating toward `transparent`, which crosses black in
               some engines and leaves a grey fringe. Keep it to three stops: Android rendered a
               four-stop version far more transparent than its stops specify. */}
@@ -47,7 +50,7 @@ const ThemedEdgeFadeSvg = withUnistyles(EdgeFadeSvg);
 
 interface EdgeFadeProps {
   /** The solid edge; content dissolves moving away from it. */
-  edge: "top" | "bottom";
+  edge: EdgeFadeEdge;
   /** Share of the fade, measured from the solid edge, that stays fully opaque. */
   solidFraction: number;
   backdrop: EdgeFadeBackdrop;

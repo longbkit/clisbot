@@ -7,7 +7,6 @@ import { Bot, Hash, SquarePen } from "lucide-react-native";
 import { usePathname } from "expo-router";
 import { BotRow, type BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
 import { ChatRow, type ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
-import { SectionDisplayMenu } from "@/clisbot/bots/sidebar/display/section-display-menu";
 import { PinOptionsMenu } from "@/clisbot/bots/sidebar/pin-options";
 import { useSidebarPinMenu } from "@/clisbot/bots/sidebar/use-section-actions";
 import { useBotSidebarActions } from "@/clisbot/bots/sidebar/use-sidebar-actions";
@@ -22,11 +21,14 @@ import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { SearchField } from "@/components/ui/search-field";
 import {
   CHATS_CHIPS,
+  chatListItems,
   chatScopeCounts,
   matchesChatsChip,
   orderChatList,
   type ChatsChip,
+  type ChatsListItem,
 } from "./chat-list";
+import { ChatsDisplayMenu } from "./chats-display-menu";
 import { useHeldOrder } from "./held-order";
 import { inScope } from "./ownership";
 import { ScopeTabs } from "./scope-tabs";
@@ -56,15 +58,19 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
     setSearchOpen((open) => !open);
     setSearch("");
   }, []);
-  const fresh = useMemo(
-    () => orderChatList({ entries, scope, chip, search }),
-    [entries, scope, chip, search],
+  const sort = useNavigationStore((state) => state.chatsSort);
+  const split = useNavigationStore((state) => state.chatsSplit);
+  const serverIds = useNavigationStore((state) => state.chatsHosts);
+  const query = useMemo(
+    () => ({ entries, scope, chip, search, sort, serverIds }),
+    [entries, scope, chip, search, sort, serverIds],
   );
+  const fresh = useMemo(() => orderChatList(query), [query]);
   const freshKeys = useMemo(() => fresh.map((entry) => entry.key), [fresh]);
   const { held, handlers } = useHeldOrder(freshKeys);
-  const rows = useMemo(
-    () => (held ? orderChatList({ entries, scope, chip, search, held }) : fresh),
-    [held, fresh, entries, scope, chip, search],
+  const items = useMemo(
+    () => chatListItems(held ? orderChatList({ ...query, held }) : fresh, split),
+    [held, fresh, query, split],
   );
   const chips = useMemo<FilterChip<ChatsChip>[]>(() => {
     const scoped = entries.filter((entry) => inScope(scope, entry.ownership));
@@ -112,14 +118,23 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
       <View style={styles.controls}>
         <ScopeTabs section="chats" counts={chatScopeCounts(entries)} />
         <View style={styles.chips}>
-          <FilterChips chips={chips} value={chip} onChange={setChip} scroll testID="chats-chip" />
+          <FilterChips
+            chips={chips}
+            value={chip}
+            onChange={setChip}
+            scroll
+            backdrop="surfaceSidebar"
+            testID="chats-chip"
+          />
         </View>
-        <DisplayRow />
+        <View style={styles.display}>
+          <ChatsDisplayMenu />
+        </View>
       </View>
       <FlatList
         {...handlers}
-        data={rows}
-        keyExtractor={entryKey}
+        data={items}
+        keyExtractor={itemKey}
         renderItem={actions.renderItem}
         extraData={actions.selection}
         contentContainerStyle={styles.list}
@@ -131,7 +146,7 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
   );
 }
 
-const entryKey = (entry: ChatsEntry) => entry.key;
+const itemKey = (item: ChatsListItem<ChatsEntry>) => item.key;
 const botIcon = <HeaderMenuIcon Icon={Bot} />;
 const groupIcon = <HeaderMenuIcon Icon={Hash} />;
 
@@ -156,7 +171,14 @@ function useChatRowActions(
   );
   const selection = `${selectedBot ?? ""}|${current?.serverId ?? ""}:${current?.chatId ?? ""}`;
   const renderItem = useCallback(
-    ({ item }: { item: ChatsEntry }) => {
+    ({ item: listItem }: { item: ChatsListItem<ChatsEntry> }) => {
+      if (listItem.type === "heading")
+        return (
+          <Text style={styles.heading}>
+            {t(listItem.kind === "bot" ? "navigation.chips.botDm" : "navigation.chips.groups")}
+          </Text>
+        );
+      const item = listItem.entry;
       if (item.bot)
         return (
           <BotRow
@@ -180,7 +202,7 @@ function useChatRowActions(
         />
       );
     },
-    [current, menu.onBotMenu, menu.onChatMenu, pressBot, pressChat, selectedBot],
+    [current, menu.onBotMenu, menu.onChatMenu, pressBot, pressChat, selectedBot, t],
   );
   const menuProps = {
     anchor: menu.menu?.anchor,
@@ -231,19 +253,6 @@ function NewChatMenu() {
   );
 }
 
-/** The existing Bots and Group chats display menus: what rows show and which Hosts they list. */
-function DisplayRow() {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.display}>
-      <Text style={styles.displayLabel}>{t("bots.workspace.shared.bots")}</Text>
-      <SectionDisplayMenu section="bots" />
-      <Text style={styles.displayLabel}>{t("bots.workspace.shared.groupChats")}</Text>
-      <SectionDisplayMenu section="chats" />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
   pane: { flex: 1, minHeight: 0 },
   search: { paddingHorizontal: theme.spacing[3], paddingBottom: theme.spacing[2] },
@@ -255,7 +264,14 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
     paddingHorizontal: theme.spacing[3],
   },
-  displayLabel: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+  heading: {
+    color: theme.colors.foregroundExtraMuted,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[3],
+    paddingBottom: theme.spacing[1],
+  },
   list: { paddingHorizontal: theme.spacing[2], paddingBottom: theme.spacing[4] },
   empty: {
     color: theme.colors.foregroundMuted,

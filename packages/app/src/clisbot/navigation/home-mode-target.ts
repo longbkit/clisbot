@@ -32,6 +32,37 @@ export function modeTargetChange(
   return null;
 }
 
+/** Which starts Home's switcher offers in a mode (Atlas F5): the mode and the switcher agree. */
+export function modeStartKinds(mode: HomeMode): {
+  quickChat: boolean;
+  project: boolean;
+  bot: boolean;
+} {
+  if (mode === "chat") return { quickChat: false, project: false, bot: true };
+  if (mode === "work") return { quickChat: true, project: true, bot: false };
+  return { quickChat: true, project: true, bot: true };
+}
+
+/**
+ * The start switcher's props on Home in Navigation V2: the mode's starts, and icon-only unselected
+ * segments on a phone. New workspace and the Home V2 Home offer every start as before.
+ */
+export function useHomeStartSwitcher(input: {
+  home: boolean;
+  compact: boolean;
+  quickChat: boolean;
+}) {
+  const mode = useNavigationStore((state) => state.homeMode);
+  const v2 = NAVIGATION_V2_ENABLED && input.home;
+  const kinds = modeStartKinds(v2 ? mode : "hybrid");
+  return {
+    quickChat: input.quickChat && kinds.quickChat,
+    project: kinds.project,
+    bot: kinds.bot,
+    compactSegments: v2 && input.compact,
+  };
+}
+
 /** Home's composer follows the mode switch; New workspace and the Home V2 Home do not. */
 export function useHomeModeStartTarget(input: {
   home: boolean;

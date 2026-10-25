@@ -58,8 +58,10 @@ export function NavigationHomeHeader() {
   return (
     <SectionHeader
       testID="home-header"
-      title={t("navigation.sections.home")}
+      // A phone's tab bar already says Home; its header row is the mode switch and search.
+      title={compact ? null : t("navigation.sections.home")}
       center={center}
+      centerInline
       actions={actions}
     />
   );

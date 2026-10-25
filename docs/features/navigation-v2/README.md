@@ -107,15 +107,24 @@ reader's verified `memberId`.
 
 ## Home
 
-Order: header (mode switch, 🔍) → Hosts strip → composer and its context row → Status & Setup and
-Import session → quick starts → scope tabs → chips → Host filter → pin tags → feed. The composer
-moved to the top on phones too; its pickers open downward there, as on desktop.
+Order: header (mode switch, 🔍) → a connection notice only when something is wrong → composer and
+its context row → Status & Setup and Import session → quick starts → scope tabs → chips → Host
+filter → pin tags → feed. Hosts live on the rail and in More; Home has no Hosts block and no
+floating updates bar (held updates show as an inline "Show N updates" above the feed). The
+composer is at the top on phones too, with its pickers opening downward; a phone's header row is
+the mode switch and search (the tab bar already says Home).
+
+- **Connection notice** (`connection-notice.tsx`): `useHomeConnectionNotice()` is the adapter seam
+  — today it reads the Hosts strip's issue model; a per-source health summary can replace its body
+  without touching `ConnectionNotice` or Home.
 
 - **Mode** (C13). Chat = sessions with a Bot label (`clisbot.bot-id`), Work = projects and Quick
   chats, the daemon Inbox Type filter's split. It filters the feed, issue cards, pin tags and
   counts on Home only. Switching to Chat points the composer at the last Bot used in Chat mode;
-  switching to Work returns to the last project or Quick chat. The composer has one draft per
-  screen, so switching never loses it.
+  switching to Work returns to the last project or Quick chat. The start switcher offers only the
+  mode's starts (Chat: Bot; Work: Quick chat and Project; Hybrid: all), so the two controls never
+  disagree; on phones unselected segments show only their icon, so all three fit 320pt. The
+  composer has one draft per screen, so switching never loses it.
 - **Chips** (C7). All · Needs me · Running · Updated · Failed. Needs me is Home's existing Needs you
   bucket — approvals and failures — limited to unseen issues; Failed lists failures with seen ones
   below, dimmed. Counts are the reader's scope; Needs me and Failed count unseen only.
@@ -161,6 +170,11 @@ occurrence was seen.
 - **Bot home projects in Work**: hidden by default; the Display menu's **Bot projects** switch
   turns them on. V2 keeps its own switch (`showBotProjectsInWork`), so the Home V2 sidebar's stored
   choice is untouched.
+- **Chats display**: one `Display ▾` for the mixed list: sort (recent activity or name), an opt-in
+  "Separate bot chats and groups" (off by default), and Hosts when there are several. The Home V2
+  sidebar's Bots and Group chats display menus are not used in V2.
+- **Chip rows** scroll sideways on one line everywhere, with a fade on the trailing edge while more
+  chips are off screen (`FilterChips scroll`, `EdgeFade edge="right"`).
 - **Chats order**: newest activity first with pins on top; while the pointer, a touch or a scroll
   is on the list the order holds and only new rows enter at the top (`held-order.ts`).
 - **Hosts strip** stays above the composer on Home; it carries the connection-issue actions.
@@ -234,6 +248,9 @@ Unit: `clisbot/navigation/*.test.ts` (registry, ownership, Chats ordering/filter
 scope/mode/chips/badge including C15, every lifecycle transition, pin tags, mode target),
 `clisbot/home/use-chat-list-navigation.test.tsx` (Work as a list tab),
 `clisbot/bot-projects/controls.test.tsx` (both flag states). Browser:
+`e2e/browser/navigation-v2-journeys.spec.ts` (Work + creates a workspace, a session opens from
+Work and sends, a Bot DM opens from Chats and sends, a needs-action card opens from Home and is
+approved, Settings from the rail and More, `/sessions` redirect) and
 `e2e/browser/navigation-v2.spec.ts` at 1440×900 and 390×844 (rail, Home lifecycle with Seen
 issues, Chats, Work, Tasks, `/sessions` redirect, phone tabs and More). Set
 `E2E_NAV_V2_SCREENSHOTS_DIR` to keep its screenshots. Native iOS/Android were not run.

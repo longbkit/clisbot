@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { chatScopeCounts, holdOrder, orderChatList, type ChatListEntry } from "./chat-list";
+import {
+  chatListItems,
+  chatScopeCounts,
+  holdOrder,
+  orderChatList,
+  type ChatListEntry,
+} from "./chat-list";
 
 function entry(key: string, overrides: Partial<ChatListEntry> = {}): ChatListEntry {
   return {
@@ -64,5 +70,41 @@ describe("orderChatList", () => {
 
   it("counts scopes consistently", () => {
     expect(chatScopeCounts(entries)).toEqual({ mine: 5, others: 1, all: 6 });
+  });
+});
+
+describe("Chats display options", () => {
+  it("sorts by name and filters by Host", () => {
+    const list = orderChatList({ entries, scope: "mine", chip: "all", search: "", sort: "name" });
+    expect(order(list)).toEqual(["dalat", "nia", "ceo", "idle-bot", "rin"]);
+    const elsewhere = [
+      ...entries,
+      entry("remote", { serverId: "h2", updatedAt: "2026-10-25T12:00:00Z" }),
+    ];
+    expect(
+      order(
+        orderChatList({
+          entries: elsewhere,
+          scope: "mine",
+          chip: "all",
+          search: "",
+          serverIds: ["h2"],
+        }),
+      ),
+    ).toEqual(["remote"]);
+  });
+
+  it("stays one mixed list unless the reader splits it", () => {
+    const ordered = orderChatList({ entries, scope: "mine", chip: "all", search: "" });
+    expect(chatListItems(ordered, false).map((item) => item.key)).toEqual(order(ordered));
+    expect(chatListItems(ordered, true).map((item) => item.key)).toEqual([
+      "heading:bot",
+      "nia",
+      "rin",
+      "idle-bot",
+      "heading:group",
+      "dalat",
+      "ceo",
+    ]);
   });
 });
