@@ -1,8 +1,9 @@
 # Paseo v0.13.0 integration
 
-Status: candidate under validation. **Not accepted or promoted to main.** The
-Owner requested the latest upstream integration, two independent reviews, and
-complete E2E/CI with repairs. This is a source integration, not a Clisbot release.
+Status: verified source integration. Product candidate `5ba5b4a37` passed all
+21 required CI jobs and the scoped local platform matrix described below. The
+Owner authorized local-main integration after acceptance. This is a source
+integration, not a Clisbot release. Earlier pending/red entries below are history.
 Clisbot package versions remain `2.1.8`. No published assets, production daemon,
 Hub, pairing, saved credentials, or Owner review servers are changed by this work.
 
@@ -303,3 +304,45 @@ remains a bounded follow-up, not a declared newly introduced regression. No
 physical-device, signed archive, native OAuth/audio or fresh native inference
 claim is made. Only test/docs changes follow this native source fingerprint;
 production package equivalence must be checked, not assumed.
+
+## Final source acceptance
+
+Product candidate `5ba5b4a37108fa206aa55921619fc725f60d9678` passed full CI
+[40176249253](https://github.com/longbkit/clisbot/actions/runs/40176249253): all
+21 jobs succeeded, including all eight browser shards, all CLI shards, server
+OS/integration jobs, app/website checks and both Desktop jobs. Required checks
+remain blocking. Flaky-attempt annotations and conditional skips remain in the
+original run; job success is not a claim every optional/live-provider case ran.
+
+The final source tree `660dd9c0c` was checked against all 149 Clisbot commits
+since the prior sync: 114 retained their inspected lines literally, and 36 affected
+paths have explicit adaptations. There are no new unexplained missing lines or
+lost files versus the preceding classified candidate. All 6,042 incoming paths
+were inventoried; the 22 exceptions are explicitly archived, moved or retained
+fork deletions. These counts detect source loss; meaningful behavior tests and
+review provide separate evidence rather than a universal feature guarantee.
+
+All existing workspace package versions remain unchanged, including Clisbot
+`2.1.8`. Native Android, iOS and packaged-web evidence described above is reused
+only where the source fingerprints match. The final seven-path delta from the
+iOS-tested `0cff95b87` contains tests/docs only; no production changes require a
+second native build.
+
+Actual macOS Electron 44.5.0 main/preload/renderer Settings acceptance passed
+five cycles across 24 destinations without detached-pane growth. Real Electron
+and daemon lifecycle checks passed. Task profiles, child processes and test
+services were cleaned up. The Owner-observed white interval is retained: cold
+Metro bundling took 43.21 seconds and Settings appeared after approximately 47
+seconds in the dev harness. This is not packaged startup, signing, installer,
+updater, cold renderer-managed daemon bootstrap or native-dialog acceptance.
+
+Known bounded follow-ups remain explicit: preexisting P2 `IC-DIR-01`, the
+unchanged Settings Add-Host intent/theme-remount anomaly, dev cold-start latency,
+and physical-device/native OAuth/audio/packaged installer coverage not exercised
+by this integration. None is silently reported as passing. No main push, sync
+release tag, publication, store submission or production restart is included.
+
+`upstream-baseline.json` now records the verified pinned release. The later
+upstream main snapshot is recorded as inspected but excluded; its three extra
+commits are not implied to be merged. This final record changes only audit and
+baseline metadata; product acceptance is bound to the exact CI-tested commit.

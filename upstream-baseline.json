@@ -1,14 +1,23 @@
 {
   "paseo": {
     "repository": "https://github.com/getpaseo/paseo",
-    "tag": "v0.11.1",
-    "commit": "ab10a6694ccf068959d1a6b67b6c915e21a9fe91",
+    "tag": "v0.13.0",
+    "commit": "d34d17a9072149320ace35ec2a2e5c7dcd992cb3",
+    "reviewedReleaseSnapshot": {
+      "ref": "refs/tags/v0.13.0",
+      "commit": "d34d17a9072149320ace35ec2a2e5c7dcd992cb3",
+      "transformedCommit": "697dd848231ba374381ed5a59394bc81afc2c1b2",
+      "verifiedAt": "2026-10-25T09:02:03.945896+00:00",
+      "productCandidate": "5ba5b4a37108fa206aa55921619fc725f60d9678",
+      "ciRun": 40176249253,
+      "audit": "docs/audits/2026-10-24-upstream-paseo/README.md"
+    },
     "reviewedMainSnapshot": {
       "ref": "refs/heads/main",
-      "commit": "337e81a9c6d4551dbcede5930c21408776d06b1b",
-      "transformedCommit": "ec8988c04f1d3ca4402df9b67fe5f384b5ba70ec",
-      "fetchedAt": "2026-10-13T11:48:03Z",
-      "audit": "docs/audits/2026-10-13-upstream-paseo/README.md"
+      "commit": "566218d682d2853085a08cb4001c549c2a71c481",
+      "includedInSync": false,
+      "commitsAfterRelease": 3,
+      "audit": "docs/audits/2026-10-24-upstream-paseo/README.md"
     }
   }
 }
