@@ -87,41 +87,46 @@ export function NavigationHomeFeed({
     activity.markAllSeen(unseen);
     requestApply();
   }, [activity, requestApply, unseen]);
-  // The chips and section titles already say what this is; the directory speaks only when it
-  // fails, and loading is the skeleton.
-  const failed = directoryHealth.status === "unavailable";
+  // The chips and section titles already say what this is, and loading is the skeleton. A Host
+  // that drops is the connection notice's to say; the directory line is for a connected Host
+  // whose list failed to load.
+  const failed = directoryHealth.status === "unavailable" && directoryHealth.recovery === "retry";
   const offline = useHostsReachability() === "unreachable" && !accepted.length;
   const empty = !isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length;
   const hasActions = pending > 0 || unseen.length > 1;
   const hasHeader = failed || isInitialLoad || empty || hasActions || offline;
   return (
     <View style={styles.container} testID="home-activity">
-      <HoldReadingPosition style={[styles.header, !hasHeader && styles.headerEmpty]}>
-        {failed ? <DirectoryStatus health={directoryHealth} label="" inset={false} /> : null}
-        {offline ? <HostsUnreachableState testID="home-feed-offline" withDetails={false} /> : null}
-        {isInitialLoad && !offline ? <ActivityPlaceholder /> : null}
-        {empty ? (
-          <ListState
-            kind="empty"
-            title={t("navigation.lists.emptyFeed")}
-            testID="home-feed-empty"
-          />
-        ) : null}
-        {hasActions ? (
-          <View style={styles.markAll}>
-            {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
-            {pending > 0 ? (
-              <Button size="xs" variant="ghost" onPress={update} testID="home-activity-apply">
-                {t("navigation.updates", { count: pending })}
-              </Button>
-            ) : null}
-            {unseen.length > 1 ? (
-              <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
-                {t("navigation.actions.markAllSeen")}
-              </Button>
-            ) : null}
-          </View>
-        ) : null}
+      <HoldReadingPosition style={styles.headerSlot}>
+        <View style={[styles.header, hasHeader && styles.headerFilled]}>
+          {failed ? <DirectoryStatus health={directoryHealth} label="" inset={false} /> : null}
+          {offline ? (
+            <HostsUnreachableState testID="home-feed-offline" withDetails={false} />
+          ) : null}
+          {isInitialLoad && !offline ? <ActivityPlaceholder /> : null}
+          {empty ? (
+            <ListState
+              kind="empty"
+              title={t("navigation.lists.emptyFeed")}
+              testID="home-feed-empty"
+            />
+          ) : null}
+          {hasActions ? (
+            <View style={styles.markAll}>
+              {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
+              {pending > 0 ? (
+                <Button size="xs" variant="ghost" onPress={update} testID="home-activity-apply">
+                  {t("navigation.updates", { count: pending })}
+                </Button>
+              ) : null}
+              {unseen.length > 1 ? (
+                <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
+                  {t("navigation.actions.markAllSeen")}
+                </Button>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </HoldReadingPosition>
       {sections.map((section) => (
         <FeedSection
@@ -357,9 +362,11 @@ const MutedChevronRight = withUnistyles(ChevronRight, (theme) => ({
 }));
 
 const styles = StyleSheet.create((theme) => ({
+  // The slot always gives back the container's gap; the gap a filled header needs sits inside it,
+  // so the reading-position hold measures it too.
+  headerSlot: { marginBottom: -theme.spacing[4] },
   header: { gap: theme.spacing[4] },
-  // An empty header still holds the reading position; it gives back the gap it would take.
-  headerEmpty: { marginBottom: -theme.spacing[4] },
+  headerFilled: { paddingBottom: theme.spacing[4] },
   container: {
     gap: theme.spacing[4],
     paddingHorizontal: theme.spacing[3],
