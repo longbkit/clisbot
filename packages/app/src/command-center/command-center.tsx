@@ -21,9 +21,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronRight, Folder, X } from "lucide-react-native";
+import { Check, ChevronRight, Folder } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { BottomSheetFlatList, type BottomSheetFlatListMethods } from "@gorhom/bottom-sheet";
 import { useAgentDescriptor, resolveAgentLabel } from "@/agent-presentation";
@@ -87,6 +88,7 @@ import {
   PINNED_SECTION_BAND,
   projectCommandCenterRows,
   type CommandCenterAgentResult,
+  type CommandCenterExtensionResult,
   type CommandCenterFileResult,
   type CommandCenterListRow,
   type CommandCenterResult,
@@ -96,6 +98,11 @@ import {
 } from "./results";
 import { createCommandCenterInteraction, type CommandCenterInteraction } from "./interaction";
 import { useWorkspaceFileSearch } from "./workspace-file-search";
+import { ScopeChip } from "./scope-chip";
+import { ScopeChips } from "@/clisbot/search-scope/scope-chips";
+import { useSearchScope, type SearchScope } from "@/clisbot/search-scope/use-search-scope";
+import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
+import type { ProjectSummary } from "@/utils/projects";
 
 const ThemedBottomSheetTextInput = withUnistyles(TextInput, (theme) => ({
   placeholderTextColor: theme.colors.placeholder,
@@ -108,7 +115,6 @@ const ThemedCheck = withUnistyles(Check, (theme) => ({ color: theme.colors.foreg
 const ThemedChevronRight = withUnistyles(ChevronRight, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
-const ThemedX = withUnistyles(X, (theme) => ({ color: theme.colors.foregroundMuted }));
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
@@ -118,6 +124,10 @@ const KEYBOARD_SHOULD_PERSIST_TAPS = "always" as const;
 /** `cwd` is not rendered, so a path match must never outrank a match on text the user can see. */
 function agentSearchFields(result: CommandCenterAgentResult): CommandCenterSearchFields {
   return { visible: [result.title, result.subtitle], hidden: [result.agent.cwd] };
+}
+
+function rankAgentRows(rows: readonly CommandCenterAgentResult[], query: string) {
+  return filterAndRankBuiltInResults(rows, query, agentSearchFields);
 }
 
 function createWorkspaceResultAction(serverId: string, workspaceId: string) {
@@ -141,6 +151,7 @@ function createAgentResultAction(serverId: string, agentId: string) {
 function useBuiltInRows(open: boolean): {
   workspaces: CommandCenterWorkspaceResult[];
   agents: CommandCenterAgentResult[];
+  directory: { projects: ProjectSummary[]; agents: AggregatedAgent[] };
 } {
   const { t } = useTranslation();
   const previousRows = useRef(
@@ -169,7 +180,7 @@ function useBuiltInRows(open: boolean): {
   return useMemo(() => {
     if (!open) {
       previousRows.current.clear();
-      return { workspaces: [], agents: [] };
+      return { workspaces: [], agents: [], directory: { projects, agents } };
     }
     // Built-in IDs identify immutable navigation targets. Reuse their callbacks and unchanged
     // row data so a directory update does not invalidate every mounted ResultRow.
@@ -235,15 +246,33 @@ function useBuiltInRows(open: boolean): {
       });
     });
     previousRows.current = nextRows;
-    return { workspaces: allWorkspaces, agents: agentRows };
+    return { workspaces: allWorkspaces, agents: agentRows, directory: { projects, agents } };
   }, [agents, iconDataByProjectViewKey, open, projects, showHost, t]);
 }
 
-function useBuiltInSections(open: boolean, query: string): CommandCenterResultSection[] {
+/** Clisbot: Host / Project scope filters and ranks the built-in rows; off, it is upstream's ranking. */
+function useBuiltInSections(
+  open: boolean,
+  query: string,
+  filesScope: boolean,
+  isCompact: boolean,
+): { sections: CommandCenterResultSection[]; searchScope: SearchScope } {
   const { t } = useTranslation();
   const rows = useBuiltInRows(open);
+  const searchScope = useSearchScope({
+    open,
+    filesScope,
+    query,
+    isCompact,
+    projects: rows.directory.projects,
+    agents: rows.directory.agents,
+    workspaceRows: rows.workspaces,
+    agentRows: rows.agents,
+    rankWorkspaces: filterAndRankWorkspaces,
+    rankAgents: rankAgentRows,
+  });
 
-  return useMemo(() => {
+  const sections = useMemo(() => {
     if (!open) return [];
     return [
       {
@@ -251,17 +280,18 @@ function useBuiltInSections(open: boolean, query: string): CommandCenterResultSe
         band: PINNED_SECTION_BAND,
         rank: 2,
         title: t("shell.commandCenter.workspaces"),
-        results: filterAndRankWorkspaces(rows.workspaces, query),
+        results: searchScope.workspaces,
       },
       {
         id: "agents",
         band: PINNED_SECTION_BAND,
         rank: 3,
         title: t("shell.commandCenter.agents"),
-        results: filterAndRankBuiltInResults(rows.agents, query, agentSearchFields),
+        results: searchScope.agents,
       },
     ];
-  }, [open, query, rows, t]);
+  }, [open, searchScope.agents, searchScope.workspaces, t]);
+  return { sections, searchScope };
 }
 
 interface CommandCenterState {
@@ -274,16 +304,40 @@ interface CommandCenterState {
   rows: readonly CommandCenterListRow[];
   offsets: readonly number[];
   inputRef: React.RefObject<EditingTextInputHandle | null>;
+  searchScope: SearchScope;
   fileSearchLoading: boolean;
   fileSearchError: string | null;
   close(): void;
   select(result: CommandCenterResult): void;
-  key(key: string): boolean;
+  selectSecondary(result: CommandCenterResult): void;
+  key(key: string, modifiers?: CommandCenterKeyModifiers): boolean;
+}
+
+interface CommandCenterKeyModifiers {
+  mod?: boolean;
+  shift?: boolean;
+}
+
+/**
+ * Clisbot search scope keys on a Host / Project row: Tab accepts it as a chip, ⌘/Ctrl+Enter runs
+ * "Show in Work". Null when the key is not one of these; "pass" lets the key do its usual job.
+ */
+function handleExtensionKey(
+  pressed: string,
+  modifiers: CommandCenterKeyModifiers,
+  selected: CommandCenterResult | undefined,
+): "select" | "secondary" | "pass" | null {
+  if (selected?.kind !== "extension") return null;
+  if (pressed === "Tab" && !modifiers.shift) return selected.acceptsTab ? "select" : "pass";
+  if (pressed === "Enter" && modifiers.mod) return selected.secondary ? "secondary" : "pass";
+  return null;
 }
 
 function useCommandCenterState(
   listMetrics: CommandCenterListMetrics,
   interaction: CommandCenterInteraction,
+  isCompact: boolean,
+  bottomSheetInputRef: React.RefObject<EditingTextInputHandle | null>,
 ): CommandCenterState {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
   const { t } = useTranslation();
@@ -295,14 +349,21 @@ function useCommandCenterState(
   const inputRef = useRef<EditingTextInputHandle>(null);
   const previousOpenRef = useRef(open);
   const { query, activeId } = useSyncExternalStore(interaction.subscribe, interaction.getSnapshot);
-  const builtInSections = useBuiltInSections(open, query);
+  const { sections: builtInSections, searchScope } = useBuiltInSections(
+    open,
+    query,
+    scope === "files",
+    isCompact,
+  );
+  const scoped = searchScope.scoped;
   const {
     entries: fileSearchEntries,
     loading: fileSearchLoading,
     error: fileSearchError,
     openFile,
   } = useWorkspaceFileSearch({
-    enabled: open && (scope === "files" || Boolean(query.trim())),
+    // Scope chips hide file rows (they do not live on a Host or Project), so do not fetch them.
+    enabled: open && (scope === "files" || (!scoped && Boolean(query.trim()))),
     query,
   });
   const fileSections = useMemo<CommandCenterResultSection[]>(() => {
@@ -331,30 +392,59 @@ function useCommandCenterState(
     () => buildContributionSections(snapshot.contributions, query),
     [query, snapshot.contributions],
   );
-  const projection = useMemo(
-    () =>
-      projectCommandCenterRows(
-        scope === "files"
-          ? fileSections
-          : [...contributionSections, ...fileSections, ...builtInSections],
-        listMetrics,
-      ),
-    [builtInSections, contributionSections, fileSections, listMetrics, scope],
-  );
+  const projection = useMemo(() => {
+    let sections = [
+      ...contributionSections,
+      ...fileSections,
+      ...searchScope.sections,
+      ...builtInSections,
+    ];
+    // Scope chips narrow to Hosts and Projects; commands and files live on neither.
+    if (scoped) sections = [...searchScope.sections, ...builtInSections];
+    if (scope === "files") sections = fileSections;
+    return projectCommandCenterRows(sections, listMetrics);
+  }, [
+    builtInSections,
+    contributionSections,
+    fileSections,
+    listMetrics,
+    scope,
+    scoped,
+    searchScope.sections,
+  ]);
   useLayoutEffect(() => {
     interaction.update({ open, scope, query, projection, loading: fileSearchLoading });
   }, [interaction, open, scope, query, projection, fileSearchLoading]);
 
   const close = useCallback(() => setOpen(false), [setOpen]);
+  const clearQuery = useCallback(() => {
+    inputRef.current?.reset();
+    bottomSheetInputRef.current?.reset();
+    interaction.setQuery("");
+  }, [bottomSheetInputRef, interaction]);
   const select = useCallback(
     (result: CommandCenterResult) => {
+      if (result.kind === "extension" && result.keepOpen) {
+        result.run();
+        clearQuery();
+        return;
+      }
       setOpen(false);
       void result.run();
+    },
+    [clearQuery, setOpen],
+  );
+  const selectSecondary = useCallback(
+    (result: CommandCenterResult) => {
+      if (result.kind !== "extension" || !result.secondary) return;
+      clearCommandCenterFocusRestoreElement();
+      setOpen(false);
+      result.secondary();
     },
     [setOpen],
   );
   const key = useCallback(
-    (pressed: string): boolean => {
+    (pressed: string, modifiers: CommandCenterKeyModifiers = {}): boolean => {
       if (!open) return false;
       const results = projection.selectableResults;
       if (pressed === "Escape") {
@@ -365,8 +455,13 @@ function useCommandCenterState(
         setScope(null);
         return true;
       }
+      if (pressed === "Backspace" && !query && searchScope.removeLastChip()) return true;
+      const selected = results.find((result) => result.id === activeId);
+      const extensionKey = handleExtensionKey(pressed, modifiers, selected);
+      if (extensionKey === "select" && selected) select(selected);
+      if (extensionKey === "secondary" && selected) selectSecondary(selected);
+      if (extensionKey !== null) return extensionKey !== "pass";
       if (pressed === "Enter") {
-        const selected = results.find((result) => result.id === activeId);
         if (!selected) return false;
         select(selected);
         return true;
@@ -381,7 +476,9 @@ function useCommandCenterState(
       query,
       activeId,
       scope,
+      searchScope,
       select,
+      selectSecondary,
       setScope,
       interaction,
     ],
@@ -416,10 +513,12 @@ function useCommandCenterState(
     rows: projection.rows,
     offsets: projection.offsets,
     inputRef,
+    searchScope,
     fileSearchLoading,
     fileSearchError,
     close,
     select,
+    selectSecondary,
     key,
   };
 }
@@ -430,6 +529,7 @@ interface ResultRowProps {
   query: string;
   active: boolean;
   onSelect(result: CommandCenterResult): void;
+  onSelectSecondary(result: CommandCenterResult): void;
 }
 
 const ResultRow = memo(function ResultRow({
@@ -438,17 +538,21 @@ const ResultRow = memo(function ResultRow({
   query,
   active,
   onSelect,
+  onSelectSecondary,
 }: ResultRowProps) {
   recordRenderProfileReasons(`CommandCenterResultRow:${result.id}`, ["render"]);
   const press = useCallback(() => onSelect(result), [onSelect, result]);
+  const pressSecondary = useCallback(() => onSelectSecondary(result), [onSelectSecondary, result]);
+  const extension = result.kind === "extension" ? result : null;
   const choice =
     result.kind === "contribution" && result.contribution.presentation.kind === "choice"
       ? result.contribution.presentation
       : null;
-  const accessibilityLabel =
+  let accessibilityLabel =
     result.kind === "file"
       ? [result.title, result.subtitle].filter(Boolean).join(" ")
       : choice?.path.join(" › ");
+  if (extension) accessibilityLabel = extension.accessibilityLabel;
   const accessibilityState = useMemo(
     () => (isNative && choice ? { selected: choice.selected } : undefined),
     [choice],
@@ -461,34 +565,77 @@ const ResultRow = memo(function ResultRow({
     ],
     [active, height],
   );
-  return (
+  const pressable = (
     <Pressable
       style={style}
       onPress={press}
+      onLongPress={extension?.secondary ? pressSecondary : undefined}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={accessibilityState}
       aria-pressed={isWeb ? choice?.selected : undefined}
       testID={
-        result.kind === "file" ? `command-center-file-row-${result.filePath}` : choice?.testId
+        result.kind === "file"
+          ? `command-center-file-row-${result.filePath}`
+          : (choice?.testId ?? extension?.testID)
       }
     >
-      {(state) => (
-        <ResultContent
-          result={result}
-          query={query}
-          backdrop={
-            active ||
-            state.pressed ||
-            Boolean((state as PressableStateCallbackType & { hovered?: boolean }).hovered)
-              ? "surface1"
-              : "surface0"
-          }
-        />
-      )}
+      {(state) => {
+        const highlighted =
+          active ||
+          state.pressed ||
+          Boolean((state as PressableStateCallbackType & { hovered?: boolean }).hovered);
+        const backdrop = highlighted ? "surface1" : "surface0";
+        return extension ? (
+          extension.render({ query, backdrop, highlighted })
+        ) : (
+          <ResultContent result={result} query={query} backdrop={backdrop} />
+        );
+      }}
     </Pressable>
   );
+  if (!extension?.renderAction) return pressable;
+  return (
+    <ExtensionActionRow
+      active={active}
+      height={height}
+      action={extension.renderAction}
+      runSecondary={pressSecondary}
+    >
+      {pressable}
+    </ExtensionActionRow>
+  );
 });
+
+/**
+ * A row with a trailing button beside its pressable (docs/hover.md): hover is tracked on a plain
+ * View around both, so moving onto the button keeps it revealed, and the button is never nested
+ * inside the row's own button.
+ */
+function ExtensionActionRow({
+  active,
+  height,
+  action,
+  runSecondary,
+  children,
+}: {
+  active: boolean;
+  height: number;
+  action: NonNullable<CommandCenterExtensionResult["renderAction"]>;
+  runSecondary(): void;
+  children: ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const enter = useCallback(() => setHovered(true), []);
+  const leave = useCallback(() => setHovered(false), []);
+  const frame = useMemo(() => [styles.actionRow, { height }], [height]);
+  return (
+    <View style={frame} onPointerEnter={enter} onPointerLeave={leave}>
+      {children}
+      <View style={styles.rowAction}>{action({ revealed: hovered || active, runSecondary })}</View>
+    </View>
+  );
+}
 
 /**
  * Text with the query's terms marked. Marks use the same matcher options the rows were ranked
@@ -512,11 +659,14 @@ function SubtitleWithTimestamp({
   query,
   subtitle,
   activityAt,
+  note,
   testID,
 }: {
   query: string;
   subtitle: string;
   activityAt: Date | null;
+  /** Clisbot search scope: "Outside filter", "Offline · cached 10:42". Never matched. */
+  note?: string | null;
   testID: string;
 }) {
   const timeAgo = useTimeAgo(activityAt);
@@ -529,6 +679,15 @@ function SubtitleWithTimestamp({
         numberOfLines={1}
         testID={testID}
       />
+      {note ? (
+        <Text
+          style={[styles.subtitle, styles.subtitleText]}
+          numberOfLines={1}
+          testID="command-center-result-note"
+        >
+          {subtitle ? `\u00a0· ${note}` : note}
+        </Text>
+      ) : null}
       {timeAgo ? (
         <Text style={styles.subtitle} numberOfLines={1} testID="command-center-result-timestamp">
           {/* Non-breaking: web collapses a leading plain space in its own flex item. */}
@@ -580,6 +739,7 @@ function AgentResultContent({
             query={query}
             subtitle={result.subtitle}
             activityAt={result.activityAt}
+            note={result.note}
             testID="command-center-agent-subtitle"
           />
         </View>
@@ -656,6 +816,7 @@ function ResultContent({
   if (result.kind === "agent") {
     return <AgentResultContent result={result} query={query} backdrop={backdrop} />;
   }
+  if (result.kind === "extension") return null;
   if (result.kind === "workspace") {
     const key = result.id.slice("workspace:".length);
     return (
@@ -676,6 +837,7 @@ function ResultContent({
               query={query}
               subtitle={result.subtitle}
               activityAt={result.activityAt}
+              note={result.note}
               testID="command-center-workspace-subtitle"
             />
           </View>
@@ -778,6 +940,8 @@ export function CommandCenter() {
   const state = useCommandCenterState(
     isCompact ? COMMAND_CENTER_LIST_METRICS.compact : COMMAND_CENTER_LIST_METRICS.desktop,
     interaction,
+    isCompact,
+    bottomSheetInputRef,
   );
   const showBottomSheet = isCompact && isNative;
   const modalLayer = useGlobalWebOverlayLayer("modal", isWeb && state.open && !showBottomSheet);
@@ -816,9 +980,10 @@ export function CommandCenter() {
           query={state.query}
           active={item.result.id === state.activeId}
           onSelect={state.select}
+          onSelectSecondary={state.selectSecondary}
         />
       ),
-    [state.activeId, state.query, state.select],
+    [state.activeId, state.query, state.select, state.selectSecondary],
   );
   const getItemLayout = useCallback(
     (_data: ArrayLike<CommandCenterListRow> | null | undefined, index: number) => ({
@@ -881,7 +1046,8 @@ export function CommandCenter() {
   const submit = useCallback(() => state.key("Enter"), [state]);
   const handleWebOverlayKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!state.key(event.key)) return false;
+      const modifiers = { mod: event.metaKey || event.ctrlKey, shift: event.shiftKey };
+      if (!state.key(event.key, modifiers)) return false;
       event.preventDefault();
       return true;
     },
@@ -913,8 +1079,9 @@ export function CommandCenter() {
       >
         <View style={[styles.bottomSheetHeader, styles.searchRow]} testID="command-center-header">
           {state.scope === "files" ? (
-            <ScopeChip label={t("shell.commandCenter.files")} onRemove={state.clearScope} />
+            <FilesScopeChip label={t("shell.commandCenter.files")} onRemove={state.clearScope} />
           ) : null}
+          {state.searchScope.chips ? <ScopeChips {...state.searchScope.chips} /> : null}
           <ThemedBottomSheetTextInput
             testID="command-center-input"
             ref={bottomSheetInputRef}
@@ -952,8 +1119,12 @@ export function CommandCenter() {
           <View ref={setWebOverlayScope} testID="command-center-panel" style={styles.panel}>
             <View style={[styles.header, styles.searchRow]} testID="command-center-header">
               {state.scope === "files" ? (
-                <ScopeChip label={t("shell.commandCenter.files")} onRemove={state.clearScope} />
+                <FilesScopeChip
+                  label={t("shell.commandCenter.files")}
+                  onRemove={state.clearScope}
+                />
               ) : null}
+              {state.searchScope.chips ? <ScopeChips {...state.searchScope.chips} /> : null}
               <ThemedTextInput
                 testID="command-center-input"
                 ref={state.inputRef}
@@ -999,22 +1170,14 @@ function FileSearchLoadingIndicator({ loading, label }: { loading: boolean; labe
   );
 }
 
-// The chip sits at the input's own height and type size so it reads as the scope of the field
-// rather than a badge dropped into the query. Its 28px matches the input's line box, so showing or
-// dropping the scope cannot resize the header.
-function ScopeChip({ label, onRemove }: { label: string; onRemove(): void }) {
+function FilesScopeChip({ label, onRemove }: { label: string; onRemove(): void }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
+    <ScopeChip
+      label={label}
+      icon={ThemedFolder}
       onPress={onRemove}
-      style={styles.scopeChip}
       testID="command-center-files-scope"
-    >
-      <ThemedFolder size={14} strokeWidth={2.2} />
-      <Text style={styles.scopeChipLabel}>{label}</Text>
-      <ThemedX size={12} strokeWidth={2.2} />
-    </Pressable>
+    />
   );
 }
 
@@ -1056,28 +1219,15 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     outlineWidth: 0,
   },
-  growingInput: { flex: 1, minWidth: 0 },
-  searchRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
-  fileSearchStatus: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
-  scopeChip: {
-    // Stretching to the row rather than setting a height keeps the chip exactly as tall as the
-    // input's line box, so showing or dropping the scope can never resize the header.
-    alignSelf: "stretch",
+  growingInput: { flex: 1, minWidth: 120 },
+  // Wraps only once scope chips leave the input less than its minimum width.
+  searchRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: theme.spacing[1.5],
-    marginRight: theme.spacing[1],
-    paddingHorizontal: theme.spacing[2],
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderAccent,
-    backgroundColor: theme.colors.surface2,
+    gap: theme.spacing[2],
   },
-  scopeChipLabel: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: "500",
-  },
+  fileSearchStatus: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
   results: { flex: 1 },
   // Sections and rows take their height from list-metrics; these styles only place content in it.
   section: { justifyContent: "flex-end" },
@@ -1094,6 +1244,15 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.border,
   },
   row: { paddingHorizontal: theme.spacing[4], justifyContent: "center" },
+  actionRow: { position: "relative" },
+  // Sits over the row's right padding and its reserved trailing slot.
+  rowAction: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    right: theme.spacing[2],
+    justifyContent: "center",
+  },
   activeRow: { backgroundColor: theme.colors.surface1 },
   rowContent: {
     flexDirection: "row",

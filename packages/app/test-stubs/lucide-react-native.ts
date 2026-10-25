@@ -126,6 +126,7 @@ export const EyeOff = StubIcon;
 export const File = StubIcon;
 export const FileSymlink = StubIcon;
 export const FileText = StubIcon;
+export const Filter = StubIcon;
 export const Folder = StubIcon;
 export const FolderPlus = StubIcon;
 export const FolderTree = StubIcon;
