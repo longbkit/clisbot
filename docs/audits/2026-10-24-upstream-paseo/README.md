@@ -263,3 +263,43 @@ was not retained, so this does not prove an exclusive historical failure cause.
 New candidate full CI, iOS native acceptance and final survival/completeness readback
 remain required before promotion. Existing valid results for unchanged source are
 reused rather than rerun as ritual. Local main and the upstream baseline remain unchanged.
+
+## Third CI and final fixture synchronization
+
+Full candidate CI `40171066535` for `0cff95b87` completed with 17 of 21 jobs
+passing. Quality (including pinned signature verification), all app units, all
+three server OS jobs, CLI shards and Desktop jobs passed. Remaining failures
+were website fragment alignment, Windows finish-observer durable removal, Home
+activity admission and a cold remote-Host recovery gate. Original failures and
+flaky results remain retained rather than relabeled.
+
+The website diagnostic reproduced font reflow after native fragment alignment.
+The no-JS fixture now waits for fonts and activates the actual SSR outline link;
+both engines passed, preserving language, href/hash, text and viewport assertions.
+This proves settled outline navigation, not initial deep-link retention during
+late font reflow. Windows completion now waits for dispatch acknowledgment before
+durable removal; its existing permission and exactly-once callback assertions
+remain, with a new unit assertion that intent persists until acknowledgment.
+Focused integration 1 and subscription units 21 passed locally; Windows remains
+a new-head CI gate.
+
+Home now admits both initial directories while idle before measuring the reading
+layout; both 1440px and 390px tests passed live rename, order, geometry and archive
+assertions. Cold B must preserve hidden protected content immediately and expose
+one truthful terminal recovery state within the existing 20-second Host wait
+policy, rather than promise an immediate transport-error label. Cold/warm cases
+passed locally. Home creation fixtures archive only their exact Bots/DMs and
+remove the exact Bot home Projects captured before archival, avoiding orphan
+Project pollution of later accepted-empty/Usage tests. Final combined cleanup
+verification remains tracked in the task receipt.
+
+Exact `0cff95b87` iOS Release simulator build passed in 985 seconds. Actual native
+cold launch, configured QA connection, persisted real Codex reply, keyboard and
+Vietnamese draft Back/reopen, explicit mock Host addition, Markdown, file Preview
+and Source, and real fixture PTY terminal passed. The simulator and task fixture
+were stopped. A theme switch re-showed a prior Add-Host modal; the relevant effect
+is unchanged from pre-merge, and its suspected remount cause is unproved. This
+remains a bounded follow-up, not a declared newly introduced regression. No
+physical-device, signed archive, native OAuth/audio or fresh native inference
+claim is made. Only test/docs changes follow this native source fingerprint;
+production package equivalence must be checked, not assumed.

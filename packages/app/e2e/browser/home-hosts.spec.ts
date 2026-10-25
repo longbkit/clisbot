@@ -70,7 +70,7 @@ for (const width of [1440, 390]) {
         clientIdPrefix: "home-stability",
         port: secondaryDaemon.port,
       });
-      const running = [];
+      const running: string[] = [];
       for (let i = 0; i < 2; i++) {
         const agent = await control.createAgent({
           provider: "mock",
@@ -85,6 +85,28 @@ for (const width of [1440, 390]) {
         await control.waitForAgentUpsert(agent.id, (snapshot) => snapshot.status === "running");
         running.push(agent.id);
       }
+      const liveUpdates: Array<{
+        agentId: string;
+        title: string | null;
+        updatedAt: string;
+        seq?: number;
+      }> = [];
+      page.on("websocket", (socket) => {
+        socket.on("framereceived", ({ payload }) => {
+          if (typeof payload !== "string" || !payload.includes('"agent_update"')) return;
+          const envelope = JSON.parse(payload);
+          const message = envelope.type === "session" ? envelope.message : envelope;
+          const update = message.type === "agent_update" ? message.payload : null;
+          if (update?.kind !== "upsert" || !running.includes(update.agent.id)) return;
+          liveUpdates.push({
+            agentId: update.agent.id,
+            title: update.agent.title,
+            updatedAt: update.agent.updatedAt,
+            seq: update.seq,
+          });
+          if (liveUpdates.length > 40) liveUpdates.shift();
+        });
+      });
       await page.setViewportSize({ width, height: 900 });
       await gotoAppShell(page);
       await addConnectedHostAndReload(page, {
@@ -95,16 +117,17 @@ for (const width of [1440, 390]) {
       });
       await expect(page.getByTestId("home-hosts")).toContainText("2 of 2 online");
       const activity = page.getByTestId("home-activity");
-      // The composer can acquire focus as its initial settings arrive. Explicitly admit both
-      // Hosts' initial snapshots before testing changes to the settled reading layout.
-      await page.getByTestId("home-activity-updates").hover();
-      await expect(async () => {
-        const apply = page.getByTestId("home-activity-apply");
-        if (await apply.isEnabled()) await apply.click({ timeout: 1000 });
-        expect(
-          await page.getByTestId("home-activity-section-active").getByRole("button").count(),
-        ).toBe(2);
-      }).toPass({ timeout: 10000 });
+      // Let both initial directories settle while Home is idle at the top.
+      // Repeated Apply clicks race automatic admission and can wait on a button
+      // that has correctly become disabled. Protect reading only after admission.
+      const composer = page.getByRole("textbox", { name: "Message agent..." }).first();
+      await expect(composer).toBeEditable();
+      await composer.blur();
+      await page.mouse.move(0, 0);
+      await expect(activity.getByTestId("directory-status")).toHaveText("Activity");
+      await expect(
+        page.getByTestId("home-activity-section-active").getByRole("button"),
+      ).toHaveCount(2);
       await activity.getByRole("button", { name: "Show more", exact: true }).click();
       await activity.getByText("Stable conversation 19", { exact: true }).scrollIntoViewIfNeeded();
       await activity.getByText("Stable conversation 19", { exact: true }).hover();
@@ -116,9 +139,21 @@ for (const width of [1440, 390]) {
         .getByRole("button")
         .evaluateAll(testIds);
       await control.updateAgent(running[0], { name: "Renamed running conversation" });
-      await expect(activity.getByText("Renamed running conversation", { exact: true })).toHaveCount(
-        1,
-      );
+      try {
+        await expect(
+          activity.getByText("Renamed running conversation", { exact: true }),
+        ).toHaveCount(1);
+      } catch (error) {
+        await info.attach("running-rename-readback", {
+          body: JSON.stringify({
+            backend: await control.fetchAgent(running[0]),
+            liveUpdates,
+            activity: await activity.innerText(),
+          }),
+          contentType: "application/json",
+        });
+        throw error;
+      }
       expect(
         await page
           .getByTestId("home-activity-section-active")

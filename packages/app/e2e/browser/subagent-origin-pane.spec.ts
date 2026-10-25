@@ -1,5 +1,6 @@
 import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { buildSeededHost } from "../support/helpers/daemon-registry";
+import { HOST_WAIT_TIMEOUT_MS } from "@/hosts/use-host-wait-timeout";
 import { submitMessage } from "../support/helpers/composer";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -444,7 +445,15 @@ test("an unopened B child keeps its qualified route and cached sidebar behind th
     await expect(destination).toBeVisible();
     // Directory metadata is not authority to mount a workspace that was never opened.
     // The same pre-existing cold-route contract is documented in docs/expo-router.md.
-    await expect(destination.getByText("Cannot reach Fleet B", { exact: true })).toBeVisible();
+    await expect(destination.getByTestId("retained-workspace-content")).toBeHidden();
+    // A dead direct endpoint can stay in the runtime's reconnecting state.
+    // Its real UI must expose recovery within the owning 20 s wait policy;
+    // an immediate error title is not guaranteed by daemon shutdown.
+    await expect(
+      destination.getByText(
+        /^(Cannot reach Fleet B|Fleet B is offline|Connection to Fleet B timed out)$/,
+      ),
+    ).toBeVisible({ timeout: HOST_WAIT_TIMEOUT_MS + 10_000 });
     await expect(destination.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
     await expect(
       destination.getByRole("button", { name: "Manage host", exact: true }),

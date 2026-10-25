@@ -1961,11 +1961,18 @@ test(
     finish.resolve();
     await expect.poll(() => parentPrompts, { timeout: 10000 }).toHaveLength(2);
     expect(parentPrompts[1]).toContain('event="finished"');
+    // onStartTurn observes provider entry, before delivery acknowledges dispatch and
+    // the observer commits its durable removal. Wait on that owner before disk state.
+    expect((await origin.client.waitForFinish(parent.id, 10000)).status).toBe("idle");
     await expect
-      .poll(async () =>
-        JSON.parse(await readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8")),
+      .poll(
+        async () =>
+          JSON.parse(await readFile(join(a.clisbotHome, "finish-subscriptions.json"), "utf8")),
+        { timeout: 5000 },
       )
       .toEqual([]);
+    expect(parentPrompts).toHaveLength(2);
+    expect(parentPrompts.filter((prompt) => prompt.includes('event="finished"'))).toHaveLength(1);
   },
 );
 

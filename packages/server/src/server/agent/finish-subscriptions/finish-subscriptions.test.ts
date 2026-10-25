@@ -252,6 +252,10 @@ test("permission checkpoint retains intent and completion reports after permissi
   await until(() => state.observation.waits.length === 2);
   state.observation.waits[1]!.result.resolve(outcome("idle"));
   await until(() => state.delivery.prompts.length === 2);
+  expect(await state.store.list()).toHaveLength(1);
+  state.delivery.acknowledgments[1]!.resolve("steered");
+  await expect.poll(async () => (await state.store.list()).length).toBe(0);
+  expect(state.delivery.prompts).toHaveLength(2);
 });
 
 test("coalesced unconditional follow-up survives detachment of a parent-owned creation", async () => {

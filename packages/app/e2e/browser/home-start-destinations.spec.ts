@@ -32,6 +32,9 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
   const baselineProjects = new Set(
     (await client.fetchWorkspaces()).entries.map((w) => w.projectId),
   );
+  let createdBotId: string | undefined;
+  let createdBotProjectId: string | undefined;
+  let createdChatId: string | undefined;
   try {
     const workAgent = await createMockIdleAgent(workspace.client, {
       cwd: workspace.workspaceDirectory,
@@ -45,6 +48,8 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
       launch: { provider: "mock", model: "ten-second-stream" },
     });
     expect(bot.error).toBeNull();
+    createdBotId = bot.bot!.id;
+    createdBotProjectId = bot.bot!.projectId;
     await gotoAppShell(page);
     await expect(page.getByTestId("workspace-create-submit")).toBeVisible();
     await page.getByRole("button", { name: "Quick chat", exact: true }).click();
@@ -86,6 +91,7 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     await fillNewWorkspaceDraft(page, "Triage this bug");
     await page.getByTestId("workspace-create-submit").click();
     await expect(page).toHaveURL(/\/chat\/chat_/, { timeout: 30000 });
+    createdChatId = new URL(page.url()).pathname.split("/").at(-1);
     await expect(page.getByTestId("chat-composer").getByRole("textbox")).toBeEditable();
     await page.screenshot({ path: info.outputPath("bot-chat-mobile.png"), fullPage: true });
     await page.getByTestId("chat-back").filter({ visible: true }).click();
@@ -95,6 +101,14 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
       [],
     );
   } finally {
+    if (createdChatId) await client.archiveChat({ chatId: createdChatId });
+    if (createdBotId) {
+      expect((await client.archiveBot({ botId: createdBotId })).error).toBeNull();
+      expect((await client.listBots()).bots.map((bot) => bot.id)).not.toContain(createdBotId);
+    }
+    // Archiving the Bot removes its workspace from discovery, but leaves its empty Project.
+    // Keep the exact creation response ID rather than trying to rediscover it after archive.
+    if (createdBotProjectId) await client.removeProject(createdBotProjectId);
     for (const projectId of new Set(
       (await client.fetchWorkspaces()).entries.map((w) => w.projectId),
     )) {
@@ -140,6 +154,8 @@ test("Home keeps a Bot's home out of Projects and starts a quick start before a 
   const baselineProjects = new Set(
     (await client.fetchWorkspaces()).entries.map((w) => w.projectId),
   );
+  let createdBotId: string | undefined;
+  let createdBotProjectId: string | undefined;
   try {
     const created = await client.createBot({
       name: "Alpha helper",
@@ -148,6 +164,8 @@ test("Home keeps a Bot's home out of Projects and starts a quick start before a 
     });
     expect(created.error).toBeNull();
     const bot = created.bot!;
+    createdBotId = bot.id;
+    createdBotProjectId = bot.projectId;
     await gotoAppShell(page);
     const choice = (name: string) => page.getByRole("button", { name, exact: true });
     const projectSegment = page.getByTestId("new-workspace-project-picker-trigger");
@@ -172,6 +190,11 @@ test("Home keeps a Bot's home out of Projects and starts a quick start before a 
     await expect(page.getByTestId("quick-start-name")).toBeVisible();
     await expect(page.getByTestId("quick-start-destination")).toContainText("Quick chat");
   } finally {
+    if (createdBotId) {
+      expect((await client.archiveBot({ botId: createdBotId })).error).toBeNull();
+      expect((await client.listBots()).bots.map((bot) => bot.id)).not.toContain(createdBotId);
+    }
+    if (createdBotProjectId) await client.removeProject(createdBotProjectId);
     for (const projectId of new Set(
       (await client.fetchWorkspaces()).entries.map((w) => w.projectId),
     )) {

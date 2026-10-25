@@ -56,7 +56,13 @@ test.describe("server-rendered Chinese pages", () => {
   test("keep CLI fallback anchors and translated guide anchors addressable without scripts", async ({
     page,
   }) => {
-    await page.goto("/zh-CN/docs/cli#running-agents");
+    await page.goto("/zh-CN/docs/cli");
+    // Native fragment scrolling uses the layout at activation time. A late web
+    // font can move the heading after that scroll, even with scripts disabled.
+    // Exercise the real SSR outline link after fonts settle, without scrolling
+    // the target through the test runner or relying on hydrated click handlers.
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator('nav a[href="#running-agents"]').click();
 
     await expect(page).toHaveURL(/\/zh-CN\/docs\/cli#running-agents$/);
     await expect(page.locator("#running-agents")).toHaveText(/Running agents/);
@@ -64,7 +70,9 @@ test.describe("server-rendered Chinese pages", () => {
     await expect(page.locator("main")).not.toContainText("{#");
 
     // A translated, reviewed guide still renders Chinese at its English anchor.
-    await page.goto("/zh-CN/docs/hub/api#api-reference");
+    await page.goto("/zh-CN/docs/hub/api");
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator('nav a[href="#api-reference"]').click();
     await expect(page.locator(".docs-prose")).toHaveAttribute("lang", "zh-CN");
     await expect(page.locator("#api-reference")).toHaveText(/API 参考/);
     await expect(page.locator("#api-reference")).toBeInViewport();
