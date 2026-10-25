@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 const RELEASE_MS = 1500;
 
 /**
- * Keeps a list still while the reader is on it (brief C3: no jumpy reorder while reading). The
- * pointer over the list, a touch or a scroll holds the order; it is released a moment after.
+ * Keeps a list still while the reader is on it (brief C3: no jumpy reorder while reading). A
+ * touch or a scroll holds the order on every platform; it is released a moment after.
  */
 export function useHeldOrder(visibleKeys: readonly string[]) {
   const [holding, setHolding] = useState(false);
@@ -32,8 +32,6 @@ export function useHeldOrder(visibleKeys: readonly string[]) {
   const held = holding ? snapshot.current : null;
   const handlers = useMemo(
     () => ({
-      onPointerEnter: hold,
-      onPointerLeave: release,
       onTouchStart: hold,
       onTouchEnd: release,
       onScrollBeginDrag: hold,

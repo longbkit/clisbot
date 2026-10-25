@@ -6,6 +6,7 @@ import { createMockIdleAgent } from "../support/helpers/archive-tab";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
+import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 
 // Navigation V2 (docs/features/navigation-v2/README.md): rail, Chats/Work, Home feed and More.
 const SHOTS = process.env.E2E_NAV_V2_SCREENSHOTS_DIR;
@@ -50,6 +51,8 @@ async function seedNavigationFixtures() {
     },
   };
 }
+
+test.use({ navigationV2: true });
 
 test.describe("Navigation V2", () => {
   test("desktop rail, Home feed lifecycle, Chats, Work, Tasks and /sessions", async ({ page }) => {
@@ -135,4 +138,173 @@ test.describe("Navigation V2", () => {
       await seeded.cleanup();
     }
   });
+
+  test("desktop deep link, list pane toggle, Work +, command center and Settings", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const seeded = await seedNavigationFixtures();
+    try {
+      await gotoAppShell(page);
+      await page.goto(buildHostWorkspaceRoute(getServerId(), seeded.workspace.workspaceId));
+      const workPane = page.getByTestId("work-pane");
+      await expect(workPane).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId("navigation-rail-work")).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await shot(page, "desktop-work-session");
+      // Pressing the active list section hides its pane and shows it again (as ⌘B does).
+      await page.getByTestId("navigation-rail-work").click();
+      await expect(workPane).toBeHidden();
+      await page.getByTestId("navigation-rail-work").click();
+      await expect(workPane).toBeVisible();
+
+      await page.getByTestId("work-new").click();
+      for (const id of ["work-new-workspace", "work-new-project", "work-import-session"])
+        await expect(page.getByTestId(id)).toBeVisible();
+      await page.getByTestId("work-new-workspace").click();
+      await expect(page).toHaveURL(/\/new(?:\?.*)?$/);
+
+      await page.getByTestId("work-search").click();
+      await expect(page.getByTestId("command-center-panel")).toBeVisible({ timeout: 30_000 });
+      await page.keyboard.press("Escape");
+
+      await page.getByTestId("navigation-rail-chats").click();
+      await page.getByTestId("chats-new").click();
+      await expect(page.getByTestId("chats-new-bot")).toBeVisible();
+      await expect(page.getByTestId("chats-new-group")).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      await page.getByTestId("navigation-rail-settings").click();
+      await expect(page).toHaveURL(/\/settings/);
+    } finally {
+      await seeded.cleanup();
+    }
+  });
+
+  test("Home lifecycle: Mark unread, Dismiss, mode and scope filters", async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const seeded = await seedNavigationFixtures();
+    try {
+      await gotoAppShell(page);
+      const id = `${getServerId()}-${seeded.failing.id}`;
+      const failedRow = page.getByTestId(`agent-row-${id}`);
+      await expect(failedRow).toBeVisible({ timeout: 30_000 });
+      const badge = page.getByTestId("navigation-rail-home");
+      await expect(badge).toContainText("1");
+
+      // Chat mode shows Bot sessions only; the failed work session leaves the feed.
+      await page.getByTestId("home-mode-chat").click();
+      await expect(failedRow).toHaveCount(0);
+      await page.getByTestId("home-mode-hybrid").click();
+      await expect(failedRow).toBeVisible();
+      // Nobody else owns anything here: Others is empty.
+      await page.getByTestId("home-scope-others").click();
+      await expect(failedRow).toHaveCount(0);
+      await page.getByTestId("home-scope-mine").click();
+      await expect(failedRow).toBeVisible();
+
+      await page.getByTestId(`issue-actions-${id}-menu`).click();
+      await page.getByTestId(`issue-actions-${id}-mark`).click();
+      await expect(page.getByTestId("home-seen-issues")).toBeVisible();
+      await expect(badge).not.toContainText("1");
+      await page.getByTestId("home-seen-issues").click();
+      await shot(page, "desktop-seen-issues-open");
+      await page.getByTestId(`issue-actions-${id}-menu`).click();
+      await page.getByTestId(`issue-actions-${id}-mark`).click();
+      await expect(page.getByTestId("home-seen-issues")).toHaveCount(0);
+      await expect(badge).toContainText("1");
+
+      // Dismiss: it leaves Needs me and the badge; the session stays in the feed as history.
+      await page.getByTestId(`issue-actions-${id}-dismiss`).click();
+      const needs = page.getByTestId("home-activity-section-needs");
+      await expect(needs.getByTestId(`agent-row-${id}`)).toHaveCount(0);
+      await expect(page.getByTestId(`issue-actions-${id}`)).toHaveCount(0);
+      await expect(failedRow).toBeVisible();
+      await expect(badge).not.toContainText("1");
+    } finally {
+      await seeded.cleanup();
+    }
+  });
+
+  test("phone: a session opened from Work goes Back to Work; dark and Vietnamese", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const seeded = await seedNavigationFixtures();
+    try {
+      await gotoAppShell(page);
+      await expect(page.getByTestId("home-tab-work")).toBeVisible();
+      await page.getByTestId("home-tab-work").click();
+      const row = page.getByTestId(
+        `sidebar-workspace-row-${getServerId()}:${seeded.workspace.workspaceId}`,
+      );
+      await expect(row).toBeVisible({ timeout: 30_000 });
+      await row.click();
+      await expect(page).toHaveURL(/\/workspace\//);
+      await expect(page.getByTestId("home-mobile-tabs")).toHaveCount(0);
+      await shot(page, "mobile-session-detail");
+      await page.getByTestId("chat-back").click();
+      await expect(page).toHaveURL(/\/work$/);
+      await expect(page.getByTestId("work-pane")).toBeVisible();
+
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.getByTestId("home-tab-open-project").click();
+      await expect(page.getByTestId("home-feed-controls")).toBeVisible();
+      await shot(page, "mobile-home-dark");
+      await page.emulateMedia({ colorScheme: "light" });
+
+      await page.getByTestId("home-tab-more").click();
+      await expect(page.getByTestId("more-settings")).toBeVisible();
+      // Settings' General page owns the language; set it there, then come back through history.
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.getByTestId("navigation-rail-settings").click();
+      await page.getByTestId("language-quick-vi").click();
+      await page.goBack();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByTestId("home-tab-more").click();
+      await expect(page.getByTestId("more-screen")).toBeVisible();
+      await expect(page.getByTestId("home-tab-schedules")).toContainText("Lịch");
+      await shot(page, "mobile-more-vi");
+      await page.getByTestId("home-tab-chat").click();
+      await shot(page, "mobile-chats-vi");
+      await page.getByTestId("home-tab-open-project").click();
+      await shot(page, "mobile-home-vi");
+    } finally {
+      await seeded.cleanup();
+    }
+  });
+
+  for (const width of [320, 430]) {
+    test(`phone at ${width}px: every tab and its section header fit`, async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width, height: 800 });
+      const seeded = await seedNavigationFixtures();
+      try {
+        await gotoAppShell(page);
+        const tabs: [string, string][] = [
+          ["open-project", "home-header"],
+          ["chat", "chats-pane"],
+          ["work", "work-pane"],
+          ["more", "more-screen"],
+        ];
+        for (const [tab, surface] of tabs) {
+          await page.getByTestId(`home-tab-${tab}`).click();
+          await expect(page.getByTestId(surface)).toBeVisible();
+          // Nothing pushes the page wider than the phone.
+          const overflow = await page.evaluate(
+            () => document.documentElement.scrollWidth - window.innerWidth,
+          );
+          expect(overflow).toBeLessThanOrEqual(0);
+          await shot(page, `mobile-${width}-${tab}`);
+        }
+      } finally {
+        await seeded.cleanup();
+      }
+    });
+  }
 });

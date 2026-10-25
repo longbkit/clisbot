@@ -69,6 +69,8 @@ function Chip<T extends string>({
       accessibilityLabel={counted ? `${chip.label} (${String(chip.count)})` : chip.label}
       onPress={press}
       testID={testID}
+      // The pill stays compact; the press area reaches 44pt.
+      hitSlop={CHIP_HIT_SLOP}
       style={[styles.chip, selected ? styles.selected : null]}
     >
       <Text style={[styles.label, selected ? styles.selectedLabel : null]} numberOfLines={1}>
@@ -78,6 +80,8 @@ function Chip<T extends string>({
     </Pressable>
   );
 }
+
+const CHIP_HIT_SLOP = { top: 8, bottom: 8, left: 2, right: 2 };
 
 const styles = StyleSheet.create((theme) => ({
   row: {

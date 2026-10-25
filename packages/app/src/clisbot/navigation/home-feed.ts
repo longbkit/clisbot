@@ -1,7 +1,13 @@
 import { getBotIdFromLabels } from "@clisbot/protocol/bots/labels";
 import { activityBucket, isUnreadReply } from "@/clisbot/home/activity";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
-import { issueSessionKey, resolveIssue, type Issue, type IssueRecords } from "./issues";
+import {
+  issueSessionKey,
+  resolveIssue,
+  type Issue,
+  type IssueRecords,
+  type IssueSubject,
+} from "./issues";
 import { inScope, type Ownership, type OwnershipScope, type ScopeCounts } from "./ownership";
 
 export type HomeMode = "chat" | "work" | "hybrid";
@@ -33,11 +39,14 @@ export function homeRows(input: {
   ownershipOf: (agent: AggregatedAgent) => Ownership;
   records: IssueRecords;
   now: number;
+  /** Adds what the directory entry lacks, such as the pending requests' ids. */
+  subjectOf?: (agent: AggregatedAgent) => IssueSubject;
 }): HomeRow[] {
+  const subjectOf = input.subjectOf ?? ((agent: AggregatedAgent) => agent);
   return input.agents.map((agent) => ({
     agent,
     ownership: input.ownershipOf(agent),
-    issue: resolveIssue(agent, input.records[issueSessionKey(agent)], input.now),
+    issue: resolveIssue(subjectOf(agent), input.records[issueSessionKey(agent)], input.now),
   }));
 }
 

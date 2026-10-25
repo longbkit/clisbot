@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react-native";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import type { HomeMode } from "./home-feed";
 import { HeaderIconButton, HeaderSearchButton, SectionHeader } from "./section-header";
@@ -11,6 +12,7 @@ const MODES: readonly HomeMode[] = ["chat", "work", "hybrid"];
 /** Home's header (brief C5, C13): the Chat / Work / Hybrid switch and Home's search. */
 export function NavigationHomeHeader() {
   const { t } = useTranslation();
+  const compact = useIsCompactFormFactor();
   const mode = useNavigationStore((state) => state.homeMode);
   const setMode = useNavigationStore((state) => state.setHomeMode);
   const searchOpen = useNavigationStore((state) => state.homeSearchOpen);
@@ -28,7 +30,7 @@ export function NavigationHomeHeader() {
   const center = useMemo(
     () => (
       <SegmentedControl
-        size="xs"
+        size={compact ? "md" : "xs"}
         variant="track"
         options={options}
         value={mode}
@@ -36,7 +38,7 @@ export function NavigationHomeHeader() {
         testID="home-mode"
       />
     ),
-    [mode, options, setMode],
+    [compact, mode, options, setMode],
   );
   const closeLabel = t("navigation.actions.closeSearch");
   const actions = useMemo(

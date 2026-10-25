@@ -7,6 +7,7 @@ import { findDestination } from "@/clisbot/quick-starts/model";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { NavigationHomeLayout } from "@/clisbot/navigation/home-layout";
+import { useHomeModeStartTarget } from "@/clisbot/navigation/home-mode-target";
 import { HomeStartLayout, StartFeedback } from "@/clisbot/home/start-surface";
 import { StartSwitcher } from "@/clisbot/home/start-switcher";
 import { useQuickChatByDefault } from "@/clisbot/home/use-quick-chat-default";
@@ -1804,6 +1805,15 @@ export function NewWorkspaceScreen({
       ) : undefined,
     [startKind, selectedProject, projectIconDataByProjectViewKey, projectTriggerLabel],
   );
+  useHomeModeStartTarget({
+    home,
+    focused,
+    serverId: selectedServerId,
+    startKind,
+    selectedBot,
+    setStartTarget,
+    prepareQuickChat,
+  });
   useQuickChatByDefault({
     focused,
     inferred: inferredStart,

@@ -104,6 +104,7 @@ export function HomePinTags() {
         <PressHighlight
           accessibilityRole="button"
           onPress={toggleOthers}
+          hitSlop={TAG_HIT_SLOP}
           style={tagStyle}
           testID="home-pin-tags-others"
         >
@@ -125,6 +126,7 @@ function Tag({ tag, onPress }: { tag: RowTag; onPress: (tag: RowTag) => void }) 
       accessibilityRole="button"
       accessibilityLabel={tag.title}
       onPress={press}
+      hitSlop={TAG_HIT_SLOP}
       style={tagStyle}
       testID={`home-pin-tag-${tag.key}`}
     >
@@ -135,6 +137,9 @@ function Tag({ tag, onPress }: { tag: RowTag; onPress: (tag: RowTag) => void }) 
     </PressHighlight>
   );
 }
+
+/** Tags stay compact; the press area reaches 44pt. */
+const TAG_HIT_SLOP = { top: 10, bottom: 10, left: 2, right: 2 };
 
 const ThemedPin = withUnistyles(Pin, (theme) => ({ color: theme.colors.foregroundMuted }));
 

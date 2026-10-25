@@ -1,9 +1,11 @@
 /**
  * Failure and needs-action lifecycle (brief 3.1c; docs/features/navigation-v2/README.md).
  *
- * The daemon's per-agent attention (`requiresAttention`, `attentionTimestamp`) is the seen signal:
- * opening a session clears it. The device keeps one record per session for what the daemon cannot
- * hold per user — the occurrence it last saw, and the reader's Seen, Dismiss and Mark unread.
+ * A failure's seen signal is the daemon's per-agent attention (`requiresAttention`,
+ * `attentionTimestamp`): opening the session clears it. The daemon raises no attention for a
+ * permission request, so a request is unseen until the reader opens its session or marks it. The
+ * device keeps one record per session for what the daemon cannot hold per reader: the occurrence it
+ * last saw, and the reader's Seen, Dismiss and Mark unread.
  */
 
 export type IssueKind = "failure" | "needs";
@@ -21,6 +23,8 @@ export interface IssueSubject {
   attentionReason?: "finished" | "error" | "permission" | null;
   attentionTimestamp?: Date | null;
   pendingPermissionCount?: number;
+  /** The pending requests' ids, sorted and joined: a request's occurrence. */
+  requestKey?: string | null;
   lastActivityAt: Date;
 }
 
@@ -75,6 +79,7 @@ export function issueOccurrence(
   kind: IssueKind,
   record: IssueRecord | undefined,
 ): string {
+  if (kind === "needs" && subject.requestKey) return `request:${subject.requestKey}`;
   if (unreadAttention(subject, kind) && subject.attentionTimestamp)
     return subject.attentionTimestamp.toISOString();
   if (record?.kind === kind) return record.occurrence;
@@ -100,13 +105,18 @@ export function resolveIssue(
   let state: IssueState;
   if (mark === "unread") state = "unseen";
   else if (mark === "seen") state = "seen";
-  else state = unreadAttention(subject, kind) ? "unseen" : "seen";
+  else state = isUnseenByDefault(subject, kind) ? "unseen" : "seen";
   if (state === "seen" && kind === "failure") {
     const seenAt = current && record.seenAt ? Date.parse(record.seenAt) : null;
     const since = seenAt ?? subject.lastActivityAt.getTime();
     if (now - since > SEEN_ISSUE_TTL_MS) return null;
   }
   return { key: issueSessionKey(subject), kind, occurrence, state };
+}
+
+/** Without a mark from the reader: a failure follows the daemon, a request waits to be seen. */
+function isUnseenByDefault(subject: IssueSubject, kind: IssueKind): boolean {
+  return kind === "needs" || unreadAttention(subject, kind);
 }
 
 /**
@@ -152,7 +162,7 @@ function observeOne(
   const iso = new Date(now).toISOString();
   if (!record || record.kind !== kind || record.occurrence !== occurrence)
     return { kind, occurrence, observedAt: iso };
-  const seen = record.mark === "seen" || (!record.mark && !unreadAttention(subject, kind));
+  const seen = record.mark === "seen" || (!record.mark && !isUnseenByDefault(subject, kind));
   if (seen && !record.seenAt) return { ...record, seenAt: iso };
   return record;
 }

@@ -2,14 +2,15 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { SectionHeader } from "./section-header";
+import { MenuHeader } from "@/components/headers/menu-header";
 
 /** Tasks is visible but in development (brief C14): no data, no actions. */
 export function TasksScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.page} testID="tasks-screen">
-      <SectionHeader title={t("navigation.sections.tasks")} />
+      {/* MenuHeader gives a phone its Back to More; the rail is the desktop's way out. */}
+      <MenuHeader title={t("navigation.sections.tasks")} />
       <View style={styles.body}>
         <StatusBadge label={t("navigation.preview")} variant="warning" />
         <Text style={styles.title}>{t("navigation.tasksPlaceholder.title")}</Text>

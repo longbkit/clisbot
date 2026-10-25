@@ -1,6 +1,10 @@
 # Home, Inbox and Quick starts
 
-CURRENT — implementation in `feat/multi-hub-hosts`, 2026-10-10.
+CURRENT — implementation in `feat/multi-hub-hosts`, 2026-10-10. With Navigation V2 on (the
+default since 2026-10-25) the sidebar, Inbox and the Home/Chat/Inbox/Automations tabs below give
+way to the rail, Chats, Work and a Home that absorbs Inbox; see
+[Navigation V2](../navigation-v2/README.md). This doc stays the reference for the Home V2 layout
+until the flag is removed.
 
 ## Navigation and scope
 

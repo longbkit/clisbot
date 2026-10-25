@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { useNavigateHomeTab } from "./mobile-navigation";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ export function useHomeActivity() {
 
 /** A reserved rail outside the scroller: updates and urgent work remain reachable while reading. */
 export function ActivityUpdates() {
+  const { t } = useTranslation();
   const { pending, needs, update, openInbox, directoryHealth } = useHomeActivity();
   const labels = {
     loading: "Loading activity…",
@@ -113,7 +115,7 @@ export function ActivityUpdates() {
         {updateLabel}
       </Button>
       <Button size="sm" variant="ghost" onPress={openInbox} testID="home-activity-needs">
-        {`${NAVIGATION_V2_ENABLED ? "Needs me" : "Needs you"} ${needs}`}
+        {`${NAVIGATION_V2_ENABLED ? t("navigation.chips.needs") : "Needs you"} ${needs}`}
       </Button>
     </View>
   );

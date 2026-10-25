@@ -24,6 +24,8 @@ import { useHostsStatus } from "./hosts-status";
 import { SECTION_ICONS } from "./rail";
 import type { BuiltinSection, NavigationSection, PluginSection } from "./sections";
 import { SectionHeader } from "./section-header";
+import { MORE_PATH } from "./sections";
+import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { useNavigationSections } from "./use-navigation-sections";
 
 /** The phone's More (brief C10): every section that is not a tab, Settings last. */
@@ -65,6 +67,8 @@ function MoreRoute({ section, last }: { section: BuiltinSection; last: boolean }
   const { t } = useTranslation();
   const router = useRouter();
   const open = useCallback(() => {
+    // Back from a page opened here returns to More (Settings keeps its own entry history).
+    rememberChatReturn(MORE_PATH);
     router.push((section.id === "settings" ? buildSettingsRoute() : section.href) as Href);
   }, [router, section]);
   const previewLabel = t("navigation.preview");

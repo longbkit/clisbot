@@ -25,8 +25,12 @@ import {
   markIssueUnread,
   markIssuesSeen,
   observeIssues,
+  type IssueRecords,
   type IssueSubject,
 } from "./issues";
+import { usePathname } from "expo-router";
+import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
+import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 import { resolveOwnership, type Ownership } from "./ownership";
 import { useReaderAccounts } from "./reader";
 
@@ -39,10 +43,10 @@ interface NavigationActivity {
   ownershipOf: (agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels">) => Ownership;
   /** Author lookup for a workspace, the source of ownership for Work rows and pins. */
   workspaceAuthor: (serverId: string, workspaceId: string) => SessionActor | undefined;
-  markSeen: (subject: IssueSubject) => void;
-  markUnread: (subject: IssueSubject) => void;
-  dismiss: (subject: IssueSubject) => void;
-  markAllSeen: (subjects: readonly IssueSubject[]) => void;
+  markSeen: (agent: AggregatedAgent) => void;
+  markUnread: (agent: AggregatedAgent) => void;
+  dismiss: (agent: AggregatedAgent) => void;
+  markAllSeen: (agents: readonly AggregatedAgent[]) => void;
 }
 
 const Context = createContext<NavigationActivity | null>(null);
@@ -63,33 +67,91 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
   const scope = useResourcePrincipalScope();
   const records = useIssueStore(selectIssueRecords(scope));
   const update = useIssueStore((state) => state.update);
+  const subjectOf = useIssueSubjects();
   useEffect(() => {
-    update(scope, (current) => observeIssues(current, agents, Date.now()));
-  }, [agents, scope, update]);
+    const subjects = agents.map(subjectOf);
+    update(scope, (current) => observeIssues(current, subjects, Date.now()));
+  }, [agents, scope, subjectOf, update]);
   const rows = useMemo(
-    () => homeRows({ agents, ownershipOf: ownership.ownershipOf, records, now }),
-    [agents, ownership.ownershipOf, records, now],
+    () => homeRows({ agents, ownershipOf: ownership.ownershipOf, records, now, subjectOf }),
+    [agents, ownership.ownershipOf, records, now, subjectOf],
   );
   const transition = useCallback(
     (apply: (current: typeof records) => typeof records) => update(scope, apply),
     [scope, update],
   );
+  useMarkOpenedSeen(rows, subjectOf, transition);
   const value = useMemo<NavigationActivity>(
     () => ({
       rows,
       badge: homeBadgeCount(rows),
       now,
       ...ownership,
-      markSeen: (subject) => transition((current) => markIssueSeen(current, subject, Date.now())),
-      markUnread: (subject) =>
-        transition((current) => markIssueUnread(current, subject, Date.now())),
-      dismiss: (subject) => transition((current) => dismissIssue(current, subject, Date.now())),
-      markAllSeen: (subjects) =>
-        transition((current) => markIssuesSeen(current, subjects, Date.now())),
+      markSeen: (agent) =>
+        transition((current) => markIssueSeen(current, subjectOf(agent), Date.now())),
+      markUnread: (agent) =>
+        transition((current) => markIssueUnread(current, subjectOf(agent), Date.now())),
+      dismiss: (agent) =>
+        transition((current) => dismissIssue(current, subjectOf(agent), Date.now())),
+      markAllSeen: (list) =>
+        transition((current) => markIssuesSeen(current, list.map(subjectOf), Date.now())),
     }),
-    [rows, now, ownership, transition],
+    [rows, now, ownership, subjectOf, transition],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
+/** A session's issue subject: its directory entry plus the ids of its pending requests. */
+function useIssueSubjects(): (agent: AggregatedAgent) => IssueSubject {
+  const hosts = useHosts();
+  const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
+  const agentMaps = useStoreWithEqualityFn(
+    useSessionStore,
+    (state) => serverIds.map((id) => state.sessions[id]?.agents ?? null),
+    shallow,
+  );
+  return useCallback(
+    (agent: AggregatedAgent) => {
+      const source = agentMaps[serverIds.indexOf(agent.serverId)]?.get(agent.id);
+      const ids = source?.pendingPermissions.map((request) => request.id) ?? [];
+      return { ...agent, requestKey: ids.length ? [...ids].sort().join(",") : null };
+    },
+    [agentMaps, serverIds],
+  );
+}
+
+/**
+ * Opening a session sees its issues (brief 3.1c): the route of an open workspace or Chat marks
+ * the issues of the sessions it shows. The daemon clears a failure's attention on its own; a
+ * request has no daemon signal, so this is what sees it.
+ */
+function useMarkOpenedSeen(
+  rows: readonly HomeRow[],
+  subjectOf: (agent: AggregatedAgent) => IssueSubject,
+  transition: (apply: (current: IssueRecords) => IssueRecords) => void,
+) {
+  const pathname = usePathname();
+  useEffect(() => {
+    const workspace = parseHostWorkspaceRouteFromPathname(pathname);
+    const chat = parseChatRouteFromPathname(pathname);
+    if (!workspace && !chat) return;
+    const opened = rows.filter(({ agent, issue }) => {
+      if (issue?.state !== "unseen") return false;
+      if (workspace)
+        return agent.serverId === workspace.serverId && agent.workspaceId === workspace.workspaceId;
+      return (
+        agent.serverId === chat!.serverId && getChatIdFromLabels(agent.labels) === chat!.chatId
+      );
+    });
+    if (!opened.length) return;
+    transition((current) =>
+      markIssuesSeen(
+        current,
+        opened.map(({ agent }) => subjectOf(agent)),
+        Date.now(),
+      ),
+    );
+  }, [pathname, rows, subjectOf, transition]);
 }
 
 export function useNavigationActivity(): NavigationActivity {

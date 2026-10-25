@@ -107,6 +107,12 @@ const daemonTest = metroTest.extend<
 });
 
 const test = daemonTest.extend<{
+  /**
+   * Navigation V2 is the app default; specs written for the Home V2 sidebar keep that layout
+   * until the flag is removed (docs/features/navigation-v2/README.md#flag-removal). A V2 spec
+   * opts in with `test.use({ navigationV2: true })`.
+   */
+  navigationV2: boolean;
   clisbotE2ESetup: void;
   outdatedDaemon: OutdatedDaemon;
   desktopManagedOutdatedDaemon: OutdatedDaemon;
@@ -114,8 +120,9 @@ const test = daemonTest.extend<{
   projectPickerFixture: TrackedProjectPickerFixture;
   withWorkspace: WithWorkspace;
 }>({
+  navigationV2: [false, { option: true }],
   clisbotE2ESetup: [
-    async ({ page }, provide, testInfo) => {
+    async ({ page, navigationV2 }, provide, testInfo) => {
       const daemonPort = getE2EDaemonPort();
       const metroPort = process.env.E2E_METRO_PORT;
       if (!metroPort) {
@@ -155,6 +162,11 @@ const test = daemonTest.extend<{
         nowIso,
       });
       const createAgentPreferences = buildCreateAgentPreferences();
+
+      await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+        key: "@clisbot:navigation-v2",
+        value: navigationV2 ? "1" : "0",
+      });
 
       await page.addInitScript(
         ({ daemon, preferences, seedNonce: nonce, extraHostsKey }) => {

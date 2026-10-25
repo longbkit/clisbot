@@ -125,24 +125,27 @@ describe("failure lifecycle", () => {
 });
 
 describe("needs-action lifecycle", () => {
+  // The daemon raises no attention for a permission request.
   const pending = (overrides: Partial<IssueSubject> = {}) =>
     failed({
       status: "running",
-      attentionReason: "permission",
+      requiresAttention: false,
+      attentionReason: null,
+      attentionTimestamp: null,
       pendingPermissionCount: 1,
+      requestKey: "perm-1",
       ...overrides,
     });
 
-  it("stays while actionable; seen after opening; leaves once resolved", () => {
+  it("stays unseen until opened or marked; seen ones stay while actionable; leaves once resolved", () => {
     const subject = pending();
     let records = observeIssues({}, [subject], T0);
     expect(issueOf(subject, records)).toMatchObject({ kind: "needs", state: "unseen" });
-    const seen = opened(subject);
-    records = observeIssues(records, [seen], T0 + 1);
-    expect(issueOf(seen, records)).toMatchObject({ kind: "needs", state: "seen" });
+    records = markIssueSeen(records, subject, T0 + 1);
+    expect(issueOf(subject, records)).toMatchObject({ kind: "needs", state: "seen" });
     // Seen requests never age out while still actionable.
-    expect(issueOf(seen, records, T0 + 10 * SEEN_ISSUE_TTL_MS)?.state).toBe("seen");
-    expect(issueOf({ ...seen, pendingPermissionCount: 0 }, records)).toBeNull();
+    expect(issueOf(subject, records, T0 + 10 * SEEN_ISSUE_TTL_MS)?.state).toBe("seen");
+    expect(issueOf({ ...subject, pendingPermissionCount: 0 }, records)).toBeNull();
   });
 
   it("leaves when the session stops", () => {
@@ -153,7 +156,7 @@ describe("needs-action lifecycle", () => {
     const subject = pending();
     let records = dismissIssue(observeIssues({}, [subject], T0), subject, T0);
     expect(issueOf(subject, records)).toBeNull();
-    const next = pending({ attentionTimestamp: new Date(T0 + 5000) });
+    const next = pending({ requestKey: "perm-2" });
     records = observeIssues(records, [next], T0 + 5000);
     expect(issueOf(next, records, T0 + 5000)?.state).toBe("unseen");
   });
