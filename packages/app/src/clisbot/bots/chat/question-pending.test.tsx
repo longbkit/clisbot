@@ -11,8 +11,13 @@ vi.mock("@/components/ui/loading-spinner", () => ({
   LoadingSpinner: () => <span data-testid="pending-spinner" />,
 }));
 vi.mock("@/components/ui/text-input", () => ({ EditingTextInput: () => null }));
-vi.mock("lucide-react-native", () => ({ Check: () => <i />, X: () => <i /> }));
-vi.mock("react-native", () => ({
+vi.mock("lucide-react-native", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("lucide-react-native")>()),
+  Check: () => <i />,
+  X: () => <i />,
+}));
+vi.mock("react-native", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-native")>()),
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   Pressable: ({

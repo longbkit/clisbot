@@ -46,10 +46,19 @@ async function watchPinnedRow(
     ({ sectionTestId: ownerTestId, rowTestId }) => {
       const state = { missingFrames: 0, stopped: false };
       (window as unknown as { __pinnedRowWatch: typeof state }).__pinnedRowWatch = state;
+      const visible = (element: Element) => {
+        const bounds = element.getBoundingClientRect();
+        return (
+          bounds.width > 0 && bounds.height > 0 && getComputedStyle(element).visibility !== "hidden"
+        );
+      };
       const sample = () => {
         if (state.stopped) return;
-        const section = document.querySelector(`[data-testid="${ownerTestId}"]`);
-        if (!section?.querySelector(`[data-testid="${rowTestId}"]`)) state.missingFrames += 1;
+        const section = [...document.querySelectorAll(`[data-testid="${ownerTestId}"]`)].find(
+          visible,
+        );
+        const row = section?.querySelector(`[data-testid="${rowTestId}"]`);
+        if (!row || !visible(row)) state.missingFrames += 1;
         requestAnimationFrame(sample);
       };
       requestAnimationFrame(sample);
@@ -86,11 +95,12 @@ test.describe("New workspace live pin", () => {
       const rowTestId = pinnedRowTestId(workspaceId);
 
       await seeded.client.setWorkspacePinned(workspaceId, true);
-      // The fusion sidebar has one unified Pins owner; the foundation sidebar
-      // retains its native workspace Pins owner. Observe the actual owner once,
+      // Fusion's sidebar-unified-pinned identifies its header, not a container:
+      // rows are siblings with a Host-qualified pin wrapper. Foundation instead
+      // owns its rows inside sidebar-pinned-section. Observe the actual owner,
       // then require this same workspace to stay under it on every sampled frame.
       const pinnedSection = page
-        .getByTestId("sidebar-unified-pinned")
+        .getByTestId(`sidebar-pin-${getServerId()}:${workspaceId}`)
         .or(page.getByTestId("sidebar-pinned-section"))
         .filter({ visible: true });
       await expect(pinnedSection).toHaveCount(1);

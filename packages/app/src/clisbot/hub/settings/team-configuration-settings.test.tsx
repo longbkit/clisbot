@@ -78,7 +78,10 @@ vi.mock("react-native-unistyles", () => ({
   withUnistyles: (component: unknown) => component,
 }));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
-vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
+vi.mock("@/constants/layout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/layout")>()),
+  useIsCompactFormFactor: () => false,
+}));
 // These native device-access surfaces have their own tests; this fixture
 // exercises organization/team settings and the chat-account linking flow.
 vi.mock("@/device-access/hub-settings", () => ({

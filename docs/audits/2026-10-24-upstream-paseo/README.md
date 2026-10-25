@@ -202,3 +202,64 @@ legacy drawer journeys and both Manual-order journeys passed. Format and lint ar
 clean; final typecheck and normal commit hooks bind acceptance to the next candidate
 commit, whose full CI is still required. Per-run counts here overlap and are not an
 additive count of unique tests.
+
+## Second full CI and native compatibility repair
+
+Candidate `cb5db7131fd50fcfe166367040a2063ef34026a2` full CI
+`40163551482` completed red. Server jobs on all three operating systems,
+Windows server integration, Linux/Windows Desktop, all CLI shards and six
+browser shards passed. Quality, website browser verification, app units and two
+browser shards exposed the following remaining closures; the old run stays red.
+
+Actual Android release-mode cold launch found two P1 integration failures that
+browser tests could not certify. Four registered native modules used the old
+Expo Gradle helper, omitting Expo 57's Pika compiler transformation. They now use
+`expo-module-gradle-plugin`; three private app-local modules explicitly disable
+standalone publishing. Existing ABI, native dependencies and registration remain.
+Compiled output has no residual reified-operation markers. After that fix,
+React Native 0.86's removed `absoluteFillObject` alias caused a real Unistyles
+startup crash. Five references use supported `absoluteFill` with the same edges.
+The original crashing APK and intermediate failures are retained.
+
+The repaired development-identity, debug-signed Android release APK
+`84e163c42ec4fcebb310f889160eaabf499c42f1b3c3afbe99f554f112b7423c`
+passed cold launch, actual Direct connection, Home/Chat/Work, synthetic messaging,
+Markdown, real Gboard/fullscreen, draft retention, file Explorer, real PTY terminal,
+reconnect and Host removal/recovery. This is a bounded API36 ARM64 emulator matrix,
+not physical-device, native audio, OAuth, real-provider or fresh-workspace creation
+acceptance. Source hashes bind the APK to the eight repaired paths, not untouched
+`cb5db713`.
+
+Fresh packaged web build passed, and an actual UI-created Codex/Luna Bot returned
+exactly `PACKAGED_BOT_OK`. Independent readback confirmed an idle agent and exactly
+one reply. A task-owned schedule remained paused with zero runs. Fourteen whole-screen
+journeys and accepted responsive captures passed. Later `list_hosts` locale copy is
+outside that bundle fingerprint; no broader source identity is implied.
+
+App CI exposed five outdated whole-module/lifecycle fixtures and a genuine missing
+`list_hosts` catalog entry. Partial mocks, real Zustand navigation and initialization-time
+profiling flags preserve the assertions. The catalog key now exists in all ten locales;
+protocol equality and locale parity tests remain unchanged. Eight affected/owning files
+passed 98 tests across two retained runs. Website SSR tests now verify reviewed English
+fallback notices/content/language and retained Chinese guides, plus real Clisbot-owned
+pending sponsorship navigation. Both browser engines passed 28 i18n tests and the six
+final sponsor cases across retained runs, not a single rerun of their union.
+
+The live-pin fixture had selected Fusion's section header as a row container. It now
+observes the actual Host-qualified pin wrapper, retaining every-frame continuity and
+single creation intent. The image Queue/Steer case now waits for the exact correlated
+normalization/Host acceptance before its ordinary UI deadline, within the unchanged
+120-second scenario budget. Durable queue equality, normalized three-image payload,
+active-turn identity and exactly-once submission are checked. Both affected browser
+files passed all six cases locally in 85 seconds.
+
+Dependency signature verification remains a blocking cryptographic gate. CI uses
+pinned `npm@11.15.0` via `npm exec`, without replacing global npm or changing the
+product lockfile. Node 22's bundled auditor predates the Pacote keyless-attestation
+fix: https://github.com/npm/pacote/pull/454. The selected auditor passed the whole
+installed tree with `invalid: []` and `missing: []`. The original CI registry payload
+was not retained, so this does not prove an exclusive historical failure cause.
+
+New candidate full CI, iOS native acceptance and final survival/completeness readback
+remain required before promotion. Existing valid results for unchanged source are
+reused rather than rerun as ritual. Local main and the upstream baseline remain unchanged.

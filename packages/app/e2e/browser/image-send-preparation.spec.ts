@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { SessionInboundMessage, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { test, expect, disabledQueueProviders } from "../support/helpers/queue-fixture";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
@@ -178,10 +179,59 @@ test("busy session prepares large image Queue and Steer submissions through the 
   await page.addInitScript(() =>
     localStorage.setItem("@clisbot:app-settings", JSON.stringify({ sendBehavior: "steer" })),
   );
+  type QueueRequest = Extract<SessionInboundMessage, { type: "agent.queue.execute.request" }>;
+  type SendRequest = Extract<SessionInboundMessage, { type: "send_agent_message_request" }>;
+  type QueueResponse = Extract<SessionOutboundMessage, { type: "agent.queue.execute.response" }>;
+  type SendResponse = Extract<SessionOutboundMessage, { type: "send_agent_message_response" }>;
+  const enqueues: QueueRequest[] = [];
+  const steers: SendRequest[] = [];
+  let acceptQueue!: (response: QueueResponse) => void;
+  let acceptSteer!: (response: SendResponse) => void;
+  const queueAccepted = new Promise<QueueResponse>((resolve) => (acceptQueue = resolve));
+  const steerAccepted = new Promise<SendResponse>((resolve) => (acceptSteer = resolve));
+  await page.routeWebSocket(daemonWsRoutePattern(), (browser) => {
+    const server = browser.connectToServer();
+    browser.onMessage((raw) => {
+      if (typeof raw === "string" && raw.startsWith("{")) {
+        const envelope = JSON.parse(raw);
+        const message: SessionInboundMessage =
+          envelope.type === "session" ? envelope.message : envelope;
+        if (message.type === "agent.queue.execute.request" && message.command.action === "enqueue")
+          enqueues.push(message);
+        if (
+          message.type === "send_agent_message_request" &&
+          message.text === "Steer with all three images"
+        )
+          steers.push(message);
+      }
+      server.send(raw);
+    });
+    server.onMessage((raw) => {
+      if (typeof raw === "string" && raw.startsWith("{")) {
+        const envelope = JSON.parse(raw);
+        const message: SessionOutboundMessage =
+          envelope.type === "session" ? envelope.message : envelope;
+        if (
+          message.type === "agent.queue.execute.response" &&
+          message.payload.requestId === enqueues[0]?.requestId
+        )
+          acceptQueue(message);
+        if (
+          message.type === "send_agent_message_response" &&
+          message.payload.requestId === steers[0]?.requestId
+        )
+          acceptSteer(message);
+      }
+      browser.send(raw);
+    });
+  });
+  const files = await imageFiles();
   const workspace = await seedMockAgentWorkspace({
     repoPrefix: "image-queue-",
     title: "Image queue",
-    model: "one-minute-stream",
+    // Keep the turn busy throughout the existing 120 s image-preparation budget.
+    // Cleanup cancels it; the test never waits for this synthetic stream to finish.
+    model: "thirty-minute-stream",
   });
   const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "image-queue-fixture" });
   try {
@@ -190,26 +240,85 @@ test("busy session prepares large image Queue and Steer submissions through the 
     await input.fill("Start fixture work");
     await page.getByTestId("composer-send-button").last().click();
     await expect(page.getByTestId("turn-working-indicator").first()).toBeVisible();
-    for (const file of await imageFiles()) await attachImageFromMenu(page, file);
+    for (const file of files) await attachImageFromMenu(page, file);
+    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(3);
     await input.fill("Queue all three images");
+    const queueStartedAt = Date.now();
     await input.press("Control+Enter");
-    const row = page.locator('[data-testid^="host-queue-"]').first();
+    // Large-image normalization is asynchronous and precedes the Host request.
+    // Wait for that exact accepted request within the scenario budget, then
+    // keep the normal UI deadline for publishing its durable queue row.
+    expect((await queueAccepted).payload.error).toBeNull();
+    const queuePreparationAndAcceptanceMs = Date.now() - queueStartedAt;
+    expect(enqueues).toHaveLength(1);
+    const command = enqueues[0].command;
+    expect(command.action).toBe("enqueue");
+    if (command.action !== "enqueue") throw new Error("Expected the image enqueue request");
+    expect(command.images).toHaveLength(3);
+    const queueBytes = command.images!.reduce((sum, image) => sum + image.data.length, 0);
+    expect(queueBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
+    const row = page.getByTestId(`host-queue-${command.id}`);
     await expect(row).toBeVisible();
     await expect(input).toHaveValue("");
+    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
     const queued = await client.executeAgentQueueCommand({
       agentId: workspace.agentId,
       command: { action: "fetch" },
     });
+    expect(queued.error).toBeNull();
     expect(queued.queue!.items).toHaveLength(1);
+    expect(queued.queue!.items[0]).toMatchObject({
+      id: command.id,
+      text: "Queue all three images",
+      images: command.images,
+    });
     await page.screenshot({ path: info.outputPath("queue-prepared.png") });
-    for (const file of await imageFiles()) await attachImageFromMenu(page, file);
+    for (const file of files) await attachImageFromMenu(page, file);
+    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(3);
+    await expect(page.getByTestId("turn-working-indicator").first()).toBeVisible();
     await input.fill("Steer with all three images");
+    const steerStartedAt = Date.now();
     await page.getByTestId("composer-send-button").last().click();
+    expect((await steerAccepted).payload.accepted).toBe(true);
+    const steerPreparationAndAcceptanceMs = Date.now() - steerStartedAt;
+    expect(steers).toHaveLength(1);
+    expect(steers[0].activeTurnBehavior).toBe("steer");
+    expect(steers[0].expectedTurnId).toEqual(expect.any(String));
+    expect(steers[0].images).toHaveLength(3);
+    const steerBytes = steers[0].images!.reduce((sum, image) => sum + image.data.length, 0);
+    expect(steerBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
     await expect(input).toHaveValue("");
+    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
     await expect(
       page.getByTestId("user-message").filter({ hasText: "Steer with all three images" }),
     ).toBeVisible();
     await expect(row).toBeVisible();
+    const afterSteer = await client.executeAgentQueueCommand({
+      agentId: workspace.agentId,
+      command: { action: "fetch" },
+    });
+    expect(afterSteer.error).toBeNull();
+    expect(afterSteer.queue!.items).toEqual(queued.queue!.items);
+    expect(enqueues).toHaveLength(1);
+    await writeFile(
+      info.outputPath("busy-image-proof.json"),
+      JSON.stringify(
+        {
+          agentId: workspace.agentId,
+          queueId: command.id,
+          queueBytes,
+          steerBytes,
+          queuePreparationAndAcceptanceMs,
+          steerPreparationAndAcceptanceMs,
+          enqueues: enqueues.length,
+          steers: steers.length,
+          realDaemon: true,
+          mockProvider: true,
+        },
+        null,
+        2,
+      ),
+    );
     await page.screenshot({ path: info.outputPath("steer-prepared.png") });
   } finally {
     await workspace.cleanup();

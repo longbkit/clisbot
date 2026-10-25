@@ -57,7 +57,10 @@ vi.mock("react-native", async () => {
   return {
     View,
     Pressable: View,
-    StyleSheet: { create: (s: unknown) => s, absoluteFillObject: {} },
+    StyleSheet: {
+      create: (s: unknown) => s,
+      absoluteFill: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
+    },
   };
 });
 vi.mock("react-native-reanimated", async () => {
@@ -99,7 +102,9 @@ it("allows native visible descendants before settled activity publication", () =
   expect(
     ancestors(row).some((n) => n.dataset.pointer === "none" || n.dataset.stylePointer === "none"),
   ).toBe(false);
-  const host = view.container.querySelector('[data-native-id="agent-list-gesture-host"]');
+  const hosts = view.container.querySelectorAll('[data-native-id^="agent-list-gesture-host-"]');
+  expect(hosts).toHaveLength(1);
+  const host = hosts[0];
   expect(
     Array.from(host?.firstElementChild?.children ?? []).map((n) => n.getAttribute("data-pointer")),
   ).toEqual(["auto", "auto"]);

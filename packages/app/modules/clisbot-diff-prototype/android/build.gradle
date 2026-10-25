@@ -1,13 +1,15 @@
-apply plugin: 'com.android.library'
+plugins {
+  id 'com.android.library'
+  // Expo 57's typed Function DSL requires the Pika compiler integration.
+  id 'expo-module-gradle-plugin'
+}
 
 group = 'sh.clisbot.diffprototype'
 version = '0.1.0'
 
-def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
-apply from: expoModulesCorePlugin
-applyKotlinExpoModulesCorePlugin()
-useCoreDependencies()
-useDefaultAndroidSdkVersions()
+// These app-local modules are private; only the application is packaged.
+expoModule { canBePublished = false }
+
 
 def skiaPackage = new File(["node", "--print", "require.resolve('@shopify/react-native-skia/package.json')"].execute(null, projectDir).text.trim()).parentFile
 

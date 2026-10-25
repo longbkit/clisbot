@@ -121,9 +121,9 @@ export function botInitials(name: string): string {
 // band against a white letter (`identity-colors.ts`), not against the surface.
 const styles = StyleSheet.create((theme) => ({
   frame: { alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 },
-  fill: StyleSheet.absoluteFillObject,
+  fill: StyleSheet.absoluteFill,
   rim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.18)",
   },

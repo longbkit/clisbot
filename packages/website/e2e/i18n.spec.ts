@@ -16,14 +16,21 @@ function describeAlternates(links: Element[]): string[] {
 test.describe("server-rendered Chinese pages", () => {
   test.use({ javaScriptEnabled: false });
 
-  test("render in Chinese with matching language metadata before any script runs", async ({
+  test("render the reviewed English CLI fallback inside Chinese page metadata before scripts", async ({
     page,
   }) => {
     await page.goto("/zh-CN/docs/cli");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-    await expect(page).toHaveTitle("CLI 参考 - Clisbot 文档");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(/CLI 参考$/);
+    // The upstream translation describes a different CLI. The reviewed Clisbot
+    // fallback is explicit, whole-document English, not a failed locale render.
+    await expect(page).toHaveTitle("CLI reference - Clisbot 文档");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(/CLI reference$/);
+    await expect(page.getByRole("note")).toHaveText("此页面尚未翻译成你的语言，因此以英文显示。");
+    await expect(page.locator(".docs-prose")).toHaveAttribute("lang", "en");
+    await expect(page.locator(".docs-prose")).toContainText(
+      "The Clisbot CLI lets you manage agents from your terminal.",
+    );
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
       "https://clisbot.com/zh-CN/docs/cli",
@@ -46,10 +53,22 @@ test.describe("server-rendered Chinese pages", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(/CLI reference$/);
   });
 
-  test("land translated anchors on the English section ids", async ({ page }) => {
+  test("keep CLI fallback anchors and translated guide anchors addressable without scripts", async ({
+    page,
+  }) => {
     await page.goto("/zh-CN/docs/cli#running-agents");
 
-    await expect(page.locator("#running-agents")).toHaveText(/运行 Agent/);
+    await expect(page).toHaveURL(/\/zh-CN\/docs\/cli#running-agents$/);
+    await expect(page.locator("#running-agents")).toHaveText(/Running agents/);
+    await expect(page.locator("#running-agents")).toBeInViewport();
+    await expect(page.locator("main")).not.toContainText("{#");
+
+    // A translated, reviewed guide still renders Chinese at its English anchor.
+    await page.goto("/zh-CN/docs/hub/api#api-reference");
+    await expect(page.locator(".docs-prose")).toHaveAttribute("lang", "zh-CN");
+    await expect(page.locator("#api-reference")).toHaveText(/API 参考/);
+    await expect(page.locator("#api-reference")).toBeInViewport();
+    await expect(page.getByRole("note")).toHaveCount(0);
     await expect(page.locator("main")).not.toContainText("{#");
   });
 
@@ -68,9 +87,11 @@ test.describe("server-rendered Chinese pages", () => {
   test("keep no space after full-width punctuation in the homepage subtitle", async ({ page }) => {
     await page.goto("/zh-CN");
 
-    await expect(page.getByText(/^同时运行多个编程 Agent/)).toHaveText(
-      "同时运行多个编程 Agent，在任何机器上。在桌前，也在手机上。",
+    const subtitle = page.getByText(/^在自己的机器上使用专业 Bot/);
+    await expect(subtitle).toHaveText(
+      "在自己的机器上使用专业 Bot 构建、研究和工作。覆盖桌面端、移动端和团队聊天频道。开源。Agent 在您选择的位置运行。",
     );
+    await expect(subtitle).not.toHaveText(/[，。]\s/);
   });
 });
 
@@ -177,9 +198,33 @@ test("shows a translated plugin overview, or the English one under a notice", as
   await expect(page.getByRole("heading", { name: "Behavior" })).toBeVisible();
 });
 
-test("shows the changelog in Chinese", async ({ page }) => {
-  await page.goto("/zh-CN/changelog");
+test.describe("server-rendered changelog translation coverage", () => {
+  test.use({ javaScriptEnabled: false });
 
-  await expect(page.getByRole("heading", { name: "新增" }).first()).toBeVisible();
-  await expect(page.getByRole("note")).toHaveCount(0);
+  test("keeps translated releases Chinese and labels each whole English fallback", async ({
+    page,
+  }) => {
+    await page.goto("/zh-CN/changelog");
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("更新日志");
+    const english = page.locator('.changelog-release-notes[lang="en"]');
+    const chinese = page.locator('.changelog-release-notes[lang="zh-CN"]');
+    expect(await english.count()).toBeGreaterThan(0);
+    expect(await chinese.count()).toBeGreaterThan(0);
+    for (const release of await english.all()) {
+      await expect(release.getByRole("note")).toHaveText(
+        "此版本的发布说明尚未翻译，因此以英文显示。",
+      );
+      // Older patch notes can be uncategorized Markdown rather than headings.
+      // Require actual release content in addition to the fallback notice.
+      expect(await release.locator(':scope > :not([role="note"])').count()).toBeGreaterThan(0);
+    }
+    await expect(chinese.getByRole("note")).toHaveCount(0);
+    await expect(
+      english.getByRole("heading", { name: /^(Added|Changed|Fixed)$/ }).first(),
+    ).toBeVisible();
+    await expect(chinese.getByRole("heading", { name: "新增", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("note")).toHaveCount(await english.count());
+  });
 });

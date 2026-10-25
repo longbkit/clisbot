@@ -106,7 +106,7 @@ const styles = StyleSheet.create((theme) => ({
   root: { flex: 1 },
   covered: { flex: 1, opacity: 0 },
   pending: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.surface0,
   },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },

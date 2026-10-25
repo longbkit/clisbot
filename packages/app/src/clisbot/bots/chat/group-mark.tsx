@@ -131,7 +131,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   rim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.18)",
   },
