@@ -125,12 +125,27 @@ const hostChip = (serverId: string, label: string): SearchScopeChip => ({
 const projectChip = (key: string): SearchScopeChip => ({ kind: "project", key, label: key });
 
 /** Items as the command center lists them: one session per (Host, project). */
+const place = (
+  serverId: string,
+  projectKey: string | null,
+  extra: Partial<ItemPlacement> = {},
+): ItemPlacement => ({ serverId, projectKey, workspaceId: null, ownership: "mine", ...extra });
+
 const ITEMS: (ItemPlacement & { id: string })[] = [
-  { id: "release on local", serverId: "local", projectKey: "clisbot" },
-  { id: "release on sb12", serverId: "sb12", projectKey: "clisbot" },
-  { id: "anyapp on local", serverId: "local", projectKey: "anyapp" },
-  { id: "release on sb14", serverId: "sb14", projectKey: "clisbot" },
+  { id: "release on local", ...place("local", "clisbot", { workspaceId: "w-local" }) },
+  { id: "release on sb12", ...place("sb12", "clisbot", { workspaceId: "w-12" }) },
+  { id: "anyapp on local", ...place("local", "anyapp") },
+  { id: "release on sb14", ...place("sb14", "clisbot", { workspaceId: "w-14" }) },
 ];
+
+const view = (input: Partial<SearchViewContext>): SearchViewContext => ({
+  label: "",
+  serverIds: null,
+  projectKeys: null,
+  ownership: null,
+  suggest: true,
+  ...input,
+});
 
 function itemsIn(catalog: Catalog, chips: SearchScopeChip[]) {
   const scope = resolveSearchScope(chips, catalog.serverIdsByHub);
@@ -293,7 +308,7 @@ describe("global search case table (docs/features/global-search/README.md)", () 
     expect(row!.note).toContain('host.lastOnline{"time":"10:42"}');
     const note = annotateItem({
       itemKind: "session",
-      placement: { serverId: "sb14", projectKey: "clisbot" },
+      placement: place("sb14", "clisbot"),
       catalog,
       view: null,
       t,
@@ -309,13 +324,9 @@ describe("global search case table (docs/features/global-search/README.md)", () 
 
   it("12: a view filter ranks inside-first and labels the rest, hiding nothing", () => {
     const catalog = fleet();
-    const view: SearchViewContext = {
-      label: "sandbox-12",
-      serverIds: new Set(["sb12"]),
-      projectKeys: null,
-    };
-    const ranked = rankItemsByView(ITEMS, view, (item) => item);
-    expect(ranked.rows.map((item) => item.id)).toEqual([
+    const filter = view({ label: "sandbox-12", serverIds: new Set(["sb12"]) });
+    const ranked = rankItemsByView(ITEMS, filter, (item) => item);
+    expect(ranked.map((item) => item.id)).toEqual([
       "release on sb12",
       "release on local",
       "anyapp on local",
@@ -325,7 +336,7 @@ describe("global search case table (docs/features/global-search/README.md)", () 
       itemKind: "session",
       placement: ITEMS[0]!,
       catalog,
-      view,
+      view: filter,
       t,
       formatTime,
     });
@@ -334,16 +345,12 @@ describe("global search case table (docs/features/global-search/README.md)", () 
 
   it("13: opening an item outside the filter publishes the reveal, and leaves the filter", () => {
     const catalog = fleet();
-    const view: SearchViewContext = {
-      label: "Máy của Long",
-      serverIds: new Set(["local"]),
-      projectKeys: null,
-    };
+    const filter = view({ label: "Máy của Long", serverIds: new Set(["local"]) });
     const { reveal } = annotateItem({
       itemKind: "session",
-      placement: { serverId: "sb12", projectKey: "clisbot" },
+      placement: place("sb12", "clisbot", { workspaceId: "w-12" }),
       catalog,
-      view,
+      view: filter,
       t,
       formatTime,
     });
@@ -352,7 +359,9 @@ describe("global search case table (docs/features/global-search/README.md)", () 
       serverId: "sb12",
       hostLabel: "sandbox-12",
       projectName: "clisbot",
+      projectViewKeys: ["view:clisbot"],
       reason: "host",
+      target: { kind: "workspace", serverId: "sb12", id: "w-12" },
     });
     setOutsideFilterReveal(reveal);
     expect(getOutsideFilterReveal()).toEqual(reveal);

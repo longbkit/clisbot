@@ -37,6 +37,7 @@ import { RenderProfile } from "@/utils/render-profiler";
 import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { ListState } from "./list-state";
+import { OutsideFilterNotice } from "./outside-filter-notice";
 import { useHeldOrder } from "./held-order";
 import { inScope } from "./ownership";
 import { SectionControls } from "./section-controls";
@@ -138,6 +139,7 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
           backdrop="surfaceSidebar"
           display={displayMenu}
         />
+        <OutsideFilterNotice list="chats" />
         <FlatList
           {...handlers}
           data={items}

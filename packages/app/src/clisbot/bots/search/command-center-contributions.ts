@@ -20,6 +20,9 @@ export interface BotSearchSource {
   icons: { bot?: CommandCenterIcon; group?: CommandCenterIcon; create?: CommandCenterIcon };
   openBot(serverId: string, botId: string): void;
   openChat(serverId: string, chatId: string): void;
+  /** Told before a row opens, so Chats can say the item is outside its filter (R3). */
+  willOpenBot?(bot: HostTagged<BotPayload>): void;
+  willOpenChat?(chat: HostTagged<ChatPayload>): void;
   createBot(): void;
   createGroup(): void;
 }
@@ -44,7 +47,10 @@ function botContribution(
     rank,
     keywords: ["bot", bot.slug, `@${bot.slug}`, bot.serverName],
     visibility: "query",
-    run: () => source.openBot(bot.serverId, bot.id),
+    run: () => {
+      source.willOpenBot?.(bot);
+      source.openBot(bot.serverId, bot.id);
+    },
     presentation: {
       kind: "action",
       title: bot.name,
@@ -72,7 +78,10 @@ function groupContribution(
     rank,
     keywords: ["group", "chat", chat.serverName],
     visibility: "query",
-    run: () => source.openChat(chat.serverId, chat.id),
+    run: () => {
+      source.willOpenChat?.(chat);
+      source.openChat(chat.serverId, chat.id);
+    },
     presentation: {
       kind: "action",
       title: chat.title,

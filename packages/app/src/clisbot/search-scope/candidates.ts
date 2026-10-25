@@ -3,6 +3,7 @@ import {
   tokenizeQuery,
   type MatchScore,
 } from "@clisbot/protocol/search/text-match";
+import type { OwnershipScope } from "@/clisbot/navigation/ownership";
 import type { ScopeHost, ScopeHub, ScopeProject, SearchScopeCatalog } from "./catalog";
 import {
   foldSearchText,
@@ -11,11 +12,15 @@ import {
   type SearchScopeChip,
 } from "./model";
 
-/** The list filter of the section search was opened from (R1). It ranks; it never hides. */
+/** The Work list's filter (R1). It ranks and labels search results; it never hides them. */
 export interface SearchViewContext {
   label: string;
   serverIds: ReadonlySet<string> | null;
   projectKeys: ReadonlySet<string> | null;
+  /** For me / Others / All; null where the layout has no ownership scope. */
+  ownership: OwnershipScope | null;
+  /** Offer "Only current filter": search was opened from the list this filter belongs to. */
+  suggest: boolean;
 }
 
 export type ScopeCandidate =

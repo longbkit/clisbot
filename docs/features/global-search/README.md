@@ -65,17 +65,21 @@ Each row is a test in `packages/app/src/clisbot/search-scope/cases.test.ts`.
 
 ## Contract case table → tests
 
-| Rules row (rules.md)                    | Unit (`cases.test.ts`) | Real app (`e2e/browser/global-search-scope.spec.ts`)       |
-| --------------------------------------- | ---------------------- | ---------------------------------------------------------- |
-| View filter Host A, type "clisbot"      | 2, 12                  | "a view filter ranks and labels…"                          |
-| Enter on a session from Host B          | 13                     | — (notice rendering belongs to the V2 Work pane)           |
-| "Show in Work" on clisbot @ B           | 14                     | "Show in Work replaces the sidebar Host filter…"           |
-| No filters, "sandbox-12", Enter on Host | 1                      | "a Host chip with a project it lacks…"                     |
-| Chip [Host B], "anyapp"                 | 5                      | "a Host chip with a project it lacks…"                     |
-| Chip [Project clisbot], "release"       | 6                      | "a project on two Hosts is one row…"                       |
-| Chip [Company Hub], empty input         | 7                      | browser harness (`search-scope.browser.test.tsx`, Hub row) |
-| Hub offline, type a project name        | 11                     | "the offline Host stays searchable…"                       |
-| Scope For me, Enter on Others item      | not on `main`          | — API only: `OutsideFilterReveal.reason = "others"`        |
+Unit: `cases.test.ts`, plus `navigation-v2.test.ts` and `navigation/outside-filter.test.ts` for
+Navigation V2. Real app: `global-search-scope.spec.ts` (sidebar layout) and
+`global-search-navigation-v2.spec.ts` (V2).
+
+| Rules row (rules.md)                    | Unit                           | Real app                                                      |
+| --------------------------------------- | ------------------------------ | ------------------------------------------------------------- |
+| View filter Host A, type "clisbot"      | cases 2, 12; V2 For me ranking | "a view filter ranks and labels…"                             |
+| Enter on a session from Host B          | case 13; outside-filter        | V2 "opening a session outside Work's Host filter…"            |
+| "Show in Work" on clisbot @ B           | case 14                        | sidebar and V2 "Show in Work … Undo"                          |
+| No filters, "sandbox-12", Enter on Host | case 1                         | "a Host chip with a project it lacks…"                        |
+| Chip [Host B], "anyapp"                 | case 5                         | "a Host chip with a project it lacks…"                        |
+| Chip [Project clisbot], "release"       | case 6                         | "a project on two Hosts is one row…"                          |
+| Chip [Company Hub], empty input         | case 7                         | browser harness (`search-scope.browser.test.tsx`, Hub row)    |
+| Hub offline, type a project name        | case 11                        | "the offline Host stays searchable…"                          |
+| Scope For me, Enter on Others item      | V2 "publishes reason others"   | V2 "an Others item opens without changing For me…" (mock Hub) |
 
 ## Deviations from rules.md
 
@@ -89,8 +93,10 @@ Each row is a test in `packages/app/src/clisbot/search-scope/cases.test.ts`.
 
 - **Commands and files while chips are active.** Hidden. They do not live on a Host or Project,
   so showing them inside a scope would contradict the chip.
-- **For me / Others.** Not on `main`. The ranking input (`SearchViewContext`) has no mine/others
-  field yet; Navigation V2 adds it next to `hosts` and `projects` and the same partition applies.
+- **For me / Others.** Results rank in four bands: in the view and For me, in the view and Others,
+  then the same two outside it. Others rows say "Others". A workspace's ownership is Work's rule
+  (`resolveOwnership` on its author); a session is its workspace's. Chats use Chats' rule, so a
+  Bot's direct chat is its author's, else the Bot owner's.
 - **Secondary action key.** ⌘/Ctrl+Enter, matching "open in background" conventions; → stays
   caret movement. Phones use the row's arrow button (always visible on touch) or long-press.
 - **When a Host counts as offline.** As the Home strip judges it: online, or connecting until the
@@ -99,21 +105,27 @@ Each row is a test in `packages/app/src/clisbot/search-scope/cases.test.ts`.
 - **Agents' project.** From the agent's workspace, else its project placement, else the Host
   project whose repo root contains its `cwd`.
 
-## Integration API for the Work list (Navigation V2)
+## Navigation V2 wiring
 
-`packages/app/src/clisbot/search-scope/work-navigation.ts`:
+The seam is `packages/app/src/clisbot/search-scope/work-navigation.ts`; Navigation V2 plugs into
+it from `clisbot/navigation/search-integration.ts`, mounted with the V2 chrome.
 
-- `setSearchViewContext(context | null)` — the section that opens search publishes its current
-  view filter (`{ label, hosts, projectNames }`). When nothing is published, search reads the
-  sidebar filters on `main`.
-- `setOpenInWorkHandler(handler)` — replaces the default "Show in Work" (on `main`: replace the
-  sidebar Host and/or Project filter, open the sidebar). The handler receives
-  `{ serverIds, projectNames, projectViewKeys }` and must return an undo function; search shows
-  the Undo toast. Replace only the dimensions the target names (R4).
-- `useOutsideFilterReveal()` / `dismissOutsideFilterReveal()` — the reveal signal. The Work list
-  renders, while it is set: one slim notice row above the list, "This session is outside your
-  filter" (or "Shown from Others"), with **Show all** (clear the conflicting dimension) and
-  **Switch to {Host}** (replace it). Nothing on `main` renders it yet.
+- **Work's filter** is published with `setSearchViewContext({ serverIds, projectViewKeys,
+ownership, suggest })`: Work's Host and Project filters (the sidebar's, which Work reads) and
+  its For me / Others / All scope. "Only current filter" is offered only when search was opened
+  from Work. Without Navigation V2 nothing is published and search reads the sidebar filters.
+- **Show in Work** (`setOpenInWorkHandler`) replaces only the dimensions the target names, opens
+  the V2 Work section and returns the Undo that restores both filters (R4).
+- **The notice** (`navigation/outside-filter-notice.tsx`) sits above Work's and Chats' lists while
+  `useOutsideFilterReveal()` names an item that list's filter still hides: "This workspace /
+  session / chat is outside your filter" with **Show all** (clear only the hiding dimension) and
+  **Switch to {Host or project}** (replace it), or "Shown from Others" with **Show all** (scope →
+  All). Neither changes until the reader taps. It ends when the reader widens the filter some
+  other way, dismisses it, or opens another item; list and Home pages keep it, because on a
+  phone the list is the page the reader goes Back to.
+- **Chats.** Bot and group-chat results publish their reveal just before opening
+  (`willOpenBot` / `willOpenChat` in `bots/search/command-center-contributions.ts`), judged
+  against Chats' own Host filter and scope at that moment.
 
 ## Performance
 

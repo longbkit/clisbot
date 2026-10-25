@@ -4,12 +4,13 @@ How the Host / Hub / Project scope ([README](README.md)) was checked, and how to
 
 ## Tests
 
-| Layer    | File                                                                  | What it proves                                                                                                                           |
-| -------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit     | `packages/app/src/clisbot/search-scope/cases.test.ts`                 | Every case-table row: matching, chips, scope, empty state, view-filter ranking, reveal signal, Show in Work + Undo, restore window, flag |
-| Unit     | `packages/app/src/i18n/search-scope/search-scope.test.ts`             | en and vi define the same keys; other locales fall back to en                                                                            |
-| Browser  | `packages/app/src/clisbot/search-scope/search-scope.browser.test.tsx` | The real Command Center over 100 Hosts / 2,000 sessions: Tab, Enter, Backspace, Hub row, empty state, latency                            |
-| Real app | `packages/app/e2e/browser/global-search-scope.spec.ts`                | Two real daemons sharing a project, one unreachable Host, the sidebar view filter, Show in Work + Undo                                   |
+| Layer    | File                                                                  | What it proves                                                                                                                               |
+| -------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit     | `packages/app/src/clisbot/search-scope/cases.test.ts`                 | Every case-table row: matching, chips, scope, empty state, view-filter ranking, reveal signal, Show in Work + Undo, restore window, flag     |
+| Unit     | `packages/app/src/i18n/search-scope/search-scope.test.ts`             | en and vi define the same keys; other locales fall back to en                                                                                |
+| Browser  | `packages/app/src/clisbot/search-scope/search-scope.browser.test.tsx` | The real Command Center over 100 Hosts / 2,000 sessions: Tab, Enter, Backspace, Hub row, empty state, latency                                |
+| Real app | `packages/app/e2e/browser/global-search-scope.spec.ts`                | Two real daemons sharing a project, one unreachable Host, the sidebar view filter, Show in Work + Undo                                       |
+| Real app | `packages/app/e2e/browser/global-search-navigation-v2.spec.ts`        | Navigation V2: the Work notice and Switch to Host, Show in Work + Undo into V2 Work, an Others item with a Hub account mocked at the network |
 
 ```bash
 cd packages/app
@@ -31,8 +32,14 @@ with a fresh daemon per worker. The screenshot matrix is the seventh test, gated
 `GS_SCREENSHOTS=1`; it writes 32 shots (4 states × desktop 1440 / phone 390 × light / dark ×
 en / vi) to `artifacts/global-search/`.
 
+`global-search-navigation-v2.spec.ts` (3 journeys) passed three consecutive runs on 2026-10-26.
+`GS_SCREENSHOTS=1` also writes the notice in Work at desktop 1440 and phone 390, light, en and vi
+(`05-work-notice-host-*`, `06-work-notice-others-*`). The Others journey signs in to a Hub mocked
+at the HTTP boundary (`signInToHub`); ownership itself is the production rule.
+
 Upstream regression: every `command-center-*.spec.ts` plus `keyboard-shortcut-sequence.spec.ts`
-(30 tests) pass with scope on. They caught one real bug: a hidden "Show in Work" button kept in
+(30 tests) pass with scope on; on the integration branch these plus `navigation-v2.spec.ts`,
+`navigation-v2-journeys.spec.ts` and the sidebar-layout scope spec pass (48). They caught one real bug: a hidden "Show in Work" button kept in
 the DOM took keyboard focus; it now mounts only while revealed.
 
 ## Latency (P2-style, typing to paint)

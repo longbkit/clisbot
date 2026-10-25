@@ -21,6 +21,11 @@ import { useSearchScopeCatalog } from "./use-scope-catalog";
 import { useScopedItems } from "./use-scoped-items";
 import { useSearchViewContext, viewContextChips } from "./view-context";
 import type { ItemPlacement } from "./items";
+import {
+  ownershipOf,
+  useWorkspaceOwnership,
+  type WorkspaceOwnership,
+} from "./use-workspace-ownership";
 import { isSearchScopeActive, SEARCH_SCOPE_ENABLED } from "./active";
 
 export interface SearchScopeInput {
@@ -80,6 +85,7 @@ function useChipLifecycle(open: boolean): void {
 function workspacePlacement(
   row: CommandCenterWorkspaceResult,
   catalog: SearchScopeCatalog,
+  owners: WorkspaceOwnership,
 ): ItemPlacement {
   return {
     serverId: row.serverId,
@@ -87,20 +93,43 @@ function workspacePlacement(
       catalog.projectKeyOfWorkspace(row.serverId, row.workspaceId) ??
       catalog.projectKeyByViewKey.get(row.project.viewKey) ??
       null,
+    workspaceId: row.workspaceId,
+    ownership: ownershipOf(owners, row.serverId, row.workspaceId),
   };
 }
 
-function agentPlacement(row: CommandCenterAgentResult, catalog: SearchScopeCatalog): ItemPlacement {
+/** A session is whoever's its workspace is; one outside any workspace is the reader's (brief 1.3). */
+function agentPlacement(
+  row: CommandCenterAgentResult,
+  catalog: SearchScopeCatalog,
+  owners: WorkspaceOwnership,
+): ItemPlacement {
   const agent = row.agent;
+  const workspaceId = agent.workspaceId ?? null;
   return {
     serverId: agent.serverId,
     projectKey: catalog.projectKeyOfAgent({
       serverId: agent.serverId,
-      workspaceId: agent.workspaceId ?? null,
+      workspaceId,
       cwd: agent.cwd,
       placementProjectName: agent.projectPlacement?.projectName ?? null,
     }),
+    workspaceId,
+    ownership: ownershipOf(owners, agent.serverId, workspaceId),
   };
+}
+
+function usePlacements(active: boolean) {
+  const owners = useWorkspaceOwnership(active);
+  return useMemo(
+    () => ({
+      workspace: (row: CommandCenterWorkspaceResult, catalog: SearchScopeCatalog) =>
+        workspacePlacement(row, catalog, owners),
+      agent: (row: CommandCenterAgentResult, catalog: SearchScopeCatalog) =>
+        agentPlacement(row, catalog, owners),
+    }),
+    [owners],
+  );
 }
 
 const workspaceAttention = (row: CommandCenterWorkspaceResult) => ({
@@ -264,11 +293,12 @@ export function useSearchScope(input: SearchScopeInput): SearchScope {
     [catalog, liveChips],
   );
   const shared = { query: input.query, catalog, view, scope, t: t as ScopeT, formatTime, active };
+  const placements = usePlacements(active);
   const workspaces = useScopedItems({
     ...shared,
     rows: input.workspaceRows,
     itemKind: "workspace",
-    placementOf: workspacePlacement,
+    placementOf: placements.workspace,
     attentionOf: workspaceAttention,
     rank: input.rankWorkspaces,
   });
@@ -276,7 +306,7 @@ export function useSearchScope(input: SearchScopeInput): SearchScope {
     ...shared,
     rows: input.agentRows,
     itemKind: "session",
-    placementOf: agentPlacement,
+    placementOf: placements.agent,
     attentionOf: agentAttention,
     rank: input.rankAgents,
   });
@@ -314,10 +344,10 @@ function useChipsProps(
 ): ScopeChipsProps | null {
   return useMemo(() => {
     if (!active) return null;
-    const suggestion =
-      view && catalog
-        ? { label: view.label, apply: () => searchScopeChips.add(viewContextChips(view, catalog)) }
-        : null;
+    const suggested = view?.suggest && catalog ? viewContextChips(view, catalog) : [];
+    const suggestion = suggested.length
+      ? { label: view!.label, apply: () => searchScopeChips.add(suggested) }
+      : null;
     return {
       chips,
       catalog,

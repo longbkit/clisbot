@@ -113,6 +113,10 @@ workspace's `createdBy`. Gaps: Hosts older than session authorship send no `crea
 their work is For me; a channel-started session is the reader's only when its snapshot carries the
 reader's verified `memberId`.
 
+Global search reads the same rule: For me ranks first, Others rows are labelled, and opening an
+item a list hides leaves the list's filter alone and shows a notice above it
+([global search wiring](../global-search/README.md#navigation-v2-wiring)).
+
 ## Home
 
 Order: header (mode switch, 🔍) → a connection notice only when something is wrong → composer and

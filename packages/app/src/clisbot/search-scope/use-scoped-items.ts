@@ -13,6 +13,14 @@ import { isScoped, type ResolvedSearchScope } from "./model";
 import type { ScopeT } from "./rows";
 import { setOutsideFilterReveal, type OutsideFilterReveal } from "./work-navigation";
 
+/** Before the catalog loads, every row is the reader's and in no project. */
+const UNPLACED: ItemPlacement = {
+  serverId: "",
+  projectKey: null,
+  workspaceId: null,
+  ownership: "mine",
+};
+
 /** Rows shown for an empty query inside a scope: a little more than upstream's five. */
 const SCOPED_EMPTY_QUERY_LIMIT = 8;
 
@@ -56,8 +64,7 @@ function useAnnotatedRows<Row extends ScopedItemRow>(
   const cache = useRef(new WeakMap<Row, { key: string; row: Row }>());
   const { rows, catalog, view, t, formatTime, itemKind, placementOf } = input;
   return useMemo(() => {
-    if (!catalog)
-      return rows.map((row) => ({ row, placement: { serverId: "", projectKey: null } }));
+    if (!catalog) return rows.map((row) => ({ row, placement: UNPLACED }));
     return rows.map((row) => {
       const placement = placementOf(row, catalog);
       const annotation = annotateItem({ itemKind, placement, catalog, view, t, formatTime });
@@ -102,6 +109,6 @@ export function useScopedItems<Row extends ScopedItemRow>(
         .slice(0, SCOPED_EMPTY_QUERY_LIMIT);
     }
     const ranked = rank(inScope.rows, query);
-    return rankItemsByView(ranked, view, (row) => inScope.placement.get(row)!).rows;
+    return rankItemsByView(ranked, view, (row) => inScope.placement.get(row)!);
   }, [active, attentionOf, inScope, query, rank, scope, view]);
 }

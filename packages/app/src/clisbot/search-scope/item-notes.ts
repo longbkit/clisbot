@@ -1,6 +1,6 @@
 import type { SearchViewContext } from "./candidates";
 import type { SearchScopeCatalog } from "./catalog";
-import { isInView, type ItemPlacement } from "./items";
+import { hiddenBy, type ItemPlacement } from "./items";
 import type { ScopeT } from "./rows";
 import type { OutsideFilterReveal } from "./work-navigation";
 
@@ -26,13 +26,6 @@ function offlineNote(
     : t("note.offline");
 }
 
-function hiddenBy(
-  view: SearchViewContext,
-  placement: ItemPlacement,
-): OutsideFilterReveal["reason"] {
-  return view.serverIds && !view.serverIds.has(placement.serverId) ? "host" : "project";
-}
-
 /** How a workspace or session row is labelled, and what opening it tells the list (R3, R7). */
 export function annotateItem(input: {
   itemKind: OutsideFilterReveal["itemKind"];
@@ -42,23 +35,30 @@ export function annotateItem(input: {
   t: ScopeT;
   formatTime(iso: string): string;
 }): ItemAnnotation {
-  const { placement, catalog, view, t } = input;
+  const { placement, catalog, t } = input;
   const offline = offlineNote(placement.serverId, catalog, t, input.formatTime);
-  const outside = view !== null && !isInView(view, placement);
-  if (!offline && !outside) return NONE;
-  const note = [outside ? t("note.outsideFilter") : null, offline].filter(Boolean).join(" · ");
-  if (!outside || !view) return { note, reveal: null };
+  const reason = hiddenBy(input.view, placement);
+  const outside = reason === "host" || reason === "project";
+  const others = placement.ownership === "others";
+  if (!offline && !outside && !others) return NONE;
+  const note = [outside ? t("note.outsideFilter") : null, others ? t("note.others") : null, offline]
+    .filter(Boolean)
+    .join(" · ");
+  if (!reason) return { note, reveal: null };
   const host = catalog.hostById.get(placement.serverId);
+  const project = placement.projectKey ? catalog.projectByKey.get(placement.projectKey) : null;
   return {
     note,
     reveal: {
       itemKind: input.itemKind,
       serverId: placement.serverId,
       hostLabel: host?.label ?? placement.serverId,
-      projectName: placement.projectKey
-        ? (catalog.projectByKey.get(placement.projectKey)?.label ?? null)
+      projectName: project?.label ?? null,
+      projectViewKeys: project ? [...project.viewKeys] : [],
+      reason,
+      target: placement.workspaceId
+        ? { kind: "workspace", serverId: placement.serverId, id: placement.workspaceId }
         : null,
-      reason: hiddenBy(view, placement),
     },
   };
 }

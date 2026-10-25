@@ -33,6 +33,19 @@ function readerFor(actor: SessionActor, accounts: readonly ReaderAccount[]) {
   return accounts.find((account) => account.origin === actor.hubOrigin);
 }
 
+/** A Bot's direct chat is whoever's chat it is; before there is one, the Bot's owner decides. */
+export function resolveDirectChatOwnership(
+  input: {
+    directChatCreatedBy: SessionActor | null | undefined;
+    bot: { isOwner?: boolean; owner?: SessionActor };
+  },
+  accounts: readonly ReaderAccount[],
+): Ownership {
+  return input.directChatCreatedBy
+    ? resolveOwnership({ createdBy: input.directChatCreatedBy, accounts })
+    : resolveBotOwnership(input.bot, accounts);
+}
+
 /** A Bot row without a chat: the Host's own ownership projection wins over the owner snapshot. */
 export function resolveBotOwnership(
   bot: { isOwner?: boolean; owner?: SessionActor },

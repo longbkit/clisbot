@@ -31,6 +31,7 @@ import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
+import { OutsideFilterNotice } from "./outside-filter-notice";
 import { useReaderAccounts } from "./reader";
 import { SectionControls } from "./section-controls";
 import {
@@ -99,6 +100,7 @@ export function WorkPane({
       <View style={styles.pane} testID="work-pane">
         <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
         <WorkControls />
+        <OutsideFilterNotice list="work" />
         <SidebarMetadataNotice />
         {workState === "offline" ? <HostsUnreachableState testID="work-offline" /> : null}
         {workState === "loading" ? <SidebarAgentListSkeleton /> : null}

@@ -5,48 +5,57 @@ import type { SearchScopeCatalog } from "./catalog";
 import { projectNameKey, type SearchScopeChip } from "./model";
 import { usePublishedViewFilter, type PublishedViewFilter } from "./work-navigation";
 
-function fromPublished(filter: PublishedViewFilter): SearchViewContext {
-  return {
-    label: filter.label,
-    serverIds: filter.serverIds?.length ? new Set(filter.serverIds) : null,
-    projectKeys: filter.projectNames?.length
-      ? new Set(filter.projectNames.map(projectNameKey))
-      : null,
-  };
-}
-
-/** `main` has no Work pane: the sidebar's Host and Project filters are the list filter. */
-function fromSidebar(
-  hostFilters: readonly string[],
-  projectFilters: readonly string[],
+/**
+ * One filter in catalog terms. Hosts the reader cannot see and projects no Host carries drop out,
+ * so a stale persisted filter never ranks or labels anything.
+ */
+export function resolveViewContext(
+  filter: PublishedViewFilter,
   catalog: SearchScopeCatalog,
 ): SearchViewContext | null {
-  const serverIds = hostFilters.filter((id) => catalog.hostById.has(id));
+  const serverIds = (filter.serverIds ?? []).filter((id) => catalog.hostById.has(id));
   const projectKeys = [
-    ...new Set(projectFilters.flatMap((key) => catalog.projectKeyByViewKey.get(key) ?? [])),
+    ...new Set([
+      ...(filter.projectViewKeys ?? []).flatMap(
+        (key) => catalog.projectKeyByViewKey.get(key) ?? [],
+      ),
+      ...(filter.projectNames ?? [])
+        .map(projectNameKey)
+        .filter((key) => catalog.projectByKey.has(key)),
+    ]),
   ];
-  if (serverIds.length === 0 && projectKeys.length === 0) return null;
-  const label = [
-    ...serverIds.map((id) => catalog.hostById.get(id)?.label ?? id),
-    ...projectKeys.map((key) => catalog.projectByKey.get(key)?.label ?? key),
-  ].join(" · ");
+  const ownership = filter.ownership ?? null;
+  // An unfiltered list showing everyone's work hides nothing and ranks nothing.
+  if (!serverIds.length && !projectKeys.length && (ownership === null || ownership === "all")) {
+    return null;
+  }
+  const label =
+    filter.label ??
+    [
+      ...serverIds.map((id) => catalog.hostById.get(id)?.label ?? id),
+      ...projectKeys.map((key) => catalog.projectByKey.get(key)?.label ?? key),
+    ].join(" · ");
   return {
     label,
     serverIds: serverIds.length ? new Set(serverIds) : null,
     projectKeys: projectKeys.length ? new Set(projectKeys) : null,
+    ownership,
+    suggest: filter.suggest ?? true,
   };
 }
 
-/** The list filter search ranks by (R1): what the opening section published, else the sidebar's. */
+/**
+ * The list filter search ranks by (R1): what Navigation V2's Work list published, else on `main`
+ * the sidebar's Host and Project filters.
+ */
 export function useSearchViewContext(catalog: SearchScopeCatalog | null): SearchViewContext | null {
   const published = usePublishedViewFilter();
-  const hostFilters = useSidebarViewStore((state) => state.hostFilters);
-  const projectFilters = useSidebarViewStore((state) => state.projectFilters);
+  const serverIds = useSidebarViewStore((state) => state.hostFilters);
+  const projectViewKeys = useSidebarViewStore((state) => state.projectFilters);
   return useMemo(() => {
     if (!catalog) return null;
-    if (published) return fromPublished(published);
-    return fromSidebar(hostFilters, projectFilters, catalog);
-  }, [catalog, hostFilters, projectFilters, published]);
+    return resolveViewContext(published ?? { serverIds, projectViewKeys }, catalog);
+  }, [catalog, projectViewKeys, published, serverIds]);
 }
 
 /** The chips "Only current filter" turns into. */

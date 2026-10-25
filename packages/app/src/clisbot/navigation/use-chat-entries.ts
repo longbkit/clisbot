@@ -9,7 +9,7 @@ import type { ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import type { ChatListEntry } from "./chat-list";
-import { resolveBotOwnership, resolveOwnership } from "./ownership";
+import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
 import { useReaderAccounts } from "./reader";
 
 export type ChatsEntry = ChatListEntry<BotsSidebarBot, ChatsSidebarChat>;
@@ -71,9 +71,10 @@ export function useChatEntries() {
         updatedAt: bot.updatedAt,
         pinned: isPinned({ kind: "bot", serverId: bot.serverId, id: bot.botId }),
         pinIndex: pinIndex("bot", bot.serverId, bot.botId),
-        ownership: direct?.record?.createdBy
-          ? resolveOwnership({ createdBy: direct.record.createdBy, accounts })
-          : resolveBotOwnership(payload ?? {}, accounts),
+        ownership: resolveDirectChatOwnership(
+          { directChatCreatedBy: direct?.record?.createdBy, bot: payload ?? {} },
+          accounts,
+        ),
         unread: Boolean(bot.agentId && unread.has(`${bot.serverId}:${bot.agentId}`)),
         company: company.has(bot.serverId),
         bot,

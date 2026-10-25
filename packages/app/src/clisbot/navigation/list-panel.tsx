@@ -29,6 +29,7 @@ import { ChatsPane } from "./chats-pane";
 import { NavigationRail } from "./rail";
 import { CHATS_PATH, WORK_PATH, sectionHasListPane } from "./sections";
 import { useNavigationStore, type ListSection } from "./store";
+import { useNavigationSearchIntegration } from "./search-integration";
 import { useActiveSection } from "./use-open-section";
 import { WorkPane } from "./work-pane";
 
@@ -47,6 +48,7 @@ export const NavigationChrome = memo(function NavigationChrome({
   railVisible: boolean;
 }) {
   const compact = useIsCompactFormFactor();
+  useNavigationSearchIntegration();
   return (
     <>
       {compact ? (

@@ -22,6 +22,12 @@ it("translates in the current language and falls back to English elsewhere", asy
   expect(searchScopeT("sessions", { count: 1 })).toBe("1 session");
   await i18n.changeLanguage("vi");
   expect(searchScopeT("project.onHosts", { count: 4 })).toBe("trên 4 Host");
+  // Others is the For me / Others tab's own word, never a second translation of it.
+  expect(searchScopeT("note.others")).toBe("Người khác");
+  expect(searchScopeT("notice.switchTo", { name: "sandbox-12" })).toBe("Chuyển sang sandbox-12");
+  await i18n.changeLanguage("en");
+  expect(searchScopeT("note.others")).toBe("Others");
+  expect(searchScopeT("notice.fromOthers")).toBe("Shown from Others");
   await i18n.changeLanguage("fr");
   expect(searchScopeT("empty.searchEverywhere")).toBe("Search everywhere");
 });

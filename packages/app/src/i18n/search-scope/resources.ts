@@ -35,6 +35,8 @@ const en = {
   sessions_other: "{{count}} sessions",
   note: {
     outsideFilter: "Outside filter",
+    // The For me / Others tab's own word, so search and the tabs never disagree.
+    others: "$t(translation:navigation.scope.others)",
     offlineCached: "Offline · cached {{time}}",
     offline: "Offline · cached",
   },
@@ -46,6 +48,15 @@ const en = {
     searchEverywhere: "Search everywhere",
   },
   offlineNotice: "{{host}} is offline. Showing cached results.",
+  notice: {
+    workspace: "This workspace is outside your filter",
+    session: "This session is outside your filter",
+    chat: "This chat is outside your filter",
+    fromOthers: "Shown from Others",
+    showAll: "Show all",
+    switchTo: "Switch to {{name}}",
+    dismiss: "Dismiss",
+  },
   showInWork: "Show in Work",
   showInWorkLabel: "Show {{label}} in Work",
   workFilterChanged: "Work now shows {{label}}",
@@ -86,6 +97,7 @@ const vi: SearchScopeResources = {
   sessions_other: "{{count}} phiên",
   note: {
     outsideFilter: "Ngoài bộ lọc",
+    others: "$t(translation:navigation.scope.others)",
     offlineCached: "Ngoại tuyến · lưu lúc {{time}}",
     offline: "Ngoại tuyến · dữ liệu đã lưu",
   },
@@ -97,6 +109,15 @@ const vi: SearchScopeResources = {
     searchEverywhere: "Tìm ở mọi nơi",
   },
   offlineNotice: "{{host}} đang ngoại tuyến. Đang hiện kết quả đã lưu.",
+  notice: {
+    workspace: "Workspace này nằm ngoài bộ lọc của bạn",
+    session: "Phiên này nằm ngoài bộ lọc của bạn",
+    chat: "Cuộc trò chuyện này nằm ngoài bộ lọc của bạn",
+    fromOthers: "Đang hiện từ Người khác",
+    showAll: "Hiện tất cả",
+    switchTo: "Chuyển sang {{name}}",
+    dismiss: "Ẩn",
+  },
   showInWork: "Xem trong Work",
   showInWorkLabel: "Xem {{label}} trong Work",
   workFilterChanged: "Work đang hiện {{label}}",
