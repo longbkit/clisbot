@@ -21,6 +21,8 @@ const AGENT_HISTORY_SORT: NonNullable<FetchAgentHistoryOptions["sort"]> = [
   { key: "updated_at", direction: "desc" },
 ];
 const AGENT_HISTORY_ALL_HOSTS_FAILED_MESSAGE = "No connected hosts could load agent history";
+/** A Host slower than this does not hold the page; its rows merge in when they arrive. */
+export const AGENT_HISTORY_SOURCE_TIMEOUT_MS = 5_000;
 
 export interface AgentHistoryResult {
   agents: AggregatedAgent[];
@@ -36,6 +38,8 @@ export interface AgentHistoryResult {
   isSearchTruncated: boolean;
   /** Hosts that failed while others succeeded. The list still renders. */
   hostErrors: AgentHistoryHostError[];
+  /** Hosts still answering after the page was shown; their sessions merge in when they do. */
+  lateHosts: AgentHistoryHostError[];
   refreshAll: () => Promise<void>;
   loadMore: () => void;
 }
@@ -71,7 +75,15 @@ interface AgentHistoryBatchPage {
   hostErrors: AgentHistoryHostError[];
   /** Set only under a query: more sessions matched than this page can hold. */
   isSearchTruncated?: boolean;
+  /** Hosts that missed the per-source deadline and are still answering. */
+  lateHosts?: AgentHistoryHostError[];
+  /** Identifies the fetch that built this page, so a late answer merges only into it. */
+  fetchId?: string;
 }
+
+export type LateAgentHistoryResult =
+  | { host: AgentHistoryHost; page: AgentHistoryPage }
+  | { host: AgentHistoryHost; error: unknown };
 
 type AgentHistoryCursorByServerId = Record<string, string | null>;
 
@@ -193,11 +205,73 @@ function getNextAgentHistoryPageParam(
   return Object.keys(cursorByServerId).length > 0 ? cursorByServerId : null;
 }
 
+type HostOutcome =
+  | { status: "fulfilled"; host: AgentHistoryHost; page: AgentHistoryPage }
+  | { status: "rejected"; host: AgentHistoryHost; error: unknown };
+
+/**
+ * Settles each Host on its own. Without `sourceTimeoutMs` it waits for every Host. With it, a
+ * Host that has not answered by then is returned as late (once at least one Host answered) and
+ * reported through `onLateResult` when it does, so one slow sandbox never holds the page.
+ */
+async function settleHosts(
+  hosts: readonly AgentHistoryHost[],
+  fetchHost: (host: AgentHistoryHost) => Promise<AgentHistoryPage>,
+  sourceTimeoutMs: number | undefined,
+  onLateResult: ((result: LateAgentHistoryResult) => void) | undefined,
+): Promise<{ settled: HostOutcome[]; late: AgentHistoryHost[] }> {
+  const outcomes = new Map<AgentHistoryHost, HostOutcome>();
+  let returned = false;
+  let notify: () => void = () => undefined;
+  const settle = async (host: AgentHistoryHost): Promise<void> => {
+    let outcome: HostOutcome;
+    try {
+      outcome = { status: "fulfilled", host, page: await fetchHost(host) };
+    } catch (error) {
+      outcome = { status: "rejected", host, error };
+    }
+    if (returned) {
+      onLateResult?.(outcome.status === "fulfilled" ? outcome : { host, error: outcome.error });
+      return;
+    }
+    outcomes.set(host, outcome);
+    notify();
+  };
+  const all = Promise.all(hosts.map(settle));
+  if (sourceTimeoutMs !== undefined) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      all,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, sourceTimeoutMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    // Past the deadline, wait only until some Host has rows to show (or every Host settled).
+    while (
+      outcomes.size < hosts.length &&
+      ![...outcomes.values()].some((outcome) => outcome.status === "fulfilled")
+    )
+      await new Promise<void>((resolve) => {
+        notify = resolve;
+      });
+  } else {
+    await all;
+  }
+  returned = true;
+  return {
+    settled: hosts.flatMap((host) => outcomes.get(host) ?? []),
+    late: hosts.filter((host) => !outcomes.has(host)),
+  };
+}
+
 export async function fetchAgentHistoryBatch(input: {
   hosts: readonly AgentHistoryHost[];
   cursorByServerId: AgentHistoryCursorByServerId | null;
   search?: string;
   activityFilter?: FetchAgentHistoryOptions["activityFilter"];
+  sourceTimeoutMs?: number;
+  onLateResult?: (result: LateAgentHistoryResult) => void;
 }): Promise<AgentHistoryBatchPage> {
   const cursorByServerId = input.cursorByServerId ?? {};
   const hasCursorFilter = Object.keys(cursorByServerId).length > 0;
@@ -205,34 +279,28 @@ export async function fetchAgentHistoryBatch(input: {
     ? input.hosts.filter((host) => Object.hasOwn(cursorByServerId, host.serverId))
     : input.hosts;
 
-  const settledPages = await Promise.allSettled(
-    hostsToFetch.map(async (host) => {
-      const page = await fetchAgentHistoryPage({
+  const { settled, late } = await settleHosts(
+    hostsToFetch,
+    (host) =>
+      fetchAgentHistoryPage({
         client: host.client,
         serverId: host.serverId,
         cursor: cursorByServerId[host.serverId] ?? null,
         ...(input.search ? { search: input.search } : {}),
         ...(input.activityFilter ? { activityFilter: input.activityFilter } : {}),
-      });
-      return { host, page };
-    }),
+      }),
+    input.sourceTimeoutMs,
+    input.onLateResult,
   );
-  const pages = settledPages.flatMap((result) =>
-    result.status === "fulfilled" ? [result.value] : [],
-  );
-  if (pages.length === 0) {
+  const pages = settled.flatMap((result) => (result.status === "fulfilled" ? [result] : []));
+  if (pages.length === 0 && late.length === 0) {
     throw new Error(AGENT_HISTORY_ALL_HOSTS_FAILED_MESSAGE);
   }
-  // allSettled preserves order, so a rejection still names the host it came
-  // from. Losing that name is what would let the list quietly under-report.
-  const hostErrors = settledPages.flatMap((result, index) =>
+  // Name each Host that failed. Losing that name is what would let the list quietly
+  // under-report.
+  const hostErrors = settled.flatMap((result) =>
     result.status === "rejected"
-      ? [
-          {
-            serverId: hostsToFetch[index].serverId,
-            serverName: hostsToFetch[index].serverLabel,
-          },
-        ]
+      ? [{ serverId: result.host.serverId, serverName: result.host.serverLabel }]
       : [],
   );
 
@@ -246,10 +314,62 @@ export async function fetchAgentHistoryBatch(input: {
     agents: sortByLatestActivity(agents),
     pageInfoByServerId,
     hostErrors,
+    ...(late.length
+      ? {
+          lateHosts: late.map((host) => ({
+            serverId: host.serverId,
+            serverName: host.serverLabel,
+          })),
+        }
+      : {}),
     ...(input.search
       ? { isSearchTruncated: pages.some(({ page }) => page.isSearchTruncated) }
       : {}),
   };
+}
+
+/**
+ * Merges a late Host's answer into the page its fetch built. Rows already shown keep their
+ * relative order; the late rows take their chronological places among them.
+ */
+export function mergeLateAgentHistory(
+  data: InfiniteData<AgentHistoryBatchPage, AgentHistoryCursorByServerId | null> | undefined,
+  fetchId: string,
+  result: LateAgentHistoryResult,
+): InfiniteData<AgentHistoryBatchPage, AgentHistoryCursorByServerId | null> | undefined {
+  const index = data?.pages.findIndex((page) => page.fetchId === fetchId) ?? -1;
+  if (!data || index < 0) return data;
+  const page = data.pages[index]!;
+  const serverId = result.host.serverId;
+  const lateHosts = (page.lateHosts ?? []).filter((host) => host.serverId !== serverId);
+  let next: AgentHistoryBatchPage;
+  if ("error" in result) {
+    next = {
+      ...page,
+      lateHosts,
+      hostErrors: [...page.hostErrors, { serverId, serverName: result.host.serverLabel }],
+    };
+  } else {
+    const fresh = result.page.agents.map((agent) =>
+      Object.assign({}, agent, { serverLabel: result.host.serverLabel }),
+    );
+    next = {
+      ...page,
+      lateHosts,
+      // Rows retained from this Host's earlier pages give way to its fresh answer.
+      agents: sortByLatestActivity([
+        ...page.agents.filter((agent) => agent.serverId !== serverId),
+        ...fresh,
+      ]),
+      pageInfoByServerId: { ...page.pageInfoByServerId, [serverId]: result.page.pageInfo },
+      ...(page.isSearchTruncated !== undefined
+        ? { isSearchTruncated: page.isSearchTruncated || result.page.isSearchTruncated }
+        : {}),
+    };
+  }
+  const pages = [...data.pages];
+  pages[index] = next;
+  return { ...data, pages };
 }
 
 export function useAgentHistory(options: {
@@ -341,23 +461,30 @@ export function useAgentHistory(options: {
       if (targetHosts.length === 0) {
         throw new Error(t("workspace.terminal.hostDisconnected"));
       }
+      const fetchId = createHistoryFetchId();
       const page = await fetchAgentHistoryBatch({
         hosts: targetHosts,
         cursorByServerId: pageParam,
         ...(search ? { search } : {}),
         ...(options.activityFilter ? { activityFilter: options.activityFilter } : {}),
+        sourceTimeoutMs: AGENT_HISTORY_SOURCE_TIMEOUT_MS,
+        onLateResult: (result) =>
+          queryClient.setQueryData<
+            InfiniteData<AgentHistoryBatchPage, AgentHistoryCursorByServerId | null>
+          >(queryKey, (data) => mergeLateAgentHistory(data, fetchId, result)),
       });
       const registered = new Set(runtime.getHosts().map((host) => host.serverId));
-      return retainUnavailableHostHistory({
+      const retained = retainUnavailableHostHistory({
         page,
         cursorByServerId: pageParam,
         accepted: queryClient.getQueryData(queryKey),
         unavailableHostIds: new Set(
-          [...unreachableHosts, ...page.hostErrors]
+          [...unreachableHosts, ...page.hostErrors, ...(page.lateHosts ?? [])]
             .map((host) => host.serverId)
             .filter((id) => registered.has(id)),
         ),
       });
+      return { ...retained, fetchId };
     },
   });
   const {
@@ -409,6 +536,12 @@ export function useAgentHistory(options: {
   const isInitialLoad = isLoading && agents.length === 0;
   const isRevalidating = isFetching && !isFetchingNextPage && agents.length > 0;
   const isSearchTruncated = Boolean(search && data?.pages.some((page) => page.isSearchTruncated));
+  const lateHosts = useMemo(() => {
+    const byServerId = new Map<string, AgentHistoryHostError>();
+    for (const page of data?.pages ?? [])
+      for (const host of page.lateHosts ?? []) byServerId.set(host.serverId, host);
+    return [...byServerId.values()];
+  }, [data?.pages]);
   const hostErrors = useMemo(
     () =>
       collectAgentHistoryHostErrors({
@@ -437,7 +570,14 @@ export function useAgentHistory(options: {
     isSearchSupported,
     isSearchTruncated,
     hostErrors,
+    lateHosts,
     refreshAll,
     loadMore,
   };
+}
+
+let historyFetchSequence = 0;
+function createHistoryFetchId(): string {
+  historyFetchSequence += 1;
+  return `history-${historyFetchSequence}`;
 }
