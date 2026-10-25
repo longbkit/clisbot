@@ -12,6 +12,7 @@ import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
 import { orphanedManagedHosts } from "./managed-host-reconciliation";
 import { useHubDaemonsQuery } from "./host-inventory";
 import { cachedListForAccount, useHubDaemonListCache } from "./hub-daemon-list-cache";
+import { deriveHubSourceState, getHubSourceHealthRegistry } from "./hub-source-health";
 import {
   hubHostSynchronizationKey,
   setHubHostSynchronizationFailure,
@@ -69,6 +70,7 @@ function AccountHostSynchronization() {
       return;
     if (cachedListForAccount(rememberedList, hub) === undefined) listCache.forget(hubOrigin);
   }, [hub, hubOrigin, listCache, rememberedList]);
+  useHubSourceHealthPublication(hub, daemons, rememberedList?.syncedAt ?? null);
   const projectedDaemonIds = useMemo(
     () =>
       new Set(
@@ -138,6 +140,33 @@ function AccountHostSynchronization() {
           />,
         ],
   );
+}
+
+/** This account's daemon-list query is the only observer; it reports the Hub's health. */
+function useHubSourceHealthPublication(
+  hub: ReturnType<typeof useHubAccount>,
+  daemons: ReturnType<typeof useHubDaemonsQuery>,
+  rememberedSyncedAt: string | null,
+): void {
+  const origin = hub.origin;
+  const state = deriveHubSourceState({
+    accountUnresolved: hub.state === null,
+    accountLoading: hub.loading,
+    signedIn: hub.signedIn !== null,
+    listLoaded: daemons.data !== undefined,
+    listError: daemons.error,
+  });
+  const listedAt = daemons.data !== undefined ? daemons.dataUpdatedAt : 0;
+  const lastSyncedAt = listedAt > 0 ? new Date(listedAt).toISOString() : rememberedSyncedAt;
+  const label = hub.signedIn?.organization.name ?? origin ?? "";
+  useEffect(() => {
+    if (!hub.enabled || origin === null) return;
+    getHubSourceHealthRegistry().publish({ origin, label, state, lastSyncedAt });
+  }, [hub.enabled, label, lastSyncedAt, origin, state]);
+  useEffect(() => {
+    if (origin === null) return;
+    return () => getHubSourceHealthRegistry().remove(origin);
+  }, [origin]);
 }
 
 function HubHostBinding({

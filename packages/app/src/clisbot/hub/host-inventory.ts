@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useFetchQueries, useFetchQuery } from "@/data/query";
 import { useHosts, useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
 import { type HubAccountContextValue, useHubAccount, useHubAccounts } from "./account-provider";
-import { classifyHubFailure } from "./api-client";
+import { classifyHubFailure } from "./hub-failure";
 import { HubDaemonsSchema } from "./contracts";
 import {
   cachedListForAccount,

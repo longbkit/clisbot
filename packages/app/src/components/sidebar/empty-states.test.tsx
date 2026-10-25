@@ -10,13 +10,17 @@ const state = vi.hoisted(() => ({
     { serverId: "host-b", label: "Host B" },
   ],
 }));
+const runtime = vi.hoisted(() => ({
+  getSnapshot: (id: string) => state.snapshots[id],
+  getHosts: () => state.hosts,
+  subscribe: () => () => {},
+  subscribeHostList: () => () => {},
+  subscribeAll: () => () => {},
+}));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => state.hosts,
   useHostRegistryLoaded: () => true,
-  getHostRuntimeStore: () => ({
-    getSnapshot: (id: string) => state.snapshots[id],
-    subscribeAll: () => () => {},
-  }),
+  getHostRuntimeStore: () => runtime,
 }));
 vi.mock("@/stores/sidebar-view-store", () => ({
   useSidebarViewStore: (select: (value: unknown) => unknown) => select({ hostFilters: ["host-a"] }),
@@ -53,6 +57,7 @@ import { SidebarProjectEmptyState } from "./empty-states";
 import { HomeActivity } from "@/clisbot/home/activity-preview";
 
 beforeEach(() => {
+  Reflect.deleteProperty(globalThis, "__clisbotSourceHealthStore");
   const ready = {
     connectionStatus: "online",
     agentDirectoryStatus: "ready",
