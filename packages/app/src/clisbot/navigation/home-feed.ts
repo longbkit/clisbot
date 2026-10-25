@@ -49,7 +49,8 @@ export function homeRows(input: {
 export function homeBucket(row: HomeRow, chip: HomeChip): HomeBucket | null {
   const { agent, issue } = row;
   if (chip === "failed") return issue?.kind === "failure" ? issueBucket(issue) : null;
-  if (chip === "needs") return issue?.kind === "needs" ? issueBucket(issue) : null;
+  // Needs me is the existing Needs you bucket: approvals and failures the reader has not seen.
+  if (chip === "needs") return issue?.state === "unseen" ? "needs" : null;
   if (chip === "updated") return isUnreadReply(agent) && !agent.archivedAt ? "recent" : null;
   const plain = plainBucket(agent);
   if (chip === "running") return plain === "active" && !issue ? "active" : null;
@@ -108,12 +109,13 @@ function countScopes(rows: readonly HomeRow[], chip: HomeChip): ScopeCounts {
   return counts;
 }
 
-/** Needs me and Failed count unseen issues only; seen ones never count (3.1c). */
+/** Needs me counts every unseen issue, Failed the unseen failures; seen ones never count (3.1c). */
 export function chipCounts(rows: readonly HomeRow[]): Record<HomeChip, number> {
   const counts: Record<HomeChip, number> = { all: 0, needs: 0, running: 0, updated: 0, failed: 0 };
   for (const row of rows) {
     counts.all += 1;
-    if (row.issue?.state === "unseen") counts[row.issue.kind === "needs" ? "needs" : "failed"] += 1;
+    if (row.issue?.state === "unseen") counts.needs += 1;
+    if (row.issue?.kind === "failure" && row.issue.state === "unseen") counts.failed += 1;
     if (homeBucket(row, "running")) counts.running += 1;
     if (homeBucket(row, "updated")) counts.updated += 1;
   }

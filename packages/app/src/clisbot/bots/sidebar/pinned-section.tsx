@@ -4,9 +4,11 @@ import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
+import { Pin } from "lucide-react-native";
+
 import { usePathname, useRouter } from "expo-router";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { PinOptionsMenu } from "./pin-options";
 import { BotsSectionHeader, useSectionCollapsed, sectionRowIndent } from "./section-header";
 import { BotRow } from "./bots-section";
@@ -18,17 +20,26 @@ import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation"
 export function FusionPinnedSection({
   onBeforeNavigate,
   renderWorkspacePin,
+  float = false,
 }: {
   onBeforeNavigate?: ChatListAdmission;
   renderWorkspacePin: (row: Exclude<PinRow, { kind: "bot" | "chat" | "unavailable" }>) => ReactNode;
+  /** Navigation V2 Work: only pinned work, floated above the projects with a pin mark. */
+  float?: boolean;
 }) {
-  const { rows, error, chats, openBot: openPinnedBot, toggle } = usePinnedRows(onBeforeNavigate);
+  const pinned = usePinnedRows(onBeforeNavigate);
+  const { error, chats, openBot: openPinnedBot, toggle } = pinned;
+  const rows = useMemo(
+    () => (float ? pinned.rows.filter(isWorkPin) : pinned.rows),
+    [float, pinned.rows],
+  );
   const menu = useSidebarPinMenu(onBeforeNavigate, chats);
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const { visibleItems, expanded, canToggle, toggleExpanded } = useLimitedSidebarGroup(rows);
-  const [collapsed, toggleCollapsed] = useSectionCollapsed("pinned");
+  const [storedCollapsed, toggleCollapsed] = useSectionCollapsed("pinned");
+  const collapsed = !float && storedCollapsed;
   const openChat = useCallback(
     (chat: { serverId: string; chatId: string }) => {
       const row = rows.find(
@@ -51,13 +62,15 @@ export function FusionPinnedSection({
   if (rows.length === 0 && !error) return null;
   return (
     <>
-      <BotsSectionHeader
-        label={t("bots.workspace.sidebar.pinned")}
-        icon="Pinned"
-        testID="sidebar-unified-pinned"
-        collapsed={collapsed}
-        onToggle={toggleCollapsed}
-      />
+      {float ? null : (
+        <BotsSectionHeader
+          label={t("bots.workspace.sidebar.pinned")}
+          icon="Pinned"
+          testID="sidebar-unified-pinned"
+          collapsed={collapsed}
+          onToggle={toggleCollapsed}
+        />
+      )}
       {error || menu.error ? (
         <Text accessibilityRole="alert" style={styles.error}>
           {error || menu.error}
@@ -74,7 +87,13 @@ export function FusionPinnedSection({
                   : styles.workspacePin
               }
             >
-              {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin, toggle)}
+              {float ? (
+                <FloatedPin>
+                  {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin, toggle)}
+                </FloatedPin>
+              ) : (
+                renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin, toggle)
+              )}
             </View>
           ))
         : null}
@@ -96,6 +115,25 @@ export function FusionPinnedSection({
     </>
   );
 }
+function isWorkPin(row: PinRow): boolean {
+  if (row.kind === "bot" || row.kind === "chat") return false;
+  return row.kind !== "unavailable" || (row.pin.kind !== "bot" && row.pin.kind !== "chat");
+}
+
+const ThemedPin = withUnistyles(Pin, (theme) => ({ color: theme.colors.foregroundMuted }));
+
+/** A pinned row in a list without a Pinned section: the row, with a pin mark at its start. */
+function FloatedPin({ children }: { children: ReactNode }) {
+  return (
+    <View style={styles.floated} testID="pinned-float">
+      <View style={styles.floatedMark} accessibilityLabel="Pinned">
+        <ThemedPin size={11} />
+      </View>
+      <View style={styles.floatedRow}>{children}</View>
+    </View>
+  );
+}
+
 function renderPin(
   row: PinRow,
   pathname: string,
@@ -129,5 +167,15 @@ function renderPin(
 
 const styles = StyleSheet.create((theme) => ({
   workspacePin: { paddingLeft: sectionRowIndent(theme) },
+  floated: { flexDirection: "row", alignItems: "center" },
+  floatedMark: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  floatedRow: { flex: 1, minWidth: 0 },
   error: { color: theme.colors.foregroundMuted, padding: 8, fontSize: theme.fontSize.sm },
 }));

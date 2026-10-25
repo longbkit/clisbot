@@ -60,6 +60,14 @@ vi.mock("@/constants/platform", () => ({
   },
 }));
 vi.mock("./feature", () => ({ HOME_V2_ENABLED: true }));
+// These cover the Home V2 Chat tab; Navigation V2's tabs and badge are covered on their own.
+vi.mock("@/clisbot/navigation/feature", () => ({ NAVIGATION_V2_ENABLED: false }));
+vi.mock("@/clisbot/navigation/mobile-tabs", () => ({
+  NAVIGATION_V2_TABS: [],
+  NavigationTabBadge: () => null,
+  lastListTabPath: () => "/chat",
+  rememberListSection: () => undefined,
+}));
 vi.mock("./inbox-activity", () => ({
   useInboxActivity: () => ({ needs: 0 }),
   useInboxActivityLabel: () => "Inbox",

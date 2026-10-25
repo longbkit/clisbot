@@ -109,7 +109,7 @@ function EnabledSections({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdmi
 }
 
 /** The bot catalog as the sidebar reads it: loaded rows and the directory's Host list. */
-function useSidebarCatalog() {
+export function useSidebarCatalog() {
   const { hosts, bots, chats } = useBotCatalog();
   const directoryHosts = useMemo(
     () =>
@@ -131,7 +131,7 @@ function useSidebarCatalog() {
  * Where New bot starts: the route's Host, else the Host of the most recent chat, when a bot can be
  * created there. Undefined leaves the choice to the form, which takes the only Host when there is one.
  */
-function useDefaultCreationServerId(
+export function useDefaultCreationServerId(
   creationHosts: { serverId: string }[],
   recentChats: readonly { serverId: string }[],
 ): string | undefined {
@@ -142,7 +142,7 @@ function useDefaultCreationServerId(
   return recentChats.find((chat) => eligible(chat.serverId))?.serverId;
 }
 
-function CreationSheets({
+export function CreationSheets({
   createName,
   createProject,
   groupOpen,

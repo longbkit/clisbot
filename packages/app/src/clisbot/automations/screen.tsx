@@ -8,6 +8,8 @@ import { AutomationsScreen } from "../hub/automations-screen";
 import { useHubAccount } from "../hub/account-provider";
 import { useBotsFeatureHosts } from "../bots/feature";
 import { AutomationsHome } from "./home";
+import { useTranslation } from "react-i18next";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 
 type Tab = "home" | "schedules" | "automations";
 const TABS = [
@@ -23,6 +25,8 @@ export function AutomationsLandingScreen() {
   return hub.enabled || botHosts.length > 0 ? <AutomationsLandingContent /> : <SchedulesScreen />;
 }
 function AutomationsLandingContent() {
+  // Navigation V2 names the destination Schedules / Lịch (brief C11); Hub Automations keep their tab.
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>("home");
   const [create, setCreate] = useState(0);
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set(["home"]));
@@ -38,7 +42,9 @@ function AutomationsLandingContent() {
   }, []);
   return (
     <View style={styles.page}>
-      <MenuHeader title="Automations" />
+      <MenuHeader
+        title={NAVIGATION_V2_ENABLED ? t("navigation.sections.schedules") : "Automations"}
+      />
       <View style={styles.tabs}>
         <ViewTabs tabs={TABS} value={tab} onChange={selectTab} />
       </View>

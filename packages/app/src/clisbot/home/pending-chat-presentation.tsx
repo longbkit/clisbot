@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { View } from "react-native";
-import { usePathname, useRouter } from "expo-router";
+import { usePathname, useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { CompactHeader } from "@/components/headers/compact-header";
@@ -10,7 +10,13 @@ import { usePanelStore } from "@/stores/panel-store";
 import type { Theme } from "@/styles/theme";
 import { nativePresentation, type PendingChatIntent } from "./chat-list-presentation";
 import { useIsChatListDeparting } from "./use-chat-list-departure";
-import { returnFromPendingChat, useNavigateHomeTab, isHomeTabPath } from "./mobile-navigation";
+import {
+  currentListTabPath,
+  isListTabPath,
+  returnFromPendingChat,
+  useNavigateHomeTab,
+  isHomeTabPath,
+} from "./mobile-navigation";
 import { HOME_V2_ENABLED } from "./feature";
 import { profileNativeRegion } from "@/utils/render-profiler";
 
@@ -42,7 +48,7 @@ export function PendingChatPresentation({ children }: { children: ReactNode }) {
     held.current = snapshot.returning || isHomeTabPath(snapshot.destination) ? null : snapshot;
   // Keep the shell to the same actual overlay visibility boundary as the source geometry.
   // A returned /chat, new panel generation, or another global screen cannot inherit it.
-  if (!departing || (!snapshot && path === "/chat")) held.current = null;
+  if (!departing || (!snapshot && isListTabPath(path))) held.current = null;
   const intent = isNative && HOME_V2_ENABLED ? held.current : null;
   const back = useCallback(() => {
     if (!intent) return;
@@ -50,7 +56,11 @@ export function PendingChatPresentation({ children }: { children: ReactNode }) {
     const parentPath = intent.destination.slice(0, intent.destination.lastIndexOf("/"));
     // A queued callback must not override a newer global navigation that did not
     // create another Chat admission. Use committed route, never render intent.
-    if (currentPath !== "/chat" && currentPath !== intent.destination && currentPath !== parentPath)
+    if (
+      !isListTabPath(currentPath) &&
+      currentPath !== intent.destination &&
+      currentPath !== parentPath
+    )
       return;
     if (returnFromPendingChat(router, navigate, intent.id)) return;
     // onAppear may have completed the intent while the native overlay still hides.
@@ -69,7 +79,7 @@ export function PendingChatPresentation({ children }: { children: ReactNode }) {
       (panels.mobilePanel.target === "agent" && panels.mobilePanel.revision === intent.revision + 1)
     ) {
       panels.showMobileAgentList();
-      router.navigate("/chat");
+      router.navigate(currentListTabPath() as Href);
     }
   }, [intent, navigate, router]);
 

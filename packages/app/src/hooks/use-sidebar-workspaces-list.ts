@@ -1,7 +1,7 @@
 import { useDirectoryHealth } from "./use-directory-health";
 import { useSidebarHostIds } from "./use-sidebar-host-ids";
 import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
-import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
+import { useShowBotProjects } from "@/clisbot/bot-projects/preferences";
 import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
 import { quickChatProjectKeys, useQuickChatRoots } from "@/clisbot/quick-chats/quick-chat-projects";
 import { useHostFeatureMap } from "@/runtime/host-features";
@@ -144,7 +144,7 @@ export function useSidebarWorkspacesList(options?: {
 
   const selectPlacements = useMemo(createSidebarWorkspacePlacementSelector, []);
   const botProjectKeys = useSidebarBotProjectKeys();
-  const showBotProjects = useBotProjectsPreference((state) => state.showBotProjects);
+  const showBotProjects = useShowBotProjects().visible;
   const quickChatRoots = useQuickChatRoots(directoryServerIds);
   const sidebarModel = useMemo(
     () =>

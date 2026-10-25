@@ -7,23 +7,47 @@ import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useActivityViewport } from "./activity-viewport";
 import { useActivityLayout } from "./use-activity-layout";
 import { useLocalDay } from "./use-local-day";
-import { activityBucket } from "./activity";
+import { activityBucket, type ActivityBucketOf } from "./activity";
+import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { visibleActivityLayout } from "./activity-layout";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { useNavigationStore } from "@/clisbot/navigation/store";
 
-function useHomeActivityState() {
-  const { agents, isInitialLoad, directoryHealth } = useAggregatedAgents();
+/**
+ * Navigation V2 passes the feed it shows (scope, mode, Host and chip already applied) and where
+ * each row sits; without them Home lays out every loaded conversation as before.
+ */
+interface HomeActivitySource {
+  agents?: AggregatedAgent[];
+  bucketOf?: ActivityBucketOf;
+}
+
+function useHomeActivityState(source: HomeActivitySource) {
+  const directory = useAggregatedAgents();
+  const { isInitialLoad, directoryHealth } = directory;
+  const agents = source.agents ?? directory.agents;
+  const bucketOf = source.bucketOf ?? activityBucket;
   const { automatic, apply } = useActivityViewport();
   const day = useLocalDay();
-  const { accepted, next, pending, accept } = useActivityLayout(agents, day, automatic);
+  const { accepted, next, pending, accept } = useActivityLayout(
+    agents,
+    day,
+    automatic,
+    source.bucketOf,
+  );
   const [limit, setLimit] = useState(10);
   const showMore = useCallback(() => setLimit((current) => current + 10), []);
   const navigate = useNavigateHomeTab();
-  const openInbox = useCallback(() => navigate("/sessions"), [navigate]);
+  // Navigation V2 has no Inbox: the Needs link narrows Home to its Needs me chip instead.
+  const openInbox = useCallback(() => {
+    if (NAVIGATION_V2_ENABLED) useNavigationStore.getState().setHomeChip("needs");
+    else navigate("/sessions");
+  }, [navigate]);
   const update = useCallback(() => {
     const visible = visibleActivityLayout(next, limit);
     void apply(accept, new Set(visible.flatMap((section) => section.keys)));
   }, [apply, accept, next, limit]);
-  const needs = agents.filter((agent) => activityBucket(agent) === "needs").length;
+  const needs = agents.filter((agent) => bucketOf(agent) === "needs").length;
   return useMemo(
     () => ({
       agents,
@@ -52,8 +76,12 @@ function useHomeActivityState() {
   );
 }
 const Context = createContext<ReturnType<typeof useHomeActivityState> | null>(null);
-export function HomeActivityProvider({ children }: { children: ReactNode }) {
-  const value = useHomeActivityState();
+export function HomeActivityProvider({
+  children,
+  agents,
+  bucketOf,
+}: { children: ReactNode } & HomeActivitySource) {
+  const value = useHomeActivityState({ agents, bucketOf });
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useHomeActivity() {
@@ -85,7 +113,7 @@ export function ActivityUpdates() {
         {updateLabel}
       </Button>
       <Button size="sm" variant="ghost" onPress={openInbox} testID="home-activity-needs">
-        {`Needs you ${needs}`}
+        {`${NAVIGATION_V2_ENABLED ? "Needs me" : "Needs you"} ${needs}`}
       </Button>
     </View>
   );

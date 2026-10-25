@@ -4,6 +4,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BotProjectsToggle } from "./controls";
 import { useBotProjectsPreference } from "./preferences";
+import { useNavigationStore } from "@/clisbot/navigation/store";
+const flags = vi.hoisted(() => ({ navigationV2: false }));
+vi.mock("@/clisbot/navigation/feature", () => ({
+  get NAVIGATION_V2_ENABLED() {
+    return flags.navigationV2;
+  },
+}));
 vi.mock("react-native-unistyles", () => ({
   withUnistyles: (component: unknown) => component,
 }));
@@ -32,7 +39,9 @@ vi.mock("@/components/ui/menu", () => ({
 }));
 beforeEach(() => {
   vi.stubGlobal("React", React);
+  flags.navigationV2 = false;
   useBotProjectsPreference.setState({ showBotProjects: true });
+  useNavigationStore.setState({ showBotProjectsInWork: false });
 });
 afterEach(cleanup);
 it("toggles Bot project visibility from Show and retains the choice when reopened", () => {
@@ -50,4 +59,15 @@ it("toggles Bot project visibility from Show and retains the choice when reopene
   expect(reopened.getAttribute("aria-checked")).toBe("false");
   fireEvent.click(reopened);
   expect(reopened.getAttribute("aria-checked")).toBe("true");
+});
+
+it("keeps Navigation V2 Work's own Bot projects switch, off by default", () => {
+  flags.navigationV2 = true;
+  render(<BotProjectsToggle />);
+  const option = screen.getByRole("menuitemcheckbox", { name: "Bot projects" });
+  expect(option.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(option);
+  expect(useNavigationStore.getState().showBotProjectsInWork).toBe(true);
+  // The Home V2 sidebar's stored choice is untouched, so turning the flag off restores it.
+  expect(useBotProjectsPreference.getState().showBotProjects).toBe(true);
 });

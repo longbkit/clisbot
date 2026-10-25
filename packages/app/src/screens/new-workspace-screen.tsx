@@ -5,6 +5,8 @@ import { useStartTemplate, type PendingStartTemplate } from "@/clisbot/home/use-
 import { snapshotStart, composerLaunch } from "@/clisbot/home/start-template";
 import { findDestination } from "@/clisbot/quick-starts/model";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { NavigationHomeLayout } from "@/clisbot/navigation/home-layout";
 import { HomeStartLayout, StartFeedback } from "@/clisbot/home/start-surface";
 import { StartSwitcher } from "@/clisbot/home/start-switcher";
 import { useQuickChatByDefault } from "@/clisbot/home/use-quick-chat-default";
@@ -2107,7 +2109,8 @@ function NewWorkspacePresentation({
             {composer}
           </ComposerDock>
         ) : (
-          <HomeStartLayout
+          <StartLayout
+            navigationHome={NAVIGATION_V2_ENABLED && home}
             compact={compact}
             title={startTitle(home, t)}
             choices={choices}
@@ -2132,6 +2135,14 @@ function NewWorkspacePresentation({
       {composer}
     </NewWorkspaceLayout>
   );
+}
+
+/** Navigation V2's Home owns its own layout; New workspace and the Home V2 Home share this one. */
+function StartLayout({
+  navigationHome,
+  ...props
+}: Parameters<typeof HomeStartLayout>[0] & { navigationHome: boolean }) {
+  return navigationHome ? <NavigationHomeLayout {...props} /> : <HomeStartLayout {...props} />;
 }
 
 /** Home names itself in the header; New workspace keeps its title in the page. */

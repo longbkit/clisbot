@@ -26,6 +26,10 @@ vi.mock("../data/resource-principal-scope", () => ({
 }));
 vi.mock("@/components/sidebar/sidebar-model", () => ({
   useSidebarModel: () => ({ allProjects: mocks.projects, allWorkspaceEntriesByKey: new Map() }),
+  useOptionalSidebarModel: () => ({
+    allProjects: mocks.projects,
+    allWorkspaceEntriesByKey: new Map(),
+  }),
 }));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => [{ serverId: "mar" }, { serverId: "saas" }],

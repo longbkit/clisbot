@@ -73,8 +73,10 @@ const en = {
     needsApproval: "Needs approval",
     noFailed: "No failed sessions.",
   },
+  display: "Display",
   lists: {
     emptyChats: "No chats yet.",
+    emptyFeed: "Nothing here yet.",
     emptyChatsFiltered: "No chats match these filters.",
     noSelection: "Pick a chat or a session.",
     quickChats: "Quick chats",
@@ -147,8 +149,10 @@ const vi: typeof en = {
     needsApproval: "Cần phê duyệt",
     noFailed: "Không có phiên lỗi.",
   },
+  display: "Hiển thị",
   lists: {
     emptyChats: "Chưa có cuộc trò chuyện.",
+    emptyFeed: "Chưa có gì ở đây.",
     emptyChatsFiltered: "Không có cuộc trò chuyện khớp bộ lọc.",
     noSelection: "Chọn một cuộc trò chuyện hoặc một phiên.",
     quickChats: "Chat nhanh",

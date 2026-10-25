@@ -96,9 +96,9 @@ describe("Home feed", () => {
   it("maps chips onto the existing buckets", () => {
     expect(ids(buildHomeFeed(rows, filters({ chip: "running" })))).toEqual(["running"]);
     expect(ids(buildHomeFeed(rows, filters({ chip: "updated" })))).toEqual(["unread"]);
-    expect(ids(buildHomeFeed(rows, filters({ chip: "needs" })))).toEqual(["approval"]);
+    expect(ids(buildHomeFeed(rows, filters({ chip: "needs" })))).toEqual(["my-fail", "approval"]);
     const counts = buildHomeFeed(rows, filters()).chipCounts;
-    expect(counts).toMatchObject({ needs: 1, failed: 1, running: 1, updated: 1, all: 5 });
+    expect(counts).toMatchObject({ needs: 2, failed: 1, running: 1, updated: 1, all: 5 });
   });
 
   it("filters by Host", () => {

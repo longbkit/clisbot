@@ -3,7 +3,7 @@ import { Bot } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
 import { MenuItem } from "@/components/ui/menu";
 import type { Theme } from "@/styles/theme";
-import { useBotProjectsPreference } from "./preferences";
+import { useShowBotProjects } from "./preferences";
 
 const ThemedBot = withUnistyles(Bot);
 const mutedIconMapping = (theme: Theme) => ({
@@ -12,8 +12,7 @@ const mutedIconMapping = (theme: Theme) => ({
 
 /** The Projects display menu owns visibility; Bot projects use the ordinary project rows. */
 export function BotProjectsToggle() {
-  const visible = useBotProjectsPreference((state) => state.showBotProjects);
-  const toggle = useBotProjectsPreference((state) => state.toggleBotProjects);
+  const { visible, toggle } = useShowBotProjects();
   const leading = useMemo(() => <ThemedBot size={14} uniProps={mutedIconMapping} />, []);
   return (
     <MenuItem
