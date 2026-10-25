@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { View } from "react-native";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,7 +19,7 @@ import {
   type ChatListAdmission,
 } from "@/clisbot/home/use-chat-list-navigation";
 import { DesktopSidebarFrame } from "@/components/desktop-sidebar-frame";
-import { RetainedPanelActivity } from "@/components/retained-panel";
+import { RetainedPanel, RetainedPanelActivity } from "@/components/retained-panel";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
@@ -70,6 +70,10 @@ function useListSection(): ListSection {
   return lastList;
 }
 
+/**
+ * Chats and Work stay mounted once opened and only swap visibility, so switching between them
+ * shows the list on the next frame instead of rebuilding it (acceptance P2).
+ */
 function ListContent({
   section,
   onBeforeNavigate,
@@ -79,10 +83,21 @@ function ListContent({
   onBeforeNavigate?: ChatListAdmission;
   active: boolean;
 }) {
-  return section === "chats" ? (
-    <ChatsPane onBeforeNavigate={onBeforeNavigate} />
-  ) : (
-    <WorkPane onBeforeNavigate={onBeforeNavigate} active={active} />
+  const [visited, setVisited] = useState<ReadonlySet<ListSection>>(() => new Set([section]));
+  if (!visited.has(section)) setVisited(new Set([...visited, section]));
+  return (
+    <>
+      {visited.has("chats") ? (
+        <RetainedPanel active={section === "chats"} style={styles.content}>
+          <ChatsPane onBeforeNavigate={onBeforeNavigate} />
+        </RetainedPanel>
+      ) : null}
+      {visited.has("work") ? (
+        <RetainedPanel active={section === "work"} style={styles.content}>
+          <WorkPane onBeforeNavigate={onBeforeNavigate} active={active && section === "work"} />
+        </RetainedPanel>
+      ) : null}
+    </>
   );
 }
 

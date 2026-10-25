@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, metroTest as test } from "../support/fixtures";
+import { hideDeveloperToasts } from "../support/developer-ui.mjs";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { buildCreateAgentPreferences, buildSeededHost } from "../support/helpers/daemon-registry";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
@@ -102,6 +103,7 @@ async function openApp(page: Page, seeded: Seeded) {
     },
     { seededHost: host, preferences: buildCreateAgentPreferences() },
   );
+  await hideDeveloperToasts(page);
   await page.goto("/");
 }
 
@@ -109,11 +111,13 @@ async function openApp(page: Page, seeded: Seeded) {
 async function measureSwitch(page: Page, press: string, target: string, panes: string[]) {
   await page.evaluate(
     ({ target: wanted, panes: known }) => {
-      const state = { t0: 0, t1: 0, blank: false };
+      const state = { t0: 0, t1: 0, blank: false, frames: [] as string[] };
       Reflect.set(window, "__navSwitch", state);
       const shown = (id: string) => {
-        const node = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-        return Boolean(node && node.getClientRects().length > 0);
+        // A stack keeps earlier copies of a page hidden; any visible copy counts.
+        return [...document.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)].some(
+          (node) => node.getClientRects().length > 0,
+        );
       };
       window.addEventListener("pointerdown", () => (state.t0 = performance.now()), {
         capture: true,
@@ -124,7 +128,16 @@ async function measureSwitch(page: Page, press: string, target: string, panes: s
           state.t1 = performance.now();
           return;
         }
-        if (state.t0 && !known.some(shown)) state.blank = true;
+        if (state.t0) {
+          const visible = known.filter(shown);
+          const present = ["chats-pane", "work-pane", "home-controls", "home-mobile-tabs"]
+            .map((id) => `${id}=${document.querySelectorAll(`[data-testid="${id}"]`).length}`)
+            .join(",");
+          state.frames.push(
+            `${Math.round(performance.now() - state.t0)}:${visible.join("+")}[${location.pathname} ${present}]`,
+          );
+          if (visible.length === 0) state.blank = true;
+        }
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -132,14 +145,26 @@ async function measureSwitch(page: Page, press: string, target: string, panes: s
     { target, panes },
   );
   await page.getByTestId(press).first().click();
-  await page.waitForFunction(
-    () => (Reflect.get(window, "__navSwitch") as { t1: number }).t1 > 0,
-    undefined,
-    { timeout: 15_000 },
-  );
+  await page
+    .waitForFunction(
+      () => (Reflect.get(window, "__navSwitch") as { t1: number }).t1 > 0,
+      undefined,
+      {
+        timeout: 15_000,
+      },
+    )
+    .catch((error: Error) => {
+      throw new Error(`${press} never showed ${target}: ${error.message}`);
+    });
   return page.evaluate(() => {
-    const state = Reflect.get(window, "__navSwitch") as { t0: number; t1: number; blank: boolean };
-    return { ms: state.t1 - state.t0, blank: state.blank };
+    const state = Reflect.get(window, "__navSwitch") as {
+      t0: number;
+      t1: number;
+      blank: boolean;
+      frames: string[];
+    };
+    if (state.blank) console.log(`[perf] blank frames: ${state.frames.join(" ")}`);
+    return { ms: state.t1 - state.t0, blank: state.blank, frames: state.frames };
   });
 }
 
@@ -217,8 +242,11 @@ async function profiledIds(page: Page, prefix: string) {
       phase: string;
       actualDuration: number;
     }[];
-    const hits = samples.filter((sample) => sample.id.startsWith(wanted));
+    const all = samples.filter((sample) => sample.id.startsWith(wanted));
+    // A mount is a row the list window newly shows; only updates are re-renders.
+    const hits = all.filter((sample) => sample.phase !== "mount");
     return {
+      mounts: all.length - hits.length,
       ids: [...new Set(hits.map((sample) => sample.id))],
       commits: hits.length,
       maxMs: Math.round(Math.max(0, ...hits.map((s) => s.actualDuration)) * 10) / 10,
@@ -262,6 +290,7 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
     // P2: rail switches, each measured to the first frame of the new list pane.
     const panes = ["chats-pane", "work-pane", "home-controls"];
     const switches: number[] = [];
+    const byTarget: Record<string, number[]> = {};
     let blank = 0;
     const order = [
       ["navigation-rail-work", "work-pane"],
@@ -272,6 +301,8 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
       const [press, target] = order[i % order.length]!;
       const result = await measureSwitch(page, press, target, panes);
       switches.push(result.ms);
+      (byTarget[target] ??= []).push(Math.round(result.ms));
+      if (result.blank) console.log(`[perf] blank ${press}→${target}: ${result.frames.join(" ")}`);
       if (result.blank) blank += 1;
       await page.waitForTimeout(150);
     }
@@ -281,6 +312,7 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
       p95Ms: Math.round(percentile(switches, 95)),
       maxMs: Math.round(Math.max(...switches)),
       blankFrames: blank,
+      byTarget,
     };
 
     // P4: 500-row Chats list.
@@ -290,7 +322,7 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
 
     // P5: rename one chat; no other Chats row may re-render.
     await resetProfile(page);
-    const target = seeded.chatIds[0]!;
+    const target = seeded.chatIds.at(-1)!; // newest: on screen at the top of Chats
     await seeded.client.updateChat({ chatId: target, patch: { title: "Synthetic group renamed" } });
     await expect(page.getByTestId("chats-list")).toContainText("Synthetic group renamed", {
       timeout: 30_000,
@@ -326,7 +358,7 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
 
     // P5: one session changes; other Home rows stay put.
     await resetProfile(page);
-    const changed = seeded.agentIds[0]!;
+    const changed = seeded.agentIds.at(-1)!; // newest: on screen at the top of the feed
     await seeded.client.updateAgent(changed, { name: "Synthetic session renamed" });
     await page.waitForTimeout(2_000);
     const homeRows = await profiledIds(page, "HomeRow:");
@@ -337,6 +369,54 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
 
     await testInfo.attach("navigation-v2-performance", {
       body: JSON.stringify(report, null, 2),
+      contentType: "application/json",
+    });
+  });
+
+  // Diagnostic: where a switch spends its time (CLISBOT_NAV_V2_PERF_CPU=<target testID>).
+  test("cpu profile of one switch", async ({ page }, testInfo) => {
+    const target = process.env.CLISBOT_NAV_V2_PERF_CPU;
+    test.skip(!target, "set CLISBOT_NAV_V2_PERF_CPU to profile a switch");
+    test.setTimeout(300_000);
+    const compact = process.env.CLISBOT_NAV_V2_PERF_CPU_PHONE === "1";
+    await page.setViewportSize(
+      compact ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+    );
+    await openApp(page, seeded);
+    const [toList, toTarget] = compact
+      ? ["home-tab-work", target === "chats-pane" ? "home-tab-chat" : "home-tab-open-project"]
+      : [
+          "navigation-rail-work",
+          target === "chats-pane" ? "navigation-rail-chats" : "navigation-rail-home",
+        ];
+    await expect(page.getByTestId(toList)).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId(toTarget).click();
+    await expect(page.getByTestId(target!).first()).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId(toList).click();
+    await page.waitForTimeout(1_000);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Profiler.enable");
+    await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
+    await cdp.send("Profiler.start");
+    await measureSwitch(page, toTarget, target!, []);
+    await page.waitForTimeout(300);
+    const { profile } = await cdp.send("Profiler.stop");
+    const self = new Map<string, number>();
+    const byId = new Map(profile.nodes.map((node) => [node.id, node]));
+    const deltas = profile.timeDeltas ?? [];
+    for (const [index, id] of (profile.samples ?? []).entries()) {
+      const frame = byId.get(id)!.callFrame;
+      const key = `${frame.functionName || "(anonymous)"} ${frame.url.split("/").slice(-2).join("/")}:${frame.lineNumber}`;
+      self.set(key, (self.get(key) ?? 0) + (deltas[index] ?? 0) / 1000);
+    }
+    const top = [...self.entries()]
+      .filter(([key]) => !key.startsWith("(idle)") && !key.startsWith("(program)"))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 40)
+      .map(([key, ms]) => `${ms.toFixed(1)}ms ${key}`);
+    console.log(`[perf] cpu ${target}:\n${top.join("\n")}`);
+    await testInfo.attach("cpu-profile", {
+      body: JSON.stringify(profile),
       contentType: "application/json",
     });
   });
@@ -354,11 +434,14 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
       ["home-tab-open-project", "home-controls"],
     ] as const;
     const switches: number[] = [];
+    const byTarget: Record<string, number[]> = {};
     let blank = 0;
     for (let i = 0; i < SWITCHES; i += 1) {
       const [press, target] = order[i % order.length]!;
       const result = await measureSwitch(page, press, target, panes);
       switches.push(result.ms);
+      (byTarget[target] ??= []).push(Math.round(result.ms));
+      if (result.blank) console.log(`[perf] blank ${press}→${target}: ${result.frames.join(" ")}`);
       if (result.blank) blank += 1;
       await page.waitForTimeout(150);
     }
@@ -368,6 +451,7 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
       p95Ms: Math.round(percentile(switches, 95)),
       maxMs: Math.round(Math.max(...switches)),
       blankFrames: blank,
+      byTarget,
     };
     await testInfo.attach("navigation-v2-performance-phone", {
       body: JSON.stringify(report.phoneSwitch, null, 2),

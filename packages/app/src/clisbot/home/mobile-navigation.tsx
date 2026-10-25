@@ -114,6 +114,12 @@ function Tab({ entry, selected, count }: { entry: TabEntry; selected: boolean; c
         rememberChatReturn(entry.path);
         rememberListSection(entry.path);
         usePanelStore.getState().showMobileAgentList();
+        // Web presents the panel a frame after the store changes; the route waits for it, so the
+        // outgoing page stays under the panel instead of a blank frame between them.
+        if (isWeb && NAVIGATION_V2_ENABLED && panels.mobilePanel.target !== "agent-list") {
+          requestAnimationFrame(() => navigate(entry.path as Href));
+          return;
+        }
       } else if (!isWeb && panels.mobilePanel.target === "agent-list") {
         nativePresentation.begin(panels.mobilePanel, entry.path, panels.showMobileAgent);
       } else panels.showMobileAgent();
