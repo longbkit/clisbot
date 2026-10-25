@@ -91,20 +91,22 @@ export interface ScopeRowActionProps {
   runSecondary(): void;
 }
 
-/** "Show in Work": laid out always, only revealed, so hovering never reflows the row. */
+/**
+ * "Show in Work". Mounted only while revealed: an invisible button would still take keyboard
+ * focus and a screen reader's attention. The row content reserves its slot, and this sits over
+ * that slot, so mounting it never moves the row's text.
+ */
 export function ScopeRowAction(props: ScopeRowActionProps) {
-  const shown = props.revealed || props.touch || isNative;
+  if (!(props.revealed || props.touch || isNative)) return null;
   return (
-    <View style={shown ? null : styles.hiddenAction} pointerEvents={shown ? "auto" : "none"}>
-      <ToolbarButton
-        label={props.label}
-        shortcut={props.touch ? null : SHOW_IN_WORK_SHORTCUT}
-        onPress={props.runSecondary}
-        testID={`${props.model.testID}-show-in-work`}
-      >
-        <ThemedArrowUpRight size={16} strokeWidth={2} />
-      </ToolbarButton>
-    </View>
+    <ToolbarButton
+      label={props.label}
+      shortcut={props.touch ? null : SHOW_IN_WORK_SHORTCUT}
+      onPress={props.runSecondary}
+      testID={`${props.model.testID}-show-in-work`}
+    >
+      <ThemedArrowUpRight size={16} strokeWidth={2} />
+    </ToolbarButton>
   );
 }
 
@@ -160,7 +162,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   dotOnline: { backgroundColor: theme.colors.statusDotSuccess },
   dotConnecting: { backgroundColor: theme.colors.statusDotWarning },
-  hiddenAction: { opacity: 0 },
   actionSlot: {
     width: smallIconButtonChromeFrameSize(),
     height: smallIconButtonChromeFrameSize(),

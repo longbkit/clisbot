@@ -31,6 +31,10 @@ with a fresh daemon per worker. The screenshot matrix is the seventh test, gated
 `GS_SCREENSHOTS=1`; it writes 32 shots (4 states × desktop 1440 / phone 390 × light / dark ×
 en / vi) to `artifacts/global-search/`.
 
+Upstream regression: every `command-center-*.spec.ts` plus `keyboard-shortcut-sequence.spec.ts`
+(30 tests) pass with scope on. They caught one real bug: a hidden "Show in Work" button kept in
+the DOM took keyboard focus; it now mounts only while revealed.
+
 ## Latency (P2-style, typing to paint)
 
 Method: the browser harness mounts the real Command Center with 100 Hosts (one local, 99 behind
