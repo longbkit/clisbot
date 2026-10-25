@@ -20,7 +20,7 @@ const en = {
     lastOnline: "Offline · last online {{time}}",
     noProject: "No {{project}}",
   },
-  hub: {
+  hubRow: {
     hosts_one: "{{count}} Host",
     hosts_other: "{{count}} Hosts",
     online: "{{count}} online",
@@ -71,7 +71,7 @@ const vi: SearchScopeResources = {
     lastOnline: "Ngoại tuyến · trực tuyến lần cuối {{time}}",
     noProject: "Không có {{project}}",
   },
-  hub: {
+  hubRow: {
     hosts_one: "{{count}} Host",
     hosts_other: "{{count}} Host",
     online: "{{count}} trực tuyến",

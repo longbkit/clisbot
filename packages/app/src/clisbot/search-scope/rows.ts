@@ -94,8 +94,8 @@ function hubRow(hub: ScopeHub, context: RowContext): ScopeRowModel {
     title: hub.name,
     subtitle: "Hub",
     note: join([
-      t("hub.hosts", { count: hub.serverIds.length }),
-      t("hub.online", { count: hub.onlineCount }),
+      t("hubRow.hosts", { count: hub.serverIds.length }),
+      t("hubRow.online", { count: hub.onlineCount }),
     ]),
     status: hub.onlineCount > 0 ? "online" : "offline",
     chips: [{ kind: "hub", origin: hub.origin, label: hub.name }],
