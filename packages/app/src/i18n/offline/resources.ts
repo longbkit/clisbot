@@ -20,6 +20,10 @@ const en = {
     needsSignIn: "Sign in to {{hub}} again.",
     revoked: "Your access to {{hub}} was removed.",
     timedOut: "The Hub did not answer within {{seconds}} s",
+    partial: "{{hub}}: {{reachable}}/{{total}} reachable",
+  },
+  notice: {
+    more: "{{summary}} · {{count}} more",
   },
 };
 
@@ -42,7 +46,14 @@ const vi: OfflineResources = {
     needsSignIn: "Hãy đăng nhập lại {{hub}}.",
     revoked: "Quyền truy cập của bạn vào {{hub}} đã bị gỡ.",
     timedOut: "Hub không phản hồi trong {{seconds}} giây",
+    partial: "{{hub}}: kết nối được {{reachable}}/{{total}}",
+  },
+  notice: {
+    more: "{{summary}} · thêm {{count}} nguồn",
   },
 };
 
-export const offlineResources: Readonly<Record<string, OfflineResources>> = { en, vi };
+export const offlineResources: Readonly<Record<string, OfflineResources>> = {
+  en,
+  vi,
+};
