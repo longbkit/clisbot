@@ -3,6 +3,7 @@ import type { HubConfiguration } from "../config";
 import type { GoogleSignInContext, HubRequestInput, HubTransport } from "./contract";
 import { i18n } from "@/i18n/i18next";
 import { BrowserOAuthHubTransport } from "./browser-oauth";
+import { fetchWithDeadline, withDeadline } from "./request-deadline";
 
 export function createHubTransport(configuration: HubConfiguration): HubTransport {
   const bridge = getDesktopHost()?.hub;
@@ -20,7 +21,7 @@ class BrowserHubTransport implements HubTransport {
 
   request(path: string, input: HubRequestInput = {}): Promise<Response> {
     this.assertSameOrigin();
-    return fetch(new URL(assertHubPath(path), this.origin), {
+    return fetchWithDeadline(new URL(assertHubPath(path), this.origin), {
       method: input.method ?? "GET",
       credentials: "include",
       headers: input.headers,
@@ -93,11 +94,12 @@ class ElectronHubTransport implements HubTransport {
   ) {}
 
   async request(path: string, input: HubRequestInput = {}): Promise<Response> {
-    const result = await this.bridge.request?.({
+    const request = this.bridge.request?.({
       origin: this.origin,
       path: assertHubPath(path),
       ...input,
     });
+    const result = request === undefined ? undefined : await withDeadline(request);
     if (result === undefined)
       throw new Error(i18n.t("hub.account.signIn.desktopBridgeUnavailable"));
     return new Response(result.body, { status: result.status, headers: result.headers });
