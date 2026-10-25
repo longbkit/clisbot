@@ -29,10 +29,22 @@ Offline Experience proposal (O1 → O2 → O3, approved 2026-10-25).
 - `DaemonClient` keeps its unjittered default; only the app opts in, so CLI and daemon timing
   do not change.
 
-Measured in `host-runtime-fleet.test.ts` (100 Hosts, 10 unreachable, 10 simulated minutes):
-the previous fixed tick made about 300 attempts per unreachable sandbox (2,989 total); backoff
-makes 21–29 (249 total), with at most 4 connects in flight. A network flip that drops all 100
-sessions for 5 minutes costs 1,591 connects to recover, all within the limit.
+Measured in `host-runtime-fleet.test.ts` with fake timers (100 Hosts, 10 simulated minutes; Node
+simulation, not device evidence):
+
+| Scenario                                     | Fixed 2 s tick (before)  | Backoff (O1)         |
+| -------------------------------------------- | ------------------------ | -------------------- |
+| Connects per unreachable sandbox (10 of 100) | 298–300 (2,989 total)    | 21–29 (249 total)    |
+| Connects in flight                           | no limit in the old code | at most 4            |
+| Network flip, all 100 down for 5 min         | not measured             | 1,591 to recover     |
+| Hub ticket requests, Hub down, sandboxes up  | 12,000                   | 2,420                |
+| Hub daemon-list reads, Hub healthy           | 10                       | 10                   |
+| Hub daemon-list reads, Hub failing           | 10                       | 5 typical, 6 at most |
+
+The "before" column replays the old 2 s pacing with the new connect limit still on. A ticket is
+requested once per attempt whose transport to the sandbox opened, so an unreachable
+sandbox costs no ticket requests. Probe intervals stay at one per Host for the whole run and drop
+to zero when Hosts are removed.
 
 ## Hub access tickets
 
