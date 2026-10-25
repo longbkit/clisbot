@@ -93,6 +93,9 @@ Each row is a test in `packages/app/src/clisbot/search-scope/cases.test.ts`.
   field yet; Navigation V2 adds it next to `hosts` and `projects` and the same partition applies.
 - **Secondary action key.** ⌘/Ctrl+Enter, matching "open in background" conventions; → stays
   caret movement. Phones use the row's arrow button (always visible on touch) or long-press.
+- **When a Host counts as offline.** As the Home strip judges it: online, or connecting until the
+  first attempt stalls (15 s) or reports an error, then offline. A slow tick re-judges waiting
+  Hosts while search is open, so a dead Host turns Offline without a keystroke.
 - **Agents' project.** From the agent's workspace, else its project placement, else the Host
   project whose repo root contains its `cwd`.
 

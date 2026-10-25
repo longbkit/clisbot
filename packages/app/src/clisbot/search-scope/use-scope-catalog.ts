@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { useHubAccounts } from "@/clisbot/hub/account-provider";
 import { effectiveHostStatus } from "@/clisbot/home/hosts-strip-model";
@@ -64,6 +64,24 @@ function useHubNames() {
   }, [accounts, profiles]);
 }
 
+/** How often a Host still connecting is re-judged, as the Home strip does. */
+const STALL_TICK_MS = 5000;
+
+/**
+ * The runtime reports an unreachable Host as "connecting" while it retries. Re-judge waiting
+ * Hosts on a slow tick so one that has stalled reads Offline without anyone typing.
+ */
+function useStallClock(statuses: ReadonlyMap<string, string>, enabled: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  const waiting = enabled && [...statuses.values()].some((s) => s === "connecting" || s === "idle");
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => setNow(Date.now()), STALL_TICK_MS);
+    return () => clearInterval(timer);
+  }, [waiting]);
+  return now;
+}
+
 function useScopeHosts(enabled: boolean): ScopeHostInput[] {
   const available = useAvailableHosts();
   const hosts = enabled ? available : NO_HOSTS;
@@ -71,8 +89,8 @@ function useScopeHosts(enabled: boolean): ScopeHostInput[] {
   const hubs = useHubNames();
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const statuses = useHostRuntimeConnectionStatuses(serverIds);
+  const now = useStallClock(statuses, enabled);
   return useMemo(() => {
-    const now = Date.now();
     const store = getHostRuntimeStore();
     return hosts.map((host) => {
       const origin = host.management?.hubOrigin ?? null;
@@ -87,7 +105,7 @@ function useScopeHosts(enabled: boolean): ScopeHostInput[] {
         lastOnlineAt: store.getSnapshot(host.serverId)?.lastOnlineAt ?? null,
       };
     });
-  }, [hosts, hubs, localServerId, statuses]);
+  }, [hosts, hubs, localServerId, now, statuses]);
 }
 
 function toProjectInputs(projects: readonly ProjectSummary[]): ScopeProjectInput[] {

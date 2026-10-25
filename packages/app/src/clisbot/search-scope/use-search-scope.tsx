@@ -11,7 +11,7 @@ import { useSearchScopeTranslation } from "@/i18n/search-scope";
 import type { ProjectSummary } from "@/utils/projects";
 import { findScopeCandidates, type SearchViewContext } from "./candidates";
 import type { SearchScopeCatalog } from "./catalog";
-import { searchScopeChips } from "./chip-store";
+import { searchScopeChips, useSearchScopeChips } from "./chip-store";
 import { isScoped, resolveSearchScope, UNSCOPED, type SearchScopeChip } from "./model";
 import { buildEmptyStateRows, buildScopeRows, type ScopeRowModel, type ScopeT } from "./rows";
 import type { ScopeChipsProps } from "./scope-chips";
@@ -251,7 +251,7 @@ export function useSearchScope(input: SearchScopeInput): SearchScope {
     filesScope: input.filesScope,
   });
   useChipLifecycle(SEARCH_SCOPE_ENABLED && input.open);
-  const chips = searchScopeChips.use();
+  const chips = useSearchScopeChips();
   const liveChips = active ? chips : EMPTY_CHIPS;
   const catalog = useSearchScopeCatalog({
     enabled: active,

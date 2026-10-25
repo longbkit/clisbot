@@ -1,5 +1,5 @@
 import { addSearchScopeChips, removeSearchScopeChip, type SearchScopeChip } from "./model";
-import { createValueStore } from "./value-store";
+import { createValueStore, useValueStore } from "./value-store";
 
 /** Reopening search this soon after closing it brings the chips back (R5). */
 export const CHIP_RESTORE_WINDOW_MS = 10_000;
@@ -8,11 +8,15 @@ const EMPTY: readonly SearchScopeChip[] = [];
 const chips = createValueStore<readonly SearchScopeChip[]>(EMPTY);
 let closedAt: number | null = null;
 
+/** The chips in render. */
+export function useSearchScopeChips(): readonly SearchScopeChip[] {
+  return useValueStore(chips);
+}
+
 /** Session-only scope chips. Never persisted: they belong to one search, not to the device. */
 export const searchScopeChips = {
   get: chips.get,
   subscribe: chips.subscribe,
-  use: chips.use,
   add(added: readonly SearchScopeChip[]) {
     chips.set(addSearchScopeChips(chips.get(), added));
   },

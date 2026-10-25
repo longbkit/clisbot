@@ -104,7 +104,8 @@ async function openFleet(page: Page, fleet: Fleet): Promise<void> {
 }
 
 async function openSearch(page: Page): Promise<Locator> {
-  await page.keyboard.press("ControlOrMeta+K");
+  // The Search control is the same on desktop (sidebar footer) and phone (top toolbar).
+  await page.getByTestId("sidebar-footer-search").filter({ visible: true }).first().click();
   const panel = page.getByTestId("command-center-panel");
   await expect(panel).toBeVisible({ timeout: 30_000 });
   return panel;
@@ -175,7 +176,10 @@ test.describe("Global search Host and Project scope", () => {
     await openFleet(page, fleet);
     const panel = await openSearch(page);
     await type(panel, OFFLINE);
-    await expect(row(panel, `command-center-scope-host-${OFFLINE_ID}`)).toContainText("Offline");
+    // An unreachable Host reads Connecting until the runtime's first attempt stalls (15 s).
+    await expect(row(panel, `command-center-scope-host-${OFFLINE_ID}`)).toContainText("Offline", {
+      timeout: 30_000,
+    });
   });
 
   test("Show in Work replaces the sidebar Host filter and Undo restores it", async ({
@@ -204,6 +208,11 @@ test.describe("Global search Host and Project scope", () => {
       const raw = JSON.parse(localStorage.getItem("sidebar-view") ?? "{}");
       raw.state = { ...raw.state, hostFilters: [serverId] };
       localStorage.setItem("sidebar-view", JSON.stringify(raw));
+      // Keep the Hosts this test added: skip the fixture's registry reset on this reload.
+      localStorage.setItem(
+        "@clisbot:e2e-disable-default-seed-once",
+        localStorage.getItem("@clisbot:e2e-seed-nonce") ?? "",
+      );
     }, getServerId());
     await page.reload();
     const panel = await openSearch(page);
@@ -250,6 +259,8 @@ async function setLanguage(page: Page, language: "en" | "vi"): Promise<void> {
       localStorage.getItem("@clisbot:e2e-seed-nonce") ?? "",
     );
   }, language);
+  // The sidebar that proves the fleet loaded is only visible on desktop.
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.reload();
   await expect(page.getByText("release train").filter({ visible: true }).first()).toBeVisible({
     timeout: 60_000,

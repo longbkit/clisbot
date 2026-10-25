@@ -1,6 +1,6 @@
 import { usePanelStore } from "@/stores/panel-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
-import { createValueStore } from "./value-store";
+import { createValueStore, useValueStore } from "./value-store";
 
 /**
  * The seam between search and the list a filter belongs to (docs/features/global-search). Search
@@ -23,7 +23,9 @@ export function setSearchViewContext(filter: PublishedViewFilter | null): void {
   publishedViewFilter.set(filter);
 }
 
-export const usePublishedViewFilter = publishedViewFilter.use;
+export function usePublishedViewFilter(): PublishedViewFilter | null {
+  return useValueStore(publishedViewFilter);
+}
 
 export interface OpenInWorkTarget {
   serverIds: readonly string[];
@@ -91,5 +93,7 @@ export function dismissOutsideFilterReveal(): void {
   outsideFilterReveal.set(null);
 }
 
-export const useOutsideFilterReveal = outsideFilterReveal.use;
+export function useOutsideFilterReveal(): OutsideFilterReveal | null {
+  return useValueStore(outsideFilterReveal);
+}
 export const getOutsideFilterReveal = outsideFilterReveal.get;

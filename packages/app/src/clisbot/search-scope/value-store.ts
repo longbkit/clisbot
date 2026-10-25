@@ -5,13 +5,12 @@ export interface ValueStore<T> {
   get(): T;
   set(next: T): void;
   subscribe(listener: () => void): () => void;
-  use(): T;
 }
 
 export function createValueStore<T>(initial: T): ValueStore<T> {
   let value = initial;
   const listeners = new Set<() => void>();
-  const store: ValueStore<T> = {
+  return {
     get: () => value,
     set(next) {
       if (Object.is(next, value)) return;
@@ -22,7 +21,14 @@ export function createValueStore<T>(initial: T): ValueStore<T> {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    use: () => useSyncExternalStore(store.subscribe, store.get, store.get),
   };
-  return store;
+}
+
+/**
+ * Read a value store in render. A standalone `use…` hook, never a `.use()` method: the React
+ * Compiler reads a member named `use` as React's conditional `use()` API and may skip it on a
+ * later render, which breaks hook order (seen as a crash in `useQueries` right after it).
+ */
+export function useValueStore<T>(store: ValueStore<T>): T {
+  return useSyncExternalStore(store.subscribe, store.get, store.get);
 }
