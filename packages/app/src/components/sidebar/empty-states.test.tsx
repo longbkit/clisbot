@@ -30,6 +30,7 @@ vi.mock("./sidebar-model", () => ({ useSidebarModel: () => ({ metadataRecoveryNo
 vi.mock("react-i18next", async (original) => ({
   ...(await original<typeof import("react-i18next")>()),
   useTranslation: () => ({ t: (key: string) => key }),
+  initReactI18next: { type: "3rdParty", init() {} },
 }));
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onPress }: { children: React.ReactNode; onPress: () => void }) => (

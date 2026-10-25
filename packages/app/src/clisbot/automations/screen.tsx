@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -12,11 +12,7 @@ import { useTranslation } from "react-i18next";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 
 type Tab = "home" | "schedules" | "automations";
-const TABS = [
-  { value: "home", label: "Home" },
-  { value: "schedules", label: "Schedules" },
-  { value: "automations", label: "Automations" },
-] as const;
+const TAB_VALUES = ["home", "schedules", "automations"] as const;
 
 /** Existing /schedules deep link stays valid; only Fusion adds the shared landing page. */
 export function AutomationsLandingScreen() {
@@ -27,6 +23,10 @@ export function AutomationsLandingScreen() {
 function AutomationsLandingContent() {
   // Navigation V2 names the destination Schedules / Lịch (brief C11); Hub Automations keep their tab.
   const { t } = useTranslation();
+  const tabs = useMemo(
+    () => TAB_VALUES.map((value) => ({ value, label: t(`home.schedulesLanding.tabs.${value}`) })),
+    [t],
+  );
   const [tab, setTab] = useState<Tab>("home");
   const [create, setCreate] = useState(0);
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set(["home"]));
@@ -46,7 +46,7 @@ function AutomationsLandingContent() {
         title={NAVIGATION_V2_ENABLED ? t("navigation.sections.schedules") : "Automations"}
       />
       <View style={styles.tabs}>
-        <ViewTabs tabs={TABS} value={tab} onChange={selectTab} />
+        <ViewTabs tabs={tabs} value={tab} onChange={selectTab} />
       </View>
       <View style={[styles.content, tab !== "home" && styles.hidden]}>
         <AutomationsHome onSchedules={schedules} onAutomations={automations} />

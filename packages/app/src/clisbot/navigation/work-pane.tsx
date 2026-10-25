@@ -29,6 +29,8 @@ import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { RenderProfile } from "@/utils/render-profiler";
+import { useHostsReachability } from "./hosts-status";
+import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { useReaderAccounts } from "./reader";
 import { SectionControls } from "./section-controls";
 import {
@@ -74,6 +76,7 @@ export function WorkPane({
     setTimeout(() => setRefreshing(false), 600);
   }, [model]);
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
+  const workState = useWorkListState(model, hasActiveHostFilter);
   const leading = useMemo(
     () => <QuickChatsSection onBeforeNavigate={onBeforeNavigate} />,
     [onBeforeNavigate],
@@ -97,9 +100,9 @@ export function WorkPane({
         <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
         <WorkControls />
         <SidebarMetadataNotice />
-        {model.isInitialLoad && !hasActiveHostFilter ? (
-          <SidebarAgentListSkeleton />
-        ) : (
+        {workState === "offline" ? <HostsUnreachableState testID="work-offline" /> : null}
+        {workState === "loading" ? <SidebarAgentListSkeleton /> : null}
+        {workState === "list" ? (
           <SidebarWorkspaceList
             pinPresentation="float"
             collapsedProjectKeys={model.collapsedProjectKeys}
@@ -122,11 +125,27 @@ export function WorkPane({
             dragGestureHostActive={active}
             listLeadingComponent={leading}
           />
-        )}
+        ) : null}
         {importSession.sheet}
       </View>
     </RenderProfile>
   );
+}
+
+/**
+ * What Work shows in place of its list: the skeleton while the first Host connects or its
+ * directory loads, a word when no Host can be reached, otherwise the list itself.
+ */
+function useWorkListState(
+  model: ReturnType<typeof useSidebarModel>,
+  hasActiveHostFilter: boolean,
+): "loading" | "offline" | "list" {
+  const reach = useHostsReachability();
+  const nothing = !model.hasProjectsBeforeFilter;
+  if (nothing && reach === "unreachable") return "offline";
+  if (hasActiveHostFilter) return "list";
+  if (model.isInitialLoad || (nothing && reach === "connecting")) return "loading";
+  return "list";
 }
 
 /** Work's search widens to everything: the Command Center, which ⌘K also opens. */

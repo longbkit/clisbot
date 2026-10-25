@@ -146,6 +146,8 @@ export function createProviderSnapshotCache(
   let index: ProviderSnapshotIndexEntry[] | null = null;
   let operationQueue = Promise.resolve();
   const bodies = new Map<string, CachedProviderSnapshot>();
+  // Screens read the same record on every mount; parse a stored string once until it changes.
+  const parsed = new Map<string, { value: string; stored: StoredProviderSnapshot }>();
 
   async function reconcileCache(): Promise<void> {
     const allKeys = await storage.getAllKeys();
@@ -317,12 +319,16 @@ export function createProviderSnapshotCache(
     const currentIndex = await ensureCacheIndex();
     const value = await storage.getItem(key);
     if (value === null) return null;
+    const hit = parsed.get(key);
+    if (hit?.value === value) return hit.stored;
     try {
       const stored = parseStoredProviderSnapshot(key, value);
       if (!stored) throw new SyntaxError("Invalid provider snapshot");
+      parsed.set(key, { value, stored });
       return stored;
     } catch (error) {
       if (!(error instanceof SyntaxError) && !(error instanceof RangeError)) throw error;
+      parsed.delete(key);
       bodies.delete(key);
       await storage.removeItem(key);
       index = currentIndex.filter((entry) => entry.key !== key);

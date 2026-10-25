@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { useCallback, useLayoutEffect, useMemo } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -15,13 +16,13 @@ import { traceInstant } from "@/performance/native-trace";
 export function activityStatus(
   agent: AggregatedAgent,
 ): { label: string; variant: StatusBadgeVariant } | null {
-  if (agent.archivedAt) return { label: "Archived", variant: "muted" };
+  if (agent.archivedAt) return { label: i18n.t("home.activity.status.archived"), variant: "muted" };
   if (activityBucket(agent) !== "needs") return null;
   if ((agent.pendingPermissionCount ?? 0) > 0 || agent.attentionReason === "permission")
-    return { label: "Needs approval", variant: "warning" };
+    return { label: i18n.t("home.activity.status.needsApproval"), variant: "warning" };
   if (agent.status === "error" || agent.attentionReason === "error")
-    return { label: "Failed", variant: "error" };
-  return { label: "Needs you", variant: "warning" };
+    return { label: i18n.t("home.activity.status.failed"), variant: "error" };
+  return { label: i18n.t("home.activity.status.needsYou"), variant: "warning" };
 }
 
 /**
@@ -89,7 +90,7 @@ export function ActivityRow({
       <View style={styles.content}>
         <View style={styles.titleRow}>
           {isUnreadReply(agent) ? (
-            <View style={styles.unread} accessibilityLabel="Unread reply" />
+            <View style={styles.unread} accessibilityLabel={t("home.activity.unreadReply")} />
           ) : null}
           <HighlightedText
             text={title}
@@ -132,9 +133,9 @@ export function heldActivityStatus(
   if (!homeBucket) return null;
   const current = activityBucket(agent);
   if (current === "active" && homeBucket !== "active")
-    return { label: "Running", variant: "muted" };
+    return { label: i18n.t("home.activity.status.running"), variant: "muted" };
   if (current === "recent" && (homeBucket === "active" || homeBucket === "needs"))
-    return { label: "Finished", variant: "muted" };
+    return { label: i18n.t("home.activity.status.finished"), variant: "muted" };
   return null;
 }
 

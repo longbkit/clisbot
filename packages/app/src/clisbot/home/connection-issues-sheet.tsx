@@ -1,4 +1,6 @@
-import { useCallback } from "react";
+import { i18n } from "@/i18n/i18next";
+import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
@@ -11,33 +13,33 @@ import { useOpenHub } from "./hosts-strip-data";
 export function issueCopy(issue: StripIssue): { title: string; hint: string; action: string } {
   if (issue.kind === "host") {
     const title =
-      issue.status === "error" ? `Can't connect to ${issue.label}` : `${issue.label} is offline`;
+      issue.status === "error"
+        ? i18n.t("home.connections.cantConnect", { name: issue.label })
+        : i18n.t("home.connections.offline", { name: issue.label });
     // Through a Hub there is no address to fix: Clisbot on that computer has to be running.
     const hint = issue.hubName
-      ? `Make sure Clisbot is running on that computer and can reach ${issue.hubName}.`
-      : "Open the Host to check its address, reconnect or remove it.";
-    return { title, hint, action: "Details" };
+      ? i18n.t("home.connections.hubHostHint", { hub: issue.hubName })
+      : i18n.t("home.connections.hostHint");
+    return { title, hint, action: i18n.t("home.connections.details") };
   }
   if (issue.kind === "setup")
     return {
-      title: `Finish setting up ${issue.name}`,
-      hint: "Create its owner account so people and Hosts can join.",
-      action: "Set up",
+      title: i18n.t("home.connections.finishSetup", { name: issue.name }),
+      hint: i18n.t("home.connections.setupHint"),
+      action: i18n.t("home.connections.setUp"),
     };
   if (issue.kind === "signIn")
     return {
-      title: `${issue.name} Hub needs you to sign in again`,
-      hint: "Its Hosts are hidden until you do.",
-      action: "Sign in",
+      title: i18n.t("home.connections.signInAgain", { name: issue.name }),
+      hint: i18n.t("home.connections.signInHint"),
+      action: i18n.t("home.connections.signIn"),
     };
   return {
-    title: `Can't reach ${issue.name} Hub`,
-    hint: "Check your network, then try again.",
-    action: "Retry",
+    title: i18n.t("home.connections.cantReachHub", { name: issue.name }),
+    hint: i18n.t("home.connections.cantReachHint"),
+    action: i18n.t("home.connections.retry"),
   };
 }
-
-const HEADER = { title: "Connections" };
 
 export function ConnectionIssuesSheet({
   issues,
@@ -48,9 +50,11 @@ export function ConnectionIssuesSheet({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
+  const header = useMemo(() => ({ title: t("home.connections.title") }), [t]);
   return (
     <AdaptiveModalSheet
-      header={HEADER}
+      header={header}
       visible={visible}
       onClose={onClose}
       testID="home-connection-issues-sheet"
@@ -67,7 +71,7 @@ export function ConnectionIssuesSheet({
           ))}
         </View>
       ) : (
-        <Text style={settingsStyles.rowHint}>All connections are working.</Text>
+        <Text style={settingsStyles.rowHint}>{t("home.connections.allWorking")}</Text>
       )}
     </AdaptiveModalSheet>
   );

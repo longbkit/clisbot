@@ -77,8 +77,7 @@ import type { Theme } from "@/styles/theme";
 import { RenderProfile } from "@/utils/render-profiler";
 import { TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
-import { useCompactTimeAgo } from "@/hooks/use-time-ago";
-import { formatCompactTimeAgoAsProse } from "@/utils/time";
+import { useTimeAgo } from "@/hooks/use-time-ago";
 import { buildWorkspaceKeyboardHandlerId } from "@/keyboard/handler-id";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
 import { WorkspaceNewTabMenuContent } from "@/screens/workspace/workspace-new-tab-menu";
@@ -172,8 +171,7 @@ function AgentTabTooltipBody({
     const agent = session?.agents.get(agentId) ?? session?.agentDetails.get(agentId) ?? null;
     return state.agentLastActivity.get(agentId) ?? agent?.lastActivityAt ?? null;
   });
-  const compactActivity = useCompactTimeAgo(lastActivityAt);
-  const activity = formatCompactTimeAgoAsProse(compactActivity);
+  const activity = useTimeAgo(lastActivityAt);
 
   return (
     <View style={styles.tooltipAgentContent}>

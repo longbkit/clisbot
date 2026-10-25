@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useCallback } from "react";
 import { Text, View } from "react-native";
@@ -26,9 +27,12 @@ export function DirectoryStatus({
         .catch(() => undefined);
     } else openHostOverview(health.serverId);
   }, [health]);
+  const { t } = useTranslation();
   let message = label;
-  if (health.status === "loading") message = `Loading ${label.toLowerCase()}…`;
-  if (health.status === "refreshing") message = `Refreshing ${label.toLowerCase()}…`;
+  if (health.status === "loading")
+    message = t("home.directory.loading", { label: label.toLowerCase() });
+  if (health.status === "refreshing")
+    message = t("home.directory.refreshing", { label: label.toLowerCase() });
   if (health.status === "unavailable") message = health.message;
   return (
     <View style={[styles.row, inset && styles.inset]} testID="directory-status">
@@ -41,7 +45,7 @@ export function DirectoryStatus({
       </Text>
       {health.status === "unavailable" ? (
         <Button variant="ghost" size="xs" onPress={details} style={styles.action}>
-          {health.recovery === "retry" ? "Retry" : "Details"}
+          {health.recovery === "retry" ? t("home.directory.retry") : t("home.directory.details")}
         </Button>
       ) : null}
     </View>

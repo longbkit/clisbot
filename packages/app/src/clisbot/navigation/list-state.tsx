@@ -1,10 +1,15 @@
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { CircleAlert, Inbox, type LucideIcon } from "lucide-react-native";
+import { CircleAlert, CloudOff, Inbox, type LucideIcon } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { ICON_SIZE, ICON_STROKE_WIDTH } from "@/styles/theme";
 
-const ICONS: Record<"empty" | "error", LucideIcon> = { empty: Inbox, error: CircleAlert };
+type ListStateKind = "empty" | "error" | "offline";
+const ICONS: Record<ListStateKind, LucideIcon> = {
+  empty: Inbox,
+  error: CircleAlert,
+  offline: CloudOff,
+};
 
 const ThemedIcon = withUnistyles(
   ({ Icon, color }: { Icon: LucideIcon; color?: string }) => (
@@ -24,7 +29,7 @@ export function ListState({
   action,
   testID,
 }: {
-  kind: "empty" | "error";
+  kind: ListStateKind;
   title: string;
   action?: { label: string; onPress(): void };
   testID: string;
@@ -33,7 +38,7 @@ export function ListState({
     <View
       style={styles.state}
       testID={testID}
-      accessibilityRole={kind === "error" ? "alert" : undefined}
+      accessibilityRole={kind === "empty" ? undefined : "alert"}
     >
       <ThemedIcon Icon={ICONS[kind]} />
       <Text style={styles.title}>{title}</Text>
