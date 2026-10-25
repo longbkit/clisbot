@@ -1,8 +1,9 @@
-import { useMemo, type ReactElement, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { activityKey } from "@/clisbot/home/activity-layout";
 import { HomeActivityProvider } from "@/clisbot/home/activity-state";
+import { ActivityPlaceholder } from "@/clisbot/home/activity-placeholder";
 import type { ActivityBucketOf } from "@/clisbot/home/activity";
 import { RenderProfile } from "@/utils/render-profiler";
 import { HoldReadingPosition } from "./hold-reading-position";
@@ -33,6 +34,7 @@ interface HomeLayoutProps {
  * 🔍 swaps the feed for Inbox's full history and search.
  */
 export function NavigationHomeLayout(props: HomeLayoutProps) {
+  const feedReady = useAfterFirstFrame();
   const { rows } = useNavigationActivity();
   const scope = useNavigationStore((state) => state.scopes.home);
   const mode = useNavigationStore((state) => state.homeMode);
@@ -70,10 +72,14 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
               </HoldReadingPosition>
               <StartBlock {...props} />
               <HomeFeedControls scopeCounts={feed.scopeCounts} chipCounts={feed.chipCounts} />
-              <NavigationHomeFeed
-                rows={byKey}
-                filterKey={`${scope}|${mode}|${chip}|${serverIds.join(",")}`}
-              />
+              {feedReady ? (
+                <NavigationHomeFeed
+                  rows={byKey}
+                  filterKey={`${scope}|${mode}|${chip}|${serverIds.join(",")}`}
+                />
+              ) : (
+                <ActivityPlaceholder />
+              )}
             </View>
           </ActivityScrollView>
         </HomeActivityProvider>
@@ -116,3 +122,16 @@ const styles = StyleSheet.create((theme) => ({
   compactContext: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   choices: { paddingLeft: theme.spacing[4], marginBottom: theme.spacing[2] },
 }));
+
+/**
+ * Home's header, composer and filters paint in the frame the reader switched in; the feed follows
+ * one frame later, so switching to Home is not held up by the longest list on it (acceptance P2).
+ */
+function useAfterFirstFrame(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return ready;
+}

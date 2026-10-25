@@ -85,20 +85,25 @@ export function NavigationHomeFeed({
     activity.markAllSeen(unseen);
     requestApply();
   }, [activity, requestApply, unseen]);
+  // The chips and section titles already say what this is; the directory speaks only when it
+  // fails, and loading is the skeleton.
+  const failed = directoryHealth.status === "unavailable";
+  const empty = !isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length;
+  const hasActions = pending > 0 || unseen.length > 1;
+  const hasHeader = failed || isInitialLoad || empty || hasActions;
   return (
     <View style={styles.container} testID="home-activity">
-      <HoldReadingPosition style={styles.header}>
-        {/* DirectoryStatus builds English sentences around its label; it is not localized yet. */}
-        <DirectoryStatus health={directoryHealth} label="Activity" inset={false} />
+      <HoldReadingPosition style={[styles.header, !hasHeader && styles.headerEmpty]}>
+        {failed ? <DirectoryStatus health={directoryHealth} label="" inset={false} /> : null}
         {isInitialLoad ? <ActivityPlaceholder /> : null}
-        {!isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length ? (
+        {empty ? (
           <ListState
             kind="empty"
             title={t("navigation.lists.emptyFeed")}
             testID="home-feed-empty"
           />
         ) : null}
-        {pending > 0 || unseen.length > 1 ? (
+        {hasActions ? (
           <View style={styles.markAll}>
             {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
             {pending > 0 ? (
@@ -349,10 +354,13 @@ const MutedChevronRight = withUnistyles(ChevronRight, (theme) => ({
 
 const styles = StyleSheet.create((theme) => ({
   header: { gap: theme.spacing[4] },
+  // An empty header still holds the reading position; it gives back the gap it would take.
+  headerEmpty: { marginBottom: -theme.spacing[4] },
   container: {
     gap: theme.spacing[4],
     paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2],
+    paddingTop: theme.spacing[1],
+    paddingBottom: theme.spacing[2],
   },
   section: { gap: theme.spacing[1] },
   subheading: {

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import {
   describeCompactTimeAgo,
   describeTimeAgo,
   formatCompactTimeAgo,
-  formatCompactTimeAgoAsProse,
   formatDuration,
   formatMessageTimestamp,
   formatTimeAgo,
@@ -80,12 +80,17 @@ describe("describeCompactTimeAgo", () => {
   });
 });
 
-describe("formatCompactTimeAgoAsProse", () => {
-  it("puts elapsed labels back into prose and leaves dates alone", () => {
-    expect(formatCompactTimeAgoAsProse("now")).toBe("just now");
-    expect(formatCompactTimeAgoAsProse("3m")).toBe("3m ago");
-    expect(formatCompactTimeAgoAsProse("2h")).toBe("2h ago");
-    expect(formatCompactTimeAgoAsProse("Jan 15")).toBe("Jan 15");
+describe("relative times in the reader's language", () => {
+  it("words prose and compact labels in Vietnamese", async () => {
+    const now = new Date("2026-03-10T12:00:00Z");
+    await i18n.changeLanguage("vi");
+    try {
+      expect(formatTimeAgo(new Date(now.getTime() - 30_000), now)).toBe("vừa xong");
+      expect(formatTimeAgo(new Date(now.getTime() - 5 * 60_000), now)).toBe("5 phút trước");
+      expect(formatCompactTimeAgo(new Date(now.getTime() - 2 * 3_600_000), now)).toBe("2 giờ");
+    } finally {
+      await i18n.changeLanguage("en");
+    }
   });
 });
 

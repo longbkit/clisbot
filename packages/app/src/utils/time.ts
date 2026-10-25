@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 /**
  * How often a relative label can change, which is all a caller needs to know to keep it honest.
  * `static` means it never will again.
@@ -30,7 +31,12 @@ const ABSOLUTE_AFTER_MS = 7 * DAY_MS;
  */
 type Age =
   | { kind: "now"; resolution: "minute" }
-  | { kind: "elapsed"; value: string; resolution: Exclude<RelativeTimeResolution, "static"> }
+  | {
+      kind: "elapsed";
+      unit: "minutes" | "hours" | "days";
+      count: number;
+      resolution: Exclude<RelativeTimeResolution, "static">;
+    }
   | { kind: "date"; value: string; resolution: "static" };
 
 function describeAge(date: Date, now: Date): Age {
@@ -40,31 +46,48 @@ function describeAge(date: Date, now: Date): Age {
     return { kind: "now", resolution: "minute" };
   }
   if (elapsedMs < HOUR_MS) {
-    return {
-      kind: "elapsed",
-      value: `${Math.floor(elapsedMs / MINUTE_MS)}m`,
-      resolution: "minute",
-    };
+    const count = Math.floor(elapsedMs / MINUTE_MS);
+    return { kind: "elapsed", unit: "minutes", count, resolution: "minute" };
   }
   if (elapsedMs < DAY_MS) {
-    return { kind: "elapsed", value: `${Math.floor(elapsedMs / HOUR_MS)}h`, resolution: "hour" };
+    const count = Math.floor(elapsedMs / HOUR_MS);
+    return { kind: "elapsed", unit: "hours", count, resolution: "hour" };
   }
   if (elapsedMs < ABSOLUTE_AFTER_MS) {
-    return { kind: "elapsed", value: `${Math.floor(elapsedMs / DAY_MS)}d`, resolution: "day" };
+    const count = Math.floor(elapsedMs / DAY_MS);
+    return { kind: "elapsed", unit: "days", count, resolution: "day" };
   }
 
-  const month = date.toLocaleDateString("en-US", { month: "short" });
-  return { kind: "date", value: `${month} ${date.getDate()}`, resolution: "static" };
+  const value = date.toLocaleDateString(i18n.resolvedLanguage ?? "en", {
+    month: "short",
+    day: "numeric",
+  });
+  return { kind: "date", value, resolution: "static" };
 }
 
+const PROSE_KEYS = {
+  minutes: "home.time.minutesAgo",
+  hours: "home.time.hoursAgo",
+  days: "home.time.daysAgo",
+} as const;
+const COMPACT_KEYS = {
+  minutes: "home.time.minutes",
+  hours: "home.time.hours",
+  days: "home.time.days",
+} as const;
+
 /**
- * A human-friendly relative time, with the resolution it changes at.
- * Examples: "just now", "5m ago", "2h ago", "3d ago", "Jan 15".
+ * A human-friendly relative time in the reader's language, with the resolution it changes at.
+ * Examples (en): "just now", "5m ago", "2h ago", "3d ago", "Jan 15".
  */
 export function describeTimeAgo(date: Date, now: Date = new Date()): RelativeTimeLabel {
   const age = describeAge(date, now);
-  if (age.kind === "now") return { label: "just now", resolution: age.resolution };
-  if (age.kind === "elapsed") return { label: `${age.value} ago`, resolution: age.resolution };
+  if (age.kind === "now") return { label: i18n.t("home.time.justNow"), resolution: age.resolution };
+  if (age.kind === "elapsed")
+    return {
+      label: i18n.t(PROSE_KEYS[age.unit], { value: age.count }),
+      resolution: age.resolution,
+    };
   return { label: age.value, resolution: age.resolution };
 }
 
@@ -75,26 +98,21 @@ export function formatTimeAgo(date: Date, now: Date = new Date()): string {
 /**
  * The same instant with the prose removed, for somewhere with no room for it — a dense list
  * where the column is understood to be a timestamp and "ago" is the only word on the line.
- * Examples: "now", "5m", "2h", "3d", "Jan 15".
+ * Examples (en): "now", "5m", "2h", "3d", "Jan 15".
  */
 export function describeCompactTimeAgo(date: Date, now: Date = new Date()): RelativeTimeLabel {
   const age = describeAge(date, now);
-  if (age.kind === "now") return { label: "now", resolution: age.resolution };
+  if (age.kind === "now") return { label: i18n.t("home.time.now"), resolution: age.resolution };
+  if (age.kind === "elapsed")
+    return {
+      label: i18n.t(COMPACT_KEYS[age.unit], { value: age.count }),
+      resolution: age.resolution,
+    };
   return { label: age.value, resolution: age.resolution };
 }
 
 export function formatCompactTimeAgo(date: Date, now: Date = new Date()): string {
   return describeCompactTimeAgo(date, now).label;
-}
-
-/**
- * A compact label put back into a sentence, for a tooltip or a line with room for prose:
- * "now" → "just now", "5m" → "5m ago", "Jan 15" stays a date.
- */
-export function formatCompactTimeAgoAsProse(label: string): string {
-  if (label === "now") return "just now";
-  if (/^\d/.test(label)) return `${label} ago`;
-  return label;
 }
 
 /**

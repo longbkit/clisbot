@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
 import { View, Text } from "react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -22,6 +23,7 @@ export function QuickStarts(props: Props) {
   return <ScopedQuickStarts key={`${props.serverId}:${principal}`} {...props} />;
 }
 function ScopedQuickStarts({ serverId, destinations, snapshot, onApply }: Props) {
+  const { t } = useTranslation();
   const source = useQuickStarts(serverId);
   const compact = useIsCompactFormFactor();
   const library = useQuickStartLibrary(source, snapshot, onApply, destinations);
@@ -34,8 +36,8 @@ function ScopedQuickStarts({ serverId, destinations, snapshot, onApply }: Props)
   return (
     <View style={styles.section}>
       <SectionLink
-        title="Quick start"
-        accessibilityLabel="View all quick starts"
+        title={t("home.quickStarts.title")}
+        accessibilityLabel={t("home.quickStarts.viewAll")}
         onPress={openLibrary}
       />
       <PinnedGrid
@@ -82,20 +84,21 @@ function PinnedGrid({
   onOpenLibrary: () => void;
   onCreate: () => void;
 }) {
+  const { t } = useTranslation();
   const empty = hasItems ? (
     <QuickStartActionTile
       Icon={Pin}
-      title="Pin a quick start"
-      detail="Keep it on Home"
-      accessibilityLabel="Pin a quick start to Home"
+      title={t("home.quickStarts.pinTitle")}
+      detail={t("home.quickStarts.pinDetail")}
+      accessibilityLabel={t("home.quickStarts.pinLabel")}
       onPress={onOpenLibrary}
     />
   ) : (
     <QuickStartActionTile
       Icon={Plus}
-      title="New quick start"
-      detail="Reuse a prompt"
-      accessibilityLabel="Create a quick start"
+      title={t("home.quickStarts.newTitle")}
+      detail={t("home.quickStarts.newDetail")}
+      accessibilityLabel={t("home.quickStarts.newLabel")}
       onPress={onCreate}
     />
   );

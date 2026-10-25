@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   forwardRef,
   useCallback,
@@ -56,6 +57,8 @@ export function StartSwitcher({
   onQuickChat: () => void;
   onPick: (kind: "project" | "bot") => void;
 }) {
+  const { t } = useTranslation();
+  const quickChatOptions = useQuickChatOption(quickChat);
   const projectRef = useRef<View>(null);
   const botRef = useRef<View>(null);
   const pick = useCallback(
@@ -73,7 +76,7 @@ export function StartSwitcher({
   const pickBot = useCallback(() => pick("bot"), [pick]);
   return (
     <SegmentedControl
-      options={quickChat ? QUICK_CHAT : NO_QUICK_CHAT}
+      options={quickChatOptions}
       value={kind}
       onValueChange={onQuickChat}
       size={size}
@@ -87,12 +90,12 @@ export function StartSwitcher({
               size={size}
               selected={kind === "project"}
               disabled={disabled}
-              label={kind === "project" ? label : "Project"}
+              label={kind === "project" ? label : t("home.start.project")}
               iconOnly={compactSegments && kind !== "project"}
               mark={kind === "project" ? mark : undefined}
               Icon={FolderOpen}
               onPress={pickProject}
-              accessibilityLabel="Workspace project"
+              accessibilityLabel={t("home.start.projectLabel")}
               testID="new-workspace-project-picker-trigger"
             />
           ) : null}
@@ -102,12 +105,12 @@ export function StartSwitcher({
               size={size}
               selected={kind === "bot"}
               disabled={disabled}
-              label={kind === "bot" ? label : "Bot"}
+              label={kind === "bot" ? label : t("home.start.bot")}
               iconOnly={compactSegments && kind !== "bot"}
               mark={kind === "bot" ? mark : undefined}
               Icon={Bot}
               onPress={pickBot}
-              accessibilityLabel="With a bot"
+              accessibilityLabel={t("home.start.botLabel")}
               testID="start-switcher-bot"
             />
           ) : null}
@@ -118,13 +121,18 @@ export function StartSwitcher({
 }
 
 const NO_QUICK_CHAT: SegmentedControlOption<StartKind>[] = [];
-const QUICK_CHAT: SegmentedControlOption<StartKind>[] = [
-  {
-    value: "quickChat",
-    label: "Quick chat",
-    icon: ({ color, size }) => <MessageCircle size={size} color={color} />,
-  },
-];
+const quickChatIcon: SegmentedControlOption<StartKind>["icon"] = ({ color, size }) => (
+  <MessageCircle size={size} color={color} />
+);
+
+function useQuickChatOption(shown: boolean): SegmentedControlOption<StartKind>[] {
+  const { t } = useTranslation();
+  const label = t("home.start.quickChat");
+  return useMemo(
+    () => (shown ? [{ value: "quickChat", label, icon: quickChatIcon }] : NO_QUICK_CHAT),
+    [label, shown],
+  );
+}
 
 interface SegmentProps {
   size: SegmentedControlSize;

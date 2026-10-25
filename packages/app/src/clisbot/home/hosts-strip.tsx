@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useCallback, useState } from "react";
 import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
@@ -93,6 +94,7 @@ export function ConnectionIssuesLine({
   issues: ReturnType<typeof useHostsStrip>["issues"];
   summary: string;
 }) {
+  const { t } = useTranslation();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const openDetails = useCallback(() => setDetailsOpen(true), []);
   const closeDetails = useCallback(() => setDetailsOpen(false), []);
@@ -108,7 +110,7 @@ export function ConnectionIssuesLine({
         <Text style={[styles.issueText, styles.grow]} numberOfLines={1}>
           {summary}
         </Text>
-        <Text style={styles.muted}>View details</Text>
+        <Text style={styles.muted}>{t("home.connections.viewDetails")}</Text>
         <MutedChevron size={ICON_SIZE.sm} />
       </Pressable>
       <ConnectionIssuesSheet issues={issues} visible={detailsOpen} onClose={closeDetails} />
