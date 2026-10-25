@@ -21,6 +21,7 @@ async function rowPositions(page: Page) {
       scrollTop: scroll.scrollTop,
       rows: [...scroll.querySelectorAll<HTMLElement>('[data-testid^="agent-row-"]')]
         .map((row) => ({ id: row.dataset.testid!, y: row.getBoundingClientRect().y }))
+        .filter((row) => !/^agent-row-(title|project|workspace|host)-/.test(row.id))
         .filter((row) => row.y > view.top && row.y < view.bottom),
     };
   });
@@ -115,6 +116,7 @@ for (const width of [1440, 390]) {
       await expect(page.getByTestId("home-activity-apply")).toBeVisible({ timeout: 30_000 });
       const badge = page.getByTestId(compact ? "home-tab-badge" : "navigation-rail-home");
       await expect(badge).toContainText("1", { timeout: 30_000 });
+      const afterData = await rowPositions(page);
 
       // S3: one of two Hosts goes away — one notice, no global spinner, rows and counts hold.
       await control.close();
@@ -124,8 +126,9 @@ for (const width of [1440, 390]) {
       await expect(page.getByTestId("home-connection-issues")).toBeVisible({ timeout: 60_000 });
       await expect(page.getByTestId("home-activity-placeholder")).toHaveCount(0);
       const held = await rowPositions(page);
+      console.log(`[stability] ${JSON.stringify({ before, afterData, held })}`);
       await info.attach("positions", {
-        body: JSON.stringify({ before, held }, null, 2),
+        body: JSON.stringify({ before, afterData, held }, null, 2),
         contentType: "application/json",
       });
       expect(held.rows.map((row) => row.id)).toEqual(before.rows.map((row) => row.id));

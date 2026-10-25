@@ -6,7 +6,7 @@ import { useHomeInteraction } from "./use-home-interaction";
 import { useActivityAnchor } from "./use-activity-anchor";
 
 type ActivityViewport = ReturnType<typeof useActivityAnchor> &
-  Pick<ReturnType<typeof useHomeInteraction>, "automatic" | "onScroll">;
+  Pick<ReturnType<typeof useHomeInteraction>, "automatic" | "onScroll" | "offset">;
 const Context = createContext<ActivityViewport | null>(null);
 export function useActivityViewport() {
   const value = useContext(Context);
@@ -18,8 +18,8 @@ export function ActivityViewportProvider({ children }: { children: ReactNode }) 
   const { automatic, offset, onScroll, handlers } = useHomeInteraction();
   const { scroll, viewport, register, apply, onUserScroll } = useActivityAnchor(offset);
   const value = useMemo(
-    () => ({ automatic, onScroll, scroll, viewport, register, apply, onUserScroll }),
-    [automatic, onScroll, scroll, viewport, register, apply, onUserScroll],
+    () => ({ automatic, onScroll, offset, scroll, viewport, register, apply, onUserScroll }),
+    [automatic, onScroll, offset, scroll, viewport, register, apply, onUserScroll],
   );
   return (
     <Context.Provider value={value}>
