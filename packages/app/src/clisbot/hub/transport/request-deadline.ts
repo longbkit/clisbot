@@ -1,3 +1,5 @@
+import { offlineT } from "@/i18n/offline";
+
 /**
  * Every Hub request settles. A company Hub behind a VPN that is off does not refuse the
  * connection; the request just never answers, and an unbounded fetch kept the Host inventory
@@ -68,5 +70,5 @@ export async function withDeadline<T>(
 }
 
 function hubTimeoutMessage(timeoutMs: number): string {
-  return `The Hub did not answer within ${Math.round(timeoutMs / 1_000)} s`;
+  return offlineT("hub.timedOut", { seconds: Math.round(timeoutMs / 1_000) });
 }

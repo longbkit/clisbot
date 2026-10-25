@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { HostProfile } from "@/types/host-connection";
+import { offlineT } from "@/i18n/offline";
 import type { HostRuntimeDirectoryStatus, HostRuntimeSnapshot } from "./host-runtime";
 
 /**
@@ -55,7 +56,7 @@ function directoryHealth(
     loaded,
     syncing: status === "initial_loading" || status === "revalidating",
     pending: status === "idle",
-    error: failed ? (error ?? "Directory request failed") : null,
+    error: failed ? (error ?? offlineT("source.directoryFailed")) : null,
   };
 }
 

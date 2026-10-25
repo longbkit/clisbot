@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { type HubSourceHealth, useHubSourceHealth } from "@/clisbot/hub/hub-source-health";
+import { offlineT } from "@/i18n/offline";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import {
   getSourceHealthStore,
@@ -104,18 +105,21 @@ export function summarizeSourceHealth(
 
 /** Plain-language status for one source; Hub outages suggest a VPN without claiming it is off. */
 export function describeSourceProblem(status: SourceStatus, hubLabel?: string): string {
-  const hub = hubLabel ?? "The Hub";
+  const values = { source: status.label, hub: hubLabel ?? offlineT("theHub") };
   switch (status.problem) {
     case "hub-unreachable":
-      return `${status.label}: ${hub} is unreachable. If it is reached over a VPN, check that connection.`;
+      return offlineT("source.hubUnreachable", values);
     case "hub-sign-in":
-      return `${status.label}: sign in to ${hub} again.`;
+      return offlineT("source.hubSignIn", values);
     case "hub-revoked":
-      return `${status.label}: access was removed.`;
+      return offlineT("source.revoked", values);
     case "host-sign-in":
-      return `${status.label}: enter the Host password again.`;
+      return offlineT("source.hostSignIn", values);
     case "host-unreachable":
-      return `${status.label}: ${status.error ?? "Disconnected. Reconnect to refresh conversations."}`;
+      return offlineT("source.hostUnreachable", {
+        ...values,
+        error: status.error ?? offlineT("source.disconnected"),
+      });
     default:
       return status.label;
   }

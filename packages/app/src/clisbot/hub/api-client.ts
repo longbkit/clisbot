@@ -13,7 +13,7 @@ export class HubApiError extends Error {
   }
 }
 
-export { classifyHubFailure, type HubFailureKind } from "./hub-failure";
+export { classifyHubFailure, describeHubFailure, type HubFailureKind } from "./hub-failure";
 
 export class HubApiClient {
   constructor(

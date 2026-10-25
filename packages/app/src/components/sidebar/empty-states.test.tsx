@@ -27,7 +27,10 @@ vi.mock("@/stores/sidebar-view-store", () => ({
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("./sidebar-model", () => ({ useSidebarModel: () => ({ metadataRecoveryNotice: null }) }));
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("react-i18next", async (original) => ({
+  ...(await original<typeof import("react-i18next")>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onPress }: { children: React.ReactNode; onPress: () => void }) => (
     <button type="button" onClick={onPress}>
