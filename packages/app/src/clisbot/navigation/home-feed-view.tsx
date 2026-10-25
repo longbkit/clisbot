@@ -26,6 +26,8 @@ import { ICON_SIZE } from "@/styles/theme";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { RenderProfile } from "@/utils/render-profiler";
 import { HoldReadingPosition } from "./hold-reading-position";
+import { useHostsReachability } from "./hosts-status";
+import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { ListState } from "./list-state";
 import { useNavigationActivity } from "./activity";
 import type { HomeChip, HomeRow } from "./home-feed";
@@ -88,14 +90,16 @@ export function NavigationHomeFeed({
   // The chips and section titles already say what this is; the directory speaks only when it
   // fails, and loading is the skeleton.
   const failed = directoryHealth.status === "unavailable";
+  const offline = useHostsReachability() === "unreachable" && !accepted.length;
   const empty = !isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length;
   const hasActions = pending > 0 || unseen.length > 1;
-  const hasHeader = failed || isInitialLoad || empty || hasActions;
+  const hasHeader = failed || isInitialLoad || empty || hasActions || offline;
   return (
     <View style={styles.container} testID="home-activity">
       <HoldReadingPosition style={[styles.header, !hasHeader && styles.headerEmpty]}>
         {failed ? <DirectoryStatus health={directoryHealth} label="" inset={false} /> : null}
-        {isInitialLoad ? <ActivityPlaceholder /> : null}
+        {offline ? <HostsUnreachableState testID="home-feed-offline" withDetails={false} /> : null}
+        {isInitialLoad && !offline ? <ActivityPlaceholder /> : null}
         {empty ? (
           <ListState
             kind="empty"

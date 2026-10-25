@@ -34,6 +34,8 @@ import {
 import { ChatsDisplayMenu } from "./chats-display-menu";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { RenderProfile } from "@/utils/render-profiler";
+import { useHostsReachability } from "./hosts-status";
+import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { ListState } from "./list-state";
 import { useHeldOrder } from "./held-order";
 import { inScope } from "./ownership";
@@ -166,7 +168,9 @@ function ChatsListState({
   const { bots, chats } = catalog;
   const retryLabel = t("navigation.actions.retry");
   const retry = useMemo(() => ({ label: retryLabel, onPress: refreshBotsAndChats }), [retryLabel]);
+  const reach = useHostsReachability();
   const loaded = bots.loadState.status === "loaded" || chats.loadState.status === "loaded";
+  if (!loaded && reach === "unreachable") return <HostsUnreachableState testID="chats-offline" />;
   if (!loaded && !bots.error && !chats.error) return <ActivityPlaceholder />;
   if (!loaded)
     return (
