@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "../support/fixtures";
 import { expectComposerVisible } from "../support/helpers/composer";
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import {
@@ -13,7 +14,6 @@ import {
   closeSheet,
   expectOpenTabCount,
   openSheetAsTab,
-  expectDeclinedDiscardPrompt,
   expectSheetAtSnap,
   replaceSheetFileText,
   selectTabFromSwitcher,
@@ -146,11 +146,16 @@ test("compact opens files and subagents in a sheet, leaving the tabs for agents"
       await replaceSheetFileText(page, "linked.ts", "edited in the sheet");
       await gate.waitForHeldClientRequest();
 
-      await expectDeclinedDiscardPrompt(page, () => tapSheetBackdrop(page));
+      await tapSheetBackdrop(page);
+      const backdropConfirmation = await answerAppConfirmation(page, "dismiss");
+      expect(backdropConfirmation.message()).toContain("Closing it will discard the draft.");
+      await expect(fileSheet).toBeVisible();
       await expect(fileSheet.locator(".cm-content")).toHaveText("edited in the sheet");
-      await expectDeclinedDiscardPrompt(page, () =>
-        sheetHeader(page, "linked.ts").getByRole("button", { name: "Close" }).click(),
-      );
+      await sheetHeader(page, "linked.ts").getByRole("button", { name: "Close" }).click();
+      const closeConfirmation = await answerAppConfirmation(page, "dismiss");
+      expect(closeConfirmation.message()).toContain("Closing it will discard the draft.");
+      await expect(fileSheet).toBeVisible();
+      await expectOpenTabCount(page, 1);
       await expect(fileSheet.locator(".cm-content")).toHaveText("edited in the sheet");
 
       gate.releaseHeldClientRequest();

@@ -23,7 +23,9 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
   const logger = createTestLogger();
   const providerSnapshotManager = new ProviderSnapshotManager({ logger });
   const agentManager = new AgentManager({ logger });
-  const agentStorage = new AgentStorage(clisbotHome, logger);
+  // Match the daemon's agent namespace: schedule JSON must never be parsed as
+  // an agent record when strict session storage loads for a missing agent.
+  const agentStorage = new AgentStorage(path.join(clisbotHome, "agents"), logger);
   const unused = async (): Promise<never> => {
     throw new Error("Unexpected workspace or agent creation");
   };
@@ -102,6 +104,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
       path.join(clisbotHome, "schedules", "broken.json"),
       JSON.stringify({ id: "broken", prompt: 17 }),
     );
+    expect(await agentStorage.list()).toEqual([]);
     const observed = [];
     for (const [tool, body, expected] of [
       [

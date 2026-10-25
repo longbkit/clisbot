@@ -66,7 +66,12 @@ test("a silently lost Hub connection leaves connected state and reconnects when 
     serverId: "server-1",
     daemonPublicKey: "public-key",
     logger: pino({ level: "silent" }),
-    remote: new DirectHubRelationshipRemote(),
+    // Keep Clisbot's configurable production defaults. Exercise the incoming
+    // upstream 10s/45s policy explicitly rather than assuming it is the default.
+    remote: new DirectHubRelationshipRemote({
+      socketPingIntervalMs: 10_000,
+      socketStaleTimeoutMs: 45_000,
+    }),
     clock: {
       now: () => new Date(),
       schedule: (_delay, task) => {
@@ -100,12 +105,20 @@ test("a silently lost Hub connection leaves connected state and reconnects when 
     const connectedAt = controller.status().connectedAt;
 
     expect(connections).toBe(1);
+    // Establish a real ping/pong baseline before blackholing the path, so no
+    // handshake/pong left in the real I/O queue can reset the fake stale clock.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expect.poll(() => pongs).toBe(1);
 
     // Model the reported proxy request ending without a close reaching the daemon.
     dropped = true;
     for (const peer of peers) peer.terminate();
     await expect.poll(() => peers.size).toBe(0);
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(controller.status()).toMatchObject({ state: "connected", lastError: null });
+    expect(retry).toBeUndefined();
+    // The next 10s tick crosses the configured 45s no-frame threshold.
+    await vi.advanceTimersByTimeAsync(10_000);
     await expect.poll(() => controller.status().state).toBe("reconnecting");
     expect(controller.status().lastError).toBe("Hub WebSocket heartbeat timed out");
     expect(retry).toBeTypeOf("function");

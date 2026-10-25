@@ -50,7 +50,18 @@ test("a definitively rejected async answer stays pending and can be dismissed", 
       answer: "Keep the original status.",
     });
     await page.getByTestId("question-form-primary-action").click();
-    await expect(page.getByText(/The active Codex turn changed/)).toBeVisible();
+    // Questions deliberately display safe translated guidance, not provider errors.
+    await expect(page.getByTestId("question-form-card").getByRole("alert")).toContainText(
+      "Could not send your response. Try again.",
+    );
+    const rejectedCalls = (
+      await readFile(path.join(workspace.repoPath, "permission-fixture.jsonl"), "utf8")
+    )
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(rejectedCalls).toHaveLength(1);
+    expect(rejectedCalls[0].accepted).toBe(false);
     await page.screenshot({ path: testInfo.outputPath("rejected-answer.png") });
     await page.getByTestId("question-form-card").getByRole("button", { name: "Dismiss" }).click();
     await expect(page.getByTestId("question-form-card")).toHaveCount(0);
@@ -115,9 +126,9 @@ for (const recovery of ["Skip", "Send", "other-client"] as const) {
         .toBe(1);
       const accepted = (await client.fetchPermissionResponses(agent.id)).records[0];
       if (recovery !== "other-client")
-        await expect(page.getByText(/Timeout waiting for message/)).toBeVisible({
-          timeout: 25_000,
-        });
+        await expect(
+          page.getByTestId("question-form-card").first().getByRole("alert"),
+        ).toContainText("Could not send your response. Try again.", { timeout: 25_000 });
       await page.screenshot({ path: testInfo.outputPath("lost-ack-pending.png") });
       dropUpdates = false;
       const retry = recovery === "Send" ? "question-form-primary-action" : "question-form-dismiss";

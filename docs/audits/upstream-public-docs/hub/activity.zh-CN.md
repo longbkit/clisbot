@@ -4,6 +4,8 @@ description: 查看 Hub 如何处理一个事件，区分被过滤和未路由�
 nav: 活动
 ---
 
+> Archived upstream Chinese documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo), source `public-docs/hub/activity.zh-CN.md`. Describes Paseo's contract, not the current Clisbot guide. Excluded from clisbot.com/docs; this zh-CN page uses the current Clisbot English original until a reviewed translation matches its contract.
+
 # Hub 活动 {#hub-activity}
 
 Hub 接受的每个事件都会被记录，无论它是否运行了任何内容。这份记录就是你排查触发器的依据。

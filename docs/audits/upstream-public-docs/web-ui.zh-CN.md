@@ -1,12 +1,14 @@
 ---
 title: 自托管 Web UI
-description: 从你自己的 daemon 提供 Clisbot Web 应用，并通过你自己的局域网、VPN、反向代理或隧道访问它。
+description: 从你自己的 daemon 提供 Paseo Web 应用，并通过你自己的局域网、VPN、反向代理或隧道访问它。
 nav: Web UI
 ---
 
+> Archived upstream Chinese documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo), source `public-docs/web-ui.zh-CN.md`. Describes Paseo's contract, not the current Clisbot guide. Excluded from clisbot.com/docs; this zh-CN page uses the current Clisbot English original until a reviewed translation matches its contract.
+
 # 自托管 Web UI {#self-hosting-the-web-ui}
 
-Clisbot 的 daemon 可以自己提供浏览器 Web 应用，地址与它已用于 API 的地址相同。你不需要使用托管在 [app.clisbot.com](https://app.clisbot.com) 的应用：让浏览器指向你自己的 daemon，就能获得完整的 UI，连接到你自己的 Agent，运行在你掌控的基础设施上。
+Paseo 的 daemon 可以自己提供浏览器 Web 应用，地址与它已用于 API 的地址相同。你不需要使用托管在 [app.paseo.sh](https://app.paseo.sh) 的应用：让浏览器指向你自己的 daemon，就能获得完整的 UI，连接到你自己的 Agent，运行在你掌控的基础设施上。
 
 以下情况适合这样做：
 
@@ -21,14 +23,14 @@ Web 应用随 daemon 软件包一起发布，因此你提供的 UI 总是与 dae
 内置的 Web UI 默认关闭。保存设置，然后启动 daemon：
 
 ```bash
-clisbot daemon config set features.webUi.enabled true
-clisbot daemon start
+paseo daemon config set features.webUi.enabled true
+paseo daemon start
 ```
 
 或者用环境变量运行一个前台部署：
 
 ```bash
-CLISBOT_WEB_UI_ENABLED=true clisbot daemon run
+PASEO_WEB_UI_ENABLED=true paseo daemon run
 ```
 
 或者把它持久化到 `config.json` 中，使其在重启后依然生效：
@@ -46,14 +48,14 @@ CLISBOT_WEB_UI_ENABLED=true clisbot daemon run
 然后在浏览器中打开 daemon 的地址：
 
 ```
-http://localhost:6868/
+http://localhost:6767/
 ```
 
 如果你的 daemon 不认识 `--web-ui`，请更新它；这个参数是随内置 Web UI 一起加入的。
 
 ## 连接的工作方式 {#how-the-connection-works}
 
-页面与 daemon 的 API 和 WebSocket 来自同一个源。打开页面时，应用会自动连接回同一个源，因此你通常可以完全跳过“添加主机”步骤：打开 `http://localhost:6868/`，就能看到你的 Agent。
+页面与 daemon 的 API 和 WebSocket 来自同一个源。打开页面时，应用会自动连接回同一个源，因此你通常可以完全跳过“添加主机”步骤：打开 `http://localhost:6767/`，就能看到你的 Agent。
 
 同一个 HTTP 服务器继续提供 API（`/api/*`）、MCP（`/mcp/*`）、服务代理路由和 WebSocket 升级。新增的只有静态文件。要让提供的 UI 指向*另一个* daemon，请照常在 UI 中把那个 daemon 添加为主机。
 
@@ -61,7 +63,7 @@ http://localhost:6868/
 
 三种常见的运行方式，按暴露程度从低到高排列：
 
-- **同一台机器。** daemon 和浏览器在同一台机器上。打开 `http://localhost:6868/`，无需其他配置。
+- **同一台机器。** daemon 和浏览器在同一台机器上。打开 `http://localhost:6767/`，无需其他配置。
 - **私有网络（局域网或 VPN）。** 从你信任的网络中的其他设备访问 daemon，例如家庭局域网或 [Tailscale](https://tailscale.com) tailnet。完整的直接连接设置见[连接方式指南](/docs/connectivity#tailscale)。
 - **公开的反向代理或隧道。** 通过 HTTPS 在一个域名上暴露 UI，在反向代理或隧道处终止 TLS。这是完整的自托管设置。
 
@@ -69,11 +71,11 @@ http://localhost:6868/
 
 ## 在 localhost 之外暴露 {#exposing-beyond-localhost}
 
-daemon 默认监听 `127.0.0.1:6868`，只能从同一台机器访问。要从其他设备访问，请把它绑定到某个网络接口：
+daemon 默认监听 `127.0.0.1:6767`，只能从同一台机器访问。要从其他设备访问，请把它绑定到某个网络接口：
 
 ```bash
-clisbot daemon config set daemon.listen 0.0.0.0:6868
-clisbot daemon start
+paseo daemon config set daemon.listen 0.0.0.0:6767
+paseo daemon start
 ```
 
 > **任何能访问该监听地址的人都可以使用你的 Agent**。在绑定到 localhost 之外之前，请设置密码并检查你的主机白名单。中继配对方式让 daemon 保持绑定在 localhost 上，从而完全避免这个问题，见[安全](/docs/security)。
@@ -83,7 +85,7 @@ clisbot daemon start
 1. **设置密码**，只让获得授权的客户端连接：
 
    ```bash
-   clisbot daemon set-password
+   paseo daemon set-password
    ```
 
    持久化设置见[密码验证](/docs/configuration#password-authentication)。密码验证控制访问，但不加密流量；在任何不受信任的网络上，请在它前面加上 TLS（见下文）。
@@ -91,7 +93,7 @@ clisbot daemon start
 2. **允许你的主机名**，让 daemon 的 DNS 重绑定防护接受发往你的域名的请求：
 
    ```bash
-   clisbot daemon config set daemon.hostnames '[".example.com"]'
+   paseo daemon config set daemon.hostnames '[".example.com"]'
    ```
 
    主机白名单的工作方式见 [DNS 重绑定防护](/docs/security#dns-rebinding-protection)。
@@ -120,15 +122,15 @@ map $http_upgrade $connection_upgrade {
 
 server {
   listen 443 ssl;
-  server_name clisbot.example.com;
+  server_name paseo.example.com;
 
-  ssl_certificate     /etc/letsencrypt/live/clisbot.example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/clisbot.example.com/privkey.pem;
+  ssl_certificate     /etc/letsencrypt/live/paseo.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/paseo.example.com/privkey.pem;
 
   client_max_body_size 100m;
 
   location / {
-    proxy_pass http://127.0.0.1:6868;
+    proxy_pass http://127.0.0.1:6767;
     proxy_http_version 1.1;
 
     # WebSocket upgrade
@@ -153,8 +155,8 @@ server {
 Caddy 会为你处理 TLS、WebSocket 升级、请求头转发和流式传输：
 
 ```caddy
-clisbot.example.com {
-  reverse_proxy 127.0.0.1:6868
+paseo.example.com {
+  reverse_proxy 127.0.0.1:6767
 }
 ```
 
@@ -164,7 +166,7 @@ clisbot.example.com {
 
 在代理（或隧道）处终止 TLS，并通过 localhost 上的普通 HTTP 转发给 daemon，上面的配置就是这样做的。当页面通过 HTTPS 提供且代理传递 `X-Forwarded-Proto: https` 时，应用会自动通过 `wss://` 连接回来。你不需要在任何地方配置协议；它跟随边缘节点。
 
-daemon 默认信任来自回环地址代理的转发请求头，上面所有的设置都是如此：代理或隧道转发到 `127.0.0.1:6868`。
+daemon 默认信任来自回环地址代理的转发请求头，上面所有的设置都是如此：代理或隧道转发到 `127.0.0.1:6767`。
 
 如果你的代理从其他地址访问 daemon，例如在某些 Docker、局域网或负载均衡器设置中，请配置受信任的代理范围：
 
@@ -176,17 +178,17 @@ daemon 默认信任来自回环地址代理的转发请求头，上面所有的�
 }
 ```
 
-`CLISBOT_TRUSTED_PROXIES` 接受相同的逗号分隔值：
+`PASEO_TRUSTED_PROXIES` 接受相同的逗号分隔值：
 
 ```bash
-CLISBOT_TRUSTED_PROXIES=loopback,172.16.0.0/12 CLISBOT_WEB_UI_ENABLED=true clisbot daemon run
+PASEO_TRUSTED_PROXIES=loopback,172.16.0.0/12 PASEO_WEB_UI_ENABLED=true paseo daemon run
 ```
 
 只有当你最后一层受信任的代理会覆盖客户端提供的 `X-Forwarded-*` 请求头时，才使用 `trustedProxies: true`。否则客户端可以伪造转发请求头的值。
 
 如果你通过 HTTPS 提供 UI，但应用尝试通过 `ws://` 连接（浏览器会把它当作混合内容拦截），说明你的代理没有转发 `X-Forwarded-Proto`，或者 daemon 不信任代理的地址。修复相应的那一项。
 
-对于远程或中继方式（通过 Clisbot 中继而不是反向代理驱动 daemon），中继有它自己的公开与内部 TLS 设置，见[安全](/docs/security)。
+对于远程或中继方式（通过 Paseo 中继而不是反向代理驱动 daemon），中继有它自己的公开与内部 TLS 设置，见[安全](/docs/security)。
 
 ## 隧道 {#tunnels}
 
@@ -195,7 +197,7 @@ CLISBOT_TRUSTED_PROXIES=loopback,172.16.0.0/12 CLISBOT_WEB_UI_ENABLED=true clisb
 - **Tailscale Serve** 把它保留在你的 tailnet 内，不公开暴露，并为你处理 TLS：
 
   ```bash
-  tailscale serve --bg http://127.0.0.1:6868
+  tailscale serve --bg http://127.0.0.1:6767
   ```
 
   通过 `https://<your-machine>.<tailnet>.ts.net/` 访问。只有你的 tailnet 中的设备可以连接。
@@ -203,7 +205,7 @@ CLISBOT_TRUSTED_PROXIES=loopback,172.16.0.0/12 CLISBOT_WEB_UI_ENABLED=true clisb
 - **Cloudflare Tunnel** 通过一个支持 TLS 和 WebSocket 的公开主机名暴露它：
 
   ```bash
-  cloudflared tunnel --url http://localhost:6868
+  cloudflared tunnel --url http://localhost:6767
   ```
 
   Cloudflare 会终止 TLS 并设置 `X-Forwarded-Proto: https`，因此自动连接可以正常工作。由于 URL 是公开的，**请设置 daemon 密码**。
@@ -217,11 +219,11 @@ CLISBOT_TRUSTED_PROXIES=loopback,172.16.0.0/12 CLISBOT_WEB_UI_ENABLED=true clisb
 - **尽可能让 daemon 保持在 localhost 上**，只让反向代理或隧道对外暴露。
 - **在自定义域名上提供服务时，检查你的主机白名单。**
 
-完整的威胁模型、中继加密和 DNS 重绑定细节，见[安全](/docs/security)和 [SECURITY.md](https://github.com/longbkit/clisbot/blob/main/SECURITY.md)。
+完整的威胁模型、中继加密和 DNS 重绑定细节，见[安全](/docs/security)和 [SECURITY.md](https://github.com/getpaseo/paseo/blob/main/SECURITY.md)。
 
 ## 故障排查 {#troubleshooting}
 
-- **`/` 显示空白页或 404。** Web UI 没有启用。用 `--web-ui` 启动 daemon，并用 `clisbot daemon status` 确认你访问的就是这个 daemon。
+- **`/` 显示空白页或 404。** Web UI 没有启用。用 `--web-ui` 启动 daemon，并用 `paseo daemon status` 确认你访问的就是这个 daemon。
 - **页面加载了但一直连不上。** 代理没有转发 WebSocket 升级，或者剥离了 `Host` 请求头。检查代理配置中的升级请求头。
 - **连上之后输出卡住。** 开启了响应缓冲，或者读取超时太短。关闭缓冲并提高超时时间。
 - **HTTPS 下出现“Mixed content”或连接被拦截。** 应用退回到了 `ws://`。要么代理没有发送 `X-Forwarded-Proto: https`，要么 daemon 不信任代理的地址。转发该请求头；如果代理不在回环地址上，再配置 `daemon.trustedProxies`。
@@ -232,5 +234,5 @@ CLISBOT_TRUSTED_PROXIES=loopback,172.16.0.0/12 CLISBOT_WEB_UI_ENABLED=true clisb
 
 - [安全](/docs/security)：连接方式、中继加密、密码验证、主机白名单。
 - [配置](/docs/configuration)：`config.json`、环境变量和 CLI 覆盖项。
-- [CLI](/docs/cli)：`clisbot daemon` 命令。
+- [CLI](/docs/cli)：`paseo daemon` 命令。
 - [社区项目](/docs/community)：社区构建的自托管工具。

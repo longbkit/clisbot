@@ -667,8 +667,9 @@ async function switchToJapanese(page: Page) {
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await openSettings(page);
   await openSettingsSection(page, "general");
-  await page.getByRole("button", { name: "System", exact: true }).click();
-  await page.getByRole("menuitem", { name: "日本語 - Japanese", exact: true }).click();
+  await page.getByTestId("language-settings-card").getByTestId("language-dropdown").click();
+  await page.getByRole("menuitem", { name: "日本語", exact: true }).click();
+  await expect(page.getByTestId("language-dropdown")).toHaveText("日本語");
   await page.getByRole("button", { name: "戻る", exact: true }).click();
 }
 

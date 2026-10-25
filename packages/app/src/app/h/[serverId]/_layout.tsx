@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Redirect, Stack, useLocalSearchParams } from "expo-router";
 import { useHostRuntimeBootstrapState } from "@/app/_layout";
 import { HostRouteProvider } from "@/navigation/host-route-context";
@@ -33,10 +34,18 @@ function KnownHostRoute() {
     hosts,
   });
 
-  if (startupRoute.kind === "redirect") {
-    // A Host route never navigates away on its own: a missing Host is shown where the reader is,
-    // with the choices, and the route renders it again once it is registered.
-    if (routeServerId !== null) return <HostUnavailableScreen serverId={routeServerId} />;
+  // The Host navigator owns the existing leaf path even after its inventory entry
+  // disappears. Replace its leaf contents, not the navigator: unmounting the stack
+  // loses the workspace segment and lets web history serialize it as a query param.
+  const unavailableContent = useMemo(
+    () =>
+      startupRoute.kind === "redirect" && routeServerId !== null ? (
+        <HostUnavailableScreen serverId={routeServerId} />
+      ) : undefined,
+    [startupRoute.kind, routeServerId],
+  );
+
+  if (startupRoute.kind === "redirect" && routeServerId === null) {
     return <Redirect href={startupRoute.href} />;
   }
 
@@ -44,6 +53,7 @@ function KnownHostRoute() {
     <ThemedStack
       screenOptions={HOST_STACK_SCREEN_OPTIONS}
       screenOwnedAppearance={SCREEN_OWNED_APPEARANCE}
+      screenContentFallback={unavailableContent}
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="workspace/[workspaceId]/index" />

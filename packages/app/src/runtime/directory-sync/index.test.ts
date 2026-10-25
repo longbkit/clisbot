@@ -1964,3 +1964,104 @@ describe("independent workspace directory lifecycle", () => {
     directory.dispose();
   });
 });
+
+describe("directory demand cancellation", () => {
+  // The real client's owned subscription rejects pending ready on release.
+  // The general fixture only stops updates, so model that contract explicitly here.
+  function cancelableSubscription<T>(snapshot: Promise<T>) {
+    let cancel!: (error: Error) => void;
+    const canceled = new Promise<never>((_resolve, reject) => {
+      cancel = reject;
+    });
+    const subscription = subscriptionFixture(Promise.race([snapshot, canceled]), () => () => {});
+    return {
+      ...subscription,
+      release: async () => {
+        cancel(new Error("Subscription released"));
+        await subscription.release();
+      },
+    };
+  }
+
+  function createDemandDirectory(serverId: string) {
+    const callbacks = { markAgentReady: vi.fn(), markWorkspaceReady: vi.fn() };
+    const result = createDirectory(serverId, { callbacks });
+    const { client } = result;
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, client as unknown as DaemonClient, 1);
+    store.updateSessionServerInfo(serverId, {
+      serverId,
+      hostname: null,
+      version: "test",
+      features: { workspaceMultiplicity: true },
+    });
+    vi.spyOn(client, "observeAgents").mockImplementation((options) =>
+      cancelableSubscription(client.fetchAgents(options)),
+    );
+    vi.spyOn(client, "observeWorkspaces").mockImplementation((options) =>
+      cancelableSubscription(client.fetchWorkspaces(options)),
+    );
+    return { ...result, callbacks };
+  }
+
+  it("restarts exactly once when demand returns before released snapshots settle", async () => {
+    const serverId = "demand-reacquired-same-connection";
+    const { client, directory, callbacks } = createDemandDirectory(serverId);
+    const finishOldAgents = client.holdAgentFetch();
+    const finishOldWorkspaces = client.holdWorkspaceFetch();
+    const oldConsumer = {};
+    directory.setDemand(oldConsumer, true);
+    await expect.poll(() => client.fetchAgentsCalls).toBe(1);
+    await expect.poll(() => client.fetchWorkspacesCalls).toBe(1);
+    directory.setDemand(oldConsumer, false);
+    directory.setDemand({}, true);
+    await expect.poll(() => callbacks.markWorkspaceReady.mock.calls.length).toBe(1);
+    await expect.poll(() => callbacks.markAgentReady.mock.calls.length).toBe(1);
+    expect(client.fetchAgentsCalls).toBe(2);
+    expect(client.fetchWorkspacesCalls).toBe(2);
+    expect(useSessionStore.getState().sessions[serverId].hasHydratedWorkspaces).toBe(true);
+
+    // A late response to the released snapshot cannot replace the new baseline.
+    finishOldAgents({
+      requestId: "old-agents",
+      entries: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    finishOldWorkspaces({
+      requestId: "old-workspaces",
+      entries: [createWorkspaceEntry("obsolete")],
+      emptyProjects: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useSessionStore.getState().sessions[serverId].workspaces.size).toBe(0);
+    expect(client.fetchAgentsCalls).toBe(2);
+    expect(client.fetchWorkspacesCalls).toBe(2);
+    directory.dispose();
+  });
+
+  it("does not restart a canceled refresh when no consumer returns", async () => {
+    const { client, directory } = createDemandDirectory("demand-canceled-no-consumer");
+    client.holdAgentFetch();
+    client.holdWorkspaceFetch();
+    const consumer = {};
+    directory.setDemand(consumer, true);
+    await expect.poll(() => client.fetchWorkspacesCalls).toBe(1);
+    directory.setDemand(consumer, false);
+    await expect(directory.refreshDemand()).rejects.toThrow("Subscription released");
+    expect(client.fetchAgentsCalls).toBe(1);
+    expect(client.fetchWorkspacesCalls).toBe(1);
+    directory.dispose();
+  });
+
+  it("does not retry a backend failure without a demand or connection change", async () => {
+    const { client, directory } = createDemandDirectory("demand-backend-error");
+    client.workspaceError = new Error("Backend denied directory");
+    directory.setDemand({}, true);
+    await expect(directory.refreshDemand()).rejects.toThrow("Backend denied directory");
+    expect(client.fetchAgentsCalls).toBe(1);
+    expect(client.fetchWorkspacesCalls).toBe(1);
+    directory.dispose();
+  });
+});

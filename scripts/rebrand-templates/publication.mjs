@@ -1,20 +1,50 @@
 // Product identity and inherited editorial material need contextual transforms.
 // Keep this module outside the general text replacement, like the README templates.
 import { rebrandPorts } from "./ports.mjs";
+import { rebrandHubDocs } from "./hub-docs.mjs";
 const upstreamPost = /^(?:hello-world|i-was-wrong-about-electron)(?:\.[A-Za-z0-9-]+)?\.md$/;
 const postsRoot = "packages/website/posts/";
+const hostedHubDoc = /^public-docs\/hub\/hosted(?:\.[A-Za-z0-9-]+)?\.md$/;
+
+// Reviewed v0.13.0 translations describe upstream contracts, not these fork-owned guides.
+// Exact zh-CN paths only: new pages/locales still require individual publication review.
+const divergentChineseDocs = new Set([
+  "public-docs/index.zh-CN.md",
+  "public-docs/connectivity.zh-CN.md",
+  "public-docs/docker.zh-CN.md",
+  "public-docs/web-ui.zh-CN.md",
+  "public-docs/cli.zh-CN.md",
+  "public-docs/hub/index.zh-CN.md",
+  "public-docs/hub/quickstart.zh-CN.md",
+  "public-docs/hub/concepts.zh-CN.md",
+  "public-docs/hub/daemons.zh-CN.md",
+  "public-docs/hub/triggers/github.zh-CN.md",
+  "public-docs/hub/configuration/index.zh-CN.md",
+  "public-docs/hub/configuration/hub-yml.zh-CN.md",
+  "public-docs/hub/activity.zh-CN.md",
+  "public-docs/hub/faq.zh-CN.md",
+  "public-docs/hub/security.zh-CN.md",
+]);
 
 export function publicationPath(path) {
+  if (hostedHubDoc.test(path) || divergentChineseDocs.has(path)) {
+    return `docs/audits/upstream-public-docs/${path.slice("public-docs/".length)}`;
+  }
   const name = path.slice(postsRoot.length);
   return path.startsWith(postsRoot) && upstreamPost.test(name)
     ? `${postsRoot}upstream/${name}`
     : path;
 }
 
-export function rebrandPublication(path, input, { repoSlug }) {
+export function rebrandPublication(path, input, { repoSlug, original = input, siteHost }) {
   input = rebrandPorts(path, input);
-  if (path === "public-docs/hub/self-hosting/index.md") return rebrandHub(path, input, repoSlug);
+  if (path === "public-docs/hub/self-hosting/index.md") {
+    return rebrandHubDocs(path, rebrandHub(path, input, repoSlug), siteHost);
+  }
   if (path.startsWith("packages/hub/")) return rebrandHub(path, input, repoSlug);
+  if (hostedHubDoc.test(path)) return archiveHostedHubDoc(original);
+  if (divergentChineseDocs.has(path)) return archiveDivergentDoc(path, original);
+  input = rebrandHubDocs(path, input, siteHost);
   if (publicationPath(path) !== path) return archivePost(input);
   if (path === "packages/website/src/components/legal-page.tsx") {
     return rebrandLegal(input).replace(
@@ -89,6 +119,21 @@ function rebrandLegal(input) {
     .replaceAll("Mohamed Boudra Ziani", "Long Luong")
     .replaceAll("hello@moboudra.com", "clisbot@gmail.com")
     .replace('lastUpdated="August 29, 2026"', 'lastUpdated="September 30, 2026"');
+}
+
+function archiveDivergentDoc(path, input) {
+  const frontmatter = input.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+  if (!frontmatter) throw new Error(`Review upstream translated guide before archiving: ${path}`);
+  const notice = `Archived upstream Chinese documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo), source \`${path}\`. Describes Paseo's contract, not the current Clisbot guide. Excluded from clisbot.com/docs; this zh-CN page uses the current Clisbot English original until a reviewed translation matches its contract.`;
+  return input.replace(frontmatter[0], `${frontmatter[0]}\n> ${notice}\n`);
+}
+
+function archiveHostedHubDoc(input) {
+  const frontmatter = input.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+  if (!frontmatter) throw new Error("Review upstream Hosted Hub frontmatter before archiving");
+  const notice =
+    "Archived upstream Hosted Hub documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo). Describes Paseo’s service, not a Clisbot-operated service. Excluded from clisbot.com/docs; Clisbot removed its Hosted Hub page in commit `7e68c03e28dea323adc3c52356cea0d2698313c1`.";
+  return input.replace(frontmatter[0], `${frontmatter[0]}\n> ${notice}\n`);
 }
 
 function archivePost(input) {

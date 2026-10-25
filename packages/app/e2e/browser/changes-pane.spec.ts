@@ -941,8 +941,9 @@ test("compact Explorer renders inline hunks with a saved tree-only desktop prefe
   await expect(explorer.getByTestId("git-diff-canvas")).toBeVisible();
   await expect(explorer.getByTestId("diff-file-0-toggle")).toBeVisible();
   await explorer.getByTestId("diff-file-0-toggle").click({ button: "right" });
-  page.once("dialog", (dialog) => dialog.accept());
+  const confirmation = answerAppConfirmation(page, "accept");
   await page.getByTestId("diff-file-0-revert").click();
+  expect((await confirmation).message()).toContain("src/use-mounted-tab-set.ts");
   await expect
     .poll(() => readFile(path.join(workspace.repoPath, "src/use-mounted-tab-set.ts"), "utf8"))
     .toBe(BEFORE);

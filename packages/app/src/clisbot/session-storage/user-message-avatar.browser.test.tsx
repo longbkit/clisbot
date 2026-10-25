@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -44,7 +44,28 @@ vi.mock("react-native-unistyles", async () => {
           ? (styles as (theme: typeof lightTheme) => T)(lightTheme)
           : styles,
     },
-    withUnistyles: <T,>(component: T): T => component,
+    // Keep the real renderer's theme-prop bridge: an identity wrapper silently drops
+    // MarkdownRenderer's uniProps and renders the library defaults instead of Clisbot spacing.
+    withUnistyles: <T,>(
+      component: T,
+      mapping?: (theme: typeof lightTheme, runtime: { breakpoint: string }) => object,
+    ): T => {
+      function TestStyled({
+        uniProps,
+        ...props
+      }: Record<string, unknown> & {
+        uniProps?: object | ((theme: typeof lightTheme, runtime: { breakpoint: string }) => object);
+      }) {
+        const runtime = { breakpoint: window.innerWidth < 500 ? "xs" : "lg" };
+        const themed = typeof uniProps === "function" ? uniProps(lightTheme, runtime) : uniProps;
+        return React.createElement(component as React.ComponentType<Record<string, unknown>>, {
+          ...mapping?.(lightTheme, runtime),
+          ...props,
+          ...themed,
+        });
+      }
+      return TestStyled as T;
+    },
     useUnistyles: () => ({
       theme: lightTheme,
       rt: { breakpoint: window.innerWidth < 500 ? "xs" : "lg" },
@@ -236,23 +257,49 @@ function renderReply(message: string, underSenderName: boolean) {
     </AssistantFileLinkResolverProvider>,
   );
   const container = view.container.querySelector<HTMLElement>('[data-testid="assistant-message"]')!;
-  return { container, firstBlock: container.firstElementChild as HTMLElement };
+  return { container };
 }
 
-it("drops the leading heading margin only for the reply under a sender name", () => {
-  // theme.spacing[6] = 24 cancels the h1 marginTop so the face meets the text.
+it("keeps a leading heading flush under a sender name and retains continuation spacing", async () => {
   const under = renderReply("# Answer\n\nbody", true);
-  expect(under.firstBlock.style.marginTop).toBe("-24px");
+  const underHeading = await within(under.container).findByRole("heading", {
+    name: "Answer",
+    level: 1,
+  });
+  const body = within(under.container).getByText("body", { exact: true });
+  // The new Markdown engine styles the actual heading with zero top margin; no negative
+  // wrapper compensation is needed. Check the rendered boxes, not the wrapper DOM shape.
+  expect(getComputedStyle(underHeading).marginTop).toBe("0px");
   expect(getComputedStyle(under.container).paddingTop).toBe("0px");
+  expect(
+    Math.abs(
+      underHeading.getBoundingClientRect().top - under.container.getBoundingClientRect().top,
+    ),
+  ).toBeLessThan(1);
+  expect(
+    body.getBoundingClientRect().top - underHeading.getBoundingClientRect().bottom,
+  ).toBeGreaterThan(0);
   cleanup();
 
-  // A reply further down the same response keeps upstream markdown spacing.
   const inside = renderReply("# Answer\n\nbody", false);
-  expect(Number.parseFloat(inside.firstBlock.style.marginTop || "0")).toBe(0);
-  expect(getComputedStyle(inside.container).paddingTop).not.toBe("0px");
+  const insideHeading = await within(inside.container).findByRole("heading", {
+    name: "Answer",
+    level: 1,
+  });
+  const continuationPadding = Number.parseFloat(getComputedStyle(inside.container).paddingTop);
+  expect(continuationPadding).toBeGreaterThan(0);
+  expect(getComputedStyle(insideHeading).marginTop).toBe("0px");
+  expect(
+    insideHeading.getBoundingClientRect().top - inside.container.getBoundingClientRect().top,
+  ).toBeCloseTo(continuationPadding, 1);
 });
 
-it("keeps a leading paragraph flush without a negative margin", () => {
-  const { firstBlock } = renderReply("plain reply", true);
-  expect(Number.parseFloat(firstBlock.style.marginTop || "0")).toBe(0);
+it("keeps a leading paragraph flush without a negative margin", async () => {
+  const { container } = renderReply("plain reply", true);
+  const paragraph = await within(container).findByText("plain reply", { exact: true });
+  expect(paragraph.tagName).toBe("P");
+  expect(getComputedStyle(paragraph).marginTop).toBe("0px");
+  expect(
+    Math.abs(paragraph.getBoundingClientRect().top - container.getBoundingClientRect().top),
+  ).toBeLessThan(1);
 });

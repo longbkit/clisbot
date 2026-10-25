@@ -553,6 +553,91 @@ test("keeps Clisbot publication identity and archives upstream endorsements idem
   }
 });
 
+test("archives upstream hosted Hub docs in every locale without inventing a Clisbot service", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-hosted-docs-"));
+  git(root, "init", "-q");
+  for (const name of ["hosted.md", "hosted.zh-CN.md"]) {
+    put(
+      root,
+      `public-docs/hub/${name}`,
+      '---\ntitle: "Hosted Paseo Hub"\n---\n[Paseo Hub](https://hub.paseo.sh) offers hosted plans.\n',
+    );
+  }
+  put(root, "public-docs/hub/self-hosting/index.md", "Run your own Paseo Hub.\n");
+  git(root, "add", "-A");
+  const args = [script, "--root", root];
+  execFileSync("node", [...args, "--apply"]);
+  git(root, "add", "-A");
+  assert.equal(
+    JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" })).changedFiles,
+    0,
+  );
+  for (const name of ["hosted.md", "hosted.zh-CN.md"]) {
+    assert.throws(() => readFileSync(join(root, "public-docs/hub", name)), { code: "ENOENT" });
+    const archived = readFileSync(join(root, "docs/audits/upstream-public-docs/hub", name), "utf8");
+    assert.match(archived, /Excluded from clisbot\.com\/docs/);
+    assert.match(archived, /\[Paseo Hub\]\(https:\/\/hub\.paseo\.sh\)/);
+    assert.doesNotMatch(archived, /https:\/\/hub\.clisbot\.com/);
+  }
+  assert.match(
+    readFileSync(join(root, "public-docs/hub/self-hosting/index.md"), "utf8"),
+    /Run your own Clisbot Hub/,
+  );
+});
+
+test("archives only the fifteen reviewed divergent Chinese guides and preserves raw upstream bytes", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-doc-fallbacks-"));
+  git(root, "init", "-q");
+  const paths = [
+    "public-docs/index.zh-CN.md",
+    "public-docs/connectivity.zh-CN.md",
+    "public-docs/docker.zh-CN.md",
+    "public-docs/web-ui.zh-CN.md",
+    "public-docs/cli.zh-CN.md",
+    "public-docs/hub/index.zh-CN.md",
+    "public-docs/hub/quickstart.zh-CN.md",
+    "public-docs/hub/concepts.zh-CN.md",
+    "public-docs/hub/daemons.zh-CN.md",
+    "public-docs/hub/triggers/github.zh-CN.md",
+    "public-docs/hub/configuration/index.zh-CN.md",
+    "public-docs/hub/configuration/hub-yml.zh-CN.md",
+    "public-docs/hub/activity.zh-CN.md",
+    "public-docs/hub/faq.zh-CN.md",
+    "public-docs/hub/security.zh-CN.md",
+  ];
+  const raw =
+    "---\ntitle: Paseo 原文\n---\n# Paseo\n\nUpstream contract uses https://hub.paseo.sh and port 6767.\n";
+  for (const path of paths) put(root, path, raw);
+  const untouched = [
+    "public-docs/hub/api.zh-CN.md",
+    "public-docs/hub/new-guide.zh-CN.md",
+    "public-docs/hub/quickstart.fr.md",
+    "public-docs/hub/quickstart.md",
+  ];
+  for (const path of untouched) put(root, path, "---\ntitle: Guide\n---\nReviewed content.\n");
+  git(root, "add", "-A");
+  const args = [script, "--root", root];
+  execFileSync("node", [...args, "--apply"]);
+  for (const path of paths) {
+    assert.throws(() => readFileSync(join(root, path)), { code: "ENOENT" });
+    const target = path.replace("public-docs/", "docs/audits/upstream-public-docs/");
+    const archived = readFileSync(join(root, target), "utf8");
+    assert.match(archived, /Archived upstream Chinese documentation/);
+    assert.match(archived, /Excluded from clisbot\.com\/docs/);
+    assert.ok(archived.includes(`source \`${path}\``));
+    // Removing the one provenance line recovers the exact original, not a renamed copy.
+    assert.equal(archived.replace(/\n> Archived upstream Chinese documentation[^\n]*\n/, ""), raw);
+  }
+  for (const path of untouched) {
+    assert.match(readFileSync(join(root, path), "utf8"), /Reviewed content/);
+  }
+  git(root, "add", "-A");
+  assert.equal(
+    JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" })).changedFiles,
+    0,
+  );
+});
+
 test("stops on unfamiliar testimonial markup before applying any rename", () => {
   const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-editorial-"));
   git(root, "init", "-q");

@@ -51,13 +51,18 @@ async function openNamedWorkspace(page: Page, names: typeof labels.long) {
 }
 
 async function expectHeaderContentsFit(page: Page, info: TestInfo, long: boolean) {
-  const menu = page.getByTestId("menu-button").filter({ visible: true });
+  // Home V2 uses Back for a workspace detail; the workspace actions menu is separate.
+  const back = page.getByTestId("chat-back").filter({ visible: true });
+  const actions = page.getByTestId("workspace-header-menu-trigger");
+  const explorer = page.getByTestId("workspace-explorer-toggle").filter({ visible: true });
   const title = page.getByTestId("workspace-header-title");
   const project = page.getByTestId("workspace-header-subtitle");
   const badge = page.getByTestId(`host-badge-${getServerId()}`).filter({ visible: true });
   const trigger = page.getByRole("button", { name: /Switch tabs/ });
   const measure = async () => ({
-    menu: await menu.boundingBox(),
+    back: await back.boundingBox(),
+    actions: await actions.boundingBox(),
+    explorer: await explorer.boundingBox(),
     title: await title.boundingBox(),
     project: await project.boundingBox(),
     badge: await badge.boundingBox(),
@@ -66,35 +71,57 @@ async function expectHeaderContentsFit(page: Page, info: TestInfo, long: boolean
     titleTruncated: await title.evaluate((el) => el.scrollWidth > el.clientWidth),
     projectTruncated: await project.evaluate((el) => el.scrollWidth > el.clientWidth),
   });
+  await expect(back).toBeVisible();
+  await expect(back).toHaveAccessibleName("Back");
+  await expect(actions).toBeVisible();
+  await expect(explorer).toBeVisible();
   await page.screenshot({ path: info.outputPath("header.png") });
-  await expect(async () => {
-    const bounds = await measure();
-    expect(bounds.menu).not.toBeNull();
-    expect(bounds.title).not.toBeNull();
-    expect(bounds.project).not.toBeNull();
-    expect(bounds.badge).not.toBeNull();
-    expect(bounds.icon).not.toBeNull();
-    expect(bounds.trigger).not.toBeNull();
-    // Identity owns the tab-list trigger; Back and the useful actions stay outside it.
-    expect(bounds.trigger!.width).toBeGreaterThanOrEqual(48);
-    expect(bounds.trigger!.height).toBeGreaterThanOrEqual(48);
-    for (const box of [bounds.title!, bounds.project!, bounds.badge!, bounds.icon!]) {
-      expect(box.x).toBeGreaterThanOrEqual(bounds.trigger!.x);
-      expect(box.x + box.width).toBeLessThanOrEqual(bounds.trigger!.x + bounds.trigger!.width + 1);
-    }
-    expect(bounds.project!.x).toBe(bounds.title!.x);
-    expect(bounds.project!.width).toBeGreaterThan(20);
-    // Long labels truncate instead of squeezing the host icon.
-    expect(bounds.icon!.width).toBe(bounds.icon!.height);
-    expect(bounds.badge!.x).toBeGreaterThan(bounds.project!.x + bounds.project!.width);
-    expect(bounds.titleTruncated).toBe(long);
-    // A 320px header can truncate even a short Project beside the retained Host icon.
-    if (long) expect(bounds.projectTruncated).toBe(true);
-  }).toPass({ timeout: 5_000 });
-  await info.attach("header-bounds", {
-    body: JSON.stringify(await measure(), null, 2),
-    contentType: "application/json",
-  });
+  try {
+    await expect(async () => {
+      const bounds = await measure();
+      expect(bounds.back).not.toBeNull();
+      expect(bounds.actions).not.toBeNull();
+      expect(bounds.explorer).not.toBeNull();
+      expect(bounds.title).not.toBeNull();
+      expect(bounds.project).not.toBeNull();
+      expect(bounds.badge).not.toBeNull();
+      expect(bounds.icon).not.toBeNull();
+      expect(bounds.trigger).not.toBeNull();
+      // Identity owns the tab-list trigger; Back and the useful actions stay outside it.
+      expect(bounds.trigger!.width).toBeGreaterThanOrEqual(48);
+      expect(bounds.trigger!.height).toBeGreaterThanOrEqual(48);
+      const viewport = page.viewportSize()!;
+      for (const control of [bounds.back!, bounds.actions!, bounds.explorer!]) {
+        expect(control.width).toBeGreaterThanOrEqual(48);
+        expect(control.height).toBeGreaterThanOrEqual(48);
+        expect(control.x).toBeGreaterThanOrEqual(0);
+        expect(control.x + control.width).toBeLessThanOrEqual(viewport.width);
+      }
+      expect(bounds.back!.x + bounds.back!.width).toBeLessThanOrEqual(bounds.trigger!.x);
+      expect(bounds.trigger!.x + bounds.trigger!.width).toBeLessThanOrEqual(bounds.actions!.x);
+      expect(bounds.actions!.x + bounds.actions!.width).toBeLessThanOrEqual(bounds.explorer!.x);
+      for (const box of [bounds.title!, bounds.project!, bounds.badge!, bounds.icon!]) {
+        expect(box.x).toBeGreaterThanOrEqual(bounds.trigger!.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(
+          bounds.trigger!.x + bounds.trigger!.width + 1,
+        );
+      }
+      expect(bounds.project!.x).toBe(bounds.title!.x);
+      expect(bounds.project!.width).toBeGreaterThan(20);
+      // Long labels truncate instead of squeezing the host icon.
+      expect(bounds.icon!.width).toBe(bounds.icon!.height);
+      expect(bounds.badge!.x).toBeGreaterThan(bounds.project!.x + bounds.project!.width);
+      expect(bounds.titleTruncated).toBe(long);
+      // A 320px header can truncate even a short Project beside the retained Host icon.
+      if (long) expect(bounds.projectTruncated).toBe(true);
+    }).toPass({ timeout: 5_000 });
+  } finally {
+    // Keep the actual measurements when a geometry assertion fails in CI, too.
+    await info.attach("header-bounds", {
+      body: JSON.stringify(await measure(), null, 2),
+      contentType: "application/json",
+    });
+  }
 }
 
 for (const width of [320, 390]) {

@@ -1,8 +1,10 @@
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { buildSeededHost } from "../support/helpers/daemon-registry";
 import { submitMessage } from "../support/helpers/composer";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
+import type { TestInfo } from "@playwright/test";
 import { runWorkspaceActionFromCommandCenter } from "../support/helpers/command-center-workspace-actions";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -157,9 +159,89 @@ test("a preferred chat file link still opens beside its right-pane agent", async
   }
 });
 
+async function attachFleetRouteDiagnostics(
+  page: Page,
+  fleet: Awaited<ReturnType<typeof delegateFleetThroughMcp>>,
+  testInfo: TestInfo,
+): Promise<void> {
+  // Capture browser state before SDK reads or test teardown can close the page.
+  const runtime = await page
+    .evaluate(
+      (ids) => {
+        const store = Reflect.get(globalThis, "__clisbotHostRuntimeStore") as
+          | {
+              getSnapshot(id: string): {
+                connectionStatus: string;
+                lastError: string | null;
+                workspaceDirectoryStatus: string;
+                workspaceDirectoryError: string | null;
+                agentDirectoryStatus: string;
+                agentDirectoryError: string | null;
+                hasEverLoadedWorkspaceDirectory: boolean;
+                clientGeneration: number;
+              } | null;
+              getHosts(): Array<{ serverId: string; label: string }>;
+            }
+          | undefined;
+        return {
+          hosts: store?.getHosts().map(({ serverId, label }) => ({ serverId, label })),
+          snapshots: ids.map((serverId) => {
+            const snapshot = store?.getSnapshot(serverId);
+            if (!snapshot) return { serverId, missing: true };
+            const {
+              connectionStatus,
+              lastError,
+              workspaceDirectoryStatus,
+              workspaceDirectoryError,
+              agentDirectoryStatus,
+              agentDirectoryError,
+              hasEverLoadedWorkspaceDirectory,
+              clientGeneration,
+            } = snapshot;
+            return {
+              serverId,
+              connectionStatus,
+              lastError,
+              workspaceDirectoryStatus,
+              workspaceDirectoryError,
+              agentDirectoryStatus,
+              agentDirectoryError,
+              hasEverLoadedWorkspaceDirectory,
+              clientGeneration,
+            };
+          }),
+        };
+      },
+      [fleet.serverId, fleet.remote.serverId],
+    )
+    .catch((error: unknown) => ({ error: String(error) }));
+  const backend = await Promise.allSettled([
+    fleet.a.fetchWorkspaces(),
+    fleet.a.fetchAgent(fleet.parent.id),
+    fleet.b.fetchWorkspaces(),
+    fleet.b.fetchAgent(fleet.remote.agentId),
+  ]);
+  await testInfo.attach("fleet-route-read-only-diagnostics", {
+    body: JSON.stringify(
+      {
+        route: page.url(),
+        originServerId: fleet.serverId,
+        destinationServerId: fleet.remote.serverId,
+        originWorkspaceId: fleet.workspace.workspaceId,
+        destinationWorkspaceId: fleet.remote.workspaceId,
+        backend,
+        runtime,
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
+}
+
 test("MCP delegates to self and B and opens both qualified children in ordinary conversations", async ({
   page,
-}) => {
+}, testInfo) => {
   const fleet = await delegateFleetThroughMcp();
   let appSockets = 0;
   let routeOpens = 0;
@@ -220,6 +302,9 @@ test("MCP delegates to self and B and opens both qualified children in ordinary 
       workspaceId: fleet.workspace.workspaceId,
       agentId: fleet.parent.id,
     });
+    const messageGroups = page.getByTestId("tool-call-group").filter({ hasText: "Agent message" });
+    await expect(messageGroups.first()).toBeVisible();
+    for (const group of await messageGroups.all()) await group.getByRole("button").first().click();
     await expect(
       page.getByRole("button", { name: /Agent finished.*MCP child on A/ }),
     ).toBeVisible();
@@ -249,6 +334,9 @@ test("MCP delegates to self and B and opens both qualified children in ordinary 
       owners,
       observationRequests,
     });
+  } catch (error) {
+    await attachFleetRouteDiagnostics(page, fleet, testInfo);
+    throw error;
   } finally {
     await fleet.close();
   }
@@ -272,6 +360,9 @@ async function openFleetParentWithDirectB(
     workspaceId: fleet.workspace.workspaceId,
     agentId: fleet.parent.id,
   });
+  // Keep a failed hydration diagnostic inside the live page's test budget.
+  // This observes the normal route load; it does not refresh or repair it.
+  await expect(page.getByTestId("subagents-track-header")).toBeVisible({ timeout: 15_000 });
   await openSubagentsTrack(page);
   await expect(page.getByTestId(`subagents-track-row-${fleet.remote.agentId}`)).toContainText(
     "MCP child on B",
@@ -288,7 +379,9 @@ async function openFleetChild(
   );
 }
 
-test("a directly connected B opens and archives its MCP child from A's track", async ({ page }) => {
+test("a directly connected B opens and archives its MCP child from A's track", async ({
+  page,
+}, testInfo) => {
   const fleet = await delegateFleetThroughMcp();
   try {
     await openFleetParentWithDirectB(page, fleet);
@@ -299,45 +392,138 @@ test("a directly connected B opens and archives its MCP child from A's track", a
     expect((await fleet.a.fetchAgent(fleet.remote.agentId))?.agent.lastUserMessageAt).toBeNull();
     await openFleetParentWithDirectB(page, fleet);
     await page.getByTestId(`subagents-track-row-${fleet.remote.agentId}`).hover();
-    page.once("dialog", (dialog) => {
-      void dialog.accept();
-    });
+    const confirmation = answerAppConfirmation(page, "accept");
     await page.getByRole("button", { name: "Archive MCP child on B", exact: true }).click();
+    expect((await confirmation).message()).toContain("MCP child on B");
     await expectManagedSubagentArchived({ client: fleet.b }, fleet.remote.agentId);
     await expect(page.getByTestId(`subagents-track-row-${fleet.remote.agentId}`)).toHaveCount(0);
     expect((await fleet.a.fetchAgent(fleet.remote.agentId))?.agent.archivedAt).toBeNull();
     await expect(page.getByText(/already connected through another route/)).toHaveCount(0);
+  } catch (error) {
+    await attachFleetRouteDiagnostics(page, fleet, testInfo);
+    throw error;
   } finally {
     await fleet.close();
   }
 });
 
-test("an unavailable B child opens its cached workspace with existing reconnecting behavior", async ({
+async function closeFleetDestinationAndWait(
+  page: Page,
+  fleet: Awaited<ReturnType<typeof delegateFleetThroughMcp>>,
+) {
+  await fleet.destination.close();
+  await expect
+    .poll(() =>
+      page.evaluate((serverId) => {
+        const runtime = Reflect.get(globalThis, "__clisbotHostRuntimeStore") as {
+          getSnapshot(id: string): { serverId: string; connectionStatus: string } | null;
+        };
+        const snapshot = runtime.getSnapshot(serverId);
+        return (
+          snapshot && { serverId: snapshot.serverId, connectionStatus: snapshot.connectionStatus }
+        );
+      }, fleet.remote.serverId),
+    )
+    .toMatchObject({
+      serverId: fleet.remote.serverId,
+      connectionStatus: expect.stringMatching(/^(offline|connecting|error)$/),
+    });
+}
+
+test("an unopened B child keeps its qualified route and cached sidebar behind the offline gate", async ({
   page,
-}) => {
+}, testInfo) => {
   const fleet = await delegateFleetThroughMcp();
   try {
     await openFleetParentWithDirectB(page, fleet);
-    await fleet.destination.close();
-    await expect
-      .poll(() =>
-        page.evaluate((serverId) => {
-          const runtime = Reflect.get(globalThis, "__clisbotHostRuntimeStore") as {
-            getSnapshot(id: string): { serverId: string; connectionStatus: string } | null;
-          };
-          return runtime.getSnapshot(serverId);
-        }, fleet.remote.serverId),
-      )
-      .toMatchObject({
-        serverId: fleet.remote.serverId,
-        connectionStatus: expect.stringMatching(/^(offline|connecting|error)$/),
-      });
+    await closeFleetDestinationAndWait(page, fleet);
     await openFleetChild(page, fleet);
-    await expect(page.getByTestId("workspace-header-title").filter({ visible: true })).toHaveText(
-      "B workspace",
+    const destination = page.getByTestId(
+      `workspace-deck-entry-${fleet.remote.serverId}:${fleet.remote.workspaceId}`,
     );
-    await expect(page.getByRole("button", { name: "MCP child on B", exact: true })).toBeVisible();
+    await expect(destination).toBeVisible();
+    // Directory metadata is not authority to mount a workspace that was never opened.
+    // The same pre-existing cold-route contract is documented in docs/expo-router.md.
+    await expect(destination.getByText("Cannot reach Fleet B", { exact: true })).toBeVisible();
+    await expect(destination.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+    await expect(
+      destination.getByRole("button", { name: "Manage host", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId(
+        `sidebar-workspace-row-${fleet.remote.serverId}:${fleet.remote.workspaceId}`,
+      ),
+    ).toContainText("B workspace");
+    await expect(
+      destination.getByTestId("workspace-header-title").filter({ visible: true }),
+    ).toHaveCount(0);
+    await expect(
+      destination.getByRole("button", { name: "MCP child on B", exact: true }),
+    ).toHaveCount(0);
+    await expect(destination.getByTestId("retained-workspace-content")).toBeHidden();
+    await expect(page).toHaveURL(
+      (url) => url.pathname === `/h/${fleet.remote.serverId}/workspace/${fleet.remote.workspaceId}`,
+    );
     await expect(page.getByText(/already connected through another route/)).toHaveCount(0);
+  } catch (error) {
+    await attachFleetRouteDiagnostics(page, fleet, testInfo);
+    throw error;
+  } finally {
+    await fleet.close();
+  }
+});
+
+test("an already-open B child keeps its workspace, pane and unsent draft after transport loss", async ({
+  page,
+}, testInfo) => {
+  const fleet = await delegateFleetThroughMcp();
+  try {
+    await openFleetParentWithDirectB(page, fleet);
+    await openFleetChild(page, fleet);
+    const destination = page.getByTestId(
+      `workspace-deck-entry-${fleet.remote.serverId}:${fleet.remote.workspaceId}`,
+    );
+    await expect(destination).toBeVisible();
+    const header = destination.getByTestId("workspace-header-title").filter({ visible: true });
+    const child = destination.getByRole("button", { name: "MCP child on B", exact: true });
+    const pane = destination.getByTestId("workspace-pane-main");
+    await expect(header).toHaveText("B workspace");
+    await expect(child).toBeVisible();
+    await expect(pane).toBeVisible();
+    const composer = destination.getByRole("textbox", { name: "Message agent..." });
+    await composer.fill("UNSENT_DIRECT_B_DRAFT");
+    const originalPane = await pane.elementHandle();
+    const originalChild = await child.elementHandle();
+    expect(originalPane).not.toBeNull();
+    expect(originalChild).not.toBeNull();
+    await closeFleetDestinationAndWait(page, fleet);
+    await expect(header).toHaveText("B workspace");
+    await expect(child).toBeVisible();
+    await expect(pane).toBeVisible();
+    expect(await originalPane!.evaluate((element) => element.isConnected)).toBe(true);
+    expect(await originalChild!.evaluate((element) => element.isConnected)).toBe(true);
+    expect(
+      await originalPane!.evaluate(
+        (element, current) => element === current,
+        await pane.elementHandle(),
+      ),
+    ).toBe(true);
+    expect(
+      await originalChild!.evaluate(
+        (element, current) => element === current,
+        await child.elementHandle(),
+      ),
+    ).toBe(true);
+    await expect(composer).toHaveValue("UNSENT_DIRECT_B_DRAFT");
+    await expect(destination.getByTestId("retained-workspace-content")).toBeVisible();
+    await expect(destination.getByText("Cannot reach Fleet B", { exact: true })).toHaveCount(0);
+    await expect(page).toHaveURL(
+      (url) => url.pathname === `/h/${fleet.remote.serverId}/workspace/${fleet.remote.workspaceId}`,
+    );
+    await expect(page.getByText(/already connected through another route/)).toHaveCount(0);
+  } catch (error) {
+    await attachFleetRouteDiagnostics(page, fleet, testInfo);
+    throw error;
   } finally {
     await fleet.close();
   }

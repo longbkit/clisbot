@@ -14,6 +14,7 @@ import {
   resizeComposerViewport,
 } from "../support/helpers/composer";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
+import { expectMobileAgentSidebarHidden } from "../support/helpers/sidebar";
 import {
   expectTerminalLaunchSelected,
   expectTerminalOutputContains,
@@ -158,43 +159,86 @@ test.describe("New workspace: launching a terminal", () => {
 });
 
 async function expectNewWorkspaceHeaderHidden(page: Page): Promise<void> {
-  await expect(page.getByTestId("menu-button").filter({ visible: true })).toHaveCount(0);
+  await expect(
+    page.getByTestId("menu-button").or(page.getByTestId("chat-back")).filter({ visible: true }),
+  ).toHaveCount(0);
 }
 
 async function expectNewWorkspaceHeaderVisible(page: Page): Promise<void> {
-  await expect(page.getByTestId("menu-button").filter({ visible: true }).first()).toBeVisible();
+  await expect(
+    page.getByTestId("menu-button").or(page.getByTestId("chat-back")).filter({ visible: true }),
+  ).toBeVisible();
+}
+
+async function revealComposerAfterCompactResize(page: Page): Promise<void> {
+  // Legacy may retain an open drawer when a pinned desktop sidebar becomes an
+  // overlay at the compact breakpoint. Close that real overlay before editing;
+  // a visible textarea underneath it is not an actionable fullscreen control.
+  const close = page.getByTestId("sidebar-close");
+  const presented = await close.evaluateAll((nodes) =>
+    nodes.some((node) => {
+      const box = node.getBoundingClientRect();
+      return (
+        box.width > 0 &&
+        box.height > 0 &&
+        box.left >= 0 &&
+        box.top >= 0 &&
+        box.right <= window.innerWidth &&
+        box.bottom <= window.innerHeight
+      );
+    }),
+  );
+  if (!presented) return;
+  const route = page.url();
+  await close.click();
+  await expectMobileAgentSidebarHidden(page);
+  await expect(page).toHaveURL(route);
 }
 
 /**
  * Fullscreen fills the content area top to bottom and out to the right edge (a pinned
  * sidebar keeps its column), covers the form, and shows only exit and the mode's submit.
  */
-async function expectNewWorkspaceFullscreen(page: Page, submitLabel: string): Promise<void> {
+async function expectNewWorkspaceFullscreen(
+  page: Page,
+  submitLabel: string,
+  homeV2: boolean,
+): Promise<void> {
   const frame = page.getByTestId("composer-fullscreen");
   await expect(page.getByRole("button", { name: "Exit fullscreen", exact: true })).toBeVisible();
   await expect(frame.getByRole("button")).toHaveCount(2);
   await expect(frame.getByRole("button", { name: submitLabel })).toBeVisible();
   await expectNewWorkspaceHeaderHidden(page);
-  const picker = (await page.getByRole("button", { name: "Workspace project" }).boundingBox())!;
+  const projectPicker = page.getByRole("button", { name: "Workspace project" });
+  // Home V2 removes the setup form while fullscreen; legacy keeps it behind the editor.
+  // Both must leave the editing surface in front and restore the picker on explicit exit.
+  let point: { x: number; y: number };
+  if (homeV2) {
+    await expect(projectPicker).toHaveCount(0);
+    point = await page.evaluate(() => ({
+      x: visualViewport!.offsetLeft + visualViewport!.width / 2,
+      y: visualViewport!.offsetTop + visualViewport!.height / 2,
+    }));
+  } else {
+    const picker = (await projectPicker.boundingBox())!;
+    point = { x: picker.x + picker.width / 2, y: picker.y + picker.height / 2 };
+  }
   await expect
     .poll(() =>
-      frame.evaluate(
-        (element, point) => {
-          const viewport = window.visualViewport!;
-          const box = element.getBoundingClientRect();
-          const covering = document.elementFromPoint(point.x, point.y);
-          return {
-            fillsHeight:
-              Math.abs(box.top - viewport.offsetTop) < 1 &&
-              Math.abs(box.height - viewport.height) < 1,
-            reachesRightEdge:
-              Math.abs(box.right - (viewport.offsetLeft + viewport.width)) < 1 &&
-              box.left >= viewport.offsetLeft,
-            coversForm: element.contains(covering),
-          };
-        },
-        { x: picker.x + picker.width / 2, y: picker.y + picker.height / 2 },
-      ),
+      frame.evaluate((element, probePoint) => {
+        const viewport = window.visualViewport!;
+        const box = element.getBoundingClientRect();
+        const covering = document.elementFromPoint(probePoint.x, probePoint.y);
+        return {
+          fillsHeight:
+            Math.abs(box.top - viewport.offsetTop) < 1 &&
+            Math.abs(box.height - viewport.height) < 1,
+          reachesRightEdge:
+            Math.abs(box.right - (viewport.offsetLeft + viewport.width)) < 1 &&
+            box.left >= viewport.offsetLeft,
+          coversForm: element.contains(covering),
+        };
+      }, point),
     )
     .toEqual({ fillsHeight: true, reachesRightEdge: true, coversForm: true });
 }
@@ -221,6 +265,9 @@ test.describe("New workspace: fullscreen composer across the compact breakpoint"
       projectDisplayName: workspace.projectDisplayName,
     });
     const projectPicker = page.getByRole("button", { name: "Workspace project" });
+    await resizeComposerViewport(page, "portrait");
+    await revealComposerAfterCompactResize(page);
+    const homeV2 = await page.getByTestId("chat-back").isVisible();
 
     await test.step("chat: fullscreen covers the centered form and exits back into it", async () => {
       await resizeComposerViewport(page, "portrait");
@@ -231,7 +278,7 @@ test.describe("New workspace: fullscreen composer across the compact breakpoint"
       await expectNewWorkspaceHeaderHidden(page);
       await resizeComposerViewport(page, "landscape");
       await expectComposerFullscreenControls(page);
-      await expectNewWorkspaceFullscreen(page, "Create");
+      await expectNewWorkspaceFullscreen(page, "Create", homeV2);
       // The desktop form's own import button is dropped from the fullscreen slot.
       await expect(
         page.getByTestId("new-workspace-import-session").filter({ visible: true }),
@@ -250,6 +297,7 @@ test.describe("New workspace: fullscreen composer across the compact breakpoint"
     // Exercise the terminal prompt's fullscreen and compact launch sheet on the phone.
     await test.step("terminal: the prompt's fullscreen shows only exit and Launch", async () => {
       await resizeComposerViewport(page, "portrait");
+      await revealComposerAfterCompactResize(page);
       // The compact launch control opens a sheet, not the desktop menu.
       await launchTrigger(page).click();
       const option = page.getByRole("menuitem").filter({ hasText: PROMPT_PROFILE.name });
@@ -260,7 +308,7 @@ test.describe("New workspace: fullscreen composer across the compact breakpoint"
       await fillTerminalPrompt(page, prompt);
       await enterComposerFullscreen(page);
       await expect(terminalPromptInput(page)).toBeVisible();
-      await expectNewWorkspaceFullscreen(page, "Launch");
+      await expectNewWorkspaceFullscreen(page, "Launch", homeV2);
       await exitComposerFullscreen(page);
       await expectNewWorkspaceHeaderVisible(page);
       await expect(projectPicker).toBeVisible();

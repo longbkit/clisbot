@@ -10,14 +10,14 @@ Hub 公开 API 让自动化可以操作一个组织中的触发器、项目和 d
 
 ## API 参考 {#api-reference}
 
-- [交互式 API 参考](https://hub.clisbot.com/api/reference)
-- [OpenAPI 3.1 文档](https://hub.clisbot.com/api/openapi.json)
+每个 Hub 都在自己的地址上提供参考文档：
 
-这些是托管版 Clisbot Hub 的标准参考端点。自托管的 Hub 在它自己的地址上提供相同的 `/api/reference` 和 `/api/openapi.json` 路径。
+- 交互式 API 参考：`<hub-origin>/api/reference`
+- OpenAPI 3.1 文档：`<hub-origin>/api/openapi.json`
 
 ## 身份验证 {#authentication}
 
-运行 `clisbot hub login [origin]` 获得交互式的 CLI 访问权限。在浏览器中批准后，Clisbot 会在 `CLISBOT_HOME` 下为这个确切的地址保存一个持久、可撤销的组织凭据。未显式指定地址时，CLI 依次使用 `CLISBOT_HUB_URL`、当前保存的登录，然后是 `https://hub.clisbot.com`。
+**Host 接入使用 `clisbot hub connect <origin>`，不需要 CLI 登录。** 只有明确需要 CLI API 管理并了解其权限时，才使用 `clisbot hub login [origin]`。在浏览器中批准后，Clisbot 会在 `CLISBOT_HOME` 下为这个确切的地址保存一个持久、可撤销的组织凭据。未显式指定地址时，CLI 依次使用 `CLISBOT_HUB_URL`、当前保存的登录；都未设置时会停止并要求提供 Hub URL。
 
 用于自动化时，请在 Hub 控制台的 **API keys** 下创建组织 API 密钥。两种凭据都是 bearer token：
 

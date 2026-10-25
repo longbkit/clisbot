@@ -37,18 +37,25 @@ async function findCreatedWorkspaceId(seeded: SeededWorkspace): Promise<string> 
 }
 
 // Samples every frame, so a row that leaves Pinned and comes back on a later update still counts.
-async function watchPinnedRow(page: Page, testId: string): Promise<() => Promise<number>> {
-  await page.evaluate((rowTestId) => {
-    const state = { missingFrames: 0, stopped: false };
-    (window as unknown as { __pinnedRowWatch: typeof state }).__pinnedRowWatch = state;
-    const sample = () => {
-      if (state.stopped) return;
-      const section = document.querySelector('[data-testid="sidebar-pinned-section"]');
-      if (!section?.querySelector(`[data-testid="${rowTestId}"]`)) state.missingFrames += 1;
+async function watchPinnedRow(
+  page: Page,
+  sectionTestId: string,
+  testId: string,
+): Promise<() => Promise<number>> {
+  await page.evaluate(
+    ({ sectionTestId: ownerTestId, rowTestId }) => {
+      const state = { missingFrames: 0, stopped: false };
+      (window as unknown as { __pinnedRowWatch: typeof state }).__pinnedRowWatch = state;
+      const sample = () => {
+        if (state.stopped) return;
+        const section = document.querySelector(`[data-testid="${ownerTestId}"]`);
+        if (!section?.querySelector(`[data-testid="${rowTestId}"]`)) state.missingFrames += 1;
+        requestAnimationFrame(sample);
+      };
       requestAnimationFrame(sample);
-    };
-    requestAnimationFrame(sample);
-  }, testId);
+    },
+    { sectionTestId, rowTestId: testId },
+  );
   return () =>
     page.evaluate(() => {
       const state = (
@@ -74,14 +81,25 @@ test.describe("New workspace live pin", () => {
       await creation.waitForCreateRequest();
       // The response is held here, carrying the descriptor from before the pin.
       await creation.waitForDelayedCreatedStatus();
+      creation.expectSingleWorkspaceIntent();
       const workspaceId = await findCreatedWorkspaceId(seeded);
       const rowTestId = pinnedRowTestId(workspaceId);
 
       await seeded.client.setWorkspacePinned(workspaceId, true);
-      const pinnedRow = page.getByTestId("sidebar-pinned-section").getByTestId(rowTestId);
+      // The fusion sidebar has one unified Pins owner; the foundation sidebar
+      // retains its native workspace Pins owner. Observe the actual owner once,
+      // then require this same workspace to stay under it on every sampled frame.
+      const pinnedSection = page
+        .getByTestId("sidebar-unified-pinned")
+        .or(page.getByTestId("sidebar-pinned-section"))
+        .filter({ visible: true });
+      await expect(pinnedSection).toHaveCount(1);
+      const pinnedRow = pinnedSection.getByTestId(rowTestId);
       await expect(pinnedRow).toBeVisible({ timeout: 10_000 });
 
-      const stopWatching = await watchPinnedRow(page, rowTestId);
+      const sectionTestId = await pinnedSection.getAttribute("data-testid");
+      if (!sectionTestId) throw new Error("The presented Pins owner must have an identity");
+      const stopWatching = await watchPinnedRow(page, sectionTestId, rowTestId);
       creation.release();
       await expect(page).toHaveURL(/\/workspace\//, { timeout: 30_000 });
       await expect(page.getByRole("textbox", { name: "Message agent..." })).toBeEditable({
@@ -91,6 +109,7 @@ test.describe("New workspace live pin", () => {
       await page.waitForTimeout(1_000);
 
       expect(await stopWatching()).toBe(0);
+      creation.expectSingleWorkspaceIntent();
       await expect(pinnedRow).toBeVisible();
     } finally {
       creation.release();

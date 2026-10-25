@@ -281,12 +281,51 @@ export async function openMobileAgentSidebar(page: Page): Promise<"chat" | "over
   const back = page.getByRole("button", { name: "Back", exact: true });
   const menu = page.getByRole("button", { name: "Open menu", exact: true });
   for (let depth = 0; depth < 6; depth += 1) {
-    await expect(chatTab.or(back).or(menu)).toHaveCount(1, { timeout: 15_000 });
-    if (await chatTab.isVisible()) {
+    const ready: { control: "chat" | "back" | "menu" | "overlay" | null } = { control: null };
+    await expect
+      .poll(
+        async () => {
+          if (await chatTab.isVisible()) return (ready.control = "chat");
+          if (await back.isVisible()) return (ready.control = "back");
+          const ratio = await presentedMobileSidebarFooter(page).evaluateAll((nodes) =>
+            Math.max(
+              0,
+              ...nodes.map((node) => {
+                const box = node.getBoundingClientRect();
+                const area = box.width * box.height;
+                if (area === 0) return 0;
+                const width = Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0));
+                const height = Math.max(
+                  0,
+                  Math.min(box.bottom, innerHeight) - Math.max(box.top, 0),
+                );
+                return (width * height) / area;
+              }),
+            ),
+          );
+          // Open menu names the requested closed state, even while the old X slides
+          // out. Wait for it to leave before clicking through that overlay.
+          if (await menu.isVisible()) return (ready.control = ratio === 0 ? "menu" : null);
+          // Legacy may bootstrap already open, without an underlying menu control.
+          // Its X is readiness only when the entire footer is settled in viewport.
+          const hasLegacyClose = (await page.getByTestId("sidebar-close").count()) > 0;
+          return (ready.control = hasLegacyClose && ratio >= 0.999999 ? "overlay" : null);
+        },
+        {
+          timeout: 15_000,
+          message: "Wait for an actual compact navigation control or settled drawer",
+        },
+      )
+      .not.toBeNull();
+    if (ready.control === "overlay") {
+      await expectMobileAgentSidebarVisible(page);
+      return "overlay";
+    }
+    if (ready.control === "chat") {
       await chatTab.click();
       return "chat";
     }
-    if (await menu.isVisible()) {
+    if (ready.control === "menu") {
       await menu.click();
       return "overlay";
     }

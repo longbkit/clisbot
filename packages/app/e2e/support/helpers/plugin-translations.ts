@@ -10,15 +10,17 @@ import { copyPluginExample } from "./plugin-fixture";
 
 async function chooseChinese(page: Page) {
   await openSettings(page);
-  await page.getByRole("button", { name: "System", exact: true }).click();
-  await page.getByRole("menuitem", { name: "简体中文 - Simplified Chinese", exact: true }).click();
+  await page.getByTestId("language-settings-card").getByTestId("language-dropdown").click();
+  await page.getByRole("menuitem", { name: "简体中文", exact: true }).click();
+  await expect(page.getByTestId("language-dropdown")).toHaveText("简体中文");
   await page.goBack();
 }
 
 async function chooseEnglish(page: Page) {
-  await page.getByTestId("sidebar-settings").click();
-  await page.getByRole("button", { name: "简体中文", exact: true }).click();
-  await page.getByRole("menuitem", { name: "English - 英语", exact: true }).click();
+  await openSettings(page);
+  await page.getByTestId("language-settings-card").getByTestId("language-dropdown").click();
+  await page.getByRole("menuitem", { name: "English", exact: true }).click();
+  await expect(page.getByTestId("language-dropdown")).toHaveText("English");
   await page.goBack();
 }
 

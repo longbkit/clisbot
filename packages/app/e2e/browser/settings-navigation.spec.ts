@@ -48,6 +48,40 @@ import {
 import { getServerId } from "../support/helpers/server-id";
 import { expectAppRoute } from "../support/helpers/route-assertions";
 
+async function recordBrowserHistory(
+  page: import("@playwright/test").Page,
+  historyEvents: unknown[],
+): Promise<void> {
+  await page.exposeBinding("__recordSettingsHistory", (_source, event: unknown) => {
+    historyEvents.push(event);
+  });
+  await page.addInitScript(() => {
+    const record = (operation: string, args: unknown[] = []) => {
+      const emit = Reflect.get(globalThis, "__recordSettingsHistory");
+      if (typeof emit === "function") {
+        void emit({
+          operation,
+          args,
+          href: location.href,
+          state: history.state,
+          length: history.length,
+        });
+      }
+    };
+    for (const operation of ["pushState", "replaceState", "go", "back"] as const) {
+      const original = Reflect.get(history, operation);
+      Reflect.set(history, operation, (...args: unknown[]) => {
+        record(`before:${operation}`, args);
+        const result = Reflect.apply(original, history, args);
+        record(`after:${operation}`);
+        return result;
+      });
+    }
+    addEventListener("popstate", () => record("popstate"));
+    record("document");
+  });
+}
+
 async function openWorkspace(
   page: import("@playwright/test").Page,
   workspace: { workspaceId: string },
@@ -277,31 +311,40 @@ test.describe("Settings — compact master-detail", () => {
   test("removing the last active host returns to its reader entry with a way to welcome", async ({
     page,
     withWorkspace,
-  }) => {
-    const workspace = await withWorkspace({ prefix: "remove-host-compact-" });
-    const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
+  }, testInfo) => {
+    const historyEvents: unknown[] = [];
+    await recordBrowserHistory(page, historyEvents);
+    try {
+      const workspace = await withWorkspace({ prefix: "remove-host-compact-" });
+      const workspaceRoute = buildHostWorkspaceRoute(getServerId(), workspace.workspaceId);
 
-    await openWorkspace(page, workspace);
-    // Enter from the reader itself. Opening the compact sidebar first navigates to Chat,
-    // which would make Chat (not this reader) the correct Settings return destination.
-    await page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }).click();
-    await page.getByTestId("workspace-header-edit-terminal-profiles").click();
-    await expectAppRoute(page, buildSettingsHostSectionRoute(getServerId(), "terminals"));
-    await goBackInSettings(page);
-    await expectAppRoute(page, buildSettingsRoute());
-    await openSettingsHostSection(page, getServerId(), "host");
-    await removeCurrentHostFromSettings(page);
-    await closeCompactSettings(page);
+      await openWorkspace(page, workspace);
+      // Enter from the reader itself. Opening the compact sidebar first navigates to Chat,
+      // which would make Chat (not this reader) the correct Settings return destination.
+      await page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }).click();
+      await page.getByTestId("workspace-header-edit-terminal-profiles").click();
+      await expectAppRoute(page, buildSettingsHostSectionRoute(getServerId(), "terminals"));
+      await goBackInSettings(page);
+      await expectAppRoute(page, buildSettingsRoute());
+      await openSettingsHostSection(page, getServerId(), "host");
+      await removeCurrentHostFromSettings(page);
+      await closeCompactSettings(page);
 
-    // A Host route never navigates on the Host's behalf (bf511ce33): the removed Host is shown
-    // as unavailable at the same URL, and Add a Host is the reader's way to Welcome.
-    await expectAppRoute(page, workspaceRoute);
-    const unavailable = page.getByTestId("host-unavailable");
-    await expect(unavailable).toBeVisible();
-    await expect(unavailable.getByTestId("host-unavailable-open-other")).toHaveCount(0);
-    await unavailable.getByTestId("host-unavailable-add-host").click();
-    await expectAppRoute(page, buildWelcomeRoute({ stay: true }));
-    await expect(page.getByTestId("welcome-direct-connection")).toBeVisible();
+      // A Host route never navigates on the Host's behalf (bf511ce33): the removed Host is shown
+      // as unavailable at the same URL, and Add a Host is the reader's way to Welcome.
+      await expectAppRoute(page, workspaceRoute);
+      const unavailable = page.getByTestId("host-unavailable");
+      await expect(unavailable).toBeVisible();
+      await expect(unavailable.getByTestId("host-unavailable-open-other")).toHaveCount(0);
+      await unavailable.getByTestId("host-unavailable-add-host").click();
+      await expectAppRoute(page, buildWelcomeRoute({ stay: true }));
+      await expect(page.getByTestId("welcome-direct-connection")).toBeVisible();
+    } finally {
+      await testInfo.attach("settings-browser-history", {
+        body: JSON.stringify({ events: historyEvents, finalUrl: page.url() }, null, 2),
+        contentType: "application/json",
+      });
+    }
   });
 });
 

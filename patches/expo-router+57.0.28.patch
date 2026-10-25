@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo-router/build/fork/createMemoryHistory.js b/node_modules/expo-router/build/fork/createMemoryHistory.js
+--- a/node_modules/expo-router/build/fork/createMemoryHistory.js
++++ b/node_modules/expo-router/build/fork/createMemoryHistory.js
+@@ -92,6 +92,9 @@
+         // This method differs from `history.go(n)` in the sense that it'll go back as many steps it can.
+         go(n) {
+             interrupt();
++            // Browser Back/Forward may have changed the active entry without calling go().
++            // Clamp against the browser-owned id, not the last programmatic navigation.
++            index = history.index;
+             // To guard against unexpected navigation out of the app we will assume that browser history is only as deep as the length of our memory
+             // history. If we don't have an item to navigate to then update our index and navigate as far as we can without taking the user out of the app.
+             const nextIndex = index + n;

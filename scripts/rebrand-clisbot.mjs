@@ -234,7 +234,7 @@ for (const path of tracked) {
                 path,
                 productTemplates.get(path) ??
                   removeCollapsedAliases(path, renameProductText(before)),
-                { repoSlug },
+                { repoSlug, original: before, siteHost },
               );
         occurrences = countBrandTokens(before);
       }
@@ -320,6 +320,9 @@ function isProtectedPath(path) {
   return (
     path === "scripts/rebrand-clisbot.mjs" ||
     path === "scripts/rebrand-clisbot.test.mjs" ||
+    // These fixtures assert original service provenance and rejection of retired origins.
+    path === "scripts/rebrand-hub-docs.test.mjs" ||
+    path === "packages/website/src/hosted-hub-publication.test.ts" ||
     // This test adapter must retain the historical tokens it normalizes.
     path === "packages/app/e2e/support/helpers/historical-upstream-fixture.ts" ||
     path.startsWith("scripts/branding/") ||

@@ -6,8 +6,8 @@ import {
   claudeAndCodexReports,
   expectPinnedUsage,
   openCompactSidebar,
-  expectCompactSidebarOpen,
 } from "../support/helpers/usage-sidebar-item";
+import { expectMobileAgentSidebarVisible } from "../support/helpers/sidebar";
 import { gotoAppShell } from "../support/helpers/app";
 import { SHOWCASE_PLUGIN_ID, installSidebarPlugins } from "../support/helpers/plugin-sidebar-items";
 import {
@@ -51,9 +51,25 @@ async function showDeveloperToast(page: Page): Promise<void> {
 test("developer toasts leave concurrent sidebar layout checks uninterrupted", async ({ page }) => {
   await gotoAppShell(page);
   await showDeveloperToast(page);
-  await expectSidebarOrder(page, ["new-workspace", "history", "search", "schedules"]);
+  // Search is a footer action by default; exercise both real layout owners while
+  // the developer-toast fixture's observer dismisses the blocking surface.
+  await Promise.all([
+    expectSidebarOrder(page, ["new-workspace", "history", "schedules"]),
+    expectFooterIconRow(page),
+  ]);
   await expect(page.locator("#error-toast")).toBeHidden();
 });
+
+async function expectCompactConversationListPresented(page: Page): Promise<void> {
+  await expectMobileAgentSidebarVisible(page);
+  const chat = page.getByTestId("home-mobile-tabs").getByRole("tab", { name: "Chat", exact: true });
+  if (await chat.isVisible()) await expect(chat).toHaveAttribute("aria-selected", "true");
+  else
+    await expect(page.getByRole("button", { name: "Close menu", exact: true })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+}
 
 // Add project is opt-in on Clisbot's bar (footer-model.ts); turn it on to cover its tooltip.
 const FOOTER_ACTIONS_WITH_ADD_PROJECT = [
@@ -103,13 +119,13 @@ test("footer bar keeps its control icons on one line and mirrors their order on 
   await openAddProjectFlow(page);
   await page.keyboard.press("Escape");
   await expect(addProjectFlow(page)).toBeHidden();
-  await expectCompactSidebarOpen(page);
+  await expectCompactConversationListPresented(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openSidebarNavSettings(page);
   await setFooterItemVisible(page, "usage", true);
   await leaveSettings(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expectCompactSidebarOpen(page);
+  await expectCompactConversationListPresented(page);
   await expectFooterSeparator(page, true);
   await expectFooterIconRowWithAddProject(true);
   await footerScreenshot(page, "footer-compact-with-rows");

@@ -1,3 +1,4 @@
+import { answerAppConfirmation } from "../support/helpers/confirmation";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -201,18 +202,18 @@ test("directory plugins render PDF bytes and write Markdown through the file han
       "# Changed outside\n",
     );
     await expect(page.getByTestId("workspace-tab-modified-file_notes.md")).toBeVisible();
-    let closePrompt = "";
-    page.once("dialog", async (dialog) => {
-      closePrompt = dialog.message();
-      await dialog.dismiss();
-    });
     await page
       .getByTestId("workspace-tab-file_notes.md")
       .filter({ visible: true })
       .first()
       .click({ button: "right" });
+    const confirmation = answerAppConfirmation(page, "dismiss");
     await page.getByRole("menuitem", { name: "Close", exact: true }).click();
-    await expect.poll(() => closePrompt).toContain("discard");
+    expect((await confirmation).message()).toMatch(/discard/i);
+    await expect(
+      page.getByTestId("workspace-tab-file_notes.md").filter({ visible: true }).first(),
+    ).toBeVisible();
+    await expect(page.getByTestId("workspace-tab-modified-file_notes.md")).toBeVisible();
 
     await openBuiltinMarkdownSource(page, "notes.md");
     await expect(

@@ -2839,6 +2839,12 @@ test("reports a plugin reload failure that arrives after the session RPC deadlin
 
     const reload = client.reloadPlugin("example");
     const request = parseSentFrame(mock.sent[0]);
+    const assertion = expect(reload).rejects.toMatchObject({
+      message: "Request failed: Plugin failed to start: example",
+      requestId: request.requestId,
+      requestType: "plugin.reload.request",
+      code: "handler_error",
+    });
 
     await vi.advanceTimersByTimeAsync(114_034);
     mock.triggerMessage(
@@ -2853,9 +2859,7 @@ test("reports a plugin reload failure that arrives after the session RPC deadlin
       }),
     );
 
-    await expect(reload).rejects.toThrow(
-      "Request failed: Plugin failed to start: example requestType=plugin.reload.request code=handler_error",
-    );
+    await assertion;
   } finally {
     vi.useRealTimers();
   }

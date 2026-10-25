@@ -25,6 +25,8 @@ interface ThemedStackBaseProps {
   nestedNavigatorScreens?: readonly string[];
   /** Screens with retained lifetime owners update appearance at their own leaves. */
   screenOwnedAppearance?: readonly string[];
+  /** Replace leaf contents below the navigator when route authority is unavailable. */
+  screenContentFallback?: ReactElement;
 }
 
 interface ScreenContent {
@@ -38,6 +40,7 @@ function ThemedStackBase({
   screenOptions,
   nestedNavigatorScreens,
   screenOwnedAppearance,
+  screenContentFallback,
 }: ThemedStackBaseProps) {
   const screenListeners = useChatListScreenListeners();
   const themedScreenOptions = useMemo<NativeStackNavigationOptions>(
@@ -51,6 +54,9 @@ function ThemedStackBase({
   // and its screen containers keep their identity. See docs/unistyles.md.
   const screenLayout = useCallback(
     ({ route, children: content }: ScreenContent): ReactElement => {
+      // Keep navigator/route state mounted without mounting inaccessible leaf content.
+      if (screenContentFallback)
+        return <AppearanceStyleBoundary>{screenContentFallback}</AppearanceStyleBoundary>;
       if (
         (nestedNavigatorScreens?.includes(route.name) ||
           screenOwnedAppearance?.includes(route.name)) &&
@@ -59,7 +65,7 @@ function ThemedStackBase({
         return content;
       return <AppearanceStyleBoundary>{content}</AppearanceStyleBoundary>;
     },
-    [nestedNavigatorScreens, screenOwnedAppearance],
+    [nestedNavigatorScreens, screenOwnedAppearance, screenContentFallback],
   );
 
   return (

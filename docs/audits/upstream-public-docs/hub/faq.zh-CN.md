@@ -1,14 +1,16 @@
 ---
 title: Hub 常见问题
-description: 关于 Clisbot Hub 中项目、连接、配置和 daemon 的常见问题。
+description: 关于 Paseo Hub 中项目、连接、配置和 daemon 的常见问题。
 nav: 常见问题
 ---
 
+> Archived upstream Chinese documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo), source `public-docs/hub/faq.zh-CN.md`. Describes Paseo's contract, not the current Clisbot guide. Excluded from clisbot.com/docs; this zh-CN page uses the current Clisbot English original until a reviewed translation matches its contract.
+
 # Hub 常见问题 {#hub-faq}
 
-## 使用 Clisbot 需要 Hub 吗？ {#do-i-need-hub-to-use-clisbot}
+## 使用 Paseo 需要 Hub 吗？ {#do-i-need-hub-to-use-paseo}
 
-不需要。没有 Hub，Clisbot 也能在你的机器上运行 Agent。Hub 增加的是单个 daemon 自身做不到的事：由外部活动启动 Agent、版本化的配置、共享的运行记录，以及团队访问。
+不需要。没有 Hub，Paseo 也能在你的机器上运行 Agent。Hub 增加的是单个 daemon 自身做不到的事：由外部活动启动 Agent、版本化的配置、共享的运行记录，以及团队访问。
 
 ## 一个组织可以连接多个 GitHub 组织吗？ {#can-one-organization-connect-several-github-organizations}
 
@@ -26,11 +28,11 @@ nav: 常见问题
 
 ## 配置可以放在被监听的仓库之外吗？ {#can-the-configuration-live-somewhere-other-than-the-repository-being-watched}
 
-可以。`filters.repo` 可以指定组织能访问的任意仓库，因此一个私有仓库可以保存监听公开仓库的 workflow 的 `.clisbot` 配置包。请保护好推送权限，因为配置包决定了组织的连接、daemon、Agent 和输出。
+可以。`filters.repo` 可以指定组织能访问的任意仓库，因此一个私有仓库可以保存监听公开仓库的 workflow 的 `.paseo` 配置包。请保护好推送权限，因为配置包决定了组织的连接、daemon、Agent 和输出。
 
 ## 现在触发器放在哪里？ {#where-do-triggers-go-now}
 
-每个触发器及其有序的 step 都放在一个直接位于 `.clisbot/workflows/*.yml` 的文件中。`hub.yml` 只包含命名的环境和 Agent。Hub 会拒绝整体式的 `triggers` 配置，而不是转换它。
+每个触发器及其有序的 step 都放在一个直接位于 `.paseo/workflows/*.yml` 的文件中。`hub.yml` 只包含命名的环境和 Agent。Hub 会拒绝整体式的 `triggers` 配置，而不是转换它。
 
 ## 可以在控制台中编辑配置吗？ {#can-i-edit-configuration-in-the-dashboard}
 
@@ -46,7 +48,7 @@ nav: 常见问题
 
 ## 退出登录会断开我的 daemon 吗？ {#does-logging-out-disconnect-my-daemon}
 
-不会。保存的 CLI 登录是一个人员的组织凭据；已注册的 daemon 有自己的关系凭据。交互式的 `clisbot hub logout` 会询问是否断开与同一 Hub 相关的 daemon。拒绝是正常的；除非你传入 `--disconnect-daemon`，JSON 或非交互式的退出登录永远不会断开 daemon。
+不会。保存的 CLI 登录是一个人员的组织凭据；已注册的 daemon 有自己的关系凭据。交互式的 `paseo hub logout` 会询问是否断开与同一 Hub 相关的 daemon。拒绝是正常的；除非你传入 `--disconnect-daemon`，JSON 或非交互式的退出登录永远不会断开 daemon。
 
 ## Agent 可以回复到 Slack 或 Discord 吗？ {#can-an-agent-reply-back-to-slack-or-discord}
 

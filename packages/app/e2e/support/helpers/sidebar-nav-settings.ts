@@ -331,8 +331,16 @@ export async function expectFooterIconRow(
 }
 
 export async function expectFooterSeparator(page: Page, shown: boolean): Promise<void> {
+  // Home V2's compact Chat uses a top toolbar; the legacy compact drawer keeps
+  // this footer below its list. Width alone does not select the border edge.
+  const compactChatToolbar =
+    (page.viewportSize()?.width ?? 1440) < 768 &&
+    (await page
+      .getByTestId("home-mobile-tabs")
+      .getByRole("tab", { name: "Chat", exact: true })
+      .isVisible());
   await expect(page.locator('[data-testid="sidebar-footer"]:visible')).toHaveCSS(
-    (page.viewportSize()?.width ?? 1440) < 768 ? "border-bottom-width" : "border-top-width",
+    compactChatToolbar ? "border-bottom-width" : "border-top-width",
     "1px",
   );
   await expect(page.locator('[data-testid="sidebar-footer-bottom-line"]:visible')).toHaveCSS(

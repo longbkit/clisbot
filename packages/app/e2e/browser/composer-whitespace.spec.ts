@@ -37,7 +37,11 @@ import {
   closeMobileAgentSidebar,
   expectMobileAgentSidebarHidden,
   expectMobileAgentSidebarVisible,
+  closeMobileExplorer,
+  expectMobileExplorerHidden,
+  expectMobileExplorerVisible,
   swipeOpenMobileAgentSidebar,
+  swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
 
 async function composerHeight(page: Page): Promise<number> {
@@ -527,7 +531,7 @@ test("retained agent tabs preserve fullscreen editing and paste when switched aw
   }
 });
 
-test("the compact sidebar over a fullscreen editor leaves the exit action alone", async ({
+test("a real compact overlay over a fullscreen editor leaves the exit action alone", async ({
   page,
 }) => {
   const agent = await seedMockAgentWorkspace({
@@ -537,18 +541,39 @@ test("the compact sidebar over a fullscreen editor leaves the exit action alone"
   try {
     await resizeComposerViewport(page, "portrait");
     await openAgentRoute(page, agent);
+    await expectWorkspaceHeaderVisible(page);
+    const back = page.getByTestId("chat-back").filter({ visible: true });
+    const menu = page.getByRole("button", { name: "Open menu", exact: true });
+    await expect(back.or(menu)).toHaveCount(1);
+    const usesChatNavigation = await back.isVisible();
     const draft = "Line one\nLine two\nLine three";
     await writeCompactDraft(page, draft);
     await enterComposerFullscreen(page);
     await expectWorkspaceHeaderHidden(page);
-    // Fullscreen hides the header's menu button; the edge swipe still opens the list over it.
-    await swipeOpenMobileAgentSidebar(page);
-    await expectMobileAgentSidebarVisible(page);
-    // The list covers the pane, so the editor's exit action is not armed.
-    await page.keyboard.press("Escape");
-    await closeMobileAgentSidebar(page);
-    await expectMobileAgentSidebarHidden(page);
+    if (usesChatNavigation) {
+      // Home V2 deliberately removes the left drawer, including while fullscreen.
+      // Prove that swipe leaves the editor intact, then cover it with the real Explorer.
+      await swipeOpenMobileAgentSidebar(page);
+      await expectMobileAgentSidebarHidden(page);
+      await expectComposerFullscreenControls(page);
+      await expect(composerLocator(page)).toHaveValue(draft);
+      await swipeOpenMobileExplorer(page);
+      await expectMobileExplorerVisible(page);
+      await blurComposer(page);
+      await page.keyboard.press("Escape");
+      await closeMobileExplorer(page);
+      await expectMobileExplorerHidden(page);
+    } else {
+      // Legacy still presents its left drawer over fullscreen, preserving that contract.
+      await swipeOpenMobileAgentSidebar(page);
+      await expectMobileAgentSidebarVisible(page);
+      await blurComposer(page);
+      await page.keyboard.press("Escape");
+      await closeMobileAgentSidebar(page);
+      await expectMobileAgentSidebarHidden(page);
+    }
     await expectComposerFullscreenControls(page);
+    await expect(composerLocator(page)).not.toBeFocused();
     await expect(composerLocator(page)).toHaveValue(draft);
     await exitComposerFullscreen(page);
     await expectWorkspaceHeaderVisible(page);

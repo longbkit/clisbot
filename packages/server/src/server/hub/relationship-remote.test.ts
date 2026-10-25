@@ -360,25 +360,35 @@ test("an idle Hub socket is kept alive with protocol pings", async () => {
   hub.close();
 });
 
-test("a Hub socket that stops answering pings is terminated and reported as lost", async () => {
+test("a Hub socket that stops answering pings reports one heartbeat failure and releases the socket", async () => {
   const hub = await startSocketHub({ autoPong: false });
-  const closed = deferred<number>();
-  new DirectHubRelationshipRemote({
+  const outcomes = new SocketOutcomes();
+  const socket = new DirectHubRelationshipRemote({
     socketPingIntervalMs: 20,
     socketStaleTimeoutMs: 100,
   }).openSocket(
     { daemonId: "daemon-1", credential: "credential", webSocketUrl: hub.webSocketUrl },
-    {
-      connected: () => undefined,
-      rejected: () => undefined,
-      closed: (code) => closed.resolve(code),
-      failed: () => undefined,
-    },
-  );
+    outcomes.events,
+  ) as HubSocketConnection & WebSocket;
 
-  await expect(closed.promise).resolves.toBe(1006);
-  expect(hub.pings()).toBeGreaterThan(0);
-  hub.close();
+  const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+  try {
+    expect(await outcomes.next()).toEqual({ type: "connected" });
+    expect(await outcomes.next()).toEqual({
+      type: "failed",
+      message: "Hub WebSocket heartbeat timed out",
+    });
+    await closed;
+    expect(await outcomes.afterCleanup()).toEqual([
+      { type: "connected" },
+      { type: "failed", message: "Hub WebSocket heartbeat timed out" },
+    ]);
+    expect(socket.readyState).toBe(WebSocket.CLOSED);
+    expect(hub.pings()).toBeGreaterThan(0);
+  } finally {
+    socket.close();
+    hub.close();
+  }
 });
 
 test.each([408, 429])("transient enrollment status %s remains retryable", async (status) => {

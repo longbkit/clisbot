@@ -126,8 +126,17 @@ test("projects and pinned chats reorder while ordinary workspaces stay newest fi
   }
 });
 
-async function selectWorkspaceSort(page: Page, name: "Manual" | "Created" | "Last prompt") {
-  await page.getByLabel("Display preferences", { exact: true }).click();
+async function selectWorkspaceSort(
+  page: Page,
+  name: "Manual" | "Created" | "Last prompt",
+  activation: "pointer" | "keyboard" = "pointer",
+) {
+  const trigger = page.getByLabel("Display preferences", { exact: true });
+  if (activation === "keyboard") {
+    await trigger.focus();
+    await trigger.press("Enter");
+  } else await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("menuitem", { name: /^Sort/ }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
@@ -386,9 +395,7 @@ async function restorePreBetaOrder(page: Page, projectKey: string, workspaceKeys
   await reconnectSidebar(page);
 }
 
-test("Manual restores pre-beta order and keeps drag order across sorting and reloads", async ({
-  page,
-}) => {
+async function seedManualWorkspacePair(page: Page) {
   const seed = await seedWorkspace({ repoPrefix: "sidebar-manual-" });
   try {
     const second = await seed.client.createWorkspace({
@@ -399,6 +406,16 @@ test("Manual restores pre-beta order and keeps drag order across sorting and rel
     const keys = [seed.workspaceId, second.workspace.id].map((id) => `${getServerId()}:${id}`);
     const ids = keys.map((key) => `sidebar-workspace-row-${key}`);
     const rows = page.locator(ids.map((id) => `[data-testid="${id}"]`).join(", "));
+    return { seed, keys, ids, rows };
+  } catch (error) {
+    await seed.cleanup();
+    throw error;
+  }
+}
+
+test("Manual restores pre-beta order across sorting and reloads", async ({ page }) => {
+  const { seed, keys, ids, rows } = await seedManualWorkspacePair(page);
+  try {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await restorePreBetaOrder(page, projectEquivalenceViewKey(seed.projectKey), keys);
@@ -410,14 +427,36 @@ test("Manual restores pre-beta order and keeps drag order across sorting and rel
     await selectWorkspaceSort(page, "Last prompt");
     await selectWorkspaceSort(page, "Manual");
     await expect.poll(() => rowTestIds(rows)).toEqual(ids);
+    await reconnectSidebar(page);
+    await expect.poll(() => rowTestIds(rows)).toEqual(ids);
+  } finally {
+    await seed.cleanup();
+  }
+});
+
+test("Manual drag order persists across sorting and reloads", async ({ page }) => {
+  const { seed, ids, rows } = await seedManualWorkspacePair(page);
+  try {
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    await selectWorkspaceSort(page, "Manual");
+    await expect(rows).toHaveCount(2);
+    const initialOrder = await rowTestIds(rows);
+    expect(initialOrder.toSorted()).toEqual(ids.toSorted());
     await quickDragFirstRowAfterSecond(rows, pressWorkspaceRow);
+    await reconnectSidebar(page);
+    await expect.poll(() => rowTestIds(rows)).toEqual(initialOrder.toReversed());
+    await quickDragFirstRowAfterSecond(rows, pressWorkspaceRow);
+    await expect.poll(() => rowTestIds(rows)).toEqual(initialOrder);
+    // dnd-kit retains its document click-capture guard for 50ms after pointer
+    // release. Use the trigger's real keyboard activation for this immediate
+    // next action instead of racing that ghost-click suppression with a sleep.
+    await selectWorkspaceSort(page, "Created", "keyboard");
+    await expect.poll(() => rowTestIds(rows)).toEqual([ids[1], ids[0]]);
     await reconnectSidebar(page);
     await expect.poll(() => rowTestIds(rows)).toEqual([ids[1], ids[0]]);
-    await quickDragFirstRowAfterSecond(rows, pressWorkspaceRow);
-    await selectWorkspaceSort(page, "Created");
-    await reconnectSidebar(page);
     await selectWorkspaceSort(page, "Manual");
-    await expect.poll(() => rowTestIds(rows)).toEqual(ids);
+    await expect.poll(() => rowTestIds(rows)).toEqual(initialOrder);
   } finally {
     await seed.cleanup();
   }

@@ -607,14 +607,38 @@ test.describe("Mobile sidebar panelState transition", () => {
     await expectMobileAgentSidebarHidden(page);
   });
 
-  test("places the close button beside the first nav row instead of over it", async ({ page }) => {
+  test("compact conversation navigation leaves the first nav row unobstructed", async ({
+    page,
+  }) => {
     await gotoAppShell(page);
-    await openMobileAgentSidebar(page);
+    const navigationMode = await openMobileAgentSidebar(page);
     await expectMobileAgentSidebarVisible(page);
 
-    const firstRow = await page.getByTestId("sidebar-global-new-workspace").boundingBox();
+    const firstRowLocator = page.getByTestId("sidebar-global-new-workspace");
+    await expect(firstRowLocator).toBeInViewport({ ratio: 1 });
+    const firstRow = await firstRowLocator.boundingBox();
+    if (!firstRow) throw new Error("first nav row must render");
+    if (navigationMode === "chat") {
+      await expect(page.getByTestId("sidebar-close")).toHaveCount(0);
+      const tabs = page.getByTestId("home-mobile-tabs");
+      await expect(tabs).toBeInViewport({ ratio: 1 });
+      await expect(tabs.getByRole("tab", { name: "Chat", exact: true })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      const tabsBox = await tabs.boundingBox();
+      if (!tabsBox) throw new Error("compact tabs must render");
+      expect(firstRow.y + firstRow.height).toBeLessThanOrEqual(tabsBox.y);
+      await tabs.getByRole("tab", { name: "Home", exact: true }).click();
+      await expectMobileAgentSidebarHidden(page);
+      await expect(tabs.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      return;
+    }
     const closeButton = await page.getByTestId("sidebar-close").boundingBox();
-    if (!firstRow || !closeButton) throw new Error("first nav row and close button must render");
+    if (!closeButton) throw new Error("legacy close button must render");
     expect(closeButton.x).toBeGreaterThanOrEqual(firstRow.x + firstRow.width);
   });
 

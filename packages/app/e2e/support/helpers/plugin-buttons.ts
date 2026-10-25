@@ -528,7 +528,8 @@ export async function withButtonShowcase(
             "Header status",
             "Open deployment logs",
             "Production locked",
-            "Copy workspace path",
+            "Search files",
+            `Copy workspace path ${workspace.repoPath}`,
           ]);
           await expect(workspaceMenuRow(page, "Production locked")).toBeDisabled();
           // Deploy lost its label to "Use icon-only header" and logs never had one; rows read titles.

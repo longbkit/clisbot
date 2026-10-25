@@ -429,9 +429,11 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       },
     });
     let settled = false;
+    let stopHeartbeat = () => {};
     const fail = (error: Error) => {
       if (settled) return;
       settled = true;
+      stopHeartbeat();
       socket.terminate();
       events.failed(error);
     };
@@ -442,7 +444,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
     });
     socket.once("open", () => {
       if (settled) return;
-      this.keepSocketAlive(socket, input.daemonId);
+      stopHeartbeat = this.keepSocketAlive(socket, input.daemonId, fail);
       events.connected(socket as WebSocketLike, sessionProtocol);
     });
     socket.once("unexpected-response", (_request, response) => {
@@ -460,6 +462,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       events.closed(1006);
     });
     socket.once("close", (code) => {
+      stopHeartbeat();
       if (settled) return;
       settled = true;
       events.closed(code);
@@ -468,7 +471,11 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
     return socket;
   }
 
-  private keepSocketAlive(socket: WebSocket, daemonId: string): void {
+  private keepSocketAlive(
+    socket: WebSocket,
+    daemonId: string,
+    fail: (error: Error) => void,
+  ): () => void {
     let lastSeenAt = Date.now();
     const seen = () => {
       lastSeenAt = Date.now();
@@ -479,22 +486,29 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
     const interval = setInterval(() => {
       if (socket.readyState !== WebSocket.OPEN) return;
       const staleForMs = Date.now() - lastSeenAt;
-      if (staleForMs > this.socketStaleTimeoutMs) {
+      if (staleForMs >= this.socketStaleTimeoutMs) {
         this.logger?.warn(
           { daemonId, staleForMs, staleTimeoutMs: this.socketStaleTimeoutMs },
           "Hub socket stale; terminating to reconnect",
         );
-        socket.terminate();
+        fail(new Error("Hub WebSocket heartbeat timed out"));
         return;
       }
       try {
-        socket.ping();
-      } catch {
-        socket.terminate();
+        socket.ping(undefined, undefined, (error) => {
+          if (error) fail(error);
+        });
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
       }
     }, this.socketPingIntervalMs);
     interval.unref?.();
-    socket.once("close", () => clearInterval(interval));
+    return () => {
+      clearInterval(interval);
+      socket.off("pong", seen);
+      socket.off("ping", seen);
+      socket.off("message", seen);
+    };
   }
 
   private async withRequestTimeout<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {

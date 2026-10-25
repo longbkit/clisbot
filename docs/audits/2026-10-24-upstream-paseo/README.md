@@ -136,3 +136,69 @@ remaining platform limitation must be explicit; an unrun gate is not green.
 Before promotion, abandoning the isolated branch leaves main and Owner services
 unchanged. After integration, undoing source requires a reviewed merge revert;
 it does not imply a runtime rollback, release, or permission to restart services.
+
+## First full CI and corrective follow-through
+
+Candidate `7c4446ad7d416374d6a84d26b8105e31e386d363` was pushed only to
+`sync/promotion-v0.13.0`. Full CI run `40141748790` completed with failures; it is
+not an acceptance receipt. Linux/Windows Desktop, three CLI shards, macOS file
+observation, Windows server integration and two browser shards passed. Other
+server, quality, website, app and browser jobs exposed repairs retained in the
+evidence directory; no unchanged failed run is relabeled green.
+
+The corrective source retains structured RPC error diagnostics in the client
+fixture, fixes Hub heartbeat failure completion, and corrects the OpenCode test
+storage namespace. Focused client219/server32 checks passed. Website content
+checks passed549 using the actual CI command. Inherited Chinese hosted-service
+claims and15 divergent translated guides are archived with raw provenance;
+explicit English fallback is shown for those guides rather than publishing
+claims for an unimplemented Clisbot service. This is not full Chinese coverage.
+
+Browser tests now use the actual Home V2/legacy navigation and translated
+confirmation surfaces without removing their geometry, dirty-draft, exact-file,
+permission-ledger or workspace-identity assertions. Expo browser-test interop
+uses the real web core and embedded Markdown WASM; that interop is scoped to
+the browser project, preserving Node unit imports.
+
+Actual Settings reproduction found a second pop after browser Back had already
+returned to the first app entry. The versioned Expo Router history patch and
+install registry prevent that extra pop. Removing a Host also unmounted its
+nested navigator and serialized its workspace as a Host query; retaining the
+navigator while replacing inaccessible leaf content preserves the original
+reader URL. All12 Settings browser journeys passed after both fixes, including
+Home/Chat/Session entry return and Forward. Focused Host composition tests11
+passed; these do not certify native navigator lifetime.
+
+Directly connected remote-Host E2E exposed a canceled directory subscription
+whose same-connection reacquisition reused the canceled refresh. Generation
+tracking now reacquires once when demand returns, preserving ordinary backend
+failure behavior without automatic retry. Actual two-Host E2E passed and the
+whole directory unit file35 passed. The exact browser producer of the original
+release is inferred from the Host-discovery demand lifecycle, not instrumented.
+
+Independent review accepted these scoped repairs. Separate preexisting P2
+`IC-DIR-01` remains open: cancellation/disposal while initial cache hydration is
+pending can admit an unneeded subscription after the last consumer leaves.
+Runtime reproduction of that adjacent path is unrun; no complete cancellation
+cleanup, data-loss or cross-Host exposure claim is made.
+
+The packaged7c web build completed and one real Codex turn returned exactly
+`OK`; four actual whole-screen web captures were inspected. Later repairs have
+not yet been rebuilt into that package. Android prebuild passed; the first
+Gradle build was intentionally stopped after920s to prioritize CI correction,
+with task-owned caches preserved. There is no APK/launch or iOS acceptance yet.
+New-head full CI, final source checks, packaged Bot/schedule/tour and native
+gates remain open before promotion.
+
+Latest focused closure also passed both offline remote-Host contracts: a never-opened
+workspace keeps its qualified route and cached sidebar behind the existing connection
+gate; an already-open workspace retains the identical pane/child DOM nodes and
+unsent draft after transport loss. The original fixture had expected warm content
+on its first offline open, contrary to the pre-merge documented cold-open contract.
+The corrected fixture adds both sides rather than removing retention coverage.
+
+Final local browser component coverage is32files/232tests passing. The two repaired
+legacy drawer journeys and both Manual-order journeys passed. Format and lint are
+clean; final typecheck and normal commit hooks bind acceptance to the next candidate
+commit, whose full CI is still required. Per-run counts here overlap and are not an
+additive count of unique tests.

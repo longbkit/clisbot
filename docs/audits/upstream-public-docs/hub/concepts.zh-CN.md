@@ -1,8 +1,10 @@
 ---
 title: Hub 工作原理
-description: Provider 事件如何到达 workflow 和 Clisbot daemon。
+description: Provider 事件如何到达 workflow 和 Paseo daemon。
 nav: 工作原理
 ---
+
+> Archived upstream Chinese documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo), source `public-docs/hub/concepts.zh-CN.md`. Describes Paseo's contract, not the current Clisbot guide. Excluded from clisbot.com/docs; this zh-CN page uses the current Clisbot English original until a reviewed translation matches its contract.
 
 # Hub 工作原理 {#how-hub-works}
 
@@ -17,21 +19,21 @@ GitHub / Slack / Discord / manual request
                 workflow
           runs ordered agent steps
                     ↓
-             Clisbot daemon
+             Paseo daemon
              starts the agent
 ```
 
 ## 组成部分 {#the-pieces}
 
 - **连接**让 Hub 接收来自 GitHub、Slack 或 Discord 的事件。
-- **daemon** 是一台运行 Clisbot daemon 的已注册机器。
+- **daemon** 是一台运行 Paseo daemon 的已注册机器。
 - **项目**把一份配置与它使用的连接和 daemon 组织在一起。
 - **环境**指定 workflow step 在哪里运行：一个 daemon、它的工作目录，以及可选的 worktree。
 - **触发器**说明哪个 Provider 事件可以启动 workflow，以及允许哪些事件通过。
 - **workflow** 是触发器匹配后运行的一组有序 step。
 - **step** 启动一次 Agent 执行，有自己的提示词、Agent 选择、凭据、回复能力和限制。
 
-当项目使用 GitHub 来源时，配置位于 `.clisbot/hub.yml` 以及按约定发现的 `.clisbot/workflows/*.yml` 文件中。一个项目同一时间只有一个生效的配置版本。
+当项目使用 GitHub 来源时，配置位于 `.paseo/hub.yml` 以及按约定发现的 `.paseo/workflows/*.yml` 文件中。一个项目同一时间只有一个生效的配置版本。
 
 ## 从事件到 Agent {#from-event-to-agent}
 
@@ -53,7 +55,7 @@ Hub 同步配置包时，会校验每个源文件并解析其中的引用：
 - `environment.daemon` 必须匹配一个已注册 daemon 的友好 slug。
 - step id、表达式、输入过滤器、输出 schema 和时长必须有效。
 - 每个有限的环境或命名 Agent 结果都必须存在并通过校验。
-- 提示词片段必须能在该提交中 `.clisbot/workflows/partials/` 下解析到。
+- 提示词片段必须能在该提交中 `.paseo/workflows/partials/` 下解析到。
 
 如果激活失败，Hub 会保留之前生效的版本。Configuration 标签页会显示失败的同步及其校验错误；Activity 继续反映上一个生效的版本。
 

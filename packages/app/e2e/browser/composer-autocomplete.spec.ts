@@ -192,9 +192,7 @@ async function expectSingleCurrentWorkspaceDeckEntry(
 async function openReadyMockAgent(
   page: Page,
   options?: { expectWorkspaceTab?: boolean },
-): Promise<{
-  cleanup: () => Promise<void>;
-}> {
+): Promise<MockAgentWorkspace> {
   const session = await seedMockAgentWorkspace({
     repoPrefix: "autocomplete-popover-",
     title: "Autocomplete popover regression",
@@ -206,7 +204,7 @@ async function openReadyMockAgent(
       await expectWorkspaceTabVisible(page, session.agentId);
     }
     await expectComposerVisible(page);
-    return { cleanup: session.cleanup };
+    return session;
   } catch (error) {
     await session.cleanup();
     throw error;
@@ -685,7 +683,9 @@ test.describe("Composer autocomplete", () => {
   test.describe("compact sidebar layering", () => {
     test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-    test("keeps the mobile agent sidebar above autocomplete", async ({ page }) => {
+    test("keeps autocomplete scoped to its agent across compact conversation navigation", async ({
+      page,
+    }) => {
       await installListCommandsStub(page);
       const agent = await openReadyMockAgent(page, { expectWorkspaceTab: false });
 
@@ -699,14 +699,23 @@ test.describe("Composer autocomplete", () => {
           timeout: 30_000,
         });
 
-        // The sidebar covers the composer, so the composer gives up its popover while the
-        // sidebar is open and brings it back once the sidebar closes.
-        await openMobileAgentSidebar(page);
+        // Home V2 leaves Work for Chat; legacy presents a drawer above the same Work.
+        // Both relinquish autocomplete until this exact agent's workspace is active again.
+        const navigationMode = await openMobileAgentSidebar(page);
         await expectMobileAgentSidebarVisible(page);
         await expect(popover).toHaveCount(0);
 
-        await closeMobileAgentSidebar(page);
+        if (navigationMode === "chat") {
+          await switchWorkspaceViaSidebar({
+            page,
+            serverId: getServerId(),
+            workspaceId: agent.workspaceId,
+          });
+        } else {
+          await closeMobileAgentSidebar(page);
+        }
         await expectMobileAgentSidebarHidden(page);
+        await expect(input).toHaveValue("/");
         await expect(popover.getByText("/help", { exact: true }).first()).toBeVisible();
       } finally {
         await agent.cleanup();

@@ -25,9 +25,12 @@ import {
   expectMobileAgentSidebarVisible,
   expectMobileExplorerHidden,
   expectMobileExplorerVisible,
+  openMobileAgentSidebar,
   swipeOpenMobileAgentSidebar,
   swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
+import { switchWorkspaceViaSidebar } from "../support/helpers/workspace-ui";
+import { getServerId } from "../support/helpers/server-id";
 import { readScrollMetrics } from "../support/helpers/agent-bottom-anchor";
 import {
   expectTimelinePromptPositionPreserved,
@@ -274,6 +277,63 @@ for (const panel of COMPACT_PANELS) {
       await resizeComposerViewport(page, "portrait");
       await openAgentRoute(page, agent);
       await expectComposerVisible(page);
+
+      if (panel.name === "agent list") {
+        await expectWorkspaceHeaderVisible(page);
+        const back = page.getByTestId("chat-back").filter({ visible: true });
+        const menu = page.getByRole("button", { name: "Open menu", exact: true });
+        await expect(back.or(menu)).toHaveCount(1);
+        if (await back.isVisible()) {
+          const workUrl = page.url();
+          const visitChatAndReturn = async () => {
+            expect(await openMobileAgentSidebar(page)).toBe("chat");
+            await expectMobileAgentSidebarVisible(page);
+            await switchWorkspaceViaSidebar({
+              page,
+              serverId: getServerId(),
+              workspaceId: agent.workspaceId,
+            });
+            await expectMobileAgentSidebarHidden(page);
+            await expectComposerVisible(page);
+          };
+          await test.step("the removed left-edge drawer does not steal an untouched editor", async () => {
+            await expectComposerNotFocused(page);
+            await swipeOpenMobileAgentSidebar(page);
+            await expectMobileAgentSidebarHidden(page);
+            await expect(page).toHaveURL(workUrl);
+            await expectComposerNotFocused(page);
+            await visitChatAndReturn();
+            await expectComposerNotFocused(page);
+          });
+          await test.step("returning from Chat preserves the inline draft without restoring focus", async () => {
+            await composerLocator(page).fill(draft);
+            await composerLocator(page).click();
+            await expectComposerFocused(page);
+            await visitChatAndReturn();
+            await expectComposerNotFocused(page);
+            await expectComposerDraft(page, draft);
+          });
+          await test.step("fullscreen is exited through its control before visiting Chat", async () => {
+            // Fullscreen changes layout; it preserves, rather than invents, editor focus.
+            await composerLocator(page).click();
+            await expectComposerFocused(page);
+            await enterComposerFullscreen(page);
+            await expectComposerFullscreenControls(page);
+            await expectComposerFocused(page);
+            await exitComposerFullscreen(page);
+            await expectWorkspaceHeaderVisible(page);
+            await visitChatAndReturn();
+            await expectComposerNotFocused(page);
+            await expectComposerDraft(page, draft);
+            await expect(page.getByTestId("composer-fullscreen")).toHaveCount(0);
+            await enterComposerFullscreen(page);
+            await expectComposerFullscreenControls(page);
+            await expectComposerDraft(page, draft);
+            await exitComposerFullscreen(page);
+          });
+          return;
+        }
+      }
 
       await test.step("an untouched editor stays untouched", async () => {
         await expectComposerNotFocused(page);

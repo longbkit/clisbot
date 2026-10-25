@@ -4,6 +4,10 @@ import path from "path";
 import fs from "fs";
 import { transformSync } from "@babel/core";
 import { build } from "esbuild";
+import {
+  enrichedMarkdownWasm,
+  enrichedMarkdownWasmOptimizer,
+} from "./test-stubs/enriched-markdown-wasm";
 
 // Set this before Vite resolves dependencies and Vitest starts its workers.
 Object.assign(process.env, { NODE_ENV: "test" });
@@ -85,10 +89,18 @@ export default defineConfig({
       },
       {
         extends: true,
+        plugins: [enrichedMarkdownWasm],
         resolve: {
           // Component browser tests have no Expo router host. Route contracts run
           // through Playwright/Metro; avoid scanning native Expo navigation here.
           alias: [
+            // Expo 57's web core installs its own browser module registry. The
+            // Node-only native-boundary stub below cannot supply Crypto AES's
+            // NativeModule/registerWebModule or the real coded errors.
+            {
+              find: /^expo-modules-core$/,
+              replacement: resolvePackageEntry("expo-modules-core/src/index.ts"),
+            },
             {
               find: /^expo-router$/,
               replacement: path.resolve(__dirname, "test-stubs/expo-router.ts"),
@@ -152,6 +164,7 @@ export default defineConfig({
     // Expo's public navigation barrel also loads screens. Match Metro's web-first resolution
     // while optimizing its CJS dependencies, including DebugContainer.web.js.
     esbuildOptions: {
+      plugins: [enrichedMarkdownWasmOptimizer],
       resolveExtensions: [
         ".web.js",
         ".web.jsx",

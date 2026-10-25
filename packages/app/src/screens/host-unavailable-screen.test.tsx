@@ -14,19 +14,65 @@ const state = vi.hoisted(() => ({
   hosts: [] as { serverId: string }[],
   router: { push: vi.fn(), replace: vi.fn(), navigate: vi.fn(), back: vi.fn() },
   record: vi.fn(),
+  stackMounts: 0,
+  stackUnmounts: 0,
+  leafMounts: 0,
+  leafUnmounts: 0,
 }));
 
-vi.mock("expo-router", () => ({
-  useRouter: () => state.router,
-  useLocalSearchParams: () => ({ serverId: "srv" }),
-  Redirect: () => <span>Unexpected redirect</span>,
-  Stack: { Screen: () => null },
-}));
+vi.mock("expo-router", () => {
+  function ProtectedHostLeaf() {
+    React.useEffect(() => {
+      state.leafMounts += 1;
+      return () => {
+        state.leafUnmounts += 1;
+      };
+    }, []);
+    return <span data-testid="protected-host-leaf" />;
+  }
+  const Stack = Object.assign(
+    function Stack({
+      screenLayout,
+    }: {
+      screenLayout: (input: {
+        route: { name: string };
+        children: React.ReactNode;
+      }) => React.ReactElement;
+    }) {
+      React.useEffect(() => {
+        state.stackMounts += 1;
+        return () => {
+          state.stackUnmounts += 1;
+        };
+      }, []);
+      // Match Expo's actual boundary: screenLayout receives a SceneView element
+      // before its leaf has mounted. Exercise the real ThemedStack composition.
+      return (
+        <div data-testid="host-stack">
+          {screenLayout({
+            route: { name: "workspace/[workspaceId]/index" },
+            children: <ProtectedHostLeaf />,
+          })}
+        </div>
+      );
+    },
+    { Screen: () => null },
+  );
+  return {
+    useRouter: () => state.router,
+    useLocalSearchParams: () => ({ serverId: "srv" }),
+    Redirect: () => <span>Unexpected redirect</span>,
+    Stack,
+  };
+});
 vi.mock("@/app/_layout", () => ({
   useHostRuntimeBootstrapState: () => ({ startupBlocker: { kind: "none" } }),
 }));
-vi.mock("@/navigation/themed-stack", () => ({
-  ThemedStack: () => <span data-testid="host-stack" />,
+vi.mock("@/clisbot/home/use-chat-list-navigation", () => ({
+  useChatListScreenListeners: () => ({}),
+}));
+vi.mock("@/components/appearance-style-boundary", () => ({
+  AppearanceStyleBoundary: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("react-native", () => ({
@@ -35,7 +81,13 @@ vi.mock("react-native", () => ({
   ),
   Text: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
 }));
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: () => ({}) },
+  withUnistyles: (Component: React.ComponentType<{ backgroundColor: string }>) =>
+    function Themed(props: object) {
+      return <Component backgroundColor="#000" {...props} />;
+    },
+}));
 vi.mock("@/components/ui/button", () => ({
   Button: ({
     children,
@@ -86,6 +138,10 @@ beforeEach(() => {
   state.hosts = [];
   for (const fn of Object.values(state.router)) fn.mockClear();
   state.record.mockClear();
+  state.stackMounts = 0;
+  state.stackUnmounts = 0;
+  state.leafMounts = 0;
+  state.leafUnmounts = 0;
 });
 afterEach(() => {
   cleanup();
@@ -167,14 +223,45 @@ it("does not call unresolved access denied and bounds the wait with a working re
   expect(navigated()).toBe(false);
 });
 
-it("does not mount the Host route stack for a saved managed Host excluded from the inventory", () => {
+it("keeps the Host navigator without mounting an excluded managed Host's leaf", () => {
   state.managed = true;
   const { rerender } = render(<HostRouteLayout />);
   expect(screen.getByText("hostUnavailable.deniedTitle")).toBeTruthy();
-  expect(screen.queryByTestId("host-stack")).toBeNull();
+  expect(screen.getByTestId("host-stack")).toBeTruthy();
+  expect(screen.queryByTestId("protected-host-leaf")).toBeNull();
+  expect(state.leafMounts).toBe(0);
+  expect(state.stackMounts).toBe(1);
   state.hosts = [{ serverId: "srv" }];
   rerender(<HostRouteLayout />);
   expect(screen.getByTestId("host-stack")).toBeTruthy();
+  expect(screen.getByTestId("protected-host-leaf")).toBeTruthy();
+  expect(state.stackMounts).toBe(1);
+  expect(navigated()).toBe(false);
+});
+
+it("retains navigator identity while removing inaccessible leaf content and recovering it", () => {
+  state.hosts = [{ serverId: "srv" }];
+  const { rerender } = render(<HostRouteLayout />);
+  expect(screen.getByTestId("protected-host-leaf")).toBeTruthy();
+  expect(state.stackMounts).toBe(1);
+  expect(state.leafMounts).toBe(1);
+
+  state.hosts = [];
+  state.managed = true;
+  rerender(<HostRouteLayout />);
+  expect(screen.getByText("hostUnavailable.deniedTitle")).toBeTruthy();
+  expect(screen.queryByTestId("protected-host-leaf")).toBeNull();
+  expect(state.leafUnmounts).toBe(1);
+  expect(state.stackUnmounts).toBe(0);
+  expect(state.stackMounts).toBe(1);
+
+  state.hosts = [{ serverId: "srv" }];
+  rerender(<HostRouteLayout />);
+  expect(screen.queryByTestId("host-unavailable")).toBeNull();
+  expect(screen.getByTestId("protected-host-leaf")).toBeTruthy();
+  expect(state.leafMounts).toBe(2);
+  expect(state.stackMounts).toBe(1);
+  expect(state.stackUnmounts).toBe(0);
   expect(navigated()).toBe(false);
 });
 

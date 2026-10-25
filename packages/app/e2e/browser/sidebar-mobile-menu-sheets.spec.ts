@@ -30,6 +30,8 @@ test("project and workspace kebabs open action sheets on compact layouts", async
       /^Title/,
       "Show",
       "Project",
+      "User",
+      "Channel",
       "Show background",
     ]);
     await closeMenuSheet(page);

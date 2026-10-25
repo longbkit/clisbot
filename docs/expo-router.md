@@ -154,6 +154,13 @@ different navigator stack while the browser still holds the actual entry. Native
 Back still resolves its explicit parent; do not change native peer-tab replacement or workspace
 retention to repair a Settings return.
 
+Expo Router 57.0.28 also keeps a private web-history index that can lag an external browser
+Back/Forward event. `patches/expo-router+57.0.28.patch` rebases that index from the current
+browser-owned entry before its existing bounds check, preventing a second pop from leaving
+the first app entry. It is installed through `postinstall-patches.mjs`; remove the patch when
+the installed dependency includes the equivalent fix. The actual-browser regression covers
+the first-entry boundary and valid interior Back/Forward. This does not change native navigation.
+
 Plugin settings use the distinct `settings/hosts/[serverId]/plugins/[pluginId]/[screenId]` leaf;
 Back returns to that host's Plugins page.
 
@@ -288,3 +295,14 @@ the actual reader (which may now show Host unavailable) in one press. A cold det
 that parent uses the router's existing dismiss-to fallback. Wide Settings still replaces the
 removed detail with General. This reuses the Settings navigation owner; it does not redirect
 the removed Host's reader or change saved workspace selection.
+
+Host availability gates leaf content below the existing Host navigator. Keep that navigator
+and its relative screen registrations mounted when its inventory entry disappears, and use
+`ThemedStack.screenContentFallback` to render Host unavailable instead of the leaf. Inaccessible
+workspace, agent, plugin, bot and chat content must unmount; a hidden overlay is not an access
+boundary. Registering the Host again restores the ordinary leaf through its existing hydration.
+
+Returning to an unavailable reader preserves its exact original path, including
+`/h/[serverId]/workspace/[workspaceId]`. Unmounting the Host navigator can lose that nested route
+and serialize `workspaceId` as a parent query parameter. A query fallback or replacement reader
+URL does not satisfy this contract.
