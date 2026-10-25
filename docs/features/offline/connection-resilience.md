@@ -20,6 +20,10 @@ Offline Experience proposal (O1 → O2 → O3, approved 2026-10-25).
 - Foreground and `ensureConnected({ verify: true })` verify live sockets at once. An offline
   managed Host keeps its backoff, so a hundred unreachable sandboxes do not reconnect together.
   An explicit retry (`runProbeCycleNow`, the user's Retry) skips the remaining backoff.
+- On web and Electron, the window `online` event makes every offline Host drop its remaining
+  backoff and try now, still through the connect limit; `offline` verifies live sockets so they
+  report offline promptly (`runtime/network-reachability.web.ts`). Native has no network-change
+  signal yet and relies on foreground; NetInfo needs a native rebuild and is deferred to O2.
 - Admission sessions and probe sockets take a connect slot. A self-retrying client's
   `connect()` can stay pending across retries, so it is not gated.
 - `DaemonClient` keeps its unjittered default; only the app opts in, so CLI and daemon timing
@@ -101,7 +105,9 @@ summary (`useSourceHealthSummary`) re-render only when what a source shows chang
   cannot refresh.
 
 Copy names the source and the next step. For a Hub that cannot be reached it suggests checking a
-VPN without claiming the VPN is off (`describeSourceProblem`).
+VPN without claiming the VPN is off (`describeSourceProblem`, `describeHubFailure`). The strings
+live in their own `offline` i18n namespace (`packages/app/src/i18n/offline/`, en and vi; other
+locales fall back to en), so they merge without touching the shared per-locale resource files.
 
 ## History fan-out
 
@@ -114,6 +120,5 @@ failure becomes a named Host error. A fetch id keeps a late answer out of a newe
 
 - Lazy connections and Hub multiplexing (fewer sockets and tickets): O4, needs an ADR and Hub
   work.
-- OS network-change events: the app reacts to foreground (`AppState`) only. There is no
-  network-change hook to reuse yet.
+- Native OS network-change events (NetInfo): O2.
 - Timeline tail cache, outbox: O2 and O3.

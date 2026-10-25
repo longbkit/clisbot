@@ -134,6 +134,7 @@ import {
   RECONNECT_MAX_DELAY_MS,
   ReconnectBackoff,
 } from "./connection-backoff";
+import { type NetworkReachability, subscribeNetworkReachability } from "./network-reachability";
 
 export type HostRuntimeConnectionStatus = "idle" | "connecting" | "online" | "offline" | "error";
 export type PairingNavigationTarget = "openProject" | "hostRoot" | "hostSettings";
@@ -1103,6 +1104,27 @@ export class HostRuntimeController {
     if (passwordChanged) this.connectionLastProbedAt.clear();
     if (passwordChanged) await this.probeCycleInFlight;
     await this.runProbeCycleNow();
+  }
+
+  /**
+   * The device's network came back: an online Host verifies its socket, any other Host drops
+   * its remaining backoff and tries now. Admission and probe connects still take a shared slot.
+   */
+  retryAfterNetworkChange(): void {
+    if (this.snapshot.connectionStatus === "online") {
+      this.activeClient?.verifyConnection();
+      return;
+    }
+    if (this.usesSessionAdmission() || !this.activeClient) {
+      void this.runProbeCycleNow();
+      return;
+    }
+    this.activeClient.ensureConnected();
+  }
+
+  /** The device lost its network: probe live sockets now so they report offline promptly. */
+  verifyIfOnline(): void {
+    if (this.snapshot.connectionStatus === "online") this.activeClient?.verifyConnection();
   }
 
   /** A changed route is new information, not another failure of the old one. */
@@ -3445,6 +3467,15 @@ export class HostRuntimeStore {
     await controller.runProbeCycleNow();
   }
 
+  /** OS network changes (web and Electron; native relies on foreground for now). */
+  handleNetworkChange(state: NetworkReachability): void {
+    recordHostDiagnostic("network-change", { state });
+    for (const controller of this.controllers.values()) {
+      if (state === "online") controller.retryAfterNetworkChange();
+      else controller.verifyIfOnline();
+    }
+  }
+
   setAppVisible(visible: boolean): void {
     // Keep normal reconnect backoff running while hidden, for as long as the OS
     // lets us execute. Foregrounding bypasses that backoff without closing healthy sockets.
@@ -3584,9 +3615,12 @@ export function getHostRuntimeStore(): HostRuntimeStore {
     return existing;
   }
 
-  singletonHostRuntimeStore = new HostRuntimeStore();
-  Reflect.set(globalThis, HOST_RUNTIME_STORE_GLOBAL_KEY, singletonHostRuntimeStore);
-  return singletonHostRuntimeStore;
+  const store = new HostRuntimeStore();
+  singletonHostRuntimeStore = store;
+  Reflect.set(globalThis, HOST_RUNTIME_STORE_GLOBAL_KEY, store);
+  // The app store lives for the process; it follows OS network changes where the platform has them.
+  subscribeNetworkReachability((state) => store.handleNetworkChange(state));
+  return store;
 }
 
 export function getHostRuntimeConnectionStatusSince(serverId: string): number | null {

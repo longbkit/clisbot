@@ -254,3 +254,30 @@ describe("an explicit retry", () => {
     await fleet.controllers[0]!.stop();
   });
 });
+
+describe("the device network coming back", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("retries every offline Host at once, still four connects at a time", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout", "setInterval"] });
+    let reachable = false;
+    const fleet = startFleet({
+      hosts: 20,
+      unreachable: () => !reachable,
+      policy: { baseDelayMs: 60_000, maxDelayMs: 60_000, random: () => 0.99 },
+    });
+    await vi.advanceTimersByTimeAsync(10_000);
+    const before = fleet.limiter.stats().granted;
+    expect(before).toBe(20);
+    // Backoff would hold them for about a minute; the network event does not wait.
+    reachable = true;
+    for (const controller of fleet.controllers) controller.retryAfterNetworkChange();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(fleet.controllers.every((c) => c.getSnapshot().connectionStatus === "online")).toBe(
+      true,
+    );
+    expect(fleet.limiter.stats().granted - before).toBe(20);
+    expect(fleet.stats.peakInFlight).toBe(4);
+    await Promise.all(fleet.controllers.map((controller) => controller.stop()));
+  });
+});
