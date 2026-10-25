@@ -138,7 +138,13 @@ the mode switch and search (the tab bar already says Home).
   below, dimmed. Counts are the reader's scope; Needs me and Failed count unseen only.
 - **Feed**. Home's activity layout (`useActivityLayout`) takes the filtered rows and a bucket per
   row, adding a `seen` group. Background changes still wait behind Show updates; a change the
-  reader makes (a filter, Mark as seen, Dismiss, Archive) applies at once.
+  reader makes (a filter, Mark as seen, Dismiss, Archive) applies at once. The feed has no caption:
+  loading is the skeleton, and the directory line appears only when a connected Host's list fails —
+  a Host that drops is the connection notice's to say. The feed renders one frame after the
+  header, composer and filters, so switching to Home paints the top of the page first.
+- **States**. Home, Chats and Work share `ListState`: the skeleton while a Host connects, one
+  offline line once no Host can be reached (`useHostsReachability`; Chats and Work add View
+  details, which opens the connection sheet), empty, and filtered-empty.
 - **Reading position**. Content above the feed that changes height by itself — the connection
   notice, the Show updates / Mark all as seen line — sits in `HoldReadingPosition`: while the reader
   is scrolled, the scroll moves by the same amount, so no row moves under them. At the top the
@@ -281,6 +287,12 @@ Opt-in measurement specs:
   adds a CPU profile of one switch.
 - `navigation-v2-matrix.spec.ts` (`E2E_NAV_V2_MATRIX_DIR=<folder>`): every acceptance screen at
   1440, 1024, 320, 390 and 430 in light/dark × en/vi.
+- `navigation-v2-states.spec.ts` (`E2E_NAV_V2_STATES_DIR=<folder>`): loading, offline, empty and
+  filtered-empty on Home, Chats and Work at 1440 and 390.
+
+Home and the surfaces around it (activity, quick starts, start switcher, connection problems, the
+directory line, the Schedules landing, relative times) take their strings from the `home` resource
+(`i18n/resources/home.ts`); relative times in `utils/time.ts` follow the reader's language.
 
 Native iOS/Android were not run.
 
