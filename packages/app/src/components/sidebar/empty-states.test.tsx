@@ -10,20 +10,27 @@ const state = vi.hoisted(() => ({
     { serverId: "host-b", label: "Host B" },
   ],
 }));
+const runtime = vi.hoisted(() => ({
+  getSnapshot: (id: string) => state.snapshots[id],
+  getHosts: () => state.hosts,
+  subscribe: () => () => {},
+  subscribeHostList: () => () => {},
+  subscribeAll: () => () => {},
+}));
 vi.mock("@/runtime/host-runtime", () => ({
   useHosts: () => state.hosts,
   useHostRegistryLoaded: () => true,
-  getHostRuntimeStore: () => ({
-    getSnapshot: (id: string) => state.snapshots[id],
-    subscribeAll: () => () => {},
-  }),
+  getHostRuntimeStore: () => runtime,
 }));
 vi.mock("@/stores/sidebar-view-store", () => ({
   useSidebarViewStore: (select: (value: unknown) => unknown) => select({ hostFilters: ["host-a"] }),
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("./sidebar-model", () => ({ useSidebarModel: () => ({ metadataRecoveryNotice: null }) }));
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("react-i18next", async (original) => ({
+  ...(await original<typeof import("react-i18next")>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onPress }: { children: React.ReactNode; onPress: () => void }) => (
     <button type="button" onClick={onPress}>
@@ -53,6 +60,7 @@ import { SidebarProjectEmptyState } from "./empty-states";
 import { HomeActivity } from "@/clisbot/home/activity-preview";
 
 beforeEach(() => {
+  Reflect.deleteProperty(globalThis, "__clisbotSourceHealthStore");
   const ready = {
     connectionStatus: "online",
     agentDirectoryStatus: "ready",

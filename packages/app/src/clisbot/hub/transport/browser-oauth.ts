@@ -3,6 +3,7 @@ import { oauthCredentialKey, parseOAuthCredential } from "./oauth-credentials";
 import { readSecret, writeSecret, deleteSecret, lockSecret } from "@/device-access/secret-storage";
 import { i18n } from "@/i18n/i18next";
 import type { HubRequestInput, HubTransport } from "./contract";
+import { fetchWithDeadline } from "./request-deadline";
 import {
   authorizationCodeFromCallback,
   encodeBase64Url,
@@ -26,7 +27,7 @@ export class BrowserOAuthHubTransport implements HubTransport {
   async request(path: string, input: HubRequestInput = {}): Promise<Response> {
     if (!path.startsWith("/api/")) throw new Error("Hub requests must use an API path.");
     const token = await this.currentToken();
-    return fetch(new URL(path, this.origin), {
+    return fetchWithDeadline(new URL(path, this.origin), {
       ...input,
       credentials: "omit",
       redirect: "error",

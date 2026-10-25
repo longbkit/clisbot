@@ -28,6 +28,7 @@ import {
 import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
 import { updateHubProfile } from "@/device-access/hub-profiles";
+import { getHubDaemonListCache } from "./hub-daemon-list-cache";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
 import {
@@ -411,8 +412,10 @@ function EnabledHubAccountController({
           await refresh();
           throw error;
         }
+        // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
+        getHubDaemonListCache().forget(configuration.origin);
       }),
-    [run, transport, refresh],
+    [run, transport, refresh, configuration.origin],
   );
   const updateProfile = useCallback(
     (input: { name?: string; image?: string | null }) =>

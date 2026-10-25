@@ -11,6 +11,8 @@ import { HubAccessTicketSchema } from "./contracts";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
 import { orphanedManagedHosts } from "./managed-host-reconciliation";
 import { useHubDaemonsQuery } from "./host-inventory";
+import { cachedListForAccount, useHubDaemonListCache } from "./hub-daemon-list-cache";
+import { deriveHubSourceState, getHubSourceHealthRegistry } from "./hub-source-health";
 import {
   hubHostSynchronizationKey,
   setHubHostSynchronizationFailure,
@@ -59,6 +61,16 @@ function AccountHostSynchronization() {
   const organizationId = signedIn?.organization.id ?? null;
   const daemons = useHubDaemonsQuery();
   const hosts = useHosts();
+  const listCache = useHubDaemonListCache();
+  // A Hub that answered (signed out, another account or organization) retires the list this
+  // device remembered for it. An unreachable Hub has no state and keeps it.
+  const rememberedList = hubOrigin === null ? undefined : listCache.get(hubOrigin);
+  useEffect(() => {
+    if (!hub.enabled || hubOrigin === null || hub.state === null || rememberedList === undefined)
+      return;
+    if (cachedListForAccount(rememberedList, hub) === undefined) listCache.forget(hubOrigin);
+  }, [hub, hubOrigin, listCache, rememberedList]);
+  useHubSourceHealthPublication(hub, daemons, rememberedList?.syncedAt ?? null);
   const projectedDaemonIds = useMemo(
     () =>
       new Set(
@@ -130,6 +142,33 @@ function AccountHostSynchronization() {
   );
 }
 
+/** This account's daemon-list query is the only observer; it reports the Hub's health. */
+function useHubSourceHealthPublication(
+  hub: ReturnType<typeof useHubAccount>,
+  daemons: ReturnType<typeof useHubDaemonsQuery>,
+  rememberedSyncedAt: string | null,
+): void {
+  const origin = hub.origin;
+  const state = deriveHubSourceState({
+    accountUnresolved: hub.state === null,
+    accountLoading: hub.loading,
+    signedIn: hub.signedIn !== null,
+    listLoaded: daemons.data !== undefined,
+    listError: daemons.error,
+  });
+  const listedAt = daemons.data !== undefined ? daemons.dataUpdatedAt : 0;
+  const lastSyncedAt = listedAt > 0 ? new Date(listedAt).toISOString() : rememberedSyncedAt;
+  const label = hub.signedIn?.organization.name ?? origin ?? "";
+  useEffect(() => {
+    if (!hub.enabled || origin === null) return;
+    getHubSourceHealthRegistry().publish({ origin, label, state, lastSyncedAt });
+  }, [hub.enabled, label, lastSyncedAt, origin, state]);
+  useEffect(() => {
+    if (origin === null) return;
+    return () => getHubSourceHealthRegistry().remove(origin);
+  }, [origin]);
+}
+
 function HubHostBinding({
   daemonId,
   label,
@@ -199,8 +238,6 @@ function HubHostBinding({
     );
     void enqueueManagedHostMutation(async () => {
       if (disposed) return;
-      // Restart any Host already running for this daemon, including a saved one being attached:
-      // its client was admitted without this binding, or gave up before it was registered.
       const existing = store
         .getHosts()
         .find((host) => host.serverId === synchronizedOffer.serverId);
@@ -212,7 +249,11 @@ function HubHostBinding({
       if (profile === null) {
         throw new Error(i18n.t("hub.account.synchronization.conflictWithHint"));
       }
-      if (!disposed && existing) await store.restartHostConnection(synchronizedOffer.serverId);
+      // Adopt, never restart, a Host already running for this daemon (cold start restores it
+      // from the registry). Registering the binding above re-ran its admission if the binding
+      // or offered routes changed; a changed offer reaches it through the upsert. A Host that
+      // gave up (offline, error) gets one immediate attempt.
+      if (!disposed && existing) await store.adoptHostConnection(synchronizedOffer.serverId);
     }).catch((error: unknown) => {
       unregister();
       if (!disposed) {

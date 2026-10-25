@@ -25,7 +25,9 @@ actions keep their existing permissions.
 
 If the Hub account or Host inventory fails to load, the page shows an error with a retry
 action and keeps saved Hosts available. An unresolved inventory does not show empty-list
-guidance.
+guidance. While a Hub cannot be reached, its Hosts stay listed from the last daemon list this
+account read; sign-out, another account, a 403 or a fresh list without the Host still remove
+them. See [connection resilience](features/offline/connection-resilience.md#remembered-hub-daemon-list).
 
 The main page title is **Hosts**. The navigation row and **All hosts** picker option
 show a separate compact **active/total** status badge. The smaller Hosts section heading

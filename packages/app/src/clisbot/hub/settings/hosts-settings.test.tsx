@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostsSettings } from "./hosts-settings";
 import { HubHostSynchronization } from "../host-synchronization";
 import { useHostInventory } from "../host-inventory";
+import { getHubDaemonListCache } from "../hub-daemon-list-cache";
 import type { HostProfile } from "@/types/host-connection";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import { HostSettingsAccess } from "./host-settings-access";
@@ -144,8 +145,13 @@ const registeredDaemon = {
 const emptyHosts = { daemons: [] };
 let queryClient: QueryClient;
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubGlobal("React", React);
+  // The last Hub list is remembered per process and in storage; each test starts without one.
+  const rememberedLists = getHubDaemonListCache();
+  await rememberedLists.load();
+  rememberedLists.forget("https://hub.example.test");
+  await rememberedLists.flush();
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   adapters.get.mockReset();
   adapters.put.mockReset();

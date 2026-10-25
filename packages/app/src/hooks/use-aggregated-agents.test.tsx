@@ -19,6 +19,12 @@ vi.mock("@/runtime/host-runtime", () => ({
 }));
 const runtime = {
   getSnapshot: () => state.snapshot,
+  getHosts: () => state.hosts,
+  subscribe: (_serverId: string, callback: () => void) => {
+    state.listeners.add(callback);
+    return () => state.listeners.delete(callback);
+  },
+  subscribeHostList: () => () => {},
   subscribeAll: (callback: () => void) => {
     state.listeners.add(callback);
     return () => state.listeners.delete(callback);
@@ -37,6 +43,9 @@ import { useAggregatedAgents } from "./use-aggregated-agents";
 import { useDirectoryHealth } from "./use-directory-health";
 
 beforeEach(() => {
+  // Per-source health is a process singleton; each test starts from a fresh one.
+  state.listeners.clear();
+  Reflect.deleteProperty(globalThis, "__clisbotSourceHealthStore");
   state.snapshot = {
     agentDirectoryStatus: "idle",
     connectionStatus: "connecting",

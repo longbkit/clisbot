@@ -7,7 +7,7 @@ import { HubHostSynchronization } from "./host-synchronization";
 const adapters = vi.hoisted(() => ({
   slug: "sandbox",
   register: vi.fn(() => vi.fn()),
-  restart: vi.fn(async () => undefined),
+  adopt: vi.fn(async () => undefined),
   upsert: vi.fn(async () => ({ serverId: "server" })),
   remove: vi.fn(async () => true),
   hosts: [
@@ -60,7 +60,7 @@ vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
     getHosts: () => adapters.hosts,
     upsertManagedConnectionFromOffer: adapters.upsert,
-    restartHostConnection: adapters.restart,
+    adoptHostConnection: adapters.adopt,
     removeManagedHost: adapters.remove,
   }),
   useHosts: () => adapters.hosts,
@@ -83,8 +83,9 @@ afterEach(() => {
 });
 it("syncs a renamed daemon without replacing its ticket resolver or reconnecting", async () => {
   vi.stubGlobal("React", React);
+  adapters.adopt.mockClear();
   const view = render(<HubHostSynchronization />);
-  await waitFor(() => expect(adapters.restart).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(adapters.adopt).toHaveBeenCalledTimes(1));
   expect(adapters.register).toHaveBeenCalledTimes(1);
   adapters.slug = "build-studio";
   view.rerender(<HubHostSynchronization />);
@@ -96,7 +97,7 @@ it("syncs a renamed daemon without replacing its ticket resolver or reconnecting
       }),
     ),
   );
-  expect(adapters.restart).toHaveBeenCalledTimes(1);
+  expect(adapters.adopt).toHaveBeenCalledTimes(1);
   expect(adapters.register).toHaveBeenCalledTimes(1);
 });
 
@@ -136,13 +137,14 @@ it("evicts a Hub-managed Host whose daemon is no longer projected", async () => 
   );
 });
 
-it("reconnects a saved Host when Hub management is attached to it", async () => {
+it("adopts a saved Host when Hub management is attached to it", async () => {
   vi.stubGlobal("React", React);
-  adapters.restart.mockClear();
+  adapters.adopt.mockClear();
   adapters.hosts = [{ serverId: "server" }] as typeof adapters.hosts;
   render(<HubHostSynchronization />);
   await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
-  await waitFor(() => expect(adapters.restart).toHaveBeenCalledWith("server"));
+  await waitFor(() => expect(adapters.adopt).toHaveBeenCalledWith("server"));
+  expect(adapters.register).toHaveBeenCalled();
 });
 
 it("adds a Host back when it leaves the registry while the Hub still lists its daemon", async () => {

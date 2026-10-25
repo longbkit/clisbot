@@ -4,7 +4,7 @@ import { i18n } from "@/i18n/i18next";
 export class HubAccountRequestError extends Error {
   constructor(
     readonly code: string,
-    status: number,
+    readonly status: number,
   ) {
     let message = i18n.t("hub.connection.errors.accountRequestFailed", { status });
     if (code === "owner_setup_approval_required")

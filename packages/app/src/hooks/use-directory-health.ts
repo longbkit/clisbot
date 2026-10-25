@@ -1,95 +1,95 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
+import { type HubSourceHealth, useHubSourceHealth } from "@/clisbot/hub/hub-source-health";
+import type { SourceHealth } from "@/runtime/source-health";
 import {
-  getHostRuntimeStore,
-  useHosts,
-  type HostRuntimeConnectionStatus,
-  type HostRuntimeAgentDirectoryStatus,
-} from "@/runtime/host-runtime";
+  describeSourceProblem,
+  resolveSourceStatus,
+  type SourceStatus,
+  useSourceHealthEntries,
+} from "./use-source-health";
 
-export type DirectoryHealth = { hasAcceptedResult: boolean } & (
+export type DirectoryHealth = {
+  hasAcceptedResult: boolean;
+  /** Selected sources that cannot refresh now; the aggregate stays usable while others can. */
+  degraded?: { serverIds: string[]; total: number };
+} & (
   | { status: "loading" | "refreshing" | "ready"; message: null; serverId: null }
   | { status: "unavailable"; message: string; serverId: string; recovery: "retry" | "connection" }
 );
 
-/** Observe transport/directory readiness, never the runtime's unrelated notification version. */
+type DirectoryKind = "agents" | "workspaces";
+
+/**
+ * One aggregate line over the selected sources. A single source never makes it "loading" or
+ * "unavailable" while another source can serve: it is `unavailable` only when no selected source
+ * can refresh, and `loading` only when none has anything to show yet. Per-source detail lives in
+ * `useSourceHealthSummary`. Reads debounced per-source health, so a blip does not flicker it.
+ */
 export function useDirectoryHealth(
   serverIds?: readonly string[],
-  kind: "agents" | "workspaces" = "agents",
+  kind: DirectoryKind = "agents",
 ): DirectoryHealth {
-  const hosts = useHosts();
-  const runtime = getHostRuntimeStore();
-  const selected = useMemo(
-    () => (serverIds ? hosts.filter((host) => serverIds.includes(host.serverId)) : hosts),
-    [hosts, serverIds],
-  );
-  const subscribe = useCallback((notify: () => void) => runtime.subscribeAll(notify), [runtime]);
-  const read = useCallback(
-    () =>
-      JSON.stringify(
-        selected.map((host) => {
-          const snapshot = runtime.getSnapshot(host.serverId);
-          return {
-            serverId: host.serverId,
-            label: host.label,
-            connection: snapshot?.connectionStatus ?? "connecting",
-            directory:
-              (kind === "agents"
-                ? snapshot?.agentDirectoryStatus
-                : snapshot?.workspaceDirectoryStatus) ?? "idle",
-            loaded:
-              (kind === "agents"
-                ? snapshot?.hasEverLoadedAgentDirectory
-                : snapshot?.hasEverLoadedWorkspaceDirectory) ?? false,
-            error:
-              (kind === "agents"
-                ? snapshot?.agentDirectoryError
-                : snapshot?.workspaceDirectoryError) ??
-              snapshot?.lastError ??
-              null,
-          };
-        }),
-      ),
-    [runtime, selected, kind],
-  );
-  const snapshot = useSyncExternalStore(subscribe, read, read);
-  return useMemo(() => projectHealth(JSON.parse(snapshot)), [snapshot]);
+  const entries = useSourceHealthEntries(serverIds);
+  const hubs = useHubSourceHealth();
+  return useMemo(() => projectDirectoryHealth(entries, hubs, kind), [entries, hubs, kind]);
 }
 
-interface DirectoryHostHealth {
-  serverId: string;
-  label: string;
-  connection: HostRuntimeConnectionStatus;
-  directory: HostRuntimeAgentDirectoryStatus;
-  loaded: boolean;
-  error: string | null;
-}
-
-function projectHealth(hosts: DirectoryHostHealth[]): DirectoryHealth {
-  const hasAcceptedResult = hosts.every((host) => host.loaded);
-  const failed = hosts.find(
-    (host) => host.error || host.connection === "offline" || host.connection === "error",
+export function projectDirectoryHealth(
+  entries: readonly SourceHealth[],
+  hubs: readonly HubSourceHealth[],
+  kind: DirectoryKind,
+): DirectoryHealth {
+  const hubByOrigin = new Map(hubs.map((hub) => [hub.origin, hub]));
+  const sources = entries.map((entry) =>
+    resolveSourceStatus(
+      entry,
+      entry.hubOrigin === null ? undefined : hubByOrigin.get(entry.hubOrigin),
+    ),
   );
-  if (failed)
+  const hasAcceptedResult = sources.every((source) => source[kind].loaded);
+  const failed = sources.filter((source) => failureOf(source, kind) !== null);
+  const degraded = failed.length
+    ? { serverIds: failed.map((source) => source.serverId), total: sources.length }
+    : undefined;
+  const usable = sources.filter((source) => failureOf(source, kind) === null);
+  if (sources.length > 0 && usable.length === 0) {
+    const first = failed[0]!;
+    const failure = failureOf(first, kind)!;
     return {
       hasAcceptedResult,
       status: "unavailable",
-      serverId: failed.serverId,
-      recovery: failed.connection === "online" ? "retry" : "connection",
-      message: `${failed.label}: ${failed.error ?? "Disconnected. Reconnect to refresh conversations."}`,
+      serverId: first.serverId,
+      recovery: failure.recovery,
+      message:
+        failure.recovery === "retry"
+          ? `${first.label}: ${failure.message}`
+          : describeSourceProblem(first, hubLabel(first, hubByOrigin)),
     };
-  const pending = hosts.filter(
-    (host) =>
-      host.directory === "initial_loading" ||
-      host.directory === "revalidating" ||
-      (host.directory === "idle" && ["idle", "connecting", "online"].includes(host.connection)) ||
-      host.connection === "connecting",
-  );
-  if (pending.length)
-    return {
-      hasAcceptedResult,
-      status: pending.some((host) => !host.loaded) ? "loading" : "refreshing",
-      message: null,
-      serverId: null,
-    };
-  return { hasAcceptedResult, status: "ready", message: null, serverId: null };
+  }
+  const busy = (source: SourceStatus) =>
+    !source.online || source[kind].syncing || source[kind].pending;
+  let status: "loading" | "refreshing" | "ready" = "ready";
+  if (usable.length > 0 && usable.every(busy))
+    status = usable.some((source) => source[kind].loaded) ? "refreshing" : "loading";
+  return {
+    hasAcceptedResult,
+    ...(degraded ? { degraded } : {}),
+    status,
+    message: null,
+    serverId: null,
+  };
+}
+
+function failureOf(
+  source: SourceStatus,
+  kind: DirectoryKind,
+): { recovery: "retry" | "connection"; message: string } | null {
+  const reachable = source.effectiveState === "live" || source.effectiveState === "syncing";
+  if (!reachable) return { recovery: "connection", message: source.error ?? "" };
+  const error = source[kind].error;
+  return error === null ? null : { recovery: "retry", message: error };
+}
+
+function hubLabel(source: SourceStatus, hubs: Map<string, HubSourceHealth>): string | undefined {
+  return source.hubOrigin === null ? undefined : hubs.get(source.hubOrigin)?.label;
 }

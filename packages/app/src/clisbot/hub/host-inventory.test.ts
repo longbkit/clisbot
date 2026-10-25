@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/runtime/host-runtime", () => ({ useHosts: () => [] }));
 vi.mock("./account-provider", () => ({ useHubAccount: () => ({}), useHubAccounts: () => [] }));
 
-const { isAccountHost } = await import("./host-inventory");
+const { isAccountHost, hubListPollIntervalMs } = await import("./host-inventory");
 
 const management = (managedAccessMode: "off" | "external", hubOrigin = "hub://old") => ({
   kind: "hub" as const,
@@ -58,5 +58,16 @@ describe("isAccountHost", () => {
     expect(isAccountHost(company, listings)).toBe(true);
     // Another Hub listing the same daemon id does not admit a Host it does not manage.
     expect(isAccountHost(company, [listing("hub://personal", "org-old", "build-03")])).toBe(false);
+  });
+});
+
+describe("hubListPollIntervalMs", () => {
+  it("polls every minute while the Hub answers and backs off to at most five after failures", () => {
+    const top = () => 0.999_999;
+    expect(hubListPollIntervalMs(0, top)).toBe(60_000);
+    expect([1, 2, 3, 4, 5, 9].map((failures) => hubListPollIntervalMs(failures, top))).toEqual([
+      60_000, 120_000, 240_000, 300_000, 300_000, 300_000,
+    ]);
+    expect(hubListPollIntervalMs(3, () => 0)).toBe(120_000);
   });
 });

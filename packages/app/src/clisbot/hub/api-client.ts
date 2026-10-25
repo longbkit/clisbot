@@ -13,6 +13,8 @@ export class HubApiError extends Error {
   }
 }
 
+export { classifyHubFailure, describeHubFailure, type HubFailureKind } from "./hub-failure";
+
 export class HubApiClient {
   constructor(
     private readonly transport: HubTransport,

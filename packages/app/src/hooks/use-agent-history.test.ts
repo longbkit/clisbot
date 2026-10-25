@@ -702,3 +702,132 @@ describe("accepted history through a Host refresh failure", () => {
     ).toBe(emptyA);
   });
 });
+
+describe("history fan-out with a slow Host", () => {
+  function deferredClient() {
+    let release!: (payload: FetchAgentHistoryResult) => void;
+    let fail!: (error: Error) => void;
+    const client: FakeAgentHistoryClient = {
+      calls: [],
+      fetchAgentHistory: (options) => {
+        client.calls.push(options ?? {});
+        return new Promise<FetchAgentHistoryResult>((resolve, reject) => {
+          release = resolve;
+          fail = reject;
+        });
+      },
+    };
+    return {
+      client,
+      release: (p: FetchAgentHistoryResult) => release(p),
+      fail: (e: Error) => fail(e),
+    };
+  }
+  const entry = (id: string, updatedAt: string) =>
+    historyEntry({ id, cwd: `/repo/${id}`, updatedAt });
+
+  it("returns the fast Hosts at the deadline and merges the slow one in place when it answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const { mergeLateAgentHistory } = await import("./use-agent-history");
+      const slow = deferredClient();
+      const fast = createClient([
+        historyPayload({
+          entries: [
+            entry("fast-new", "2026-10-25T10:00:00.000Z"),
+            entry("fast-old", "2026-10-25T08:00:00.000Z"),
+          ],
+        }),
+      ]);
+      const late: Parameters<typeof mergeLateAgentHistory>[2][] = [];
+      const pending = fetchAgentHistoryBatch({
+        hosts: [
+          { serverId: "slow", serverLabel: "Slow", client: slow.client },
+          { serverId: "fast", serverLabel: "Fast", client: fast },
+        ],
+        cursorByServerId: null,
+        sourceTimeoutMs: 5_000,
+        onLateResult: (result) => late.push(result),
+      });
+      let settled = false;
+      void pending.then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const page = await pending;
+      expect(page.agents.map((agent) => agent.id)).toEqual(["fast-new", "fast-old"]);
+      expect(page.lateHosts).toEqual([{ serverId: "slow", serverName: "Slow" }]);
+      expect(page.hostErrors).toEqual([]);
+
+      slow.release(historyPayload({ entries: [entry("slow-mid", "2026-10-25T09:00:00.000Z")] }));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(late).toHaveLength(1);
+
+      const shown = { pages: [{ ...page, fetchId: "f1" }], pageParams: [null] };
+      const merged = mergeLateAgentHistory(shown, "f1", late[0]!);
+      expect(merged?.pages[0]?.agents.map((agent) => `${agent.serverLabel}:${agent.id}`)).toEqual([
+        "Fast:fast-new",
+        "Slow:slow-mid",
+        "Fast:fast-old",
+      ]);
+      expect(merged?.pages[0]?.lateHosts).toEqual([]);
+      expect(Object.keys(merged?.pages[0]?.pageInfoByServerId ?? {}).sort()).toEqual([
+        "fast",
+        "slow",
+      ]);
+      // A late answer from an earlier fetch never lands in a newer one.
+      expect(mergeLateAgentHistory(shown, "f0", late[0]!)).toBe(shown);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports a late Host that fails as a named Host error", async () => {
+    const { mergeLateAgentHistory } = await import("./use-agent-history");
+    const host = { serverId: "slow", serverLabel: "Slow", client: createFailingClient() };
+    const shown = {
+      pages: [
+        {
+          agents: [],
+          pageInfoByServerId: {},
+          hostErrors: [],
+          lateHosts: [{ serverId: "slow", serverName: "Slow" }],
+          fetchId: "f1",
+        },
+      ],
+      pageParams: [null],
+    };
+    const merged = mergeLateAgentHistory(shown, "f1", { host, error: new Error("timed out") });
+    expect(merged?.pages[0]).toMatchObject({
+      lateHosts: [],
+      hostErrors: [{ serverId: "slow", serverName: "Slow" }],
+    });
+  });
+
+  it("waits past the deadline only until the first Host has rows to show", async () => {
+    vi.useFakeTimers();
+    try {
+      const first = deferredClient();
+      const second = deferredClient();
+      const pending = fetchAgentHistoryBatch({
+        hosts: [
+          { serverId: "a", serverLabel: "A", client: first.client },
+          { serverId: "b", serverLabel: "B", client: second.client },
+        ],
+        cursorByServerId: null,
+        sourceTimeoutMs: 5_000,
+        onLateResult: () => undefined,
+      });
+      let settled = false;
+      void pending.then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(settled).toBe(false);
+      first.release(historyPayload({ entries: [entry("a-1", "2026-10-25T10:00:00.000Z")] }));
+      const page = await pending;
+      expect(page.agents.map((agent) => agent.id)).toEqual(["a-1"]);
+      expect(page.lateHosts).toEqual([{ serverId: "b", serverName: "B" }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

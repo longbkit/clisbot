@@ -14,6 +14,7 @@ import {
   tokenRequestBody,
 } from "./oauth";
 import { i18n } from "@/i18n/i18next";
+import { fetchWithDeadline } from "./request-deadline";
 
 interface AccessCredential {
   accessToken: string;
@@ -36,7 +37,7 @@ class NativeHubTransport implements HubTransport {
 
   async request(path: string, input: HubRequestInput = {}): Promise<Response> {
     const accessToken = await this.currentAccessToken();
-    return fetch(new URL(assertHubPath(path), this.origin), {
+    return fetchWithDeadline(new URL(assertHubPath(path), this.origin), {
       method: input.method ?? "GET",
       credentials: "omit",
       redirect: "error",

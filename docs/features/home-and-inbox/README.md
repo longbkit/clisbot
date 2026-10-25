@@ -173,6 +173,9 @@ authoritative results replace that Host's rows, including an empty result. Remov
 excluded from projection. Recovery invalidates the existing history/archive query roots. Inbox
 reserves its status line, with the full per-Host errors and manual retry in Details, so errors do
 not push the reading viewport down. Retry attempts unavailable connections through the runtime.
+Each Host has 5 s to answer a history page; slower Hosts are listed as late and their rows merge
+into the shown page when they arrive, without moving rows already shown
+([connection resilience](../offline/connection-resilience.md#history-fan-out)).
 Home's deterministic activity identity ordering reuses a default `Intl.Collator`: locale/case/
 numeric semantics and accepted placement stay the same, without per-comparison ICU construction
 on Hermes. Mobile tabs acknowledge a held press with the shared interaction highlight; only the

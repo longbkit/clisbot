@@ -467,6 +467,13 @@ export interface DaemonClientConfig {
     enabled?: boolean;
     baseDelayMs?: number;
     maxDelayMs?: number;
+    /**
+     * `full` draws each delay uniformly from [0, min(max, base·2^attempt)) so many clients
+     * that lost the same network do not retry in lockstep. Defaults to `none`.
+     */
+    jitter?: "none" | "full";
+    /** Uniform in [0, 1); for deterministic tests of `jitter: "full"`. */
+    random?: () => number;
   };
   runtimeMetricsIntervalMs?: number;
   runtimeMetricsWindowMs?: number;
@@ -1413,6 +1420,7 @@ export class DaemonClient {
   private connectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingGenericTransportErrorTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
+  private pendingReconnectDelay: { attempt: number; delayMs: number } | null = null;
   private traceConnectionAttempt = 0;
   private shouldReconnect = true;
   private connectionAttempt: symbol | null = null;
@@ -7795,14 +7803,7 @@ export class DaemonClient {
           : {}),
         ...(this.shouldReconnect && this.config.reconnect?.enabled !== false
           ? {
-              nextRetryAt: new Date(
-                Date.now() +
-                  Math.min(
-                    (this.config.reconnect?.baseDelayMs ?? DEFAULT_RECONNECT_BASE_DELAY_MS) *
-                      2 ** this.reconnectAttempt,
-                    this.config.reconnect?.maxDelayMs ?? DEFAULT_RECONNECT_MAX_DELAY_MS,
-                  ),
-              ).toISOString(),
+              nextRetryAt: new Date(Date.now() + this.nextReconnectDelayMs()).toISOString(),
             }
           : {}),
         ...(reason ? { reason } : {}),
@@ -7815,11 +7816,25 @@ export class DaemonClient {
     );
   }
 
-  private armReconnectTimer(): void {
-    const attempt = this.reconnectAttempt;
+  /** The delay for the current attempt, drawn once so the published retry time is the real one. */
+  private nextReconnectDelayMs(): number {
+    if (this.pendingReconnectDelay?.attempt === this.reconnectAttempt)
+      return this.pendingReconnectDelay.delayMs;
     const baseDelay = this.config.reconnect?.baseDelayMs ?? DEFAULT_RECONNECT_BASE_DELAY_MS;
     const maxDelay = this.config.reconnect?.maxDelayMs ?? DEFAULT_RECONNECT_MAX_DELAY_MS;
-    const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
+    const ceiling = Math.min(baseDelay * 2 ** this.reconnectAttempt, maxDelay);
+    const delayMs =
+      this.config.reconnect?.jitter === "full"
+        ? Math.floor((this.config.reconnect.random ?? Math.random)() * ceiling)
+        : ceiling;
+    this.pendingReconnectDelay = { attempt: this.reconnectAttempt, delayMs };
+    return delayMs;
+  }
+
+  private armReconnectTimer(): void {
+    const attempt = this.reconnectAttempt;
+    const delay = this.nextReconnectDelayMs();
+    this.pendingReconnectDelay = null;
     this.traceInstant("clisbot.connection.reconnect", {
       attempt: String(attempt),
       delayMs: String(delay),
