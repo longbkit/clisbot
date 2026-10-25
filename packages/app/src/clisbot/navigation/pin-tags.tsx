@@ -1,10 +1,9 @@
 import { useCallback, useMemo } from "react";
-import { ScrollView, Text, type PressableStateCallbackType } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { PressHighlight } from "@/components/ui/press-highlight";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { Pin } from "lucide-react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { ChipButton, ChipRow } from "@/components/ui/filter-chips";
+import { PinMark } from "@/components/ui/pin-mark";
 import { usePinnedRows, type PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
 import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { useBotCatalog } from "@/clisbot/bots/data/runtime";
@@ -91,77 +90,40 @@ export function HomePinTags() {
   if (mine.length === 0 && others.length === 0) return null;
   const shown = showOthers ? [...mine, ...others] : mine;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
-      testID="home-pin-tags"
-    >
+    <ChipRow contentStyle={styles.row} testID="home-pin-tags">
       {shown.map((tag) => (
         <Tag key={tag.key} tag={tag} onPress={open} />
       ))}
       {others.length > 0 ? (
-        <PressHighlight
-          accessibilityRole="button"
-          onPress={toggleOthers}
-          hitSlop={TAG_HIT_SLOP}
-          style={tagStyle}
-          testID="home-pin-tags-others"
-        >
-          <Text style={styles.muted}>
-            {showOthers
+        <ChipButton
+          label={
+            showOthers
               ? t("navigation.pins.hideOthers")
-              : t("navigation.pins.showOthers", { count: others.length })}
-          </Text>
-        </PressHighlight>
+              : t("navigation.pins.showOthers", { count: others.length })
+          }
+          onPress={toggleOthers}
+          testID="home-pin-tags-others"
+        />
       ) : null}
-    </ScrollView>
+    </ChipRow>
   );
 }
 
 function Tag({ tag, onPress }: { tag: RowTag; onPress: (tag: RowTag) => void }) {
   const press = useCallback(() => onPress(tag), [onPress, tag]);
   return (
-    <PressHighlight
-      accessibilityRole="button"
-      accessibilityLabel={tag.title}
+    <ChipButton
+      label={tag.title}
+      leading={pinMark}
+      truncate
       onPress={press}
-      hitSlop={TAG_HIT_SLOP}
-      style={tagStyle}
       testID={`home-pin-tag-${tag.key}`}
-    >
-      <ThemedPin size={11} />
-      <Text style={styles.label} numberOfLines={1}>
-        {tag.title}
-      </Text>
-    </PressHighlight>
+    />
   );
 }
 
-/** Tags stay compact; the press area reaches 44pt. */
-const TAG_HIT_SLOP = { top: 10, bottom: 10, left: 2, right: 2 };
-
-const ThemedPin = withUnistyles(Pin, (theme) => ({ color: theme.colors.foregroundMuted }));
-
-function tagStyle({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) {
-  return [styles.tag, (pressed || hovered) && styles.tagHovered];
-}
+const pinMark = <PinMark />;
 
 const styles = StyleSheet.create((theme) => ({
-  row: { gap: theme.spacing[2], paddingHorizontal: theme.spacing[4] },
-  tag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1],
-    maxWidth: 200,
-    paddingVertical: theme.spacing[1],
-    paddingHorizontal: theme.spacing[2],
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface0,
-  },
-  tagHovered: { backgroundColor: theme.colors.surface2 },
-  label: { color: theme.colors.foreground, fontSize: theme.fontSize.sm, flexShrink: 1 },
-  muted: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+  row: { flexDirection: "row", gap: theme.spacing[2] },
 }));

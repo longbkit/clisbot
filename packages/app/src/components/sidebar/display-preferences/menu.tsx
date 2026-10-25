@@ -55,6 +55,7 @@ import {
   type MenuPageDefinition,
 } from "@/components/ui/menu";
 import { HostStatusDot } from "@/components/host-status-dot";
+import { DisplayMenuTrigger } from "@/components/ui/display-menu-trigger";
 import { isWeb } from "@/constants/platform";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSidebarModel } from "@/components/sidebar/sidebar-model";
@@ -87,7 +88,8 @@ const ThemedCircle = withUnistyles(Circle);
 
 /** Fits the item's 16pt leading slot with a hair of room, matching the trailing check. */
 const OPTION_ICON_SIZE = 14;
-const MENU_WIDTH = 232;
+/** Every list's Display menu opens at this width. */
+export const DISPLAY_MENU_WIDTH = 232;
 
 /**
  * Unlabelled's stand-in for a color dot: the same circle at the same size, hollow.
@@ -200,7 +202,57 @@ const TRAILING_LABEL_KEYS: Record<SidebarTrailingChoice, string> = {
  * shape is deliberate — every option of every decision on one surface is what this menu used to
  * be, and it grew a row for each host on top of that.
  */
-export function SidebarDisplayPreferencesMenu(): ReactElement {
+function DisplayPreferencesTrigger({
+  kind,
+  active,
+}: {
+  kind: "icon" | "label";
+  active: boolean;
+}): ReactElement {
+  const { t } = useTranslation();
+  const triggerStyle = useCallback(
+    ({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.trigger,
+      hovered && styles.triggerHovered,
+    ],
+    [],
+  );
+  if (kind === "label")
+    return (
+      <DisplayMenuTrigger
+        label={t("navigation.display")}
+        active={active}
+        testID="sidebar-display-preferences-menu"
+      />
+    );
+  return (
+    <MenuTrigger
+      style={triggerStyle}
+      accessibilityRole={isWeb ? undefined : "button"}
+      accessibilityLabel={t("sidebar.display.trigger")}
+      testID="sidebar-display-preferences-menu"
+    >
+      <View style={styles.triggerGlyph}>
+        <ThemedSettings2 size={14} uniProps={mutedIconMapping} />
+        {active ? (
+          <View
+            style={styles.triggerIndicator}
+            testID="sidebar-display-filter-indicator"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+        ) : null}
+      </View>
+    </MenuTrigger>
+  );
+}
+
+export function SidebarDisplayPreferencesMenu({
+  trigger = "icon",
+}: {
+  /** `label`: Navigation V2's "Display ▾", the trigger every list's Display menu shares. */
+  trigger?: "icon" | "label";
+} = {}): ReactElement {
   const { t } = useTranslation();
   const preferences = useSidebarDisplayPreferences();
   const hosts = useHosts();
@@ -226,14 +278,6 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
   const [managerOpen, setManagerOpen] = useState(false);
   const openManager = useCallback(() => setManagerOpen(true), []);
   const closeManager = useCallback(() => setManagerOpen(false), []);
-
-  const triggerStyle = useCallback(
-    ({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.trigger,
-      hovered && styles.triggerHovered,
-    ],
-    [],
-  );
 
   const hasActiveFilters =
     preferences.hostFilters.length > 0 ||
@@ -402,27 +446,10 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
   return (
     <>
       <MenuRoot compactMode="sheet">
-        <MenuTrigger
-          style={triggerStyle}
-          accessibilityRole={isWeb ? undefined : "button"}
-          accessibilityLabel={t("sidebar.display.trigger")}
-          testID="sidebar-display-preferences-menu"
-        >
-          <View style={styles.triggerGlyph}>
-            <ThemedSettings2 size={14} uniProps={mutedIconMapping} />
-            {hasActiveFilters ? (
-              <View
-                style={styles.triggerIndicator}
-                testID="sidebar-display-filter-indicator"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              />
-            ) : null}
-          </View>
-        </MenuTrigger>
+        <DisplayPreferencesTrigger kind={trigger} active={hasActiveFilters} />
         <MenuSurface
-          align="end"
-          width={MENU_WIDTH}
+          align={trigger === "label" ? "start" : "end"}
+          width={DISPLAY_MENU_WIDTH}
           scrollable
           maxHeight={400}
           pages={pages}

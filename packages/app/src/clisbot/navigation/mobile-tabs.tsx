@@ -60,5 +60,5 @@ function HostsDot() {
 
 const styles = StyleSheet.create((theme) => ({
   badge: { position: "absolute", top: -theme.spacing[2], left: theme.spacing[3] },
-  dot: { position: "absolute", top: -2, right: -4 },
+  dot: { position: "absolute", top: -theme.spacing[0.5], right: -theme.spacing[1] },
 }));

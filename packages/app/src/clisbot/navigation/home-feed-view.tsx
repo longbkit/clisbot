@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import equal from "fast-deep-equal";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { PressHighlight } from "@/components/ui/press-highlight";
@@ -20,6 +21,11 @@ import { Button } from "@/components/ui/button";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
+import { CONTROL_HEIGHTS, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import { ICON_SIZE } from "@/styles/theme";
+import { useStableEvent } from "@/hooks/use-stable-event";
+import { RenderProfile } from "@/utils/render-profiler";
+import { ListState } from "./list-state";
 import { useNavigationActivity } from "./activity";
 import type { HomeChip, HomeRow } from "./home-feed";
 import { IssueActions } from "./issue-actions";
@@ -55,19 +61,17 @@ export function NavigationHomeFeed({
   const activity = useNavigationActivity();
   const requestApply = useApplyReaderChanges(filterKey);
   const showHost = useHosts().length > 1;
-  const open = useCallback(
-    (agent: AggregatedAgent) => {
-      if (rows.get(activityKey(agent))?.issue) activity.markSeen(agent);
-      rememberChatReturn(HOME_PATH);
-      navigateToAgent({
-        serverId: agent.serverId,
-        agentId: agent.id,
-        workspaceId: agent.workspaceId,
-        pin: true,
-      });
-    },
-    [activity, rows],
-  );
+  // Stable across updates, so a row that did not change skips its render (acceptance P5).
+  const open = useStableEvent((agent: AggregatedAgent) => {
+    if (rows.get(activityKey(agent))?.issue) activity.markSeen(agent);
+    rememberChatReturn(HOME_PATH);
+    navigateToAgent({
+      serverId: agent.serverId,
+      agentId: agent.id,
+      workspaceId: agent.workspaceId,
+      pin: true,
+    });
+  });
   const sections = visibleActivityLayout(accepted, limit);
   const total = (list: ActivityLayoutSection[]) => list.reduce((n, s) => n + s.keys.length, 0);
   const hasMore = total(sections) < total(accepted);
@@ -82,10 +86,11 @@ export function NavigationHomeFeed({
   }, [activity, requestApply, unseen]);
   return (
     <View style={styles.container} testID="home-activity">
+      {/* DirectoryStatus builds English sentences around its label; it is not localized yet. */}
       <DirectoryStatus health={directoryHealth} label="Activity" inset={false} />
       {isInitialLoad ? <ActivityPlaceholder /> : null}
       {!isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length ? (
-        <Text style={styles.muted}>{t("navigation.lists.emptyFeed")}</Text>
+        <ListState kind="empty" title={t("navigation.lists.emptyFeed")} testID="home-feed-empty" />
       ) : null}
       {pending > 0 || unseen.length > 1 ? (
         <View style={styles.markAll}>
@@ -115,8 +120,8 @@ export function NavigationHomeFeed({
         />
       ))}
       {hasMore ? (
-        <Button variant="ghost" onPress={showMore}>
-          Show more
+        <Button variant="ghost" onPress={showMore} testID="home-activity-show-more">
+          {t("navigation.actions.showMore")}
         </Button>
       ) : null}
     </View>
@@ -234,16 +239,7 @@ function sectionTitle(section: ActivityLayoutSection, t: (key: string) => string
   return section.title;
 }
 
-function FeedRow({
-  identity,
-  agent,
-  row,
-  dimmed,
-  showHost,
-  homeBucket,
-  onPress,
-  onAction,
-}: {
+interface FeedRowProps {
   identity: string;
   agent: AggregatedAgent | undefined;
   row: HomeRow | undefined;
@@ -252,25 +248,55 @@ function FeedRow({
   homeBucket: string;
   onPress: (agent: AggregatedAgent) => void;
   onAction: () => void;
-}) {
+}
+
+const FeedRow = memo(function FeedRow({
+  identity,
+  agent,
+  row,
+  dimmed,
+  showHost,
+  homeBucket,
+  onPress,
+  onAction,
+}: FeedRowProps) {
+  const { t } = useTranslation();
   return (
-    <ActivityAnchor identity={identity}>
-      {agent ? (
-        <View style={[styles.row, dimmed && styles.dimmed]}>
-          <View style={styles.rowMain}>
-            <ActivityRow
-              agent={agent}
-              homeBucket={homeBucket}
-              showHost={showHost}
-              onPress={onPress}
-            />
+    <RenderProfile id={`HomeRow:${identity}`}>
+      <ActivityAnchor identity={identity}>
+        {agent ? (
+          <View style={[styles.row, dimmed && styles.dimmed]}>
+            <View style={styles.rowMain}>
+              <ActivityRow
+                agent={agent}
+                homeBucket={homeBucket}
+                showHost={showHost}
+                onPress={onPress}
+              />
+            </View>
+            {row?.issue ? (
+              <IssueActions agent={agent} issue={row.issue} onAction={onAction} />
+            ) : null}
           </View>
-          {row?.issue ? <IssueActions agent={agent} issue={row.issue} onAction={onAction} /> : null}
-        </View>
-      ) : (
-        <Text style={styles.muted}>Conversation unavailable</Text>
-      )}
-    </ActivityAnchor>
+        ) : (
+          <Text style={styles.muted}>{t("navigation.lists.unavailable")}</Text>
+        )}
+      </ActivityAnchor>
+    </RenderProfile>
+  );
+}, sameFeedRowProps);
+
+/** Live agents and rows are rebuilt on every update; a row compares them by value. */
+function sameFeedRowProps(previous: FeedRowProps, next: FeedRowProps): boolean {
+  return (
+    previous.identity === next.identity &&
+    previous.dimmed === next.dimmed &&
+    previous.showHost === next.showHost &&
+    previous.homeBucket === next.homeBucket &&
+    previous.onPress === next.onPress &&
+    previous.onAction === next.onAction &&
+    equal(previous.row, next.row) &&
+    equal(previous.agent, next.agent)
   );
 }
 
@@ -292,13 +318,20 @@ function SeenIssuesToggle({
       accessibilityState={state}
       onPress={onPress}
       style={styles.seenToggle}
+      hitSlop={SEEN_TOGGLE_HIT_SLOP}
       testID="home-seen-issues"
     >
-      <Chevron size={14} />
+      <Chevron size={ICON_SIZE.sm} />
       <Text style={styles.seenLabel}>{t("navigation.issues.seenIssues", { count })}</Text>
     </PressHighlight>
   );
 }
+
+/** The toggle is a compact line; the press area reaches the touch target. */
+const SEEN_TOGGLE_HIT_SLOP = {
+  top: (MIN_TOUCH_TARGET_SIZE - CONTROL_HEIGHTS.compact) / 2,
+  bottom: (MIN_TOUCH_TARGET_SIZE - CONTROL_HEIGHTS.compact) / 2,
+};
 
 const MutedChevronDown = withUnistyles(ChevronDown, (theme) => ({
   color: theme.colors.foregroundMuted,
@@ -310,7 +343,7 @@ const MutedChevronRight = withUnistyles(ChevronRight, (theme) => ({
 const styles = StyleSheet.create((theme) => ({
   container: {
     gap: theme.spacing[4],
-    paddingHorizontal: theme.spacing[4],
+    paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2],
   },
   section: { gap: theme.spacing[1] },
@@ -323,12 +356,12 @@ const styles = StyleSheet.create((theme) => ({
   markAll: { flexDirection: "row", justifyContent: "flex-end" },
   row: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
   rowMain: { flex: 1, minWidth: 0 },
-  dimmed: { opacity: 0.6 },
+  dimmed: { opacity: theme.opacity[50] },
   seenToggle: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
-    minHeight: 36,
+    minHeight: CONTROL_HEIGHTS.compact,
     paddingHorizontal: theme.spacing[2],
     borderRadius: theme.borderRadius.lg,
   },

@@ -8,7 +8,8 @@ import { ScreenTitle } from "@/components/headers/screen-title";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
-import type { Theme } from "@/styles/theme";
+import { ICON_SIZE, ICON_STROKE_WIDTH, type Theme } from "@/styles/theme";
+import { DISPLAY_MENU_WIDTH } from "@/components/sidebar/display-preferences/menu";
 
 /**
  * A section's header (brief C5): its title, then its own actions as icons. Search and New belong
@@ -52,7 +53,7 @@ export function SectionHeader({
 
 const ThemedIcon = withUnistyles(
   ({ Icon, color }: { Icon: LucideIcon; color?: string }) => (
-    <Icon size={16} color={color} strokeWidth={1.5} />
+    <Icon size={ICON_SIZE.md} color={color} strokeWidth={ICON_STROKE_WIDTH} />
   ),
   (theme: Theme) => ({ color: theme.colors.foregroundMuted }),
 );
@@ -91,6 +92,9 @@ export function HeaderSearchButton({ onPress, testID }: { onPress: () => void; t
     />
   );
 }
+
+/** Every Navigation V2 menu (New, row actions, Display) opens at one width. */
+export const SECTION_MENU_WIDTH = DISPLAY_MENU_WIDTH;
 
 export function HeaderMenuIcon({ Icon }: { Icon: LucideIcon }) {
   return <ThemedIcon Icon={Icon} />;

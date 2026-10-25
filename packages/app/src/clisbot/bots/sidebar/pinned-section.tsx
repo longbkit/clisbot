@@ -5,10 +5,10 @@ import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { Pin } from "lucide-react-native";
+import { PinMark } from "@/components/ui/pin-mark";
 
 import { usePathname, useRouter } from "expo-router";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { PinOptionsMenu } from "./pin-options";
 import { BotsSectionHeader, useSectionCollapsed, sectionRowIndent } from "./section-header";
 import { BotRow } from "./bots-section";
@@ -120,14 +120,12 @@ function isWorkPin(row: PinRow): boolean {
   return row.kind !== "unavailable" || (row.pin.kind !== "bot" && row.pin.kind !== "chat");
 }
 
-const ThemedPin = withUnistyles(Pin, (theme) => ({ color: theme.colors.foregroundMuted }));
-
 /** A pinned row in a list without a Pinned section: the row, with a pin mark at its start. */
 function FloatedPin({ children }: { children: ReactNode }) {
   return (
     <View style={styles.floated} testID="pinned-float">
-      <View style={styles.floatedMark} accessibilityLabel="Pinned">
-        <ThemedPin size={11} />
+      <View style={styles.floatedMark}>
+        <PinMark />
       </View>
       <View style={styles.floatedRow}>{children}</View>
     </View>
@@ -170,9 +168,9 @@ const styles = StyleSheet.create((theme) => ({
   floated: { flexDirection: "row", alignItems: "center" },
   floatedMark: {
     position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
+    left: theme.spacing[0],
+    top: theme.spacing[0],
+    bottom: theme.spacing[0],
     justifyContent: "center",
     zIndex: 1,
   },

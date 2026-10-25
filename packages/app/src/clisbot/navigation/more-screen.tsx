@@ -19,7 +19,9 @@ import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { UsageSidebarRoot, useOpenSidebarUsage } from "@/usage";
 import { buildSettingsAddHostRoute, buildSettingsRoute } from "@/utils/host-routes";
 import { settingsStyles } from "@/styles/settings";
-import type { Theme } from "@/styles/theme";
+import { RenderProfile } from "@/utils/render-profiler";
+import { ICON_SIZE, ICON_STROKE_WIDTH, type Theme } from "@/styles/theme";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useHostsStatus } from "./hosts-status";
 import { SECTION_ICONS } from "./rail";
 import type { BuiltinSection, NavigationSection, PluginSection } from "./sections";
@@ -35,23 +37,25 @@ export function MoreScreen() {
   const settings = more.filter((section) => section.key === "settings");
   const rest = more.filter((section) => section.key !== "settings");
   return (
-    <UsageSidebarRoot>
-      <View style={styles.page} testID="more-screen">
-        <SectionHeader title={t("navigation.sections.more")} />
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={settingsStyles.card}>
-            {rest.map((section, index) => (
-              <MoreEntry key={section.key} section={section} last={index === rest.length - 1} />
-            ))}
-          </View>
-          <View style={settingsStyles.card}>
-            {settings.map((section) => (
-              <MoreEntry key={section.key} section={section} last />
-            ))}
-          </View>
-        </ScrollView>
-      </View>
-    </UsageSidebarRoot>
+    <RenderProfile id="NavMore">
+      <UsageSidebarRoot>
+        <View style={styles.page} testID="more-screen">
+          <SectionHeader title={t("navigation.sections.more")} />
+          <ScrollView contentContainerStyle={styles.content}>
+            <View style={settingsStyles.card}>
+              {rest.map((section, index) => (
+                <MoreEntry key={section.key} section={section} last={index === rest.length - 1} />
+              ))}
+            </View>
+            <View style={settingsStyles.card}>
+              {settings.map((section) => (
+                <MoreEntry key={section.key} section={section} last />
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </UsageSidebarRoot>
+    </RenderProfile>
   );
 }
 
@@ -223,7 +227,7 @@ function RowBody({
 }
 
 const ThemedIcon = withUnistyles(({ Icon, color }: { Icon: LucideIcon; color?: string }) => (
-  <Icon size={18} color={color} />
+  <Icon size={ICON_SIZE.md} color={color} strokeWidth={ICON_STROKE_WIDTH} />
 ));
 const muted = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -234,11 +238,14 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[3],
-    minHeight: 48,
+    minHeight: MIN_TOUCH_TARGET_SIZE,
     paddingHorizontal: theme.spacing[4],
   },
   rowHovered: { backgroundColor: theme.colors.surface2 },
-  divider: { borderBottomWidth: 1, borderBottomColor: theme.colors.borderSubtle },
+  divider: {
+    borderBottomWidth: theme.borderWidth[1],
+    borderBottomColor: theme.colors.borderSubtle,
+  },
   label: { flex: 1, minWidth: 0, color: theme.colors.foreground, fontSize: theme.fontSize.base },
   plugin: { paddingHorizontal: theme.spacing[2], paddingVertical: theme.spacing[1] },
 }));

@@ -1,15 +1,15 @@
-import { useCallback, useMemo } from "react";
-import { View } from "react-native";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet } from "react-native-unistyles";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import { HostFilter } from "@/components/hosts/host-filter";
-import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker";
-import { FilterChips, type FilterChip } from "@/components/ui/filter-chips";
+import { DisplayMenuTrigger } from "@/components/ui/display-menu-trigger";
+import { DropdownMenu, DropdownMenuContent } from "@/components/ui/dropdown-menu";
+import type { FilterChip } from "@/components/ui/filter-chips";
+import { DISPLAY_MENU_WIDTH } from "@/components/sidebar/display-preferences/menu";
 import { HOME_CHIPS, type HomeChip } from "./home-feed";
+import { HostsDisplayItems } from "./hosts-display-items";
 import type { ScopeCounts } from "./ownership";
 import { HomePinTags } from "./pin-tags";
-import { ScopeTabs } from "./scope-tabs";
+import { SectionControls, SectionInset } from "./section-controls";
 import { useNavigationStore } from "./store";
 
 const CHIP_LABELS: Record<HomeChip, string> = {
@@ -22,7 +22,7 @@ const CHIP_LABELS: Record<HomeChip, string> = {
 
 /**
  * Home's filters in the brief's order (C7, C7a, C8, C12): scope, quick-filter chips over the
- * existing activity buckets, Inbox's Host filter, then the reader's pins as tags.
+ * existing activity buckets, the Display menu with the Host filter, then the reader's pins.
  */
 export function HomeFeedControls({
   scopeCounts,
@@ -34,6 +34,7 @@ export function HomeFeedControls({
   const { t } = useTranslation();
   const chip = useNavigationStore((state) => state.homeChip);
   const setChip = useNavigationStore((state) => state.setHomeChip);
+  const multipleHosts = useAvailableHosts().length > 1;
   const chips = useMemo<FilterChip<HomeChip>[]>(
     () =>
       HOME_CHIPS.map((value) => ({
@@ -44,42 +45,51 @@ export function HomeFeedControls({
     [chipCounts, t],
   );
   return (
-    <View style={styles.controls} testID="home-feed-controls">
-      <ScopeTabs section="home" counts={scopeCounts} />
-      <View style={styles.inset}>
-        <FilterChips chips={chips} value={chip} onChange={setChip} scroll testID="home-chip" />
-      </View>
-      <HomeHostFilter />
-      <HomePinTags />
-    </View>
+    <SectionControls
+      section="home"
+      scopeCounts={scopeCounts}
+      chips={chips}
+      chip={chip}
+      onChip={setChip}
+      backdrop="surface0"
+      display={multipleHosts ? homeDisplayMenu : undefined}
+    >
+      <SectionInset>
+        <HomePinTags />
+      </SectionInset>
+    </SectionControls>
   );
 }
 
-function HomeHostFilter() {
+/** Home's Display menu: which Hosts the feed covers. */
+function HomeDisplayMenu() {
+  const { t } = useTranslation();
   const hosts = useAvailableHosts();
   const selected = useNavigationStore((state) => state.homeHosts);
-  const setHosts = useNavigationStore((state) => state.setHomeHosts);
-  const select = useCallback(
-    (serverId: string) => setHosts(serverId === ALL_HOSTS_OPTION_ID ? [] : [serverId]),
-    [setHosts],
-  );
-  if (hosts.length < 2) return null;
+  const toggle = useNavigationStore((state) => state.toggleHomeHost);
+  const clear = useNavigationStore((state) => state.clearHomeHosts);
   return (
-    <View style={styles.inset}>
-      <View style={styles.filterRow}>
-        <HostFilter
+    <DropdownMenu>
+      <DisplayMenuTrigger
+        label={t("navigation.display")}
+        active={selected.length > 0}
+        testID="home-display"
+      />
+      <DropdownMenuContent
+        align="start"
+        width={DISPLAY_MENU_WIDTH}
+        sheetTitle={t("navigation.display")}
+      >
+        <HostsDisplayItems
           hosts={hosts}
-          selectedHost={selected[0] ?? ALL_HOSTS_OPTION_ID}
-          onSelectHost={select}
-          triggerTestID="home-host-filter"
+          selected={selected}
+          onToggle={toggle}
+          onClear={clear}
+          testID="home-display"
         />
-      </View>
-    </View>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
-  controls: { gap: theme.spacing[2], paddingVertical: theme.spacing[2] },
-  inset: { paddingHorizontal: theme.spacing[4] },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
-}));
+const homeDisplayMenu = <HomeDisplayMenu />;

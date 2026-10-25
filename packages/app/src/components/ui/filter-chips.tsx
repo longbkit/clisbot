@@ -1,15 +1,19 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
-  Pressable,
   ScrollView,
   Text,
   View,
+  type AccessibilityRole,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type PressableStateCallbackType,
 } from "react-native";
-import { EdgeFade } from "./edge-fade";
 import { StyleSheet } from "react-native-unistyles";
+import { SPACING } from "@/styles/theme";
+import { CONTROL_HEIGHTS, MIN_TOUCH_TARGET_SIZE } from "./control-geometry";
+import { EdgeFade } from "./edge-fade";
+import { PressHighlight } from "./press-highlight";
 
 export interface FilterChip<T extends string> {
   value: T;
@@ -17,6 +21,8 @@ export interface FilterChip<T extends string> {
   /** Omitted when the count says nothing (an "All" chip, a list that is still loading). */
   count?: number;
 }
+
+type ChipBackdrop = "surface0" | "surfaceSidebar";
 
 /**
  * The counts that open a directory tab, each one a filter: pressing "Owners 2" shows the two
@@ -36,13 +42,13 @@ export function FilterChips<T extends string>({
   onChange(value: T): void;
   scroll?: boolean;
   /** The surface behind a scrolling row; its trailing edge fades into it. */
-  backdrop?: "surface0" | "surfaceSidebar";
+  backdrop?: ChipBackdrop;
   testID?: string;
 }) {
   const row = (
     <View style={scroll ? styles.line : styles.row} accessibilityRole="tablist" testID={testID}>
       {chips.map((chip) => (
-        <Chip
+        <FilterChipButton
           key={chip.value}
           chip={chip}
           selected={chip.value === value}
@@ -53,15 +59,19 @@ export function FilterChips<T extends string>({
     </View>
   );
   if (!scroll) return row;
-  return <ScrollingChips backdrop={backdrop}>{row}</ScrollingChips>;
+  return <ChipRow backdrop={backdrop}>{row}</ChipRow>;
 }
 
-/** One line that scrolls sideways; a fade on the trailing edge says there is more. */
-function ScrollingChips({
-  backdrop,
+/** One line of chips that scrolls sideways; a fade on the trailing edge says there is more. */
+export function ChipRow({
+  backdrop = "surface0",
+  contentStyle,
+  testID,
   children,
 }: {
-  backdrop: "surface0" | "surfaceSidebar";
+  backdrop?: ChipBackdrop;
+  contentStyle?: ScrollView["props"]["contentContainerStyle"];
+  testID?: string;
   children: ReactNode;
 }) {
   const [width, setWidth] = useState(0);
@@ -76,11 +86,12 @@ function ScrollingChips({
   }, []);
   const more = content - width - offset > 1;
   return (
-    <View style={styles.scrollFrame} onLayout={measure}>
+    <View style={styles.scrollFrame} onLayout={measure} testID={testID}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.scroll}
+        contentContainerStyle={contentStyle}
         onContentSizeChange={measureContent}
         onScroll={track}
         scrollEventThrottle={32}
@@ -94,7 +105,7 @@ function ScrollingChips({
   );
 }
 
-function Chip<T extends string>({
+function FilterChipButton<T extends string>({
   chip,
   selected,
   onChange,
@@ -106,28 +117,85 @@ function Chip<T extends string>({
   testID?: string;
 }) {
   const press = useCallback(() => onChange(chip.value), [chip.value, onChange]);
-  const state = useMemo(() => ({ selected }), [selected]);
   const counted = chip.count !== undefined;
   return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={state}
+    <ChipButton
+      role="tab"
+      label={chip.label}
+      count={chip.count}
+      selected={selected}
       accessibilityLabel={counted ? `${chip.label} (${String(chip.count)})` : chip.label}
       onPress={press}
       testID={testID}
-      // The pill stays compact; the press area reaches 44pt.
-      hitSlop={CHIP_HIT_SLOP}
-      style={[styles.chip, selected ? styles.selected : null]}
-    >
-      <Text style={[styles.label, selected ? styles.selectedLabel : null]} numberOfLines={1}>
-        {chip.label}
-      </Text>
-      {counted ? <Text style={styles.count}>{String(chip.count)}</Text> : null}
-    </Pressable>
+    />
   );
 }
 
-const CHIP_HIT_SLOP = { top: 8, bottom: 8, left: 2, right: 2 };
+/**
+ * The one chip: a compact pill whose press area still reaches the touch target. Filter chips,
+ * pin tags and "show more" tags are all this pill.
+ */
+export function ChipButton({
+  label,
+  leading,
+  count,
+  selected = false,
+  truncate = false,
+  role = "button",
+  accessibilityLabel,
+  onPress,
+  testID,
+}: {
+  label: string;
+  leading?: ReactNode;
+  count?: number;
+  selected?: boolean;
+  /** Long titles (a pinned workspace) stop at a fixed width instead of widening the row. */
+  truncate?: boolean;
+  role?: Extract<AccessibilityRole, "button" | "tab">;
+  accessibilityLabel?: string;
+  onPress(): void;
+  testID?: string;
+}) {
+  const state = useMemo(() => ({ selected }), [selected]);
+  const style = useCallback(
+    ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.chip,
+      truncate && styles.truncate,
+      (pressed || hovered) && styles.hovered,
+      selected && styles.selected,
+    ],
+    [selected, truncate],
+  );
+  return (
+    <PressHighlight
+      accessibilityRole={role}
+      accessibilityState={state}
+      accessibilityLabel={accessibilityLabel ?? label}
+      onPress={onPress}
+      testID={testID}
+      hitSlop={CHIP_HIT_SLOP}
+      style={style}
+    >
+      {leading}
+      <Text
+        style={[styles.label, selected && styles.selectedLabel, truncate && styles.labelShrink]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      {count !== undefined ? <Text style={styles.count}>{String(count)}</Text> : null}
+    </PressHighlight>
+  );
+}
+
+/** The pill stays `CONTROL_HEIGHTS.tight`; the press area reaches the touch target. */
+const CHIP_HIT_SLOP = {
+  top: (MIN_TOUCH_TARGET_SIZE - CONTROL_HEIGHTS.tight) / 2,
+  bottom: (MIN_TOUCH_TARGET_SIZE - CONTROL_HEIGHTS.tight) / 2,
+  left: SPACING[1],
+  right: SPACING[1],
+};
 
 const styles = StyleSheet.create((theme) => ({
   row: {
@@ -141,18 +209,26 @@ const styles = StyleSheet.create((theme) => ({
   },
   scroll: { flexGrow: 0 },
   scrollFrame: { position: "relative" },
-  fade: { position: "absolute", top: 0, bottom: 0, right: 0, width: theme.spacing[8] },
+  fade: {
+    position: "absolute",
+    top: theme.spacing[0],
+    bottom: theme.spacing[0],
+    right: theme.spacing[0],
+    width: theme.spacing[8],
+  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[2],
-    paddingVertical: theme.spacing[1.5],
+    gap: theme.spacing[1.5],
+    minHeight: CONTROL_HEIGHTS.tight,
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
+    borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface1,
   },
+  truncate: { maxWidth: theme.spacing[32] + theme.spacing[16] },
+  hovered: { backgroundColor: theme.colors.surface2 },
   selected: {
     backgroundColor: theme.colors.surface3,
     borderColor: theme.colors.borderAccent,
@@ -161,6 +237,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
   },
+  labelShrink: { flexShrink: 1 },
   selectedLabel: {
     color: theme.colors.foreground,
   },

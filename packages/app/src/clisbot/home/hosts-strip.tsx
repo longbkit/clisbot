@@ -23,7 +23,7 @@ import { useAppDiagnosticStore } from "@/diagnostics/store";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { openHostOverview } from "@/navigation/settings-navigation";
 import { buildSettingsAddHostRoute } from "@/utils/host-routes";
-import type { Theme } from "@/styles/theme";
+import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { hubSubtitle, type StripHost, type StripHub } from "./hosts-strip-model";
 import { useHostsStrip, useOpenHub } from "./hosts-strip-data";
 import { ConnectionIssuesSheet } from "./connection-issues-sheet";
@@ -104,12 +104,12 @@ export function ConnectionIssuesLine({
         accessibilityRole="button"
         testID="home-connection-issues"
       >
-        <WarningGlyph size={14} />
+        <WarningGlyph size={ICON_SIZE.sm} />
         <Text style={[styles.issueText, styles.grow]} numberOfLines={1}>
           {summary}
         </Text>
         <Text style={styles.muted}>View details</Text>
-        <MutedChevron size={14} />
+        <MutedChevron size={ICON_SIZE.sm} />
       </Pressable>
       <ConnectionIssuesSheet issues={issues} visible={detailsOpen} onClose={closeDetails} />
     </>

@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState, type ComponentProps } from "react";
+import equal from "fast-deep-equal";
 import { Text, View } from "react-native";
 import { FlatList } from "@/components/ui/scroll-view";
 import { useTranslation } from "react-i18next";
@@ -11,12 +12,14 @@ import { PinOptionsMenu } from "@/clisbot/bots/sidebar/pin-options";
 import { useSidebarPinMenu } from "@/clisbot/bots/sidebar/use-section-actions";
 import { useBotSidebarActions } from "@/clisbot/bots/sidebar/use-sidebar-actions";
 import { useCreationRequest } from "@/clisbot/bots/sidebar/creation-request";
+import { refreshBotsAndChats } from "@/clisbot/bots/data/runtime";
+import { ActivityPlaceholder } from "@/clisbot/home/activity-placeholder";
 import { useBotCreationHosts } from "@/clisbot/bots/feature";
 import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { selectedDirectBotKey } from "@/clisbot/bots/sidebar/sidebar-model";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { FilterChips, type FilterChip } from "@/components/ui/filter-chips";
+import type { FilterChip } from "@/components/ui/filter-chips";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { SearchField } from "@/components/ui/search-field";
 import {
@@ -29,10 +32,18 @@ import {
   type ChatsListItem,
 } from "./chat-list";
 import { ChatsDisplayMenu } from "./chats-display-menu";
+import { useStableEvent } from "@/hooks/use-stable-event";
+import { RenderProfile } from "@/utils/render-profiler";
+import { ListState } from "./list-state";
 import { useHeldOrder } from "./held-order";
 import { inScope } from "./ownership";
-import { ScopeTabs } from "./scope-tabs";
-import { HeaderMenuIcon, HeaderSearchButton, SectionHeader } from "./section-header";
+import { SectionControls } from "./section-controls";
+import {
+  HeaderMenuIcon,
+  HeaderSearchButton,
+  SECTION_MENU_WIDTH,
+  SectionHeader,
+} from "./section-header";
 import { useNavigationStore } from "./store";
 import { useChatEntries, type ChatsEntry } from "./use-chat-entries";
 
@@ -88,10 +99,10 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
     onBeforeNavigate,
     catalog.chats.loadState.status === "loaded",
   );
-  const empty =
-    entries.length === 0 ? "navigation.lists.emptyChats" : "navigation.lists.emptyChatsFiltered";
-  const emptyText = t(empty);
-  const emptyView = useMemo(() => <Text style={styles.empty}>{emptyText}</Text>, [emptyText]);
+  const emptyView = useMemo(
+    () => <ChatsListState catalog={catalog} filtered={entries.length > 0} />,
+    [catalog, entries.length],
+  );
   const headerActions = useMemo(
     () => (
       <>
@@ -102,51 +113,136 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
     [toggleSearch],
   );
   return (
-    <View style={styles.pane} testID="chats-pane">
-      <SectionHeader title={t("navigation.sections.chats")} actions={headerActions} />
-      {searchOpen ? (
-        <View style={styles.search}>
-          <SearchField
-            value={search}
-            onChangeText={setSearch}
-            placeholder={t("navigation.lists.searchChats")}
-            clearAccessibilityLabel={t("navigation.actions.closeSearch")}
-            testID="chats-search-input"
-          />
-        </View>
-      ) : null}
-      <View style={styles.controls}>
-        <ScopeTabs section="chats" counts={chatScopeCounts(entries)} />
-        <View style={styles.chips}>
-          <FilterChips
-            chips={chips}
-            value={chip}
-            onChange={setChip}
-            scroll
-            backdrop="surfaceSidebar"
-            testID="chats-chip"
-          />
-        </View>
-        <View style={styles.display}>
-          <ChatsDisplayMenu />
-        </View>
+    <RenderProfile id="NavChats">
+      <View style={styles.pane} testID="chats-pane">
+        <SectionHeader title={t("navigation.sections.chats")} actions={headerActions} />
+        {searchOpen ? (
+          <View style={styles.search}>
+            <SearchField
+              value={search}
+              onChangeText={setSearch}
+              placeholder={t("navigation.lists.searchChats")}
+              clearAccessibilityLabel={t("navigation.actions.closeSearch")}
+              testID="chats-search-input"
+            />
+          </View>
+        ) : null}
+        <SectionControls
+          section="chats"
+          scopeCounts={chatScopeCounts(entries)}
+          chips={chips}
+          chip={chip}
+          onChip={setChip}
+          backdrop="surfaceSidebar"
+          display={displayMenu}
+        />
+        <FlatList
+          {...handlers}
+          data={items}
+          keyExtractor={itemKey}
+          renderItem={actions.renderItem}
+          extraData={actions.selection}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={emptyView}
+          testID="chats-list"
+        />
+        <PinOptionsMenu {...actions.menuProps} />
       </View>
-      <FlatList
-        {...handlers}
-        data={items}
-        keyExtractor={itemKey}
-        renderItem={actions.renderItem}
-        extraData={actions.selection}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={emptyView}
-        testID="chats-list"
-      />
-      <PinOptionsMenu {...actions.menuProps} />
-    </View>
+    </RenderProfile>
   );
 }
 
+const displayMenu = <ChatsDisplayMenu />;
+
+/** Chats with no rows: still loading, failed on every Host, or empty (or filtered to nothing). */
+function ChatsListState({
+  catalog,
+  filtered,
+}: {
+  catalog: ReturnType<typeof useChatEntries>["catalog"];
+  filtered: boolean;
+}) {
+  const { t } = useTranslation();
+  const { bots, chats } = catalog;
+  const retryLabel = t("navigation.actions.retry");
+  const retry = useMemo(() => ({ label: retryLabel, onPress: refreshBotsAndChats }), [retryLabel]);
+  const loaded = bots.loadState.status === "loaded" || chats.loadState.status === "loaded";
+  if (!loaded && !bots.error && !chats.error) return <ActivityPlaceholder />;
+  if (!loaded)
+    return (
+      <ListState
+        kind="error"
+        title={t("navigation.lists.chatsFailed")}
+        action={retry}
+        testID="chats-list-error"
+      />
+    );
+  return (
+    <ListState
+      kind="empty"
+      title={t(filtered ? "navigation.lists.emptyChatsFiltered" : "navigation.lists.emptyChats")}
+      testID="chats-list-empty"
+    />
+  );
+}
 const itemKey = (item: ChatsListItem<ChatsEntry>) => item.key;
+
+interface ChatsListEntryProps {
+  entry: ChatsEntry;
+  selected: boolean;
+  onPressBot: (bot: BotsSidebarBot) => void;
+  onPressChat: (chat: ChatsSidebarChat) => void;
+  onBotMenu: ComponentProps<typeof BotRow>["onOpenMenu"];
+  onChatMenu: ComponentProps<typeof ChatRow>["onOpenMenu"];
+}
+
+/**
+ * One Chats row. The list rebuilds its entries on every catalog change, so a row compares its
+ * entry by value: a rename or a new message re-renders that row only (acceptance P5). Profiled
+ * inside the memo, so a skipped row records nothing.
+ */
+const ChatsListEntry = memo(function ChatsListEntry({
+  entry,
+  selected,
+  onPressBot,
+  onPressChat,
+  onBotMenu,
+  onChatMenu,
+}: ChatsListEntryProps) {
+  return (
+    <RenderProfile id={`ChatsRow:${entry.key}`}>
+      {entry.bot ? (
+        <BotRow
+          bot={entry.bot}
+          pinned={entry.pinned}
+          selected={selected}
+          onPress={onPressBot}
+          onOpenMenu={onBotMenu}
+        />
+      ) : null}
+      {!entry.bot && entry.group ? (
+        <ChatRow
+          chat={entry.group}
+          pinned={entry.pinned}
+          selected={selected}
+          onPress={onPressChat}
+          onOpenMenu={onChatMenu}
+        />
+      ) : null}
+    </RenderProfile>
+  );
+}, sameRowProps);
+
+function sameRowProps(previous: ChatsListEntryProps, next: ChatsListEntryProps): boolean {
+  return (
+    previous.selected === next.selected &&
+    previous.onPressBot === next.onPressBot &&
+    previous.onPressChat === next.onPressChat &&
+    previous.onBotMenu === next.onBotMenu &&
+    previous.onChatMenu === next.onChatMenu &&
+    equal(previous.entry, next.entry)
+  );
+}
 const botIcon = <HeaderMenuIcon Icon={Bot} />;
 const groupIcon = <HeaderMenuIcon Icon={Hash} />;
 
@@ -157,18 +253,16 @@ function useChatRowActions(
 ) {
   const { t } = useTranslation();
   const pathname = usePathname();
-  const current = parseChatRouteFromPathname(pathname);
+  const current = useMemo(() => parseChatRouteFromPathname(pathname), [pathname]);
   const selectedBot = selectedDirectBotKey(chatRows, current);
   const { openBot, navigate } = useBotSidebarActions(chatRows, onBeforeNavigate, loaded);
   const menu = useSidebarPinMenu(onBeforeNavigate, chatRows);
-  const pressBot = useCallback(
-    (bot: BotsSidebarBot) => void openBot(bot.serverId, bot.botId),
-    [openBot],
+  const pressBot = useStableEvent((bot: BotsSidebarBot) => void openBot(bot.serverId, bot.botId));
+  const pressChat = useStableEvent((chat: ChatsSidebarChat) =>
+    navigate(chat.serverId, chat.chatId),
   );
-  const pressChat = useCallback(
-    (chat: ChatsSidebarChat) => navigate(chat.serverId, chat.chatId),
-    [navigate],
-  );
+  const botMenu = useStableEvent(menu.onBotMenu);
+  const chatMenu = useStableEvent(menu.onChatMenu);
   const selection = `${selectedBot ?? ""}|${current?.serverId ?? ""}:${current?.chatId ?? ""}`;
   const renderItem = useCallback(
     ({ item: listItem }: { item: ChatsListItem<ChatsEntry> }) => {
@@ -178,31 +272,22 @@ function useChatRowActions(
             {t(listItem.kind === "bot" ? "navigation.chips.botDm" : "navigation.chips.groups")}
           </Text>
         );
-      const item = listItem.entry;
-      if (item.bot)
-        return (
-          <BotRow
-            bot={item.bot}
-            pinned={item.pinned}
-            selected={selectedBot === item.bot.key}
-            onPress={pressBot}
-            onOpenMenu={menu.onBotMenu}
-          />
-        );
-      if (!item.group) return null;
+      const entry = listItem.entry;
+      const selected = entry.bot
+        ? selectedBot === entry.bot.key
+        : current?.serverId === entry.group?.serverId && current?.chatId === entry.group?.chatId;
       return (
-        <ChatRow
-          chat={item.group}
-          pinned={item.pinned}
-          selected={
-            current?.serverId === item.group.serverId && current.chatId === item.group.chatId
-          }
-          onPress={pressChat}
-          onOpenMenu={menu.onChatMenu}
+        <ChatsListEntry
+          entry={entry}
+          selected={selected}
+          onPressBot={pressBot}
+          onPressChat={pressChat}
+          onBotMenu={botMenu}
+          onChatMenu={chatMenu}
         />
       );
     },
-    [current, menu.onBotMenu, menu.onChatMenu, pressBot, pressChat, selectedBot, t],
+    [botMenu, chatMenu, current, pressBot, pressChat, selectedBot, t],
   );
   const menuProps = {
     anchor: menu.menu?.anchor,
@@ -231,7 +316,11 @@ function NewChatMenu() {
       <ToolbarButton kind="menu" label={t("navigation.actions.newChat")} testID="chats-new">
         <HeaderMenuIcon Icon={SquarePen} />
       </ToolbarButton>
-      <DropdownMenuContent align="end" width={220} sheetTitle={t("navigation.actions.newChat")}>
+      <DropdownMenuContent
+        align="end"
+        width={SECTION_MENU_WIDTH}
+        sheetTitle={t("navigation.actions.newChat")}
+      >
         <DropdownMenuItem
           leading={botIcon}
           disabled={!canCreate || creationHosts.length === 0}
@@ -256,14 +345,6 @@ function NewChatMenu() {
 const styles = StyleSheet.create((theme) => ({
   pane: { flex: 1, minHeight: 0 },
   search: { paddingHorizontal: theme.spacing[3], paddingBottom: theme.spacing[2] },
-  controls: { gap: theme.spacing[2], paddingBottom: theme.spacing[2] },
-  chips: { paddingHorizontal: theme.spacing[3] },
-  display: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1],
-    paddingHorizontal: theme.spacing[3],
-  },
   heading: {
     color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
@@ -273,10 +354,4 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.spacing[1],
   },
   list: { paddingHorizontal: theme.spacing[2], paddingBottom: theme.spacing[4] },
-  empty: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    padding: theme.spacing[4],
-    textAlign: "center",
-  },
 }));

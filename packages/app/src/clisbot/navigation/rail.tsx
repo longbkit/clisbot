@@ -39,8 +39,10 @@ import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { UsageSidebarRoot, useOpenSidebarUsage } from "@/usage";
 import { buildSettingsAddHostRoute } from "@/utils/host-routes";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
-import type { Theme } from "@/styles/theme";
+import { ICON_SIZE, ICON_STROKE_WIDTH, type Theme } from "@/styles/theme";
+import { CONTROL_HEIGHTS, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useNavigationActivity } from "./activity";
+import { SECTION_MENU_WIDTH } from "./section-header";
 import { useHostsStatus } from "./hosts-status";
 import type {
   BuiltinSection,
@@ -179,11 +181,16 @@ function RailHelp({ section }: { section: BuiltinSection }) {
   const label = useSectionLabel(section);
   const trigger = useMemo(
     () => ({
-      style: railTriggerStyle,
+      style: styles.item,
       side: "right" as const,
       align: "end" as const,
       render: (state: MenuTriggerState) => (
-        <RailContent Icon={CircleHelp} label={label} active={state.open} hovered={state.hovered} />
+        <RailContent
+          Icon={CircleHelp}
+          label={label}
+          active={state.open}
+          hovered={state.hovered || state.pressed}
+        />
       ),
     }),
     [label],
@@ -201,7 +208,7 @@ function RailPluginItem({ section }: { section: PluginSection }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        style={railTriggerStyle}
+        style={styles.item}
         accessibilityRole="button"
         accessibilityLabel={section.group.title}
         testID={`navigation-rail-${section.key}`}
@@ -211,11 +218,11 @@ function RailPluginItem({ section }: { section: PluginSection }) {
             Icon={Icon as LucideIcon}
             label={section.group.title}
             active={state.open}
-            hovered={state.hovered}
+            hovered={state.hovered || state.pressed}
           />
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="start" width={260}>
+      <DropdownMenuContent side="right" align="start" width={SECTION_MENU_WIDTH}>
         <View ref={anchor} collapsable={false} style={styles.pluginMenu}>
           <PluginSidebarItem
             group={section.group}
@@ -226,10 +233,6 @@ function RailPluginItem({ section }: { section: PluginSection }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-function railTriggerStyle({ pressed }: MenuTriggerState) {
-  return [styles.item, pressed && styles.itemPressed];
 }
 
 function RailButton({
@@ -251,10 +254,6 @@ function RailButton({
   dot?: ReactNode;
   testID: string;
 }) {
-  const style = useCallback(
-    ({ pressed }: PressableStateCallbackType) => [styles.item, pressed && styles.itemPressed],
-    [],
-  );
   const state = useMemo(() => ({ selected: active }), [active]);
   return (
     <Tooltip delayDuration={500}>
@@ -265,15 +264,15 @@ function RailButton({
           accessibilityState={state}
           aria-selected={active}
           onPress={onPress}
-          style={style}
+          style={styles.item}
           testID={testID}
         >
-          {({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
+          {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
             <RailContent
               Icon={Icon}
               label={label}
               active={active}
-              hovered={Boolean(hovered)}
+              hovered={Boolean(hovered) || pressed}
               badge={badge}
               dot={dot}
             />
@@ -323,7 +322,7 @@ function Glyph({
   Icon: ComponentType<{ size: number; color?: string; strokeWidth?: number }>;
   color?: string;
 }) {
-  return <Icon size={20} color={color} strokeWidth={1.75} />;
+  return <Icon size={ICON_SIZE.lg} color={color} strokeWidth={ICON_STROKE_WIDTH} />;
 }
 const ThemedIcon = withUnistyles(Glyph);
 const mutedColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -334,25 +333,24 @@ const styles = StyleSheet.create((theme) => ({
     width: RAIL_WIDTH,
     flex: 1,
     backgroundColor: theme.colors.surfaceSidebar,
-    borderRightWidth: 1,
+    borderRightWidth: theme.borderWidth[1],
     borderRightColor: theme.colors.border,
     paddingBottom: theme.spacing[3],
   },
   dragArea: { height: theme.spacing[3] },
-  chromeSpacer: { height: 0 },
+  chromeSpacer: { height: theme.spacing[0] },
   group: { gap: theme.spacing[1], alignItems: "stretch", flexShrink: 1 },
   spacer: { flex: 1 },
   item: {
     alignItems: "center",
-    gap: 2,
+    gap: theme.spacing[0.5],
     paddingVertical: theme.spacing[1],
     paddingHorizontal: theme.spacing[1],
-    minHeight: 52,
+    minHeight: MIN_TOUCH_TARGET_SIZE,
   },
-  itemPressed: { opacity: 0.85 },
   glyph: {
-    width: 40,
-    height: 30,
+    height: CONTROL_HEIGHTS.compact,
+    paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
@@ -366,8 +364,8 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
   },
   labelActive: { color: theme.colors.foreground, fontWeight: theme.fontWeight.medium },
-  badge: { position: "absolute", top: -6, right: -10 },
-  dot: { position: "absolute", top: 3, right: 6 },
+  badge: { position: "absolute", top: -theme.spacing[1.5], right: -theme.spacing[2] },
+  dot: { position: "absolute", top: theme.spacing[1], right: theme.spacing[1.5] },
   tooltip: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm },
   pluginMenu: { padding: theme.spacing[1] },
 }));

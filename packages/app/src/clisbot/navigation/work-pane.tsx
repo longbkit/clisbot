@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type MutableRefObject } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { FolderPlus, Import, Plus } from "lucide-react-native";
@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { FilterChips, type FilterChip } from "@/components/ui/filter-chips";
+import type { FilterChip } from "@/components/ui/filter-chips";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -28,9 +28,15 @@ import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { RenderProfile } from "@/utils/render-profiler";
 import { useReaderAccounts } from "./reader";
-import { ScopeTabs } from "./scope-tabs";
-import { HeaderMenuIcon, HeaderSearchButton, SectionHeader } from "./section-header";
+import { SectionControls } from "./section-controls";
+import {
+  HeaderMenuIcon,
+  HeaderSearchButton,
+  SECTION_MENU_WIDTH,
+  SectionHeader,
+} from "./section-header";
 import { useNavigationStore, type WorkChip } from "./store";
 import { countWork, WORK_CHIPS } from "./work-filter";
 
@@ -86,38 +92,40 @@ export function WorkPane({
     [importSession.open, onBeforeNavigate, openAddProject, openSearch],
   );
   return (
-    <View style={styles.pane} testID="work-pane">
-      <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
-      <WorkControls />
-      <SidebarMetadataNotice />
-      {model.isInitialLoad && !hasActiveHostFilter ? (
-        <SidebarAgentListSkeleton />
-      ) : (
-        <SidebarWorkspaceList
-          pinPresentation="float"
-          collapsedProjectKeys={model.collapsedProjectKeys}
-          onToggleProjectCollapsed={model.toggleProjectCollapsed}
-          shortcutIndexByWorkspaceKey={model.shortcutModel.shortcutIndexByWorkspaceKey}
-          groupMode={model.groupMode}
-          workspaceGroups={model.workspaceGroups}
-          projectIconTargets={model.projectIconTargets}
-          pinnedGroups={model.pinnedGroups}
-          projects={model.projects}
-          hasProjectsBeforeFilter={model.hasProjectsBeforeFilter}
-          hasActiveProjectFilter={model.resolvedProjectFilters.length > 0}
-          workspaceEntriesByKey={model.workspaceEntriesByKey}
-          isRefreshing={refreshing}
-          onRefresh={refresh}
-          onWorkspacePress={onBeforeNavigate}
-          onAddProject={openAddProject}
-          onImportSession={importSession.open}
-          parentGestureRef={parentGestureRef}
-          dragGestureHostActive={active}
-          listLeadingComponent={leading}
-        />
-      )}
-      {importSession.sheet}
-    </View>
+    <RenderProfile id="NavWork">
+      <View style={styles.pane} testID="work-pane">
+        <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
+        <WorkControls />
+        <SidebarMetadataNotice />
+        {model.isInitialLoad && !hasActiveHostFilter ? (
+          <SidebarAgentListSkeleton />
+        ) : (
+          <SidebarWorkspaceList
+            pinPresentation="float"
+            collapsedProjectKeys={model.collapsedProjectKeys}
+            onToggleProjectCollapsed={model.toggleProjectCollapsed}
+            shortcutIndexByWorkspaceKey={model.shortcutModel.shortcutIndexByWorkspaceKey}
+            groupMode={model.groupMode}
+            workspaceGroups={model.workspaceGroups}
+            projectIconTargets={model.projectIconTargets}
+            pinnedGroups={model.pinnedGroups}
+            projects={model.projects}
+            hasProjectsBeforeFilter={model.hasProjectsBeforeFilter}
+            hasActiveProjectFilter={model.resolvedProjectFilters.length > 0}
+            workspaceEntriesByKey={model.workspaceEntriesByKey}
+            isRefreshing={refreshing}
+            onRefresh={refresh}
+            onWorkspacePress={onBeforeNavigate}
+            onAddProject={openAddProject}
+            onImportSession={importSession.open}
+            parentGestureRef={parentGestureRef}
+            dragGestureHostActive={active}
+            listLeadingComponent={leading}
+          />
+        )}
+        {importSession.sheet}
+      </View>
+    </RenderProfile>
   );
 }
 
@@ -148,27 +156,22 @@ function WorkControls() {
     [counts, t],
   );
   return (
-    <View style={styles.controls}>
-      <ScopeTabs section="work" counts={counts.scopes} />
-      <View style={styles.inset}>
-        <FilterChips
-          chips={chips}
-          value={chip}
-          onChange={setChip}
-          scroll
-          backdrop="surfaceSidebar"
-          testID="work-chip"
-        />
-      </View>
-      <View style={styles.display}>
-        <Text style={styles.displayLabel}>{t("navigation.display")}</Text>
-        <SidebarDisplayPreferencesMenu />
-      </View>
+    <SectionControls
+      section="work"
+      scopeCounts={counts.scopes}
+      chips={chips}
+      chip={chip}
+      onChip={setChip}
+      backdrop="surfaceSidebar"
+      display={displayMenu}
+    >
       <SidebarViewBar />
       <SidebarActiveFilters />
-    </View>
+    </SectionControls>
   );
 }
+
+const displayMenu = <SidebarDisplayPreferencesMenu trigger="label" />;
 
 /** +: New workspace, Add project, Import session (brief 3.1a). */
 function NewWorkMenu({
@@ -198,7 +201,11 @@ function NewWorkMenu({
       <ToolbarButton kind="menu" label={t("navigation.actions.new")} testID="work-new">
         <HeaderMenuIcon Icon={Plus} />
       </ToolbarButton>
-      <DropdownMenuContent align="end" width={240} sheetTitle={t("navigation.actions.new")}>
+      <DropdownMenuContent
+        align="end"
+        width={SECTION_MENU_WIDTH}
+        sheetTitle={t("navigation.actions.new")}
+      >
         <DropdownMenuItem
           leading={plusIcon}
           trailing={workspaceShortcut}
@@ -232,15 +239,6 @@ const plusIcon = <HeaderMenuIcon Icon={Plus} />;
 const folderIcon = <HeaderMenuIcon Icon={FolderPlus} />;
 const importIcon = <HeaderMenuIcon Icon={Import} />;
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create({
   pane: { flex: 1, minHeight: 0 },
-  controls: { gap: theme.spacing[2], paddingBottom: theme.spacing[1] },
-  inset: { paddingHorizontal: theme.spacing[3] },
-  display: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1],
-    paddingHorizontal: theme.spacing[3],
-  },
-  displayLabel: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
-}));
+});

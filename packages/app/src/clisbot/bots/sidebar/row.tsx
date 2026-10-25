@@ -7,14 +7,14 @@ import type { Rect } from "@/components/ui/anchor";
 import { memo, useRef, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { MoreVertical, Pin } from "lucide-react-native";
+import { MoreVertical } from "lucide-react-native";
+import { PinMark } from "@/components/ui/pin-mark";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { sectionRowIndent } from "./section-header";
 
 const ThemedMoreVertical = withUnistyles(MoreVertical);
-const ThemedPin = withUnistyles(Pin);
 const mutedColorMapping = (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
 });
@@ -150,12 +150,8 @@ function RowTrailing({
   return (
     <View style={[styles.trailingSlot, compact && styles.trailingSlotTouch]}>
       {pinned ? (
-        <View
-          style={[styles.pinMark, hidden && styles.trailingHidden]}
-          accessibilityLabel="Pinned"
-          testID={`${testID}-pinned`}
-        >
-          <ThemedPin size={11} uniProps={mutedColorMapping} />
+        <View style={[styles.pinMark, hidden && styles.trailingHidden]} testID={`${testID}-pinned`}>
+          <PinMark />
         </View>
       ) : null}
       {trailing ? (

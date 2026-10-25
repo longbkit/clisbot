@@ -57,8 +57,13 @@ interface NavigationState {
   setWorkChip: (chip: WorkChip) => void;
   setShowOthersPins: (show: boolean) => void;
   setHomeSearchOpen: (open: boolean) => void;
-  setHomeHosts: (serverIds: string[]) => void;
+  toggleHomeHost: (serverId: string) => void;
+  clearHomeHosts: () => void;
   setSeenIssuesOpen: (open: boolean) => void;
+}
+
+function toggled(ids: readonly string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
 }
 
 export const useNavigationStore = create<NavigationState>()(
@@ -78,11 +83,7 @@ export const useNavigationStore = create<NavigationState>()(
       setChatsSort: (chatsSort) => set({ chatsSort }),
       toggleChatsSplit: () => set((state) => ({ chatsSplit: !state.chatsSplit })),
       toggleChatsHost: (serverId) =>
-        set((state) => ({
-          chatsHosts: state.chatsHosts.includes(serverId)
-            ? state.chatsHosts.filter((id) => id !== serverId)
-            : [...state.chatsHosts, serverId],
-        })),
+        set((state) => ({ chatsHosts: toggled(state.chatsHosts, serverId) })),
       clearChatsHosts: () => set({ chatsHosts: [] }),
       toggleBotProjectsInWork: () =>
         set((state) => ({ showBotProjectsInWork: !state.showBotProjectsInWork })),
@@ -98,7 +99,9 @@ export const useNavigationStore = create<NavigationState>()(
       setWorkChip: (workChip) => set({ workChip }),
       setShowOthersPins: (showOthersPins) => set({ showOthersPins }),
       setHomeSearchOpen: (homeSearchOpen) => set({ homeSearchOpen }),
-      setHomeHosts: (homeHosts) => set({ homeHosts }),
+      toggleHomeHost: (serverId) =>
+        set((state) => ({ homeHosts: toggled(state.homeHosts, serverId) })),
+      clearHomeHosts: () => set({ homeHosts: [] }),
       setSeenIssuesOpen: (seenIssuesOpen) => set({ seenIssuesOpen }),
     }),
     {

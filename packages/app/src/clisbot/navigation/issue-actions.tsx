@@ -14,7 +14,7 @@ import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import { useNavigationActivity } from "./activity";
 import type { Issue } from "./issues";
-import { HeaderMenuIcon } from "./section-header";
+import { HeaderMenuIcon, SECTION_MENU_WIDTH } from "./section-header";
 
 /**
  * A failure or a request is never a dead end (brief 3.1c): the row opens it, and these are the
@@ -72,7 +72,7 @@ export function IssueActions({
         <ToolbarButton kind="menu" label={t("navigation.actions.open")} testID={`${testID}-menu`}>
           <HeaderMenuIcon Icon={MoreHorizontal} />
         </ToolbarButton>
-        <DropdownMenuContent align="end" width={220}>
+        <DropdownMenuContent align="end" width={SECTION_MENU_WIDTH}>
           {compact && canReload ? (
             <DropdownMenuItem leading={reloadIcon} onSelect={actions.reload}>
               {t("navigation.actions.reload")}

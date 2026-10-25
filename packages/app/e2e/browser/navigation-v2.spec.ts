@@ -74,7 +74,7 @@ test.describe("Navigation V2", () => {
       await expect(page.getByTestId("home-activity-updates")).toHaveCount(0);
 
       const failedRow = page.getByTestId(`agent-row-${getServerId()}-${seeded.failing.id}`);
-      await expect(page.getByTestId("home-feed-controls")).toBeVisible();
+      await expect(page.getByTestId("home-controls")).toBeVisible();
       await expect(failedRow).toBeVisible({ timeout: 30_000 });
       const actions = page.getByTestId(`issue-actions-${getServerId()}-${seeded.failing.id}`);
       await expect(actions.getByTestId(/-dismiss$/)).toBeVisible();
@@ -264,7 +264,7 @@ test.describe("Navigation V2", () => {
 
       await page.emulateMedia({ colorScheme: "dark" });
       await page.getByTestId("home-tab-open-project").click();
-      await expect(page.getByTestId("home-feed-controls")).toBeVisible();
+      await expect(page.getByTestId("home-controls")).toBeVisible();
       await shot(page, "mobile-home-dark");
       await page.emulateMedia({ colorScheme: "light" });
 

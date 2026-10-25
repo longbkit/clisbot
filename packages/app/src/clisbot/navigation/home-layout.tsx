@@ -4,6 +4,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { activityKey } from "@/clisbot/home/activity-layout";
 import { HomeActivityProvider } from "@/clisbot/home/activity-state";
 import type { ActivityBucketOf } from "@/clisbot/home/activity";
+import { RenderProfile } from "@/utils/render-profiler";
 import { ActivityScrollView, ActivityViewportProvider } from "@/clisbot/home/activity-viewport";
 import { StartStatus } from "@/clisbot/home/start-surface";
 import { ComposerPickerPlacementProvider } from "@/composer/picker-placement";
@@ -54,25 +55,27 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
   }, [feed.visible]);
   if (searchOpen) return <InboxHistory />;
   return (
-    <ActivityViewportProvider>
-      <HomeActivityProvider agents={agents} bucketOf={bucketOf}>
-        <ActivityScrollView
-          testID="home-scroll"
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.scroll}
-        >
-          <View style={styles.column}>
-            <HomeConnectionNotice />
-            <StartBlock {...props} />
-            <HomeFeedControls scopeCounts={feed.scopeCounts} chipCounts={feed.chipCounts} />
-            <NavigationHomeFeed
-              rows={byKey}
-              filterKey={`${scope}|${mode}|${chip}|${serverIds.join(",")}`}
-            />
-          </View>
-        </ActivityScrollView>
-      </HomeActivityProvider>
-    </ActivityViewportProvider>
+    <RenderProfile id="NavHome">
+      <ActivityViewportProvider>
+        <HomeActivityProvider agents={agents} bucketOf={bucketOf}>
+          <ActivityScrollView
+            testID="home-scroll"
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scroll}
+          >
+            <View style={styles.column}>
+              <HomeConnectionNotice />
+              <StartBlock {...props} />
+              <HomeFeedControls scopeCounts={feed.scopeCounts} chipCounts={feed.chipCounts} />
+              <NavigationHomeFeed
+                rows={byKey}
+                filterKey={`${scope}|${mode}|${chip}|${serverIds.join(",")}`}
+              />
+            </View>
+          </ActivityScrollView>
+        </HomeActivityProvider>
+      </ActivityViewportProvider>
+    </RenderProfile>
   );
 }
 
