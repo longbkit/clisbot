@@ -4,7 +4,13 @@ import type { z } from "zod";
 import { useFetchQueries, useFetchQuery } from "@/data/query";
 import { useHosts, useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
 import { type HubAccountContextValue, useHubAccount, useHubAccounts } from "./account-provider";
+import { classifyHubFailure } from "./api-client";
 import { HubDaemonsSchema } from "./contracts";
+import {
+  cachedListForAccount,
+  getHubDaemonListCache,
+  useHubDaemonListCache,
+} from "./hub-daemon-list-cache";
 import { hubResourceQueryKey } from "./query-keys";
 
 type HubDaemons = z.infer<typeof HubDaemonsSchema>;
@@ -20,14 +26,50 @@ function hubDaemonsQueryKey(hub: HubAccountContextValue) {
   );
 }
 
+const HUB_LIST_POLL_MS = 60_000;
+const HUB_LIST_MAX_POLL_MS = 300_000;
+/** Consecutive failed list reads per query; the query cache resets its own count per fetch. */
+const listFailures = new Map<string, number>();
+
+/** 60 s while the Hub answers; after failures, a jittered doubling up to 5 min. */
+export function hubListPollIntervalMs(failures: number, random: () => number = Math.random) {
+  if (failures <= 0) return HUB_LIST_POLL_MS;
+  const ceiling = Math.min(HUB_LIST_MAX_POLL_MS, HUB_LIST_POLL_MS * 2 ** (failures - 1));
+  return Math.round(ceiling * (0.5 + random() / 2));
+}
+
+/** Reads the list and keeps the remembered copy in step: replaced on success, dropped on 403. */
+export async function readHubDaemons(hub: HubAccountContextValue): Promise<HubDaemons> {
+  const failureKey = JSON.stringify(hubDaemonsQueryKey(hub));
+  const cache = getHubDaemonListCache();
+  try {
+    const list = await hub.api().get("daemons", HubDaemonsSchema);
+    listFailures.delete(failureKey);
+    if (hub.origin !== null && hub.signedIn !== null)
+      cache.remember({
+        origin: hub.origin,
+        accountId: hub.signedIn.account.id,
+        organizationId: hub.signedIn.organization.id,
+        daemons: list.daemons,
+        syncedAt: new Date().toISOString(),
+      });
+    return list;
+  } catch (error) {
+    listFailures.set(failureKey, (listFailures.get(failureKey) ?? 0) + 1);
+    if (hub.origin !== null && classifyHubFailure(error) === "revoked") cache.forget(hub.origin);
+    throw error;
+  }
+}
+
 function hubDaemonsQueryInput(hub: HubAccountContextValue) {
+  const failureKey = JSON.stringify(hubDaemonsQueryKey(hub));
   return {
     queryKey: hubDaemonsQueryKey(hub),
-    queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
+    queryFn: () => readHubDaemons(hub),
     dataShape: "value" as const,
     enabled: hub.enabled && hub.signedIn !== null,
     retry: false,
-    refetchInterval: 60_000,
+    refetchInterval: () => hubListPollIntervalMs(listFailures.get(failureKey) ?? 0),
     staleTimeMs: 0,
   };
 }
@@ -98,17 +140,37 @@ export function useHostInventory() {
   const lists = useStableItems(queries.map((query) => query.data));
   const errors = useStableItems(queries.map((query) => query.error));
   const refetches = useStableItems(queries.map((query) => query.refetch));
+  const listCache = useHubDaemonListCache();
+  // A Hub without a live list falls back to the list it last returned for this account, so
+  // its Hosts stay visible while it (or its VPN) is unreachable. Fresh lists always win.
+  const remembered = useStableItems(
+    accounts.map((account, index) =>
+      lists[index] === undefined && account.origin !== null
+        ? cachedListForAccount(listCache.get(account.origin), account)
+        : undefined,
+    ),
+  );
   const hosts = useMemo(() => {
     if (accounts.length === 0) return registeredHosts;
     const listings = accounts.map((account, index) => ({
       origin: account.origin,
-      organizationId: account.signedIn?.organization.id ?? null,
-      daemons: lists[index]?.daemons,
+      organizationId:
+        account.signedIn?.organization.id ?? remembered[index]?.organizationId ?? null,
+      daemons: lists[index]?.daemons ?? remembered[index]?.daemons,
     }));
     return registeredHosts.filter((host) =>
       isAccountHost(host, listings, localServerIds.includes(host.serverId)),
     );
-  }, [accounts, lists, registeredHosts, localServerIds]);
+  }, [accounts, lists, remembered, registeredHosts, localServerIds]);
+  /** Hubs whose Hosts are shown from a remembered list, with the time it was read. */
+  const lastSyncedAtByOrigin = useMemo(() => {
+    const result = new Map<string, string>();
+    for (const [index, account] of accounts.entries()) {
+      const list = remembered[index];
+      if (account.origin !== null && list !== undefined) result.set(account.origin, list.syncedAt);
+    }
+    return result;
+  }, [accounts, remembered]);
   // Daemon ids are unique across Hubs, so one merged list answers "does a Hub list this Host".
   const daemons = useMemo<{ data: HubDaemons | undefined; error: Error | null }>(
     () => ({
@@ -150,7 +212,7 @@ export function useHostInventory() {
       }
     }
   }, [accounts, queryClient, refetches]);
-  return { hosts, daemons, status, error, retry };
+  return { hosts, daemons, status, error, retry, lastSyncedAtByOrigin };
 }
 
 export function useAvailableHosts() {

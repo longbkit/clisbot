@@ -11,6 +11,7 @@ import { HubAccessTicketSchema } from "./contracts";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
 import { orphanedManagedHosts } from "./managed-host-reconciliation";
 import { useHubDaemonsQuery } from "./host-inventory";
+import { cachedListForAccount, useHubDaemonListCache } from "./hub-daemon-list-cache";
 import {
   hubHostSynchronizationKey,
   setHubHostSynchronizationFailure,
@@ -59,6 +60,15 @@ function AccountHostSynchronization() {
   const organizationId = signedIn?.organization.id ?? null;
   const daemons = useHubDaemonsQuery();
   const hosts = useHosts();
+  const listCache = useHubDaemonListCache();
+  // A Hub that answered (signed out, another account or organization) retires the list this
+  // device remembered for it. An unreachable Hub has no state and keeps it.
+  const rememberedList = hubOrigin === null ? undefined : listCache.get(hubOrigin);
+  useEffect(() => {
+    if (!hub.enabled || hubOrigin === null || hub.state === null || rememberedList === undefined)
+      return;
+    if (cachedListForAccount(rememberedList, hub) === undefined) listCache.forget(hubOrigin);
+  }, [hub, hubOrigin, listCache, rememberedList]);
   const projectedDaemonIds = useMemo(
     () =>
       new Set(
