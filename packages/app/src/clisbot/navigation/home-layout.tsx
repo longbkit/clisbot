@@ -5,6 +5,7 @@ import { activityKey } from "@/clisbot/home/activity-layout";
 import { HomeActivityProvider } from "@/clisbot/home/activity-state";
 import type { ActivityBucketOf } from "@/clisbot/home/activity";
 import { RenderProfile } from "@/utils/render-profiler";
+import { HoldReadingPosition } from "./hold-reading-position";
 import { ActivityScrollView, ActivityViewportProvider } from "@/clisbot/home/activity-viewport";
 import { StartStatus } from "@/clisbot/home/start-surface";
 import { ComposerPickerPlacementProvider } from "@/composer/picker-placement";
@@ -64,7 +65,9 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
             contentContainerStyle={styles.scroll}
           >
             <View style={styles.column}>
-              <HomeConnectionNotice />
+              <HoldReadingPosition>
+                <HomeConnectionNotice />
+              </HoldReadingPosition>
               <StartBlock {...props} />
               <HomeFeedControls scopeCounts={feed.scopeCounts} chipCounts={feed.chipCounts} />
               <NavigationHomeFeed

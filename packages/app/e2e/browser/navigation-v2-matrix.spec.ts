@@ -119,7 +119,7 @@ async function captureScreens(page: Page, seeded: Seeded, size: Size, folder: st
     ["work", "/work", "work-pane"],
     ["more", "/more", "more-screen"],
     ["tasks", "/tasks", "tasks-screen"],
-    ["schedules", "/schedules", "schedules-empty"],
+    ["schedules", "/schedules", "automations-home"],
   ] as const;
   for (const [screen, route, ready] of routes) {
     await page.goto(route);
@@ -167,7 +167,10 @@ matrixDescribe("Navigation V2 screenshot matrix", () => {
         await expect(page.getByTestId("home-seen-issues")).toBeVisible();
         for (const size of SIZES) await captureScreens(page, seeded, size, folder);
 
-        // Last, because the offline Host stays in the registry: the compact connection notice.
+        // Last: the compact connection notice. The fixture rewrites the Host registry on every
+        // page load, so the offline Host lives only until the next goto — resize in place instead.
+        await page.goto("/open-project");
+        await settle(page, "home-controls");
         await addOfflineHostAndReload(page, {
           serverId: "nav-v2-matrix-offline",
           label: "Studio Mini",
@@ -175,8 +178,11 @@ matrixDescribe("Navigation V2 screenshot matrix", () => {
         });
         for (const size of SIZES) {
           await page.setViewportSize({ width: size.width, height: size.height });
-          await page.goto("/open-project");
-          await settle(page, "home-connection-issues");
+          // The Hosts runtime calls a Host unreachable after ~15s of retries.
+          await expect(page.getByTestId("home-connection-issues").first()).toBeVisible({
+            timeout: 60_000,
+          });
+          await page.waitForTimeout(700);
           await page.screenshot({ path: `${folder}/connection-notice-${size.name}.png` });
         }
       } finally {

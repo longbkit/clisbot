@@ -41,28 +41,36 @@ The primary navigation says where you are; each section owns its header, filters
   Lịch · More. Chats and Work are both list tabs: the same retained `agent-list` panel shows the
   Chats or Work list, so native presentation, the pending-detail shell and the Back return path
   stay one implementation (`isListTabPath`, `currentListTabPath`). More is the `/more` page.
+- **One component per job** across Home, Chats and Work: `SectionHeader`, `SectionControls` (For
+  me / Others / All, chips, then the Display row, on one inset), `DisplayMenuTrigger`
+  ("Display ▾", with a dot while a filter is in force), `HostsDisplayItems`, `ChipRow` /
+  `ChipButton` (filter chips and pin tags), `PinMark`, `ListState` (empty and error) and Home's
+  `ActivityPlaceholder` skeleton (Chats loading too). Menus open at `DISPLAY_MENU_WIDTH`.
+- **Chats and Work stay mounted** once opened (`ListContent` in `list-panel.tsx`) and swap
+  visibility, so switching between them never rebuilds a 500-row list. Their rows are memoized and
+  compare entries by value: a rename or a new message re-renders that row only.
 
 ## Change map
 
-| #   | Status | Where                                                                                                                                           |
-| --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1  | done   | `rail.tsx` from the registry; bottom Usage (when on), Hosts with its dot, Help, Settings                                                        |
-| C2  | done   | `list-panel.tsx` replaces `LeftSidebar`; no Pinned, Bots, Group chats, Projects sections or footer in V2                                        |
-| C3  | done   | `chats-pane.tsx`, `chat-list.ts`, `use-chat-entries.ts`, `held-order.ts`                                                                        |
-| C4  | done   | `work-pane.tsx` wraps `SidebarWorkspaceList` with `pinPresentation="float"`; Quick chats lead the list                                          |
-| C5  | done   | `section-header.tsx`; Home 🔍, Chats 🔍 ✎, Work 🔍 +; ⌘K unchanged                                                                              |
-| C6  | done   | `home-layout.tsx`; `/sessions` redirects to Home; Home 🔍 shows Inbox's history in place (`InboxHistory`)                                       |
-| C7  | done   | `home-controls.tsx` chips over Home's existing activity buckets                                                                                 |
-| C7a | done   | Chats: the Bots and Group chats display menus; Work: the sidebar display menu, grouping tabs and active-filter chips; Home: Inbox's Host filter |
-| C8  | done   | `pin-tags.tsx`, `pin-tags-model.ts`                                                                                                             |
-| C9  | done   | phone tabs from the registry; Home carries the unseen-issue badge                                                                               |
-| C10 | done   | `more-screen.tsx`                                                                                                                               |
-| C11 | done   | rail, tabs and the `/schedules` landing title read Schedules / Lịch; routes unchanged                                                           |
-| C12 | done   | `ownership.ts`, `scope-tabs.tsx` on Home, Chats and Work                                                                                        |
-| C13 | done   | `home-header.tsx` switch; `home-mode-target.ts` moves the composer target                                                                       |
-| C14 | done   | Tasks entry with `status: "preview"`, `tasks-screen.tsx`                                                                                        |
-| C15 | done   | the scope applies before chips, pin tags, counts and badges (`home-feed.ts`, `homeBadgeCount`)                                                  |
-| C16 | done   | `issues.ts`, `issue-store.ts`, `activity.tsx`, `issue-actions.tsx`, `home-feed-view.tsx`                                                        |
+| #   | Status | Where                                                                                                                                              |
+| --- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | done   | `rail.tsx` from the registry; bottom Usage (when on), Hosts with its dot, Help, Settings                                                           |
+| C2  | done   | `list-panel.tsx` replaces `LeftSidebar`; no Pinned, Bots, Group chats, Projects sections or footer in V2                                           |
+| C3  | done   | `chats-pane.tsx`, `chat-list.ts`, `use-chat-entries.ts`, `held-order.ts`                                                                           |
+| C4  | done   | `work-pane.tsx` wraps `SidebarWorkspaceList` with `pinPresentation="float"`; Quick chats lead the list                                             |
+| C5  | done   | `section-header.tsx`; Home 🔍, Chats 🔍 ✎, Work 🔍 +; ⌘K unchanged                                                                                 |
+| C6  | done   | `home-layout.tsx`; `/sessions` redirects to Home; Home 🔍 shows Inbox's history in place (`InboxHistory`)                                          |
+| C7  | done   | `home-controls.tsx` chips over Home's existing activity buckets                                                                                    |
+| C7a | done   | one Display ▾ per list: Chats (order, split, Hosts), Work (the sidebar display menu; grouping tabs and active-filter chips under it), Home (Hosts) |
+| C8  | done   | `pin-tags.tsx`, `pin-tags-model.ts`                                                                                                                |
+| C9  | done   | phone tabs from the registry; Home carries the unseen-issue badge                                                                                  |
+| C10 | done   | `more-screen.tsx`                                                                                                                                  |
+| C11 | done   | rail, tabs and the `/schedules` landing title read Schedules / Lịch; routes unchanged                                                              |
+| C12 | done   | `ownership.ts`, `scope-tabs.tsx` on Home, Chats and Work                                                                                           |
+| C13 | done   | `home-header.tsx` switch; `home-mode-target.ts` moves the composer target                                                                          |
+| C14 | done   | Tasks entry with `status: "preview"`, `tasks-screen.tsx`                                                                                           |
+| C15 | done   | the scope applies before chips, pin tags, counts and badges (`home-feed.ts`, `homeBadgeCount`)                                                     |
+| C16 | done   | `issues.ts`, `issue-store.ts`, `activity.tsx`, `issue-actions.tsx`, `home-feed-view.tsx`                                                           |
 
 ## Old controls → new home (3.1a)
 
@@ -108,8 +116,8 @@ reader's verified `memberId`.
 ## Home
 
 Order: header (mode switch, 🔍) → a connection notice only when something is wrong → composer and
-its context row → Status & Setup and Import session → quick starts → scope tabs → chips → Host
-filter → pin tags → feed. Hosts live on the rail and in More; Home has no Hosts block and no
+its context row → Status & Setup and Import session → quick starts → scope tabs → chips → Display
+(Hosts, when there are several) → pin tags → feed. Hosts live on the rail and in More; Home has no Hosts block and no
 floating updates bar (held updates show as an inline "Show N updates" above the feed). The
 composer is at the top on phones too, with its pickers opening downward; a phone's header row is
 the mode switch and search (the tab bar already says Home).
@@ -131,6 +139,10 @@ the mode switch and search (the tab bar already says Home).
 - **Feed**. Home's activity layout (`useActivityLayout`) takes the filtered rows and a bucket per
   row, adding a `seen` group. Background changes still wait behind Show updates; a change the
   reader makes (a filter, Mark as seen, Dismiss, Archive) applies at once.
+- **Reading position**. Content above the feed that changes height by itself — the connection
+  notice, the Show updates / Mark all as seen line — sits in `HoldReadingPosition`: while the reader
+  is scrolled, the scroll moves by the same amount, so no row moves under them. At the top the
+  change is simply shown.
 - **Pins** (C8). Every resource pin as a tag, the reader's own first; other members' pins fold into
   `+N · Show`. Ownership follows the rules above.
 
@@ -253,7 +265,24 @@ Work and sends, a Bot DM opens from Chats and sends, a needs-action card opens f
 approved, Settings from the rail and More, `/sessions` redirect) and
 `e2e/browser/navigation-v2.spec.ts` at 1440×900 and 390×844 (rail, Home lifecycle with Seen
 issues, Chats, Work, Tasks, `/sessions` redirect, phone tabs and More). Set
-`E2E_NAV_V2_SCREENSHOTS_DIR` to keep its screenshots. Native iOS/Android were not run.
+`E2E_NAV_V2_SCREENSHOTS_DIR` to keep its screenshots. `e2e/browser/navigation-v2-stability.spec.ts`
+(acceptance S1, S3, S6 at 1440 and 390: rows hold within 1px while a rename, a new arrival, a new
+failure and a Host going offline land; one notice; counts agree across Home, Chats, Work and the
+badge).
+
+Opt-in measurement specs:
+
+- `navigation-v2-performance.spec.ts` (`CLISBOT_NAV_V2_PERF_E2E=1`): an isolated daemon with 500
+  sessions and 500 group chats; rail and tab switch time to the first frame of the new section with
+  blank-frame detection, wheel-scroll frame gaps on Chats, Work and a 200-item Home feed, and row
+  re-renders after one change (render profiler). Set `E2E_STATIC_APP_DIR` to a production
+  `expo export --platform web` for switch and scroll numbers; re-render counts need the dev bundle,
+  because React reports `Profiler` renders only in development. `CLISBOT_NAV_V2_PERF_CPU=<testID>`
+  adds a CPU profile of one switch.
+- `navigation-v2-matrix.spec.ts` (`E2E_NAV_V2_MATRIX_DIR=<folder>`): every acceptance screen at
+  1440, 1024, 320, 390 and 430 in light/dark × en/vi.
+
+Native iOS/Android were not run.
 
 ## Native
 
@@ -262,7 +291,11 @@ no DOM path. Phones keep the Home V2 native model: peer tabs replace their route
 are the retained list panel with its pending-detail shell, Android Back follows the tab rules, and
 iOS swipe-back is the native stack's. Chats is a virtualized `FlatList`; Work is the existing
 workspace list; the Home feed keeps Home's existing scroller and its fixed row height. Chips and pin
-tags stay visually compact and reach 44pt through `hitSlop`; the scope and mode switches use the
+tags stay visually compact and reach 44pt through `hitSlop`. On web only, a tab that opens the
+list panel changes the route one frame after presenting the panel, because the panel presents a
+frame after the store changes and the outgoing page would otherwise leave one blank frame; native
+keeps its own presentation. `HoldReadingPosition` compensates from `onLayout`, which on native can
+land a frame after the change, so a native recording should confirm S1; the scope and mode switches use the
 44pt segmented size on phones. The issue store persists only when a record changes (a new occurrence or a reader mark), as one small JSON write through AsyncStorage; observing an unchanged directory writes nothing. Native iOS/Android builds were not run for
 Round 1.
 

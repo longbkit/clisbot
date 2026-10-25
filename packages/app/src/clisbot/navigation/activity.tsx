@@ -131,6 +131,11 @@ function useMarkOpenedSeen(
   transition: (apply: (current: IssueRecords) => IssueRecords) => void,
 ) {
   const pathname = usePathname();
+  const routeServerId = parseHostWorkspaceRouteFromPathname(pathname)?.serverId;
+  // A workspace holds many sessions; only the one on screen has been opened.
+  const focusedAgentId = useSessionStore((state) =>
+    routeServerId ? (state.sessions[routeServerId]?.focusedAgentId ?? null) : null,
+  );
   useEffect(() => {
     const workspace = parseHostWorkspaceRouteFromPathname(pathname);
     const chat = parseChatRouteFromPathname(pathname);
@@ -138,7 +143,11 @@ function useMarkOpenedSeen(
     const opened = rows.filter(({ agent, issue }) => {
       if (issue?.state !== "unseen") return false;
       if (workspace)
-        return agent.serverId === workspace.serverId && agent.workspaceId === workspace.workspaceId;
+        return (
+          agent.serverId === workspace.serverId &&
+          agent.workspaceId === workspace.workspaceId &&
+          agent.id === focusedAgentId
+        );
       return (
         agent.serverId === chat!.serverId && getChatIdFromLabels(agent.labels) === chat!.chatId
       );
@@ -151,7 +160,7 @@ function useMarkOpenedSeen(
         Date.now(),
       ),
     );
-  }, [pathname, rows, subjectOf, transition]);
+  }, [focusedAgentId, pathname, rows, subjectOf, transition]);
 }
 
 export function useNavigationActivity(): NavigationActivity {

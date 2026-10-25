@@ -25,6 +25,7 @@ import { CONTROL_HEIGHTS, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-
 import { ICON_SIZE } from "@/styles/theme";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { RenderProfile } from "@/utils/render-profiler";
+import { HoldReadingPosition } from "./hold-reading-position";
 import { ListState } from "./list-state";
 import { useNavigationActivity } from "./activity";
 import type { HomeChip, HomeRow } from "./home-feed";
@@ -86,27 +87,33 @@ export function NavigationHomeFeed({
   }, [activity, requestApply, unseen]);
   return (
     <View style={styles.container} testID="home-activity">
-      {/* DirectoryStatus builds English sentences around its label; it is not localized yet. */}
-      <DirectoryStatus health={directoryHealth} label="Activity" inset={false} />
-      {isInitialLoad ? <ActivityPlaceholder /> : null}
-      {!isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length ? (
-        <ListState kind="empty" title={t("navigation.lists.emptyFeed")} testID="home-feed-empty" />
-      ) : null}
-      {pending > 0 || unseen.length > 1 ? (
-        <View style={styles.markAll}>
-          {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
-          {pending > 0 ? (
-            <Button size="xs" variant="ghost" onPress={update} testID="home-activity-apply">
-              {t("navigation.updates", { count: pending })}
-            </Button>
-          ) : null}
-          {unseen.length > 1 ? (
-            <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
-              {t("navigation.actions.markAllSeen")}
-            </Button>
-          ) : null}
-        </View>
-      ) : null}
+      <HoldReadingPosition style={styles.header}>
+        {/* DirectoryStatus builds English sentences around its label; it is not localized yet. */}
+        <DirectoryStatus health={directoryHealth} label="Activity" inset={false} />
+        {isInitialLoad ? <ActivityPlaceholder /> : null}
+        {!isInitialLoad && directoryHealth.hasAcceptedResult && !accepted.length ? (
+          <ListState
+            kind="empty"
+            title={t("navigation.lists.emptyFeed")}
+            testID="home-feed-empty"
+          />
+        ) : null}
+        {pending > 0 || unseen.length > 1 ? (
+          <View style={styles.markAll}>
+            {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
+            {pending > 0 ? (
+              <Button size="xs" variant="ghost" onPress={update} testID="home-activity-apply">
+                {t("navigation.updates", { count: pending })}
+              </Button>
+            ) : null}
+            {unseen.length > 1 ? (
+              <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
+                {t("navigation.actions.markAllSeen")}
+              </Button>
+            ) : null}
+          </View>
+        ) : null}
+      </HoldReadingPosition>
       {sections.map((section) => (
         <FeedSection
           key={section.key}
@@ -341,6 +348,7 @@ const MutedChevronRight = withUnistyles(ChevronRight, (theme) => ({
 }));
 
 const styles = StyleSheet.create((theme) => ({
+  header: { gap: theme.spacing[4] },
   container: {
     gap: theme.spacing[4],
     paddingHorizontal: theme.spacing[3],

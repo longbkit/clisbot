@@ -29,7 +29,7 @@ export function AutomationsHome({
 }) {
   return (
     <ScrollView>
-      <View style={styles.page}>
+      <View style={styles.page} testID="automations-home">
         <HomeSchedules onSeeAll={onSchedules} />
         <HomeAutomations onOpen={onAutomations} />
         <View style={styles.section}>
