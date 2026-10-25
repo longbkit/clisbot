@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { Activity, CircleHelp, Gift, Keyboard } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -13,7 +13,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  type DropdownMenuTriggerProps as MenuTriggerProps,
 } from "@/components/ui/dropdown-menu";
+import type { MenuTriggerState } from "@/components/ui/menu/menu-root";
 import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { DensityIcon } from "@/components/ui/density-icon";
@@ -80,7 +82,15 @@ function HostVersionHint({ host }: { host: HostProfile }) {
   );
 }
 
-export function SidebarHelpMenu() {
+/** Navigation V2 draws its own trigger (a rail item, a More row); the menu stays the same. */
+export interface SidebarHelpMenuTrigger {
+  style: MenuTriggerProps["style"];
+  render: (state: MenuTriggerState) => ReactNode;
+  side?: "top" | "right" | "bottom";
+  align?: "start" | "end";
+}
+
+export function SidebarHelpMenu({ trigger }: { trigger?: SidebarHelpMenuTrigger } = {}) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const finePointer = useHasFinePointer();
@@ -105,33 +115,50 @@ export function SidebarHelpMenu() {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <Tooltip delayDuration={300} enabledOnDesktop={!open}>
-        <TooltipTrigger asChild>
-          <View>
-            <DropdownMenuTrigger
-              style={[styles.trigger, isCompact || !finePointer ? styles.touchTrigger : null]}
-              testID="sidebar-help"
-              accessibilityRole="button"
-              accessibilityLabel={t("sidebar.help.trigger")}
-            >
-              {({ hovered, pressed, open: menuOpen }) => (
-                <>
-                  <SidebarFooterIconHighlight visible={pressed || menuOpen} />
-                  <DensityIcon
-                    icon={CircleHelp}
-                    size="md"
-                    color={hovered ? "foreground" : "foregroundMuted"}
-                  />
-                </>
-              )}
-            </DropdownMenuTrigger>
-          </View>
-        </TooltipTrigger>
-        <TooltipContent side="top" align="center" offset={8}>
-          <Text style={styles.tooltipText}>{t("sidebar.help.trigger")}</Text>
-        </TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent side="top" align="end" offset={8} width={280} testID="sidebar-help-menu">
+      {trigger ? (
+        <DropdownMenuTrigger
+          style={trigger.style}
+          testID="sidebar-help"
+          accessibilityRole="button"
+          accessibilityLabel={t("sidebar.help.trigger")}
+        >
+          {trigger.render}
+        </DropdownMenuTrigger>
+      ) : (
+        <Tooltip delayDuration={300} enabledOnDesktop={!open}>
+          <TooltipTrigger asChild>
+            <View>
+              <DropdownMenuTrigger
+                style={[styles.trigger, isCompact || !finePointer ? styles.touchTrigger : null]}
+                testID="sidebar-help"
+                accessibilityRole="button"
+                accessibilityLabel={t("sidebar.help.trigger")}
+              >
+                {({ hovered, pressed, open: menuOpen }) => (
+                  <>
+                    <SidebarFooterIconHighlight visible={pressed || menuOpen} />
+                    <DensityIcon
+                      icon={CircleHelp}
+                      size="md"
+                      color={hovered ? "foreground" : "foregroundMuted"}
+                    />
+                  </>
+                )}
+              </DropdownMenuTrigger>
+            </View>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="center" offset={8}>
+            <Text style={styles.tooltipText}>{t("sidebar.help.trigger")}</Text>
+          </TooltipContent>
+        </Tooltip>
+      )}
+      <DropdownMenuContent
+        side={trigger?.side ?? "top"}
+        align={trigger?.align ?? "end"}
+        offset={8}
+        width={280}
+        testID="sidebar-help-menu"
+      >
         <DropdownMenuLabel>{t("sidebar.help.sectionHelp")}</DropdownMenuLabel>
         {shortcutsAvailable ? (
           <DropdownMenuItem

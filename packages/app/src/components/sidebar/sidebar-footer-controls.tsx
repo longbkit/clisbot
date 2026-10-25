@@ -8,6 +8,7 @@ import {
   HostPicker,
 } from "@/components/hosts/host-picker";
 import { buttonControlHeight, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import type { ComboboxProps } from "@/components/ui/combobox";
 import { DensityIcon } from "@/components/ui/density-icon";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -21,7 +22,7 @@ import { density } from "@/styles/density";
 import { useOpenSidebarUsage } from "@/usage";
 import { router } from "expo-router";
 import { CircleGauge, Search, Server, type LucideIcon } from "lucide-react-native";
-import { useCallback, useRef, useState, type RefObject } from "react";
+import { useCallback, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -177,14 +178,27 @@ function useFooterSearchLabelFits(compact: boolean) {
   return { fits, measureField, measureLabel };
 }
 
+/** What a custom Host picker trigger needs: its anchor, the press, and the filter state. */
+export interface SidebarHostPickerTrigger {
+  ref: RefObject<View | null>;
+  onPress: () => void;
+  label: string;
+  filtered: boolean;
+}
+
 export function SidebarHostPicker({
   label,
   onAddHost,
   onOpenHostSettings,
+  renderTrigger,
+  placement = "top-start",
 }: {
   label: string;
   onAddHost: () => void;
   onOpenHostSettings: (serverId: string) => void;
+  /** Navigation V2 draws the trigger as a rail item or a More row. */
+  renderTrigger?: (trigger: SidebarHostPickerTrigger) => ReactNode;
+  placement?: ComboboxProps["desktopPlacement"];
 }) {
   const { t } = useTranslation();
   const hosts = useAvailableHosts();
@@ -230,22 +244,31 @@ export function SidebarHostPicker({
       onOpenAllHostsSettings={handleOpenAllHostsSettings}
       searchable
       title="Filter by host"
-      desktopPlacement="top-start"
+      desktopPlacement={placement}
       desktopMinWidth={240}
       addHostTestID="sidebar-host-add"
       hostOptionTestID={sidebarHostOptionTestID}
     >
-      <FooterIconButton
-        buttonRef={triggerRef}
-        onPress={handleOpen}
-        testID="sidebar-hosts-trigger"
-        label={triggerLabel}
-        icon={Server}
-        // Server's two boxes fill more of the square than the other glyphs.
-        iconSizeAdjustment={-1}
-        indicator={hasActiveHostFilter}
-        indicatorTestID="sidebar-hosts-filter-indicator"
-      />
+      {renderTrigger ? (
+        renderTrigger({
+          ref: triggerRef,
+          onPress: handleOpen,
+          label: triggerLabel,
+          filtered: hasActiveHostFilter,
+        })
+      ) : (
+        <FooterIconButton
+          buttonRef={triggerRef}
+          onPress={handleOpen}
+          testID="sidebar-hosts-trigger"
+          label={triggerLabel}
+          icon={Server}
+          // Server's two boxes fill more of the square than the other glyphs.
+          iconSizeAdjustment={-1}
+          indicator={hasActiveHostFilter}
+          indicatorTestID="sidebar-hosts-filter-indicator"
+        />
+      )}
     </HostPicker>
   );
 }

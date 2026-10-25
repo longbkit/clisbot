@@ -7,13 +7,14 @@ import type { Rect } from "@/components/ui/anchor";
 import { memo, useRef, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { MoreVertical } from "lucide-react-native";
+import { MoreVertical, Pin } from "lucide-react-native";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { sectionRowIndent } from "./section-header";
 
 const ThemedMoreVertical = withUnistyles(MoreVertical);
+const ThemedPin = withUnistyles(Pin);
 const mutedColorMapping = (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
 });
@@ -35,6 +36,8 @@ interface BotsSidebarRowProps {
   /** Menu replaces the trailing metadata on hover/focus; touch keeps it visible. */
   onOpenMenu?: (anchor: Rect) => void;
   menuLabel?: string;
+  /** Navigation V2 floats pinned rows to the top of Chats; the mark says why it is there. */
+  pinned?: boolean;
 }
 
 /** Shared bot/chat row; hover belongs to the outer View, as with workspace rows. */
@@ -52,6 +55,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
   onPress,
   onOpenMenu,
   menuLabel,
+  pinned = false,
 }: BotsSidebarRowProps) {
   const { t } = useTranslation();
   const bucket = statusBucket ?? (active ? "running" : "done");
@@ -106,14 +110,14 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
             </Text>
           ) : null}
         </View>
-        {onOpenMenu || trailing ? (
-          <View style={[styles.trailingSlot, compact && styles.trailingSlotTouch]}>
-            {trailing ? (
-              <Text style={[styles.trailing, menuVisible && styles.trailingHidden]}>
-                {trailing}
-              </Text>
-            ) : null}
-          </View>
+        {onOpenMenu || trailing || pinned ? (
+          <RowTrailing
+            compact={compact}
+            pinned={pinned}
+            trailing={trailing}
+            hidden={menuVisible}
+            testID={testID}
+          />
         ) : null}
       </Pressable>
       {onOpenMenu ? (
@@ -128,6 +132,38 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
     </View>
   );
 });
+
+/** The time and pin mark at a row's end; the kebab covers them while it shows. */
+function RowTrailing({
+  compact,
+  pinned,
+  trailing,
+  hidden,
+  testID,
+}: {
+  compact: boolean;
+  pinned: boolean;
+  trailing?: string | null;
+  hidden: boolean;
+  testID: string;
+}) {
+  return (
+    <View style={[styles.trailingSlot, compact && styles.trailingSlotTouch]}>
+      {pinned ? (
+        <View
+          style={[styles.pinMark, hidden && styles.trailingHidden]}
+          accessibilityLabel="Pinned"
+          testID={`${testID}-pinned`}
+        >
+          <ThemedPin size={11} uniProps={mutedColorMapping} />
+        </View>
+      ) : null}
+      {trailing ? (
+        <Text style={[styles.trailing, hidden && styles.trailingHidden]}>{trailing}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 function RowKebab({
   visible,
@@ -189,6 +225,7 @@ export function sidebarMarkSize(hasSubtitle: boolean): number {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  pinMark: { marginRight: theme.spacing[1] },
   container: {
     position: "relative",
     marginBottom: theme.spacing[0.5],
@@ -247,8 +284,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   trailingSlot: {
     minWidth: 28,
-    alignItems: "flex-end",
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
   trailingSlotTouch: { minWidth: 40 },
   trailingHidden: { opacity: 0 },

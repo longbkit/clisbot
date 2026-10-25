@@ -20,10 +20,14 @@ export function activityBucket(agent: AggregatedAgent): "needs" | "active" | "re
     return "active";
   return "recent";
 }
+/** Where a conversation sits; Navigation V2 adds `seen`, its collapsed Seen issues group. */
+export type ActivityBucketOf = (agent: AggregatedAgent) => "needs" | "active" | "recent" | "seen";
+
 export function activitySections(
   agents: AggregatedAgent[],
   now = new Date(),
   limit?: number,
+  bucketOf: ActivityBucketOf = activityBucket,
 ): ActivitySection[] {
   const sorted = [...agents].sort(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
@@ -33,17 +37,17 @@ export function activitySections(
     {
       key: "needs",
       title: "Needs you",
-      agents: take(sorted.filter((a) => activityBucket(a) === "needs")),
+      agents: take(sorted.filter((a) => bucketOf(a) === "needs")),
     },
     {
       key: "active",
       title: "Active",
-      agents: take(sorted.filter((a) => activityBucket(a) === "active")),
+      agents: take(sorted.filter((a) => bucketOf(a) === "active")),
     },
   ];
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const recent = take(sorted.filter((a) => activityBucket(a) === "recent"));
+  const recent = take(sorted.filter((a) => bucketOf(a) === "recent"));
   if (recent.length) sections.push({ key: "recent", title: "Recent", agents: [] });
   let dateFormatter: Intl.DateTimeFormat | undefined;
   for (const agent of recent) {
@@ -68,5 +72,7 @@ export function activitySections(
     }
     section.agents.push(agent);
   }
+  const seen = take(sorted.filter((a) => bucketOf(a) === "seen"));
+  if (seen.length) sections.push({ key: "seen", title: "Seen issues", agents: seen });
   return sections.filter((s) => s.agents.length || s.key === "recent");
 }

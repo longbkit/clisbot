@@ -7,7 +7,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { settingsStyles } from "@/styles/settings";
 import { useChannelCatalog } from "../channel-catalog-queries";
 import { identityRealms } from "../channel-identity-link-realms";
-import { FilterChips } from "../filter-chips";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { EmptyRow, ResourceFeedbackGroup } from "../resource-rows";
 import {
   filterMemberRows,

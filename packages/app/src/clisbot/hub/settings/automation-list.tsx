@@ -12,7 +12,7 @@ import {
   type AutomationListFilter,
   type HubScopedAutomation,
 } from "./automation-access";
-import { FilterChips, type FilterChip } from "./filter-chips";
+import { FilterChips, type FilterChip } from "@/components/ui/filter-chips";
 import { tableStyles } from "./table-styles";
 
 /**
