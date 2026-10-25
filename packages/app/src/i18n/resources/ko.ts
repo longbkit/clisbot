@@ -3,6 +3,7 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3073,4 +3074,5 @@ export const ko: TranslationResources = {
   connectors: connectors.ko,
   bots: bots.ko,
   heartbeats: heartbeats.ko,
+  navigation: navigation.ko,
 };

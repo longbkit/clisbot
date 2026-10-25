@@ -3,6 +3,7 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3114,4 +3115,5 @@ export const ru: TranslationResources = {
   connectors: connectors.ru,
   bots: bots.ru,
   heartbeats: heartbeats.ru,
+  navigation: navigation.ru,
 };

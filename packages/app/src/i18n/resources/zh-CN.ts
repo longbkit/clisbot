@@ -3,6 +3,7 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3024,4 +3025,5 @@ export const zhCN: TranslationResources = {
   connectors: connectors["zh-CN"],
   bots: bots["zh-CN"],
   heartbeats: heartbeats["zh-CN"],
+  navigation: navigation["zh-CN"],
 };

@@ -2,6 +2,7 @@ import { hostQueueVi as hostQueue } from "./host-queue";
 import type { TranslationResources } from "./en";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 import { pluginSettings } from "./plugin-settings";
@@ -3088,6 +3089,7 @@ export const vi: TranslationResources = {
   connectors: connectors.vi,
   bots: bots.vi,
   heartbeats: heartbeats.vi,
+  navigation: navigation.vi,
 
   providerUsage: {
     options: "Cài đặt",

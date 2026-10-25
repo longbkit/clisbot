@@ -1,6 +1,7 @@
 import { hostQueue } from "./host-queue";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3197,6 +3198,7 @@ export const en = {
   connectors: connectors.en,
   bots: bots.en,
   heartbeats: heartbeats.en,
+  navigation: navigation.en,
 } as const;
 
 type WidenStringLeaves<T> = {

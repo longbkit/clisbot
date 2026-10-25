@@ -3,6 +3,7 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3101,4 +3102,5 @@ export const ptBR: TranslationResources = {
   connectors: connectors["pt-BR"],
   bots: bots["pt-BR"],
   heartbeats: heartbeats["pt-BR"],
+  navigation: navigation["pt-BR"],
 };

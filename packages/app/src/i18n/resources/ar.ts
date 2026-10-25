@@ -3,6 +3,7 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3094,4 +3095,5 @@ export const ar: TranslationResources = {
   connectors: connectors.ar,
   bots: bots.ar,
   heartbeats: heartbeats.ar,
+  navigation: navigation.ar,
 };
