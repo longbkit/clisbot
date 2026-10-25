@@ -11,6 +11,7 @@ export const BottomSheetModalProvider = PassThrough;
 export const BottomSheetBackdrop = Stub;
 export const BottomSheetHandle = Stub;
 export const BottomSheetScrollView = PassThrough;
+export const BottomSheetFlatList = Stub;
 export const BottomSheetView = PassThrough;
 export const BottomSheetTextInput = Stub;
 
