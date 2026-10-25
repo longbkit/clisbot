@@ -3432,6 +3432,19 @@ export class HostRuntimeStore {
     await controller.start();
   }
 
+  /**
+   * Take over a Host for a newly mounted owner (a Hub binding) without tearing down what is
+   * already working. An online or connecting controller is kept: registering the binding has
+   * already re-run admission if it changed anything. Anything else gets one immediate attempt.
+   */
+  async adoptHostConnection(serverId: string): Promise<void> {
+    const controller = this.controllers.get(serverId);
+    if (controller === undefined) return;
+    const status = controller.getSnapshot().connectionStatus;
+    if (status === "online" || status === "connecting") return;
+    await controller.runProbeCycleNow();
+  }
+
   setAppVisible(visible: boolean): void {
     // Keep normal reconnect backoff running while hidden, for as long as the OS
     // lets us execute. Foregrounding bypasses that backoff without closing healthy sockets.

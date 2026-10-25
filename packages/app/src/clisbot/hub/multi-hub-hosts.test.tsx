@@ -142,7 +142,7 @@ vi.mock("@/runtime/host-runtime", () => {
       notify();
       return true;
     },
-    restartHostConnection: async () => undefined,
+    adoptHostConnection: async () => undefined,
   };
   return {
     getHostRuntimeStore: () => store,

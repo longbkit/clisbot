@@ -199,8 +199,6 @@ function HubHostBinding({
     );
     void enqueueManagedHostMutation(async () => {
       if (disposed) return;
-      // Restart any Host already running for this daemon, including a saved one being attached:
-      // its client was admitted without this binding, or gave up before it was registered.
       const existing = store
         .getHosts()
         .find((host) => host.serverId === synchronizedOffer.serverId);
@@ -212,7 +210,11 @@ function HubHostBinding({
       if (profile === null) {
         throw new Error(i18n.t("hub.account.synchronization.conflictWithHint"));
       }
-      if (!disposed && existing) await store.restartHostConnection(synchronizedOffer.serverId);
+      // Adopt, never restart, a Host already running for this daemon (cold start restores it
+      // from the registry). Registering the binding above re-ran its admission if the binding
+      // or offered routes changed; a changed offer reaches it through the upsert. A Host that
+      // gave up (offline, error) gets one immediate attempt.
+      if (!disposed && existing) await store.adoptHostConnection(synchronizedOffer.serverId);
     }).catch((error: unknown) => {
       unregister();
       if (!disposed) {
