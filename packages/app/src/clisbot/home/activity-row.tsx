@@ -11,6 +11,11 @@ import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { activityBucket, isUnreadReply } from "./activity";
 import { traceInstant } from "@/performance/native-trace";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import {
+  SIDEBAR_TWO_LINE_ROW_HEIGHT,
+  sidebarLeadingColumnWidth,
+} from "@/components/sidebar/row-geometry";
 
 /** Why a conversation sits in Needs you, in the words the row shows. */
 export function activityStatus(
@@ -84,7 +89,7 @@ export function ActivityRow({
       accessibilityRole="button"
       testID={`agent-row-${agent.serverId}-${agent.id}`}
     >
-      <View style={styles.leading}>
+      <View style={[styles.leading, NAVIGATION_V2_ENABLED && styles.leadingV2]}>
         <ProviderGlyph provider={agent.provider} serverId={agent.serverId} />
       </View>
       <View style={styles.content}>
@@ -160,6 +165,7 @@ const ProviderGlyph = withUnistyles(ProviderGlyphIcon, (theme) => ({
 
 const rowStyle = ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
   styles.row,
+  NAVIGATION_V2_ENABLED && styles.rowV2,
   hovered && styles.rowHovered,
   pressed && styles.rowPressed,
 ];
@@ -173,9 +179,12 @@ const styles = StyleSheet.create((t) => ({
     paddingHorizontal: t.spacing[3],
     borderRadius: t.borderRadius.lg,
   },
+  // Navigation V2: the Chats and Workspace rows' rails, so the title sits where theirs do.
+  rowV2: { gap: t.spacing[2], minHeight: SIDEBAR_TWO_LINE_ROW_HEIGHT },
   rowHovered: { backgroundColor: t.colors.surface1 },
   rowPressed: { backgroundColor: t.colors.surface2 },
   leading: { width: t.iconSize.sm, alignItems: "center" },
+  leadingV2: { width: sidebarLeadingColumnWidth(t) },
   content: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: t.spacing[1.5] },
   title: { color: t.colors.foreground, fontSize: t.fontSize.base, flexShrink: 1 },

@@ -34,6 +34,7 @@ import {
 import { ChatsDisplayMenu } from "./chats-display-menu";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { RenderProfile } from "@/utils/render-profiler";
+import { SPACING } from "@/styles/theme";
 import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { ListState } from "./list-state";
@@ -146,7 +147,7 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
           keyExtractor={itemKey}
           renderItem={actions.renderItem}
           extraData={actions.selection}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={LIST_CONTENT}
           ListEmptyComponent={emptyView}
           testID="chats-list"
         />
@@ -359,5 +360,8 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.spacing[3],
     paddingBottom: theme.spacing[1],
   },
-  list: { paddingHorizontal: theme.spacing[2], paddingBottom: theme.spacing[4] },
 }));
+
+// Theme-free on purpose: a FlatList's content container never gets a Unistyles class on web
+// (docs/unistyles.md, contentContainerStyle).
+const LIST_CONTENT = { paddingHorizontal: SPACING[2], paddingBottom: SPACING[4] };

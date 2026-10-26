@@ -1,4 +1,5 @@
 import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { PinnedRowProvider } from "@/components/ui/pin-mark";
 import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceSessionFilter } from "./session-filter";
@@ -286,6 +287,7 @@ function useSessionRowStyle({
       placement === "indented" && styles.rowIndented,
       placement === "statusGroup" && styles.rowInStatusGroup,
       placement === "topLevel" && styles.rowTopLevel,
+      placement === "topLevel" && NAVIGATION_V2_ENABLED && styles.rowTopLevelV2,
       (hovered || rowHovered) && styles.rowHovered,
       selected && styles.rowSelected,
       pressed && styles.rowPressed,
@@ -429,6 +431,11 @@ const styles = StyleSheet.create((theme) => ({
   // grouping, which lists straight under the Projects section.
   rowTopLevel: {
     paddingLeft: theme.spacing[2],
+  },
+  // Navigation V2 lists workspace rows (pinned, Workspace grouping) beside these lines; the
+  // status-group indent puts both titles on one rail.
+  rowTopLevelV2: {
+    paddingLeft: theme.spacing[2] + theme.spacing[2],
   },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,

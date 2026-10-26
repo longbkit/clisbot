@@ -1,6 +1,7 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { StyleSheet } from "react-native-unistyles";
 import { FlatList } from "@/components/ui/scroll-view";
+import { SPACING } from "@/styles/theme";
 import { SidebarFilterEmptyState } from "@/components/sidebar/empty-states";
 import {
   buildStatusRowProjectPresentation,
@@ -151,7 +152,7 @@ export function SidebarStatusFlatList({
       renderItem={renderItem}
       ListHeaderComponent={header}
       style={styles.list}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={LIST_CONTENT}
       showsVerticalScrollIndicator={false}
       initialNumToRender={30}
       maxToRenderPerBatch={30}
@@ -161,7 +162,10 @@ export function SidebarStatusFlatList({
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+// Theme-free on purpose: a FlatList's content container never gets a Unistyles class on web
+// (docs/unistyles.md, contentContainerStyle). The legacy status list's insets.
+const LIST_CONTENT = { paddingHorizontal: SPACING[2], paddingTop: 2, paddingBottom: SPACING[4] };
+
+const styles = StyleSheet.create({
   list: { flex: 1 },
-  content: { paddingHorizontal: theme.spacing[2], paddingBottom: theme.spacing[4] },
-}));
+});

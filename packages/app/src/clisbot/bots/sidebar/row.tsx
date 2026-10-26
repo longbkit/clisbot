@@ -13,6 +13,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { sectionRowIndent } from "./section-header";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 
 const ThemedMoreVertical = withUnistyles(MoreVertical);
 const mutedColorMapping = (theme: Theme) => ({
@@ -71,6 +72,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
     ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
       compact && styles.rowTouch,
+      NAVIGATION_V2_ENABLED && styles.rowV2,
       (hovered || rowHovered) && styles.rowHovered,
       selected && styles.rowSelected,
       pressed && styles.rowPressed,
@@ -227,7 +229,9 @@ export function BotsSidebarRowSkeleton() {
     >
       {SKELETON_ROWS.map((key) => (
         <View key={key} style={styles.container} testID="chats-list-placeholder-row">
-          <View style={[styles.row, compact && styles.rowTouch]}>
+          <View
+            style={[styles.row, compact && styles.rowTouch, NAVIGATION_V2_ENABLED && styles.rowV2]}
+          >
             <View style={styles.leadingSlot}>
               <View style={styles.skeletonMark} testID="chats-list-placeholder-mark" />
             </View>
@@ -280,6 +284,8 @@ const styles = StyleSheet.create((theme) => ({
     userSelect: "none",
   },
   rowTouch: { minHeight: 44 },
+  // Navigation V2: a two-line row is the Workspace row's height (`row-geometry.ts`).
+  rowV2: { paddingVertical: theme.spacing[2] },
   rowHovered: { backgroundColor: theme.colors.surfaceSidebarHover },
   rowSelected: { backgroundColor: theme.colors.surfaceSidebarSelected, ...theme.shadow.raised },
   rowPressed: { backgroundColor: theme.colors.surface2 },

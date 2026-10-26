@@ -2,6 +2,11 @@ import { useMemo } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import {
+  SIDEBAR_TWO_LINE_ROW_HEIGHT,
+  sidebarLeadingColumnWidth,
+} from "@/components/sidebar/row-geometry";
 
 const rows = ["first", "second", "third"];
 /**
@@ -11,7 +16,10 @@ const rows = ["first", "second", "third"];
 export function ActivityPlaceholder() {
   const { t } = useTranslation();
   const { fontScale } = useWindowDimensions();
-  const rowStyle = useMemo(() => ({ height: 56 * fontScale }), [fontScale]);
+  const rowStyle = useMemo(
+    () => ({ height: (NAVIGATION_V2_ENABLED ? SIDEBAR_TWO_LINE_ROW_HEIGHT : 56) * fontScale }),
+    [fontScale],
+  );
   return (
     <View
       testID="home-activity-placeholder"
@@ -19,8 +27,12 @@ export function ActivityPlaceholder() {
       accessibilityRole="progressbar"
     >
       {rows.map((key) => (
-        <View key={key} style={[styles.row, rowStyle]} testID="home-activity-placeholder-row">
-          <View style={styles.leading}>
+        <View
+          key={key}
+          style={[styles.row, NAVIGATION_V2_ENABLED && styles.rowV2, rowStyle]}
+          testID="home-activity-placeholder-row"
+        >
+          <View style={[styles.leading, NAVIGATION_V2_ENABLED && styles.leadingV2]}>
             <View style={styles.mark} />
           </View>
           <View style={styles.content}>
@@ -41,7 +53,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
     paddingHorizontal: theme.spacing[3],
   },
+  rowV2: { gap: theme.spacing[2] },
   leading: { width: theme.iconSize.sm, alignItems: "center" },
+  leadingV2: { width: sidebarLeadingColumnWidth(theme) },
   mark: {
     width: theme.iconSize.sm,
     height: theme.iconSize.sm,
