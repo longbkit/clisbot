@@ -6,6 +6,7 @@ import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { buildSeededHost } from "../support/helpers/daemon-registry";
 import { selectSidebarStatusGrouping } from "../support/helpers/sidebar";
+import { pinNavigationV2 } from "../support/helpers/navigation-v2-layout";
 
 test("published old daemon keeps workspace navigation and gates sorting", async ({ page }) => {
   test.setTimeout(180_000);
@@ -43,6 +44,7 @@ async function openPublishedHost(
     endpoint: `127.0.0.1:${daemon.port}`,
     nowIso: new Date().toISOString(),
   });
+  await pinNavigationV2(page, false);
   await page.addInitScript((seededHost) => {
     localStorage.setItem("@clisbot:e2e", "1");
     localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([seededHost]));

@@ -5,6 +5,7 @@ import { gotoAppShell } from "../support/helpers/app";
 import { buildCreateAgentPreferences, buildSeededHost } from "../support/helpers/daemon-registry";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import { seedWorkspace } from "../support/helpers/seed-client";
+import { pinNavigationV2 } from "../support/helpers/navigation-v2-layout";
 
 test("Sessions shows an empty placeholder when the host has no history", async ({ page }) => {
   const serverId = `srv_sessions_empty_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
@@ -25,6 +26,8 @@ test("Sessions shows an empty placeholder when the host has no history", async (
     await page.routeWebSocket(/:(6767|6768|6868|6869)\b/, async (webSocket) => {
       await webSocket.close({ code: 1008, reason: "Blocked developer daemon during e2e." });
     });
+    // Sessions is the Home V2 sidebar's entry; Navigation V2 shows history on Home instead.
+    await pinNavigationV2(page, false);
     await page.addInitScript(
       ({ seededHost, preferences }) => {
         localStorage.setItem("@clisbot:e2e", "1");

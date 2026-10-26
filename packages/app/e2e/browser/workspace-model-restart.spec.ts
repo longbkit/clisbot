@@ -25,6 +25,7 @@ import { selectSidebarStatusGrouping } from "../support/helpers/sidebar";
 import { killProcessTree, spawnTsx } from "../support/helpers/spawn-node";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 import { getVisibleWorkspaceAgentTabIds } from "../support/helpers/workspace-tabs";
+import { pinNavigationV2 } from "../support/helpers/navigation-v2-layout";
 
 const LEGACY_AGENT_ID = "10000000-0000-4000-8000-000000000001";
 const SERVER_ID = `srv_restart_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
@@ -302,6 +303,7 @@ function loadAppVersion(): string {
 }
 
 async function seedBrowserForDaemon(page: Page, input: { serverId: string; port: number }) {
+  await pinNavigationV2(page, false);
   await page.route(/:(6767|6768|6868|6869)\b/, (route) => route.abort());
   await page.routeWebSocket(/:(6767|6768|6868|6869)\b/, async (ws) => {
     await ws.close({ code: 1008, reason: "Blocked connection to localhost:6767 during e2e." });

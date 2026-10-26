@@ -11,6 +11,7 @@ import {
 } from "./helpers/project-picker-fixture";
 import { connectSeedClient, type SeedDaemonClient } from "./helpers/seed-client";
 import { createWithWorkspace, type WithWorkspace } from "./helpers/with-workspace";
+import { pinNavigationV2 } from "./helpers/navigation-v2-layout";
 
 const EXTRA_HOSTS_KEY = "@clisbot:e2e-extra-hosts";
 
@@ -163,10 +164,7 @@ const test = daemonTest.extend<{
       });
       const createAgentPreferences = buildCreateAgentPreferences();
 
-      await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
-        key: "@clisbot:navigation-v2",
-        value: navigationV2 ? "1" : "0",
-      });
+      await pinNavigationV2(page, navigationV2);
 
       await page.addInitScript(
         ({ daemon, preferences, seedNonce: nonce, extraHostsKey }) => {

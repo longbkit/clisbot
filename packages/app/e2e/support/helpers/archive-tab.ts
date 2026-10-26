@@ -10,6 +10,7 @@ import {
   buildHostWorkspaceRoute,
   buildSessionsRoute,
 } from "@/utils/host-routes";
+import { pinNavigationV2 } from "./navigation-v2-layout";
 
 export interface ArchiveTabAgent {
   id: string;
@@ -137,6 +138,8 @@ export async function primeAdditionalPage(page: Page): Promise<void> {
   await page.routeWebSocket(/:(6767|6768|6868|6869)\b/, async (ws) => {
     await ws.close({ code: 1008, reason: "Blocked connection to localhost:6767 during e2e." });
   });
+  // A page the spec opens itself misses the fixture's layout pin.
+  await pinNavigationV2(page, false);
   await page.addInitScript(
     ({ daemon: seededDaemon, preferences: seededPreferences, seedNonce: nonce }) => {
       const disableOnceKey = "@clisbot:e2e-disable-default-seed-once";

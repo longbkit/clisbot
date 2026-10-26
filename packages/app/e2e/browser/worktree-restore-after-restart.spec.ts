@@ -28,6 +28,7 @@ import {
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
+import { pinNavigationV2 } from "../support/helpers/navigation-v2-layout";
 
 test.describe("Worktree restore after daemon restart", () => {
   const serverId = `srv_worktree_restart_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
@@ -67,6 +68,7 @@ test.describe("Worktree restore after daemon restart", () => {
 
   async function seedBrowser(page: Page) {
     const nowIso = new Date().toISOString();
+    await pinNavigationV2(page, false);
     await page.addInitScript(
       ({ host, preferences }) => {
         localStorage.setItem("@clisbot:e2e", "1");
