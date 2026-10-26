@@ -78,7 +78,8 @@ export function useAggregatedQuery<T>(input: AggregatedQueryInput<T>): Aggregate
 
 interface Held<T> {
   source: FetchAggregatedState<T> | undefined;
-  serverIds: readonly string[];
+  /** The Host ids by value: callers may pass a new array with the same Hosts on every render. */
+  serverKey: string;
   rows: HeldHostRows<T>;
   shown: FetchAggregatedState<T> | undefined;
 }
@@ -91,13 +92,14 @@ function useHeldRows<T>(
   source: FetchAggregatedState<T> | undefined,
   serverIds: readonly string[],
 ): FetchAggregatedState<T> | undefined {
+  const serverKey = serverIds.join("\n");
   const [held, setHeld] = useState<Held<T>>(() => ({
     source,
-    serverIds,
+    serverKey,
     ...hold(new Map(), source, serverIds),
   }));
-  if (held.source === source && held.serverIds === serverIds) return held.shown;
-  const next = { source, serverIds, ...hold(held.rows, source, serverIds) };
+  if (held.source === source && held.serverKey === serverKey) return held.shown;
+  const next = { source, serverKey, ...hold(held.rows, source, serverIds) };
   setHeld(next);
   return next.shown;
 }
