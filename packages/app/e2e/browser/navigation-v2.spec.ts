@@ -466,9 +466,8 @@ test.describe("Navigation V2 app-wide Host filter", () => {
       await addConnectedHostAndReload(page, { serverId, label: "Second Host", port: daemon.port });
       const chip = page.getByTestId("home-host-filter").filter({ visible: true });
       await expect(chip).toContainText("All Hosts", { timeout: 60_000 });
-      await expect(page.getByTestId("rail-host-count")).toHaveText("2", {
-        timeout: 60_000,
-      });
+      // The rail's Hosts icon carries no count; its status dot shows the Hosts are connected.
+      await expect(page.getByTestId("rail-host-count")).toHaveCount(0);
       // Choosing a Host on Home filters every list and puts its tag on the rail.
       await chip.click();
       await page.getByText("Second Host", { exact: true }).last().click();

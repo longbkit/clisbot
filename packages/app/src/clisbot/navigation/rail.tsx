@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { MenuTriggerState } from "@/components/ui/menu/menu-root";
+import { ConnectionStatusDot } from "@/components/host-status-dot";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
@@ -173,22 +174,13 @@ function RailHosts({ section }: { section: BuiltinSection }) {
   const status = useHostsStatus();
   const filter = useHostFilter();
   const { t } = useTranslation();
-  // Only how many are online; the tooltip and the Hosts picker give the total.
-  const counts = String(filter.online);
+  // The tooltip and the Hosts picker say how many are online; the icon only carries the dot.
   const countsLabel = t("navigation.hostFilter.online", {
     online: filter.online,
     total: filter.total,
   });
   const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
-  // Online / total in the status dot's corner, coloured as the dot was: one item's height.
-  const badge = useMemo(
-    () => (
-      <Text style={[styles.hostCount, HOST_COUNT_TONE[status]]} testID="rail-host-count">
-        {counts}
-      </Text>
-    ),
-    [counts, status],
-  );
+  const dot = useMemo(() => <ConnectionStatusDot status={status} small />, [status]);
   const renderTrigger = useCallback(
     (trigger: SidebarHostPickerTrigger) => (
       <View ref={trigger.ref} collapsable={false}>
@@ -197,12 +189,12 @@ function RailHosts({ section }: { section: BuiltinSection }) {
           label={label}
           tooltip={`${trigger.label} · ${countsLabel}`}
           onPress={trigger.onPress}
-          badge={badge}
+          dot={dot}
           testID="sidebar-hosts-trigger"
         />
       </View>
     ),
-    [badge, countsLabel, label],
+    [countsLabel, dot, label],
   );
   return (
     <>
@@ -476,22 +468,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     ...RAIL_MICRO_TEXT,
   },
-  hostCount: {
-    ...RAIL_MICRO_TEXT,
-    fontWeight: theme.fontWeight.medium,
-    fontVariant: ["tabular-nums"],
-  },
-  hostCountOnline: { color: theme.colors.statusSuccess },
-  hostCountConnecting: { color: theme.colors.statusWarning },
-  hostCountError: { color: theme.colors.statusDanger },
   badge: { position: "absolute", top: -theme.spacing[1.5], right: -theme.spacing[2] },
   dot: { position: "absolute", top: theme.spacing[1], right: theme.spacing[1.5] },
   tooltip: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm },
   pluginMenu: { padding: theme.spacing[1] },
 }));
-
-const HOST_COUNT_TONE = {
-  online: styles.hostCountOnline,
-  connecting: styles.hostCountConnecting,
-  error: styles.hostCountError,
-} as const;
